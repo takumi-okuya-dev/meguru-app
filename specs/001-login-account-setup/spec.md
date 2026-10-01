@@ -80,10 +80,10 @@ Threads側の接続が期限切れ・取り消しなどで無効になったAcco
 **Acceptance Scenarios**:
 
 1. **Given** Threads接続が無効になったAccount、**When** ユーザーがそのAccountの画面を開く、**Then** そのAccountに「要再接続」の表示と再接続の操作が出て、以後はAccount一覧でも「要再接続」と表示される。
-5. **Given** 登録数上限に達しているユーザーの「接続中」のAccount、**When** 設定画面から同じThreadsアカウントで認可し直す、**Then** Accountは増えずに接続情報が更新される。
 2. **Given**「要再接続」のAccount、**When** ユーザーが再接続を選び、同じThreadsアカウントでThreads側の認可を完了する、**Then** 同じAccountが（新規作成されずに）通常状態に戻り、既存の関連データはそのまま残る。
 3. **Given**「要再接続」のAccount、**When** ユーザーが再接続で別のThreadsアカウントを認可する、**Then** 再接続は拒否され、元のThreadsアカウントで認可する必要があると案内される。
 4. **Given** Accountを持つユーザー、**When** Accountの削除を選び、確認ステップでAccount名を入力して確定する、**Then** そのAccountと接続情報が削除され、一覧から消え、プランの登録数上限のカウントからも外れる。
+5. **Given** 登録数上限に達しているユーザーの「接続中」のAccount、**When** 設定画面から同じThreadsアカウントで認可し直す、**Then** Accountは増えずに接続情報が更新される。
 
 ---
 
