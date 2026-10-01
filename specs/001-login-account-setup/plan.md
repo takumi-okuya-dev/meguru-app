@@ -78,6 +78,8 @@ Googleアカウントでログインし、自分のThreadsアカウントを公�
 
 **PR #2の5回目のレビュー対応後の再確認（2026-10-02）**：データ削除callbackの再送の重複排除（`request_fingerprint`）、AES-GCMのIVを暗号化ごとに乱数で作る規則（R5）、`open`の順序をタブごとのIDと連番で判定（R10）、接続中のAccount削除による作り直しの防止（`users.last_account_deleted_at`、R13）、上限5件のときの案内、識別用ハッシュの保持期間の正確化（R7）を反映した。DBの列が4つ増えるだけで、構成・コスト・Constitutionへの影響はない。
 
+**PR #2の6回目のレビュー対応後の再確認（2026-10-02）**：tombstoneの規則を「未完了」か「認可の開始以降に完了」に改め、識別用ハッシュを完了から15分は残すようにした（R7）。アンインストール通知は、ユーザーが最後に認可した時刻（`threads_connections.authorized_at`）より古ければ適用しない（R7）。`open`の`clientId`はページの読み込みごとに作る（R10）。DBの列が1つ増えるだけで、構成・コスト・Constitutionへの影響はない。
+
 ## プロジェクト構成（Project Structure）
 
 ### ドキュメント（このfeature）

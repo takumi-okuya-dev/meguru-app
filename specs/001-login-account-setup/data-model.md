@@ -38,7 +38,7 @@ erDiagram
 | `display_name` | text | NULL可 | 表示用 |
 | `last_account_id` | uuid | NULL可、FK → `accounts.id` ON DELETE SET NULL | 最後に使ったAccount（FR-004、FR-007） |
 | `last_account_deleted_at` | timestamptz | NULL可 | このユーザーが最後にAccountを削除した日時。これより前に始めた`mode = new`の認可フローは拒否する（research.md R13） |
-| `last_account_client_id` | text | NULL可 | `last_account_id`を記録した`open`の`clientId`（ブラウザのタブごとの乱数ID） |
+| `last_account_client_id` | text | NULL可 | `last_account_id`を記録した`open`の`clientId`（ページを読み込むたびに作る乱数ID） |
 | `last_account_open_seq` | bigint | NULL可 | 同じく`openSeq`。同じ`clientId`からの、これ以下の`openSeq`の記録は反映しない（research.md R10） |
 | `created_at` / `updated_at` | timestamptz | NOT NULL | |
 
@@ -106,6 +106,7 @@ AccountがThreadsにアクセスするための認証情報。Accountと1対1で
 | `scopes` | text[] | NOT NULL | 認可されたスコープ |
 | `expires_at` | timestamptz | NOT NULL | 長期トークンの有効期限（発行から60日） |
 | `issued_at` | timestamptz | NOT NULL | 発行または更新した日時。更新できるのは24時間経過後 |
+| `authorized_at` | timestamptz | NOT NULL | ユーザーがThreads側で最後に認可した日時。接続・再接続のcallbackで記録し、定期更新では変えない。これより前に発行されたアンインストール通知は適用しない（research.md R7） |
 | `created_at` / `updated_at` | timestamptz | NOT NULL | |
 
 - **競合制御**：この表の行への書き込み・削除は、必ず`accounts.connection_generation`を1増やすのと同じ文（またはトランザクション）で行う。
@@ -137,7 +138,7 @@ Metaのデータ削除callbackの受付記録、削除の進み具合、進行�
 | `confirmation_code` | text | PK | Metaに返す確認コード（推測できない乱数） |
 | `request_fingerprint` | text | NOT NULL, UNIQUE | 検証済み`signed_request`の文字列全体のSHA-256（hex）。Metaが同じcallbackを再送したときに、同じ要求だと判定する。署名部分を含むので、App Secretなしには元の値を推測できない（research.md R7） |
 | `threads_user_id` | text | NULL可 | 対象のThreadsユーザーID（平文）。再試行に使う。`completed`にするのと同じトランザクションでNULLにする |
-| `threads_user_hmac` | text | NULL可 | `HMAC-SHA256(IDENTIFIER_HASH_KEY, threads_user_id)`（hex）。受付時に記録する。tombstoneの確認に使う。`completed`で受付から15分以上経ったら、完了の記録時または日次CronでNULLにする（最長で完了から約25時間。research.md R7） |
+| `threads_user_hmac` | text | NULL可 | `HMAC-SHA256(IDENTIFIER_HASH_KEY, threads_user_id)`（hex）。受付時に記録する。tombstoneの確認に使う。`completed`で完了から15分以上経ったら、日次CronでNULLにする（最長で完了から約25時間。research.md R7） |
 | `status` | deletion_status | NOT NULL | 下の状態遷移を参照 |
 | `received_at` | timestamptz | NOT NULL | |
 | `last_attempted_at` | timestamptz | NOT NULL | 最後に削除を試みた日時。再試行のリースの起点であり、claimの条件（楽観的な排他）にも使う |
@@ -148,7 +149,7 @@ Metaのデータ削除callbackの受付記録、削除の進み具合、進行�
 - **インデックス**：`threads_user_hmac`（tombstoneの確認用）、`(status, last_attempted_at)`（Cronの再試行の抽出用）。
 - **再試行の対象**：`status IN ('pending', 'failed') AND last_attempted_at < now() - interval '15 minutes'`。`pending`（受付直後の中断からの回収）と`failed`を、同じリースで扱う。
 - **claim**：試行のたびに、アドバイザリーロック → `SELECT … FOR UPDATE`での読み直し → `last_attempted_at`を条件にした`UPDATE … RETURNING`の順で、担当を確定する。claim・削除・完了の記録は1つのトランザクションで行い、claimできなかったWorkerは削除しない（research.md R7）。
-- **tombstoneの確認**：callbackは、`threads_user_hmac`が一致し、次のどちらかに当たる行があれば登録を拒否する。(1) `status`が`pending` / `failed`（未完了。受付時刻は問わない）、(2) `received_at`が自分の`oauth_states.created_at`以降（状態は問わない）。平文ではなく鍵付きハッシュで照合するので、完了後に平文を消しても確認できる。未完了の行の`threads_user_hmac`は、完了するまで消さない（research.md R7）。
+- **tombstoneの確認**：callbackは、`threads_user_hmac`が一致し、次のどちらかに当たる行があれば登録を拒否する。(1) `status`が`pending` / `failed`（未完了。受付時刻は問わない）、(2) `completed_at`が自分の`oauth_states.created_at`以降（認可を始めた後に完了した）。平文ではなく鍵付きハッシュで照合するので、完了後に平文を消しても確認できる。未完了の行の`threads_user_hmac`は、完了するまで消さない（research.md R7）。
 - **最終的に残る情報**：確認コード・状態・日時・試行回数だけ。どちらの識別子もNULLになる。
 - **状況確認**：`GET /api/data-deletion/:confirmationCode`が`status`・`received_at`・`completed_at`だけを返す。識別子は外に出さない。
 
@@ -160,7 +161,7 @@ stateDiagram-v2
     pending --> pending: 15分経っても未完了のものをCronが再試行
     failed --> completed: Cronの再試行で成功
     failed --> failed: 再試行も失敗
-    completed --> completed: 受付から15分以上経ったら、完了の記録時または日次CronでhmacをNULLに
+    completed --> completed: 完了から15分以上経った後の日次CronでhmacをNULLに
 ```
 
 ## 業務ルールとの対応
@@ -175,6 +176,6 @@ stateDiagram-v2
 | 再接続とCronの競合で新しい接続を壊さない（FR-018、FR-020） | `accounts.connection_generation`を条件にした書き込み（research.md R6） |
 | データ削除要求の履行（research.md R7） | Accountのカスケード削除、`threads_deletion_requests.status`、`pending`のリース付き回収 |
 | 削除要求の後に、進行中の接続フローでAccountを作り直さない（research.md R7） | Threadsユーザー単位のアドバイザリーロックと、`threads_user_hmac`によるtombstoneの確認 |
-| 削除後に識別子を残さない（research.md R7） | 完了時に平文をNULL。hmacは受付から15分以上経ったら、完了の記録時または日次Cronで消す（最長で完了から約25時間） |
+| 削除後に識別子を残さない（research.md R7） | 完了時に平文をNULL。hmacは完了から15分以上経った後の日次Cronで消す（最長で完了から約25時間） |
 | Account削除で関連データも消える（FR-022） | 全テーブルの`ON DELETE CASCADE` |
 | プランとロールの分離（原則IV） | `plan`は`accounts`だけ、`role`は`memberships`だけに持つ |

@@ -55,14 +55,17 @@ pnpm e2e                   # Playwright：Clerkのテスト用ログイン + 偽
 | 接続行の作り直し（ABA） | Cronがトークンを読んだ後に、アンインストールで接続行が消え、再接続で作り直されても、Cronの結果は新しい接続に反映されない | research.md R6 |
 | 画面を開いたときの確認 | 偽サーバーでトークンを無効にしてから`POST /api/accounts/:id/open`を呼ぶと、そのレスポンスで`needs_reconnect`になり、`GET /api/me`の一覧にも反映される | FR-018、SC-007 |
 | 最後に使ったAccountの記録 | `open`が2回失敗しても3回目の再試行で記録され、次の`GET /api/me`の`landingAccountId`がそのAccountになる | FR-007、SC-004 |
+| 再読み込み後の`open` | Aを開いた後にページを再読み込みし、Bを開くと、`landingAccountId`はBになる（再読み込みで`clientId`が替わるので、連番が戻っても無視されない） | FR-007、research.md R10 |
 | 古い`open`の再試行 | Aの`open`が失敗して再試行を待つ間にBを開くと、Aの再試行は中止される。中止をすり抜けて、Aの古い`openSeq`のリクエストが後から届いても、`landingAccountId`はBのまま。ブラウザの時計をサーバーより進めても結果は変わらない | FR-007、research.md R10 |
+| 遅れて届いたアンインストール通知 | アンインストールの後に再接続し、その後で再接続より前の`issued_at`を持つアンインストール通知が届いても、接続は`connected`のまま残る。再接続より後の`issued_at`なら`needs_reconnect`になる | research.md R7 |
 | 削除callbackの再送 | 同じ`signed_request`を2回送ると、2回目は同じ確認コードを返し、新しい行は作られない。1回目の完了後にユーザーが再接続してから再送が届いても、再接続したAccountは残る | research.md R7 |
 | データ削除要求 | 署名の正しい`signed_request`でAccountと関連行がすべて消え、状況確認APIが`completed`を返す。削除を失敗させると`failed`になり、Cronの再試行で`completed`になる | research.md R7 |
 | 中断した削除要求の回収 | 受付の記録だけ残して処理を中断した`pending`の要求は、15分経つ前のCronでは再試行されず、15分経った後のCronで`completed`になる。`failed`の要求も同じリースで扱われる | research.md R7 |
 | 再試行Workerの重複 | 2つのWorkerが同じ古い要求を読み取り、Aが削除して`completed`にした後、ユーザーが新しい認可フローで再接続する。その後でBが処理を続けても、Bはclaimに失敗して何も削除せず、再接続したAccountが残る | research.md R7 |
 | 削除要求とcallbackの競合 | 認可フローを始めた後に削除要求を処理すると、そのcallbackは`THREADS_DATA_DELETION_REQUESTED`になり、Accountは作られない。削除要求が完了した後に始めた認可フローは成功する | research.md R7・R8 |
+| 未完了中に始めた認可と削除の完了 | 削除要求を受付から15分以上`pending`のまま残し、その間に認可を始める。callbackより先に再試行が削除を完了させると、callbackは`THREADS_DATA_DELETION_REQUESTED`になり、Accountは作り直されない | research.md R7・R8 |
 | 未完了の削除要求と再接続 | 削除要求を`failed`（または`pending`）のまま残し、その**後で**始めた認可フローのcallbackも`THREADS_DATA_DELETION_REQUESTED`になり、Accountは作られない。Cronの再試行で`completed`になった後に始めた認可フローは成功する | research.md R7・R8 |
-| 削除後の識別子 | 完了した削除要求の平文のIDはNULLになっている。完了から15分以上経った後のCronでhmacもNULLになる | research.md R7 |
+| 削除後の識別子 | 完了した削除要求の平文のIDはNULLになっている。hmacは完了の時点では残り、完了から15分以上経った後のCronでNULLになる | research.md R7 |
 | `state`の漏えい防止 | `authorizeUrl`以外のレスポンスとログの出力に、`state`の値が含まれない | FR-010 |
 | 未ログインのガード | 認証が必要なルートは、内容を描画せずに`/sign-in`へ遷移する | FR-003、SC-003 |
 
