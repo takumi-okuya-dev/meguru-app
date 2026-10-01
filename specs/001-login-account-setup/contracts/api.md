@@ -75,7 +75,7 @@ Account 1件の詳細を、DBに保存されている状態のまま返す。副
 
 ユーザーがAccountの画面（`/accounts/:accountId`とその配下）を開いたときに、Webが1回呼ぶ。次の2つを1つのリクエストで行う（research.md R10・R14）。
 
-1. **最後に使ったAccountの記録**（FR-007）：`clientId`が`users.last_account_client_id`と同じで、`openSeq`が`last_account_open_seq`以下なら、同じタブの古いリクエスト（遅れて届いた再試行など）なので記録を変えない。それ以外は、`users.last_account_id`・`last_account_client_id`・`last_account_open_seq`を更新し、`accounts.last_used_at`をサーバーの現在時刻にする。比較は`users`の行を更新する1つの条件付き`UPDATE`で行う（research.md R10）。
+1. **最後に使ったAccountの記録**（FR-007）：リクエストを受け取った時点のサーバー時刻を`receivedAt`とする。次のどちらかに当たれば、古いリクエストなので記録を変えない。(a) `receivedAt`が`users.last_account_open_received_at`以前（再読み込み前のページなど、先に届いていたリクエストが遅れて完了した）。(b) `clientId`が`users.last_account_client_id`と同じで、`openSeq`が`last_account_open_seq`以下（同じページの遅れて届いた再試行）。それ以外は、`users.last_account_id`・`last_account_client_id`・`last_account_open_seq`・`last_account_open_received_at`を更新し、`accounts.last_used_at`を`receivedAt`にする。比較は`users`の行を更新する1つの条件付き`UPDATE`で行う（research.md R10）。
 2. **接続の確認**（FR-018）：接続情報があれば、そのトークンでThreadsのプロフィールを取得する。
    - 成功：プロフィール（ユーザー名・表示名・画像）を最新にする。
    - 認証エラー：`needs_reconnect`にする（research.md R6の競合制御に従う）。
@@ -135,6 +135,7 @@ Threadsの認可画面から戻ってくる先。ブラウザのトップレベ�
 | `ACCOUNT_LIMIT_REACHED` | callback時の再判定で上限に達していた | FR-017 |
 | `RECONNECT_ACCOUNT_MISMATCH` | 再接続で、元とは別のThreadsアカウントを認可した | FR-020 |
 | `ACCOUNT_DELETED_DURING_CONNECT` | この認可フローを始めた後に、ユーザーが自分のAccountを削除していた（`users.last_account_deleted_at`が`oauth_states.created_at`より新しい）。Accountは作らず、接続も更新しない | research.md R13 |
+| `THREADS_AUTH_REVOKED` | 認可の直後、callbackが接続を書き込む前に、ユーザーがThreads側で連携を解除していた（`authorized_at`以降に発行された取り消しがある）。Accountは作らず、接続も更新しない | research.md R7 |
 | `THREADS_DATA_DELETION_REQUESTED` | そのThreadsユーザーについて、未完了（`pending` / `failed`）のデータ削除要求がある。または、この認可フローを始めた後にデータ削除要求が完了していた。Accountは作らず、接続も更新しない | spec エッジケース、research.md R7 |
 
 ### DELETE /api/accounts/:accountId
@@ -159,11 +160,12 @@ Threadsアプリの設定に登録する（research.md R7）。どちらも`appl
 
 - **処理**（research.md R7）：
   1. `signed_request`から`user_id`と`issued_at`を取り出す。
-  2. トランザクションを始め、Threadsユーザー単位のアドバイザリーロックを取る（callbackと同じキー）。`threads_user_id`に一致するAccountと`threads_connections`の行を読む。
-  3. Accountまたは接続の行がなければ、何もしない。
-  4. `issued_at`が`threads_connections.authorized_at`より前なら、その後に再認可された接続への古い通知なので、何もしない（遅れて届いた通知・再送への対応）。
-  5. それ以外なら、Accountを`needs_reconnect`にし、`threads_connections`の行を削除し、`accounts.connection_generation`を1増やす。
-  6. `issued_at`が含まれていない場合は、手順2の前に現在のトークンでプロフィール取得を試し、成功すれば何もしない。認証エラーなら、取得前に読んだ`connection_generation`を条件にして手順5を行う。
+  2. トランザクションを始め、Threadsユーザー単位のアドバイザリーロックを取る（callbackと同じキー）。
+  3. Accountの有無にかかわらず、`threads_revocations`に取り消しを記録する（`threads_user_hmac`、`issued_at`、受信時刻）。進行中のcallbackが、この取り消しを見つけて接続を拒否できるようにするため（research.md R7）。
+  4. `threads_user_id`に一致するAccountと`threads_connections`の行を読む。どちらかがなければ、ここで終える（取り消しの記録は残る）。
+  5. `issued_at`が`threads_connections.authorized_at`より前なら、その後に再認可された接続への古い通知なので、何もしない（遅れて届いた通知・再送への対応）。
+  6. それ以外なら、Accountを`needs_reconnect`にし、`threads_connections`の行を削除し、`accounts.connection_generation`を1増やす。
+  7. `issued_at`が含まれていない場合は、受信時刻を`issued_at`として取り消しを記録する。そのうえで、手順4の前に現在のトークンでプロフィール取得を試し、成功すれば接続は変えない。認証エラーなら、取得前に読んだ`connection_generation`を条件にして手順6を行う。
   - 結果にかかわらず`200`を返す。
 - **200**：本文なし
 
@@ -204,9 +206,10 @@ HTTPエンドポイントではないが、外から観測できる振る舞い�
 - **処理**（research.md R6）：
   1. `expires_at`が7日以内で、`issued_at`から24時間以上経った接続のトークンを更新し、プロフィールも取り直す。
   2. 更新時に認証エラーが返った接続、または`expires_at`を過ぎた接続のAccountを`needs_reconnect`にする。
-  3. 期限切れの`oauth_states`を削除する。
+  3. 期限切れの`oauth_states`と、受信から15分以上経った`threads_revocations`を削除する。
   4. データ削除要求を再試行する（research.md R7）。対象は、`last_attempted_at`から15分以上経った`status = pending`と`status = failed`のもの（同じリースで扱う）。対象を一覧で読み取った後、1件ずつwebhookの手順3〜4（ロック → 読み直し → 条件付きUPDATEでclaim → 削除 → 完了）で処理する。claimできなかった要求は、他のWorkerが処理中か処理済みなので、削除しない。
-  5. `completed`で、完了から15分以上経った削除要求の`threads_user_hmac`をNULLにする（research.md R7）。
+  5. `completed`で、完了から15分以上経った削除要求の`threads_user_hmac`をNULLにする（research.md R7）。前回の実行が止まっていた場合も、条件を満たす行はこの回でまとめて消える。
+  6. 消去した件数と、消去の対象なのに残っている最も古い行の経過時間をログに出す。25時間を超える行があれば、エラーとしてログに出す（research.md R7）。
 - **再接続との競合**：1・2の書き込みは、読み取った時点の`accounts.connection_generation`が変わっていない場合だけ反映する。処理の途中で再接続・アンインストールなどにより接続が変わった場合は、Cronの結果を捨てる（data-model.mdの`accounts`）。
 - 1件の失敗で全体を止めない。失敗した件数はログに出す（トークンは出さない）。
 

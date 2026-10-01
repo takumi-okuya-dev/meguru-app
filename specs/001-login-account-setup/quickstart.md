@@ -56,7 +56,9 @@ pnpm e2e                   # Playwright：Clerkのテスト用ログイン + 偽
 | 画面を開いたときの確認 | 偽サーバーでトークンを無効にしてから`POST /api/accounts/:id/open`を呼ぶと、そのレスポンスで`needs_reconnect`になり、`GET /api/me`の一覧にも反映される | FR-018、SC-007 |
 | 最後に使ったAccountの記録 | `open`が2回失敗しても3回目の再試行で記録され、次の`GET /api/me`の`landingAccountId`がそのAccountになる | FR-007、SC-004 |
 | 再読み込み後の`open` | Aを開いた後にページを再読み込みし、Bを開くと、`landingAccountId`はBになる（再読み込みで`clientId`が替わるので、連番が戻っても無視されない） | FR-007、research.md R10 |
+| 再読み込み前の`open`の遅延 | Aの`open`がサーバーに届いた後で処理を遅らせ、その間にページを再読み込みしてBを開く。Bの記録の後にAが完了しても、`landingAccountId`はBのまま | FR-007、research.md R10 |
 | 古い`open`の再試行 | Aの`open`が失敗して再試行を待つ間にBを開くと、Aの再試行は中止される。中止をすり抜けて、Aの古い`openSeq`のリクエストが後から届いても、`landingAccountId`はBのまま。ブラウザの時計をサーバーより進めても結果は変わらない | FR-007、research.md R10 |
+| callbackの最中の連携解除 | 認可の後、callbackが接続を書き込む前にアンインストール通知を処理すると（Accountがまだない場合も）、callbackは`THREADS_AUTH_REVOKED`になり、Accountも接続も作られない | research.md R7 |
 | 遅れて届いたアンインストール通知 | アンインストールの後に再接続し、その後で再接続より前の`issued_at`を持つアンインストール通知が届いても、接続は`connected`のまま残る。再接続より後の`issued_at`なら`needs_reconnect`になる | research.md R7 |
 | 削除callbackの再送 | 同じ`signed_request`を2回送ると、2回目は同じ確認コードを返し、新しい行は作られない。1回目の完了後にユーザーが再接続してから再送が届いても、再接続したAccountは残る | research.md R7 |
 | データ削除要求 | 署名の正しい`signed_request`でAccountと関連行がすべて消え、状況確認APIが`completed`を返す。削除を失敗させると`failed`になり、Cronの再試行で`completed`になる | research.md R7 |

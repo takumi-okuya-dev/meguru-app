@@ -82,6 +82,7 @@ APIからのリダイレクトのクエリ（`connected`、`error`）を読み�
 | `THREADS_ACCOUNT_TAKEN` | このThreadsアカウントは別のユーザーが登録済みです。 | 別のアカウントで接続する |
 | `RECONNECT_ACCOUNT_MISMATCH` | 再接続には、元の@{username}で認可してください。別のアカウントで認可されました。 | もう一度再接続する |
 | `ACCOUNT_DELETED_DURING_CONNECT` | 接続の途中でAccountが削除されたため、接続を中止しました。接続する場合は、もう一度お試しください。 | もう一度接続する |
+| `THREADS_AUTH_REVOKED` | Threadsとの連携が解除されたため、接続を中止しました。接続する場合は、もう一度お試しください。 | もう一度接続する |
 | `THREADS_DATA_DELETION_REQUESTED` | このThreadsアカウントのデータ削除の要求を処理しているため、接続を中止しました。削除が完了してから、もう一度お試しください（通常は1日以内に完了します）。 | 時間をおいてもう一度接続する |
 | `OAUTH_STATE_INVALID` | 接続の有効期限が切れました。最初からやり直してください。 | もう一度接続する |
 | `CONFIRMATION_MISMATCH` | 入力したユーザー名が一致しません。 | 入力し直す |

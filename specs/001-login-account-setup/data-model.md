@@ -40,6 +40,7 @@ erDiagram
 | `last_account_deleted_at` | timestamptz | NULL可 | このユーザーが最後にAccountを削除した日時。これより前に始めた`mode = new`の認可フローは拒否する（research.md R13） |
 | `last_account_client_id` | text | NULL可 | `last_account_id`を記録した`open`の`clientId`（ページを読み込むたびに作る乱数ID） |
 | `last_account_open_seq` | bigint | NULL可 | 同じく`openSeq`。同じ`clientId`からの、これ以下の`openSeq`の記録は反映しない（research.md R10） |
+| `last_account_open_received_at` | timestamptz | NULL可 | `last_account_id`を記録した`open`を、サーバーが受け取った時刻。これ以前に受け取ったリクエストの記録は反映しない（research.md R10） |
 | `created_at` / `updated_at` | timestamptz | NOT NULL | |
 
 - **作成**：認証済みのAPIリクエストで、`clerk_user_id`に一致する行がなければ作る（research.md R2）。
@@ -106,7 +107,7 @@ AccountがThreadsにアクセスするための認証情報。Accountと1対1で
 | `scopes` | text[] | NOT NULL | 認可されたスコープ |
 | `expires_at` | timestamptz | NOT NULL | 長期トークンの有効期限（発行から60日） |
 | `issued_at` | timestamptz | NOT NULL | 発行または更新した日時。更新できるのは24時間経過後 |
-| `authorized_at` | timestamptz | NOT NULL | ユーザーがThreads側で最後に認可した日時。接続・再接続のcallbackで記録し、定期更新では変えない。これより前に発行されたアンインストール通知は適用しない（research.md R7） |
+| `authorized_at` | timestamptz | NOT NULL | ユーザーがThreads側で最後に認可した日時（callbackがリダイレクトを受け取った時刻）。接続・再接続のcallbackで記録し、定期更新では変えない。これより前に発行されたアンインストール通知は適用しない（research.md R7） |
 | `created_at` / `updated_at` | timestamptz | NOT NULL | |
 
 - **競合制御**：この表の行への書き込み・削除は、必ず`accounts.connection_generation`を1増やすのと同じ文（またはトランザクション）で行う。
@@ -163,6 +164,21 @@ stateDiagram-v2
     failed --> failed: 再試行も失敗
     completed --> completed: 完了から15分以上経った後の日次CronでhmacをNULLに
 ```
+
+## threads_revocations
+
+Metaのアンインストール通知（連携の取り消し）の短期記録（research.md R7）。Accountの有無にかかわらず記録し、進行中のcallbackが、認可の直後に解除された接続を書き込まないようにする。
+
+| 列 | 型 | 制約 | 説明 |
+|---|---|---|---|
+| `id` | uuid | PK | |
+| `threads_user_hmac` | text | NOT NULL | `HMAC-SHA256(IDENTIFIER_HASH_KEY, threads_user_id)`（hex）。平文のIDは持たない |
+| `issued_at` | timestamptz | NOT NULL | 通知の`signed_request`の`issued_at`。含まれていなければ受信時刻 |
+| `received_at` | timestamptz | NOT NULL | |
+
+- **インデックス**：`(threads_user_hmac, issued_at)`。
+- **照合**：callbackは、`threads_user_hmac`が一致し、`issued_at`が自分の`authorized_at`以降の行があれば、`THREADS_AUTH_REVOKED`で拒否する。
+- **掃除**：受信から15分以上経った行を、日次のCronで削除する（最長で約25時間残る）。
 
 ## 業務ルールとの対応
 
