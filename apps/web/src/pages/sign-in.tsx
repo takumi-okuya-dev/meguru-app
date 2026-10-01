@@ -2,7 +2,7 @@
 import { SignIn, useAuth } from "@clerk/react";
 import { Navigate } from "react-router";
 import { CenteredLayout } from "@/components/layout/AppShell";
-import { LoadingSkeleton } from "@/router";
+import { LoadingSkeleton } from "@/components/guards";
 
 export function SignInPage() {
   const { isLoaded, isSignedIn } = useAuth();

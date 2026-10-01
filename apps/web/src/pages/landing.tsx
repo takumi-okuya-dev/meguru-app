@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Navigate } from "react-router";
 import { api } from "@/lib/api-client";
 import { queryKeys } from "@/lib/query";
-import { LoadingSkeleton } from "@/router";
+import { LoadingSkeleton } from "@/components/guards";
 
 export function Landing() {
   const me = useQuery({ queryKey: queryKeys.me, queryFn: api.me });

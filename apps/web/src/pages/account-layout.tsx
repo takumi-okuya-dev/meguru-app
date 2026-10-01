@@ -13,7 +13,7 @@ import { ApiError, api } from "@/lib/api-client";
 import { queryKeys } from "@/lib/query";
 import { useAccountOpen } from "@/lib/use-account-open";
 import { NotFound } from "@/pages/not-found";
-import { LoadingSkeleton } from "@/router";
+import { LoadingSkeleton } from "@/components/guards";
 
 export type AccountOutletContext = { account: AccountSummary };
 

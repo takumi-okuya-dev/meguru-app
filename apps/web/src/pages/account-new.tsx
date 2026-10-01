@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button";
 import { ApiError, api, describeError } from "@/lib/api-client";
 import { useCallbackResult } from "@/lib/callback-result";
 import { queryKeys } from "@/lib/query";
-import { LoadingSkeleton } from "@/router";
+import { LoadingSkeleton } from "@/components/guards";
 
 export function AccountNew() {
   const me = useQuery({ queryKey: queryKeys.me, queryFn: api.me });

@@ -1,8 +1,8 @@
 // Accountの作成・更新・上限（FR-008〜FR-017、research.md R8・R9）
-import { and, eq, gt, gte, inArray, or, sql } from "drizzle-orm";
+import { and, eq, gt, gte, inArray, isNull, lt, ne, or, sql } from "drizzle-orm";
 import { initialPlanFor, limitForOwnedPlans, type Plan } from "@threads-grower/shared";
 import type { Env } from "../env";
-import { withTransaction, type Db, type TxDb } from "../db/client";
+import { createDb, withTransaction, type Db, type TxDb } from "../db/client";
 import { lockThreadsUser, lockUserRow } from "../db/locks";
 import {
   accounts,
@@ -15,7 +15,8 @@ import {
 import { createTokenCipher } from "../lib/crypto";
 import { AppError } from "../lib/errors";
 import { threadsUserHmac } from "../lib/identifier-hash";
-import { THREADS_SCOPES, type ThreadsProfile } from "../lib/threads-client";
+import { logger } from "../lib/logger";
+import { THREADS_SCOPES, ThreadsAuthError, type ThreadsClient, type ThreadsProfile } from "../lib/threads-client";
 import type { ConsumedState } from "./threads-oauth";
 
 // ---- 登録数の上限（FR-015〜FR-017） ----
@@ -187,4 +188,100 @@ async function writeConnection(
       updatedAt: now,
     })
     .where(eq(accounts.id, accountId));
+}
+
+// ---- Accountの画面を開いたとき（research.md R10・R14） ----
+
+/**
+ * 「最後に使ったAccount」の記録。1つの条件付き UPDATE で、次のどちらかに当たる古いリクエストは反映しない。
+ * (a) receivedAt が users.last_account_open_received_at 以前（先に届いていたリクエストが遅れて完了した）
+ * (b) 同じ clientId で openSeq が記録以下（同じページの遅れて届いた再試行）
+ */
+export async function openAccount(
+  env: Env,
+  userId: string,
+  accountId: string,
+  req: { clientId: string; openSeq: number },
+  receivedAt: Date,
+): Promise<boolean> {
+  const db = createDb(env.DATABASE_URL);
+  const updated = await db
+    .update(users)
+    .set({
+      lastAccountId: accountId,
+      lastAccountClientId: req.clientId,
+      lastAccountOpenSeq: req.openSeq,
+      lastAccountOpenReceivedAt: receivedAt,
+      updatedAt: new Date(),
+    })
+    .where(
+      and(
+        eq(users.id, userId),
+        or(isNull(users.lastAccountOpenReceivedAt), lt(users.lastAccountOpenReceivedAt, receivedAt)),
+        or(
+          isNull(users.lastAccountClientId),
+          ne(users.lastAccountClientId, req.clientId),
+          isNull(users.lastAccountOpenSeq),
+          lt(users.lastAccountOpenSeq, req.openSeq),
+        ),
+      ),
+    )
+    .returning({ id: users.id });
+  if (updated.length === 0) return false;
+  await db.update(accounts).set({ lastUsedAt: receivedAt }).where(eq(accounts.id, accountId));
+  return true;
+}
+
+/**
+ * 保存しているトークンでプロフィールを取得して、接続を確認する（FR-018）。
+ * - 成功：プロフィールを最新にする
+ * - 認証エラー：needs_reconnect にする
+ * - それ以外の失敗：状態は変えない
+ * 書き込みはすべて、読んだ時点の connection_generation を条件にする（research.md R6）。
+ */
+export async function verifyConnection(env: Env, accountId: string, threads: ThreadsClient): Promise<void> {
+  const db = createDb(env.DATABASE_URL);
+  const [row] = await db
+    .select({ generation: accounts.connectionGeneration, conn: threadsConnections })
+    .from(accounts)
+    .innerJoin(threadsConnections, eq(threadsConnections.accountId, accounts.id))
+    .where(eq(accounts.id, accountId))
+    .limit(1);
+  if (!row) return;
+
+  const sameGeneration = and(eq(accounts.id, accountId), eq(accounts.connectionGeneration, row.generation));
+  let token: string;
+  try {
+    const cipher = createTokenCipher(env.TOKEN_ENCRYPTION_KEYS, env.TOKEN_ENCRYPTION_KEY_VERSION);
+    token = await cipher.decrypt(
+      { ciphertext: row.conn.accessTokenCiphertext, iv: row.conn.accessTokenIv, keyVersion: row.conn.keyVersion },
+      accountId,
+    );
+  } catch (err) {
+    // 鍵の設定ミスなどで復号できないときは、接続状態を変えずにログだけ残す（research.md R5）
+    logger.error("failed to decrypt threads token", { accountId, err });
+    return;
+  }
+
+  try {
+    const profile = await threads.getProfile(token);
+    await db
+      .update(accounts)
+      .set({
+        username: profile.username,
+        displayName: profile.name,
+        profilePictureUrl: profile.profilePictureUrl,
+        updatedAt: new Date(),
+      })
+      .where(sameGeneration);
+  } catch (err) {
+    if (err instanceof ThreadsAuthError) {
+      await db
+        .update(accounts)
+        .set({ connectionStatus: "needs_reconnect", updatedAt: new Date() })
+        .where(sameGeneration);
+      return;
+    }
+    logger.warn("threads profile check failed", { accountId, err });
+  }
 }

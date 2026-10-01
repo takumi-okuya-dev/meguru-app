@@ -137,18 +137,18 @@ description: "ログインとThreadsアカウント登録の実装タスク"
 
 ### US2のテスト
 
-- [ ] T054 [P] [US2] `apps/api/test/integration/account-open.test.ts`を書く：`open`が2回失敗しても3回目で記録され`landingAccountId`がそのAccountになる。同じ`clientId`で古い`openSeq`のリクエストは記録を変えない。先に受け取ったリクエストが後から完了しても（偽の遅延を使う）、後で受け取ったBの記録が残る。`clientId`が替われば`openSeq`が小さくても反映される（再読み込み）。トークンを無効にしてから`open`すると、そのレスポンスで`needs_reconnect`になり`GET /api/me`にも反映される（quickstart.mdの該当行、FR-018、SC-007）
-- [ ] T055 [P] [US2] `apps/web/test/guards.test.tsx`を書く：未ログインでは認証が必要なルートの内容を描画せずに`/sign-in`へ遷移する。ログアウト後に「戻る」でも内容が出ない（FR-003・FR-006、SC-003）
-- [ ] T056 [P] [US2] `apps/web/test/use-account-open.test.tsx`を書く：画面を離れると、待機中・実行中の再試行が中止される
+- [X] T054 [P] [US2] `apps/api/test/integration/account-open.test.ts`を書く：`open`が2回失敗しても3回目で記録され`landingAccountId`がそのAccountになる。同じ`clientId`で古い`openSeq`のリクエストは記録を変えない。先に受け取ったリクエストが後から完了しても（偽の遅延を使う）、後で受け取ったBの記録が残る。`clientId`が替われば`openSeq`が小さくても反映される（再読み込み）。トークンを無効にしてから`open`すると、そのレスポンスで`needs_reconnect`になり`GET /api/me`にも反映される（quickstart.mdの該当行、FR-018、SC-007）
+- [X] T055 [P] [US2] `apps/web/test/guards.test.tsx`を書く：未ログインでは認証が必要なルートの内容を描画せずに`/sign-in`へ遷移する。ログアウト後に「戻る」でも内容が出ない（FR-003・FR-006、SC-003）
+- [X] T056 [P] [US2] `apps/web/test/use-account-open.test.tsx`を書く：画面を離れると、待機中・実行中の再試行が中止される
 
 ### US2の実装
 
-- [ ] T057 [US2] `apps/api/src/services/account-service.ts`に`openAccount(userId, accountId, { clientId, openSeq }, receivedAt)`を作る：`users`を1つの条件付き`UPDATE`で更新する。条件は「`receivedAt > last_account_open_received_at`（NULLなら真）」かつ「`clientId`が`last_account_client_id`と違う、または`openSeq > last_account_open_seq`」。更新したら`accounts.last_used_at = receivedAt`（research.md R10）
-- [ ] T058 [US2] `apps/api/src/services/account-service.ts`に`verifyConnection(accountId)`を作る：`connection_generation`を読み、トークンで`getProfile`。成功ならプロフィールを更新、`ThreadsAuthError`なら`needs_reconnect`に。どちらの書き込みも読んだ`connection_generation`を条件にする。それ以外の失敗は状態を変えない（research.md R6・R14）
-- [ ] T059 [US2] `apps/api/src/routes/accounts.ts`に`POST /api/accounts/:accountId/open`を作る：処理を始めた時点のサーバー時刻を`receivedAt`とし、`openAccount`と`verifyConnection`を行って最新の`AccountSummary`を返す
-- [ ] T060 [US2] `apps/web/src/lib/use-account-open.ts`を作る：`clientId`はページを読み込むたびに作る乱数ID（メモリーだけに持ち、`sessionStorage`には保存しない）、`openSeq`はAccountの画面を開くたびに1つ増やす。失敗したら指数バックオフで最大3回まで再試行し、それでも失敗したらウィンドウにフォーカスが戻ったときにもう一度呼ぶ。画面を離れたら`AbortController`で中止する。ホバーなどの先読みでは呼ばない（contracts/ui-routes.mdの規則5）
-- [ ] T061 [US2] `apps/web/src/pages/account-home.tsx`と`account-settings.tsx`の共通の親（`apps/web/src/pages/account-layout.tsx`）で`use-account-open`を呼び、レスポンスで接続状態とプロフィールを差し替える
-- [ ] T062 [P] [US2] `apps/web/src/components/layout/UserMenu.tsx`を作る：ユーザー名とログアウト。ログアウトはClerkのセッションを終了し、TanStack Queryのキャッシュを全部消してから`/sign-in`へ置き換え遷移する（FR-006、規則6）
+- [X] T057 [US2] `apps/api/src/services/account-service.ts`に`openAccount(userId, accountId, { clientId, openSeq }, receivedAt)`を作る：`users`を1つの条件付き`UPDATE`で更新する。条件は「`receivedAt > last_account_open_received_at`（NULLなら真）」かつ「`clientId`が`last_account_client_id`と違う、または`openSeq > last_account_open_seq`」。更新したら`accounts.last_used_at = receivedAt`（research.md R10）
+- [X] T058 [US2] `apps/api/src/services/account-service.ts`に`verifyConnection(accountId)`を作る：`connection_generation`を読み、トークンで`getProfile`。成功ならプロフィールを更新、`ThreadsAuthError`なら`needs_reconnect`に。どちらの書き込みも読んだ`connection_generation`を条件にする。それ以外の失敗は状態を変えない（research.md R6・R14）
+- [X] T059 [US2] `apps/api/src/routes/accounts.ts`に`POST /api/accounts/:accountId/open`を作る：処理を始めた時点のサーバー時刻を`receivedAt`とし、`openAccount`と`verifyConnection`を行って最新の`AccountSummary`を返す
+- [X] T060 [US2] `apps/web/src/lib/use-account-open.ts`を作る：`clientId`はページを読み込むたびに作る乱数ID（メモリーだけに持ち、`sessionStorage`には保存しない）、`openSeq`はAccountの画面を開くたびに1つ増やす。失敗したら指数バックオフで最大3回まで再試行し、それでも失敗したらウィンドウにフォーカスが戻ったときにもう一度呼ぶ。画面を離れたら`AbortController`で中止する。ホバーなどの先読みでは呼ばない（contracts/ui-routes.mdの規則5）
+- [X] T061 [US2] `apps/web/src/pages/account-home.tsx`と`account-settings.tsx`の共通の親（`apps/web/src/pages/account-layout.tsx`）で`use-account-open`を呼び、レスポンスで接続状態とプロフィールを差し替える
+- [X] T062 [P] [US2] `apps/web/src/components/layout/UserMenu.tsx`を作る：ユーザー名とログアウト。ログアウトはClerkのセッションを終了し、TanStack Queryのキャッシュを全部消してから`/sign-in`へ置き換え遷移する（FR-006、規則6）
 
 **チェックポイント**：US1・US2が単独でも組み合わせても動く（SC-003・SC-004）
 
@@ -162,16 +162,16 @@ description: "ログインとThreadsアカウント登録の実装タスク"
 
 ### US3のテスト
 
-- [ ] T063 [P] [US3] `apps/api/test/integration/account-limit.test.ts`を書く：プラン1で1件持つユーザーの`mode = new` → `409 ACCOUNT_LIMIT_REACHED`。`multi-account`のAccountを持てば5件まで作れ、2件目以降のプランは最上位プランを引き継ぐ（FR-014〜FR-016）。上限1件のユーザーで2つのcallbackを同時に処理しても、作られるAccountは1件だけ（FR-017、research.md R8）
-- [ ] T064 [P] [US3] `apps/web/test/account-new-limit.test.tsx`を書く：`max = 1`ならプラン3の案内、`max = 5`なら不要なAccountの削除の案内が出て、接続ボタンは無効
+- [X] T063 [P] [US3] `apps/api/test/integration/account-limit.test.ts`を書く：プラン1で1件持つユーザーの`mode = new` → `409 ACCOUNT_LIMIT_REACHED`。`multi-account`のAccountを持てば5件まで作れ、2件目以降のプランは最上位プランを引き継ぐ（FR-014〜FR-016）。上限1件のユーザーで2つのcallbackを同時に処理しても、作られるAccountは1件だけ（FR-017、research.md R8）
+- [X] T064 [P] [US3] `apps/web/test/account-new-limit.test.tsx`を書く：`max = 1`ならプラン3の案内、`max = 5`なら不要なAccountの削除の案内が出て、接続ボタンは無効
 
 ### US3の実装
 
-- [ ] T065 [US3] `apps/api/src/services/account-service.ts`に`accountLimitFor(db, userId)`を作り、`assertCanAddAccount`を本実装にする：`owner`として保有するAccountの最上位プランから上限を計算し、`used >= max`なら`ACCOUNT_LIMIT_REACHED`（FR-015・FR-016）
-- [ ] T066 [US3] `apps/api/src/routes/threads-connect.ts`の`mode = new`で、認可URLを作る前に`assertCanAddAccount`を呼ぶ（FR-017）。`completeConnection`の手順(8)の直前でも、`users`の行ロックを持ったまま再判定する（research.md R8）
-- [ ] T067 [P] [US3] `apps/web/src/components/layout/AccountSwitcher.tsx`を作る：サイドバーにAccount一覧（`needs_reconnect`には警告アイコン）と「＋ 追加」を出し、選んだら`/accounts/:id`へ遷移するだけにする（記録は遷移先の`open`で行う。規則5）
-- [ ] T068 [US3] `apps/web/src/pages/account-new.tsx`に上限の表示を加える：`accountLimit.used >= accountLimit.max`なら接続ボタンを無効にし、`max`に応じた案内と「登録済みのAccountの接続を更新したい場合は、そのAccountの設定画面から認可し直せます」を表示する。APIの`409`を受けた場合も同じ表示（規則8）
-- [ ] T069 [P] [US3] `apps/api/scripts/set-plan.ts`を作り、`apps/api/package.json`に`admin:set-plan <accountId> <plan>`を足す：`plan`を4値のどれかに変更する。管理画面は作らない（research.md R9）
+- [X] T065 [US3] `apps/api/src/services/account-service.ts`に`accountLimitFor(db, userId)`を作り、`assertCanAddAccount`を本実装にする：`owner`として保有するAccountの最上位プランから上限を計算し、`used >= max`なら`ACCOUNT_LIMIT_REACHED`（FR-015・FR-016）
+- [X] T066 [US3] `apps/api/src/routes/threads-connect.ts`の`mode = new`で、認可URLを作る前に`assertCanAddAccount`を呼ぶ（FR-017）。`completeConnection`の手順(8)の直前でも、`users`の行ロックを持ったまま再判定する（research.md R8）
+- [X] T067 [P] [US3] `apps/web/src/components/layout/AccountSwitcher.tsx`を作る：サイドバーにAccount一覧（`needs_reconnect`には警告アイコン）と「＋ 追加」を出し、選んだら`/accounts/:id`へ遷移するだけにする（記録は遷移先の`open`で行う。規則5）
+- [X] T068 [US3] `apps/web/src/pages/account-new.tsx`に上限の表示を加える：`accountLimit.used >= accountLimit.max`なら接続ボタンを無効にし、`max`に応じた案内と「登録済みのAccountの接続を更新したい場合は、そのAccountの設定画面から認可し直せます」を表示する。APIの`409`を受けた場合も同じ表示（規則8）
+- [X] T069 [P] [US3] `apps/api/scripts/set-plan.ts`を作り、`apps/api/package.json`に`admin:set-plan <accountId> <plan>`を足す：`plan`を4値のどれかに変更する。管理画面は作らない（research.md R9）
 
 **チェックポイント**：US1〜US3がそれぞれ単独で動く（SC-006）
 
