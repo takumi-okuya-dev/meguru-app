@@ -1,0 +1,82 @@
+// POST /api/threads/connect と GET /api/threads/callback（contracts/api.md、research.md R3・R4・R8）
+import { connectRequestSchema, type ErrorCode } from "@threads-grower/shared";
+import { Hono, type MiddlewareHandler } from "hono";
+import type { AppEnv } from "../app";
+import { createDb } from "../db/client";
+import { AppError } from "../lib/errors";
+import { logger } from "../lib/logger";
+import { createThreadsClient, ThreadsApiError, ThreadsAuthError } from "../lib/threads-client";
+import { completeConnection } from "../services/account-service";
+import { consumeState, startConnect, type ConsumedState } from "../services/threads-oauth";
+
+export function threadsConnectRoutes(authed: MiddlewareHandler<AppEnv>) {
+  return new Hono<AppEnv>()
+    .post("/threads/connect", authed, async (c) => {
+      const parsed = connectRequestSchema.safeParse(await c.req.json().catch(() => null));
+      if (!parsed.success) throw new AppError("VALIDATION_FAILED", 400, "invalid connect request");
+      const authorizeUrl = await startConnect(
+        createDb(c.env.DATABASE_URL),
+        createThreadsClient(c.env),
+        c.get("user").id,
+        parsed.data,
+      );
+      return c.json({ authorizeUrl });
+    })
+    .get("/threads/callback", async (c) => {
+      // ユーザーが認可した直後にリダイレクトされるので、受け取った時刻を認可の時刻とみなす（research.md R7）
+      const authorizedAt = new Date();
+      const web = c.env.WEB_ORIGIN.replace(/\/$/, "");
+      const redirect = (path: string, params: Record<string, string>) =>
+        c.redirect(`${web}${path}?${new URLSearchParams(params)}`, 302);
+
+      const stateParam = c.req.query("state");
+      const state = stateParam ? await consumeState(createDb(c.env.DATABASE_URL), stateParam) : null;
+      if (!state) return redirect("/accounts/new", { error: "OAUTH_STATE_INVALID" });
+
+      const fail = (code: ErrorCode) =>
+        state.mode === "reconnect"
+          ? redirect(`/accounts/${state.targetAccountId}/settings`, { error: code })
+          : redirect("/accounts/new", { error: code });
+
+      if (c.req.query("error")) return fail("THREADS_AUTH_CANCELLED");
+      const code = c.req.query("code");
+      if (!code) return fail("THREADS_AUTH_FAILED");
+
+      const threads = createThreadsClient(c.env);
+      let longLived: { accessToken: string; expiresAt: Date };
+      try {
+        const short = await threads.exchangeCode(code);
+        longLived = await threads.exchangeLongLived(short.accessToken);
+      } catch (err) {
+        logger.warn("threads token exchange failed", { err });
+        return fail("THREADS_AUTH_FAILED");
+      }
+
+      let profile;
+      try {
+        profile = await threads.getProfile(longLived.accessToken);
+      } catch (err) {
+        if (!(err instanceof ThreadsAuthError || err instanceof ThreadsApiError)) throw err;
+        logger.warn("threads profile fetch failed", { err });
+        return fail("THREADS_PROFILE_FETCH_FAILED");
+      }
+
+      try {
+        const result = await completeConnection(c.env, {
+          state: state as ConsumedState,
+          threadsUserId: profile.id,
+          profile,
+          accessToken: longLived.accessToken,
+          expiresAt: longLived.expiresAt,
+          authorizedAt,
+        });
+        if (result.kind === "reconnect") {
+          return redirect(`/accounts/${result.accountId}/settings`, { connected: "reconnect" });
+        }
+        return redirect(`/accounts/${result.accountId}`, { connected: result.kind });
+      } catch (err) {
+        if (err instanceof AppError) return fail(err.code);
+        throw err;
+      }
+    });
+}

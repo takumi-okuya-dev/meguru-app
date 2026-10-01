@@ -30,19 +30,19 @@ description: "ログインとThreadsアカウント登録の実装タスク"
 
 **目的**：モノレポと開発環境を用意する（research.md R1・R12）
 
-- [ ] T001 リポジトリのルートに`package.json`（`private: true`、`dev`・`test`・`e2e`・`lint`のスクリプト）と`pnpm-workspace.yaml`（`apps/*`・`packages/*`）を作り、`.gitignore`に`node_modules/`・`dist/`・`.wrangler/`・`.dev.vars`・`.env.local`を追記する
-- [ ] T002 [P] ルートに`tsconfig.base.json`（`strict: true`、`moduleResolution: "bundler"`、`target: "ES2022"`）を作る
-- [ ] T003 [P] ルートにESLint（`eslint.config.js`、TypeScript用）とPrettier（`.prettierrc`）を設定する
-- [ ] T004 [P] `packages/shared/package.json`・`packages/shared/tsconfig.json`・`packages/shared/src/index.ts`を作り、zodを依存に加える
-- [ ] T005 `apps/api`を作る：`apps/api/package.json`（hono、drizzle-orm、@neondatabase/serverless、zod、Clerkのバックエンドミドルウェア、`@threads-grower/shared`）、`apps/api/tsconfig.json`、`apps/api/wrangler.toml`（`compatibility_date`、Cron Trigger `crons = ["0 18 * * *"]`）、`apps/api/src/index.ts`（空のHonoアプリと空の`scheduled`ハンドラーをexport）
-- [ ] T006 [P] `apps/api/.dev.vars.example`に、contracts/api.mdの「環境変数・Secret」の表の全項目（`CLERK_SECRET_KEY`、`CLERK_PUBLISHABLE_KEY`、`THREADS_APP_ID`、`THREADS_APP_SECRET`、`THREADS_REDIRECT_URI`、`THREADS_AUTH_BASE_URL`、`THREADS_GRAPH_BASE_URL`、`TOKEN_ENCRYPTION_KEYS`、`TOKEN_ENCRYPTION_KEY_VERSION`、`IDENTIFIER_HASH_KEY`、`DATABASE_URL`、`WEB_ORIGIN`）を、説明のコメント付きで書く
-- [ ] T007 `apps/web`をVite + React 19 + TypeScriptで作る：`apps/web/package.json`（react-router v7、@tanstack/react-query、`@clerk/react` v6、hono（RPCクライアント用）、`@threads-grower/shared`）、`apps/web/vite.config.ts`、`apps/web/index.html`、`apps/web/src/main.tsx`
-- [ ] T008 [P] `apps/web`にTailwind CSS v4とshadcn/uiを導入し（`apps/web/components.json`、`apps/web/src/index.css`）、`apps/web/src/components/ui/`にbutton・input・dialog・dropdown-menu・sheet・toast（sonner）・avatar・alertを追加する。ダークモードはOSの設定に従う（`prefers-color-scheme`）
-- [ ] T009 [P] `apps/web/.env.example`に`VITE_CLERK_PUBLISHABLE_KEY`と`VITE_API_BASE_URL`を書く
-- [ ] T010 [P] ルートに`docker-compose.yml`を作る：Postgres 17と`local-neon-http-proxy`（`db.localtest.me:4444`）。research.md R12
-- [ ] T011 [P] `apps/api/vitest.config.ts`を`@cloudflare/vitest-pool-workers`で設定し、テスト用の環境変数（偽のThreadsサーバーのURL、テスト用の鍵）を`apps/api/test/env.ts`にまとめる
-- [ ] T012 [P] `apps/web/vitest.config.ts`をjsdomとTesting Libraryで設定し、`apps/web/test/setup.ts`を作る
-- [ ] T013 [P] `e2e/playwright.config.ts`と`e2e/package.json`（`@playwright/test`、`@clerk/testing`）を作り、`webServer`でWeb・API・偽のThreadsサーバーを起動する設定を書く
+- [X] T001 リポジトリのルートに`package.json`（`private: true`、`dev`・`test`・`e2e`・`lint`のスクリプト）と`pnpm-workspace.yaml`（`apps/*`・`packages/*`）を作り、`.gitignore`に`node_modules/`・`dist/`・`.wrangler/`・`.dev.vars`・`.env.local`を追記する
+- [X] T002 [P] ルートに`tsconfig.base.json`（`strict: true`、`moduleResolution: "bundler"`、`target: "ES2022"`）を作る
+- [X] T003 [P] ルートにESLint（`eslint.config.js`、TypeScript用）とPrettier（`.prettierrc`）を設定する
+- [X] T004 [P] `packages/shared/package.json`・`packages/shared/tsconfig.json`・`packages/shared/src/index.ts`を作り、zodを依存に加える
+- [X] T005 `apps/api`を作る：`apps/api/package.json`（hono、drizzle-orm、@neondatabase/serverless、zod、Clerkのバックエンドミドルウェア、`@threads-grower/shared`）、`apps/api/tsconfig.json`、`apps/api/wrangler.toml`（`compatibility_date`、Cron Trigger `crons = ["0 18 * * *"]`）、`apps/api/src/index.ts`（空のHonoアプリと空の`scheduled`ハンドラーをexport）
+- [X] T006 [P] `apps/api/.dev.vars.example`に、contracts/api.mdの「環境変数・Secret」の表の全項目（`CLERK_SECRET_KEY`、`CLERK_PUBLISHABLE_KEY`、`THREADS_APP_ID`、`THREADS_APP_SECRET`、`THREADS_REDIRECT_URI`、`THREADS_AUTH_BASE_URL`、`THREADS_GRAPH_BASE_URL`、`TOKEN_ENCRYPTION_KEYS`、`TOKEN_ENCRYPTION_KEY_VERSION`、`IDENTIFIER_HASH_KEY`、`DATABASE_URL`、`WEB_ORIGIN`）を、説明のコメント付きで書く
+- [X] T007 `apps/web`をVite + React 19 + TypeScriptで作る：`apps/web/package.json`（react-router v7、@tanstack/react-query、`@clerk/react` v6、hono（RPCクライアント用）、`@threads-grower/shared`）、`apps/web/vite.config.ts`、`apps/web/index.html`、`apps/web/src/main.tsx`
+- [X] T008 [P] `apps/web`にTailwind CSS v4とshadcn/uiを導入し（`apps/web/components.json`、`apps/web/src/index.css`）、`apps/web/src/components/ui/`にbutton・input・dialog・dropdown-menu・sheet・toast（sonner）・avatar・alertを追加する。ダークモードはOSの設定に従う（`prefers-color-scheme`）
+- [X] T009 [P] `apps/web/.env.example`に`VITE_CLERK_PUBLISHABLE_KEY`と`VITE_API_BASE_URL`を書く
+- [X] T010 [P] ルートに`docker-compose.yml`を作る：Postgres 17と`local-neon-http-proxy`（`db.localtest.me:4444`）。research.md R12
+- [X] T011 [P] `apps/api/vitest.config.ts`を`@cloudflare/vitest-pool-workers`で設定し、テスト用の環境変数（偽のThreadsサーバーのURL、テスト用の鍵）を`apps/api/test/env.ts`にまとめる
+- [X] T012 [P] `apps/web/vitest.config.ts`をjsdomとTesting Libraryで設定し、`apps/web/test/setup.ts`を作る
+- [X] T013 [P] `e2e/playwright.config.ts`と`e2e/package.json`（`@playwright/test`、`@clerk/testing`）を作り、`webServer`でWeb・API・偽のThreadsサーバーを起動する設定を書く
 
 **完了条件**：`pnpm install`が通り、`pnpm -r build`（中身は空でよい）と`docker compose up -d`が成功する
 
@@ -56,43 +56,43 @@ description: "ログインとThreadsアカウント登録の実装タスク"
 
 ### 共通パッケージ
 
-- [ ] T014 [P] `packages/shared/src/plans.ts`を作る：`Plan`型（`"auto-only" | "auto-grower" | "multi-account" | "team"`）、順位（この並び順）、上限（`auto-only`=1、`auto-grower`=1、`multi-account`=5、`team`=5）、`highestPlan(plans)`、`limitFor(plan)`、`initialPlanFor(ownedPlans)`（0件なら`auto-only`、それ以外は最上位プラン。FR-014）
-- [ ] T015 [P] `packages/shared/src/errors.ts`を作る：エラーコードの列挙（`AUTH_REQUIRED`、`ACCOUNT_NOT_FOUND`、`ACCOUNT_LIMIT_REACHED`、`THREADS_AUTH_CANCELLED`、`THREADS_AUTH_FAILED`、`THREADS_PROFILE_FETCH_FAILED`、`THREADS_ACCOUNT_TAKEN`、`RECONNECT_ACCOUNT_MISMATCH`、`ACCOUNT_DELETED_DURING_CONNECT`、`THREADS_AUTH_REVOKED`、`THREADS_DATA_DELETION_REQUESTED`、`OAUTH_STATE_INVALID`、`CONFIRMATION_MISMATCH`）と、contracts/ui-routes.mdの「エラー文言」の表の日本語の文言・次の操作。`ACCOUNT_LIMIT_REACHED`は`max`で文言を切り替える関数にする（`max = 1`ならプラン3への案内、`max = 5`なら不要なAccountの削除の案内）
-- [ ] T016 [P] `packages/shared/src/schemas.ts`を作る：contracts/api.mdの型（`AccountSummary`、`AccountLimit`、`GET /api/me`のレスポンス、`POST /api/threads/connect`のリクエスト（`mode`が`new`、または`reconnect`と`accountId`）、`POST /api/accounts/:id/open`のリクエスト（`clientId`：文字列、`openSeq`：0以上の整数）、`DELETE`のリクエスト（`confirmUsername`）、エラーの形`{ error: { code, message } }`）をzodで定義する
-- [ ] T017 [P] `packages/shared/src/username.ts`に`normalizeUsername(s)`を作る：「前後の空白を除く → 先頭の`@`を1つだけ除く → 小文字にする」（contracts/api.mdのDELETE）。`packages/shared/test/username.test.ts`で`@takumi`・`takumi`・` @Takumi `がすべて`takumi`になることを確かめる
-- [ ] T018 [P] `packages/shared/test/plans.test.ts`で、上限の計算と`initialPlanFor`をテストする
+- [X] T014 [P] `packages/shared/src/plans.ts`を作る：`Plan`型（`"auto-only" | "auto-grower" | "multi-account" | "team"`）、順位（この並び順）、上限（`auto-only`=1、`auto-grower`=1、`multi-account`=5、`team`=5）、`highestPlan(plans)`、`limitFor(plan)`、`initialPlanFor(ownedPlans)`（0件なら`auto-only`、それ以外は最上位プラン。FR-014）
+- [X] T015 [P] `packages/shared/src/errors.ts`を作る：エラーコードの列挙（`AUTH_REQUIRED`、`ACCOUNT_NOT_FOUND`、`ACCOUNT_LIMIT_REACHED`、`THREADS_AUTH_CANCELLED`、`THREADS_AUTH_FAILED`、`THREADS_PROFILE_FETCH_FAILED`、`THREADS_ACCOUNT_TAKEN`、`RECONNECT_ACCOUNT_MISMATCH`、`ACCOUNT_DELETED_DURING_CONNECT`、`THREADS_AUTH_REVOKED`、`THREADS_DATA_DELETION_REQUESTED`、`OAUTH_STATE_INVALID`、`CONFIRMATION_MISMATCH`）と、contracts/ui-routes.mdの「エラー文言」の表の日本語の文言・次の操作。`ACCOUNT_LIMIT_REACHED`は`max`で文言を切り替える関数にする（`max = 1`ならプラン3への案内、`max = 5`なら不要なAccountの削除の案内）
+- [X] T016 [P] `packages/shared/src/schemas.ts`を作る：contracts/api.mdの型（`AccountSummary`、`AccountLimit`、`GET /api/me`のレスポンス、`POST /api/threads/connect`のリクエスト（`mode`が`new`、または`reconnect`と`accountId`）、`POST /api/accounts/:id/open`のリクエスト（`clientId`：文字列、`openSeq`：0以上の整数）、`DELETE`のリクエスト（`confirmUsername`）、エラーの形`{ error: { code, message } }`）をzodで定義する
+- [X] T017 [P] `packages/shared/src/username.ts`に`normalizeUsername(s)`を作る：「前後の空白を除く → 先頭の`@`を1つだけ除く → 小文字にする」（contracts/api.mdのDELETE）。`packages/shared/test/username.test.ts`で`@takumi`・`takumi`・` @Takumi `がすべて`takumi`になることを確かめる
+- [X] T018 [P] `packages/shared/test/plans.test.ts`で、上限の計算と`initialPlanFor`をテストする
 
 ### データベース
 
-- [ ] T019 `apps/api/src/db/schema.ts`にDrizzleのスキーマを書く。data-model.mdの全テーブル・列挙型・制約をそのまま反映する：`users`（`clerk_user_id`はNOT NULL・UNIQUE、`last_account_id`は「FK → `accounts.id` ON DELETE SET NULL」、`last_account_deleted_at`・`last_account_client_id`・`last_account_open_seq`（bigint）・`last_account_open_received_at`はNULL可）、`accounts`（`threads_user_id`はNOT NULL・UNIQUE、`plan`はNOT NULL、`connection_status`は「NOT NULL, 既定値`connected`」、`connection_generation`は「bigint NOT NULL, 既定値0」）、`memberships`（一意制約`(user_id, account_id)`、部分一意インデックス「`account_id WHERE role = 'owner'`」、FKはどちらもON DELETE CASCADE）、`threads_connections`（`account_id`はPKかつFK ON DELETE CASCADE、`access_token_iv`は12バイト、`key_version`はsmallint、`authorized_at`はNOT NULL）、`oauth_states`（`state_hash`がPK、`target_account_id`は「`mode = reconnect`のときだけ必須（CHECK制約）」）、`threads_deletion_requests`（`request_fingerprint`はNOT NULL・UNIQUE、CHECK制約「`status <> 'completed'`なら`threads_user_id IS NOT NULL`、`status = 'completed'`なら`threads_user_id IS NULL`」、インデックス`threads_user_hmac`と`(status, last_attempted_at)`）、`threads_revocations`（インデックス`(threads_user_hmac, issued_at)`）
-- [ ] T020 `apps/api/drizzle.config.ts`を作り、`apps/api/package.json`に`db:generate`・`db:migrate`・`db:psql`のスクリプトを足して、最初のマイグレーションを`apps/api/drizzle/`に生成する
-- [ ] T021 `apps/api/src/db/client.ts`を作る：通常のクエリ用の`neon-http`版Drizzleと、対話的トランザクション用の`neon-serverless`（WebSocketのPool。リクエストごとに作って破棄する）版を返す関数。ローカルでは`local-neon-http-proxy`へ向ける`fetchEndpoint`の設定を入れる（research.md R8・R12）
-- [ ] T022 `apps/api/src/db/locks.ts`を作る：`lockThreadsUser(tx, threadsUserId)`（`pg_advisory_xact_lock`、キーは`threads_user_id`から作る）と`lockUserRow(tx, userId)`（`SELECT … FROM users WHERE id = $1 FOR UPDATE`）。ロックの順序は必ず「アドバイザリーロック → `users`の行ロック」とし、関数のコメントに明記する（research.md R8）
+- [X] T019 `apps/api/src/db/schema.ts`にDrizzleのスキーマを書く。data-model.mdの全テーブル・列挙型・制約をそのまま反映する：`users`（`clerk_user_id`はNOT NULL・UNIQUE、`last_account_id`は「FK → `accounts.id` ON DELETE SET NULL」、`last_account_deleted_at`・`last_account_client_id`・`last_account_open_seq`（bigint）・`last_account_open_received_at`はNULL可）、`accounts`（`threads_user_id`はNOT NULL・UNIQUE、`plan`はNOT NULL、`connection_status`は「NOT NULL, 既定値`connected`」、`connection_generation`は「bigint NOT NULL, 既定値0」）、`memberships`（一意制約`(user_id, account_id)`、部分一意インデックス「`account_id WHERE role = 'owner'`」、FKはどちらもON DELETE CASCADE）、`threads_connections`（`account_id`はPKかつFK ON DELETE CASCADE、`access_token_iv`は12バイト、`key_version`はsmallint、`authorized_at`はNOT NULL）、`oauth_states`（`state_hash`がPK、`target_account_id`は「`mode = reconnect`のときだけ必須（CHECK制約）」）、`threads_deletion_requests`（`request_fingerprint`はNOT NULL・UNIQUE、CHECK制約「`status <> 'completed'`なら`threads_user_id IS NOT NULL`、`status = 'completed'`なら`threads_user_id IS NULL`」、インデックス`threads_user_hmac`と`(status, last_attempted_at)`）、`threads_revocations`（インデックス`(threads_user_hmac, issued_at)`）
+- [X] T020 `apps/api/drizzle.config.ts`を作り、`apps/api/package.json`に`db:generate`・`db:migrate`・`db:psql`のスクリプトを足して、最初のマイグレーションを`apps/api/drizzle/`に生成する
+- [X] T021 `apps/api/src/db/client.ts`を作る：通常のクエリ用の`neon-http`版Drizzleと、対話的トランザクション用の`neon-serverless`（WebSocketのPool。リクエストごとに作って破棄する）版を返す関数。ローカルでは`local-neon-http-proxy`へ向ける`fetchEndpoint`の設定を入れる（research.md R8・R12）
+- [X] T022 `apps/api/src/db/locks.ts`を作る：`lockThreadsUser(tx, threadsUserId)`（`pg_advisory_xact_lock`、キーは`threads_user_id`から作る）と`lockUserRow(tx, userId)`（`SELECT … FROM users WHERE id = $1 FOR UPDATE`）。ロックの順序は必ず「アドバイザリーロック → `users`の行ロック」とし、関数のコメントに明記する（research.md R8）
 
 ### 暗号・秘密情報・ログ
 
-- [ ] T023 [P] `apps/api/test/unit/crypto.test.ts`を書く：同じ平文を同じ鍵で2回暗号化するとIVも暗号文も異なる、AADに別の`account_id`を使うと復号に失敗する、鍵リングに旧バージョンの鍵があれば旧暗号文を復号できる、鍵が欠けたバージョンはエラーになる、現在のバージョンの鍵がない設定は起動時の検証で失敗する（quickstart.mdの「暗号文の付け替え」「IVの一意性」「鍵のローテーション」）
-- [ ] T024 `apps/api/src/lib/crypto.ts`を作る：`TOKEN_ENCRYPTION_KEYS`（JSON。各鍵は32バイトのbase64）と`TOKEN_ENCRYPTION_KEY_VERSION`を読み、起動時に検証する。`encrypt(plaintext, accountId)`はAES-256-GCMで、IVを暗号化のたびに`crypto.getRandomValues`で12バイト新しく作り、AADに`account_id`を使い、`{ ciphertext, iv, keyVersion }`を返す。`decrypt`は行の`key_version`の鍵を選ぶ（research.md R5）
-- [ ] T025 [P] `apps/api/src/lib/identifier-hash.ts`に`threadsUserHmac(threadsUserId)`を作る（`HMAC-SHA256(IDENTIFIER_HASH_KEY, threads_user_id)`のhex。research.md R7）
-- [ ] T026 [P] `apps/api/test/unit/logger.test.ts`を書いてから`apps/api/src/lib/logger.ts`を作る：`access_token`・`code`・`client_secret`・`signed_request`・`state`・`authorizeUrl`のキーを持つ値と、URLのクエリ文字列を自動でマスクする構造化ロガー（research.md R5、contracts/api.mdの秘密情報）
+- [X] T023 [P] `apps/api/test/unit/crypto.test.ts`を書く：同じ平文を同じ鍵で2回暗号化するとIVも暗号文も異なる、AADに別の`account_id`を使うと復号に失敗する、鍵リングに旧バージョンの鍵があれば旧暗号文を復号できる、鍵が欠けたバージョンはエラーになる、現在のバージョンの鍵がない設定は起動時の検証で失敗する（quickstart.mdの「暗号文の付け替え」「IVの一意性」「鍵のローテーション」）
+- [X] T024 `apps/api/src/lib/crypto.ts`を作る：`TOKEN_ENCRYPTION_KEYS`（JSON。各鍵は32バイトのbase64）と`TOKEN_ENCRYPTION_KEY_VERSION`を読み、起動時に検証する。`encrypt(plaintext, accountId)`はAES-256-GCMで、IVを暗号化のたびに`crypto.getRandomValues`で12バイト新しく作り、AADに`account_id`を使い、`{ ciphertext, iv, keyVersion }`を返す。`decrypt`は行の`key_version`の鍵を選ぶ（research.md R5）
+- [X] T025 [P] `apps/api/src/lib/identifier-hash.ts`に`threadsUserHmac(threadsUserId)`を作る（`HMAC-SHA256(IDENTIFIER_HASH_KEY, threads_user_id)`のhex。research.md R7）
+- [X] T026 [P] `apps/api/test/unit/logger.test.ts`を書いてから`apps/api/src/lib/logger.ts`を作る：`access_token`・`code`・`client_secret`・`signed_request`・`state`・`authorizeUrl`のキーを持つ値と、URLのクエリ文字列を自動でマスクする構造化ロガー（research.md R5、contracts/api.mdの秘密情報）
 
 ### Threadsクライアントと偽サーバー
 
-- [ ] T027 `apps/api/src/lib/threads-client.ts`を作る：ベースURL（`THREADS_AUTH_BASE_URL`・`THREADS_GRAPH_BASE_URL`）を環境変数から取る。`buildAuthorizeUrl(state)`（`client_id`、`redirect_uri`、`scope=threads_basic,threads_content_publish,threads_manage_insights`、`response_type=code`、`state`）、`exchangeCode(code)`（`POST /oauth/access_token`）、`exchangeLongLived(shortToken)`（`GET /access_token?grant_type=th_exchange_token`）、`refresh(token)`（`GET /refresh_access_token?grant_type=th_refresh_token`）、`getProfile(token)`（`GET /v1.0/me?fields=id,username,name,threads_profile_picture_url`、トークンは`Authorization`ヘッダーで渡す）。認証エラー（OAuthエラー190など）は`ThreadsAuthError`として区別する。リクエストURLはログに出さない（research.md R3・R5・R6）
-- [ ] T028 `apps/api/test/fake-threads/server.ts`に偽のThreadsサーバー（Hono）を作る：認可画面（許可・拒否を選べる）、コード交換、長期トークン交換、更新、プロフィール、テストから「トークンを無効にする」「失敗させる」「遅延させる」を指示できる制御用エンドポイント（research.md R12）
-- [ ] T029 [P] `apps/api/src/lib/signed-request.ts`を作り、`apps/api/test/unit/signed-request.test.ts`で確かめる：`signed_request`をApp SecretのHMAC-SHA256で検証し、`user_id`と`issued_at`（なければ`undefined`）を返す。検証の失敗は例外にする
+- [X] T027 `apps/api/src/lib/threads-client.ts`を作る：ベースURL（`THREADS_AUTH_BASE_URL`・`THREADS_GRAPH_BASE_URL`）を環境変数から取る。`buildAuthorizeUrl(state)`（`client_id`、`redirect_uri`、`scope=threads_basic,threads_content_publish,threads_manage_insights`、`response_type=code`、`state`）、`exchangeCode(code)`（`POST /oauth/access_token`）、`exchangeLongLived(shortToken)`（`GET /access_token?grant_type=th_exchange_token`）、`refresh(token)`（`GET /refresh_access_token?grant_type=th_refresh_token`）、`getProfile(token)`（`GET /v1.0/me?fields=id,username,name,threads_profile_picture_url`、トークンは`Authorization`ヘッダーで渡す）。認証エラー（OAuthエラー190など）は`ThreadsAuthError`として区別する。リクエストURLはログに出さない（research.md R3・R5・R6）
+- [X] T028 `apps/api/test/fake-threads/server.ts`に偽のThreadsサーバー（Hono）を作る：認可画面（許可・拒否を選べる）、コード交換、長期トークン交換、更新、プロフィール、テストから「トークンを無効にする」「失敗させる」「遅延させる」を指示できる制御用エンドポイント（research.md R12）
+- [X] T029 [P] `apps/api/src/lib/signed-request.ts`を作り、`apps/api/test/unit/signed-request.test.ts`で確かめる：`signed_request`をApp SecretのHMAC-SHA256で検証し、`user_id`と`issued_at`（なければ`undefined`）を返す。検証の失敗は例外にする
 
 ### API・Webの骨格
 
-- [ ] T030 `apps/api/src/middleware/auth.ts`を作る：Clerkのセッショントークンを検証し、失敗したら`401 AUTH_REQUIRED`。成功したら`clerk_user_id`で`users`を探し、なければ作る（JIT作成）。`email`はClerkの値で更新する（research.md R2）
-- [ ] T031 `apps/api/src/index.ts`に共通部分を組み込む：CORS（`WEB_ORIGIN`だけ許可）、エラーハンドラー（`{ error: { code, message } }`の形。メッセージに秘密情報を含めない）、`/api`のルーティング、HonoのRPC用の型（`AppType`）のexport
-- [ ] T032 [P] `apps/api/src/services/access.ts`に`findOwnedAccount(db, userId, accountId)`を作る：Membershipで絞り込み、なければ`ACCOUNT_NOT_FOUND`（存在の有無を漏らさない。data-model.mdの`memberships`）
-- [ ] T033 [P] `apps/web/src/lib/api-client.ts`を作る：HonoのRPCクライアントにClerkのトークンを付ける。`401`を受けたら「セッションの有効期限が切れました。もう一度ログインしてください」と表示して`/sign-in`へ遷移する（contracts/ui-routes.mdの規則7）
-- [ ] T034 [P] `apps/web/src/lib/query.ts`にTanStack Queryのクライアントを作る
-- [ ] T035 `apps/web/src/main.tsx`と`apps/web/src/router.tsx`を作る：ClerkProvider、QueryClientProvider、ルート一覧（`/sign-in`、`/`、`/accounts/new`、`/accounts/:accountId`、`/accounts/:accountId/settings`、`/data-deletion/:code`、それ以外は404）。認証が必要なルートは、未ログインなら内容を描画する前に`/sign-in`へ置き換え遷移するガードで包む（FR-003、contracts/ui-routes.mdの規則1）
-- [ ] T036 [P] `apps/web/src/components/layout/AppShell.tsx`と`Sidebar.tsx`を作る：左サイドバー＋右メインパネル、狭い画面ではサイドバーをドロワー（Sheet）にする。サイドバーの中身（Account一覧・追加・ユーザーメニュー）は空の枠だけ用意する（contracts/ui-routes.mdの「レイアウトの骨格」）
-- [ ] T037 [P] `apps/web/src/lib/callback-result.ts`を作る：URLの`connected`・`error`のクエリを読み、トーストで表示してからURLから消すフック（contracts/ui-routes.mdの「callbackの結果表示」）
-- [ ] T038 [P] `apps/web/src/pages/not-found.tsx`に404画面を作る（「自分のAccountへ戻る」リンク付き）
+- [X] T030 `apps/api/src/middleware/auth.ts`を作る：Clerkのセッショントークンを検証し、失敗したら`401 AUTH_REQUIRED`。成功したら`clerk_user_id`で`users`を探し、なければ作る（JIT作成）。`email`はClerkの値で更新する（research.md R2）
+- [X] T031 `apps/api/src/index.ts`に共通部分を組み込む：CORS（`WEB_ORIGIN`だけ許可）、エラーハンドラー（`{ error: { code, message } }`の形。メッセージに秘密情報を含めない）、`/api`のルーティング、HonoのRPC用の型（`AppType`）のexport
+- [X] T032 [P] `apps/api/src/services/access.ts`に`findOwnedAccount(db, userId, accountId)`を作る：Membershipで絞り込み、なければ`ACCOUNT_NOT_FOUND`（存在の有無を漏らさない。data-model.mdの`memberships`）
+- [X] T033 [P] `apps/web/src/lib/api-client.ts`を作る：HonoのRPCクライアントにClerkのトークンを付ける。`401`を受けたら「セッションの有効期限が切れました。もう一度ログインしてください」と表示して`/sign-in`へ遷移する（contracts/ui-routes.mdの規則7）
+- [X] T034 [P] `apps/web/src/lib/query.ts`にTanStack Queryのクライアントを作る
+- [X] T035 `apps/web/src/main.tsx`と`apps/web/src/router.tsx`を作る：ClerkProvider、QueryClientProvider、ルート一覧（`/sign-in`、`/`、`/accounts/new`、`/accounts/:accountId`、`/accounts/:accountId/settings`、`/data-deletion/:code`、それ以外は404）。認証が必要なルートは、未ログインなら内容を描画する前に`/sign-in`へ置き換え遷移するガードで包む（FR-003、contracts/ui-routes.mdの規則1）
+- [X] T036 [P] `apps/web/src/components/layout/AppShell.tsx`と`Sidebar.tsx`を作る：左サイドバー＋右メインパネル、狭い画面ではサイドバーをドロワー（Sheet）にする。サイドバーの中身（Account一覧・追加・ユーザーメニュー）は空の枠だけ用意する（contracts/ui-routes.mdの「レイアウトの骨格」）
+- [X] T037 [P] `apps/web/src/lib/callback-result.ts`を作る：URLの`connected`・`error`のクエリを読み、トーストで表示してからURLから消すフック（contracts/ui-routes.mdの「callbackの結果表示」）
+- [X] T038 [P] `apps/web/src/pages/not-found.tsx`に404画面を作る（「自分のAccountへ戻る」リンク付き）
 
 **完了条件**：`pnpm --filter api test`のunitテストが通る。ローカルでAPIとWebが起動し、未ログインで`/`を開くと`/sign-in`に遷移する
 
@@ -106,24 +106,24 @@ description: "ログインとThreadsアカウント登録の実装タスク"
 
 ### US1のテスト（先に書き、失敗することを確かめる）
 
-- [ ] T039 [P] [US1] `apps/api/test/integration/threads-connect.test.ts`を書く：`mode = new`で`authorizeUrl`が返り、`oauth_states`には`state`のSHA-256だけが保存され有効期限は10分。偽サーバーで許可 → callbackでAccount・Membership（`owner`）・`threads_connections`が作られ、`/accounts/:id?connected=new`へ302。拒否 → `THREADS_AUTH_CANCELLED`。同じ`state`で2回目のcallback → `OAUTH_STATE_INVALID`。プロフィール取得の失敗 → `THREADS_PROFILE_FETCH_FAILED`でAccountは作られない
-- [ ] T040 [P] [US1] `apps/api/test/integration/threads-callback-guards.test.ts`を書く：別ユーザーが登録済みの`threads_user_id` → `THREADS_ACCOUNT_TAKEN`。自分の既存Accountと同じ`threads_user_id` → Accountは増えず接続だけ更新して`connected=updated`。`authorized_at`以降に発行された`threads_revocations`がある → `THREADS_AUTH_REVOKED`。未完了の削除要求がある、または`completed_at >= oauth_states.created_at`の削除要求がある → `THREADS_DATA_DELETION_REQUESTED`。`users.last_account_deleted_at`が`oauth_states.created_at`より新しい → `ACCOUNT_DELETED_DURING_CONNECT`（quickstart.mdの該当行）
-- [ ] T041 [P] [US1] `apps/api/test/integration/secrets.test.ts`を書く：偽サーバーが返したトークン文字列と`state`の値が、`authorizeUrl`以外のAPIのレスポンスとログの出力に含まれない（FR-010、SC-005）
-- [ ] T042 [P] [US1] `apps/api/test/integration/me.test.ts`を書く：Accountが0件なら`landingAccountId`は`null`、Clerkの新しいユーザーで呼ぶと`users`行が作られる
+- [X] T039 [P] [US1] `apps/api/test/integration/threads-connect.test.ts`を書く：`mode = new`で`authorizeUrl`が返り、`oauth_states`には`state`のSHA-256だけが保存され有効期限は10分。偽サーバーで許可 → callbackでAccount・Membership（`owner`）・`threads_connections`が作られ、`/accounts/:id?connected=new`へ302。拒否 → `THREADS_AUTH_CANCELLED`。同じ`state`で2回目のcallback → `OAUTH_STATE_INVALID`。プロフィール取得の失敗 → `THREADS_PROFILE_FETCH_FAILED`でAccountは作られない
+- [X] T040 [P] [US1] `apps/api/test/integration/threads-callback-guards.test.ts`を書く：別ユーザーが登録済みの`threads_user_id` → `THREADS_ACCOUNT_TAKEN`。自分の既存Accountと同じ`threads_user_id` → Accountは増えず接続だけ更新して`connected=updated`。`authorized_at`以降に発行された`threads_revocations`がある → `THREADS_AUTH_REVOKED`。未完了の削除要求がある、または`completed_at >= oauth_states.created_at`の削除要求がある → `THREADS_DATA_DELETION_REQUESTED`。`users.last_account_deleted_at`が`oauth_states.created_at`より新しい → `ACCOUNT_DELETED_DURING_CONNECT`（quickstart.mdの該当行）
+- [X] T041 [P] [US1] `apps/api/test/integration/secrets.test.ts`を書く：偽サーバーが返したトークン文字列と`state`の値が、`authorizeUrl`以外のAPIのレスポンスとログの出力に含まれない（FR-010、SC-005）
+- [X] T042 [P] [US1] `apps/api/test/integration/me.test.ts`を書く：Accountが0件なら`landingAccountId`は`null`、Clerkの新しいユーザーで呼ぶと`users`行が作られる
 
 ### US1の実装
 
-- [ ] T043 [US1] `apps/api/src/services/threads-oauth.ts`に`startConnect(userId, { mode: "new" })`を作る：32バイトの乱数の`state`を作り、SHA-256（hex）を`oauth_states`に`expires_at = 作成から10分`で保存し、`buildAuthorizeUrl`を返す（research.md R4）
-- [ ] T044 [US1] `apps/api/src/services/threads-oauth.ts`に`consumeState(state)`を作る：`DELETE … RETURNING`で取得し、ない・期限切れなら`OAUTH_STATE_INVALID`
-- [ ] T045 [US1] `apps/api/src/services/account-service.ts`に`completeConnection(...)`を作る（research.md R8の手順を1つの対話的トランザクションで）：(1) `lockThreadsUser`、(2) `lockUserRow`、(3) `threads_revocations`に`authorized_at`以降の取り消しがあれば`THREADS_AUTH_REVOKED`、(4) 未完了の削除要求、または`completed_at >= oauth_states.created_at`の削除要求があれば`THREADS_DATA_DELETION_REQUESTED`（照合は`threads_user_hmac`）、(5) `users.last_account_deleted_at > oauth_states.created_at`なら`ACCOUNT_DELETED_DURING_CONNECT`、(6) `threads_user_id`で既存Accountを探す、(7) 自分のAccountなら接続を条件なしで上書きし`connection_generation`を1増やす、他人なら`THREADS_ACCOUNT_TAKEN`、(8) なければ`initialPlanFor`でプランを決め、Account・`owner`のMembership・接続を作る。接続には`encrypt`の結果、`scopes`、`expires_at`、`issued_at`、`authorized_at`（callbackがリダイレクトを受け取った時刻）を保存する。上限の判定はUS3で加えるため、ここでは呼び出し口（`assertCanAddAccount`、初期実装は常に許可）だけを置く
-- [ ] T046 [US1] `apps/api/src/routes/threads-connect.ts`に`POST /api/threads/connect`（`mode = new`）と`GET /api/threads/callback`を作る：callbackはリダイレクトを受け取った時刻を`authorized_at`として記録し、`error`クエリなら`THREADS_AUTH_CANCELLED`、それ以外は`consumeState` → `exchangeCode` → `exchangeLongLived` → `getProfile` → `completeConnection`の順に処理し、contracts/api.mdの表どおりに302でWebへ戻す
-- [ ] T047 [P] [US1] `apps/api/src/routes/me.ts`に`GET /api/me`を作る：`accounts`は`last_used_at`の新しい順。`landingAccountId`は`last_account_id` → `last_used_at`がもっとも新しいもの → `created_at`がもっとも新しいもの → `null`の順で決める（research.md R10）。`accountLimit`の`max`・`used`も返す
-- [ ] T048 [P] [US1] `apps/api/src/routes/accounts.ts`に`GET /api/accounts/:accountId`を作る（副作用なし、`findOwnedAccount`を使う）
-- [ ] T049 [P] [US1] `apps/web/src/pages/sign-in.tsx`を作る：「Googleでログイン」ボタンだけの中央寄せの画面。ログイン済みなら`/`へ。Googleでのログインの失敗は「Googleでのログインに失敗しました。もう一度お試しください。」を表示する（FR-001）
-- [ ] T050 [US1] `apps/web/src/pages/landing.tsx`を作る：`GET /api/me`の`landingAccountId`があれば`/accounts/:id`、なければ`/accounts/new`へ置き換え遷移する（FR-004・FR-005）
-- [ ] T051 [US1] `apps/web/src/pages/account-new.tsx`を作る：「Threadsアカウントを接続」ボタンで`POST /api/threads/connect`（`mode = new`）を呼び、`window.location.assign(authorizeUrl)`で遷移する。テスター制限の案内（「現在は検証期間中のため、招待されたThreadsアカウントのみ接続できます。…」と問い合わせ先）を常に表示する。Accountが0件のときはサイドバーなしの1カラム（contracts/ui-routes.md）
-- [ ] T052 [US1] `apps/web/src/pages/account-home.tsx`を作る：プロフィール画像（読み込めなければイニシャル）・表示名・@ユーザー名・接続状態を表示する。`callback-result`で`connected=new`なら「@{username} を追加しました」
-- [ ] T053 [US1] `apps/web/src/router.tsx`に「Account 0件のガード」を加える：Accountが0件のユーザーが`/accounts/:accountId`系を開いたら`/accounts/new`へ置き換え遷移する（US1 シナリオ3、規則3）
+- [X] T043 [US1] `apps/api/src/services/threads-oauth.ts`に`startConnect(userId, { mode: "new" })`を作る：32バイトの乱数の`state`を作り、SHA-256（hex）を`oauth_states`に`expires_at = 作成から10分`で保存し、`buildAuthorizeUrl`を返す（research.md R4）
+- [X] T044 [US1] `apps/api/src/services/threads-oauth.ts`に`consumeState(state)`を作る：`DELETE … RETURNING`で取得し、ない・期限切れなら`OAUTH_STATE_INVALID`
+- [X] T045 [US1] `apps/api/src/services/account-service.ts`に`completeConnection(...)`を作る（research.md R8の手順を1つの対話的トランザクションで）：(1) `lockThreadsUser`、(2) `lockUserRow`、(3) `threads_revocations`に`authorized_at`以降の取り消しがあれば`THREADS_AUTH_REVOKED`、(4) 未完了の削除要求、または`completed_at >= oauth_states.created_at`の削除要求があれば`THREADS_DATA_DELETION_REQUESTED`（照合は`threads_user_hmac`）、(5) `users.last_account_deleted_at > oauth_states.created_at`なら`ACCOUNT_DELETED_DURING_CONNECT`、(6) `threads_user_id`で既存Accountを探す、(7) 自分のAccountなら接続を条件なしで上書きし`connection_generation`を1増やす、他人なら`THREADS_ACCOUNT_TAKEN`、(8) なければ`initialPlanFor`でプランを決め、Account・`owner`のMembership・接続を作る。接続には`encrypt`の結果、`scopes`、`expires_at`、`issued_at`、`authorized_at`（callbackがリダイレクトを受け取った時刻）を保存する。上限の判定はUS3で加えるため、ここでは呼び出し口（`assertCanAddAccount`、初期実装は常に許可）だけを置く
+- [X] T046 [US1] `apps/api/src/routes/threads-connect.ts`に`POST /api/threads/connect`（`mode = new`）と`GET /api/threads/callback`を作る：callbackはリダイレクトを受け取った時刻を`authorized_at`として記録し、`error`クエリなら`THREADS_AUTH_CANCELLED`、それ以外は`consumeState` → `exchangeCode` → `exchangeLongLived` → `getProfile` → `completeConnection`の順に処理し、contracts/api.mdの表どおりに302でWebへ戻す
+- [X] T047 [P] [US1] `apps/api/src/routes/me.ts`に`GET /api/me`を作る：`accounts`は`last_used_at`の新しい順。`landingAccountId`は`last_account_id` → `last_used_at`がもっとも新しいもの → `created_at`がもっとも新しいもの → `null`の順で決める（research.md R10）。`accountLimit`の`max`・`used`も返す
+- [X] T048 [P] [US1] `apps/api/src/routes/accounts.ts`に`GET /api/accounts/:accountId`を作る（副作用なし、`findOwnedAccount`を使う）
+- [X] T049 [P] [US1] `apps/web/src/pages/sign-in.tsx`を作る：「Googleでログイン」ボタンだけの中央寄せの画面。ログイン済みなら`/`へ。Googleでのログインの失敗は「Googleでのログインに失敗しました。もう一度お試しください。」を表示する（FR-001）
+- [X] T050 [US1] `apps/web/src/pages/landing.tsx`を作る：`GET /api/me`の`landingAccountId`があれば`/accounts/:id`、なければ`/accounts/new`へ置き換え遷移する（FR-004・FR-005）
+- [X] T051 [US1] `apps/web/src/pages/account-new.tsx`を作る：「Threadsアカウントを接続」ボタンで`POST /api/threads/connect`（`mode = new`）を呼び、`window.location.assign(authorizeUrl)`で遷移する。テスター制限の案内（「現在は検証期間中のため、招待されたThreadsアカウントのみ接続できます。…」と問い合わせ先）を常に表示する。Accountが0件のときはサイドバーなしの1カラム（contracts/ui-routes.md）
+- [X] T052 [US1] `apps/web/src/pages/account-home.tsx`を作る：プロフィール画像（読み込めなければイニシャル）・表示名・@ユーザー名・接続状態を表示する。`callback-result`で`connected=new`なら「@{username} を追加しました」
+- [X] T053 [US1] `apps/web/src/router.tsx`に「Account 0件のガード」を加える：Accountが0件のユーザーが`/accounts/:accountId`系を開いたら`/accounts/new`へ置き換え遷移する（US1 シナリオ3、規則3）
 
 **チェックポイント**：US1だけで、ログインからAccountの画面まで動く（SC-001）
 

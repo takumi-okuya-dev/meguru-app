@@ -1,0 +1,10 @@
+node_modules/
+dist/
+build/
+coverage/
+.wrangler/
+pnpm-lock.yaml
+apps/api/drizzle/
+specs/
+_bmad/
+_bmad-output/
