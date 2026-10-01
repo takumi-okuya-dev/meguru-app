@@ -30,6 +30,12 @@ An uncited assertion sits here [4].
 [9] inside a fence never counts
 ```
 
+~~~~
+[8] inside a tilde fence never counts
+```
+[7] a shorter or different fence does not close it
+~~~~
+
 ## Source appendix
 
 | [n] | Supports | Publisher | Pub date | Accessed | Confidence |
@@ -70,6 +76,8 @@ class CitationsTest(unittest.TestCase):
         self.assertEqual(result["dangling_markers"], [4])
         self.assertEqual(result["orphaned_rows"], [3])
         self.assertNotIn(9, result["markers"])  # fenced content ignored
+        self.assertNotIn(8, result["markers"])
+        self.assertNotIn(7, result["markers"])
         self.assertEqual(code, 1)
 
 
@@ -128,6 +136,14 @@ class SlugTest(unittest.TestCase):
             ["slug", "SMB Accounting SaaS", "--type", "market", "--date", "2026-07-22", "--pattern", pattern]
         )
         self.assertEqual(result["folder"], "market-smb-accounting-saas-2026-07-22")
+        self.assertEqual(code, 0)
+
+    def test_non_ascii_topics_keep_their_script(self):
+        self.assertEqual(slugify("競合分析"), "競合分析")
+        self.assertEqual(slugify("ガジェット"), "ガジェット")
+        self.assertNotEqual(slugify("AI 市場"), slugify("AI 競合"))
+        code, result = run(["slug", "AI 市場", "--type", "market"])
+        self.assertEqual(result["topic_slug"], "ai-市場")
         self.assertEqual(code, 0)
 
 

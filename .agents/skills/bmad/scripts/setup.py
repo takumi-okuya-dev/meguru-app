@@ -1976,7 +1976,9 @@ def tree_matches(root: Path, expected: PlainTree) -> bool:
 
 def tree_state(root: Path, expected: PlainTree) -> str:
     if not root.exists() and not root.is_symlink():
-        return "missing"
+        # Git cannot keep an empty directory, so a clean checkout of a module
+        # that declares no scripts never has one; that is not a missing setup.
+        return "current" if expected == PlainTree((), ()) else "missing"
     return "current" if tree_matches(root, expected) else "stale"
 
 

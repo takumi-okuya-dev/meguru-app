@@ -45,6 +45,7 @@ from urllib.parse import urlparse
 MARKER_RE = re.compile(r"\[(\d+)\](?!\()")  # [3] but not a [3](url) link
 MD_LINK_RE = re.compile(r"\[([^\]]*)\]\((\S+?)\)")
 BARE_URL_RE = re.compile(r"https?://[^\s|)\]]+")
+FENCE_RE = re.compile(r"^\s*(`{3,}|~{3,})")
 
 
 def out(payload: dict, exit_code: int) -> int:
@@ -59,14 +60,24 @@ def read_text(path_arg: str) -> str:
 
 
 def strip_fences(text: str) -> str:
-    """Blank out fenced code blocks so their contents never count as markers or rows."""
-    lines, fenced = [], False
+    """Blank out fenced code blocks so their contents never count as markers or rows.
+
+    A fence opens with 3+ backticks or tildes and closes only on a bare run of the
+    same character at least as long, so ``` inside a ~~~ block (or vice versa) stays fenced.
+    """
+    lines, fence = [], None
     for ln in text.splitlines():
-        if ln.lstrip().startswith("```"):
-            fenced = not fenced
-            lines.append("")
+        m = FENCE_RE.match(ln)
+        if fence is None:
+            if m:
+                fence = m.group(1)
+                lines.append("")
+            else:
+                lines.append(ln)
             continue
-        lines.append("" if fenced else ln)
+        lines.append("")
+        if m and m.group(1)[0] == fence[0] and len(m.group(1)) >= len(fence) and not ln[m.end() :].strip():
+            fence = None
     return "\n".join(lines)
 
 
@@ -223,8 +234,15 @@ def cmd_staleness(args) -> int:
 
 
 def slugify(text: str, max_len: int = 40) -> str:
-    text = unicodedata.normalize("NFKD", text).encode("ascii", "ignore").decode()
-    text = re.sub(r"[^a-z0-9]+", "-", text.lower()).strip("-")
+    """Fold accents off ASCII letters (é -> e) but keep other scripts, so a
+    Japanese topic neither slugifies to "" nor collides with its ASCII words."""
+    kept: list[str] = []
+    for ch in unicodedata.normalize("NFKD", text):
+        if unicodedata.combining(ch) and kept and kept[-1].isascii():
+            continue
+        kept.append(ch)
+    text = unicodedata.normalize("NFKC", "".join(kept))
+    text = re.sub(r"[\W_]+", "-", text.lower()).strip("-")
     return re.sub(r"-{2,}", "-", text)[:max_len].rstrip("-")
 
 

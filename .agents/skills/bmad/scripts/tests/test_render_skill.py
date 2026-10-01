@@ -24,8 +24,6 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest import mock
 
-from helpers import chmod
-
 SCRIPTS_SRC = Path(__file__).resolve().parents[1]
 REPO = SCRIPTS_SRC.parents[2]
 SKILLS_SRC = REPO / "skills"
@@ -44,6 +42,15 @@ DISPATCH_PREFIX = "read and follow "
 
 sys.path.insert(0, str(SCRIPTS_SRC))
 import render_skill as rs  # noqa: E402
+
+
+def chmod(path: Path, mode: int, deny: str | None = None) -> None:
+    """Set POSIX mode bits; on Windows, where they barely apply, deny `deny`
+    rights (icacls codes such as "WD,AD") to Everyone, or lift that deny."""
+    if os.name == "nt":
+        grant = ["/deny", f"*S-1-1-0:({deny})"] if deny else ["/remove:d", "*S-1-1-0"]
+        subprocess.run(["icacls", str(path), *grant], check=True, capture_output=True)
+    os.chmod(path, mode)
 
 
 def _team_config(project: Path) -> str:
