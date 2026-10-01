@@ -46,7 +46,7 @@ Googleアカウントでログインし、自分のThreadsアカウントを公�
 - Threadsのredirect URIはHTTPS必須で、`localhost`は使えない（research.md R3）。
 - トークンの平文をレスポンス・ログに出さない（FR-010）。
 
-**規模**：検証期間はユーザー数十人・1人あたりAccount最大5件。画面は5つ（ログイン、アカウント追加、Accountホーム、Account設定、データ削除の受付表示）。APIのエンドポイントは8つと、日次のCron。
+**規模**：検証期間はユーザー数十人・1人あたりAccount最大5件。画面は5つ（ログイン、アカウント追加、Accountホーム、Account設定、データ削除の状況表示）。APIのエンドポイントは9つと、日次のCron。
 
 「要確認」の項目はなし（すべて[research.md](./research.md)で解消済み）。
 
@@ -66,7 +66,9 @@ Googleアカウントでログインし、自分のThreadsアカウントを公�
 | 運用コスト制約（固定費$0） | 合格（specを1件修正） | セッション期間を30日から7日に変更した（Clerkの無料枠の既定値）。Cronは1日1回でNeonへの負荷は小さい |
 | 開発ワークフロー | 注意 | 現在`main`にいる。実装の前に`feature/001-login-account-setup`を切ること |
 
-**Phase 1の設計後の再確認**：設計（data-model.md、contracts/）で新たな違反は生じていない。データ削除callbackの厳密な対応は、`TODO(COMMERCIAL_LAUNCH_GATE)`の時点で見直す（research.md R7）。
+**Phase 1の設計後の再確認**：設計（data-model.md、contracts/）で新たな違反は生じていない。
+
+**PR #2のレビュー対応後の再確認（2026-10-01）**：データ削除要求でAccountを関連データごと削除する設計（research.md R7）、画面を開いたときの接続確認（R14）、`token_version`による競合制御（R6）を追加した。いずれもConstitutionの原則・技術スタック制約の範囲内で、新たな違反はない。画面を開いたときのThreads APIの呼び出しは1回だけで、固定費$0の制約にも影響しない。
 
 ## プロジェクト構成（Project Structure）
 
@@ -114,13 +116,15 @@ apps/api/                          # Cloudflare Workers + Hono
 │   │   └── auth.ts                # Clerkの検証とusers行のJIT作成
 │   ├── routes/
 │   │   ├── me.ts
-│   │   ├── accounts.ts
+│   │   ├── accounts.ts            # 取得・open・削除
+│   │   ├── data-deletion.ts       # データ削除要求の状況確認
 │   │   ├── threads-connect.ts     # connectとcallback
 │   │   └── threads-webhooks.ts    # アンインストールとデータ削除
 │   ├── services/
-│   │   ├── account-service.ts     # 作成・更新・上限・削除
+│   │   ├── account-service.ts     # 作成・更新・上限・削除・open（記録と接続確認）
+│   │   ├── data-deletion.ts       # Metaのデータ削除要求の履行と再試行
 │   │   ├── threads-oauth.ts       # state、認可URL、callbackの処理
-│   │   └── token-refresh.ts       # 日次のCronの処理
+│   │   └── token-refresh.ts       # 日次のCronの処理（token_versionによる競合制御）
 │   └── lib/
 │       ├── threads-client.ts      # Threads APIの呼び出し（ベースURLを差し替えられる）
 │       ├── crypto.ts              # AES-256-GCM

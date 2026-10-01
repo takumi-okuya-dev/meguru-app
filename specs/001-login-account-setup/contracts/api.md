@@ -16,7 +16,10 @@
   ```
 
   `message`は開発者向けの英文。画面に出す日本語の文言は、Webが`code`から引く（[ui-routes.md](./ui-routes.md)）。
-- **秘密情報**：アクセストークン・認可コード・`state`の平文は、どのレスポンスにも含めない（FR-010）。
+- **秘密情報**（FR-010）：
+  - アクセストークン、認可コード、App Secretは、どのレスポンスにも含めない。
+  - `state`は例外で、`POST /api/threads/connect`のレスポンスの`authorizeUrl`の中にだけ含める（OAuthの仕組み上、ブラウザに渡す必要がある）。それ以外のレスポンスには含めない。
+  - 上記すべて（`state`と`authorizeUrl`を含む）は、ログ・エラーメッセージに出さない。
 
 ## 型
 
@@ -60,22 +63,30 @@ type AccountLimit = {
 
 - `landingAccountId`は、Accountが0件のとき`null`になる。決め方はresearch.md R10を参照。
 
-### PUT /api/me/last-account
-
-Accountを切り替えたことを記録する（FR-007）。
-
-- **認証**：必要
-- **リクエスト**：`{ "accountId": "…" }`
-- **204**：`users.last_account_id`と`accounts.last_used_at`を更新した
-- **404 `ACCOUNT_NOT_FOUND`**：Accountがない、または自分のものではない
-
 ### GET /api/accounts/:accountId
 
-Account 1件の詳細を返す。
+Account 1件の詳細を、DBに保存されている状態のまま返す。副作用はない。
 
 - **認証**：必要
 - **200**：`AccountSummary`
 - **404 `ACCOUNT_NOT_FOUND`**
+
+### POST /api/accounts/:accountId/open
+
+ユーザーがAccountの画面（`/accounts/:accountId`とその配下）を開いたときに、Webが1回呼ぶ。次の2つを1つのリクエストで行う（research.md R10・R14）。
+
+1. **最後に使ったAccountの記録**（FR-007）：`users.last_account_id`と`accounts.last_used_at`を更新する。
+2. **接続の確認**（FR-018）：接続情報があれば、そのトークンでThreadsのプロフィールを取得する。
+   - 成功：プロフィール（ユーザー名・表示名・画像）を最新にする。
+   - 認証エラー：`needs_reconnect`にする（research.md R6の競合制御に従う）。
+   - 認証エラー以外の失敗（Threads側の障害など）：状態は変えず、記録だけ行う。
+
+- **認証**：必要
+- **リクエスト**：本文なし
+- **200**：更新後の`AccountSummary`
+- **404 `ACCOUNT_NOT_FOUND`**
+- **冪等**：何度呼んでも結果は同じ。Webは失敗時に再試行する（[ui-routes.md](./ui-routes.md)）。
+- **プリフェッチ禁止**：画面を実際に開いたときだけ呼ぶ。ホバーなどの先読みで呼ぶと、見ていないAccountが「最後に使ったAccount」になってしまうため。
 
 ### POST /api/threads/connect
 
@@ -85,10 +96,12 @@ Threads接続フローを始め、認可URLを返す（FR-008、FR-017、FR-020�
 - **リクエスト**：
   - 新規：`{ "mode": "new" }`
   - 再接続：`{ "mode": "reconnect", "accountId": "…" }`
+    - 接続状態に関係なく（`connected`でも`needs_reconnect`でも）使える。既存のAccountの接続を、同じThreadsアカウントで認可し直すための経路である（FR-013、FR-020）。
+    - 新しいAccountを作らないので、登録数上限の判定はしない。上限に達しているユーザーでも、既存のAccountは再認可できる。
 - **200**：`{ "authorizeUrl": "https://threads.com/oauth/authorize?…" }`
   - WebはこのURLへ`window.location.assign`で遷移する。
   - `state`は有効期限10分、1回限り（research.md R4）。
-- **409 `ACCOUNT_LIMIT_REACHED`**：`mode = new`で、上限に達している。認可には進ませない。
+- **409 `ACCOUNT_LIMIT_REACHED`**：`mode = new`で、上限に達している。認可には進ませない。既存のAccountを認可し直したい場合は、`mode = reconnect`を使う。
 - **404 `ACCOUNT_NOT_FOUND`**：`mode = reconnect`で、Accountがない、または自分のものではない
 
 ### GET /api/threads/callback
@@ -128,8 +141,11 @@ Accountを削除する（FR-022）。
 
 - **認証**：必要（ownerのみ）
 - **リクエスト**：`{ "confirmUsername": "…" }`
+  - サーバーは`confirmUsername`と`username`の両方を次の手順で正規化してから比較する：前後の空白を除く → 先頭の`@`を1つだけ除く → 小文字にする。
+  - そのため、`@takumi`、`takumi`、` @Takumi `はいずれも`takumi`と一致する。Webは入力をそのまま送ってよい。
+  - 正規化の関数は`packages/shared`に置き、Webのボタンの有効・無効の判定にも同じ関数を使う。
 - **204**：Account・接続情報・関連データを削除した。`last_account_id`が指していた場合はNULLになる
-- **422 `CONFIRMATION_MISMATCH`**：`confirmUsername`がAccountの`username`と一致しない
+- **422 `CONFIRMATION_MISMATCH`**：正規化した`confirmUsername`が、正規化したAccountの`username`と一致しない
 - **404 `ACCOUNT_NOT_FOUND`**
 
 ## Metaからのcallback
@@ -143,14 +159,26 @@ Threadsアプリの設定に登録する（research.md R7）。どちらも`appl
 
 ### POST /api/threads/webhooks/data-deletion
 
-- **処理**：アンインストールと同じ処理をしたうえで、`threads_deletion_requests`に記録する。
+- **処理**（research.md R7）：
+  1. `threads_deletion_requests`に`status = pending`で記録し、確認コードを発行する。
+  2. 同じリクエストの中で、`threads_user_id`に一致するAccountを削除する。接続情報と関連データは`ON DELETE CASCADE`で消える。FR-022と同じ削除処理を、確認入力なしで実行する。
+  3. 削除に成功したら`status = completed`と`completed_at`を記録する。該当するAccountがなかった場合も、削除すべきデータがないので`completed`にする。
+  4. 削除に失敗したら`status = failed`にし、Metaには`200`と確認コードを返す。失敗した要求は日次のCronで再試行する（下記「定期処理」）。
 - **200**：
 
   ```json
   { "url": "{WEB_ORIGIN}/data-deletion/<confirmation_code>", "confirmation_code": "…" }
   ```
 
-  状況確認ページ（`/data-deletion/:code`）の中身は、`TODO(COMMERCIAL_LAUNCH_GATE)`の時点で作る。MVPでは「受け付けました」とだけ表示する。
+### GET /api/data-deletion/:confirmationCode
+
+データ削除の状況確認ページ（`/data-deletion/:code`）が、実際の進み具合を表示するために呼ぶ。
+
+- **認証**：不要（確認コードは推測できない乱数）
+- **200**：`{ "status": "pending" | "completed" | "failed", "receivedAt": "…", "completedAt": "…" | null }`
+  - `failed`は「処理中」として表示し、再試行で`completed`になるのを待つ。
+  - ThreadsのユーザーIDやAccountの情報は返さない。
+- **404**：確認コードが存在しない
 
 ## 定期処理（Cron Trigger）
 
@@ -161,6 +189,8 @@ HTTPエンドポイントではないが、外から観測できる振る舞い�
   1. `expires_at`が7日以内で、`issued_at`から24時間以上経った接続のトークンを更新し、プロフィールも取り直す。
   2. 更新時に認証エラーが返った接続、または`expires_at`を過ぎた接続のAccountを`needs_reconnect`にする。
   3. 期限切れの`oauth_states`を削除する。
+  4. `status = failed`のデータ削除要求を再試行する（research.md R7）。
+- **再接続との競合**：1・2の書き込みは、読み取った時点の`token_version`が変わっていない場合だけ反映する。処理の途中でユーザーが再接続した場合は、Cronの結果を捨てる（data-model.mdの`threads_connections`）。
 - 1件の失敗で全体を止めない。失敗した件数はログに出す（トークンは出さない）。
 
 ## 環境変数・Secret

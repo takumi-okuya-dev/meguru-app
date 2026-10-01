@@ -46,7 +46,13 @@ pnpm e2e                   # Playwright：Clerkのテスト用ログイン + 偽
 | 平文が出ない | APIのレスポンスとログの出力に、偽サーバーが返したトークン文字列が含まれない | FR-010、SC-005 |
 | 暗号文の付け替え | 別のAccountの`account_id`をAADにすると復号に失敗する | research.md R5 |
 | 定期更新 | 期限まで7日を切った接続は更新され、認証エラーなら`needs_reconnect`になる | FR-018、FR-021 |
-| 削除の確認 | `confirmUsername`が違えば`422`で何も消えず、一致すれば関連行がすべて消える | FR-022 |
+| 削除の確認 | `confirmUsername`が違えば`422`で何も消えず、一致すれば関連行がすべて消える。`@takumi`・`takumi`・` @Takumi `のどれでも一致する | FR-022 |
+| 上限到達時の再認可 | 上限に達したユーザーでも、`mode = reconnect`なら接続中のAccountを認可し直せ、Accountは増えない | FR-013、FR-020 |
+| Cronと再接続の競合 | Cronがトークンを読んだ後に再接続が完了すると、Cronの更新結果・認証エラーは反映されず、新しい接続が`connected`のまま残る | research.md R6 |
+| 画面を開いたときの確認 | 偽サーバーでトークンを無効にしてから`POST /api/accounts/:id/open`を呼ぶと、そのレスポンスで`needs_reconnect`になり、`GET /api/me`の一覧にも反映される | FR-018、SC-007 |
+| 最後に使ったAccountの記録 | `open`が2回失敗しても3回目の再試行で記録され、次の`GET /api/me`の`landingAccountId`がそのAccountになる | FR-007、SC-004 |
+| データ削除要求 | 署名の正しい`signed_request`でAccountと関連行がすべて消え、状況確認APIが`completed`を返す。削除を失敗させると`failed`になり、Cronの再試行で`completed`になる | research.md R7 |
+| `state`の漏えい防止 | `authorizeUrl`以外のレスポンスとログの出力に、`state`の値が含まれない | FR-010 |
 | 未ログインのガード | 認証が必要なルートは、内容を描画せずに`/sign-in`へ遷移する | FR-003、SC-003 |
 
 ## 手動での確認（本物のGoogleとThreadsを使う）
@@ -91,13 +97,20 @@ cloudflared tunnel run <トンネル名>   # 別ターミナルで
 ### US4：再接続と削除
 
 1. Threadsアプリの「設定 → アカウント → ウェブサイトのアクセス許可」で、このアプリを削除する。
-   - **期待**：数秒〜数分でアンインストールのcallbackが届き、そのAccountに「要再接続」のバナーと警告アイコンが出る（US4-1）。
+   - **期待**：アンインストールのcallbackが届けば、そのAccountに「要再接続」のバナーと警告アイコンが出る。callbackが届かなくても、そのAccountの画面を開き直した時点で「要再接続」になる（US4-1、SC-007）。
 2. 「再接続」を選び、同じThreadsアカウントで許可する。
    - **期待**：「再接続しました」と表示され、警告が消える（US4-2）。1分以内（SC-007）。
 3. もう一度「再接続」を選び、別のThreadsアカウントで許可する。
    - **期待**：`RECONNECT_ACCOUNT_MISMATCH`の文言が出る（US4-3）。
-4. 設定画面で「Accountを削除」を選び、@ユーザー名を入力して確定する。
+4. プラン1（上限1件）のまま、接続中のAccountの設定画面で「Threadsとの接続を認可し直す」を選び、同じThreadsアカウントで許可する。
+   - **期待**：上限の案内は出ず、Accountは増えずに接続が更新される（US4-5）。
+5. 設定画面で「Accountを削除」を選び、`@`付きの@ユーザー名を入力して確定する。
    - **期待**：一覧から消え、上限の使用数が1減る（US4-4）。
+
+### Metaのデータ削除要求
+
+1. テスター用のThreadsアカウントでAccountを登録しておき、Threadsアプリの「ウェブサイトのアクセス許可」から、このアプリへのデータ削除を要求する。
+   - **期待**：Account一覧からそのAccountが消える。Metaに返した確認URL（`/data-deletion/:code`）を開くと「削除が完了しました」と完了日時が表示される。
 
 ### 秘密情報の確認
 

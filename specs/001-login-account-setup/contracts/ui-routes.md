@@ -34,8 +34,8 @@
 | `/` | 必要 | 中身を持たない振り分け用のルート。`GET /api/me`の`landingAccountId`があれば`/accounts/:id`、なければ`/accounts/new`へ置き換え遷移する | FR-004、FR-005 |
 | `/accounts/new` | 必要 | アカウント追加画面。上限の表示、「Threadsアカウントを接続」ボタン、テスター制限の案内 | FR-008、FR-017 |
 | `/accounts/:accountId` | 必要 | Accountのホーム。本featureでは、プロフィール（画像・表示名・@ユーザー名）と接続状態のみを表示する。後続featureがここに機能を足す | US1 |
-| `/accounts/:accountId/settings` | 必要 | 接続状態、「再接続」ボタン、Accountの削除 | FR-019、FR-020、FR-022 |
-| `/data-deletion/:code` | 不要 | Metaのデータ削除の受付表示（api.md参照） | research.md R7 |
+| `/accounts/:accountId/settings` | 必要 | 接続状態、Threadsとの接続を認可し直すボタン（接続状態に関係なく常に表示）、Accountの削除 | FR-013、FR-019、FR-020、FR-022 |
+| `/data-deletion/:code` | 不要 | Metaのデータ削除要求の状況表示。`GET /api/data-deletion/:code`の結果に応じて「処理中」「削除が完了しました（日時）」を出す（api.md参照） | research.md R7 |
 | 上記以外 | — | 404画面 | — |
 
 ## 遷移の規則
@@ -44,11 +44,16 @@
 2. **ログイン後**：常に`/`を経由して振り分ける（FR-004、FR-005）。直前に開こうとしていたURLへは戻さない（spec FR-004に従う）。
 3. **Account 0件のガード**：Accountが0件のユーザーが`/accounts/:accountId`系にアクセスしたら、`/accounts/new`へ置き換え遷移する（US1 シナリオ3）。
 4. **他人・存在しないAccount**：APIが`404 ACCOUNT_NOT_FOUND`を返したら404画面を出し、「自分のAccountへ戻る」リンクを置く。
-5. **Accountの切り替え**：サイドバーで選んだら`PUT /api/me/last-account`を呼び、`/accounts/:id`へ遷移する（FR-007）。呼び出しの失敗は遷移を妨げない。
+5. **Accountを開いたとき**：`/accounts/:accountId`配下を開くたびに、`POST /api/accounts/:accountId/open`を1回呼ぶ（FR-007、FR-018、research.md R10・R14）。経路は問わない（サイドバー、URLの直接入力、ブラウザの戻る・進む）。
+   - 画面は、DBに保存されている状態ですぐに描画する。レスポンスが返ったら、接続状態とプロフィールを最新の値に差し替える。
+   - 失敗しても画面の表示は止めない。指数バックオフで最大3回まで再試行し、それでも失敗した場合は、ウィンドウにフォーカスが戻ったとき・再読み込みのときに、開いているAccountについてもう一度呼ぶ。
+   - ホバーなどでの先読みでは呼ばない。
+   - サイドバーでAccountを選んだときは、`/accounts/:id`へ遷移するだけでよい（記録は遷移先の画面で行われる）。
 6. **ログアウト**：Clerkのセッションを終了し、TanStack Queryのキャッシュを全部消してから`/sign-in`へ置き換え遷移する。ブラウザの「戻る」で戻っても、ガード1により内容は表示されない（FR-006）。
 7. **セッション切れ**：APIが`401`を返したら、「セッションの有効期限が切れました。もう一度ログインしてください」と表示してから`/sign-in`へ遷移する（spec エッジケース）。
-8. **上限到達**：`/accounts/new`は、`accountLimit.used >= accountLimit.max`のとき接続ボタンを無効にし、上限の案内を出す。APIの`409`を受けた場合も同じ表示にする（FR-017）。
-9. **削除の確認**：`/accounts/:id/settings`の削除ダイアログでは、`@username`を入力欄に打ち込むまで「削除する」ボタンを無効にする（FR-022）。削除後は`/`へ遷移して振り分け直す。
+8. **上限到達**：`/accounts/new`は、`accountLimit.used >= accountLimit.max`のとき接続ボタンを無効にし、上限の案内を出す。APIの`409`を受けた場合も同じ表示にする（FR-017）。案内には「登録済みのAccountの接続を更新したい場合は、そのAccountの設定画面から認可し直せます」という一文を添える。
+9. **認可し直す**：`/accounts/:id/settings`には、接続状態に関係なく「Threadsとの接続を認可し直す」ボタンを置き、`POST /api/threads/connect`を`mode = reconnect`で呼ぶ（FR-013、FR-020）。新しいAccountは作らないので、上限に達していても使える。`needs_reconnect`のときは、このボタンを「再接続」として強調する。
+10. **削除の確認**：`/accounts/:id/settings`の削除ダイアログには「確認のため、@{username} と入力してください」と表示する。入力は`@`付きでも`@`なしでもよく、大文字・小文字も区別しない。`packages/shared`の正規化関数で比べて一致するまで「削除する」ボタンを無効にし、入力した値はそのままAPIへ送る（api.mdのDELETE、FR-022）。削除後は`/`へ遷移して振り分け直す。
 
 ## callbackの結果表示
 
