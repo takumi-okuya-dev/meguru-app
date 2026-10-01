@@ -162,11 +162,14 @@ Threadsアプリの設定に登録する（research.md R7）。どちらも`appl
 
 - **処理**（research.md R7）：
   1. 確認コードを発行し、`threads_deletion_requests`に`status = pending`で記録する。平文の`threads_user_id`と鍵付きハッシュ`threads_user_hmac`の両方を記録し、`last_attempted_at`を現在時刻にする。この記録は単独でコミットし、以降の処理が中断しても要求が失われないようにする。
-  2. 削除のトランザクションを始め、Threadsユーザー単位のアドバイザリーロックを取る（callbackと同じキー。research.md R7・R8）。
-  3. `threads_user_id`に一致するAccountを削除する。接続情報と関連データは`ON DELETE CASCADE`で消える。FR-022と同じ削除処理を、確認入力なしで実行する。該当するAccountがなければ、削除すべきデータがないので何もしない。
-  4. 同じトランザクションで、`status = completed`・`completed_at`を記録し、平文の`threads_user_id`をNULLにしてからコミットする。
-  5. 3・4が失敗したら`status = failed`にする。Workerが強制終了して`failed`に移せなかった場合は、`pending`のまま残る。どちらも日次のCronで再試行する（下記「定期処理」）。
-  6. 処理の成否にかかわらず、Metaには`200`と確認コードを返す。
+  2. 削除の試行を、次の手順で**1つのトランザクション**として行う（research.md R7「試行ごとの原子的なclaim」）。Cronの再試行も、まったく同じ手順を使う。
+     1. Threadsユーザー単位のアドバイザリーロックを取る（callbackと同じキー。research.md R7・R8）。
+     2. 削除要求の行を`SELECT … FOR UPDATE`で読み直し、`status`が`pending` / `failed`で、`threads_user_id`がロックのキーと一致し、`last_attempted_at`が最初に読み取った値のままであることを確かめる。どれかが違えば、他のWorkerが処理済みなので、何もせずに終える。
+     3. 条件付きの`UPDATE … SET attempts = attempts + 1, last_attempted_at = now() WHERE confirmation_code = $1 AND status IN ('pending', 'failed') AND last_attempted_at = <最初に読み取った値> RETURNING threads_user_id`で、この試行の担当を確定（claim）する。更新件数が0なら、削除しない。
+     4. claimで得た`threads_user_id`に一致するAccountを削除する。接続情報と関連データは`ON DELETE CASCADE`で消える。FR-022と同じ削除処理を、確認入力なしで実行する。該当するAccountがなければ、削除すべきデータがないので何もしない。
+     5. `status = completed`・`completed_at`を記録し、平文の`threads_user_id`をNULLにしてからコミットする。
+  3. 2が失敗したらロールバックし、別のトランザクションで`status = failed`、`attempts + 1`、`last_attempted_at = now()`にする（`status <> 'completed'`を条件にする。claimの更新もロールバックされているため、ここで試行を記録し直す）。Workerが強制終了して`failed`に移せなかった場合は、`pending`のまま残る。どちらも日次のCronで再試行する（下記「定期処理」）。
+  4. 処理の成否にかかわらず、Metaには`200`と確認コードを返す。
 - **200**：
 
   ```json
@@ -192,7 +195,7 @@ HTTPエンドポイントではないが、外から観測できる振る舞い�
   1. `expires_at`が7日以内で、`issued_at`から24時間以上経った接続のトークンを更新し、プロフィールも取り直す。
   2. 更新時に認証エラーが返った接続、または`expires_at`を過ぎた接続のAccountを`needs_reconnect`にする。
   3. 期限切れの`oauth_states`を削除する。
-  4. データ削除要求を再試行する（research.md R7）。対象は、`status = failed`のものと、`last_attempted_at`から15分以上経った`status = pending`のもの。手順はwebhookの2〜5と同じで、試行のたびに`attempts`と`last_attempted_at`を更新する。
+  4. データ削除要求を再試行する（research.md R7）。対象は、`last_attempted_at`から15分以上経った`status = pending`と`status = failed`のもの（同じリースで扱う）。対象を一覧で読み取った後、1件ずつwebhookの手順2〜3（ロック → 読み直し → 条件付きUPDATEでclaim → 削除 → 完了）で処理する。claimできなかった要求は、他のWorkerが処理中か処理済みなので、削除しない。
   5. 完了から15分以上経った削除要求の`threads_user_hmac`をNULLにする（research.md R7）。
 - **再接続との競合**：1・2の書き込みは、読み取った時点の`accounts.connection_generation`が変わっていない場合だけ反映する。処理の途中で再接続・アンインストールなどにより接続が変わった場合は、Cronの結果を捨てる（data-model.mdの`accounts`）。
 - 1件の失敗で全体を止めない。失敗した件数はログに出す（トークンは出さない）。

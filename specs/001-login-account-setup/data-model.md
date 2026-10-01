@@ -136,13 +136,14 @@ Metaのデータ削除callbackの受付記録、削除の進み具合、進行�
 | `threads_user_hmac` | text | NULL可 | `HMAC-SHA256(IDENTIFIER_HASH_KEY, threads_user_id)`（hex）。受付時に記録する。tombstoneの確認に使い、完了から15分以上経った後の日次Cronでnullにする |
 | `status` | deletion_status | NOT NULL | 下の状態遷移を参照 |
 | `received_at` | timestamptz | NOT NULL | |
-| `last_attempted_at` | timestamptz | NOT NULL | 最後に削除を試みた日時。`pending`の要求を回収するリースの起点 |
+| `last_attempted_at` | timestamptz | NOT NULL | 最後に削除を試みた日時。再試行のリースの起点であり、claimの条件（楽観的な排他）にも使う |
 | `completed_at` | timestamptz | NULL可 | Accountと関連データを削除し終えた日時 |
 | `attempts` | smallint | NOT NULL, 既定値0 | 削除を試みた回数 |
 
 - **CHECK制約**：`status <> 'completed'`なら`threads_user_id IS NOT NULL`（完了するまでは再試行のために平文を保持する）。`status = 'completed'`なら`threads_user_id IS NULL`。
 - **インデックス**：`threads_user_hmac`（tombstoneの確認用）、`(status, last_attempted_at)`（Cronの再試行の抽出用）。
-- **再試行の対象**：`status = 'failed'`、または`status = 'pending' AND last_attempted_at < now() - interval '15 minutes'`（受付直後の中断からの回収）。
+- **再試行の対象**：`status IN ('pending', 'failed') AND last_attempted_at < now() - interval '15 minutes'`。`pending`（受付直後の中断からの回収）と`failed`を、同じリースで扱う。
+- **claim**：試行のたびに、アドバイザリーロック → `SELECT … FOR UPDATE`での読み直し → `last_attempted_at`を条件にした`UPDATE … RETURNING`の順で、担当を確定する。claim・削除・完了の記録は1つのトランザクションで行い、claimできなかったWorkerは削除しない（research.md R7）。
 - **tombstoneの確認**：callbackは、`threads_user_hmac`が一致し、`received_at`が自分の`oauth_states.created_at`以降の行があれば登録を拒否する。平文ではなく鍵付きハッシュで照合するので、完了後に平文を消しても確認できる。
 - **最終的に残る情報**：確認コード・状態・日時・試行回数だけ。どちらの識別子もNULLになる。
 - **状況確認**：`GET /api/data-deletion/:confirmationCode`が`status`・`received_at`・`completed_at`だけを返す。識別子は外に出さない。

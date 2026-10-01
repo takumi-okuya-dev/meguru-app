@@ -103,8 +103,25 @@
   - **データ削除**：同じく検証したうえで、該当するThreadsユーザーのAccountを関連データごと削除する（FR-022と同じ削除処理）。受け付けた時点で要求を記録し、削除の成否を`pending` / `completed` / `failed`で持つ。状況確認ページはこの状態をそのまま表示する。
 - **中断からの回復**：
   - 削除処理は冪等にする（「このThreadsユーザーのAccountが残っていれば消す」）。何度実行しても結果は同じ。
-  - 日次のCronは、`failed`の要求に加えて、**最後に試みてから15分以上経った`pending`の要求**も再試行する。受付を記録した直後にWorkerが強制終了し、`failed`に移せなかった要求も、これで回収できる（PR #2の2回目のレビューで指摘）。
-  - 15分という猶予は、通常の削除処理（数秒）が終わるのを待つためのリース期間である。受付のリクエスト自体がまだ処理中の要求を、Cronが二重に処理しないようにする。仮に二重に処理しても、冪等なので害はない。
+  - 日次のCronは、**最後に試みてから15分以上経った`pending`と`failed`の要求**を再試行する。`pending`と`failed`の両方に、同じ15分のリースを使う。受付を記録した直後にWorkerが強制終了し、`failed`に移せなかった要求も、これで回収できる（PR #2の2回目のレビューで指摘）。
+  - 15分という猶予は、通常の削除処理（数秒）が終わるのを待つためのリース期間である。受付のリクエスト自体がまだ処理中の要求を、Cronが拾わないようにする。
+- **試行ごとの原子的なclaim**：
+  - 「冪等だから二重に処理しても害はない」とは言えない。次の競合があるためである（PR #2の3回目のレビューで指摘）。
+    1. 2つのWorker（AとB）が、同じ古い要求を読み取る。
+    2. Aが削除して`completed`にする。
+    3. ユーザーが削除の完了後に、新しい認可フローで正当に再接続する（tombstoneの規則上、削除要求より後に始めた接続は許可される）。
+    4. 遅れて動いたBが、先に読み取っていた`threads_user_id`を使い、再接続されたAccountまで削除してしまう。
+  - そこで、削除の試行（webhookでの最初の試行も、Cronの再試行も）は、すべて次の手順を**1つのトランザクション**で行う。
+    1. Threadsユーザー単位のアドバイザリーロックを取る。
+    2. 削除要求の行を`SELECT … FOR UPDATE`で読み直す。
+    3. 読み直した行の`status`・`threads_user_id`・`last_attempted_at`を確認する。次のどれかに当たれば、何もせずに終える。
+       - `status`が`pending` / `failed`ではない（他のWorkerが完了させた）
+       - `threads_user_id`がNULLになっている、またはロックのキーに使ったIDと違う
+       - `last_attempted_at`が、最初に読み取った値から変わっている（他のWorkerが先に試行した）
+    4. 条件付きの`UPDATE … SET attempts = attempts + 1, last_attempted_at = now() WHERE confirmation_code = $1 AND status IN ('pending', 'failed') AND last_attempted_at = <最初に読み取った値> RETURNING threads_user_id`で、この試行の担当を確定（claim）する。更新件数が0なら、claimに失敗したので削除しない。
+    5. claimできた場合だけ、`RETURNING`で得た`threads_user_id`のAccountを削除し、`status = completed`・`completed_at`を記録し、平文の`threads_user_id`をNULLにしてコミットする。
+  - claim・削除・完了の記録が同じトランザクションなので、「claimしたが削除は終わっていない」状態は外から見えない。途中で失敗すればすべてロールバックされ、要求は試行前の状態に戻り、次のCronで再試行される。そのうえで、別のトランザクションで`status = failed`、`attempts + 1`、`last_attempted_at = now()`にする（`status <> 'completed'`を条件にする）。
+  - ロックを取ってから読み直すので、先行するWorkerが完了させた要求を、後続のWorkerが古い読み取り結果のまま処理することはない。
 - **進行中のOAuth callbackとの直列化（tombstone）**：
   - 次の競合を防ぐ。`mode = new`のcallbackがプロフィールの取得を終え、Account作成のトランザクションに入る前に削除要求が処理されると、削除して`completed`にした直後に、callbackが同じThreadsユーザーのAccountを作り直してしまう（PR #2の2回目のレビューで指摘）。
   - 対策として、callbackのトランザクションと削除処理のトランザクションの両方で、最初に**Threadsユーザー単位のアドバイザリーロック**（`pg_advisory_xact_lock`。キーは`threads_user_id`から作る）を取る。2つの処理は必ずどちらかが先に終わる。

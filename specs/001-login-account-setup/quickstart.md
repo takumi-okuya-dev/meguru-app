@@ -53,7 +53,8 @@ pnpm e2e                   # Playwright：Clerkのテスト用ログイン + 偽
 | 画面を開いたときの確認 | 偽サーバーでトークンを無効にしてから`POST /api/accounts/:id/open`を呼ぶと、そのレスポンスで`needs_reconnect`になり、`GET /api/me`の一覧にも反映される | FR-018、SC-007 |
 | 最後に使ったAccountの記録 | `open`が2回失敗しても3回目の再試行で記録され、次の`GET /api/me`の`landingAccountId`がそのAccountになる | FR-007、SC-004 |
 | データ削除要求 | 署名の正しい`signed_request`でAccountと関連行がすべて消え、状況確認APIが`completed`を返す。削除を失敗させると`failed`になり、Cronの再試行で`completed`になる | research.md R7 |
-| 中断した削除要求の回収 | 受付の記録だけ残して処理を中断した`pending`の要求は、15分経つ前のCronでは再試行されず、15分経った後のCronで`completed`になる | research.md R7 |
+| 中断した削除要求の回収 | 受付の記録だけ残して処理を中断した`pending`の要求は、15分経つ前のCronでは再試行されず、15分経った後のCronで`completed`になる。`failed`の要求も同じリースで扱われる | research.md R7 |
+| 再試行Workerの重複 | 2つのWorkerが同じ古い要求を読み取り、Aが削除して`completed`にした後、ユーザーが新しい認可フローで再接続する。その後でBが処理を続けても、Bはclaimに失敗して何も削除せず、再接続したAccountが残る | research.md R7 |
 | 削除要求とcallbackの競合 | 認可フローを始めた後に削除要求を処理すると、そのcallbackは`THREADS_DATA_DELETION_REQUESTED`になり、Accountは作られない。削除要求より後に始めた認可フローは成功する | research.md R7 |
 | 削除後の識別子 | 完了した削除要求の平文のIDはNULLになっている。完了から15分以上経った後のCronでhmacもNULLになる | research.md R7 |
 | `state`の漏えい防止 | `authorizeUrl`以外のレスポンスとログの出力に、`state`の値が含まれない | FR-010 |

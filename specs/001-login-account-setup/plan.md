@@ -72,6 +72,8 @@ Googleアカウントでログインし、自分のThreadsアカウントを公�
 
 **PR #2の2回目のレビュー対応後の再確認（2026-10-01）**：世代番号を`accounts.connection_generation`へ移し（R6）、データ削除要求に`pending`のリース付き回収・Threadsユーザー単位のロックとtombstone・完了後の識別子の消去を追加した（R7・R8）。Cronは日次のまま増やしておらず、Neonの無料枠と固定費$0の制約にも影響しない。新しいSecret（`IDENTIFIER_HASH_KEY`）が1つ増えるだけで、新たな違反はない。
 
+**PR #2の3回目のレビュー対応後の再確認（2026-10-01）**：データ削除の試行（webhook・Cronの再試行とも）を、ロック → 読み直し → 条件付きUPDATEでのclaim → 削除 → 完了の記録、という1つのトランザクションにまとめた（research.md R7）。DBの使い方が変わるだけで、構成・コスト・Constitutionへの影響はない。
+
 ## プロジェクト構成（Project Structure）
 
 ### ドキュメント（このfeature）
