@@ -1,12 +1,12 @@
 // /api/accounts/*（contracts/api.md）
-import { openAccountRequestSchema } from "@threads-grower/shared";
+import { deleteAccountRequestSchema, openAccountRequestSchema } from "@threads-grower/shared";
 import { Hono, type MiddlewareHandler } from "hono";
 import type { AppEnv } from "../app";
 import { createDb } from "../db/client";
 import { AppError } from "../lib/errors";
 import { createThreadsClient } from "../lib/threads-client";
 import { findOwnedAccount, toAccountSummary } from "../services/access";
-import { openAccount, verifyConnection } from "../services/account-service";
+import { deleteAccount, openAccount, verifyConnection } from "../services/account-service";
 
 export function accountRoutes(authed: MiddlewareHandler<AppEnv>) {
   return new Hono<AppEnv>()
@@ -26,5 +26,11 @@ export function accountRoutes(authed: MiddlewareHandler<AppEnv>) {
       await openAccount(c.env, userId, account.id, parsed.data, receivedAt);
       await verifyConnection(c.env, account.id, createThreadsClient(c.env));
       return c.json(toAccountSummary(await findOwnedAccount(db, userId, account.id)));
+    })
+    .delete("/accounts/:accountId", authed, async (c) => {
+      const parsed = deleteAccountRequestSchema.safeParse(await c.req.json().catch(() => null));
+      if (!parsed.success) throw new AppError("VALIDATION_FAILED", 400, "invalid delete request");
+      await deleteAccount(c.env, c.get("user").id, c.req.param("accountId"), parsed.data.confirmUsername);
+      return c.body(null, 204);
     });
 }

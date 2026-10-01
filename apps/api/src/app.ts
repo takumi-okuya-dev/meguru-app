@@ -7,6 +7,8 @@ import { AppError } from "./lib/errors";
 import { logger } from "./lib/logger";
 import { authMiddleware, clerkVerifier, type AuthVerifier, type AuthVariables } from "./middleware/auth";
 import { accountRoutes } from "./routes/accounts";
+import { dataDeletionRoutes } from "./routes/data-deletion";
+import { threadsWebhookRoutes } from "./routes/threads-webhooks";
 import { meRoutes } from "./routes/me";
 import { threadsConnectRoutes } from "./routes/threads-connect";
 
@@ -48,7 +50,9 @@ export function createApp(deps: AppDeps = defaultDeps) {
     .get("/health", (c) => c.json({ ok: true }))
     .route("/", meRoutes(authed))
     .route("/", accountRoutes(authed))
-    .route("/", threadsConnectRoutes(authed));
+    .route("/", threadsConnectRoutes(authed))
+    .route("/", threadsWebhookRoutes())
+    .route("/", dataDeletionRoutes());
 
   return routes;
 }

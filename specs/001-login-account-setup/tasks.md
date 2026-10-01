@@ -185,29 +185,29 @@ description: "ログインとThreadsアカウント登録の実装タスク"
 
 ### US4のテスト
 
-- [ ] T070 [P] [US4] `apps/api/test/integration/reconnect.test.ts`を書く：`mode = reconnect`は`connected`でも`needs_reconnect`でも使え、上限に達していても通る。別のThreadsアカウントで認可 → `RECONNECT_ACCOUNT_MISMATCH`で接続は変わらない（FR-013・FR-020）
-- [ ] T071 [P] [US4] `apps/api/test/integration/account-delete.test.ts`を書く：`confirmUsername`が違えば`422`で何も消えない。一致（`@`の有無・大文字小文字は問わない）すれば関連行がすべて消え、`users.last_account_deleted_at`が記録される。`mode = new`の認可の開始後に削除すると、そのcallbackは`ACCOUNT_DELETED_DURING_CONNECT`（FR-022、research.md R13）
-- [ ] T072 [P] [US4] `apps/api/test/integration/token-refresh.test.ts`を書く：期限まで7日を切った接続は更新され、認証エラーなら`needs_reconnect`。Cronが読んだ後に再接続、または「アンインストールで接続行が消えて再接続で作り直された」場合も、Cronの結果は反映されない（research.md R6、ABA）
-- [ ] T073 [P] [US4] `apps/api/test/integration/uninstall.test.ts`を書く：通知でAccountが`needs_reconnect`になり接続行が消える。再接続より前の`issued_at`の通知は適用されない。Accountがなくても`threads_revocations`に記録される。`issued_at`がなければトークンで確認する（research.md R7）
-- [ ] T074 [P] [US4] `apps/api/test/integration/data-deletion.test.ts`を書く：Accountと関連行が消え状況確認APIが`completed`。同じ`signed_request`の再送は同じ確認コードで新しい行を作らない。`pending`のまま15分経った要求と`failed`の要求をCronが`completed`にする。2つのWorkerが同じ古い要求を処理しても、claimに失敗した側は何も削除しない。完了の時点では`threads_user_hmac`が残り、完了から15分以上後のCronで消える（quickstart.mdの該当行）
+- [X] T070 [P] [US4] `apps/api/test/integration/reconnect.test.ts`を書く：`mode = reconnect`は`connected`でも`needs_reconnect`でも使え、上限に達していても通る。別のThreadsアカウントで認可 → `RECONNECT_ACCOUNT_MISMATCH`で接続は変わらない（FR-013・FR-020）
+- [X] T071 [P] [US4] `apps/api/test/integration/account-delete.test.ts`を書く：`confirmUsername`が違えば`422`で何も消えない。一致（`@`の有無・大文字小文字は問わない）すれば関連行がすべて消え、`users.last_account_deleted_at`が記録される。`mode = new`の認可の開始後に削除すると、そのcallbackは`ACCOUNT_DELETED_DURING_CONNECT`（FR-022、research.md R13）
+- [X] T072 [P] [US4] `apps/api/test/integration/token-refresh.test.ts`を書く：期限まで7日を切った接続は更新され、認証エラーなら`needs_reconnect`。Cronが読んだ後に再接続、または「アンインストールで接続行が消えて再接続で作り直された」場合も、Cronの結果は反映されない（research.md R6、ABA）
+- [X] T073 [P] [US4] `apps/api/test/integration/uninstall.test.ts`を書く：通知でAccountが`needs_reconnect`になり接続行が消える。再接続より前の`issued_at`の通知は適用されない。Accountがなくても`threads_revocations`に記録される。`issued_at`がなければトークンで確認する（research.md R7）
+- [X] T074 [P] [US4] `apps/api/test/integration/data-deletion.test.ts`を書く：Accountと関連行が消え状況確認APIが`completed`。同じ`signed_request`の再送は同じ確認コードで新しい行を作らない。`pending`のまま15分経った要求と`failed`の要求をCronが`completed`にする。2つのWorkerが同じ古い要求を処理しても、claimに失敗した側は何も削除しない。完了の時点では`threads_user_hmac`が残り、完了から15分以上後のCronで消える（quickstart.mdの該当行）
 
 ### US4の実装：再接続と削除
 
-- [ ] T075 [US4] `apps/api/src/services/threads-oauth.ts`の`startConnect`に`mode = reconnect`を加える：`findOwnedAccount`で確認し、`oauth_states.target_account_id`に保存する。上限の判定はしない
-- [ ] T076 [US4] `apps/api/src/services/account-service.ts`の`completeConnection`に再接続の分岐を加える：`target_account_id`のAccountの`threads_user_id`と、認可されたユーザーIDが違えば`RECONNECT_ACCOUNT_MISMATCH`。同じなら接続を上書きし、`connected`に戻して`connection_generation`を1増やす。302先は`/accounts/:id/settings?connected=reconnect`（失敗時は`?error=`）
-- [ ] T077 [US4] `apps/api/src/routes/accounts.ts`に`DELETE /api/accounts/:accountId`を作る：`normalizeUsername`で比較し、違えば`422 CONFIRMATION_MISMATCH`。1つのトランザクションで`lockUserRow` → `users.last_account_deleted_at = now()` → Accountを削除（research.md R13）
-- [ ] T078 [US4] `apps/web/src/pages/account-settings.tsx`を作る：接続状態、接続状態に関係なく常に表示する「Threadsとの接続を認可し直す」ボタン（`needs_reconnect`なら「再接続」として強調）、Accountの削除ダイアログ（「確認のため、@{username} と入力してください」。`normalizeUsername`で一致するまで「削除する」を無効にし、入力はそのまま送る。削除後は`/`へ）（規則9・10）
-- [ ] T079 [US4] `apps/web/src/pages/account-layout.tsx`に`needs_reconnect`のバナーを加える：「Threadsとの接続が切れています。再接続するまで、このAccountの自動処理は止まります。」と「再接続」ボタン（FR-019）
+- [X] T075 [US4] `apps/api/src/services/threads-oauth.ts`の`startConnect`に`mode = reconnect`を加える：`findOwnedAccount`で確認し、`oauth_states.target_account_id`に保存する。上限の判定はしない
+- [X] T076 [US4] `apps/api/src/services/account-service.ts`の`completeConnection`に再接続の分岐を加える：`target_account_id`のAccountの`threads_user_id`と、認可されたユーザーIDが違えば`RECONNECT_ACCOUNT_MISMATCH`。同じなら接続を上書きし、`connected`に戻して`connection_generation`を1増やす。302先は`/accounts/:id/settings?connected=reconnect`（失敗時は`?error=`）
+- [X] T077 [US4] `apps/api/src/routes/accounts.ts`に`DELETE /api/accounts/:accountId`を作る：`normalizeUsername`で比較し、違えば`422 CONFIRMATION_MISMATCH`。1つのトランザクションで`lockUserRow` → `users.last_account_deleted_at = now()` → Accountを削除（research.md R13）
+- [X] T078 [US4] `apps/web/src/pages/account-settings.tsx`を作る：接続状態、接続状態に関係なく常に表示する「Threadsとの接続を認可し直す」ボタン（`needs_reconnect`なら「再接続」として強調）、Accountの削除ダイアログ（「確認のため、@{username} と入力してください」。`normalizeUsername`で一致するまで「削除する」を無効にし、入力はそのまま送る。削除後は`/`へ）（規則9・10）
+- [X] T079 [US4] `apps/web/src/pages/account-layout.tsx`に`needs_reconnect`のバナーを加える：「Threadsとの接続が切れています。再接続するまで、このAccountの自動処理は止まります。」と「再接続」ボタン（FR-019）
 
 ### US4の実装：定期処理とMetaからの通知
 
-- [ ] T080 [US4] `apps/api/src/services/token-refresh.ts`を作る：`expires_at`が7日以内で`issued_at`から24時間以上経った接続を更新し、プロフィールも取り直す。更新時の認証エラー、または`expires_at`を過ぎた接続は`needs_reconnect`。書き込みはすべて読んだ`connection_generation`を条件にし、更新件数0なら捨てる。トークンの暗号化はIVを毎回新しく作る（research.md R5・R6）
-- [ ] T081 [US4] `apps/api/src/routes/threads-webhooks.ts`に`POST /api/threads/webhooks/uninstall`を作る（contracts/api.mdの手順1〜7）：`lockThreadsUser`の下で`threads_revocations`に記録し、`issued_at < authorized_at`なら適用しない。`issued_at`がなければ受信時刻で記録し、トークンでプロフィール取得を試して判断する
-- [ ] T082 [US4] `apps/api/src/services/data-deletion.ts`を作る：`receive(signedRequest)`は`request_fingerprint`（`signed_request`全体のSHA-256）で`INSERT … ON CONFLICT DO NOTHING`し、重複なら既存の確認コードを返す。`attempt(confirmationCode, observedLastAttemptedAt)`は1つのトランザクションで`lockThreadsUser` → `SELECT … FOR UPDATE`で読み直し → `last_attempted_at`を条件にした`UPDATE … RETURNING`でclaim → Accountを削除し所有者の`users.last_account_deleted_at`を記録 → `completed`・`completed_at`・平文の`threads_user_id`をNULL（hmacは残す）。失敗したらロールバックし、別のトランザクションで`failed`・`attempts + 1`・`last_attempted_at = now()`（`status <> 'completed'`を条件に）（research.md R7）
-- [ ] T083 [US4] `apps/api/src/routes/threads-webhooks.ts`に`POST /api/threads/webhooks/data-deletion`を、`apps/api/src/routes/data-deletion.ts`に`GET /api/data-deletion/:confirmationCode`（`status`・`receivedAt`・`completedAt`だけを返す）を作る
-- [ ] T084 [US4] `apps/api/src/index.ts`の`scheduled`ハンドラーに日次の処理をまとめる（contracts/api.mdの「定期処理」1〜6）：トークン更新、期限切れの`oauth_states`と受信から15分以上経った`threads_revocations`の削除、`last_attempted_at`から15分以上経った`pending`・`failed`の削除要求の再試行（`attempt`）、完了から15分以上経った`threads_user_hmac`のNULL化、消去件数と残っている最古の行の経過時間のログ（25時間超はエラー）。1件の失敗で全体を止めない
-- [ ] T085 [P] [US4] `apps/web/src/pages/data-deletion.tsx`を作る：`GET /api/data-deletion/:code`の結果で「処理中」（`pending`・`failed`）か「削除が完了しました（日時）」を表示する
-- [ ] T086 [P] [US4] `apps/api/scripts/rotate-token-key.ts`を作り、`apps/api/package.json`に`admin:rotate-token-key`を足す：鍵が欠けているバージョンの行があれば開始しない。古いバージョンの行を、IVを新しく作って現在の鍵で暗号化し直す（`key_version`と`connection_generation`を条件に。世代番号は上げない）。最後に旧バージョンの行の件数を表示する（research.md R5）
+- [X] T080 [US4] `apps/api/src/services/token-refresh.ts`を作る：`expires_at`が7日以内で`issued_at`から24時間以上経った接続を更新し、プロフィールも取り直す。更新時の認証エラー、または`expires_at`を過ぎた接続は`needs_reconnect`。書き込みはすべて読んだ`connection_generation`を条件にし、更新件数0なら捨てる。トークンの暗号化はIVを毎回新しく作る（research.md R5・R6）
+- [X] T081 [US4] `apps/api/src/routes/threads-webhooks.ts`に`POST /api/threads/webhooks/uninstall`を作る（contracts/api.mdの手順1〜7）：`lockThreadsUser`の下で`threads_revocations`に記録し、`issued_at < authorized_at`なら適用しない。`issued_at`がなければ受信時刻で記録し、トークンでプロフィール取得を試して判断する
+- [X] T082 [US4] `apps/api/src/services/data-deletion.ts`を作る：`receive(signedRequest)`は`request_fingerprint`（`signed_request`全体のSHA-256）で`INSERT … ON CONFLICT DO NOTHING`し、重複なら既存の確認コードを返す。`attempt(confirmationCode, observedLastAttemptedAt)`は1つのトランザクションで`lockThreadsUser` → `SELECT … FOR UPDATE`で読み直し → `last_attempted_at`を条件にした`UPDATE … RETURNING`でclaim → Accountを削除し所有者の`users.last_account_deleted_at`を記録 → `completed`・`completed_at`・平文の`threads_user_id`をNULL（hmacは残す）。失敗したらロールバックし、別のトランザクションで`failed`・`attempts + 1`・`last_attempted_at = now()`（`status <> 'completed'`を条件に）（research.md R7）
+- [X] T083 [US4] `apps/api/src/routes/threads-webhooks.ts`に`POST /api/threads/webhooks/data-deletion`を、`apps/api/src/routes/data-deletion.ts`に`GET /api/data-deletion/:confirmationCode`（`status`・`receivedAt`・`completedAt`だけを返す）を作る
+- [X] T084 [US4] `apps/api/src/index.ts`の`scheduled`ハンドラーに日次の処理をまとめる（contracts/api.mdの「定期処理」1〜6）：トークン更新、期限切れの`oauth_states`と受信から15分以上経った`threads_revocations`の削除、`last_attempted_at`から15分以上経った`pending`・`failed`の削除要求の再試行（`attempt`）、完了から15分以上経った`threads_user_hmac`のNULL化、消去件数と残っている最古の行の経過時間のログ（25時間超はエラー）。1件の失敗で全体を止めない
+- [X] T085 [P] [US4] `apps/web/src/pages/data-deletion.tsx`を作る：`GET /api/data-deletion/:code`の結果で「処理中」（`pending`・`failed`）か「削除が完了しました（日時）」を表示する
+- [X] T086 [P] [US4] `apps/api/scripts/rotate-token-key.ts`を作り、`apps/api/package.json`に`admin:rotate-token-key`を足す：鍵が欠けているバージョンの行があれば開始しない。古いバージョンの行を、IVを新しく作って現在の鍵で暗号化し直す（`key_version`と`connection_generation`を条件に。世代番号は上げない）。最後に旧バージョンの行の件数を表示する（research.md R5）
 
 **チェックポイント**：全ストーリーが単独で動く（SC-007）
 

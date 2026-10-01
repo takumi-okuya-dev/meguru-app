@@ -1,6 +1,6 @@
 // Accountの作成・更新・上限（FR-008〜FR-017、research.md R8・R9）
 import { and, eq, gt, gte, inArray, isNull, lt, ne, or, sql } from "drizzle-orm";
-import { initialPlanFor, limitForOwnedPlans, type Plan } from "@threads-grower/shared";
+import { initialPlanFor, limitForOwnedPlans, normalizeUsername, type Plan } from "@threads-grower/shared";
 import type { Env } from "../env";
 import { createDb, withTransaction, type Db, type TxDb } from "../db/client";
 import { lockThreadsUser, lockUserRow } from "../db/locks";
@@ -17,6 +17,7 @@ import { AppError } from "../lib/errors";
 import { threadsUserHmac } from "../lib/identifier-hash";
 import { logger } from "../lib/logger";
 import { THREADS_SCOPES, ThreadsAuthError, type ThreadsClient, type ThreadsProfile } from "../lib/threads-client";
+import { findOwnedAccount } from "./access";
 import type { ConsumedState } from "./threads-oauth";
 
 // ---- 登録数の上限（FR-015〜FR-017） ----
@@ -284,4 +285,23 @@ export async function verifyConnection(env: Env, accountId: string, threads: Thr
     }
     logger.warn("threads profile check failed", { accountId, err });
   }
+}
+
+// ---- Accountの削除（FR-022、research.md R13） ----
+
+/**
+ * 確認入力を正規化して比べ、1つのトランザクションで users 行をロック → last_account_deleted_at を記録 → Accountを削除する。
+ * 進行中の mode = new の認可フローが、削除したAccountを作り直さないようにするため。
+ */
+export async function deleteAccount(env: Env, userId: string, accountId: string, confirmUsername: string) {
+  await withTransaction(env.DATABASE_URL, async (tx) => {
+    await lockUserRow(tx, userId);
+    const account = await findOwnedAccount(tx, userId, accountId);
+    if (normalizeUsername(confirmUsername) !== normalizeUsername(account.username) || !confirmUsername.trim()) {
+      throw new AppError("CONFIRMATION_MISMATCH", 422, "confirmation does not match");
+    }
+    const now = new Date();
+    await tx.update(users).set({ lastAccountDeletedAt: now, updatedAt: now }).where(eq(users.id, userId));
+    await tx.delete(accounts).where(eq(accounts.id, account.id));
+  });
 }
