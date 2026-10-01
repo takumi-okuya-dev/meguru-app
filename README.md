@@ -2,9 +2,9 @@
 
 Threadsアカウントを「投稿ストック→承認→自動投稿→分析→改善」のループで育てるためのアプリ。
 
--由来: Obsidian vault `Wiki/仕事/システム開発/アイデア/Threads自動投稿アプリ.md`
--既存の[threads-grower](https://github.com/MarronTaku/threads-grower)リポジトリ（spec-kit導入済み・実装進行中）とは**別プロジェクト**として並走する（2026-10-01、ユーザー確認済み）。
--開発方法論: [BMAD-METHOD](https://github.com/bmad-code-org/BMAD-METHOD)でPRD/設計の叩き台を作成し、[spec-kit](https://github.com/github/spec-kit)で仕様→計画→タスク→実装を進める。
+- 由来: Obsidian vault `Wiki/仕事/システム開発/アイデア/Threads自動投稿アプリ.md`
+- 既存の[threads-grower](https://github.com/MarronTaku/threads-grower)リポジトリ（spec-kit導入済み・実装進行中）とは**別プロジェクト**として並走する（2026-10-01、ユーザー確認済み）。
+- 開発方法論: [BMAD-METHOD](https://github.com/bmad-code-org/BMAD-METHOD)でPRD/設計の叩き台を作成し、[spec-kit](https://github.com/github/spec-kit)で仕様→計画→タスク→実装を進める。
 
 ## 現在のフェーズ
 
@@ -32,9 +32,9 @@ pnpm workspacesのモノレポ（[plan.md](specs/001-login-account-setup/plan.md
 
 - Node.js 22以上、pnpm 9（`npx pnpm@9`でも可）
 - Docker（ローカルのPostgres 17と`local-neon-http-proxy`を起動する）
--本物のThreadsで試す場合：`cloudflared`（Cloudflare Tunnel）
+- 本物のThreadsで試す場合：`cloudflared`（Cloudflare Tunnel）
 
-### 1.依存とDB
+### 1. 依存とDB
 
 ```bash
 pnpm install
@@ -42,7 +42,7 @@ docker compose up -d                      # Postgres 17（:5432）+ local-neon-h
 pnpm --filter api db:migrate              # マイグレーションの適用
 ```
 
-### 2.環境変数
+### 2. 環境変数
 
 ```bash
 cp apps/api/.dev.vars.example apps/api/.dev.vars    # 各項目は contracts/api.md「環境変数・Secret」
@@ -50,11 +50,11 @@ cp apps/web/.env.example apps/web/.env.local
 ```
 
 - **Clerk**：開発用インスタンスを作り、ログイン手段は**Googleだけ**を有効にする（メール＋パスワードは無効）。
-  -セッショントークンにメールアドレスと名前を含めると、APIが毎回Clerkに問い合わせずに済む（任意）。Clerkダッシュボードの「Sessions → Customize session token」に`{"email": "{{user.primary_email_address}}", "name": "{{user.full_name}}"}`を設定する。
+  - セッショントークンにメールアドレスと名前を含めると、APIが毎回Clerkに問い合わせずに済む（任意）。Clerkダッシュボードの「Sessions → Customize session token」に`{"email": "{{user.primary_email_address}}", "name": "{{user.full_name}}"}`を設定する。
 - **鍵**：`TOKEN_ENCRYPTION_KEYS`と`IDENTIFIER_HASH_KEY`は`openssl rand -base64 32`で作る。
 - **DATABASE_URL**：ローカルは`postgres://postgres:postgres@db.localtest.me:5432/threads_grower`（`local-neon-http-proxy`経由）。
 
-### 3.起動
+### 3. 起動
 
 ```bash
 pnpm dev     # web（http://localhost:5173）と api（http://localhost:8787）
@@ -65,7 +65,7 @@ pnpm dev     # web（http://localhost:5173）と api（http://localhost:8787）
 - Threadsのredirect URIはHTTPS必須で`localhost`は登録できない。Cloudflare Tunnelで固定のホスト名をローカルのAPI（`localhost:8787`）に向け、そのURLを`THREADS_REDIRECT_URI`とMetaのアプリ設定に登録する。
 - Metaのアプリ設定には、リダイレクトのほかに**アンインストール**（`/api/threads/webhooks/uninstall`）と**データ削除**（`/api/threads/webhooks/data-deletion`）のcallback URLも登録する（登録しないと保存できない）。
 - Meta App Reviewの前は、アプリのテスターに追加し、Threadsアプリの「設定 → アカウント → ウェブサイトのアクセス許可 → 招待」で承認したアカウントしか接続できない。
--手順の全体は[quickstart.md](specs/001-login-account-setup/quickstart.md)を参照。
+- 手順の全体は[quickstart.md](specs/001-login-account-setup/quickstart.md)を参照。
 
 ## テスト
 
