@@ -24,6 +24,7 @@ export default async function setup(project: TestProject) {
   } catch (err) {
     throw new Error(
       `結合テストにはローカルのDBが必要です。リポジトリのルートで "docker compose up -d" を実行してください（${String(err)}）`,
+      { cause: err },
     );
   }
   await migrate(drizzle(pool), { migrationsFolder: new URL("../drizzle", import.meta.url).pathname });

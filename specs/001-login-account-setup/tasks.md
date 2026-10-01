@@ -36,7 +36,7 @@ description: "ログインとThreadsアカウント登録の実装タスク"
 - [X] T004 [P] `packages/shared/package.json`・`packages/shared/tsconfig.json`・`packages/shared/src/index.ts`を作り、zodを依存に加える
 - [X] T005 `apps/api`を作る：`apps/api/package.json`（hono、drizzle-orm、@neondatabase/serverless、zod、Clerkのバックエンドミドルウェア、`@threads-grower/shared`）、`apps/api/tsconfig.json`、`apps/api/wrangler.toml`（`compatibility_date`、Cron Trigger `crons = ["0 18 * * *"]`）、`apps/api/src/index.ts`（空のHonoアプリと空の`scheduled`ハンドラーをexport）
 - [X] T006 [P] `apps/api/.dev.vars.example`に、contracts/api.mdの「環境変数・Secret」の表の全項目（`CLERK_SECRET_KEY`、`CLERK_PUBLISHABLE_KEY`、`THREADS_APP_ID`、`THREADS_APP_SECRET`、`THREADS_REDIRECT_URI`、`THREADS_AUTH_BASE_URL`、`THREADS_GRAPH_BASE_URL`、`TOKEN_ENCRYPTION_KEYS`、`TOKEN_ENCRYPTION_KEY_VERSION`、`IDENTIFIER_HASH_KEY`、`DATABASE_URL`、`WEB_ORIGIN`）を、説明のコメント付きで書く
-- [X] T007 `apps/web`をVite + React 19 + TypeScriptで作る：`apps/web/package.json`（react-router v7、@tanstack/react-query、`@clerk/react` v6、hono（RPCクライアント用）、`@threads-grower/shared`）、`apps/web/vite.config.ts`、`apps/web/index.html`、`apps/web/src/main.tsx`
+- [X] T007 `apps/web`をVite + React 19 + TypeScriptで作る：`apps/web/package.json`（react-router、@tanstack/react-query、`@clerk/react` v6、hono（RPCクライアント用）、`@threads-grower/shared`）、`apps/web/vite.config.ts`、`apps/web/index.html`、`apps/web/src/main.tsx`
 - [X] T008 [P] `apps/web`にTailwind CSS v4とshadcn/uiを導入し（`apps/web/components.json`、`apps/web/src/index.css`）、`apps/web/src/components/ui/`にbutton・input・dialog・dropdown-menu・sheet・toast（sonner）・avatar・alertを追加する。ダークモードはOSの設定に従う（`prefers-color-scheme`）
 - [X] T009 [P] `apps/web/.env.example`に`VITE_CLERK_PUBLISHABLE_KEY`と`VITE_API_BASE_URL`を書く
 - [X] T010 [P] ルートに`docker-compose.yml`を作る：Postgres 17と`local-neon-http-proxy`（`db.localtest.me:4444`）。research.md R12
@@ -87,7 +87,7 @@ description: "ログインとThreadsアカウント登録の実装タスク"
 - [X] T030 `apps/api/src/middleware/auth.ts`を作る：Clerkのセッショントークンを検証し、失敗したら`401 AUTH_REQUIRED`。成功したら`clerk_user_id`で`users`を探し、なければ作る（JIT作成）。`email`はClerkの値で更新する（research.md R2）
 - [X] T031 `apps/api/src/index.ts`に共通部分を組み込む：CORS（`WEB_ORIGIN`だけ許可）、エラーハンドラー（`{ error: { code, message } }`の形。メッセージに秘密情報を含めない）、`/api`のルーティング、HonoのRPC用の型（`AppType`）のexport
 - [X] T032 [P] `apps/api/src/services/access.ts`に`findOwnedAccount(db, userId, accountId)`を作る：Membershipで絞り込み、なければ`ACCOUNT_NOT_FOUND`（存在の有無を漏らさない。data-model.mdの`memberships`）
-- [X] T033 [P] `apps/web/src/lib/api-client.ts`を作る：HonoのRPCクライアントにClerkのトークンを付ける。`401`を受けたら「セッションの有効期限が切れました。もう一度ログインしてください」と表示して`/sign-in`へ遷移する（contracts/ui-routes.mdの規則7）
+- [X] T033 [P] `apps/web/src/lib/api-client.ts`を作る：共通のzodスキーマでレスポンスを検証するクライアントにClerkのトークンを付ける（HonoのRPCから変更。research.md R11）。`401`を受けたら「セッションの有効期限が切れました。もう一度ログインしてください」と表示して`/sign-in`へ遷移する（contracts/ui-routes.mdの規則7）
 - [X] T034 [P] `apps/web/src/lib/query.ts`にTanStack Queryのクライアントを作る
 - [X] T035 `apps/web/src/main.tsx`と`apps/web/src/router.tsx`を作る：ClerkProvider、QueryClientProvider、ルート一覧（`/sign-in`、`/`、`/accounts/new`、`/accounts/:accountId`、`/accounts/:accountId/settings`、`/data-deletion/:code`、それ以外は404）。認証が必要なルートは、未ログインなら内容を描画する前に`/sign-in`へ置き換え遷移するガードで包む（FR-003、contracts/ui-routes.mdの規則1）
 - [X] T036 [P] `apps/web/src/components/layout/AppShell.tsx`と`Sidebar.tsx`を作る：左サイドバー＋右メインパネル、狭い画面ではサイドバーをドロワー（Sheet）にする。サイドバーの中身（Account一覧・追加・ユーザーメニュー）は空の枠だけ用意する（contracts/ui-routes.mdの「レイアウトの骨格」）
@@ -215,9 +215,9 @@ description: "ログインとThreadsアカウント登録の実装タスク"
 
 ## Phase 7：仕上げと横断的な確認
 
-- [ ] T087 [P] `e2e/tests/onboarding.spec.ts`を書く：`@clerk/testing`でログインし、偽のThreadsサーバーで接続 → Accountの画面 → ログアウト → 再ログインで同じAccountに戻る（US1・US2）
-- [ ] T088 [P] `e2e/tests/reconnect-delete.spec.ts`を書く：偽サーバーでトークンを無効化 → 画面を開くと「要再接続」 → 再接続 → 削除（US4）
-- [ ] T089 [P] リポジトリのルートの`README.md`に、開発環境の用意（Docker、Cloudflare Tunnel、Clerk・Metaの設定）とコマンドを、quickstart.mdへのリンク付きで追記する
+- [X] T087 [P] `e2e/tests/onboarding.spec.ts`を書く：`@clerk/testing`でログインし、偽のThreadsサーバーで接続 → Accountの画面 → ログアウト → 再ログインで同じAccountに戻る（US1・US2）
+- [X] T088 [P] `e2e/tests/reconnect-delete.spec.ts`を書く：偽サーバーでトークンを無効化 → 画面を開くと「要再接続」 → 再接続 → 削除（US4）
+- [X] T089 [P] リポジトリのルートの`README.md`に、開発環境の用意（Docker、Cloudflare Tunnel、Clerk・Metaの設定）とコマンドを、quickstart.mdへのリンク付きで追記する
 - [ ] T090 `pnpm lint`と`pnpm test`と`pnpm e2e`をすべて通す
 - [ ] T091 quickstart.mdの「手動での確認」を、本物のGoogle・Threads（テスターのアカウント）で最後まで実施し、`wrangler dev`のログを`access_token`・`code=`・`client_secret`で検索して何も出ないことを確かめる（SC-005）
 

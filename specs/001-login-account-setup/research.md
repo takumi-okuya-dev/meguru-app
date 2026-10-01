@@ -9,7 +9,7 @@
 ## R1. リポジトリ構成
 
 - **決定**：pnpm workspacesによるモノレポとし、`apps/web`（Vite + React SPA、Cloudflare Pages）、`apps/api`（Cloudflare Workers + Hono）、`packages/shared`（プラン上限・エラーコード・入出力スキーマ）の3パッケージ構成にする。
-- **理由**：フロントエンドとバックエンドをTypeScriptで統一する方針（Constitution）のもと、HonoのRPCクライアントで型を共有できる。プラン上限やエラーコードを両側で同じ定義から参照すれば、表示と判定のずれを防げる。
+- **理由**：フロントエンドとバックエンドをTypeScriptで統一する方針（Constitution）のもと、`packages/shared`のzodスキーマで入出力の型を共有できる。プラン上限やエラーコードを両側で同じ定義から参照すれば、表示と判定のずれを防げる。
 - **検討した代替案**：
   - 1パッケージにまとめる：Pages用とWorkers用でビルドとデプロイの単位が異なるため不採用。
   - DBスキーマを独立パッケージにする：DBに触れるのは現時点で`apps/api`だけなので、YAGNI（原則V）に従い`apps/api`内に置く。
@@ -234,7 +234,8 @@
 ## R11. フロントエンドの構成と画面の骨格
 
 - **決定**：
-  - React 19、Vite、React Router v7（SPAモード）、TanStack Query、Honoの型付きRPCクライアント、shadcn/ui（Tailwind CSS v4）を使う。
+  - React 19、Vite 8、React Router 8（SPAモード）、TanStack Query、shadcn/ui（Tailwind CSS v4）を使う。
+  - APIクライアントは、`packages/shared`のzodスキーマでレスポンスを検証する薄い`fetch`ラッパーにする。当初はHonoの型付きRPCクライアントを予定していたが、APIの型をWebに取り込むとWorkersの型定義まで入り込み、ブラウザの型と衝突するため、実装時に変更した。
   - レイアウトは、左サイドバー（Account切り替え、アカウント追加、ユーザーメニュー）と右メインパネルの2列とし、ダークモードはOSの設定に従う。画面一覧と遷移の規則は[contracts/ui-routes.md](./contracts/ui-routes.md)を参照。
   - エラーコードと表示文言（日本語）の対応表は`packages/shared`に置く。
 - **理由**：Constitutionで確定したUIの方針（ChatGPT風のニュートラルな質感、左サイドバー＋右メインパネル）を、このfeatureで画面の骨格として確立する。アプリ全体の詳細なデザインは、投稿ストックのfeatureに入る前に改めて決める（2026-10-01のユーザーとの合意）。

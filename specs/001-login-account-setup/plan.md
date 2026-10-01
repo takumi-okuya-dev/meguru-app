@@ -17,10 +17,10 @@ Googleアカウントでログインし、自分のThreadsアカウントを公�
 
 ## 技術コンテキスト（Technical Context）
 
-**言語・バージョン**：TypeScript 5.x（フロントエンド・バックエンドとも）。開発ツールはNode.js 22 LTS。
+**言語・バージョン**：TypeScript 6.0（フロントエンド・バックエンドとも。7.0はtypescript-eslintが未対応のため見送り）。開発ツールはNode.js 22 LTS。
 
 **主な依存**：
-- **Web**：React 19、Vite、React Router v7（SPAモード）、TanStack Query、`@clerk/react` v6、shadcn/ui（Tailwind CSS v4）
+- **Web**：React 19、Vite 8、React Router 8（SPAモード）、TanStack Query、`@clerk/react` v6、shadcn/ui（Tailwind CSS v4）
 - **API**：Hono、ClerkのバックエンドSDK（Hono用ミドルウェア）、Drizzle ORM、`@neondatabase/serverless`、zod
 - **共通**：pnpm workspaces
 
@@ -163,7 +163,7 @@ apps/web/                          # Vite + React SPA（Cloudflare Pages）
 │   │   ├── account-settings.tsx
 │   │   └── data-deletion.tsx
 │   └── lib/
-│       ├── api-client.ts          # HonoのRPCクライアント + Clerkのトークン付与
+│       ├── api-client.ts          # 共通のzodスキーマで検証するAPIクライアント + Clerkのトークン付与
 │       └── query.ts
 └── test/
 
