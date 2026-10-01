@@ -74,6 +74,8 @@ Googleアカウントでログインし、自分のThreadsアカウントを公�
 
 **PR #2の3回目のレビュー対応後の再確認（2026-10-01）**：データ削除の試行（webhook・Cronの再試行とも）を、ロック → 読み直し → 条件付きUPDATEでのclaim → 削除 → 完了の記録、という1つのトランザクションにまとめた（research.md R7）。DBの使い方が変わるだけで、構成・コスト・Constitutionへの影響はない。
 
+**PR #2の4回目のレビュー対応後の再確認（2026-10-02）**：未完了の削除要求がある間は再接続を拒否する規則（research.md R7）、`open`の`openedAt`による順序の保護（R10）、暗号鍵の鍵リングとローテーション手順（R5）を追加した。Secretが`TOKEN_ENCRYPTION_KEY`から鍵リングの`TOKEN_ENCRYPTION_KEYS`に変わり、運営者用スクリプトが1つ増える。構成・コスト・Constitutionへの影響はない。
+
 ## プロジェクト構成（Project Structure）
 
 ### ドキュメント（このfeature）
@@ -110,7 +112,8 @@ apps/api/                          # Cloudflare Workers + Hono
 ├── wrangler.toml                  # Cron Trigger（毎日 18:00 UTC）
 ├── drizzle/                       # マイグレーション
 ├── scripts/
-│   └── set-plan.ts                # 運営者がプランを手動で変える（research.md R9）
+│   ├── set-plan.ts                # 運営者がプランを手動で変える（research.md R9）
+│   └── rotate-token-key.ts        # 古い鍵の暗号文を新しい鍵で暗号化し直す（research.md R5）
 ├── src/
 │   ├── index.ts                   # Honoのアプリとscheduledハンドラー
 │   ├── db/

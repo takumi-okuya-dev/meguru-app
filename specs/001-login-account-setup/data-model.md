@@ -37,6 +37,7 @@ erDiagram
 | `email` | text | NOT NULL | 表示用。ログインのたびにClerkの値で更新する |
 | `display_name` | text | NULL可 | 表示用 |
 | `last_account_id` | uuid | NULL可、FK → `accounts.id` ON DELETE SET NULL | 最後に使ったAccount（FR-004、FR-007） |
+| `last_account_opened_at` | timestamptz | NULL可 | `last_account_id`を記録した`open`の`openedAt`。これより古い`openedAt`の記録は反映しない（research.md R10） |
 | `created_at` / `updated_at` | timestamptz | NOT NULL | |
 
 - **作成**：認証済みのAPIリクエストで、`clerk_user_id`に一致する行がなければ作る（research.md R2）。
@@ -99,7 +100,7 @@ AccountがThreadsにアクセスするための認証情報。Accountと1対1で
 | `account_id` | uuid | PK, FK → `accounts.id` ON DELETE CASCADE | |
 | `access_token_ciphertext` | bytea | NOT NULL | AES-256-GCMの暗号文。AADは`account_id`（research.md R5） |
 | `access_token_iv` | bytea | NOT NULL | 12バイト |
-| `key_version` | smallint | NOT NULL | 暗号鍵のバージョン |
+| `key_version` | smallint | NOT NULL | 暗号化に使った鍵のバージョン。復号時は、鍵リングからこのバージョンの鍵を選ぶ（research.md R5） |
 | `scopes` | text[] | NOT NULL | 認可されたスコープ |
 | `expires_at` | timestamptz | NOT NULL | 長期トークンの有効期限（発行から60日） |
 | `issued_at` | timestamptz | NOT NULL | 発行または更新した日時。更新できるのは24時間経過後 |
@@ -144,7 +145,7 @@ Metaのデータ削除callbackの受付記録、削除の進み具合、進行�
 - **インデックス**：`threads_user_hmac`（tombstoneの確認用）、`(status, last_attempted_at)`（Cronの再試行の抽出用）。
 - **再試行の対象**：`status IN ('pending', 'failed') AND last_attempted_at < now() - interval '15 minutes'`。`pending`（受付直後の中断からの回収）と`failed`を、同じリースで扱う。
 - **claim**：試行のたびに、アドバイザリーロック → `SELECT … FOR UPDATE`での読み直し → `last_attempted_at`を条件にした`UPDATE … RETURNING`の順で、担当を確定する。claim・削除・完了の記録は1つのトランザクションで行い、claimできなかったWorkerは削除しない（research.md R7）。
-- **tombstoneの確認**：callbackは、`threads_user_hmac`が一致し、`received_at`が自分の`oauth_states.created_at`以降の行があれば登録を拒否する。平文ではなく鍵付きハッシュで照合するので、完了後に平文を消しても確認できる。
+- **tombstoneの確認**：callbackは、`threads_user_hmac`が一致し、次のどちらかに当たる行があれば登録を拒否する。(1) `status`が`pending` / `failed`（未完了。受付時刻は問わない）、(2) `received_at`が自分の`oauth_states.created_at`以降（状態は問わない）。平文ではなく鍵付きハッシュで照合するので、完了後に平文を消しても確認できる。未完了の行の`threads_user_hmac`は、完了するまで消さない（research.md R7）。
 - **最終的に残る情報**：確認コード・状態・日時・試行回数だけ。どちらの識別子もNULLになる。
 - **状況確認**：`GET /api/data-deletion/:confirmationCode`が`status`・`received_at`・`completed_at`だけを返す。識別子は外に出さない。
 

@@ -45,6 +45,7 @@ pnpm e2e                   # Playwright：Clerkのテスト用ログイン + 偽
 | `state`の使い回し | 同じ`state`で2回目のcallbackは`OAUTH_STATE_INVALID`になる | research.md R4 |
 | 平文が出ない | APIのレスポンスとログの出力に、偽サーバーが返したトークン文字列が含まれない | FR-010、SC-005 |
 | 暗号文の付け替え | 別のAccountの`account_id`をAADにすると復号に失敗する | research.md R5 |
+| 鍵のローテーション | 鍵リングに新旧の鍵を入れて現在のバージョンを上げると、旧鍵の行も復号でき、新規の暗号化は新鍵になる。移行スクリプトの後は旧バージョンの行が0件になる。鍵が欠けたバージョンの行は復号エラーになり、接続状態は変わらない | research.md R5 |
 | 定期更新 | 期限まで7日を切った接続は更新され、認証エラーなら`needs_reconnect`になる | FR-018、FR-021 |
 | 削除の確認 | `confirmUsername`が違えば`422`で何も消えず、一致すれば関連行がすべて消える。`@takumi`・`takumi`・` @Takumi `のどれでも一致する | FR-022 |
 | 上限到達時の再認可 | 上限に達したユーザーでも、`mode = reconnect`なら接続中のAccountを認可し直せ、Accountは増えない | FR-013、FR-020 |
@@ -52,6 +53,7 @@ pnpm e2e                   # Playwright：Clerkのテスト用ログイン + 偽
 | 接続行の作り直し（ABA） | Cronがトークンを読んだ後に、アンインストールで接続行が消え、再接続で作り直されても、Cronの結果は新しい接続に反映されない | research.md R6 |
 | 画面を開いたときの確認 | 偽サーバーでトークンを無効にしてから`POST /api/accounts/:id/open`を呼ぶと、そのレスポンスで`needs_reconnect`になり、`GET /api/me`の一覧にも反映される | FR-018、SC-007 |
 | 最後に使ったAccountの記録 | `open`が2回失敗しても3回目の再試行で記録され、次の`GET /api/me`の`landingAccountId`がそのAccountになる | FR-007、SC-004 |
+| 古い`open`の再試行 | Aの`open`が失敗して再試行を待つ間にBを開くと、Aの再試行は中止される。中止をすり抜けてAの古い`openedAt`のリクエストが後から届いても、`landingAccountId`はBのまま | FR-007、research.md R10 |
 | データ削除要求 | 署名の正しい`signed_request`でAccountと関連行がすべて消え、状況確認APIが`completed`を返す。削除を失敗させると`failed`になり、Cronの再試行で`completed`になる | research.md R7 |
 | 中断した削除要求の回収 | 受付の記録だけ残して処理を中断した`pending`の要求は、15分経つ前のCronでは再試行されず、15分経った後のCronで`completed`になる。`failed`の要求も同じリースで扱われる | research.md R7 |
 | 再試行Workerの重複 | 2つのWorkerが同じ古い要求を読み取り、Aが削除して`completed`にした後、ユーザーが新しい認可フローで再接続する。その後でBが処理を続けても、Bはclaimに失敗して何も削除せず、再接続したAccountが残る | research.md R7 |

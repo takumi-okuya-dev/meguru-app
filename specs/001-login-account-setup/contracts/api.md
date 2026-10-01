@@ -75,17 +75,17 @@ Account 1件の詳細を、DBに保存されている状態のまま返す。副
 
 ユーザーがAccountの画面（`/accounts/:accountId`とその配下）を開いたときに、Webが1回呼ぶ。次の2つを1つのリクエストで行う（research.md R10・R14）。
 
-1. **最後に使ったAccountの記録**（FR-007）：`users.last_account_id`と`accounts.last_used_at`を更新する。
+1. **最後に使ったAccountの記録**（FR-007）：`openedAt`（サーバーの現在時刻より未来なら現在時刻に丸める）が`users.last_account_opened_at`より新しいときだけ、`users.last_account_id`と`last_account_opened_at`を更新する。`accounts.last_used_at`は、既存の値と`openedAt`の新しいほうにする。古い`openedAt`のリクエスト（遅れて届いた再試行など）は記録を変えない（research.md R10）。
 2. **接続の確認**（FR-018）：接続情報があれば、そのトークンでThreadsのプロフィールを取得する。
    - 成功：プロフィール（ユーザー名・表示名・画像）を最新にする。
    - 認証エラー：`needs_reconnect`にする（research.md R6の競合制御に従う）。
    - 認証エラー以外の失敗（Threads側の障害など）：状態は変えず、記録だけ行う。
 
 - **認証**：必要
-- **リクエスト**：本文なし
+- **リクエスト**：`{ "openedAt": "…" }`（ISO 8601。Webがその画面を開いた時刻。再試行でも最初の値を使う）
 - **200**：更新後の`AccountSummary`
 - **404 `ACCOUNT_NOT_FOUND`**
-- **冪等**：何度呼んでも結果は同じ。Webは失敗時に再試行する（[ui-routes.md](./ui-routes.md)）。
+- **冪等**：同じ`openedAt`で何度呼んでも結果は同じ。Webは失敗時に再試行し、画面を離れたら再試行を中止する（[ui-routes.md](./ui-routes.md)）。
 - **プリフェッチ禁止**：画面を実際に開いたときだけ呼ぶ。ホバーなどの先読みで呼ぶと、見ていないAccountが「最後に使ったAccount」になってしまうため。
 
 ### POST /api/threads/connect
@@ -134,7 +134,7 @@ Threadsの認可画面から戻ってくる先。ブラウザのトップレベ�
 | `THREADS_ACCOUNT_TAKEN` | そのThreadsアカウントは別のユーザーが登録済み | FR-012 |
 | `ACCOUNT_LIMIT_REACHED` | callback時の再判定で上限に達していた | FR-017 |
 | `RECONNECT_ACCOUNT_MISMATCH` | 再接続で、元とは別のThreadsアカウントを認可した | FR-020 |
-| `THREADS_DATA_DELETION_REQUESTED` | この認可フローを始めた後に、そのThreadsユーザーのデータ削除要求を受け付けていた。Accountは作らず、接続も更新しない | spec エッジケース、research.md R7 |
+| `THREADS_DATA_DELETION_REQUESTED` | そのThreadsユーザーについて、未完了（`pending` / `failed`）のデータ削除要求がある。または、この認可フローを始めた後にデータ削除要求を受け付けていた。Accountは作らず、接続も更新しない | spec エッジケース、research.md R7 |
 
 ### DELETE /api/accounts/:accountId
 
@@ -209,8 +209,8 @@ HTTPエンドポイントではないが、外から観測できる振る舞い�
 | `THREADS_REDIRECT_URI` | 変数 | 例：`https://<api-host>/api/threads/callback`。Metaに登録した値と完全一致させる |
 | `THREADS_AUTH_BASE_URL` | 変数 | 既定は`https://threads.com`。テストでは偽サーバーに向ける |
 | `THREADS_GRAPH_BASE_URL` | 変数 | 既定は`https://graph.threads.com`。同上 |
-| `TOKEN_ENCRYPTION_KEY` | Secret | 32バイトをbase64化した値 |
-| `TOKEN_ENCRYPTION_KEY_VERSION` | 変数 | 例：`1` |
+| `TOKEN_ENCRYPTION_KEYS` | Secret | バージョン別の鍵リング（JSON）。例：`{"1":"<32バイトのbase64>"}`。ローテーション中は新旧の鍵を両方含める（research.md R5） |
+| `TOKEN_ENCRYPTION_KEY_VERSION` | 変数 | 新しく暗号化するときに使う鍵のバージョン。例：`1`。鍵リングに含まれていなければ起動を失敗させる |
 | `IDENTIFIER_HASH_KEY` | Secret | 32バイトをbase64化した値。データ削除要求のtombstone用の鍵付きハッシュに使う（research.md R7） |
 | `DATABASE_URL` | Secret | Neonの接続文字列 |
 | `WEB_ORIGIN` | 変数 | CORSの許可とリダイレクト先 |
