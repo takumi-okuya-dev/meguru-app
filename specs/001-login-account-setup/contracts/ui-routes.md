@@ -46,14 +46,14 @@
 4. **他人・存在しないAccount**：APIが`404 ACCOUNT_NOT_FOUND`を返したら404画面を出し、「自分のAccountへ戻る」リンクを置く。
 5. **Accountを開いたとき**：`/accounts/:accountId`配下を開くたびに、`POST /api/accounts/:accountId/open`を1回呼ぶ（FR-007、FR-018、research.md R10・R14）。経路は問わない（サイドバー、URLの直接入力、ブラウザの戻る・進む）。
    - 画面は、DBに保存されている状態ですぐに描画する。レスポンスが返ったら、接続状態とプロフィールを最新の値に差し替える。
-   - リクエストには、その画面を開いた時刻（`openedAt`）を含める。再試行でも同じ値を送る。
+   - リクエストには、タブごとの乱数ID（`clientId`、`sessionStorage`に保存）と、そのタブでAccountの画面を開くたびに1つ増やす連番（`openSeq`）を含める。再試行でも同じ値を送る。
    - 失敗しても画面の表示は止めない。指数バックオフで最大3回まで再試行し、それでも失敗した場合は、ウィンドウにフォーカスが戻ったとき・再読み込みのときに、開いているAccountについてもう一度呼ぶ。
    - 画面を離れたら（別のAccountへの移動を含む）、そのAccountについて待機中・実行中の再試行を中止する。古い再試行が後から成功して、新しく開いたAccountの記録を戻さないようにするため（research.md R10）。
    - ホバーなどでの先読みでは呼ばない。
    - サイドバーでAccountを選んだときは、`/accounts/:id`へ遷移するだけでよい（記録は遷移先の画面で行われる）。
 6. **ログアウト**：Clerkのセッションを終了し、TanStack Queryのキャッシュを全部消してから`/sign-in`へ置き換え遷移する。ブラウザの「戻る」で戻っても、ガード1により内容は表示されない（FR-006）。
 7. **セッション切れ**：APIが`401`を返したら、「セッションの有効期限が切れました。もう一度ログインしてください」と表示してから`/sign-in`へ遷移する（spec エッジケース）。
-8. **上限到達**：`/accounts/new`は、`accountLimit.used >= accountLimit.max`のとき接続ボタンを無効にし、上限の案内を出す。APIの`409`を受けた場合も同じ表示にする（FR-017）。案内には「登録済みのAccountの接続を更新したい場合は、そのAccountの設定画面から認可し直せます」という一文を添える。
+8. **上限到達**：`/accounts/new`は、`accountLimit.used >= accountLimit.max`のとき接続ボタンを無効にし、上限の案内を出す。APIの`409`を受けた場合も同じ表示にする（FR-017）。案内の文言は`accountLimit.max`で切り替える。`max = 1`ならプラン3へのアップグレードを、`max = 5`（現在の最上位の上限。プラン4も本featureでは5件）なら不要なAccountの削除を案内する（FR-023の「次に取れる操作」）。どちらの場合も「登録済みのAccountの接続を更新したい場合は、そのAccountの設定画面から認可し直せます」という一文を添える。
 9. **認可し直す**：`/accounts/:id/settings`には、接続状態に関係なく「Threadsとの接続を認可し直す」ボタンを置き、`POST /api/threads/connect`を`mode = reconnect`で呼ぶ（FR-013、FR-020）。新しいAccountは作らないので、上限に達していても使える。`needs_reconnect`のときは、このボタンを「再接続」として強調する。
 10. **削除の確認**：`/accounts/:id/settings`の削除ダイアログには「確認のため、@{username} と入力してください」と表示する。入力は`@`付きでも`@`なしでもよく、大文字・小文字も区別しない。`packages/shared`の正規化関数で比べて一致するまで「削除する」ボタンを無効にし、入力した値はそのままAPIへ送る（api.mdのDELETE、FR-022）。削除後は`/`へ遷移して振り分け直す。
 
@@ -74,12 +74,14 @@ APIからのリダイレクトのクエリ（`connected`、`error`）を読み�
 |---|---|---|
 | `AUTH_REQUIRED` | セッションの有効期限が切れました。もう一度ログインしてください。 | ログイン画面へ |
 | `ACCOUNT_NOT_FOUND` | このAccountは見つかりません。削除されたか、アクセスする権限がありません。 | 自分のAccountへ戻る |
-| `ACCOUNT_LIMIT_REACHED` | 現在のプランで登録できるAccount数（{max}件）に達しています。プラン3以上にすると最大5件まで登録できます。 | プランの案内（課金featureまでは問い合わせ先） |
+| `ACCOUNT_LIMIT_REACHED`（`max = 1`のとき） | 現在のプランで登録できるAccount数（1件）に達しています。プラン3にすると最大5件まで登録できます。 | プランの案内（課金featureまでは問い合わせ先） |
+| `ACCOUNT_LIMIT_REACHED`（`max = 5`のとき） | 登録できるAccount数の上限（5件）に達しています。新しく追加するには、使っていないAccountを削除してください。 | Account一覧（各Accountの設定画面から削除できる） |
 | `THREADS_AUTH_CANCELLED` | Threadsとの接続がキャンセルされました。 | もう一度接続する |
 | `THREADS_AUTH_FAILED` | Threadsとの接続に失敗しました。時間をおいてもう一度お試しください。 | もう一度接続する |
 | `THREADS_PROFILE_FETCH_FAILED` | Threadsアカウントの情報を取得できませんでした。もう一度お試しください。 | もう一度接続する |
 | `THREADS_ACCOUNT_TAKEN` | このThreadsアカウントは別のユーザーが登録済みです。 | 別のアカウントで接続する |
 | `RECONNECT_ACCOUNT_MISMATCH` | 再接続には、元の@{username}で認可してください。別のアカウントで認可されました。 | もう一度再接続する |
+| `ACCOUNT_DELETED_DURING_CONNECT` | 接続の途中でAccountが削除されたため、接続を中止しました。接続する場合は、もう一度お試しください。 | もう一度接続する |
 | `THREADS_DATA_DELETION_REQUESTED` | このThreadsアカウントのデータ削除の要求を処理しているため、接続を中止しました。削除が完了してから、もう一度お試しください（通常は1日以内に完了します）。 | 時間をおいてもう一度接続する |
 | `OAUTH_STATE_INVALID` | 接続の有効期限が切れました。最初からやり直してください。 | もう一度接続する |
 | `CONFIRMATION_MISMATCH` | 入力したユーザー名が一致しません。 | 入力し直す |

@@ -75,17 +75,17 @@ Account 1件の詳細を、DBに保存されている状態のまま返す。副
 
 ユーザーがAccountの画面（`/accounts/:accountId`とその配下）を開いたときに、Webが1回呼ぶ。次の2つを1つのリクエストで行う（research.md R10・R14）。
 
-1. **最後に使ったAccountの記録**（FR-007）：`openedAt`（サーバーの現在時刻より未来なら現在時刻に丸める）が`users.last_account_opened_at`より新しいときだけ、`users.last_account_id`と`last_account_opened_at`を更新する。`accounts.last_used_at`は、既存の値と`openedAt`の新しいほうにする。古い`openedAt`のリクエスト（遅れて届いた再試行など）は記録を変えない（research.md R10）。
+1. **最後に使ったAccountの記録**（FR-007）：`clientId`が`users.last_account_client_id`と同じで、`openSeq`が`last_account_open_seq`以下なら、同じタブの古いリクエスト（遅れて届いた再試行など）なので記録を変えない。それ以外は、`users.last_account_id`・`last_account_client_id`・`last_account_open_seq`を更新し、`accounts.last_used_at`をサーバーの現在時刻にする。比較は`users`の行を更新する1つの条件付き`UPDATE`で行う（research.md R10）。
 2. **接続の確認**（FR-018）：接続情報があれば、そのトークンでThreadsのプロフィールを取得する。
    - 成功：プロフィール（ユーザー名・表示名・画像）を最新にする。
    - 認証エラー：`needs_reconnect`にする（research.md R6の競合制御に従う）。
    - 認証エラー以外の失敗（Threads側の障害など）：状態は変えず、記録だけ行う。
 
 - **認証**：必要
-- **リクエスト**：`{ "openedAt": "…" }`（ISO 8601。Webがその画面を開いた時刻。再試行でも最初の値を使う）
+- **リクエスト**：`{ "clientId": "…", "openSeq": 12 }`（`clientId`はタブごとの乱数ID、`openSeq`はそのタブでAccountの画面を開くたびに増える連番。再試行でも最初の値を使う）
 - **200**：更新後の`AccountSummary`
 - **404 `ACCOUNT_NOT_FOUND`**
-- **冪等**：同じ`openedAt`で何度呼んでも結果は同じ。Webは失敗時に再試行し、画面を離れたら再試行を中止する（[ui-routes.md](./ui-routes.md)）。
+- **冪等**：同じ`clientId`・`openSeq`で何度呼んでも結果は同じ。Webは失敗時に再試行し、画面を離れたら再試行を中止する（[ui-routes.md](./ui-routes.md)）。
 - **プリフェッチ禁止**：画面を実際に開いたときだけ呼ぶ。ホバーなどの先読みで呼ぶと、見ていないAccountが「最後に使ったAccount」になってしまうため。
 
 ### POST /api/threads/connect
@@ -134,6 +134,7 @@ Threadsの認可画面から戻ってくる先。ブラウザのトップレベ�
 | `THREADS_ACCOUNT_TAKEN` | そのThreadsアカウントは別のユーザーが登録済み | FR-012 |
 | `ACCOUNT_LIMIT_REACHED` | callback時の再判定で上限に達していた | FR-017 |
 | `RECONNECT_ACCOUNT_MISMATCH` | 再接続で、元とは別のThreadsアカウントを認可した | FR-020 |
+| `ACCOUNT_DELETED_DURING_CONNECT` | この認可フローを始めた後に、ユーザーが自分のAccountを削除していた（`users.last_account_deleted_at`が`oauth_states.created_at`より新しい）。Accountは作らず、接続も更新しない | research.md R13 |
 | `THREADS_DATA_DELETION_REQUESTED` | そのThreadsユーザーについて、未完了（`pending` / `failed`）のデータ削除要求がある。または、この認可フローを始めた後にデータ削除要求を受け付けていた。Accountは作らず、接続も更新しない | spec エッジケース、research.md R7 |
 
 ### DELETE /api/accounts/:accountId
@@ -145,6 +146,7 @@ Accountを削除する（FR-022）。
   - サーバーは`confirmUsername`と`username`の両方を次の手順で正規化してから比較する：前後の空白を除く → 先頭の`@`を1つだけ除く → 小文字にする。
   - そのため、`@takumi`、`takumi`、` @Takumi `はいずれも`takumi`と一致する。Webは入力をそのまま送ってよい。
   - 正規化の関数は`packages/shared`に置き、Webのボタンの有効・無効の判定にも同じ関数を使う。
+- **処理**：1つのトランザクションで、`users`の行を`FOR UPDATE`でロックし、`users.last_account_deleted_at`を現在時刻にしてから、Accountを削除する（research.md R13）。進行中の`mode = new`の認可フローが、削除したAccountを作り直さないようにするため。
 - **204**：Account・接続情報・関連データを削除した。`last_account_id`が指していた場合はNULLになる
 - **422 `CONFIRMATION_MISMATCH`**：正規化した`confirmUsername`が、正規化したAccountの`username`と一致しない
 - **404 `ACCOUNT_NOT_FOUND`**
@@ -161,15 +163,16 @@ Threadsアプリの設定に登録する（research.md R7）。どちらも`appl
 ### POST /api/threads/webhooks/data-deletion
 
 - **処理**（research.md R7）：
-  1. 確認コードを発行し、`threads_deletion_requests`に`status = pending`で記録する。平文の`threads_user_id`と鍵付きハッシュ`threads_user_hmac`の両方を記録し、`last_attempted_at`を現在時刻にする。この記録は単独でコミットし、以降の処理が中断しても要求が失われないようにする。
-  2. 削除の試行を、次の手順で**1つのトランザクション**として行う（research.md R7「試行ごとの原子的なclaim」）。Cronの再試行も、まったく同じ手順を使う。
+  1. **重複の排除**：検証済みの`signed_request`の文字列全体からSHA-256の指紋（`request_fingerprint`）を作る。同じ指紋の要求がすでにあれば、新しい行は作らず、削除も試みず、既存の確認コードと状況確認URLを`200`で返して終える（Metaの再送への対応。research.md R7）。`INSERT … ON CONFLICT (request_fingerprint) DO NOTHING RETURNING …`で判定し、競合したら既存の行を読み出す。
+  2. 新しい要求なら、確認コードを発行し、`threads_deletion_requests`に`status = pending`で記録する。平文の`threads_user_id`と鍵付きハッシュ`threads_user_hmac`の両方を記録し、`last_attempted_at`を現在時刻にする。この記録は単独でコミットし、以降の処理が中断しても要求が失われないようにする。
+  3. 削除の試行を、次の手順で**1つのトランザクション**として行う（research.md R7「試行ごとの原子的なclaim」）。Cronの再試行も、まったく同じ手順を使う。
      1. Threadsユーザー単位のアドバイザリーロックを取る（callbackと同じキー。research.md R7・R8）。
      2. 削除要求の行を`SELECT … FOR UPDATE`で読み直し、`status`が`pending` / `failed`で、`threads_user_id`がロックのキーと一致し、`last_attempted_at`が最初に読み取った値のままであることを確かめる。どれかが違えば、他のWorkerが処理済みなので、何もせずに終える。
      3. 条件付きの`UPDATE … SET attempts = attempts + 1, last_attempted_at = now() WHERE confirmation_code = $1 AND status IN ('pending', 'failed') AND last_attempted_at = <最初に読み取った値> RETURNING threads_user_id`で、この試行の担当を確定（claim）する。更新件数が0なら、削除しない。
      4. claimで得た`threads_user_id`に一致するAccountを削除する。接続情報と関連データは`ON DELETE CASCADE`で消える。FR-022と同じ削除処理を、確認入力なしで実行する。該当するAccountがなければ、削除すべきデータがないので何もしない。
-     5. `status = completed`・`completed_at`を記録し、平文の`threads_user_id`をNULLにしてからコミットする。
-  3. 2が失敗したらロールバックし、別のトランザクションで`status = failed`、`attempts + 1`、`last_attempted_at = now()`にする（`status <> 'completed'`を条件にする。claimの更新もロールバックされているため、ここで試行を記録し直す）。Workerが強制終了して`failed`に移せなかった場合は、`pending`のまま残る。どちらも日次のCronで再試行する（下記「定期処理」）。
-  4. 処理の成否にかかわらず、Metaには`200`と確認コードを返す。
+     5. `status = completed`・`completed_at`を記録し、平文の`threads_user_id`をNULLにしてからコミットする。受付から15分以上経っていれば、`threads_user_hmac`もここでNULLにする（research.md R7）。
+  4. 3が失敗したらロールバックし、別のトランザクションで`status = failed`、`attempts + 1`、`last_attempted_at = now()`にする（`status <> 'completed'`を条件にする。claimの更新もロールバックされているため、ここで試行を記録し直す）。Workerが強制終了して`failed`に移せなかった場合は、`pending`のまま残る。どちらも日次のCronで再試行する（下記「定期処理」）。
+  5. 処理の成否にかかわらず、Metaには`200`と確認コードを返す。
 - **200**：
 
   ```json
@@ -195,8 +198,8 @@ HTTPエンドポイントではないが、外から観測できる振る舞い�
   1. `expires_at`が7日以内で、`issued_at`から24時間以上経った接続のトークンを更新し、プロフィールも取り直す。
   2. 更新時に認証エラーが返った接続、または`expires_at`を過ぎた接続のAccountを`needs_reconnect`にする。
   3. 期限切れの`oauth_states`を削除する。
-  4. データ削除要求を再試行する（research.md R7）。対象は、`last_attempted_at`から15分以上経った`status = pending`と`status = failed`のもの（同じリースで扱う）。対象を一覧で読み取った後、1件ずつwebhookの手順2〜3（ロック → 読み直し → 条件付きUPDATEでclaim → 削除 → 完了）で処理する。claimできなかった要求は、他のWorkerが処理中か処理済みなので、削除しない。
-  5. 完了から15分以上経った削除要求の`threads_user_hmac`をNULLにする（research.md R7）。
+  4. データ削除要求を再試行する（research.md R7）。対象は、`last_attempted_at`から15分以上経った`status = pending`と`status = failed`のもの（同じリースで扱う）。対象を一覧で読み取った後、1件ずつwebhookの手順3〜4（ロック → 読み直し → 条件付きUPDATEでclaim → 削除 → 完了）で処理する。claimできなかった要求は、他のWorkerが処理中か処理済みなので、削除しない。
+  5. `completed`で、受付から15分以上経った削除要求の`threads_user_hmac`をNULLにする（research.md R7）。
 - **再接続との競合**：1・2の書き込みは、読み取った時点の`accounts.connection_generation`が変わっていない場合だけ反映する。処理の途中で再接続・アンインストールなどにより接続が変わった場合は、Cronの結果を捨てる（data-model.mdの`accounts`）。
 - 1件の失敗で全体を止めない。失敗した件数はログに出す（トークンは出さない）。
 
