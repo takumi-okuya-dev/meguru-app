@@ -68,7 +68,9 @@ Googleアカウントでログインし、自分のThreadsアカウントを公�
 
 **Phase 1の設計後の再確認**：設計（data-model.md、contracts/）で新たな違反は生じていない。
 
-**PR #2のレビュー対応後の再確認（2026-10-01）**：データ削除要求でAccountを関連データごと削除する設計（research.md R7）、画面を開いたときの接続確認（R14）、`token_version`による競合制御（R6）を追加した。いずれもConstitutionの原則・技術スタック制約の範囲内で、新たな違反はない。画面を開いたときのThreads APIの呼び出しは1回だけで、固定費$0の制約にも影響しない。
+**PR #2のレビュー対応後の再確認（2026-10-01）**：データ削除要求でAccountを関連データごと削除する設計（research.md R7）、画面を開いたときの接続確認（R14）、世代番号による競合制御（R6）を追加した。いずれもConstitutionの原則・技術スタック制約の範囲内で、新たな違反はない。画面を開いたときのThreads APIの呼び出しは1回だけで、固定費$0の制約にも影響しない。
+
+**PR #2の2回目のレビュー対応後の再確認（2026-10-01）**：世代番号を`accounts.connection_generation`へ移し（R6）、データ削除要求に`pending`のリース付き回収・Threadsユーザー単位のロックとtombstone・完了後の識別子の消去を追加した（R7・R8）。Cronは日次のまま増やしておらず、Neonの無料枠と固定費$0の制約にも影響しない。新しいSecret（`IDENTIFIER_HASH_KEY`）が1つ増えるだけで、新たな違反はない。
 
 ## プロジェクト構成（Project Structure）
 
@@ -124,7 +126,7 @@ apps/api/                          # Cloudflare Workers + Hono
 │   │   ├── account-service.ts     # 作成・更新・上限・削除・open（記録と接続確認）
 │   │   ├── data-deletion.ts       # Metaのデータ削除要求の履行と再試行
 │   │   ├── threads-oauth.ts       # state、認可URL、callbackの処理
-│   │   └── token-refresh.ts       # 日次のCronの処理（token_versionによる競合制御）
+│   │   └── token-refresh.ts       # 日次のCronの処理（connection_generationによる競合制御）
 │   └── lib/
 │       ├── threads-client.ts      # Threads APIの呼び出し（ベースURLを差し替えられる）
 │       ├── crypto.ts              # AES-256-GCM

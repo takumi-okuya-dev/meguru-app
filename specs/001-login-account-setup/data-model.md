@@ -55,8 +55,10 @@ Threadsアカウント1件に対応する運用単位。
 | `plan` | account_plan | NOT NULL | 初期値はサーバー側で決める（FR-014） |
 | `connection_status` | connection_status | NOT NULL, 既定値`connected` | |
 | `last_used_at` | timestamptz | NULL可 | 最後に画面が開かれた日時 |
+| `connection_generation` | bigint | NOT NULL, 既定値0 | 接続の世代番号。トークンを書き込む・消すたびに1増やす。Accountが存在する限り単調に増え、初期値に戻らない（research.md R6） |
 | `created_at` / `updated_at` | timestamptz | NOT NULL | |
 
+- **競合制御**：Cron・画面を開いたときの確認・後続featureのヘルパーは、読んだ時点の`connection_generation`を条件にして書き込む。条件に合わなければ（その間に再接続・アンインストールなどで接続が変わっていれば）結果を捨てる。再接続のcallbackは条件なしで上書きし、世代番号を1増やす。世代番号をこの表に置くのは、接続行を削除して作り直しても番号が戻らないようにするため（ABA問題の防止、research.md R6）。
 - **プランと上限**：`plan`はAccountが持ち、ロールは持たない（Constitution原則IV）。上限の判定方法はresearch.md R9を参照。
 - **削除**：物理削除する。Accountに紐づくテーブルはすべて`ON DELETE CASCADE`とする（research.md R13。後続featureも守る規約）。
 
@@ -101,11 +103,10 @@ AccountがThreadsにアクセスするための認証情報。Accountと1対1で
 | `scopes` | text[] | NOT NULL | 認可されたスコープ |
 | `expires_at` | timestamptz | NOT NULL | 長期トークンの有効期限（発行から60日） |
 | `issued_at` | timestamptz | NOT NULL | 発行または更新した日時。更新できるのは24時間経過後 |
-| `token_version` | integer | NOT NULL, 既定値1 | トークンを書き換えるたびに1増やす。競合制御に使う（research.md R6） |
 | `created_at` / `updated_at` | timestamptz | NOT NULL | |
 
-- **競合制御**：Cron・画面を開いたときの確認・後続featureのヘルパーは、読んだ時点の`token_version`を条件にして書き込む。条件に合わなければ（その間に再接続されていれば）結果を捨てる。再接続のcallbackは条件なしで上書きし、`token_version`を1増やす。
-- **行がない状態**：アンインストールのcallbackを受けると行を削除する。このときAccountは`needs_reconnect`になる。データ削除のcallbackでは、Accountごと削除する（research.md R7）。
+- **競合制御**：この表の行への書き込み・削除は、必ず`accounts.connection_generation`を1増やすのと同じ文（またはトランザクション）で行う。
+- **行がない状態**：アンインストールのcallbackを受けると行を削除する。このときAccountは`needs_reconnect`になり、`connection_generation`が1増える。データ削除のcallbackでは、Accountごと削除する（research.md R7）。
 - **平文を出さない**：この表の値はAPIのレスポンス・ログ・エラーのどこにも出さない（FR-010）。
 
 ## oauth_states
@@ -126,18 +127,36 @@ Threads接続フローの使い捨ての`state`（research.md R4）。
 
 ## threads_deletion_requests
 
-Metaのデータ削除callbackの受付記録と、削除の進み具合（research.md R7）。Accountを削除しても、この行は残す（Accountへの外部キーは持たない）。
+Metaのデータ削除callbackの受付記録、削除の進み具合、進行中の接続フローに対するtombstone（research.md R7）。Accountを削除しても、この行は残す（Accountへの外部キーは持たない）。
 
 | 列 | 型 | 制約 | 説明 |
 |---|---|---|---|
 | `confirmation_code` | text | PK | Metaに返す確認コード（推測できない乱数） |
-| `threads_user_id` | text | NOT NULL | 対象のThreadsユーザーID。Cronでの再試行に使う |
-| `status` | deletion_status | NOT NULL | `pending` → `completed`、または`pending` → `failed` → `completed` |
+| `threads_user_id` | text | NULL可 | 対象のThreadsユーザーID（平文）。再試行に使う。`completed`にするのと同じトランザクションでNULLにする |
+| `threads_user_hmac` | text | NULL可 | `HMAC-SHA256(IDENTIFIER_HASH_KEY, threads_user_id)`（hex）。受付時に記録する。tombstoneの確認に使い、完了から15分以上経った後の日次Cronでnullにする |
+| `status` | deletion_status | NOT NULL | 下の状態遷移を参照 |
 | `received_at` | timestamptz | NOT NULL | |
+| `last_attempted_at` | timestamptz | NOT NULL | 最後に削除を試みた日時。`pending`の要求を回収するリースの起点 |
 | `completed_at` | timestamptz | NULL可 | Accountと関連データを削除し終えた日時 |
 | `attempts` | smallint | NOT NULL, 既定値0 | 削除を試みた回数 |
 
-- **状況確認**：`GET /api/data-deletion/:confirmationCode`が`status`・`received_at`・`completed_at`だけを返す。`threads_user_id`は外に出さない。
+- **CHECK制約**：`status <> 'completed'`なら`threads_user_id IS NOT NULL`（完了するまでは再試行のために平文を保持する）。`status = 'completed'`なら`threads_user_id IS NULL`。
+- **インデックス**：`threads_user_hmac`（tombstoneの確認用）、`(status, last_attempted_at)`（Cronの再試行の抽出用）。
+- **再試行の対象**：`status = 'failed'`、または`status = 'pending' AND last_attempted_at < now() - interval '15 minutes'`（受付直後の中断からの回収）。
+- **tombstoneの確認**：callbackは、`threads_user_hmac`が一致し、`received_at`が自分の`oauth_states.created_at`以降の行があれば登録を拒否する。平文ではなく鍵付きハッシュで照合するので、完了後に平文を消しても確認できる。
+- **最終的に残る情報**：確認コード・状態・日時・試行回数だけ。どちらの識別子もNULLになる。
+- **状況確認**：`GET /api/data-deletion/:confirmationCode`が`status`・`received_at`・`completed_at`だけを返す。識別子は外に出さない。
+
+```mermaid
+stateDiagram-v2
+    [*] --> pending: 受付（threads_user_idとhmacを記録）
+    pending --> completed: 削除に成功（平文のIDをNULLに）
+    pending --> failed: 削除に失敗
+    pending --> pending: 15分経っても未完了のものをCronが再試行
+    failed --> completed: Cronの再試行で成功
+    failed --> failed: 再試行も失敗
+    completed --> completed: 完了から15分以上経った後の日次CronでhmacをNULLに
+```
 
 ## 業務ルールとの対応
 
@@ -148,7 +167,9 @@ Metaのデータ削除callbackの受付記録と、削除の進み具合（resea
 | 登録数の上限（FR-015〜FR-017） | `memberships`（owner）とその`accounts.plan`から計算。callbackでは`users`行をロックして再判定（research.md R8） |
 | 再接続は同じThreadsアカウントだけ（FR-020） | `oauth_states.target_account_id`の`threads_user_id`と、認可されたユーザーIDを照合 |
 | 最後に使ったAccount（FR-004、FR-007） | `users.last_account_id`と`accounts.last_used_at`。Accountの画面を開くたびに冪等に更新（research.md R10） |
-| 再接続とCronの競合で新しい接続を壊さない（FR-018、FR-020） | `threads_connections.token_version`を条件にした書き込み（research.md R6） |
-| データ削除要求の履行（research.md R7） | Accountのカスケード削除と`threads_deletion_requests.status` |
+| 再接続とCronの競合で新しい接続を壊さない（FR-018、FR-020） | `accounts.connection_generation`を条件にした書き込み（research.md R6） |
+| データ削除要求の履行（research.md R7） | Accountのカスケード削除、`threads_deletion_requests.status`、`pending`のリース付き回収 |
+| 削除要求の後に、進行中の接続フローでAccountを作り直さない（research.md R7） | Threadsユーザー単位のアドバイザリーロックと、`threads_user_hmac`によるtombstoneの確認 |
+| 削除後に識別子を残さない（research.md R7） | 完了時に平文をNULL、15分以上経った後の日次Cronでhmacも消す |
 | Account削除で関連データも消える（FR-022） | 全テーブルの`ON DELETE CASCADE` |
 | プランとロールの分離（原則IV） | `plan`は`accounts`だけ、`role`は`memberships`だけに持つ |

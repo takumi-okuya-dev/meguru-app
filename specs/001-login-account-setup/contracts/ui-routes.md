@@ -78,6 +78,7 @@ APIからのリダイレクトのクエリ（`connected`、`error`）を読み�
 | `THREADS_PROFILE_FETCH_FAILED` | Threadsアカウントの情報を取得できませんでした。もう一度お試しください。 | もう一度接続する |
 | `THREADS_ACCOUNT_TAKEN` | このThreadsアカウントは別のユーザーが登録済みです。 | 別のアカウントで接続する |
 | `RECONNECT_ACCOUNT_MISMATCH` | 再接続には、元の@{username}で認可してください。別のアカウントで認可されました。 | もう一度再接続する |
+| `THREADS_DATA_DELETION_REQUESTED` | このThreadsアカウントのデータ削除の要求を受け付けたため、接続を中止しました。改めて接続する場合は、もう一度お試しください。 | もう一度接続する |
 | `OAUTH_STATE_INVALID` | 接続の有効期限が切れました。最初からやり直してください。 | もう一度接続する |
 | `CONFIRMATION_MISMATCH` | 入力したユーザー名が一致しません。 | 入力し直す |
 | （Googleログインの失敗） | Googleでのログインに失敗しました。もう一度お試しください。 | もう一度ログインする |

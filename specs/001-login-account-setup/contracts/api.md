@@ -134,6 +134,7 @@ Threadsの認可画面から戻ってくる先。ブラウザのトップレベ�
 | `THREADS_ACCOUNT_TAKEN` | そのThreadsアカウントは別のユーザーが登録済み | FR-012 |
 | `ACCOUNT_LIMIT_REACHED` | callback時の再判定で上限に達していた | FR-017 |
 | `RECONNECT_ACCOUNT_MISMATCH` | 再接続で、元とは別のThreadsアカウントを認可した | FR-020 |
+| `THREADS_DATA_DELETION_REQUESTED` | この認可フローを始めた後に、そのThreadsユーザーのデータ削除要求を受け付けていた。Accountは作らず、接続も更新しない | spec エッジケース、research.md R7 |
 
 ### DELETE /api/accounts/:accountId
 
@@ -154,16 +155,18 @@ Threadsアプリの設定に登録する（research.md R7）。どちらも`appl
 
 ### POST /api/threads/webhooks/uninstall
 
-- **処理**：`threads_user_id`に一致するAccountを`needs_reconnect`にし、`threads_connections`の行を削除する。該当するAccountがなくても`200`を返す。
+- **処理**：`threads_user_id`に一致するAccountを`needs_reconnect`にし、`threads_connections`の行を削除し、`accounts.connection_generation`を1増やす（同じトランザクション）。該当するAccountがなくても`200`を返す。
 - **200**：本文なし
 
 ### POST /api/threads/webhooks/data-deletion
 
 - **処理**（research.md R7）：
-  1. `threads_deletion_requests`に`status = pending`で記録し、確認コードを発行する。
-  2. 同じリクエストの中で、`threads_user_id`に一致するAccountを削除する。接続情報と関連データは`ON DELETE CASCADE`で消える。FR-022と同じ削除処理を、確認入力なしで実行する。
-  3. 削除に成功したら`status = completed`と`completed_at`を記録する。該当するAccountがなかった場合も、削除すべきデータがないので`completed`にする。
-  4. 削除に失敗したら`status = failed`にし、Metaには`200`と確認コードを返す。失敗した要求は日次のCronで再試行する（下記「定期処理」）。
+  1. 確認コードを発行し、`threads_deletion_requests`に`status = pending`で記録する。平文の`threads_user_id`と鍵付きハッシュ`threads_user_hmac`の両方を記録し、`last_attempted_at`を現在時刻にする。この記録は単独でコミットし、以降の処理が中断しても要求が失われないようにする。
+  2. 削除のトランザクションを始め、Threadsユーザー単位のアドバイザリーロックを取る（callbackと同じキー。research.md R7・R8）。
+  3. `threads_user_id`に一致するAccountを削除する。接続情報と関連データは`ON DELETE CASCADE`で消える。FR-022と同じ削除処理を、確認入力なしで実行する。該当するAccountがなければ、削除すべきデータがないので何もしない。
+  4. 同じトランザクションで、`status = completed`・`completed_at`を記録し、平文の`threads_user_id`をNULLにしてからコミットする。
+  5. 3・4が失敗したら`status = failed`にする。Workerが強制終了して`failed`に移せなかった場合は、`pending`のまま残る。どちらも日次のCronで再試行する（下記「定期処理」）。
+  6. 処理の成否にかかわらず、Metaには`200`と確認コードを返す。
 - **200**：
 
   ```json
@@ -189,8 +192,9 @@ HTTPエンドポイントではないが、外から観測できる振る舞い�
   1. `expires_at`が7日以内で、`issued_at`から24時間以上経った接続のトークンを更新し、プロフィールも取り直す。
   2. 更新時に認証エラーが返った接続、または`expires_at`を過ぎた接続のAccountを`needs_reconnect`にする。
   3. 期限切れの`oauth_states`を削除する。
-  4. `status = failed`のデータ削除要求を再試行する（research.md R7）。
-- **再接続との競合**：1・2の書き込みは、読み取った時点の`token_version`が変わっていない場合だけ反映する。処理の途中でユーザーが再接続した場合は、Cronの結果を捨てる（data-model.mdの`threads_connections`）。
+  4. データ削除要求を再試行する（research.md R7）。対象は、`status = failed`のものと、`last_attempted_at`から15分以上経った`status = pending`のもの。手順はwebhookの2〜5と同じで、試行のたびに`attempts`と`last_attempted_at`を更新する。
+  5. 完了から15分以上経った削除要求の`threads_user_hmac`をNULLにする（research.md R7）。
+- **再接続との競合**：1・2の書き込みは、読み取った時点の`accounts.connection_generation`が変わっていない場合だけ反映する。処理の途中で再接続・アンインストールなどにより接続が変わった場合は、Cronの結果を捨てる（data-model.mdの`accounts`）。
 - 1件の失敗で全体を止めない。失敗した件数はログに出す（トークンは出さない）。
 
 ## 環境変数・Secret
@@ -204,5 +208,6 @@ HTTPエンドポイントではないが、外から観測できる振る舞い�
 | `THREADS_GRAPH_BASE_URL` | 変数 | 既定は`https://graph.threads.com`。同上 |
 | `TOKEN_ENCRYPTION_KEY` | Secret | 32バイトをbase64化した値 |
 | `TOKEN_ENCRYPTION_KEY_VERSION` | 変数 | 例：`1` |
+| `IDENTIFIER_HASH_KEY` | Secret | 32バイトをbase64化した値。データ削除要求のtombstone用の鍵付きハッシュに使う（research.md R7） |
 | `DATABASE_URL` | Secret | Neonの接続文字列 |
 | `WEB_ORIGIN` | 変数 | CORSの許可とリダイレクト先 |

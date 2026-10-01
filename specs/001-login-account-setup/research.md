@@ -34,7 +34,7 @@
 
 - **決定**：Threads公式のOAuth（認可コード方式）を使い、APIを起点に次の流れで処理する。詳細は[contracts/api.md](./contracts/api.md)を参照。
   1. Webが`POST /api/threads/connect`を呼ぶ。APIは登録数上限を判定し（FR-017。認可に進む**前**に判定する）、使い捨ての`state`を発行して認可URLを返す。
-  2. ブラウザが`https://threads.com/oauth/authorize`へ遷移する。パラメータは`client_id`、`redirect_uri`、`scope`、`response_type=code`、`state`。
+  2. ブラウザが`https://threads.com/oauth/authorize`へ遷移する。パラメーターは`client_id`、`redirect_uri`、`scope`、`response_type=code`、`state`。
   3. ThreadsからAPIの`GET /api/threads/callback`へ戻る。APIは`state`を検証して消費し、次の順に処理する。
      - 認可コードを短期トークン（有効期間1時間）に交換する（`POST graph.threads.com/oauth/access_token`）。
      - 短期トークンを長期トークン（有効期間60日）に交換する（`GET /access_token?grant_type=th_exchange_token`）。
@@ -80,12 +80,13 @@
   - 更新に成功したら、同時にプロフィール（ユーザー名・表示名・プロフィール画像）も取得し直す。
   - 次のいずれかに当たる場合は`connection_status = needs_reconnect`にする：更新時に認証エラー（OAuthエラー190など）が返った、有効期限を過ぎた、アンインストールのcallbackを受け取った、画面を開いたときの確認で認証エラーが返った（R14）。後続featureがThreads APIを呼んで認証エラーを受けた場合も、共通のヘルパーで同じ処理をする。
   - 同じCronで、期限切れの`oauth_states`も削除する。
-  - **再接続との競合制御**：`threads_connections`に`token_version`（整数）を持たせ、トークンを書き換えるたびに1増やす。Cron・画面を開いたときの確認・後続featureのヘルパーは、次の手順で書き込む。
-    1. トークンを読むときに`token_version`も読む。
+  - **再接続との競合制御**：`accounts`に世代番号`connection_generation`（bigint）を持たせる。トークンを書き込む・消すたびに（接続、再接続、定期更新、アンインストールによる削除）、同じ文の中で1増やす。Cron・画面を開いたときの確認・後続featureのヘルパーは、次の手順で書き込む。
+    1. トークンを読むときに`accounts.connection_generation`も読む。
     2. Threadsを呼び出す。
-    3. 結果を書き込むときは`WHERE account_id = $1 AND token_version = <読んだ値>`を条件にする。
-    4. 更新件数が0なら、その間にユーザーが再接続したということなので、結果を捨てる。`needs_reconnect`への変更も同じ条件で行うため、古いトークンの認証エラーで新しい接続を壊すことはない。
-    - 再接続（callback）は条件なしで上書きし、`token_version`を1増やす。ユーザーの操作をつねに優先する。
+    3. 結果を書き込むときは`WHERE accounts.id = $1 AND connection_generation = <読んだ値>`を条件にする。トークンの更新は、`accounts`の世代番号を上げる`UPDATE … RETURNING`をCTEにし、その結果があるときだけ`threads_connections`を更新する1つの文にする。
+    4. 更新件数が0なら、その間に再接続・アンインストールなどで接続が変わったということなので、結果を捨てる。`needs_reconnect`への変更も同じ条件で行うため、古いトークンの認証エラーで新しい接続を壊すことはない。
+    - 再接続（callback）は条件なしで上書きし、世代番号を1増やす。ユーザーの操作をつねに優先する。
+    - 世代番号を`threads_connections`ではなく`accounts`に置くのは、アンインストールで接続行を削除して作り直しても、番号が初期値に戻らないようにするためである。接続行の側に置くと、「古い処理がversion 1を読む → アンインストールで行を削除 → 再接続で行をversion 1で作り直す → 古い処理の条件が新しい行に一致する」というABA問題が起きる（PR #2の2回目のレビューで指摘）。`accounts`の行はAccountを削除するまで消えないので、番号は単調に増え続ける。
 - **理由**：
   - 1日1回の処理なら、Neonの無料枠（100 CU-hours/月）への影響はごくわずかで、Constitutionの既知リスク（高頻度ポーリング）にも当たらない。
   - 7日の余裕があれば、Cronが数回失敗しても期限切れを避けられる。
@@ -99,7 +100,23 @@
 
 - **決定**：Threadsアプリの設定でredirect URIを保存するには、アンインストールとデータ削除のcallback URLの登録が必須である。そこで2つのエンドポイントを用意する。
   - **アンインストール**：`signed_request`をApp SecretのHMAC-SHA256で検証し、該当するThreadsユーザーのAccountを`needs_reconnect`にして、接続情報（トークン）を削除する。
-  - **データ削除**：同じく検証したうえで、該当するThreadsユーザーのAccountを関連データごと削除する（FR-022と同じ削除処理）。受け付けた時点で要求を記録し、削除の成否を`pending` / `completed` / `failed`で持つ。状況確認ページはこの状態をそのまま表示する。失敗した要求は日次のCronで再試行する。
+  - **データ削除**：同じく検証したうえで、該当するThreadsユーザーのAccountを関連データごと削除する（FR-022と同じ削除処理）。受け付けた時点で要求を記録し、削除の成否を`pending` / `completed` / `failed`で持つ。状況確認ページはこの状態をそのまま表示する。
+- **中断からの回復**：
+  - 削除処理は冪等にする（「このThreadsユーザーのAccountが残っていれば消す」）。何度実行しても結果は同じ。
+  - 日次のCronは、`failed`の要求に加えて、**最後に試みてから15分以上経った`pending`の要求**も再試行する。受付を記録した直後にWorkerが強制終了し、`failed`に移せなかった要求も、これで回収できる（PR #2の2回目のレビューで指摘）。
+  - 15分という猶予は、通常の削除処理（数秒）が終わるのを待つためのリース期間である。受付のリクエスト自体がまだ処理中の要求を、Cronが二重に処理しないようにする。仮に二重に処理しても、冪等なので害はない。
+- **進行中のOAuth callbackとの直列化（tombstone）**：
+  - 次の競合を防ぐ。`mode = new`のcallbackがプロフィールの取得を終え、Account作成のトランザクションに入る前に削除要求が処理されると、削除して`completed`にした直後に、callbackが同じThreadsユーザーのAccountを作り直してしまう（PR #2の2回目のレビューで指摘）。
+  - 対策として、callbackのトランザクションと削除処理のトランザクションの両方で、最初に**Threadsユーザー単位のアドバイザリーロック**（`pg_advisory_xact_lock`。キーは`threads_user_id`から作る）を取る。2つの処理は必ずどちらかが先に終わる。
+  - callbackはロックを取った後、「このThreadsユーザーについて、自分の認可フローを始めた時刻（`oauth_states.created_at`）より後に受け付けた削除要求」があるかを確認する。あれば登録を拒否し、`THREADS_DATA_DELETION_REQUESTED`としてWebに戻す。
+    - 削除が先に終わった場合：callbackが削除要求（tombstone）を見つけて拒否するので、Accountは作り直されない。
+    - callbackが先に終わった場合：作られたAccountを、続く削除処理が消す。
+  - 認可フローの開始より**前**に受け付けた削除要求は、ユーザーが削除を求めた後で改めて接続し直したという意味なので、拒否しない。
+- **削除後に残す情報（識別子の消去）**：
+  - 再試行のため、完了するまでは平文の`threads_user_id`を保持する。
+  - `completed`になった時点で、同じトランザクションの中で平文の`threads_user_id`をNULLにする。代わりに、tombstoneの確認に使う鍵付きハッシュ（`HMAC-SHA256(IDENTIFIER_HASH_KEY, threads_user_id)`）だけを残す。鍵はWorkersのSecretで、鍵なしでは元のIDを復元・照合できない。
+  - tombstoneが意味を持つのは、受付時点で進行中だった認可フロー（`state`の有効期限は10分）の間だけである。そのため、完了から15分以上経った要求の鍵付きハッシュは、日次のCronでNULLにする。最終的に残るのは、確認コード・状態・日時・試行回数だけである（PR #2の2回目のレビューで指摘）。
+  - 確認コード・状態・日時は、Metaの状況確認URLに応えるために残す。保存期間は、`TODO(COMMERCIAL_LAUNCH_GATE)`でプライバシーポリシーを定めるときに決める。
 - **理由**：
   - アンインストールの検知は、FR-018の「取り消しの検知」そのものである。
   - データ削除の要求は、ユーザー本人がThreads側で「このアプリから自分のデータを消してほしい」と明示的に求めたものである。確認コードを返す以上、要求を実際に履行し、その進み具合を正直に返す必要がある。接続情報だけを消して「受け付けました」と表示する設計では、Account・プロフィール・運用データが無期限に残り、App Reviewの要件とユーザーデータの保護の両方を満たせない（PR #2のレビューで指摘）。
@@ -107,16 +124,22 @@
 - **検討した代替案**：
   - 接続情報だけを消し、Account本体の削除はユーザーのアプリ内操作に任せる（当初案）：上記のとおり削除要求を履行できないため不採用。
   - 削除を非同期キュー（Cloudflare Queues等）で行う：削除量がAccount 1件分で小さく、同期処理で足りる。YAGNI（原則V）に従い不採用。
+  - ロックだけで直列化し、tombstoneを持たない：削除が先に終わると、callbackはロックを取った後に何も見つけられず、Accountを作り直してしまう。順序を決めるだけでは防げないため不採用。
+  - 平文のIDを完了後もそのまま残す：削除を求めたユーザーを識別できる情報が残り続けるため不採用。
+  - 識別子の消去のためにCronを1時間ごとに動かす：Neonが1時間ごとに起動し、無料枠の消費が増える。鍵付きハッシュは単独では元のIDに戻せないので、最長1日残っても実害は小さい。日次で足りると判断した。
 
 ## R8. DBアクセスと同時実行の制御（FR-012、FR-013、FR-017）
 
 - **決定**：
   - Drizzle ORMとNeonのサーバーレスドライバーを使う。通常のクエリはHTTP経由（`neon-http`）で発行する。
-  - Account作成を伴うcallback処理だけは、WebSocket経由（`neon-serverless`のPool。リクエストごとに作成して破棄する）の対話的トランザクションで行い、次の手順で処理する。
-    1. `SELECT … FROM users WHERE id = $1 FOR UPDATE`で、そのユーザーの処理を直列化する。
-    2. `threads_user_id`で既存のAccountを探す。
-    3. 見つかった場合：自分のAccountなら接続を更新する。他人のAccountなら拒否する。
-    4. 見つからない場合：上限を再判定してから、AccountとMembershipを作成する。
+  - Account作成を伴うcallback処理と、データ削除処理（R7）は、WebSocket経由（`neon-serverless`のPool。リクエストごとに作成して破棄する）の対話的トランザクションで行う。callbackは次の手順で処理する。
+    1. Threadsユーザー単位のアドバイザリーロックを取る（R7）。
+    2. `SELECT … FROM users WHERE id = $1 FOR UPDATE`で、そのユーザーの処理を直列化する。
+    3. 認可フローの開始後に受け付けた削除要求（tombstone）があれば拒否する（R7）。
+    4. `threads_user_id`で既存のAccountを探す。
+    5. 見つかった場合：自分のAccountなら接続を更新する。他人のAccountなら拒否する。
+    6. 見つからない場合：上限を再判定してから、AccountとMembershipを作成する。
+  - **ロックの順序**：どの処理も「Threadsユーザー単位のアドバイザリーロック → `users`の行ロック」の順で取る。データ削除処理はAccountを削除する際、`users.last_account_id`のNULL化で`users`の行もロックする。順序をそろえないと、callbackと削除処理が互いの持つロックを待ってデッドロックする。
   - 最後の防衛線として、`accounts.threads_user_id`に一意制約を張る。
 - **理由**：
   - 上限判定はconnect開始時（FR-017の「認可に進む前」）とcallback時の2回行う。2回目をロック付きトランザクションで行えば、複数タブからの同時操作でも上限を超えない（spec エッジケース）。
@@ -181,7 +204,7 @@
 
 - **決定**：
   - ユーザーがAccountの画面を開いたとき（`POST /api/accounts/:accountId/open`、R10）に、保存しているトークンでThreadsのプロフィール取得（`GET /v1.0/me`）を1回呼ぶ。
-  - 認証エラーが返れば、その場で`needs_reconnect`にして画面に返す。書き込みにはR6の`token_version`による競合制御を使う。
+  - 認証エラーが返れば、その場で`needs_reconnect`にして画面に返す。書き込みにはR6の`connection_generation`による競合制御を使う。
   - 成功すればプロフィールを最新にする。期限付きの画像URLも、ここで取り直せる。
   - Account一覧（サイドバー）では、Accountごとの確認はしない。その時点までに検知してDBに保存されている状態を表示する。
 - **理由**：
@@ -206,3 +229,5 @@
   - FR-020：「要再接続」のときに限らず、既存のAccountを認可し直せるようにした
   - SC-007：一覧は最新の検知結果の表示とし、確認のタイミングを「Accountを開いた時点」に絞った
   - Assumptions：初期プランの記述をFR-014にそろえた
+- PR #2の2回目のレビュー対応（2026-10-01）：
+  - エッジケース：データ削除の要求を受けた後は、それより前に始めた接続フローでAccountを作り直さないことを追記（R7）
