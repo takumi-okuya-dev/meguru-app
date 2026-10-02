@@ -30,7 +30,11 @@ pnpm workspacesのモノレポ（[plan.md](specs/001-login-account-setup/plan.md
 
 ### 必要なもの
 
-- Node.js 22以上、pnpm 9（`npx pnpm@9`でも可）
+- Node.js 22以上
+- pnpm 9。入っていなければ、次のどちらかで入れる（`pnpm -v`でバージョンが出ればよい）
+  - `npm install -g pnpm@9.15.9`（`package.json`の`packageManager`と同じバージョン）
+  - `brew install pnpm`
+  - 入れずに試すだけなら、`pnpm`の代わりに`npx pnpm@9`と書いても動く
 - Docker（ローカルのPostgres 17と`local-neon-http-proxy`を起動する）
 - 本物のThreadsで試す場合：`cloudflared`（Cloudflare Tunnel）
 

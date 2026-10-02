@@ -22,7 +22,7 @@ Metaの設定でHTTPSのURLが必要になるので、**Cloudflare Tunnel → Cl
 - **Metaの開発者アカウント**（Facebookのアカウントで登録する）
 - **接続に使うThreadsアカウント**（自分の「たくみ」アカウントなど）
 - **Googleアカウント**（ログインに使う）
-- macOSにHomebrew、Docker（OrbStack）、Node.js 22以上
+- macOSにHomebrew、Docker（OrbStack）、Node.js 22以上、pnpm 9（入れ方はREADMEの「必要なもの」）
 
 ---
 
