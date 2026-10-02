@@ -1,0 +1,64 @@
+# CI：PRのたび（と main への push）に、lint・型チェック・テストを実行する。
+# API の結合テストに使う Postgres 17 と local-neon-http-proxy は、サービスコンテナとして起動する（research.md R12）。
+# E2E は Clerk の開発用キーが必要なので、ここでは実行しない（README の E2E の項を参照）。
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: threads_grower
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 2s
+          --health-timeout 2s
+          --health-retries 30
+      neon-proxy:
+        image: ghcr.io/timowilhelm/local-neon-http-proxy:main
+        env:
+          PG_CONNECTION_STRING: postgres://postgres:postgres@postgres:5432/threads_grower
+        ports:
+          - 4444:4444
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: 依存を入れる
+        run: pnpm install --frozen-lockfile
+
+      - name: lint
+        run: pnpm lint
+
+      - name: 型チェック
+        run: pnpm typecheck
+
+      - name: テスト（共通・Web・API の単体と結合）
+        run: pnpm test
+
+      - name: Web のビルド
+        run: pnpm --filter web build

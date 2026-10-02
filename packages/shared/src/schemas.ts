@@ -69,6 +69,8 @@ export const errorResponseSchema = z.object({
   error: z.object({
     code: z.enum(ERROR_CODES),
     message: z.string(),
+    /** CONFIG_ERROR のときの、誤っている設定の項目名（値は含めない） */
+    details: z.array(z.string()).optional(),
   }),
 });
 export type ErrorResponse = z.infer<typeof errorResponseSchema>;

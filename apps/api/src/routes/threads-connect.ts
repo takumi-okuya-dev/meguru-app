@@ -29,54 +29,62 @@ export function threadsConnectRoutes(authed: MiddlewareHandler<AppEnv>) {
       const redirect = (path: string, params: Record<string, string>) =>
         c.redirect(`${web}${path}?${new URLSearchParams(params)}`, 302);
 
-      const stateParam = c.req.query("state");
-      const state = stateParam ? await consumeState(createDb(c.env.DATABASE_URL), stateParam) : null;
-      if (!state) return redirect("/accounts/new", { error: "OAUTH_STATE_INVALID" });
-
-      const fail = (code: ErrorCode) =>
-        state.mode === "reconnect"
-          ? redirect(`/accounts/${state.targetAccountId}/settings`, { error: code })
-          : redirect("/accounts/new", { error: code });
-
-      if (c.req.query("error")) return fail("THREADS_AUTH_CANCELLED");
-      const code = c.req.query("code");
-      if (!code) return fail("THREADS_AUTH_FAILED");
-
-      const threads = createThreadsClient(c.env);
-      let longLived: { accessToken: string; expiresAt: Date };
+      // 想定外の失敗でも、JSON の画面で止めずに Web へ戻してエラーの案内を出す
+      let failTarget = "/accounts/new";
       try {
-        const short = await threads.exchangeCode(code);
-        longLived = await threads.exchangeLongLived(short.accessToken);
-      } catch (err) {
-        logger.warn("threads token exchange failed", { err });
-        return fail("THREADS_AUTH_FAILED");
-      }
+        const stateParam = c.req.query("state");
+        const state = stateParam ? await consumeState(createDb(c.env.DATABASE_URL), stateParam) : null;
+        if (!state) return redirect("/accounts/new", { error: "OAUTH_STATE_INVALID" });
 
-      let profile;
-      try {
-        profile = await threads.getProfile(longLived.accessToken);
-      } catch (err) {
-        if (!(err instanceof ThreadsAuthError || err instanceof ThreadsApiError)) throw err;
-        logger.warn("threads profile fetch failed", { err });
-        return fail("THREADS_PROFILE_FETCH_FAILED");
-      }
+        if (state.mode === "reconnect") failTarget = `/accounts/${state.targetAccountId}/settings`;
+        const fail = (code: ErrorCode) =>
+          state.mode === "reconnect"
+            ? redirect(`/accounts/${state.targetAccountId}/settings`, { error: code })
+            : redirect("/accounts/new", { error: code });
 
-      try {
-        const result = await completeConnection(c.env, {
-          state: state as ConsumedState,
-          threadsUserId: profile.id,
-          profile,
-          accessToken: longLived.accessToken,
-          expiresAt: longLived.expiresAt,
-          authorizedAt,
-        });
-        if (result.kind === "reconnect") {
-          return redirect(`/accounts/${result.accountId}/settings`, { connected: "reconnect" });
+        if (c.req.query("error")) return fail("THREADS_AUTH_CANCELLED");
+        const code = c.req.query("code");
+        if (!code) return fail("THREADS_AUTH_FAILED");
+
+        const threads = createThreadsClient(c.env);
+        let longLived: { accessToken: string; expiresAt: Date };
+        try {
+          const short = await threads.exchangeCode(code);
+          longLived = await threads.exchangeLongLived(short.accessToken);
+        } catch (err) {
+          logger.warn("threads token exchange failed", { err });
+          return fail("THREADS_AUTH_FAILED");
         }
-        return redirect(`/accounts/${result.accountId}`, { connected: result.kind });
+
+        let profile;
+        try {
+          profile = await threads.getProfile(longLived.accessToken);
+        } catch (err) {
+          if (!(err instanceof ThreadsAuthError || err instanceof ThreadsApiError)) throw err;
+          logger.warn("threads profile fetch failed", { err });
+          return fail("THREADS_PROFILE_FETCH_FAILED");
+        }
+
+        try {
+          const result = await completeConnection(c.env, {
+            state: state as ConsumedState,
+            threadsUserId: profile.id,
+            profile,
+            accessToken: longLived.accessToken,
+            expiresAt: longLived.expiresAt,
+            authorizedAt,
+          });
+          if (result.kind === "reconnect") {
+            return redirect(`/accounts/${result.accountId}/settings`, { connected: "reconnect" });
+          }
+          return redirect(`/accounts/${result.accountId}`, { connected: result.kind });
+        } catch (err) {
+          if (err instanceof AppError) return fail(err.code);
+          throw err;
+        }
       } catch (err) {
-        if (err instanceof AppError) return fail(err.code);
-        throw err;
+        logger.error("threads callback failed unexpectedly", { err });
+        return redirect(failTarget, { error: "INTERNAL_ERROR" });
       }
     });
 }

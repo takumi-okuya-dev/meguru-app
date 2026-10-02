@@ -2,10 +2,13 @@
 import { SignIn, useAuth } from "@clerk/react";
 import { Navigate } from "react-router";
 import { CenteredLayout } from "@/components/layout/AppShell";
-import { LoadingSkeleton } from "@/components/guards";
+import { ClerkLoadFailedScreen } from "@/components/ErrorScreen";
+import { LoadingSkeleton, useLoadTimeout } from "@/components/guards";
 
 export function SignInPage() {
   const { isLoaded, isSignedIn } = useAuth();
+  const timedOut = useLoadTimeout(Boolean(isLoaded));
+  if (timedOut) return <ClerkLoadFailedScreen />;
   if (!isLoaded) return <LoadingSkeleton />;
   if (isSignedIn) return <Navigate to="/" replace />;
   return (

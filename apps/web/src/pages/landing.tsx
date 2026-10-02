@@ -3,12 +3,13 @@ import { useQuery } from "@tanstack/react-query";
 import { Navigate } from "react-router";
 import { api } from "@/lib/api-client";
 import { queryKeys } from "@/lib/query";
+import { ApiErrorScreen } from "@/components/ApiErrorScreen";
 import { LoadingSkeleton } from "@/components/guards";
 
 export function Landing() {
   const me = useQuery({ queryKey: queryKeys.me, queryFn: api.me });
   if (me.isPending) return <LoadingSkeleton />;
-  if (me.isError) return <LoadingSkeleton />;
+  if (me.isError) return <ApiErrorScreen error={me.error} onRetry={() => void me.refetch()} />;
   const target = me.data.landingAccountId ? `/accounts/${me.data.landingAccountId}` : "/accounts/new";
   return <Navigate to={target} replace />;
 }

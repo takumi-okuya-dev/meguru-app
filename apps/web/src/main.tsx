@@ -7,13 +7,14 @@ import { createRoot } from "react-dom/client";
 import { RouterProvider } from "react-router";
 import { toast } from "sonner";
 import { Toaster } from "@/components/ui/sonner";
+import { ClerkKeyMissingScreen } from "@/components/ErrorScreen";
 import { configureApiClient } from "@/lib/api-client";
+import { isUsablePublishableKey } from "@/lib/config-check";
 import { queryClient } from "@/lib/query";
 import { router } from "@/router";
 import "./index.css";
 
 const publishableKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY as string | undefined;
-if (!publishableKey) throw new Error("VITE_CLERK_PUBLISHABLE_KEY が設定されていません（apps/web/.env.example 参照）");
 
 /** APIクライアントに、Clerkのトークンの取り方とセッション切れの扱いを渡す */
 function ApiClientBridge() {
@@ -31,14 +32,25 @@ function ApiClientBridge() {
   return null;
 }
 
-createRoot(document.getElementById("root")!).render(
-  <StrictMode>
-    <ClerkProvider publishableKey={publishableKey} localization={jaJP} afterSignOutUrl="/sign-in">
-      <QueryClientProvider client={queryClient}>
-        <ApiClientBridge />
-        <RouterProvider router={router} />
-        <Toaster />
-      </QueryClientProvider>
-    </ClerkProvider>
-  </StrictMode>,
-);
+const root = createRoot(document.getElementById("root")!);
+
+// Clerk のキーが未設定・見本の値なら、真っ白や読み込み中のまま止めずに案内を出す
+if (!isUsablePublishableKey(publishableKey)) {
+  root.render(
+    <StrictMode>
+      <ClerkKeyMissingScreen />
+    </StrictMode>,
+  );
+} else {
+  root.render(
+    <StrictMode>
+      <ClerkProvider publishableKey={publishableKey} localization={jaJP} afterSignOutUrl="/sign-in">
+        <QueryClientProvider client={queryClient}>
+          <ApiClientBridge />
+          <RouterProvider router={router} />
+          <Toaster />
+        </QueryClientProvider>
+      </ClerkProvider>
+    </StrictMode>,
+  );
+}

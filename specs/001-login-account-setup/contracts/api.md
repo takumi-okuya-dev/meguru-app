@@ -16,6 +16,11 @@
   ```
 
   `message`は開発者向けの英文。画面に出す日本語の文言は、Webが`code`から引く（[ui-routes.md](./ui-routes.md)）。
+- **設定の確認**（2026-10-02に追加）：リクエストを受けたら、環境変数・Secretが使える形かを確かめる（未設定・見本の値・形の誤り。ThreadsのアプリID・シークレット・戻り先URLは、接続先が本物のThreadsのときだけ確かめる）。誤りがあれば、どの項目が悪いかをログに1回出し、`500 CONFIG_ERROR`を返す。`details`には誤っている**項目名だけ**を入れ、値は入れない。ブラウザが遷移してくる`GET /api/threads/callback`だけは、`{WEB_ORIGIN}/accounts/new?error=CONFIG_ERROR`へリダイレクトする。
+
+  ```json
+  { "error": { "code": "CONFIG_ERROR", "message": "server configuration error", "details": ["IDENTIFIER_HASH_KEY"] } }
+  ```
 - **秘密情報**（FR-010）：
   - アクセストークン、認可コード、App Secretは、どのレスポンスにも含めない。
   - `state`は例外で、`POST /api/threads/connect`のレスポンスの`authorizeUrl`の中にだけ含める（OAuthの仕組み上、ブラウザに渡す必要がある）。それ以外のレスポンスには含めない。
@@ -44,6 +49,10 @@ type AccountLimit = {
 ```
 
 ## エンドポイント
+
+### GET /api/health
+
+動作確認用。認証不要。設定に誤りがなければ`{ "ok": true }`、誤りがあれば`{ "ok": false, "configErrors": ["…"] }`（項目名だけ）を返す。
 
 ### GET /api/me
 
@@ -136,6 +145,7 @@ Threadsの認可画面から戻ってくる先。ブラウザのトップレベ�
 | `RECONNECT_ACCOUNT_MISMATCH` | 再接続で、元とは別のThreadsアカウントを認可した | FR-020 |
 | `ACCOUNT_DELETED_DURING_CONNECT` | この認可フローを始めた後に、ユーザーが自分のAccountを削除していた（`users.last_account_deleted_at`が`oauth_states.created_at`より新しい）。Accountは作らず、接続も更新しない | research.md R13 |
 | `THREADS_AUTH_REVOKED` | 認可の直後、callbackが接続を書き込む前に、ユーザーがThreads側で連携を解除していた（`authorized_at`以降に発行された取り消しがある）。Accountは作らず、接続も更新しない | research.md R7 |
+| `INTERNAL_ERROR` | 上記以外の想定外の失敗。JSONの画面で止めず、Webへ戻して案内を出す（2026-10-02に追加） | — |
 | `THREADS_DATA_DELETION_REQUESTED` | そのThreadsユーザーについて、未完了（`pending` / `failed`）のデータ削除要求がある。または、この認可フローを始めた後にデータ削除要求が完了していた。Accountは作らず、接続も更新しない | spec エッジケース、research.md R7 |
 
 ### DELETE /api/accounts/:accountId

@@ -6,8 +6,8 @@ export const TEST_APP_SECRET = "test-app-secret";
 
 export function testBindings(fakeThreadsUrl: string, databaseUrl: string) {
   return {
-    CLERK_SECRET_KEY: "sk_test_unused",
-    CLERK_PUBLISHABLE_KEY: "pk_test_unused",
+    CLERK_SECRET_KEY: "sk_test_TestOnlyDummySecretKey00000",
+    CLERK_PUBLISHABLE_KEY: "pk_test_dGVzdC5jbGVyay5hY2NvdW50cy5kZXYk",
     THREADS_APP_ID: "123456",
     THREADS_APP_SECRET: TEST_APP_SECRET,
     THREADS_REDIRECT_URI: "https://api.test/api/threads/callback",

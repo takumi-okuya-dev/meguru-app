@@ -20,6 +20,8 @@ export class ApiError extends Error {
   constructor(
     readonly code: ErrorCode,
     readonly status: number,
+    /** CONFIG_ERROR のときの、誤っている設定の項目名 */
+    readonly details: string[] = [],
   ) {
     super(code);
   }
@@ -46,12 +48,19 @@ async function request<T>(
     const token = await getToken();
     if (token) headers.set("Authorization", `Bearer ${token}`);
   }
-  const res = await fetch(`${API_BASE_URL}${path}`, { ...init, headers });
+  let res: Response;
+  try {
+    res = await fetch(`${API_BASE_URL}${path}`, { ...init, headers });
+  } catch (err) {
+    // 中止は呼び出し側で扱う。それ以外の通信の失敗は、APIに届いていない（起動していない・CORSで拒否された など）
+    if (err instanceof DOMException && err.name === "AbortError") throw err;
+    throw new ApiError("API_UNREACHABLE", 0);
+  }
   if (!res.ok) {
     const parsed = errorResponseSchema.safeParse(await res.json().catch(() => null));
     const code: ErrorCode = parsed.success ? parsed.data.error.code : "INTERNAL_ERROR";
     if (res.status === 401) onSessionExpired();
-    throw new ApiError(code, res.status);
+    throw new ApiError(code, res.status, parsed.success ? (parsed.data.error.details ?? []) : []);
   }
   if (schema === null || res.status === 204) return undefined as T;
   return schema.parse(await res.json());
@@ -77,5 +86,6 @@ export const api = {
 /** エラーを画面の文言にする */
 export function describeError(err: unknown, ctx: { username?: string; max?: number } = {}): string {
   const code: ErrorCode = err instanceof ApiError ? err.code : "INTERNAL_ERROR";
-  return errorMessage(code, ctx).message;
+  const details = err instanceof ApiError ? err.details : [];
+  return errorMessage(code, { ...ctx, details, apiUrl: API_BASE_URL }).message;
 }

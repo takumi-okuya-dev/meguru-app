@@ -16,6 +16,8 @@ export const ERROR_CODES = [
   "OAUTH_STATE_INVALID",
   "CONFIRMATION_MISMATCH",
   "VALIDATION_FAILED",
+  "CONFIG_ERROR",
+  "API_UNREACHABLE",
   "INTERNAL_ERROR",
 ] as const;
 
@@ -30,6 +32,10 @@ export type ErrorMessageContext = {
   username?: string;
   /** ACCOUNT_LIMIT_REACHED で使う、ユーザーの登録数上限 */
   max?: number;
+  /** CONFIG_ERROR で使う、誤っている設定の項目名（値は含めない） */
+  details?: string[];
+  /** API_UNREACHABLE で使う、接続しようとしたAPIのURL */
+  apiUrl?: string;
 };
 
 export type NextAction =
@@ -40,6 +46,7 @@ export type NextAction =
   | "retry-connect"
   | "retry-later"
   | "retype"
+  | "reload"
   | "none";
 
 export type ErrorMessage = { message: string; action: NextAction };
@@ -104,6 +111,16 @@ export function errorMessage(code: ErrorCode, ctx: ErrorMessageContext = {}): Er
       return { message: "入力したユーザー名が一致しません。", action: "retype" };
     case "VALIDATION_FAILED":
       return { message: "入力内容を確認してください。", action: "none" };
+    case "CONFIG_ERROR":
+      return {
+        message: `サーバーの設定に誤りがあります${ctx.details?.length ? `（${ctx.details.join("、")}）` : ""}。開発環境では apps/api/.dev.vars を確認し、APIを起動し直してください。`,
+        action: "reload",
+      };
+    case "API_UNREACHABLE":
+      return {
+        message: `APIに接続できませんでした${ctx.apiUrl ? `（${ctx.apiUrl}）` : ""}。APIが起動しているか、apps/web/.env.local の VITE_API_BASE_URL と apps/api/.dev.vars の WEB_ORIGIN が正しいかを確認してください。`,
+        action: "reload",
+      };
     case "INTERNAL_ERROR":
       return { message: "エラーが発生しました。時間をおいてもう一度お試しください。", action: "none" };
   }

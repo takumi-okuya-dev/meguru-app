@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { ApiError, api, describeError } from "@/lib/api-client";
 import { useCallbackResult } from "@/lib/callback-result";
 import { queryKeys } from "@/lib/query";
+import { ApiErrorScreen } from "@/components/ApiErrorScreen";
 import { LoadingSkeleton } from "@/components/guards";
 
 export function AccountNew() {
@@ -22,7 +23,7 @@ export function AccountNew() {
   });
 
   if (me.isPending) return <LoadingSkeleton />;
-  if (me.isError) return <LoadingSkeleton />;
+  if (me.isError) return <ApiErrorScreen error={me.error} onRetry={() => void me.refetch()} />;
 
   const { max, used } = me.data.accountLimit;
   const limitReached =

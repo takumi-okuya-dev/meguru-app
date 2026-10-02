@@ -13,6 +13,7 @@ import { ApiError, api } from "@/lib/api-client";
 import { queryKeys } from "@/lib/query";
 import { useAccountOpen } from "@/lib/use-account-open";
 import { NotFound } from "@/pages/not-found";
+import { ApiErrorScreen } from "@/components/ApiErrorScreen";
 import { LoadingSkeleton } from "@/components/guards";
 
 export type AccountOutletContext = { account: AccountSummary };
@@ -38,13 +39,13 @@ export function AccountLayout() {
   });
 
   if (me.isPending) return <LoadingSkeleton />;
-  if (me.isError) return <LoadingSkeleton />;
+  if (me.isError) return <ApiErrorScreen error={me.error} onRetry={() => void me.refetch()} />;
   if (me.data.accounts.length === 0) return <Navigate to="/accounts/new" replace />;
   if (account.isError) {
     if (account.error instanceof ApiError && account.error.code === "ACCOUNT_NOT_FOUND") {
       return <NotFound message={errorMessage("ACCOUNT_NOT_FOUND").message} />;
     }
-    return <LoadingSkeleton />;
+    return <ApiErrorScreen error={account.error} onRetry={() => void account.refetch()} />;
   }
   if (!account.data) return <LoadingSkeleton />;
 
