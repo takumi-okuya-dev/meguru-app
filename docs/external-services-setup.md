@@ -89,10 +89,26 @@ curl https://api-dev.example.com/api/health
 
 ### 2-1. アプリケーションを作る
 
-1. [Clerkのダッシュボード](https://dashboard.clerk.com/)で「Create application」を選ぶ。
-2. 名前（例：`ThreadsGrower`）を入れ、サインインの方法として**Googleだけ**を選んで作成する。
+1. [Clerk](https://clerk.com/)にサインアップし、[Clerkのダッシュボード](https://dashboard.clerk.com/)を開く。
+   - Clerkの管理画面に入るアカウントは、GitHub・Google・メールのどれで作ってもかまいません。アプリの利用者がログインする手段（次の手順で選ぶもの）とは別物です。
+2. アプリケーションの作成画面で、次のように選んで「Create application」を押す。
+
+| 項目 | 選ぶもの | 理由 |
+|---|---|---|
+| Select a project type | **Consumer** | B2Bを選ぶとClerkのOrganizations（組織・ロール）が有効になる。Organizationsはプラン4（チーム管理）でだけ使うと決めているため、今は使わない（Constitution「技術スタック制約」） |
+| Application name | `ThreadsGrower`など | 後から変えられる |
+| Sign in options：Email | **オフ** | 初期状態はオン。オフにできなければ、作成後に2-2でオフにする |
+| Sign in options：Phone number | オフ | |
+| Sign in options：Username | オフ | |
+| Sign in options：Google | **オン** | アプリのログイン手段はGoogleだけ（FR-001） |
 
 作成直後は**開発用インスタンス**（Development）になっています。開発用インスタンスでは、Clerkが用意した共有のGoogle認証情報が使われるので、Google Cloud側の設定は不要です（本番は「9. 本番公開時」を参照）。
+
+3. 作成すると「Add authentication to your app」という画面（Next.js・Reactなどを選び、AIエージェント向けのプロンプトをコピーする画面）が出ますが、**この画面の手順は飛ばします**。
+   - このリポジトリにはClerkを組み込み済みです（Webは`@clerk/react`、APIは`@clerk/backend`）。
+   - 「Copy prompt」でAIエージェントに貼ると、今の実装を書き換えてしまうおそれがあります。
+   - 画面にある`http://localhost:3000`はNext.jsの既定のポートで、このアプリは`http://localhost:5173`です。
+   - 必要なのはキーだけなので、左のメニューから「API keys」に進みます（2-4）。
 
 ### 2-2. ログイン手段をGoogleだけにする
 
@@ -118,12 +134,14 @@ APIは、セッショントークンにメールアドレスが含まれてい�
 
 ### 2-4. キーを控える
 
-「API keys」で次の2つを控えます。
+ダッシュボードの左のメニューの「**API keys**」（見つからなければ「Configure」の中）で、次の2つを控えます。
 
 | 名前 | 形 | 入れる先 |
 |---|---|---|
 | Publishable key | `pk_test_…` | `apps/web/.env.local`の`VITE_CLERK_PUBLISHABLE_KEY`、`apps/api/.dev.vars`の`CLERK_PUBLISHABLE_KEY` |
 | Secret key | `sk_test_…` | `apps/api/.dev.vars`の`CLERK_SECRET_KEY`（**秘密情報。コミットしない**） |
+
+キーを入れたら`pnpm dev`を起動し直し、`http://localhost:5173`を開いてGoogleでログインします。最初にログインしたユーザーがClerkに登録され、作成直後の画面の「Watching for users」もそれを検知します。
 
 ---
 
