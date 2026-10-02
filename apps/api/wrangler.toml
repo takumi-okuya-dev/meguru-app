@@ -1,0 +1,14 @@
+name = "threads-grower-api"
+main = "src/index.ts"
+compatibility_date = "2026-08-22"
+compatibility_flags = ["nodejs_compat"]
+
+# 日次の定期処理（03:00 JST）。contracts/api.md「定期処理」
+[triggers]
+crons = ["0 18 * * *"]
+
+# 秘密でない設定。秘密情報は `wrangler secret put` / .dev.vars で設定する（.dev.vars.example 参照）
+[vars]
+THREADS_AUTH_BASE_URL = "https://threads.com"
+THREADS_GRAPH_BASE_URL = "https://graph.threads.com"
+TOKEN_ENCRYPTION_KEY_VERSION = "1"

@@ -1,0 +1,29 @@
+# apps/api のローカル開発用の環境変数。コピーして .dev.vars を作る（.dev.vars はコミットしない）
+# 一覧と意味は specs/001-login-account-setup/contracts/api.md「環境変数・Secret」を参照
+
+# Clerk（Googleログインのみを有効にした開発用インスタンス）
+CLERK_SECRET_KEY=sk_test_xxx
+CLERK_PUBLISHABLE_KEY=pk_test_xxx
+
+# Threads（Meta）アプリ
+THREADS_APP_ID=000000000000000
+THREADS_APP_SECRET=xxxxxxxx
+# Metaに登録した値と完全一致させる。HTTPS必須・localhost不可なので Cloudflare Tunnel のホスト名を使う
+THREADS_REDIRECT_URI=https://api-dev.example.com/api/threads/callback
+# 既定値は wrangler.toml。テストでは偽のThreadsサーバーに向ける
+# THREADS_AUTH_BASE_URL=https://threads.com
+# THREADS_GRAPH_BASE_URL=https://graph.threads.com
+
+# トークン暗号化の鍵リング（JSON。各鍵は32バイトをbase64化した値）。生成例: openssl rand -base64 32
+TOKEN_ENCRYPTION_KEYS={"1":"REPLACE_WITH_32_BYTES_BASE64"}
+# 新しく暗号化するときに使う鍵のバージョン（鍵リングに含まれていること）
+TOKEN_ENCRYPTION_KEY_VERSION=1
+
+# データ削除・取り消しのtombstone用の鍵付きハッシュの鍵（32バイトをbase64化した値）
+IDENTIFIER_HASH_KEY=REPLACE_WITH_32_BYTES_BASE64
+
+# Neon（ローカルは docker compose の Postgres + local-neon-http-proxy）
+DATABASE_URL=postgres://postgres:postgres@db.localtest.me:5432/threads_grower
+
+# CORSの許可とリダイレクト先
+WEB_ORIGIN=http://localhost:5173
