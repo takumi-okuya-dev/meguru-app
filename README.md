@@ -36,6 +36,7 @@ pnpm workspacesのモノレポ（[plan.md](specs/001-login-account-setup/plan.md
   - `brew install pnpm`
   - 入れずに試すだけなら、`pnpm`の代わりに`npx pnpm@9`と書いても動く
 - Docker（ローカルのPostgres 17と`local-neon-http-proxy`を起動する）
+- [Clerk](https://clerk.com/)のアカウント（無料。ログインに使うので、ローカルで動かすときも**必須**）
 - 本物のThreadsで試す場合：`cloudflared`（Cloudflare Tunnel）
 
 ### 1. 依存とDB
@@ -53,7 +54,8 @@ cp apps/api/.dev.vars.example apps/api/.dev.vars    # 各項目は contracts/api
 cp apps/web/.env.example apps/web/.env.local
 ```
 
-- **Clerk**：開発用インスタンスを作り、ログイン手段は**Googleだけ**を有効にする（メール＋パスワードは無効）。
+- **Clerk**：[Clerkのダッシュボード](https://dashboard.clerk.com/)で開発用インスタンスを作り、ログイン手段は**Googleだけ**を有効にする（メール＋パスワードは無効）。詳しい手順は[docs/external-services-setup.md](docs/external-services-setup.md)の「2. Clerk」。
+  - ダッシュボードの「API keys」で、Publishable key（`pk_test_…`）を`apps/web/.env.local`の`VITE_CLERK_PUBLISHABLE_KEY`と`apps/api/.dev.vars`の`CLERK_PUBLISHABLE_KEY`に、Secret key（`sk_test_…`）を`apps/api/.dev.vars`の`CLERK_SECRET_KEY`に入れる。見本の値のままだと、画面が真っ白になる。
   - セッショントークンにメールアドレスと名前を含めると、APIが毎回Clerkに問い合わせずに済む（任意）。Clerkダッシュボードの「Sessions → Customize session token」に`{"email": "{{user.primary_email_address}}", "name": "{{user.full_name}}"}`を設定する。
 - **鍵**：`TOKEN_ENCRYPTION_KEYS`と`IDENTIFIER_HASH_KEY`は`openssl rand -base64 32`で作る。
 - **DATABASE_URL**：ローカルは`postgres://postgres:postgres@db.localtest.me:5432/threads_grower`（`local-neon-http-proxy`経由）。
@@ -63,6 +65,9 @@ cp apps/web/.env.example apps/web/.env.local
 ```bash
 pnpm dev     # web（http://localhost:5173）と api（http://localhost:8787）
 ```
+
+- アプリは`http://localhost:5173`を開く。`http://localhost:8787`は画面を持たないAPIなので、ブラウザで開くと404になる（動作確認は`/api/health`）。
+- `.env.local`や`.dev.vars`を書き換えたら、`pnpm dev`を止めて起動し直す。
 
 ### 本物のThreads（Meta）につなぐ場合
 
