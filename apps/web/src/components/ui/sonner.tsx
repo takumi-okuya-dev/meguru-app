@@ -1,5 +1,7 @@
 import { Toaster as Sonner, type ToasterProps } from "sonner";
+import { useTheme } from "@/lib/theme";
 
 export function Toaster(props: ToasterProps) {
-  return <Sonner theme="system" position="top-center" richColors {...props} />;
+  const { resolved } = useTheme();
+  return <Sonner theme={resolved} position="top-center" richColors {...props} />;
 }

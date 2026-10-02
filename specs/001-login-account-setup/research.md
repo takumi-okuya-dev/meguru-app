@@ -236,7 +236,7 @@
 - **決定**：
   - React 19、Vite 8、React Router 8（SPAモード）、TanStack Query、shadcn/ui（Tailwind CSS v4）を使う。
   - APIクライアントは、`packages/shared`のzodスキーマでレスポンスを検証する薄い`fetch`ラッパーにする。当初はHonoの型付きRPCクライアントを予定していたが、APIの型をWebに取り込むとWorkersの型定義まで入り込み、ブラウザの型と衝突するため、実装時に変更した。
-  - レイアウトは、左サイドバー（Account切り替え、アカウント追加、ユーザーメニュー）と右メインパネルの2列とし、ダークモードはOSの設定に従う。画面一覧と遷移の規則は[contracts/ui-routes.md](./contracts/ui-routes.md)を参照。
+  - レイアウトは、左サイドバー（Account切り替え、アカウント追加、ユーザーメニュー）と右メインパネルの2列とし、配色は既定をライトとし、ユーザーメニューでライト／ダーク／OSに合わせるを切り替える（当初はOSの設定に従う方式だったが、2026-10-02にユーザーの要望で変更）。画面一覧と遷移の規則は[contracts/ui-routes.md](./contracts/ui-routes.md)を参照。
   - エラーコードと表示文言（日本語）の対応表は`packages/shared`に置く。
 - **理由**：Constitutionで確定したUIの方針（ChatGPT風のニュートラルな質感、左サイドバー＋右メインパネル）を、このfeatureで画面の骨格として確立する。アプリ全体の詳細なデザインは、投稿ストックのfeatureに入る前に改めて決める（2026-10-01のユーザーとの合意）。
 - **検討した代替案**：TanStack Router：型安全性は高いが、画面数が少ないMVPでは学習コストに見合わないため不採用。
