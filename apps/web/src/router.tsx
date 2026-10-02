@@ -1,5 +1,5 @@
 // ルートとガード（contracts/ui-routes.md「ルート」「遷移の規則」）
-import { createBrowserRouter } from "react-router";
+import { createBrowserRouter, Navigate } from "react-router";
 import { RequireAuth } from "@/components/guards";
 import { AccountLayout } from "@/pages/account-layout";
 import { AccountHome } from "@/pages/account-home";
@@ -9,6 +9,10 @@ import { DataDeletion } from "@/pages/data-deletion";
 import { Landing } from "@/pages/landing";
 import { NotFound } from "@/pages/not-found";
 import { SignInPage } from "@/pages/sign-in";
+import { AccountSettingsPage } from "@/pages/settings/account";
+import { AppearanceSettings } from "@/pages/settings/appearance";
+import { DEFAULT_SETTINGS_SLUG } from "@/pages/settings/sections";
+import { SettingsLayout } from "@/pages/settings/settings-layout";
 
 export const routes = [
   { path: "/sign-in/*", element: <SignInPage /> },
@@ -18,6 +22,15 @@ export const routes = [
     children: [
       { path: "/", element: <Landing /> },
       { path: "/accounts/new", element: <AccountNew /> },
+      {
+        path: "/settings",
+        element: <SettingsLayout />,
+        children: [
+          { index: true, element: <Navigate to={DEFAULT_SETTINGS_SLUG} replace /> },
+          { path: "appearance", element: <AppearanceSettings /> },
+          { path: "account", element: <AccountSettingsPage /> },
+        ],
+      },
       {
         path: "/accounts/:accountId",
         element: <AccountLayout />,

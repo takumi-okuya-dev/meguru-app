@@ -1,9 +1,7 @@
-// ユーザーメニューとログアウト（FR-006、規則6）。
-// ログアウトは Clerk のセッションを終了し、TanStack Query のキャッシュを全部消してから /sign-in へ置き換え遷移する
-import { useClerk, useUser } from "@clerk/react";
-import { useQueryClient } from "@tanstack/react-query";
-import { CheckIcon, ChevronsUpDownIcon, LogOutIcon, MonitorIcon, MoonIcon, SunIcon } from "lucide-react";
-import { useNavigate } from "react-router";
+// サイドバー左下のユーザーメニュー。名前とメールアドレス、設定、ログアウト（FR-006）
+import { useUser } from "@clerk/react";
+import { ChevronsUpDownIcon, LogOutIcon, SettingsIcon } from "lucide-react";
+import { Link } from "react-router";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -12,44 +10,33 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { useTheme, type Theme } from "@/lib/theme";
-
-const THEME_OPTIONS: { value: Theme; label: string; Icon: typeof SunIcon }[] = [
-  { value: "light", label: "ライト", Icon: SunIcon },
-  { value: "dark", label: "ダーク", Icon: MoonIcon },
-  { value: "system", label: "OSに合わせる", Icon: MonitorIcon },
-];
+import { useLogout } from "@/lib/use-logout";
 
 export function UserMenu() {
   const { user } = useUser();
-  const { signOut } = useClerk();
-  const queryClient = useQueryClient();
-  const navigate = useNavigate();
-  const { theme, setTheme } = useTheme();
+  const logout = useLogout();
+  const email = user?.primaryEmailAddress?.emailAddress ?? "";
+  const name = user?.fullName || email || "ユーザー";
+  const initial = name.slice(0, 1).toUpperCase();
 
-  const logout = async () => {
-    await signOut();
-    queryClient.clear();
-    void navigate("/sign-in", { replace: true });
-  };
-
-  const name = user?.fullName || user?.primaryEmailAddress?.emailAddress || "ユーザー";
   return (
     <DropdownMenu>
       <DropdownMenuTrigger className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm hover:bg-accent">
+        <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-muted text-xs">{initial}</span>
         <span className="min-w-0 flex-1 truncate">{name}</span>
         <ChevronsUpDownIcon className="size-4 text-muted-foreground" />
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" className="w-56">
-        <DropdownMenuLabel className="truncate">{user?.primaryEmailAddress?.emailAddress}</DropdownMenuLabel>
+      <DropdownMenuContent align="start" side="top" className="w-60">
+        <DropdownMenuLabel className="space-y-0.5">
+          <div className="truncate">{name}</div>
+          {email && <div className="truncate text-xs font-normal text-muted-foreground">{email}</div>}
+        </DropdownMenuLabel>
         <DropdownMenuSeparator />
-        <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">配色</DropdownMenuLabel>
-        {THEME_OPTIONS.map(({ value, label, Icon }) => (
-          <DropdownMenuItem key={value} onSelect={() => setTheme(value)}>
-            <Icon className="size-4" /> {label}
-            {theme === value && <CheckIcon className="ml-auto size-4" aria-label="選択中" />}
-          </DropdownMenuItem>
-        ))}
+        <DropdownMenuItem asChild>
+          <Link to="/settings">
+            <SettingsIcon className="size-4" /> 設定
+          </Link>
+        </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem onSelect={() => void logout()}>
           <LogOutIcon className="size-4" /> ログアウト
