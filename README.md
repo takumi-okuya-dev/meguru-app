@@ -62,6 +62,8 @@ pnpm dev     # web（http://localhost:5173）と api（http://localhost:8787）
 
 ### 本物のThreads（Meta）につなぐ場合
 
+> Clerk・Meta・Cloudflare Tunnelの具体的な準備手順は[docs/external-services-setup.md](docs/external-services-setup.md)にまとめています。
+
 - Threadsのredirect URIはHTTPS必須で`localhost`は登録できない。Cloudflare Tunnelで固定のホスト名をローカルのAPI（`localhost:8787`）に向け、そのURLを`THREADS_REDIRECT_URI`とMetaのアプリ設定に登録する。
 - Metaのアプリ設定には、リダイレクトのほかに**アンインストール**（`/api/threads/webhooks/uninstall`）と**データ削除**（`/api/threads/webhooks/data-deletion`）のcallback URLも登録する（登録しないと保存できない）。
 - Meta App Reviewの前は、アプリのテスターに追加し、Threadsアプリの「設定 → アカウント → ウェブサイトのアクセス許可 → 招待」で承認したアカウントしか接続できない。

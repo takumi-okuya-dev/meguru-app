@@ -5,6 +5,7 @@ description: "ログインとThreadsアカウント登録の実装タスク"
 # タスク（Tasks）：ログインとThreadsアカウント登録
 
 **入力**：`specs/001-login-account-setup/`の設計文書
+
 **前提**：[plan.md](./plan.md)、[spec.md](./spec.md)、[research.md](./research.md)、[data-model.md](./data-model.md)、[contracts/api.md](./contracts/api.md)、[contracts/ui-routes.md](./contracts/ui-routes.md)、[quickstart.md](./quickstart.md)
 
 **テスト**：quickstart.mdの「自動テスト」の表にあるテストを、該当するユーザーストーリーのフェーズで先に書く（失敗することを確認してから実装する）。
