@@ -17,7 +17,15 @@ const LEASE_MS = 15 * 60_000;
 const IDENTIFIER_GRACE_MS = 15 * 60_000;
 const RETENTION_TARGET_MS = 25 * 3600_000;
 
-/** 受付（手順1・2）。重複なら既存の確認コードを返し、新しい行は作らない */
+/**
+ * Meta のデータ削除要求を受け付ける（research.md R7 の手順1・2）。
+ * signed_request 全体の SHA-256 で重複を除き、再送なら既存の確認コードを返して新しい行は作らない。
+ * @param env - Workers のバインディング
+ * @param signedRequest - Meta から受け取った signed_request
+ * @param now - 受け付けた時刻
+ * @returns 確認コードと、新しい要求かどうか
+ * @throws SignedRequestError signed_request が不正なとき
+ */
 export async function receiveDeletion(
   env: Env,
   signedRequest: string,
@@ -49,9 +57,19 @@ export async function receiveDeletion(
   return { code: existing!.code, isNew: false };
 }
 
+/** 削除の試行に差し込む処理（テストで失敗を起こすために使う）。 */
 export type AttemptHooks = { beforeDelete?: () => void | Promise<void> };
 
-/** 削除の試行（手順3・4）。claim できなければ何もしない */
+/**
+ * 削除を1回試みる（research.md R7「試行ごとの原子的なclaim」）。
+ * 1つのトランザクションで、ロック → 読み直し → last_attempted_at を条件にした UPDATE で claim → Account の削除 → 完了の記録を行う。
+ * claim できなければ何もしない。失敗したらロールバックし、別のトランザクションで failed を記録する。
+ * @param env - Workers のバインディング
+ * @param code - 確認コード
+ * @param observedLastAttemptedAt - 最初に読み取った last_attempted_at（claim の条件）
+ * @param hooks - 差し込む処理（テスト用）
+ * @returns completed（削除した）・skipped（claim できなかった）・failed（失敗した）
+ */
 export async function attemptDeletion(
   env: Env,
   code: string,
@@ -133,7 +151,12 @@ export async function attemptDeletion(
   }
 }
 
-/** Cron の再試行：最後に試みてから15分以上経った pending と failed（同じリースで扱う） */
+/**
+ * Cron で削除要求を再試行する。最後に試みてから15分以上経った pending と failed を対象にする。
+ * @param env - Workers のバインディング
+ * @param now - 基準にする時刻
+ * @returns 試行した件数と、結果ごとの件数
+ */
 export async function retryDeletions(env: Env, now: Date) {
   const due = await createDb(env.DATABASE_URL)
     .select({ code: threadsDeletionRequests.confirmationCode, lastAttemptedAt: threadsDeletionRequests.lastAttemptedAt })
@@ -153,7 +176,12 @@ export async function retryDeletions(env: Env, now: Date) {
   return result;
 }
 
-/** 完了から15分以上経った要求の hmac を消し、残っている最古の行の経過時間をログに出す */
+/**
+ * 完了から15分以上経った削除要求の鍵付きハッシュを消し、残っている最古の行の経過時間をログに出す（25時間を超えたらエラー）。
+ * @param env - Workers のバインディング
+ * @param now - 基準にする時刻
+ * @returns 消した件数と、残っている最古の行の経過時間（ミリ秒。なければ null）
+ */
 export async function cleanupDeletionIdentifiers(env: Env, now: Date) {
   const db = createDb(env.DATABASE_URL);
   const cleared = await db
@@ -182,6 +210,12 @@ export async function cleanupDeletionIdentifiers(env: Env, now: Date) {
   return { cleared: cleared.length, oldestRemainingAgeMs: oldestAgeMs };
 }
 
+/**
+ * データ削除要求の状況を返す。識別子は返さない。
+ * @param env - Workers のバインディング
+ * @param code - 確認コード
+ * @returns 状態・受付日時・完了日時。確認コードが存在しなければ null
+ */
 export async function deletionStatus(env: Env, code: string) {
   const [row] = await createDb(env.DATABASE_URL)
     .select()

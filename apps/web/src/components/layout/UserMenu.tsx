@@ -12,6 +12,10 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useLogout } from "@/lib/use-logout";
 
+/**
+ * サイドバー左下のユーザーメニュー。名前とメールアドレス、設定、ログアウト（FR-006）。
+ * @returns ユーザーメニュー
+ */
 export function UserMenu() {
   const { user } = useUser();
   const logout = useLogout();

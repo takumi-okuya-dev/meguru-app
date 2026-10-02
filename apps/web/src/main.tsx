@@ -16,7 +16,10 @@ import "./index.css";
 
 const publishableKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY as string | undefined;
 
-/** APIクライアントに、Clerkのトークンの取り方とセッション切れの扱いを渡す */
+/**
+ * API クライアントに、Clerk のトークンの取り方とセッション切れの扱いを渡す（ClerkProvider の中に置く）。
+ * @returns 何も描画しない
+ */
 function ApiClientBridge() {
   const { getToken } = useAuth();
   useEffect(() => {

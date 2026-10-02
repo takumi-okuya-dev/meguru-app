@@ -9,6 +9,7 @@ import { createDb } from "../db/client";
 import { users } from "../db/schema";
 import { AppError } from "../lib/errors";
 
+/** セッショントークンから確かめた本人。 */
 export type VerifiedIdentity = {
   clerkUserId: string;
   /** セッショントークンのカスタムクレーム。Clerkダッシュボードで email・name を含める設定にする */
@@ -16,16 +17,23 @@ export type VerifiedIdentity = {
   displayName?: string | null;
 };
 
-/** トークンを検証し、本人を返す。無効なら null */
+/** セッショントークンの検証と、ユーザーのプロフィールの取得。テストでは偽のものを差し込む。 */
 export type AuthVerifier = {
   verify(token: string): Promise<VerifiedIdentity | null>;
   /** users 行を新しく作るときに、メールアドレスがトークンに含まれていなければ取りに行く */
   fetchProfile(clerkUserId: string): Promise<{ email: string; displayName: string | null }>;
 };
 
+/** リクエストしたユーザー（users の行）。 */
 export type CurrentUser = typeof users.$inferSelect;
+/** 認証済みのリクエストで Hono のコンテキストに置く値。 */
 export type AuthVariables = { user: CurrentUser };
 
+/**
+ * Clerk でセッショントークンを検証する AuthVerifier を作る。
+ * @param env - Workers のバインディング（Clerk のキーと WEB_ORIGIN を使う）
+ * @returns Clerk を使う AuthVerifier
+ */
 export function clerkVerifier(env: Env): AuthVerifier {
   return {
     async verify(token) {
@@ -57,6 +65,12 @@ export function clerkVerifier(env: Env): AuthVerifier {
   };
 }
 
+/**
+ * 認証のミドルウェアを作る（FR-001〜FR-003、research.md R2）。
+ * Bearer トークンを検証し、失敗したら 401 AUTH_REQUIRED。成功したら users の行を探し、なければ作る（JIT作成）。
+ * @param makeVerifier - バインディングから AuthVerifier を作る関数
+ * @returns Hono のミドルウェア
+ */
 export function authMiddleware(makeVerifier: (env: Env) => AuthVerifier) {
   return createMiddleware<{ Bindings: Env; Variables: AuthVariables }>(async (c, next) => {
     const header = c.req.header("Authorization") ?? "";

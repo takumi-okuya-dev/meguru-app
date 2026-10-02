@@ -4,6 +4,10 @@ import { useParams } from "react-router";
 import { CenteredLayout } from "@/components/layout/AppShell";
 import { api } from "@/lib/api-client";
 
+/**
+ * Meta のデータ削除要求の状況の画面（research.md R7）。failed は「処理中」として表示する。
+ * @returns 状況の画面
+ */
 export function DataDeletion() {
   const { code } = useParams<{ code: string }>();
   const status = useQuery({

@@ -9,6 +9,7 @@ import { threadsUserHmac } from "../lib/identifier-hash";
 import { logger } from "../lib/logger";
 import { ThreadsAuthError, type ThreadsClient } from "../lib/threads-client";
 
+/** アンインストール通知の中身。issuedAt は Meta が通知を発行した時刻（含まれていなければ undefined）。 */
 export type UninstallPayload = { userId: string; issuedAt?: Date };
 
 async function recordRevocation(tx: TxDb, hmac: string, issuedAt: Date, receivedAt: Date) {
@@ -24,6 +25,14 @@ async function revokeConnection(tx: TxDb, accountId: string, generation: number)
   if (bumped.length > 0) await tx.delete(threadsConnections).where(eq(threadsConnections.accountId, accountId));
 }
 
+/**
+ * Meta のアンインストール通知を処理する（research.md R7、contracts/api.md の手順1〜7）。
+ * Accountの有無にかかわらず取り消しを記録し、ユーザーが最後に認可した時刻より前の通知は適用しない。
+ * @param env - Workers のバインディング
+ * @param threads - Threads API のクライアント（issued_at がないときの確認に使う）
+ * @param payload - 検証済みの通知の中身
+ * @param receivedAt - 通知を受け取った時刻
+ */
 export async function handleUninstall(env: Env, threads: ThreadsClient, payload: UninstallPayload, receivedAt: Date) {
   const hmac = await threadsUserHmac(env.IDENTIFIER_HASH_KEY, payload.userId);
 
@@ -76,7 +85,12 @@ export async function handleUninstall(env: Env, threads: ThreadsClient, payload:
   });
 }
 
-/** 受信から15分以上経った取り消しの記録を削除する（日次Cron） */
+/**
+ * 受信から15分以上経った取り消しの記録を削除する（日次Cron）。
+ * @param env - Workers のバインディング
+ * @param now - 基準にする時刻
+ * @returns 削除した件数
+ */
 export async function cleanupRevocations(env: Env, now: Date) {
   const deleted = await createDb(env.DATABASE_URL)
     .delete(threadsRevocations)

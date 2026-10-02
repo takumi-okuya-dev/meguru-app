@@ -6,6 +6,11 @@ import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Sidebar } from "./Sidebar";
 
+/**
+ * 画面の骨格。左サイドバー＋右メインパネルで、狭い画面ではサイドバーをドロワーにする（contracts/ui-routes.md）。
+ * @param props - children：メインパネルの中身
+ * @returns 画面の骨格
+ */
 export function AppShell({ children }: { children: ReactNode }) {
   return (
     <div className="flex min-h-svh">
@@ -32,7 +37,11 @@ export function AppShell({ children }: { children: ReactNode }) {
   );
 }
 
-/** ログイン画面・Accountが0件のときのアカウント追加画面に使う、サイドバーなしの中央寄せ1カラム */
+/**
+ * サイドバーなしの中央寄せの1カラム。ログイン画面や、Accountが0件のときのアカウント追加画面に使う。
+ * @param props - children：中身
+ * @returns 中央寄せの骨格
+ */
 export function CenteredLayout({ children }: { children: ReactNode }) {
   return <div className="flex min-h-svh items-center justify-center px-4 py-10">{children}</div>;
 }

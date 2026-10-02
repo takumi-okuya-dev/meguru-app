@@ -1,6 +1,10 @@
 import { AccountSwitcher } from "./AccountSwitcher";
 import { UserMenu } from "./UserMenu";
 
+/**
+ * サイドバーの中身。Account の一覧とユーザーメニュー。
+ * @returns サイドバー
+ */
 export function Sidebar() {
   return (
     <div className="flex h-full flex-col">

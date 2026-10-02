@@ -1,10 +1,12 @@
 // Metaの signed_request の検証（research.md R7）。
 // 形式は "<base64urlの署名>.<base64urlのJSONペイロード>"。署名は App Secret による HMAC-SHA256。
 
+/** Meta の signed_request が不正（形式・署名・内容の誤り）であることを表す。 */
 export class SignedRequestError extends Error {
   override name = "SignedRequestError";
 }
 
+/** 検証済みの signed_request の中身。 */
 export type SignedRequestPayload = {
   userId: string;
   /** Metaが通知を発行した時刻。含まれていなければ undefined */
@@ -19,6 +21,14 @@ function b64urlToBytes(value: string): Uint8Array {
   return out;
 }
 
+/**
+ * Meta の signed_request を検証して中身を取り出す（research.md R7）。
+ * 形式は「base64url の署名.base64url の JSON」で、署名は App Secret による HMAC-SHA256。
+ * @param signedRequest - Meta から受け取った signed_request
+ * @param appSecret - Threadsのアプリシークレット
+ * @returns ThreadsのユーザーIDと、通知の発行時刻
+ * @throws SignedRequestError 形式・署名・内容が不正なとき
+ */
 export async function verifySignedRequest(signedRequest: string, appSecret: string): Promise<SignedRequestPayload> {
   const parts = signedRequest.split(".");
   if (parts.length !== 2 || !parts[0] || !parts[1]) throw new SignedRequestError("malformed signed_request");

@@ -17,6 +17,10 @@ async function readSignedRequest(c: { req: { parseBody: () => Promise<Record<str
   return typeof sr === "string" ? sr : null;
 }
 
+/**
+ * Meta からの callback（アンインストール・データ削除）のルート。signed_request を検証し、失敗したら 400。
+ * @returns Hono のルート
+ */
 export function threadsWebhookRoutes() {
   return new Hono<AppEnv>()
     .post("/threads/webhooks/uninstall", async (c) => {

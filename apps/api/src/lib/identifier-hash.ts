@@ -8,10 +8,21 @@ function base64ToBytes(b64: string): Uint8Array {
   return out;
 }
 
+/**
+ * バイト列を16進の文字列にする。
+ * @param bytes - バイト列
+ * @returns 16進の文字列（小文字）
+ */
 export function toHex(bytes: ArrayBuffer | Uint8Array): string {
   return [...new Uint8Array(bytes)].map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
+/**
+ * ThreadsのユーザーIDの鍵付きハッシュを求める（research.md R7）。平文のIDを残さずに照合するために使う。
+ * @param identifierHashKeyB64 - IDENTIFIER_HASH_KEY（32バイトの base64）
+ * @param threadsUserId - ThreadsのユーザーID
+ * @returns HMAC-SHA256 の16進の文字列
+ */
 export async function threadsUserHmac(identifierHashKeyB64: string, threadsUserId: string): Promise<string> {
   const key = await crypto.subtle.importKey(
     "raw",
@@ -24,6 +35,11 @@ export async function threadsUserHmac(identifierHashKeyB64: string, threadsUserI
   return toHex(mac);
 }
 
+/**
+ * 文字列の SHA-256 を求める。state の保存や signed_request の重複判定に使う。
+ * @param value - ハッシュを求める文字列
+ * @returns SHA-256 の16進の文字列
+ */
 export async function sha256Hex(value: string): Promise<string> {
   return toHex(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value)));
 }

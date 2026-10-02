@@ -13,16 +13,24 @@ import { threadsWebhookRoutes } from "./routes/threads-webhooks";
 import { meRoutes } from "./routes/me";
 import { threadsConnectRoutes } from "./routes/threads-connect";
 
+/** アプリに差し込む依存。テストでは偽の認証を渡す。 */
 export type AppDeps = {
   verifyAuth: (env: Env) => AuthVerifier;
 };
 
+/** 本番の依存。認証は Clerk で検証する。 */
 export const defaultDeps: AppDeps = {
   verifyAuth: (env) => clerkVerifier(env),
 };
 
+/** Hono のアプリの型引数。バインディングと、認証済みのユーザー。 */
 export type AppEnv = { Bindings: Env; Variables: AuthVariables };
 
+/**
+ * API の Hono アプリを組み立てる。CORS・設定の確認・エラーの形・各ルートをまとめる。
+ * @param deps - 差し込む依存。省略すると本番の依存（Clerk の検証）を使う
+ * @returns /api 以下のルートを持つアプリ
+ */
 export function createApp(deps: AppDeps = defaultDeps) {
   const app = new Hono<AppEnv>();
 
@@ -90,4 +98,5 @@ export function createApp(deps: AppDeps = defaultDeps) {
   return routes;
 }
 
+/** API のアプリの型。 */
 export type AppType = ReturnType<typeof createApp>;

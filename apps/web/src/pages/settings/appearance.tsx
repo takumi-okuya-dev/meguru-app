@@ -10,7 +10,11 @@ const MODES: { value: Theme; label: string }[] = [
   { value: "dark", label: "ダーク" },
 ];
 
-/** 画面の見本の絵（サイドバー・本文の線・入力欄を簡略化して描く） */
+/**
+ * 配色の見本の絵（サイドバー・本文の線・入力欄を簡略化して描く）。
+ * @param props - tone：light か dark
+ * @returns 見本の絵
+ */
 function Preview({ tone }: { tone: "light" | "dark" }) {
   const dark = tone === "dark";
   return (
@@ -33,6 +37,11 @@ function Preview({ tone }: { tone: "light" | "dark" }) {
   );
 }
 
+/**
+ * モードの見本の絵。OSに合わせるは、左半分をライト、右半分をダークにする。
+ * @param props - mode：選べる配色
+ * @returns 見本の絵
+ */
 function ModeThumbnail({ mode }: { mode: Theme }) {
   if (mode === "system") {
     // 左半分がライト、右半分がダーク
@@ -50,6 +59,10 @@ function ModeThumbnail({ mode }: { mode: Theme }) {
   return <Preview tone={mode} />;
 }
 
+/**
+ * 設定 > 外観。表示スタイルのモードを見本の絵（OSに合わせる・ライト・ダーク）で選ぶ。既定はライト。
+ * @returns 外観の設定
+ */
 export function AppearanceSettings() {
   const { theme, setTheme } = useTheme();
   return (

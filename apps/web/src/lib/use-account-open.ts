@@ -11,8 +11,16 @@ import { ApiError, api } from "./api-client";
 const pageClientId = crypto.randomUUID();
 let pageOpenSeq = 0;
 
+/** open が失敗したときの再試行の間隔（ミリ秒）。指数バックオフで最大3回。 */
 export const OPEN_RETRY_DELAYS_MS = [500, 1000, 2000];
 
+/**
+ * Accountの画面を開いたときに、「最後に使ったAccount」の記録と接続の確認を行う（FR-007・FR-018、規則5）。
+ * 失敗したら再試行し、画面を離れたら待機中・実行中の再試行を中止する。
+ * @param accountId - 開いた Account の ID
+ * @param onResult - 最新の AccountSummary を受け取る処理
+ * @param deps - 差し替える依存（テスト用。openAccount と clientId）
+ */
 export function useAccountOpen(
   accountId: string | undefined,
   onResult: (account: AccountSummary) => void,

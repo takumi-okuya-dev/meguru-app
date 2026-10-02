@@ -2,6 +2,11 @@ import { Link } from "react-router";
 import { Button } from "@/components/ui/button";
 import { CenteredLayout } from "@/components/layout/AppShell";
 
+/**
+ * 404 画面。「自分のAccountへ戻る」リンクを置く。
+ * @param props - message：補足の説明
+ * @returns 404 画面
+ */
 export function NotFound({ message }: { message?: string }) {
   return (
     <CenteredLayout>

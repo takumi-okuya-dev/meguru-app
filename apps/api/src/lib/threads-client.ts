@@ -4,12 +4,15 @@
 // - 認証エラー（OAuthエラー190、HTTP 401）は ThreadsAuthError として区別する
 import type { Env } from "../env";
 
+/** 接続時にまとめて要求する Threads の権限（research.md R3）。 */
 export const THREADS_SCOPES = ["threads_basic", "threads_content_publish", "threads_manage_insights"] as const;
 
+/** Threads の認証エラー（OAuthエラー190、HTTP 401）。トークンが無効になったことを表す。 */
 export class ThreadsAuthError extends Error {
   override name = "ThreadsAuthError";
 }
 
+/** 認証エラー以外の Threads API の失敗。 */
 export class ThreadsApiError extends Error {
   override name = "ThreadsApiError";
   constructor(
@@ -20,6 +23,7 @@ export class ThreadsApiError extends Error {
   }
 }
 
+/** Threads のプロフィール。 */
 export type ThreadsProfile = {
   id: string;
   username: string;
@@ -27,8 +31,10 @@ export type ThreadsProfile = {
   profilePictureUrl: string | null;
 };
 
+/** 長期トークン（有効期間60日）と有効期限。 */
 export type LongLivedToken = { accessToken: string; expiresAt: Date };
 
+/** Threads API の呼び出し（research.md R3・R6）。 */
 export type ThreadsClient = {
   buildAuthorizeUrl(state: string): string;
   exchangeCode(code: string): Promise<{ accessToken: string; userId: string }>;
@@ -55,6 +61,12 @@ async function parseOrThrow<T>(res: Response, what: string): Promise<T> {
   throw new ThreadsApiError(`${what}: request failed with status ${res.status}`, res.status);
 }
 
+/**
+ * Threads API のクライアントを作る。ベースURLは環境変数から取る（テストでは偽のサーバーに向ける）。
+ * @param env - Workers のバインディング
+ * @param fetchImpl - 使う fetch（テスト用に差し替えられる）
+ * @returns Threads API のクライアント
+ */
 export function createThreadsClient(env: Env, fetchImpl: typeof fetch = fetch): ThreadsClient {
   const graph = env.THREADS_GRAPH_BASE_URL.replace(/\/$/, "");
   const auth = env.THREADS_AUTH_BASE_URL.replace(/\/$/, "");

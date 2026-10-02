@@ -7,7 +7,13 @@ import { createDb } from "../db/client";
 import { accounts, memberships } from "../db/schema";
 import { toAccountSummary, type AccountRow } from "../services/access";
 
-/** ログイン後の遷移先：last_account_id → last_used_at が最新 → created_at が最新 → null */
+/**
+ * ログイン後の遷移先の Account を決める（FR-004、research.md R10）。
+ * last_account_id → last_used_at が最新 → created_at が最新 → null の順。
+ * @param owned - ownerとして保有するAccount
+ * @param lastAccountId - users.last_account_id
+ * @returns 遷移先の Account の ID。Accountが0件なら null
+ */
 export function resolveLandingAccountId(owned: AccountRow[], lastAccountId: string | null): string | null {
   if (lastAccountId && owned.some((a) => a.id === lastAccountId)) return lastAccountId;
   const byUsed = owned
@@ -18,6 +24,11 @@ export function resolveLandingAccountId(owned: AccountRow[], lastAccountId: stri
   return byCreated[0]?.id ?? null;
 }
 
+/**
+ * GET /api/me のルート（FR-004・FR-005）。
+ * @param authed - 認証のミドルウェア
+ * @returns Hono のルート
+ */
 export function meRoutes(authed: MiddlewareHandler<AppEnv>) {
   return new Hono<AppEnv>().get("/me", authed, async (c) => {
     const user = c.get("user");

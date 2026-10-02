@@ -1,4 +1,4 @@
-// Workers のバインディング（contracts/api.md「環境変数・Secret」）
+/** Workers のバインディング（環境変数・Secret）。一覧と意味は contracts/api.md「環境変数・Secret」。 */
 export interface Env {
   CLERK_SECRET_KEY: string;
   CLERK_PUBLISHABLE_KEY: string;

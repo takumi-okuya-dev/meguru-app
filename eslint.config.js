@@ -1,4 +1,5 @@
 import js from "@eslint/js";
+import jsdoc from "eslint-plugin-jsdoc";
 import globals from "globals";
 import tseslint from "typescript-eslint";
 
@@ -28,6 +29,33 @@ export default tseslint.config(
     },
     rules: {
       "@typescript-eslint/no-unused-vars": ["error", { argsIgnorePattern: "^_", varsIgnorePattern: "^_" }],
+    },
+  },
+  // ドキュメントコメント（JSDoc）。外部に公開している関数・クラス・型には説明を付ける。
+  // TypeScript では型はコードに書くので、JSDoc には型（{string} など）を書かない。
+  {
+    files: ["apps/*/src/**/*.{ts,tsx}", "apps/api/scripts/**/*.ts", "packages/*/src/**/*.ts"],
+    ignores: ["apps/web/src/components/ui/**"],
+    plugins: { jsdoc },
+    settings: { jsdoc: { mode: "typescript" } },
+    rules: {
+      "jsdoc/require-jsdoc": [
+        "error",
+        {
+          publicOnly: true,
+          require: { FunctionDeclaration: true, ClassDeclaration: true, ArrowFunctionExpression: true, MethodDefinition: false },
+          contexts: ["TSTypeAliasDeclaration", "TSInterfaceDeclaration", "ExportNamedDeclaration > VariableDeclaration"],
+        },
+      ],
+      "jsdoc/require-description": ["error", { contexts: ["any"] }],
+      "jsdoc/require-param": ["error", { checkDestructured: false, unnamedRootBase: ["props"] }],
+      "jsdoc/require-param-description": "error",
+      "jsdoc/check-param-names": ["error", { checkDestructured: false }],
+      // React のコンポーネントの props は分割代入で受け取るので、まとめて @param props で説明する
+      "jsdoc/require-returns": ["error", { checkGetters: false, forceReturnsWithAsync: false }],
+      "jsdoc/require-returns-description": "error",
+      "jsdoc/no-types": "error",
+      "jsdoc/check-tag-names": "error",
     },
   },
 );

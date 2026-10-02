@@ -29,7 +29,11 @@ function isHttpUrl(v: string | undefined, { httpsOnly = false } = {}): boolean {
   }
 }
 
-/** 接続先が本物のThreads（偽のサーバーではない）か */
+/**
+ * 接続先が本物のThreads（偽のサーバーではない）かを判定する。
+ * @param env - Workers のバインディング
+ * @returns 本物のThreadsにつなぐなら true
+ */
 function usesRealThreads(env: Env): boolean {
   try {
     const host = new URL(env.THREADS_AUTH_BASE_URL).hostname;
@@ -39,7 +43,12 @@ function usesRealThreads(env: Env): boolean {
   }
 }
 
-/** 誤っている設定の項目名の一覧。問題がなければ空 */
+/**
+ * 設定（環境変数・Secret）を確かめる。未設定・見本の値・形の誤りを見つける。
+ * ThreadsのアプリID・シークレット・戻り先URLは、接続先が本物のThreadsのときだけ確かめる。
+ * @param env - Workers のバインディング
+ * @returns 誤っている設定の項目名の一覧（値は含めない）。問題がなければ空
+ */
 export function validateConfig(env: Env): string[] {
   const problems: string[] = [];
 

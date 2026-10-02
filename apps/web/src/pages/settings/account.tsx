@@ -4,6 +4,10 @@ import { SettingCard, SettingRow } from "@/components/settings/SettingRow";
 import { Button } from "@/components/ui/button";
 import { useLogout } from "@/lib/use-logout";
 
+/**
+ * 設定 > アカウント。ログイン中の Google アカウントとログアウト（FR-001・FR-006）。
+ * @returns アカウントの設定
+ */
 export function AccountSettingsPage() {
   const { user } = useUser();
   const logout = useLogout();

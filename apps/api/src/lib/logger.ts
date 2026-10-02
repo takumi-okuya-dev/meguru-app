@@ -27,6 +27,12 @@ function redactString(value: string): string {
   );
 }
 
+/**
+ * ログに出す値から秘密情報を取り除く。秘密のキーの値と、URLのクエリ文字列を伏せる。
+ * @param value - ログに出す値
+ * @param depth - 入れ子の深さ（深すぎる値はまとめて伏せる）
+ * @returns 秘密情報を伏せた値
+ */
 export function redact(value: unknown, depth = 0): unknown {
   if (depth > 6) return MASK;
   if (typeof value === "string") return redactString(value);
@@ -42,12 +48,18 @@ export function redact(value: unknown, depth = 0): unknown {
   return value;
 }
 
+/** 構造化ロガー。値は出力の前に redact で秘密情報を伏せる。 */
 export type Logger = {
   info(message: string, fields?: Record<string, unknown>): void;
   warn(message: string, fields?: Record<string, unknown>): void;
   error(message: string, fields?: Record<string, unknown>): void;
 };
 
+/**
+ * 構造化ロガーを作る。1行に1つの JSON を出力する。
+ * @param write - 1行を書き出す処理（既定は console.log）
+ * @returns ロガー
+ */
 export function createLogger(write: (line: string) => void = (line) => console.log(line)): Logger {
   function log(level: string, message: string, fields?: Record<string, unknown>) {
     write(JSON.stringify({ level, message: redactString(message), ...(redact(fields ?? {}) as object) }));
@@ -59,4 +71,5 @@ export function createLogger(write: (line: string) => void = (line) => console.l
   };
 }
 
+/** アプリ全体で使うロガー。 */
 export const logger = createLogger();

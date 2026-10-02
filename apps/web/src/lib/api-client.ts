@@ -13,8 +13,10 @@ import {
 } from "@threads-grower/shared";
 import type { z } from "zod";
 
+/** API のベースURL（apps/web/.env.local の VITE_API_BASE_URL）。 */
 export const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? "http://localhost:8787";
 
+/** API の呼び出しの失敗。エラーコードと HTTP のステータス（通信の失敗は 0）。 */
 export class ApiError extends Error {
   override name = "ApiError";
   constructor(
@@ -31,7 +33,10 @@ type TokenGetter = () => Promise<string | null>;
 let getToken: TokenGetter = async () => null;
 let onSessionExpired: () => void = () => {};
 
-/** ClerkProvider の中で一度だけ設定する */
+/**
+ * API クライアントに、Clerk のトークンの取り方とセッション切れの扱いを渡す。ClerkProvider の中で一度だけ呼ぶ。
+ * @param opts - getToken：セッショントークンを返す関数、onSessionExpired：401 を受けたときの処理
+ */
 export function configureApiClient(opts: { getToken: TokenGetter; onSessionExpired: () => void }) {
   getToken = opts.getToken;
   onSessionExpired = opts.onSessionExpired;
@@ -66,6 +71,7 @@ async function request<T>(
   return schema.parse(await res.json());
 }
 
+/** API の呼び出し。レスポンスは共通のスキーマで検証する。 */
 export const api = {
   me: () => request("/api/me", meResponseSchema),
   account: (accountId: string) => request(`/api/accounts/${accountId}`, accountSummarySchema),
@@ -83,7 +89,12 @@ export const api = {
     request(`/api/data-deletion/${encodeURIComponent(code)}`, dataDeletionStatusSchema, { auth: false }),
 };
 
-/** エラーを画面の文言にする */
+/**
+ * エラーを、画面に出す日本語の文言にする。
+ * @param err - API の呼び出しの失敗など
+ * @param ctx - 文言に埋め込む値（ユーザー名・上限）
+ * @returns 画面に出す文言
+ */
 export function describeError(err: unknown, ctx: { username?: string; max?: number } = {}): string {
   const code: ErrorCode = err instanceof ApiError ? err.code : "INTERNAL_ERROR";
   const details = err instanceof ApiError ? err.details : [];

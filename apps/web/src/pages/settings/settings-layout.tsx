@@ -6,6 +6,10 @@ import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { SETTINGS_GROUPS, filterSettingsGroups } from "./sections";
 
+/**
+ * 設定画面の骨格（contracts/ui-routes.md）。左に「アプリに戻る」・検索・項目の一覧、右に項目の中身。
+ * @returns 設定画面
+ */
 export function SettingsLayout() {
   const [query, setQuery] = useState("");
   const groups = filterSettingsGroups(SETTINGS_GROUPS, query);

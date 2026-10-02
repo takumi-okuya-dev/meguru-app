@@ -39,12 +39,18 @@ const timestamps = {
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 };
 
+/** Accountの契約プランの列挙型（account_plan）。 */
 export const accountPlan = pgEnum("account_plan", PLANS);
+/** Membershipのロールの列挙型（membership_role）。member はプラン4限定で、本featureでは作らない。 */
 export const membershipRole = pgEnum("membership_role", ["owner", "member"]);
+/** Threads接続の状態の列挙型（connection_status）。 */
 export const connectionStatus = pgEnum("connection_status", ["connected", "needs_reconnect"]);
+/** 接続フローの種類の列挙型（oauth_mode）。 */
 export const oauthMode = pgEnum("oauth_mode", ["new", "reconnect"]);
+/** Metaのデータ削除要求の進み具合の列挙型（deletion_status）。 */
 export const deletionStatus = pgEnum("deletion_status", ["pending", "completed", "failed"]);
 
+/** アプリを使う個人。Clerk のユーザーと1対1で対応する（data-model.md の users）。 */
 export const users = pgTable("users", {
   id: uuid("id").primaryKey().defaultRandom(),
   clerkUserId: text("clerk_user_id").notNull().unique(),
@@ -58,6 +64,7 @@ export const users = pgTable("users", {
   ...timestamps,
 });
 
+/** Threadsアカウント1件に対応する運用単位（data-model.md の accounts）。 */
 export const accounts = pgTable("accounts", {
   id: uuid("id").primaryKey().defaultRandom(),
   threadsUserId: text("threads_user_id").notNull().unique(),
@@ -71,6 +78,7 @@ export const accounts = pgTable("accounts", {
   ...timestamps,
 });
 
+/** User と Account の関係（data-model.md の memberships）。1つのAccountに owner は1人だけ。 */
 export const memberships = pgTable(
   "memberships",
   {
@@ -91,6 +99,7 @@ export const memberships = pgTable(
   ],
 );
 
+/** AccountがThreadsにアクセスするための認証情報（data-model.md の threads_connections）。トークンは暗号化して保存する。 */
 export const threadsConnections = pgTable("threads_connections", {
   accountId: uuid("account_id")
     .primaryKey()
@@ -107,6 +116,7 @@ export const threadsConnections = pgTable("threads_connections", {
   ...timestamps,
 });
 
+/** Threads接続フローの使い捨ての state（data-model.md の oauth_states）。平文は保存しない。 */
 export const oauthStates = pgTable(
   "oauth_states",
   {
@@ -127,6 +137,7 @@ export const oauthStates = pgTable(
   ],
 );
 
+/** Metaのデータ削除要求の受付記録・進み具合・tombstone（data-model.md の threads_deletion_requests）。 */
 export const threadsDeletionRequests = pgTable(
   "threads_deletion_requests",
   {
@@ -151,6 +162,7 @@ export const threadsDeletionRequests = pgTable(
   ],
 );
 
+/** Metaのアンインストール通知（連携の取り消し）の短期記録（data-model.md の threads_revocations）。 */
 export const threadsRevocations = pgTable(
   "threads_revocations",
   {

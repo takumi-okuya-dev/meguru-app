@@ -5,6 +5,11 @@ import { useEffect, useRef } from "react";
 import { useSearchParams } from "react-router";
 import { toast } from "sonner";
 
+/**
+ * API の callback からのリダイレクトのクエリ（connected・error）を読み、トーストで表示してから URL から消す（contracts/ui-routes.md）。
+ * @param opts - 文言に埋め込む値（ユーザー名・上限）
+ * @returns 読み取った connected と error
+ */
 export function useCallbackResult(opts: { username?: string; max?: number } = {}) {
   const [params, setParams] = useSearchParams();
   const shown = useRef(false);

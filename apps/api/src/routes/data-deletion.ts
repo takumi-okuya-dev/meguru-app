@@ -3,6 +3,10 @@ import { Hono } from "hono";
 import type { AppEnv } from "../app";
 import { deletionStatus } from "../services/data-deletion";
 
+/**
+ * GET /api/data-deletion/:confirmationCode のルート。認証は不要（確認コードは推測できない乱数）。
+ * @returns Hono のルート
+ */
 export function dataDeletionRoutes() {
   return new Hono<AppEnv>().get("/data-deletion/:confirmationCode", async (c) => {
     const status = await deletionStatus(c.env, c.req.param("confirmationCode"));

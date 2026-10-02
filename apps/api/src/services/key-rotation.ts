@@ -8,6 +8,13 @@ import { createDb } from "../db/client";
 import { accounts, threadsConnections } from "../db/schema";
 import { createTokenCipher, KeyRingError } from "../lib/crypto";
 
+/**
+ * 暗号鍵のローテーション（research.md R5 の手順3・4）。古いバージョンの行を、新しいIVと現在の鍵で暗号化し直す。
+ * 各行の書き込みは key_version と connection_generation を条件にし、その間に書き換わった行は飛ばす。
+ * @param env - バインディング（鍵リング・現在のバージョン・DATABASE_URL）
+ * @returns 暗号化し直した件数、飛ばした件数、旧バージョンの残りの件数
+ * @throws KeyRingError 鍵が欠けているバージョンの行があるとき（開始しない）
+ */
 export async function rotateTokenKeys(env: Env) {
   const cipher = createTokenCipher(env.TOKEN_ENCRYPTION_KEYS, env.TOKEN_ENCRYPTION_KEY_VERSION);
   const ring = JSON.parse(env.TOKEN_ENCRYPTION_KEYS) as Record<string, string>;

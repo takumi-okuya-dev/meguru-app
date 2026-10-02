@@ -14,6 +14,7 @@ import { AppearanceSettings } from "@/pages/settings/appearance";
 import { DEFAULT_SETTINGS_SLUG } from "@/pages/settings/sections";
 import { SettingsLayout } from "@/pages/settings/settings-layout";
 
+/** 画面のルート（contracts/ui-routes.md「ルート」）。認証が必要な画面は RequireAuth で包む。 */
 export const routes = [
   { path: "/sign-in/*", element: <SignInPage /> },
   { path: "/data-deletion/:code", element: <DataDeletion /> },
@@ -44,4 +45,5 @@ export const routes = [
   { path: "*", element: <NotFound /> },
 ];
 
+/** アプリのルーター。 */
 export const router = createBrowserRouter(routes);

@@ -2,6 +2,11 @@
 import type { ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 
+/**
+ * 設定の誤りや接続の失敗を、読み込み中のまま止めずに案内する画面。
+ * @param props - title：見出し、message：説明、hints：確認すること、onRetry：再読み込みのときの処理（省略するとページを再読み込みする）
+ * @returns 案内の画面
+ */
 export function ErrorScreen({
   title,
   message,
@@ -31,7 +36,10 @@ export function ErrorScreen({
   );
 }
 
-/** Clerk の Publishable key が未設定・見本の値のとき */
+/**
+ * Clerk の Publishable key が未設定・見本の値のときの案内。
+ * @returns 案内の画面
+ */
 export function ClerkKeyMissingScreen() {
   return (
     <ErrorScreen
@@ -50,7 +58,10 @@ export function ClerkKeyMissingScreen() {
   );
 }
 
-/** Clerk の読み込みが一定時間終わらないとき */
+/**
+ * Clerk の読み込みが一定時間終わらないときの案内。
+ * @returns 案内の画面
+ */
 export function ClerkLoadFailedScreen() {
   return (
     <ErrorScreen

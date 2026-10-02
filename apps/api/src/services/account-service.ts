@@ -22,6 +22,12 @@ import type { ConsumedState } from "./threads-oauth";
 
 // ---- 登録数の上限（FR-015〜FR-017） ----
 
+/**
+ * ユーザーが owner として持つ Account のプランを取得する。
+ * @param db - データベース（トランザクションの中でもよい）
+ * @param userId - users.id
+ * @returns プランの一覧
+ */
 export async function ownedPlans(db: Db | TxDb, userId: string): Promise<Plan[]> {
   const rows = await db
     .select({ plan: accounts.plan })
@@ -31,12 +37,24 @@ export async function ownedPlans(db: Db | TxDb, userId: string): Promise<Plan[]>
   return rows.map((r) => r.plan);
 }
 
+/**
+ * ユーザーの登録数上限と使用数を求める（FR-015・FR-016）。
+ * @param db - データベース（トランザクションの中でもよい）
+ * @param userId - users.id
+ * @returns 上限（max）、使用数（used）、保有Accountのプラン（plans）
+ */
 export async function accountLimitFor(db: Db | TxDb, userId: string) {
   const plans = await ownedPlans(db, userId);
   return { max: limitForOwnedPlans(plans), used: plans.length, plans };
 }
 
-/** 新しいAccountを追加できなければ ACCOUNT_LIMIT_REACHED */
+/**
+ * 新しい Account を追加できるかを確かめる（FR-017）。
+ * @param db - データベース（トランザクションの中でもよい）
+ * @param userId - users.id
+ * @returns 上限・使用数・保有Accountのプラン
+ * @throws AppError ACCOUNT_LIMIT_REACHED（上限に達しているとき）
+ */
 export async function assertCanAddAccount(db: Db | TxDb, userId: string) {
   const limit = await accountLimitFor(db, userId);
   if (limit.used >= limit.max) throw new AppError("ACCOUNT_LIMIT_REACHED", 409, "account limit reached");
@@ -45,6 +63,7 @@ export async function assertCanAddAccount(db: Db | TxDb, userId: string) {
 
 // ---- callback での接続の確定（research.md R8 の手順） ----
 
+/** callback で接続を確定するときの入力。 */
 export type CompleteConnectionInput = {
   state: ConsumedState;
   threadsUserId: string;
@@ -55,12 +74,21 @@ export type CompleteConnectionInput = {
   authorizedAt: Date;
 };
 
+/** callback で接続を確定した結果。new（新規）、updated（既存を更新）、reconnect（再接続）。 */
 export type CompleteConnectionResult = {
   accountId: string;
   username: string;
   kind: "new" | "updated" | "reconnect";
 };
 
+/**
+ * callback で接続を確定する（research.md R8 の手順を1つのトランザクションで行う）。
+ * ロック → 取り消し・削除要求・Account削除の確認 → 既存の Account の更新、または上限を再判定して作成。
+ * @param env - Workers のバインディング
+ * @param input - 消費した state・Threadsのユーザー・プロフィール・トークンなど
+ * @returns 確定した Account と、その種類
+ * @throws AppError THREADS_AUTH_REVOKED・THREADS_DATA_DELETION_REQUESTED・ACCOUNT_DELETED_DURING_CONNECT・RECONNECT_ACCOUNT_MISMATCH・THREADS_ACCOUNT_TAKEN・ACCOUNT_LIMIT_REACHED など
+ */
 export async function completeConnection(env: Env, input: CompleteConnectionInput): Promise<CompleteConnectionResult> {
   const cipher = createTokenCipher(env.TOKEN_ENCRYPTION_KEYS, env.TOKEN_ENCRYPTION_KEY_VERSION);
   const hmac = await threadsUserHmac(env.IDENTIFIER_HASH_KEY, input.threadsUserId);
@@ -153,8 +181,11 @@ export async function completeConnection(env: Env, input: CompleteConnectionInpu
 }
 
 /**
- * 接続（トークン）を条件なしで書き込み、世代番号を1増やす。
- * ユーザーの再認可はつねに優先する（research.md R6）。
+ * 接続（トークン）を条件なしで書き込み、世代番号を1増やす。ユーザーの再認可はつねに優先する（research.md R6）。
+ * @param tx - トランザクション
+ * @param cipher - トークンの暗号器
+ * @param accountId - accounts.id（暗号化の AAD にも使う）
+ * @param input - トークン・有効期限・認可の時刻・プロフィール
  */
 async function writeConnection(
   tx: TxDb,
@@ -194,9 +225,14 @@ async function writeConnection(
 // ---- Accountの画面を開いたとき（research.md R10・R14） ----
 
 /**
- * 「最後に使ったAccount」の記録。1つの条件付き UPDATE で、次のどちらかに当たる古いリクエストは反映しない。
- * (a) receivedAt が users.last_account_open_received_at 以前（先に届いていたリクエストが遅れて完了した）
- * (b) 同じ clientId で openSeq が記録以下（同じページの遅れて届いた再試行）
+ * 「最後に使ったAccount」を記録する（FR-007、research.md R10）。
+ * 1つの条件付き UPDATE で、(a) receivedAt が記録以前のもの、(b) 同じ clientId で openSeq が記録以下のもの、を反映しない。
+ * @param env - Workers のバインディング
+ * @param userId - users.id
+ * @param accountId - 開いた Account の ID
+ * @param req - ページごとの乱数ID（clientId）と連番（openSeq）
+ * @param receivedAt - サーバーがリクエストを受け取った時刻
+ * @returns 記録を更新したら true。古いリクエストで反映しなかったら false
  */
 export async function openAccount(
   env: Env,
@@ -234,11 +270,12 @@ export async function openAccount(
 }
 
 /**
- * 保存しているトークンでプロフィールを取得して、接続を確認する（FR-018）。
- * - 成功：プロフィールを最新にする
- * - 認証エラー：needs_reconnect にする
- * - それ以外の失敗：状態は変えない
- * 書き込みはすべて、読んだ時点の connection_generation を条件にする（research.md R6）。
+ * 保存しているトークンでプロフィールを取得して、接続を確かめる（FR-018、research.md R14）。
+ * 成功ならプロフィールを最新にし、認証エラーなら needs_reconnect にする。それ以外の失敗では状態を変えない。
+ * 書き込みは、読んだ時点の connection_generation を条件にする（research.md R6）。
+ * @param env - Workers のバインディング
+ * @param accountId - accounts.id
+ * @param threads - Threads API のクライアント
  */
 export async function verifyConnection(env: Env, accountId: string, threads: ThreadsClient): Promise<void> {
   const db = createDb(env.DATABASE_URL);
@@ -290,8 +327,13 @@ export async function verifyConnection(env: Env, accountId: string, threads: Thr
 // ---- Accountの削除（FR-022、research.md R13） ----
 
 /**
- * 確認入力を正規化して比べ、1つのトランザクションで users 行をロック → last_account_deleted_at を記録 → Accountを削除する。
- * 進行中の mode = new の認可フローが、削除したAccountを作り直さないようにするため。
+ * Account を削除する（FR-022、research.md R13）。
+ * 1つのトランザクションで users の行をロックし、last_account_deleted_at を記録してから削除する。
+ * @param env - Workers のバインディング
+ * @param userId - users.id
+ * @param accountId - 削除する Account の ID
+ * @param confirmUsername - 確認のために入力されたユーザー名（@の有無・大文字小文字は問わない）
+ * @throws AppError ACCOUNT_NOT_FOUND・CONFIRMATION_MISMATCH
  */
 export async function deleteAccount(env: Env, userId: string, accountId: string, confirmUsername: string) {
   await withTransaction(env.DATABASE_URL, async (tx) => {

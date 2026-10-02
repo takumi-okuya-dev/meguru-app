@@ -16,12 +16,22 @@ import { NotFound } from "@/pages/not-found";
 import { ApiErrorScreen } from "@/components/ApiErrorScreen";
 import { LoadingSkeleton } from "@/components/guards";
 
+/** Account の画面の子に渡す値。 */
 export type AccountOutletContext = { account: AccountSummary };
 
+/**
+ * Account の画面の子から、表示中の Account を受け取る。
+ * @returns 表示中の Account
+ */
 export function useCurrentAccount() {
   return useOutletContext<AccountOutletContext>().account;
 }
 
+/**
+ * Account の画面（/accounts/:accountId とその配下）の共通の親（規則3・4・5、FR-019）。
+ * Accountが0件ならアカウント追加画面へ、他人・存在しない Account なら404、needs_reconnect ならバナーを出す。
+ * @returns Account の画面の骨格
+ */
 export function AccountLayout() {
   const { accountId } = useParams<{ accountId: string }>();
   const queryClient = useQueryClient();

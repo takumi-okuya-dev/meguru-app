@@ -20,6 +20,10 @@ import { api, describeError } from "@/lib/api-client";
 import { useCallbackResult } from "@/lib/callback-result";
 import { useCurrentAccount } from "@/pages/account-layout";
 
+/**
+ * Account の設定（FR-013・FR-019・FR-020・FR-022、規則9・10）。認可し直す操作と、確認つきの削除。
+ * @returns Account の設定画面
+ */
 export function AccountSettings() {
   const account = useCurrentAccount();
   useCallbackResult({ username: account.username });

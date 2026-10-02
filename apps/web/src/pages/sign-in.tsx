@@ -5,6 +5,10 @@ import { CenteredLayout } from "@/components/layout/AppShell";
 import { ClerkLoadFailedScreen } from "@/components/ErrorScreen";
 import { LoadingSkeleton, useLoadTimeout } from "@/components/guards";
 
+/**
+ * ログイン画面（FR-001）。Clerk 側で Google だけを有効にしているので、「Googleで続ける」だけが出る。
+ * @returns ログイン画面
+ */
 export function SignInPage() {
   const { isLoaded, isSignedIn } = useAuth();
   const timedOut = useLoadTimeout(Boolean(isLoaded));

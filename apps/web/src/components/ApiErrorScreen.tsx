@@ -8,6 +8,12 @@ const TITLES: Partial<Record<string, string>> = {
   API_UNREACHABLE: "APIに接続できません",
 };
 
+/**
+ * API の呼び出しに失敗したとき、読み込み中のまま止めずに案内と再読み込みを出す。
+ * セッション切れ（AUTH_REQUIRED）は API クライアントがログイン画面へ移すので、骨組みだけを出す。
+ * @param props - error：API の呼び出しの失敗、onRetry：再読み込みのときに呼ぶ処理
+ * @returns エラーの案内の画面
+ */
 export function ApiErrorScreen({ error, onRetry }: { error: unknown; onRetry: () => void }) {
   // セッション切れは、APIクライアントがログイン画面へ移すので、ここでは何も出さない
   if (error instanceof ApiError && error.code === "AUTH_REQUIRED") return <LoadingSkeleton />;

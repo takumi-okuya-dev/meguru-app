@@ -8,6 +8,11 @@ import { createThreadsClient } from "../lib/threads-client";
 import { findOwnedAccount, toAccountSummary } from "../services/access";
 import { deleteAccount, openAccount, verifyConnection } from "../services/account-service";
 
+/**
+ * /api/accounts/* のルート。取得・open（記録と接続の確認）・削除。
+ * @param authed - 認証のミドルウェア
+ * @returns Hono のルート
+ */
 export function accountRoutes(authed: MiddlewareHandler<AppEnv>) {
   return new Hono<AppEnv>()
     .get("/accounts/:accountId", authed, async (c) => {

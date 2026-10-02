@@ -8,6 +8,10 @@ import { api } from "@/lib/api-client";
 import { queryKeys } from "@/lib/query";
 import { cn } from "@/lib/utils";
 
+/**
+ * サイドバーの Account 一覧と切り替え（FR-007・FR-019、規則5）。選んだら遷移するだけで、記録は遷移先の open で行う。
+ * @returns Account の一覧
+ */
 export function AccountSwitcher() {
   const me = useQuery({ queryKey: queryKeys.me, queryFn: api.me });
   const accounts = me.data?.accounts ?? [];

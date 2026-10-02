@@ -14,6 +14,10 @@ import { queryKeys } from "@/lib/query";
 import { ApiErrorScreen } from "@/components/ApiErrorScreen";
 import { LoadingSkeleton } from "@/components/guards";
 
+/**
+ * アカウント追加画面（FR-008・FR-017、規則8）。上限の案内とテスター制限の案内を出す。
+ * @returns アカウント追加画面
+ */
 export function AccountNew() {
   const me = useQuery({ queryKey: queryKeys.me, queryFn: api.me });
   useCallbackResult({ max: me.data?.accountLimit.max });

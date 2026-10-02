@@ -9,6 +9,11 @@ import { createThreadsClient, ThreadsApiError, ThreadsAuthError } from "../lib/t
 import { completeConnection } from "../services/account-service";
 import { consumeState, startConnect, type ConsumedState } from "../services/threads-oauth";
 
+/**
+ * POST /api/threads/connect と GET /api/threads/callback のルート（research.md R3・R4・R8）。
+ * @param authed - 認証のミドルウェア（connect だけに使う。callback は state で本人を確かめる）
+ * @returns Hono のルート
+ */
 export function threadsConnectRoutes(authed: MiddlewareHandler<AppEnv>) {
   return new Hono<AppEnv>()
     .post("/threads/connect", authed, async (c) => {

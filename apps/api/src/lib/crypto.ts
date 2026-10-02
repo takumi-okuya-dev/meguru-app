@@ -3,16 +3,19 @@
 // - IVは暗号化のたびに crypto.getRandomValues で12バイト新しく作る。使い回さない
 // - 鍵はバージョン別の鍵リング（TOKEN_ENCRYPTION_KEYS）。復号は行の key_version の鍵で行う
 
+/** 暗号鍵の鍵リングの設定の誤り、または必要なバージョンの鍵がないことを表す。 */
 export class KeyRingError extends Error {
   override name = "KeyRingError";
 }
 
+/** 暗号化したトークン。暗号文・IV・暗号化に使った鍵のバージョン。 */
 export type EncryptedToken = {
   ciphertext: Uint8Array;
   iv: Uint8Array;
   keyVersion: number;
 };
 
+/** Threadsのトークンの暗号化と復号（research.md R5）。 */
 export type TokenCipher = {
   currentVersion: number;
   encrypt(plaintext: string, accountId: string): Promise<EncryptedToken>;
@@ -52,7 +55,14 @@ function parseKeyRing(json: string): Map<number, Uint8Array> {
   return ring;
 }
 
-/** 鍵リングを検証して暗号器を作る。設定が不正なら KeyRingError（起動時の検証として使う） */
+/**
+ * 鍵リングを検証して、トークンの暗号器を作る。設定の検証にも使う。
+ * 暗号化は AES-256-GCM で、IV は暗号化のたびに新しく作り、AAD に account_id を使う。
+ * @param keyRingJson - TOKEN_ENCRYPTION_KEYS（バージョンごとの鍵の JSON。各鍵は32バイトの base64）
+ * @param currentVersionText - TOKEN_ENCRYPTION_KEY_VERSION（新しく暗号化するときに使う鍵のバージョン）
+ * @returns トークンの暗号器
+ * @throws KeyRingError 鍵リングが不正なとき、または現在のバージョンの鍵がないとき
+ */
 export function createTokenCipher(keyRingJson: string, currentVersionText: string): TokenCipher {
   const ring = parseKeyRing(keyRingJson);
   const currentVersion = Number(currentVersionText);

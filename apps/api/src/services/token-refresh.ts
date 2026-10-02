@@ -12,6 +12,7 @@ import { ThreadsAuthError, type ThreadsClient } from "../lib/threads-client";
 
 const DAY_MS = 24 * 3600_000;
 
+/** 定期更新の対象の接続。読んだ時点の世代番号を持つ。 */
 export type RefreshCandidate = {
   accountId: string;
   generation: number;
@@ -20,6 +21,12 @@ export type RefreshCandidate = {
   keyVersion: number;
 };
 
+/**
+ * 定期更新の対象を選ぶ。期限まで7日を切り、発行から24時間以上経った、まだ有効な接続。
+ * @param env - Workers のバインディング
+ * @param now - 基準にする時刻
+ * @returns 定期更新の対象
+ */
 export async function selectRefreshCandidates(env: Env, now: Date): Promise<RefreshCandidate[]> {
   const db = createDb(env.DATABASE_URL);
   const rows = await db
@@ -49,6 +56,14 @@ async function markNeedsReconnect(env: Env, accountId: string, generation: numbe
     .where(and(eq(accounts.id, accountId), eq(accounts.connectionGeneration, generation)));
 }
 
+/**
+ * 接続を1件更新する（research.md R6）。プロフィールも取り直し、IVは新しく作る。
+ * 書き込みは、読んだ時点の connection_generation を条件にし、その間に変わっていれば結果を捨てる。
+ * @param env - Workers のバインディング
+ * @param threads - Threads API のクライアント
+ * @param c - 定期更新の対象
+ * @returns refreshed（更新した）・needs_reconnect（認証エラー）・stale（その間に接続が変わった）・failed（その他の失敗）
+ */
 export async function refreshOne(
   env: Env,
   threads: ThreadsClient,
@@ -110,6 +125,13 @@ export async function refreshOne(
   });
 }
 
+/**
+ * 日次のトークン更新（FR-021）。期限を過ぎた接続は needs_reconnect にし、対象の接続を更新する。1件の失敗で全体を止めない。
+ * @param env - Workers のバインディング
+ * @param threads - Threads API のクライアント
+ * @param now - 基準にする時刻
+ * @returns 結果ごとの件数
+ */
 export async function refreshExpiringTokens(env: Env, threads: ThreadsClient, now: Date) {
   const result = { refreshed: 0, needsReconnect: 0, stale: 0, failed: 0, expired: 0 };
 

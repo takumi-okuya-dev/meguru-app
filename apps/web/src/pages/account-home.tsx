@@ -4,6 +4,10 @@ import { AccountAvatar } from "@/components/AccountAvatar";
 import { ConnectionBadge } from "@/components/ConnectionBadge";
 import { useCurrentAccount } from "@/pages/account-layout";
 
+/**
+ * Account のホーム（US1）。本featureでは、プロフィールと接続状態だけを表示する。後続featureがここに機能を足す。
+ * @returns Account のホーム
+ */
 export function AccountHome() {
   const account = useCurrentAccount();
   useCallbackResult({ username: account.username });

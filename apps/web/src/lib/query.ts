@@ -1,6 +1,7 @@
 import { QueryClient } from "@tanstack/react-query";
 import { ApiError } from "./api-client";
 
+/** TanStack Query のクライアント。認証・権限・存在しない・設定の誤りは再試行しない。 */
 export const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
@@ -14,6 +15,7 @@ export const queryClient = new QueryClient({
   },
 });
 
+/** TanStack Query のキー。 */
 export const queryKeys = {
   me: ["me"] as const,
   account: (id: string) => ["account", id] as const,
