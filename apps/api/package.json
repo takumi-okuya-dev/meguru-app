@@ -4,6 +4,8 @@
   "type": "module",
   "scripts": {
     "dev": "wrangler dev --port 8787",
+    "dev:fake": "wrangler dev --port 8787 --var THREADS_AUTH_BASE_URL:http://localhost:8790 --var THREADS_GRAPH_BASE_URL:http://localhost:8790 --var THREADS_REDIRECT_URI:http://localhost:8787/api/threads/callback",
+    "fake-threads": "tsx test/fake-threads/serve.ts",
     "deploy": "wrangler deploy",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",

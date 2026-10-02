@@ -69,6 +69,20 @@ pnpm dev     # web（http://localhost:5173）と api（http://localhost:8787）
 - アプリは`http://localhost:5173`を開く。`http://localhost:8787`は画面を持たないAPIなので、ブラウザで開くと404になる（動作確認は`/api/health`）。
 - `.env.local`や`.dev.vars`を書き換えたら、`pnpm dev`を止めて起動し直す。
 
+### Metaなしで試す（偽のThreadsで動かす）
+
+Metaのアプリ・Cloudflare Tunnelを用意する前でも、偽のThreadsサーバーで、接続・再接続・削除などの画面の流れを一通り試せる。必要なのはClerkだけ。
+
+```bash
+pnpm dev:fake    # 偽のThreads（:8790）・api（:8787）・web（:5173）をまとめて起動
+```
+
+- 「Threadsアカウントを接続」を押すと、「偽のThreads認可画面」が出る。「許可する」を押すと、テスト用のアカウント（`@e2e_user`）が接続済みになる。パスワードの入力はない。
+- APIのThreadsの接続先と戻り先URLは、起動時に偽のサーバーへ切り替わる（`.dev.vars`に本物の値が入っていても上書きされる）。
+- 偽のサーバーの中身は、起動し直すたびに消える。前回つないだAccountを開くと「要再接続」になるので、設定画面から再接続する。
+- `pnpm dev`と同時には起動できない（ポートが重なる）。どちらか一方を止めてから起動する。
+- 「要再接続」を試すには、別のターミナルで`curl -X POST localhost:8790/__control/invalidate -H 'Content-Type: application/json' -d '{"userId":"9001"}'`を実行してから、Accountの画面を開き直す。
+
 ### 本物のThreads（Meta）につなぐ場合
 
 > Clerk・Meta・Cloudflare Tunnelの具体的な準備手順は[docs/external-services-setup.md](docs/external-services-setup.md)にまとめています。

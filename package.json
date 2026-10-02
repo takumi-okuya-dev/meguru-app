@@ -8,6 +8,7 @@
   },
   "scripts": {
     "dev": "pnpm --parallel --filter api --filter web dev",
+    "dev:fake": "concurrently -k -n fake,api,web -c magenta,blue,green \"pnpm --filter api fake-threads\" \"pnpm --filter api dev:fake\" \"pnpm --filter web dev\"",
     "build": "pnpm -r build",
     "test": "pnpm -r --filter '!e2e' test",
     "typecheck": "pnpm -r typecheck",
@@ -16,6 +17,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "concurrently": "^10.0.5",
     "eslint": "^10.11.0",
     "globals": "^17.13.0",
     "prettier": "^3.9.9",
