@@ -13,7 +13,9 @@ Threadsアカウントを「投稿ストック→承認→自動投稿→分析�
 - [x] spec-kit導入・Constitutionの制定
 - [x] feature 001「ログインとThreadsアカウント登録」：仕様・計画・タスク・実装（[specs/001-login-account-setup/](specs/001-login-account-setup/)）
 - [ ] 本物のGoogle・Threadsでの手動確認（[quickstart.md](specs/001-login-account-setup/quickstart.md)「手動での確認」）
-- [ ] 次のfeature（戦略プロファイル、投稿ストックなど）
+- [x] UI全体設計（ChatGPT風。[docs/ui-design.md](docs/ui-design.md)）
+- [x] feature 002「戦略プロファイル（課題・宣伝内容・リサーチ）」：仕様・計画・タスク・実装（[specs/002-strategy-profile/](specs/002-strategy-profile/)）
+- [ ] 次のfeature（003：AIプロンプト生成と投稿案の一括登録）
 
 ## 構成
 
@@ -90,6 +92,7 @@ pnpm dev:fake    # 偽のThreads（:8790）・api（:8787）・web（:5173）を
 - Threadsのredirect URIはHTTPS必須で`localhost`は登録できない。Cloudflare Tunnelで固定のホスト名をローカルのAPI（`localhost:8787`）に向け、そのURLを`THREADS_REDIRECT_URI`とMetaのアプリ設定に登録する。
 - Metaのアプリ設定には、リダイレクトのほかに**アンインストール**（`/api/threads/webhooks/uninstall`）と**データ削除**（`/api/threads/webhooks/data-deletion`）のcallback URLも登録する（登録しないと保存できない）。
 - Meta App Reviewの前は、アプリのテスターに追加し、Threadsアプリの「設定 → アカウント → ウェブサイトのアクセス許可 → 招待」で承認したアカウントしか接続できない。
+- その間は`apps/api/.dev.vars`の`THREADS_ACCESS_MODE`を`testers`（既定）のままにする。アカウント追加画面に「招待されたアカウントのみ接続できます」の案内が出る。App Reviewに通り、Metaのアプリを公開したら`public`にすると案内が消える（[research.md R15](specs/002-strategy-profile/research.md)）。
 - 手順の全体は[quickstart.md](specs/001-login-account-setup/quickstart.md)を参照。
 
 ## テスト

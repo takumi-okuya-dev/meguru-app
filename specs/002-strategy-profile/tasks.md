@@ -352,7 +352,7 @@ description: "戦略プロファイル（課題・宣伝内容・リサーチ）
 - [X] T062 [P] `apps/api/test/integration/profile-cascade.test.ts`を書く（quickstart.mdの表の「Accountの削除」）：課題・宣伝内容・参考投稿・キーワードを持つAccountを`DELETE /api/accounts/:accountId`で削除すると、4つのテーブルの行がすべて消える。Metaのデータ削除要求の処理でも同じ
 - [X] T063 [P] `e2e/tests/strategy.spec.ts`を書く：ログイン → Accountの接続（偽のThreadsサーバー）→ 課題に入力して保存 → 再読み込みで復元される。未保存のままサイドバーで移動すると確認のダイアログが出る
 - [X] T064 `pnpm lint`・`pnpm typecheck`・`pnpm test`を通す。新しくexportした関数・コンポーネントすべてにJSDocを付ける（001で導入した`eslint-plugin-jsdoc`の規則）
-- [ ] T065 quickstart.mdの「手動の確認」1〜7を、`pnpm dev:fake`で375・768・1024・1440pxの4つの幅で行い、docs/ui-design.mdとずれた点があれば直す。タブレット（768〜1023px）の見え方の結果をdocs/ui-design.md「10. まだ決めていないこと」に反映する
+- [X] T065 （2026-10-03、ユーザーがローカルで動作確認し問題なし）quickstart.mdの「手動の確認」1〜7を、`pnpm dev:fake`で375・768・1024・1440pxの4つの幅で行い、docs/ui-design.mdとずれた点があれば直す。タブレット（768〜1023px）の見え方の結果をdocs/ui-design.md「10. まだ決めていないこと」に反映する
 - [X] T066 [P] `specs/001-login-account-setup/contracts/ui-routes.md`の「レイアウトの骨格」に、「2026-10-03以降はdocs/ui-design.mdを正とする」と1行足す
 
 ---
