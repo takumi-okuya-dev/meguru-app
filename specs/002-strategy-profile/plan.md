@@ -122,6 +122,8 @@ apps/api/test/integration/
 ├── ★ strategy.test.ts
 ├── ★ promotions.test.ts
 ├── ★ research.test.ts
+├── ★ profile-status.test.ts       # ホームの入力状況と無料体験
+├── ★ access-mode.test.ts          # THREADS_ACCESS_MODE
 └── ★ profile-cascade.test.ts      # Account削除で関連行が消える
 
 apps/web/src/
@@ -136,7 +138,10 @@ apps/web/src/
 │   ├── ui/★ textarea.tsx、★ tabs.tsx、✎ dialog.tsx（狭い画面で全画面にする）
 │   ├── ★ FieldWithCounter.tsx     # ラベル・説明・未入力・文字数つきの入力欄
 │   ├── ★ ConflictDialog.tsx       # 「他の場所で更新されています」
-│   └── ★ UnsavedChangesDialog.tsx # 「保存していない変更があります」
+│   ├── ★ UnsavedChangesDialog.tsx # 「保存していない変更があります」
+│   ├── ★ GrowerRequiredNotice.tsx # プラン2以上の案内（画面の上部とダイアログ）
+│   ├── ★ promotions/PromotionFormDialog.tsx
+│   └── ★ research/ReferencePostFormDialog.tsx、KeywordFormDialog.tsx
 ├── pages/
 │   ├── ✎ account-home.tsx         # 入力状況のカード、「次にやること」、無料体験の終了日
 │   ├── ✎ account-new.tsx          # threadsAccessMode が testers のときだけ検証期間の案内
@@ -150,9 +155,10 @@ apps/web/src/
 apps/web/test/
 ├── ★ strategy.test.tsx            # 未保存の警告、競合のダイアログ
 ├── ★ account-home.test.tsx        # 「次にやること」の切り替え
+├── ★ research.test.tsx            # タブ、重複の事前判定
 └── ★ layout-responsive.test.tsx   # ドロワー、設定の2段
 
-e2e/★ strategy.spec.ts              # 課題の保存と復元
+e2e/tests/★ strategy.spec.ts        # 課題の保存と復元
 ```
 
 **構成の決定**：001と同じWebアプリ型（`apps/web`、`apps/api`、`packages/shared`のモノレポ）。項目の定義・判定の関数を`packages/shared`に集め、画面・API・後続のプロンプト生成が同じ定義を使う。

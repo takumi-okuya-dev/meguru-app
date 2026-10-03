@@ -36,7 +36,7 @@
     - 更新できた：`200`で更新後の値を返す。
     - 一致しなかった：`409 STALE_UPDATE`と、DBにある最新の値を返す。
     - 行が消えていた（宣伝内容・参考投稿・キーワード）：`404 ITEM_NOT_FOUND`を返す。
-  - 課題は、まだ行がないとき`expectedVersion: 0`で保存する。`INSERT … ON CONFLICT (account_id) DO UPDATE … WHERE strategy_designs.version = $expectedVersion`の1文で、作成と更新の両方を扱う。別のタブが先に作っていれば、条件に合わずに`409`になる。
+  - 課題は、まだ行がないとき`expectedVersion: 0`で保存する。`INSERT … ON CONFLICT (account_id) DO UPDATE … WHERE strategy_designs.version = $expectedVersion`の1文で、作成と更新の両方を扱う。別のタブが先に作っていれば、条件に合わずに`409`になる。行がないのに`expectedVersion`が1以上なら（別のタブで消された後など）、作らずに`409 STALE_UPDATE`を返し、`latest`には全項目が空・`version: 0`の課題を入れる。
   - Webは`409`を受けたら、「他の場所で更新されています」のダイアログを出し、次のどちらかを選ばせる。
     - **上書きする**：受け取った最新の`version`を`expectedVersion`にして、自分の入力内容で保存し直す。
     - **最新の内容を読み込み直す**：自分の入力内容を捨て、受け取った最新の値を画面に出す。
