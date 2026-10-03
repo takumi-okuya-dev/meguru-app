@@ -140,11 +140,10 @@ export function ResearchPage() {
   const dialogCallbacks = {
     onSaved,
     onClose: () => setDialog(null),
-    onGrowerLost: () => {
-      setDialog(null);
-      setGrowerLost(true);
-    },
+    // ダイアログは閉じずに、入力内容を読むだけで残す（閉じるのはユーザーの操作で）
+    onGrowerLost: () => setGrowerLost(true),
     onDeletedElsewhere: refresh,
+    onLimitReached: refresh,
   };
 
   return (

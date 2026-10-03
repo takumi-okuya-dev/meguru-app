@@ -7,6 +7,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { NEEDS_RECONNECT_BANNER, errorMessage, type AccountSummary } from "@threads-grower/shared";
 import { Link, Navigate, Outlet, useOutletContext, useParams } from "react-router";
 import { AppShell } from "@/components/layout/AppShell";
+import { UnsavedChangesProvider } from "@/components/UnsavedChangesProvider";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { ApiError, api } from "@/lib/api-client";
@@ -75,7 +76,9 @@ export function AccountLayout() {
 
   return (
     <AppShell banner={banner}>
-      <Outlet context={{ account: account.data } satisfies AccountOutletContext} />
+      <UnsavedChangesProvider>
+        <Outlet context={{ account: account.data } satisfies AccountOutletContext} />
+      </UnsavedChangesProvider>
     </AppShell>
   );
 }

@@ -47,6 +47,7 @@ export function ReferencePostFormDialog({
   onClose,
   onGrowerLost,
   onDeletedElsewhere,
+  onLimitReached,
 }: {
   accountId: string;
   item?: ReferencePost;
@@ -54,6 +55,7 @@ export function ReferencePostFormDialog({
   onClose: () => void;
   onGrowerLost: () => void;
   onDeletedElsewhere: () => void;
+  onLimitReached: () => void;
 }) {
   const f = useItemForm<Form, ReferencePost>({
     item,
@@ -65,6 +67,7 @@ export function ReferencePostFormDialog({
     onClose,
     onGrowerLost,
     onDeletedElsewhere,
+    onLimitReached,
     save: (form, expectedVersion) =>
       expectedVersion === undefined
         ? api.createReferencePost(accountId, form)
@@ -79,11 +82,13 @@ export function ReferencePostFormDialog({
         description="Threadsで見つけた反応の良い投稿を保存します。"
         submitLabel="保存"
         submitting={f.submitting}
+        locked={f.locked}
         onSubmit={f.submit}
         onRequestClose={f.requestClose}
       >
         {f.deleted && <DeletedElsewhereNotice what="参考投稿" onClose={f.closeDeleted} />}
         <FieldWithCounter
+          readOnly={f.readOnly}
           id="reference-body"
           label="本文"
           requiredNote="必須"
@@ -95,6 +100,7 @@ export function ReferencePostFormDialog({
           onChange={(v) => setField("body", v)}
         />
         <FieldWithCounter
+          readOnly={f.readOnly}
           id="reference-keyword"
           label="検索したキーワード"
           placeholder="例: AI 初心者"
@@ -104,6 +110,7 @@ export function ReferencePostFormDialog({
           onChange={(v) => setField("keyword", v)}
         />
         <FieldWithCounter
+          readOnly={f.readOnly}
           id="reference-url"
           label="投稿のURL"
           placeholder="https://www.threads.net/…"
@@ -115,6 +122,7 @@ export function ReferencePostFormDialog({
           onChange={(v) => setField("postUrl", v)}
         />
         <FieldWithCounter
+          readOnly={f.readOnly}
           id="reference-why"
           label="なぜ良いか"
           description="自分で書くか、ChatGPTやClaudeに分析してもらった結果を貼り付けます"

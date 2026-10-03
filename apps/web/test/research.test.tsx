@@ -1,6 +1,6 @@
 // US3：リサーチの画面（specs/002 FR-012〜FR-015、contracts/ui-routes.md「リサーチの画面」・規則10）
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { AccountSummary } from "@threads-grower/shared";
 import { createMemoryRouter, Outlet, RouterProvider } from "react-router";
@@ -99,5 +99,31 @@ describe("リサーチの画面", () => {
     await userEvent.click(screen.getAllByRole("button", { name: "保存" })[0]!);
     expect(await screen.findByText("編集できなくなりました")).toBeInTheDocument();
     expect(screen.getByLabelText("本文")).toHaveValue("新しい投稿");
+    // 案内を閉じても、ダイアログは閉じずに入力内容を読むだけで残す（Codexレビュー P1）
+    const notice = screen.getByRole("dialog", { name: "編集できなくなりました" });
+    await userEvent.click(within(notice).getAllByRole("button", { name: "閉じる" })[0]!);
+    await waitFor(() => expect(screen.queryByText("編集できなくなりました")).not.toBeInTheDocument());
+    expect(screen.getByLabelText("本文")).toHaveValue("新しい投稿");
+    expect(screen.getByLabelText("本文")).toHaveAttribute("readonly");
+    expect(screen.queryByRole("button", { name: "保存" })).not.toBeInTheDocument();
+  });
+
+  it("保存の途中は入力欄を読み取り専用にする（送った内容と食い違わないように。Codexレビュー P1）", async () => {
+    createReferencePost.mockReturnValue(new Promise(() => {}));
+    renderPage();
+    await userEvent.click(await screen.findByRole("button", { name: /参考投稿を追加/ }));
+    await userEvent.type(await screen.findByLabelText("本文"), "新しい投稿");
+    await userEvent.click(screen.getAllByRole("button", { name: "保存" })[0]!);
+    await waitFor(() => expect(screen.getByLabelText("本文")).toHaveAttribute("readonly"));
+  });
+
+  it("追加で件数の上限（409 ITEM_LIMIT_REACHED）を受けたら、一覧を読み込み直す（Codexレビュー P2）", async () => {
+    createReferencePost.mockRejectedValue(new ApiError("ITEM_LIMIT_REACHED", 409));
+    renderPage();
+    await userEvent.click(await screen.findByRole("button", { name: /参考投稿を追加/ }));
+    await userEvent.type(await screen.findByLabelText("本文"), "新しい投稿");
+    const before = listReferencePosts.mock.calls.length;
+    await userEvent.click(screen.getAllByRole("button", { name: "保存" })[0]!);
+    await waitFor(() => expect(listReferencePosts.mock.calls.length).toBeGreaterThan(before));
   });
 });

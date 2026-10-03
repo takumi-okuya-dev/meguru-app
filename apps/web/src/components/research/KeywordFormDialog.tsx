@@ -22,6 +22,7 @@ export function KeywordFormDialog({
   onClose,
   onGrowerLost,
   onDeletedElsewhere,
+  onLimitReached,
 }: {
   accountId: string;
   item?: ResearchKeyword;
@@ -30,6 +31,7 @@ export function KeywordFormDialog({
   onClose: () => void;
   onGrowerLost: () => void;
   onDeletedElsewhere: () => void;
+  onLimitReached: () => void;
 }) {
   const taken = new Set(existing.filter((k) => k.id !== item?.id).map((k) => normalizeKeyword(k.keyword)));
   const isDuplicate = (s: string) => !isBlank(s) && taken.has(normalizeKeyword(s));
@@ -47,6 +49,7 @@ export function KeywordFormDialog({
     onClose,
     onGrowerLost,
     onDeletedElsewhere,
+    onLimitReached,
     save: (form, expectedVersion) =>
       expectedVersion === undefined
         ? api.createResearchKeyword(accountId, form)
@@ -63,11 +66,13 @@ export function KeywordFormDialog({
         description="リサーチで検索する言葉を登録します。"
         submitLabel="保存"
         submitting={f.submitting}
+        locked={f.locked}
         onSubmit={f.submit}
         onRequestClose={f.requestClose}
       >
         {f.deleted && <DeletedElsewhereNotice what="キーワード" onClose={f.closeDeleted} />}
         <FieldWithCounter
+          readOnly={f.readOnly}
           id="keyword"
           label="キーワード"
           requiredNote="必須"
@@ -79,6 +84,7 @@ export function KeywordFormDialog({
           onChange={(v) => setField("keyword", v)}
         />
         <FieldWithCounter
+          readOnly={f.readOnly}
           id="keyword-purpose"
           label="狙いのメモ"
           placeholder="例: 初心者向けの共感投稿を探す"

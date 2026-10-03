@@ -5,6 +5,7 @@ import type { ProfileStatus } from "@threads-grower/shared";
 import { ChevronRightIcon, MegaphoneIcon, SearchIcon, TargetIcon, type LucideIcon } from "lucide-react";
 import { Link } from "react-router";
 import { AccountAvatar } from "@/components/AccountAvatar";
+import { ApiErrorScreen } from "@/components/ApiErrorScreen";
 import { ConnectionBadge } from "@/components/ConnectionBadge";
 import { PLAN_CHANGE_CONTACT } from "@/components/GrowerRequiredNotice";
 import { PageBody, PageHeader } from "@/components/layout/PageHeader";
@@ -59,6 +60,8 @@ export function AccountHome() {
     queryFn: () => api.getProfileStatus(account.id),
   });
   const s = status.data;
+  // 読み込めなかったら、読み込み中のまま止めずに原因と再読み込みを出す
+  if (status.isError) return <ApiErrorScreen error={status.error} onRetry={() => void status.refetch()} />;
   const step = s ? nextStep(s) : null;
   const canEdit = s?.access.canEdit ?? true;
 

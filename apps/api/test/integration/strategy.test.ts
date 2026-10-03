@@ -98,6 +98,8 @@ describe("GET・PUT /api/accounts/:id/strategy", () => {
       expect(body.error.code).toBe("STALE_UPDATE");
       expect(body.latest.finalAction).toBe("タブA");
       expect(body.latest.version).toBe(1);
+      // GET と同じ形（canEdit を含む）で返す
+      expect((body.latest as unknown as { canEdit: boolean }).canEdit).toBe(true);
       const retry = await call(app, "PUT", path(accountId), {
         user: "u1",
         body: { ...second, expectedVersion: body.latest.version },

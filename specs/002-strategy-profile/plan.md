@@ -151,7 +151,7 @@ apps/web/src/
 │   └── settings/✎ settings-layout.tsx  # 狭い画面で「一覧 → 中身」の2段
 └── lib/
     ├── ✎ api-client.ts            # 本featureのエンドポイント、409 の latest の受け取り
-    └── ★ use-unsaved-changes.ts   # useBlocker + beforeunload
+    └── ★ use-unsaved-changes.ts   # 未保存の変更の登録（ブロッカーは components/UnsavedChangesProvider.tsx に1つ）
 apps/web/test/
 ├── ★ strategy.test.tsx            # 未保存の警告、競合のダイアログ
 ├── ★ account-home.test.tsx        # 「次にやること」の切り替え

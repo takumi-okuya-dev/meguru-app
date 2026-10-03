@@ -3,12 +3,13 @@
 // 767px以下は全画面のシート（左上に✕、右上に「保存」）。
 import { XIcon } from "lucide-react";
 import type { ReactNode } from "react";
+import { GrowerRequiredBanner } from "@/components/GrowerRequiredNotice";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 
 /**
  * 追加・編集のダイアログの枠。閉じる操作（✕・キャンセル・Esc・背景のクリック）は、すべて onRequestClose を通す。
- * @param props - title：見出し、submitLabel：主な操作の文言、onSubmit：保存、onRequestClose：閉じる操作、submitting：保存中、children：入力欄
+ * @param props - title：見出し、submitLabel：主な操作の文言、onSubmit：保存、onRequestClose：閉じる操作、submitting：保存中、locked：保存できない、children：入力欄
  * @returns ダイアログ
  */
 export function FormDialogFrame({
@@ -16,6 +17,7 @@ export function FormDialogFrame({
   description,
   submitLabel,
   submitting,
+  locked = false,
   onSubmit,
   onRequestClose,
   children,
@@ -24,6 +26,8 @@ export function FormDialogFrame({
   description: string;
   submitLabel: string;
   submitting: boolean;
+  /** grower機能が使えなくなった（保存の操作を出さず、案内を出す） */
+  locked?: boolean;
   onSubmit: () => void;
   onRequestClose: () => void;
   children: ReactNode;
@@ -44,22 +48,29 @@ export function FormDialogFrame({
             {title}
           </DialogTitle>
           <div className="flex justify-end pr-1.5 md:hidden">
-            <Button className="h-9 rounded-full px-4" disabled={submitting} onClick={onSubmit}>
-              {submitLabel}
-            </Button>
+            {!locked && (
+              <Button className="h-9 rounded-full px-4" disabled={submitting} onClick={onSubmit}>
+                {submitLabel}
+              </Button>
+            )}
           </div>
         </div>
         <DialogDescription id="form-dialog-desc" className="sr-only">
           {description}
         </DialogDescription>
-        <div className="flex-1 space-y-4 overflow-y-auto px-4 py-4 md:max-h-[65vh] md:px-6 md:py-3">{children}</div>
+        <div className="flex-1 space-y-4 overflow-y-auto px-4 py-4 md:max-h-[65vh] md:px-6 md:py-3">
+          {locked && <GrowerRequiredBanner />}
+          {children}
+        </div>
         <div className="hidden justify-end gap-2 px-6 pt-3 pb-5 md:flex">
           <Button variant="outline" className="rounded-full" onClick={onRequestClose}>
-            キャンセル
+            {locked ? "閉じる" : "キャンセル"}
           </Button>
-          <Button className="rounded-full" disabled={submitting} onClick={onSubmit}>
-            {submitLabel}
-          </Button>
+          {!locked && (
+            <Button className="rounded-full" disabled={submitting} onClick={onSubmit}>
+              {submitLabel}
+            </Button>
+          )}
         </div>
       </DialogContent>
     </Dialog>

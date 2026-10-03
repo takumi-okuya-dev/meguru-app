@@ -5,6 +5,7 @@ import { EllipsisIcon, ExternalLinkIcon, PlusIcon } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { ApiErrorScreen } from "@/components/ApiErrorScreen";
+import { ConflictDialog } from "@/components/ConflictDialog";
 import { GrowerRequiredBanner, GrowerRequiredDialog } from "@/components/GrowerRequiredNotice";
 import { ConfirmDeleteDialog } from "@/components/items/ConfirmDeleteDialog";
 import { PageBody, PageHeader } from "@/components/layout/PageHeader";
@@ -22,6 +23,7 @@ import { formatMonthDay } from "@/lib/format";
 import { queryKeys } from "@/lib/query";
 import { isGrowerRequired, isStale, saveErrorMessage } from "@/lib/save-error";
 import { cn } from "@/lib/utils";
+import { useUnsavedChanges } from "@/lib/use-unsaved-changes";
 import { useCurrentAccount } from "@/pages/account-layout";
 
 type DialogState = { mode: "add" } | { mode: "edit"; item: Promotion } | null;
@@ -64,6 +66,8 @@ export function PromotionsPage() {
   const [toDelete, setToDelete] = useState<Promotion | null>(null);
   const [growerLost, setGrowerLost] = useState(false);
   const [growerDialog, setGrowerDialog] = useState(false);
+  // カードのメニューからの状態の変更が、他で先に更新されていた（contracts/ui-routes.md 規則5）
+  const [statusConflict, setStatusConflict] = useState<{ latest: Promotion; status: Promotion["status"] } | null>(null);
 
   const refresh = () => {
     void queryClient.invalidateQueries({ queryKey: queryKeys.promotions(account.id) });
@@ -85,7 +89,10 @@ export function PromotionsPage() {
       refresh();
       toast.success("保存しました");
     },
-    onError: onMutationError,
+    onError: (err, { status }) => {
+      if (isStale(err)) return setStatusConflict({ latest: err.latest as Promotion, status });
+      onMutationError(err);
+    },
   });
   const remove = useMutation({
     mutationFn: (item: Promotion) => api.deletePromotion(account.id, item.id),
@@ -226,11 +233,10 @@ export function PromotionsPage() {
             toast.success("保存しました");
           }}
           onClose={() => setDialog(null)}
-          onGrowerLost={() => {
-            setDialog(null);
-            setGrowerLost(true);
-          }}
+          // ダイアログは閉じずに、入力内容を読むだけで残す（閉じるのはユーザーの操作で）
+          onGrowerLost={() => setGrowerLost(true)}
           onDeletedElsewhere={refresh}
+          onLimitReached={refresh}
         />
       )}
       <ConfirmDeleteDialog
@@ -238,6 +244,20 @@ export function PromotionsPage() {
         deleting={remove.isPending}
         onCancel={() => setToDelete(null)}
         onConfirm={() => toDelete && remove.mutate(toDelete)}
+      />
+      <ConflictDialog
+        open={statusConflict !== null}
+        updatedAt={statusConflict?.latest.updatedAt ?? null}
+        onCancel={() => setStatusConflict(null)}
+        onReload={() => {
+          setStatusConflict(null);
+          refresh();
+        }}
+        onOverwrite={() => {
+          // 最新の内容に、選んだ状態だけを当てて保存し直す
+          if (statusConflict) changeStatus.mutate({ item: statusConflict.latest, status: statusConflict.status });
+          setStatusConflict(null);
+        }}
       />
       <GrowerRequiredDialog
         open={growerDialog}
@@ -316,6 +336,8 @@ function RatioRow({
   const shown = draft ?? (value === undefined ? "" : String(value));
   const valid = /^\d+$/.test(shown) && Number(shown) <= 100;
   const changed = draft !== null && draft !== String(value);
+  // 保存していない割合も、移動・タブを閉じる前に確認する（FR-019）
+  useUnsavedChanges(canEdit && changed);
 
   const save = useMutation({
     mutationFn: () => api.putPromotionSettings(accountId, Number(shown)),

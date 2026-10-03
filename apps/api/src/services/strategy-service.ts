@@ -95,6 +95,10 @@ export async function saveStrategy(db: Db, accountId: string, req: PutStrategyRe
       .returning();
   }
   if (saved) return toBody(saved);
-  // 他で先に保存された（または行が消えた）。最新の課題を latest に入れて 409
-  throw new AppError("STALE_UPDATE", 409, "updated elsewhere", toBody(await findRow(db, accountId)));
+  // 他で先に保存された（または行が消えた）。最新の課題を latest に入れて 409。
+  // GET と同じ形にするため canEdit も入れる（保存は grower機能を確かめた後にだけ呼ぶので true）
+  throw new AppError("STALE_UPDATE", 409, "updated elsewhere", {
+    ...toBody(await findRow(db, accountId)),
+    canEdit: true,
+  });
 }

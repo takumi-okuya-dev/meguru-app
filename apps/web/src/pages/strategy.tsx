@@ -22,7 +22,6 @@ import { ConflictDialog } from "@/components/ConflictDialog";
 import { FieldWithCounter } from "@/components/FieldWithCounter";
 import { GrowerRequiredBanner, GrowerRequiredDialog } from "@/components/GrowerRequiredNotice";
 import { PageBody, PageHeader } from "@/components/layout/PageHeader";
-import { UnsavedChangesDialog } from "@/components/UnsavedChangesDialog";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -87,7 +86,7 @@ function StrategyEditor({ accountId, initial }: { accountId: string; initial: St
 
   const baseline = pickValues(saved);
   const dirty = canEdit && !sameValues(values, baseline);
-  const unsaved = useUnsavedChanges(dirty);
+  useUnsavedChanges(dirty);
   const overLimit = STRATEGY_TEXT_KEYS.some((k) => countChars(values[k]) > STRATEGY_TEXT_MAX);
   const filled = countFilled(values);
 
@@ -97,23 +96,32 @@ function StrategyEditor({ accountId, initial }: { accountId: string; initial: St
     queryClient.setQueryData(queryKeys.strategy(accountId), s);
   };
 
+  // 送った内容（payload）を変数として持ち、保存中に入力が続いても、その分を消さない
   const save = useMutation({
-    mutationFn: (expectedVersion: number) => api.putStrategy(accountId, { ...values, expectedVersion }),
-    onSuccess: (s) => {
-      applySaved(s);
+    mutationFn: ({ payload, expectedVersion }: { payload: StrategyValues; expectedVersion: number }) =>
+      api.putStrategy(accountId, { ...payload, expectedVersion }),
+    onSuccess: (s, { payload }) => {
+      setSaved(s);
+      queryClient.setQueryData(queryKeys.strategy(accountId), s);
+      // 保存中に入力が続いていなければ、保存後の値（空白だけの項目は空になる）に合わせる。
+      // 続いていれば、その入力は残す（保存後の値との差分として、未保存の変更のまま）
+      setValues((current) => (sameValues(current, payload) ? pickValues(s) : current));
       void queryClient.invalidateQueries({ queryKey: queryKeys.profileStatus(accountId) });
       toast.success("保存しました");
     },
     onError: (err) => {
       if (isStale(err)) {
-        setConflict(err.latest as Strategy);
+        // サーバーの latest には canEdit がないことがあるので、いまの値で補う（保存できた＝編集できる）
+        setConflict({ ...(err.latest as Strategy), canEdit: true });
       } else if (isGrowerRequired(err)) {
         setGrowerDialog(true);
       } else {
-        toast.error(saveErrorMessage(err), { action: { label: "もう一度保存", onClick: () => save.mutate(saved.version) } });
+        toast.error(saveErrorMessage(err), { action: { label: "もう一度保存", onClick: () => submit(saved.version) } });
       }
     },
   });
+
+  const submit = (expectedVersion: number) => save.mutate({ payload: values, expectedVersion });
 
   const set = <K extends keyof StrategyValues>(key: K, value: StrategyValues[K]) =>
     setValues((v) => ({ ...v, [key]: value }));
@@ -143,7 +151,7 @@ function StrategyEditor({ accountId, initial }: { accountId: string; initial: St
       <Button
         className="h-9 rounded-full px-4 md:px-5"
         disabled={!dirty || overLimit || save.isPending}
-        onClick={() => save.mutate(saved.version)}
+        onClick={() => submit(saved.version)}
       >
         保存
       </Button>
@@ -229,7 +237,6 @@ function StrategyEditor({ accountId, initial }: { accountId: string; initial: St
         </div>
       </PageBody>
 
-      <UnsavedChangesDialog open={unsaved.blocked} onStay={unsaved.reset} onDiscard={unsaved.proceed} />
       <ConflictDialog
         open={conflict !== null}
         updatedAt={conflict?.updatedAt ?? null}
@@ -242,7 +249,7 @@ function StrategyEditor({ accountId, initial }: { accountId: string; initial: St
           if (conflict) {
             // 入力内容はそのままに、最新の version で保存し直す
             applySaved(conflict, true);
-            save.mutate(conflict.version);
+            submit(conflict.version);
           }
           setConflict(null);
         }}

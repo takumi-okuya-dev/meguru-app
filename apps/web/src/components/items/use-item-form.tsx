@@ -31,8 +31,10 @@ export type ItemFormOptions<F, T extends { version: number; updatedAt: string }>
   onSaved: (item: T) => void;
   /** 閉じる */
   onClose: () => void;
-  /** grower機能が使えなくなった（画面を読むだけにする） */
+  /** grower機能が使えなくなった（画面を読むだけにする）。ダイアログは閉じずに、入力内容を読むだけで残す */
   onGrowerLost: () => void;
+  /** 件数の上限に達していた（一覧を読み込み直して、上限の案内を出す） */
+  onLimitReached?: () => void;
   /** 削除済みの案内を閉じた（一覧を読み込み直す） */
   onDeletedElsewhere: () => void;
   /** 409 KEYWORD_DUPLICATE などを、入力欄の案内にする */
@@ -59,9 +61,11 @@ export function useItemForm<F, T extends { version: number; updatedAt: string }>
   const [growerLost, setGrowerLost] = useState(false);
   const [deleted, setDeleted] = useState(false);
   const [confirmClose, setConfirmClose] = useState(false);
+  // grower機能が使えなくなった後は、入力内容を読むだけで残す（閉じるまで消さない）
+  const [locked, setLocked] = useState(false);
 
   const dirty = !sameForm(form, base.form) && !deleted;
-  const unsaved = useUnsavedChanges(dirty);
+  useUnsavedChanges(dirty);
   const errors = { ...(showErrors ? opts.validate(form) : {}), ...serverErrors } as FormErrors<F>;
 
   const mutation = useMutation({
@@ -74,6 +78,10 @@ export function useItemForm<F, T extends { version: number; updatedAt: string }>
       if (isStale(err)) return setConflict(err.latest as T);
       if (isGrowerRequired(err)) return setGrowerLost(true);
       if (err instanceof ApiError && err.code === "ITEM_NOT_FOUND") return setDeleted(true);
+      if (err instanceof ApiError && err.code === "ITEM_LIMIT_REACHED") {
+        toast.error(saveErrorMessage(err));
+        return opts.onLimitReached?.();
+      }
       const fieldErrors = err instanceof ApiError ? opts.fieldErrorFor?.(err) : null;
       if (fieldErrors) return setServerErrors(fieldErrors);
       toast.error(saveErrorMessage(err));
@@ -86,6 +94,7 @@ export function useItemForm<F, T extends { version: number; updatedAt: string }>
   };
 
   const submit = () => {
+    if (locked || mutation.isPending) return;
     setShowErrors(true);
     const found = opts.validate(form);
     if (Object.values(found).some(Boolean) || opts.overLimit(form)) return;
@@ -97,13 +106,9 @@ export function useItemForm<F, T extends { version: number; updatedAt: string }>
   const overlays: ReactNode = (
     <>
       <UnsavedChangesDialog
-        open={unsaved.blocked || confirmClose}
-        onStay={() => {
-          setConfirmClose(false);
-          unsaved.reset();
-        }}
+        open={confirmClose}
+        onStay={() => setConfirmClose(false)}
         onDiscard={() => {
-          if (unsaved.blocked) unsaved.proceed();
           setConfirmClose(false);
           opts.onClose();
         }}
@@ -129,6 +134,7 @@ export function useItemForm<F, T extends { version: number; updatedAt: string }>
         open={growerLost}
         onClose={() => {
           setGrowerLost(false);
+          setLocked(true);
           opts.onGrowerLost();
         }}
       />
@@ -141,6 +147,10 @@ export function useItemForm<F, T extends { version: number; updatedAt: string }>
     errors,
     submit,
     submitting: mutation.isPending,
+    /** grower機能が使えなくなり、保存できない（入力内容は読むだけで残す） */
+    locked,
+    /** 入力欄を読み取り専用にするか（保存中は、送った内容と食い違わないよう入力を止める） */
+    readOnly: locked || mutation.isPending,
     requestClose,
     deleted,
     closeDeleted: () => {

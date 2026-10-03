@@ -94,6 +94,7 @@ export function PromotionFormDialog({
   onClose,
   onGrowerLost,
   onDeletedElsewhere,
+  onLimitReached,
 }: {
   accountId: string;
   item?: Promotion;
@@ -101,6 +102,7 @@ export function PromotionFormDialog({
   onClose: () => void;
   onGrowerLost: () => void;
   onDeletedElsewhere: () => void;
+  onLimitReached: () => void;
 }) {
   const f = useItemForm<Form, Promotion>({
     item,
@@ -112,6 +114,7 @@ export function PromotionFormDialog({
     onClose,
     onGrowerLost,
     onDeletedElsewhere,
+    onLimitReached,
     save: (form, expectedVersion) => {
       const body = { ...form, priority: Number(form.priority), validUntil: form.validUntil || null };
       return expectedVersion === undefined
@@ -129,11 +132,13 @@ export function PromotionFormDialog({
         description="投稿で案内したいイベントやサービスを登録します。"
         submitLabel={item ? "保存" : "追加"}
         submitting={f.submitting}
+        locked={f.locked}
         onSubmit={f.submit}
         onRequestClose={f.requestClose}
       >
         {f.deleted && <DeletedElsewhereNotice what="宣伝内容" onClose={f.closeDeleted} />}
         <FieldWithCounter
+          readOnly={f.readOnly}
           id="promotion-title"
           label="管理用タイトル"
           requiredNote="必須・投稿には出ません"
@@ -145,6 +150,7 @@ export function PromotionFormDialog({
           onChange={(v) => setField("title", v)}
         />
         <FieldWithCounter
+          readOnly={f.readOnly}
           id="promotion-content"
           label="宣伝したい内容"
           requiredNote="必須"
@@ -166,6 +172,7 @@ export function PromotionFormDialog({
               ] as const
             ).map(([key, label, placeholder]) => (
               <FieldWithCounter
+          readOnly={f.readOnly}
                 key={key}
                 id={`promotion-${key}`}
                 label={label}
@@ -180,6 +187,7 @@ export function PromotionFormDialog({
           </div>
         </fieldset>
         <FieldWithCounter
+          readOnly={f.readOnly}
           id="promotion-cta"
           label="読者に取ってほしい行動（CTA）"
           placeholder="例: プロフィールのLINEから応募"
@@ -189,6 +197,7 @@ export function PromotionFormDialog({
           onChange={(v) => setField("cta", v)}
         />
         <FieldWithCounter
+          readOnly={f.readOnly}
           id="promotion-url"
           label="専用URL"
           placeholder="https://"
@@ -211,6 +220,7 @@ export function PromotionFormDialog({
               min={0}
               max={100}
               value={form.priority}
+              readOnly={f.readOnly}
               onChange={(e) => setField("priority", e.target.value)}
               className="mt-1 h-11 w-full rounded-xl border border-input bg-card px-3 text-base md:h-10 md:text-[15px]"
             />
@@ -223,6 +233,7 @@ export function PromotionFormDialog({
             <select
               id="promotion-status"
               value={form.status}
+              disabled={f.readOnly}
               onChange={(e) => setField("status", e.target.value as PromotionStatus)}
               className="mt-1 h-11 w-full rounded-xl border border-input bg-card px-3 text-base md:h-10 md:text-[15px]"
             >
@@ -241,6 +252,7 @@ export function PromotionFormDialog({
               id="promotion-valid-until"
               type="date"
               value={form.validUntil}
+              readOnly={f.readOnly}
               onChange={(e) => setField("validUntil", e.target.value)}
               className="mt-1 h-11 w-full rounded-xl border border-input bg-card px-3 text-base md:h-10 md:text-[15px]"
             />

@@ -5,10 +5,16 @@ import type { AccountSummary, ProfileStatus } from "@threads-grower/shared";
 import { createMemoryRouter, Outlet, RouterProvider } from "react-router";
 import { describe, expect, it, vi } from "vitest";
 
-let current: ProfileStatus;
+let current: ProfileStatus | Error;
 vi.mock("@/lib/api-client", async (orig) => {
   const actual = await orig<typeof import("@/lib/api-client")>();
-  return { ...actual, api: { ...actual.api, getProfileStatus: () => Promise.resolve(current) } };
+  return {
+    ...actual,
+    api: {
+      ...actual.api,
+      getProfileStatus: () => (current instanceof Error ? Promise.reject(current) : Promise.resolve(current)),
+    },
+  };
 });
 
 const { AccountHome } = await import("@/pages/account-home");
@@ -33,7 +39,7 @@ function status(overrides: Partial<ProfileStatus> = {}): ProfileStatus {
   };
 }
 
-function renderHome(s: ProfileStatus) {
+function renderHome(s: ProfileStatus | Error) {
   current = s;
   const router = createMemoryRouter(
     [{ path: "/accounts/:accountId", element: <Outlet context={{ account }} />, children: [{ index: true, element: <AccountHome /> }] }],
@@ -87,5 +93,12 @@ describe("Accountのホーム", () => {
       await screen.findByRole("heading", { name: "課題・宣伝内容・リサーチの編集は、プラン2以上で使えます" }),
     ).toBeInTheDocument();
     expect(screen.queryByText(/無料体験中/)).not.toBeInTheDocument();
+  });
+
+  it("入力状況を読み込めなければ、読み込み中のまま止めずに原因と「再読み込み」を出す（Codexレビュー P2）", async () => {
+    const { ApiError } = await import("@/lib/api-client");
+    renderHome(new ApiError("INTERNAL_ERROR", 500));
+    expect(await screen.findByRole("heading", { name: "読み込めませんでした" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "再読み込み" })).toBeInTheDocument();
   });
 });

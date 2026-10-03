@@ -15,6 +15,7 @@ vi.mock("@/lib/api-client", async (orig) => {
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
 const { ApiError } = await import("@/lib/api-client");
+const { UnsavedChangesProvider } = await import("@/components/UnsavedChangesProvider");
 const { StrategyPage } = await import("@/pages/strategy");
 
 const account: AccountSummary = {
@@ -48,7 +49,9 @@ function renderPage() {
         element: (
           <>
             <Link to="/accounts/a1">ホームへ</Link>
-            <Outlet context={{ account }} />
+            <UnsavedChangesProvider>
+              <Outlet context={{ account }} />
+            </UnsavedChangesProvider>
           </>
         ),
         children: [
@@ -117,6 +120,22 @@ describe("課題の画面", () => {
       await waitFor(() => expect(router.state.location.pathname).toBe("/accounts/a1"));
       expect(screen.queryByText("保存していない変更があります")).not.toBeInTheDocument();
     });
+  });
+
+  it("保存の途中で続けて入力した内容は、保存の完了時に消えず、未保存の変更として残る（Codexレビュー P1）", async () => {
+    getStrategy.mockResolvedValue(strategy());
+    let resolve!: (s: Strategy) => void;
+    putStrategy.mockReturnValue(new Promise<Strategy>((r) => (resolve = r)));
+    renderPage();
+    const field = await screen.findByLabelText(fieldLabel);
+    await userEvent.type(field, "A");
+    await userEvent.click(screen.getByRole("button", { name: "保存" }));
+    // 保存の応答を待つ間に、さらに入力する
+    await userEvent.type(field, "B");
+    resolve(strategy({ finalAction: "保存済みの行動A", version: 2 }));
+    await waitFor(() => expect(screen.getByRole("button", { name: "保存" })).toBeEnabled());
+    expect(screen.getByLabelText(fieldLabel)).toHaveValue("保存済みの行動AB");
+    expect(putStrategy.mock.calls[0]![1]).toMatchObject({ finalAction: "保存済みの行動A", expectedVersion: 1 });
   });
 
   describe("競合のダイアログ（FR-020）", () => {
