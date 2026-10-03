@@ -59,16 +59,22 @@ export function AccountLayout() {
   }
   if (!account.data) return <LoadingSkeleton />;
 
+  // 再接続のバナーは、各画面の上部バーの下に出す（docs/ui-design.md「2. 画面の骨格」）
+  const banner =
+    account.data.connectionStatus === "needs_reconnect" ? (
+      <Alert
+        variant="warning"
+        className="flex flex-col gap-3 rounded-none border-x-0 border-t-0 px-4 sm:flex-row sm:items-center sm:justify-between md:px-5"
+      >
+        <AlertDescription className="text-foreground">{NEEDS_RECONNECT_BANNER}</AlertDescription>
+        <Button asChild size="sm">
+          <Link to={`/accounts/${account.data.id}/settings`}>再接続</Link>
+        </Button>
+      </Alert>
+    ) : null;
+
   return (
-    <AppShell>
-      {account.data.connectionStatus === "needs_reconnect" && (
-        <Alert variant="warning" className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <AlertDescription className="text-foreground">{NEEDS_RECONNECT_BANNER}</AlertDescription>
-          <Button asChild size="sm">
-            <Link to={`/accounts/${account.data.id}/settings`}>再接続</Link>
-          </Button>
-        </Alert>
-      )}
+    <AppShell banner={banner}>
       <Outlet context={{ account: account.data } satisfies AccountOutletContext} />
     </AppShell>
   );

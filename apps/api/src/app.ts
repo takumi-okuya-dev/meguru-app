@@ -74,7 +74,8 @@ export function createApp(deps: AppDeps = defaultDeps) {
 
   app.onError((err, c) => {
     if (err instanceof AppError) {
-      return c.json({ error: { code: err.code, message: err.message } }, err.status);
+      const error = { code: err.code, message: err.message, ...(err.details ? { details: err.details } : {}) };
+      return c.json(err.latest === undefined ? { error } : { error, latest: err.latest }, err.status);
     }
     logger.error("unhandled error", { err });
     return c.json({ error: { code: "INTERNAL_ERROR" as const, message: "internal error" } }, 500);

@@ -22,8 +22,10 @@ export class ApiError extends Error {
   constructor(
     readonly code: ErrorCode,
     readonly status: number,
-    /** CONFIG_ERROR のときの、誤っている設定の項目名 */
+    /** CONFIG_ERROR のときの誤っている設定の項目名、VALIDATION_FAILED のときの違反した項目名 */
     readonly details: string[] = [],
+    /** 409 STALE_UPDATE のときの、DBにある最新の値（specs/002 contracts/api.md） */
+    readonly latest?: unknown,
   ) {
     super(code);
   }
@@ -65,7 +67,12 @@ async function request<T>(
     const parsed = errorResponseSchema.safeParse(await res.json().catch(() => null));
     const code: ErrorCode = parsed.success ? parsed.data.error.code : "INTERNAL_ERROR";
     if (res.status === 401) onSessionExpired();
-    throw new ApiError(code, res.status, parsed.success ? (parsed.data.error.details ?? []) : []);
+    throw new ApiError(
+      code,
+      res.status,
+      parsed.success ? (parsed.data.error.details ?? []) : [],
+      parsed.success ? parsed.data.latest : undefined,
+    );
   }
   if (schema === null || res.status === 204) return undefined as T;
   return schema.parse(await res.json());

@@ -90,6 +90,8 @@ export const errorResponseSchema = z.object({
     /** CONFIG_ERROR のときの、誤っている設定の項目名（値は含めない） */
     details: z.array(z.string()).optional(),
   }),
+  /** 409 STALE_UPDATE のときの、DBにある最新の値（形は資源ごとに違う。specs/002 contracts/api.md） */
+  latest: z.unknown().optional(),
 });
 /** APIのエラーレスポンス。 */
 export type ErrorResponse = z.infer<typeof errorResponseSchema>;

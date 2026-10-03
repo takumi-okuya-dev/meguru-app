@@ -31,8 +31,8 @@ description: "戦略プロファイル（課題・宣伝内容・リサーチ）
 
 **目的**：本featureで足す依存と設定の雛形を用意する
 
-- [ ] T001 [P] `apps/web`に`@radix-ui/react-tabs`を追加し、shadcn/uiの`apps/web/src/components/ui/textarea.tsx`と`apps/web/src/components/ui/tabs.tsx`を追加する（research.md R9）
-- [ ] T002 [P] `apps/api/.dev.vars.example`に`THREADS_ACCESS_MODE=testers`を、「`testers`（既定）か`public`。Meta App Reviewに通り、Metaのアプリを公開したら`public`にする」という説明のコメント付きで足す（contracts/api.md「環境変数（追加）」）
+- [X] T001 [P] `apps/web`に`@radix-ui/react-tabs`を追加し、shadcn/uiの`apps/web/src/components/ui/textarea.tsx`と`apps/web/src/components/ui/tabs.tsx`を追加する（research.md R9）
+- [X] T002 [P] `apps/api/.dev.vars.example`に`THREADS_ACCESS_MODE=testers`を、「`testers`（既定）か`public`。Meta App Reviewに通り、Metaのアプリを公開したら`public`にする」という説明のコメント付きで足す（contracts/api.md「環境変数（追加）」）
 
 **完了条件**：`pnpm install`と`pnpm -r typecheck`が通る
 
@@ -46,30 +46,30 @@ description: "戦略プロファイル（課題・宣伝内容・リサーチ）
 
 ### 共通パッケージ
 
-- [ ] T003 [P] `packages/shared/test/text.test.ts`と`packages/shared/test/access.test.ts`を書く（失敗を確認する）：
+- [X] T003 [P] `packages/shared/test/text.test.ts`と`packages/shared/test/access.test.ts`を書く（失敗を確認する）：
   - 文字数：コードポイントで数え、絵文字1つは1文字
   - 空欄：空白・改行だけは空
   - キーワードの正規化：「ＡＩ」「 ai 」「Ai」がすべて`"ai"`になる
   - grower機能：プラン`auto-grower`・`multi-account`・`team`は常に使える。`auto-only`は無料体験中だけ使える
   - 無料体験の終了時刻：日本時間の暦で1か月後。1月31日の登録は2月の最終日の同じ時刻
-- [ ] T004 [P] `packages/shared/src/limits.ts`を作る（research.md R8、spec FR-021・FR-022）：
+- [X] T004 [P] `packages/shared/src/limits.ts`を作る（research.md R8、spec FR-021・FR-022）：
   - 文字数の上限：`STRATEGY_TEXT_MAX = 2000`、`PROMOTION_CONTENT_MAX = 2000`、`REFERENCE_BODY_MAX = 2000`、`REFERENCE_WHY_GOOD_MAX = 2000`、`SHORT_TEXT_MAX = 100`（管理用タイトル・届けたい属性・CTA・キーワード・狙いのメモ）、`URL_MAX = 2000`
   - 件数の上限：`PROMOTION_LIMIT = 50`、`REFERENCE_POST_LIMIT = 200`、`KEYWORD_LIMIT = 100`
   - その他：`PRIORITY_MIN = 0`、`PRIORITY_MAX = 100`、`PROMOTION_RATIO_DEFAULT = 20`
-- [ ] T005 [P] `packages/shared/src/text.ts`を作る（research.md R2・R5・R8）：
+- [X] T005 [P] `packages/shared/src/text.ts`を作る（research.md R2・R5・R8）：
   - `countChars(s)`：`[...s].length`
   - `isBlank(s)`：`s.trim() === ""`
   - `normalizeKeyword(s)`：NFKC正規化 → 前後の空白を除く → 小文字
   - `isHttpUrl(s)`：`http:`・`https:`のURLだけ`true`
-- [ ] T006 [P] `packages/shared/src/access.ts`を作る（research.md R14）：
+- [X] T006 [P] `packages/shared/src/access.ts`を作る（research.md R14）：
   - `trialEndsAt(userCreatedAt: Date): Date`：日本時間の暦で1か月後の同じ時刻。日がない月は月の最終日に丸める
   - `isInTrial(userCreatedAt, now)`
   - `hasGrowerAccess(plan, userCreatedAt, now)`：`plan`が`auto-grower`・`multi-account`・`team`のどれか、または`isInTrial`
-- [ ] T007 `packages/shared/src/errors.ts`の`ERROR_CODES`に`STALE_UPDATE`・`ITEM_NOT_FOUND`・`ITEM_LIMIT_REACHED`・`KEYWORD_DUPLICATE`・`GROWER_FEATURE_REQUIRED`を足し、`errorMessage`にcontracts/ui-routes.md「エラー文言」の文言を足す。`errorResponseSchema`（`packages/shared/src/schemas.ts`）に任意の`latest`（形は問わない`unknown`）を足す。`packages/shared/src/index.ts`から本フェーズの新しいモジュールをexportする
+- [X] T007 `packages/shared/src/errors.ts`の`ERROR_CODES`に`STALE_UPDATE`・`ITEM_NOT_FOUND`・`ITEM_LIMIT_REACHED`・`KEYWORD_DUPLICATE`・`GROWER_FEATURE_REQUIRED`を足し、`errorMessage`にcontracts/ui-routes.md「エラー文言」の文言を足す。`errorResponseSchema`（`packages/shared/src/schemas.ts`）に任意の`latest`（形は問わない`unknown`）を足す。`packages/shared/src/index.ts`から本フェーズの新しいモジュールをexportする
 
 ### DB
 
-- [ ] T008 `apps/api/src/db/schema.ts`に、data-model.mdのとおり次を足す。どのテーブルも`account_id`は`accounts.id`への`ON DELETE CASCADE`。
+- [X] T008 `apps/api/src/db/schema.ts`に、data-model.mdのとおり次を足す。どのテーブルも`account_id`は`accounts.id`への`ON DELETE CASCADE`。
   - **列挙型**：`tone_preset`（`energetic_casual`, `polite_warm`, `formal`, `casual_frank`, `introspective_calm`, `passionate`, `humorous`）、`promotion_status`（`active`, `paused`, `ended`）
   - **`accounts`**：列`promotion_ratio_percent`（smallint、NOT NULL、既定値20、`0 <= 値 <= 100`）を足す
   - **`strategy_designs`**：
@@ -87,13 +87,13 @@ description: "戦略プロファイル（課題・宣伝内容・リサーチ）
   - **`research_keywords`**：
     - `keyword`（NOT NULL、`1 <= char_length <= 100`）、`keyword_normalized`（NOT NULL）、`purpose`（NULL可、`char_length <= 100`）
     - `version`、`created_at`・`updated_at`、一意制約`(account_id, keyword_normalized)`
-- [ ] T009 `pnpm --filter api db:generate --name strategy_profile`でマイグレーション（`apps/api/drizzle/0001_strategy_profile.sql`）を作り、ローカルDBに当てて、既存のAccountに`promotion_ratio_percent = 20`が入ることを確かめる
+- [X] T009 `pnpm --filter api db:generate --name strategy_profile`でマイグレーション（`apps/api/drizzle/0001_strategy_profile.sql`）を作り、ローカルDBに当てて、既存のAccountに`promotion_ratio_percent = 20`が入ることを確かめる
 
 ### APIの共通部品
 
-- [ ] T010 `apps/api/src/lib/errors.ts`の`AppError`の`status`に`403`を足し、`409 STALE_UPDATE`のときにレスポンスへ`latest`を載せられるようにする（`AppError`に任意の`latest`を持たせ、`apps/api/src/app.ts`のエラー処理で`{ error, latest }`の形にする。contracts/api.md「共通事項」）
-- [ ] T011 [P] `apps/api/src/services/grower-access.ts`を作る：Accountの行とリクエストしたユーザー（`users.created_at`）から`hasGrowerAccess`（T006）を求める`canEditProfile`と、使えなければ`403 GROWER_FEATURE_REQUIRED`を投げる`requireGrowerAccess`（research.md R14）
-- [ ] T012 [P] `apps/api/src/services/item-service.ts`を作る（research.md R3・R4）。宣伝内容・参考投稿・キーワードで共通に使う。
+- [X] T010 `apps/api/src/lib/errors.ts`の`AppError`の`status`に`403`を足し、`409 STALE_UPDATE`のときにレスポンスへ`latest`を載せられるようにする（`AppError`に任意の`latest`を持たせ、`apps/api/src/app.ts`のエラー処理で`{ error, latest }`の形にする。contracts/api.md「共通事項」）
+- [X] T011 [P] `apps/api/src/services/grower-access.ts`を作る：Accountの行とリクエストしたユーザー（`users.created_at`）から`hasGrowerAccess`（T006）を求める`canEditProfile`と、使えなければ`403 GROWER_FEATURE_REQUIRED`を投げる`requireGrowerAccess`（research.md R14）
+- [X] T012 [P] `apps/api/src/services/item-service.ts`を作る（research.md R3・R4）。宣伝内容・参考投稿・キーワードで共通に使う。
   - `insertWithLimit(env, accountId, kind, limit, insertFn)`
     - `withTransaction`の中で、`pg_advisory_xact_lock(hashtextextended('account_items:<accountId>:<kind>', 0))` → 件数を数え、上限なら`409 ITEM_LIMIT_REACHED` → `insertFn`
     - 外部キー違反は`404 ACCOUNT_NOT_FOUND`にする
@@ -102,49 +102,49 @@ description: "戦略プロファイル（課題・宣伝内容・リサーチ）
     - 0行なら行の有無を確かめ、あれば`409 STALE_UPDATE`（`latest`付き）、なければ`404 ITEM_NOT_FOUND`
     - IDがUUIDの形でなければ`404 ITEM_NOT_FOUND`
   - `deleteItem(db, table, accountId, id)`：なくても成功（`204`）
-- [ ] T013 [P] `apps/api/test/helpers/app.ts`に、本featureのテスト用の部品を足す：ユーザーとAccountを直接作る`createUserWithAccount(user, { plan, userCreatedAt })`（`users.created_at`を指定して無料体験の内外を作れる）と、Accountの`plan`・`connection_status`を書き換える部品
+- [X] T013 [P] `apps/api/test/helpers/app.ts`に、本featureのテスト用の部品を足す：ユーザーとAccountを直接作る`createUserWithAccount(user, { plan, userCreatedAt })`（`users.created_at`を指定して無料体験の内外を作れる）と、Accountの`plan`・`connection_status`を書き換える部品
 
 ### Webの共通部品と001の画面の手直し（docs/ui-design.md）
 
-- [ ] T014 [P] `apps/web/src/index.css`の色の変数を、docs/ui-design.md「4. 見た目の約束」の表の値にする。
+- [X] T014 [P] `apps/web/src/index.css`の色の変数を、docs/ui-design.md「4. 見た目の約束」の表の値にする。
   - `--background`（ライト`#FFFFFF`／ダーク`#212121`）、`--sidebar`（`#F9F9F9`／`#181818`）、`--card`（`#FFFFFF`／`#2A2A2A`）、`--accent`（`#ECECEC`／`#303030`）、`--muted`（`#F0F0F0`／`#303030`）、`--border`（`#E3E3E3`／`#3A3A3A`）、`--foreground`（`#0D0D0D`／`#ECECEC`）、`--muted-foreground`（`#5D5D5D`／`#B4B4B4`）、`--ring`（`#0B66D0`／`#61A8FF`）
   - 足すもの：`--success`（文字`#17733A`・背景`#E6F4EA`／`#6FD79A`・`#173A25`）と、注意の背景（`#FFF0DC`／`#3B2A12`。`--warning`の文字は`#8F4700`／`#FFB866`）
   - 書体：`font-family: 'Hiragino Sans', 'Noto Sans JP', system-ui, sans-serif`（Webフォントは読み込まない）
-- [ ] T015 [P] `apps/web/test/layout-responsive.test.tsx`を書く（失敗を確認する）：
+- [X] T015 [P] `apps/web/test/layout-responsive.test.tsx`を書く（失敗を確認する）：
   - サイドバーのAccountの切り替えがドロップダウンで、一覧と「＋ アカウントを追加」が出る。「要再接続」のAccountには「要再接続」と出る
   - サイドバーを畳んだ状態が`localStorage`に保存される
   - 767px以下では、設定画面が「一覧 → 中身」の2段になり、中身の画面に「← 設定」がある
-- [ ] T016 `apps/web/src/components/layout/AccountSwitcher.tsx`を、表示中のAccount（アイコン・表示名・@ユーザー名）のボタンからドロップダウンを開く形に変える（`@radix-ui/react-dropdown-menu`）。中身は全Accountの一覧（表示中にチェック、`needs_reconnect`には`TriangleAlert`と「要再接続」）と「＋ アカウントを追加」とする（docs/ui-design.md「2. 画面の骨格」）
-- [ ] T017 `apps/web/src/components/layout/Sidebar.tsx`を、docs/ui-design.md「2. 画面の骨格」の並びにする。
+- [X] T016 `apps/web/src/components/layout/AccountSwitcher.tsx`を、表示中のAccount（アイコン・表示名・@ユーザー名）のボタンからドロップダウンを開く形に変える（`@radix-ui/react-dropdown-menu`）。中身は全Accountの一覧（表示中にチェック、`needs_reconnect`には`TriangleAlert`と「要再接続」）と「＋ アカウントを追加」とする（docs/ui-design.md「2. 画面の骨格」）
+- [X] T017 `apps/web/src/components/layout/Sidebar.tsx`を、docs/ui-design.md「2. 画面の骨格」の並びにする。
   - 上から順に、Accountの切り替え（T016）と畳むボタン（`PanelLeft`）、「ホーム」（`House`）、機能の移動の欄、区切り線の下に「このアカウントの設定」（`SlidersHorizontal`、`/accounts/:id/settings`）とユーザーメニュー
   - 表示中の画面は背景を`--accent`にする
   - 見出し「戦略」の項目は、各ストーリーのフェーズで足す
-- [ ] T018 `apps/web/src/components/layout/AppShell.tsx`を変える（research.md R9、docs/ui-design.md「5. 画面幅ごとの振る舞い」）：
+- [X] T018 `apps/web/src/components/layout/AppShell.tsx`を変える（research.md R9、docs/ui-design.md「5. 画面幅ごとの振る舞い」）：
   - `lg`（1024px）以上：サイドバーを常に表示し、畳めるようにする。畳んだ状態は`localStorage`に保存する（読み書きは`try/catch`で包む）
   - `md`〜`lg`未満：サイドバーを`Sheet`で画面の上に重ねて開く
   - `md`未満：左から出るドロワーにする
   - メインパネルの中身は、各画面の`PageHeader`（T019）とスクロール領域にする
-- [ ] T019 [P] `apps/web/src/components/layout/PageHeader.tsx`を作る：
+- [X] T019 [P] `apps/web/src/components/layout/PageHeader.tsx`を作る：
   - 左に画面名、右に主な操作を置き、スクロール領域の上端に固定する（高さ56px、`md`未満は52px）
   - `md`未満では`[≡] 画面名 [主な操作]`の3列にし、画面名を中央に置く
   - サイドバーを畳んでいるときは、画面名の左に「サイドバーを開く」ボタンを出す
   - `needs_reconnect`のバナー（001）は、この下に出す
-- [ ] T020 `apps/web/src/pages/settings/settings-layout.tsx`を、`md`未満では「項目の一覧の画面 → 項目の中身の画面（左上に「← 設定」）」の2段にする。`md`以上は001の2列のまま（docs/ui-design.md 型D）
-- [ ] T021 [P] `apps/web/src/components/ui/dialog.tsx`に、`md`未満で全画面のシート（左上に✕、右上に主な操作）として出す表示を足す（docs/ui-design.md 型B、research.md R9）
-- [ ] T022 [P] `apps/web/src/lib/use-unsaved-changes.ts`を作る（research.md R10）：
+- [X] T020 `apps/web/src/pages/settings/settings-layout.tsx`を、`md`未満では「項目の一覧の画面 → 項目の中身の画面（左上に「← 設定」）」の2段にする。`md`以上は001の2列のまま（docs/ui-design.md 型D）
+- [X] T021 [P] `apps/web/src/components/ui/dialog.tsx`に、`md`未満で全画面のシート（左上に✕、右上に主な操作）として出す表示を足す（docs/ui-design.md 型B、research.md R9）
+- [X] T022 [P] `apps/web/src/lib/use-unsaved-changes.ts`を作る（research.md R10）：
   - `useUnsavedChanges(isDirty)`：React Routerの`useBlocker`でアプリ内の移動を止め、`beforeunload`でブラウザ標準の確認を出す
   - 止めた移動を「続ける」「やめる」ための値を返す
   - 「変更がある」は、入力値と最後に保存した値の比較で決める（元に戻したら変更なし）
-- [ ] T023 [P] `apps/web/src/components/UnsavedChangesDialog.tsx`（見出し「保存していない変更があります」、説明「このまま移動すると、変更は失われます。」、「編集に戻る」（既定）／「変更を破棄して移動」）と、`apps/web/src/components/ConflictDialog.tsx`（見出し「他の場所で更新されています」、説明「この内容は、別のタブや端末で先に保存されています（{最新の更新日時}）。」、「最新の内容を読み込み直す」（既定）／「自分の内容で上書きする」）を作る（contracts/ui-routes.md 規則3・5）
-- [ ] T024 [P] `apps/web/src/components/FieldWithCounter.tsx`を作る（contracts/ui-routes.md 規則9、docs/ui-design.md 型A）：
+- [X] T023 [P] `apps/web/src/components/UnsavedChangesDialog.tsx`（見出し「保存していない変更があります」、説明「このまま移動すると、変更は失われます。」、「編集に戻る」（既定）／「変更を破棄して移動」）と、`apps/web/src/components/ConflictDialog.tsx`（見出し「他の場所で更新されています」、説明「この内容は、別のタブや端末で先に保存されています（{最新の更新日時}）。」、「最新の内容を読み込み直す」（既定）／「自分の内容で上書きする」）を作る（contracts/ui-routes.md 規則3・5）
+- [X] T024 [P] `apps/web/src/components/FieldWithCounter.tsx`を作る（contracts/ui-routes.md 規則9、docs/ui-design.md 型A）：
   - 表示：ラベル、未入力のときの「未入力」の小さなラベル、1行の説明、`Textarea`（または`Input`）、右下の「{いまの文字数}/{上限}」
   - 記入例は`placeholder`に出す
   - 上限を超えたら、注意の色にして「{上限}文字以内で入力してください」を出す
   - 文字数は`countChars`（T005）で数える。`md`未満の入力の文字は16px以上にする
-- [ ] T025 [P] `apps/web/src/components/GrowerRequiredNotice.tsx`を作る（contracts/ui-routes.md 規則10）：
+- [X] T025 [P] `apps/web/src/components/GrowerRequiredNotice.tsx`を作る（contracts/ui-routes.md 規則10）：
   - 文言：「課題・宣伝内容・リサーチの編集は、プラン2以上で使えます。保存済みの内容はそのまま残っています。」と「プランの変更は運営者にお問い合わせください。」
   - 画面の上部の案内と、保存で`403`を受けたときのダイアログの両方の形で使える
-- [ ] T026 `apps/web/src/lib/api-client.ts`の`ApiError`に、`409`のレスポンスの`latest`を持たせる。`apps/web/src/lib/query.ts`の再試行しないステータスに`403`と`409`を足し、`queryKeys`に`profileStatus(id)`・`strategy(id)`・`promotions(id)`・`promotionSettings(id)`・`referencePosts(id)`・`researchKeywords(id)`を足す
+- [X] T026 `apps/web/src/lib/api-client.ts`の`ApiError`に、`409`のレスポンスの`latest`を持たせる。`apps/web/src/lib/query.ts`の再試行しないステータスに`403`と`409`を足し、`queryKeys`に`profileStatus(id)`・`strategy(id)`・`promotions(id)`・`promotionSettings(id)`・`referencePosts(id)`・`researchKeywords(id)`を足す
 
 **完了条件**：`pnpm --filter @threads-grower/shared test`とT015が通る。001の既存のテスト（API・Web・E2E）が引き続き通る。サイドバー・設定画面が4つの画面幅（375・768・1024・1440px）で崩れない
 

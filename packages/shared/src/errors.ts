@@ -17,6 +17,11 @@ export const ERROR_CODES = [
   "OAUTH_STATE_INVALID",
   "CONFIRMATION_MISMATCH",
   "VALIDATION_FAILED",
+  "STALE_UPDATE",
+  "ITEM_NOT_FOUND",
+  "ITEM_LIMIT_REACHED",
+  "KEYWORD_DUPLICATE",
+  "GROWER_FEATURE_REQUIRED",
   "CONFIG_ERROR",
   "API_UNREACHABLE",
   "INTERNAL_ERROR",
@@ -128,6 +133,19 @@ export function errorMessage(code: ErrorCode, ctx: ErrorMessageContext = {}): Er
       return { message: "入力したユーザー名が一致しません。", action: "retype" };
     case "VALIDATION_FAILED":
       return { message: "入力内容を確認してください。", action: "none" };
+    case "STALE_UPDATE":
+      return { message: "別のタブや端末で先に保存されています。", action: "none" };
+    case "ITEM_NOT_FOUND":
+      return { message: "この項目は、別のタブや端末で削除されています。", action: "reload" };
+    case "ITEM_LIMIT_REACHED":
+      return { message: "登録できる上限に達しています。不要なものを削除してから追加してください。", action: "none" };
+    case "KEYWORD_DUPLICATE":
+      return { message: "同じキーワードがすでに登録されています。", action: "retype" };
+    case "GROWER_FEATURE_REQUIRED":
+      return {
+        message: "この機能はプラン2以上で使えます。保存済みの内容はそのまま残っています。",
+        action: "plan-guidance",
+      };
     case "CONFIG_ERROR":
       return {
         message: `サーバーの設定に誤りがあります${ctx.details?.length ? `（${ctx.details.join("、")}）` : ""}。開発環境では apps/api/.dev.vars を確認し、APIを起動し直してください。`,

@@ -67,7 +67,7 @@ export function AppearanceSettings() {
   const { theme, setTheme } = useTheme();
   return (
     <div className="space-y-8">
-      <h1 className="text-2xl font-semibold">外観</h1>
+      <h1 className="text-2xl font-semibold max-md:hidden">外観</h1>
       <section className="space-y-3">
         <h2 className="text-base font-medium">表示スタイル</h2>
         <SettingCard>
