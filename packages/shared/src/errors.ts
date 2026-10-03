@@ -22,6 +22,7 @@ export const ERROR_CODES = [
   "ITEM_LIMIT_REACHED",
   "KEYWORD_DUPLICATE",
   "GROWER_FEATURE_REQUIRED",
+  "PASTE_TOO_LARGE",
   "CONFIG_ERROR",
   "API_UNREACHABLE",
   "INTERNAL_ERROR",
@@ -141,6 +142,11 @@ export function errorMessage(code: ErrorCode, ctx: ErrorMessageContext = {}): Er
       return { message: "登録できる上限に達しています。不要なものを削除してから追加してください。", action: "none" };
     case "KEYWORD_DUPLICATE":
       return { message: "同じキーワードがすでに登録されています。", action: "retype" };
+    case "PASTE_TOO_LARGE":
+      return {
+        message: "一度に登録できるのは50件・50,000文字まで、1件は2,000文字までです。分けて貼り付けてください。",
+        action: "none",
+      };
     case "GROWER_FEATURE_REQUIRED":
       return {
         message: "この機能はプラン2以上で使えます。保存済みの内容はそのまま残っています。",

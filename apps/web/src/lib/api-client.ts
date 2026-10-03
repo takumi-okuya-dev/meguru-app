@@ -3,6 +3,12 @@
 import {
   accountSummarySchema,
   connectResponseSchema,
+  deleteCountSchema,
+  draftBatchResultSchema,
+  postDraftListSchema,
+  postDraftSchema,
+  promptResponseSchema,
+  promptSettingsSchema,
   dataDeletionStatusSchema,
   errorMessage,
   errorResponseSchema,
@@ -150,6 +156,35 @@ export const api = {
     }),
   deleteResearchKeyword: (accountId: string, id: string) =>
     request(`/api/accounts/${accountId}/research-keywords/${id}`, null, { method: "DELETE" }),
+  // ---- 投稿ストック（specs/003-prompt-bulk-register contracts/api.md）----
+  getPrompt: (accountId: string, count?: number) =>
+    request(
+      `/api/accounts/${accountId}/prompt${count === undefined ? "" : `?count=${count}`}`,
+      promptResponseSchema,
+    ),
+  putPromptSettings: (accountId: string, postCount: number) =>
+    request(`/api/accounts/${accountId}/prompt-settings`, promptSettingsSchema, {
+      method: "PUT",
+      body: JSON.stringify({ postCount }),
+    }),
+  listPostDrafts: (accountId: string) => request(`/api/accounts/${accountId}/post-drafts`, postDraftListSchema),
+  createDraftBatch: (accountId: string, body: { clientRequestId: string; text: string }) =>
+    request(`/api/accounts/${accountId}/draft-batches`, draftBatchResultSchema, {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+  deleteDraftBatch: (accountId: string, batchId: string) =>
+    request(`/api/accounts/${accountId}/draft-batches/${batchId}`, deleteCountSchema, { method: "DELETE" }),
+  updatePostDraft: (accountId: string, id: string, body: { body: string; expectedVersion: number }) =>
+    request(`/api/accounts/${accountId}/post-drafts/${id}`, postDraftSchema, {
+      method: "PUT",
+      body: JSON.stringify(body),
+    }),
+  deletePostDrafts: (accountId: string, ids: string[]) =>
+    request(`/api/accounts/${accountId}/post-drafts/delete`, deleteCountSchema, {
+      method: "POST",
+      body: JSON.stringify({ ids }),
+    }),
   dataDeletionStatus: (code: string) =>
     request(`/api/data-deletion/${encodeURIComponent(code)}`, dataDeletionStatusSchema, { auth: false }),
 };

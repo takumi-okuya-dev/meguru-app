@@ -1,16 +1,18 @@
 // サイドバーの中身（docs/ui-design.md「2. 画面の骨格」）。
-// 上から：Accountの切り替えと畳むボタン → 機能の移動 → 区切り線 → このアカウントの設定・ユーザーメニュー。
+// 上から：Accountの切り替えと畳むボタン → 「投稿をつくる」 → 機能の移動 → 区切り線 → このアカウントの設定・ユーザーメニュー。
 // まだ作っていない機能は出さない（各featureで画面を作ったときに NAV_GROUPS に足す）。
 import {
   HouseIcon,
+  InboxIcon,
   MegaphoneIcon,
   PanelLeftIcon,
   SearchIcon,
   SlidersHorizontalIcon,
+  SquarePenIcon,
   TargetIcon,
   type LucideIcon,
 } from "lucide-react";
-import { NavLink, useParams } from "react-router";
+import { Link, NavLink, useParams } from "react-router";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { AccountSwitcher } from "./AccountSwitcher";
@@ -21,7 +23,12 @@ type NavGroup = { label?: string; items: NavItem[] };
 
 /** 機能の移動。path は /accounts/:id からの相対パス。 */
 const NAV_GROUPS: NavGroup[] = [
-  { items: [{ path: "", label: "ホーム", Icon: HouseIcon, end: true }] },
+  {
+    items: [
+      { path: "", label: "ホーム", Icon: HouseIcon, end: true },
+      { path: "stock", label: "投稿ストック", Icon: InboxIcon },
+    ],
+  },
   {
     label: "戦略",
     items: [
@@ -63,6 +70,17 @@ export function Sidebar({ onCollapse, onNavigate }: { onCollapse?: () => void; o
         )}
       </div>
       <nav aria-label="このアカウント" className="flex-1 space-y-0.5 overflow-y-auto px-2 py-1">
+        {accountId && (
+          // 投稿ストックの画面へ移動し、貼り付け欄にフォーカスを当てる（specs/003 FR-021）
+          <Link
+            to={`${base}/stock`}
+            state={{ focusComposer: true }}
+            className={itemClass({ isActive: false })}
+            onClick={onNavigate}
+          >
+            <SquarePenIcon className="size-5 lg:size-[18px]" /> 投稿をつくる
+          </Link>
+        )}
         {NAV_GROUPS.map((group, i) => (
           <div key={group.label ?? i} className="space-y-0.5">
             {group.label && <div className="px-3 pt-4 pb-1 text-xs text-muted-foreground lg:px-2.5">{group.label}</div>}

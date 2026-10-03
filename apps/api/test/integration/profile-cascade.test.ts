@@ -1,7 +1,15 @@
-// Accountの削除で戦略プロファイルも消える（specs/002-strategy-profile FR-026、data-model.md「共通の規則」）
+// Accountの削除で戦略プロファイルと投稿ストックも消える（specs/002-strategy-profile FR-026、specs/003-prompt-bulk-register FR-026）
 import { emptyStrategyValues } from "@threads-grower/shared";
 import { beforeEach, describe, expect, it } from "vitest";
-import { accounts, promotions, referencePosts, researchKeywords, strategyDesigns } from "../../src/db/schema";
+import {
+  accounts,
+  draftBatches,
+  postDrafts,
+  promotions,
+  referencePosts,
+  researchKeywords,
+  strategyDesigns,
+} from "../../src/db/schema";
 import { TEST_APP_SECRET } from "../env";
 import { call, connectNew, db, fake, makeApp, resetDb } from "../helpers/app";
 import { makeSignedRequest } from "../helpers/signed-request";
@@ -14,7 +22,7 @@ beforeEach(async () => {
   await fake.addUser("1001", "takumi");
 });
 
-/** 課題・宣伝内容・参考投稿・キーワードを1件ずつ持つ Account を作る */
+/** 課題・宣伝内容・参考投稿・キーワード・登録のまとまり・下書きを1件ずつ持つ Account を作る */
 async function accountWithProfile() {
   await connectNew(app, "u1", "1001");
   const [a] = await db().select().from(accounts);
@@ -26,20 +34,21 @@ async function accountWithProfile() {
   await call(app, "POST", `${base}/promotions`, { user: "u1", body: { title: "t", content: "c" } });
   await call(app, "POST", `${base}/reference-posts`, { user: "u1", body: { body: "本文" } });
   await call(app, "POST", `${base}/research-keywords`, { user: "u1", body: { keyword: "AI" } });
-  for (const t of [strategyDesigns, promotions, referencePosts, researchKeywords]) {
+  await call(app, "POST", `${base}/draft-batches`, { user: "u1", body: { clientRequestId: crypto.randomUUID(), text: "下書き" } });
+  for (const t of [strategyDesigns, promotions, referencePosts, researchKeywords, draftBatches, postDrafts]) {
     expect(await db().select().from(t)).toHaveLength(1);
   }
   return a!;
 }
 
 async function expectProfileGone() {
-  for (const t of [strategyDesigns, promotions, referencePosts, researchKeywords]) {
+  for (const t of [strategyDesigns, promotions, referencePosts, researchKeywords, draftBatches, postDrafts]) {
     expect(await db().select().from(t)).toHaveLength(0);
   }
 }
 
 describe("Accountの削除と戦略プロファイル", () => {
-  it("DELETE /api/accounts/:id で、課題・宣伝内容・参考投稿・キーワードの行がすべて消える", async () => {
+  it("DELETE /api/accounts/:id で、課題・宣伝内容・参考投稿・キーワード・登録のまとまり・下書きの行がすべて消える", async () => {
     const a = await accountWithProfile();
     const res = await call(app, "DELETE", `/api/accounts/${a.id}`, { user: "u1", body: { confirmUsername: "takumi" } });
     expect(res.status).toBe(204);

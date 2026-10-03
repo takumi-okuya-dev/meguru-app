@@ -3,6 +3,7 @@
 import { sql } from "drizzle-orm";
 import {
   bigint,
+  boolean,
   check,
   customType,
   date,
@@ -17,7 +18,7 @@ import {
   uuid,
   type AnyPgColumn,
 } from "drizzle-orm/pg-core";
-import { PLANS, PROMOTION_RATIO_DEFAULT } from "@threads-grower/shared";
+import { PLANS, PROMOTION_RATIO_DEFAULT, PROMPT_COUNT_DEFAULT } from "@threads-grower/shared";
 
 const bytea = customType<{ data: Uint8Array; driverData: Uint8Array | string }>({
   dataType() {
@@ -79,9 +80,12 @@ export const accounts = pgTable("accounts", {
   connectionGeneration: bigint("connection_generation", { mode: "number" }).notNull().default(0),
   // 宣伝投稿の割合（specs/002-strategy-profile data-model.md、research.md R7）
   promotionRatioPercent: smallint("promotion_ratio_percent").notNull().default(PROMOTION_RATIO_DEFAULT),
+  // プロンプトで作る件数（specs/003-prompt-bulk-register data-model.md、research.md R11）
+  promptPostCount: smallint("prompt_post_count").notNull().default(PROMPT_COUNT_DEFAULT),
   ...timestamps,
 }, (t) => [
   check("accounts_promotion_ratio_range", sql`${t.promotionRatioPercent} BETWEEN 0 AND 100`),
+  check("accounts_prompt_post_count_range", sql`${t.promptPostCount} BETWEEN 1 AND 50`),
 ]);
 
 /** User と Account の関係（data-model.md の memberships）。1つのAccountに owner は1人だけ。 */
@@ -333,5 +337,56 @@ export const researchKeywords = pgTable(
     uniqueIndex("research_keywords_account_keyword_unique").on(t.accountId, t.keywordNormalized),
     check("research_keywords_keyword_length", sql`char_length(${t.keyword}) BETWEEN 1 AND 100`),
     check("research_keywords_purpose_length", sql`char_length(${t.purpose}) <= 100`),
+  ],
+);
+
+// ---- 投稿ストック（specs/003-prompt-bulk-register/data-model.md）----
+
+/** 下書きの状態の列挙型（post_draft_status）。003では要確認だけ。004で approved・rejected を足す。 */
+export const postDraftStatus = pgEnum("post_draft_status", ["needs_review"]);
+
+/** 登録のまとまり（data-model.md の draft_batches）。貼り付けの1回の送信。 */
+export const draftBatches = pgTable(
+  "draft_batches",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    accountId: uuid("account_id")
+      .notNull()
+      .references(() => accounts.id, { onDelete: "cascade" }),
+    // Webが送信ごとに作るID。再試行では同じ値（research.md R5）
+    clientRequestId: uuid("client_request_id").notNull(),
+    draftCount: smallint("draft_count").notNull(),
+    delimiterFound: boolean("delimiter_found").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true, precision: 6 }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("draft_batches_account_request_unique").on(t.accountId, t.clientRequestId),
+    check("draft_batches_draft_count_range", sql`${t.draftCount} BETWEEN 1 AND 50`),
+  ],
+);
+
+/** 下書き（data-model.md の post_drafts）。 */
+export const postDrafts = pgTable(
+  "post_drafts",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    accountId: uuid("account_id")
+      .notNull()
+      .references(() => accounts.id, { onDelete: "cascade" }),
+    batchId: uuid("batch_id")
+      .notNull()
+      .references(() => draftBatches.id, { onDelete: "cascade" }),
+    // 登録のまとまりの中での順番（貼り付けたテキストの順。0始まり）
+    position: smallint("position").notNull(),
+    body: text("body").notNull(),
+    status: postDraftStatus("status").notNull().default("needs_review"),
+    version: versionColumn(),
+    ...timestamps,
+  },
+  (t) => [
+    uniqueIndex("post_drafts_batch_position_unique").on(t.batchId, t.position),
+    index("post_drafts_account_status_idx").on(t.accountId, t.status),
+    check("post_drafts_position_range", sql`${t.position} >= 0 AND ${t.position} < 50`),
+    check("post_drafts_body_length", sql`char_length(${t.body}) BETWEEN 1 AND 2000`),
   ],
 );
