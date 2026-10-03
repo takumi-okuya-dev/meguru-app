@@ -213,9 +213,9 @@ description: "AIプロンプトの生成と投稿案の一括登録の実装タ�
 
 **目的**：ホームの案内、Account削除との関係、全体の確認
 
-- [ ] T036 [P] `apps/web/src/pages/account-home.tsx`の「次にやること」の4つ目（すべての材料がそろったとき）を、大見出し「投稿をつくりましょう」・説明「プロンプトをChatGPTやClaudeに送り、返ってきた投稿案を投稿ストックに登録します。」・「投稿ストックへ」のボタン（`/accounts/:id/stock`）に変える（contracts/ui-routes.md「ホーム」）。`apps/web/test/account-home.test.tsx`の該当するテストを直す
-- [ ] T037 [P] `apps/api/test/integration/profile-cascade.test.ts`に、登録のまとまりと下書きを持つAccountを削除すると、`draft_batches`・`post_drafts`の行がすべて消えることを足す（FR-026。Account削除とMetaのデータ削除要求の両方）
-- [ ] T038 `pnpm lint`・`pnpm typecheck`・`pnpm test`を通す。新しくexportした関数・コンポーネントすべてにJSDocを付ける
+- [X] T036 [P] `apps/web/src/pages/account-home.tsx`の「次にやること」の4つ目（すべての材料がそろったとき）を、大見出し「投稿をつくりましょう」・説明「プロンプトをChatGPTやClaudeに送り、返ってきた投稿案を投稿ストックに登録します。」・「投稿ストックへ」のボタン（`/accounts/:id/stock`）に変える（contracts/ui-routes.md「ホーム」）。`apps/web/test/account-home.test.tsx`の該当するテストを直す
+- [X] T037 [P] `apps/api/test/integration/profile-cascade.test.ts`に、登録のまとまりと下書きを持つAccountを削除すると、`draft_batches`・`post_drafts`の行がすべて消えることを足す（FR-026。Account削除とMetaのデータ削除要求の両方）
+- [X] T038 `pnpm lint`・`pnpm typecheck`・`pnpm test`を通す。新しくexportした関数・コンポーネントすべてにJSDocを付ける
 - [ ] T039 quickstart.mdの「手動の確認」1〜4を、`pnpm dev:fake`で375・768・1024・1440pxの4つの幅で行う。実際にChatGPTかClaudeにプロンプトを送り、30件の回答を貼り付けて登録できることを確かめる（SC-007）。50件・合計約30,000文字の回答を貼り付けて送り、登録の案内が出るまで待たされないこと（plan.md 性能目標の目安：500ms以内）を確かめる
 
 ---

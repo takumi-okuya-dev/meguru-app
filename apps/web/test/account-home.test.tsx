@@ -66,12 +66,12 @@ describe("Accountのホーム", () => {
     expect(await screen.findByRole("heading", { name: "次は「宣伝内容」を登録しましょう" })).toBeInTheDocument();
   });
 
-  it("宣伝内容もあれば「次は「リサーチ」がおすすめです」、全部あれば「投稿の材料がそろっています」", async () => {
+  it("宣伝内容もあれば「次は「リサーチ」がおすすめです」", async () => {
     renderHome(status({ strategy: { filledCount: 8, totalCount: 16 }, promotions: { targetableCount: 0, totalCount: 1 } }));
     expect(await screen.findByRole("heading", { name: "次は「リサーチ」がおすすめです" })).toBeInTheDocument();
   });
 
-  it("全部あれば「投稿の材料がそろっています」", async () => {
+  it("全部あれば「投稿をつくりましょう」と、投稿ストックへのボタン（specs/003）", async () => {
     renderHome(
       status({
         strategy: { filledCount: 16, totalCount: 16 },
@@ -79,7 +79,11 @@ describe("Accountのホーム", () => {
         research: { referencePostCount: 3, keywordCount: 0 },
       }),
     );
-    expect(await screen.findByRole("heading", { name: "投稿の材料がそろっています" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "投稿をつくりましょう" })).toBeInTheDocument();
+    expect(
+      screen.getByText("プロンプトをChatGPTやClaudeに送り、返ってきた投稿案を投稿ストックに登録します。"),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "投稿ストックへ" })).toHaveAttribute("href", "/accounts/a1/stock");
   });
 
   it("無料体験中は「無料体験中：{YYYY年M月D日}まで、すべての機能を使えます」が出る（FR-024b）", async () => {

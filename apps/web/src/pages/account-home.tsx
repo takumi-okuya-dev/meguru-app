@@ -9,6 +9,7 @@ import { ApiErrorScreen } from "@/components/ApiErrorScreen";
 import { ConnectionBadge } from "@/components/ConnectionBadge";
 import { PLAN_CHANGE_CONTACT } from "@/components/GrowerRequiredNotice";
 import { PageBody, PageHeader } from "@/components/layout/PageHeader";
+import { Button } from "@/components/ui/button";
 import { api } from "@/lib/api-client";
 import { useCallbackResult } from "@/lib/callback-result";
 import { formatDate } from "@/lib/format";
@@ -21,7 +22,7 @@ type Area = "strategy" | "promotions" | "research";
 /**
  * 「次にやること」を決める（research.md R11）。上から順に、最初に当てはまるもの。
  * @param s - 入力状況
- * @returns 案内する画面と文言（すべて入力済みなら area は null）
+ * @returns 案内する画面と文言（すべて入力済みなら area は null で、投稿ストックへ案内する）
  */
 function nextStep(s: ProfileStatus): { area: Area | null; title: string; body: string } {
   if (s.strategy.filledCount === 0) {
@@ -45,7 +46,12 @@ function nextStep(s: ProfileStatus): { area: Area | null; title: string; body: s
       body: "Threadsで伸びている投稿を保存しておくと、投稿の精度が上がります。",
     };
   }
-  return { area: null, title: "投稿の材料がそろっています", body: "課題・宣伝内容・リサーチは、いつでも見直せます。" };
+  // 材料がそろったら、投稿ストックへ案内する（specs/003 contracts/ui-routes.md「ホーム」）
+  return {
+    area: null,
+    title: "投稿をつくりましょう",
+    body: "プロンプトをChatGPTやClaudeに送り、返ってきた投稿案を投稿ストックに登録します。",
+  };
 }
 
 /**
@@ -105,6 +111,11 @@ export function AccountHome() {
                 <>
                   <h2 className="text-[22px] leading-snug font-semibold md:text-[26px]">{step!.title}</h2>
                   <p className="text-[15px] text-muted-foreground">{step!.body}</p>
+                  {step!.area === null && (
+                    <Button asChild className="mt-3 h-11 rounded-full px-5 md:h-9">
+                      <Link to={`/accounts/${account.id}/stock`}>投稿ストックへ</Link>
+                    </Button>
+                  )}
                 </>
               ) : (
                 <>
