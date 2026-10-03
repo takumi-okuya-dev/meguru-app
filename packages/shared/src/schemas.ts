@@ -1,10 +1,18 @@
 // APIの入出力スキーマ（contracts/api.md「型」）。WebとAPIで共有する。
 import { z } from "zod";
 import { ERROR_CODES } from "./errors";
-import { STRATEGY_TEXT_MAX } from "./limits";
+import {
+  PRIORITY_MAX,
+  PRIORITY_MIN,
+  PROMOTION_CONTENT_MAX,
+  SHORT_TEXT_MAX,
+  STRATEGY_TEXT_MAX,
+  URL_MAX,
+} from "./limits";
+import { isValidYmd } from "./promotions";
 import { PLANS } from "./plans";
 import { STRATEGY_TEXT_KEYS, TONE_PRESET_VALUES, type StrategyTextKey } from "./strategy";
-import { countChars } from "./text";
+import { countChars, isBlank, isHttpUrl } from "./text";
 
 /** 契約プランのスキーマ。 */
 export const planSchema = z.enum(PLANS);
@@ -144,3 +152,78 @@ export type Strategy = z.infer<typeof strategySchema>;
 export function invalidFields(error: z.ZodError): string[] {
   return [...new Set(error.issues.map((i) => String(i.path[0] ?? "")).filter(Boolean))];
 }
+
+/**
+ * 空白だけでない、文字数の上限つきの文字列（必須の項目）。
+ * @param max - 上限
+ * @returns zod のスキーマ
+ */
+export const requiredText = (max: number) =>
+  textMax(max).refine((s) => !isBlank(s), { message: "required" });
+
+/**
+ * 任意の URL（"" は未入力）。http・https のみで、文字数の上限つき（research.md R8）。
+ * @param max - 上限
+ * @returns zod のスキーマ
+ */
+export const optionalUrl = (max: number) =>
+  textMax(max)
+    .default("")
+    .refine((s) => s === "" || isHttpUrl(s), { message: "http(s) url" });
+
+/** 一覧のレスポンスに共通の項目。 */
+const listMeta = { limit: z.number().int(), canEdit: z.boolean() };
+
+/** 子の行（宣伝内容・参考投稿・キーワード）に共通の項目。 */
+const itemMeta = { id: z.string(), version: z.number().int(), createdAt: z.string(), updatedAt: z.string() };
+
+/** 宣伝内容の状態のスキーマ。 */
+export const promotionStatusSchema = z.enum(["active", "paused", "ended"]);
+
+/** 宣伝内容の入力のスキーマ（contracts/api.md の PromotionInput）。 */
+export const promotionInputSchema = z.object({
+  title: requiredText(SHORT_TEXT_MAX),
+  content: requiredText(PROMOTION_CONTENT_MAX),
+  targetLocation: textMax(SHORT_TEXT_MAX).default(""),
+  targetPersona: textMax(SHORT_TEXT_MAX).default(""),
+  targetAgeRange: textMax(SHORT_TEXT_MAX).default(""),
+  cta: textMax(SHORT_TEXT_MAX).default(""),
+  linkedUrl: optionalUrl(URL_MAX),
+  priority: z.number().int().min(PRIORITY_MIN).max(PRIORITY_MAX).default(0),
+  status: promotionStatusSchema.default("active"),
+  /** YYYY-MM-DD。過去の日付も受け付ける（期限切れとして扱う） */
+  validUntil: z
+    .string()
+    .refine(isValidYmd, { message: "YYYY-MM-DD" })
+    .nullable()
+    .default(null),
+});
+/** 宣伝内容の入力。 */
+export type PromotionInput = z.infer<typeof promotionInputSchema>;
+
+/** PUT /promotions/:id のリクエストのスキーマ。 */
+export const updatePromotionRequestSchema = promotionInputSchema.extend({
+  expectedVersion: z.number().int().positive(),
+});
+
+/** 宣伝内容（レスポンス）のスキーマ。 */
+export const promotionSchema = promotionInputSchema.extend({
+  ...itemMeta,
+  isExpired: z.boolean(),
+  isTargetable: z.boolean(),
+});
+/** 宣伝内容（レスポンス）。 */
+export type Promotion = z.infer<typeof promotionSchema>;
+
+/** GET /promotions のレスポンスのスキーマ。 */
+export const promotionListSchema = z.object({ items: z.array(promotionSchema), ...listMeta });
+
+/** 宣伝投稿の割合の入力のスキーマ（FR-010）。 */
+export const promotionSettingsInputSchema = z.object({
+  ratioPercent: z.number().int().min(0).max(100),
+});
+
+/** 宣伝投稿の割合（レスポンス）のスキーマ。 */
+export const promotionSettingsSchema = promotionSettingsInputSchema.extend({ canEdit: z.boolean() });
+/** 宣伝投稿の割合（レスポンス）。 */
+export type PromotionSettings = z.infer<typeof promotionSettingsSchema>;

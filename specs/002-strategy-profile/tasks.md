@@ -208,23 +208,23 @@ description: "戦略プロファイル（課題・宣伝内容・リサーチ）
 
 ### テスト（先に書いて失敗を確認する）
 
-- [ ] T037 [P] [US2] `packages/shared/test/promotions.test.ts`を書く：
+- [X] T037 [P] [US2] `packages/shared/test/promotions.test.ts`を書く：
   - 日本時間の今日：UTCの15:00の前後で日付が変わる
   - 宣伝の対象・期限切れ：掲載期限の当日は対象、翌日の0時（日本時間）から期限切れ
   - 並び順（FR-009）
-- [ ] T038 [P] [US2] `apps/api/test/integration/promotions.test.ts`を書く（quickstart.mdの表の次の行）：
+- [X] T038 [P] [US2] `apps/api/test/integration/promotions.test.ts`を書く（quickstart.mdの表の次の行）：
   - 「宣伝内容の並び順」「掲載期限の境目」「件数の上限の同時実行」「削除済みの行の更新」「URLの検証」（専用URL）
   - 「別のAccountの行」「他人のAccount」「要再接続のAccount」（promotions・promotion-settings）、「grower機能の判定」（promotions・promotion-settings）
   - 宣伝投稿の割合の`GET`・`PUT`（`101`と`1.5`は`400`）
 
 ### 実装
 
-- [ ] T039 [P] [US2] `packages/shared/src/promotions.ts`を作る（research.md R6）：
+- [X] T039 [P] [US2] `packages/shared/src/promotions.ts`を作る（research.md R6）：
   - `jstToday(now)`：`YYYY-MM-DD`
   - `isExpired(validUntil, now)`：`validUntil < jstToday`
   - `isTargetable(status, validUntil, now)`：`status === "active"`かつ期限切れでない
   - `sortPromotions(items, now)`：宣伝の対象を先に。それぞれの中は`priority`の降順、同じなら`createdAt`の降順
-- [ ] T040 [US2] `packages/shared/src/schemas.ts`に、宣伝内容のスキーマを足す（contracts/api.mdの`PromotionInput`・`Promotion`）。
+- [X] T040 [US2] `packages/shared/src/schemas.ts`に、宣伝内容のスキーマを足す（contracts/api.mdの`PromotionInput`・`Promotion`）。
   - `promotionInputSchema`
     - `title`・`content`は空でない（`isBlank`でない）。`title`は100文字まで、`content`は2,000文字まで
     - `targetLocation`・`targetPersona`・`targetAgeRange`・`cta`は100文字まで
@@ -233,26 +233,26 @@ description: "戦略プロファイル（課題・宣伝内容・リサーチ）
     - `validUntil`は実在する`YYYY-MM-DD`か`null`
   - `promotionSchema`：`isExpired`・`isTargetable`・`version`・`createdAt`・`updatedAt`を含む
   - `promotionSettingsSchema`：`ratioPercent`は0〜100の整数
-- [ ] T041 [US2] `apps/api/src/routes/promotions.ts`を作り、`apps/api/src/app.ts`に登録する（contracts/api.md）：
+- [X] T041 [US2] `apps/api/src/routes/promotions.ts`を作り、`apps/api/src/app.ts`に登録する（contracts/api.md）：
   - `GET`・`PUT /api/accounts/:accountId/promotion-settings`（`accounts.promotion_ratio_percent`。競合は検知しない）
   - `GET /promotions`（`sortPromotions`の順。`items`・`limit: 50`・`canEdit`）
   - `POST /promotions`（`insertWithLimit`、上限50）
   - `PUT /promotions/:promotionId`（`updateWithVersion`）
   - `DELETE /promotions/:promotionId`（`deleteItem`）
   - 書き込みはすべて`requireGrowerAccess`のあとに行う。任意のテキストの`""`はDBで`NULL`にする
-- [ ] T042 [US2] `apps/web/src/lib/api-client.ts`に、宣伝内容と宣伝投稿の割合の呼び出しを足す
-- [ ] T043 [P] [US2] `apps/web/src/components/promotions/PromotionFormDialog.tsx`を作る（contracts/ui-routes.md「宣伝内容の画面」の追加・編集のダイアログ）：
+- [X] T042 [US2] `apps/web/src/lib/api-client.ts`に、宣伝内容と宣伝投稿の割合の呼び出しを足す
+- [X] T043 [P] [US2] `apps/web/src/components/promotions/PromotionFormDialog.tsx`を作る（contracts/ui-routes.md「宣伝内容の画面」の追加・編集のダイアログ）：
   - 見出し：「宣伝内容を追加」／「宣伝内容を編集」
   - 項目：管理用タイトル（「必須・投稿には出ません」）、宣伝したい内容（必須）、届けたい属性（場所・どんな人・年齢。`md`以上は横に3つ並べる）、CTA、専用URL、優先度、状態、掲載期限
   - 掲載期限が過去なら「この日付はすでに過ぎているため、期限切れとして扱われます。」と出す（保存はできる）
   - `useUnsavedChanges`で、閉じる操作でも確認する。保存で`404 ITEM_NOT_FOUND`なら規則6、`409`なら`ConflictDialog`、`403 GROWER_FEATURE_REQUIRED`なら入力内容を残したまま`GrowerRequiredNotice`のダイアログを出し、画面を読むだけの表示に切り替える（ui-routes.md 規則10）
-- [ ] T044 [US2] `apps/web/src/pages/promotions.tsx`を作る（contracts/ui-routes.md「宣伝内容の画面」、docs/ui-design.md 型B）：
+- [X] T044 [US2] `apps/web/src/pages/promotions.tsx`を作る（contracts/ui-routes.md「宣伝内容の画面」、docs/ui-design.md 型B）：
   - 上部バー：`PageHeader`に「宣伝内容」と「＋ 追加」（`md`未満は「＋」アイコン）
   - 案内文と、宣伝投稿の割合の行（値を変えたら「保存」を出す）
   - 一覧：「宣伝の対象（{件数}）」のカードと、「対象外（{件数}）」の1行のカード
   - 「⋯」メニュー：編集、一時停止／有効に戻す、終了、削除（確認のダイアログ）
   - その他：空の状態、件数の上限の案内（規則8）、`canEdit: false`のときの読むだけの表示
-- [ ] T045 [US2] `apps/web/src/router.tsx`に`/accounts/:accountId/promotions`を足し、`apps/web/src/components/layout/Sidebar.tsx`の「戦略」に「宣伝内容」（`Megaphone`）を足す
+- [X] T045 [US2] `apps/web/src/router.tsx`に`/accounts/:accountId/promotions`を足し、`apps/web/src/components/layout/Sidebar.tsx`の「戦略」に「宣伝内容」（`Megaphone`）を足す
 
 **完了条件**：T037・T038が通り、quickstart.md「手動の確認 3」ができる
 

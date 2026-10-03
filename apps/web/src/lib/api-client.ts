@@ -7,8 +7,12 @@ import {
   errorMessage,
   errorResponseSchema,
   meResponseSchema,
+  promotionListSchema,
+  promotionSchema,
+  promotionSettingsSchema,
   strategySchema,
   type ConnectRequest,
+  type PromotionInput,
   type PutStrategyRequest,
   type ErrorCode,
   type OpenAccountRequest,
@@ -98,6 +102,20 @@ export const api = {
   getStrategy: (accountId: string) => request(`/api/accounts/${accountId}/strategy`, strategySchema),
   putStrategy: (accountId: string, body: PutStrategyRequest) =>
     request(`/api/accounts/${accountId}/strategy`, strategySchema, { method: "PUT", body: JSON.stringify(body) }),
+  listPromotions: (accountId: string) => request(`/api/accounts/${accountId}/promotions`, promotionListSchema),
+  createPromotion: (accountId: string, body: PromotionInput) =>
+    request(`/api/accounts/${accountId}/promotions`, promotionSchema, { method: "POST", body: JSON.stringify(body) }),
+  updatePromotion: (accountId: string, id: string, body: PromotionInput & { expectedVersion: number }) =>
+    request(`/api/accounts/${accountId}/promotions/${id}`, promotionSchema, { method: "PUT", body: JSON.stringify(body) }),
+  deletePromotion: (accountId: string, id: string) =>
+    request(`/api/accounts/${accountId}/promotions/${id}`, null, { method: "DELETE" }),
+  getPromotionSettings: (accountId: string) =>
+    request(`/api/accounts/${accountId}/promotion-settings`, promotionSettingsSchema),
+  putPromotionSettings: (accountId: string, ratioPercent: number) =>
+    request(`/api/accounts/${accountId}/promotion-settings`, promotionSettingsSchema, {
+      method: "PUT",
+      body: JSON.stringify({ ratioPercent }),
+    }),
   dataDeletionStatus: (code: string) =>
     request(`/api/data-deletion/${encodeURIComponent(code)}`, dataDeletionStatusSchema, { auth: false }),
 };

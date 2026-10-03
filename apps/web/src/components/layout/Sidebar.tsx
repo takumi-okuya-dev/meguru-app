@@ -1,7 +1,14 @@
 // サイドバーの中身（docs/ui-design.md「2. 画面の骨格」）。
 // 上から：Accountの切り替えと畳むボタン → 機能の移動 → 区切り線 → このアカウントの設定・ユーザーメニュー。
 // まだ作っていない機能は出さない（各featureで画面を作ったときに NAV_GROUPS に足す）。
-import { HouseIcon, PanelLeftIcon, SlidersHorizontalIcon, TargetIcon, type LucideIcon } from "lucide-react";
+import {
+  HouseIcon,
+  MegaphoneIcon,
+  PanelLeftIcon,
+  SlidersHorizontalIcon,
+  TargetIcon,
+  type LucideIcon,
+} from "lucide-react";
 import { NavLink, useParams } from "react-router";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -14,7 +21,13 @@ type NavGroup = { label?: string; items: NavItem[] };
 /** 機能の移動。path は /accounts/:id からの相対パス。 */
 const NAV_GROUPS: NavGroup[] = [
   { items: [{ path: "", label: "ホーム", Icon: HouseIcon, end: true }] },
-  { label: "戦略", items: [{ path: "strategy", label: "課題", Icon: TargetIcon }] },
+  {
+    label: "戦略",
+    items: [
+      { path: "strategy", label: "課題", Icon: TargetIcon },
+      { path: "promotions", label: "宣伝内容", Icon: MegaphoneIcon },
+    ],
+  },
 ];
 
 const itemClass = ({ isActive }: { isActive: boolean }) =>
