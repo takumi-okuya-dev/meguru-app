@@ -12,6 +12,7 @@ import { dataDeletionRoutes } from "./routes/data-deletion";
 import { threadsWebhookRoutes } from "./routes/threads-webhooks";
 import { meRoutes } from "./routes/me";
 import { promotionRoutes } from "./routes/promotions";
+import { researchRoutes } from "./routes/research";
 import { strategyRoutes } from "./routes/strategy";
 import { threadsConnectRoutes } from "./routes/threads-connect";
 
@@ -96,6 +97,7 @@ export function createApp(deps: AppDeps = defaultDeps) {
     .route("/", accountRoutes(authed))
     .route("/", strategyRoutes(authed))
     .route("/", promotionRoutes(authed))
+    .route("/", researchRoutes(authed))
     .route("/", threadsConnectRoutes(authed))
     .route("/", threadsWebhookRoutes())
     .route("/", dataDeletionRoutes());

@@ -5,6 +5,8 @@ import {
   PRIORITY_MAX,
   PRIORITY_MIN,
   PROMOTION_CONTENT_MAX,
+  REFERENCE_BODY_MAX,
+  REFERENCE_WHY_GOOD_MAX,
   SHORT_TEXT_MAX,
   STRATEGY_TEXT_MAX,
   URL_MAX,
@@ -227,3 +229,47 @@ export const promotionSettingsInputSchema = z.object({
 export const promotionSettingsSchema = promotionSettingsInputSchema.extend({ canEdit: z.boolean() });
 /** 宣伝投稿の割合（レスポンス）。 */
 export type PromotionSettings = z.infer<typeof promotionSettingsSchema>;
+
+/** 参考投稿の入力のスキーマ（contracts/api.md の ReferencePostInput）。 */
+export const referencePostInputSchema = z.object({
+  body: requiredText(REFERENCE_BODY_MAX),
+  keyword: textMax(SHORT_TEXT_MAX).default(""),
+  postUrl: optionalUrl(URL_MAX),
+  whyGood: textMax(REFERENCE_WHY_GOOD_MAX).default(""),
+});
+/** 参考投稿の入力。 */
+export type ReferencePostInput = z.infer<typeof referencePostInputSchema>;
+
+/** PUT /reference-posts/:id のリクエストのスキーマ。 */
+export const updateReferencePostRequestSchema = referencePostInputSchema.extend({
+  expectedVersion: z.number().int().positive(),
+});
+
+/** 参考投稿（レスポンス）のスキーマ。 */
+export const referencePostSchema = referencePostInputSchema.extend(itemMeta);
+/** 参考投稿（レスポンス）。 */
+export type ReferencePost = z.infer<typeof referencePostSchema>;
+
+/** GET /reference-posts のレスポンスのスキーマ。 */
+export const referencePostListSchema = z.object({ items: z.array(referencePostSchema), ...listMeta });
+
+/** キーワードの入力のスキーマ（contracts/api.md の ResearchKeywordInput）。 */
+export const researchKeywordInputSchema = z.object({
+  keyword: requiredText(SHORT_TEXT_MAX),
+  purpose: textMax(SHORT_TEXT_MAX).default(""),
+});
+/** キーワードの入力。 */
+export type ResearchKeywordInput = z.infer<typeof researchKeywordInputSchema>;
+
+/** PUT /research-keywords/:id のリクエストのスキーマ。 */
+export const updateResearchKeywordRequestSchema = researchKeywordInputSchema.extend({
+  expectedVersion: z.number().int().positive(),
+});
+
+/** キーワード（レスポンス）のスキーマ。 */
+export const researchKeywordSchema = researchKeywordInputSchema.extend(itemMeta);
+/** キーワード（レスポンス）。 */
+export type ResearchKeyword = z.infer<typeof researchKeywordSchema>;
+
+/** GET /research-keywords のレスポンスのスキーマ。 */
+export const researchKeywordListSchema = z.object({ items: z.array(researchKeywordSchema), ...listMeta });

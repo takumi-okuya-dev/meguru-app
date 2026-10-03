@@ -266,11 +266,11 @@ description: "戦略プロファイル（課題・宣伝内容・リサーチ）
 
 ### テスト（先に書いて失敗を確認する）
 
-- [ ] T046 [P] [US3] `apps/api/test/integration/research.test.ts`を書く（quickstart.mdの表の次の行）：
+- [X] T046 [P] [US3] `apps/api/test/integration/research.test.ts`を書く（quickstart.mdの表の次の行）：
   - 「キーワードの重複」「キーワードの削除」「URLの検証」（投稿のURL）
   - 「他人のAccount」「要再接続のAccount」「grower機能の判定」（reference-posts・research-keywords）
   - 参考投稿の新しい順、件数の上限（参考投稿200件・キーワード100件）
-- [ ] T047 [P] [US3] `apps/web/test/research.test.tsx`を書く：
+- [X] T047 [P] [US3] `apps/web/test/research.test.tsx`を書く：
   - タブの切り替えがクエリ`?tab=keywords`に残る
   - 「なぜ良いか：未入力」が出る
   - 重複したキーワードを入力すると、保存する前に「同じキーワードがすでに登録されています」が出る
@@ -278,7 +278,7 @@ description: "戦略プロファイル（課題・宣伝内容・リサーチ）
 
 ### 実装
 
-- [ ] T048 [US3] `packages/shared/src/schemas.ts`に、リサーチのスキーマを足す（contracts/api.md）：
+- [X] T048 [US3] `packages/shared/src/schemas.ts`に、リサーチのスキーマを足す（contracts/api.md）：
   - `referencePostInputSchema`
     - `body`は空でなく2,000文字まで
     - `keyword`は100文字まで
@@ -286,23 +286,23 @@ description: "戦略プロファイル（課題・宣伝内容・リサーチ）
     - `whyGood`は2,000文字まで
   - `researchKeywordInputSchema`：`keyword`は空でなく100文字まで、`purpose`は100文字まで
   - 一覧のレスポンス（`items`・`limit`・`canEdit`）
-- [ ] T049 [US3] `apps/api/src/routes/research.ts`を作り、`apps/api/src/app.ts`に登録する（contracts/api.md）：
+- [X] T049 [US3] `apps/api/src/routes/research.ts`を作り、`apps/api/src/app.ts`に登録する（contracts/api.md）：
   - `GET`・`POST /reference-posts`（新しい順、上限200）、`PUT`・`DELETE /reference-posts/:referencePostId`
   - `GET`・`POST /research-keywords`（新しい順、上限100）、`PUT`・`DELETE /research-keywords/:keywordId`
   - キーワードは`normalizeKeyword`の値を`keyword_normalized`に入れ、一意制約の違反（`23505`）を`409 KEYWORD_DUPLICATE`にする
   - 書き込みはすべて`requireGrowerAccess`のあとに行う
-- [ ] T050 [US3] `apps/web/src/lib/api-client.ts`に、参考投稿とキーワードの呼び出しを足す
-- [ ] T051 [P] [US3] `apps/web/src/components/research/ReferencePostFormDialog.tsx`と`apps/web/src/components/research/KeywordFormDialog.tsx`を作る（contracts/ui-routes.md「リサーチの画面」）：
+- [X] T050 [US3] `apps/web/src/lib/api-client.ts`に、参考投稿とキーワードの呼び出しを足す
+- [X] T051 [P] [US3] `apps/web/src/components/research/ReferencePostFormDialog.tsx`と`apps/web/src/components/research/KeywordFormDialog.tsx`を作る（contracts/ui-routes.md「リサーチの画面」）：
   - 参考投稿：本文（必須、記入例「Threadsで見つけた投稿の本文をそのまま貼り付け」）、検索したキーワード、投稿のURL、なぜ良いか
   - キーワード：キーワード（必須）、狙いのメモ。重複は`normalizeKeyword`で事前に判定する
   - 未保存の警告・`404`・`409`・`403`の扱いはT043と同じ
-- [ ] T052 [US3] `apps/web/src/pages/research.tsx`を作る（contracts/ui-routes.md「リサーチの画面」、docs/ui-design.md 型B）：
+- [X] T052 [US3] `apps/web/src/pages/research.tsx`を作る（contracts/ui-routes.md「リサーチの画面」、docs/ui-design.md 型B）：
   - 上部バー：`PageHeader`に「リサーチ」と、選択中のタブに応じた「＋ 参考投稿を追加」／「＋ キーワードを追加」
   - 案内文と、折りたたみの「リサーチの手順」
   - タブ（`Tabs`、クエリ`?tab=`に持つ）
   - 参考投稿のカード：本文6行まで＋「もっと見る」、キーワード・保存日時、URLのリンク（`target="_blank" rel="noopener noreferrer"`）、「なぜ良いか」
   - キーワードの行、空の状態、件数の上限の案内、`canEdit: false`のときの読むだけの表示
-- [ ] T053 [US3] `apps/web/src/router.tsx`に`/accounts/:accountId/research`を足し、`apps/web/src/components/layout/Sidebar.tsx`の「戦略」に「リサーチ」（`Search`）を足す
+- [X] T053 [US3] `apps/web/src/router.tsx`に`/accounts/:accountId/research`を足し、`apps/web/src/components/layout/Sidebar.tsx`の「戦略」に「リサーチ」（`Search`）を足す
 
 **完了条件**：T046・T047が通り、quickstart.md「手動の確認 4」ができる
 

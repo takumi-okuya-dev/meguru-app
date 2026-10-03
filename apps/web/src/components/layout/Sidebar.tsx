@@ -5,6 +5,7 @@ import {
   HouseIcon,
   MegaphoneIcon,
   PanelLeftIcon,
+  SearchIcon,
   SlidersHorizontalIcon,
   TargetIcon,
   type LucideIcon,
@@ -26,6 +27,7 @@ const NAV_GROUPS: NavGroup[] = [
     items: [
       { path: "strategy", label: "課題", Icon: TargetIcon },
       { path: "promotions", label: "宣伝内容", Icon: MegaphoneIcon },
+      { path: "research", label: "リサーチ", Icon: SearchIcon },
     ],
   },
 ];

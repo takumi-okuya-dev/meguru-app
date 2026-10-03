@@ -1,7 +1,6 @@
 // /api/accounts/:accountId/promotions と /promotion-settings（specs/002-strategy-profile contracts/api.md）
 import {
   PROMOTION_LIMIT,
-  invalidFields,
   isExpired,
   isTargetable,
   promotionInputSchema,
@@ -12,11 +11,10 @@ import {
 } from "@threads-grower/shared";
 import { and, count, eq, sql } from "drizzle-orm";
 import { Hono, type MiddlewareHandler } from "hono";
-import type { z } from "zod";
 import type { AppEnv } from "../app";
 import { createDb, type Db } from "../db/client";
 import { accounts, promotions } from "../db/schema";
-import { AppError } from "../lib/errors";
+import { parseBody } from "../lib/validate";
 import { findOwnedAccount } from "../services/access";
 import { canEditProfile, requireGrowerAccess } from "../services/grower-access";
 import { assertItemId, insertWithLimit, updateWithVersion } from "../services/item-service";
@@ -69,18 +67,6 @@ function toColumns(input: PromotionInput) {
     status: input.status,
     validUntil: input.validUntil,
   };
-}
-
-/**
- * リクエストの本文を検証する。違反は 400 VALIDATION_FAILED（details に項目名）。
- * @param schema - zod のスキーマ
- * @param body - リクエストの本文
- * @returns 検証済みの値
- */
-async function parseBody<S extends z.ZodTypeAny>(schema: S, body: Promise<unknown>): Promise<z.infer<S>> {
-  const parsed = schema.safeParse(await body.catch(() => null));
-  if (!parsed.success) throw new AppError("VALIDATION_FAILED", 400, "invalid request", undefined, invalidFields(parsed.error));
-  return parsed.data;
 }
 
 async function findPromotion(db: Db, accountId: string, id: string) {

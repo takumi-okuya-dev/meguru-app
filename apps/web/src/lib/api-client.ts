@@ -10,10 +10,16 @@ import {
   promotionListSchema,
   promotionSchema,
   promotionSettingsSchema,
+  referencePostListSchema,
+  referencePostSchema,
+  researchKeywordListSchema,
+  researchKeywordSchema,
   strategySchema,
   type ConnectRequest,
   type PromotionInput,
   type PutStrategyRequest,
+  type ReferencePostInput,
+  type ResearchKeywordInput,
   type ErrorCode,
   type OpenAccountRequest,
 } from "@threads-grower/shared";
@@ -116,6 +122,31 @@ export const api = {
       method: "PUT",
       body: JSON.stringify({ ratioPercent }),
     }),
+  listReferencePosts: (accountId: string) =>
+    request(`/api/accounts/${accountId}/reference-posts`, referencePostListSchema),
+  createReferencePost: (accountId: string, body: ReferencePostInput) =>
+    request(`/api/accounts/${accountId}/reference-posts`, referencePostSchema, { method: "POST", body: JSON.stringify(body) }),
+  updateReferencePost: (accountId: string, id: string, body: ReferencePostInput & { expectedVersion: number }) =>
+    request(`/api/accounts/${accountId}/reference-posts/${id}`, referencePostSchema, {
+      method: "PUT",
+      body: JSON.stringify(body),
+    }),
+  deleteReferencePost: (accountId: string, id: string) =>
+    request(`/api/accounts/${accountId}/reference-posts/${id}`, null, { method: "DELETE" }),
+  listResearchKeywords: (accountId: string) =>
+    request(`/api/accounts/${accountId}/research-keywords`, researchKeywordListSchema),
+  createResearchKeyword: (accountId: string, body: ResearchKeywordInput) =>
+    request(`/api/accounts/${accountId}/research-keywords`, researchKeywordSchema, {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+  updateResearchKeyword: (accountId: string, id: string, body: ResearchKeywordInput & { expectedVersion: number }) =>
+    request(`/api/accounts/${accountId}/research-keywords/${id}`, researchKeywordSchema, {
+      method: "PUT",
+      body: JSON.stringify(body),
+    }),
+  deleteResearchKeyword: (accountId: string, id: string) =>
+    request(`/api/accounts/${accountId}/research-keywords/${id}`, null, { method: "DELETE" }),
   dataDeletionStatus: (code: string) =>
     request(`/api/data-deletion/${encodeURIComponent(code)}`, dataDeletionStatusSchema, { auth: false }),
 };
