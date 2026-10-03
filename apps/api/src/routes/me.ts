@@ -45,6 +45,8 @@ export function meRoutes(authed: MiddlewareHandler<AppEnv>) {
       accounts: owned.map(toAccountSummary),
       landingAccountId: resolveLandingAccountId(owned, user.lastAccountId),
       accountLimit: { max: limitForOwnedPlans(owned.map((a) => a.plan)), used: owned.length },
+      // Threads連携の公開範囲。Web はアカウント追加画面の案内の有無に使う（specs/002 FR-028）
+      threadsAccessMode: c.env.THREADS_ACCESS_MODE ?? "testers",
     });
   });
 }

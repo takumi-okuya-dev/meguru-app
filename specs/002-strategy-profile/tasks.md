@@ -343,17 +343,17 @@ description: "戦略プロファイル（課題・宣伝内容・リサーチ）
 
 **目的**：Threads連携の公開範囲の切り替え（FR-028）、Account削除との関係、E2E、全体の確認
 
-- [ ] T059 [P] `apps/api/test/integration/access-mode.test.ts`を書く（quickstart.mdの表の「公開範囲の切り替え」）：
+- [X] T059 [P] `apps/api/test/integration/access-mode.test.ts`を書く（quickstart.mdの表の「公開範囲の切り替え」）：
   - 未設定・`testers`なら`GET /api/me`が`threadsAccessMode: "testers"`
   - `public`なら`"public"`
   - `foo`なら`500 CONFIG_ERROR`で`details`に`THREADS_ACCESS_MODE`
-- [ ] T060 `apps/api/src/env.ts`に任意の`THREADS_ACCESS_MODE`を足し、`apps/api/src/lib/config.ts`で値が未設定・`testers`・`public`以外なら`THREADS_ACCESS_MODE`を設定の誤りにする。`apps/api/src/routes/me.ts`のレスポンスと`meResponseSchema`（`packages/shared/src/schemas.ts`）に`threadsAccessMode`を足す（research.md R15）
-- [ ] T061 `apps/web/src/pages/account-new.tsx`で、`TESTER_NOTICE`を`threadsAccessMode === "testers"`のときだけ出す（contracts/ui-routes.md「アカウント追加画面の案内」）。`apps/web/test/account-new-limit.test.tsx`に、`public`では出ないことを足す
-- [ ] T062 [P] `apps/api/test/integration/profile-cascade.test.ts`を書く（quickstart.mdの表の「Accountの削除」）：課題・宣伝内容・参考投稿・キーワードを持つAccountを`DELETE /api/accounts/:accountId`で削除すると、4つのテーブルの行がすべて消える。Metaのデータ削除要求の処理でも同じ
-- [ ] T063 [P] `e2e/tests/strategy.spec.ts`を書く：ログイン → Accountの接続（偽のThreadsサーバー）→ 課題に入力して保存 → 再読み込みで復元される。未保存のままサイドバーで移動すると確認のダイアログが出る
-- [ ] T064 `pnpm lint`・`pnpm typecheck`・`pnpm test`を通す。新しくexportした関数・コンポーネントすべてにJSDocを付ける（001で導入した`eslint-plugin-jsdoc`の規則）
+- [X] T060 `apps/api/src/env.ts`に任意の`THREADS_ACCESS_MODE`を足し、`apps/api/src/lib/config.ts`で値が未設定・`testers`・`public`以外なら`THREADS_ACCESS_MODE`を設定の誤りにする。`apps/api/src/routes/me.ts`のレスポンスと`meResponseSchema`（`packages/shared/src/schemas.ts`）に`threadsAccessMode`を足す（research.md R15）
+- [X] T061 `apps/web/src/pages/account-new.tsx`で、`TESTER_NOTICE`を`threadsAccessMode === "testers"`のときだけ出す（contracts/ui-routes.md「アカウント追加画面の案内」）。`apps/web/test/account-new-limit.test.tsx`に、`public`では出ないことを足す
+- [X] T062 [P] `apps/api/test/integration/profile-cascade.test.ts`を書く（quickstart.mdの表の「Accountの削除」）：課題・宣伝内容・参考投稿・キーワードを持つAccountを`DELETE /api/accounts/:accountId`で削除すると、4つのテーブルの行がすべて消える。Metaのデータ削除要求の処理でも同じ
+- [X] T063 [P] `e2e/tests/strategy.spec.ts`を書く：ログイン → Accountの接続（偽のThreadsサーバー）→ 課題に入力して保存 → 再読み込みで復元される。未保存のままサイドバーで移動すると確認のダイアログが出る
+- [X] T064 `pnpm lint`・`pnpm typecheck`・`pnpm test`を通す。新しくexportした関数・コンポーネントすべてにJSDocを付ける（001で導入した`eslint-plugin-jsdoc`の規則）
 - [ ] T065 quickstart.mdの「手動の確認」1〜7を、`pnpm dev:fake`で375・768・1024・1440pxの4つの幅で行い、docs/ui-design.mdとずれた点があれば直す。タブレット（768〜1023px）の見え方の結果をdocs/ui-design.md「10. まだ決めていないこと」に反映する
-- [ ] T066 [P] `specs/001-login-account-setup/contracts/ui-routes.md`の「レイアウトの骨格」に、「2026-10-03以降はdocs/ui-design.mdを正とする」と1行足す
+- [X] T066 [P] `specs/001-login-account-setup/contracts/ui-routes.md`の「レイアウトの骨格」に、「2026-10-03以降はdocs/ui-design.mdを正とする」と1行足す
 
 ---
 

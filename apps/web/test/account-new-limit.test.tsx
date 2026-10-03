@@ -25,12 +25,13 @@ function account(id: string) {
   };
 }
 
-function renderWith(max: number, used: number) {
+function renderWith(max: number, used: number, threadsAccessMode: "testers" | "public" = "testers") {
   meResponse = {
     user: { id: "u", email: "u@example.com", displayName: null },
     accounts: Array.from({ length: used }, (_, i) => account(`a${i}`)),
     landingAccountId: used > 0 ? "a0" : null,
     accountLimit: { max, used },
+    threadsAccessMode,
   };
   render(
     <QueryClientProvider client={new QueryClient()}>
@@ -58,9 +59,15 @@ describe("アカウント追加画面の上限の案内", () => {
     expect(screen.getByRole("button", { name: "Threadsアカウントを接続" })).toBeDisabled();
   });
 
-  it("上限に余裕があれば接続ボタンは押せて、テスター制限の案内が常に出る", async () => {
+  it("上限に余裕があれば接続ボタンは押せて、testers のときはテスター制限の案内が出る", async () => {
     renderWith(5, 1);
     expect(await screen.findByRole("button", { name: "Threadsアカウントを接続" })).toBeEnabled();
     expect(screen.getByText(/招待されたThreadsアカウントのみ接続できます/)).toBeInTheDocument();
+  });
+
+  it("THREADS_ACCESS_MODE が public なら、テスター制限の案内を出さない（specs/002 FR-028）", async () => {
+    renderWith(5, 1, "public");
+    expect(await screen.findByRole("button", { name: "Threadsアカウントを接続" })).toBeEnabled();
+    expect(screen.queryByText(/招待されたThreadsアカウントのみ接続できます/)).not.toBeInTheDocument();
   });
 });

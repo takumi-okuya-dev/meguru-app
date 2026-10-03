@@ -56,6 +56,8 @@ export const meResponseSchema = z.object({
   accounts: z.array(accountSummarySchema),
   landingAccountId: z.string().nullable(),
   accountLimit: accountLimitSchema,
+  /** Threads連携の公開範囲（specs/002 FR-028）。testers の間は、アカウント追加画面に検証期間の案内を出す */
+  threadsAccessMode: z.enum(["testers", "public"]),
 });
 /** GET /api/me のレスポンス。ログイン中のユーザー、Account一覧、ログイン後の遷移先、登録数上限。 */
 export type MeResponse = z.infer<typeof meResponseSchema>;

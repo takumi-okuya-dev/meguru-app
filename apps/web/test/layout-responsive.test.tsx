@@ -20,6 +20,7 @@ const meResponse: MeResponse = {
   accounts: [account("a1", "takumi"), account("a2", "aibu", "needs_reconnect")],
   landingAccountId: "a1",
   accountLimit: { max: 5, used: 2 },
+  threadsAccessMode: "testers",
 };
 vi.mock("@/lib/api-client", async (orig) => {
   const actual = await orig<typeof import("@/lib/api-client")>();

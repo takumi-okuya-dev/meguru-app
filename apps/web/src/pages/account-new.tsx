@@ -61,9 +61,12 @@ export function AccountNew() {
         Threadsアカウントを接続
       </Button>
 
-      <Alert>
-        <AlertDescription>{TESTER_NOTICE}</AlertDescription>
-      </Alert>
+      {/* Meta App Review の前（テスターだけが接続できる間）だけ出す（specs/002 FR-028） */}
+      {me.data.threadsAccessMode === "testers" && (
+        <Alert>
+          <AlertDescription>{TESTER_NOTICE}</AlertDescription>
+        </Alert>
+      )}
     </div>
   );
 
