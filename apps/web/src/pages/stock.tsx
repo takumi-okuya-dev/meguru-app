@@ -3,6 +3,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { ApiErrorScreen } from "@/components/ApiErrorScreen";
 import { PageBody, PageHeader } from "@/components/layout/PageHeader";
+import { PromptCard } from "@/components/stock/PromptCard";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { api } from "@/lib/api-client";
 import { queryKeys } from "@/lib/query";
@@ -25,7 +26,15 @@ export function StockPage() {
     <>
       <PageHeader title="投稿ストック" />
       <PageBody className="flex-1 space-y-5">
-        <section aria-label="プロンプト" data-slot="prompt-card" />
+        {drafts.data ? (
+          <PromptCard
+            accountId={account.id}
+            canGeneratePrompt={drafts.data.canGeneratePrompt}
+            promptPostCount={drafts.data.promptPostCount}
+          />
+        ) : (
+          <div className="h-32 animate-pulse rounded-2xl bg-muted" aria-busy="true" />
+        )}
         <Tabs value="needs_review">
           <TabsList>
             <TabsTrigger value="needs_review">要確認 {drafts.data?.items.length ?? ""}</TabsTrigger>

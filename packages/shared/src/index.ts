@@ -4,6 +4,7 @@ export * from "./errors";
 export * from "./limits";
 export * from "./plans";
 export * from "./promotions";
+export * from "./prompt";
 export * from "./schemas";
 export * from "./strategy";
 export * from "./text";

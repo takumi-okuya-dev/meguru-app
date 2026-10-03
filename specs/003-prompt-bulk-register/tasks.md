@@ -93,19 +93,19 @@ description: "AIプロンプトの生成と投稿案の一括登録の実装タ�
 
 ### テスト（先に書いて失敗を確認する）
 
-- [ ] T012 [P] [US1] `packages/shared/test/prompt.test.ts`を書く（quickstart.mdの表の「プロンプトの節」「宣伝に絡める件数」「参考投稿と下書きの上限」「長さの目安」）。
+- [X] T012 [P] [US1] `packages/shared/test/prompt.test.ts`を書く（quickstart.mdの表の「プロンプトの節」「宣伝に絡める件数」「参考投稿と下書きの上限」「長さの目安」）。
   - 入力済みの課題の項目だけが含まれ、プロフィール文・固定投稿の下書きは含まれない。人柄は表示名（「丁寧・温かい」）で含まれる
   - 材料のない節（課題0項目・宣伝の対象0件・割合0%・参考投稿0件・下書き0件）は見出しごと省かれる
   - 件数30・割合20%で「6件程度」、件数3・割合10%で「1件程度」（0のときは1）
   - 参考投稿は新しい順に10件、下書きは新しい順に20件まで。要約の件数が実際に含めた件数と一致する
   - 30,000文字を超える材料では、下書き → 参考投稿の順に古いものから減らして収める
   - 区切りの数の指示が「{件数-1}個」になり、最後の案内が「ThreadsGrowerの投稿ストックの画面にある貼り付け欄」になる
-- [ ] T013 [P] [US1] `apps/api/test/integration/prompt.test.ts`を書く。
+- [X] T013 [P] [US1] `apps/api/test/integration/prompt.test.ts`を書く。
   - `GET /prompt`が保存済みの課題・宣伝の対象・参考投稿・直近の下書きを反映し、`count`省略時はAccountの`prompt_post_count`（既定30）を使う。`count=0`・`count=51`は`400`
   - `PUT /prompt-settings`で保存した件数が次の`GET /prompt`と`GET /post-drafts`の`promptPostCount`に反映される。`0`・`51`・`1.5`は`400`
   - 「プロンプトのプラン判定」：無料体験の後のプラン1は`GET /prompt`・`PUT /prompt-settings`が`403 GROWER_FEATURE_REQUIRED`、`GET /post-drafts`は`canGeneratePrompt: false`で`200`
   - 他人のAccountは`404 ACCOUNT_NOT_FOUND`、要再接続のAccountでも`200`
-- [ ] T014 [P] [US1] `apps/web/test/stock.test.tsx`に、プロンプトのカードのテストを書く。
+- [X] T014 [P] [US1] `apps/web/test/stock.test.tsx`に、プロンプトのカードのテストを書く。
   - 要約（「課題 11/16・宣伝の対象 1件・参考投稿 3件を反映」）が出て、「コピー」で`navigator.clipboard.writeText`に全文が渡り、トーストが出る
   - 「コピーの失敗」：`writeText`が失敗すると、全文の欄が開いて全選択され、「自動でコピーできませんでした…」が出る
   - 「プロンプトを見る」で全文を書き換えてからコピーすると、書き換えた内容が渡る。「元に戻す」で元に戻る
@@ -115,19 +115,19 @@ description: "AIプロンプトの生成と投稿案の一括登録の実装タ�
 
 ### 実装
 
-- [ ] T015 [US1] `packages/shared/src/prompt.ts`に`buildPrompt(input): { prompt: string; summary: PromptSummary }`を作り、`packages/shared/src/index.ts`からexportする。
+- [X] T015 [US1] `packages/shared/src/prompt.ts`に`buildPrompt(input): { prompt: string; summary: PromptSummary }`を作り、`packages/shared/src/index.ts`からexportする。
   - 文面は[contracts/prompt-template.md](./contracts/prompt-template.md)のとおり。「短文・中文・長文」と「出力形式」の節は、[reference-prompt.md](./reference-prompt.md)の原文を、prompt-template.mdに書いた差分だけ変えて埋め込む
   - 課題の項目の見出しと順は、prompt-template.mdの「アカウントの戦略設計」の表のとおりにする（002の`STRATEGY_FIELDS`のうち`counted: true`のもの）
   - 宣伝に絡める件数は`Math.max(1, Math.round(count * ratio / 100))`、型を使う件数は`Math.min(3, count)`
   - 長さの目安（30,000文字）を超えたら、直近の下書き → 参考投稿の順に、古いものから1件ずつ減らして組み立て直す
-- [ ] T016 [US1] `apps/api/src/services/prompt-service.ts`に、材料を集めて`buildPrompt`を呼ぶ`getPrompt(db, account, count)`を作る（research.md R1）。課題（002の`getStrategy`）、宣伝の対象（002の宣伝内容から`isTargetable`のものを、掲載期限の近い順・期限なしは最後・同じなら優先度の高い順に）、宣伝投稿の割合、参考投稿（新しい順に10件）、要確認の下書き（登録の新しい順に20件）を、並べて（`Promise.all`）取得する。表示名はAccountの`displayName`、なければ`@username`
-- [ ] T017 [US1] `apps/api/src/routes/prompt.ts`に`GET /api/accounts/:accountId/prompt`と`PUT /api/accounts/:accountId/prompt-settings`を作り、`apps/api/src/app.ts`に登録する。どちらも`findOwnedAccount` → `requireGrowerAccess`の順で確かめる。`count`のクエリは1〜50の整数で、範囲外は`400 VALIDATION_FAILED`（`details: ["count"]`）。`PUT`は`accounts.prompt_post_count`を更新する（競合は検知しない）
-- [ ] T018 [P] [US1] `apps/web/src/components/stock/PromptCard.tsx`を作る（contracts/ui-routes.md「プロンプトのカード」）。
+- [X] T016 [US1] `apps/api/src/services/prompt-service.ts`に、材料を集めて`buildPrompt`を呼ぶ`getPrompt(db, account, count)`を作る（research.md R1）。課題（002の`getStrategy`）、宣伝の対象（002の宣伝内容から`isTargetable`のものを、掲載期限の近い順・期限なしは最後・同じなら優先度の高い順に）、宣伝投稿の割合、参考投稿（新しい順に10件）、要確認の下書き（登録の新しい順に20件）を、並べて（`Promise.all`）取得する。表示名はAccountの`displayName`、なければ`@username`
+- [X] T017 [US1] `apps/api/src/routes/prompt.ts`に`GET /api/accounts/:accountId/prompt`と`PUT /api/accounts/:accountId/prompt-settings`を作り、`apps/api/src/app.ts`に登録する。どちらも`findOwnedAccount` → `requireGrowerAccess`の順で確かめる。`count`のクエリは1〜50の整数で、範囲外は`400 VALIDATION_FAILED`（`details: ["count"]`）。`PUT`は`accounts.prompt_post_count`を更新する（競合は検知しない）
+- [X] T018 [P] [US1] `apps/web/src/components/stock/PromptCard.tsx`を作る（contracts/ui-routes.md「プロンプトのカード」）。
   - 見出し、要約、作る件数の入力欄（1〜50。変えたら0.5秒後に`putPromptSettings`で保存し、`getPrompt`を取り直す）、「コピー」、「プロンプトを見る」（開閉。全文の`Textarea`と「元に戻す」）
   - コピーは`navigator.clipboard.writeText`。失敗したら全文の欄を開いて`select()`し、カードの中に案内を出す（research.md R13）
   - プロンプトの取得の失敗は、カードの中に原因と「再読み込み」を出す
   - `canGeneratePrompt: false`のときは、案内の表示（「AIプロンプトの生成はプラン2以上で使えます」、貼り付けで登録できること、`PLAN_CHANGE_CONTACT`）に切り替える
-- [ ] T019 [US1] `apps/web/src/pages/stock.tsx`の上部のカードの場所に`PromptCard`を置く。`listPostDrafts`の`canGeneratePrompt`・`promptPostCount`を渡す
+- [X] T019 [US1] `apps/web/src/pages/stock.tsx`の上部のカードの場所に`PromptCard`を置く。`listPostDrafts`の`canGeneratePrompt`・`promptPostCount`を渡す
 
 **完了条件**：T012〜T014が通り、quickstart.md「手動の確認 1」ができる
 
