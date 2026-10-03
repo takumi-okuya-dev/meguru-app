@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { splitDrafts } from "../src/drafts";
+import { findPasteProblem, splitDrafts } from "../src/drafts";
 
 describe("splitDrafts（research.md R3）", () => {
   it("分割の基本：@@@ だけの行で分け、順番を保つ（FR-010、SC-003）", () => {
@@ -46,5 +46,22 @@ describe("splitDrafts（research.md R3）", () => {
 
   it("本文は元の文字のまま（全角英数字を NFKC で変えない）", () => {
     expect(splitDrafts("ＡＩの話\n@@@\n次").parts[0]).toBe("ＡＩの話");
+  });
+});
+
+describe("findPasteProblem（FR-014）", () => {
+  it("上限の内側なら null", () => {
+    const parts = Array.from({ length: 50 }, () => "あ".repeat(2000));
+    expect(findPasteProblem("x".repeat(50000), parts)).toBeNull();
+  });
+
+  it("全体が50,000文字を超えると text、51件で drafts、2,001文字の1件で draft:N", () => {
+    expect(findPasteProblem("x".repeat(50001), ["x"])).toBe("text");
+    expect(findPasteProblem("x", Array.from({ length: 51 }, () => "x"))).toBe("drafts");
+    expect(findPasteProblem("x", ["a", "b", "😀".repeat(2001)])).toBe("draft:3");
+  });
+
+  it("文字数はコードポイントで数える（絵文字1つは1文字）", () => {
+    expect(findPasteProblem("x", ["😀".repeat(2000)])).toBeNull();
   });
 });

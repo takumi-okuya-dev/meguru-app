@@ -3,6 +3,8 @@
 import { useQuery } from "@tanstack/react-query";
 import { ApiErrorScreen } from "@/components/ApiErrorScreen";
 import { PageBody, PageHeader } from "@/components/layout/PageHeader";
+import { DraftList } from "@/components/stock/DraftList";
+import { PasteComposer } from "@/components/stock/PasteComposer";
 import { PromptCard } from "@/components/stock/PromptCard";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { api } from "@/lib/api-client";
@@ -19,6 +21,8 @@ export function StockPage() {
     queryKey: queryKeys.postDrafts(account.id),
     queryFn: () => api.listPostDrafts(account.id),
   });
+
+  const atLimit = drafts.data ? drafts.data.items.length >= drafts.data.limit : false;
 
   if (drafts.error) return <ApiErrorScreen error={drafts.error} onRetry={() => void drafts.refetch()} />;
 
@@ -43,14 +47,20 @@ export function StockPage() {
             {!drafts.data ? (
               <div className="h-32 animate-pulse rounded-2xl bg-muted" aria-busy="true" />
             ) : (
-              <div data-slot="draft-list" />
+              <DraftList
+                items={drafts.data.items}
+                limit={drafts.data.limit}
+                canGeneratePrompt={drafts.data.canGeneratePrompt}
+              />
             )}
           </TabsContent>
         </Tabs>
       </PageBody>
       {/* 貼り付け欄。スクロール領域の下端に固定し、767px以下は画面下端の操作バーの領域を避ける */}
       <div className="sticky bottom-0 z-10 bg-background pb-[env(safe-area-inset-bottom)]">
-        <div className="mx-auto w-full max-w-3xl px-4 pb-3 md:px-8" data-slot="composer" />
+        <div className="mx-auto w-full max-w-3xl px-4 pb-3 md:px-8">
+          <PasteComposer accountId={account.id} atLimit={atLimit} />
+        </div>
       </div>
     </>
   );

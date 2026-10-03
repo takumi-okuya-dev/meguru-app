@@ -141,11 +141,11 @@ description: "AIプロンプトの生成と投稿案の一括登録の実装タ�
 
 ### テスト（先に書いて失敗を確認する）
 
-- [ ] T020 [P] [US2] `apps/api/test/integration/post-drafts.test.ts`に、一括登録のテストを書く（quickstart.mdの表の次の行）。
+- [X] T020 [P] [US2] `apps/api/test/integration/post-drafts.test.ts`に、一括登録のテストを書く（quickstart.mdの表の次の行）。
   - 「一括登録は全プラン」「二重送信」「1回の上限」（51件・50,001文字・2,001文字の1件で`400 PASTE_TOO_LARGE`、何も登録されない、`details`がcontracts/api.mdのとおり）「下書きの上限と同時実行」（要確認490件に6件と6件を同時に送ると片方だけ成功）「並び順」「取り消し」
   - 区切りなしで`delimiterFound: false`の1件、Threadsの上限を超える下書きが`overLimitCount`に数えられる
   - 他人のAccountは`404`、要再接続のAccountでも`201`
-- [ ] T021 [P] [US2] `apps/web/test/stock.test.tsx`に、貼り付け欄のテストを足す。
+- [X] T021 [P] [US2] `apps/web/test/stock.test.tsx`に、貼り付け欄のテストを足す。
   - 「登録と取り消し」：貼り付けて送ると「{n}件を登録しました」が出て一覧の先頭に並び、「取り消す」で一覧から消えて欄に内容が戻る
   - 送信中は送るボタンと欄が無効になり、送信を再試行するときは同じ`clientRequestId`を送る
   - 空・空白だけのときは送れない。51件分を貼ると、送らずに上限の案内が出る
@@ -155,18 +155,18 @@ description: "AIプロンプトの生成と投稿案の一括登録の実装タ�
 
 ### 実装
 
-- [ ] T022 [US2] `apps/api/src/services/draft-service.ts`に`createDraftBatch(env, accountId, { clientRequestId, text })`を作る（research.md R3・R5・R6）。
+- [X] T022 [US2] `apps/api/src/services/draft-service.ts`に`createDraftBatch(env, accountId, { clientRequestId, text })`を作る（research.md R3・R5・R6）。
   1. `splitDrafts`で分割する。50件を超える・全体が50,000文字を超える・1件が2,000文字を超える場合は`400 PASTE_TOO_LARGE`（`details`はcontracts/api.mdのとおり）
   2. `withTransaction`の中で`pg_advisory_xact_lock(hashtextextended('account_items:<accountId>:post_drafts', 0))`を取る
   3. 同じ`(account_id, client_request_id)`の`draft_batches`があれば、新しく登録せず、その登録と今も残っている下書きを返す（呼び出し側は`200`）
   4. 要確認の下書きの件数＋今回の件数が500を超えれば`409 ITEM_LIMIT_REACHED`
   5. `draft_batches`の行と、`position`を0から振った`post_drafts`の行をまとめて作り、`overLimitCount`（`isOverThreadsLimit`の件数）を数えて返す（呼び出し側は`201`）
   - 外部キー違反（`23503`）は`404 ACCOUNT_NOT_FOUND`
-- [ ] T023 [US2] `apps/api/src/services/draft-service.ts`に、一覧の取得`listDrafts(db, accountId)`（`draft_batches.created_at`の降順 → `position`の昇順。要確認だけ）と、取り消し`deleteBatch(db, accountId, batchId)`（その登録の要確認の下書きだけを削除して件数を返す。登録のまとまりの行は残す）を足す
-- [ ] T024 [US2] `apps/api/src/routes/post-drafts.ts`に`GET /api/accounts/:accountId/post-drafts`（`items`・`limit: 500`・`canGeneratePrompt`（`canEditProfile`）・`promptPostCount`）、`POST /api/accounts/:accountId/draft-batches`（`201`／二重送信は`200`）、`DELETE /api/accounts/:accountId/draft-batches/:batchId`（`assertItemId`、なければ`404 ITEM_NOT_FOUND`）を作り、`apps/api/src/app.ts`に登録する。grower機能は判定しない（research.md R10）
-- [ ] T025 [P] [US2] `apps/web/src/components/stock/ThreadsLengthBar.tsx`を作る（contracts/ui-routes.md「各下書き」の長さの表示、Clarifications Q3）：「{threadsLength}文字」と、500までの使用量の細いバー。80%を超えたら手前の色、超えたら注意の色と「Threadsの上限を超えています（500文字まで）」。リンクが6個以上なら「リンクは5個までです」
-- [ ] T026 [US2] `apps/web/src/components/stock/DraftList.tsx`を作る（contracts/ui-routes.md「状態のタブと下書きの一覧」）：登録のまとまりごとの小見出し「{登録日時}に登録した{n}件」、各下書きの本文（改行を保って6行まで、「もっと見る」）と`ThreadsLengthBar`と登録日時、空の状態の文言（`canGeneratePrompt`で切り替え）、500件に達したときの案内
-- [ ] T027 [US2] `apps/web/src/components/stock/PasteComposer.tsx`を作る（contracts/ui-routes.md「貼り付け欄」「登録直後の案内」）。
+- [X] T023 [US2] `apps/api/src/services/draft-service.ts`に、一覧の取得`listDrafts(db, accountId)`（`draft_batches.created_at`の降順 → `position`の昇順。要確認だけ）と、取り消し`deleteBatch(db, accountId, batchId)`（その登録の要確認の下書きだけを削除して件数を返す。登録のまとまりの行は残す）を足す
+- [X] T024 [US2] `apps/api/src/routes/post-drafts.ts`に`GET /api/accounts/:accountId/post-drafts`（`items`・`limit: 500`・`canGeneratePrompt`（`canEditProfile`）・`promptPostCount`）、`POST /api/accounts/:accountId/draft-batches`（`201`／二重送信は`200`）、`DELETE /api/accounts/:accountId/draft-batches/:batchId`（`assertItemId`、なければ`404 ITEM_NOT_FOUND`）を作り、`apps/api/src/app.ts`に登録する。grower機能は判定しない（research.md R10）
+- [X] T025 [P] [US2] `apps/web/src/components/stock/ThreadsLengthBar.tsx`を作る（contracts/ui-routes.md「各下書き」の長さの表示、Clarifications Q3）：「{threadsLength}文字」と、500までの使用量の細いバー。80%を超えたら手前の色、超えたら注意の色と「Threadsの上限を超えています（500文字まで）」。リンクが6個以上なら「リンクは5個までです」
+- [X] T026 [US2] `apps/web/src/components/stock/DraftList.tsx`を作る（contracts/ui-routes.md「状態のタブと下書きの一覧」）：登録のまとまりごとの小見出し「{登録日時}に登録した{n}件」、各下書きの本文（改行を保って6行まで、「もっと見る」）と`ThreadsLengthBar`と登録日時、空の状態の文言（`canGeneratePrompt`で切り替え）、500件に達したときの案内
+- [X] T027 [US2] `apps/web/src/components/stock/PasteComposer.tsx`を作る（contracts/ui-routes.md「貼り付け欄」「登録直後の案内」）。
   - 複数行の欄（最大8行まで伸びる）、送るボタン（読み上げ名「投稿ストックに登録する」）、下の説明文
   - 送る前に`splitDrafts`で上限を確かめ、超えていれば送らずに案内を出す
   - 送信ごとに`crypto.randomUUID()`で`clientRequestId`を作り、失敗して再試行するときは同じIDを使う。成功したら欄を空にする。失敗したら内容を残し、次のように案内する。
@@ -175,7 +175,7 @@ description: "AIプロンプトの生成と投稿案の一括登録の実装タ�
     - それ以外（通信の失敗など）：002の`saveErrorMessage`の文言と「もう一度送る」
   - 送った内容を手元に覚えておき、登録直後の案内（件数、区切りなし、上限を超える件数、「取り消す」「閉じる」）を出す。「取り消す」で`deleteDraftBatch`を呼び、欄に内容を戻してトースト「{n}件の登録を取り消しました」
   - 書きかけの内容を`useUnsavedChanges`に登録する。`location.state.focusComposer`のときは欄にフォーカスを当てる
-- [ ] T028 [US2] `apps/web/src/pages/stock.tsx`の一覧の場所に`DraftList`、下部の場所に`PasteComposer`を置き、登録・取り消しのあとに`queryKeys.postDrafts(id)`と、`["account", id, "prompt"]`で始まるキー（件数によらず、すべてのプロンプト）を古いものとして扱う
+- [X] T028 [US2] `apps/web/src/pages/stock.tsx`の一覧の場所に`DraftList`、下部の場所に`PasteComposer`を置き、登録・取り消しのあとに`queryKeys.postDrafts(id)`と、`["account", id, "prompt"]`で始まるキー（件数によらず、すべてのプロンプト）を古いものとして扱う
 
 **完了条件**：T020・T021が通り、quickstart.md「手動の確認 2」ができる
 

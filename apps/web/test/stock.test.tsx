@@ -2,7 +2,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import type { AccountSummary, PostDraft, PromptResponse } from "@threads-grower/shared";
+import type { AccountSummary, DraftBatchResult, PostDraft, PromptResponse } from "@threads-grower/shared";
 import { createMemoryRouter, Link, Outlet, RouterProvider } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -54,6 +54,24 @@ function promptResponse(overrides: Partial<PromptResponse["summary"]> = {}, coun
     count,
     summary: { strategyFilledCount: 11, promotionCount: 1, referencePostCount: 3, recentDraftCount: 0, length: 100, ...overrides },
   };
+}
+
+function draft(overrides: Partial<PostDraft> = {}): PostDraft {
+  return {
+    id: "d1",
+    batchId: "b1",
+    position: 0,
+    body: "下書きの本文",
+    status: "needs_review",
+    version: 1,
+    createdAt: "2026-10-03T00:00:00.000Z",
+    updatedAt: "2026-10-03T00:00:00.000Z",
+    ...overrides,
+  };
+}
+
+function batchResult(drafts: PostDraft[], overrides: Partial<DraftBatchResult> = {}): DraftBatchResult {
+  return { batchId: "b1", draftCount: drafts.length, delimiterFound: true, overLimitCount: 0, drafts, ...overrides };
 }
 
 function listResponse(overrides: { items?: PostDraft[]; canGeneratePrompt?: boolean; promptPostCount?: number } = {}) {
@@ -201,5 +219,155 @@ describe("プロンプトのカード（US1）", () => {
     await user.click(screen.getByRole("link", { name: "投稿ストックへ" }));
     await screen.findByText("課題 11/16・宣伝の対象 1件・参考投稿 3件を反映");
     await waitFor(() => expect(getPrompt).toHaveBeenCalledTimes(2));
+  });
+});
+
+describe("貼り付け欄（US2）", () => {
+  const composer = () => screen.getByRole("textbox", { name: "AIの返信を貼り付ける欄" });
+  const sendButton = () => screen.getByRole("button", { name: "投稿ストックに登録する" });
+
+  async function paste(user: ReturnType<typeof userEvent.setup>, text: string) {
+    await user.click(composer());
+    await user.paste(text);
+  }
+
+  it("登録と取り消し：送ると案内が出て一覧に並び、「取り消す」で一覧から消えて欄に内容が戻る（FR-016・FR-016a）", async () => {
+    const user = userEvent.setup();
+    const drafts = [draft({ id: "d1", body: "1件目" }), draft({ id: "d2", position: 1, body: "2件目" })];
+    createDraftBatch.mockImplementation(async () => {
+      listPostDrafts.mockResolvedValue(listResponse({ items: drafts }));
+      return batchResult(drafts);
+    });
+    deleteDraftBatch.mockImplementation(async () => {
+      listPostDrafts.mockResolvedValue(listResponse());
+      return { deletedCount: 2 };
+    });
+    renderPage();
+    await screen.findByText(/まだ下書きがありません/);
+    await paste(user, "1件目\n@@@\n2件目");
+    await user.click(sendButton());
+    expect(await screen.findByText("2件を登録しました")).toBeInTheDocument();
+    expect(createDraftBatch).toHaveBeenCalledWith("a1", { clientRequestId: expect.any(String), text: "1件目\n@@@\n2件目" });
+    expect(await screen.findByText("1件目")).toBeInTheDocument();
+    expect(screen.getByText("2件目")).toBeInTheDocument();
+    expect(composer()).toHaveValue("");
+
+    await user.click(screen.getByRole("button", { name: "取り消す" }));
+    expect(deleteDraftBatch).toHaveBeenCalledWith("a1", "b1");
+    await waitFor(() => expect(composer()).toHaveValue("1件目\n@@@\n2件目"));
+    expect(toastSuccess).toHaveBeenCalledWith("2件の登録を取り消しました");
+    expect(await screen.findByText(/まだ下書きがありません/)).toBeInTheDocument();
+    expect(screen.queryByText("2件を登録しました")).not.toBeInTheDocument();
+  });
+
+  it("送信中は送るボタンと欄が無効になり、失敗して送り直すときは同じ clientRequestId を送る（FR-015）", async () => {
+    const user = userEvent.setup();
+    let reject: (e: unknown) => void = () => {};
+    createDraftBatch.mockImplementationOnce(() => new Promise((_, r) => (reject = r)));
+    createDraftBatch.mockResolvedValueOnce(batchResult([draft()]));
+    renderPage();
+    await screen.findByText(/まだ下書きがありません/);
+    await paste(user, "A");
+    await user.click(sendButton());
+    await waitFor(() => expect(composer()).toBeDisabled());
+    expect(sendButton()).toBeDisabled();
+    reject(new ApiError("API_UNREACHABLE", 0));
+    await user.click(await screen.findByRole("button", { name: "もう一度送る" }));
+    await screen.findByText("1件を登録しました");
+    const [first, second] = createDraftBatch.mock.calls.map((c) => (c[1] as { clientRequestId: string }).clientRequestId);
+    expect(second).toBe(first);
+  });
+
+  it("空・空白だけのときは送れない。51件分を貼ると、送らずに上限の案内が出る（FR-014）", async () => {
+    const user = userEvent.setup();
+    renderPage();
+    await screen.findByText(/まだ下書きがありません/);
+    expect(sendButton()).toBeDisabled();
+    await paste(user, "   ");
+    expect(sendButton()).toBeDisabled();
+    await user.clear(composer());
+    await paste(user, Array.from({ length: 51 }, (_, i) => `投稿${i}`).join("\n@@@\n"));
+    await user.click(sendButton());
+    expect(await screen.findByText(/一度に登録できるのは50件・50,000文字まで/)).toBeInTheDocument();
+    expect(createDraftBatch).not.toHaveBeenCalled();
+  });
+
+  it("区切りがない・上限を超える下書きがあるときの案内", async () => {
+    const user = userEvent.setup();
+    createDraftBatch.mockResolvedValue(batchResult([draft()], { delimiterFound: false, overLimitCount: 1 }));
+    renderPage();
+    await screen.findByText(/まだ下書きがありません/);
+    await paste(user, "区切りのない投稿");
+    await user.click(sendButton());
+    expect(await screen.findByText("区切り（@@@）が見つからなかったため、1件として登録しました")).toBeInTheDocument();
+    expect(screen.getByText("そのうち1件はThreadsの上限を超えています")).toBeInTheDocument();
+  });
+
+  it("409 ITEM_LIMIT_REACHED は投稿ストック用の文言を出し、再試行は出さず、一覧を取り直す", async () => {
+    const user = userEvent.setup();
+    createDraftBatch.mockRejectedValue(new ApiError("ITEM_LIMIT_REACHED", 409));
+    renderPage();
+    await screen.findByText(/まだ下書きがありません/);
+    expect(listPostDrafts).toHaveBeenCalledTimes(1);
+    await paste(user, "A");
+    await user.click(sendButton());
+    expect(
+      await screen.findByText("要確認の下書きが上限（500件）に達しています。不要な下書きを削除してから登録してください。"),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "もう一度送る" })).not.toBeInTheDocument();
+    await waitFor(() => expect(listPostDrafts).toHaveBeenCalledTimes(2));
+    expect(composer()).toHaveValue("A");
+  });
+
+  it("400 PASTE_TOO_LARGE（draft:12）では「12件目」が案内に出る", async () => {
+    const user = userEvent.setup();
+    createDraftBatch.mockRejectedValue(new ApiError("PASTE_TOO_LARGE", 400, ["draft:12"]));
+    renderPage();
+    await screen.findByText(/まだ下書きがありません/);
+    await paste(user, "A");
+    await user.click(sendButton());
+    expect(await screen.findByText(/^12件目が2,000文字を超えています。一度に登録できるのは/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "もう一度送る" })).not.toBeInTheDocument();
+  });
+
+  it("要確認が上限に達していると、一覧の上に案内が出て送るボタンが無効になる", async () => {
+    const user = userEvent.setup();
+    listPostDrafts.mockResolvedValue({ ...listResponse({ items: [draft()] }), limit: 1 });
+    renderPage();
+    expect(await screen.findByText(/要確認の下書きが上限（500件）に達しています/)).toBeInTheDocument();
+    await paste(user, "A");
+    expect(sendButton()).toBeDisabled();
+  });
+
+  it("書きかけの内容があるまま移動しようとすると、未保存の警告が出る（FR-022）", async () => {
+    const user = userEvent.setup();
+    renderPage();
+    await screen.findByText(/まだ下書きがありません/);
+    await paste(user, "書きかけ");
+    await user.click(screen.getByRole("link", { name: "ホームへ" }));
+    expect(await screen.findByText("保存していない変更があります")).toBeInTheDocument();
+  });
+
+  it("「投稿をつくる」から来たら、欄にフォーカスが当たる（FR-021）", async () => {
+    const router = createMemoryRouter(
+      [
+        {
+          path: "/accounts/:accountId",
+          element: (
+            <UnsavedChangesProvider>
+              <Outlet context={{ account }} />
+            </UnsavedChangesProvider>
+          ),
+          children: [{ path: "stock", element: <StockPage /> }],
+        },
+      ],
+      { initialEntries: [{ pathname: "/accounts/a1/stock", state: { focusComposer: true } }] },
+    );
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <RouterProvider router={router} />
+      </QueryClientProvider>,
+    );
+    await waitFor(() => expect(composer()).toHaveFocus());
   });
 });
