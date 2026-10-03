@@ -217,7 +217,7 @@ description: "AIプロンプトの生成と投稿案の一括登録の実装タ�
 - [X] T037 [P] `apps/api/test/integration/profile-cascade.test.ts`に、登録のまとまりと下書きを持つAccountを削除すると、`draft_batches`・`post_drafts`の行がすべて消えることを足す（FR-026。Account削除とMetaのデータ削除要求の両方）
 - [X] T038 `pnpm lint`・`pnpm typecheck`・`pnpm test`を通す。新しくexportした関数・コンポーネントすべてにJSDocを付ける
 - [X] T040 下書きの削除から確認のダイアログをなくし、トーストの「元に戻す」で取り消せるようにする（spec Clarifications 2026-10-04、contracts/ui-routes.md「下書きの削除」、research.md R9の追記）。`apps/web/src/pages/stock.tsx`で、削除した下書きを一覧から隠し、約5秒後に`deletePostDrafts`を呼ぶ。「元に戻す」で取りやめ、次の削除・画面を離れたときは前の削除をすぐ確定する。確定に失敗したら一覧を取り直してトーストを出す。`apps/web/test/stock.test.tsx`のUS3のテストを直す
-- [ ] T039 quickstart.mdの「手動の確認」1〜4を、`pnpm dev:fake`で375・768・1024・1440pxの4つの幅で行う。実際にChatGPTかClaudeにプロンプトを送り、30件の回答を貼り付けて登録できることを確かめる（SC-007）。50件・合計約30,000文字の回答を貼り付けて送り、登録の案内が出るまで待たされないこと（plan.md 性能目標の目安：500ms以内）を確かめる
+- [X] T039 quickstart.mdの「手動の確認」1〜4を、`pnpm dev:fake`で375・768・1024・1440pxの4つの幅で行う。実際にChatGPTかClaudeにプロンプトを送り、30件の回答を貼り付けて登録できることを確かめる（SC-007）。50件・合計約30,000文字の回答を貼り付けて送り、登録の案内が出るまで待たされないこと（plan.md 性能目標の目安：500ms以内）を確かめる
 
 ---
 
