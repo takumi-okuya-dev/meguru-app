@@ -7,6 +7,7 @@ import {
   errorMessage,
   errorResponseSchema,
   meResponseSchema,
+  profileStatusSchema,
   promotionListSchema,
   promotionSchema,
   promotionSettingsSchema,
@@ -105,6 +106,8 @@ export const api = {
   deleteAccount: (accountId: string, confirmUsername: string) =>
     request(`/api/accounts/${accountId}`, null, { method: "DELETE", body: JSON.stringify({ confirmUsername }) }),
   // ---- 戦略プロファイル（specs/002-strategy-profile contracts/api.md）----
+  getProfileStatus: (accountId: string) =>
+    request(`/api/accounts/${accountId}/profile-status`, profileStatusSchema),
   getStrategy: (accountId: string) => request(`/api/accounts/${accountId}/strategy`, strategySchema),
   putStrategy: (accountId: string, body: PutStrategyRequest) =>
     request(`/api/accounts/${accountId}/strategy`, strategySchema, { method: "PUT", body: JSON.stringify(body) }),

@@ -6,15 +6,23 @@ import { createDb } from "../db/client";
 import { AppError } from "../lib/errors";
 import { findOwnedAccount } from "../services/access";
 import { canEditProfile, requireGrowerAccess } from "../services/grower-access";
+import { getProfileStatus } from "../services/profile-status";
 import { getStrategy, saveStrategy } from "../services/strategy-service";
 
 /**
- * 課題のルート。GET は誰でも（owner なら）読め、PUT は grower機能を使える場合だけ保存できる。
+ * 課題とホームの入力状況のルート。GET は誰でも（owner なら）読め、PUT は grower機能を使える場合だけ保存できる。
  * @param authed - 認証のミドルウェア
  * @returns Hono のルート
  */
 export function strategyRoutes(authed: MiddlewareHandler<AppEnv>) {
   return new Hono<AppEnv>()
+    .get("/accounts/:accountId/profile-status", authed, async (c) => {
+      // ホームの入力状況（FR-017）。読み取りなので grower機能の判定はしない
+      const db = createDb(c.env.DATABASE_URL);
+      const user = c.get("user");
+      const account = await findOwnedAccount(db, user.id, c.req.param("accountId"));
+      return c.json(await getProfileStatus(db, account, user));
+    })
     .get("/accounts/:accountId/strategy", authed, async (c) => {
       const db = createDb(c.env.DATABASE_URL);
       const user = c.get("user");

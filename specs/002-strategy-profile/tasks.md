@@ -316,24 +316,24 @@ description: "戦略プロファイル（課題・宣伝内容・リサーチ）
 
 ### テスト（先に書いて失敗を確認する）
 
-- [ ] T054 [P] [US4] `apps/api/test/integration/profile-status.test.ts`を書く：
+- [X] T054 [P] [US4] `apps/api/test/integration/profile-status.test.ts`を書く：
   - 入力済み項目数・宣伝の対象の件数・全件数・参考投稿とキーワードの件数が正しい
   - `access`：無料体験中は`inTrial: true`・`trialEndsAt`あり。無料体験の後のプラン1は`canEdit: false`
   - 他人のAccountは`404`
   - `needs_reconnect`のAccountでも`200`で返る
-- [ ] T055 [P] [US4] `apps/web/test/account-home.test.tsx`を書く：
+- [X] T055 [P] [US4] `apps/web/test/account-home.test.tsx`を書く：
   - 「ホームの案内（Web）」：research.md R11の4つの「次にやること」の切り替え
   - 無料体験中に「無料体験中：{YYYY年M月D日}まで、すべての機能を使えます」が出る
   - `canEdit: false`ではgrower機能の案内に変わる
 
 ### 実装
 
-- [ ] T056 [US4] `apps/api/src/services/profile-status.ts`と`GET /api/accounts/:accountId/profile-status`を作る（`apps/api/src/routes/strategy.ts`に置く。contracts/api.md）。件数は1回のクエリでまとめて数える。`access`は`canEditProfile`と`trialEndsAt`（T006）から作る。レスポンスのスキーマを`packages/shared/src/schemas.ts`に足す
-- [ ] T057 [US4] `apps/web/src/pages/account-home.tsx`を、contracts/ui-routes.md「ホーム」のとおりにする：
+- [X] T056 [US4] `apps/api/src/services/profile-status.ts`と`GET /api/accounts/:accountId/profile-status`を作る（`apps/api/src/routes/strategy.ts`に置く。contracts/api.md）。件数は1回のクエリでまとめて数える。`access`は`canEditProfile`と`trialEndsAt`（T006）から作る。レスポンスのスキーマを`packages/shared/src/schemas.ts`に足す
+- [X] T057 [US4] `apps/web/src/pages/account-home.tsx`を、contracts/ui-routes.md「ホーム」のとおりにする：
   - 001の表示（アイコン・表示名・@ユーザー名・接続状態）の下に、無料体験中の表示、「次にやること」の大見出しと説明、3枚のカード（`md`以上は横並び、`md`未満は縦並びで右端に「›」）を出す
   - 案内している画面のカードは枠線を濃くする
   - `canEdit: false`では、grower機能の案内に変える
-- [ ] T058 [US4] 課題・宣伝内容・リサーチの保存・削除の`onSuccess`で`queryKeys.profileStatus(id)`を古いものとして扱う（`apps/web/src/pages/strategy.tsx`・`apps/web/src/pages/promotions.tsx`・`apps/web/src/pages/research.tsx`。contracts/ui-routes.md 規則11）
+- [X] T058 [US4] 課題・宣伝内容・リサーチの保存・削除の`onSuccess`で`queryKeys.profileStatus(id)`を古いものとして扱う（`apps/web/src/pages/strategy.tsx`・`apps/web/src/pages/promotions.tsx`・`apps/web/src/pages/research.tsx`。contracts/ui-routes.md 規則11）
 
 **完了条件**：T054・T055が通り、quickstart.md「手動の確認 5・6」ができる
 

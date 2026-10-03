@@ -273,3 +273,18 @@ export type ResearchKeyword = z.infer<typeof researchKeywordSchema>;
 
 /** GET /research-keywords のレスポンスのスキーマ。 */
 export const researchKeywordListSchema = z.object({ items: z.array(researchKeywordSchema), ...listMeta });
+
+/** GET /api/accounts/:id/profile-status のレスポンスのスキーマ（ホームの入力状況。research.md R11・R14）。 */
+export const profileStatusSchema = z.object({
+  strategy: z.object({ filledCount: z.number().int(), totalCount: z.number().int() }),
+  promotions: z.object({ targetableCount: z.number().int(), totalCount: z.number().int() }),
+  research: z.object({ referencePostCount: z.number().int(), keywordCount: z.number().int() }),
+  access: z.object({
+    canEdit: z.boolean(),
+    inTrial: z.boolean(),
+    /** 無料体験の終了時刻（ISO 8601） */
+    trialEndsAt: z.string().nullable(),
+  }),
+});
+/** ホームの入力状況。 */
+export type ProfileStatus = z.infer<typeof profileStatusSchema>;
