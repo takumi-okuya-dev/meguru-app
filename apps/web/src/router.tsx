@@ -14,6 +14,7 @@ import { AppearanceSettings } from "@/pages/settings/appearance";
 import { SettingsIndex, SettingsLayout } from "@/pages/settings/settings-layout";
 import { PromotionsPage } from "@/pages/promotions";
 import { ResearchPage } from "@/pages/research";
+import { StockPage } from "@/pages/stock";
 import { StrategyPage } from "@/pages/strategy";
 
 /** 画面のルート（contracts/ui-routes.md「ルート」）。認証が必要な画面は RequireAuth で包む。 */
@@ -43,6 +44,7 @@ export const routes = [
           { path: "strategy", element: <StrategyPage /> },
           { path: "promotions", element: <PromotionsPage /> },
           { path: "research", element: <ResearchPage /> },
+          { path: "stock", element: <StockPage /> },
         ],
       },
     ],

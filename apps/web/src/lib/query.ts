@@ -26,4 +26,8 @@ export const queryKeys = {
   promotionSettings: (id: string) => ["account", id, "promotion-settings"] as const,
   referencePosts: (id: string) => ["account", id, "reference-posts"] as const,
   researchKeywords: (id: string) => ["account", id, "research-keywords"] as const,
+  // 投稿ストック（specs/003-prompt-bulk-register）。プロンプトは件数ごとのキーで、取り直しは ["account", id, "prompt"] の範囲で行う
+  prompt: (id: string, count: number) => ["account", id, "prompt", count] as const,
+  promptAll: (id: string) => ["account", id, "prompt"] as const,
+  postDrafts: (id: string) => ["account", id, "post-drafts"] as const,
 };

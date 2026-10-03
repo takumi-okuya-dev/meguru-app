@@ -10,6 +10,9 @@ import {
   SHORT_TEXT_MAX,
   STRATEGY_TEXT_MAX,
   URL_MAX,
+  DRAFT_BODY_MAX,
+  PROMPT_COUNT_MAX,
+  PROMPT_COUNT_MIN,
 } from "./limits";
 import { isValidYmd } from "./promotions";
 import { PLANS } from "./plans";
@@ -290,3 +293,95 @@ export const profileStatusSchema = z.object({
 });
 /** ホームの入力状況。 */
 export type ProfileStatus = z.infer<typeof profileStatusSchema>;
+
+// ---- 投稿ストック（specs/003-prompt-bulk-register contracts/api.md）----
+
+/** 下書きの状態のスキーマ。003では要確認だけ（004で approved・rejected を足す）。 */
+export const postDraftStatusSchema = z.enum(["needs_review"]);
+
+/** 下書き（レスポンス）のスキーマ。 */
+export const postDraftSchema = z.object({
+  id: z.string(),
+  batchId: z.string(),
+  /** 登録のまとまりの中での順番（0始まり） */
+  position: z.number().int(),
+  body: z.string(),
+  status: postDraftStatusSchema,
+  version: z.number().int(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
+/** 下書き（レスポンス）。 */
+export type PostDraft = z.infer<typeof postDraftSchema>;
+
+/** GET /post-drafts のレスポンスのスキーマ。 */
+export const postDraftListSchema = z.object({
+  items: z.array(postDraftSchema),
+  limit: z.number().int(),
+  /** そのAccountで、プロンプトの生成（grower機能）を使えるか */
+  canGeneratePrompt: z.boolean(),
+  /** 保存済みの作る件数 */
+  promptPostCount: z.number().int(),
+});
+/** GET /post-drafts のレスポンス。 */
+export type PostDraftList = z.infer<typeof postDraftListSchema>;
+
+/** POST /draft-batches のリクエストのスキーマ。 */
+export const createDraftBatchRequestSchema = z.object({
+  /** Webが送信ごとに作るID。再試行では同じ値（research.md R5） */
+  clientRequestId: z.string().uuid(),
+  text: z.string().refine((s) => !isBlank(s), { message: "required" }),
+});
+/** POST /draft-batches のリクエスト。 */
+export type CreateDraftBatchRequest = z.infer<typeof createDraftBatchRequestSchema>;
+
+/** POST /draft-batches のレスポンスのスキーマ。 */
+export const draftBatchResultSchema = z.object({
+  batchId: z.string(),
+  draftCount: z.number().int(),
+  delimiterFound: z.boolean(),
+  /** Threadsの上限（500・リンク5個）を超える下書きの件数 */
+  overLimitCount: z.number().int(),
+  drafts: z.array(postDraftSchema),
+});
+/** POST /draft-batches のレスポンス。 */
+export type DraftBatchResult = z.infer<typeof draftBatchResultSchema>;
+
+/** PUT /post-drafts/:id のリクエストのスキーマ。 */
+export const updatePostDraftRequestSchema = z.object({
+  body: requiredText(DRAFT_BODY_MAX),
+  expectedVersion: z.number().int().positive(),
+});
+
+/** POST /post-drafts/delete のリクエストのスキーマ。 */
+export const deletePostDraftsRequestSchema = z.object({
+  ids: z.array(z.string().uuid()).min(1).max(500),
+});
+
+/** 削除した件数のスキーマ（取り消し・まとめての削除のレスポンス）。 */
+export const deleteCountSchema = z.object({ deletedCount: z.number().int() });
+
+/** プロンプトに実際に含めた内容の要約のスキーマ。 */
+export const promptSummarySchema = z.object({
+  strategyFilledCount: z.number().int(),
+  promotionCount: z.number().int(),
+  referencePostCount: z.number().int(),
+  recentDraftCount: z.number().int(),
+  length: z.number().int(),
+});
+/** プロンプトに実際に含めた内容の要約。 */
+export type PromptSummary = z.infer<typeof promptSummarySchema>;
+
+/** GET /prompt のレスポンスのスキーマ。 */
+export const promptResponseSchema = z.object({
+  prompt: z.string(),
+  count: z.number().int(),
+  summary: promptSummarySchema,
+});
+/** GET /prompt のレスポンス。 */
+export type PromptResponse = z.infer<typeof promptResponseSchema>;
+
+/** 作る件数のスキーマ（PUT /prompt-settings のリクエストとレスポンス）。 */
+export const promptSettingsSchema = z.object({
+  postCount: z.number().int().min(PROMPT_COUNT_MIN).max(PROMPT_COUNT_MAX),
+});

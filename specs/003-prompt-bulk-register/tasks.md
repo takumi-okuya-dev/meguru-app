@@ -45,22 +45,22 @@ description: "AIプロンプトの生成と投稿案の一括登録の実装タ�
 
 ### 共通パッケージ
 
-- [ ] T001 [P] `packages/shared/test/drafts.test.ts`と`packages/shared/test/threads-text.test.ts`を書く（失敗を確認する）。quickstart.mdの表の次の行をすべて含める。
+- [X] T001 [P] `packages/shared/test/drafts.test.ts`と`packages/shared/test/threads-text.test.ts`を書く（失敗を確認する）。quickstart.mdの表の次の行をすべて含める。
   - `drafts.test.ts`：「分割の基本」「区切りの揺れ」「前後の空白・空の部分」「区切りなし」。区切りの揺れは、行全体が` @@@ `・`＠＠＠`・`@@@@`・`**@@@**`・`` `@@@` ``のとき分割し、`本文の中の@@@`（行の一部）では分割しないこと。改行`\r\n`・`\r`も扱えること。外部LLMが付けた番号（`1. `・`【1】`）は消さず、そのまま本文に残ること（spec エッジケース）
   - `threads-text.test.ts`：「Threadsの長さ」。日本語100文字は100、「😀」は4、「🇯🇵」は8、ZWJで結合した絵文字「👨‍👩‍👧」はそのUTF-8のバイト数（18）。`countLinks`は`https://a.example/x`・`http://b.example`・`www.c.example`をそれぞれ1と数える。上限の判定（`threadsLength > 500`または`countLinks > 5`で超え）
-- [ ] T002 [P] `packages/shared/src/drafts.ts`に`splitDrafts(text: string): { parts: string[]; delimiterFound: boolean }`を作る（research.md R3）。
+- [X] T002 [P] `packages/shared/src/drafts.ts`に`splitDrafts(text: string): { parts: string[]; delimiterFound: boolean }`を作る（research.md R3）。
   1. 改行を`\n`にそろえる
   2. 各行をNFKC正規化し、前後の空白と`*`・`_`・`` ` ``を除いた結果が`/^@{3,}$/`に一致する行を区切りの行とする
   3. 区切りの行で分け、各部分は**元の文字のまま**（NFKCをかけない）前後の空白・改行を取り除き、空の部分は捨てる
   4. 区切りの行が1つもなければ、全体を前後の空白を除いて1件にし`delimiterFound: false`
-- [ ] T003 [P] `packages/shared/src/threads-text.ts`に`THREADS_TEXT_LIMIT = 500`、`THREADS_LINK_LIMIT = 5`、`threadsLength(text)`、`countLinks(text)`、`isOverThreadsLimit(text)`を作る（research.md R4、FR-013）。
+- [X] T003 [P] `packages/shared/src/threads-text.ts`に`THREADS_TEXT_LIMIT = 500`、`THREADS_LINK_LIMIT = 5`、`threadsLength(text)`、`countLinks(text)`、`isOverThreadsLimit(text)`を作る（research.md R4、FR-013）。
   - `Intl.Segmenter`（`granularity: "grapheme"`）で書記素に分ける
   - 書記素が`/\p{Extended_Pictographic}|\p{Regional_Indicator}/u`に一致すれば、その書記素のUTF-8のバイト数を足す（コードポイントから計算：`< 0x80`は1、`< 0x800`は2、`< 0x10000`は3、それ以外は4。`TextEncoder`は使わない）
   - それ以外は、書記素のコードポイントの数を足す
   - `countLinks`は`/https?:\/\/\S+|\bwww\.\S+/gi`の一致数
-- [ ] T004 `packages/shared/src/limits.ts`に、`PASTE_MAX_DRAFTS = 50`、`PASTE_MAX_CHARS = 50000`、`DRAFT_BODY_MAX = 2000`、`NEEDS_REVIEW_LIMIT = 500`、`PROMPT_COUNT_MIN = 1`、`PROMPT_COUNT_MAX = 50`、`PROMPT_COUNT_DEFAULT = 30`、`PROMPT_REFERENCE_POSTS = 10`、`PROMPT_RECENT_DRAFTS = 20`、`PROMPT_LENGTH_TARGET = 30000`を足す
-- [ ] T005 `packages/shared/src/errors.ts`の`ERROR_CODES`に`PASTE_TOO_LARGE`を足し、`errorMessage`に「一度に登録できるのは50件・50,000文字まで、1件は2,000文字までです。分けて貼り付けてください。」（action `none`）を足す。`packages/shared/src/index.ts`から`drafts`・`threads-text`をexportする
-- [ ] T006 `packages/shared/src/schemas.ts`に、contracts/api.mdの型のスキーマを足す。
+- [X] T004 `packages/shared/src/limits.ts`に、`PASTE_MAX_DRAFTS = 50`、`PASTE_MAX_CHARS = 50000`、`DRAFT_BODY_MAX = 2000`、`NEEDS_REVIEW_LIMIT = 500`、`PROMPT_COUNT_MIN = 1`、`PROMPT_COUNT_MAX = 50`、`PROMPT_COUNT_DEFAULT = 30`、`PROMPT_REFERENCE_POSTS = 10`、`PROMPT_RECENT_DRAFTS = 20`、`PROMPT_LENGTH_TARGET = 30000`を足す
+- [X] T005 `packages/shared/src/errors.ts`の`ERROR_CODES`に`PASTE_TOO_LARGE`を足し、`errorMessage`に「一度に登録できるのは50件・50,000文字まで、1件は2,000文字までです。分けて貼り付けてください。」（action `none`）を足す。`packages/shared/src/index.ts`から`drafts`・`threads-text`をexportする
+- [X] T006 `packages/shared/src/schemas.ts`に、contracts/api.mdの型のスキーマを足す。
   - `postDraftSchema`（`status`は`z.enum(["needs_review"])`）、`postDraftListSchema`（`items`・`limit`・`canGeneratePrompt`・`promptPostCount`）
   - `createDraftBatchRequestSchema`（`clientRequestId: z.string().uuid()`、`text`は空白だけでない文字列）、`draftBatchResultSchema`（`batchId`・`draftCount`・`delimiterFound`・`overLimitCount`・`drafts`）
   - `updatePostDraftRequestSchema`（`body`は`requiredText(DRAFT_BODY_MAX)`、`expectedVersion`は1以上の整数）、`deletePostDraftsRequestSchema`（`ids`はUUIDの配列で1〜500件）、`deleteCountSchema`（`deletedCount`）
@@ -68,18 +68,18 @@ description: "AIプロンプトの生成と投稿案の一括登録の実装タ�
 
 ### DB
 
-- [ ] T007 `apps/api/src/db/schema.ts`に、data-model.mdのとおり次を足す。
+- [X] T007 `apps/api/src/db/schema.ts`に、data-model.mdのとおり次を足す。
   - **列挙型**：`post_draft_status`（`needs_review`）
   - **`accounts`**：`prompt_post_count`（smallint、NOT NULL、既定値30、`1 <= 値 <= 50`）
   - **`draft_batches`**：`id`（uuid、PK）、`account_id`（NOT NULL、FK → `accounts.id` ON DELETE CASCADE）、`client_request_id`（uuid、NOT NULL）、`draft_count`（smallint、NOT NULL、`1 <= 値 <= 50`）、`delimiter_found`（boolean、NOT NULL）、`created_at`（timestamptz、NOT NULL）。一意制約`(account_id, client_request_id)`
   - **`post_drafts`**：`id`（uuid、PK）、`account_id`（NOT NULL、FK → `accounts.id` ON DELETE CASCADE）、`batch_id`（NOT NULL、FK → `draft_batches.id` ON DELETE CASCADE）、`position`（smallint、NOT NULL、`0 <= 値 < 50`）、`body`（text、NOT NULL、`1 <= char_length <= 2000`）、`status`（post_draft_status、NOT NULL、既定値`needs_review`）、`version`（integer、NOT NULL、既定値1）、`created_at`・`updated_at`。一意制約`(batch_id, position)`、インデックス`(account_id, status)`
-- [ ] T008 `pnpm --filter api db:generate --name post_drafts`でマイグレーション（`apps/api/drizzle/0002_post_drafts.sql`）を作り、ローカルDBに当てて、既存のAccountに`prompt_post_count = 30`が入ることを確かめる。`apps/api/test/helpers/app.ts`の`resetDb`と`e2e/tests/helpers.ts`の`resetAll`の`TRUNCATE`に`draft_batches`・`post_drafts`を足す
+- [X] T008 `pnpm --filter api db:generate --name post_drafts`でマイグレーション（`apps/api/drizzle/0002_post_drafts.sql`）を作り、ローカルDBに当てて、既存のAccountに`prompt_post_count = 30`が入ることを確かめる。`apps/api/test/helpers/app.ts`の`resetDb`と`e2e/tests/helpers.ts`の`resetAll`の`TRUNCATE`に`draft_batches`・`post_drafts`を足す
 
 ### Webの骨組み
 
-- [ ] T009 [P] `apps/web/src/lib/api-client.ts`の`api`に、本featureの呼び出し（`getPrompt(accountId, count?)`・`putPromptSettings`・`listPostDrafts`・`createDraftBatch`・`deleteDraftBatch`・`updatePostDraft`・`deletePostDrafts`）を、T006のスキーマで検証する形で足す。`apps/web/src/lib/query.ts`の`queryKeys`に`prompt(id, count)`（`["account", id, "prompt", count]`）・`postDrafts(id)`（`["account", id, "post-drafts"]`）を足す
-- [ ] T010 `apps/web/src/pages/stock.tsx`に投稿ストックの画面の骨組みを作る（contracts/ui-routes.md「投稿ストックの画面」、docs/ui-design.md 型C）：`PageHeader`（「投稿ストック」）、上部のカードの場所、状態のタブ（「要確認 {件数}」）と一覧の場所、画面下部に固定の貼り付け欄の場所（`md`未満は`pb-[env(safe-area-inset-bottom)]`で下端の操作バーを避ける）。`listPostDrafts`で一覧を取得し、読み込み中・失敗（`ApiErrorScreen`）を扱う
-- [ ] T011 `apps/web/src/router.tsx`に`/accounts/:accountId/stock`を足し、`apps/web/src/components/layout/Sidebar.tsx`に「投稿をつくる」（`SquarePen`。Accountの切り替えのすぐ下。押すと`/accounts/:id/stock`へ移動し、`location.state`の`focusComposer: true`で貼り付け欄にフォーカスを当てる）と、見出しなしの欄の「ホーム」の下に「投稿ストック」（`Inbox`）を足す（FR-021）
+- [X] T009 [P] `apps/web/src/lib/api-client.ts`の`api`に、本featureの呼び出し（`getPrompt(accountId, count?)`・`putPromptSettings`・`listPostDrafts`・`createDraftBatch`・`deleteDraftBatch`・`updatePostDraft`・`deletePostDrafts`）を、T006のスキーマで検証する形で足す。`apps/web/src/lib/query.ts`の`queryKeys`に`prompt(id, count)`（`["account", id, "prompt", count]`）・`postDrafts(id)`（`["account", id, "post-drafts"]`）を足す
+- [X] T010 `apps/web/src/pages/stock.tsx`に投稿ストックの画面の骨組みを作る（contracts/ui-routes.md「投稿ストックの画面」、docs/ui-design.md 型C）：`PageHeader`（「投稿ストック」）、上部のカードの場所、状態のタブ（「要確認 {件数}」）と一覧の場所、画面下部に固定の貼り付け欄の場所（`md`未満は`pb-[env(safe-area-inset-bottom)]`で下端の操作バーを避ける）。`listPostDrafts`で一覧を取得し、読み込み中・失敗（`ApiErrorScreen`）を扱う
+- [X] T011 `apps/web/src/router.tsx`に`/accounts/:accountId/stock`を足し、`apps/web/src/components/layout/Sidebar.tsx`に「投稿をつくる」（`SquarePen`。Accountの切り替えのすぐ下。押すと`/accounts/:id/stock`へ移動し、`location.state`の`focusComposer: true`で貼り付け欄にフォーカスを当てる）と、見出しなしの欄の「ホーム」の下に「投稿ストック」（`Inbox`）を足す（FR-021）
 
 **完了条件**：`pnpm --filter @threads-grower/shared test`（T001）が通る。002までの既存のテストが引き続き通る。サイドバーから投稿ストックの画面（空の骨組み）を開ける
 
