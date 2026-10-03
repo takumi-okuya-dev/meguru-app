@@ -172,3 +172,90 @@ describe("DELETE /draft-batches/:batchId（取り消し）", () => {
     expect(await countRows(other.accountId)).toBe(1);
   });
 });
+
+describe("PUT /post-drafts/:draftId（編集）", () => {
+  it("本文を更新して version が1増える。前後の空白は除いて保存する（FR-019）", async () => {
+    const { accountId } = await createUserWithAccount("u1");
+    const [d] = (await register(accountId, "元の本文")).drafts;
+    const res = await call(app, "PUT", `${base(accountId)}/post-drafts/${d!.id}`, {
+      user: "u1",
+      body: { body: "  直した本文\n2行目 \n", expectedVersion: 1 },
+    });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({ id: d!.id, body: "直した本文\n2行目", version: 2, position: 0 });
+  });
+
+  it("空白だけ・2,001文字は 400 VALIDATION_FAILED（details: body）", async () => {
+    const { accountId } = await createUserWithAccount("u1");
+    const [d] = (await register(accountId, "A")).drafts;
+    for (const body of [" \n ", "あ".repeat(2001)]) {
+      const res = await call(app, "PUT", `${base(accountId)}/post-drafts/${d!.id}`, { user: "u1", body: { body, expectedVersion: 1 } });
+      expect(res.status).toBe(400);
+      expect(await res.json()).toMatchObject({ error: { code: "VALIDATION_FAILED", details: ["body"] } });
+    }
+  });
+
+  it("同じ expectedVersion の2回目は 409 STALE_UPDATE（latest 付き）、削除済みは 404 ITEM_NOT_FOUND", async () => {
+    const { accountId } = await createUserWithAccount("u1");
+    const [d] = (await register(accountId, "A")).drafts;
+    const path = `${base(accountId)}/post-drafts/${d!.id}`;
+    expect((await call(app, "PUT", path, { user: "u1", body: { body: "B", expectedVersion: 1 } })).status).toBe(200);
+    const stale = await call(app, "PUT", path, { user: "u1", body: { body: "C", expectedVersion: 1 } });
+    expect(stale.status).toBe(409);
+    expect(await stale.json()).toMatchObject({ error: { code: "STALE_UPDATE" }, latest: { body: "B", version: 2 } });
+    await call(app, "POST", `${base(accountId)}/post-drafts/delete`, { user: "u1", body: { ids: [d!.id] } });
+    const gone = await call(app, "PUT", path, { user: "u1", body: { body: "D", expectedVersion: 2 } });
+    expect(gone.status).toBe(404);
+    expect(await gone.json()).toMatchObject({ error: { code: "ITEM_NOT_FOUND" } });
+  });
+
+  it("他人のAccountの下書きは 404 ITEM_NOT_FOUND", async () => {
+    const { accountId } = await createUserWithAccount("u1");
+    const other = await createUserWithAccount("u2");
+    const [d] = (await register(other.accountId, "他人", "u2")).drafts;
+    const res = await call(app, "PUT", `${base(accountId)}/post-drafts/${d!.id}`, { user: "u1", body: { body: "X", expectedVersion: 1 } });
+    expect(res.status).toBe(404);
+  });
+});
+
+describe("POST /post-drafts/delete（まとめての削除）", () => {
+  it("自分のAccountの要確認の下書きだけを消し、他人の下書きのIDは無視して数えない（FR-020）", async () => {
+    const { accountId } = await createUserWithAccount("u1");
+    const other = await createUserWithAccount("u2");
+    const mine = (await register(accountId, "A\n@@@\nB\n@@@\nC")).drafts;
+    const theirs = (await register(other.accountId, "他人", "u2")).drafts;
+    const res = await call(app, "POST", `${base(accountId)}/post-drafts/delete`, {
+      user: "u1",
+      body: { ids: [mine[0]!.id, mine[2]!.id, theirs[0]!.id, crypto.randomUUID()] },
+    });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ deletedCount: 2 });
+    expect((await list(accountId)).items.map((d) => d.body)).toEqual(["B"]);
+    expect(await countRows(other.accountId)).toBe(1);
+  });
+
+  it("0件・501件・UUIDでないIDは 400", async () => {
+    const { accountId } = await createUserWithAccount("u1");
+    for (const ids of [[], Array.from({ length: 501 }, () => crypto.randomUUID()), ["abc"]]) {
+      const res = await call(app, "POST", `${base(accountId)}/post-drafts/delete`, { user: "u1", body: { ids } });
+      expect(res.status).toBe(400);
+    }
+  });
+});
+
+describe("要再接続のAccount（FR-025）", () => {
+  it("編集・まとめての削除・取り消しが使える", async () => {
+    const { accountId } = await createUserWithAccount("u1");
+    const r = await register(accountId, "A\n@@@\nB");
+    await setAccount(accountId, { connectionStatus: "needs_reconnect" });
+    const put = await call(app, "PUT", `${base(accountId)}/post-drafts/${r.drafts[0]!.id}`, {
+      user: "u1",
+      body: { body: "直した", expectedVersion: 1 },
+    });
+    expect(put.status).toBe(200);
+    const del = await call(app, "POST", `${base(accountId)}/post-drafts/delete`, { user: "u1", body: { ids: [r.drafts[1]!.id] } });
+    expect(await del.json()).toEqual({ deletedCount: 1 });
+    const undo = await call(app, "DELETE", `${base(accountId)}/draft-batches/${r.batchId}`, { user: "u1" });
+    expect(await undo.json()).toEqual({ deletedCount: 1 });
+  });
+});

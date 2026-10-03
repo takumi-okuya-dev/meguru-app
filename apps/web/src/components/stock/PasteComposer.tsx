@@ -20,6 +20,8 @@ import { useUnsavedChanges } from "@/lib/use-unsaved-changes";
 import { STOCK_LIMIT_MESSAGE } from "./messages";
 
 type Notice = { message: string; retry: boolean };
+/** 下書きを選んでいるときの状態と操作（US3）。 */
+export type DraftSelection = { count: number; onClear: () => void; onDelete: () => void };
 type Registered = { result: DraftBatchResult; text: string };
 
 /**
@@ -35,10 +37,20 @@ function pasteTooLargeMessage(details: string[]): string {
 
 /**
  * 貼り付け欄。登録直後の案内（件数・取り消し）も、この欄のすぐ上に出す。
- * @param props - accountId：Account の ID、atLimit：要確認の下書きが上限に達しているか（送るボタンを無効にする）
- * @returns 貼り付け欄
+ * 下書きを1件でも選んでいる間は、欄の代わりに選択のバーを出す（書きかけの内容は残る）。
+ * @param props - accountId：Account の ID、atLimit：要確認の下書きが上限に達しているか（送るボタンを無効にする）、
+ *   selection：下書きの選択の状態と操作
+ * @returns 貼り付け欄、または選択のバー
  */
-export function PasteComposer({ accountId, atLimit }: { accountId: string; atLimit: boolean }) {
+export function PasteComposer({
+  accountId,
+  atLimit,
+  selection,
+}: {
+  accountId: string;
+  atLimit: boolean;
+  selection?: DraftSelection;
+}) {
   const queryClient = useQueryClient();
   const location = useLocation();
   const [text, setText] = useState("");
@@ -114,6 +126,8 @@ export function PasteComposer({ accountId, atLimit }: { accountId: string; atLim
 
   const blank = text.trim() === "";
   const canSend = !blank && !send.isPending && !atLimit;
+
+  if (selection && selection.count > 0) return <SelectionBar selection={selection} />;
 
   return (
     <div className="space-y-2 pt-2">
@@ -191,6 +205,26 @@ function RegisteredNotice({
       <Button size="icon" variant="ghost" className="size-8 rounded-full" aria-label="閉じる" onClick={onClose}>
         <XIcon className="size-4" />
       </Button>
+    </div>
+  );
+}
+
+function SelectionBar({ selection }: { selection: DraftSelection }) {
+  return (
+    <div className="pt-2 pb-1">
+      <div
+        role="toolbar"
+        aria-label="選んだ下書きの操作"
+        className="flex flex-wrap items-center gap-2 rounded-3xl border bg-card py-2 pr-2 pl-4 shadow-sm"
+      >
+        <span className="min-w-0 flex-1 text-sm font-medium">{selection.count}件を選択中</span>
+        <Button variant="ghost" className="h-10 rounded-full md:h-9" onClick={selection.onClear}>
+          選択を解除
+        </Button>
+        <Button variant="destructive" className="h-10 rounded-full md:h-9" onClick={selection.onDelete}>
+          選んだ下書きを削除
+        </Button>
+      </div>
     </div>
   );
 }

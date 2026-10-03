@@ -1,11 +1,12 @@
 // 投稿ストックの下書き（specs/003-prompt-bulk-register research.md R3・R5〜R8）。
 // 一覧・一括登録・取り消し・編集・まとめての削除の手順を持つ。下書きの操作は全プランで使える（R10）。
 import { NEEDS_REVIEW_LIMIT, findPasteProblem, isOverThreadsLimit, splitDrafts } from "@threads-grower/shared";
-import { and, asc, count, desc, eq, sql } from "drizzle-orm";
+import { and, asc, count, desc, eq, inArray, sql } from "drizzle-orm";
 import { withTransaction, type Db, type TxDb } from "../db/client";
 import { draftBatches, postDrafts } from "../db/schema";
 import type { Env } from "../env";
 import { AppError, itemNotFound, notFound, pgErrorCode } from "../lib/errors";
+import { updateWithVersion } from "./item-service";
 
 type PostDraftRow = typeof postDrafts.$inferSelect;
 
@@ -131,6 +132,45 @@ export async function deleteBatch(db: Db, accountId: string, batchId: string): P
   const deleted = await db
     .delete(postDrafts)
     .where(and(eq(postDrafts.batchId, batchId), eq(postDrafts.accountId, accountId), eq(postDrafts.status, "needs_review")))
+    .returning({ id: postDrafts.id });
+  return deleted.length;
+}
+
+/**
+ * 下書きの本文を編集する（FR-019）。要確認の下書きだけを対象にし、本文の前後の空白を除いて保存する。
+ * @param db - データベース
+ * @param accountId - accounts.id
+ * @param id - post_drafts.id（UUID の形は確かめてあること）
+ * @param req - body：新しい本文、expectedVersion：読み込んだときの version
+ * @returns 更新した PostDraft
+ * @throws AppError STALE_UPDATE（他で先に更新された。latest 付き）、ITEM_NOT_FOUND（ない・別のAccountのもの）
+ */
+export async function updateDraft(db: Db, accountId: string, id: string, req: { body: string; expectedVersion: number }) {
+  const mine = and(eq(postDrafts.id, id), eq(postDrafts.accountId, accountId), eq(postDrafts.status, "needs_review"));
+  const row = await updateWithVersion(
+    () =>
+      db
+        .update(postDrafts)
+        .set({ body: req.body.trim(), version: sql`${postDrafts.version} + 1`, updatedAt: new Date() })
+        .where(and(mine, eq(postDrafts.version, req.expectedVersion)))
+        .returning(),
+    async () => (await db.select().from(postDrafts).where(mine).limit(1))[0],
+    toPostDraft,
+  );
+  return toPostDraft(row);
+}
+
+/**
+ * 下書きをまとめて削除する（FR-020）。そのAccountの要確認の下書きだけを消し、それ以外のIDは無視する。
+ * @param db - データベース
+ * @param accountId - accounts.id
+ * @param ids - post_drafts.id の一覧（UUID の形は確かめてあること）
+ * @returns 削除した件数
+ */
+export async function deleteDrafts(db: Db, accountId: string, ids: string[]): Promise<number> {
+  const deleted = await db
+    .delete(postDrafts)
+    .where(and(inArray(postDrafts.id, ids), eq(postDrafts.accountId, accountId), eq(postDrafts.status, "needs_review")))
     .returning({ id: postDrafts.id });
   return deleted.length;
 }

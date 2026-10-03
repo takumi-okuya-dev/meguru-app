@@ -1,6 +1,6 @@
 // 投稿ストックの画面（specs/003-prompt-bulk-register US1〜US3、contracts/ui-routes.md「投稿ストックの画面」）
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { AccountSummary, DraftBatchResult, PostDraft, PromptResponse } from "@threads-grower/shared";
 import { createMemoryRouter, Link, Outlet, RouterProvider } from "react-router";
@@ -369,5 +369,96 @@ describe("貼り付け欄（US2）", () => {
       </QueryClientProvider>,
     );
     await waitFor(() => expect(composer()).toHaveFocus());
+  });
+});
+
+describe("下書きの確認・修正・削除（US3）", () => {
+  const items = [
+    draft({ id: "d1", body: "1件目の下書き" }),
+    draft({ id: "d2", position: 1, body: "2件目の下書き" }),
+    draft({ id: "d3", position: 2, body: "3件目の下書き" }),
+  ];
+
+  beforeEach(() => {
+    listPostDrafts.mockResolvedValue(listResponse({ items }));
+  });
+
+  it("下書きを選ぶと貼り付け欄の位置に選択のバーが出て、確認のうえ選んだIDで削除する（FR-020）", async () => {
+    const user = userEvent.setup();
+    deletePostDrafts.mockImplementation(async () => {
+      listPostDrafts.mockResolvedValue(listResponse({ items: [items[1]!] }));
+      return { deletedCount: 2 };
+    });
+    renderPage();
+    await user.click(await screen.findByRole("checkbox", { name: "「1件目の下書き」を選択" }));
+    await user.click(screen.getByRole("checkbox", { name: "「3件目の下書き」を選択" }));
+    expect(screen.getByText("2件を選択中")).toBeInTheDocument();
+    expect(screen.queryByRole("textbox", { name: "AIの返信を貼り付ける欄" })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "選んだ下書きを削除" }));
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).getByText("2件の下書きを削除しますか？")).toBeInTheDocument();
+    expect(within(dialog).getByText("元に戻せません。")).toBeInTheDocument();
+    await user.click(within(dialog).getByRole("button", { name: "削除する" }));
+    expect(deletePostDrafts).toHaveBeenCalledWith("a1", ["d1", "d3"]);
+    await waitFor(() => expect(screen.queryByText("1件目の下書き")).not.toBeInTheDocument());
+    expect(screen.queryByText(/件を選択中/)).not.toBeInTheDocument();
+    expect(screen.getByRole("textbox", { name: "AIの返信を貼り付ける欄" })).toBeInTheDocument();
+  });
+
+  it("「すべて選択」と「選択を解除」", async () => {
+    const user = userEvent.setup();
+    renderPage();
+    await user.click(await screen.findByRole("checkbox", { name: "すべて選択" }));
+    expect(screen.getByText("3件を選択中")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "選択を解除" }));
+    expect(screen.queryByText(/件を選択中/)).not.toBeInTheDocument();
+  });
+
+  it("「⋯」の「削除」で1件を確認のうえ削除する", async () => {
+    const user = userEvent.setup();
+    deletePostDrafts.mockResolvedValue({ deletedCount: 1 });
+    renderPage();
+    await user.click(await screen.findByRole("button", { name: "「2件目の下書き」の操作" }));
+    await user.click(await screen.findByRole("menuitem", { name: "削除" }));
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).getByText("この下書きを削除しますか？")).toBeInTheDocument();
+    await user.click(within(dialog).getByRole("button", { name: "削除する" }));
+    expect(deletePostDrafts).toHaveBeenCalledWith("a1", ["d2"]);
+  });
+
+  it("「⋯」の「編集」で本文を直して保存すると一覧に反映される（FR-019）", async () => {
+    const user = userEvent.setup();
+    updatePostDraft.mockImplementation(async (_a: string, id: string, req: { body: string }) => {
+      const updated = { ...items[0]!, id, body: req.body, version: 2 };
+      listPostDrafts.mockResolvedValue(listResponse({ items: [updated, items[1]!, items[2]!] }));
+      return updated;
+    });
+    renderPage();
+    await user.click(await screen.findByRole("button", { name: "「1件目の下書き」の操作" }));
+    await user.click(await screen.findByRole("menuitem", { name: "編集" }));
+    const dialog = await screen.findByRole("dialog", { name: "下書きを編集" });
+    const body = within(dialog).getByRole("textbox", { name: /本文/ });
+    await user.clear(body);
+    await user.type(body, "直した下書き");
+    expect(within(dialog).getByText("6文字")).toBeInTheDocument();
+    await user.click(within(dialog).getAllByRole("button", { name: "保存" }).at(-1)!);
+    expect(updatePostDraft).toHaveBeenCalledWith("a1", "d1", { body: "直した下書き", expectedVersion: 1 });
+    expect(await screen.findByText("直した下書き")).toBeInTheDocument();
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+
+  it("編集の保存で 409 なら競合のダイアログが出る", async () => {
+    const user = userEvent.setup();
+    updatePostDraft.mockRejectedValue(
+      new ApiError("STALE_UPDATE", 409, [], { ...items[0]!, body: "他で直した", version: 2, updatedAt: "2026-10-03T01:00:00.000Z" }),
+    );
+    renderPage();
+    await user.click(await screen.findByRole("button", { name: "「1件目の下書き」の操作" }));
+    await user.click(await screen.findByRole("menuitem", { name: "編集" }));
+    const dialog = await screen.findByRole("dialog", { name: "下書きを編集" });
+    await user.type(within(dialog).getByRole("textbox", { name: /本文/ }), "追記");
+    await user.click(within(dialog).getAllByRole("button", { name: "保存" }).at(-1)!);
+    expect(await screen.findByText("他の場所で更新されています")).toBeInTheDocument();
   });
 });

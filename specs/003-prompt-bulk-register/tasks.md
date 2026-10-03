@@ -189,21 +189,21 @@ description: "AIプロンプトの生成と投稿案の一括登録の実装タ�
 
 ### テスト（先に書いて失敗を確認する）
 
-- [ ] T029 [P] [US3] `apps/api/test/integration/post-drafts.test.ts`に、編集と削除のテストを足す（quickstart.mdの表の「まとめての削除」「編集の競合」）。
+- [X] T029 [P] [US3] `apps/api/test/integration/post-drafts.test.ts`に、編集と削除のテストを足す（quickstart.mdの表の「まとめての削除」「編集の競合」）。
   - `PUT /post-drafts/:id`で本文を更新し`version`が1増える。空白だけ・2,001文字は`400`。同じ`expectedVersion`の2回目は`409 STALE_UPDATE`（`latest`付き）。削除済みは`404 ITEM_NOT_FOUND`
   - `POST /post-drafts/delete`は自分のAccountの要確認の下書きだけを消し、他人のAccountの下書きのIDは無視して`deletedCount`に数えない。0件・501件・UUIDでないIDは`400`
   - 要再接続のAccountでも、`PUT /post-drafts/:id`・`POST /post-drafts/delete`・`DELETE /draft-batches/:id`が使える（FR-025）
-- [ ] T030 [P] [US3] `apps/web/test/stock.test.tsx`に、選択と編集のテストを足す。
+- [X] T030 [P] [US3] `apps/web/test/stock.test.tsx`に、選択と編集のテストを足す。
   - 下書きを選ぶと貼り付け欄の位置に選択のバー（「{n}件を選択中」「選択を解除」「選んだ下書きを削除」）が出て、確認のうえ`deletePostDrafts`に選んだIDが渡る
   - 「⋯」の「編集」で本文を直して保存すると一覧に反映される。`409`で競合のダイアログが出る
 
 ### 実装
 
-- [ ] T031 [US3] `apps/api/src/services/draft-service.ts`に、編集`updateDraft(db, accountId, id, { body, expectedVersion })`（002の`updateWithVersion`。要確認の下書きだけを対象にし、本文の前後の空白を除いて保存する）と、まとめての削除`deleteDrafts(db, accountId, ids)`（そのAccountの要確認の下書きだけを削除して件数を返す）を足す
-- [ ] T032 [US3] `apps/api/src/routes/post-drafts.ts`に`PUT /api/accounts/:accountId/post-drafts/:draftId`と`POST /api/accounts/:accountId/post-drafts/delete`を足す（contracts/api.md）
-- [ ] T033 [P] [US3] `apps/web/src/components/stock/DraftEditDialog.tsx`を作る（contracts/ui-routes.md「下書きの編集」）：002の`useItemForm`・`FormDialogFrame`で、見出し「下書きを編集」、本文（必須、2,000文字まで）と、その下に`ThreadsLengthBar`
-- [ ] T034 [US3] `apps/web/src/components/stock/DraftList.tsx`に、各下書きのチェックボックス（押せる範囲は44px角以上）、要確認のタブの見出しの「すべて選択」、「⋯」メニュー（「編集」「削除」）を足す。1件の削除は`ConfirmDeleteDialog`のあと`deletePostDrafts`（IDを1つ）を呼ぶ
-- [ ] T035 [US3] 選択の状態（選んだ下書きのID）は`apps/web/src/pages/stock.tsx`で持ち、`DraftList`と`PasteComposer`に渡す。`apps/web/src/components/stock/PasteComposer.tsx`は、選択が1件以上あるとき、貼り付け欄の代わりに選択のバーを描く。「選んだ下書きを削除」は確認のダイアログ（「{n}件の下書きを削除しますか？ 元に戻せません。」）のあと`deletePostDrafts`を呼び、成功したら選択を解除して一覧を取り直す
+- [X] T031 [US3] `apps/api/src/services/draft-service.ts`に、編集`updateDraft(db, accountId, id, { body, expectedVersion })`（002の`updateWithVersion`。要確認の下書きだけを対象にし、本文の前後の空白を除いて保存する）と、まとめての削除`deleteDrafts(db, accountId, ids)`（そのAccountの要確認の下書きだけを削除して件数を返す）を足す
+- [X] T032 [US3] `apps/api/src/routes/post-drafts.ts`に`PUT /api/accounts/:accountId/post-drafts/:draftId`と`POST /api/accounts/:accountId/post-drafts/delete`を足す（contracts/api.md）
+- [X] T033 [P] [US3] `apps/web/src/components/stock/DraftEditDialog.tsx`を作る（contracts/ui-routes.md「下書きの編集」）：002の`useItemForm`・`FormDialogFrame`で、見出し「下書きを編集」、本文（必須、2,000文字まで）と、その下に`ThreadsLengthBar`
+- [X] T034 [US3] `apps/web/src/components/stock/DraftList.tsx`に、各下書きのチェックボックス（押せる範囲は44px角以上）、要確認のタブの見出しの「すべて選択」、「⋯」メニュー（「編集」「削除」）を足す。1件の削除は`ConfirmDeleteDialog`のあと`deletePostDrafts`（IDを1つ）を呼ぶ
+- [X] T035 [US3] 選択の状態（選んだ下書きのID）は`apps/web/src/pages/stock.tsx`で持ち、`DraftList`と`PasteComposer`に渡す。`apps/web/src/components/stock/PasteComposer.tsx`は、選択が1件以上あるとき、貼り付け欄の代わりに選択のバーを描く。「選んだ下書きを削除」は確認のダイアログ（「{n}件の下書きを削除しますか？ 元に戻せません。」）のあと`deletePostDrafts`を呼び、成功したら選択を解除して一覧を取り直す
 
 **完了条件**：T029・T030が通り、quickstart.md「手動の確認 3」ができる
 
