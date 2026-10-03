@@ -49,7 +49,7 @@ export function call(
 export async function resetDb() {
   const sql = neon(testEnv.DATABASE_URL);
   createDb(testEnv.DATABASE_URL); // ローカルプロキシの設定を有効にする
-  await sql`TRUNCATE users, accounts, memberships, threads_connections, oauth_states, threads_deletion_requests, threads_revocations CASCADE`;
+  await sql`TRUNCATE users, accounts, memberships, threads_connections, oauth_states, threads_deletion_requests, threads_revocations, strategy_designs, promotions, reference_posts, research_keywords CASCADE`;
 }
 
 export function db() {
@@ -109,3 +109,49 @@ export function redirectTarget(res: Response) {
   if (!loc) throw new Error(`expected redirect, got ${res.status}`);
   return new URL(loc);
 }
+
+// ---- 戦略プロファイルのテスト用（specs/002-strategy-profile）----
+
+let accountSeq = 0;
+
+/**
+ * Threadsの接続を通さずに、ユーザーと owner の Account を直接作る。
+ * userCreatedAt を指定すると、無料体験の内外を作れる（research.md R14）。
+ */
+export async function createUserWithAccount(
+  user: string,
+  opts: { plan?: "auto-only" | "auto-grower" | "multi-account" | "team"; userCreatedAt?: Date } = {},
+) {
+  const sql = neon(testEnv.DATABASE_URL);
+  createDb(testEnv.DATABASE_URL);
+  const createdAt = (opts.userCreatedAt ?? new Date()).toISOString();
+  const [u] = (await sql`
+    INSERT INTO users (clerk_user_id, email, display_name, created_at, updated_at)
+    VALUES (${user}, ${`${user}@example.com`}, ${user}, ${createdAt}, ${createdAt})
+    ON CONFLICT (clerk_user_id) DO UPDATE SET created_at = EXCLUDED.created_at
+    RETURNING id`) as [{ id: string }];
+  accountSeq += 1;
+  const threadsUserId = `tu_${user}_${Date.now()}_${accountSeq}`;
+  const [a] = (await sql`
+    INSERT INTO accounts (threads_user_id, username, plan)
+    VALUES (${threadsUserId}, ${`${user}_${accountSeq}`}, ${opts.plan ?? "auto-only"})
+    RETURNING id`) as [{ id: string }];
+  await sql`INSERT INTO memberships (user_id, account_id, role) VALUES (${u.id}, ${a.id}, 'owner')`;
+  return { userId: u.id, accountId: a.id };
+}
+
+/** Account の plan・接続状態を書き換える */
+export async function setAccount(
+  accountId: string,
+  values: { plan?: "auto-only" | "auto-grower" | "multi-account" | "team"; connectionStatus?: "connected" | "needs_reconnect" },
+) {
+  const sql = neon(testEnv.DATABASE_URL);
+  createDb(testEnv.DATABASE_URL);
+  if (values.plan) await sql`UPDATE accounts SET plan = ${values.plan} WHERE id = ${accountId}`;
+  if (values.connectionStatus) {
+    await sql`UPDATE accounts SET connection_status = ${values.connectionStatus} WHERE id = ${accountId}`;
+  }
+}
+
+/** 無料体験が終わった登録日時（今から40日前） */
+export const AFTER_TRIAL = () => new Date(Date.now() - 40 * 24 * 60 * 60 * 1000);

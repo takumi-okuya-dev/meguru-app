@@ -25,7 +25,7 @@ export function UserMenu() {
 
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm hover:bg-accent">
+      <DropdownMenuTrigger className="flex min-h-11 w-full items-center gap-2.5 rounded-lg px-3 py-1.5 text-left text-sm hover:bg-accent lg:min-h-10 lg:px-2.5">
         <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-muted text-xs">{initial}</span>
         <span className="min-w-0 flex-1 truncate">{name}</span>
         <ChevronsUpDownIcon className="size-4 text-muted-foreground" />

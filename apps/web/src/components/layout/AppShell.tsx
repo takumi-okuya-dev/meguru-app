@@ -1,39 +1,73 @@
-// 画面の骨格：左サイドバー＋右メインパネル。狭い画面ではサイドバーをドロワーにする
-// （contracts/ui-routes.md「レイアウトの骨格」）。後続featureもこの骨格を引き継ぐ。
-import { MenuIcon } from "lucide-react";
-import type { ReactNode } from "react";
-import { Button } from "@/components/ui/button";
-import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+// 画面の骨格：左サイドバー＋右メインパネル（docs/ui-design.md「2. 画面の骨格」「5. 画面幅ごとの振る舞い」）。
+// 1024px以上はサイドバーを常に出して畳める（状態は localStorage）。未満はドロワーで画面の上に重ねて開く。
+import { useCallback, useMemo, useState, type ReactNode } from "react";
+import { Sheet, SheetContent } from "@/components/ui/sheet";
+import { LG_QUERY, useMediaQuery } from "@/lib/use-media-query";
+import { ShellContext, type ShellState } from "./shell-context";
 import { Sidebar } from "./Sidebar";
 
+const COLLAPSED_KEY = "tg.sidebarCollapsed";
+
+function readCollapsed(): boolean {
+  try {
+    return localStorage.getItem(COLLAPSED_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function writeCollapsed(value: boolean) {
+  try {
+    localStorage.setItem(COLLAPSED_KEY, value ? "1" : "0");
+  } catch {
+    // 保存できない環境（プライベートブラウズなど）では、この画面の間だけ覚える
+  }
+}
+
 /**
- * 画面の骨格。左サイドバー＋右メインパネルで、狭い画面ではサイドバーをドロワーにする（contracts/ui-routes.md）。
- * @param props - children：メインパネルの中身
+ * 画面の骨格。左サイドバー＋右メインパネルで、メインパネルの中身は各画面の PageHeader とスクロール領域にする。
+ * @param props - children：メインパネルの中身、banner：上部バーの下に出すバナー
  * @returns 画面の骨格
  */
-export function AppShell({ children }: { children: ReactNode }) {
+export function AppShell({ children, banner = null }: { children: ReactNode; banner?: ReactNode }) {
+  const isWide = useMediaQuery(LG_QUERY);
+  const [collapsed, setCollapsed] = useState(readCollapsed);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const sidebarVisible = isWide && !collapsed;
+
+  const setCollapsedAndSave = useCallback((value: boolean) => {
+    setCollapsed(value);
+    writeCollapsed(value);
+  }, []);
+
+  const shell = useMemo<ShellState>(
+    () => ({
+      sidebarVisible,
+      isWide,
+      openSidebar: () => (isWide ? setCollapsedAndSave(false) : setDrawerOpen(true)),
+      banner,
+    }),
+    [sidebarVisible, isWide, banner, setCollapsedAndSave],
+  );
+
   return (
-    <div className="flex min-h-svh">
-      <aside className="hidden w-64 shrink-0 border-r bg-sidebar md:flex md:flex-col">
-        <Sidebar />
-      </aside>
-      <div className="flex min-w-0 flex-1 flex-col">
-        <header className="flex h-12 items-center border-b px-2 md:hidden">
-          <Sheet>
-            <SheetTrigger asChild>
-              <Button variant="ghost" size="icon" aria-label="メニューを開く">
-                <MenuIcon />
-              </Button>
-            </SheetTrigger>
-            <SheetContent>
-              <Sidebar />
-            </SheetContent>
-          </Sheet>
-          <span className="ml-2 text-sm font-semibold">ThreadsGrower</span>
-        </header>
-        <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-6">{children}</main>
+    <ShellContext.Provider value={shell}>
+      <div className="flex h-svh">
+        {sidebarVisible && (
+          <aside className="flex w-64 shrink-0 flex-col border-r bg-sidebar">
+            <Sidebar onCollapse={() => setCollapsedAndSave(true)} />
+          </aside>
+        )}
+        <Sheet open={drawerOpen && !sidebarVisible} onOpenChange={setDrawerOpen}>
+          <SheetContent className="w-[19rem] max-w-[85vw]">
+            <Sidebar onNavigate={() => setDrawerOpen(false)} />
+          </SheetContent>
+        </Sheet>
+        <div className="flex min-w-0 flex-1 flex-col overflow-y-auto" data-main-scroll>
+          {children}
+        </div>
       </div>
-    </div>
+    </ShellContext.Provider>
   );
 }
 

@@ -68,6 +68,9 @@ export function validateConfig(env: Env): string[] {
   }
   if (!env.DATABASE_URL || !/^postgres(ql)?:\/\//.test(env.DATABASE_URL)) problems.push("DATABASE_URL");
   if (!isHttpUrl(env.WEB_ORIGIN)) problems.push("WEB_ORIGIN");
+  if (env.THREADS_ACCESS_MODE !== undefined && !["testers", "public"].includes(env.THREADS_ACCESS_MODE)) {
+    problems.push("THREADS_ACCESS_MODE");
+  }
 
   if (usesRealThreads(env)) {
     if (isPlaceholder(env.THREADS_APP_ID) || !/^\d+$/.test(env.THREADS_APP_ID)) problems.push("THREADS_APP_ID");

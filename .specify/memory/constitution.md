@@ -1,18 +1,22 @@
 <!--
 Sync Impact Report:
-Version change: N/A → 1.0.0 (initial ratification)
-Modified principles: N/A (initial)
-Added principles: I. 人格・トーン・NGワードの一貫性, II. 人間承認ゲート, III. 外部LLM前提・API依存ゼロ（MVPスコープ）,
-  IV. プラン／ロール分離の原則, V. 個人プラン起点のシンプルさ（YAGNI）, VI. 改善フィードバックループの忠実性
-Added sections: 技術スタック制約, 開発ワークフロー, Governance
+Version change: 1.0.0 → 1.1.0
+Modified principles:
+  I. 人格・トーン・NGワードの一貫性（名称は変更なし）
+    - 配信前の必須チェックを「NGワード設定によるチェック（全プラン）」と明確にした
+    - 戦略プロファイルは、grower機能を使えるAccountで人格・トーンの一貫性を担保する入力として扱うと定めた
+    - 背景：2026-10-02〜03に、戦略プロファイルをgrower機能（プラン2以上、または登録から1か月の無料体験中）
+      にすると決めた（PRD FR-12、specs/002-strategy-profile FR-024）。プラン1のAccountは無料体験の後に
+      戦略プロファイルを編集できないため、旧文言（すべての配信に戦略プロファイルのチェックを求める）と食い違った
+Added sections: none
 Removed sections: none
-Templates requiring updates: ⚠ spec-template.md / plan-template.md / tasks-template.md / checklist-template.md
-  — bundled defaults, not yet reviewed against these principles (first feature spec will surface gaps)
+Version bump rationale: MINOR。バイパス経路を残さない・配信前に必ずチェックする、という原則の中核は維持し、
+  チェックに使う入力をプランに応じて明確にした（ガイダンスの実質的な変更）。既存のfeature（001・002）で
+  この原則に反するものはない。原則の削除・中核の撤回ではないためMAJORにはしない
+Templates requiring updates: none（spec/plan/tasks/checklistのテンプレートは原則名を参照しておらず、文言の変更の影響を受けない）
 Follow-up TODOs:
-  - TODO(COMMERCIAL_LAUNCH_GATE): Meta App Reviewを通過し他者が使える本番公開・課金を開始するタイミングで、
-    develop ブランチ運用を導入し、Cloudflare/Neon/Clerk/Stripeの本番・検証環境を分離すること（PRD §6.2参照）
-  - TODO(OSS_LICENSE_CHECK): n8n/Postizは不採用（フルスクラッチ確定済み、Wikiノート「分岐判定」参照）。
-    将来OSSコンポーネントを追加する場合はSaaS再販可否のライセンス確認を本原則に追記すること
+  - TODO(COMMERCIAL_LAUNCH_GATE)、TODO(OSS_LICENSE_CHECK)：1.0.0から継続（内容は変更なし）
+  - NGワード設定の仕様化：自動投稿のfeature（PRD FR-8）より前に行う（specs/002-strategy-profile Assumptions）
 -->
 
 # ThreadsGrower App Constitution
@@ -20,11 +24,17 @@ Follow-up TODOs:
 ## Core Principles
 
 ### I. 人格・トーン・NGワードの一貫性（NON-NEGOTIABLE）
-Threadsへ実際に配信されるあらゆるコンテンツ（自動投稿・スケジュール投稿を含む）は、Account単位の
-戦略プロファイル・NGワード設定によるチェックを経なければ配信されてはならない。このチェックを
+Threadsへ実際に配信されるあらゆるコンテンツ（自動投稿・スケジュール投稿を含む）は、プランに
+かかわらず、Account単位のNGワード設定によるチェックを経なければ配信されてはならない。このチェックを
 バイパスできる経路を本番導線・管理者操作に残してはならない。
+戦略プロファイル（課題・宣伝内容・リサーチ）は、それを使えるAccount（grower機能。プラン2以上、
+または無料体験中）で、人格・トーンの一貫性を担保する入力として扱う。grower機能を使えるAccount
+では、AIプロンプトの生成（FR-4）に必ず戦略プロファイルの内容を反映しなければならない。
 **Rationale**: 「人格・トーンを保ったまま継続的にThreadsを運用したい」がプロダクトの存在意義その
 ものである（PRD §1 Vision）。5本柱（Five Pillars）の偏り管理もこの一貫性の一部として扱う。
+NGワードのチェックは事故（人格を損なう投稿の公開）を防ぐ最低限の安全策なので全プランに課し、
+戦略プロファイルによる一貫性はgrower機能の価値として提供する（2026-10-02〜03の料金の決定。
+PRD FR-12）。
 
 ### II. 人間承認ゲート（NON-NEGOTIABLE）
 投稿ストック（Post Stock）上の下書きは、個別承認または一括承認という明示的な承認ステップを経ない
@@ -107,4 +117,4 @@ Membershipのみとする。
   実質的な拡張＝MINOR、文言修正・明確化＝PATCH。
 - 改定時は`/speckit-constitution`を再実行し、Sync Impact Reportを都度残す。
 
-**Version**: 1.0.0 | **Ratified**: 2026-10-01 | **Last Amended**: 2026-10-01
+**Version**: 1.1.0 | **Ratified**: 2026-10-01 | **Last Amended**: 2026-10-03

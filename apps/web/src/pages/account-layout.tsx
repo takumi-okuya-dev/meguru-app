@@ -7,6 +7,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { NEEDS_RECONNECT_BANNER, errorMessage, type AccountSummary } from "@threads-grower/shared";
 import { Link, Navigate, Outlet, useOutletContext, useParams } from "react-router";
 import { AppShell } from "@/components/layout/AppShell";
+import { UnsavedChangesProvider } from "@/components/UnsavedChangesProvider";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { ApiError, api } from "@/lib/api-client";
@@ -59,17 +60,25 @@ export function AccountLayout() {
   }
   if (!account.data) return <LoadingSkeleton />;
 
+  // 再接続のバナーは、各画面の上部バーの下に出す（docs/ui-design.md「2. 画面の骨格」）
+  const banner =
+    account.data.connectionStatus === "needs_reconnect" ? (
+      <Alert
+        variant="warning"
+        className="flex flex-col gap-3 rounded-none border-x-0 border-t-0 px-4 sm:flex-row sm:items-center sm:justify-between md:px-5"
+      >
+        <AlertDescription className="text-foreground">{NEEDS_RECONNECT_BANNER}</AlertDescription>
+        <Button asChild size="sm">
+          <Link to={`/accounts/${account.data.id}/settings`}>再接続</Link>
+        </Button>
+      </Alert>
+    ) : null;
+
   return (
-    <AppShell>
-      {account.data.connectionStatus === "needs_reconnect" && (
-        <Alert variant="warning" className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <AlertDescription className="text-foreground">{NEEDS_RECONNECT_BANNER}</AlertDescription>
-          <Button asChild size="sm">
-            <Link to={`/accounts/${account.data.id}/settings`}>再接続</Link>
-          </Button>
-        </Alert>
-      )}
-      <Outlet context={{ account: account.data } satisfies AccountOutletContext} />
+    <AppShell banner={banner}>
+      <UnsavedChangesProvider>
+        <Outlet context={{ account: account.data } satisfies AccountOutletContext} />
+      </UnsavedChangesProvider>
     </AppShell>
   );
 }

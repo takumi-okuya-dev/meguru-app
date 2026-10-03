@@ -5,7 +5,9 @@ import {
   bigint,
   check,
   customType,
+  date,
   index,
+  integer,
   pgEnum,
   pgTable,
   smallint,
@@ -15,7 +17,7 @@ import {
   uuid,
   type AnyPgColumn,
 } from "drizzle-orm/pg-core";
-import { PLANS } from "@threads-grower/shared";
+import { PLANS, PROMOTION_RATIO_DEFAULT } from "@threads-grower/shared";
 
 const bytea = customType<{ data: Uint8Array; driverData: Uint8Array | string }>({
   dataType() {
@@ -75,8 +77,12 @@ export const accounts = pgTable("accounts", {
   connectionStatus: connectionStatus("connection_status").notNull().default("connected"),
   lastUsedAt: timestamp("last_used_at", { withTimezone: true, precision: 6 }),
   connectionGeneration: bigint("connection_generation", { mode: "number" }).notNull().default(0),
+  // 宣伝投稿の割合（specs/002-strategy-profile data-model.md、research.md R7）
+  promotionRatioPercent: smallint("promotion_ratio_percent").notNull().default(PROMOTION_RATIO_DEFAULT),
   ...timestamps,
-});
+}, (t) => [
+  check("accounts_promotion_ratio_range", sql`${t.promotionRatioPercent} BETWEEN 0 AND 100`),
+]);
 
 /** User と Account の関係（data-model.md の memberships）。1つのAccountに owner は1人だけ。 */
 export const memberships = pgTable(
@@ -174,3 +180,158 @@ export const threadsRevocations = pgTable(
   (t) => [index("threads_revocations_hmac_issued_idx").on(t.threadsUserHmac, t.issuedAt)],
 );
 
+
+// ---- 戦略プロファイル（specs/002-strategy-profile/data-model.md）----
+// どのテーブルも Account に紐づき、Account の削除で一緒に消える（ON DELETE CASCADE）。
+// 文字数の上限は char_length（コードポイントの数）で守る（research.md R2）。
+
+/** 課題の「近い人間性」の列挙型（tone_preset）。未選択は NULL。 */
+export const tonePreset = pgEnum("tone_preset", [
+  "energetic_casual",
+  "polite_warm",
+  "formal",
+  "casual_frank",
+  "introspective_calm",
+  "passionate",
+  "humorous",
+]);
+/** 宣伝内容の状態の列挙型（promotion_status）。「期限切れ」は掲載期限から求める（research.md R6）。 */
+export const promotionStatus = pgEnum("promotion_status", ["active", "paused", "ended"]);
+
+const versionColumn = () => integer("version").notNull().default(1);
+
+/** 課題（data-model.md の strategy_designs）。Account と1対1で、最初の保存で作る。 */
+export const strategyDesigns = pgTable(
+  "strategy_designs",
+  {
+    accountId: uuid("account_id")
+      .primaryKey()
+      .references(() => accounts.id, { onDelete: "cascade" }),
+    finalAction: text("final_action"),
+    targetPersona: text("target_persona"),
+    realWorries: text("real_worries"),
+    desiredSelfImage: text("desired_self_image"),
+    perceivedImage: text("perceived_image"),
+    contentThemeMix: text("content_theme_mix"),
+    antiPersona: text("anti_persona"),
+    benchmarkAccounts: text("benchmark_accounts"),
+    funnelDesign: text("funnel_design"),
+    postGenres: text("post_genres"),
+    dmReplyTemplate: text("dm_reply_template"),
+    inquiryQualityTips: text("inquiry_quality_tips"),
+    tonePreset: tonePreset("tone_preset"),
+    toneNotes: text("tone_notes"),
+    differentiation: text("differentiation"),
+    successMetrics: text("success_metrics"),
+    profileBioDraft: text("profile_bio_draft"),
+    pinnedPostDraft1: text("pinned_post_draft_1"),
+    pinnedPostDraft2: text("pinned_post_draft_2"),
+    pinnedPostDraft3: text("pinned_post_draft_3"),
+    version: versionColumn(),
+    ...timestamps,
+  },
+  (t) =>
+    (
+      [
+        t.finalAction,
+        t.targetPersona,
+        t.realWorries,
+        t.desiredSelfImage,
+        t.perceivedImage,
+        t.contentThemeMix,
+        t.antiPersona,
+        t.benchmarkAccounts,
+        t.funnelDesign,
+        t.postGenres,
+        t.dmReplyTemplate,
+        t.inquiryQualityTips,
+        t.toneNotes,
+        t.differentiation,
+        t.successMetrics,
+        t.profileBioDraft,
+        t.pinnedPostDraft1,
+        t.pinnedPostDraft2,
+        t.pinnedPostDraft3,
+      ] as const
+    ).map((col) => check(`strategy_designs_${col.name}_length`, sql`char_length(${col}) <= 2000`)),
+);
+
+/** 宣伝内容（data-model.md の promotions）。 */
+export const promotions = pgTable(
+  "promotions",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    accountId: uuid("account_id")
+      .notNull()
+      .references(() => accounts.id, { onDelete: "cascade" }),
+    title: text("title").notNull(),
+    content: text("content").notNull(),
+    targetLocation: text("target_location"),
+    targetPersona: text("target_persona"),
+    targetAgeRange: text("target_age_range"),
+    cta: text("cta"),
+    linkedUrl: text("linked_url"),
+    priority: smallint("priority").notNull().default(0),
+    status: promotionStatus("status").notNull().default("active"),
+    validUntil: date("valid_until", { mode: "string" }),
+    version: versionColumn(),
+    ...timestamps,
+  },
+  (t) => [
+    index("promotions_account_idx").on(t.accountId),
+    check("promotions_title_length", sql`char_length(${t.title}) BETWEEN 1 AND 100`),
+    check("promotions_content_length", sql`char_length(${t.content}) BETWEEN 1 AND 2000`),
+    check("promotions_target_location_length", sql`char_length(${t.targetLocation}) <= 100`),
+    check("promotions_target_persona_length", sql`char_length(${t.targetPersona}) <= 100`),
+    check("promotions_target_age_range_length", sql`char_length(${t.targetAgeRange}) <= 100`),
+    check("promotions_cta_length", sql`char_length(${t.cta}) <= 100`),
+    check("promotions_linked_url_length", sql`char_length(${t.linkedUrl}) <= 2000`),
+    check("promotions_priority_range", sql`${t.priority} BETWEEN 0 AND 100`),
+  ],
+);
+
+/** 参考投稿（data-model.md の reference_posts）。 */
+export const referencePosts = pgTable(
+  "reference_posts",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    accountId: uuid("account_id")
+      .notNull()
+      .references(() => accounts.id, { onDelete: "cascade" }),
+    body: text("body").notNull(),
+    keyword: text("keyword"),
+    postUrl: text("post_url"),
+    whyGood: text("why_good"),
+    version: versionColumn(),
+    ...timestamps,
+  },
+  (t) => [
+    index("reference_posts_account_created_idx").on(t.accountId, t.createdAt.desc()),
+    check("reference_posts_body_length", sql`char_length(${t.body}) BETWEEN 1 AND 2000`),
+    check("reference_posts_keyword_length", sql`char_length(${t.keyword}) <= 100`),
+    check("reference_posts_post_url_length", sql`char_length(${t.postUrl}) <= 2000`),
+    check("reference_posts_why_good_length", sql`char_length(${t.whyGood}) <= 2000`),
+  ],
+);
+
+/** リサーチキーワード（data-model.md の research_keywords）。 */
+export const researchKeywords = pgTable(
+  "research_keywords",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    accountId: uuid("account_id")
+      .notNull()
+      .references(() => accounts.id, { onDelete: "cascade" }),
+    keyword: text("keyword").notNull(),
+    // 重複判定用（NFKC → 前後の空白を除く → 小文字。research.md R5）
+    keywordNormalized: text("keyword_normalized").notNull(),
+    purpose: text("purpose"),
+    version: versionColumn(),
+    ...timestamps,
+  },
+  (t) => [
+    uniqueIndex("research_keywords_account_keyword_unique").on(t.accountId, t.keywordNormalized),
+    check("research_keywords_keyword_length", sql`char_length(${t.keyword}) BETWEEN 1 AND 100`),
+    check("research_keywords_purpose_length", sql`char_length(${t.purpose}) <= 100`),
+  ],
+);

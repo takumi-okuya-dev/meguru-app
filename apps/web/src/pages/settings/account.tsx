@@ -13,7 +13,7 @@ export function AccountSettingsPage() {
   const logout = useLogout();
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-semibold">アカウント</h1>
+      <h1 className="text-2xl font-semibold max-md:hidden">アカウント</h1>
       <SettingCard>
         <SettingRow label="名前" description={user?.fullName || "—"} />
         <SettingRow label="メールアドレス" description={user?.primaryEmailAddress?.emailAddress || "—"} />

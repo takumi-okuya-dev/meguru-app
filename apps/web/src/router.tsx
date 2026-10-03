@@ -1,5 +1,5 @@
 // ルートとガード（contracts/ui-routes.md「ルート」「遷移の規則」）
-import { createBrowserRouter, Navigate } from "react-router";
+import { createBrowserRouter } from "react-router";
 import { RequireAuth } from "@/components/guards";
 import { AccountLayout } from "@/pages/account-layout";
 import { AccountHome } from "@/pages/account-home";
@@ -11,8 +11,10 @@ import { NotFound } from "@/pages/not-found";
 import { SignInPage } from "@/pages/sign-in";
 import { AccountSettingsPage } from "@/pages/settings/account";
 import { AppearanceSettings } from "@/pages/settings/appearance";
-import { DEFAULT_SETTINGS_SLUG } from "@/pages/settings/sections";
-import { SettingsLayout } from "@/pages/settings/settings-layout";
+import { SettingsIndex, SettingsLayout } from "@/pages/settings/settings-layout";
+import { PromotionsPage } from "@/pages/promotions";
+import { ResearchPage } from "@/pages/research";
+import { StrategyPage } from "@/pages/strategy";
 
 /** 画面のルート（contracts/ui-routes.md「ルート」）。認証が必要な画面は RequireAuth で包む。 */
 export const routes = [
@@ -27,7 +29,7 @@ export const routes = [
         path: "/settings",
         element: <SettingsLayout />,
         children: [
-          { index: true, element: <Navigate to={DEFAULT_SETTINGS_SLUG} replace /> },
+          { index: true, element: <SettingsIndex /> },
           { path: "appearance", element: <AppearanceSettings /> },
           { path: "account", element: <AccountSettingsPage /> },
         ],
@@ -38,6 +40,9 @@ export const routes = [
         children: [
           { index: true, element: <AccountHome /> },
           { path: "settings", element: <AccountSettings /> },
+          { path: "strategy", element: <StrategyPage /> },
+          { path: "promotions", element: <PromotionsPage /> },
+          { path: "research", element: <ResearchPage /> },
         ],
       },
     ],

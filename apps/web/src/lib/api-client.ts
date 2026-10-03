@@ -7,7 +7,20 @@ import {
   errorMessage,
   errorResponseSchema,
   meResponseSchema,
+  profileStatusSchema,
+  promotionListSchema,
+  promotionSchema,
+  promotionSettingsSchema,
+  referencePostListSchema,
+  referencePostSchema,
+  researchKeywordListSchema,
+  researchKeywordSchema,
+  strategySchema,
   type ConnectRequest,
+  type PromotionInput,
+  type PutStrategyRequest,
+  type ReferencePostInput,
+  type ResearchKeywordInput,
   type ErrorCode,
   type OpenAccountRequest,
 } from "@threads-grower/shared";
@@ -22,8 +35,10 @@ export class ApiError extends Error {
   constructor(
     readonly code: ErrorCode,
     readonly status: number,
-    /** CONFIG_ERROR のときの、誤っている設定の項目名 */
+    /** CONFIG_ERROR のときの誤っている設定の項目名、VALIDATION_FAILED のときの違反した項目名 */
     readonly details: string[] = [],
+    /** 409 STALE_UPDATE のときの、DBにある最新の値（specs/002 contracts/api.md） */
+    readonly latest?: unknown,
   ) {
     super(code);
   }
@@ -65,7 +80,12 @@ async function request<T>(
     const parsed = errorResponseSchema.safeParse(await res.json().catch(() => null));
     const code: ErrorCode = parsed.success ? parsed.data.error.code : "INTERNAL_ERROR";
     if (res.status === 401) onSessionExpired();
-    throw new ApiError(code, res.status, parsed.success ? (parsed.data.error.details ?? []) : []);
+    throw new ApiError(
+      code,
+      res.status,
+      parsed.success ? (parsed.data.error.details ?? []) : [],
+      parsed.success ? parsed.data.latest : undefined,
+    );
   }
   if (schema === null || res.status === 204) return undefined as T;
   return schema.parse(await res.json());
@@ -85,6 +105,51 @@ export const api = {
     request("/api/threads/connect", connectResponseSchema, { method: "POST", body: JSON.stringify(body) }),
   deleteAccount: (accountId: string, confirmUsername: string) =>
     request(`/api/accounts/${accountId}`, null, { method: "DELETE", body: JSON.stringify({ confirmUsername }) }),
+  // ---- 戦略プロファイル（specs/002-strategy-profile contracts/api.md）----
+  getProfileStatus: (accountId: string) =>
+    request(`/api/accounts/${accountId}/profile-status`, profileStatusSchema),
+  getStrategy: (accountId: string) => request(`/api/accounts/${accountId}/strategy`, strategySchema),
+  putStrategy: (accountId: string, body: PutStrategyRequest) =>
+    request(`/api/accounts/${accountId}/strategy`, strategySchema, { method: "PUT", body: JSON.stringify(body) }),
+  listPromotions: (accountId: string) => request(`/api/accounts/${accountId}/promotions`, promotionListSchema),
+  createPromotion: (accountId: string, body: PromotionInput) =>
+    request(`/api/accounts/${accountId}/promotions`, promotionSchema, { method: "POST", body: JSON.stringify(body) }),
+  updatePromotion: (accountId: string, id: string, body: PromotionInput & { expectedVersion: number }) =>
+    request(`/api/accounts/${accountId}/promotions/${id}`, promotionSchema, { method: "PUT", body: JSON.stringify(body) }),
+  deletePromotion: (accountId: string, id: string) =>
+    request(`/api/accounts/${accountId}/promotions/${id}`, null, { method: "DELETE" }),
+  getPromotionSettings: (accountId: string) =>
+    request(`/api/accounts/${accountId}/promotion-settings`, promotionSettingsSchema),
+  putPromotionSettings: (accountId: string, ratioPercent: number) =>
+    request(`/api/accounts/${accountId}/promotion-settings`, promotionSettingsSchema, {
+      method: "PUT",
+      body: JSON.stringify({ ratioPercent }),
+    }),
+  listReferencePosts: (accountId: string) =>
+    request(`/api/accounts/${accountId}/reference-posts`, referencePostListSchema),
+  createReferencePost: (accountId: string, body: ReferencePostInput) =>
+    request(`/api/accounts/${accountId}/reference-posts`, referencePostSchema, { method: "POST", body: JSON.stringify(body) }),
+  updateReferencePost: (accountId: string, id: string, body: ReferencePostInput & { expectedVersion: number }) =>
+    request(`/api/accounts/${accountId}/reference-posts/${id}`, referencePostSchema, {
+      method: "PUT",
+      body: JSON.stringify(body),
+    }),
+  deleteReferencePost: (accountId: string, id: string) =>
+    request(`/api/accounts/${accountId}/reference-posts/${id}`, null, { method: "DELETE" }),
+  listResearchKeywords: (accountId: string) =>
+    request(`/api/accounts/${accountId}/research-keywords`, researchKeywordListSchema),
+  createResearchKeyword: (accountId: string, body: ResearchKeywordInput) =>
+    request(`/api/accounts/${accountId}/research-keywords`, researchKeywordSchema, {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+  updateResearchKeyword: (accountId: string, id: string, body: ResearchKeywordInput & { expectedVersion: number }) =>
+    request(`/api/accounts/${accountId}/research-keywords/${id}`, researchKeywordSchema, {
+      method: "PUT",
+      body: JSON.stringify(body),
+    }),
+  deleteResearchKeyword: (accountId: string, id: string) =>
+    request(`/api/accounts/${accountId}/research-keywords/${id}`, null, { method: "DELETE" }),
   dataDeletionStatus: (code: string) =>
     request(`/api/data-deletion/${encodeURIComponent(code)}`, dataDeletionStatusSchema, { auth: false }),
 };

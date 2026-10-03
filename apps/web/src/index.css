@@ -4,51 +4,59 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 :root {
+  /* 値は docs/ui-design.md「4. 見た目の約束」の表（画面イメージで決めたもの） */
   color-scheme: light;
-  --radius: 0.625rem;
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
+  --radius: 0.75rem;
+  --background: #ffffff;
+  --foreground: #0d0d0d;
+  --card: #ffffff;
+  --card-foreground: #0d0d0d;
+  --popover: #ffffff;
+  --popover-foreground: #0d0d0d;
+  --primary: #0d0d0d;
+  --primary-foreground: #ffffff;
+  --secondary: #f0f0f0;
+  --secondary-foreground: #0d0d0d;
+  --muted: #f0f0f0;
+  --muted-foreground: #5d5d5d;
+  --accent: #ececec;
+  --accent-foreground: #0d0d0d;
   --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --sidebar: oklch(0.985 0 0);
-  --warning: oklch(0.769 0.188 70.08);
+  --border: #e3e3e3;
+  --input: #e3e3e3;
+  --ring: #0b66d0;
+  --sidebar: #f9f9f9;
+  --success: #17733a;
+  --success-bg: #e6f4ea;
+  --warning: #8f4700;
+  --warning-bg: #fff0dc;
 }
 
 .dark {
   color-scheme: dark;
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
+  --background: #212121;
+  --foreground: #ececec;
+  --card: #2a2a2a;
+  --card-foreground: #ececec;
+  --popover: #2a2a2a;
+  --popover-foreground: #ececec;
+  --primary: #ececec;
+  --primary-foreground: #0d0d0d;
+  --secondary: #303030;
+  --secondary-foreground: #ececec;
+  --muted: #303030;
+  --muted-foreground: #b4b4b4;
+  --accent: #303030;
+  --accent-foreground: #ececec;
   --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
-  --sidebar: oklch(0.205 0 0);
+  --border: #3a3a3a;
+  --input: #3a3a3a;
+  --ring: #61a8ff;
+  --sidebar: #181818;
+  --success: #6fd79a;
+  --success-bg: #173a25;
+  --warning: #ffb866;
+  --warning-bg: #3b2a12;
 }
 
 @theme inline {
@@ -75,6 +83,10 @@
   --color-ring: var(--ring);
   --color-sidebar: var(--sidebar);
   --color-warning: var(--warning);
+  --color-warning-bg: var(--warning-bg);
+  --color-success: var(--success);
+  --color-success-bg: var(--success-bg);
+  --font-sans: "Hiragino Sans", "Noto Sans JP", system-ui, sans-serif;
 }
 
 @layer base {

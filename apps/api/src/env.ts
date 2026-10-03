@@ -12,4 +12,6 @@ export interface Env {
   IDENTIFIER_HASH_KEY: string;
   DATABASE_URL: string;
   WEB_ORIGIN: string;
+  /** Threads連携の公開範囲。未設定は testers（specs/002-strategy-profile research.md R15） */
+  THREADS_ACCESS_MODE?: "testers" | "public";
 }
