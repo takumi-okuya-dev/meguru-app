@@ -43,7 +43,7 @@ export function StockPage() {
   });
   const [picked, setPicked] = useState<ReadonlySet<string>>(new Set());
   const [editing, setEditing] = useState<PostDraft | null>(null);
-  const { hidden, remove } = useDeferredDelete(account.id);
+  const { hidden, remove, flush } = useDeferredDelete(account.id);
 
   // 削除して確定を待っている下書きは、一覧から隠す
   const items = useMemo(() => (drafts.data?.items ?? []).filter((d) => !hidden.has(d.id)), [drafts.data, hidden]);
@@ -158,6 +158,8 @@ export function StockPage() {
           <PasteComposer
             accountId={account.id}
             atLimit={atLimit}
+            // 削除して確定を待っている下書きは、まだサーバーで数えられているので、登録の前に確定する
+            beforeSubmit={flush}
             selection={{
               count: selected.size,
               onClear: () => setPicked(new Set()),

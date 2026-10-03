@@ -62,9 +62,12 @@ function PromptReadyCard({
   onGrowerLost: () => void;
 }) {
   const queryClient = useQueryClient();
-  // count：プロンプトの取得に使う件数。countInput：入力欄の文字（保存の前の値も持つ）
+  // count：プロンプトの取得に使う件数。countInput：入力欄の文字（保存の前の値も持つ）。
+  // saved：サーバーに保存できた件数。failed：保存に失敗した件数と理由（同じ件数は自動で送り直さない）
   const [count, setCount] = useState(savedCount);
   const [countInput, setCountInput] = useState(String(savedCount));
+  const [saved, setSaved] = useState(savedCount);
+  const [failed, setFailed] = useState<{ count: number; message: string } | null>(null);
   const [open, setOpen] = useState(false);
   const [edited, setEdited] = useState<string | null>(null);
   const [copyFailed, setCopyFailed] = useState(false);
@@ -81,28 +84,37 @@ function PromptReadyCard({
     if (isGrowerRequired(prompt.error)) onGrowerLost();
   }, [prompt.error, onGrowerLost]);
 
-  const saveCount = useMutation({
+  const { mutate: save, isPending: saving } = useMutation({
     mutationFn: (n: number) => api.putPromptSettings(accountId, n),
     onSuccess: ({ postCount }) => {
+      setSaved(postCount);
+      setFailed(null);
       queryClient.setQueryData<PostDraftList>(queryKeys.postDrafts(accountId), (old) =>
         old ? { ...old, promptPostCount: postCount } : old,
       );
     },
-    onError: (err) => (isGrowerRequired(err) ? onGrowerLost() : toast.error(saveErrorMessage(err))),
+    onError: (err, n) => {
+      if (isGrowerRequired(err)) onGrowerLost();
+      else setFailed({ count: n, message: saveErrorMessage(err) });
+    },
   });
-  const { mutate: save } = saveCount;
 
-  // 入力が止まってから0.5秒後に、保存して取り直す（contracts/ui-routes.md）
+  // 入力が止まってから0.5秒後に、その件数でプロンプトを取り直す（contracts/ui-routes.md）
   useEffect(() => {
     if (!isValidCount(countInput) || Number(countInput) === count) return;
     const n = Number(countInput);
     const timer = setTimeout(() => {
       setCount(n);
       setEdited(null);
-      save(n);
     }, SAVE_DELAY_MS);
     return () => clearTimeout(timer);
-  }, [countInput, count, save]);
+  }, [countInput, count]);
+
+  // 件数の保存は1つずつ順に行う。保存中に件数が変わったら、終わってから最新の件数を保存する（古い値で上書きしない）
+  useEffect(() => {
+    if (count === saved || saving || failed?.count === count) return;
+    save(count);
+  }, [count, saved, saving, failed, save]);
 
   // コピーに失敗したら、全文の欄を開いた後に全選択する（research.md R13）
   useEffect(() => {
@@ -169,6 +181,15 @@ function PromptReadyCard({
         <p className="text-[13px] text-warning">
           {PROMPT_COUNT_MIN}〜{PROMPT_COUNT_MAX}の整数で入力してください
         </p>
+      )}
+
+      {failed && failed.count === count && (
+        <div role="alert" className="flex flex-wrap items-center gap-3 rounded-xl border border-warning/40 bg-warning-bg px-3 py-2 text-sm">
+          <span className="min-w-0 flex-1">作る件数（{count}件）：{failed.message}</span>
+          <Button size="sm" variant="outline" className="rounded-full" onClick={() => setFailed(null)}>
+            もう一度保存
+          </Button>
+        </div>
       )}
 
       {prompt.error && !isGrowerRequired(prompt.error) ? (

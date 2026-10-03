@@ -172,6 +172,42 @@ describe("プロンプトのカード（US1）", () => {
     await waitFor(() => expect(getPrompt).toHaveBeenCalledWith("a1", 10));
   });
 
+  it("保存中に件数を変えても並行して保存せず、終わってから最新の件数を保存する（Codexレビュー）", async () => {
+    const user = userEvent.setup();
+    let resolveFirst: (v: { postCount: number }) => void = () => {};
+    putPromptSettings.mockImplementationOnce(() => new Promise((r) => (resolveFirst = r)));
+    putPromptSettings.mockImplementation(async (_id: string, n: number) => ({ postCount: n }));
+    renderPage();
+    const input = await screen.findByRole("spinbutton", { name: "作る件数" });
+    await user.clear(input);
+    await user.type(input, "10");
+    await waitFor(() => expect(putPromptSettings).toHaveBeenCalledWith("a1", 10), { timeout: 2000 });
+    await user.clear(input);
+    await user.type(input, "20");
+    await waitFor(() => expect(getPrompt).toHaveBeenCalledWith("a1", 20), { timeout: 2000 });
+    expect(putPromptSettings).toHaveBeenCalledTimes(1);
+    act(() => resolveFirst({ postCount: 10 }));
+    await waitFor(() => expect(putPromptSettings).toHaveBeenCalledTimes(2));
+    expect(putPromptSettings).toHaveBeenLastCalledWith("a1", 20);
+  });
+
+  it("件数の保存に失敗したら、案内と「もう一度保存」を出し、押すまで送り直さない（Codexレビュー）", async () => {
+    const user = userEvent.setup();
+    putPromptSettings.mockRejectedValueOnce(new ApiError("API_UNREACHABLE", 0));
+    putPromptSettings.mockResolvedValueOnce({ postCount: 10 });
+    renderPage();
+    const input = await screen.findByRole("spinbutton", { name: "作る件数" });
+    await user.clear(input);
+    await user.type(input, "10");
+    const retry = await screen.findByRole("button", { name: "もう一度保存" }, { timeout: 2000 });
+    expect(screen.getByText(/^作る件数（10件）：/)).toBeInTheDocument();
+    await new Promise((r) => setTimeout(r, 700));
+    expect(putPromptSettings).toHaveBeenCalledTimes(1);
+    await user.click(retry);
+    await waitFor(() => expect(putPromptSettings).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(screen.queryByRole("button", { name: "もう一度保存" })).not.toBeInTheDocument());
+  });
+
   it("作る件数が範囲外なら保存しない", async () => {
     const user = userEvent.setup();
     renderPage();
@@ -260,6 +296,39 @@ describe("貼り付け欄（US2）", () => {
     expect(toastSuccess).toHaveBeenCalledWith("2件の登録を取り消しました");
     expect(await screen.findByText(/まだ下書きがありません/)).toBeInTheDocument();
     expect(screen.queryByText("2件を登録しました")).not.toBeInTheDocument();
+  });
+
+  it("次の送信が失敗しても、前回の登録の案内（「取り消す」）は残る（Codexレビュー）", async () => {
+    const user = userEvent.setup();
+    createDraftBatch.mockResolvedValueOnce(batchResult([draft()]));
+    createDraftBatch.mockRejectedValueOnce(new ApiError("API_UNREACHABLE", 0));
+    renderPage();
+    await screen.findByText(/まだ下書きがありません/);
+    await paste(user, "1回目");
+    await user.click(sendButton());
+    await screen.findByText("1件を登録しました");
+    await paste(user, "2回目");
+    await user.click(sendButton());
+    await screen.findByRole("button", { name: "もう一度送る" });
+    expect(screen.getByText("1件を登録しました")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "取り消す" })).toBeInTheDocument();
+  });
+
+  it("削除の確定を待っている間に送ると、先に削除を確定してから登録する（Codexレビュー）", async () => {
+    const user = userEvent.setup();
+    const items = [draft({ id: "d1", body: "1件目" }), draft({ id: "d2", position: 1, body: "2件目" })];
+    listPostDrafts.mockResolvedValue({ ...listResponse({ items }), limit: 2 });
+    deletePostDrafts.mockResolvedValue({ deletedCount: 1 });
+    createDraftBatch.mockResolvedValue(batchResult([draft({ id: "d3", body: "新しい" })]));
+    renderPage();
+    await user.click(await screen.findByRole("button", { name: "「1件目」の操作" }));
+    await user.click(await screen.findByRole("menuitem", { name: "削除" }));
+    await paste(user, "新しい");
+    expect(sendButton()).toBeEnabled();
+    await user.click(sendButton());
+    await screen.findByText("1件を登録しました");
+    expect(deletePostDrafts).toHaveBeenCalledWith("a1", ["d1"]);
+    expect(deletePostDrafts.mock.invocationCallOrder[0]!).toBeLessThan(createDraftBatch.mock.invocationCallOrder[0]!);
   });
 
   it("送信中は送るボタンと欄が無効になり、失敗して送り直すときは同じ clientRequestId を送る（FR-015）", async () => {

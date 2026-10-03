@@ -50,9 +50,9 @@
 
 - **決定**：`packages/shared`の`threadsLength(text)`と`countLinks(text)`で数える。
   - `Intl.Segmenter`で書記素（見た目の1文字）に分ける。
-  - 書記素が絵文字（`\p{Extended_Pictographic}`か`\p{Regional_Indicator}`を含む）なら、その書記素のUTF-8のバイト数を足す。結合文字（ZWJ）や異体字セレクタを含む絵文字も、まとめてバイト数で数える（多めに数える側に倒す）。
+  - 書記素が絵文字（`\p{Extended_Pictographic}`・`\p{Regional_Indicator}`・キーキャップの結合文字`U+20E3`のどれかを含む）なら、その書記素のUTF-8のバイト数を足す。結合文字（ZWJ）や異体字セレクタを含む絵文字も、まとめてバイト数で数える（多めに数える側に倒す）。
   - それ以外は、書記素に含まれるコードポイントの数を足す（002 R2の`countChars`と同じ数え方）。
-  - リンクの数は、`http://`・`https://`で始まる部分と、`www.`で始まる部分の数とする。
+  - リンクの数は、`http://`・`https://`の数と、`www.`の数（`https://www.`のように、直前が`/`・英数字・`.`のものは除く）とする。日本語の本文ではURLが句読点や次のURLと空白なしで続くことがあるため、URLの終わりではなく始まりを数える（PR #4のCodexレビュー）。
   - 上限は`THREADS_TEXT_LIMIT = 500`、`THREADS_LINK_LIMIT = 5`。どちらかを超えたら「Threadsの上限を超えています」。
   - UTF-8のバイト数は、コードポイントから計算する（`TextEncoder`に頼らず、WorkersとブラウザとNodeで同じ結果にする）。
 - **理由**：公式ドキュメント（[Threads Posts](https://developers.facebook.com/docs/threads/posts/)、2026-10-03に確認）の「Text posts are limited to 500 characters」「Emojis are counted as the number of UTF-8 bytes」に合わせる。絵文字の細かな扱い（家族の絵文字など）は文書に書かれていないため、多めに数えて、投稿に失敗する側を避ける。005で実際のAPIで確かめる。

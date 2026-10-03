@@ -80,6 +80,17 @@ describe("buildPrompt（contracts/prompt-template.md）", () => {
     );
   });
 
+  it("宣伝の対象が3件以上のときだけ、偏らせない指示を出す。1件なら並び順・偏りの指示を出さない（Codexレビュー）", () => {
+    const three = buildPrompt(input({ promotions: [promo("A"), promo("B"), promo("C")] })).prompt;
+    expect(three).toContain(
+      "掲載期限が近い順に並んでいます。期限が近いものはやや多めに扱ってよいが、一部だけに偏らせないこと。期限未設定のものも含め、下に掲載している宣伝内容全体をきちんと扱うこと。\n下に3件掲載している宣伝内容のうち、特定の1〜2件だけに偏らせないこと。\n1. A",
+    );
+    const one = buildPrompt(input({ promotions: [promo("A")] })).prompt;
+    expect(one).toContain("残りは宣伝色のない共感・気づき系の投稿にすること)\n1. A\n");
+    expect(one).not.toContain("偏らせない");
+    expect(one).not.toContain("掲載期限が近い順");
+  });
+
   it("割合0%なら宣伝の節を省き、要約の件数も0", () => {
     const { prompt, summary } = buildPrompt(input({ promotionRatioPercent: 0, promotions: [promo("A")] }));
     expect(prompt).not.toContain("■今回組み込む宣伝内容");
@@ -95,7 +106,8 @@ describe("buildPrompt（contracts/prompt-template.md）", () => {
         ],
       }),
     );
-    expect(prompt).toContain("下に2件掲載している宣伝内容のうち");
+    expect(prompt).toContain("掲載期限が近い順に並んでいます。期限が近いものはやや多めに扱ってよいが、2件ともきちんと扱うこと。\n1. 交流会");
+    expect(prompt).not.toContain("偏らせない");
     expect(prompt).toContain("1. 交流会(届けたい相手: 場所: 東京 / 年齢: 20代) / 行動喚起: DMで申し込み / 専用URL: https://example.com/e\n2. 相談会\n");
     expect(summary.promotionCount).toBe(2);
   });

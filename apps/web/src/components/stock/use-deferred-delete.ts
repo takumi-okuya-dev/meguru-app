@@ -16,7 +16,7 @@ type Pending = { ids: string[]; timer: ReturnType<typeof setTimeout>; toastId: s
  * 下書きの削除を遅らせて確定する。削除した下書きはすぐ一覧から隠し、UNDO_WINDOW_MS 後に API を呼ぶ。
  * 次の削除・画面を離れたときは、前の削除をその時点で確定する。
  * @param accountId - Account の ID
- * @returns hidden：一覧から隠す下書きのID、remove：削除する
+ * @returns hidden：一覧から隠す下書きのID、remove：削除する、flush：待っている削除をすぐ確定し、終わるまで待つ
  */
 export function useDeferredDelete(accountId: string) {
   const queryClient = useQueryClient();
@@ -27,14 +27,14 @@ export function useDeferredDelete(accountId: string) {
     setHidden((prev) => new Set([...prev].filter((id) => !ids.includes(id))));
   }, []);
 
-  const commit = useCallback(() => {
+  const commit = useCallback((): Promise<void> => {
     const p = pending.current;
-    if (!p) return;
+    if (!p) return Promise.resolve();
     pending.current = null;
     clearTimeout(p.timer);
     // 次の削除で前の削除を確定するときは、前のトーストの「元に戻す」も消す
     toast.dismiss(p.toastId);
-    api.deletePostDrafts(accountId, p.ids).then(
+    return api.deletePostDrafts(accountId, p.ids).then(
       async () => {
         // 直近の下書きはプロンプトの材料なので、プロンプトも取り直す
         void queryClient.invalidateQueries({ queryKey: queryKeys.promptAll(accountId) });
@@ -54,11 +54,16 @@ export function useDeferredDelete(accountId: string) {
   useEffect(() => {
     commitRef.current = commit;
   }, [commit]);
-  useEffect(() => () => commitRef.current(), []);
+  useEffect(
+    () => () => {
+      void commitRef.current();
+    },
+    [],
+  );
 
   const remove = useCallback(
     (ids: string[]) => {
-      commit();
+      void commit();
       setHidden((prev) => new Set([...prev, ...ids]));
       const undo = () => {
         const p = pending.current;
@@ -71,10 +76,10 @@ export function useDeferredDelete(accountId: string) {
         duration: UNDO_WINDOW_MS,
         action: { label: "元に戻す", onClick: undo },
       });
-      pending.current = { ids, timer: setTimeout(commit, UNDO_WINDOW_MS), toastId };
+      pending.current = { ids, timer: setTimeout(() => void commit(), UNDO_WINDOW_MS), toastId };
     },
     [commit, unhide],
   );
 
-  return { hidden, remove };
+  return { hidden, remove, flush: commit };
 }

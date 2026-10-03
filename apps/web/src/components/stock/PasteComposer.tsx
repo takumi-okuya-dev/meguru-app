@@ -39,16 +39,18 @@ function pasteTooLargeMessage(details: string[]): string {
  * 貼り付け欄。登録直後の案内（件数・取り消し）も、この欄のすぐ上に出す。
  * 下書きを1件でも選んでいる間は、欄の代わりに選択のバーを出す（書きかけの内容は残る）。
  * @param props - accountId：Account の ID、atLimit：要確認の下書きが上限に達しているか（送るボタンを無効にする）、
- *   selection：下書きの選択の状態と操作
+ *   beforeSubmit：送る前に済ませておく処理（待っている削除の確定）、selection：下書きの選択の状態と操作
  * @returns 貼り付け欄、または選択のバー
  */
 export function PasteComposer({
   accountId,
   atLimit,
+  beforeSubmit,
   selection,
 }: {
   accountId: string;
   atLimit: boolean;
+  beforeSubmit?: () => Promise<void>;
   selection?: DraftSelection;
 }) {
   const queryClient = useQueryClient();
@@ -56,6 +58,8 @@ export function PasteComposer({
   const [text, setText] = useState("");
   const [notice, setNotice] = useState<Notice | null>(null);
   const [registered, setRegistered] = useState<Registered | null>(null);
+  // 送る前の処理（待っている削除の確定）の最中
+  const [preparing, setPreparing] = useState(false);
   // 失敗した送信のIDと内容。同じ内容を送り直すときは同じIDを使う（二重登録を防ぐ。research.md R5）
   const pending = useRef<{ id: string; text: string } | null>(null);
   const areaRef = useRef<HTMLTextAreaElement>(null);
@@ -110,7 +114,7 @@ export function PasteComposer({
     onError: (err) => toast.error(saveErrorMessage(err)),
   });
 
-  const submit = () => {
+  const submit = async () => {
     const { parts } = splitDrafts(text);
     const problem = findPasteProblem(text, parts);
     if (problem) {
@@ -120,12 +124,21 @@ export function PasteComposer({
     const id = pending.current?.text === text ? pending.current.id : crypto.randomUUID();
     pending.current = { id, text };
     setNotice(null);
-    setRegistered(null);
+    // 前回の登録の案内（「取り消す」）は、次の登録が成功するまで残す
+    if (beforeSubmit) {
+      setPreparing(true);
+      try {
+        await beforeSubmit();
+      } finally {
+        setPreparing(false);
+      }
+    }
     send.mutate({ clientRequestId: id, text });
   };
 
+  const busy = preparing || send.isPending;
   const blank = text.trim() === "";
-  const canSend = !blank && !send.isPending && !atLimit;
+  const canSend = !blank && !busy && !atLimit;
 
   if (selection && selection.count > 0) return <SelectionBar selection={selection} />;
 
@@ -143,7 +156,7 @@ export function PasteComposer({
         <div role="alert" className="flex flex-wrap items-center gap-2 rounded-xl border border-warning/40 bg-warning-bg px-3 py-2 text-sm">
           <span className="min-w-0 flex-1">{notice.message}</span>
           {notice.retry && (
-            <Button size="sm" variant="outline" className="rounded-full" disabled={send.isPending} onClick={submit}>
+            <Button size="sm" variant="outline" className="rounded-full" disabled={busy} onClick={() => void submit()}>
               もう一度送る
             </Button>
           )}
@@ -155,7 +168,7 @@ export function PasteComposer({
           aria-label="AIの返信を貼り付ける欄"
           placeholder="AIの返信をここに貼り付け…"
           value={text}
-          disabled={send.isPending}
+          disabled={busy}
           onChange={(e) => setText(e.target.value)}
           rows={1}
           className="field-sizing-content max-h-[calc(8lh+1rem)] min-h-10 flex-1 resize-none bg-transparent py-2 text-base leading-6 outline-none placeholder:text-muted-foreground disabled:opacity-60 md:text-[15px]"
@@ -165,7 +178,7 @@ export function PasteComposer({
           className="size-10 shrink-0 rounded-full"
           aria-label="投稿ストックに登録する"
           disabled={!canSend}
-          onClick={submit}
+          onClick={() => void submit()}
         >
           <ArrowUpIcon className="size-5" />
         </Button>

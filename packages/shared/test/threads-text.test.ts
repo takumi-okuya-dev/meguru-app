@@ -16,9 +16,24 @@ describe("Threadsの長さ（research.md R4、公式ドキュメント：500文�
     expect(threadsLength("あ😀い")).toBe(6);
   });
 
+  it("キーキャップの絵文字もUTF-8のバイト数で数える（Codexレビュー）", () => {
+    // 1️⃣ = "1"(1) + U+FE0F(3) + U+20E3(3)
+    expect(threadsLength("1️⃣")).toBe(7);
+    expect(threadsLength("#️⃣")).toBe(7);
+    expect(threadsLength("*⃣")).toBe(4);
+    expect(isOverThreadsLimit("1️⃣".repeat(72))).toBe(true);
+  });
+
   it("リンクの数を数える", () => {
     expect(countLinks("https://a.example/x と http://b.example と www.c.example")).toBe(3);
     expect(countLinks("リンクなし")).toBe(0);
+  });
+
+  it("空白なしで句読点やURLが続いても、URLの始まりごとに1つと数える（Codexレビュー）", () => {
+    expect(countLinks("https://a.example、https://b.example")).toBe(2);
+    expect(countLinks("https://a.examplehttps://b.example")).toBe(2);
+    expect(countLinks("詳しくはwww.a.exampleへ。https://www.b.example/x")).toBe(2);
+    expect(countLinks(Array.from({ length: 6 }, (_, i) => `https://e.example/${i}`).join("、"))).toBe(6);
   });
 
   it("上限の判定：500を超えるか、リンクが5個を超えると上限超え", () => {

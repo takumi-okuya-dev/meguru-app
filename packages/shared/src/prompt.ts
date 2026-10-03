@@ -83,12 +83,27 @@ function promotionLine(p: PromptPromotion, i: number): string {
   return line;
 }
 
+/**
+ * 宣伝内容の並び順と偏りの指示。「1〜2件に偏らせない」は3件以上のときだけ出す（1〜2件では守れない指示になる）。
+ * @param n - 宣伝内容の件数
+ * @returns 指示の行
+ */
+function promotionGuidance(n: number): string[] {
+  if (n >= 3) {
+    return [
+      "掲載期限が近い順に並んでいます。期限が近いものはやや多めに扱ってよいが、一部だけに偏らせないこと。期限未設定のものも含め、下に掲載している宣伝内容全体をきちんと扱うこと。",
+      `下に${n}件掲載している宣伝内容のうち、特定の1〜2件だけに偏らせないこと。`,
+    ];
+  }
+  if (n === 2) return ["掲載期限が近い順に並んでいます。期限が近いものはやや多めに扱ってよいが、2件ともきちんと扱うこと。"];
+  return [];
+}
+
 function promotionSection(count: number, ratio: number, promotions: PromptPromotion[]): string {
   const share = Math.max(1, Math.round((count * ratio) / 100));
   return [
     `■今回組み込む宣伝内容(宣伝投稿の割合は${ratio}%の設定です。今回生成する${count}件のうち${share}件程度に自然に絡めること。残りは宣伝色のない共感・気づき系の投稿にすること)`,
-    "掲載期限が近い順に並んでいます。期限が近いものはやや多めに扱ってよいが、一部だけに偏らせないこと。期限未設定のものも含め、下に掲載している宣伝内容全体をきちんと扱うこと。",
-    `下に${promotions.length}件掲載している宣伝内容のうち、特定の1〜2件だけに偏らせないこと。`,
+    ...promotionGuidance(promotions.length),
     ...promotions.map(promotionLine),
     "",
     "宣伝を含む投稿でも、押し売り・広告っぽい言い回しにはせず、トーンをそのまま守ること。「届けたい相手」に書かれた属性を意識した切り口にすること。",

@@ -7,8 +7,11 @@ export const THREADS_TEXT_LIMIT = 500;
 /** Threadsの1投稿のリンクの上限。 */
 export const THREADS_LINK_LIMIT = 5;
 
-const EMOJI = /\p{Extended_Pictographic}|\p{Regional_Indicator}/u;
-const LINK = /https?:\/\/\S+|\bwww\.\S+/gi;
+// キーキャップ（1️⃣・#️⃣など）は U+20E3 で結合する。Extended_Pictographic を含まないので別に見る
+const EMOJI = /\p{Extended_Pictographic}|\p{Regional_Indicator}|\u20E3/u;
+// リンクの始まり。日本語の本文では、URLが句読点や次のURLと空白なしで続くことがあるので、終わりではなく始まりを数える。
+// 「https://www.」の www. は数えない（直前が「/」・英数字・「.」の www. は除く）
+const LINK_START = /https?:\/\/|(?<![/\w.])www\./gi;
 
 let segmenter: Intl.Segmenter | undefined;
 
@@ -37,12 +40,12 @@ export function threadsLength(text: string): number {
 }
 
 /**
- * 本文の中のリンク（http://・https://・www.で始まる部分）の数を数える。
+ * 本文の中のリンク（http://・https://・www.で始まる部分）の数を、始まりの数で数える。
  * @param text - 本文
  * @returns リンクの数
  */
 export function countLinks(text: string): number {
-  return text.match(LINK)?.length ?? 0;
+  return text.match(LINK_START)?.length ?? 0;
 }
 
 /**
