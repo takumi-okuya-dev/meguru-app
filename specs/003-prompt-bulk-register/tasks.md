@@ -194,7 +194,7 @@ description: "AIプロンプトの生成と投稿案の一括登録の実装タ�
   - `POST /post-drafts/delete`は自分のAccountの要確認の下書きだけを消し、他人のAccountの下書きのIDは無視して`deletedCount`に数えない。0件・501件・UUIDでないIDは`400`
   - 要再接続のAccountでも、`PUT /post-drafts/:id`・`POST /post-drafts/delete`・`DELETE /draft-batches/:id`が使える（FR-025）
 - [X] T030 [P] [US3] `apps/web/test/stock.test.tsx`に、選択と編集のテストを足す。
-  - 下書きを選ぶと貼り付け欄の位置に選択のバー（「{n}件を選択中」「選択を解除」「選んだ下書きを削除」）が出て、確認のうえ`deletePostDrafts`に選んだIDが渡る
+  - 下書きを選ぶと貼り付け欄の位置に選択のバー（「{n}件を選択中」「選択を解除」「選んだ下書きを削除」）が出て、確認のうえ`deletePostDrafts`に選んだIDが渡る（T040で、確認なし・「元に戻す」付きに変えた）
   - 「⋯」の「編集」で本文を直して保存すると一覧に反映される。`409`で競合のダイアログが出る
 
 ### 実装
@@ -202,7 +202,7 @@ description: "AIプロンプトの生成と投稿案の一括登録の実装タ�
 - [X] T031 [US3] `apps/api/src/services/draft-service.ts`に、編集`updateDraft(db, accountId, id, { body, expectedVersion })`（002の`updateWithVersion`。要確認の下書きだけを対象にし、本文の前後の空白を除いて保存する）と、まとめての削除`deleteDrafts(db, accountId, ids)`（そのAccountの要確認の下書きだけを削除して件数を返す）を足す
 - [X] T032 [US3] `apps/api/src/routes/post-drafts.ts`に`PUT /api/accounts/:accountId/post-drafts/:draftId`と`POST /api/accounts/:accountId/post-drafts/delete`を足す（contracts/api.md）
 - [X] T033 [P] [US3] `apps/web/src/components/stock/DraftEditDialog.tsx`を作る（contracts/ui-routes.md「下書きの編集」）：002の`useItemForm`・`FormDialogFrame`で、見出し「下書きを編集」、本文（必須、2,000文字まで）と、その下に`ThreadsLengthBar`
-- [X] T034 [US3] `apps/web/src/components/stock/DraftList.tsx`に、各下書きのチェックボックス（押せる範囲は44px角以上）、要確認のタブの見出しの「すべて選択」、「⋯」メニュー（「編集」「削除」）を足す。1件の削除は`ConfirmDeleteDialog`のあと`deletePostDrafts`（IDを1つ）を呼ぶ
+- [X] T034 [US3] `apps/web/src/components/stock/DraftList.tsx`に、各下書きのチェックボックス（押せる範囲は44px角以上）、要確認のタブの見出しの「すべて選択」、「⋯」メニュー（「編集」「削除」）を足す。1件の削除は`ConfirmDeleteDialog`のあと`deletePostDrafts`（IDを1つ）を呼ぶ（T040で、確認なし・「元に戻す」付きに変えた）
 - [X] T035 [US3] 選択の状態（選んだ下書きのID）は`apps/web/src/pages/stock.tsx`で持ち、`DraftList`と`PasteComposer`に渡す。`apps/web/src/components/stock/PasteComposer.tsx`は、選択が1件以上あるとき、貼り付け欄の代わりに選択のバーを描く。「選んだ下書きを削除」は確認のダイアログ（「{n}件の下書きを削除しますか？ 元に戻せません。」）のあと`deletePostDrafts`を呼び、成功したら選択を解除して一覧を取り直す
 
 **完了条件**：T029・T030が通り、quickstart.md「手動の確認 3」ができる
@@ -216,6 +216,7 @@ description: "AIプロンプトの生成と投稿案の一括登録の実装タ�
 - [X] T036 [P] `apps/web/src/pages/account-home.tsx`の「次にやること」の4つ目（すべての材料がそろったとき）を、大見出し「投稿をつくりましょう」・説明「プロンプトをChatGPTやClaudeに送り、返ってきた投稿案を投稿ストックに登録します。」・「投稿ストックへ」のボタン（`/accounts/:id/stock`）に変える（contracts/ui-routes.md「ホーム」）。`apps/web/test/account-home.test.tsx`の該当するテストを直す
 - [X] T037 [P] `apps/api/test/integration/profile-cascade.test.ts`に、登録のまとまりと下書きを持つAccountを削除すると、`draft_batches`・`post_drafts`の行がすべて消えることを足す（FR-026。Account削除とMetaのデータ削除要求の両方）
 - [X] T038 `pnpm lint`・`pnpm typecheck`・`pnpm test`を通す。新しくexportした関数・コンポーネントすべてにJSDocを付ける
+- [X] T040 下書きの削除から確認のダイアログをなくし、トーストの「元に戻す」で取り消せるようにする（spec Clarifications 2026-10-04、contracts/ui-routes.md「下書きの削除」、research.md R9の追記）。`apps/web/src/pages/stock.tsx`で、削除した下書きを一覧から隠し、約5秒後に`deletePostDrafts`を呼ぶ。「元に戻す」で取りやめ、次の削除・画面を離れたときは前の削除をすぐ確定する。確定に失敗したら一覧を取り直してトーストを出す。`apps/web/test/stock.test.tsx`のUS3のテストを直す
 - [ ] T039 quickstart.mdの「手動の確認」1〜4を、`pnpm dev:fake`で375・768・1024・1440pxの4つの幅で行う。実際にChatGPTかClaudeにプロンプトを送り、30件の回答を貼り付けて登録できることを確かめる（SC-007）。50件・合計約30,000文字の回答を貼り付けて送り、登録の案内が出るまで待たされないこと（plan.md 性能目標の目安：500ms以内）を確かめる
 
 ---

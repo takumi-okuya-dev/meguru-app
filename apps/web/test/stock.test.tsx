@@ -1,6 +1,6 @@
 // 投稿ストックの画面（specs/003-prompt-bulk-register US1〜US3、contracts/ui-routes.md「投稿ストックの画面」）
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { AccountSummary, DraftBatchResult, PostDraft, PromptResponse } from "@threads-grower/shared";
 import { createMemoryRouter, Link, Outlet, RouterProvider } from "react-router";
@@ -30,7 +30,8 @@ vi.mock("@/lib/api-client", async (orig) => {
   };
 });
 const toastSuccess = vi.fn();
-vi.mock("sonner", () => ({ toast: { success: toastSuccess, error: vi.fn() } }));
+const toastError = vi.fn();
+vi.mock("sonner", () => ({ toast: { success: toastSuccess, error: toastError, dismiss: vi.fn() } }));
 
 const { ApiError } = await import("@/lib/api-client");
 const { UnsavedChangesProvider } = await import("@/components/UnsavedChangesProvider");
@@ -114,6 +115,7 @@ beforeEach(() => {
     fn.mockReset();
   }
   toastSuccess.mockReset();
+  toastError.mockReset();
   listPostDrafts.mockResolvedValue(listResponse());
   getPrompt.mockImplementation((_id: string, count?: number) => Promise.resolve(promptResponse({}, count ?? 30)));
 });
@@ -383,27 +385,98 @@ describe("下書きの確認・修正・削除（US3）", () => {
     listPostDrafts.mockResolvedValue(listResponse({ items }));
   });
 
-  it("下書きを選ぶと貼り付け欄の位置に選択のバーが出て、確認のうえ選んだIDで削除する（FR-020）", async () => {
-    const user = userEvent.setup();
-    deletePostDrafts.mockImplementation(async () => {
-      listPostDrafts.mockResolvedValue(listResponse({ items: [items[1]!] }));
-      return { deletedCount: 2 };
+  /** 直近の削除のトーストの「元に戻す」を押す */
+  const clickUndo = () =>
+    act(() => {
+      const opts = toastSuccess.mock.lastCall?.[1] as { action: { label: string; onClick: () => void } };
+      expect(opts.action.label).toBe("元に戻す");
+      opts.action.onClick();
     });
-    renderPage();
-    await user.click(await screen.findByRole("checkbox", { name: "「1件目の下書き」を選択" }));
-    await user.click(screen.getByRole("checkbox", { name: "「3件目の下書き」を選択" }));
-    expect(screen.getByText("2件を選択中")).toBeInTheDocument();
-    expect(screen.queryByRole("textbox", { name: "AIの返信を貼り付ける欄" })).not.toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: "選んだ下書きを削除" }));
-    const dialog = await screen.findByRole("dialog");
-    expect(within(dialog).getByText("2件の下書きを削除しますか？")).toBeInTheDocument();
-    expect(within(dialog).getByText("元に戻せません。")).toBeInTheDocument();
-    await user.click(within(dialog).getByRole("button", { name: "削除する" }));
-    expect(deletePostDrafts).toHaveBeenCalledWith("a1", ["d1", "d3"]);
-    await waitFor(() => expect(screen.queryByText("1件目の下書き")).not.toBeInTheDocument());
-    expect(screen.queryByText(/件を選択中/)).not.toBeInTheDocument();
-    expect(screen.getByRole("textbox", { name: "AIの返信を貼り付ける欄" })).toBeInTheDocument();
+  it("選ぶと選択のバーが出て、「選んだ下書きを削除」で確認なしに一覧から消え、5秒後に選んだIDで削除する（FR-020）", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+      deletePostDrafts.mockImplementation(async () => {
+        listPostDrafts.mockResolvedValue(listResponse({ items: [items[1]!] }));
+        return { deletedCount: 2 };
+      });
+      renderPage();
+      await user.click(await screen.findByRole("checkbox", { name: "「1件目の下書き」を選択" }));
+      await user.click(screen.getByRole("checkbox", { name: "「3件目の下書き」を選択" }));
+      expect(screen.getByText("2件を選択中")).toBeInTheDocument();
+      expect(screen.queryByRole("textbox", { name: "AIの返信を貼り付ける欄" })).not.toBeInTheDocument();
+
+      await user.click(screen.getByRole("button", { name: "選んだ下書きを削除" }));
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+      expect(screen.queryByText("1件目の下書き")).not.toBeInTheDocument();
+      expect(screen.queryByText("3件目の下書き")).not.toBeInTheDocument();
+      expect(screen.getByText("2件目の下書き")).toBeInTheDocument();
+      expect(screen.getByRole("tab", { name: "要確認 1" })).toBeInTheDocument();
+      expect(toastSuccess).toHaveBeenLastCalledWith("2件の下書きを削除しました", expect.anything());
+      expect(screen.queryByText(/件を選択中/)).not.toBeInTheDocument();
+      expect(deletePostDrafts).not.toHaveBeenCalled();
+
+      act(() => vi.advanceTimersByTime(5000));
+      expect(deletePostDrafts).toHaveBeenCalledWith("a1", ["d1", "d3"]);
+      await waitFor(() => expect(listPostDrafts).toHaveBeenCalledTimes(2));
+      expect(screen.queryByText("1件目の下書き")).not.toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("「元に戻す」を押すと一覧に戻り、削除のAPIを呼ばない", async () => {
+    const user = userEvent.setup();
+    renderPage();
+    await user.click(await screen.findByRole("button", { name: "「2件目の下書き」の操作" }));
+    await user.click(await screen.findByRole("menuitem", { name: "削除" }));
+    expect(screen.queryByText("2件目の下書き")).not.toBeInTheDocument();
+    expect(toastSuccess).toHaveBeenLastCalledWith("1件の下書きを削除しました", expect.anything());
+    clickUndo();
+    expect(await screen.findByText("2件目の下書き")).toBeInTheDocument();
+    await new Promise((r) => setTimeout(r, 50));
+    expect(deletePostDrafts).not.toHaveBeenCalled();
+  });
+
+  it("次の削除をすると、前の削除はその時点で確定する", async () => {
+    const user = userEvent.setup();
+    deletePostDrafts.mockResolvedValue({ deletedCount: 1 });
+    renderPage();
+    await user.click(await screen.findByRole("button", { name: "「1件目の下書き」の操作" }));
+    await user.click(await screen.findByRole("menuitem", { name: "削除" }));
+    await user.click(screen.getByRole("button", { name: "「2件目の下書き」の操作" }));
+    await user.click(await screen.findByRole("menuitem", { name: "削除" }));
+    expect(deletePostDrafts).toHaveBeenCalledTimes(1);
+    expect(deletePostDrafts).toHaveBeenCalledWith("a1", ["d1"]);
+  });
+
+  it("画面を離れると、待っている削除をその時点で確定する", async () => {
+    const user = userEvent.setup();
+    deletePostDrafts.mockResolvedValue({ deletedCount: 1 });
+    renderPage();
+    await user.click(await screen.findByRole("button", { name: "「3件目の下書き」の操作" }));
+    await user.click(await screen.findByRole("menuitem", { name: "削除" }));
+    await user.click(screen.getByRole("link", { name: "ホームへ" }));
+    await screen.findByText("ホームの中身");
+    expect(deletePostDrafts).toHaveBeenCalledWith("a1", ["d3"]);
+  });
+
+  it("確定に失敗したら、下書きが一覧に戻り、失敗を伝える", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+      deletePostDrafts.mockRejectedValue(new ApiError("API_UNREACHABLE", 0));
+      renderPage();
+      await user.click(await screen.findByRole("button", { name: "「1件目の下書き」の操作" }));
+      await user.click(await screen.findByRole("menuitem", { name: "削除" }));
+      expect(screen.queryByText("1件目の下書き")).not.toBeInTheDocument();
+      act(() => vi.advanceTimersByTime(5000));
+      expect(await screen.findByText("1件目の下書き")).toBeInTheDocument();
+      expect(toastError).toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("「すべて選択」と「選択を解除」", async () => {
@@ -413,18 +486,6 @@ describe("下書きの確認・修正・削除（US3）", () => {
     expect(screen.getByText("3件を選択中")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "選択を解除" }));
     expect(screen.queryByText(/件を選択中/)).not.toBeInTheDocument();
-  });
-
-  it("「⋯」の「削除」で1件を確認のうえ削除する", async () => {
-    const user = userEvent.setup();
-    deletePostDrafts.mockResolvedValue({ deletedCount: 1 });
-    renderPage();
-    await user.click(await screen.findByRole("button", { name: "「2件目の下書き」の操作" }));
-    await user.click(await screen.findByRole("menuitem", { name: "削除" }));
-    const dialog = await screen.findByRole("dialog");
-    expect(within(dialog).getByText("この下書きを削除しますか？")).toBeInTheDocument();
-    await user.click(within(dialog).getByRole("button", { name: "削除する" }));
-    expect(deletePostDrafts).toHaveBeenCalledWith("a1", ["d2"]);
   });
 
   it("「⋯」の「編集」で本文を直して保存すると一覧に反映される（FR-019）", async () => {

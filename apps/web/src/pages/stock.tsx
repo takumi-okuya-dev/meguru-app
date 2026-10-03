@@ -1,17 +1,18 @@
 // 投稿ストックの画面（specs/003 US1〜US3、contracts/ui-routes.md「投稿ストックの画面」、docs/ui-design.md 型C）。
 // 上から：プロンプトのカード → 状態のタブと下書きの一覧 → 画面下部に固定の貼り付け欄（選択中は選択のバー）。
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+// 下書きの削除は確認を求めず、トーストの「元に戻す」で取り消せる（Clarifications 2026-10-04）。
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { PostDraft } from "@threads-grower/shared";
 import { EllipsisIcon } from "lucide-react";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { ApiErrorScreen } from "@/components/ApiErrorScreen";
-import { ConfirmDeleteDialog } from "@/components/items/ConfirmDeleteDialog";
 import { PageBody, PageHeader } from "@/components/layout/PageHeader";
 import { DraftEditDialog } from "@/components/stock/DraftEditDialog";
 import { DraftList } from "@/components/stock/DraftList";
 import { PasteComposer } from "@/components/stock/PasteComposer";
 import { PromptCard } from "@/components/stock/PromptCard";
+import { useDeferredDelete } from "@/components/stock/use-deferred-delete";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -22,10 +23,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { api } from "@/lib/api-client";
 import { queryKeys } from "@/lib/query";
-import { saveErrorMessage } from "@/lib/save-error";
 import { useCurrentAccount } from "@/pages/account-layout";
-
-type ToDelete = { ids: string[]; name: string } | null;
 
 const excerpt = (body: string) => {
   const line = body.split("\n")[0] ?? "";
@@ -45,9 +43,10 @@ export function StockPage() {
   });
   const [picked, setPicked] = useState<ReadonlySet<string>>(new Set());
   const [editing, setEditing] = useState<PostDraft | null>(null);
-  const [toDelete, setToDelete] = useState<ToDelete>(null);
+  const { hidden, remove } = useDeferredDelete(account.id);
 
-  const items = useMemo(() => drafts.data?.items ?? [], [drafts.data]);
+  // 削除して確定を待っている下書きは、一覧から隠す
+  const items = useMemo(() => (drafts.data?.items ?? []).filter((d) => !hidden.has(d.id)), [drafts.data, hidden]);
   // 一覧から消えた下書き（取り消し・他の端末での削除）は、選択からも外す
   const selected = useMemo(() => new Set(items.filter((d) => picked.has(d.id)).map((d) => d.id)), [items, picked]);
   const atLimit = drafts.data ? items.length >= drafts.data.limit : false;
@@ -57,19 +56,10 @@ export function StockPage() {
     void queryClient.invalidateQueries({ queryKey: queryKeys.promptAll(account.id) });
   };
 
-  const remove = useMutation({
-    mutationFn: (ids: string[]) => api.deletePostDrafts(account.id, ids),
-    onSuccess: (_, ids) => {
-      setToDelete(null);
-      setPicked((prev) => new Set([...prev].filter((id) => !ids.includes(id))));
-      refresh();
-      toast.success("削除しました");
-    },
-    onError: (err) => {
-      setToDelete(null);
-      toast.error(saveErrorMessage(err));
-    },
-  });
+  const removeDrafts = (ids: string[]) => {
+    setPicked((prev) => new Set([...prev].filter((id) => !ids.includes(id))));
+    remove(ids);
+  };
 
   if (drafts.error) return <ApiErrorScreen error={drafts.error} onRetry={() => void drafts.refetch()} />;
 
@@ -149,7 +139,7 @@ export function StockPage() {
                         <DropdownMenuItem onSelect={() => setEditing(d)}>編集</DropdownMenuItem>
                         <DropdownMenuItem
                           className="text-destructive"
-                          onSelect={() => setToDelete({ ids: [d.id], name: "この下書き" })}
+                          onSelect={() => removeDrafts([d.id])}
                         >
                           削除
                         </DropdownMenuItem>
@@ -171,7 +161,7 @@ export function StockPage() {
             selection={{
               count: selected.size,
               onClear: () => setPicked(new Set()),
-              onDelete: () => setToDelete({ ids: [...selected], name: `${selected.size}件の下書き` }),
+              onDelete: () => removeDrafts([...selected]),
             }}
           />
         </div>
@@ -190,12 +180,6 @@ export function StockPage() {
           onDeletedElsewhere={refresh}
         />
       )}
-      <ConfirmDeleteDialog
-        name={toDelete?.name ?? null}
-        deleting={remove.isPending}
-        onCancel={() => setToDelete(null)}
-        onConfirm={() => toDelete && remove.mutate(toDelete.ids)}
-      />
     </>
   );
 }
