@@ -12,6 +12,7 @@ import { SignInPage } from "@/pages/sign-in";
 import { AccountSettingsPage } from "@/pages/settings/account";
 import { AppearanceSettings } from "@/pages/settings/appearance";
 import { SettingsIndex, SettingsLayout } from "@/pages/settings/settings-layout";
+import { StrategyPage } from "@/pages/strategy";
 
 /** 画面のルート（contracts/ui-routes.md「ルート」）。認証が必要な画面は RequireAuth で包む。 */
 export const routes = [
@@ -37,6 +38,7 @@ export const routes = [
         children: [
           { index: true, element: <AccountHome /> },
           { path: "settings", element: <AccountSettings /> },
+          { path: "strategy", element: <StrategyPage /> },
         ],
       },
     ],

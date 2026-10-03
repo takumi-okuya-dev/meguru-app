@@ -1,7 +1,10 @@
 // APIの入出力スキーマ（contracts/api.md「型」）。WebとAPIで共有する。
 import { z } from "zod";
 import { ERROR_CODES } from "./errors";
+import { STRATEGY_TEXT_MAX } from "./limits";
 import { PLANS } from "./plans";
+import { STRATEGY_TEXT_KEYS, TONE_PRESET_VALUES, type StrategyTextKey } from "./strategy";
+import { countChars } from "./text";
 
 /** 契約プランのスキーマ。 */
 export const planSchema = z.enum(PLANS);
@@ -95,3 +98,49 @@ export const errorResponseSchema = z.object({
 });
 /** APIのエラーレスポンス。 */
 export type ErrorResponse = z.infer<typeof errorResponseSchema>;
+
+// ---- 戦略プロファイル（specs/002-strategy-profile contracts/api.md）----
+
+/**
+ * 文字数（コードポイントの数）の上限つきの文字列（research.md R2）。
+ * @param max - 上限
+ * @returns zod のスキーマ
+ */
+export const textMax = (max: number) => z.string().refine((s) => countChars(s) <= max, { message: `max ${max}` });
+
+/** 課題の全項目の値のスキーマ。19個のテキストはすべて必須（"" は未入力）。 */
+export const strategyValuesSchema = z.object({
+  ...(Object.fromEntries(STRATEGY_TEXT_KEYS.map((k) => [k, textMax(STRATEGY_TEXT_MAX)])) as Record<
+    StrategyTextKey,
+    ReturnType<typeof textMax>
+  >),
+  tonePreset: z.enum(TONE_PRESET_VALUES).nullable(),
+});
+
+/** PUT /api/accounts/:id/strategy のリクエストのスキーマ。 */
+export const putStrategyRequestSchema = strategyValuesSchema.extend({
+  expectedVersion: z.number().int().nonnegative(),
+});
+/** PUT /api/accounts/:id/strategy のリクエスト。 */
+export type PutStrategyRequest = z.infer<typeof putStrategyRequestSchema>;
+
+/** 課題（GET・PUT のレスポンス）のスキーマ。 */
+export const strategySchema = strategyValuesSchema.extend({
+  version: z.number().int(),
+  filledCount: z.number().int(),
+  totalCount: z.literal(16),
+  /** ISO 8601。まだ保存していなければ null */
+  updatedAt: z.string().nullable(),
+  canEdit: z.boolean(),
+});
+/** 課題（GET・PUT のレスポンス）。 */
+export type Strategy = z.infer<typeof strategySchema>;
+
+/**
+ * zod の検証の失敗から、違反した項目名（リクエストのキー名）を取り出す。VALIDATION_FAILED の details に使う。
+ * @param error - zod のエラー
+ * @returns 項目名の一覧（重複なし）
+ */
+export function invalidFields(error: z.ZodError): string[] {
+  return [...new Set(error.issues.map((i) => String(i.path[0] ?? "")).filter(Boolean))];
+}

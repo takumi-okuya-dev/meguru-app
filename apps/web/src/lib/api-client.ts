@@ -7,7 +7,9 @@ import {
   errorMessage,
   errorResponseSchema,
   meResponseSchema,
+  strategySchema,
   type ConnectRequest,
+  type PutStrategyRequest,
   type ErrorCode,
   type OpenAccountRequest,
 } from "@threads-grower/shared";
@@ -92,6 +94,10 @@ export const api = {
     request("/api/threads/connect", connectResponseSchema, { method: "POST", body: JSON.stringify(body) }),
   deleteAccount: (accountId: string, confirmUsername: string) =>
     request(`/api/accounts/${accountId}`, null, { method: "DELETE", body: JSON.stringify({ confirmUsername }) }),
+  // ---- 戦略プロファイル（specs/002-strategy-profile contracts/api.md）----
+  getStrategy: (accountId: string) => request(`/api/accounts/${accountId}/strategy`, strategySchema),
+  putStrategy: (accountId: string, body: PutStrategyRequest) =>
+    request(`/api/accounts/${accountId}/strategy`, strategySchema, { method: "PUT", body: JSON.stringify(body) }),
   dataDeletionStatus: (code: string) =>
     request(`/api/data-deletion/${encodeURIComponent(code)}`, dataDeletionStatusSchema, { auth: false }),
 };

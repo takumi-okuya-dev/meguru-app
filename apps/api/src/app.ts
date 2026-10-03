@@ -11,6 +11,7 @@ import { accountRoutes } from "./routes/accounts";
 import { dataDeletionRoutes } from "./routes/data-deletion";
 import { threadsWebhookRoutes } from "./routes/threads-webhooks";
 import { meRoutes } from "./routes/me";
+import { strategyRoutes } from "./routes/strategy";
 import { threadsConnectRoutes } from "./routes/threads-connect";
 
 /** アプリに差し込む依存。テストでは偽の認証を渡す。 */
@@ -92,6 +93,7 @@ export function createApp(deps: AppDeps = defaultDeps) {
     })
     .route("/", meRoutes(authed))
     .route("/", accountRoutes(authed))
+    .route("/", strategyRoutes(authed))
     .route("/", threadsConnectRoutes(authed))
     .route("/", threadsWebhookRoutes())
     .route("/", dataDeletionRoutes());

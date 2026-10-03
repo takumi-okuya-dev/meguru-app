@@ -158,43 +158,43 @@ description: "戦略プロファイル（課題・宣伝内容・リサーチ）
 
 ### テスト（先に書いて失敗を確認する）
 
-- [ ] T027 [P] [US1] `packages/shared/test/strategy.test.ts`を書く：`STRATEGY_FIELDS`が20項目（数える16項目＋下書き4項目）を持ち、入力済み項目数が下書きを数えず、`tonePreset`は`null`以外で入力済みになる
-- [ ] T028 [P] [US1] `apps/api/test/integration/strategy.test.ts`を書く（quickstart.mdの表の次の行）：
+- [X] T027 [P] [US1] `packages/shared/test/strategy.test.ts`を書く：`STRATEGY_FIELDS`が20項目（数える16項目＋下書き4項目）を持ち、入力済み項目数が下書きを数えず、`tonePreset`は`null`以外で入力済みになる
+- [X] T028 [P] [US1] `apps/api/test/integration/strategy.test.ts`を書く（quickstart.mdの表の次の行）：
   - 「課題の復元」「空欄の扱い」「文字数の上限」「課題の競合」（行がないのに`expectedVersion: 1`で保存すると`409`になり、行は作られないことも含む）
   - 「他人のAccount」（strategy）、「要再接続のAccount」（strategy）
   - 「grower機能の判定」（strategy）：無料体験中・プラン2は保存できる。無料体験の後のプラン1は`PUT`が`403 GROWER_FEATURE_REQUIRED`で、`GET`は`canEdit: false`と保存済みの内容を返す
-- [ ] T029 [P] [US1] `apps/web/test/strategy.test.tsx`を書く：
+- [X] T029 [P] [US1] `apps/web/test/strategy.test.tsx`を書く：
   - 「未保存の警告（Web）」「競合のダイアログ（Web）」
   - `canEdit: false`のとき入力欄が読み取り専用で、保存がなく、案内が出る
   - 保存で`403`を受けると、入力内容を残したまま案内のダイアログが出る
 
 ### 実装
 
-- [ ] T030 [P] [US1] `packages/shared/src/strategy.ts`を作る（data-model.md「strategy_designs」、contracts/ui-routes.md「項目の文言」）：
+- [X] T030 [P] [US1] `packages/shared/src/strategy.ts`を作る（data-model.md「strategy_designs」、contracts/ui-routes.md「項目の文言」）：
   - `STRATEGY_FIELDS`：キー、DBの列名、区分（「課題① 営業導線設計」「課題② アカウント設計」「課題③ 集客導線設計」「人柄（トンマナ）」「その他」「プロフィール・固定投稿（下書き）」）、ラベル・説明・記入例（ui-routes.mdの表のとおり）、入力済み項目数に数えるか
   - `TONE_PRESETS`：値と表示名の組。`energetic_casual`=元気・カジュアル、`polite_warm`=丁寧・温かい、`formal`=敬語ベース、`casual_frank`=ため口・フランク、`introspective_calm`=内省的・静かめ、`passionate`=情熱的・熱量高め、`humorous`=ユーモア・自虐混じり
   - `countFilled(values)`：16項目のうち入力済みの数
-- [ ] T031 [US1] `packages/shared/src/schemas.ts`に、課題のスキーマを足す（contracts/api.mdの`StrategyValues`・`Strategy`）。
+- [X] T031 [US1] `packages/shared/src/schemas.ts`に、課題のスキーマを足す（contracts/api.mdの`StrategyValues`・`Strategy`）。
   - `strategyValuesSchema`：19個のテキストのキーすべて必須、各`countChars <= 2000`。`tonePreset`は`TONE_PRESETS`の値か`null`
   - `putStrategyRequestSchema`：`expectedVersion`は0以上の整数
   - `strategyResponseSchema`：`version`、`filledCount`、`totalCount: 16`、`updatedAt`、`canEdit`を含む
-- [ ] T032 [US1] `apps/api/src/services/strategy-service.ts`を作る（research.md R1・R2・R3）：
+- [X] T032 [US1] `apps/api/src/services/strategy-service.ts`を作る（research.md R1・R2・R3）：
   - `getStrategy`：行がなければ全項目`""`・`tonePreset: null`・`version: 0`・`updatedAt: null`
   - `saveStrategy`：空白だけの値は`NULL`にする。`INSERT … ON CONFLICT (account_id) DO UPDATE SET …, version = strategy_designs.version + 1, updated_at = now() WHERE strategy_designs.version = $expectedVersion RETURNING *`の1文で保存し、0行なら最新の値を`latest`に入れて`409 STALE_UPDATE`。行がないのに`expectedVersion`が1以上なら、作らずに`409 STALE_UPDATE`を返し、`latest`には全項目が空・`version: 0`の課題を入れる
   - DBの`NULL`はレスポンスで`""`にする
-- [ ] T033 [US1] `apps/api/src/routes/strategy.ts`に`GET`・`PUT /api/accounts/:accountId/strategy`を作り、`apps/api/src/app.ts`に登録する。
+- [X] T033 [US1] `apps/api/src/routes/strategy.ts`に`GET`・`PUT /api/accounts/:accountId/strategy`を作り、`apps/api/src/app.ts`に登録する。
   - どちらも`findOwnedAccount`で確かめる
   - `PUT`は`requireGrowerAccess`（T011）のあとに検証し、違反は`400 VALIDATION_FAILED`で`details`に項目名
   - `GET`には`canEdit`を入れる（contracts/api.md）
-- [ ] T034 [US1] `apps/web/src/lib/api-client.ts`に`getStrategy`・`putStrategy`を足す
-- [ ] T035 [US1] `apps/web/src/pages/strategy.tsx`を作る（contracts/ui-routes.md「課題の画面」、docs/ui-design.md 型A）。
+- [X] T034 [US1] `apps/web/src/lib/api-client.ts`に`getStrategy`・`putStrategy`を足す
+- [X] T035 [US1] `apps/web/src/pages/strategy.tsx`を作る（contracts/ui-routes.md「課題の画面」、docs/ui-design.md 型A）。
   - 上部バー：`PageHeader`に「課題」、「{入力済み}/16 入力済み」、PCのみ「最終更新：{日時}」、「⋯」（変更を破棄）、「保存」
   - 本文：案内文、区分のチップ（`md`未満は上部バーの下に固定して横スクロール、先頭に「{入力済み}/16」）、区分ごとの見出しと`FieldWithCounter`
   - 近い人間性：ブラウザ標準の`<select>`（「（未選択）」と7つ）
   - プロフィール・固定投稿の区分：見出しの下に「Threadsには自動で反映されない下書きです。投稿づくりの材料には使いません。」
   - 保存：成功したらトースト「保存しました」。`409`は`ConflictDialog`、`403`は`GrowerRequiredNotice`のダイアログ、その他の失敗は入力を残してトースト（ui-routes.md 規則2）
   - `useUnsavedChanges`で警告する。`canEdit: false`なら読むだけの表示と`GrowerRequiredNotice`
-- [ ] T036 [US1] `apps/web/src/router.tsx`に`/accounts/:accountId/strategy`を足し、`apps/web/src/components/layout/Sidebar.tsx`に見出し「戦略」と「課題」（`Target`）を足す
+- [X] T036 [US1] `apps/web/src/router.tsx`に`/accounts/:accountId/strategy`を足し、`apps/web/src/components/layout/Sidebar.tsx`に見出し「戦略」と「課題」（`Target`）を足す
 
 **完了条件**：T027〜T029が通り、quickstart.md「手動の確認 1・2」ができる
 
