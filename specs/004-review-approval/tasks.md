@@ -345,7 +345,7 @@ description: "重複検知・承認/却下・NGワード（CORE RULES）の実�
 
 ### テスト（先に書いて失敗を確認する）
 
-- [ ] T027 [P] [US2] `apps/api/test/integration/posting-rules.test.ts`を作る。
+- [X] T027 [P] [US2] `apps/api/test/integration/posting-rules.test.ts`を作る。
   - `GET /posting-rules`：`ngWords`が古い順で、`ngWordLimit: 200`・`coreRules: ""`・`coreRulesVersion: 1`・`canEditCoreRules`が返る
   - 「NGワードの重複・上限」：
     - 「絶対」がある状態で`["絶対", "ＡＢＣ", "abc", "  "]`を送ると、`added`は「ＡＢＣ」だけ、`duplicates`は「絶対」「abc」になる
@@ -359,7 +359,7 @@ description: "重複検知・承認/却下・NGワード（CORE RULES）の実�
   - 「NGワードと承認の同時実行」：「絶対」を含む要確認の下書きの承認と、「絶対」の追加を`Promise.all`で20回繰り返し、毎回、終わった後に「絶対」を含む承認済みが0件であること
   - `DELETE /ng-words/:id`：`204`。別のAccountの語のIDは`404 ITEM_NOT_FOUND`
   - 無料体験の後のプラン1でもNGワードを追加・削除できる（FR-017）。他人のAccountは`404 ACCOUNT_NOT_FOUND`
-- [ ] T028 [P] [US2] `apps/web/test/account-settings.test.tsx`を作る。
+- [X] T028 [P] [US2] `apps/web/test/account-settings.test.tsx`を作る。
   - 「このアカウントの設定」に「投稿のルール」の区分が、「Threadsとの接続」より上にある。NGワードの行に「{n}語」と「編集」がある
   - NGワードのダイアログ：
     - 「絶対、必ず儲かる」を入れて「追加」（またはEnter）を押すと、`addNgWords`に`["絶対", "必ず儲かる"]`が渡る（改行・「,」でも区切る）
@@ -371,7 +371,7 @@ description: "重複検知・承認/却下・NGワード（CORE RULES）の実�
 
 ### 実装
 
-- [ ] T029 [US2] `apps/api/src/services/posting-rules-service.ts`に、次の3つを作る（research.md R6）。
+- [X] T029 [US2] `apps/api/src/services/posting-rules-service.ts`に、次の3つを作る（research.md R6）。
   - `getPostingRules(db, account, user)`：`canEditCoreRules`は`canEditProfile`で求める。
   - `addNgWords(env, accountId, words)`：次の順に行う。
     1. 003と同じロックを取ったトランザクションを始める。
@@ -382,12 +382,12 @@ description: "重複検知・承認/却下・NGワード（CORE RULES）の実�
     6. そのAccountの承認済みの下書きを読み、足した語で`findNgWords`に当たるものを、1回の`UPDATE`で`status = 'needs_review'`・`reviewed_at = NULL`・`version + 1`にする。
     7. `{ added, duplicates, reopenedCount }`を返す。
   - `deleteNgWord(db, accountId, id)`：なければ`404 ITEM_NOT_FOUND`。
-- [ ] T030 [US2] `apps/api/src/routes/posting-rules.ts`を作り、`apps/api/src/app.ts`に登録する（contracts/api.md）。
+- [X] T030 [US2] `apps/api/src/routes/posting-rules.ts`を作り、`apps/api/src/app.ts`に登録する（contracts/api.md）。
   - `GET /api/accounts/:accountId/posting-rules`
   - `POST /api/accounts/:accountId/ng-words`
   - `DELETE /api/accounts/:accountId/ng-words/:ngWordId`（`assertItemId`）
   - どれもgrower機能は判定しない。
-- [ ] T031 [P] [US2] `apps/web/src/components/settings/NgWordsDialog.tsx`を作る（contracts/ui-routes.md「NGワードのダイアログ」）。
+- [X] T031 [P] [US2] `apps/web/src/components/settings/NgWordsDialog.tsx`を作る（contracts/ui-routes.md「NGワードのダイアログ」）。
   - 説明文を出す。
   - 入力欄と「追加」を置く。入力は改行・「、」・「,」で区切って送る。
   - 登録済みの語を、古い順のチップで並べる。「×」の読み上げ名は「{語}を削除」。押すと確認なしで削除し、トースト「「{語}」を削除しました」と「元に戻す」を出す。「元に戻す」は同じ語を`addNgWords`で足し直す（contracts/ui-routes.md）。
@@ -397,15 +397,15 @@ description: "重複検知・承認/却下・NGワード（CORE RULES）の実�
     - `queryKeys.postDrafts(id)`
     - `queryKeys.draftCounts(id)`
     - `["account", id, "prompt"]`で始まるキー
-- [ ] T032 [US2] `apps/web/src/components/settings/PostingRulesSection.tsx`を作る。
+- [X] T032 [US2] `apps/web/src/components/settings/PostingRulesSection.tsx`を作る。
   - 小見出し「投稿のルール」と、角の丸い枠の中に`SettingRow`の行を並べる（contracts/ui-routes.md「このアカウントの設定」）。
   - まずNGワードの行（「この言葉を含む下書きは承認できません。{n}語」と「編集」→`NgWordsDialog`）を作る。投稿ルールの行はT049、規約の行はT060で足す。
   - `apps/web/src/pages/account-settings.tsx`の既存の区分より上に置き、`getPostingRules`で読み込む。
-- [ ] T033 [P] [US2] `apps/web/src/components/stock/DraftLabels.tsx`を作る。
+- [X] T033 [P] [US2] `apps/web/src/components/stock/DraftLabels.tsx`を作る。
   - NGワードのラベル「NGワード：{言葉}、{言葉}」（`--destructive`の文字）を出す。
   - 本文の該当範囲を`<mark>`で強調する`HighlightedBody`を作る。範囲は`findNgWords`の`ranges`。文字として描き、`dangerouslySetInnerHTML`は使わない。
   - Threadsの上限のラベルは、003の`ThreadsLengthBar`の表示のままにする。
-- [ ] T034 [US2] `apps/web/src/components/stock/DraftCard.tsx`のラベルの行と本文を`DraftLabels`・`HighlightedBody`で描く（NGワードのラベルは要確認のタブだけ。FR-016）。`apps/web/src/components/stock/DraftEditDialog.tsx`の本文の欄の下にも、入力に合わせてNGワードのラベルを出す。
+- [X] T034 [US2] `apps/web/src/components/stock/DraftCard.tsx`のラベルの行と本文を`DraftLabels`・`HighlightedBody`で描く（NGワードのラベルは要確認のタブだけ。FR-016）。`apps/web/src/components/stock/DraftEditDialog.tsx`の本文の欄の下にも、入力に合わせてNGワードのラベルを出す。
 
 **完了条件**：T027・T028が通り、quickstart.md「手動の確認 1」の1〜2と「2」の2・7ができる
 

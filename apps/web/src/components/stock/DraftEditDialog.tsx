@@ -1,12 +1,13 @@
 // 下書きの編集のダイアログ（specs/003 US3、contracts/ui-routes.md「下書きの編集」、FR-019）。
 // 002の追加・編集のダイアログの枠を使い、保存の 409・404 の扱いも002と同じにする。
 // 承認済みの下書きも編集でき、保存すると要確認に戻る（specs/004 FR-007、Clarifications Q1）。
-import { DRAFT_BODY_MAX, countChars, isBlank, type PostDraft } from "@threads-grower/shared";
+import { DRAFT_BODY_MAX, checkPublishable, countChars, isBlank, type NgWord, type PostDraft } from "@threads-grower/shared";
 import { FieldWithCounter } from "@/components/FieldWithCounter";
 import { DeletedElsewhereNotice, FormDialogFrame } from "@/components/items/FormDialogFrame";
 import { useItemForm, type FormErrors } from "@/components/items/use-item-form";
 import { useRef } from "react";
 import { api } from "@/lib/api-client";
+import { LabelRow, NgWordLabel } from "./DraftLabels";
 import { ThreadsLengthBar } from "./ThreadsLengthBar";
 
 type Form = { body: string };
@@ -14,7 +15,7 @@ type Form = { body: string };
 /**
  * 下書きの編集のダイアログ。本文の下に、一覧と同じ長さの表示を出す。
  * @param props - accountId、item：編集する下書き、onSaved：保存できた（reopened：承認済みから要確認に戻った）、
- *   onClose：閉じる、onDeletedElsewhere：削除済みの案内を閉じた
+ *   onClose：閉じる、onDeletedElsewhere：削除済みの案内を閉じた、ngWords：NGワード
  * @returns ダイアログ
  */
 export function DraftEditDialog({
@@ -23,9 +24,12 @@ export function DraftEditDialog({
   onSaved,
   onClose,
   onDeletedElsewhere,
+  ngWords = [],
 }: {
   accountId: string;
   item: PostDraft;
+  /** そのAccountのNGワード（入力に合わせてラベルを出す。FR-016） */
+  ngWords?: NgWord[];
   onSaved: (d: PostDraft, reopened: boolean) => void;
   onClose: () => void;
   onDeletedElsewhere: () => void;
@@ -81,8 +85,19 @@ export function DraftEditDialog({
           onChange={(v) => setField("body", v)}
         />
         <ThreadsLengthBar text={form.body} />
+        <LiveLabels body={form.body} ngWords={ngWords} />
       </FormDialogFrame>
       {f.overlays}
     </>
   );
+}
+
+/**
+ * 入力中の本文に合わせて出すラベル（保存の前に気づけるように）。
+ * @param props - body：入力中の本文、ngWords：NGワード
+ * @returns ラベルの行
+ */
+function LiveLabels({ body, ngWords }: { body: string; ngWords: NgWord[] }) {
+  const check = checkPublishable(body, ngWords);
+  return <LabelRow labels={[check.ngWords.length > 0 && <NgWordLabel key="ng" check={check} />].filter(Boolean)} />;
 }

@@ -3,13 +3,24 @@
 // 下書きの削除は確認を求めず、トーストの「元に戻す」で取り消せる（003 Clarifications 2026-10-04）。
 // 承認・却下・要確認に戻すも、トーストの「元に戻す」で取り消せる（004 FR-008）。
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { checkPublishable, type PostDraft, type PostDraftStatus, type PublishCheck } from "@threads-grower/shared";
+import {
+  checkPublishable,
+  type PostDraft,
+  type PostDraftStatus,
+  type PublishCheck,
+} from "@threads-grower/shared";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { ApiErrorScreen } from "@/components/ApiErrorScreen";
 import { PageBody, PageHeader } from "@/components/layout/PageHeader";
 import { DraftCard } from "@/components/stock/DraftCard";
 import { DraftEditDialog } from "@/components/stock/DraftEditDialog";
+import {
+  HighlightedBody,
+  LabelRow,
+  NgWordLabel,
+  highlightsOf,
+} from "@/components/stock/DraftLabels";
 import { DraftList } from "@/components/stock/DraftList";
 import { PasteComposer } from "@/components/stock/PasteComposer";
 import { PromptCard } from "@/components/stock/PromptCard";
@@ -58,7 +69,8 @@ export function StockPage() {
   const counts = useMemo(
     () =>
       data && {
-        needsReview: data.counts.needsReview - (data.needsReview.length - lists.needs_review.length),
+        needsReview:
+          data.counts.needsReview - (data.needsReview.length - lists.needs_review.length),
         approved: data.counts.approved,
         rejected: data.counts.rejected - (data.rejected.length - lists.rejected.length),
       },
@@ -68,7 +80,8 @@ export function StockPage() {
   const checks = useMemo(() => {
     const ngWords = data?.ngWords ?? [];
     const map = new Map<string, PublishCheck>();
-    for (const d of [...lists.needs_review, ...lists.approved]) map.set(d.id, checkPublishable(d.body, ngWords));
+    for (const d of [...lists.needs_review, ...lists.approved])
+      map.set(d.id, checkPublishable(d.body, ngWords));
     return map;
   }, [data, lists]);
 
@@ -82,14 +95,19 @@ export function StockPage() {
     void queryClient.invalidateQueries({ queryKey: queryKeys.promptAll(account.id) });
   };
 
-  const unpick = (ids: string[]) => setPicked((prev) => new Set([...prev].filter((id) => !ids.includes(id))));
+  const unpick = (ids: string[]) =>
+    setPicked((prev) => new Set([...prev].filter((id) => !ids.includes(id))));
 
   const removeDrafts = (ids: string[]) => {
     unpick(ids);
     remove(ids);
   };
 
-  const runReview = async (action: "approve" | "reject" | "reopen", targets: PostDraft[], options: ReviewOptions = {}) => {
+  const runReview = async (
+    action: "approve" | "reject" | "reopen",
+    targets: PostDraft[],
+    options: ReviewOptions = {},
+  ) => {
     setBusy(true);
     try {
       const res = await review(action, targets, options);
@@ -110,7 +128,8 @@ export function StockPage() {
     setPicked(new Set());
   };
 
-  if (drafts.error) return <ApiErrorScreen error={drafts.error} onRetry={() => void drafts.refetch()} />;
+  if (drafts.error)
+    return <ApiErrorScreen error={drafts.error} onRetry={() => void drafts.refetch()} />;
 
   const toggle = (id: string) =>
     setPicked((prev) => {
@@ -132,10 +151,19 @@ export function StockPage() {
         >
           削除
         </Button>
-        <Button variant="outline" className="h-10 rounded-full md:h-9" disabled={busy} onClick={() => setRejecting(selected)}>
+        <Button
+          variant="outline"
+          className="h-10 rounded-full md:h-9"
+          disabled={busy}
+          onClick={() => setRejecting(selected)}
+        >
           まとめて却下
         </Button>
-        <Button className="h-10 rounded-full md:h-9" disabled={busy} onClick={() => approve(selected)}>
+        <Button
+          className="h-10 rounded-full md:h-9"
+          disabled={busy}
+          onClick={() => approve(selected)}
+        >
           まとめて承認
         </Button>
       </>
@@ -153,36 +181,54 @@ export function StockPage() {
         >
           削除
         </Button>
-        <Button className="h-10 rounded-full md:h-9" disabled={busy} onClick={() => reopen(selected)}>
+        <Button
+          className="h-10 rounded-full md:h-9"
+          disabled={busy}
+          onClick={() => reopen(selected)}
+        >
           要確認に戻す
         </Button>
       </>
     );
 
-  const renderCard = (d: PostDraft) => (
-    <DraftCard
-      key={d.id}
-      draft={d}
-      selected={picked.has(d.id)}
-      check={checks.get(d.id) ?? checkPublishable(d.body, [])}
-      busy={busy}
-      actions={{
-        onToggle: () => toggle(d.id),
-        onApprove: () => approve([d]),
-        onReject: () => setRejecting([d]),
-        onEdit: () => setEditing(d),
-        onDelete: () => removeDrafts([d.id]),
-        onReopen: () => reopen([d]),
-      }}
-    />
-  );
+  const renderCard = (d: PostDraft) => {
+    const check = checks.get(d.id) ?? checkPublishable(d.body, []);
+    // NGワードのラベルは要確認だけ（承認済みには、NGワードの追加で要確認に戻るため残らない。FR-016・FR-016a）
+    const showNg = d.status === "needs_review" && check.ngWords.length > 0;
+    const marks = highlightsOf(check).filter((m) => m.kind !== "ng" || showNg);
+    return (
+      <DraftCard
+        key={d.id}
+        draft={d}
+        selected={picked.has(d.id)}
+        check={check}
+        busy={busy}
+        labels={
+          <LabelRow labels={[showNg && <NgWordLabel key="ng" check={check} />].filter(Boolean)} />
+        }
+        body={marks.length > 0 ? <HighlightedBody body={d.body} marks={marks} /> : undefined}
+        actions={{
+          onToggle: () => toggle(d.id),
+          onApprove: () => approve([d]),
+          onReject: () => setRejecting([d]),
+          onEdit: () => setEditing(d),
+          onDelete: () => removeDrafts([d.id]),
+          onReopen: () => reopen([d]),
+        }}
+      />
+    );
+  };
 
   return (
     <>
       <PageHeader title="投稿ストック" />
       <PageBody className="flex-1 space-y-5">
         {data ? (
-          <PromptCard accountId={account.id} canGeneratePrompt={data.canGeneratePrompt} promptPostCount={data.promptPostCount} />
+          <PromptCard
+            accountId={account.id}
+            canGeneratePrompt={data.canGeneratePrompt}
+            promptPostCount={data.promptPostCount}
+          />
         ) : (
           <div className="h-32 animate-pulse rounded-2xl bg-muted" aria-busy="true" />
         )}
@@ -195,7 +241,9 @@ export function StockPage() {
                   type="checkbox"
                   className="size-4 accent-foreground"
                   checked={allSelected}
-                  onChange={() => setPicked(allSelected ? new Set() : new Set(items.map((d) => d.id)))}
+                  onChange={() =>
+                    setPicked(allSelected ? new Set() : new Set(items.map((d) => d.id)))
+                  }
                 />
                 すべて選択
               </label>
@@ -227,7 +275,11 @@ export function StockPage() {
             atLimit={atLimit}
             // 削除して確定を待っている下書きは、まだサーバーで数えられているので、登録の前に確定する
             beforeSubmit={flush}
-            selection={{ count: selected.length, onClear: () => setPicked(new Set()), actions: selectionActions }}
+            selection={{
+              count: selected.length,
+              onClear: () => setPicked(new Set()),
+              actions: selectionActions,
+            }}
           />
         </div>
       </div>
@@ -243,6 +295,7 @@ export function StockPage() {
           }}
           onClose={() => setEditing(null)}
           onDeletedElsewhere={refresh}
+          ngWords={data?.ngWords ?? []}
         />
       )}
       {rejecting && (

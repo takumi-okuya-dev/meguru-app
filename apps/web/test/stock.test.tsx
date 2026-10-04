@@ -789,3 +789,35 @@ describe("承認・却下（004 US1）", () => {
     await waitFor(() => expect(toastError).toHaveBeenCalledWith("他の場所で更新されています。最新の内容を表示しました。"));
   });
 });
+
+describe("NGワードのラベルと強調（004 US2、FR-016）", () => {
+  it("要確認の下書きに「NGワード：絶対」が出て、本文の「絶対」が強調される", async () => {
+    listPostDrafts.mockResolvedValue(
+      listResponse({
+        items: [draft({ id: "n1", body: "絶対に伸びる方法" })],
+        ngWords: [{ id: "w1", word: "絶対", normalized: "絶対", createdAt: "2026-10-04T00:00:00.000Z" }],
+      }),
+    );
+    renderPage();
+    expect(await screen.findByText("NGワード：絶対")).toBeInTheDocument();
+    const mark = document.querySelector("mark");
+    expect(mark?.textContent).toBe("絶対");
+  });
+
+  it("編集のダイアログでも、入力に合わせてNGワードのラベルが出る", async () => {
+    const user = userEvent.setup();
+    listPostDrafts.mockResolvedValue(
+      listResponse({
+        items: [draft({ id: "n1", body: "ふつうの投稿" })],
+        ngWords: [{ id: "w1", word: "絶対", normalized: "絶対", createdAt: "2026-10-04T00:00:00.000Z" }],
+      }),
+    );
+    renderPage();
+    await user.click(await screen.findByRole("button", { name: "「ふつうの投稿」の操作" }));
+    await user.click(await screen.findByRole("menuitem", { name: "編集" }));
+    const dialog = await screen.findByRole("dialog", { name: "下書きを編集" });
+    expect(within(dialog).queryByText(/NGワード：/)).not.toBeInTheDocument();
+    await user.type(within(dialog).getByRole("textbox", { name: /本文/ }), "絶対");
+    expect(within(dialog).getByText("NGワード：絶対")).toBeInTheDocument();
+  });
+});
