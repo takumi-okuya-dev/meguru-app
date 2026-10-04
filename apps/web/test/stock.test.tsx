@@ -821,3 +821,59 @@ describe("NGワードのラベルと強調（004 US2、FR-016）", () => {
     expect(within(dialog).getByText("NGワード：絶対")).toBeInTheDocument();
   });
 });
+
+describe("重複検知（004 US3、FR-026〜FR-029）", () => {
+  const base = "朝の散歩を続けて三か月がたった。体より先に気持ちが軽くなった気がする。";
+  const approvedTwin: PostDraft = draft({
+    id: "p1",
+    body: base,
+    batchId: "b0",
+    status: "approved",
+    version: 2,
+    reviewedAt: "2026-10-04T01:00:00.000Z",
+  });
+  const twin = draft({ id: "n1", body: base.replace("三か月", "四か月") });
+  const other = draft({ id: "n2", body: "仕事の段取りを前日の夜に決めておくと、次の朝の迷いがぐっと減る。", position: 1 });
+
+  beforeEach(() => {
+    listPostDrafts.mockResolvedValue(listResponse({ items: [twin, other], approved: [approvedTwin] }));
+    reviewPostDrafts.mockResolvedValue({ updated: [], skipped: [], counts: { needsReview: 2, approved: 1, rejected: 0 } });
+  });
+
+  it("承認済みとほぼ同じ下書きは注意の色の類似度と「似ている投稿があります」。違う投稿は低い類似度だけ", async () => {
+    renderPage();
+    expect(await screen.findByRole("button", { name: /^類似度 9\d%・似ている投稿があります$/ })).toBeInTheDocument();
+    const low = screen.getAllByRole("button", { name: /^類似度 \d+%$/ });
+    expect(low.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it("ラベルを押すと「似ている投稿」に相手の状態と本文が出て、押すと承認済みのタブに移る", async () => {
+    const user = userEvent.setup();
+    renderPage();
+    await user.click(await screen.findByRole("button", { name: /似ている投稿があります/ }));
+    const panel = screen.getByRole("region", { name: "似ている投稿" });
+    expect(within(panel).getByText("承認済み")).toBeInTheDocument();
+    await user.click(within(panel).getByRole("button", { name: /朝の散歩を続けて三か月/ }));
+    expect(await screen.findByRole("tab", { name: /承認済み/ })).toHaveAttribute("aria-selected", "true");
+  });
+
+  it("似ている下書きの却下で「似た投稿がある」が最初から選ばれている。80%以上でも「承認」は押せる", async () => {
+    const user = userEvent.setup();
+    renderPage();
+    await screen.findByRole("button", { name: /似ている投稿があります/ });
+    expect(screen.getByRole("button", { name: `「${twin.body.slice(0, 20)}…」を承認` })).toBeEnabled();
+    await user.click(screen.getByRole("button", { name: `「${twin.body.slice(0, 20)}…」を却下` }));
+    const dialog = await screen.findByRole("dialog", { name: "却下の理由" });
+    expect(within(dialog).getByRole("button", { name: "似た投稿がある" })).toHaveAttribute("aria-pressed", "true");
+  });
+
+  it("まとめて却下では、選んだうち1件でも似ていれば最初から選ばれている", async () => {
+    const user = userEvent.setup();
+    renderPage();
+    await screen.findByRole("button", { name: /似ている投稿があります/ });
+    await user.click(screen.getByRole("checkbox", { name: "すべて選択" }));
+    await user.click(screen.getByRole("button", { name: "まとめて却下" }));
+    const dialog = await screen.findByRole("dialog", { name: "2件を却下する理由" });
+    expect(within(dialog).getByRole("button", { name: "似た投稿がある" })).toHaveAttribute("aria-pressed", "true");
+  });
+});

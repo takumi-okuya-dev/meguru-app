@@ -25,7 +25,9 @@ export function skipMessage(reason: SkipReason, action: "approve" | "reject" | "
     case "NOT_FOUND":
       return "この下書きは削除されています。";
     case "LIMIT":
-      return action === "reopen" ? STOCK_LIMIT_MESSAGE : `承認済みの下書きが上限（${APPROVED_LIMIT}件）に達しています。`;
+      return action === "reopen"
+        ? STOCK_LIMIT_MESSAGE
+        : `承認済みの下書きが上限（${APPROVED_LIMIT}件）に達しています。`;
   }
 }
 

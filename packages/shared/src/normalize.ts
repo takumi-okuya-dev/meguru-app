@@ -29,7 +29,11 @@ export function normalizeForMatch(text: string): { normalized: string; toOrigina
  * @param end - 正規化した文字列での終了位置（含まない）
  * @returns 元の文字列での [開始, 終了)
  */
-export function toOriginalRange(toOriginal: number[], start: number, end: number): [number, number] {
+export function toOriginalRange(
+  toOriginal: number[],
+  start: number,
+  end: number,
+): [number, number] {
   const from = toOriginal[start]!;
   // 終わりは「最後の文字の次の元の文字の位置」。1文字が複数に広がった途中で終わる場合も、その元の文字を含める
   const last = toOriginal[end - 1]!;

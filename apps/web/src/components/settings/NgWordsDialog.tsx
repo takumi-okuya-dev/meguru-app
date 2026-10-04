@@ -6,7 +6,13 @@ import { XIcon } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { ApiError, api } from "@/lib/api-client";
 import { queryKeys } from "@/lib/query";
@@ -29,7 +35,15 @@ export function splitWords(text: string): string[] {
  * @param props - accountId、ngWords：登録済みの語（古い順）、onClose：閉じる
  * @returns ダイアログ
  */
-export function NgWordsDialog({ accountId, ngWords, onClose }: { accountId: string; ngWords: NgWord[]; onClose: () => void }) {
+export function NgWordsDialog({
+  accountId,
+  ngWords,
+  onClose,
+}: {
+  accountId: string;
+  ngWords: NgWord[];
+  onClose: () => void;
+}) {
   const queryClient = useQueryClient();
   const [text, setText] = useState("");
   const [notice, setNotice] = useState<string | null>(null);
@@ -46,7 +60,11 @@ export function NgWordsDialog({ accountId, ngWords, onClose }: { accountId: stri
     mutationFn: (words: string[]) => api.addNgWords(accountId, words),
     onSuccess: (res) => {
       setText("");
-      setNotice(res.duplicates.length > 0 ? `${res.duplicates.map((w) => `「${w}」`).join("")}はすでにあります` : null);
+      setNotice(
+        res.duplicates.length > 0
+          ? `${res.duplicates.map((w) => `「${w}」`).join("")}はすでにあります`
+          : null,
+      );
       if (res.reopenedCount > 0) {
         toast.success(`NGワードを含む承認済みの下書き${res.reopenedCount}件を、要確認に戻しました`);
       }
@@ -84,7 +102,9 @@ export function NgWordsDialog({ accountId, ngWords, onClose }: { accountId: stri
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>NGワード</DialogTitle>
-          <DialogDescription>全角・半角、大文字・小文字の違いは同じ言葉として扱います</DialogDescription>
+          <DialogDescription>
+            全角・半角、大文字・小文字の違いは同じ言葉として扱います
+          </DialogDescription>
         </DialogHeader>
         <div className="space-y-3">
           <div className="flex gap-2">
@@ -102,11 +122,17 @@ export function NgWordsDialog({ accountId, ngWords, onClose }: { accountId: stri
               }}
               className="h-11 rounded-xl text-base md:h-10 md:text-[15px]"
             />
-            <Button className="h-11 rounded-full md:h-10" disabled={atLimit || add.isPending || splitWords(text).length === 0} onClick={submit}>
+            <Button
+              className="h-11 rounded-full md:h-10"
+              disabled={atLimit || add.isPending || splitWords(text).length === 0}
+              onClick={submit}
+            >
               追加
             </Button>
           </div>
-          {atLimit && <p className="text-[13px] text-warning">上限（{NG_WORD_LIMIT}語）に達しています</p>}
+          {atLimit && (
+            <p className="text-[13px] text-warning">上限（{NG_WORD_LIMIT}語）に達しています</p>
+          )}
           {notice && (
             <p role="status" className="text-[13px] text-muted-foreground">
               {notice}
@@ -120,7 +146,10 @@ export function NgWordsDialog({ accountId, ngWords, onClose }: { accountId: stri
           ) : (
             <ul aria-label="登録済みのNGワード" className="flex flex-wrap gap-2">
               {ngWords.map((w) => (
-                <li key={w.id} className="flex items-center gap-1 rounded-full border bg-card py-1 pr-1 pl-3 text-sm">
+                <li
+                  key={w.id}
+                  className="flex items-center gap-1 rounded-full border bg-card py-1 pr-1 pl-3 text-sm"
+                >
                   {w.word}
                   <button
                     type="button"

@@ -20,7 +20,9 @@ function groupByBatch(items: PostDraft[]): Group[] {
 
 function Empty({ children }: { children: ReactNode }) {
   return (
-    <div className="rounded-2xl border border-dashed px-6 py-10 text-center text-[15px] text-muted-foreground">{children}</div>
+    <div className="rounded-2xl border border-dashed px-6 py-10 text-center text-[15px] text-muted-foreground">
+      {children}
+    </div>
   );
 }
 
@@ -50,7 +52,9 @@ export function DraftList({
       <div className="space-y-3">
         <p className="px-1 text-[13px] text-muted-foreground">{APPROVED_TAB_NOTICE}</p>
         {items.length === 0 ? (
-          <Empty>承認した下書きはまだありません。要確認のタブで内容を確かめて「承認」を押してください。</Empty>
+          <Empty>
+            承認した下書きはまだありません。要確認のタブで内容を確かめて「承認」を押してください。
+          </Empty>
         ) : (
           <ul className="space-y-2">{items.map(renderCard)}</ul>
         )}
@@ -63,7 +67,9 @@ export function DraftList({
       <div className="space-y-3">
         <ul className="space-y-2">{items.map(renderCard)}</ul>
         {total > REJECTED_LIST_MAX && (
-          <p className="px-1 text-center text-[13px] text-muted-foreground">新しい{REJECTED_LIST_MAX}件を表示しています</p>
+          <p className="px-1 text-center text-[13px] text-muted-foreground">
+            新しい{REJECTED_LIST_MAX}件を表示しています
+          </p>
         )}
       </div>
     );
@@ -80,12 +86,19 @@ export function DraftList({
   return (
     <div className="space-y-5">
       {items.length >= limit && (
-        <p role="status" className="rounded-xl border border-warning/40 bg-warning-bg px-4 py-3 text-sm">
+        <p
+          role="status"
+          className="rounded-xl border border-warning/40 bg-warning-bg px-4 py-3 text-sm"
+        >
           {STOCK_LIMIT_MESSAGE}
         </p>
       )}
       {groupByBatch(items).map((g) => (
-        <section key={g.batchId} aria-label={`${formatDateTime(g.createdAt)}に登録した${g.drafts.length}件`} className="space-y-2">
+        <section
+          key={g.batchId}
+          aria-label={`${formatDateTime(g.createdAt)}に登録した${g.drafts.length}件`}
+          className="space-y-2"
+        >
           <h3 className="px-1 text-xs text-muted-foreground">
             {formatDateTime(g.createdAt)}に登録した{g.drafts.length}件
           </h3>

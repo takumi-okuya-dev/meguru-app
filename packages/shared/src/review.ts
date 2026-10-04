@@ -17,7 +17,10 @@ export const REJECT_REASONS = [
 export type RejectReasonCode = (typeof REJECT_REASONS)[number]["code"];
 
 /** 却下理由の候補のコードの一覧。 */
-export const REJECT_REASON_CODES = REJECT_REASONS.map((r) => r.code) as [RejectReasonCode, ...RejectReasonCode[]];
+export const REJECT_REASON_CODES = REJECT_REASONS.map((r) => r.code) as [
+  RejectReasonCode,
+  ...RejectReasonCode[],
+];
 
 /**
  * 却下理由の候補のコードを表示名にする。
@@ -56,5 +59,10 @@ export type PublishCheck = {
 export function checkPublishable(body: string, ngWords: NgWordForMatch[]): PublishCheck {
   const ng = findNgWords(body, ngWords);
   const overThreadsLimit = isOverThreadsLimit(body);
-  return { ngWords: ng, overThreadsLimit, policyCautions: [], approvable: ng.length === 0 && !overThreadsLimit };
+  return {
+    ngWords: ng,
+    overThreadsLimit,
+    policyCautions: [],
+    approvable: ng.length === 0 && !overThreadsLimit,
+  };
 }

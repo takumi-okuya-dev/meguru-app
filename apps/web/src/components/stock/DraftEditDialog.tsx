@@ -1,7 +1,14 @@
 // 下書きの編集のダイアログ（specs/003 US3、contracts/ui-routes.md「下書きの編集」、FR-019）。
 // 002の追加・編集のダイアログの枠を使い、保存の 409・404 の扱いも002と同じにする。
 // 承認済みの下書きも編集でき、保存すると要確認に戻る（specs/004 FR-007、Clarifications Q1）。
-import { DRAFT_BODY_MAX, checkPublishable, countChars, isBlank, type NgWord, type PostDraft } from "@threads-grower/shared";
+import {
+  DRAFT_BODY_MAX,
+  checkPublishable,
+  countChars,
+  isBlank,
+  type NgWord,
+  type PostDraft,
+} from "@threads-grower/shared";
 import { FieldWithCounter } from "@/components/FieldWithCounter";
 import { DeletedElsewhereNotice, FormDialogFrame } from "@/components/items/FormDialogFrame";
 import { useItemForm, type FormErrors } from "@/components/items/use-item-form";
@@ -39,7 +46,9 @@ export function DraftEditDialog({
     item,
     emptyForm: { body: "" },
     toForm: (d) => ({ body: d.body }),
-    validate: (form): FormErrors<Form> => ({ body: isBlank(form.body) ? "入力してください" : undefined }),
+    validate: (form): FormErrors<Form> => ({
+      body: isBlank(form.body) ? "入力してください" : undefined,
+    }),
     overLimit: (form) => countChars(form.body) > DRAFT_BODY_MAX,
     onSaved: (d) => onSaved(d, reopened.current),
     onClose,
@@ -69,7 +78,10 @@ export function DraftEditDialog({
       >
         {f.deleted && <DeletedElsewhereNotice what="下書き" onClose={f.closeDeleted} />}
         {item.status === "approved" && (
-          <p role="note" className="rounded-xl border border-warning/40 bg-warning-bg px-4 py-3 text-sm">
+          <p
+            role="note"
+            className="rounded-xl border border-warning/40 bg-warning-bg px-4 py-3 text-sm"
+          >
             保存すると要確認に戻り、もう一度承認が必要になります
           </p>
         )}
@@ -99,5 +111,9 @@ export function DraftEditDialog({
  */
 function LiveLabels({ body, ngWords }: { body: string; ngWords: NgWord[] }) {
   const check = checkPublishable(body, ngWords);
-  return <LabelRow labels={[check.ngWords.length > 0 && <NgWordLabel key="ng" check={check} />].filter(Boolean)} />;
+  return (
+    <LabelRow
+      labels={[check.ngWords.length > 0 && <NgWordLabel key="ng" check={check} />].filter(Boolean)}
+    />
+  );
 }

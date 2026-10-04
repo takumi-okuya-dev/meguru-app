@@ -4,6 +4,7 @@
 // 承認・却下・要確認に戻すも、トーストの「元に戻す」で取り消せる（004 FR-008）。
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
+  SIMILARITY_THRESHOLD,
   checkPublishable,
   type PostDraft,
   type PostDraftStatus,
@@ -19,6 +20,7 @@ import {
   HighlightedBody,
   LabelRow,
   NgWordLabel,
+  SimilarityLabel,
   highlightsOf,
 } from "@/components/stock/DraftLabels";
 import { DraftList } from "@/components/stock/DraftList";
@@ -29,6 +31,7 @@ import { REOPENED_BY_EDIT } from "@/components/stock/messages";
 import { StatusTabs, useStatusTab } from "@/components/stock/StatusTabs";
 import { useDeferredDelete } from "@/components/stock/use-deferred-delete";
 import { useReview, type ReviewOptions } from "@/components/stock/use-review";
+import { useSimilarities } from "@/components/stock/use-similarities";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent } from "@/components/ui/tabs";
 import { api } from "@/lib/api-client";
@@ -85,6 +88,15 @@ export function StockPage() {
     return map;
   }, [data, lists]);
 
+  // 類似度（要確認だけ。相手は全状態。FR-026）。計算はブラウザで行う（research.md R8）
+  const allDrafts = useMemo(
+    () => [...lists.needs_review, ...lists.approved, ...lists.rejected],
+    [lists],
+  );
+  const byId = useMemo(() => new Map(allDrafts.map((d) => [d.id, d])), [allDrafts]);
+  const similarities = useSimilarities(lists.needs_review, allDrafts);
+  const isSimilar = (d: PostDraft) => (similarities?.get(d.id)?.score ?? 0) >= SIMILARITY_THRESHOLD;
+
   const items = lists[tab];
   // 一覧から消えた下書き（取り消し・他の端末での削除・状態の変更）は、選択からも外す
   const selected = useMemo(() => items.filter((d) => picked.has(d.id)), [items, picked]);
@@ -126,6 +138,17 @@ export function StockPage() {
     if (!TAB_VALUES.includes(value as PostDraftStatus)) return;
     setTab(value as PostDraftStatus);
     setPicked(new Set());
+  };
+
+  // 似ている相手の下書きへ移る：そのタブに切り替え、下書きまでスクロールして枠を一瞬強調する（FR-028）
+  const jumpTo = (target: PostDraft) => {
+    changeTab(target.status);
+    setTimeout(() => {
+      const el = document.getElementById(`draft-${target.id}`);
+      el?.scrollIntoView?.({ block: "center", behavior: "smooth" });
+      el?.classList.add("ring-2", "ring-ring");
+      setTimeout(() => el?.classList.remove("ring-2", "ring-ring"), 1500);
+    }, 50);
   };
 
   if (drafts.error)
@@ -204,7 +227,19 @@ export function StockPage() {
         check={check}
         busy={busy}
         labels={
-          <LabelRow labels={[showNg && <NgWordLabel key="ng" check={check} />].filter(Boolean)} />
+          <LabelRow
+            labels={[
+              showNg && <NgWordLabel key="ng" check={check} />,
+              d.status === "needs_review" && (
+                <SimilarityLabel
+                  key="similarity"
+                  result={similarities ? similarities.get(d.id) : null}
+                  find={(id) => byId.get(id)}
+                  onJump={jumpTo}
+                />
+              ),
+            ].filter(Boolean)}
+          />
         }
         body={marks.length > 0 ? <HighlightedBody body={d.body} marks={marks} /> : undefined}
         actions={{
@@ -301,6 +336,8 @@ export function StockPage() {
       {rejecting && (
         <RejectDialog
           count={rejecting.length}
+          // 似た投稿（80%以上）が1件でもあれば「似た投稿がある」を最初から選ぶ（FR-029）
+          initialReasons={rejecting.some(isSimilar) ? ["similar"] : []}
           submitting={busy}
           onSubmit={(reject) => {
             const targets = rejecting;

@@ -1,7 +1,13 @@
 // 下書きのラベルの行と本文の強調（specs/004-review-approval FR-016・FR-027・FR-039、contracts/ui-routes.md「下書きのカード」）。
 // 本文は文字として描き、当たった範囲だけを <mark> で囲む（dangerouslySetInnerHTML は使わない）。
-import type { PublishCheck } from "@threads-grower/shared";
-import type { ReactNode } from "react";
+import {
+  SIMILARITY_THRESHOLD,
+  type PostDraft,
+  type PostDraftStatus,
+  type PublishCheck,
+  type SimilarityResult,
+} from "@threads-grower/shared";
+import { useId, useState, type ReactNode } from "react";
 import { cn } from "@/lib/utils";
 
 /** 強調の種類。NGワードは destructive 系、規約に注意は warning 系の背景。 */
@@ -15,8 +21,12 @@ type Mark = { start: number; end: number; kind: HighlightKind };
  */
 export function highlightsOf(check: PublishCheck): Mark[] {
   return [
-    ...check.ngWords.flatMap((h) => h.ranges.map(([start, end]) => ({ start, end, kind: "ng" as const }))),
-    ...check.policyCautions.flatMap((h) => h.ranges.map(([start, end]) => ({ start, end, kind: "policy" as const }))),
+    ...check.ngWords.flatMap((h) =>
+      h.ranges.map(([start, end]) => ({ start, end, kind: "ng" as const })),
+    ),
+    ...check.policyCautions.flatMap((h) =>
+      h.ranges.map(([start, end]) => ({ start, end, kind: "policy" as const })),
+    ),
   ];
 }
 
@@ -29,7 +39,9 @@ export function HighlightedBody({ body, marks }: { body: string; marks: Mark[] }
   if (marks.length === 0) return <>{body}</>;
   // 1文字ずつ種類を決めてから、同じ種類の連続をまとめる（重なり・隣り合いを扱いやすくする）
   const kinds: (HighlightKind | null)[] = Array.from({ length: body.length }, () => null);
-  for (const m of [...marks].sort((a, b) => (a.kind === "ng" ? 1 : 0) - (b.kind === "ng" ? 1 : 0))) {
+  for (const m of [...marks].sort(
+    (a, b) => (a.kind === "ng" ? 1 : 0) - (b.kind === "ng" ? 1 : 0),
+  )) {
     for (let i = m.start; i < m.end && i < body.length; i++) kinds[i] = m.kind;
   }
   const parts: ReactNode[] = [];
@@ -44,7 +56,9 @@ export function HighlightedBody({ body, marks }: { body: string; marks: Mark[] }
           key={from}
           className={cn(
             "rounded-sm px-0.5 text-foreground",
-            kind === "ng" ? "bg-destructive/20 underline decoration-destructive" : "bg-warning-bg underline decoration-warning",
+            kind === "ng"
+              ? "bg-destructive/20 underline decoration-destructive"
+              : "bg-warning-bg underline decoration-warning",
           )}
         >
           {text}
@@ -80,4 +94,85 @@ export function NgWordLabel({ check }: { check: PublishCheck }) {
 export function LabelRow({ labels }: { labels: ReactNode[] }) {
   if (labels.length === 0) return null;
   return <div className="flex flex-wrap items-start gap-1.5">{labels}</div>;
+}
+
+const STATUS_LABEL: Record<PostDraftStatus, string> = {
+  needs_review: "要確認",
+  approved: "承認済み",
+  rejected: "却下",
+};
+
+/**
+ * 類似度のラベルと、押すと開く「似ている投稿」（FR-026〜FR-028）。
+ * 80%以上は注意の色にして「似ている投稿があります」を添える（色だけで区別しない）。
+ * @param props - result：類似度の結果（計算中は null、比べない短い本文は undefined）、
+ *   find：IDから下書きを引く、onJump：似ている相手の下書きへ移る
+ * @returns ラベル（比べない本文では何も出さない）
+ */
+export function SimilarityLabel({
+  result,
+  find,
+  onJump,
+}: {
+  result: SimilarityResult | null | undefined;
+  find: (id: string) => PostDraft | undefined;
+  onJump: (draft: PostDraft) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const panelId = useId();
+  if (result === undefined) return null;
+  if (result === null) {
+    return (
+      <span className="rounded-full bg-muted px-2.5 py-0.5 text-[13px] text-muted-foreground">
+        類似度 計算中
+      </span>
+    );
+  }
+  const high = result.score >= SIMILARITY_THRESHOLD;
+  const matches = result.matches.map((m) => ({ ...m, draft: find(m.id) })).filter((m) => m.draft);
+  return (
+    <div className="w-full space-y-2">
+      <button
+        type="button"
+        aria-expanded={open}
+        aria-controls={panelId}
+        disabled={matches.length === 0}
+        onClick={() => setOpen((v) => !v)}
+        className={cn(
+          "inline-flex min-h-8 items-center gap-1 rounded-full px-2.5 py-0.5 text-[13px]",
+          high ? "bg-warning-bg text-warning" : "bg-muted text-muted-foreground",
+          matches.length > 0 && "hover:underline",
+        )}
+      >
+        類似度 {result.score}%{high && "・似ている投稿があります"}
+      </button>
+      {open && (
+        <div
+          id={panelId}
+          role="region"
+          aria-label="似ている投稿"
+          className="space-y-1.5 rounded-xl border bg-background p-3"
+        >
+          <p className="text-xs font-medium text-muted-foreground">似ている投稿</p>
+          <ul className="space-y-1.5">
+            {matches.map((m) => (
+              <li key={m.id}>
+                <button
+                  type="button"
+                  onClick={() => onJump(m.draft!)}
+                  className="w-full rounded-lg px-2 py-1.5 text-left text-[13px] hover:bg-accent"
+                >
+                  <span className="mr-2 tabular-nums">{m.score}%</span>
+                  <span className="mr-2 rounded-full bg-muted px-2 py-px text-[11px]">
+                    {STATUS_LABEL[m.draft!.status]}
+                  </span>
+                  <span className="line-clamp-3 whitespace-pre-wrap">{m.draft!.body}</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
+  );
 }

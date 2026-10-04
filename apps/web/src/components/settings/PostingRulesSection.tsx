@@ -16,7 +16,10 @@ type Open = "ng-words" | null;
  * @returns 区分
  */
 export function PostingRulesSection({ accountId }: { accountId: string }) {
-  const rules = useQuery({ queryKey: queryKeys.postingRules(accountId), queryFn: () => api.getPostingRules(accountId) });
+  const rules = useQuery({
+    queryKey: queryKeys.postingRules(accountId),
+    queryFn: () => api.getPostingRules(accountId),
+  });
   const [open, setOpen] = useState<Open>(null);
   const data = rules.data;
 
@@ -28,7 +31,11 @@ export function PostingRulesSection({ accountId }: { accountId: string }) {
       {rules.isError ? (
         <p className="text-sm text-muted-foreground">
           読み込めませんでした。{" "}
-          <button type="button" className="text-ring underline" onClick={() => void rules.refetch()}>
+          <button
+            type="button"
+            className="text-ring underline"
+            onClick={() => void rules.refetch()}
+          >
             再読み込み
           </button>
         </p>
@@ -38,13 +45,20 @@ export function PostingRulesSection({ accountId }: { accountId: string }) {
             label="NGワード"
             description={`この言葉を含む下書きは承認できません。${data ? `${data.ngWords.length}語` : ""}`}
           >
-            <Button variant="outline" className="h-10 rounded-full md:h-9" disabled={!data} onClick={() => setOpen("ng-words")}>
+            <Button
+              variant="outline"
+              className="h-10 rounded-full md:h-9"
+              disabled={!data}
+              onClick={() => setOpen("ng-words")}
+            >
               編集
             </Button>
           </SettingRow>
         </SettingCard>
       )}
-      {open === "ng-words" && data && <NgWordsDialog accountId={accountId} ngWords={data.ngWords} onClose={() => setOpen(null)} />}
+      {open === "ng-words" && data && (
+        <NgWordsDialog accountId={accountId} ngWords={data.ngWords} onClose={() => setOpen(null)} />
+      )}
     </section>
   );
 }

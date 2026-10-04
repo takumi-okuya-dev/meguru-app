@@ -76,10 +76,18 @@ export function DraftCard({
   const [expanded, setExpanded] = useState(false);
   const long = draft.body.split("\n").length > LONG_LINES || draft.body.length > LONG_CHARS;
   const name = `「${excerpt(draft.body)}」`;
-  const notApprovable = check.ngWords.length > 0 ? NOT_APPROVABLE_NG : check.overThreadsLimit ? NOT_APPROVABLE_LIMIT : null;
+  const notApprovable =
+    check.ngWords.length > 0
+      ? NOT_APPROVABLE_NG
+      : check.overThreadsLimit
+        ? NOT_APPROVABLE_LIMIT
+        : null;
 
   return (
-    <li id={`draft-${draft.id}`} className="flex gap-2 rounded-2xl border bg-card px-3 py-3 transition-shadow md:px-4">
+    <li
+      id={`draft-${draft.id}`}
+      className="flex gap-2 rounded-2xl border bg-card px-3 py-3 transition-shadow md:px-4"
+    >
       {/* タッチ操作でも押しやすいよう、押せる範囲を44px角にする */}
       <label className="-my-1.5 -ml-1.5 flex size-11 shrink-0 cursor-pointer items-center justify-center md:size-9">
         <input
@@ -91,11 +99,17 @@ export function DraftCard({
         />
       </label>
       <div className="min-w-0 flex-1 space-y-2">
-        <p className={`text-[15px] leading-relaxed break-words whitespace-pre-wrap ${expanded ? "" : "line-clamp-6"}`}>
+        <p
+          className={`text-[15px] leading-relaxed break-words whitespace-pre-wrap ${expanded ? "" : "line-clamp-6"}`}
+        >
           {body ?? draft.body}
         </p>
         {long && (
-          <button type="button" className="text-[13px] text-ring underline" onClick={() => setExpanded((v) => !v)}>
+          <button
+            type="button"
+            className="text-[13px] text-ring underline"
+            onClick={() => setExpanded((v) => !v)}
+          >
             {expanded ? "閉じる" : "もっと見る"}
           </button>
         )}
@@ -122,11 +136,15 @@ export function DraftCard({
                 承認
               </Button>
             </div>
-            {notApprovable && <p className="text-[13px] text-muted-foreground md:text-right">{notApprovable}</p>}
+            {notApprovable && (
+              <p className="text-[13px] text-muted-foreground md:text-right">{notApprovable}</p>
+            )}
           </div>
         )}
         {draft.status === "approved" && draft.reviewedAt && (
-          <p className="text-[13px] text-muted-foreground">{formatDateTime(draft.reviewedAt)}に承認</p>
+          <p className="text-[13px] text-muted-foreground">
+            {formatDateTime(draft.reviewedAt)}に承認
+          </p>
         )}
         {draft.status === "rejected" && (
           <div className="space-y-0.5 text-[13px] text-muted-foreground">
@@ -147,8 +165,12 @@ export function DraftCard({
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
-          {draft.status !== "rejected" && <DropdownMenuItem onSelect={actions.onEdit}>編集</DropdownMenuItem>}
-          {draft.status !== "needs_review" && <DropdownMenuItem onSelect={actions.onReopen}>要確認に戻す</DropdownMenuItem>}
+          {draft.status !== "rejected" && (
+            <DropdownMenuItem onSelect={actions.onEdit}>編集</DropdownMenuItem>
+          )}
+          {draft.status !== "needs_review" && (
+            <DropdownMenuItem onSelect={actions.onReopen}>要確認に戻す</DropdownMenuItem>
+          )}
           {draft.status !== "approved" && (
             <DropdownMenuItem className="text-destructive" onSelect={actions.onDelete}>
               削除

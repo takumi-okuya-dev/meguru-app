@@ -1,7 +1,13 @@
 // 承認・却下・要確認に戻すと、トーストの「元に戻す」（specs/004-review-approval FR-002〜FR-008、research.md R2）。
 // 「元に戻す」は逆の操作を同じAPIで送る（承認・却下 → 要確認に戻す、要確認に戻す → 元の承認・却下）。
 import { useQueryClient } from "@tanstack/react-query";
-import type { PostDraft, RejectReasonCode, ReviewRequest, ReviewResponse, SkipReason } from "@threads-grower/shared";
+import type {
+  PostDraft,
+  RejectReasonCode,
+  ReviewRequest,
+  ReviewResponse,
+  SkipReason,
+} from "@threads-grower/shared";
 import { useCallback } from "react";
 import { toast } from "sonner";
 import { api } from "@/lib/api-client";
@@ -14,13 +20,21 @@ const UNDO_MS = 5000;
 
 type Action = ReviewRequest["action"];
 
-const DONE: Record<Action, string> = { approve: "承認しました", reject: "却下しました", reopen: "要確認に戻しました" };
+const DONE: Record<Action, string> = {
+  approve: "承認しました",
+  reject: "却下しました",
+  reopen: "要確認に戻しました",
+};
 const DONE_N: Record<Action, (n: number) => string> = {
   approve: (n) => `${n}件を承認しました`,
   reject: (n) => `${n}件を却下しました`,
   reopen: (n) => `${n}件を要確認に戻しました`,
 };
-const FAILED: Record<Action, string> = { approve: "承認", reject: "却下", reopen: "要確認に戻すことが" };
+const FAILED: Record<Action, string> = {
+  approve: "承認",
+  reject: "却下",
+  reopen: "要確認に戻すことが",
+};
 
 /** 状態を変える下書きの指定。 */
 export type ReviewOptions = {
@@ -58,13 +72,19 @@ export function useReview(accountId: string) {
   }, [accountId, queryClient]);
 
   const send = useCallback(
-    async (action: Action, drafts: PostDraft[], options: ReviewOptions): Promise<ReviewResponse | null> => {
+    async (
+      action: Action,
+      drafts: PostDraft[],
+      options: ReviewOptions,
+    ): Promise<ReviewResponse | null> => {
       try {
         return await api.reviewPostDrafts(accountId, {
           action,
           items: drafts.map((d) => ({ id: d.id, expectedVersion: d.version })),
           ...(action === "reject" ? { reject: options.reject } : {}),
-          ...(action === "approve" && options.confirmPolicyCaution ? { confirmPolicyCaution: true } : {}),
+          ...(action === "approve" && options.confirmPolicyCaution
+            ? { confirmPolicyCaution: true }
+            : {}),
         });
       } catch (err) {
         toast.error(`${FAILED[action]}できませんでした。${saveErrorMessage(err)}`);
@@ -85,10 +105,15 @@ export function useReview(accountId: string) {
       }
       // 要確認に戻す前の状態ごとに、承認・却下（元の理由）を送り直す
       const latest = new Map(updated.map((d) => [d.id, d]));
-      const approved = before.filter((d) => d.status === "approved" && latest.has(d.id)).map((d) => latest.get(d.id)!);
+      const approved = before
+        .filter((d) => d.status === "approved" && latest.has(d.id))
+        .map((d) => latest.get(d.id)!);
       // 直前に確認済みの承認を戻すだけなので、規約に注意の確認はもう一度求めない
       if (approved.length > 0) await send("approve", approved, { confirmPolicyCaution: true });
-      const groups = new Map<string, { reject: { reasons: RejectReasonCode[]; note: string }; drafts: PostDraft[] }>();
+      const groups = new Map<
+        string,
+        { reject: { reasons: RejectReasonCode[]; note: string }; drafts: PostDraft[] }
+      >();
       for (const d of before) {
         if (d.status !== "rejected" || !latest.has(d.id)) continue;
         const reject = { reasons: d.rejectReasons, note: d.rejectNote ?? "" };
@@ -103,13 +128,25 @@ export function useReview(accountId: string) {
   );
 
   const review = useCallback(
-    async (action: Action, drafts: PostDraft[], options: ReviewOptions = {}): Promise<ReviewResponse | null> => {
+    async (
+      action: Action,
+      drafts: PostDraft[],
+      options: ReviewOptions = {},
+    ): Promise<ReviewResponse | null> => {
       const res = await send(action, drafts, options);
       if (!res) return null;
-      const changed = res.updated.filter((u) => drafts.find((d) => d.id === u.id)?.status !== u.status);
-      const withUndo = changed.length > 0 ? { action: { label: "元に戻す", onClick: () => void undo(action, drafts, changed) } } : {};
+      const changed = res.updated.filter(
+        (u) => drafts.find((d) => d.id === u.id)?.status !== u.status,
+      );
+      const withUndo =
+        changed.length > 0
+          ? { action: { label: "元に戻す", onClick: () => void undo(action, drafts, changed) } }
+          : {};
       if (res.skipped.length === 0) {
-        toast.success(drafts.length === 1 ? DONE[action] : DONE_N[action](res.updated.length), { duration: UNDO_MS, ...withUndo });
+        toast.success(drafts.length === 1 ? DONE[action] : DONE_N[action](res.updated.length), {
+          duration: UNDO_MS,
+          ...withUndo,
+        });
       } else if (drafts.length === 1) {
         toast.error(skipMessage(res.skipped[0]!.reason, action));
       } else {

@@ -1,6 +1,12 @@
 // 却下理由の入力（specs/004-review-approval FR-003・FR-029・FR-040、contracts/ui-routes.md「却下理由の入力」）。
 // 理由は必須（Constitution原則II）。よくある理由の候補を選ぶだけでも確定できる。
-import { REJECT_NOTE_MAX, REJECT_REASONS, countChars, isBlank, type RejectReasonCode } from "@threads-grower/shared";
+import {
+  REJECT_NOTE_MAX,
+  REJECT_REASONS,
+  countChars,
+  isBlank,
+  type RejectReasonCode,
+} from "@threads-grower/shared";
 import { useState } from "react";
 import { FieldWithCounter } from "@/components/FieldWithCounter";
 import { FormDialogFrame } from "@/components/items/FormDialogFrame";
@@ -39,7 +45,10 @@ export function RejectDialog({
   const submit = () => {
     if (empty || tooLong || submitting) return;
     // 候補の並びは REJECT_REASONS の順にそろえる
-    onSubmit({ reasons: REJECT_REASONS.map((r) => r.code).filter((c) => reasons.includes(c)), note: note.trim() });
+    onSubmit({
+      reasons: REJECT_REASONS.map((r) => r.code).filter((c) => reasons.includes(c)),
+      note: note.trim(),
+    });
   };
 
   return (
@@ -51,7 +60,9 @@ export function RejectDialog({
       onSubmit={submit}
       onRequestClose={onClose}
     >
-      <p className="text-[13px] text-muted-foreground">理由は次のプロンプトに「繰り返さないこと」として入ります</p>
+      <p className="text-[13px] text-muted-foreground">
+        理由は次のプロンプトに「繰り返さないこと」として入ります
+      </p>
       <div role="group" aria-label="よくある理由" className="flex flex-wrap gap-2">
         {REJECT_REASONS.map((r) => {
           const on = reasons.includes(r.code);

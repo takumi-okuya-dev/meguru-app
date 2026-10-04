@@ -419,7 +419,7 @@ description: "重複検知・承認/却下・NGワード（CORE RULES）の実�
 
 ### テスト（先に書いて失敗を確認する）
 
-- [ ] T035 [P] [US3] `packages/shared/test/similarity.test.ts`を作る（quickstart.mdの表の「類似度」の行、SC-003）。
+- [X] T035 [P] [US3] `packages/shared/test/similarity.test.ts`を作る（quickstart.mdの表の「類似度」の行、SC-003）。
   - 同じ本文は100
   - 10・20・150文字の本文の1文字違い・2文字違い（離れた位置の置き換え）は80以上
   - 2文の順番を入れ替えた本文は80以上
@@ -429,7 +429,7 @@ description: "重複検知・承認/却下・NGワード（CORE RULES）の実�
   - 自分自身とは比べない
   - 似ている相手は高い順に最大3件
   - 長い本文（1,000文字）の1文字違いも80以上（編集距離を省き、Dice係数だけで判定する）
-- [ ] T036 [P] [US3] `apps/web/test/stock.test.tsx`に足す。
+- [X] T036 [P] [US3] `apps/web/test/stock.test.tsx`に足す。
   - 要確認の下書きに「類似度 {n}%」が出る。承認済みとほぼ同じ下書きは注意の色の「類似度 9x%」と「似ている投稿があります」
   - ラベルを押すと「似ている投稿」のポップオーバーに、相手の状態のラベル（承認済み）と本文が出る。行を押すと承認済みのタブに切り替わる
   - 類似度が80%以上の下書きの「却下」で、「似た投稿がある」が最初から選ばれている。まとめて却下では、選んだうち1件でも当てはまれば選ばれている
@@ -437,17 +437,17 @@ description: "重複検知・承認/却下・NGワード（CORE RULES）の実�
 
 ### 実装
 
-- [ ] T037 [US3] `packages/shared/src/similarity.ts`に`computeSimilarities(targets: { id: string; body: string }[], others: { id: string; body: string }[]): Map<string, { score: number; matches: { id: string; score: number }[] }>`を作り、`index.ts`からexportする（research.md R8）。
+- [X] T037 [US3] `packages/shared/src/similarity.ts`に`computeSimilarities(targets: { id: string; body: string }[], others: { id: string; body: string }[]): Map<string, { score: number; matches: { id: string; score: number }[] }>`を作り、`index.ts`からexportする（research.md R8）。
   - **正規化**：`normalizeForMatch` → `/[\s\p{P}\p{S}\p{Extended_Pictographic}‍️]/gu`を除く。長さが`SIMILARITY_MIN_LENGTH`未満は除外する。
   - **Dice係数**：2文字組の多重集合で求める。`others`の2文字組 → 出現の逆引きの表を作り、各`target`の共通の数を数える。
   - **編集距離**：Dice係数が0.3以上の組のうち、各`target`の上位5件だけに、編集距離の比`1 − 距離 ÷ 長いほうの長さ`を求める（2行のDPで、メモリはO(n)）。どちらかの長さが`SIMILARITY_EDIT_DISTANCE_MAX_LENGTH`を超える組は、編集距離を求めない。
   - 各組の類似度は`round(max(dice, editRatio) × 100)`。
   - `score`はもっとも高い値（相手がいなければ0）、`matches`は高い順に`SIMILARITY_TOP_MATCHES`件。
   - `targets`と`others`に同じ`id`があっても、自分とは比べない。
-- [ ] T038 [US3] `apps/web/src/components/stock/use-similarities.ts`を作る。
+- [X] T038 [US3] `apps/web/src/components/stock/use-similarities.ts`を作る。
   - 一覧のデータ（要確認・承認済み・却下）から、`targets` = 要確認、`others` = 全部で`computeSimilarities`を呼び、結果を`useMemo`で覚える。
   - 要確認が100件を超えるときは、計算を`requestIdleCallback`（なければ`setTimeout`）で区切って行い、終わるまで「計算中」を返す。
-- [ ] T039 [US3] `apps/web/src/components/stock/DraftLabels.tsx`に、類似度のラベルとポップオーバーを足す（contracts/ui-routes.md「似ている相手のポップオーバー」）。
+- [X] T039 [US3] `apps/web/src/components/stock/DraftLabels.tsx`に、類似度のラベルとポップオーバーを足す（contracts/ui-routes.md「似ている相手のポップオーバー」）。
   - ラベル：「類似度 {n}%」。`SIMILARITY_THRESHOLD`以上なら注意の色にし、「似ている投稿があります」を添える。計算中は「類似度 計算中」。
   - ポップオーバー：相手の類似度・状態のラベル・本文の先頭3行。
   - 行を押すと、次を行う。
@@ -455,7 +455,7 @@ description: "重複検知・承認/却下・NGワード（CORE RULES）の実�
     2. その下書きの要素（`id="draft-{id}"`）までスクロールする
     3. 枠を一瞬強調する
   - `apps/web/src/components/stock/DraftCard.tsx`の要確認のカードに出す。
-- [ ] T040 [US3] `apps/web/src/pages/stock.tsx`の却下の開き方を変え、`RejectDialog`の`initialReasons`を渡す。類似度が`SIMILARITY_THRESHOLD`以上なら`similar`を含める。まとめて却下では、選んだうち1件でも当てはまれば含める。
+- [X] T040 [US3] `apps/web/src/pages/stock.tsx`の却下の開き方を変え、`RejectDialog`の`initialReasons`を渡す。類似度が`SIMILARITY_THRESHOLD`以上なら`similar`を含める。まとめて却下では、選んだうち1件でも当てはまれば含める。
 
 **完了条件**：T035・T036が通り、quickstart.md「手動の確認 3」ができる
 
