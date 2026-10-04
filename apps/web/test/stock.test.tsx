@@ -13,6 +13,7 @@ const createDraftBatch = vi.fn();
 const deleteDraftBatch = vi.fn();
 const updatePostDraft = vi.fn();
 const deletePostDrafts = vi.fn();
+const reviewPostDrafts = vi.fn();
 vi.mock("@/lib/api-client", async (orig) => {
   const actual = await orig<typeof import("@/lib/api-client")>();
   return {
@@ -26,12 +27,14 @@ vi.mock("@/lib/api-client", async (orig) => {
       deleteDraftBatch,
       updatePostDraft,
       deletePostDrafts,
+      reviewPostDrafts,
     },
   };
 });
 const toastSuccess = vi.fn();
 const toastError = vi.fn();
-vi.mock("sonner", () => ({ toast: { success: toastSuccess, error: toastError, dismiss: vi.fn() } }));
+const toastWarning = vi.fn();
+vi.mock("sonner", () => ({ toast: { success: toastSuccess, error: toastError, warning: toastWarning, dismiss: vi.fn() } }));
 
 const { ApiError } = await import("@/lib/api-client");
 const { UnsavedChangesProvider } = await import("@/components/UnsavedChangesProvider");
@@ -144,11 +147,21 @@ function renderPage(path = "/accounts/a1/stock") {
 }
 
 beforeEach(() => {
-  for (const fn of [listPostDrafts, getPrompt, putPromptSettings, createDraftBatch, deleteDraftBatch, updatePostDraft, deletePostDrafts]) {
+  for (const fn of [
+    listPostDrafts,
+    getPrompt,
+    putPromptSettings,
+    createDraftBatch,
+    deleteDraftBatch,
+    updatePostDraft,
+    deletePostDrafts,
+    reviewPostDrafts,
+  ]) {
     fn.mockReset();
   }
   toastSuccess.mockReset();
   toastError.mockReset();
+  toastWarning.mockReset();
   listPostDrafts.mockResolvedValue(listResponse());
   getPrompt.mockImplementation((_id: string, count?: number) => Promise.resolve(promptResponse({}, count ?? 30)));
 });
@@ -623,5 +636,156 @@ describe("下書きの確認・修正・削除（US3）", () => {
     await user.type(within(dialog).getByRole("textbox", { name: /本文/ }), "追記");
     await user.click(within(dialog).getAllByRole("button", { name: "保存" }).at(-1)!);
     expect(await screen.findByText("他の場所で更新されています")).toBeInTheDocument();
+  });
+});
+
+// ---- specs/004-review-approval US1：承認・却下（contracts/ui-routes.md「状態のタブ」「承認」「却下理由の入力」「選択のバー」）----
+
+describe("承認・却下（004 US1）", () => {
+  const reviewed = (d: PostDraft, status: PostDraft["status"], extra: Partial<PostDraft> = {}): PostDraft => ({
+    ...d,
+    status,
+    version: d.version + 1,
+    reviewedAt: status === "needs_review" ? null : "2026-10-04T01:00:00.000Z",
+    ...extra,
+  });
+  const needs = [
+    draft({ id: "n1", body: "1件目の下書き" }),
+    draft({ id: "n2", body: "2件目の下書き", position: 1 }),
+    draft({ id: "n3", body: "絶対に伸びる", position: 2 }),
+  ];
+  const approvedDraft = reviewed(draft({ id: "p1", body: "承認した投稿", batchId: "b0" }), "approved");
+  const rejectedDraft = reviewed(draft({ id: "r1", body: "却下した投稿", batchId: "b0", position: 1 }), "rejected", {
+    rejectReasons: ["tone"],
+    rejectNote: "語尾がきつい",
+  });
+  const ngWords = [{ id: "w1", word: "絶対", normalized: "絶対", createdAt: "2026-10-04T00:00:00.000Z" }];
+
+  beforeEach(() => {
+    listPostDrafts.mockResolvedValue(listResponse({ items: needs, approved: [approvedDraft], rejected: [rejectedDraft], ngWords }));
+    reviewPostDrafts.mockImplementation(async (_a: string, req: { action: string; items: { id: string }[] }) => {
+      const all = [...needs, approvedDraft, rejectedDraft];
+      const target = { approve: "approved", reject: "rejected", reopen: "needs_review" }[req.action] as PostDraft["status"];
+      return {
+        updated: req.items.map((i) => reviewed(all.find((d) => d.id === i.id)!, target)),
+        skipped: [],
+        counts: { needsReview: 2, approved: 2, rejected: 1 },
+      };
+    });
+  });
+
+  it("3つのタブに件数が出て、?tab=approved で承認済みのタブが開く（FR-001）", async () => {
+    renderPage("/accounts/a1/stock?tab=approved");
+    expect(await screen.findByRole("tab", { name: "要確認 3" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "却下 1" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "承認済み 1" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByText("承認した投稿")).toBeInTheDocument();
+    expect(screen.getByText("承認した投稿は、自動投稿の設定ができると順に投稿されます")).toBeInTheDocument();
+  });
+
+  it("「承認」で状態を変え、トーストの「元に戻す」で要確認に戻す（FR-002・FR-008）", async () => {
+    const user = userEvent.setup();
+    renderPage();
+    await user.click(await screen.findByRole("button", { name: "「1件目の下書き」を承認" }));
+    expect(reviewPostDrafts).toHaveBeenCalledWith("a1", { action: "approve", items: [{ id: "n1", expectedVersion: 1 }] });
+    await waitFor(() => expect(toastSuccess).toHaveBeenCalledWith("承認しました", expect.anything()));
+    const undo = toastSuccess.mock.calls.at(-1)![1].action.onClick as () => void;
+    await act(async () => undo());
+    expect(reviewPostDrafts).toHaveBeenLastCalledWith("a1", { action: "reopen", items: [{ id: "n1", expectedVersion: 2 }] });
+  });
+
+  it("却下理由：候補が6つあり、空なら確定できず、選ぶと理由つきで却下する（FR-003）", async () => {
+    const user = userEvent.setup();
+    renderPage();
+    await user.click(await screen.findByRole("button", { name: "「1件目の下書き」を却下" }));
+    const dialog = await screen.findByRole("dialog", { name: "却下の理由" });
+    const chips = within(within(dialog).getByRole("group", { name: "よくある理由" })).getAllByRole("button");
+    expect(chips.map((c) => c.textContent)).toEqual([
+      "似た投稿がある",
+      "トーンが違う",
+      "内容が薄い",
+      "事実と違う",
+      "宣伝っぽすぎる",
+      "規約に触れそう",
+    ]);
+    expect(within(dialog).getByText("理由を1つ以上選ぶか、書いてください")).toBeInTheDocument();
+    for (const b of within(dialog).getAllByRole("button", { name: "却下する" })) expect(b).toBeDisabled();
+    await user.click(within(dialog).getByRole("button", { name: "トーンが違う" }));
+    await user.click(within(dialog).getAllByRole("button", { name: "却下する" }).at(-1)!);
+    expect(reviewPostDrafts).toHaveBeenCalledWith("a1", {
+      action: "reject",
+      items: [{ id: "n1", expectedVersion: 1 }],
+      reject: { reasons: ["tone"], note: "" },
+    });
+  });
+
+  it("却下のタブに却下理由が出る（FR-012）", async () => {
+    renderPage("/accounts/a1/stock?tab=rejected");
+    expect(await screen.findByText("却下理由：トーンが違う / 語尾がきつい")).toBeInTheDocument();
+  });
+
+  it("まとめて承認：飛ばしたものがあれば件数と理由を出し、飛ばした下書きは選んだまま（FR-004・FR-005）", async () => {
+    const user = userEvent.setup();
+    reviewPostDrafts.mockResolvedValue({
+      updated: [reviewed(needs[0]!, "approved"), reviewed(needs[1]!, "approved")],
+      skipped: [{ id: "n3", reason: "NG_WORD", latest: needs[2] }],
+      counts: { needsReview: 1, approved: 3, rejected: 1 },
+    });
+    renderPage();
+    await user.click(await screen.findByRole("checkbox", { name: "すべて選択" }));
+    const bar = screen.getByRole("toolbar", { name: "選んだ下書きの操作" });
+    expect(within(bar).getByRole("button", { name: "まとめて却下" })).toBeInTheDocument();
+    expect(within(bar).getByRole("button", { name: "選んだ下書きを削除" })).toBeInTheDocument();
+    await user.click(within(bar).getByRole("button", { name: "まとめて承認" }));
+    await waitFor(() =>
+      expect(toastWarning).toHaveBeenCalledWith("2件を承認しました。1件は承認できませんでした（NGワード 1件）", expect.anything()),
+    );
+    expect(screen.getByRole("checkbox", { name: "「絶対に伸びる」を選択" })).toBeChecked();
+    expect(screen.getByRole("checkbox", { name: "「1件目の下書き」を選択" })).not.toBeChecked();
+  });
+
+  it("選択のバーの中身はタブごとに変わる", async () => {
+    const user = userEvent.setup();
+    renderPage("/accounts/a1/stock?tab=approved");
+    await user.click(await screen.findByRole("checkbox", { name: "「承認した投稿」を選択" }));
+    let bar = screen.getByRole("toolbar", { name: "選んだ下書きの操作" });
+    expect(within(bar).getByRole("button", { name: "要確認に戻す" })).toBeInTheDocument();
+    expect(within(bar).queryByRole("button", { name: "選んだ下書きを削除" })).not.toBeInTheDocument();
+    await user.click(screen.getByRole("tab", { name: "却下 1" }));
+    await user.click(await screen.findByRole("checkbox", { name: "「却下した投稿」を選択" }));
+    bar = screen.getByRole("toolbar", { name: "選んだ下書きの操作" });
+    expect(within(bar).getByRole("button", { name: "選んだ下書きを削除" })).toBeInTheDocument();
+    expect(within(bar).getByRole("button", { name: "要確認に戻す" })).toBeInTheDocument();
+  });
+
+  it("NGワードを含む下書きは「承認」が押せず、理由が出る（FR-005）", async () => {
+    renderPage();
+    expect(await screen.findByRole("button", { name: "「絶対に伸びる」を承認" })).toBeDisabled();
+    expect(screen.getByText("NGワードを含むため承認できません。本文を直すか却下してください")).toBeInTheDocument();
+  });
+
+  it("承認済みの「編集」で案内が出て、要確認に戻ったら知らせる（FR-007）", async () => {
+    const user = userEvent.setup();
+    updatePostDraft.mockResolvedValue({ draft: reviewed(approvedDraft, "needs_review"), reopened: true });
+    renderPage("/accounts/a1/stock?tab=approved");
+    await user.click(await screen.findByRole("button", { name: "「承認した投稿」の操作" }));
+    await user.click(await screen.findByRole("menuitem", { name: "編集" }));
+    const dialog = await screen.findByRole("dialog", { name: "下書きを編集" });
+    expect(within(dialog).getByText("保存すると要確認に戻り、もう一度承認が必要になります")).toBeInTheDocument();
+    await user.type(within(dialog).getByRole("textbox", { name: /本文/ }), "！");
+    await user.click(within(dialog).getAllByRole("button", { name: "保存" }).at(-1)!);
+    await waitFor(() => expect(toastSuccess).toHaveBeenCalledWith("直したので、要確認に戻しました。もう一度承認してください"));
+  });
+
+  it("1件の操作で skipped なら、理由の文言を出す", async () => {
+    const user = userEvent.setup();
+    reviewPostDrafts.mockResolvedValue({
+      updated: [],
+      skipped: [{ id: "n1", reason: "STALE", latest: needs[0] }],
+      counts: { needsReview: 3, approved: 1, rejected: 1 },
+    });
+    renderPage();
+    await user.click(await screen.findByRole("button", { name: "「1件目の下書き」を承認" }));
+    await waitFor(() => expect(toastError).toHaveBeenCalledWith("他の場所で更新されています。最新の内容を表示しました。"));
   });
 });

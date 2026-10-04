@@ -5,6 +5,7 @@ import {
   NEEDS_REVIEW_LIMIT,
   createDraftBatchRequestSchema,
   deletePostDraftsRequestSchema,
+  reviewRequestSchema,
   updatePostDraftRequestSchema,
 } from "@threads-grower/shared";
 import { Hono, type MiddlewareHandler } from "hono";
@@ -23,6 +24,7 @@ import {
 import { canEditProfile } from "../services/grower-access";
 import { assertItemId } from "../services/item-service";
 import { listNgWords, toNgWord } from "../services/posting-rules-service";
+import { reviewDrafts } from "../services/review-service";
 
 /**
  * 投稿ストックの下書きのルート。
@@ -71,7 +73,7 @@ export function postDraftRoutes(authed: MiddlewareHandler<AppEnv>) {
       const account = await findOwnedAccount(db, user.id, c.req.param("accountId"));
       const id = assertItemId(c.req.param("draftId"));
       const req = await parseBody(updatePostDraftRequestSchema, c.req.json());
-      return c.json(await updateDraft(db, account.id, id, req));
+      return c.json(await updateDraft(c.env, account.id, id, req));
     })
     .post("/accounts/:accountId/post-drafts/delete", authed, async (c) => {
       const db = createDb(c.env.DATABASE_URL);
@@ -79,5 +81,12 @@ export function postDraftRoutes(authed: MiddlewareHandler<AppEnv>) {
       const account = await findOwnedAccount(db, user.id, c.req.param("accountId"));
       const { ids } = await parseBody(deletePostDraftsRequestSchema, c.req.json());
       return c.json({ deletedCount: await deleteDrafts(db, account.id, ids) });
+    })
+    .post("/accounts/:accountId/post-drafts/review", authed, async (c) => {
+      // 承認・却下・要確認に戻す（specs/004-review-approval contracts/api.md）。全プランで使える（FR-034）
+      const db = createDb(c.env.DATABASE_URL);
+      const account = await findOwnedAccount(db, c.get("user").id, c.req.param("accountId"));
+      const req = await parseBody(reviewRequestSchema, c.req.json());
+      return c.json(await reviewDrafts(c.env, account.id, req));
     });
 }

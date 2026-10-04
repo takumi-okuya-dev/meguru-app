@@ -9,7 +9,7 @@ import {
   type DraftBatchResult,
 } from "@threads-grower/shared";
 import { ArrowUpIcon, XIcon } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useLocation } from "react-router";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -20,8 +20,8 @@ import { useUnsavedChanges } from "@/lib/use-unsaved-changes";
 import { STOCK_LIMIT_MESSAGE } from "./messages";
 
 type Notice = { message: string; retry: boolean };
-/** 下書きを選んでいるときの状態と操作（US3）。 */
-export type DraftSelection = { count: number; onClear: () => void; onDelete: () => void };
+/** 下書きを選んでいるときの状態と操作（003 US3、004 FR-004）。actions はタブごとの操作のボタン。 */
+export type DraftSelection = { count: number; onClear: () => void; actions: ReactNode };
 type Registered = { result: DraftBatchResult; text: string };
 
 /**
@@ -234,9 +234,7 @@ function SelectionBar({ selection }: { selection: DraftSelection }) {
         <Button variant="ghost" className="h-10 rounded-full md:h-9" onClick={selection.onClear}>
           選択を解除
         </Button>
-        <Button variant="destructive" className="h-10 rounded-full md:h-9" onClick={selection.onDelete}>
-          選んだ下書きを削除
-        </Button>
+        {selection.actions}
       </div>
     </div>
   );

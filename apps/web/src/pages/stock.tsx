@@ -1,37 +1,33 @@
-// 投稿ストックの画面（specs/003 US1〜US3、contracts/ui-routes.md「投稿ストックの画面」、docs/ui-design.md 型C）。
-// 上から：プロンプトのカード → 状態のタブと下書きの一覧 → 画面下部に固定の貼り付け欄（選択中は選択のバー）。
-// 下書きの削除は確認を求めず、トーストの「元に戻す」で取り消せる（Clarifications 2026-10-04）。
+// 投稿ストックの画面（specs/003 US1〜US3・specs/004 US1〜US5、contracts/ui-routes.md「投稿ストックの画面」、docs/ui-design.md 型C）。
+// 上から：プロンプトのカード → 状態のタブ（要確認／承認済み／却下）と下書きの一覧 → 画面下部に固定の貼り付け欄（選択中は選択のバー）。
+// 下書きの削除は確認を求めず、トーストの「元に戻す」で取り消せる（003 Clarifications 2026-10-04）。
+// 承認・却下・要確認に戻すも、トーストの「元に戻す」で取り消せる（004 FR-008）。
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import type { PostDraft } from "@threads-grower/shared";
-import { EllipsisIcon } from "lucide-react";
+import { checkPublishable, type PostDraft, type PostDraftStatus, type PublishCheck } from "@threads-grower/shared";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { ApiErrorScreen } from "@/components/ApiErrorScreen";
 import { PageBody, PageHeader } from "@/components/layout/PageHeader";
+import { DraftCard } from "@/components/stock/DraftCard";
 import { DraftEditDialog } from "@/components/stock/DraftEditDialog";
 import { DraftList } from "@/components/stock/DraftList";
 import { PasteComposer } from "@/components/stock/PasteComposer";
 import { PromptCard } from "@/components/stock/PromptCard";
+import { RejectDialog } from "@/components/stock/RejectDialog";
+import { REOPENED_BY_EDIT } from "@/components/stock/messages";
+import { StatusTabs, useStatusTab } from "@/components/stock/StatusTabs";
 import { useDeferredDelete } from "@/components/stock/use-deferred-delete";
+import { useReview, type ReviewOptions } from "@/components/stock/use-review";
 import { Button } from "@/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsContent } from "@/components/ui/tabs";
 import { api } from "@/lib/api-client";
 import { queryKeys } from "@/lib/query";
 import { useCurrentAccount } from "@/pages/account-layout";
 
-const excerpt = (body: string) => {
-  const line = body.split("\n")[0] ?? "";
-  return line.length > 20 ? `${line.slice(0, 20)}…` : line;
-};
+const TAB_VALUES: PostDraftStatus[] = ["needs_review", "approved", "rejected"];
 
 /**
- * 投稿ストックの画面。プロンプトのコピー、貼り付けによる一括登録、要確認の下書きの確認・修正・削除。
+ * 投稿ストックの画面。プロンプトのコピー、貼り付けによる一括登録、下書きの確認・修正・削除・承認・却下。
  * @returns 投稿ストックの画面
  */
 export function StockPage() {
@@ -41,24 +37,77 @@ export function StockPage() {
     queryKey: queryKeys.postDrafts(account.id),
     queryFn: () => api.listPostDrafts(account.id),
   });
+  const { tab, setTab } = useStatusTab();
   const [picked, setPicked] = useState<ReadonlySet<string>>(new Set());
   const [editing, setEditing] = useState<PostDraft | null>(null);
+  const [rejecting, setRejecting] = useState<PostDraft[] | null>(null);
+  const [busy, setBusy] = useState(false);
   const { hidden, remove, flush } = useDeferredDelete(account.id);
+  const { review } = useReview(account.id);
+  const data = drafts.data;
 
   // 削除して確定を待っている下書きは、一覧から隠す
-  const items = useMemo(() => (drafts.data?.needsReview ?? []).filter((d) => !hidden.has(d.id)), [drafts.data, hidden]);
-  // 一覧から消えた下書き（取り消し・他の端末での削除）は、選択からも外す
-  const selected = useMemo(() => new Set(items.filter((d) => picked.has(d.id)).map((d) => d.id)), [items, picked]);
-  const atLimit = drafts.data ? items.length >= drafts.data.limits.needsReview : false;
+  const lists = useMemo<Record<PostDraftStatus, PostDraft[]>>(
+    () => ({
+      needs_review: (data?.needsReview ?? []).filter((d) => !hidden.has(d.id)),
+      approved: data?.approved ?? [],
+      rejected: (data?.rejected ?? []).filter((d) => !hidden.has(d.id)),
+    }),
+    [data, hidden],
+  );
+  const counts = useMemo(
+    () =>
+      data && {
+        needsReview: data.counts.needsReview - (data.needsReview.length - lists.needs_review.length),
+        approved: data.counts.approved,
+        rejected: data.counts.rejected - (data.rejected.length - lists.rejected.length),
+      },
+    [data, lists],
+  );
+  // 承認できるか（NGワード・Threadsの上限）。承認のチェックそのものはAPIが行い、ここは表示のため（research.md R3）
+  const checks = useMemo(() => {
+    const ngWords = data?.ngWords ?? [];
+    const map = new Map<string, PublishCheck>();
+    for (const d of [...lists.needs_review, ...lists.approved]) map.set(d.id, checkPublishable(d.body, ngWords));
+    return map;
+  }, [data, lists]);
+
+  const items = lists[tab];
+  // 一覧から消えた下書き（取り消し・他の端末での削除・状態の変更）は、選択からも外す
+  const selected = useMemo(() => items.filter((d) => picked.has(d.id)), [items, picked]);
+  const atLimit = data ? lists.needs_review.length >= data.limits.needsReview : false;
 
   const refresh = () => {
     void queryClient.invalidateQueries({ queryKey: queryKeys.postDrafts(account.id) });
     void queryClient.invalidateQueries({ queryKey: queryKeys.promptAll(account.id) });
   };
 
+  const unpick = (ids: string[]) => setPicked((prev) => new Set([...prev].filter((id) => !ids.includes(id))));
+
   const removeDrafts = (ids: string[]) => {
-    setPicked((prev) => new Set([...prev].filter((id) => !ids.includes(id))));
+    unpick(ids);
     remove(ids);
+  };
+
+  const runReview = async (action: "approve" | "reject" | "reopen", targets: PostDraft[], options: ReviewOptions = {}) => {
+    setBusy(true);
+    try {
+      const res = await review(action, targets, options);
+      // 状態を変えた下書きは選択から外し、飛ばした下書きは選んだまま残す（spec エッジケース）
+      if (res) unpick(res.updated.map((d) => d.id));
+      return res;
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const approve = (targets: PostDraft[]) => void runReview("approve", targets);
+  const reopen = (targets: PostDraft[]) => void runReview("reopen", targets);
+
+  const changeTab = (value: string) => {
+    if (!TAB_VALUES.includes(value as PostDraftStatus)) return;
+    setTab(value as PostDraftStatus);
+    setPicked(new Set());
   };
 
   if (drafts.error) return <ApiErrorScreen error={drafts.error} onRetry={() => void drafts.refetch()} />;
@@ -70,28 +119,78 @@ export function StockPage() {
       else next.add(id);
       return next;
     });
-  const allSelected = items.length > 0 && selected.size === items.length;
+  const allSelected = items.length > 0 && selected.length === items.length;
+
+  const selectionActions =
+    tab === "needs_review" ? (
+      <>
+        <Button
+          variant="ghost"
+          className="h-10 rounded-full text-destructive md:h-9"
+          aria-label="選んだ下書きを削除"
+          onClick={() => removeDrafts(selected.map((d) => d.id))}
+        >
+          削除
+        </Button>
+        <Button variant="outline" className="h-10 rounded-full md:h-9" disabled={busy} onClick={() => setRejecting(selected)}>
+          まとめて却下
+        </Button>
+        <Button className="h-10 rounded-full md:h-9" disabled={busy} onClick={() => approve(selected)}>
+          まとめて承認
+        </Button>
+      </>
+    ) : tab === "approved" ? (
+      <Button className="h-10 rounded-full md:h-9" disabled={busy} onClick={() => reopen(selected)}>
+        要確認に戻す
+      </Button>
+    ) : (
+      <>
+        <Button
+          variant="ghost"
+          className="h-10 rounded-full text-destructive md:h-9"
+          aria-label="選んだ下書きを削除"
+          onClick={() => removeDrafts(selected.map((d) => d.id))}
+        >
+          削除
+        </Button>
+        <Button className="h-10 rounded-full md:h-9" disabled={busy} onClick={() => reopen(selected)}>
+          要確認に戻す
+        </Button>
+      </>
+    );
+
+  const renderCard = (d: PostDraft) => (
+    <DraftCard
+      key={d.id}
+      draft={d}
+      selected={picked.has(d.id)}
+      check={checks.get(d.id) ?? checkPublishable(d.body, [])}
+      busy={busy}
+      actions={{
+        onToggle: () => toggle(d.id),
+        onApprove: () => approve([d]),
+        onReject: () => setRejecting([d]),
+        onEdit: () => setEditing(d),
+        onDelete: () => removeDrafts([d.id]),
+        onReopen: () => reopen([d]),
+      }}
+    />
+  );
 
   return (
     <>
       <PageHeader title="投稿ストック" />
       <PageBody className="flex-1 space-y-5">
-        {drafts.data ? (
-          <PromptCard
-            accountId={account.id}
-            canGeneratePrompt={drafts.data.canGeneratePrompt}
-            promptPostCount={drafts.data.promptPostCount}
-          />
+        {data ? (
+          <PromptCard accountId={account.id} canGeneratePrompt={data.canGeneratePrompt} promptPostCount={data.promptPostCount} />
         ) : (
           <div className="h-32 animate-pulse rounded-2xl bg-muted" aria-busy="true" />
         )}
-        <Tabs value="needs_review">
+        <Tabs value={tab} onValueChange={changeTab}>
           <div className="flex items-center justify-between gap-3">
-            <TabsList>
-              <TabsTrigger value="needs_review">要確認 {drafts.data ? items.length : ""}</TabsTrigger>
-            </TabsList>
+            <StatusTabs counts={counts ?? undefined} />
             {items.length > 0 && (
-              <label className="flex min-h-11 cursor-pointer items-center gap-2 px-1 text-sm md:min-h-9">
+              <label className="flex min-h-11 shrink-0 cursor-pointer items-center gap-2 px-1 text-sm md:min-h-9">
                 <input
                   type="checkbox"
                   className="size-4 accent-foreground"
@@ -102,54 +201,22 @@ export function StockPage() {
               </label>
             )}
           </div>
-          <TabsContent value="needs_review">
-            {!drafts.data ? (
-              <div className="h-32 animate-pulse rounded-2xl bg-muted" aria-busy="true" />
-            ) : (
-              <DraftList
-                items={items}
-                limit={drafts.data.limits.needsReview}
-                canGeneratePrompt={drafts.data.canGeneratePrompt}
-                renderControls={(d) => ({
-                  leading: (
-                    // タッチ操作でも押しやすいよう、押せる範囲を44px角にする
-                    <label className="-my-1.5 -ml-1.5 flex size-11 shrink-0 cursor-pointer items-center justify-center md:size-9">
-                      <input
-                        type="checkbox"
-                        className="size-4 accent-foreground"
-                        aria-label={`「${excerpt(d.body)}」を選択`}
-                        checked={selected.has(d.id)}
-                        onChange={() => toggle(d.id)}
-                      />
-                    </label>
-                  ),
-                  trailing: (
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="-my-1.5 -mr-1.5 size-11 shrink-0 text-muted-foreground md:size-8"
-                          aria-label={`「${excerpt(d.body)}」の操作`}
-                        >
-                          <EllipsisIcon className="size-5" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem onSelect={() => setEditing(d)}>編集</DropdownMenuItem>
-                        <DropdownMenuItem
-                          className="text-destructive"
-                          onSelect={() => removeDrafts([d.id])}
-                        >
-                          削除
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  ),
-                })}
-              />
-            )}
-          </TabsContent>
+          {TAB_VALUES.map((value) => (
+            <TabsContent key={value} value={value}>
+              {!data ? (
+                <div className="h-32 animate-pulse rounded-2xl bg-muted" aria-busy="true" />
+              ) : (
+                <DraftList
+                  tab={value}
+                  items={lists[value]}
+                  limit={data.limits.needsReview}
+                  canGeneratePrompt={data.canGeneratePrompt}
+                  total={value === "rejected" ? (counts?.rejected ?? 0) : lists[value].length}
+                  renderCard={renderCard}
+                />
+              )}
+            </TabsContent>
+          ))}
         </Tabs>
       </PageBody>
       {/* 貼り付け欄。スクロール領域の下端に固定し、767px以下は画面下端の操作バーの領域を避ける */}
@@ -160,11 +227,7 @@ export function StockPage() {
             atLimit={atLimit}
             // 削除して確定を待っている下書きは、まだサーバーで数えられているので、登録の前に確定する
             beforeSubmit={flush}
-            selection={{
-              count: selected.size,
-              onClear: () => setPicked(new Set()),
-              onDelete: () => removeDrafts([...selected]),
-            }}
+            selection={{ count: selected.length, onClear: () => setPicked(new Set()), actions: selectionActions }}
           />
         </div>
       </div>
@@ -173,13 +236,25 @@ export function StockPage() {
         <DraftEditDialog
           accountId={account.id}
           item={editing}
-          onSaved={() => {
+          onSaved={(_d, reopened) => {
             setEditing(null);
             refresh();
-            toast.success("保存しました");
+            toast.success(reopened ? REOPENED_BY_EDIT : "保存しました");
           }}
           onClose={() => setEditing(null)}
           onDeletedElsewhere={refresh}
+        />
+      )}
+      {rejecting && (
+        <RejectDialog
+          count={rejecting.length}
+          submitting={busy}
+          onSubmit={(reject) => {
+            const targets = rejecting;
+            setRejecting(null);
+            void runReview("reject", targets, { reject });
+          }}
+          onClose={() => setRejecting(null)}
         />
       )}
     </>

@@ -1,14 +1,10 @@
-// 要確認の下書きの一覧（specs/003 US2・US3、contracts/ui-routes.md「状態のタブと下書きの一覧」）。
-// 新しい登録が上、同じ登録の中は貼り付けた順（API の順のまま）。登録のまとまりごとに小見出しを挟む。
-import type { PostDraft } from "@threads-grower/shared";
-import { useState, type ReactNode } from "react";
+// 状態のタブごとの下書きの一覧（specs/003 US2・US3、specs/004 FR-011・FR-012、contracts/ui-routes.md）。
+// 要確認：新しい登録が上、同じ登録の中は貼り付けた順（API の順のまま）。登録のまとまりごとに小見出しを挟む。
+// 承認済み・却下：承認・却下した日時の新しい順（API の順のまま）。
+import { REJECTED_LIST_MAX, type PostDraft, type PostDraftStatus } from "@threads-grower/shared";
+import type { ReactNode } from "react";
 import { formatDateTime } from "@/lib/format";
-import { STOCK_LIMIT_MESSAGE } from "./messages";
-import { ThreadsLengthBar } from "./ThreadsLengthBar";
-
-/** 「もっと見る」を出す目安（6行を超えそうな本文） */
-const LONG_LINES = 6;
-const LONG_CHARS = 180;
+import { APPROVED_TAB_NOTICE, STOCK_LIMIT_MESSAGE } from "./messages";
 
 type Group = { batchId: string; createdAt: string; drafts: PostDraft[] };
 
@@ -22,30 +18,63 @@ function groupByBatch(items: PostDraft[]): Group[] {
   return groups;
 }
 
+function Empty({ children }: { children: ReactNode }) {
+  return (
+    <div className="rounded-2xl border border-dashed px-6 py-10 text-center text-[15px] text-muted-foreground">{children}</div>
+  );
+}
+
 /**
- * 要確認の下書きの一覧。
- * @param props - items：下書き（API の順）、limit：要確認の上限、canGeneratePrompt：空の状態の文言の切り替え、
- *   renderControls：各下書きの左（選択）と右（メニュー）に出すもの（US3）
+ * タブごとの下書きの一覧。
+ * @param props - tab：表示するタブ、items：下書き（API の順）、limit：要確認の上限、canGeneratePrompt：空の状態の文言の切り替え、
+ *   total：そのタブの全件数（却下は500件までしか返らないため）、renderCard：1件のカード
  * @returns 一覧
  */
 export function DraftList({
+  tab,
   items,
   limit,
   canGeneratePrompt,
-  renderControls,
+  total,
+  renderCard,
 }: {
+  tab: PostDraftStatus;
   items: PostDraft[];
   limit: number;
   canGeneratePrompt: boolean;
-  renderControls?: (draft: PostDraft) => { leading?: ReactNode; trailing?: ReactNode };
+  total: number;
+  renderCard: (draft: PostDraft) => ReactNode;
 }) {
+  if (tab === "approved") {
+    return (
+      <div className="space-y-3">
+        <p className="px-1 text-[13px] text-muted-foreground">{APPROVED_TAB_NOTICE}</p>
+        {items.length === 0 ? (
+          <Empty>承認した下書きはまだありません。要確認のタブで内容を確かめて「承認」を押してください。</Empty>
+        ) : (
+          <ul className="space-y-2">{items.map(renderCard)}</ul>
+        )}
+      </div>
+    );
+  }
+  if (tab === "rejected") {
+    if (items.length === 0) return <Empty>却下した下書きはありません。</Empty>;
+    return (
+      <div className="space-y-3">
+        <ul className="space-y-2">{items.map(renderCard)}</ul>
+        {total > REJECTED_LIST_MAX && (
+          <p className="px-1 text-center text-[13px] text-muted-foreground">新しい{REJECTED_LIST_MAX}件を表示しています</p>
+        )}
+      </div>
+    );
+  }
   if (items.length === 0) {
     return (
-      <div className="rounded-2xl border border-dashed px-6 py-10 text-center text-[15px] text-muted-foreground">
+      <Empty>
         {canGeneratePrompt
           ? "まだ下書きがありません。上のプロンプトをChatGPTやClaudeに送り、返ってきた回答を下の欄に貼り付けてください。"
           : "まだ下書きがありません。投稿を「@@@」だけの行で区切って、下の欄に貼り付けてください。"}
-      </div>
+      </Empty>
     );
   }
   return (
@@ -60,35 +89,9 @@ export function DraftList({
           <h3 className="px-1 text-xs text-muted-foreground">
             {formatDateTime(g.createdAt)}に登録した{g.drafts.length}件
           </h3>
-          <ul className="space-y-2">
-            {g.drafts.map((d) => (
-              <DraftItem key={d.id} draft={d} controls={renderControls?.(d)} />
-            ))}
-          </ul>
+          <ul className="space-y-2">{g.drafts.map(renderCard)}</ul>
         </section>
       ))}
     </div>
-  );
-}
-
-function DraftItem({ draft, controls }: { draft: PostDraft; controls?: { leading?: ReactNode; trailing?: ReactNode } }) {
-  const [expanded, setExpanded] = useState(false);
-  const long = draft.body.split("\n").length > LONG_LINES || draft.body.length > LONG_CHARS;
-  return (
-    <li className="flex gap-2 rounded-2xl border bg-card px-3 py-3 md:px-4">
-      {controls?.leading}
-      <div className="min-w-0 flex-1 space-y-2">
-        <p className={`text-[15px] leading-relaxed break-words whitespace-pre-wrap ${expanded ? "" : "line-clamp-6"}`}>
-          {draft.body}
-        </p>
-        {long && (
-          <button type="button" className="text-[13px] text-ring underline" onClick={() => setExpanded((v) => !v)}>
-            {expanded ? "閉じる" : "もっと見る"}
-          </button>
-        )}
-        <ThreadsLengthBar text={draft.body} />
-      </div>
-      {controls?.trailing}
-    </li>
   );
 }

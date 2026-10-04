@@ -182,7 +182,10 @@ describe("PUT /post-drafts/:draftId（編集）", () => {
       body: { body: "  直した本文\n2行目 \n", expectedVersion: 1 },
     });
     expect(res.status).toBe(200);
-    expect(await res.json()).toMatchObject({ id: d!.id, body: "直した本文\n2行目", version: 2, position: 0 });
+    expect(await res.json()).toMatchObject({
+      draft: { id: d!.id, body: "直した本文\n2行目", version: 2, position: 0, status: "needs_review" },
+      reopened: false,
+    });
   });
 
   it("空白だけ・2,001文字は 400 VALIDATION_FAILED（details: body）", async () => {
@@ -215,6 +218,96 @@ describe("PUT /post-drafts/:draftId（編集）", () => {
     const [d] = (await register(other.accountId, "他人", "u2")).drafts;
     const res = await call(app, "PUT", `${base(accountId)}/post-drafts/${d!.id}`, { user: "u1", body: { body: "X", expectedVersion: 1 } });
     expect(res.status).toBe(404);
+  });
+});
+
+describe("承認済み・却下の下書き（specs/004-review-approval FR-007・FR-009・FR-012・FR-013）", () => {
+  const review = (accountId: string, body: unknown) =>
+    call(app, "POST", `${base(accountId)}/post-drafts/review`, { user: "u1", body });
+
+  it("承認済みの下書きを編集すると reopened: true で要確認に戻る", async () => {
+    const { accountId } = await createUserWithAccount("u1");
+    const [d] = (await register(accountId, "A")).drafts;
+    await review(accountId, { action: "approve", items: [{ id: d!.id, expectedVersion: 1 }] });
+    const res = await call(app, "PUT", `${base(accountId)}/post-drafts/${d!.id}`, {
+      user: "u1",
+      body: { body: "直した", expectedVersion: 2 },
+    });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({
+      draft: { body: "直した", status: "needs_review", reviewedAt: null, version: 3 },
+      reopened: true,
+    });
+  });
+
+  it("却下の下書きは編集できない（404 ITEM_NOT_FOUND）", async () => {
+    const { accountId } = await createUserWithAccount("u1");
+    const [d] = (await register(accountId, "A")).drafts;
+    await review(accountId, { action: "reject", items: [{ id: d!.id, expectedVersion: 1 }], reject: { reasons: ["tone"], note: "" } });
+    const res = await call(app, "PUT", `${base(accountId)}/post-drafts/${d!.id}`, {
+      user: "u1",
+      body: { body: "直した", expectedVersion: 2 },
+    });
+    expect(res.status).toBe(404);
+  });
+
+  it("まとめての削除は要確認と却下を消し、承認済みは無視する。取り消しは要確認だけを消す", async () => {
+    const { accountId } = await createUserWithAccount("u1");
+    const r = await register(accountId, "要確認\n@@@\n承認\n@@@\n却下");
+    const [n, a, j] = r.drafts;
+    await review(accountId, { action: "approve", items: [{ id: a!.id, expectedVersion: 1 }] });
+    await review(accountId, { action: "reject", items: [{ id: j!.id, expectedVersion: 1 }], reject: { reasons: [], note: "x" } });
+    const del = await call(app, "POST", `${base(accountId)}/post-drafts/delete`, {
+      user: "u1",
+      body: { ids: [n!.id, a!.id, j!.id] },
+    });
+    expect(await del.json()).toEqual({ deletedCount: 2 });
+    expect(await countRows(accountId)).toBe(1);
+
+    const r2 = await register(accountId, "B1\n@@@\nB2");
+    await review(accountId, { action: "approve", items: [{ id: r2.drafts[0]!.id, expectedVersion: 1 }] });
+    const undo = await call(app, "DELETE", `${base(accountId)}/draft-batches/${r2.batchId}`, { user: "u1" });
+    expect(await undo.json()).toEqual({ deletedCount: 1 });
+    expect(await countRows(accountId)).toBe(2);
+  });
+
+  it("一覧：承認済み・却下は reviewedAt の新しい順。件数のAPIは一覧の counts と一致する", async () => {
+    const { accountId } = await createUserWithAccount("u1");
+    const ds = (await register(accountId, "A\n@@@\nB\n@@@\nC\n@@@\nD")).drafts;
+    for (const d of ds.slice(0, 2)) await review(accountId, { action: "approve", items: [{ id: d.id, expectedVersion: 1 }] });
+    await review(accountId, { action: "reject", items: [{ id: ds[2]!.id, expectedVersion: 1 }], reject: { reasons: ["thin"], note: "" } });
+    const res = await call(app, "GET", `${base(accountId)}/post-drafts`, { user: "u1" });
+    const body = (await res.json()) as {
+      needsReview: PostDraft[];
+      approved: PostDraft[];
+      rejected: PostDraft[];
+      counts: unknown;
+    };
+    expect(body.approved.map((d) => d.body)).toEqual(["B", "A"]);
+    expect(body.rejected.map((d) => d.body)).toEqual(["C"]);
+    expect(body.needsReview.map((d) => d.body)).toEqual(["D"]);
+    expect(body.counts).toEqual({ needsReview: 1, approved: 2, rejected: 1 });
+    const counts = await call(app, "GET", `${base(accountId)}/post-drafts/counts`, { user: "u1" });
+    expect(await counts.json()).toEqual(body.counts);
+  });
+
+  it("却下の一覧は新しい500件まで返し、counts.rejected は全件", async () => {
+    const { accountId } = await createUserWithAccount("u1");
+    const sql = neon(testEnv.DATABASE_URL);
+    // position は1つのまとまりで50未満なので、まとまりを分けて501件作る
+    for (let i = 0; i < 501; i += 49) {
+      const [bb] = (await sql`
+        INSERT INTO draft_batches (account_id, client_request_id, draft_count, delimiter_found)
+        VALUES (${accountId}, gen_random_uuid(), 49, true) RETURNING id`) as [{ id: string }];
+      await sql`
+        INSERT INTO post_drafts (account_id, batch_id, position, body, status, reviewed_at, reject_reasons)
+        SELECT ${accountId}, ${bb.id}, g, 'r ' || g, 'rejected', now(), '{tone}'
+        FROM generate_series(0, ${Math.min(48, 500 - i)}) AS g`;
+    }
+    const res = await call(app, "GET", `${base(accountId)}/post-drafts`, { user: "u1" });
+    const body = (await res.json()) as { rejected: PostDraft[]; counts: { rejected: number } };
+    expect(body.rejected).toHaveLength(500);
+    expect(body.counts.rejected).toBe(501);
   });
 });
 

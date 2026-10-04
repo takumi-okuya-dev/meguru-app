@@ -12,13 +12,16 @@ import {
   TargetIcon,
   type LucideIcon,
 } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
 import { Link, NavLink, useParams } from "react-router";
 import { Button } from "@/components/ui/button";
+import { api } from "@/lib/api-client";
+import { queryKeys } from "@/lib/query";
 import { cn } from "@/lib/utils";
 import { AccountSwitcher } from "./AccountSwitcher";
 import { UserMenu } from "./UserMenu";
 
-type NavItem = { path: string; label: string; Icon: LucideIcon; end?: boolean };
+type NavItem = { path: string; label: string; Icon: LucideIcon; end?: boolean; badge?: "needsReview" };
 type NavGroup = { label?: string; items: NavItem[] };
 
 /** 機能の移動。path は /accounts/:id からの相対パス。 */
@@ -26,7 +29,7 @@ const NAV_GROUPS: NavGroup[] = [
   {
     items: [
       { path: "", label: "ホーム", Icon: HouseIcon, end: true },
-      { path: "stock", label: "投稿ストック", Icon: InboxIcon },
+      { path: "stock", label: "投稿ストック", Icon: InboxIcon, badge: "needsReview" },
     ],
   },
   {
@@ -53,6 +56,12 @@ const itemClass = ({ isActive }: { isActive: boolean }) =>
 export function Sidebar({ onCollapse, onNavigate }: { onCollapse?: () => void; onNavigate?: () => void }) {
   const { accountId } = useParams<{ accountId: string }>();
   const base = accountId ? `/accounts/${accountId}` : "/";
+  // 投稿ストックの右に出す要確認の件数（specs/004 FR-013）。本文を含まない軽いAPIで読む
+  const counts = useQuery({
+    queryKey: queryKeys.draftCounts(accountId ?? ""),
+    queryFn: () => api.getDraftCounts(accountId!),
+    enabled: !!accountId,
+  });
   return (
     <div className="flex h-full flex-col">
       <div className="flex items-center gap-1 p-2">
@@ -84,11 +93,20 @@ export function Sidebar({ onCollapse, onNavigate }: { onCollapse?: () => void; o
         {NAV_GROUPS.map((group, i) => (
           <div key={group.label ?? i} className="space-y-0.5">
             {group.label && <div className="px-3 pt-4 pb-1 text-xs text-muted-foreground lg:px-2.5">{group.label}</div>}
-            {group.items.map(({ path, label, Icon, end }) => (
-              <NavLink key={label} to={path ? `${base}/${path}` : base} end={end} className={itemClass} onClick={onNavigate}>
-                <Icon className="size-5 lg:size-[18px]" /> {label}
-              </NavLink>
-            ))}
+            {group.items.map(({ path, label, Icon, end, badge }) => {
+              const n = badge ? (counts.data?.[badge] ?? 0) : 0;
+              return (
+                <NavLink key={label} to={path ? `${base}/${path}` : base} end={end} className={itemClass} onClick={onNavigate}>
+                  <Icon className="size-5 lg:size-[18px]" /> {label}
+                  {n > 0 && (
+                    <span className="ml-auto text-xs text-muted-foreground tabular-nums">
+                      <span aria-hidden="true">{n}</span>
+                      <span className="sr-only">（要確認 {n}件）</span>
+                    </span>
+                  )}
+                </NavLink>
+              );
+            })}
           </div>
         ))}
       </nav>

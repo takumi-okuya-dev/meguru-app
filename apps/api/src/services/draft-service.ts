@@ -11,6 +11,7 @@ import {
 } from "@threads-grower/shared";
 import { and, asc, count, desc, eq, inArray, sql } from "drizzle-orm";
 import { withTransaction, type Db, type TxDb } from "../db/client";
+import { lockAccountDrafts } from "../db/locks";
 import { draftBatches, postDrafts } from "../db/schema";
 import type { Env } from "../env";
 import { AppError, itemNotFound, notFound, pgErrorCode } from "../lib/errors";
@@ -147,7 +148,7 @@ export async function createDraftBatch(env: Env, accountId: string, req: { clien
   try {
     return await withTransaction(env.DATABASE_URL, async (tx) => {
       // 「Account × 下書き」単位で直列化してから数える（同時の登録でも500件を超えない）
-      await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${`account_items:${accountId}:post_drafts`}, 0))`);
+      await lockAccountDrafts(tx, accountId);
       const [existing] = await tx
         .select()
         .from(draftBatches)
@@ -207,31 +208,48 @@ export async function deleteBatch(db: Db, accountId: string, batchId: string): P
 }
 
 /**
- * 下書きの本文を編集する（FR-019）。要確認の下書きだけを対象にし、本文の前後の空白を除いて保存する。
- * @param db - データベース
+ * 下書きの本文を編集する（003 FR-019、004 FR-007、research.md R5）。要確認と承認済みの下書きを対象にし、
+ * 本文の前後の空白を除いて保存する。承認済みの下書きは、同じ更新で要確認に戻す（直した本文はもう一度承認が要る）。
+ * 状態の変更・NGワードの追加と同じロックで直列化する。要確認の件数の上限は確かめない（編集中に保存できないのを避ける）。
+ * @param env - Workers のバインディング（DATABASE_URL を使う）
  * @param accountId - accounts.id
  * @param id - post_drafts.id（UUID の形は確かめてあること）
  * @param req - body：新しい本文、expectedVersion：読み込んだときの version
- * @returns 更新した PostDraft
- * @throws AppError STALE_UPDATE（他で先に更新された。latest 付き）、ITEM_NOT_FOUND（ない・別のAccountのもの）
+ * @returns draft：更新した PostDraft、reopened：承認済みから要確認に戻したか
+ * @throws AppError STALE_UPDATE（他で先に更新された。latest 付き）、ITEM_NOT_FOUND（ない・別のAccountのもの・却下の下書き）
  */
-export async function updateDraft(db: Db, accountId: string, id: string, req: { body: string; expectedVersion: number }) {
-  const mine = and(eq(postDrafts.id, id), eq(postDrafts.accountId, accountId), eq(postDrafts.status, "needs_review"));
-  const row = await updateWithVersion(
-    () =>
-      db
-        .update(postDrafts)
-        .set({ body: req.body.trim(), version: sql`${postDrafts.version} + 1`, updatedAt: new Date() })
-        .where(and(mine, eq(postDrafts.version, req.expectedVersion)))
-        .returning(),
-    async () => (await db.select().from(postDrafts).where(mine).limit(1))[0],
-    toPostDraft,
-  );
-  return toPostDraft(row);
+export async function updateDraft(env: Env, accountId: string, id: string, req: { body: string; expectedVersion: number }) {
+  return withTransaction(env.DATABASE_URL, async (tx) => {
+    await lockAccountDrafts(tx, accountId);
+    const mine = and(
+      eq(postDrafts.id, id),
+      eq(postDrafts.accountId, accountId),
+      inArray(postDrafts.status, ["needs_review", "approved"]),
+    );
+    const [before] = await tx.select({ status: postDrafts.status }).from(postDrafts).where(mine).limit(1);
+    const row = await updateWithVersion(
+      () =>
+        tx
+          .update(postDrafts)
+          .set({
+            body: req.body.trim(),
+            status: "needs_review",
+            reviewedAt: null,
+            version: sql`${postDrafts.version} + 1`,
+            updatedAt: new Date(),
+          })
+          .where(and(mine, eq(postDrafts.version, req.expectedVersion)))
+          .returning(),
+      async () => (await tx.select().from(postDrafts).where(mine).limit(1))[0],
+      toPostDraft,
+    );
+    return { draft: toPostDraft(row), reopened: before?.status === "approved" };
+  });
 }
 
 /**
- * 下書きをまとめて削除する（FR-020）。そのAccountの要確認の下書きだけを消し、それ以外のIDは無視する。
+ * 下書きをまとめて削除する（003 FR-020、004 FR-009）。そのAccountの要確認と却下の下書きを消し、それ以外のIDは無視する。
+ * 承認済みの下書きは、要確認に戻してから削除する。
  * @param db - データベース
  * @param accountId - accounts.id
  * @param ids - post_drafts.id の一覧（UUID の形は確かめてあること）
@@ -240,7 +258,13 @@ export async function updateDraft(db: Db, accountId: string, id: string, req: { 
 export async function deleteDrafts(db: Db, accountId: string, ids: string[]): Promise<number> {
   const deleted = await db
     .delete(postDrafts)
-    .where(and(inArray(postDrafts.id, ids), eq(postDrafts.accountId, accountId), eq(postDrafts.status, "needs_review")))
+    .where(
+      and(
+        inArray(postDrafts.id, ids),
+        eq(postDrafts.accountId, accountId),
+        inArray(postDrafts.status, ["needs_review", "rejected"]),
+      ),
+    )
     .returning({ id: postDrafts.id });
   return deleted.length;
 }

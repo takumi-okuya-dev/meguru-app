@@ -192,7 +192,7 @@ description: "重複検知・承認/却下・NGワード（CORE RULES）の実�
 
 ### テスト（先に書いて失敗を確認する）
 
-- [ ] T012 [P] [US1] `apps/api/test/integration/review.test.ts`を作る（quickstart.mdの表の該当する行）。
+- [X] T012 [P] [US1] `apps/api/test/integration/review.test.ts`を作る（quickstart.mdの表の該当する行）。
   - 「承認・却下・戻す」：
     - 承認で`status: approved`・`reviewedAt`が入り、`version`が1増える
     - 却下で理由（コードと自由記述）が入る
@@ -219,7 +219,7 @@ description: "重複検知・承認/却下・NGワード（CORE RULES）の実�
   - 別のAccountの下書きのID → `NOT_FOUND`
   - 他人のAccount → `404 ACCOUNT_NOT_FOUND`
   - 要再接続のAccount、無料体験の後のプラン1でも使える（FR-034・FR-035）
-- [ ] T013 [P] [US1] `apps/api/test/integration/post-drafts.test.ts`に足す。
+- [X] T013 [P] [US1] `apps/api/test/integration/post-drafts.test.ts`に足す。
   - 「承認済みの編集」：
     - 承認済みの下書きの`PUT`は`200`で、`reopened: true`、`draft.status: needs_review`、`reviewedAt: null`、`version`が1増える
     - 要確認の下書きでは`reopened: false`
@@ -228,7 +228,7 @@ description: "重複検知・承認/却下・NGワード（CORE RULES）の実�
   - `DELETE /draft-batches/:id`：その登録の要確認の下書きだけを消し、承認済み・却下は残す
   - 一覧：承認済み・却下が`reviewedAt`の新しい順。却下は500件まで返り、`counts.rejected`は全件
   - 「件数のAPI」：`GET /post-drafts/counts`が一覧の`counts`と一致する
-- [ ] T014 [P] [US1] `apps/web/test/stock.test.tsx`に足す。
+- [X] T014 [P] [US1] `apps/web/test/stock.test.tsx`に足す。
   - タブ：「要確認 {n}」「承認済み {n}」「却下 {n}」が出る。`?tab=approved`で開くと承認済みのタブになる
   - 「承認と元に戻す」：
     - 「承認」で`reviewPostDrafts`に`{ action: "approve", items: [{ id, expectedVersion }] }`が渡り、要確認の一覧から消える
@@ -249,7 +249,7 @@ description: "重複検知・承認/却下・NGワード（CORE RULES）の実�
 
 ### 実装
 
-- [ ] T015 [US1] `apps/api/src/services/review-service.ts`に`reviewDrafts(env, accountId, req)`を作る（research.md R2・R3、contracts/api.md「POST /post-drafts/review」）。
+- [X] T015 [US1] `apps/api/src/services/review-service.ts`に`reviewDrafts(env, accountId, req)`を作る（research.md R2・R3、contracts/api.md「POST /post-drafts/review」）。
   1. `withTransaction`の中で、003と同じ`pg_advisory_xact_lock(hashtextextended('account_items:<accountId>:post_drafts', 0))`を取る。
   2. 対象の下書き（`id IN (…) AND account_id = …`）と、そのAccountの`ng_words`と、状態ごとの件数を読む。
   3. 各項目を、contracts/api.mdの「処理」の順（`NOT_FOUND` → すでに目的の状態 → `STALE` → 移れない状態 → `approve`のチェック → 上限）で判定する。
@@ -263,8 +263,8 @@ description: "重複検知・承認/却下・NGワード（CORE RULES）の実�
      - `reopen`：3列を`NULL`
   5. `{ updated, skipped, counts }`を返す。`skipped`の`latest`は、`NOT_FOUND`以外で今の行を`toPostDraft`したもの。
   - 外部キー違反（`23503`）は`404 ACCOUNT_NOT_FOUND`。
-- [ ] T016 [US1] `apps/api/src/routes/post-drafts.ts`に`POST /api/accounts/:accountId/post-drafts/review`を足す（`findOwnedAccount` → `parseBody(reviewRequestSchema)` → `reviewDrafts`）。grower機能は判定しない。
-- [ ] T017 [US1] `apps/api/src/services/draft-service.ts`を変える（research.md R5、FR-007・FR-009）。
+- [X] T016 [US1] `apps/api/src/routes/post-drafts.ts`に`POST /api/accounts/:accountId/post-drafts/review`を足す（`findOwnedAccount` → `parseBody(reviewRequestSchema)` → `reviewDrafts`）。grower機能は判定しない。
+- [X] T017 [US1] `apps/api/src/services/draft-service.ts`を変える（research.md R5、FR-007・FR-009）。
   - `updateDraft`：
     - 対象を`status IN ('needs_review', 'approved')`に広げ、003と同じロックを取ったトランザクションで更新する
     - 承認済みなら、同じ`UPDATE`で`status = 'needs_review'`・`reviewed_at = NULL`にする
@@ -272,17 +272,17 @@ description: "重複検知・承認/却下・NGワード（CORE RULES）の実�
     - 要確認の上限は確かめない
   - `deleteDrafts`：対象を`status IN ('needs_review', 'rejected')`にする。
   - `apps/api/src/routes/post-drafts.ts`の`PUT /post-drafts/:draftId`のレスポンスを`{ draft, reopened }`にする。
-- [ ] T018 [P] [US1] `apps/web/src/components/stock/StatusTabs.tsx`を作る（contracts/ui-routes.md「状態のタブ」）。
+- [X] T018 [P] [US1] `apps/web/src/components/stock/StatusTabs.tsx`を作る（contracts/ui-routes.md「状態のタブ」）。
   - 3つのタブ（`role="tablist"`）と件数を出す。
   - 選んだタブは`useSearchParams`の`tab`（`needs_review`（既定）・`approved`・`rejected`）に持つ。
-- [ ] T019 [P] [US1] `apps/web/src/components/stock/RejectDialog.tsx`を作る（contracts/ui-routes.md「却下理由の入力」）。
+- [X] T019 [P] [US1] `apps/web/src/components/stock/RejectDialog.tsx`を作る（contracts/ui-routes.md「却下理由の入力」）。
   - `FormDialogFrame`で、見出し（1件／「{n}件を却下する理由」）と説明を出す。
   - 候補のチップ（`REJECT_REASONS`。`aria-pressed`で複数選べる）を並べる。
   - 自由記述（`FieldWithCounter`、`REJECT_NOTE_MAX`文字まで、記入例「例：語尾がきつい」）を置く。
   - `initialReasons`のpropで、最初から選ぶ候補を受け取る。
   - 理由が空なら「却下する」を無効にし、案内を出す。
   - 自由記述を書きかけのときは、`useUnsavedChanges`に登録する。
-- [ ] T020 [US1] `apps/web/src/components/stock/use-review.ts`を作る（research.md R2）。
+- [X] T020 [US1] `apps/web/src/components/stock/use-review.ts`を作る（research.md R2）。
   - `review(action, drafts, options)`：`reviewPostDrafts`を呼び、成功したら次を古いものとして扱う。
     - `queryKeys.postDrafts(id)`
     - `queryKeys.draftCounts(id)`
@@ -294,7 +294,7 @@ description: "重複検知・承認/却下・NGワード（CORE RULES）の実�
     - 承認・却下の取り消し：`reopen`
     - 要確認に戻すのを取り消す：元の状態が承認済みなら`approve`、却下なら元の理由で`reject`
   - `skipped`の理由ごとの文言は`apps/web/src/components/stock/messages.ts`に置く（contracts/ui-routes.mdの表）。
-- [ ] T021 [US1] `apps/web/src/components/stock/DraftCard.tsx`を作り、003の`DraftList.tsx`から1件分の表示を移す（contracts/ui-routes.md「下書きのカード」）。
+- [X] T021 [US1] `apps/web/src/components/stock/DraftCard.tsx`を作り、003の`DraftList.tsx`から1件分の表示を移す（contracts/ui-routes.md「下書きのカード」）。
   - チェックボックス、本文、`ThreadsLengthBar`
   - タブごとの操作：
     - 要確認：「却下」「承認」。PCは右下に小さく、`md`未満は横幅いっぱいに2つ
@@ -303,26 +303,26 @@ description: "重複検知・承認/却下・NGワード（CORE RULES）の実�
   - 「⋯」メニュー：要確認は「編集」「削除」、承認済みは「編集」「要確認に戻す」、却下は「要確認に戻す」「削除」
   - 「承認」は`checkPublishable(body, ngWords).approvable`が偽なら無効にし、理由の1行を出す。
   - 押せる範囲は44px角以上。
-- [ ] T022 [US1] `apps/web/src/components/stock/DraftList.tsx`をタブごとの一覧にする。
+- [X] T022 [US1] `apps/web/src/components/stock/DraftList.tsx`をタブごとの一覧にする。
   - 要確認は003の見出しつきの並び、承認済み・却下は`reviewedAt`の新しい順に`DraftCard`を並べる。
   - 空の状態の文言（承認済み・却下）を出す。
   - 承認済みのタブの上の案内「承認した投稿は、自動投稿の設定ができると順に投稿されます」（FR-011）を出す。
   - 却下が500件を超えるときは「新しい500件を表示しています」を出す。
   - 「すべて選択」を各タブの見出しの右に置く。
-- [ ] T023 [US1] `apps/web/src/components/stock/PasteComposer.tsx`の選択のバーを、タブごとの中身にする（contracts/ui-routes.md「選択のバー」）。
+- [X] T023 [US1] `apps/web/src/components/stock/PasteComposer.tsx`の選択のバーを、タブごとの中身にする（contracts/ui-routes.md「選択のバー」）。
   - 「まとめて承認」：飛ばした下書きは選んだまま残し、承認したものだけ選択から外す。
   - 「まとめて却下」：`RejectDialog`を開き、選んだ全件に同じ理由で送る。
   - 「要確認に戻す」：確認なしで送る。
   - 「削除」：003の確認なし・「元に戻す」付きの削除のまま。
-- [ ] T024 [US1] `apps/web/src/components/stock/DraftEditDialog.tsx`を変える。
+- [X] T024 [US1] `apps/web/src/components/stock/DraftEditDialog.tsx`を変える。
   - 承認済みの下書きでは、上に「保存すると要確認に戻り、もう一度承認が必要になります」を出す。
   - 保存の結果が`reopened: true`なら、トースト「直したので、要確認に戻しました。もう一度承認してください」を出す。
-- [ ] T025 [US1] `apps/web/src/pages/stock.tsx`に、次を組み込む。
+- [X] T025 [US1] `apps/web/src/pages/stock.tsx`に、次を組み込む。
   - `StatusTabs`、タブごとの`DraftList`、`use-review`、`RejectDialog`
   - 却下は、1件は`DraftCard`の「却下」から、まとめては選択のバーから開く
   - タブを変えたら選択を解除する
   - 状態の変更・編集・削除の後は、`queryKeys.draftCounts(id)`も古いものとして扱う
-- [ ] T026 [US1] `apps/web/src/components/layout/Sidebar.tsx`の「投稿ストック」の右に、`getDraftCounts`の`needsReview`を出す（0件なら出さない。FR-013）。投稿ストックの一括登録・取り消し（003）の後も、`queryKeys.draftCounts(id)`を古いものとして扱う。
+- [X] T026 [US1] `apps/web/src/components/layout/Sidebar.tsx`の「投稿ストック」の右に、`getDraftCounts`の`needsReview`を出す（0件なら出さない。FR-013）。投稿ストックの一括登録・取り消し（003）の後も、`queryKeys.draftCounts(id)`を古いものとして扱う。
 
 **完了条件**：T012〜T014が通り、quickstart.md「手動の確認 2」の3〜6ができる
 
