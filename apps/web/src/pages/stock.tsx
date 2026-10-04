@@ -46,10 +46,10 @@ export function StockPage() {
   const { hidden, remove, flush } = useDeferredDelete(account.id);
 
   // 削除して確定を待っている下書きは、一覧から隠す
-  const items = useMemo(() => (drafts.data?.items ?? []).filter((d) => !hidden.has(d.id)), [drafts.data, hidden]);
+  const items = useMemo(() => (drafts.data?.needsReview ?? []).filter((d) => !hidden.has(d.id)), [drafts.data, hidden]);
   // 一覧から消えた下書き（取り消し・他の端末での削除）は、選択からも外す
   const selected = useMemo(() => new Set(items.filter((d) => picked.has(d.id)).map((d) => d.id)), [items, picked]);
-  const atLimit = drafts.data ? items.length >= drafts.data.limit : false;
+  const atLimit = drafts.data ? items.length >= drafts.data.limits.needsReview : false;
 
   const refresh = () => {
     void queryClient.invalidateQueries({ queryKey: queryKeys.postDrafts(account.id) });
@@ -108,7 +108,7 @@ export function StockPage() {
             ) : (
               <DraftList
                 items={items}
-                limit={drafts.data.limit}
+                limit={drafts.data.limits.needsReview}
                 canGeneratePrompt={drafts.data.canGeneratePrompt}
                 renderControls={(d) => ({
                   leading: (

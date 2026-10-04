@@ -82,10 +82,14 @@ export const accounts = pgTable("accounts", {
   promotionRatioPercent: smallint("promotion_ratio_percent").notNull().default(PROMOTION_RATIO_DEFAULT),
   // プロンプトで作る件数（specs/003-prompt-bulk-register data-model.md、research.md R11）
   promptPostCount: smallint("prompt_post_count").notNull().default(PROMPT_COUNT_DEFAULT),
+  // 投稿ルール（CORE RULES。specs/004-review-approval data-model.md、research.md R11）
+  coreRules: text("core_rules").notNull().default(""),
+  coreRulesVersion: integer("core_rules_version").notNull().default(1),
   ...timestamps,
 }, (t) => [
   check("accounts_promotion_ratio_range", sql`${t.promotionRatioPercent} BETWEEN 0 AND 100`),
   check("accounts_prompt_post_count_range", sql`${t.promptPostCount} BETWEEN 1 AND 50`),
+  check("accounts_core_rules_length", sql`char_length(${t.coreRules}) <= 2000`),
 ]);
 
 /** User と Account の関係（data-model.md の memberships）。1つのAccountに owner は1人だけ。 */
@@ -342,8 +346,8 @@ export const researchKeywords = pgTable(
 
 // ---- 投稿ストック（specs/003-prompt-bulk-register/data-model.md）----
 
-/** 下書きの状態の列挙型（post_draft_status）。003では要確認だけ。004で approved・rejected を足す。 */
-export const postDraftStatus = pgEnum("post_draft_status", ["needs_review"]);
+/** 下書きの状態の列挙型（post_draft_status）。要確認・承認済み・却下（004で approved・rejected を足した）。 */
+export const postDraftStatus = pgEnum("post_draft_status", ["needs_review", "approved", "rejected"]);
 
 /** 登録のまとまり（data-model.md の draft_batches）。貼り付けの1回の送信。 */
 export const draftBatches = pgTable(
@@ -381,12 +385,46 @@ export const postDrafts = pgTable(
     body: text("body").notNull(),
     status: postDraftStatus("status").notNull().default("needs_review"),
     version: versionColumn(),
+    // 承認・却下の記録（specs/004-review-approval data-model.md、research.md R1）
+    reviewedAt: timestamp("reviewed_at", { withTimezone: true, precision: 6 }),
+    rejectReasons: text("reject_reasons").array(),
+    rejectNote: text("reject_note"),
     ...timestamps,
   },
   (t) => [
     uniqueIndex("post_drafts_batch_position_unique").on(t.batchId, t.position),
-    index("post_drafts_account_status_idx").on(t.accountId, t.status),
+    index("post_drafts_account_status_reviewed_idx").on(t.accountId, t.status, t.reviewedAt.desc()),
     check("post_drafts_position_range", sql`${t.position} >= 0 AND ${t.position} < 50`),
     check("post_drafts_body_length", sql`char_length(${t.body}) BETWEEN 1 AND 2000`),
+    check("post_drafts_reject_note_length", sql`char_length(${t.rejectNote}) <= 200`),
+    // 状態は status::text で比べる（ADD VALUE で足した値は、同じトランザクションの中で列挙型として使えないため）。
+    // NULL との比較は CHECK を通ってしまうので、coalesce で必ず真か偽にする（理由のない却下を入れない。原則II）
+    check(
+      "post_drafts_review_state",
+      sql`(${t.status}::text = 'needs_review' AND ${t.reviewedAt} IS NULL AND ${t.rejectReasons} IS NULL AND ${t.rejectNote} IS NULL)
+        OR (${t.status}::text = 'approved' AND ${t.reviewedAt} IS NOT NULL AND ${t.rejectReasons} IS NULL AND ${t.rejectNote} IS NULL)
+        OR (${t.status}::text = 'rejected' AND ${t.reviewedAt} IS NOT NULL
+          AND (coalesce(cardinality(${t.rejectReasons}), 0) >= 1 OR coalesce(btrim(${t.rejectNote}), '') <> ''))`,
+    ),
+  ],
+);
+
+/** NGワード（specs/004-review-approval data-model.md の ng_words）。 */
+export const ngWords = pgTable(
+  "ng_words",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    accountId: uuid("account_id")
+      .notNull()
+      .references(() => accounts.id, { onDelete: "cascade" }),
+    // 入力のまま（前後の空白を除く）。画面とプロンプトに出す
+    word: text("word").notNull(),
+    // 照合と重複の判定に使う値（normalizeNgWord。research.md R4）
+    normalized: text("normalized").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true, precision: 6 }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("ng_words_account_normalized_unique").on(t.accountId, t.normalized),
+    check("ng_words_word_length", sql`char_length(${t.word}) BETWEEN 1 AND 50`),
   ],
 );

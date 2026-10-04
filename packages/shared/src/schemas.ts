@@ -13,7 +13,13 @@ import {
   DRAFT_BODY_MAX,
   PROMPT_COUNT_MAX,
   PROMPT_COUNT_MIN,
+  CORE_RULES_MAX,
+  NG_WORD_LIMIT,
+  NG_WORD_MAX,
+  REJECT_NOTE_MAX,
+  REVIEW_MAX_ITEMS,
 } from "./limits";
+import { REJECT_REASON_CODES } from "./review";
 import { isValidYmd } from "./promotions";
 import { PLANS } from "./plans";
 import { STRATEGY_TEXT_KEYS, TONE_PRESET_VALUES, type StrategyTextKey } from "./strategy";
@@ -296,8 +302,13 @@ export type ProfileStatus = z.infer<typeof profileStatusSchema>;
 
 // ---- 投稿ストック（specs/003-prompt-bulk-register contracts/api.md）----
 
-/** 下書きの状態のスキーマ。003では要確認だけ（004で approved・rejected を足す）。 */
-export const postDraftStatusSchema = z.enum(["needs_review"]);
+/** 下書きの状態のスキーマ（要確認・承認済み・却下。specs/004-review-approval data-model.md）。 */
+export const postDraftStatusSchema = z.enum(["needs_review", "approved", "rejected"]);
+/** 下書きの状態。 */
+export type PostDraftStatus = z.infer<typeof postDraftStatusSchema>;
+
+/** 却下理由の候補のコードのスキーマ（004 research.md R10）。 */
+export const rejectReasonCodeSchema = z.enum(REJECT_REASON_CODES);
 
 /** 下書き（レスポンス）のスキーマ。 */
 export const postDraftSchema = z.object({
@@ -308,16 +319,51 @@ export const postDraftSchema = z.object({
   body: z.string(),
   status: postDraftStatusSchema,
   version: z.number().int(),
+  /** 承認・却下した日時（ISO 8601）。要確認では null */
+  reviewedAt: z.string().nullable(),
+  /** 選んだ却下理由の候補。却下でないときは [] */
+  rejectReasons: z.array(rejectReasonCodeSchema),
+  /** 却下理由の自由記述 */
+  rejectNote: z.string().nullable(),
   createdAt: z.string(),
   updatedAt: z.string(),
 });
 /** 下書き（レスポンス）。 */
 export type PostDraft = z.infer<typeof postDraftSchema>;
 
-/** GET /post-drafts のレスポンスのスキーマ。 */
+/** 状態ごとの下書きの件数のスキーマ（GET /post-drafts/counts）。 */
+export const draftCountsSchema = z.object({
+  needsReview: z.number().int(),
+  approved: z.number().int(),
+  rejected: z.number().int(),
+});
+/** 状態ごとの下書きの件数。 */
+export type DraftCounts = z.infer<typeof draftCountsSchema>;
+
+/** NGワードのスキーマ（004 contracts/api.md）。 */
+export const ngWordSchema = z.object({
+  id: z.string(),
+  /** 入力のまま */
+  word: z.string(),
+  /** 照合に使う値（normalizeNgWord） */
+  normalized: z.string(),
+  createdAt: z.string(),
+});
+/** NGワード。 */
+export type NgWord = z.infer<typeof ngWordSchema>;
+
+/** GET /post-drafts のレスポンスのスキーマ（004で3つの状態を返す形にした）。 */
 export const postDraftListSchema = z.object({
-  items: z.array(postDraftSchema),
-  limit: z.number().int(),
+  /** 登録のまとまりの新しい順 → position の昇順 */
+  needsReview: z.array(postDraftSchema),
+  /** reviewedAt の新しい順 */
+  approved: z.array(postDraftSchema),
+  /** reviewedAt の新しい順に最大500件 */
+  rejected: z.array(postDraftSchema),
+  counts: draftCountsSchema,
+  limits: z.object({ needsReview: z.number().int(), approved: z.number().int() }),
+  /** そのAccountのNGワード（古い順） */
+  ngWords: z.array(ngWordSchema),
   /** そのAccountで、プロンプトの生成（grower機能）を使えるか */
   canGeneratePrompt: z.boolean(),
   /** 保存済みの作る件数 */
@@ -353,6 +399,63 @@ export const updatePostDraftRequestSchema = z.object({
   expectedVersion: z.number().int().positive(),
 });
 
+/** PUT /post-drafts/:id のレスポンスのスキーマ。承認済みを保存すると reopened: true で要確認に戻る。 */
+export const updatePostDraftResponseSchema = z.object({ draft: postDraftSchema, reopened: z.boolean() });
+
+/** POST /post-drafts/review のリクエストのスキーマ（004 contracts/api.md、research.md R2）。 */
+export const reviewRequestSchema = z
+  .object({
+    action: z.enum(["approve", "reject", "reopen"]),
+    items: z
+      .array(z.object({ id: z.string().uuid(), expectedVersion: z.number().int().positive() }))
+      .min(1)
+      .max(REVIEW_MAX_ITEMS),
+    confirmPolicyCaution: z.boolean().optional(),
+    reject: z
+      .object({
+        reasons: z.array(rejectReasonCodeSchema),
+        note: textMax(REJECT_NOTE_MAX).default(""),
+      })
+      .optional(),
+  })
+  .superRefine((v, ctx) => {
+    if (new Set(v.items.map((i) => i.id)).size !== v.items.length) {
+      ctx.addIssue({ code: "custom", path: ["items"], message: "duplicate id" });
+    }
+    if (v.action !== "reject") {
+      if (v.reject) ctx.addIssue({ code: "custom", path: ["reject"], message: "only for reject" });
+      return;
+    }
+    if (!v.reject || (v.reject.reasons.length === 0 && isBlank(v.reject.note))) {
+      ctx.addIssue({ code: "custom", path: ["reject"], message: "reason required" });
+    } else if (new Set(v.reject.reasons).size !== v.reject.reasons.length) {
+      ctx.addIssue({ code: "custom", path: ["reject"], message: "duplicate reason" });
+    }
+  });
+/** POST /post-drafts/review のリクエスト。 */
+export type ReviewRequest = z.infer<typeof reviewRequestSchema>;
+
+/** 状態を変えなかった理由のスキーマ。 */
+export const skipReasonSchema = z.enum([
+  "NG_WORD",
+  "OVER_THREADS_LIMIT",
+  "POLICY_CONFIRM_REQUIRED",
+  "STALE",
+  "NOT_FOUND",
+  "LIMIT",
+]);
+/** 状態を変えなかった理由。 */
+export type SkipReason = z.infer<typeof skipReasonSchema>;
+
+/** POST /post-drafts/review のレスポンスのスキーマ。 */
+export const reviewResponseSchema = z.object({
+  updated: z.array(postDraftSchema),
+  skipped: z.array(z.object({ id: z.string(), reason: skipReasonSchema, latest: postDraftSchema.optional() })),
+  counts: draftCountsSchema,
+});
+/** POST /post-drafts/review のレスポンス。 */
+export type ReviewResponse = z.infer<typeof reviewResponseSchema>;
+
 /** POST /post-drafts/delete のリクエストのスキーマ。 */
 export const deletePostDraftsRequestSchema = z.object({
   ids: z.array(z.string().uuid()).min(1).max(500),
@@ -368,6 +471,12 @@ export const promptSummarySchema = z.object({
   referencePostCount: z.number().int(),
   recentDraftCount: z.number().int(),
   length: z.number().int(),
+  /** 含めた投稿ルールの行数（規約上のルールは数えない。004） */
+  coreRuleCount: z.number().int(),
+  /** 含めたNGワードの数（004） */
+  ngWordCount: z.number().int(),
+  /** 含めた却下の下書きの件数（004） */
+  rejectedCount: z.number().int(),
 });
 /** プロンプトに実際に含めた内容の要約。 */
 export type PromptSummary = z.infer<typeof promptSummarySchema>;
@@ -385,3 +494,47 @@ export type PromptResponse = z.infer<typeof promptResponseSchema>;
 export const promptSettingsSchema = z.object({
   postCount: z.number().int().min(PROMPT_COUNT_MIN).max(PROMPT_COUNT_MAX),
 });
+
+// ---- 投稿のルール（specs/004-review-approval contracts/api.md）----
+
+/** GET /posting-rules のレスポンスのスキーマ。 */
+export const postingRulesSchema = z.object({
+  ngWords: z.array(ngWordSchema),
+  ngWordLimit: z.number().int(),
+  coreRules: z.string(),
+  coreRulesVersion: z.number().int(),
+  /** 投稿ルールを編集できるか（grower機能） */
+  canEditCoreRules: z.boolean(),
+});
+/** GET /posting-rules のレスポンス。 */
+export type PostingRules = z.infer<typeof postingRulesSchema>;
+
+/** POST /ng-words のリクエストのスキーマ。空白だけの語はAPIで除く。 */
+export const addNgWordsRequestSchema = z.object({
+  words: z
+    .array(z.string().refine((s) => countChars(s.trim()) <= NG_WORD_MAX, { message: `max ${NG_WORD_MAX}` }))
+    .min(1)
+    .max(NG_WORD_LIMIT),
+});
+
+/** POST /ng-words のレスポンスのスキーマ。 */
+export const addNgWordsResponseSchema = z.object({
+  added: z.array(ngWordSchema),
+  /** すでにあった、または同じ送信の中で重なった語 */
+  duplicates: z.array(z.string()),
+  /** 要確認に戻した承認済みの下書きの件数 */
+  reopenedCount: z.number().int(),
+});
+/** POST /ng-words のレスポンス。 */
+export type AddNgWordsResponse = z.infer<typeof addNgWordsResponseSchema>;
+
+/** PUT /core-rules のリクエストのスキーマ。 */
+export const coreRulesRequestSchema = z.object({
+  text: textMax(CORE_RULES_MAX),
+  expectedVersion: z.number().int().positive(),
+});
+
+/** PUT /core-rules のレスポンス（と 409 の latest）のスキーマ。 */
+export const coreRulesResponseSchema = z.object({ coreRules: z.string(), coreRulesVersion: z.number().int() });
+/** PUT /core-rules のレスポンス。 */
+export type CoreRulesResponse = z.infer<typeof coreRulesResponseSchema>;

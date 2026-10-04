@@ -2,7 +2,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import type { AccountSummary, DraftBatchResult, PostDraft, PromptResponse } from "@threads-grower/shared";
+import type { AccountSummary, DraftBatchResult, PostDraft, PostDraftList, PromptResponse } from "@threads-grower/shared";
 import { createMemoryRouter, Link, Outlet, RouterProvider } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -53,7 +53,17 @@ function promptResponse(overrides: Partial<PromptResponse["summary"]> = {}, coun
   return {
     prompt: count === 30 ? PROMPT : `${count}件のプロンプト`,
     count,
-    summary: { strategyFilledCount: 11, promotionCount: 1, referencePostCount: 3, recentDraftCount: 0, length: 100, ...overrides },
+    summary: {
+      strategyFilledCount: 11,
+      promotionCount: 1,
+      referencePostCount: 3,
+      recentDraftCount: 0,
+      length: 100,
+      coreRuleCount: 0,
+      ngWordCount: 0,
+      rejectedCount: 0,
+      ...overrides,
+    },
   };
 }
 
@@ -65,6 +75,9 @@ function draft(overrides: Partial<PostDraft> = {}): PostDraft {
     body: "下書きの本文",
     status: "needs_review",
     version: 1,
+    reviewedAt: null,
+    rejectReasons: [],
+    rejectNote: null,
     createdAt: "2026-10-03T00:00:00.000Z",
     updatedAt: "2026-10-03T00:00:00.000Z",
     ...overrides,
@@ -75,8 +88,28 @@ function batchResult(drafts: PostDraft[], overrides: Partial<DraftBatchResult> =
   return { batchId: "b1", draftCount: drafts.length, delimiterFound: true, overLimitCount: 0, drafts, ...overrides };
 }
 
-function listResponse(overrides: { items?: PostDraft[]; canGeneratePrompt?: boolean; promptPostCount?: number } = {}) {
-  return { items: [], limit: 500, canGeneratePrompt: true, promptPostCount: 30, ...overrides };
+function listResponse(
+  overrides: {
+    items?: PostDraft[];
+    approved?: PostDraft[];
+    rejected?: PostDraft[];
+    ngWords?: PostDraftList["ngWords"];
+    canGeneratePrompt?: boolean;
+    promptPostCount?: number;
+  } = {},
+): PostDraftList {
+  const { items = [], approved = [], rejected = [], ngWords = [], ...rest } = overrides;
+  return {
+    needsReview: items,
+    approved,
+    rejected,
+    counts: { needsReview: items.length, approved: approved.length, rejected: rejected.length },
+    limits: { needsReview: 500, approved: 500 },
+    ngWords,
+    canGeneratePrompt: true,
+    promptPostCount: 30,
+    ...rest,
+  };
 }
 
 function renderPage(path = "/accounts/a1/stock") {
@@ -317,7 +350,7 @@ describe("貼り付け欄（US2）", () => {
   it("削除の確定を待っている間に送ると、先に削除を確定してから登録する（Codexレビュー）", async () => {
     const user = userEvent.setup();
     const items = [draft({ id: "d1", body: "1件目" }), draft({ id: "d2", position: 1, body: "2件目" })];
-    listPostDrafts.mockResolvedValue({ ...listResponse({ items }), limit: 2 });
+    listPostDrafts.mockResolvedValue({ ...listResponse({ items }), limits: { needsReview: 2, approved: 500 } });
     deletePostDrafts.mockResolvedValue({ deletedCount: 1 });
     createDraftBatch.mockResolvedValue(batchResult([draft({ id: "d3", body: "新しい" })]));
     renderPage();
@@ -403,7 +436,7 @@ describe("貼り付け欄（US2）", () => {
 
   it("要確認が上限に達していると、一覧の上に案内が出て送るボタンが無効になる", async () => {
     const user = userEvent.setup();
-    listPostDrafts.mockResolvedValue({ ...listResponse({ items: [draft()] }), limit: 1 });
+    listPostDrafts.mockResolvedValue({ ...listResponse({ items: [draft()] }), limits: { needsReview: 1, approved: 500 } });
     renderPage();
     expect(await screen.findByText(/要確認の下書きが上限（500件）に達しています/)).toBeInTheDocument();
     await paste(user, "A");
@@ -562,7 +595,7 @@ describe("下書きの確認・修正・削除（US3）", () => {
     updatePostDraft.mockImplementation(async (_a: string, id: string, req: { body: string }) => {
       const updated = { ...items[0]!, id, body: req.body, version: 2 };
       listPostDrafts.mockResolvedValue(listResponse({ items: [updated, items[1]!, items[2]!] }));
-      return updated;
+      return { draft: updated, reopened: false };
     });
     renderPage();
     await user.click(await screen.findByRole("button", { name: "「1件目の下書き」の操作" }));

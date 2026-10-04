@@ -38,8 +38,9 @@ export function DraftEditDialog({
     // 下書きの操作は全プランで使える（research.md R10）ので、403 は起きない
     onGrowerLost: () => {},
     onDeletedElsewhere,
-    save: (form, expectedVersion) =>
-      api.updatePostDraft(accountId, item.id, { body: form.body, expectedVersion: expectedVersion ?? item.version }),
+    save: async (form, expectedVersion) =>
+      (await api.updatePostDraft(accountId, item.id, { body: form.body, expectedVersion: expectedVersion ?? item.version }))
+        .draft,
   });
   const { form, setField, errors } = f;
 

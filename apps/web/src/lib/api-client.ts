@@ -6,7 +6,12 @@ import {
   deleteCountSchema,
   draftBatchResultSchema,
   postDraftListSchema,
-  postDraftSchema,
+  addNgWordsResponseSchema,
+  coreRulesResponseSchema,
+  draftCountsSchema,
+  postingRulesSchema,
+  reviewResponseSchema,
+  updatePostDraftResponseSchema,
   promptResponseSchema,
   promptSettingsSchema,
   dataDeletionStatusSchema,
@@ -23,6 +28,7 @@ import {
   researchKeywordSchema,
   strategySchema,
   type ConnectRequest,
+  type ReviewRequest,
   type PromotionInput,
   type PutStrategyRequest,
   type ReferencePostInput,
@@ -176,7 +182,7 @@ export const api = {
   deleteDraftBatch: (accountId: string, batchId: string) =>
     request(`/api/accounts/${accountId}/draft-batches/${batchId}`, deleteCountSchema, { method: "DELETE" }),
   updatePostDraft: (accountId: string, id: string, body: { body: string; expectedVersion: number }) =>
-    request(`/api/accounts/${accountId}/post-drafts/${id}`, postDraftSchema, {
+    request(`/api/accounts/${accountId}/post-drafts/${id}`, updatePostDraftResponseSchema, {
       method: "PUT",
       body: JSON.stringify(body),
     }),
@@ -184,6 +190,26 @@ export const api = {
     request(`/api/accounts/${accountId}/post-drafts/delete`, deleteCountSchema, {
       method: "POST",
       body: JSON.stringify({ ids }),
+    }),
+  // ---- 承認・却下・投稿のルール（specs/004-review-approval contracts/api.md）----
+  getDraftCounts: (accountId: string) => request(`/api/accounts/${accountId}/post-drafts/counts`, draftCountsSchema),
+  reviewPostDrafts: (accountId: string, body: ReviewRequest) =>
+    request(`/api/accounts/${accountId}/post-drafts/review`, reviewResponseSchema, {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+  getPostingRules: (accountId: string) => request(`/api/accounts/${accountId}/posting-rules`, postingRulesSchema),
+  addNgWords: (accountId: string, words: string[]) =>
+    request(`/api/accounts/${accountId}/ng-words`, addNgWordsResponseSchema, {
+      method: "POST",
+      body: JSON.stringify({ words }),
+    }),
+  deleteNgWord: (accountId: string, id: string) =>
+    request(`/api/accounts/${accountId}/ng-words/${id}`, null, { method: "DELETE" }),
+  putCoreRules: (accountId: string, body: { text: string; expectedVersion: number }) =>
+    request(`/api/accounts/${accountId}/core-rules`, coreRulesResponseSchema, {
+      method: "PUT",
+      body: JSON.stringify(body),
     }),
   dataDeletionStatus: (code: string) =>
     request(`/api/data-deletion/${encodeURIComponent(code)}`, dataDeletionStatusSchema, { auth: false }),

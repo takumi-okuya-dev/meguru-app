@@ -123,7 +123,7 @@ describe("プランと権限", () => {
     expect(put.status).toBe(403);
     const drafts = await call(app, "GET", `${base(accountId)}/post-drafts`, { user: "u1" });
     expect(drafts.status).toBe(200);
-    expect(await drafts.json()).toMatchObject({ items: [], limit: 500, canGeneratePrompt: false, promptPostCount: 30 });
+    expect(await drafts.json()).toMatchObject({ needsReview: [], limits: { needsReview: 500 }, canGeneratePrompt: false, promptPostCount: 30 });
   });
 
   it("無料体験の後でもプラン2なら使える", async () => {

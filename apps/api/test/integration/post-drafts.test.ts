@@ -27,7 +27,7 @@ async function register(accountId: string, text: string, user = "u1") {
 async function list(accountId: string, user = "u1") {
   const res = await call(app, "GET", `${base(accountId)}/post-drafts`, { user });
   expect(res.status).toBe(200);
-  return (await res.json()) as { items: PostDraft[]; limit: number };
+  return (await res.json()) as { needsReview: PostDraft[]; limits: { needsReview: number; approved: number } };
 }
 
 /** 要確認の下書きを n 件、SQL で直接作る（49件ずつのまとまり） */
@@ -141,9 +141,9 @@ describe("GET /post-drafts（一覧）", () => {
     const { accountId } = await createUserWithAccount("u1");
     await register(accountId, "1-A\n@@@\n1-B");
     await register(accountId, "2-A\n@@@\n2-B\n@@@\n2-C");
-    const { items, limit } = await list(accountId);
-    expect(items.map((d) => d.body)).toEqual(["2-A", "2-B", "2-C", "1-A", "1-B"]);
-    expect(limit).toBe(500);
+    const { needsReview, limits } = await list(accountId);
+    expect(needsReview.map((d) => d.body)).toEqual(["2-A", "2-B", "2-C", "1-A", "1-B"]);
+    expect(limits).toEqual({ needsReview: 500, approved: 500 });
   });
 });
 
@@ -155,7 +155,7 @@ describe("DELETE /draft-batches/:batchId（取り消し）", () => {
     const res = await call(app, "DELETE", `${base(accountId)}/draft-batches/${r.batchId}`, { user: "u1" });
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ deletedCount: 2 });
-    expect((await list(accountId)).items.map((d) => d.body)).toEqual(["残す"]);
+    expect((await list(accountId)).needsReview.map((d) => d.body)).toEqual(["残す"]);
     const again = await call(app, "DELETE", `${base(accountId)}/draft-batches/${r.batchId}`, { user: "u1" });
     expect(await again.json()).toEqual({ deletedCount: 0 });
   });
@@ -230,7 +230,7 @@ describe("POST /post-drafts/delete（まとめての削除）", () => {
     });
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ deletedCount: 2 });
-    expect((await list(accountId)).items.map((d) => d.body)).toEqual(["B"]);
+    expect((await list(accountId)).needsReview.map((d) => d.body)).toEqual(["B"]);
     expect(await countRows(other.accountId)).toBe(1);
   });
 

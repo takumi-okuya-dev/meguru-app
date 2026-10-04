@@ -64,7 +64,7 @@ description: "重複検知・承認/却下・NGワード（CORE RULES）の実�
 
 ### 共通パッケージ
 
-- [ ] T001 [P] 共通の判定のテストを書く（失敗を確認する）。
+- [X] T001 [P] 共通の判定のテストを書く（失敗を確認する）。
   - `packages/shared/test/normalize.test.ts`：
     - `normalizeForMatch`が1文字ずつNFKC → 小文字にすること（「ＡＢＣ」→「abc」、「ｱｲ」→「アイ」、「ア」はそのまま、「あ」はカタカナにならない）
     - 正規化した位置から元の位置への対応表が、「㌔」（→「キロ」）や絵文字（サロゲートペア）の前後でも正しいこと
@@ -75,27 +75,27 @@ description: "重複検知・承認/却下・NGワード（CORE RULES）の実�
   - `packages/shared/test/review.test.ts`：
     - `checkPublishable`：NGワードを含む・Threadsの上限を超える（501文字、リンク6個）・どちらもない、の3通りの結果
     - `REJECT_REASONS`の6つのコードと表示名がresearch.md R10の表のとおりであること
-- [ ] T002 [P] `packages/shared/src/normalize.ts`に`normalizeForMatch(text: string): { normalized: string; toOriginal: number[] }`を作る（research.md R4）。
+- [X] T002 [P] `packages/shared/src/normalize.ts`に`normalizeForMatch(text: string): { normalized: string; toOriginal: number[] }`を作る（research.md R4）。
   - 元の文字列をコードポイントごとに`String.prototype.normalize("NFKC")`→`toLowerCase()`にかけてつなぐ。
   - `toOriginal[i]`は、正規化した文字列のUTF-16の位置`i`が、元の文字列のどのUTF-16の位置から来たかを表す。最後に、元の長さを1つ足す。
   - 範囲を元の位置に戻す`toOriginalRange(map, start, end): [number, number]`も作る。
-- [ ] T003 `packages/shared/src/ng-words.ts`に次の2つを作る（T002の後。research.md R4、FR-015・FR-016）。
+- [X] T003 `packages/shared/src/ng-words.ts`に次の2つを作る（T002の後。research.md R4、FR-015・FR-016）。
   - `normalizeNgWord(word: string): string`：前後の空白を除いてから、`normalizeForMatch`の`normalized`を返す。
   - `findNgWords(body: string, ngWords: { word: string; normalized: string }[]): { word: string; ranges: [number, number][] }[]`
     - 照合は`normalizeForMatch(body).normalized`への部分文字列の検索（`indexOf`の繰り返し）。正規表現は使わない。
     - 範囲は、元の本文のUTF-16の位置で返す。
-- [ ] T004 `packages/shared/src/review.ts`に次を作る（research.md R10・R14）。
+- [X] T004 `packages/shared/src/review.ts`に次を作る（research.md R10・R14）。
   - `REJECT_REASONS`：`[{ code: "similar", label: "似た投稿がある" }, { code: "tone", label: "トーンが違う" }, { code: "thin", label: "内容が薄い" }, { code: "inaccurate", label: "事実と違う" }, { code: "too_promotional", label: "宣伝っぽすぎる" }, { code: "policy", label: "規約に触れそう" }]`
   - `REJECT_REASON_CODES`と`rejectReasonLabel(code)`
   - `checkPublishable(body, ngWords)`。返す値は`{ ngWords: ReturnType<typeof findNgWords>; overThreadsLimit: boolean; policyCautions: [] }`と、`approvable`（NGワードなし、かつ上限内）
     - `policyCautions`はUS5（T055）で中身を入れる。それまでは空の配列を返す。
-- [ ] T005 `packages/shared/src/limits.ts`に、次の上限を足す。
+- [X] T005 `packages/shared/src/limits.ts`に、次の上限を足す。
   - `APPROVED_LIMIT = 500`、`REJECTED_LIST_MAX = 500`、`REVIEW_MAX_ITEMS = 500`
   - `NG_WORD_LIMIT = 200`、`NG_WORD_MAX = 50`
   - `CORE_RULES_MAX = 2000`、`REJECT_NOTE_MAX = 200`
   - `PROMPT_REJECTED_DRAFTS = 10`
   - `SIMILARITY_THRESHOLD = 80`、`SIMILARITY_MIN_LENGTH = 10`、`SIMILARITY_TOP_MATCHES = 3`、`SIMILARITY_EDIT_DISTANCE_MAX_LENGTH = 300`
-- [ ] T006 `packages/shared/src/schemas.ts`に、contracts/api.mdの型のスキーマを足す・変える。`packages/shared/src/index.ts`から`normalize`・`ng-words`・`review`をexportする。
+- [X] T006 `packages/shared/src/schemas.ts`に、contracts/api.mdの型のスキーマを足す・変える。`packages/shared/src/index.ts`から`normalize`・`ng-words`・`review`をexportする。
   - **下書き**：
     - `postDraftStatusSchema`を`z.enum(["needs_review", "approved", "rejected"])`にする
     - `rejectReasonCodeSchema`（`REJECT_REASON_CODES`）を足す
@@ -122,7 +122,7 @@ description: "重複検知・承認/却下・NGワード（CORE RULES）の実�
 
 ### DB
 
-- [ ] T007 `apps/api/src/db/schema.ts`を、data-model.mdのとおりに変える。
+- [X] T007 `apps/api/src/db/schema.ts`を、data-model.mdのとおりに変える。
   - **列挙型**：`postDraftStatus`を`["needs_review", "approved", "rejected"]`にする
   - **`accounts`**：
     - `core_rules`（text、NOT NULL、既定値`''`、CHECK `char_length(core_rules) <= 2000`）
@@ -143,7 +143,7 @@ description: "重複検知・承認/却下・NGワード（CORE RULES）の実�
     - `normalized`（text、NOT NULL）
     - `created_at`（timestamptz、NOT NULL）
     - 一意制約`(account_id, normalized)`
-- [ ] T008 `pnpm --filter api db:generate --name review_approval`で`apps/api/drizzle/0003_review_approval.sql`を作り、ローカルDBに当てる。
+- [X] T008 `pnpm --filter api db:generate --name review_approval`で`apps/api/drizzle/0003_review_approval.sql`を作り、ローカルDBに当てる。
   - 生成されたSQLを確かめ、列挙型の値の追加が`ALTER TYPE "public"."post_draft_status" ADD VALUE 'approved'`・`'rejected'`になっていることを確かめる。drizzleが型を作り直す形で出した場合は、手で`ADD VALUE`に直す。追加した値は、同じマイグレーションの中で列挙型として使わない（data-model.md）。
   - 生成されたSQLのCHECK制約が、状態を`status::text`で比べていることを確かめる。
   - 003の下書きが残ったDBと空のDBの両方に、`db:migrate`を1回で当てられることを確かめる。
@@ -152,7 +152,7 @@ description: "重複検知・承認/却下・NGワード（CORE RULES）の実�
 
 ### 一覧のAPIの新しい形
 
-- [ ] T009 `apps/api/src/services/draft-service.ts`を変える（research.md R9）。
+- [X] T009 `apps/api/src/services/draft-service.ts`を変える（research.md R9）。
   - `toPostDraft`に`reviewedAt`（ISO 8601またはnull）・`rejectReasons`（NULLなら`[]`）・`rejectNote`を足す。
   - `listAllDrafts(db, accountId)`を足し、次の4つを`Promise.all`で取得して返す。
     - 要確認：003の並び
@@ -161,8 +161,8 @@ description: "重複検知・承認/却下・NGワード（CORE RULES）の実�
     - 件数：状態ごとの`count`
   - `countDrafts(db, accountId)`も足す。
   - そのAccountの`ng_words`を古い順に読む`listNgWords(db, accountId)`を、`apps/api/src/services/posting-rules-service.ts`（新規）に作る。
-- [ ] T010 `apps/api/src/routes/post-drafts.ts`の`GET /post-drafts`を、contracts/api.mdの新しい形（`needsReview`・`approved`・`rejected`・`counts`・`limits`・`ngWords`・`canGeneratePrompt`・`promptPostCount`）にする。`GET /api/accounts/:accountId/post-drafts/counts`も足す。`apps/api/test/integration/post-drafts.test.ts`の一覧のテストを、新しい形に直す。
-- [ ] T011 Webを新しい形に追従させる。
+- [X] T010 `apps/api/src/routes/post-drafts.ts`の`GET /post-drafts`を、contracts/api.mdの新しい形（`needsReview`・`approved`・`rejected`・`counts`・`limits`・`ngWords`・`canGeneratePrompt`・`promptPostCount`）にする。`GET /api/accounts/:accountId/post-drafts/counts`も足す。`apps/api/test/integration/post-drafts.test.ts`の一覧のテストを、新しい形に直す。
+- [X] T011 Webを新しい形に追従させる。
   - `apps/web/src/lib/api-client.ts`の`listPostDrafts`のスキーマを変え、本featureの呼び出しを足す。
     - `getDraftCounts`、`reviewPostDrafts`、`getPostingRules`、`addNgWords`、`deleteNgWord`、`putCoreRules`
     - `updatePostDraft`の戻り値を`{ draft, reopened }`にする

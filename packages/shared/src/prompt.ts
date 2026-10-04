@@ -235,6 +235,9 @@ export function buildPrompt(input: PromptInput): { prompt: string; summary: Prom
       referencePostCount: posts.length,
       recentDraftCount: drafts.length,
       length,
+      coreRuleCount: 0,
+      ngWordCount: 0,
+      rejectedCount: 0,
     },
   };
 }
