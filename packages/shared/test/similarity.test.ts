@@ -81,3 +81,26 @@ describe("類似度（specs/004-review-approval FR-026、research.md R8、SC-003
     expect(score(replaceAt(base, 500), base)).toBeGreaterThanOrEqual(80);
   });
 });
+
+describe("類似度の計算の速さ（research.md R8、plan.md 性能目標）", () => {
+  // 遅い環境（CI）で不安定になる場合は、上限を2倍にして注記する
+  const time = (targets: number, others: number, length: number) => {
+    const ts = Array.from({ length: targets }, (_, i) => ({ id: `t${i}`, body: text(length, i + 1) }));
+    const os = [...ts, ...Array.from({ length: others - targets }, (_, i) => ({ id: `o${i}`, body: text(length, 10_000 + i) }))];
+    const start = Date.now();
+    computeSimilarities(ts, os);
+    return Date.now() - start;
+  };
+
+  it("150文字・要確認30件 × 全体300件：100ms以内", () => {
+    expect(time(30, 300, 150)).toBeLessThan(100);
+  });
+
+  it("150文字・要確認500件 × 全体1,500件：1,000ms以内", () => {
+    expect(time(500, 1500, 150)).toBeLessThan(1000);
+  });
+
+  it("2,000文字・要確認50件 × 全体500件：1,000ms以内（長い組は編集距離を省く）", () => {
+    expect(time(50, 500, 2000)).toBeLessThan(1000);
+  });
+});

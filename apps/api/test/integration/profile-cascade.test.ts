@@ -1,9 +1,10 @@
-// Accountの削除で戦略プロファイルと投稿ストックも消える（specs/002-strategy-profile FR-026、specs/003-prompt-bulk-register FR-026）
+// Accountの削除で戦略プロファイルと投稿ストック・投稿のルールも消える（specs/002 FR-026、specs/003 FR-026、specs/004 FR-036）
 import { emptyStrategyValues } from "@threads-grower/shared";
 import { beforeEach, describe, expect, it } from "vitest";
 import {
   accounts,
   draftBatches,
+  ngWords,
   postDrafts,
   promotions,
   referencePosts,
@@ -22,7 +23,10 @@ beforeEach(async () => {
   await fake.addUser("1001", "takumi");
 });
 
-/** 課題・宣伝内容・参考投稿・キーワード・登録のまとまり・下書きを1件ずつ持つ Account を作る */
+/**
+ * 課題・宣伝内容・参考投稿・キーワード・登録のまとまりを1件ずつ、下書きを3件（要確認・承認済み・却下）、
+ * NGワード・投稿ルールを持つ Account を作る（004 FR-036）
+ */
 async function accountWithProfile() {
   await connectNew(app, "u1", "1001");
   const [a] = await db().select().from(accounts);
@@ -34,15 +38,30 @@ async function accountWithProfile() {
   await call(app, "POST", `${base}/promotions`, { user: "u1", body: { title: "t", content: "c" } });
   await call(app, "POST", `${base}/reference-posts`, { user: "u1", body: { body: "本文" } });
   await call(app, "POST", `${base}/research-keywords`, { user: "u1", body: { keyword: "AI" } });
-  await call(app, "POST", `${base}/draft-batches`, { user: "u1", body: { clientRequestId: crypto.randomUUID(), text: "下書き" } });
-  for (const t of [strategyDesigns, promotions, referencePosts, researchKeywords, draftBatches, postDrafts]) {
+  const reg = await call(app, "POST", `${base}/draft-batches`, {
+    user: "u1",
+    body: { clientRequestId: crypto.randomUUID(), text: "下書き\n@@@\n承認\n@@@\n却下" },
+  });
+  const [, approved, rejected] = ((await reg.json()) as { drafts: { id: string }[] }).drafts;
+  await call(app, "POST", `${base}/post-drafts/review`, {
+    user: "u1",
+    body: { action: "approve", items: [{ id: approved!.id, expectedVersion: 1 }] },
+  });
+  await call(app, "POST", `${base}/post-drafts/review`, {
+    user: "u1",
+    body: { action: "reject", items: [{ id: rejected!.id, expectedVersion: 1 }], reject: { reasons: ["tone"], note: "" } },
+  });
+  await call(app, "POST", `${base}/ng-words`, { user: "u1", body: { words: ["絶対"] } });
+  await call(app, "PUT", `${base}/core-rules`, { user: "u1", body: { text: "断定口調は使わない", expectedVersion: 1 } });
+  for (const t of [strategyDesigns, promotions, referencePosts, researchKeywords, draftBatches, ngWords]) {
     expect(await db().select().from(t)).toHaveLength(1);
   }
+  expect((await db().select().from(postDrafts)).map((d) => d.status).sort()).toEqual(["approved", "needs_review", "rejected"]);
   return a!;
 }
 
 async function expectProfileGone() {
-  for (const t of [strategyDesigns, promotions, referencePosts, researchKeywords, draftBatches, postDrafts]) {
+  for (const t of [strategyDesigns, promotions, referencePosts, researchKeywords, draftBatches, postDrafts, ngWords]) {
     expect(await db().select().from(t)).toHaveLength(0);
   }
 }

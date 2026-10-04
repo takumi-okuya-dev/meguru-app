@@ -627,8 +627,8 @@ description: "重複検知・承認/却下・NGワード（CORE RULES）の実�
 
 **目的**：Account削除との関係、性能、全体の確認
 
-- [ ] T061 [P] `apps/api/test/integration/profile-cascade.test.ts`に足す（FR-036）。NGワード・投稿ルール・承認済み・却下の下書きを持つAccountを削除すると、`ng_words`・`post_drafts`の行がすべて消えることを確かめる。Account削除とMetaのデータ削除要求の両方で確かめる。
-- [ ] T062 [P] `packages/shared/test/similarity.test.ts`に、性能の確認を足す（research.md R8、plan.md 性能目標）。
+- [X] T061 [P] `apps/api/test/integration/profile-cascade.test.ts`に足す（FR-036）。NGワード・投稿ルール・承認済み・却下の下書きを持つAccountを削除すると、`ng_words`・`post_drafts`の行がすべて消えることを確かめる。Account削除とMetaのデータ削除要求の両方で確かめる。
+- [X] T062 [P] `packages/shared/test/similarity.test.ts`に、性能の確認を足す（research.md R8、plan.md 性能目標）。
   - 150文字前後のランダムな日本語の本文で、次の時間を測る。
     - 要確認30件 × 全体300件：100ms以内
     - 要確認500件 × 全体1,500件：1,000ms以内
