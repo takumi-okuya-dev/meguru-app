@@ -634,7 +634,7 @@ description: "重複検知・承認/却下・NGワード（CORE RULES）の実�
     - 要確認500件 × 全体1,500件：1,000ms以内
     - 2,000文字の要確認50件 × 全体500件：1,000ms以内
   - 遅い環境（CI）で不安定なら、上限を2倍にして注記する。超える場合は、T037の候補の絞り込み（上位5件・0.3）を見直す。
-- [ ] T063 `pnpm lint`・`pnpm typecheck`・`pnpm test`を通す。新しくexportした関数・コンポーネントすべてにJSDocを付ける。入力内容は文字として表示するだけにし、`dangerouslySetInnerHTML`は使わない（002 research.md R13）。
+- [X] T063 `pnpm lint`・`pnpm typecheck`・`pnpm test`を通す。新しくexportした関数・コンポーネントすべてにJSDocを付ける。入力内容は文字として表示するだけにし、`dangerouslySetInnerHTML`は使わない（002 research.md R13）。
 - [ ] T064 quickstart.mdの「手動の確認」1〜6を、`pnpm dev:fake`で375・768・1024・1440pxの4つの幅で行う。
   - 375pxで、次を確かめる。
     - 却下・承認のボタンが横幅いっぱいに2つ並ぶ
