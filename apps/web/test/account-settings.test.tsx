@@ -234,11 +234,35 @@ describe("投稿ルール（CORE RULES）のダイアログ（FR-019〜FR-021）
       rules({ coreRules: "断定口調は使わない", canEditCoreRules: false }),
     );
     const { section, dialog } = await openCoreRules();
-    expect(within(section).getByRole("button", { name: "見る", hidden: true })).toBeInTheDocument();
+    expect(within(section).getAllByRole("button", { name: "見る", hidden: true })).toHaveLength(2);
     expect(within(dialog).getByRole("textbox", { name: /投稿ルール/ })).toHaveAttribute("readonly");
     expect(
       within(dialog).getByText(/投稿ルールはAIプロンプトの生成（プラン2以上）で使われます/),
     ).toBeInTheDocument();
+    expect(within(dialog).queryByRole("button", { name: "保存" })).not.toBeInTheDocument();
+  });
+});
+
+describe("Threadsの規約への備え（FR-042・FR-043）", () => {
+  it("「見る」で規約上のルール6つ・4つの分類・版の日付が出て、編集の手段はない", async () => {
+    const user = userEvent.setup();
+    renderPage();
+    const section = await screen.findByRole("region", { name: "投稿のルール" });
+    await user.click(within(section).getAllByRole("button", { name: "見る" }).at(-1)!);
+    const dialog = await screen.findByRole("dialog", { name: "Threadsの規約への備え" });
+    expect(within(dialog).getAllByRole("listitem")).toHaveLength(6 + 4);
+    for (const label of [
+      "見返りでの反応集め",
+      "反応しないと見られない形",
+      "収益・成果の断定",
+      "健康・医療の効果",
+    ]) {
+      expect(within(dialog).getByText(label)).toBeInTheDocument();
+    }
+    expect(
+      within(dialog).getByText("2026-10-04時点のMetaコミュニティ規定をもとにしています"),
+    ).toBeInTheDocument();
+    expect(within(dialog).queryByRole("textbox")).not.toBeInTheDocument();
     expect(within(dialog).queryByRole("button", { name: "保存" })).not.toBeInTheDocument();
   });
 });

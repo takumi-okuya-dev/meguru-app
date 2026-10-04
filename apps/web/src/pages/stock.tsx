@@ -20,6 +20,7 @@ import {
   HighlightedBody,
   LabelRow,
   NgWordLabel,
+  PolicyCautionLabels,
   SimilarityLabel,
   highlightsOf,
 } from "@/components/stock/DraftLabels";
@@ -28,6 +29,7 @@ import { PasteComposer } from "@/components/stock/PasteComposer";
 import { PromptCard } from "@/components/stock/PromptCard";
 import { RejectDialog } from "@/components/stock/RejectDialog";
 import { REOPENED_BY_EDIT } from "@/components/stock/messages";
+import { PolicyConfirmDialog } from "@/components/stock/PolicyConfirmDialog";
 import { StatusTabs, useStatusTab } from "@/components/stock/StatusTabs";
 import { useDeferredDelete } from "@/components/stock/use-deferred-delete";
 import { useReview, type ReviewOptions } from "@/components/stock/use-review";
@@ -55,6 +57,10 @@ export function StockPage() {
   const [picked, setPicked] = useState<ReadonlySet<string>>(new Set());
   const [editing, setEditing] = useState<PostDraft | null>(null);
   const [rejecting, setRejecting] = useState<PostDraft[] | null>(null);
+  const [confirming, setConfirming] = useState<{
+    targets: PostDraft[];
+    cautious: PostDraft[];
+  } | null>(null);
   const [busy, setBusy] = useState(false);
   const { hidden, remove, flush } = useDeferredDelete(account.id);
   const { review } = useReview(account.id);
@@ -131,7 +137,16 @@ export function StockPage() {
     }
   };
 
-  const approve = (targets: PostDraft[]) => void runReview("approve", targets);
+  // 規約に注意の下書き（NGワード・上限で承認できないものは除く）があれば、承認の前に確認する（FR-040）
+  const cautionsOf = (d: PostDraft) => {
+    const c = checks.get(d.id);
+    return c && c.approvable ? c.policyCautions : [];
+  };
+  const approve = (targets: PostDraft[]) => {
+    const cautious = targets.filter((d) => cautionsOf(d).length > 0);
+    if (cautious.length > 0) setConfirming({ targets, cautious });
+    else void runReview("approve", targets);
+  };
   const reopen = (targets: PostDraft[]) => void runReview("reopen", targets);
 
   const changeTab = (value: string) => {
@@ -218,7 +233,9 @@ export function StockPage() {
     const check = checks.get(d.id) ?? checkPublishable(d.body, []);
     // NGワードのラベルは要確認だけ（承認済みには、NGワードの追加で要確認に戻るため残らない。FR-016・FR-016a）
     const showNg = d.status === "needs_review" && check.ngWords.length > 0;
-    const marks = highlightsOf(check).filter((m) => m.kind !== "ng" || showNg);
+    // 規約に注意は要確認・承認済みに出す（FR-039）
+    const showPolicy = d.status !== "rejected" && check.policyCautions.length > 0;
+    const marks = highlightsOf(check).filter((m) => (m.kind === "ng" ? showNg : showPolicy));
     return (
       <DraftCard
         key={d.id}
@@ -230,6 +247,13 @@ export function StockPage() {
           <LabelRow
             labels={[
               showNg && <NgWordLabel key="ng" check={check} />,
+              showPolicy && (
+                <PolicyCautionLabels
+                  key="policy"
+                  check={check}
+                  onReopen={d.status === "approved" ? () => reopen([d]) : undefined}
+                />
+              ),
               d.status === "needs_review" && (
                 <SimilarityLabel
                   key="similarity"
@@ -333,11 +357,29 @@ export function StockPage() {
           ngWords={data?.ngWords ?? []}
         />
       )}
+      {confirming && (
+        <PolicyConfirmDialog
+          bulk={confirming.targets.length > 1}
+          count={confirming.cautious.length}
+          labels={[
+            ...new Set(confirming.cautious.flatMap((d) => cautionsOf(d).map((c) => c.label))),
+          ]}
+          onConfirm={() => {
+            const { targets } = confirming;
+            setConfirming(null);
+            void runReview("approve", targets, { confirmPolicyCaution: true });
+          }}
+          onCancel={() => setConfirming(null)}
+        />
+      )}
       {rejecting && (
         <RejectDialog
           count={rejecting.length}
           // 似た投稿（80%以上）が1件でもあれば「似た投稿がある」を最初から選ぶ（FR-029）
-          initialReasons={rejecting.some(isSimilar) ? ["similar"] : []}
+          initialReasons={[
+            ...(rejecting.some(isSimilar) ? (["similar"] as const) : []),
+            ...(rejecting.some((d) => cautionsOf(d).length > 0) ? (["policy"] as const) : []),
+          ]}
           submitting={busy}
           onSubmit={(reject) => {
             const targets = rejecting;

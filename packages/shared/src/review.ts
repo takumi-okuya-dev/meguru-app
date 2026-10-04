@@ -1,6 +1,7 @@
 // 承認・却下の判定と却下理由（specs/004-review-approval research.md R10・R14）。
 // checkPublishable は承認のチェック（API）・ラベル（Web）・配信の直前のチェック（005）で同じものを使う。
 import { findNgWords, type NgWordForMatch, type NgWordHit } from "./ng-words";
+import { findPolicyCautions } from "./policy";
 import { isOverThreadsLimit } from "./threads-text";
 
 /** 却下理由の候補（コードと表示名）。コードをDBに保存し、表示とプロンプトでは表示名にする。 */
@@ -31,7 +32,7 @@ export function rejectReasonLabel(code: RejectReasonCode): string {
   return REJECT_REASONS.find((r) => r.code === code)!.label;
 }
 
-/** 「規約に注意」の照合の結果（US5で中身を入れる）。 */
+/** 「規約に注意」の照合の結果（FR-039）。ranges は元の本文の [開始, 終了)。 */
 export type PolicyCautionHit = {
   id: string;
   label: string;
@@ -62,7 +63,7 @@ export function checkPublishable(body: string, ngWords: NgWordForMatch[]): Publi
   return {
     ngWords: ng,
     overThreadsLimit,
-    policyCautions: [],
+    policyCautions: findPolicyCautions(body),
     approvable: ng.length === 0 && !overThreadsLimit,
   };
 }

@@ -256,3 +256,27 @@ describe("アクセス範囲・プラン（FR-033〜FR-035）", () => {
     expect(r.updated[0]!.status).toBe("approved");
   });
 });
+
+describe("規約に注意の確認（specs/004-review-approval FR-040、research.md R7）", () => {
+  it("規約に注意の下書きは、確認なし・false なら POLICY_CONFIRM_REQUIRED、true なら承認される", async () => {
+    const { accountId } = await createUserWithAccount("u1");
+    const [a, b] = await register(accountId, ["この投稿にいいねした人の中から抽選でプレゼント", "ふつうの投稿"]);
+    const none = await reviewOk(accountId, { action: "approve", items: items(a!) });
+    expect(none.skipped).toMatchObject([{ id: a!.id, reason: "POLICY_CONFIRM_REQUIRED" }]);
+    const no = await reviewOk(accountId, { action: "approve", items: items(a!), confirmPolicyCaution: false });
+    expect(no.skipped[0]!.reason).toBe("POLICY_CONFIRM_REQUIRED");
+    const yes = await reviewOk(accountId, { action: "approve", items: items(a!), confirmPolicyCaution: true });
+    expect(yes.updated[0]!.status).toBe("approved");
+    // 規約に注意でない下書きは、確認がなくても承認される
+    const plain = await reviewOk(accountId, { action: "approve", items: items(b!), confirmPolicyCaution: false });
+    expect(plain.updated[0]!.status).toBe("approved");
+  });
+
+  it("NGワードと規約に注意の両方に当たる下書きは、確認があっても NG_WORD", async () => {
+    const { accountId } = await createUserWithAccount("u1");
+    await addNgWord(accountId, "絶対");
+    const [a] = await register(accountId, ["絶対に誰でも必ず稼げる"]);
+    const r = await reviewOk(accountId, { action: "approve", items: items(a!), confirmPolicyCaution: true });
+    expect(r.skipped[0]!.reason).toBe("NG_WORD");
+  });
+});

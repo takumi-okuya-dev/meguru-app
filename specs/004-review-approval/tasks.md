@@ -565,17 +565,17 @@ description: "重複検知・承認/却下・NGワード（CORE RULES）の実�
 
 ### テスト（先に書いて失敗を確認する）
 
-- [ ] T051 [P] [US5] `packages/shared/test/policy.test.ts`を作る（quickstart.mdの表の「規約に注意」、SC-008）。
+- [X] T051 [P] [US5] `packages/shared/test/policy.test.ts`を作る（quickstart.mdの表の「規約に注意」、SC-008）。
   - [contracts/policy-cautions.md](./contracts/policy-cautions.md)の4分類の「当たる例」がすべて、その分類に当たる。
   - 「当たらない例」が、どの分類にも当たらない。
   - 全角・半角の揺れ（「ＤＭ」「１００％」）でも当たる。
   - 範囲が元の本文の位置で返る。
   - `checkPublishable`の`policyCautions`に結果が入るが、`approvable`は変わらない（承認は止めない）。
-- [ ] T052 [P] [US5] `apps/api/test/integration/review.test.ts`に足す。
+- [X] T052 [P] [US5] `apps/api/test/integration/review.test.ts`に足す。
   - 規約に注意の下書きの承認は、`confirmPolicyCaution`なし・`false`で`skipped: POLICY_CONFIRM_REQUIRED`になり、状態が変わらない。
   - `true`なら承認される。
   - 規約に注意でない下書きは、`false`でも承認される。
-- [ ] T053 [P] [US5] Web のテストを足す。
+- [X] T053 [P] [US5] Web のテストを足す。
   - `apps/web/test/stock.test.tsx`：
     - 規約に注意の下書きに「規約に注意：見返りでの反応集め」が出て、該当箇所が強調される
     - ラベルを押すと、関わる規約の名前・リンクと言い換えの方向が出る
@@ -590,28 +590,28 @@ description: "重複検知・承認/却下・NGワード（CORE RULES）の実�
 
 ### 実装
 
-- [ ] T054 [US5] `packages/shared/src/policy.ts`に、`POLICY_CAUTIONS`と`findPolicyCautions(body)`を足す（research.md R7、[contracts/policy-cautions.md](./contracts/policy-cautions.md)）。
+- [X] T054 [US5] `packages/shared/src/policy.ts`に、`POLICY_CAUTIONS`と`findPolicyCautions(body)`を足す（research.md R7、[contracts/policy-cautions.md](./contracts/policy-cautions.md)）。
   - `POLICY_CAUTIONS`：4分類それぞれの`{ id, label, policyName, policyUrl, suggestion, patterns: RegExp[] }`。
     - `patterns`は、contracts/policy-cautions.mdの「照合の形」を、正規化した後の文字（小文字・半角）の正規表現にしたもの
     - 「〜」は`[^。\n]{0,15}`
   - `findPolicyCautions(body)`：`normalizeForMatch`で正規化した本文に各`pattern`を`matchAll`で当てる。当たった分類と、元の本文の位置の範囲を返す（`{ id, label, policyName, policyUrl, suggestion, ranges }[]`）。
-- [ ] T055 [US5] `packages/shared/src/review.ts`の`checkPublishable`の`policyCautions`に、`findPolicyCautions`の結果を入れる。`approvable`には含めない。
-- [ ] T056 [US5] `apps/api/src/services/review-service.ts`の`approve`のチェックに、次を足す（FR-040、research.md R7）。
+- [X] T055 [US5] `packages/shared/src/review.ts`の`checkPublishable`の`policyCautions`に、`findPolicyCautions`の結果を入れる。`approvable`には含めない。
+- [X] T056 [US5] `apps/api/src/services/review-service.ts`の`approve`のチェックに、次を足す（FR-040、research.md R7）。
   - `checkPublishable(...).policyCautions`が1件以上で、`req.confirmPolicyCaution !== true`なら`POLICY_CONFIRM_REQUIRED`にする。
   - 判定の順は、`NG_WORD`・`OVER_THREADS_LIMIT`の後、`LIMIT`の前。
-- [ ] T057 [P] [US5] `apps/web/src/components/stock/PolicyConfirmDialog.tsx`を作る（contracts/ui-routes.md「承認」「選択のバー」）。
+- [X] T057 [P] [US5] `apps/web/src/components/stock/PolicyConfirmDialog.tsx`を作る（contracts/ui-routes.md「承認」「選択のバー」）。
   - 見出しと本文を出す。1件のときは当たった分類の名前、まとめてのときは「選んだうち{k}件に…」。
   - 「キャンセル」「承認する」を置く。
-- [ ] T058 [US5] `apps/web/src/components/stock/DraftLabels.tsx`に、規約に注意のラベル（注意の色）とポップオーバーを足す。
+- [X] T058 [US5] `apps/web/src/components/stock/DraftLabels.tsx`に、規約に注意のラベル（注意の色）とポップオーバーを足す。
   - ポップオーバーの中身：「Threadsの規約（{policyName}）に触れるおそれのある表現です。{suggestion}」と、新しいタブで開く規約へのリンク。
   - `HighlightedBody`の強調に、規約に注意の範囲（`--warning`系の背景）を足す。
   - `apps/web/src/components/stock/DraftCard.tsx`の承認済みのタブでは、規約に注意のとき、ラベルの下に「規約に注意の表現があります。要確認に戻して確かめることをおすすめします」と「要確認に戻す」（`reopen`）のボタンを出す（contracts/ui-routes.md）。
   - `apps/web/src/components/stock/DraftEditDialog.tsx`の入力中のラベルにも出す。
-- [ ] T059 [US5] `apps/web/src/components/stock/use-review.ts`の承認の流れを変える。
+- [X] T059 [US5] `apps/web/src/components/stock/use-review.ts`の承認の流れを変える。
   - 対象に規約に注意のものがあれば`PolicyConfirmDialog`を出し、「承認する」で`confirmPolicyCaution: true`を付けて送る。
   - 「元に戻す」の`approve`（要確認に戻すのを取り消す）では、確認なしで`confirmPolicyCaution: true`を付ける（直前に確認済みの承認を戻すだけのため）。
   - `apps/web/src/pages/stock.tsx`の`RejectDialog`の`initialReasons`に、規約に注意なら`policy`を含める（まとめて却下では、1件でも当てはまれば）。
-- [ ] T060 [US5] 規約の備えを、設定の画面で読めるようにする（contracts/ui-routes.md「Threadsの規約への備えのダイアログ」）。
+- [X] T060 [US5] 規約の備えを、設定の画面で読めるようにする（contracts/ui-routes.md「Threadsの規約への備えのダイアログ」）。
   - `apps/web/src/components/settings/PolicyInfoDialog.tsx`を作る。中身は次のとおり。
     - 説明文
     - 「AIプロンプトに入れるルール」（`POLICY_PROMPT_RULES`）

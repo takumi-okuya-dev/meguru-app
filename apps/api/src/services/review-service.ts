@@ -124,6 +124,11 @@ export async function reviewDrafts(env: Env, accountId: string, req: ReviewReque
             skip("OVER_THREADS_LIMIT");
             continue;
           }
+          // 規約に注意は承認を止めないが、Webで確認を経ていない承認は受け付けない（FR-040）
+          if (check.policyCautions.length > 0 && req.confirmPolicyCaution !== true) {
+            skip("POLICY_CONFIRM_REQUIRED");
+            continue;
+          }
           if (approved + 1 > APPROVED_LIMIT) {
             skip("LIMIT");
             continue;

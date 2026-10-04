@@ -14,7 +14,7 @@ import { DeletedElsewhereNotice, FormDialogFrame } from "@/components/items/Form
 import { useItemForm, type FormErrors } from "@/components/items/use-item-form";
 import { useRef } from "react";
 import { api } from "@/lib/api-client";
-import { LabelRow, NgWordLabel } from "./DraftLabels";
+import { LabelRow, NgWordLabel, PolicyCautionLabels } from "./DraftLabels";
 import { ThreadsLengthBar } from "./ThreadsLengthBar";
 
 type Form = { body: string };
@@ -113,7 +113,10 @@ function LiveLabels({ body, ngWords }: { body: string; ngWords: NgWord[] }) {
   const check = checkPublishable(body, ngWords);
   return (
     <LabelRow
-      labels={[check.ngWords.length > 0 && <NgWordLabel key="ng" check={check} />].filter(Boolean)}
+      labels={[
+        check.ngWords.length > 0 && <NgWordLabel key="ng" check={check} />,
+        check.policyCautions.length > 0 && <PolicyCautionLabels key="policy" check={check} />,
+      ].filter(Boolean)}
     />
   );
 }

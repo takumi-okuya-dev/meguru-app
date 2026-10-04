@@ -176,3 +176,68 @@ export function SimilarityLabel({
     </div>
   );
 }
+
+/**
+ * 規約に注意のラベルと、押すと開く説明（FR-039）。承認済みのタブでは、要確認に戻すことを勧める（spec エッジケース）。
+ * 文言は「注意」「おそれ」にとどめる（FR-043）。
+ * @param props - check：承認できるかの判定、onReopen：承認済みの下書きを要確認に戻す（承認済みのタブだけ渡す）
+ * @returns ラベル（当たりがなければ何も出さない）
+ */
+export function PolicyCautionLabels({
+  check,
+  onReopen,
+}: {
+  check: PublishCheck;
+  onReopen?: () => void;
+}) {
+  const [open, setOpen] = useState<string | null>(null);
+  const panelId = useId();
+  if (check.policyCautions.length === 0) return null;
+  const current = check.policyCautions.find((c) => c.id === open);
+  return (
+    <div className="w-full space-y-2">
+      <div className="flex flex-wrap gap-1.5">
+        {check.policyCautions.map((c) => (
+          <button
+            key={c.id}
+            type="button"
+            aria-expanded={open === c.id}
+            aria-controls={panelId}
+            onClick={() => setOpen((v) => (v === c.id ? null : c.id))}
+            className="inline-flex min-h-8 items-center rounded-full bg-warning-bg px-2.5 py-0.5 text-[13px] text-warning hover:underline"
+          >
+            規約に注意：{c.label}
+          </button>
+        ))}
+      </div>
+      {current && (
+        <div
+          id={panelId}
+          role="region"
+          aria-label="規約に注意の説明"
+          className="space-y-1 rounded-xl border bg-background p-3 text-[13px]"
+        >
+          <p>
+            Threadsの規約（{current.policyName}）に触れるおそれのある表現です。{current.suggestion}
+          </p>
+          <a
+            href={current.policyUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="text-ring underline"
+          >
+            {current.policyName}を開く
+          </a>
+        </div>
+      )}
+      {onReopen && (
+        <div className="flex flex-wrap items-center gap-2 text-[13px] text-muted-foreground">
+          <span>規約に注意の表現があります。要確認に戻して確かめることをおすすめします</span>
+          <button type="button" className="text-ring underline" onClick={onReopen}>
+            要確認に戻す
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}

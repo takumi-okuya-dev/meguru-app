@@ -7,9 +7,10 @@ import { api } from "@/lib/api-client";
 import { queryKeys } from "@/lib/query";
 import { CoreRulesDialog } from "./CoreRulesDialog";
 import { NgWordsDialog } from "./NgWordsDialog";
+import { PolicyInfoDialog } from "./PolicyInfoDialog";
 import { SettingCard, SettingRow } from "./SettingRow";
 
-type Open = "ng-words" | "core-rules" | null;
+type Open = "ng-words" | "core-rules" | "policy" | null;
 
 /**
  * 投稿ルールの空でない行の数。
@@ -19,7 +20,7 @@ type Open = "ng-words" | "core-rules" | null;
 const ruleCount = (text: string) => text.split("\n").filter((l) => l.trim() !== "").length;
 
 /**
- * 「投稿のルール」の区分。NGワードの行（US2）、投稿ルールの行（US4）。
+ * 「投稿のルール」の区分。NGワードの行（US2）、投稿ルールの行（US4）、Threadsの規約への備えの行（US5）。
  * @param props - accountId：Account の ID
  * @returns 区分
  */
@@ -82,8 +83,21 @@ export function PostingRulesSection({ accountId }: { accountId: string }) {
               {data && !data.canEditCoreRules ? "見る" : "編集"}
             </Button>
           </SettingRow>
+          <SettingRow
+            label="Threadsの規約への備え"
+            description="規約に触れやすい表現に「規約に注意」と表示し、プロンプトにルールを入れます"
+          >
+            <Button
+              variant="outline"
+              className="h-10 rounded-full md:h-9"
+              onClick={() => setOpen("policy")}
+            >
+              見る
+            </Button>
+          </SettingRow>
         </SettingCard>
       )}
+      {open === "policy" && <PolicyInfoDialog onClose={() => setOpen(null)} />}
       {open === "core-rules" && data && (
         <CoreRulesDialog
           accountId={accountId}
