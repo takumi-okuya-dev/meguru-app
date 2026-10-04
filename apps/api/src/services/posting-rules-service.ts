@@ -3,7 +3,7 @@ import { NG_WORD_LIMIT, findNgWords, normalizeNgWord } from "@threads-grower/sha
 import { and, asc, eq, inArray, sql } from "drizzle-orm";
 import { withTransaction, type Db, type TxDb } from "../db/client";
 import { lockAccountDrafts } from "../db/locks";
-import { ngWords, postDrafts } from "../db/schema";
+import { accounts, ngWords, postDrafts } from "../db/schema";
 import type { Env } from "../env";
 import { AppError, itemNotFound, notFound, pgErrorCode } from "../lib/errors";
 import type { AccountRow } from "./access";
@@ -81,9 +81,12 @@ export async function addNgWords(env: Env, accountId: string, words: string[]) {
       }
       if (toAdd.length === 0) return { added: [], duplicates, reopenedCount: 0 };
 
+      // 1回の送信で足した語も「登録の古い順」が入力の順になるよう、1ミリ秒ずつずらした日時を入れる
+      // （既定の now() はトランザクションの中で同じ値になり、並びが ID 任せになるため）
+      const base = Date.now();
       const added = await tx
         .insert(ngWords)
-        .values(toAdd.map((w) => ({ accountId, ...w })))
+        .values(toAdd.map((w, i) => ({ accountId, ...w, createdAt: new Date(base + i) })))
         .returning();
       // 足した語を含む承認済みの下書きを要確認に戻す（「承認済み」は常にその時点のNGワードを通ったものだけにする）
       const approved = await tx
@@ -97,7 +100,7 @@ export async function addNgWords(env: Env, accountId: string, words: string[]) {
           .set({ status: "needs_review", reviewedAt: null, version: sql`${postDrafts.version} + 1`, updatedAt: new Date() })
           .where(and(eq(postDrafts.accountId, accountId), inArray(postDrafts.id, hitIds)));
       }
-      added.sort((a, b) => toAdd.findIndex((w) => w.word === a.word) - toAdd.findIndex((w) => w.word === b.word));
+      added.sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
       return { added: added.map(toNgWord), duplicates, reopenedCount: hitIds.length };
     });
   } catch (err) {
@@ -124,4 +127,33 @@ export async function deleteNgWord(env: Env, accountId: string, id: string): Pro
       .returning({ id: ngWords.id });
     if (deleted.length === 0) throw itemNotFound();
   });
+}
+
+/**
+ * 投稿ルール（CORE RULES）を保存する（FR-019・FR-021、research.md R11）。全体の前後の空白だけを除き、
+ * 読み込んだ版（expectedVersion）のときだけ更新する。
+ * @param db - データベース
+ * @param accountId - accounts.id
+ * @param req - text：投稿ルール、expectedVersion：読み込んだときの core_rules_version
+ * @returns 保存した投稿ルールと版
+ * @throws AppError STALE_UPDATE（他で先に保存された。latest 付き）、ACCOUNT_NOT_FOUND（Accountがない）
+ */
+export async function saveCoreRules(db: Db, accountId: string, req: { text: string; expectedVersion: number }) {
+  const [row] = await db
+    .update(accounts)
+    .set({
+      coreRules: req.text.trim(),
+      coreRulesVersion: sql`${accounts.coreRulesVersion} + 1`,
+      updatedAt: new Date(),
+    })
+    .where(and(eq(accounts.id, accountId), eq(accounts.coreRulesVersion, req.expectedVersion)))
+    .returning({ coreRules: accounts.coreRules, coreRulesVersion: accounts.coreRulesVersion });
+  if (row) return row;
+  const [current] = await db
+    .select({ coreRules: accounts.coreRules, coreRulesVersion: accounts.coreRulesVersion })
+    .from(accounts)
+    .where(eq(accounts.id, accountId))
+    .limit(1);
+  if (!current) throw notFound();
+  throw new AppError("STALE_UPDATE", 409, "updated elsewhere", current);
 }

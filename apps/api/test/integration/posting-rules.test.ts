@@ -157,3 +157,33 @@ describe("DELETE /ng-words/:id とアクセス範囲", () => {
     expect((await addWords(other.accountId, ["x"])).status).toBe(404);
   });
 });
+
+describe("PUT /core-rules（FR-019〜FR-021）", () => {
+  const put = (accountId: string, text: string, expectedVersion: number) =>
+    call(app, "PUT", `${base(accountId)}/core-rules`, { user: "u1", body: { text, expectedVersion } });
+
+  it("保存すると版が1増え、GET /posting-rules に反映される。全体の前後の空白は除く", async () => {
+    const { accountId } = await createUserWithAccount("u1");
+    const res = await put(accountId, "  断定口調は使わない\n医療の効果をうたわない \n", 1);
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ coreRules: "断定口調は使わない\n医療の効果をうたわない", coreRulesVersion: 2 });
+    expect(await rules(accountId)).toMatchObject({ coreRules: "断定口調は使わない\n医療の効果をうたわない", coreRulesVersion: 2 });
+  });
+
+  it("同じ expectedVersion の2回目は 409 STALE_UPDATE（latest 付き）。2,001文字は 400", async () => {
+    const { accountId } = await createUserWithAccount("u1");
+    await put(accountId, "A", 1);
+    const stale = await put(accountId, "B", 1);
+    expect(stale.status).toBe(409);
+    expect(await stale.json()).toMatchObject({ error: { code: "STALE_UPDATE" }, latest: { coreRules: "A", coreRulesVersion: 2 } });
+    expect((await put(accountId, "あ".repeat(2001), 2)).status).toBe(400);
+  });
+
+  it("無料体験の後のプラン1は 403 GROWER_FEATURE_REQUIRED で、GET は canEditCoreRules: false（FR-020）", async () => {
+    const { accountId } = await createUserWithAccount("u1", { userCreatedAt: AFTER_TRIAL() });
+    const res = await put(accountId, "A", 1);
+    expect(res.status).toBe(403);
+    expect(await res.json()).toMatchObject({ error: { code: "GROWER_FEATURE_REQUIRED" } });
+    expect((await rules(accountId)).canEditCoreRules).toBe(false);
+  });
+});

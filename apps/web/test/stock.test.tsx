@@ -877,3 +877,13 @@ describe("重複検知（004 US3、FR-026〜FR-029）", () => {
     expect(within(dialog).getByRole("button", { name: "似た投稿がある" })).toHaveAttribute("aria-pressed", "true");
   });
 });
+
+describe("プロンプトのカードの要約（004 FR-025）", () => {
+  it("投稿ルール・NGワード・却下の件数が足される（0件の項目は出ない）", async () => {
+    getPrompt.mockResolvedValue(promptResponse({ coreRuleCount: 3, ngWordCount: 2, rejectedCount: 0 }));
+    renderPage();
+    expect(
+      await screen.findByText("課題 11/16・宣伝の対象 1件・参考投稿 3件・ルール 3件・NGワード 2語を反映", { normalizer: (s) => s.replace(/\s+/g, " ").trim() }),
+    ).toBeInTheDocument();
+  });
+});

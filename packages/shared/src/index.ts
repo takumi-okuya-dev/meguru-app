@@ -5,6 +5,7 @@ export * from "./limits";
 export * from "./ng-words";
 export * from "./normalize";
 export * from "./plans";
+export * from "./policy";
 export * from "./promotions";
 export * from "./prompt";
 export * from "./review";

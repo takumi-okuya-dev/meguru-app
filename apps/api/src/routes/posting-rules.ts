@@ -1,13 +1,14 @@
 // /api/accounts/:accountId/posting-rules・/ng-words（specs/004-review-approval contracts/api.md）。
-// NGワードは全プランで使える（FR-017）ので、grower機能は判定しない。
-import { addNgWordsRequestSchema } from "@threads-grower/shared";
+// NGワードは全プランで使える（FR-017）ので、grower機能は判定しない。投稿ルールの保存だけを判定する（FR-020）。
+import { addNgWordsRequestSchema, coreRulesRequestSchema } from "@threads-grower/shared";
 import { Hono, type MiddlewareHandler } from "hono";
 import type { AppEnv } from "../app";
 import { createDb } from "../db/client";
 import { parseBody } from "../lib/validate";
 import { findOwnedAccount } from "../services/access";
+import { requireGrowerAccess } from "../services/grower-access";
 import { assertItemId } from "../services/item-service";
-import { addNgWords, deleteNgWord, getPostingRules } from "../services/posting-rules-service";
+import { addNgWords, deleteNgWord, getPostingRules, saveCoreRules } from "../services/posting-rules-service";
 
 /**
  * 投稿のルールのルート。
@@ -33,5 +34,13 @@ export function postingRulesRoutes(authed: MiddlewareHandler<AppEnv>) {
       const account = await findOwnedAccount(db, c.get("user").id, c.req.param("accountId"));
       await deleteNgWord(c.env, account.id, assertItemId(c.req.param("ngWordId")));
       return c.body(null, 204);
+    })
+    .put("/accounts/:accountId/core-rules", authed, async (c) => {
+      const db = createDb(c.env.DATABASE_URL);
+      const user = c.get("user");
+      const account = await findOwnedAccount(db, user.id, c.req.param("accountId"));
+      requireGrowerAccess(account, user);
+      const req = await parseBody(coreRulesRequestSchema, c.req.json());
+      return c.json(await saveCoreRules(db, account.id, req));
     });
 }

@@ -1,7 +1,13 @@
 // プロンプトのカード（specs/003 US1、contracts/ui-routes.md「プロンプトのカード」、research.md R11・R13）。
 // 戦略プロファイルから組み立てたプロンプトを、件数を選んでコピーする。grower機能を使えないAccountでは案内に変わる。
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { PROMPT_COUNT_MAX, PROMPT_COUNT_MIN, STRATEGY_TOTAL, type PostDraftList } from "@threads-grower/shared";
+import {
+  PROMPT_COUNT_MAX,
+  PROMPT_COUNT_MIN,
+  STRATEGY_TOTAL,
+  type PostDraftList,
+  type PromptSummary,
+} from "@threads-grower/shared";
 import { ChevronDownIcon, CopyIcon, LockIcon } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router";
@@ -13,6 +19,19 @@ import { api, describeError } from "@/lib/api-client";
 import { queryKeys } from "@/lib/query";
 import { isGrowerRequired, saveErrorMessage } from "@/lib/save-error";
 import { cn } from "@/lib/utils";
+
+/**
+ * 投稿ルール・NGワード・却下の反映の要約（specs/004 FR-025）。0件の項目は出さない。
+ * @param summary - プロンプトの要約
+ * @returns 「・ルール 3件・NGワード 2語・却下 5件」のような文字列
+ */
+function reviewSummary(summary: PromptSummary): string {
+  return [
+    summary.coreRuleCount > 0 ? `・ルール ${summary.coreRuleCount}件` : "",
+    summary.ngWordCount > 0 ? `・NGワード ${summary.ngWordCount}語` : "",
+    summary.rejectedCount > 0 ? `・却下 ${summary.rejectedCount}件` : "",
+  ].join("");
+}
 
 /** 作る件数を変えてから保存するまでの待ち時間（ミリ秒） */
 const SAVE_DELAY_MS = 500;
@@ -155,7 +174,7 @@ function PromptReadyCard({
             ) : (
               <p className="text-[13px] text-muted-foreground">
                 課題 {summary.strategyFilledCount}/{STRATEGY_TOTAL}・宣伝の対象 {summary.promotionCount}件・参考投稿{" "}
-                {summary.referencePostCount}件を反映
+                {summary.referencePostCount}件{reviewSummary(summary)}を反映
               </p>
             ))}
         </div>

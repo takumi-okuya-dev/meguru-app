@@ -2,15 +2,19 @@
 import {
   PROMPT_RECENT_DRAFTS,
   PROMPT_REFERENCE_POSTS,
+  PROMPT_REJECTED_DRAFTS,
   buildPrompt,
   isTargetable,
+  rejectReasonLabel,
   type PromptPromotion,
+  type RejectReasonCode,
 } from "@threads-grower/shared";
-import { desc, eq } from "drizzle-orm";
+import { and, asc, desc, eq, inArray } from "drizzle-orm";
 import type { Db } from "../db/client";
-import { promotions, referencePosts } from "../db/schema";
+import { draftBatches, postDrafts, promotions, referencePosts } from "../db/schema";
 import type { AccountRow } from "./access";
-import { listDraftRows } from "./draft-service";
+import { listReviewedRows } from "./draft-service";
+import { listNgWords } from "./posting-rules-service";
 import { getStrategy } from "./strategy-service";
 
 type PromotionRow = typeof promotions.$inferSelect;
@@ -47,6 +51,35 @@ function toPromptPromotion(r: PromotionRow): PromptPromotion {
 }
 
 /**
+ * 重複防止で比べる直近の下書き（要確認と承認済み。004 FR-024）。登録のまとまりの新しい順 → 貼り付けた順。
+ * @param db - データベース
+ * @param accountId - accounts.id
+ * @returns 本文（最大 PROMPT_RECENT_DRAFTS 件）
+ */
+async function recentDraftBodies(db: Db, accountId: string): Promise<string[]> {
+  const rows = await db
+    .select({ body: postDrafts.body })
+    .from(postDrafts)
+    .innerJoin(draftBatches, eq(draftBatches.id, postDrafts.batchId))
+    .where(and(eq(postDrafts.accountId, accountId), inArray(postDrafts.status, ["needs_review", "approved"])))
+    .orderBy(desc(draftBatches.createdAt), desc(draftBatches.id), asc(postDrafts.position))
+    .limit(PROMPT_RECENT_DRAFTS);
+  return rows.map((r) => r.body);
+}
+
+/**
+ * 投稿ルールの空でない行（004 FR-022）。
+ * @param text - accounts.core_rules
+ * @returns 前後の空白を除いて空でない行
+ */
+function coreRuleLines(text: string): string[] {
+  return text
+    .split("\n")
+    .map((l) => l.trim())
+    .filter((l) => l !== "");
+}
+
+/**
  * 最新の材料からプロンプトを組み立てる（FR-002・FR-007）。材料の取得は並べて行う。
  * @param db - データベース
  * @param account - Account の行
@@ -55,7 +88,7 @@ function toPromptPromotion(r: PromotionRow): PromptPromotion {
  */
 export async function getPrompt(db: Db, account: AccountRow, count: number) {
   const now = new Date();
-  const [strategy, promotionRows, postRows, draftRows] = await Promise.all([
+  const [strategy, promotionRows, postRows, draftBodies, ngWordRows, rejectedRows] = await Promise.all([
     getStrategy(db, account.id),
     db.select().from(promotions).where(eq(promotions.accountId, account.id)),
     db
@@ -64,7 +97,9 @@ export async function getPrompt(db: Db, account: AccountRow, count: number) {
       .where(eq(referencePosts.accountId, account.id))
       .orderBy(desc(referencePosts.createdAt), desc(referencePosts.id))
       .limit(PROMPT_REFERENCE_POSTS),
-    listDraftRows(db, account.id, PROMPT_RECENT_DRAFTS),
+    recentDraftBodies(db, account.id),
+    listNgWords(db, account.id),
+    listReviewedRows(db, account.id, "rejected", PROMPT_REJECTED_DRAFTS),
   ]);
   const { prompt, summary } = buildPrompt({
     count,
@@ -73,7 +108,14 @@ export async function getPrompt(db: Db, account: AccountRow, count: number) {
     promotions: targetPromotions(promotionRows, now).map(toPromptPromotion),
     promotionRatioPercent: account.promotionRatioPercent,
     referencePosts: postRows.map((p) => ({ body: p.body, keyword: p.keyword ?? "", whyGood: p.whyGood ?? "" })),
-    recentDrafts: draftRows.map((d) => d.body),
+    recentDrafts: draftBodies,
+    coreRules: coreRuleLines(account.coreRules),
+    ngWords: ngWordRows.map((w) => w.word),
+    rejectedDrafts: rejectedRows.map((r) => ({
+      body: r.body,
+      reasonLabels: ((r.rejectReasons ?? []) as RejectReasonCode[]).map(rejectReasonLabel),
+      note: r.rejectNote,
+    })),
   });
   return { prompt, count, summary };
 }

@@ -153,3 +153,35 @@ describe("プランと権限", () => {
     expect(put.status).toBe(200);
   });
 });
+
+describe("CORE RULES・NGワード・却下の反映（specs/004-review-approval FR-022〜FR-025）", () => {
+  it("投稿ルール・NGワード・却下の下書き（新しく却下した順、理由の表示名つき）が入り、要約に件数が入る", async () => {
+    const { accountId } = await createUserWithAccount("u1");
+    await call(app, "PUT", `${base(accountId)}/core-rules`, {
+      user: "u1",
+      body: { text: "断定口調は使わない\n\n医療の効果をうたわない\n", expectedVersion: 1 },
+    });
+    await call(app, "POST", `${base(accountId)}/ng-words`, { user: "u1", body: { words: ["絶対", "必ず儲かる"] } });
+    const reg = await call(app, "POST", `${base(accountId)}/draft-batches`, {
+      user: "u1",
+      body: { clientRequestId: crypto.randomUUID(), text: "却下1\n@@@\n却下2\n@@@\n承認する下書き\n@@@\n戻す下書き" },
+    });
+    const [d1, d2, d3, d4] = ((await reg.json()) as { drafts: { id: string }[] }).drafts;
+    const review = (body: unknown) => call(app, "POST", `${base(accountId)}/post-drafts/review`, { user: "u1", body });
+    await review({ action: "reject", items: [{ id: d1!.id, expectedVersion: 1 }], reject: { reasons: ["tone"], note: "" } });
+    await review({ action: "reject", items: [{ id: d2!.id, expectedVersion: 1 }], reject: { reasons: [], note: "語尾がきつい" } });
+    await review({ action: "approve", items: [{ id: d3!.id, expectedVersion: 1 }] });
+    await review({ action: "reject", items: [{ id: d4!.id, expectedVersion: 1 }], reject: { reasons: ["thin"], note: "" } });
+    await review({ action: "reopen", items: [{ id: d4!.id, expectedVersion: 2 }] });
+
+    const { prompt, summary } = await getPrompt(accountId);
+    expect(prompt).toContain("・断定口調は使わない\n・医療の効果をうたわない\n・次の言葉は使わないこと: 絶対、必ず儲かる");
+    expect(prompt).toContain(
+      "■過去に却下された投稿(この傾向は繰り返さないこと)\n1. 却下2(却下理由: 語尾がきつい)\n2. 却下1(却下理由: トーンが違う)",
+    );
+    // 要確認に戻した却下は入らない。承認済みは「直近の下書き」に入る
+    expect(prompt).not.toContain("戻す下書き(却下理由");
+    expect(prompt).toMatch(/投稿ストックにある直近の下書き[^■]*承認する下書き/);
+    expect(summary).toMatchObject({ coreRuleCount: 2, ngWordCount: 2, rejectedCount: 2 });
+  });
+});

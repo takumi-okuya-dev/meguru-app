@@ -12,11 +12,16 @@ const deleteNgWord = vi.fn();
 const putCoreRules = vi.fn();
 vi.mock("@/lib/api-client", async (orig) => {
   const actual = await orig<typeof import("@/lib/api-client")>();
-  return { ...actual, api: { ...actual.api, getPostingRules, addNgWords, deleteNgWord, putCoreRules } };
+  return {
+    ...actual,
+    api: { ...actual.api, getPostingRules, addNgWords, deleteNgWord, putCoreRules },
+  };
 });
 const toastSuccess = vi.fn();
 const toastError = vi.fn();
-vi.mock("sonner", () => ({ toast: { success: toastSuccess, error: toastError, dismiss: vi.fn() } }));
+vi.mock("sonner", () => ({
+  toast: { success: toastSuccess, error: toastError, dismiss: vi.fn() },
+}));
 
 const { ApiError } = await import("@/lib/api-client");
 const { UnsavedChangesProvider } = await import("@/components/UnsavedChangesProvider");
@@ -32,10 +37,22 @@ const account: AccountSummary = {
   lastUsedAt: null,
 };
 
-const word = (id: string, w: string): NgWord => ({ id, word: w, normalized: w, createdAt: "2026-10-04T00:00:00.000Z" });
+const word = (id: string, w: string): NgWord => ({
+  id,
+  word: w,
+  normalized: w,
+  createdAt: "2026-10-04T00:00:00.000Z",
+});
 
 function rules(overrides: Partial<PostingRules> = {}): PostingRules {
-  return { ngWords: [], ngWordLimit: 200, coreRules: "", coreRulesVersion: 1, canEditCoreRules: true, ...overrides };
+  return {
+    ngWords: [],
+    ngWordLimit: 200,
+    coreRules: "",
+    coreRulesVersion: 1,
+    canEditCoreRules: true,
+    ...overrides,
+  };
 }
 
 function renderPage() {
@@ -54,14 +71,24 @@ function renderPage() {
     { initialEntries: ["/accounts/a1/settings"] },
   );
   render(
-    <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+    <QueryClientProvider
+      client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
+    >
       <RouterProvider router={router} />
     </QueryClientProvider>,
   );
 }
 
 beforeEach(() => {
-  for (const fn of [getPostingRules, addNgWords, deleteNgWord, putCoreRules, toastSuccess, toastError]) fn.mockReset();
+  for (const fn of [
+    getPostingRules,
+    addNgWords,
+    deleteNgWord,
+    putCoreRules,
+    toastSuccess,
+    toastError,
+  ])
+    fn.mockReset();
   getPostingRules.mockResolvedValue(rules({ ngWords: [word("w1", "絶対")] }));
 });
 
@@ -70,8 +97,12 @@ describe("「投稿のルール」の区分（FR-031）", () => {
     renderPage();
     const section = await screen.findByRole("region", { name: "投稿のルール" });
     const heading = screen.getByRole("heading", { name: "Threadsとの接続" });
-    expect(section.compareDocumentPosition(heading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(await within(section).findByText("この言葉を含む下書きは承認できません。1語")).toBeInTheDocument();
+    expect(
+      section.compareDocumentPosition(heading) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(
+      await within(section).findByText("この言葉を含む下書きは承認できません。1語"),
+    ).toBeInTheDocument();
   });
 });
 
@@ -80,7 +111,9 @@ describe("NGワードのダイアログ（FR-014・FR-016a）", () => {
     const user = userEvent.setup();
     renderPage();
     const section = await screen.findByRole("region", { name: "投稿のルール" });
-    await waitFor(() => expect(within(section).getAllByRole("button", { name: "編集" })[0]).toBeEnabled());
+    await waitFor(() =>
+      expect(within(section).getAllByRole("button", { name: "編集" })[0]).toBeEnabled(),
+    );
     await user.click(within(section).getAllByRole("button", { name: "編集" })[0]!);
     return { user, dialog: await screen.findByRole("dialog", { name: "NGワード" }) };
   }
@@ -97,12 +130,18 @@ describe("NGワードのダイアログ（FR-014・FR-016a）", () => {
   });
 
   it("重複は「すでにあります」、承認済みを戻したらトーストで知らせる", async () => {
-    addNgWords.mockResolvedValue({ added: [word("w2", "神")], duplicates: ["絶対"], reopenedCount: 2 });
+    addNgWords.mockResolvedValue({
+      added: [word("w2", "神")],
+      duplicates: ["絶対"],
+      reopenedCount: 2,
+    });
     const { user, dialog } = await openDialog();
     await user.type(within(dialog).getByRole("textbox", { name: "追加するNGワード" }), "絶対、神");
     await user.click(within(dialog).getByRole("button", { name: "追加" }));
     expect(await within(dialog).findByText("「絶対」はすでにあります")).toBeInTheDocument();
-    expect(toastSuccess).toHaveBeenCalledWith("NGワードを含む承認済みの下書き2件を、要確認に戻しました");
+    expect(toastSuccess).toHaveBeenCalledWith(
+      "NGワードを含む承認済みの下書き2件を、要確認に戻しました",
+    );
   });
 
   it("チップの×で削除し、トーストの「元に戻す」で足し直す", async () => {
@@ -111,14 +150,18 @@ describe("NGワードのダイアログ（FR-014・FR-016a）", () => {
     const { user, dialog } = await openDialog();
     await user.click(within(dialog).getByRole("button", { name: "絶対を削除" }));
     expect(deleteNgWord).toHaveBeenCalledWith("a1", "w1");
-    await waitFor(() => expect(toastSuccess).toHaveBeenCalledWith("「絶対」を削除しました", expect.anything()));
+    await waitFor(() =>
+      expect(toastSuccess).toHaveBeenCalledWith("「絶対」を削除しました", expect.anything()),
+    );
     const undo = toastSuccess.mock.calls.at(-1)![1].action.onClick as () => void;
     await act(async () => undo());
     expect(addNgWords).toHaveBeenCalledWith("a1", ["絶対"]);
   });
 
   it("200語に達したら入力欄が無効になり、案内が出る", async () => {
-    getPostingRules.mockResolvedValue(rules({ ngWords: Array.from({ length: 200 }, (_, i) => word(`w${i}`, `語${i}`)) }));
+    getPostingRules.mockResolvedValue(
+      rules({ ngWords: Array.from({ length: 200 }, (_, i) => word(`w${i}`, `語${i}`)) }),
+    );
     const { dialog } = await openDialog();
     expect(within(dialog).getByRole("textbox", { name: "追加するNGワード" })).toBeDisabled();
     expect(within(dialog).getByText("上限（200語）に達しています")).toBeInTheDocument();
@@ -129,6 +172,73 @@ describe("NGワードのダイアログ（FR-014・FR-016a）", () => {
     const { user, dialog } = await openDialog();
     await user.type(within(dialog).getByRole("textbox", { name: "追加するNGワード" }), "新しい語");
     await user.click(within(dialog).getByRole("button", { name: "追加" }));
-    expect(await within(dialog).findByText("NGワードは200語まで登録できます。")).toBeInTheDocument();
+    expect(
+      await within(dialog).findByText("NGワードは200語まで登録できます。"),
+    ).toBeInTheDocument();
+  });
+});
+
+describe("投稿ルール（CORE RULES）のダイアログ（FR-019〜FR-021）", () => {
+  async function openCoreRules() {
+    const user = userEvent.setup();
+    renderPage();
+    const section = await screen.findByRole("region", { name: "投稿のルール" });
+    await waitFor(() =>
+      expect(within(section).getAllByRole("button", { name: /^(編集|見る)$/ })[1]).toBeEnabled(),
+    );
+    await user.click(within(section).getAllByRole("button", { name: /^(編集|見る)$/ })[1]!);
+    return {
+      user,
+      section,
+      dialog: await screen.findByRole("dialog", { name: "投稿ルール（CORE RULES）" }),
+    };
+  }
+
+  it("行に件数（または未入力）と「編集」がある", async () => {
+    getPostingRules.mockResolvedValue(
+      rules({ coreRules: "断定口調は使わない\n\n医療の効果をうたわない" }),
+    );
+    renderPage();
+    expect(
+      await screen.findByText("AIプロンプトに「絶対に守るルール」として入ります。2件"),
+    ).toBeInTheDocument();
+  });
+
+  it("書いて保存すると putCoreRules に本文と版が渡る", async () => {
+    putCoreRules.mockResolvedValue({ coreRules: "断定口調は使わない", coreRulesVersion: 2 });
+    const { user, dialog } = await openCoreRules();
+    await user.type(
+      within(dialog).getByRole("textbox", { name: /投稿ルール/ }),
+      "断定口調は使わない",
+    );
+    await user.click(within(dialog).getAllByRole("button", { name: "保存" }).at(-1)!);
+    expect(putCoreRules).toHaveBeenCalledWith("a1", {
+      text: "断定口調は使わない",
+      expectedVersion: 1,
+    });
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+  });
+
+  it("409 では「他の場所で更新されています」のダイアログが出る", async () => {
+    putCoreRules.mockRejectedValue(
+      new ApiError("STALE_UPDATE", 409, [], { coreRules: "他で書いた", coreRulesVersion: 3 }),
+    );
+    const { user, dialog } = await openCoreRules();
+    await user.type(within(dialog).getByRole("textbox", { name: /投稿ルール/ }), "A");
+    await user.click(within(dialog).getAllByRole("button", { name: "保存" }).at(-1)!);
+    expect(await screen.findByText("他の場所で更新されています")).toBeInTheDocument();
+  });
+
+  it("grower機能を使えないAccountでは「見る」になり、読み取り専用で案内が出る（FR-020）", async () => {
+    getPostingRules.mockResolvedValue(
+      rules({ coreRules: "断定口調は使わない", canEditCoreRules: false }),
+    );
+    const { section, dialog } = await openCoreRules();
+    expect(within(section).getByRole("button", { name: "見る", hidden: true })).toBeInTheDocument();
+    expect(within(dialog).getByRole("textbox", { name: /投稿ルール/ })).toHaveAttribute("readonly");
+    expect(
+      within(dialog).getByText(/投稿ルールはAIプロンプトの生成（プラン2以上）で使われます/),
+    ).toBeInTheDocument();
+    expect(within(dialog).queryByRole("button", { name: "保存" })).not.toBeInTheDocument();
   });
 });

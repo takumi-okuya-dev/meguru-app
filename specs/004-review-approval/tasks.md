@@ -478,7 +478,7 @@ description: "重複検知・承認/却下・NGワード（CORE RULES）の実�
 
 ### テスト（先に書いて失敗を確認する）
 
-- [ ] T041 [P] [US4] `packages/shared/test/prompt.test.ts`に足す（quickstart.mdの表の「CORE RULESの節」「却下の節」「長さの目安」、contracts/prompt-template.md）。
+- [X] T041 [P] [US4] `packages/shared/test/prompt.test.ts`に足す（quickstart.mdの表の「CORE RULESの節」「却下の節」「長さの目安」、contracts/prompt-template.md）。
   - **CORE RULESの節**：
     - 材料がなくても「■絶対に守るルール(CORE RULES)」があり、話者の直後にある
     - 中は、規約上のルール6つ（`POLICY_PROMPT_RULES`の順）→ 投稿ルールの行（空の行を除き、行頭の「・」「-」もそのまま「・」の後に残る）→「・次の言葉は使わないこと: 絶対、必ず儲かる」の順
@@ -492,7 +492,7 @@ description: "重複検知・承認/却下・NGワード（CORE RULES）の実�
   - 重複防止の節は、却下があるとき「上に書かれている却下された投稿・宣伝内容・リサーチ内容…」になる
   - 長さの目安：30,000文字を超える材料では、直近の下書き → 却下 → 参考投稿の順に減らし、CORE RULESの節は減らさない
   - 要約の`coreRuleCount`（規約上のルールは数えない）・`ngWordCount`・`rejectedCount`が、実際に含めた数と一致する
-- [ ] T042 [P] [US4] API のテストを足す。
+- [X] T042 [P] [US4] API のテストを足す。
   - `apps/api/test/integration/posting-rules.test.ts`：
     - `PUT /core-rules`で保存すると`coreRulesVersion`が1増え、`GET /posting-rules`に反映される
     - 同じ`expectedVersion`の2回目は`409 STALE_UPDATE`（`latest`付き）
@@ -503,7 +503,7 @@ description: "重複検知・承認/却下・NGワード（CORE RULES）の実�
     - 要確認に戻した却下の下書きは入らない
     - 「直近の下書き」に承認済みが入る
     - `summary`に3つの件数が入る
-- [ ] T043 [P] [US4] Web のテストを足す。
+- [X] T043 [P] [US4] Web のテストを足す。
   - `apps/web/test/account-settings.test.tsx`：
     - 投稿ルールの行に「{n}件」または「未入力」と「編集」がある
     - ダイアログで書いて保存すると`putCoreRules`に`{ text, expectedVersion }`が渡る
@@ -513,8 +513,8 @@ description: "重複検知・承認/却下・NGワード（CORE RULES）の実�
 
 ### 実装
 
-- [ ] T044 [US4] `packages/shared/src/policy.ts`を作り、`POLICY_LIST_VERSION = "2026-10-04"`と`POLICY_PROMPT_RULES`（[contracts/policy-cautions.md](./contracts/policy-cautions.md)「規約上のルール」の6つの文面、その順）を定める。`index.ts`からexportする。
-- [ ] T045 [US4] `packages/shared/src/prompt.ts`を、[contracts/prompt-template.md](./contracts/prompt-template.md)のとおりに変える（research.md R12）。
+- [X] T044 [US4] `packages/shared/src/policy.ts`を作り、`POLICY_LIST_VERSION = "2026-10-04"`と`POLICY_PROMPT_RULES`（[contracts/policy-cautions.md](./contracts/policy-cautions.md)「規約上のルール」の6つの文面、その順）を定める。`index.ts`からexportする。
+- [X] T045 [US4] `packages/shared/src/prompt.ts`を、[contracts/prompt-template.md](./contracts/prompt-template.md)のとおりに変える（research.md R12）。
   - **入力**：`coreRules: string[]`、`ngWords: string[]`、`rejectedDrafts: { body: string; reasonLabels: string[]; note: string | null }[]`を足す。
   - **節**：
     - `coreRulesSection`（常に。話者の後）を足す
@@ -524,27 +524,27 @@ description: "重複検知・承認/却下・NGワード（CORE RULES）の実�
     - `dedupeSection`に、却下があるときの「却下された投稿・」を足す
   - **長さの目安**：減らす順を、直近の下書き → 却下 → 参考投稿にする。
   - **要約**：`coreRuleCount`・`ngWordCount`・`rejectedCount`を返す。
-- [ ] T046 [US4] `apps/api/src/services/prompt-service.ts`の材料を足す。
+- [X] T046 [US4] `apps/api/src/services/prompt-service.ts`の材料を足す。
   - `coreRules`：`account.coreRules`を行に分け、`trim`して空でない行。
   - `ngWords`：`listNgWords`の`word`（古い順）。
   - `rejectedDrafts`：却下の下書きを`reviewed_at`の降順に`PROMPT_REJECTED_DRAFTS`件。`reasonLabels`は`rejectReasonLabel`で表示名にする。
   - `recentDrafts`：要確認と承認済みを、登録のまとまりの新しい順 → `position`の昇順に`PROMPT_RECENT_DRAFTS`件。
   - 取得は`Promise.all`で並べる。
-- [ ] T047 [US4] 投稿ルールの保存を作る（research.md R11）。
+- [X] T047 [US4] 投稿ルールの保存を作る（research.md R11）。
   - `apps/api/src/services/posting-rules-service.ts`に`saveCoreRules(db, accountId, { text, expectedVersion })`を作る。
     - `UPDATE accounts SET core_rules = trim(text), core_rules_version = core_rules_version + 1 WHERE id = … AND core_rules_version = …`
     - 0行なら、今の値を`latest`に入れて`409 STALE_UPDATE`
   - `apps/api/src/routes/posting-rules.ts`に`PUT /api/accounts/:accountId/core-rules`（`findOwnedAccount` → `requireGrowerAccess` → `parseBody(coreRulesRequestSchema)`）を足す。
-- [ ] T048 [P] [US4] `apps/web/src/components/settings/CoreRulesDialog.tsx`を作る（contracts/ui-routes.md「投稿ルールのダイアログ」）。
+- [X] T048 [P] [US4] `apps/web/src/components/settings/CoreRulesDialog.tsx`を作る（contracts/ui-routes.md「投稿ルールのダイアログ」）。
   - `useItemForm`・`FormDialogFrame`で、見出し・説明を出す。
   - 欄は`FieldWithCounter`の複数行で`CORE_RULES_MAX`文字まで。記入例は「断定口調は使わない\n医療・投資の効果をうたわない」。
   - `409`は`ConflictDialog`で扱う。
   - `readOnly`のpropでは、欄を読み取り専用にし、案内と`PLAN_CHANGE_CONTACT`を出す。
-- [ ] T049 [US4] `apps/web/src/components/settings/PostingRulesSection.tsx`に投稿ルールの行を足す。
+- [X] T049 [US4] `apps/web/src/components/settings/PostingRulesSection.tsx`に投稿ルールの行を足す。
   - 説明：「AIプロンプトに「絶対に守るルール」として入ります。{n}件」（空でない行の数）または「未入力」。
   - 操作：`canEditCoreRules`なら「編集」、そうでなければ「見る」。
   - 保存の後は、`queryKeys.postingRules(id)`と`["account", id, "prompt"]`で始まるキーを古いものとして扱う。
-- [ ] T050 [US4] `apps/web/src/components/stock/PromptCard.tsx`の要約に、「・ルール {coreRuleCount}件」「・NGワード {ngWordCount}語」「・却下 {rejectedCount}件」を、0でないものだけ足す（FR-025）。
+- [X] T050 [US4] `apps/web/src/components/stock/PromptCard.tsx`の要約に、「・ルール {coreRuleCount}件」「・NGワード {ngWordCount}語」「・却下 {rejectedCount}件」を、0でないものだけ足す（FR-025）。
 
 **完了条件**：T041〜T043が通り、quickstart.md「手動の確認 1」の3と「5」ができる
 

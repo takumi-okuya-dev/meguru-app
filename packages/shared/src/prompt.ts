@@ -1,6 +1,14 @@
 // 外部LLMに送るプロンプトの組み立て（specs/003-prompt-bulk-register contracts/prompt-template.md、research.md R1・R2・R12）。
-// 文面の土台は参考プロダクトのプロンプト（reference-prompt.md）。004の却下された投稿・006の改善フィードバックの節は、ここに足す。
-import { PROMPT_LENGTH_TARGET, PROMPT_RECENT_DRAFTS, PROMPT_REFERENCE_POSTS } from "./limits";
+// 文面の土台は参考プロダクトのプロンプト（reference-prompt.md）。
+// 004でCORE RULESと却下された投稿の節を足した（specs/004-review-approval contracts/prompt-template.md、research.md R12）。
+// 006の改善フィードバックの節も、ここに足す。
+import {
+  PROMPT_LENGTH_TARGET,
+  PROMPT_RECENT_DRAFTS,
+  PROMPT_REFERENCE_POSTS,
+  PROMPT_REJECTED_DRAFTS,
+} from "./limits";
+import { POLICY_PROMPT_RULES } from "./policy";
 import type { PromptSummary } from "./schemas";
 import { countFilled, TONE_PRESETS, type StrategyValues } from "./strategy";
 import { isBlank } from "./text";
@@ -18,6 +26,9 @@ export type PromptPromotion = {
 /** プロンプトに含める参考投稿。 */
 export type PromptReferencePost = { body: string; keyword: string; whyGood: string };
 
+/** プロンプトに含める却下の下書き（004）。reasonLabels は却下理由の候補の表示名。 */
+export type PromptRejectedDraft = { body: string; reasonLabels: string[]; note: string | null };
+
 /** buildPrompt の入力（contracts/prompt-template.md「入力」）。 */
 export type PromptInput = {
   /** 作る件数（1〜50） */
@@ -30,8 +41,14 @@ export type PromptInput = {
   promotionRatioPercent: number;
   /** 新しい順。先頭の PROMPT_REFERENCE_POSTS 件まで使う */
   referencePosts: PromptReferencePost[];
-  /** 投稿ストックの直近の下書きの本文。新しい順。先頭の PROMPT_RECENT_DRAFTS 件まで使う */
+  /** 投稿ストックの直近の下書き（要確認と承認済み）の本文。新しい順。先頭の PROMPT_RECENT_DRAFTS 件まで使う */
   recentDrafts: string[];
+  /** 投稿ルール（CORE RULES）の空でない行（004） */
+  coreRules: string[];
+  /** NGワード（入力のままの表記。登録の古い順。004） */
+  ngWords: string[];
+  /** 却下の下書き。新しく却下した順。先頭の PROMPT_REJECTED_DRAFTS 件まで使う（004） */
+  rejectedDrafts: PromptRejectedDraft[];
 };
 
 /** 課題の項目のプロンプトでの見出し（prompt-template.md「アカウントの戦略設計」の順）。 */
@@ -53,6 +70,31 @@ const STRATEGY_PROMPT_LABELS = [
   ["differentiation", "他アカウントとの違い"],
   ["successMetrics", "成功の指標"],
 ] as const;
+
+/**
+ * 「■絶対に守るルール(CORE RULES)」の節（004 FR-022・FR-041）。規約上のルールが常に入るので、節は省かない。
+ * @param coreRules - 投稿ルールの空でない行
+ * @param ngWords - NGワード
+ * @returns 節の文面
+ */
+function coreRulesSection(coreRules: string[], ngWords: string[]): string {
+  const lines = [...POLICY_PROMPT_RULES, ...coreRules].map((r) => `・${r}`);
+  if (ngWords.length > 0) lines.push(`・次の言葉は使わないこと: ${ngWords.join("、")}`);
+  return ["■絶対に守るルール(CORE RULES)", ...lines].join("\n");
+}
+
+/**
+ * 「■過去に却下された投稿」の節（004 FR-023）。
+ * @param drafts - 却下の下書き（含める分だけ）
+ * @returns 節の文面
+ */
+function rejectedSection(drafts: PromptRejectedDraft[]): string {
+  const items = drafts.map((d, i) => {
+    const reason = [d.reasonLabels.join("・"), d.note ?? ""].filter((s) => s !== "").join(" / ");
+    return `${i + 1}. ${d.body}(却下理由: ${reason})`;
+  });
+  return ["■過去に却下された投稿(この傾向は繰り返さないこと)", ...items].join("\n");
+}
 
 function strategySection(strategy: StrategyValues): string | null {
   const lines: string[] = [];
@@ -106,7 +148,7 @@ function promotionSection(count: number, ratio: number, promotions: PromptPromot
     ...promotionGuidance(promotions.length),
     ...promotions.map(promotionLine),
     "",
-    "宣伝を含む投稿でも、押し売り・広告っぽい言い回しにはせず、トーンをそのまま守ること。「届けたい相手」に書かれた属性を意識した切り口にすること。",
+    "宣伝を含む投稿でも、押し売り・広告っぽい言い回しにはせず、上記のCORE RULES・トーンをそのまま守ること。「届けたい相手」に書かれた属性を意識した切り口にすること。",
   ].join("\n");
 }
 
@@ -131,11 +173,11 @@ function researchSection(count: number, posts: PromptReferencePost[]): string {
   ].join("\n");
 }
 
-function dedupeSection(count: number, drafts: string[]): string {
+function dedupeSection(count: number, drafts: string[], withRejected: boolean): string {
   const lines = [
     "■重複防止(絶対厳守。最も重要なルールの1つ)",
     `- ${count}件それぞれ、言いたい核(結論・メッセージ)を1行で要約したときに、他のどれとも被らないこと。書き出しや言い回しを変えただけの「実質同じ投稿」は禁止。`,
-    `- 上に書かれている宣伝内容・リサーチ内容${drafts.length > 0 ? "、下に並べた投稿ストックの下書き" : ""}とも、核となる話題やエピソードが重複しないこと。同じテーマを扱う場合も、切り口・具体例・結論を変えて別物にすること。`,
+    `- 上に書かれている${withRejected ? "却下された投稿・" : ""}宣伝内容・リサーチ内容${drafts.length > 0 ? "、下に並べた投稿ストックの下書き" : ""}とも、核となる話題やエピソードが重複しないこと。同じテーマを扱う場合も、切り口・具体例・結論を変えて別物にすること。`,
     `- 生成の最後に、${count}件同士を見比べて「言いたいことが似すぎているペア」が無いか自分で確認し、あれば書き直してから出力すること。`,
   ];
   if (drafts.length > 0) {
@@ -193,15 +235,19 @@ function outputSection(count: number): string {
   ].join("\n");
 }
 
-function assemble(input: PromptInput, posts: PromptReferencePost[], drafts: string[], withPromotions: boolean): string {
+type Parts = { posts: PromptReferencePost[]; drafts: string[]; rejected: PromptRejectedDraft[] };
+
+function assemble(input: PromptInput, { posts, drafts, rejected }: Parts, withPromotions: boolean): string {
   const { count } = input;
   const sections = [
     `以下の情報をもとに、Threadsに投稿する文章を${count}件作ってください。`,
     `■話者\n表示名: ${input.displayName}`,
+    coreRulesSection(input.coreRules, input.ngWords),
     strategySection(input.strategy),
     withPromotions ? promotionSection(count, input.promotionRatioPercent, input.promotions) : null,
+    rejected.length > 0 ? rejectedSection(rejected) : null,
     posts.length > 0 ? researchSection(count, posts) : null,
-    dedupeSection(count, drafts),
+    dedupeSection(count, drafts, rejected.length > 0),
     lengthMixSection(count),
     charCountSection(count),
     outputSection(count),
@@ -211,22 +257,28 @@ function assemble(input: PromptInput, posts: PromptReferencePost[], drafts: stri
 
 /**
  * 戦略プロファイルと投稿ストックから、外部LLMに送るプロンプトを組み立てる（FR-002・FR-003・FR-008）。
- * 全文が PROMPT_LENGTH_TARGET 文字を超えるときは、直近の下書き → 参考投稿の順に、古いものから減らして収める（R12）。
+ * 全文が PROMPT_LENGTH_TARGET 文字を超えるときは、直近の下書き → 却下の下書き → 参考投稿の順に、古いものから減らして収める
+ * （003 R12、004 R12）。CORE RULESの節は減らさない。
  * @param input - 材料
  * @returns 全文と、実際に含めた材料の数
  */
 export function buildPrompt(input: PromptInput): { prompt: string; summary: PromptSummary } {
   const withPromotions = input.promotions.length > 0 && input.promotionRatioPercent >= 1;
-  let posts = input.referencePosts.slice(0, PROMPT_REFERENCE_POSTS);
-  let drafts = input.recentDrafts.slice(0, PROMPT_RECENT_DRAFTS);
-  let prompt = assemble(input, posts, drafts, withPromotions);
+  const parts: Parts = {
+    posts: input.referencePosts.slice(0, PROMPT_REFERENCE_POSTS),
+    drafts: input.recentDrafts.slice(0, PROMPT_RECENT_DRAFTS),
+    rejected: input.rejectedDrafts.slice(0, PROMPT_REJECTED_DRAFTS),
+  };
+  let prompt = assemble(input, parts, withPromotions);
   let length = [...prompt].length;
-  while (length > PROMPT_LENGTH_TARGET && (drafts.length > 0 || posts.length > 0)) {
-    if (drafts.length > 0) drafts = drafts.slice(0, -1);
-    else posts = posts.slice(0, -1);
-    prompt = assemble(input, posts, drafts, withPromotions);
+  while (length > PROMPT_LENGTH_TARGET && (parts.drafts.length > 0 || parts.rejected.length > 0 || parts.posts.length > 0)) {
+    if (parts.drafts.length > 0) parts.drafts = parts.drafts.slice(0, -1);
+    else if (parts.rejected.length > 0) parts.rejected = parts.rejected.slice(0, -1);
+    else parts.posts = parts.posts.slice(0, -1);
+    prompt = assemble(input, parts, withPromotions);
     length = [...prompt].length;
   }
+  const { posts, drafts, rejected } = parts;
   return {
     prompt,
     summary: {
@@ -235,9 +287,9 @@ export function buildPrompt(input: PromptInput): { prompt: string; summary: Prom
       referencePostCount: posts.length,
       recentDraftCount: drafts.length,
       length,
-      coreRuleCount: 0,
-      ngWordCount: 0,
-      rejectedCount: 0,
+      coreRuleCount: input.coreRules.length,
+      ngWordCount: input.ngWords.length,
+      rejectedCount: rejected.length,
     },
   };
 }
