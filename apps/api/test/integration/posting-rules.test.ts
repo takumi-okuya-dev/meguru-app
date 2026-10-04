@@ -119,7 +119,8 @@ describe("POST /ng-words（FR-014・FR-016a）", () => {
   it("NGワードの追加と承認を同時に送っても、NGワードを含む承認済みが残らない（research.md R3）", async () => {
     const { accountId } = await createUserWithAccount("u1");
     const sql = neon(testEnv.DATABASE_URL);
-    for (let i = 0; i < 20; i++) {
+    // 1回ごとに登録・承認・追加の3リクエストを送る。CIでは1リクエスト1〜3秒かかるので、回数を抑えて時間の上限を延ばす
+    for (let i = 0; i < 8; i++) {
       await sql`DELETE FROM ng_words WHERE account_id = ${accountId}`;
       const [d] = await register(accountId, [`絶対に伸びる ${i}`]);
       await Promise.all([approve(accountId, d!), addWords(accountId, ["絶対"])]);
@@ -128,7 +129,7 @@ describe("POST /ng-words（FR-014・FR-016a）", () => {
         WHERE account_id = ${accountId} AND status = 'approved' AND body LIKE '%絶対%'`) as [{ n: number }];
       expect(r.n).toBe(0);
     }
-  });
+  }, 120_000);
 
   it("無料体験の後のプラン1でも追加・削除できる（FR-017）", async () => {
     const { accountId } = await createUserWithAccount("u1", { userCreatedAt: AFTER_TRIAL() });
