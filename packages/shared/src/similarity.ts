@@ -27,19 +27,22 @@ const IGNORED = /[\s\p{P}\p{S}\p{Extended_Pictographic}]|\u200d|\ufe0f|\u20e3/gu
  * @param body - 本文
  * @returns コードポイントの配列
  */
-function normalizeForSimilarity(body: string): string[] {
-  return [...normalizeForMatch(body).normalized.replace(IGNORED, "")];
+function normalizeForSimilarity(body: string): number[] {
+  return [...normalizeForMatch(body).normalized.replace(IGNORED, "")].map((c) => c.codePointAt(0)!);
 }
 
+/** コードポイントの上限＋1。2文字組を1つの数（前 × CODE_SPACE ＋ 後）にする。 */
+const CODE_SPACE = 0x110000;
+
 /**
- * 2文字組の多重集合（組 → 個数）。
- * @param chars - 正規化した文字
+ * 2文字組の多重集合（組 → 個数）。組は数にして持つ（文字列の連結より速い）。
+ * @param codes - 正規化した文字のコードポイント
  * @returns 2文字組の個数
  */
-function bigrams(chars: string[]): Map<string, number> {
-  const m = new Map<string, number>();
-  for (let i = 0; i + 1 < chars.length; i++) {
-    const g = chars[i]! + chars[i + 1]!;
+function bigrams(codes: number[]): Map<number, number> {
+  const m = new Map<number, number>();
+  for (let i = 0; i + 1 < codes.length; i++) {
+    const g = codes[i]! * CODE_SPACE + codes[i + 1]!;
     m.set(g, (m.get(g) ?? 0) + 1);
   }
   return m;
@@ -47,36 +50,46 @@ function bigrams(chars: string[]): Map<string, number> {
 
 /**
  * レーベンシュタイン距離（2行のDP。メモリはO(n)）。
- * @param a - 文字の配列
- * @param b - 文字の配列
+ * @param a - コードポイントの配列
+ * @param b - コードポイントの配列
  * @returns 距離
  */
-function levenshtein(a: string[], b: string[]): number {
-  let prev = Array.from({ length: b.length + 1 }, (_, j) => j);
-  let cur = new Array<number>(b.length + 1);
+function levenshtein(a: number[], b: number[]): number {
+  let prev = new Int32Array(b.length + 1);
+  let cur = new Int32Array(b.length + 1);
+  for (let j = 0; j <= b.length; j++) prev[j] = j;
   for (let i = 1; i <= a.length; i++) {
     cur[0] = i;
+    const ai = a[i - 1];
     for (let j = 1; j <= b.length; j++) {
-      cur[j] = Math.min(
-        prev[j]! + 1,
-        cur[j - 1]! + 1,
-        prev[j - 1]! + (a[i - 1] === b[j - 1] ? 0 : 1),
-      );
+      const sub = prev[j - 1]! + (ai === b[j - 1] ? 0 : 1);
+      const del = prev[j]! + 1;
+      const ins = cur[j - 1]! + 1;
+      cur[j] = sub < del ? (sub < ins ? sub : ins) : del < ins ? del : ins;
     }
     [prev, cur] = [cur, prev];
   }
   return prev[b.length]!;
 }
 
-type Prepared = { id: string; chars: string[]; grams: Map<string, number>; total: number };
+type Prepared = { id: string; codes: number[]; grams: Map<number, number>; total: number };
 
-function prepare(items: SimilarityInput[]): Prepared[] {
+function prepare(items: SimilarityInput[], cache: Map<string, Prepared | null>): Prepared[] {
   const out: Prepared[] = [];
   for (const { id, body } of items) {
-    const chars = normalizeForSimilarity(body);
-    // 短すぎる本文は、比べる側にも比べられる側にも入れない（偶然似やすいため）
-    if (chars.length < SIMILARITY_MIN_LENGTH) continue;
-    out.push({ id, chars, grams: bigrams(chars), total: chars.length - 1 });
+    // targets と others に同じ下書きが入るので、同じIDと本文の正規化は1回にする
+    const key = `${id}\u0000${body}`;
+    let p = cache.get(key);
+    if (p === undefined) {
+      const codes = normalizeForSimilarity(body);
+      // 短すぎる本文は、比べる側にも比べられる側にも入れない（偶然似やすいため）
+      p =
+        codes.length < SIMILARITY_MIN_LENGTH
+          ? null
+          : { id, codes, grams: bigrams(codes), total: codes.length - 1 };
+      cache.set(key, p);
+    }
+    if (p) out.push(p);
   }
   return out;
 }
@@ -92,41 +105,50 @@ export function computeSimilarities(
   targets: SimilarityInput[],
   others: SimilarityInput[],
 ): Map<string, SimilarityResult> {
-  const ts = prepare(targets);
-  const os = prepare(others);
-  // 2文字組 → それを含む相手（相手の位置と個数）の逆引き
-  const index = new Map<string, { o: number; n: number }[]>();
+  const cache = new Map<string, Prepared | null>();
+  const os = prepare(others, cache);
+  const ts = prepare(targets, cache);
+  // 2文字組 → それを含む相手の逆引き。[相手の位置, 個数, 相手の位置, 個数, …] の平らな配列にする
+  const index = new Map<number, number[]>();
   os.forEach((p, o) => {
     for (const [g, n] of p.grams) {
       const list = index.get(g);
-      if (list) list.push({ o, n });
-      else index.set(g, [{ o, n }]);
+      if (list) list.push(o, n);
+      else index.set(g, [o, n]);
     }
   });
 
   const result = new Map<string, SimilarityResult>();
+  // 共通の2文字組の数（多重集合の共通部分）。対象ごとに、触れた位置だけを0に戻して使い回す
+  const common = new Int32Array(os.length);
+  const touched: number[] = [];
   for (const t of ts) {
-    // 共通の2文字組の数（多重集合の共通部分）
-    const common = new Map<number, number>();
     for (const [g, n] of t.grams) {
-      for (const { o, n: m } of index.get(g) ?? [])
-        common.set(o, (common.get(o) ?? 0) + Math.min(n, m));
+      const list = index.get(g);
+      if (!list) continue;
+      for (let k = 0; k < list.length; k += 2) {
+        const o = list[k]!;
+        const m = list[k + 1]!;
+        if (common[o] === 0) touched.push(o);
+        common[o] = common[o]! + (n < m ? n : m);
+      }
     }
     const scored: { o: number; dice: number }[] = [];
-    for (const [o, c] of common) {
-      if (os[o]!.id === t.id) continue;
-      scored.push({ o, dice: (2 * c) / (t.total + os[o]!.total) });
+    for (const o of touched) {
+      if (os[o]!.id !== t.id) scored.push({ o, dice: (2 * common[o]!) / (t.total + os[o]!.total) });
+      common[o] = 0;
     }
+    touched.length = 0;
     scored.sort((a, b) => b.dice - a.dice);
     const final = scored.map(({ o, dice }, rank) => {
       const other = os[o]!;
       let s = dice;
       const short =
-        t.chars.length <= SIMILARITY_EDIT_DISTANCE_MAX_LENGTH &&
-        other.chars.length <= SIMILARITY_EDIT_DISTANCE_MAX_LENGTH;
+        t.codes.length <= SIMILARITY_EDIT_DISTANCE_MAX_LENGTH &&
+        other.codes.length <= SIMILARITY_EDIT_DISTANCE_MAX_LENGTH;
       if (short && rank < EDIT_DISTANCE_CANDIDATES && dice >= EDIT_DISTANCE_MIN_DICE) {
         const ratio =
-          1 - levenshtein(t.chars, other.chars) / Math.max(t.chars.length, other.chars.length);
+          1 - levenshtein(t.codes, other.codes) / Math.max(t.codes.length, other.codes.length);
         s = Math.max(s, ratio);
       }
       return { id: other.id, score: Math.round(s * 100) };
