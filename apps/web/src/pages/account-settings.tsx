@@ -1,10 +1,11 @@
-// Account設定（FR-013・FR-019・FR-020・FR-022、規則9・10）
+// Account設定（FR-013・FR-019・FR-020・FR-022、規則9・10）。004で「投稿のルール」の区分を、既存の区分より上に足した
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { normalizeUsername } from "@threads-grower/shared";
 import { useState } from "react";
 import { useNavigate } from "react-router";
 import { ConnectionBadge } from "@/components/ConnectionBadge";
 import { PageBody, PageHeader } from "@/components/layout/PageHeader";
+import { PostingRulesSection } from "@/components/settings/PostingRulesSection";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
@@ -63,6 +64,8 @@ export function AccountSettings() {
             <ConnectionBadge status={account.connectionStatus} />
           </div>
         </section>
+
+        <PostingRulesSection accountId={account.id} />
 
         <section className="space-y-3">
           <h2 className="font-medium">Threadsとの接続</h2>

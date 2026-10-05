@@ -18,7 +18,7 @@ export async function resetAll() {
   await client.connect();
   try {
     await client.query(
-      "TRUNCATE users, accounts, memberships, threads_connections, oauth_states, threads_deletion_requests, threads_revocations, strategy_designs, promotions, reference_posts, research_keywords, draft_batches, post_drafts CASCADE",
+      "TRUNCATE users, accounts, memberships, threads_connections, oauth_states, threads_deletion_requests, threads_revocations, strategy_designs, promotions, reference_posts, research_keywords, draft_batches, post_drafts, ng_words CASCADE",
     );
   } finally {
     await client.end();

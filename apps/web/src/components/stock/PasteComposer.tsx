@@ -9,8 +9,7 @@ import {
   type DraftBatchResult,
 } from "@threads-grower/shared";
 import { ArrowUpIcon, XIcon } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
-import { useLocation } from "react-router";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { ApiError, api } from "@/lib/api-client";
@@ -20,8 +19,8 @@ import { useUnsavedChanges } from "@/lib/use-unsaved-changes";
 import { STOCK_LIMIT_MESSAGE } from "./messages";
 
 type Notice = { message: string; retry: boolean };
-/** 下書きを選んでいるときの状態と操作（US3）。 */
-export type DraftSelection = { count: number; onClear: () => void; onDelete: () => void };
+/** 下書きを選んでいるときの状態と操作（003 US3、004 FR-004）。actions はタブごとの操作のボタン。 */
+export type DraftSelection = { count: number; onClear: () => void; actions: ReactNode };
 type Registered = { result: DraftBatchResult; text: string };
 
 /**
@@ -39,7 +38,8 @@ function pasteTooLargeMessage(details: string[]): string {
  * 貼り付け欄。登録直後の案内（件数・取り消し）も、この欄のすぐ上に出す。
  * 下書きを1件でも選んでいる間は、欄の代わりに選択のバーを出す（書きかけの内容は残る）。
  * @param props - accountId：Account の ID、atLimit：要確認の下書きが上限に達しているか（送るボタンを無効にする）、
- *   beforeSubmit：送る前に済ませておく処理（待っている削除の確定）、selection：下書きの選択の状態と操作
+ *   beforeSubmit：送る前に済ませておく処理（待っている削除の確定）、selection：下書きの選択の状態と操作、
+ *   focusKey：欄にフォーカスを当てる移動のキー（押すたびに変わる）
  * @returns 貼り付け欄、または選択のバー
  */
 export function PasteComposer({
@@ -47,14 +47,15 @@ export function PasteComposer({
   atLimit,
   beforeSubmit,
   selection,
+  focusKey,
 }: {
   accountId: string;
   atLimit: boolean;
   beforeSubmit?: () => Promise<void>;
   selection?: DraftSelection;
+  focusKey?: string;
 }) {
   const queryClient = useQueryClient();
-  const location = useLocation();
   const [text, setText] = useState("");
   const [notice, setNotice] = useState<Notice | null>(null);
   const [registered, setRegistered] = useState<Registered | null>(null);
@@ -67,11 +68,7 @@ export function PasteComposer({
   // 書きかけの内容は、移動・タブを閉じる前に確認する（FR-022）
   useUnsavedChanges(text.trim() !== "");
 
-  // サイドバーの「投稿をつくる」から来たら、欄にフォーカスを当てる（FR-021）
-  const focusComposer = (location.state as { focusComposer?: boolean } | null)?.focusComposer === true;
-  useEffect(() => {
-    if (focusComposer) areaRef.current?.focus();
-  }, [focusComposer, location.key]);
+  const focusedFor = useRef<string | null>(null);
 
   const refresh = () => {
     void queryClient.invalidateQueries({ queryKey: queryKeys.postDrafts(accountId) });
@@ -139,6 +136,18 @@ export function PasteComposer({
   const busy = preparing || send.isPending;
   const blank = text.trim() === "";
   const canSend = !blank && !busy && !atLimit;
+
+  // サイドバーの「投稿をつくる」から来て、プロンプトを作れないとき（プラン1）は、欄にフォーカスを当てる
+  // （003 FR-021。プロンプトを作れるときはプロンプトのカードに移る。specs/004 Clarifications 2026-10-05）。
+  // 選択のバーで欄が隠れている間や、送信中で欄が使えない間は待つ。実際に欄にフォーカスが移ったときだけ
+  // 済ませた扱いにする（PR #5 のCodexレビュー）
+  const showingSelection = !!selection && selection.count > 0;
+  useEffect(() => {
+    const area = areaRef.current;
+    if (!focusKey || showingSelection || busy || focusedFor.current === focusKey || !area) return;
+    area.focus();
+    if (document.activeElement === area) focusedFor.current = focusKey;
+  }, [focusKey, showingSelection, busy]);
 
   if (selection && selection.count > 0) return <SelectionBar selection={selection} />;
 
@@ -234,9 +243,7 @@ function SelectionBar({ selection }: { selection: DraftSelection }) {
         <Button variant="ghost" className="h-10 rounded-full md:h-9" onClick={selection.onClear}>
           選択を解除
         </Button>
-        <Button variant="destructive" className="h-10 rounded-full md:h-9" onClick={selection.onDelete}>
-          選んだ下書きを削除
-        </Button>
+        {selection.actions}
       </div>
     </div>
   );

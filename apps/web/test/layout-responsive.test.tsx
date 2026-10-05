@@ -1,6 +1,6 @@
 // 001の画面の手直し（docs/ui-design.md「8. 001からの変更点」）：Accountの切り替え、サイドバーの開閉、設定の2段表示
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { MeResponse } from "@threads-grower/shared";
 import { createMemoryRouter, RouterProvider } from "react-router";
@@ -22,9 +22,10 @@ const meResponse: MeResponse = {
   accountLimit: { max: 5, used: 2 },
   threadsAccessMode: "testers",
 };
+const getDraftCounts = vi.fn();
 vi.mock("@/lib/api-client", async (orig) => {
   const actual = await orig<typeof import("@/lib/api-client")>();
-  return { ...actual, api: { ...actual.api, me: () => Promise.resolve(meResponse) } };
+  return { ...actual, api: { ...actual.api, me: () => Promise.resolve(meResponse), getDraftCounts } };
 });
 
 const { AppShell } = await import("@/components/layout/AppShell");
@@ -141,5 +142,28 @@ describe("設定画面の2段表示（767px以下）", () => {
     const router = renderSettings("/settings");
     expect(await screen.findByRole("heading", { name: "外観" })).toBeInTheDocument();
     expect(router.state.location.pathname).toBe("/settings/appearance");
+  });
+});
+
+describe("サイドバーの要確認の件数（specs/004 FR-013）", () => {
+  beforeEach(() => setViewport(1440));
+  afterEach(() => {
+    resetViewport();
+    getDraftCounts.mockReset();
+  });
+
+  it("投稿ストックの右に要確認の件数が出る", async () => {
+    getDraftCounts.mockResolvedValue({ needsReview: 12, approved: 3, rejected: 1 });
+    renderShell();
+    expect(await screen.findByRole("link", { name: /^投稿ストック.*（要確認 12件）$/ })).toBeInTheDocument();
+    expect(getDraftCounts).toHaveBeenCalledWith("a1");
+  });
+
+  it("0件のときは出さない", async () => {
+    getDraftCounts.mockResolvedValue({ needsReview: 0, approved: 3, rejected: 1 });
+    renderShell();
+    expect(await screen.findByRole("link", { name: "投稿ストック" })).toBeInTheDocument();
+    await waitFor(() => expect(getDraftCounts).toHaveBeenCalled());
+    expect(screen.queryByText(/要確認 \d+件/)).not.toBeInTheDocument();
   });
 });

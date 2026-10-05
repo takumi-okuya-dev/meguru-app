@@ -9,7 +9,8 @@ import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/compone
 
 /**
  * 追加・編集のダイアログの枠。閉じる操作（✕・キャンセル・Esc・背景のクリック）は、すべて onRequestClose を通す。
- * @param props - title：見出し、submitLabel：主な操作の文言、onSubmit：保存、onRequestClose：閉じる操作、submitting：保存中、locked：保存できない、children：入力欄
+ * @param props - title：見出し、submitLabel：主な操作の文言、onSubmit：保存、onRequestClose：閉じる操作、submitting：保存中、locked：保存できない、
+ *   lockedNotice：保存できないときの案内（省略すると grower機能の案内）、children：入力欄
  * @returns ダイアログ
  */
 export function FormDialogFrame({
@@ -18,6 +19,7 @@ export function FormDialogFrame({
   submitLabel,
   submitting,
   locked = false,
+  lockedNotice,
   onSubmit,
   onRequestClose,
   children,
@@ -28,6 +30,8 @@ export function FormDialogFrame({
   submitting: boolean;
   /** grower機能が使えなくなった（保存の操作を出さず、案内を出す） */
   locked?: boolean;
+  /** 保存できないときに、grower機能の案内の代わりに出す案内 */
+  lockedNotice?: ReactNode;
   onSubmit: () => void;
   onRequestClose: () => void;
   children: ReactNode;
@@ -59,7 +63,7 @@ export function FormDialogFrame({
           {description}
         </DialogDescription>
         <div className="flex-1 space-y-4 overflow-y-auto px-4 py-4 md:max-h-[65vh] md:px-6 md:py-3">
-          {locked && <GrowerRequiredBanner />}
+          {locked && (lockedNotice ?? <GrowerRequiredBanner />)}
           {children}
         </div>
         <div className="hidden justify-end gap-2 px-6 pt-3 pb-5 md:flex">

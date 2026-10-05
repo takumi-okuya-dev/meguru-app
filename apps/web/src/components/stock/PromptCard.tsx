@@ -1,7 +1,13 @@
 // プロンプトのカード（specs/003 US1、contracts/ui-routes.md「プロンプトのカード」、research.md R11・R13）。
 // 戦略プロファイルから組み立てたプロンプトを、件数を選んでコピーする。grower機能を使えないAccountでは案内に変わる。
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { PROMPT_COUNT_MAX, PROMPT_COUNT_MIN, STRATEGY_TOTAL, type PostDraftList } from "@threads-grower/shared";
+import {
+  PROMPT_COUNT_MAX,
+  PROMPT_COUNT_MIN,
+  STRATEGY_TOTAL,
+  type PostDraftList,
+  type PromptSummary,
+} from "@threads-grower/shared";
 import { ChevronDownIcon, CopyIcon, LockIcon } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router";
@@ -14,6 +20,19 @@ import { queryKeys } from "@/lib/query";
 import { isGrowerRequired, saveErrorMessage } from "@/lib/save-error";
 import { cn } from "@/lib/utils";
 
+/**
+ * 投稿ルール・NGワード・却下の反映の要約（specs/004 FR-025）。0件の項目は出さない。
+ * @param summary - プロンプトの要約
+ * @returns 「・ルール 3件・NGワード 2語・却下 5件」のような文字列
+ */
+function reviewSummary(summary: PromptSummary): string {
+  return [
+    summary.coreRuleCount > 0 ? `・ルール ${summary.coreRuleCount}件` : "",
+    summary.ngWordCount > 0 ? `・NGワード ${summary.ngWordCount}語` : "",
+    summary.rejectedCount > 0 ? `・却下 ${summary.rejectedCount}件` : "",
+  ].join("");
+}
+
 /** 作る件数を変えてから保存するまでの待ち時間（ミリ秒） */
 const SAVE_DELAY_MS = 500;
 
@@ -21,21 +40,38 @@ const isValidCount = (s: string) => /^\d+$/.test(s) && Number(s) >= PROMPT_COUNT
 
 /**
  * プロンプトのカード。
- * @param props - accountId：Account の ID、canGeneratePrompt：grower機能を使えるか、promptPostCount：保存済みの作る件数
+ * @param props - accountId：Account の ID、canGeneratePrompt：grower機能を使えるか、promptPostCount：保存済みの作る件数、
+ *   startKey：サイドバーの「投稿をつくる」から来たときの移動のキー（押すたびに変わる）。プロンプトのカードまで移り、
+ *   「コピー」にフォーカスを当てる（specs/004 Clarifications 2026-10-05）、
+ *   onLocked：画面を開いた後にプロンプトが使えなくなった（無料体験の終了など）。ページは貼り付け欄にフォーカスを移す
  * @returns プロンプトのカード（使えないときは案内）
  */
 export function PromptCard({
   accountId,
   canGeneratePrompt,
   promptPostCount,
+  startKey,
+  onLocked,
 }: {
   accountId: string;
   canGeneratePrompt: boolean;
   promptPostCount: number;
+  startKey?: string;
+  onLocked?: () => void;
 }) {
   const [growerLost, setGrowerLost] = useState(false);
   if (!canGeneratePrompt || growerLost) return <PromptLockedCard />;
-  return <PromptReadyCard accountId={accountId} savedCount={promptPostCount} onGrowerLost={() => setGrowerLost(true)} />;
+  return (
+    <PromptReadyCard
+      accountId={accountId}
+      savedCount={promptPostCount}
+      startKey={startKey}
+      onGrowerLost={() => {
+        setGrowerLost(true);
+        onLocked?.();
+      }}
+    />
+  );
 }
 
 function PromptLockedCard() {
@@ -55,12 +91,17 @@ function PromptLockedCard() {
 function PromptReadyCard({
   accountId,
   savedCount,
+  startKey,
   onGrowerLost,
 }: {
   accountId: string;
   savedCount: number;
+  startKey?: string;
   onGrowerLost: () => void;
 }) {
+  const sectionRef = useRef<HTMLElement>(null);
+  // 「投稿をつくる」で移った先のキー。同じ移動で2回フォーカスを当てない
+  const focusedFor = useRef<string | null>(null);
   const queryClient = useQueryClient();
   // count：プロンプトの取得に使う件数。countInput：入力欄の文字（保存の前の値も持つ）。
   // saved：サーバーに保存できた件数。failed：保存に失敗した件数と理由（同じ件数は自動で送り直さない）
@@ -83,6 +124,21 @@ function PromptReadyCard({
   useEffect(() => {
     if (isGrowerRequired(prompt.error)) onGrowerLost();
   }, [prompt.error, onGrowerLost]);
+
+  // 「投稿をつくる」から来たら、プロンプトを読み込んだ後に、カードまで移って「コピー」にフォーカスを当てる。
+  // 作る流れの最初の一歩（プロンプトのコピー）から始められるようにする（specs/004 Clarifications 2026-10-05）。
+  // 読み込みに失敗して「コピー」が出ていない間は待ち、「再読み込み」で出た時点で当てる。
+  // 実際に当てられたときだけ済ませた扱いにする（PR #5 のCodexレビュー）
+  // 再訪で読み込み直している間は待つ（古い「コピー」で済ませた扱いにしない。PR #5 のCodexレビュー）
+  const copyShown = prompt.isSuccess && !prompt.isFetching;
+  useEffect(() => {
+    if (!startKey || !copyShown || focusedFor.current === startKey) return;
+    const copyButton = sectionRef.current?.querySelector<HTMLButtonElement>("[data-prompt-copy]");
+    if (!copyButton || copyButton.disabled) return;
+    sectionRef.current?.scrollIntoView?.({ block: "start", behavior: "smooth" });
+    copyButton.focus({ preventScroll: true });
+    if (document.activeElement === copyButton) focusedFor.current = startKey;
+  }, [startKey, copyShown]);
 
   const { mutate: save, isPending: saving } = useMutation({
     mutationFn: (n: number) => api.putPromptSettings(accountId, n),
@@ -140,7 +196,7 @@ function PromptReadyCard({
   const summary = prompt.data?.summary;
 
   return (
-    <section aria-label="プロンプト" className="space-y-3 rounded-2xl border bg-card px-4 py-4 md:px-5">
+    <section ref={sectionRef} aria-label="プロンプト" className="scroll-mt-4 space-y-3 rounded-2xl border bg-card px-4 py-4 md:px-5">
       <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
         <div className="min-w-0 space-y-1">
           <h2 className="font-semibold">プロンプトをコピーして、ChatGPTやClaudeに送る</h2>
@@ -155,7 +211,7 @@ function PromptReadyCard({
             ) : (
               <p className="text-[13px] text-muted-foreground">
                 課題 {summary.strategyFilledCount}/{STRATEGY_TOTAL}・宣伝の対象 {summary.promotionCount}件・参考投稿{" "}
-                {summary.referencePostCount}件を反映
+                {summary.referencePostCount}件{reviewSummary(summary)}を反映
               </p>
             ))}
         </div>
@@ -201,7 +257,7 @@ function PromptReadyCard({
         </div>
       ) : (
         <div className="flex flex-wrap items-center gap-2">
-          <Button className="h-11 rounded-full px-5 md:h-9" disabled={!prompt.data} onClick={() => void copy()}>
+          <Button data-prompt-copy className="h-11 rounded-full px-5 md:h-9" disabled={!prompt.data} onClick={() => void copy()}>
             <CopyIcon className="size-4" />
             コピー
           </Button>

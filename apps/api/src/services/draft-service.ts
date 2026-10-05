@@ -1,8 +1,17 @@
 // 投稿ストックの下書き（specs/003-prompt-bulk-register research.md R3・R5〜R8）。
 // 一覧・一括登録・取り消し・編集・まとめての削除の手順を持つ。下書きの操作は全プランで使える（R10）。
-import { NEEDS_REVIEW_LIMIT, findPasteProblem, isOverThreadsLimit, splitDrafts } from "@threads-grower/shared";
+import {
+  NEEDS_REVIEW_LIMIT,
+  REJECTED_LIST_MAX,
+  findPasteProblem,
+  isOverThreadsLimit,
+  splitDrafts,
+  type DraftCounts,
+  type RejectReasonCode,
+} from "@threads-grower/shared";
 import { and, asc, count, desc, eq, inArray, sql } from "drizzle-orm";
 import { withTransaction, type Db, type TxDb } from "../db/client";
+import { lockAccountDrafts } from "../db/locks";
 import { draftBatches, postDrafts } from "../db/schema";
 import type { Env } from "../env";
 import { AppError, itemNotFound, notFound, pgErrorCode } from "../lib/errors";
@@ -23,6 +32,9 @@ export function toPostDraft(row: PostDraftRow) {
     body: row.body,
     status: row.status,
     version: row.version,
+    reviewedAt: row.reviewedAt?.toISOString() ?? null,
+    rejectReasons: (row.rejectReasons ?? []) as RejectReasonCode[],
+    rejectNote: row.rejectNote,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   };
@@ -44,6 +56,65 @@ export async function listDraftRows(db: Db | TxDb, accountId: string, limit?: nu
     .orderBy(desc(draftBatches.createdAt), desc(draftBatches.id), asc(postDrafts.position));
   const rows = limit === undefined ? await query : await query.limit(limit);
   return rows.map((r) => r.draft);
+}
+
+/**
+ * 状態ごとの下書きの件数（FR-001・FR-013）。
+ * @param db - データベース
+ * @param accountId - accounts.id
+ * @returns 要確認・承認済み・却下の件数
+ */
+export async function countDrafts(db: Db | TxDb, accountId: string): Promise<DraftCounts> {
+  const rows = await db
+    .select({ status: postDrafts.status, n: count() })
+    .from(postDrafts)
+    .where(eq(postDrafts.accountId, accountId))
+    .groupBy(postDrafts.status);
+  const n = (status: PostDraftRow["status"]) => Number(rows.find((r) => r.status === status)?.n ?? 0);
+  return { needsReview: n("needs_review"), approved: n("approved"), rejected: n("rejected") };
+}
+
+/**
+ * 承認済み・却下の下書きを、承認・却下した日時の新しい順に読む（FR-012）。
+ * @param db - データベース
+ * @param accountId - accounts.id
+ * @param status - approved か rejected
+ * @param limit - 取得する最大件数（省略するとすべて）
+ * @returns 下書きの行
+ */
+export async function listReviewedRows(
+  db: Db | TxDb,
+  accountId: string,
+  status: "approved" | "rejected",
+  limit?: number,
+): Promise<PostDraftRow[]> {
+  const query = db
+    .select()
+    .from(postDrafts)
+    .where(and(eq(postDrafts.accountId, accountId), eq(postDrafts.status, status)))
+    .orderBy(desc(postDrafts.reviewedAt), desc(postDrafts.id));
+  return limit === undefined ? await query : await query.limit(limit);
+}
+
+/**
+ * 3つの状態の下書きと件数をまとめて読む（GET /post-drafts。research.md R9）。
+ * @param db - データベース
+ * @param accountId - accounts.id
+ * @returns 要確認・承認済み・却下（新しい500件）の下書きと、状態ごとの件数
+ */
+export async function listAllDrafts(db: Db, accountId: string) {
+  const [needsReview, approved, rejected, counts] = await Promise.all([
+    listDraftRows(db, accountId),
+    listReviewedRows(db, accountId, "approved"),
+    listReviewedRows(db, accountId, "rejected", REJECTED_LIST_MAX),
+    countDrafts(db, accountId),
+  ]);
+  return {
+    needsReview: needsReview.map(toPostDraft),
+    approved: approved.map(toPostDraft),
+    rejected: rejected.map(toPostDraft),
+    counts,
+  };
 }
 
 type BatchRow = typeof draftBatches.$inferSelect;
@@ -77,7 +148,7 @@ export async function createDraftBatch(env: Env, accountId: string, req: { clien
   try {
     return await withTransaction(env.DATABASE_URL, async (tx) => {
       // 「Account × 下書き」単位で直列化してから数える（同時の登録でも500件を超えない）
-      await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${`account_items:${accountId}:post_drafts`}, 0))`);
+      await lockAccountDrafts(tx, accountId);
       const [existing] = await tx
         .select()
         .from(draftBatches)
@@ -137,31 +208,49 @@ export async function deleteBatch(db: Db, accountId: string, batchId: string): P
 }
 
 /**
- * 下書きの本文を編集する（FR-019）。要確認の下書きだけを対象にし、本文の前後の空白を除いて保存する。
- * @param db - データベース
+ * 下書きの本文を編集する（003 FR-019、004 FR-007、research.md R5）。要確認と承認済みの下書きを対象にし、
+ * 本文の前後の空白を除いて保存する。承認済みの下書きは、同じ更新で要確認に戻す（直した本文はもう一度承認が要る）。
+ * 状態の変更・NGワードの追加と同じロックで直列化する。要確認の件数の上限は確かめない（編集中に保存できないのを避ける）。
+ * @param env - Workers のバインディング（DATABASE_URL を使う）
  * @param accountId - accounts.id
  * @param id - post_drafts.id（UUID の形は確かめてあること）
  * @param req - body：新しい本文、expectedVersion：読み込んだときの version
- * @returns 更新した PostDraft
- * @throws AppError STALE_UPDATE（他で先に更新された。latest 付き）、ITEM_NOT_FOUND（ない・別のAccountのもの）
+ * @returns draft：更新した PostDraft、reopened：承認済みから要確認に戻したか
+ * @throws AppError STALE_UPDATE（他で先に更新された。latest 付き）、ITEM_NOT_FOUND（ない・別のAccountのもの・却下の下書き）
  */
-export async function updateDraft(db: Db, accountId: string, id: string, req: { body: string; expectedVersion: number }) {
-  const mine = and(eq(postDrafts.id, id), eq(postDrafts.accountId, accountId), eq(postDrafts.status, "needs_review"));
-  const row = await updateWithVersion(
-    () =>
-      db
-        .update(postDrafts)
-        .set({ body: req.body.trim(), version: sql`${postDrafts.version} + 1`, updatedAt: new Date() })
-        .where(and(mine, eq(postDrafts.version, req.expectedVersion)))
-        .returning(),
-    async () => (await db.select().from(postDrafts).where(mine).limit(1))[0],
-    toPostDraft,
-  );
-  return toPostDraft(row);
+export async function updateDraft(env: Env, accountId: string, id: string, req: { body: string; expectedVersion: number }) {
+  return withTransaction(env.DATABASE_URL, async (tx) => {
+    await lockAccountDrafts(tx, accountId);
+    const mine = and(
+      eq(postDrafts.id, id),
+      eq(postDrafts.accountId, accountId),
+      inArray(postDrafts.status, ["needs_review", "approved"]),
+    );
+    const [before] = await tx.select({ status: postDrafts.status }).from(postDrafts).where(mine).limit(1);
+    const row = await updateWithVersion(
+      () =>
+        tx
+          .update(postDrafts)
+          .set({
+            body: req.body.trim(),
+            status: "needs_review",
+            reviewedAt: null,
+            lastReviewRequestId: null,
+            version: sql`${postDrafts.version} + 1`,
+            updatedAt: new Date(),
+          })
+          .where(and(mine, eq(postDrafts.version, req.expectedVersion)))
+          .returning(),
+      async () => (await tx.select().from(postDrafts).where(mine).limit(1))[0],
+      toPostDraft,
+    );
+    return { draft: toPostDraft(row), reopened: before?.status === "approved" };
+  });
 }
 
 /**
- * 下書きをまとめて削除する（FR-020）。そのAccountの要確認の下書きだけを消し、それ以外のIDは無視する。
+ * 下書きをまとめて削除する（003 FR-020、004 FR-009）。そのAccountの要確認と却下の下書きを消し、それ以外のIDは無視する。
+ * 承認済みの下書きは、要確認に戻してから削除する。
  * @param db - データベース
  * @param accountId - accounts.id
  * @param ids - post_drafts.id の一覧（UUID の形は確かめてあること）
@@ -170,7 +259,13 @@ export async function updateDraft(db: Db, accountId: string, id: string, req: { 
 export async function deleteDrafts(db: Db, accountId: string, ids: string[]): Promise<number> {
   const deleted = await db
     .delete(postDrafts)
-    .where(and(inArray(postDrafts.id, ids), eq(postDrafts.accountId, accountId), eq(postDrafts.status, "needs_review")))
+    .where(
+      and(
+        inArray(postDrafts.id, ids),
+        eq(postDrafts.accountId, accountId),
+        inArray(postDrafts.status, ["needs_review", "rejected"]),
+      ),
+    )
     .returning({ id: postDrafts.id });
   return deleted.length;
 }

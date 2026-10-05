@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { POLICY_PROMPT_RULES } from "../src/policy";
 import { buildPrompt, type PromptInput } from "../src/prompt";
 import { emptyStrategyValues } from "../src/strategy";
 
@@ -11,6 +12,9 @@ function input(overrides: Partial<PromptInput> = {}): PromptInput {
     promotionRatioPercent: 20,
     referencePosts: [],
     recentDrafts: [],
+    coreRules: [],
+    ngWords: [],
+    rejectedDrafts: [],
     ...overrides,
   };
 }
@@ -150,5 +154,86 @@ describe("buildPrompt（contracts/prompt-template.md）", () => {
   it("要約の length は全文のコードポイントの数", () => {
     const { prompt, summary } = buildPrompt(input({ displayName: "😀" }));
     expect(summary.length).toBe([...prompt].length);
+  });
+});
+
+describe("CORE RULESと却下された投稿（specs/004-review-approval contracts/prompt-template.md）", () => {
+  const rejected = (body: string, reasonLabels: string[] = [], note: string | null = null) => ({ body, reasonLabels, note });
+
+  it("材料がなくても「■絶対に守るルール(CORE RULES)」が話者の直後にあり、規約上のルール6つが入る（FR-041、SC-009）", () => {
+    const { prompt, summary } = buildPrompt(input());
+    const rules = POLICY_PROMPT_RULES.map((r) => `・${r}`).join("\n");
+    expect(prompt).toContain(`■話者\n表示名: たくみ\n\n■絶対に守るルール(CORE RULES)\n${rules}\n\n`);
+    expect(POLICY_PROMPT_RULES).toHaveLength(6);
+    expect(prompt).not.toContain("次の言葉は使わないこと");
+    expect(summary).toMatchObject({ coreRuleCount: 0, ngWordCount: 0, rejectedCount: 0 });
+  });
+
+  it("規約上のルール → 投稿ルールの行 → NGワードの1行の順。行頭の記号はそのまま残す（FR-022、SC-006）", () => {
+    const { prompt, summary } = buildPrompt(
+      input({ coreRules: ["断定口調は使わない", "- 医療の効果をうたわない"], ngWords: ["絶対", "必ず儲かる"] }),
+    );
+    const last = POLICY_PROMPT_RULES.at(-1)!;
+    expect(prompt).toContain(
+      `・${last}\n・断定口調は使わない\n・- 医療の効果をうたわない\n・次の言葉は使わないこと: 絶対、必ず儲かる\n\n`,
+    );
+    expect(summary).toMatchObject({ coreRuleCount: 2, ngWordCount: 2 });
+  });
+
+  it("宣伝内容の最後の文は「上記のCORE RULES・トーンをそのまま守ること」", () => {
+    const { prompt } = buildPrompt(input({ promotions: [promo("体験会")] }));
+    expect(prompt).toContain("押し売り・広告っぽい言い回しにはせず、上記のCORE RULES・トーンをそのまま守ること。");
+  });
+
+  it("却下の節は宣伝内容の後・リサーチの前。理由は候補だけ・自由記述だけ・両方で書き分ける（FR-023）", () => {
+    const { prompt, summary } = buildPrompt(
+      input({
+        promotions: [promo("体験会")],
+        referencePosts: [{ body: "参考", keyword: "", whyGood: "" }],
+        rejectedDrafts: [
+          rejected("却下A", ["トーンが違う", "内容が薄い"]),
+          rejected("却下B", [], "語尾がきつい"),
+          rejected("却下C\n2行目", ["トーンが違う"], "語尾がきつい"),
+        ],
+      }),
+    );
+    expect(prompt).toContain(
+      "■過去に却下された投稿(この傾向は繰り返さないこと)\n" +
+        "1. 却下A(却下理由: トーンが違う・内容が薄い)\n" +
+        "2. 却下B(却下理由: 語尾がきつい)\n" +
+        "3. 却下C\n2行目(却下理由: トーンが違う / 語尾がきつい)",
+    );
+    const at = (s: string) => prompt.indexOf(s);
+    expect(at("■今回組み込む宣伝内容")).toBeLessThan(at("■過去に却下された投稿"));
+    expect(at("■過去に却下された投稿")).toBeLessThan(at("■リサーチで見つけた"));
+    expect(prompt).toContain("- 上に書かれている却下された投稿・宣伝内容・リサーチ内容とも、");
+    expect(summary.rejectedCount).toBe(3);
+  });
+
+  it("却下は10件まで。0件なら節がない", () => {
+    const many = Array.from({ length: 11 }, (_, i) => rejected(`却下${i}`, ["トーンが違う"]));
+    const { prompt, summary } = buildPrompt(input({ rejectedDrafts: many }));
+    expect(prompt).toContain("10. 却下9(");
+    expect(prompt).not.toContain("却下10");
+    expect(summary.rejectedCount).toBe(10);
+    expect(buildPrompt(input()).prompt).not.toContain("■過去に却下された投稿");
+  });
+
+  it("長さの目安を超えると、直近の下書き → 却下 → 参考投稿の順に減らし、CORE RULESは減らさない", () => {
+    const long = (s: string) => s.repeat(1500);
+    const { prompt, summary } = buildPrompt(
+      input({
+        recentDrafts: Array.from({ length: 5 }, (_, i) => long(`d${i}`)),
+        rejectedDrafts: Array.from({ length: 10 }, (_, i) => rejected(long(`j${i}`), ["トーンが違う"])),
+        referencePosts: Array.from({ length: 10 }, (_, i) => ({ body: long(`r${i}`), keyword: "", whyGood: "" })),
+        coreRules: ["断定口調は使わない"],
+        ngWords: ["絶対"],
+      }),
+    );
+    expect(summary.length).toBeLessThanOrEqual(30000);
+    expect(summary.recentDraftCount).toBe(0);
+    expect(summary.rejectedCount).toBe(0);
+    expect(summary.referencePostCount).toBeGreaterThan(0);
+    expect(prompt).toContain("・断定口調は使わない\n・次の言葉は使わないこと: 絶対");
   });
 });

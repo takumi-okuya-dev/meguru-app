@@ -30,4 +30,7 @@ export const queryKeys = {
   prompt: (id: string, count: number) => ["account", id, "prompt", count] as const,
   promptAll: (id: string) => ["account", id, "prompt"] as const,
   postDrafts: (id: string) => ["account", id, "post-drafts"] as const,
+  // 承認・却下（specs/004-review-approval）。件数は post-drafts の下に置き、下書きの取り直しで一緒に取り直す
+  draftCounts: (id: string) => ["account", id, "post-drafts", "counts"] as const,
+  postingRules: (id: string) => ["account", id, "posting-rules"] as const,
 };
