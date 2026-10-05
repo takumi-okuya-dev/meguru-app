@@ -29,7 +29,8 @@ function Empty({ children }: { children: ReactNode }) {
 /**
  * タブごとの下書きの一覧。
  * @param props - tab：表示するタブ、items：下書き（API の順）、limit：要確認の上限、canGeneratePrompt：空の状態の文言の切り替え、
- *   total：そのタブの全件数（却下は500件までしか返らないため）、renderCard：1件のカード
+ *   total：そのタブの全件数（却下は500件までしか返らないため）、renderCard：1件のカード、
+ *   onSelectBatch：登録のまとまりの下書きを選択に足す（要確認。FR-004a）
  * @returns 一覧
  */
 export function DraftList({
@@ -39,6 +40,7 @@ export function DraftList({
   canGeneratePrompt,
   total,
   renderCard,
+  onSelectBatch,
 }: {
   tab: PostDraftStatus;
   items: PostDraft[];
@@ -46,6 +48,7 @@ export function DraftList({
   canGeneratePrompt: boolean;
   total: number;
   renderCard: (draft: PostDraft) => ReactNode;
+  onSelectBatch?: (drafts: PostDraft[]) => void;
 }) {
   if (tab === "approved") {
     return (
@@ -99,9 +102,20 @@ export function DraftList({
           aria-label={`${formatDateTime(g.createdAt)}に登録した${g.drafts.length}件`}
           className="space-y-2"
         >
-          <h3 className="px-1 text-xs text-muted-foreground">
-            {formatDateTime(g.createdAt)}に登録した{g.drafts.length}件
-          </h3>
+          <div className="flex items-center justify-between gap-2 px-1">
+            <h3 className="text-xs text-muted-foreground">
+              {formatDateTime(g.createdAt)}に登録した{g.drafts.length}件
+            </h3>
+            {onSelectBatch && (
+              <button
+                type="button"
+                className="min-h-8 text-xs text-ring underline"
+                onClick={() => onSelectBatch(g.drafts)}
+              >
+                この{g.drafts.length}件を選択
+              </button>
+            )}
+          </div>
           <ul className="space-y-2">{g.drafts.map(renderCard)}</ul>
         </section>
       ))}

@@ -30,12 +30,20 @@ import { PromptCard } from "@/components/stock/PromptCard";
 import { RejectDialog } from "@/components/stock/RejectDialog";
 import { REOPENED_BY_EDIT } from "@/components/stock/messages";
 import { PolicyConfirmDialog } from "@/components/stock/PolicyConfirmDialog";
+import { BulkApproveDialog } from "@/components/stock/BulkApproveDialog";
 import { StatusTabs, useStatusTab } from "@/components/stock/StatusTabs";
 import { useDeferredDelete } from "@/components/stock/use-deferred-delete";
 import { useReview, type ReviewOptions } from "@/components/stock/use-review";
 import { useSimilarities } from "@/components/stock/use-similarities";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent } from "@/components/ui/tabs";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { ChevronDownIcon } from "lucide-react";
 import { api } from "@/lib/api-client";
 import { queryKeys } from "@/lib/query";
 import { useCurrentAccount } from "@/pages/account-layout";
@@ -61,6 +69,8 @@ export function StockPage() {
     targets: PostDraft[];
     cautious: PostDraft[];
   } | null>(null);
+  // まとめて承認の確認（FR-004b）で待っている、選んだ下書き
+  const [bulkApproving, setBulkApproving] = useState<PostDraft[] | null>(null);
   const [busy, setBusy] = useState(false);
   const { hidden, remove, flush } = useDeferredDelete(account.id);
   const { review } = useReview(account.id);
@@ -149,6 +159,15 @@ export function StockPage() {
   };
   const reopen = (targets: PostDraft[]) => void runReview("reopen", targets);
 
+  // 注意の付いていない下書き：NGワード・Threadsの上限・規約に注意・似ている投稿（80%以上）のどれにも当たらない（FR-004a）
+  const isClean = (d: PostDraft) => {
+    const c = checks.get(d.id);
+    return !!c && c.approvable && c.policyCautions.length === 0 && !isSimilar(d);
+  };
+  const cleanDrafts = lists.needs_review.filter(isClean);
+  const addToSelection = (ds: PostDraft[]) =>
+    setPicked((prev) => new Set([...prev, ...ds.map((d) => d.id)]));
+
   const changeTab = (value: string) => {
     if (!TAB_VALUES.includes(value as PostDraftStatus)) return;
     setTab(value as PostDraftStatus);
@@ -200,7 +219,8 @@ export function StockPage() {
         <Button
           className="h-10 rounded-full md:h-9"
           disabled={busy}
-          onClick={() => approve(selected)}
+          // まとめて承認は、責任の確認を経てから送る（FR-004b。規約に注意の確認も兼ねる）
+          onClick={() => setBulkApproving(selected)}
         >
           まとめて承認
         </Button>
@@ -295,17 +315,51 @@ export function StockPage() {
           <div className="flex items-center justify-between gap-3">
             <StatusTabs counts={counts ?? undefined} />
             {items.length > 0 && (
-              <label className="flex min-h-11 shrink-0 cursor-pointer items-center gap-2 px-1 text-sm md:min-h-9">
-                <input
-                  type="checkbox"
-                  className="size-4 accent-foreground"
-                  checked={allSelected}
-                  onChange={() =>
-                    setPicked(allSelected ? new Set() : new Set(items.map((d) => d.id)))
-                  }
-                />
-                すべて選択
-              </label>
+              <div className="flex shrink-0 items-center">
+                <label className="flex min-h-11 cursor-pointer items-center gap-2 px-1 text-sm md:min-h-9">
+                  <input
+                    type="checkbox"
+                    className="size-4 accent-foreground"
+                    checked={allSelected}
+                    onChange={() =>
+                      setPicked(allSelected ? new Set() : new Set(items.map((d) => d.id)))
+                    }
+                  />
+                  すべて選択
+                </label>
+                {tab === "needs_review" && (
+                  // 選び方のメニュー（FR-004a）
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="size-11 text-muted-foreground md:size-8"
+                        aria-label="選び方"
+                      >
+                        <ChevronDownIcon className="size-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem onSelect={() => setPicked(new Set(items.map((d) => d.id)))}>
+                        すべて選択
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        // 類似度の計算が終わるまでは、似ている投稿を見分けられないので選べない
+                        disabled={similarities === null || cleanDrafts.length === 0}
+                        onSelect={() => setPicked(new Set(cleanDrafts.map((d) => d.id)))}
+                      >
+                        {similarities === null
+                          ? "承認できるものを選択（類似度を計算中）"
+                          : `承認できるものを選択（${cleanDrafts.length}件）`}
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onSelect={() => setPicked(new Set())}>
+                        選択を解除
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                )}
+              </div>
             )}
           </div>
           {TAB_VALUES.map((value) => (
@@ -320,6 +374,7 @@ export function StockPage() {
                   canGeneratePrompt={data.canGeneratePrompt}
                   total={value === "rejected" ? (counts?.rejected ?? 0) : lists[value].length}
                   renderCard={renderCard}
+                  onSelectBatch={addToSelection}
                 />
               )}
             </TabsContent>
@@ -355,6 +410,21 @@ export function StockPage() {
           onClose={() => setEditing(null)}
           onDeletedElsewhere={refresh}
           ngWords={data?.ngWords ?? []}
+        />
+      )}
+      {bulkApproving && (
+        <BulkApproveDialog
+          selected={bulkApproving.length}
+          blocked={bulkApproving.filter((d) => !checks.get(d.id)?.approvable).length}
+          cautious={bulkApproving.filter((d) => cautionsOf(d).length > 0).length}
+          onConfirm={() => {
+            const targets = bulkApproving;
+            setBulkApproving(null);
+            void runReview("approve", targets, {
+              confirmPolicyCaution: targets.some((d) => cautionsOf(d).length > 0),
+            });
+          }}
+          onCancel={() => setBulkApproving(null)}
         />
       )}
       {confirming && (

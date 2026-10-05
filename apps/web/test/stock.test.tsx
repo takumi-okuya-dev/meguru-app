@@ -868,6 +868,12 @@ describe("承認・却下（004 US1）", () => {
     expect(within(bar).getByRole("button", { name: "まとめて却下" })).toBeInTheDocument();
     expect(within(bar).getByRole("button", { name: "選んだ下書きを削除" })).toBeInTheDocument();
     await user.click(within(bar).getByRole("button", { name: "まとめて承認" }));
+    // 責任の確認（FR-004b）。NGワードの1件は承認されないことも出る
+    const confirm = await screen.findByRole("dialog", { name: "選んだ3件を承認します" });
+    expect(
+      within(confirm).getByText("うち1件はNGワード・Threadsの上限に当たるため、承認されません"),
+    ).toBeInTheDocument();
+    await user.click(within(confirm).getByRole("button", { name: "2件を承認する" }));
     await waitFor(() =>
       expect(toastWarning).toHaveBeenCalledWith(
         "2件を承認しました。1件は承認できませんでした（NGワード 1件）",
@@ -1152,15 +1158,30 @@ describe("規約に注意（004 US5、FR-039・FR-040・FR-043）", () => {
     });
   });
 
-  it("まとめて承認で、選んだうち2件が規約に注意なら件数つきの確認が出る", async () => {
+  it("まとめて承認で、選んだうち2件が規約に注意なら、責任の確認1回にその件数が出て、confirmPolicyCaution: true で送る", async () => {
     const user = userEvent.setup();
     renderPage();
     await user.click(await screen.findByRole("checkbox", { name: "すべて選択" }));
     await user.click(screen.getByRole("button", { name: "まとめて承認" }));
-    const dialog = await screen.findByRole("dialog", {
-      name: "Threadsの規約に触れるおそれのある表現があります",
+    const dialog = await screen.findByRole("dialog", { name: "選んだ3件を承認します" });
+    expect(
+      within(dialog).getByText("うち2件に、Threadsの規約に触れるおそれのある表現があります"),
+    ).toBeInTheDocument();
+    await user.click(within(dialog).getByRole("button", { name: "3件を承認する" }));
+    // 規約に注意の確認は、責任の確認で済ませる（続けて2回は出ない）
+    expect(
+      screen.queryByRole("dialog", { name: "Threadsの規約に触れるおそれのある表現があります" }),
+    ).not.toBeInTheDocument();
+    expect(reviewPostDrafts).toHaveBeenCalledWith("a1", {
+      requestId: expect.any(String),
+      action: "approve",
+      items: [
+        { id: "n1", expectedVersion: 1 },
+        { id: "n2", expectedVersion: 1 },
+        { id: "n3", expectedVersion: 1 },
+      ],
+      confirmPolicyCaution: true,
     });
-    expect(within(dialog).getByText(/選んだうち2件に/)).toBeInTheDocument();
   });
 
   it("却下で「規約に触れそう」が最初から選ばれている", async () => {
@@ -1198,5 +1219,129 @@ describe("規約に注意（004 US5、FR-039・FR-040・FR-043）", () => {
     for (const word of ["安全", "規約に適合", "違反しない", "問題ありません"]) {
       expect(document.body.textContent).not.toContain(word);
     }
+  });
+});
+
+describe("まとめて選ぶ方法と、まとめて承認の前の責任の確認（004 FR-004a・FR-004b、Clarifications 2026-10-05）", () => {
+  const ngWords = [
+    { id: "w1", word: "絶対", normalized: "絶対", createdAt: "2026-10-05T00:00:00.000Z" },
+  ];
+  const base = "朝の散歩を続けて三か月がたった。体より先に気持ちが軽くなった気がする。";
+  const clean1 = draft({
+    id: "c1",
+    body: "仕事の段取りを前日の夜に決めておくと、次の朝の迷いが減る",
+    batchId: "b2",
+  });
+  const clean2 = draft({
+    id: "c2",
+    body: "新しい本を読み始めた。最初の章から引き込まれている",
+    batchId: "b2",
+    position: 1,
+  });
+  const ng = draft({ id: "x1", body: "絶対に伸びる方法をまとめてみた", batchId: "b1" });
+  const policy = draft({
+    id: "x2",
+    body: "誰でも必ず稼げる方法を教えます",
+    batchId: "b1",
+    position: 1,
+  });
+  const similar = draft({
+    id: "x3",
+    body: base.replace("三か月", "四か月"),
+    batchId: "b1",
+    position: 2,
+  });
+  const approvedTwin = draft({
+    id: "p1",
+    body: base,
+    batchId: "b0",
+    status: "approved",
+    version: 2,
+    reviewedAt: "2026-10-04T01:00:00.000Z",
+  });
+
+  beforeEach(() => {
+    listPostDrafts.mockResolvedValue(
+      listResponse({
+        items: [clean1, clean2, ng, policy, similar],
+        approved: [approvedTwin],
+        ngWords,
+      }),
+    );
+    reviewPostDrafts.mockImplementation(async (_a: string, req: { items: { id: string }[] }) => ({
+      updated: req.items.map((i) => ({
+        ...[clean1, clean2].find((d) => d.id === i.id)!,
+        version: 2,
+      })),
+      skipped: [],
+      counts: { needsReview: 3, approved: 3, rejected: 0 },
+    }));
+  });
+
+  it("「承認できるものを選択」で、NGワード・規約に注意・似ている投稿以外だけが選ばれる", async () => {
+    const user = userEvent.setup();
+    renderPage();
+    await screen.findByRole("button", { name: /似ている投稿があります/ });
+    await user.click(screen.getByRole("button", { name: "選び方" }));
+    await user.click(await screen.findByRole("menuitem", { name: "承認できるものを選択（2件）" }));
+    expect(screen.getByText("2件を選択中")).toBeInTheDocument();
+    for (const d of [clean1, clean2]) {
+      expect(
+        screen.getByRole("checkbox", { name: `「${d.body.slice(0, 20)}…」を選択` }),
+      ).toBeChecked();
+    }
+    for (const d of [ng, policy, similar]) {
+      const name = d.body.length > 20 ? `「${d.body.slice(0, 20)}…」を選択` : `「${d.body}」を選択`;
+      expect(screen.getByRole("checkbox", { name })).not.toBeChecked();
+    }
+  });
+
+  it("登録のまとまりの「この◯件を選択」で、そのまとまりの下書きだけが選ばれる", async () => {
+    const user = userEvent.setup();
+    renderPage();
+    await user.click(await screen.findByRole("button", { name: "この2件を選択" }));
+    expect(screen.getByText("2件を選択中")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "この3件を選択" }));
+    expect(screen.getByText("5件を選択中")).toBeInTheDocument();
+  });
+
+  it("まとめて承認で責任の確認が出る。キャンセルなら送らず、確認すると送る", async () => {
+    const user = userEvent.setup();
+    renderPage();
+    await user.click(await screen.findByRole("button", { name: "この2件を選択" }));
+    await user.click(screen.getByRole("button", { name: "まとめて承認" }));
+    let dialog = await screen.findByRole("dialog", { name: "選んだ2件を承認します" });
+    expect(
+      within(dialog).getByText(
+        /投稿の内容は、あなた（アカウントの運用者）の責任のもとで公開されます/,
+      ),
+    ).toBeInTheDocument();
+    await user.click(within(dialog).getByRole("button", { name: "キャンセル" }));
+    expect(reviewPostDrafts).not.toHaveBeenCalled();
+    await user.click(screen.getByRole("button", { name: "まとめて承認" }));
+    dialog = await screen.findByRole("dialog", { name: "選んだ2件を承認します" });
+    await user.click(within(dialog).getByRole("button", { name: "2件を承認する" }));
+    expect(reviewPostDrafts).toHaveBeenCalledWith("a1", {
+      requestId: expect.any(String),
+      action: "approve",
+      items: [
+        { id: "c1", expectedVersion: 1 },
+        { id: "c2", expectedVersion: 1 },
+      ],
+    });
+  });
+
+  it("1件ずつの承認では、責任の確認は出ない", async () => {
+    const user = userEvent.setup();
+    renderPage();
+    await user.click(
+      await screen.findByRole("button", { name: `「${clean1.body.slice(0, 20)}…」を承認` }),
+    );
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(reviewPostDrafts).toHaveBeenCalledWith("a1", {
+      requestId: expect.any(String),
+      action: "approve",
+      items: [{ id: "c1", expectedVersion: 1 }],
+    });
   });
 });
