@@ -541,7 +541,7 @@ describe("貼り付け欄（US2）", () => {
     expect(await screen.findByText("保存していない変更があります")).toBeInTheDocument();
   });
 
-  it("「投稿をつくる」から来たら、欄にフォーカスが当たる（FR-021）", async () => {
+  function renderFromCreate() {
     const router = createMemoryRouter(
       [
         {
@@ -554,13 +554,25 @@ describe("貼り付け欄（US2）", () => {
           children: [{ path: "stock", element: <StockPage /> }],
         },
       ],
-      { initialEntries: [{ pathname: "/accounts/a1/stock", state: { focusComposer: true } }] },
+      { initialEntries: [{ pathname: "/accounts/a1/stock", state: { startCreate: true } }] },
     );
     render(
       <QueryClientProvider client={new QueryClient()}>
         <RouterProvider router={router} />
       </QueryClientProvider>,
     );
+  }
+
+  it("「投稿をつくる」から来たら、プロンプトのカードの「コピー」にフォーカスが当たる（specs/004 Clarifications 2026-10-05）", async () => {
+    renderFromCreate();
+    const copy = await screen.findByRole("button", { name: "コピー" });
+    await waitFor(() => expect(copy).toHaveFocus());
+    expect(composer()).not.toHaveFocus();
+  });
+
+  it("プロンプトを作れないとき（プラン1）は、「投稿をつくる」で欄にフォーカスが当たる（003 FR-021）", async () => {
+    listPostDrafts.mockResolvedValue(listResponse({ canGeneratePrompt: false }));
+    renderFromCreate();
     await waitFor(() => expect(composer()).toHaveFocus());
   });
 });

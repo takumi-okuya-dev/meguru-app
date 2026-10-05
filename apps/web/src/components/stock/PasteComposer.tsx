@@ -10,7 +10,6 @@ import {
 } from "@threads-grower/shared";
 import { ArrowUpIcon, XIcon } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { useLocation } from "react-router";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { ApiError, api } from "@/lib/api-client";
@@ -39,7 +38,8 @@ function pasteTooLargeMessage(details: string[]): string {
  * 貼り付け欄。登録直後の案内（件数・取り消し）も、この欄のすぐ上に出す。
  * 下書きを1件でも選んでいる間は、欄の代わりに選択のバーを出す（書きかけの内容は残る）。
  * @param props - accountId：Account の ID、atLimit：要確認の下書きが上限に達しているか（送るボタンを無効にする）、
- *   beforeSubmit：送る前に済ませておく処理（待っている削除の確定）、selection：下書きの選択の状態と操作
+ *   beforeSubmit：送る前に済ませておく処理（待っている削除の確定）、selection：下書きの選択の状態と操作、
+ *   focusKey：欄にフォーカスを当てる移動のキー（押すたびに変わる）
  * @returns 貼り付け欄、または選択のバー
  */
 export function PasteComposer({
@@ -47,14 +47,15 @@ export function PasteComposer({
   atLimit,
   beforeSubmit,
   selection,
+  focusKey,
 }: {
   accountId: string;
   atLimit: boolean;
   beforeSubmit?: () => Promise<void>;
   selection?: DraftSelection;
+  focusKey?: string;
 }) {
   const queryClient = useQueryClient();
-  const location = useLocation();
   const [text, setText] = useState("");
   const [notice, setNotice] = useState<Notice | null>(null);
   const [registered, setRegistered] = useState<Registered | null>(null);
@@ -67,11 +68,11 @@ export function PasteComposer({
   // 書きかけの内容は、移動・タブを閉じる前に確認する（FR-022）
   useUnsavedChanges(text.trim() !== "");
 
-  // サイドバーの「投稿をつくる」から来たら、欄にフォーカスを当てる（FR-021）
-  const focusComposer = (location.state as { focusComposer?: boolean } | null)?.focusComposer === true;
+  // サイドバーの「投稿をつくる」から来て、プロンプトを作れないとき（プラン1）は、欄にフォーカスを当てる
+  // （003 FR-021。プロンプトを作れるときはプロンプトのカードに移る。specs/004 Clarifications 2026-10-05）
   useEffect(() => {
-    if (focusComposer) areaRef.current?.focus();
-  }, [focusComposer, location.key]);
+    if (focusKey) areaRef.current?.focus();
+  }, [focusKey]);
 
   const refresh = () => {
     void queryClient.invalidateQueries({ queryKey: queryKeys.postDrafts(accountId) });

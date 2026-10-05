@@ -80,10 +80,11 @@ export function Sidebar({ onCollapse, onNavigate }: { onCollapse?: () => void; o
       </div>
       <nav aria-label="このアカウント" className="flex-1 space-y-0.5 overflow-y-auto px-2 py-1">
         {accountId && (
-          // 投稿ストックの画面へ移動し、貼り付け欄にフォーカスを当てる（specs/003 FR-021）
+          // 投稿ストックの画面へ移動し、プロンプトのカード（作る流れの最初の一歩）から始める。
+          // プロンプトを作れないプラン1では、貼り付け欄にフォーカスを当てる（specs/003 FR-021、specs/004 Clarifications 2026-10-05）
           <Link
             to={`${base}/stock`}
-            state={{ focusComposer: true }}
+            state={{ startCreate: true }}
             className={itemClass({ isActive: false })}
             onClick={onNavigate}
           >

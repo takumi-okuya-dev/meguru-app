@@ -657,6 +657,8 @@ description: "重複検知・承認/却下・NGワード（CORE RULES）の実�
 - [X] T066 [US1] `apps/web/src/components/stock/BulkApproveDialog.tsx`を作る（contracts/ui-routes.md「まとめて承認」の確認）。
 - [X] T067 [US1] `apps/web/src/pages/stock.tsx`に、選び方のメニュー（「すべて選択」「承認できるものを選択（{n}件）」「選択を解除」）と、まとめて承認の流れ（`BulkApproveDialog`。規約に注意の確認を兼ねる）を足す。`apps/web/src/components/stock/DraftList.tsx`の登録のまとまりの見出しに「この{n}件を選択」を足す。
 
+- [X] T068 [US1] サイドバーの「投稿をつくる」で、プロンプトのカードの「コピー」にフォーカスを当てる（FR-013a、Clarifications 2026-10-05）。`apps/web/src/components/layout/Sidebar.tsx`の移動の`state`を`startCreate`にし、`apps/web/src/pages/stock.tsx`から`PromptCard`（grower機能あり）または`PasteComposer`（なし）にフォーカスの合図を渡す。`apps/web/test/stock.test.tsx`の003のフォーカスのテストを、この2通りに直す。
+
 ---
 
 ## 依存関係と実行順

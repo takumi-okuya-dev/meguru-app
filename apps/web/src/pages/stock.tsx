@@ -11,6 +11,7 @@ import {
   type PublishCheck,
 } from "@threads-grower/shared";
 import { useMemo, useState } from "react";
+import { useLocation } from "react-router";
 import { toast } from "sonner";
 import { ApiErrorScreen } from "@/components/ApiErrorScreen";
 import { PageBody, PageHeader } from "@/components/layout/PageHeader";
@@ -62,6 +63,11 @@ export function StockPage() {
     queryFn: () => api.listPostDrafts(account.id),
   });
   const { tab, setTab } = useStatusTab();
+  const location = useLocation();
+  // サイドバーの「投稿をつくる」から来たか。押すたびに location.key が変わるので、それをキーにする
+  const startKey = (location.state as { startCreate?: boolean } | null)?.startCreate
+    ? location.key
+    : undefined;
   const [picked, setPicked] = useState<ReadonlySet<string>>(new Set());
   const [editing, setEditing] = useState<PostDraft | null>(null);
   const [rejecting, setRejecting] = useState<PostDraft[] | null>(null);
@@ -307,6 +313,7 @@ export function StockPage() {
             accountId={account.id}
             canGeneratePrompt={data.canGeneratePrompt}
             promptPostCount={data.promptPostCount}
+            startKey={startKey}
           />
         ) : (
           <div className="h-32 animate-pulse rounded-2xl bg-muted" aria-busy="true" />
@@ -389,6 +396,8 @@ export function StockPage() {
             atLimit={atLimit}
             // 削除して確定を待っている下書きは、まだサーバーで数えられているので、登録の前に確定する
             beforeSubmit={flush}
+            // プロンプトを作れないとき（プラン1）は、「投稿をつくる」で貼り付け欄から始める
+            focusKey={data && !data.canGeneratePrompt ? startKey : undefined}
             selection={{
               count: selected.length,
               onClear: () => setPicked(new Set()),
