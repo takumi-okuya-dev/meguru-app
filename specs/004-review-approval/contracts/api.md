@@ -122,9 +122,9 @@ type PromptSummary = {
   ```
 
   - `action`：`approve`・`reject`・`reopen`
-  - `requestId`：操作ごとのID（UUID）。Webが操作のたびに作り、同じ操作の再試行では同じ値を送る（research.md R2）
+  - `requestId`：操作ごとのID（UUID）。Webが操作のたびに作り、同じ操作の再試行では同じ値を送る（research.md R2）。大文字・小文字の違いは同じとみなす（APIが小文字にそろえる）
   - `items`：1〜500件。同じ`id`の重複は不可
-  - `confirmPolicyCaution`：`approve`のときだけ使う。省略は`false`
+  - `confirmPolicyCaution`：`approve`のときだけ送る。省略は`false`。ほかの`action`で送ると`400`
   - `reject`：`reject`のときは必須で、それ以外では送らない。`reasons`（コードの配列、重複不可）と`note`（200文字まで）の、少なくとも一方が空でないこと
 - **処理**：ロックを取ったトランザクションで、各下書きを次の順に判定する。
   1. そのAccountにない：`NOT_FOUND`
@@ -155,7 +155,7 @@ type PromptSummary = {
   }
   ```
 
-- **400** `VALIDATION_FAILED`：`action`が不正、`requestId`がない・UUIDでない、`items`が0件・501件以上・重複、`reject`の理由が空、`reject`以外で`reject`がある
+- **400** `VALIDATION_FAILED`：`action`が不正、`requestId`がない・UUIDでない、`approve`以外で`confirmPolicyCaution`がある、`items`が0件・501件以上・重複、`reject`の理由が空、`reject`以外で`reject`がある
 
 ### GET /api/accounts/:accountId/post-drafts/counts
 

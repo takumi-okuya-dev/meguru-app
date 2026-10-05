@@ -200,6 +200,18 @@ describe("二重の記録の防止と競合（FR-010）", () => {
     expect(r2.updated[0]!.rejectReasons).toEqual(["tone"]);
   });
 
+  it("大文字のUUIDで送った自分の再試行も、同じ操作として updated になる（PR #5 のCodexレビュー）", async () => {
+    const { accountId } = await createUserWithAccount("u1");
+    const [a] = await register(accountId, ["A"]);
+    const requestId = crypto.randomUUID().toUpperCase();
+    const upper = [{ id: a!.id.toUpperCase(), expectedVersion: a!.version }];
+    const first = await reviewOk(accountId, { requestId, action: "approve", items: upper });
+    expect(first.updated.map((d) => d.status)).toEqual(["approved"]);
+    const again = await reviewOk(accountId, { requestId, action: "approve", items: upper });
+    expect(again.skipped).toEqual([]);
+    expect(again.updated[0]).toEqual(first.updated[0]);
+  });
+
   it("別の操作で先に目的の状態になっていたら STALE（別タブの承認を「元に戻す」で取り消せない。PR #5 のCodexレビュー）", async () => {
     const { accountId } = await createUserWithAccount("u1");
     const [a] = await register(accountId, ["A"]);
@@ -260,6 +272,22 @@ describe("理由のない却下と入力の検証（FR-003、Constitution原則I
       ).status,
     ).toBe(400);
     expect((await review(accountId, { action: "reject", items: items(a!) })).status).toBe(400);
+  });
+
+  it("confirmPolicyCaution は approve のときだけ。reject・reopen に付けると 400", async () => {
+    const { accountId } = await createUserWithAccount("u1");
+    const [a] = await register(accountId, ["A"]);
+    const reject = { reasons: ["tone"], note: "" };
+    for (const body of [
+      { action: "reject", items: items(a!), reject, confirmPolicyCaution: true },
+      { action: "reopen", items: items(a!), confirmPolicyCaution: false },
+    ]) {
+      const res = await review(accountId, body);
+      expect(res.status).toBe(400);
+      expect(await res.json()).toMatchObject({
+        error: { code: "VALIDATION_FAILED", details: ["confirmPolicyCaution"] },
+      });
+    }
   });
 
   it("approve に reject を付ける・items が0件・501件・重複は 400", async () => {

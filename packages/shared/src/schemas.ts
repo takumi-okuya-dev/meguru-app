@@ -402,16 +402,26 @@ export const updatePostDraftRequestSchema = z.object({
 /** PUT /post-drafts/:id のレスポンスのスキーマ。承認済みを保存すると reopened: true で要確認に戻る。 */
 export const updatePostDraftResponseSchema = z.object({ draft: postDraftSchema, reopened: z.boolean() });
 
+/**
+ * UUID を小文字にそろえる。DB（uuid 型）は小文字で返すので、比べる前にそろえておく
+ * （大文字で送られた自分の再試行を、別の操作と取り違えないため。PR #5 のCodexレビュー）。
+ */
+const lowerUuid = z
+  .string()
+  .uuid()
+  .transform((s) => s.toLowerCase());
+
 /** POST /post-drafts/review のリクエストのスキーマ（004 contracts/api.md、research.md R2）。 */
 export const reviewRequestSchema = z
   .object({
     action: z.enum(["approve", "reject", "reopen"]),
     /** 操作ごとのID。同じ操作の再試行では同じ値を送り、自分の再試行だけを成功として扱う（research.md R2） */
-    requestId: z.string().uuid(),
+    requestId: lowerUuid,
     items: z
-      .array(z.object({ id: z.string().uuid(), expectedVersion: z.number().int().positive() }))
+      .array(z.object({ id: lowerUuid, expectedVersion: z.number().int().positive() }))
       .min(1)
       .max(REVIEW_MAX_ITEMS),
+    /** 規約に注意の確認を済ませた。approve のときだけ送る */
     confirmPolicyCaution: z.boolean().optional(),
     reject: z
       .object({
@@ -423,6 +433,9 @@ export const reviewRequestSchema = z
   .superRefine((v, ctx) => {
     if (new Set(v.items.map((i) => i.id)).size !== v.items.length) {
       ctx.addIssue({ code: "custom", path: ["items"], message: "duplicate id" });
+    }
+    if (v.action !== "approve" && v.confirmPolicyCaution !== undefined) {
+      ctx.addIssue({ code: "custom", path: ["confirmPolicyCaution"], message: "only for approve" });
     }
     if (v.action !== "reject") {
       if (v.reject) ctx.addIssue({ code: "custom", path: ["reject"], message: "only for reject" });
