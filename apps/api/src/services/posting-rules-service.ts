@@ -27,7 +27,7 @@ export function toNgWord(row: NgWordRow) {
  * @returns NGワードの行
  */
 export async function listNgWords(db: Db | TxDb, accountId: string): Promise<NgWordRow[]> {
-  return db.select().from(ngWords).where(eq(ngWords.accountId, accountId)).orderBy(asc(ngWords.createdAt), asc(ngWords.id));
+  return db.select().from(ngWords).where(eq(ngWords.accountId, accountId)).orderBy(asc(ngWords.seq));
 }
 
 /**
@@ -81,14 +81,14 @@ export async function addNgWords(env: Env, accountId: string, words: string[]) {
       }
       if (toAdd.length === 0) return { added: [], duplicates, reopenedCount: 0 };
 
-      // 1回の送信で足した語も「登録の古い順」が入力の順になるよう、1ミリ秒ずつずらした日時を入れる
-      // （既定の now() はトランザクションの中で同じ値になり、並びが ID 任せになるため）
-      const base = Date.now();
+      // 登録の順は seq（増え続ける番号）で持つ。1回の送信の中も、入力の順に番号が振られる
       const added = await tx
         .insert(ngWords)
-        .values(toAdd.map((w, i) => ({ accountId, ...w, createdAt: new Date(base + i) })))
+        .values(toAdd.map((w) => ({ accountId, ...w })))
         .returning();
-      // 足した語を含む承認済みの下書きを要確認に戻す（「承認済み」は常にその時点のNGワードを通ったものだけにする）
+      // 足した語を含む承認済みの下書きを要確認に戻す（「承認済み」は常にその時点のNGワードを通ったものだけにする）。
+      // 要確認の上限（500件）は確かめない。安全のため、該当するものはすべて戻す（要確認は最大で 500＋承認済み500 件になる。
+      // data-model.md「件数の上限」、PR #5 のCodexレビュー）
       const approved = await tx
         .select({ id: postDrafts.id, body: postDrafts.body })
         .from(postDrafts)
@@ -97,10 +97,16 @@ export async function addNgWords(env: Env, accountId: string, words: string[]) {
       if (hitIds.length > 0) {
         await tx
           .update(postDrafts)
-          .set({ status: "needs_review", reviewedAt: null, version: sql`${postDrafts.version} + 1`, updatedAt: new Date() })
+          .set({
+            status: "needs_review",
+            reviewedAt: null,
+            lastReviewRequestId: null,
+            version: sql`${postDrafts.version} + 1`,
+            updatedAt: new Date(),
+          })
           .where(and(eq(postDrafts.accountId, accountId), inArray(postDrafts.id, hitIds)));
       }
-      added.sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
+      added.sort((a, b) => a.seq - b.seq);
       return { added: added.map(toNgWord), duplicates, reopenedCount: hitIds.length };
     });
   } catch (err) {

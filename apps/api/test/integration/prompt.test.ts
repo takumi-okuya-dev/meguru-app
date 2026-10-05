@@ -168,11 +168,11 @@ describe("CORE RULES・NGワード・却下の反映（specs/004-review-approval
     });
     const [d1, d2, d3, d4] = ((await reg.json()) as { drafts: { id: string }[] }).drafts;
     const review = (body: unknown) => call(app, "POST", `${base(accountId)}/post-drafts/review`, { user: "u1", body });
-    await review({ action: "reject", items: [{ id: d1!.id, expectedVersion: 1 }], reject: { reasons: ["tone"], note: "" } });
-    await review({ action: "reject", items: [{ id: d2!.id, expectedVersion: 1 }], reject: { reasons: [], note: "語尾がきつい" } });
-    await review({ action: "approve", items: [{ id: d3!.id, expectedVersion: 1 }] });
-    await review({ action: "reject", items: [{ id: d4!.id, expectedVersion: 1 }], reject: { reasons: ["thin"], note: "" } });
-    await review({ action: "reopen", items: [{ id: d4!.id, expectedVersion: 2 }] });
+    await review({ requestId: crypto.randomUUID(), action: "reject", items: [{ id: d1!.id, expectedVersion: 1 }], reject: { reasons: ["tone"], note: "" } });
+    await review({ requestId: crypto.randomUUID(), action: "reject", items: [{ id: d2!.id, expectedVersion: 1 }], reject: { reasons: [], note: "語尾がきつい" } });
+    await review({ requestId: crypto.randomUUID(), action: "approve", items: [{ id: d3!.id, expectedVersion: 1 }] });
+    await review({ requestId: crypto.randomUUID(), action: "reject", items: [{ id: d4!.id, expectedVersion: 1 }], reject: { reasons: ["thin"], note: "" } });
+    await review({ requestId: crypto.randomUUID(), action: "reopen", items: [{ id: d4!.id, expectedVersion: 2 }] });
 
     const { prompt, summary } = await getPrompt(accountId);
     expect(prompt).toContain("・断定口調は使わない\n・医療の効果をうたわない\n・次の言葉は使わないこと: 絶対、必ず儲かる");

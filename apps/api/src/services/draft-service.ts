@@ -235,6 +235,7 @@ export async function updateDraft(env: Env, accountId: string, id: string, req: 
             body: req.body.trim(),
             status: "needs_review",
             reviewedAt: null,
+            lastReviewRequestId: null,
             version: sql`${postDrafts.version} + 1`,
             updatedAt: new Date(),
           })

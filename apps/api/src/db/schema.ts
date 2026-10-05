@@ -18,7 +18,12 @@ import {
   uuid,
   type AnyPgColumn,
 } from "drizzle-orm/pg-core";
-import { PLANS, PROMOTION_RATIO_DEFAULT, PROMPT_COUNT_DEFAULT } from "@threads-grower/shared";
+import {
+  PLANS,
+  PROMOTION_RATIO_DEFAULT,
+  PROMPT_COUNT_DEFAULT,
+  REJECT_REASON_CODES,
+} from "@threads-grower/shared";
 
 const bytea = customType<{ data: Uint8Array; driverData: Uint8Array | string }>({
   dataType() {
@@ -389,10 +394,19 @@ export const postDrafts = pgTable(
     reviewedAt: timestamp("reviewed_at", { withTimezone: true, precision: 6 }),
     rejectReasons: text("reject_reasons").array(),
     rejectNote: text("reject_note"),
+    // 最後に状態を変えた操作のID。同じ操作の再試行だけを成功として扱う（research.md R2、PR #5 のCodexレビュー）
+    lastReviewRequestId: uuid("last_review_request_id"),
     ...timestamps,
   },
   (t) => [
     uniqueIndex("post_drafts_batch_position_unique").on(t.batchId, t.position),
+    // 却下理由の候補は、NULLの要素・空文字・知らないコードを入れない（PR #5 のCodexレビュー）
+    check(
+      "post_drafts_reject_reasons_valid",
+      sql`${t.rejectReasons} IS NULL OR (cardinality(${t.rejectReasons}) >= 1
+        AND array_position(${t.rejectReasons}, NULL) IS NULL
+        AND ${t.rejectReasons} <@ ARRAY[${sql.raw(REJECT_REASON_CODES.map((c) => `'${c}'`).join(", "))}]::text[])`,
+    ),
     index("post_drafts_account_status_reviewed_idx").on(t.accountId, t.status, t.reviewedAt.desc()),
     check("post_drafts_position_range", sql`${t.position} >= 0 AND ${t.position} < 50`),
     check("post_drafts_body_length", sql`char_length(${t.body}) BETWEEN 1 AND 2000`),
@@ -422,6 +436,8 @@ export const ngWords = pgTable(
     // 照合と重複の判定に使う値（normalizeNgWord。research.md R4）
     normalized: text("normalized").notNull(),
     createdAt: timestamp("created_at", { withTimezone: true, precision: 6 }).notNull().defaultNow(),
+    // 登録の順番。1回の送信で足した語も入力の順に増える（日時の並びに頼らない。PR #5 のCodexレビュー）
+    seq: bigint("seq", { mode: "number" }).generatedAlwaysAsIdentity().notNull(),
   },
   (t) => [
     uniqueIndex("ng_words_account_normalized_unique").on(t.accountId, t.normalized),

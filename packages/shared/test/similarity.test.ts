@@ -102,6 +102,10 @@ describe("類似度の計算の速さ（research.md R8、plan.md 性能目標）
     expect(time(500, 1500, 150)).toBeLessThan(1000 * LIMIT_FACTOR);
   });
 
+  it("150文字・要確認1,000件 × 全体1,500件（NGワードの追加で500件を超えた場合）：1,000ms以内", () => {
+    expect(time(1000, 1500, 150)).toBeLessThan(1000 * LIMIT_FACTOR);
+  });
+
   it("2,000文字・要確認50件 × 全体500件：1,000ms以内（長い組は編集距離を省く）", () => {
     expect(time(50, 500, 2000)).toBeLessThan(1000 * LIMIT_FACTOR);
   });

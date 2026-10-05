@@ -26,7 +26,7 @@ async function register(accountId: string, bodies: string[]) {
 async function approve(accountId: string, d: PostDraft) {
   const res = await call(app, "POST", `${base(accountId)}/post-drafts/review`, {
     user: "u1",
-    body: { action: "approve", items: [{ id: d.id, expectedVersion: d.version }] },
+    body: { requestId: crypto.randomUUID(), action: "approve", items: [{ id: d.id, expectedVersion: d.version }] },
   });
   return (await res.json()) as { updated: PostDraft[]; skipped: { reason: string }[] };
 }
@@ -130,6 +130,26 @@ describe("POST /ng-words（FR-014・FR-016a）", () => {
       expect(r.n).toBe(0);
     }
   }, 120_000);
+
+  it("要確認が500件でも、足した語を含む承認済みはすべて要確認に戻す（安全を優先。data-model.md、PR #5 のCodexレビュー）", async () => {
+    const { accountId } = await createUserWithAccount("u1");
+    const [hit] = await register(accountId, ["絶対に伸びる"]);
+    await approve(accountId, hit!);
+    const sql = neon(testEnv.DATABASE_URL);
+    for (let done = 0; done < 500; done += 49) {
+      const size = Math.min(49, 500 - done);
+      const [b] = (await sql`
+        INSERT INTO draft_batches (account_id, client_request_id, draft_count, delimiter_found)
+        VALUES (${accountId}, gen_random_uuid(), ${size}, true) RETURNING id`) as [{ id: string }];
+      await sql`
+        INSERT INTO post_drafts (account_id, batch_id, position, body)
+        SELECT ${accountId}, ${b.id}, g, 'seed ' || g FROM generate_series(0, ${size - 1}) AS g`;
+    }
+    const res = await addWords(accountId, ["絶対"]);
+    expect(((await res.json()) as { reopenedCount: number }).reopenedCount).toBe(1);
+    const counts = await call(app, "GET", `${base(accountId)}/post-drafts/counts`, { user: "u1" });
+    expect(await counts.json()).toMatchObject({ needsReview: 501, approved: 0 });
+  });
 
   it("無料体験の後のプラン1でも追加・削除できる（FR-017）", async () => {
     const { accountId } = await createUserWithAccount("u1", { userCreatedAt: AFTER_TRIAL() });

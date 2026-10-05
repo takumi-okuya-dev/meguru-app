@@ -805,6 +805,7 @@ describe("承認・却下（004 US1）", () => {
     renderPage();
     await user.click(await screen.findByRole("button", { name: "「1件目の下書き」を承認" }));
     expect(reviewPostDrafts).toHaveBeenCalledWith("a1", {
+      requestId: expect.any(String),
       action: "approve",
       items: [{ id: "n1", expectedVersion: 1 }],
     });
@@ -814,6 +815,7 @@ describe("承認・却下（004 US1）", () => {
     const undo = toastSuccess.mock.calls.at(-1)![1].action.onClick as () => void;
     await act(async () => undo());
     expect(reviewPostDrafts).toHaveBeenLastCalledWith("a1", {
+      requestId: expect.any(String),
       action: "reopen",
       items: [{ id: "n1", expectedVersion: 2 }],
     });
@@ -841,6 +843,7 @@ describe("承認・却下（004 US1）", () => {
     await user.click(within(dialog).getByRole("button", { name: "トーンが違う" }));
     await user.click(within(dialog).getAllByRole("button", { name: "却下する" }).at(-1)!);
     expect(reviewPostDrafts).toHaveBeenCalledWith("a1", {
+      requestId: expect.any(String),
       action: "reject",
       items: [{ id: "n1", expectedVersion: 1 }],
       reject: { reasons: ["tone"], note: "" },
@@ -1123,14 +1126,13 @@ describe("規約に注意（004 US5、FR-039・FR-040・FR-043）", () => {
     });
     await user.click(within(dialog).getByRole("button", { name: "キャンセル" }));
     expect(reviewPostDrafts).not.toHaveBeenCalled();
-    await user.click(
-      screen.getByRole("button", { name: `「${bait.body.slice(0, 20)}…」を承認` }),
-    );
+    await user.click(screen.getByRole("button", { name: `「${bait.body.slice(0, 20)}…」を承認` }));
     dialog = await screen.findByRole("dialog", {
       name: "Threadsの規約に触れるおそれのある表現があります",
     });
     await user.click(within(dialog).getByRole("button", { name: "承認する" }));
     expect(reviewPostDrafts).toHaveBeenCalledWith("a1", {
+      requestId: expect.any(String),
       action: "approve",
       items: [{ id: "n1", expectedVersion: 1 }],
       confirmPolicyCaution: true,
@@ -1144,6 +1146,7 @@ describe("規約に注意（004 US5、FR-039・FR-040・FR-043）", () => {
       await screen.findByRole("button", { name: "「朝の散歩を続けて三か月がたった」を承認" }),
     );
     expect(reviewPostDrafts).toHaveBeenCalledWith("a1", {
+      requestId: expect.any(String),
       action: "approve",
       items: [{ id: "n3", expectedVersion: 1 }],
     });
@@ -1183,6 +1186,7 @@ describe("規約に注意（004 US5、FR-039・FR-040・FR-043）", () => {
     ).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "要確認に戻す" }));
     expect(reviewPostDrafts).toHaveBeenCalledWith("a1", {
+      requestId: expect.any(String),
       action: "reopen",
       items: [{ id: "p1", expectedVersion: 2 }],
     });

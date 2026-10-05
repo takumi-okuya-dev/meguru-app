@@ -406,6 +406,8 @@ export const updatePostDraftResponseSchema = z.object({ draft: postDraftSchema, 
 export const reviewRequestSchema = z
   .object({
     action: z.enum(["approve", "reject", "reopen"]),
+    /** 操作ごとのID。同じ操作の再試行では同じ値を送り、自分の再試行だけを成功として扱う（research.md R2） */
+    requestId: z.string().uuid(),
     items: z
       .array(z.object({ id: z.string().uuid(), expectedVersion: z.number().int().positive() }))
       .min(1)

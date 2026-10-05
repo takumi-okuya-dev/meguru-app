@@ -107,24 +107,30 @@ type PromptSummary = {
 
 下書きの状態を変える。承認・却下・要確認に戻すを、1件でもまとめてでも扱う（FR-002〜FR-006、FR-008、FR-010、FR-040、research.md R2）。
 
-- **リクエスト**：
+- **リクエスト**（`action`ごとの例。PR #5 のCodexレビューで、承認の例から`reject`を外した）：
 
   ```json
-  {
-    "action": "approve",
-    "items": [ { "id": "uuid", "expectedVersion": 3 } ],
-    "confirmPolicyCaution": true,
-    "reject": { "reasons": ["tone"], "note": "" }
-  }
+  { "action": "approve", "requestId": "uuid", "items": [ { "id": "uuid", "expectedVersion": 3 } ], "confirmPolicyCaution": true }
+  ```
+
+  ```json
+  { "action": "reject", "requestId": "uuid", "items": [ { "id": "uuid", "expectedVersion": 3 } ], "reject": { "reasons": ["tone"], "note": "" } }
+  ```
+
+  ```json
+  { "action": "reopen", "requestId": "uuid", "items": [ { "id": "uuid", "expectedVersion": 4 } ] }
   ```
 
   - `action`：`approve`・`reject`・`reopen`
+  - `requestId`：操作ごとのID（UUID）。Webが操作のたびに作り、同じ操作の再試行では同じ値を送る（research.md R2）
   - `items`：1〜500件。同じ`id`の重複は不可
   - `confirmPolicyCaution`：`approve`のときだけ使う。省略は`false`
   - `reject`：`reject`のときは必須で、それ以外では送らない。`reasons`（コードの配列、重複不可）と`note`（200文字まで）の、少なくとも一方が空でないこと
 - **処理**：ロックを取ったトランザクションで、各下書きを次の順に判定する。
   1. そのAccountにない：`NOT_FOUND`
-  2. すでに目的の状態：何もせず`updated`に入れる（二重の記録の防止）
+  2. すでに目的の状態：
+     - 最後にその状態にした操作が同じ`requestId`（自分の再試行）：何もせず`updated`に入れる（二重の記録の防止）
+     - 別の操作でその状態になっていた（別タブで先に承認された など）：`STALE`（`latest`付き）。古い画面からの操作を成功扱いにすると、Webの「元に戻す」で別タブの操作まで取り消せてしまうため（PR #5 のCodexレビュー）
   3. `version`が`expectedVersion`と違う：`STALE`
   4. 今の状態から目的の状態に移れない（例：却下 → 承認）：`STALE`
   5. `approve`のとき：
@@ -133,7 +139,7 @@ type PromptSummary = {
      - 規約に注意で、`confirmPolicyCaution`が`false`：`POLICY_CONFIRM_REQUIRED`
      - 承認済みが500件を超える：`LIMIT`
   6. `reopen`のとき：要確認が500件を超える：`LIMIT`
-  7. 状態を変え、`version`を1増やす。
+  7. 状態を変え、`version`を1増やし、`last_review_request_id`に`requestId`を記録する。
      - `approve`：`reviewed_at`を記録する
      - `reject`：`reviewed_at`と理由を記録する
      - `reopen`：`reviewed_at`と理由を消す
@@ -149,7 +155,7 @@ type PromptSummary = {
   }
   ```
 
-- **400** `VALIDATION_FAILED`：`action`が不正、`items`が0件・501件以上・重複、`reject`の理由が空、`reject`以外で`reject`がある
+- **400** `VALIDATION_FAILED`：`action`が不正、`requestId`がない・UUIDでない、`items`が0件・501件以上・重複、`reject`の理由が空、`reject`以外で`reject`がある
 
 ### GET /api/accounts/:accountId/post-drafts/counts
 
@@ -187,7 +193,7 @@ NGワードを足す（FR-014、FR-016a、research.md R6）。
   1. 空の語と、既存・送信内の重複（正規化した値で判定）を除く。
   2. 上限を確かめる。
   3. 残った語を足す。
-  4. 足した語を含む承認済みの下書きを要確認に戻す。
+  4. 足した語を含む承認済みの下書きを要確認に戻す。要確認の上限（500件）は確かめず、該当するものはすべて戻す（安全を優先。data-model.md「件数の上限」）。
 - **200**：
 
   ```json

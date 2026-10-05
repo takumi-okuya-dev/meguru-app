@@ -26,10 +26,11 @@ export const REJECT_REASON_CODES = REJECT_REASONS.map((r) => r.code) as [
 /**
  * 却下理由の候補のコードを表示名にする。
  * @param code - 候補のコード
- * @returns 表示名
+ * @returns 表示名（知らないコードはそのまま）
  */
-export function rejectReasonLabel(code: RejectReasonCode): string {
-  return REJECT_REASONS.find((r) => r.code === code)!.label;
+export function rejectReasonLabel(code: RejectReasonCode | string): string {
+  // DBの制約で候補のコードだけが入るが、知らないコードでもプロンプトの生成を止めない
+  return REJECT_REASONS.find((r) => r.code === code)?.label ?? code;
 }
 
 /** 「規約に注意」の照合の結果（FR-039）。ranges は元の本文の [開始, 終了)。 */

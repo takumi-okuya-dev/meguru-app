@@ -62,14 +62,23 @@ async function applyChange(tx: TxDb, accountId: string, req: ReviewRequest, targ
   );
   return tx
     .update(postDrafts)
-    .set({ status: TARGET[req.action], ...record, version: sql`${postDrafts.version} + 1`, updatedAt: now })
+    .set({
+      status: TARGET[req.action],
+      ...record,
+      // 自分の再試行を見分けるため、変えた操作のIDを残す（R2）
+      lastReviewRequestId: req.requestId,
+      version: sql`${postDrafts.version} + 1`,
+      updatedAt: now,
+    })
     .where(and(eq(postDrafts.accountId, accountId), sql`(${postDrafts.id}, ${postDrafts.version}) IN (${pairs})`))
     .returning();
 }
 
 /**
  * 下書きの状態を、1件でもまとめてでも変える（FR-002〜FR-006・FR-010、contracts/api.md「POST /post-drafts/review」）。
- * すでに目的の状態にある下書きは何もせず updated に入れる（再試行・連打で二重に記録しない）。
+ * 同じ操作（requestId）の再試行で、すでにその操作で目的の状態になっている下書きは、何もせず updated に入れる
+ * （二重に記録しない）。別の操作で目的の状態になっていたものは STALE にする（別タブでの操作を「元に戻す」で
+ * 取り消せないようにする。PR #5 のCodexレビュー）。
  * @param env - Workers のバインディング（DATABASE_URL を使う）
  * @param accountId - accounts.id
  * @param req - リクエスト（スキーマで確かめてあること）
@@ -107,7 +116,8 @@ export async function reviewDrafts(env: Env, accountId: string, req: ReviewReque
         }
         const skip = (reason: SkipReason) => skipped.push({ id, reason, latest: toPostDraft(row) });
         if (row.status === target) {
-          updated.set(id, toPostDraft(row));
+          if (row.lastReviewRequestId === req.requestId) updated.set(id, toPostDraft(row));
+          else skip("STALE");
           continue;
         }
         if (row.version !== expectedVersion || !FROM[req.action].includes(row.status)) {

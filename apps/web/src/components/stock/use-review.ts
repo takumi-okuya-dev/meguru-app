@@ -80,6 +80,8 @@ export function useReview(accountId: string) {
       try {
         return await api.reviewPostDrafts(accountId, {
           action,
+          // 操作ごとのID。APIは、同じIDの再試行だけを成功として扱う（research.md R2）
+          requestId: crypto.randomUUID(),
           items: drafts.map((d) => ({ id: d.id, expectedVersion: d.version })),
           ...(action === "reject" ? { reject: options.reject } : {}),
           ...(action === "approve" && options.confirmPolicyCaution

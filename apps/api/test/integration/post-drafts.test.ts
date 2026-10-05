@@ -228,7 +228,7 @@ describe("承認済み・却下の下書き（specs/004-review-approval FR-007�
   it("承認済みの下書きを編集すると reopened: true で要確認に戻る", async () => {
     const { accountId } = await createUserWithAccount("u1");
     const [d] = (await register(accountId, "A")).drafts;
-    await review(accountId, { action: "approve", items: [{ id: d!.id, expectedVersion: 1 }] });
+    await review(accountId, { requestId: crypto.randomUUID(), action: "approve", items: [{ id: d!.id, expectedVersion: 1 }] });
     const res = await call(app, "PUT", `${base(accountId)}/post-drafts/${d!.id}`, {
       user: "u1",
       body: { body: "直した", expectedVersion: 2 },
@@ -243,7 +243,7 @@ describe("承認済み・却下の下書き（specs/004-review-approval FR-007�
   it("却下の下書きは編集できない（404 ITEM_NOT_FOUND）", async () => {
     const { accountId } = await createUserWithAccount("u1");
     const [d] = (await register(accountId, "A")).drafts;
-    await review(accountId, { action: "reject", items: [{ id: d!.id, expectedVersion: 1 }], reject: { reasons: ["tone"], note: "" } });
+    await review(accountId, { requestId: crypto.randomUUID(), action: "reject", items: [{ id: d!.id, expectedVersion: 1 }], reject: { reasons: ["tone"], note: "" } });
     const res = await call(app, "PUT", `${base(accountId)}/post-drafts/${d!.id}`, {
       user: "u1",
       body: { body: "直した", expectedVersion: 2 },
@@ -255,8 +255,8 @@ describe("承認済み・却下の下書き（specs/004-review-approval FR-007�
     const { accountId } = await createUserWithAccount("u1");
     const r = await register(accountId, "要確認\n@@@\n承認\n@@@\n却下");
     const [n, a, j] = r.drafts;
-    await review(accountId, { action: "approve", items: [{ id: a!.id, expectedVersion: 1 }] });
-    await review(accountId, { action: "reject", items: [{ id: j!.id, expectedVersion: 1 }], reject: { reasons: [], note: "x" } });
+    await review(accountId, { requestId: crypto.randomUUID(), action: "approve", items: [{ id: a!.id, expectedVersion: 1 }] });
+    await review(accountId, { requestId: crypto.randomUUID(), action: "reject", items: [{ id: j!.id, expectedVersion: 1 }], reject: { reasons: [], note: "x" } });
     const del = await call(app, "POST", `${base(accountId)}/post-drafts/delete`, {
       user: "u1",
       body: { ids: [n!.id, a!.id, j!.id] },
@@ -265,7 +265,7 @@ describe("承認済み・却下の下書き（specs/004-review-approval FR-007�
     expect(await countRows(accountId)).toBe(1);
 
     const r2 = await register(accountId, "B1\n@@@\nB2");
-    await review(accountId, { action: "approve", items: [{ id: r2.drafts[0]!.id, expectedVersion: 1 }] });
+    await review(accountId, { requestId: crypto.randomUUID(), action: "approve", items: [{ id: r2.drafts[0]!.id, expectedVersion: 1 }] });
     const undo = await call(app, "DELETE", `${base(accountId)}/draft-batches/${r2.batchId}`, { user: "u1" });
     expect(await undo.json()).toEqual({ deletedCount: 1 });
     expect(await countRows(accountId)).toBe(2);
@@ -274,8 +274,8 @@ describe("承認済み・却下の下書き（specs/004-review-approval FR-007�
   it("一覧：承認済み・却下は reviewedAt の新しい順。件数のAPIは一覧の counts と一致する", async () => {
     const { accountId } = await createUserWithAccount("u1");
     const ds = (await register(accountId, "A\n@@@\nB\n@@@\nC\n@@@\nD")).drafts;
-    for (const d of ds.slice(0, 2)) await review(accountId, { action: "approve", items: [{ id: d.id, expectedVersion: 1 }] });
-    await review(accountId, { action: "reject", items: [{ id: ds[2]!.id, expectedVersion: 1 }], reject: { reasons: ["thin"], note: "" } });
+    for (const d of ds.slice(0, 2)) await review(accountId, { requestId: crypto.randomUUID(), action: "approve", items: [{ id: d.id, expectedVersion: 1 }] });
+    await review(accountId, { requestId: crypto.randomUUID(), action: "reject", items: [{ id: ds[2]!.id, expectedVersion: 1 }], reject: { reasons: ["thin"], note: "" } });
     const res = await call(app, "GET", `${base(accountId)}/post-drafts`, { user: "u1" });
     const body = (await res.json()) as {
       needsReview: PostDraft[];

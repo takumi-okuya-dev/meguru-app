@@ -45,11 +45,11 @@ async function accountWithProfile() {
   const [, approved, rejected] = ((await reg.json()) as { drafts: { id: string }[] }).drafts;
   await call(app, "POST", `${base}/post-drafts/review`, {
     user: "u1",
-    body: { action: "approve", items: [{ id: approved!.id, expectedVersion: 1 }] },
+    body: { requestId: crypto.randomUUID(), action: "approve", items: [{ id: approved!.id, expectedVersion: 1 }] },
   });
   await call(app, "POST", `${base}/post-drafts/review`, {
     user: "u1",
-    body: { action: "reject", items: [{ id: rejected!.id, expectedVersion: 1 }], reject: { reasons: ["tone"], note: "" } },
+    body: { requestId: crypto.randomUUID(), action: "reject", items: [{ id: rejected!.id, expectedVersion: 1 }], reject: { reasons: ["tone"], note: "" } },
   });
   await call(app, "POST", `${base}/ng-words`, { user: "u1", body: { words: ["絶対"] } });
   await call(app, "PUT", `${base}/core-rules`, { user: "u1", body: { text: "断定口調は使わない", expectedVersion: 1 } });

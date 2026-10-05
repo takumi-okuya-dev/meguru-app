@@ -41,7 +41,7 @@ erDiagram
 | 列 | 型 | 制約 | 説明 |
 |---|---|---|---|
 | `reviewed_at` | timestamptz | NULL可 | 承認・却下した日時。承認済み・却下のタブの並び順（FR-012） |
-| `reject_reasons` | text[] | NULL可 | 選んだ却下理由の候補のコード（R10） |
+| `reject_reasons` | text[] | NULL可。入れるなら1件以上で、NULLの要素・空文字・知らないコードを含まない（CHECK制約`post_drafts_reject_reasons_valid`） | 選んだ却下理由の候補のコード（R10） |
 | `reject_note` | text | NULL可、`char_length <= 200` | 却下理由の自由記述 |
 
 - **状態と記録の組み合わせ**（CHECK制約`post_drafts_review_state`。R1）：
@@ -52,11 +52,12 @@ erDiagram
   - 状態は列挙型の値ではなく、`status::text`の文字列で比べる（下の「マイグレーション」）。
 - **インデックス**：`(account_id, status, reviewed_at DESC)`を足す。003の`(account_id, status)`は、このインデックスで代えられるので消す。
 - **件数の上限**：
-  - 要確認：500件（003）
+  - 要確認：500件（003）。ただし、本文の編集（承認済みを戻す。R5）とNGワードの追加（R6）で戻すときは上限を確かめず、最大で1,000件（要確認500件＋承認済み500件）になりうる。上限を超えている間は、新しい登録と手で要確認に戻す操作ができない
   - 承認済み：500件（R9）
   - 却下：上限なし。一覧のAPIは新しい順に500件まで返す
   - 上限の確認は、「Account × 下書き」のアドバイザリーロックの中で行う（R3）
 - **`version`**：本文の編集に加え、状態の変更（承認・却下・要確認に戻す）のたびに1増やす（R1）。
+- **`last_review_request_id`**（uuid、NULL可）：最後に状態を変えた操作のID（`requestId`）。同じ操作の再試行だけを成功として扱うために使う（R2）。本文の編集・NGワードの追加で要確認に戻すときは消す。
 
 ### 状態の移り変わり
 
@@ -84,7 +85,8 @@ stateDiagram-v2
 | `account_id` | uuid | NOT NULL、FK → `accounts.id` ON DELETE CASCADE | |
 | `word` | text | NOT NULL、`1 <= char_length <= 50` | 入力のままの言葉（前後の空白を除く）。画面とプロンプトに出す |
 | `normalized` | text | NOT NULL | 照合と重複の判定に使う値（1文字ずつNFKC → 小文字。R4） |
-| `created_at` | timestamptz | NOT NULL | 一覧とプロンプトでの並び順（古い順） |
+| `created_at` | timestamptz | NOT NULL | 登録した日時 |
+| `seq` | bigint | NOT NULL、IDENTITY（増え続ける番号） | 一覧とプロンプトでの並び順（登録の古い順）。1回の送信の中も入力の順（R6） |
 
 - **一意制約**：`(account_id, normalized)`。
 - **件数の上限**：1つのAccountにつき200語（FR-014）。追加は「Account × 下書き」のアドバイザリーロックの中で数えてから行う（R3・R6）。
@@ -97,7 +99,7 @@ stateDiagram-v2
   - 自分のAccountにない下書き・NGワード：`404 ITEM_NOT_FOUND`、またはまとめての操作では`skipped: NOT_FOUND`
 - **grower機能**：投稿ルールの保存だけを判定する（FR-020）。承認・却下・NGワードは全プラン（FR-034）。
 - **Accountの削除**：`ON DELETE CASCADE`で、NGワード・下書き（承認・却下の記録を含む）が消える。投稿ルールは`accounts`の列なので一緒に消える（FR-036）。
-- **マイグレーション**：`apps/api/drizzle/`に1本追加する（`0003_review_approval.sql`）。中身は次のとおり。
+- **マイグレーション**：`apps/api/drizzle/`に2本追加する。`0003_review_approval.sql`と、PR #5 のCodexレビューを受けた`0004_review_fixes.sql`（`post_drafts.last_review_request_id`、`ng_words.seq`、`post_drafts_reject_reasons_valid`）。中身は次のとおり。
   - 列挙型への値の追加
   - `post_drafts`への列3つと、CHECK制約・インデックスの付け替え
   - `accounts`への列2つ
