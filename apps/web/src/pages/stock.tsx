@@ -10,7 +10,7 @@ import {
   type PostDraftStatus,
   type PublishCheck,
 } from "@threads-grower/shared";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useLocation } from "react-router";
 import { toast } from "sonner";
 import { ApiErrorScreen } from "@/components/ApiErrorScreen";
@@ -78,6 +78,8 @@ export function StockPage() {
   // まとめて承認の確認（FR-004b）で待っている、選んだ下書き
   const [bulkApproving, setBulkApproving] = useState<PostDraft[] | null>(null);
   const [busy, setBusy] = useState(false);
+  // 画面を開いた後にプロンプトが使えなくなった（無料体験の終了など）。「投稿をつくる」は貼り付け欄から始める
+  const [promptLocked, setPromptLocked] = useState(false);
   const { hidden, remove, flush } = useDeferredDelete(account.id);
   const { review } = useReview(account.id);
   const data = drafts.data;
@@ -173,6 +175,11 @@ export function StockPage() {
   const cleanDrafts = lists.needs_review.filter(isClean);
   const addToSelection = (ds: PostDraft[]) =>
     setPicked((prev) => new Set([...prev, ...ds.map((d) => d.id)]));
+
+  // 「投稿をつくる」を押したら選択を解除する（選択のバーで貼り付け欄が隠れたままにしない。PR #5 のCodexレビュー）
+  useEffect(() => {
+    if (startKey) setPicked(new Set());
+  }, [startKey]);
 
   const changeTab = (value: string) => {
     if (!TAB_VALUES.includes(value as PostDraftStatus)) return;
@@ -314,6 +321,7 @@ export function StockPage() {
             canGeneratePrompt={data.canGeneratePrompt}
             promptPostCount={data.promptPostCount}
             startKey={startKey}
+            onLocked={() => setPromptLocked(true)}
           />
         ) : (
           <div className="h-32 animate-pulse rounded-2xl bg-muted" aria-busy="true" />
@@ -397,7 +405,7 @@ export function StockPage() {
             // 削除して確定を待っている下書きは、まだサーバーで数えられているので、登録の前に確定する
             beforeSubmit={flush}
             // プロンプトを作れないとき（プラン1）は、「投稿をつくる」で貼り付け欄から始める
-            focusKey={data && !data.canGeneratePrompt ? startKey : undefined}
+            focusKey={data && (!data.canGeneratePrompt || promptLocked) ? startKey : undefined}
             selection={{
               count: selected.length,
               onClear: () => setPicked(new Set()),
@@ -426,6 +434,7 @@ export function StockPage() {
           selected={bulkApproving.length}
           blocked={bulkApproving.filter((d) => !checks.get(d.id)?.approvable).length}
           cautious={bulkApproving.filter((d) => cautionsOf(d).length > 0).length}
+          approvedSlots={data ? data.limits.approved - data.counts.approved : 0}
           onConfirm={() => {
             const targets = bulkApproving;
             setBulkApproving(null);

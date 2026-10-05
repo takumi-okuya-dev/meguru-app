@@ -69,10 +69,15 @@ export function PasteComposer({
   useUnsavedChanges(text.trim() !== "");
 
   // サイドバーの「投稿をつくる」から来て、プロンプトを作れないとき（プラン1）は、欄にフォーカスを当てる
-  // （003 FR-021。プロンプトを作れるときはプロンプトのカードに移る。specs/004 Clarifications 2026-10-05）
+  // （003 FR-021。プロンプトを作れるときはプロンプトのカードに移る。specs/004 Clarifications 2026-10-05）。
+  // 選択のバーで欄が隠れている間は待ち、欄が出た時点で当てる。実際に当てられたときだけ済ませた扱いにする（PR #5 のCodexレビュー）
+  const showingSelection = !!selection && selection.count > 0;
+  const focusedFor = useRef<string | null>(null);
   useEffect(() => {
-    if (focusKey) areaRef.current?.focus();
-  }, [focusKey]);
+    if (!focusKey || showingSelection || focusedFor.current === focusKey || !areaRef.current) return;
+    areaRef.current.focus();
+    focusedFor.current = focusKey;
+  }, [focusKey, showingSelection]);
 
   const refresh = () => {
     void queryClient.invalidateQueries({ queryKey: queryKeys.postDrafts(accountId) });

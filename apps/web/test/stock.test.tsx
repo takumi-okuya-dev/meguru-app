@@ -1357,3 +1357,123 @@ describe("まとめて選ぶ方法と、まとめて承認の前の責任の確�
     });
   });
 });
+
+describe("PR #5 のCodexレビュー（2回目）への対応", () => {
+  function renderWithRouter(state?: unknown) {
+    const router = createMemoryRouter(
+      [
+        {
+          path: "/accounts/:accountId",
+          element: (
+            <UnsavedChangesProvider>
+              <Outlet context={{ account }} />
+            </UnsavedChangesProvider>
+          ),
+          children: [{ path: "stock", element: <StockPage /> }],
+        },
+      ],
+      { initialEntries: [{ pathname: "/accounts/a1/stock", state }] },
+    );
+    render(
+      <QueryClientProvider
+        client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
+      >
+        <RouterProvider router={router} />
+      </QueryClientProvider>,
+    );
+    return router;
+  }
+  const composer = () => screen.getByRole("textbox", { name: "AIの返信を貼り付ける欄" });
+
+  it("500件を超える選択のまとめて却下は、500件ずつに分けて送る", async () => {
+    const user = userEvent.setup();
+    const many = Array.from({ length: 501 }, (_, i) =>
+      draft({
+        id: `m${i}`,
+        body: `まとめて却下する下書き${i}`,
+        batchId: `b${Math.floor(i / 50)}`,
+        position: i % 50,
+      }),
+    );
+    listPostDrafts.mockResolvedValue(listResponse({ items: many }));
+    reviewPostDrafts.mockImplementation(async (_a: string, req: { items: { id: string }[] }) => ({
+      updated: req.items.map((i) => ({
+        ...many.find((d) => d.id === i.id)!,
+        status: "rejected",
+        version: 2,
+      })),
+      skipped: [],
+      counts: { needsReview: 0, approved: 0, rejected: 501 },
+    }));
+    renderPage();
+    await user.click(await screen.findByRole("checkbox", { name: "すべて選択" }));
+    await user.click(screen.getByRole("button", { name: "まとめて却下" }));
+    const dialog = await screen.findByRole("dialog", { name: "501件を却下する理由" });
+    await user.click(within(dialog).getByRole("button", { name: "トーンが違う" }));
+    await user.click(within(dialog).getAllByRole("button", { name: "却下する" }).at(-1)!);
+    await waitFor(() => expect(reviewPostDrafts).toHaveBeenCalledTimes(2));
+    expect(
+      reviewPostDrafts.mock.calls.map((c) => (c[1] as { items: unknown[] }).items.length),
+    ).toEqual([500, 1]);
+    await waitFor(() =>
+      expect(toastSuccess).toHaveBeenCalledWith("501件を却下しました", expect.anything()),
+    );
+  }, 60_000);
+
+  it("承認済みが上限に近いと、確認に出る件数を残りの枠に合わせる", async () => {
+    const user = userEvent.setup();
+    const items = [
+      "朝の光が窓から差し込んでくる",
+      "新しい本を読み始めた。最初の章から",
+      "仕事の段取りを前日の夜に決めておく",
+    ].map((body, i) => draft({ id: `s${i}`, body, position: i }));
+    listPostDrafts.mockResolvedValue({
+      ...listResponse({ items }),
+      counts: { needsReview: 3, approved: 499, rejected: 0 },
+    });
+    renderPage();
+    await user.click(await screen.findByRole("checkbox", { name: "すべて選択" }));
+    await user.click(screen.getByRole("button", { name: "まとめて承認" }));
+    const dialog = await screen.findByRole("dialog", { name: "選んだ3件を承認します" });
+    expect(
+      within(dialog).getByText(
+        "承認済みの下書きが上限（500件）に近いため、承認されるのは1件までです",
+      ),
+    ).toBeInTheDocument();
+    expect(within(dialog).getByRole("button", { name: "1件を承認する" })).toBeInTheDocument();
+  });
+
+  it("プラン1で下書きを選んでいる間に「投稿をつくる」を押すと、選択を解除して貼り付け欄にフォーカスする", async () => {
+    const user = userEvent.setup();
+    listPostDrafts.mockResolvedValue(
+      listResponse({
+        items: [draft({ id: "d1", body: "選んでおく下書き" })],
+        canGeneratePrompt: false,
+      }),
+    );
+    const router = renderWithRouter();
+    await user.click(await screen.findByRole("checkbox", { name: "「選んでおく下書き」を選択" }));
+    expect(screen.getByText("1件を選択中")).toBeInTheDocument();
+    await act(() => router.navigate("/accounts/a1/stock", { state: { startCreate: true } }));
+    await waitFor(() => expect(composer()).toHaveFocus());
+    expect(screen.queryByText(/件を選択中/)).not.toBeInTheDocument();
+  });
+
+  it("プロンプトの読み込みに失敗しても、「再読み込み」で「コピー」が出た時点でフォーカスする", async () => {
+    const user = userEvent.setup();
+    getPrompt.mockRejectedValueOnce(new ApiError("API_UNREACHABLE", 0));
+    renderWithRouter({ startCreate: true });
+    await user.click(await screen.findByRole("button", { name: "再読み込み" }));
+    const copy = await screen.findByRole("button", { name: "コピー" });
+    await waitFor(() => expect(copy).toHaveFocus());
+  });
+
+  it("画面を開いた後にプロンプトが使えなくなったら、「投稿をつくる」で貼り付け欄にフォーカスする", async () => {
+    getPrompt.mockRejectedValue(new ApiError("GROWER_FEATURE_REQUIRED", 403));
+    renderWithRouter({ startCreate: true });
+    expect(
+      await screen.findByText("AIプロンプトの生成はプラン2以上で使えます"),
+    ).toBeInTheDocument();
+    await waitFor(() => expect(composer()).toHaveFocus());
+  });
+});

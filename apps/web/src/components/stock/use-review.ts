@@ -1,12 +1,13 @@
 // 承認・却下・要確認に戻すと、トーストの「元に戻す」（specs/004-review-approval FR-002〜FR-008、research.md R2）。
 // 「元に戻す」は逆の操作を同じAPIで送る（承認・却下 → 要確認に戻す、要確認に戻す → 元の承認・却下）。
 import { useQueryClient } from "@tanstack/react-query";
-import type {
-  PostDraft,
-  RejectReasonCode,
-  ReviewRequest,
-  ReviewResponse,
-  SkipReason,
+import {
+  REVIEW_MAX_ITEMS,
+  type PostDraft,
+  type RejectReasonCode,
+  type ReviewRequest,
+  type ReviewResponse,
+  type SkipReason,
 } from "@threads-grower/shared";
 import { useCallback } from "react";
 import { toast } from "sonner";
@@ -77,20 +78,36 @@ export function useReview(accountId: string) {
       drafts: PostDraft[],
       options: ReviewOptions,
     ): Promise<ReviewResponse | null> => {
+      // 1回のリクエストは REVIEW_MAX_ITEMS 件まで。NGワードの追加で要確認が500件を超えることがあるので、
+      // それを超える選択は分けて順に送り、結果をまとめる（PR #5 のCodexレビュー）
+      let merged: ReviewResponse | null = null;
       try {
-        return await api.reviewPostDrafts(accountId, {
-          action,
-          // 操作ごとのID。APIは、同じIDの再試行だけを成功として扱う（research.md R2）
-          requestId: crypto.randomUUID(),
-          items: drafts.map((d) => ({ id: d.id, expectedVersion: d.version })),
-          ...(action === "reject" ? { reject: options.reject } : {}),
-          ...(action === "approve" && options.confirmPolicyCaution
-            ? { confirmPolicyCaution: true }
-            : {}),
-        });
+        for (let i = 0; i < drafts.length; i += REVIEW_MAX_ITEMS) {
+          const res = await api.reviewPostDrafts(accountId, {
+            action,
+            // 操作ごとのID。APIは、同じIDの再試行だけを成功として扱う（research.md R2）
+            requestId: crypto.randomUUID(),
+            items: drafts
+              .slice(i, i + REVIEW_MAX_ITEMS)
+              .map((d) => ({ id: d.id, expectedVersion: d.version })),
+            ...(action === "reject" ? { reject: options.reject } : {}),
+            ...(action === "approve" && options.confirmPolicyCaution
+              ? { confirmPolicyCaution: true }
+              : {}),
+          });
+          merged = merged
+            ? {
+                updated: [...merged.updated, ...res.updated],
+                skipped: [...merged.skipped, ...res.skipped],
+                counts: res.counts,
+              }
+            : res;
+        }
+        return merged;
       } catch (err) {
         toast.error(`${FAILED[action]}できませんでした。${saveErrorMessage(err)}`);
-        return null;
+        // 途中までに送った分は、状態が変わっているので結果として返す
+        return merged;
       } finally {
         refresh();
       }

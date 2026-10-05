@@ -42,7 +42,8 @@ const isValidCount = (s: string) => /^\d+$/.test(s) && Number(s) >= PROMPT_COUNT
  * プロンプトのカード。
  * @param props - accountId：Account の ID、canGeneratePrompt：grower機能を使えるか、promptPostCount：保存済みの作る件数、
  *   startKey：サイドバーの「投稿をつくる」から来たときの移動のキー（押すたびに変わる）。プロンプトのカードまで移り、
- *   「コピー」にフォーカスを当てる（specs/004 Clarifications 2026-10-05）
+ *   「コピー」にフォーカスを当てる（specs/004 Clarifications 2026-10-05）、
+ *   onLocked：画面を開いた後にプロンプトが使えなくなった（無料体験の終了など）。ページは貼り付け欄にフォーカスを移す
  * @returns プロンプトのカード（使えないときは案内）
  */
 export function PromptCard({
@@ -50,11 +51,13 @@ export function PromptCard({
   canGeneratePrompt,
   promptPostCount,
   startKey,
+  onLocked,
 }: {
   accountId: string;
   canGeneratePrompt: boolean;
   promptPostCount: number;
   startKey?: string;
+  onLocked?: () => void;
 }) {
   const [growerLost, setGrowerLost] = useState(false);
   if (!canGeneratePrompt || growerLost) return <PromptLockedCard />;
@@ -63,7 +66,10 @@ export function PromptCard({
       accountId={accountId}
       savedCount={promptPostCount}
       startKey={startKey}
-      onGrowerLost={() => setGrowerLost(true)}
+      onGrowerLost={() => {
+        setGrowerLost(true);
+        onLocked?.();
+      }}
     />
   );
 }
@@ -120,14 +126,18 @@ function PromptReadyCard({
   }, [prompt.error, onGrowerLost]);
 
   // 「投稿をつくる」から来たら、プロンプトを読み込んだ後に、カードまで移って「コピー」にフォーカスを当てる。
-  // 作る流れの最初の一歩（プロンプトのコピー）から始められるようにする（specs/004 Clarifications 2026-10-05）
-  const ready = !!prompt.data;
+  // 作る流れの最初の一歩（プロンプトのコピー）から始められるようにする（specs/004 Clarifications 2026-10-05）。
+  // 読み込みに失敗して「コピー」が出ていない間は待ち、「再読み込み」で出た時点で当てる。
+  // 実際に当てられたときだけ済ませた扱いにする（PR #5 のCodexレビュー）
+  const copyShown = !!prompt.data && !prompt.error;
   useEffect(() => {
-    if (!startKey || !ready || focusedFor.current === startKey) return;
-    focusedFor.current = startKey;
+    if (!startKey || !copyShown || focusedFor.current === startKey) return;
+    const copyButton = sectionRef.current?.querySelector<HTMLButtonElement>("[data-prompt-copy]");
+    if (!copyButton || copyButton.disabled) return;
     sectionRef.current?.scrollIntoView?.({ block: "start", behavior: "smooth" });
-    sectionRef.current?.querySelector<HTMLButtonElement>("[data-prompt-copy]")?.focus({ preventScroll: true });
-  }, [startKey, ready]);
+    copyButton.focus({ preventScroll: true });
+    focusedFor.current = startKey;
+  }, [startKey, copyShown]);
 
   const { mutate: save, isPending: saving } = useMutation({
     mutationFn: (n: number) => api.putPromptSettings(accountId, n),
