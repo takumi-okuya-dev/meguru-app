@@ -153,14 +153,22 @@ describe("サイドバーの要確認の件数（specs/004 FR-013）", () => {
   });
 
   it("投稿ストックの右に要確認の件数が出る", async () => {
-    getDraftCounts.mockResolvedValue({ needsReview: 12, approved: 3, rejected: 1 });
+    getDraftCounts.mockResolvedValue({ needsReview: 12, approved: 3, rejected: 1, published: 40, publishFailed: 2 });
     renderShell();
     expect(await screen.findByRole("link", { name: /^投稿ストック.*（要確認 12件）$/ })).toBeInTheDocument();
     expect(getDraftCounts).toHaveBeenCalledWith("a1");
   });
 
+  it("投稿に失敗・投稿済みの件数は数えない（specs/005-auto-post FR-023）", async () => {
+    getDraftCounts.mockResolvedValue({ needsReview: 0, approved: 3, rejected: 1, published: 40, publishFailed: 2 });
+    renderShell();
+    const link = await screen.findByRole("link", { name: "投稿ストック" });
+    await waitFor(() => expect(getDraftCounts).toHaveBeenCalled());
+    expect(link).not.toHaveTextContent(/\d/);
+  });
+
   it("0件のときは出さない", async () => {
-    getDraftCounts.mockResolvedValue({ needsReview: 0, approved: 3, rejected: 1 });
+    getDraftCounts.mockResolvedValue({ needsReview: 0, approved: 3, rejected: 1, published: 40, publishFailed: 2 });
     renderShell();
     expect(await screen.findByRole("link", { name: "投稿ストック" })).toBeInTheDocument();
     await waitFor(() => expect(getDraftCounts).toHaveBeenCalled());

@@ -7,7 +7,6 @@ import {
   SIMILARITY_THRESHOLD,
   checkPublishable,
   type PostDraft,
-  type PostDraftStatus,
   type PublishCheck,
 } from "@threads-grower/shared";
 import { useEffect, useMemo, useState } from "react";
@@ -32,7 +31,7 @@ import { RejectDialog } from "@/components/stock/RejectDialog";
 import { REOPENED_BY_EDIT } from "@/components/stock/messages";
 import { PolicyConfirmDialog } from "@/components/stock/PolicyConfirmDialog";
 import { BulkApproveDialog } from "@/components/stock/BulkApproveDialog";
-import { StatusTabs, useStatusTab } from "@/components/stock/StatusTabs";
+import { StatusTabs, useStatusTab, type StockTab } from "@/components/stock/StatusTabs";
 import { useDeferredDelete } from "@/components/stock/use-deferred-delete";
 import { useReview, type ReviewOptions } from "@/components/stock/use-review";
 import { useSimilarities } from "@/components/stock/use-similarities";
@@ -49,7 +48,16 @@ import { api } from "@/lib/api-client";
 import { queryKeys } from "@/lib/query";
 import { useCurrentAccount } from "@/pages/account-layout";
 
-const TAB_VALUES: PostDraftStatus[] = ["needs_review", "approved", "rejected"];
+const TAB_VALUES: StockTab[] = ["needs_review", "approved", "rejected"];
+
+/**
+ * 下書きを表示するタブ。投稿の処理中は承認済みのタブに出す（005）。
+ * @param d - 下書き
+ * @returns タブ
+ */
+function tabOf(d: PostDraft): StockTab {
+  return d.status === "needs_review" || d.status === "rejected" ? d.status : "approved";
+}
 
 /**
  * 投稿ストックの画面。プロンプトのコピー、貼り付けによる一括登録、下書きの確認・修正・削除・承認・却下。
@@ -96,7 +104,7 @@ function StockPageContent() {
   const data = drafts.data;
 
   // 削除して確定を待っている下書きは、一覧から隠す
-  const lists = useMemo<Record<PostDraftStatus, PostDraft[]>>(
+  const lists = useMemo<Record<StockTab, PostDraft[]>>(
     () => ({
       needs_review: (data?.needsReview ?? []).filter((d) => !hidden.has(d.id)),
       approved: data?.approved ?? [],
@@ -111,6 +119,8 @@ function StockPageContent() {
           data.counts.needsReview - (data.needsReview.length - lists.needs_review.length),
         approved: data.counts.approved,
         rejected: data.counts.rejected - (data.rejected.length - lists.rejected.length),
+        published: data.counts.published,
+        publishFailed: data.counts.publishFailed,
       },
     [data, lists],
   );
@@ -193,14 +203,14 @@ function StockPageContent() {
   }, [startKey]);
 
   const changeTab = (value: string) => {
-    if (!TAB_VALUES.includes(value as PostDraftStatus)) return;
-    setTab(value as PostDraftStatus);
+    if (!TAB_VALUES.includes(value as StockTab)) return;
+    setTab(value as StockTab);
     setPicked(new Set());
   };
 
   // 似ている相手の下書きへ移る：そのタブに切り替え、下書きまでスクロールして枠を一瞬強調する（FR-028）
   const jumpTo = (target: PostDraft) => {
-    changeTab(target.status);
+    changeTab(tabOf(target));
     setTimeout(() => {
       const el = document.getElementById(`draft-${target.id}`);
       el?.scrollIntoView?.({ block: "center", behavior: "smooth" });

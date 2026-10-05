@@ -3,9 +3,18 @@ main = "src/index.ts"
 compatibility_date = "2026-08-22"
 compatibility_flags = ["nodejs_compat"]
 
-# 日次の定期処理（03:00 JST）。contracts/api.md「定期処理」
+# 定期処理（contracts/api.md「定期処理」）
+# - 0 18 * * *：日次の処理（03:00 JST）
+# - */5 * * * *：自動投稿（specs/005-auto-post contracts/auto-post-job.md）。KVの関所で、用のない回はDBに触れない
 [triggers]
-crons = ["0 18 * * *"]
+crons = ["0 18 * * *", "*/5 * * * *"]
+
+# 自動投稿の関所（specs/005-auto-post research.md R3）。
+# 本番では `wrangler kv namespace create AUTOPOST_KV` で作り、表示された id をここに入れる（docs/external-services-setup.md）。
+# ローカル（wrangler dev）とテストは、メモリ上のKVを使うので、この id のままでよい。
+[[kv_namespaces]]
+binding = "AUTOPOST_KV"
+id = "00000000000000000000000000000000"
 
 # 秘密でない設定。秘密情報は `wrangler secret put` / .dev.vars で設定する（.dev.vars.example 参照）
 [vars]

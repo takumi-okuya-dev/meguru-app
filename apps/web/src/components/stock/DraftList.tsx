@@ -1,10 +1,11 @@
 // 状態のタブごとの下書きの一覧（specs/003 US2・US3、specs/004 FR-011・FR-012、contracts/ui-routes.md）。
 // 要確認：新しい登録が上、同じ登録の中は貼り付けた順（API の順のまま）。登録のまとまりごとに小見出しを挟む。
 // 承認済み・却下：承認・却下した日時の新しい順（API の順のまま）。
-import { REJECTED_LIST_MAX, type PostDraft, type PostDraftStatus } from "@threads-grower/shared";
+import { REJECTED_LIST_MAX, type PostDraft } from "@threads-grower/shared";
 import type { ReactNode } from "react";
 import { formatDateTime } from "@/lib/format";
 import { APPROVED_TAB_NOTICE, STOCK_LIMIT_MESSAGE } from "./messages";
+import type { StockTab } from "./StatusTabs";
 
 type Group = { batchId: string; createdAt: string; drafts: PostDraft[] };
 
@@ -42,7 +43,7 @@ export function DraftList({
   renderCard,
   onSelectBatch,
 }: {
-  tab: PostDraftStatus;
+  tab: StockTab;
   items: PostDraft[];
   limit: number;
   canGeneratePrompt: boolean;

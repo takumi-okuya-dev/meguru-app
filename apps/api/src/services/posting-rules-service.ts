@@ -7,6 +7,7 @@ import { accounts, ngWords, postDrafts } from "../db/schema";
 import type { Env } from "../env";
 import { AppError, itemNotFound, notFound, pgErrorCode } from "../lib/errors";
 import type { AccountRow } from "./access";
+import { CLEAR_QUEUE_FIELDS } from "./draft-service";
 import { canEditProfile } from "./grower-access";
 
 type NgWordRow = typeof ngWords.$inferSelect;
@@ -101,6 +102,8 @@ export async function addNgWords(env: Env, accountId: string, words: string[]) {
             status: "needs_review",
             reviewedAt: null,
             lastReviewRequestId: null,
+            // 要確認では、投稿の順の記録を持たない（005 data-model.md）
+            ...CLEAR_QUEUE_FIELDS,
             version: sql`${postDrafts.version} + 1`,
             updatedAt: new Date(),
           })

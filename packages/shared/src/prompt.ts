@@ -49,6 +49,8 @@ export type PromptInput = {
   ngWords: string[];
   /** 却下の下書き。新しく却下した順。先頭の PROMPT_REJECTED_DRAFTS 件まで使う（004） */
   rejectedDrafts: PromptRejectedDraft[];
+  /** 投稿の設定の時刻の数（0〜10。自動投稿のオン・オフは問わない。005 FR-024）。省略は0 */
+  dailyPostCount?: number;
 };
 
 /** 課題の項目のプロンプトでの見出し（prompt-template.md「アカウントの戦略設計」の順）。 */
@@ -290,6 +292,7 @@ export function buildPrompt(input: PromptInput): { prompt: string; summary: Prom
       coreRuleCount: input.coreRules.length,
       ngWordCount: input.ngWords.length,
       rejectedCount: rejected.length,
+      dailyPostCount: input.dailyPostCount ?? 0,
     },
   };
 }

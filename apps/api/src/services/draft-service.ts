@@ -6,7 +6,9 @@ import {
   findPasteProblem,
   isOverThreadsLimit,
   splitDrafts,
+  type BlockedReason,
   type DraftCounts,
+  type PublishError,
   type RejectReasonCode,
 } from "@threads-grower/shared";
 import { and, asc, count, desc, eq, inArray, sql } from "drizzle-orm";
@@ -15,7 +17,9 @@ import { lockAccountDrafts } from "../db/locks";
 import { draftBatches, postDrafts } from "../db/schema";
 import type { Env } from "../env";
 import { AppError, itemNotFound, notFound, pgErrorCode } from "../lib/errors";
+import type { AccountRow } from "./access";
 import { updateWithVersion } from "./item-service";
+import { readPostingSchedule, toAutoPostState } from "./posting-schedule-service";
 
 type PostDraftRow = typeof postDrafts.$inferSelect;
 
@@ -35,10 +39,30 @@ export function toPostDraft(row: PostDraftRow) {
     reviewedAt: row.reviewedAt?.toISOString() ?? null,
     rejectReasons: (row.rejectReasons ?? []) as RejectReasonCode[],
     rejectNote: row.rejectNote,
+    // 自動投稿（specs/005-auto-post data-model.md）
+    prioritizedAt: row.prioritizedAt?.toISOString() ?? null,
+    carryover: row.carryoverAttemptId !== null,
+    publishedAt: row.publishedAt?.toISOString() ?? null,
+    threadsMediaId: row.threadsMediaId,
+    threadsPermalink: row.threadsPermalink,
+    publishFailedAt: row.publishFailedAt?.toISOString() ?? null,
+    publishError: row.publishError as PublishError | null,
+    blockedAt: row.blockedAt?.toISOString() ?? null,
+    blockedReason: row.blockedReason as BlockedReason | null,
+    blockedWords: row.blockedWords ?? [],
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   };
 }
+
+/**
+ * 要確認に戻すときに消す列（specs/005-auto-post data-model.md「状態と記録の組み合わせ」）。
+ * 要確認では、投稿の順（次に投稿する・持ち越し）の記録を持たない（FR-005a）。
+ */
+export const CLEAR_QUEUE_FIELDS = { prioritizedAt: null, carryoverAttemptId: null } as const;
+
+/** 投稿の直前のチェックの記録を消す列（状態が変わったら消す。005 FR-007）。 */
+export const CLEAR_BLOCKED_FIELDS = { blockedAt: null, blockedReason: null, blockedWords: null } as const;
 
 /**
  * 要確認の下書きの一覧（FR-018）。登録のまとまりの新しい順 → まとまりの中は貼り付けた順。
@@ -59,10 +83,10 @@ export async function listDraftRows(db: Db | TxDb, accountId: string, limit?: nu
 }
 
 /**
- * 状態ごとの下書きの件数（FR-001・FR-013）。
+ * 状態ごとの下書きの件数（FR-001・FR-013、005 FR-020・FR-023）。
  * @param db - データベース
  * @param accountId - accounts.id
- * @returns 要確認・承認済み・却下の件数
+ * @returns 要確認・承認済み（投稿の処理中を含む）・却下・投稿済み・投稿に失敗の件数
  */
 export async function countDrafts(db: Db | TxDb, accountId: string): Promise<DraftCounts> {
   const rows = await db
@@ -71,7 +95,58 @@ export async function countDrafts(db: Db | TxDb, accountId: string): Promise<Dra
     .where(eq(postDrafts.accountId, accountId))
     .groupBy(postDrafts.status);
   const n = (status: PostDraftRow["status"]) => Number(rows.find((r) => r.status === status)?.n ?? 0);
-  return { needsReview: n("needs_review"), approved: n("approved"), rejected: n("rejected") };
+  return {
+    needsReview: n("needs_review"),
+    approved: n("approved") + n("publishing"),
+    rejected: n("rejected"),
+    published: n("published"),
+    publishFailed: n("publish_failed"),
+  };
+}
+
+/**
+ * 承認済みの下書きを、投稿の順に読む（005 research.md R4。packages/shared の compareQueueOrder と同じ並び）。
+ * 処理中 → 持ち越し → 「次に投稿する」の新しい順 → 承認した古い順 → id の順。
+ * @param db - データベース
+ * @param accountId - accounts.id
+ * @param opts - includePublishing：処理中も含めるか（一覧は含める。取り出しは含めない）
+ * @returns 下書きの行
+ */
+export async function listQueueRows(
+  db: Db | TxDb,
+  accountId: string,
+  opts: { includePublishing: boolean } = { includePublishing: true },
+): Promise<PostDraftRow[]> {
+  return db
+    .select()
+    .from(postDrafts)
+    .where(
+      and(
+        eq(postDrafts.accountId, accountId),
+        inArray(postDrafts.status, opts.includePublishing ? ["approved", "publishing"] : ["approved"]),
+      ),
+    )
+    .orderBy(
+      sql`(${postDrafts.status}::text = 'publishing') DESC`,
+      sql`(${postDrafts.carryoverAttemptId} IS NOT NULL) DESC`,
+      sql`${postDrafts.prioritizedAt} DESC NULLS LAST`,
+      asc(postDrafts.reviewedAt),
+      asc(postDrafts.id),
+    );
+}
+
+/**
+ * 投稿に失敗の下書きを、失敗した日時の新しい順にすべて読む（005 FR-021）。
+ * @param db - データベース
+ * @param accountId - accounts.id
+ * @returns 下書きの行
+ */
+export async function listPublishFailedRows(db: Db | TxDb, accountId: string): Promise<PostDraftRow[]> {
+  return db
+    .select()
+    .from(postDrafts)
+    .where(and(eq(postDrafts.accountId, accountId), eq(postDrafts.status, "publish_failed")))
+    .orderBy(desc(postDrafts.publishFailedAt), desc(postDrafts.id));
 }
 
 /**
@@ -97,22 +172,30 @@ export async function listReviewedRows(
 }
 
 /**
- * 3つの状態の下書きと件数をまとめて読む（GET /post-drafts。research.md R9）。
+ * 投稿ストックの下書きと件数をまとめて読む（GET /post-drafts。004 research.md R9、005 research.md R10）。
+ * 投稿済みは返さない（タブを開いたときだけ別のAPIで読む。005 research.md R14）。
  * @param db - データベース
- * @param accountId - accounts.id
- * @returns 要確認・承認済み・却下（新しい500件）の下書きと、状態ごとの件数
+ * @param account - Account の行（自動投稿の停止の理由に、接続の状態を使う）
+ * @param now - 今の時刻
+ * @returns 要確認・承認済み（投稿の順）・却下（新しい500件）・投稿に失敗の下書き、予定、自動投稿の状態、件数
  */
-export async function listAllDrafts(db: Db, accountId: string) {
-  const [needsReview, approved, rejected, counts] = await Promise.all([
-    listDraftRows(db, accountId),
-    listReviewedRows(db, accountId, "approved"),
-    listReviewedRows(db, accountId, "rejected", REJECTED_LIST_MAX),
-    countDrafts(db, accountId),
+export async function listAllDrafts(db: Db, account: AccountRow, now: Date = new Date()) {
+  const [needsReview, approved, rejected, publishFailed, counts, schedule] = await Promise.all([
+    listDraftRows(db, account.id),
+    listQueueRows(db, account.id),
+    listReviewedRows(db, account.id, "rejected", REJECTED_LIST_MAX),
+    listPublishFailedRows(db, account.id),
+    countDrafts(db, account.id),
+    readPostingSchedule(db, account.id),
   ]);
   return {
     needsReview: needsReview.map(toPostDraft),
     approved: approved.map(toPostDraft),
     rejected: rejected.map(toPostDraft),
+    publishFailed: publishFailed.map(toPostDraft),
+    // 予定の計算は 005 US4 で足す
+    schedule: {} as Record<string, string>,
+    autoPost: toAutoPostState(account, schedule, now),
     counts,
   };
 }
@@ -236,6 +319,9 @@ export async function updateDraft(env: Env, accountId: string, id: string, req: 
             status: "needs_review",
             reviewedAt: null,
             lastReviewRequestId: null,
+            // 要確認では、投稿の順と直前のチェックの記録を持たない（005 data-model.md）
+            ...CLEAR_QUEUE_FIELDS,
+            ...CLEAR_BLOCKED_FIELDS,
             version: sql`${postDrafts.version} + 1`,
             updatedAt: new Date(),
           })

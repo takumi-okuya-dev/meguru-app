@@ -271,7 +271,7 @@ describe("承認済み・却下の下書き（specs/004-review-approval FR-007�
     expect(await countRows(accountId)).toBe(2);
   });
 
-  it("一覧：承認済み・却下は reviewedAt の新しい順。件数のAPIは一覧の counts と一致する", async () => {
+  it("一覧：承認済みは投稿の順（承認した古い順。005）、却下は reviewedAt の新しい順。件数のAPIは一覧の counts と一致する", async () => {
     const { accountId } = await createUserWithAccount("u1");
     const ds = (await register(accountId, "A\n@@@\nB\n@@@\nC\n@@@\nD")).drafts;
     for (const d of ds.slice(0, 2)) await review(accountId, { requestId: crypto.randomUUID(), action: "approve", items: [{ id: d.id, expectedVersion: 1 }] });
@@ -283,10 +283,10 @@ describe("承認済み・却下の下書き（specs/004-review-approval FR-007�
       rejected: PostDraft[];
       counts: unknown;
     };
-    expect(body.approved.map((d) => d.body)).toEqual(["B", "A"]);
+    expect(body.approved.map((d) => d.body)).toEqual(["A", "B"]);
     expect(body.rejected.map((d) => d.body)).toEqual(["C"]);
     expect(body.needsReview.map((d) => d.body)).toEqual(["D"]);
-    expect(body.counts).toEqual({ needsReview: 1, approved: 2, rejected: 1 });
+    expect(body.counts).toEqual({ needsReview: 1, approved: 2, rejected: 1, published: 0, publishFailed: 0 });
     const counts = await call(app, "GET", `${base(accountId)}/post-drafts/counts`, { user: "u1" });
     expect(await counts.json()).toEqual(body.counts);
   });
@@ -350,5 +350,126 @@ describe("要再接続のAccount（FR-025）", () => {
     expect(await del.json()).toEqual({ deletedCount: 1 });
     const undo = await call(app, "DELETE", `${base(accountId)}/draft-batches/${r.batchId}`, { user: "u1" });
     expect(await undo.json()).toEqual({ deletedCount: 1 });
+  });
+});
+
+// ---- specs/005-auto-post：一覧の新しい形（T014）と、既存の操作で新しい列が消えること（analyze I2）----
+
+describe("005：一覧の形（research.md R10）", () => {
+  const review = (accountId: string, body: unknown) =>
+    call(app, "POST", `${base(accountId)}/post-drafts/review`, { user: "u1", body });
+  const approve = (accountId: string, id: string, expectedVersion = 1) =>
+    review(accountId, { requestId: crypto.randomUUID(), action: "approve", items: [{ id, expectedVersion }] });
+
+  it("承認済みは「次に投稿する」の新しい順 → 承認した古い順。処理中は先頭で、件数は承認済みに数える", async () => {
+    const { accountId } = await createUserWithAccount("u1");
+    const ds = (await register(accountId, "A\n@@@\nB\n@@@\nC\n@@@\nD")).drafts;
+    for (const d of ds) await approve(accountId, d.id);
+    const sql = neon(testEnv.DATABASE_URL);
+    await sql`UPDATE post_drafts SET prioritized_at = now() - interval '1 minute' WHERE id = ${ds[2]!.id}`;
+    await sql`UPDATE post_drafts SET prioritized_at = now() WHERE id = ${ds[3]!.id}`;
+    await sql`UPDATE post_drafts SET status = 'publishing' WHERE id = ${ds[1]!.id}`;
+    const res = await call(app, "GET", `${base(accountId)}/post-drafts`, { user: "u1" });
+    const body = (await res.json()) as Record<string, unknown> & { approved: PostDraft[]; counts: Record<string, number> };
+    expect(body.approved.map((d) => d.body)).toEqual(["B", "D", "C", "A"]);
+    expect(body.counts).toMatchObject({ approved: 4, published: 0, publishFailed: 0 });
+    expect(body).toHaveProperty("publishFailed", []);
+    expect(body).toHaveProperty("schedule", {});
+    expect(body).toHaveProperty("autoPost", { enabled: false, slotCount: 0, stoppedReason: null });
+    expect(body).not.toHaveProperty("published");
+  });
+
+  it("投稿済み・投稿に失敗を数え、投稿に失敗は一覧に入る。新しい項目の既定値", async () => {
+    const { accountId } = await createUserWithAccount("u1");
+    const ds = (await register(accountId, "A\n@@@\nB\n@@@\nC")).drafts;
+    for (const d of ds) await approve(accountId, d.id);
+    const sql = neon(testEnv.DATABASE_URL);
+    await sql`UPDATE post_drafts SET status = 'published', published_at = now(), threads_media_id = 'm1' WHERE id = ${ds[0]!.id}`;
+    await sql`UPDATE post_drafts SET status = 'publish_failed', publish_failed_at = now(), publish_error = 'network' WHERE id = ${ds[1]!.id}`;
+    const res = await call(app, "GET", `${base(accountId)}/post-drafts`, { user: "u1" });
+    const body = (await res.json()) as { approved: PostDraft[]; publishFailed: (PostDraft & Record<string, unknown>)[]; counts: unknown };
+    expect(body.counts).toEqual({ needsReview: 0, approved: 1, rejected: 0, published: 1, publishFailed: 1 });
+    expect(body.publishFailed.map((d) => [d.body, d.publishError])).toEqual([["B", "network"]]);
+    expect(body.approved[0]).toMatchObject({
+      body: "C",
+      carryover: false,
+      blockedWords: [],
+      prioritizedAt: null,
+      publishedAt: null,
+      blockedReason: null,
+    });
+  });
+});
+
+describe("005：既存の操作で新しい列が消える（CHECK制約の違反で500にならない。analyze I2）", () => {
+  const review = (accountId: string, body: unknown) =>
+    call(app, "POST", `${base(accountId)}/post-drafts/review`, { user: "u1", body });
+
+  /** 要確認の下書きに、投稿の直前のチェックの記録を入れる。 */
+  async function block(id: string) {
+    const sql = neon(testEnv.DATABASE_URL);
+    await sql`UPDATE post_drafts SET blocked_at = now(), blocked_reason = 'ng_word', blocked_words = '{絶対}' WHERE id = ${id}`;
+  }
+
+  /** 承認済みの下書きに、「次に投稿する」と持ち越しの記録を入れる。 */
+  async function prioritizeAndCarry(accountId: string, id: string) {
+    const sql = neon(testEnv.DATABASE_URL);
+    const [a] = (await sql`
+      INSERT INTO publish_attempts (account_id, slot_at, slot_date, slot_minute, state)
+      VALUES (${accountId}, now(), current_date, 0, 'carried_over') RETURNING id`) as [{ id: string }];
+    await sql`UPDATE post_drafts SET prioritized_at = now(), carryover_attempt_id = ${a.id} WHERE id = ${id}`;
+  }
+
+  async function row(id: string) {
+    const sql = neon(testEnv.DATABASE_URL);
+    const [r] = (await sql`SELECT * FROM post_drafts WHERE id = ${id}`) as [Record<string, unknown>];
+    return r;
+  }
+
+  it("直前のチェックの記録のある要確認の下書きを、編集・承認・却下すると記録が消え、削除もできる", async () => {
+    const { accountId } = await createUserWithAccount("u1");
+    const [e, a, j, x] = (await register(accountId, "E\n@@@\nA\n@@@\nJ\n@@@\nX")).drafts;
+    for (const d of [e!, a!, j!, x!]) await block(d.id);
+
+    const edit = await call(app, "PUT", `${base(accountId)}/post-drafts/${e!.id}`, { user: "u1", body: { body: "E2", expectedVersion: 1 } });
+    expect(edit.status).toBe(200);
+    expect(await edit.json()).toMatchObject({ draft: { blockedAt: null, blockedReason: null, blockedWords: [] } });
+
+    const ap = await review(accountId, { requestId: crypto.randomUUID(), action: "approve", items: [{ id: a!.id, expectedVersion: 1 }] });
+    expect(((await ap.json()) as { updated: unknown[] }).updated).toHaveLength(1);
+    expect(await row(a!.id)).toMatchObject({ status: "approved", blocked_at: null, blocked_reason: null, blocked_words: null });
+
+    const rj = await review(accountId, {
+      requestId: crypto.randomUUID(),
+      action: "reject",
+      items: [{ id: j!.id, expectedVersion: 1 }],
+      reject: { reasons: ["tone"], note: "" },
+    });
+    expect(((await rj.json()) as { updated: unknown[] }).updated).toHaveLength(1);
+    expect(await row(j!.id)).toMatchObject({ status: "rejected", blocked_at: null });
+
+    const del = await call(app, "POST", `${base(accountId)}/post-drafts/delete`, { user: "u1", body: { ids: [x!.id] } });
+    expect(await del.json()).toEqual({ deletedCount: 1 });
+  });
+
+  it("「次に投稿する」・持ち越しのある承認済みを、要確認に戻す・編集・NGワードの追加で戻すと、2つとも消える", async () => {
+    const { accountId } = await createUserWithAccount("u1");
+    const [r, e, n] = (await register(accountId, "R\n@@@\nE\n@@@\n絶対N")).drafts;
+    for (const d of [r!, e!, n!]) {
+      await review(accountId, { requestId: crypto.randomUUID(), action: "approve", items: [{ id: d.id, expectedVersion: 1 }] });
+      await prioritizeAndCarry(accountId, d.id);
+    }
+
+    const reopen = await review(accountId, { requestId: crypto.randomUUID(), action: "reopen", items: [{ id: r!.id, expectedVersion: 2 }] });
+    expect(((await reopen.json()) as { updated: unknown[] }).updated).toHaveLength(1);
+    expect(await row(r!.id)).toMatchObject({ status: "needs_review", prioritized_at: null, carryover_attempt_id: null });
+
+    const edit = await call(app, "PUT", `${base(accountId)}/post-drafts/${e!.id}`, { user: "u1", body: { body: "E2", expectedVersion: 2 } });
+    expect(edit.status).toBe(200);
+    expect(await row(e!.id)).toMatchObject({ status: "needs_review", prioritized_at: null, carryover_attempt_id: null });
+
+    const ng = await call(app, "POST", `${base(accountId)}/ng-words`, { user: "u1", body: { words: ["絶対"] } });
+    expect(ng.status).toBe(200);
+    expect(await row(n!.id)).toMatchObject({ status: "needs_review", prioritized_at: null, carryover_attempt_id: null });
   });
 });

@@ -18,6 +18,8 @@ import {
   NG_WORD_MAX,
   REJECT_NOTE_MAX,
   REVIEW_MAX_ITEMS,
+  AUTOPOST_SLOT_LIMIT,
+  PUBLISHED_PAGE_SIZE,
 } from "./limits";
 import { REJECT_REASON_CODES } from "./review";
 import { isValidYmd } from "./promotions";
@@ -302,10 +304,30 @@ export type ProfileStatus = z.infer<typeof profileStatusSchema>;
 
 // ---- 投稿ストック（specs/003-prompt-bulk-register contracts/api.md）----
 
-/** 下書きの状態のスキーマ（要確認・承認済み・却下。specs/004-review-approval data-model.md）。 */
-export const postDraftStatusSchema = z.enum(["needs_review", "approved", "rejected"]);
+/**
+ * 下書きの状態のスキーマ（specs/004-review-approval・005-auto-post data-model.md）。
+ * 要確認・承認済み・却下（004）と、投稿の処理中・投稿済み・投稿に失敗（005）。
+ */
+export const postDraftStatusSchema = z.enum([
+  "needs_review",
+  "approved",
+  "rejected",
+  "publishing",
+  "published",
+  "publish_failed",
+]);
 /** 下書きの状態。 */
 export type PostDraftStatus = z.infer<typeof postDraftStatusSchema>;
+
+/** 投稿に失敗した理由のスキーマ（005 data-model.md）。 */
+export const publishErrorSchema = z.enum(["network", "threads_server", "invalid_request", "container_error", "unknown"]);
+/** 投稿に失敗した理由。 */
+export type PublishError = z.infer<typeof publishErrorSchema>;
+
+/** 投稿の直前のチェックで要確認に戻した理由のスキーマ（005 FR-007）。 */
+export const blockedReasonSchema = z.enum(["ng_word", "over_threads_limit"]);
+/** 投稿の直前のチェックで要確認に戻した理由。 */
+export type BlockedReason = z.infer<typeof blockedReasonSchema>;
 
 /** 却下理由の候補のコードのスキーマ（004 research.md R10）。 */
 export const rejectReasonCodeSchema = z.enum(REJECT_REASON_CODES);
@@ -325,6 +347,22 @@ export const postDraftSchema = z.object({
   rejectReasons: z.array(rejectReasonCodeSchema),
   /** 却下理由の自由記述 */
   rejectNote: z.string().nullable(),
+  /** 「次に投稿する」の日時（005） */
+  prioritizedAt: z.string().nullable(),
+  /** 前の時刻から持ち越したか（005） */
+  carryover: z.boolean(),
+  /** 投稿した日時（005） */
+  publishedAt: z.string().nullable(),
+  threadsMediaId: z.string().nullable(),
+  /** Threadsの投稿のURL。投稿済みでも、URLを取る前は null（005 research.md R6） */
+  threadsPermalink: z.string().nullable(),
+  publishFailedAt: z.string().nullable(),
+  publishError: publishErrorSchema.nullable(),
+  /** 投稿の直前のチェックで要確認に戻した日時（005） */
+  blockedAt: z.string().nullable(),
+  blockedReason: blockedReasonSchema.nullable(),
+  /** 当たったNGワード（ng_word のとき）。ほかは [] */
+  blockedWords: z.array(z.string()),
   createdAt: z.string(),
   updatedAt: z.string(),
 });
@@ -334,8 +372,11 @@ export type PostDraft = z.infer<typeof postDraftSchema>;
 /** 状態ごとの下書きの件数のスキーマ（GET /post-drafts/counts）。 */
 export const draftCountsSchema = z.object({
   needsReview: z.number().int(),
+  /** 投稿の処理中を含む */
   approved: z.number().int(),
   rejected: z.number().int(),
+  published: z.number().int(),
+  publishFailed: z.number().int(),
 });
 /** 状態ごとの下書きの件数。 */
 export type DraftCounts = z.infer<typeof draftCountsSchema>;
@@ -352,12 +393,27 @@ export const ngWordSchema = z.object({
 /** NGワード。 */
 export type NgWord = z.infer<typeof ngWordSchema>;
 
-/** GET /post-drafts のレスポンスのスキーマ（004で3つの状態を返す形にした）。 */
+/** 自動投稿の状態のスキーマ（005 contracts/api.md）。 */
+export const autoPostStateSchema = z.object({
+  enabled: z.boolean(),
+  slotCount: z.number().int(),
+  /** 止まっている理由。止まっていなければ null */
+  stoppedReason: z.enum(["needs_reconnect", "rate_limited"]).nullable(),
+});
+/** 自動投稿の状態。 */
+export type AutoPostState = z.infer<typeof autoPostStateSchema>;
+
+/** GET /post-drafts のレスポンスのスキーマ（004で3つの状態を返す形にした。005で投稿の順と予定を足した）。 */
 export const postDraftListSchema = z.object({
   /** 登録のまとまりの新しい順 → position の昇順 */
   needsReview: z.array(postDraftSchema),
-  /** reviewedAt の新しい順 */
+  /** 投稿の順（005 research.md R4）。投稿の処理中を含む */
   approved: z.array(postDraftSchema),
+  /** 投稿に失敗した日時の新しい順に、すべて（005） */
+  publishFailed: z.array(postDraftSchema),
+  /** 下書きのIDから、投稿の予定の時刻（ISO 8601）へ。オフ・停止中は {}（005） */
+  schedule: z.record(z.string(), z.string()),
+  autoPost: autoPostStateSchema,
   /** reviewedAt の新しい順に最大500件 */
   rejected: z.array(postDraftSchema),
   counts: draftCountsSchema,
@@ -414,7 +470,8 @@ const lowerUuid = z
 /** POST /post-drafts/review のリクエストのスキーマ（004 contracts/api.md、research.md R2）。 */
 export const reviewRequestSchema = z
   .object({
-    action: z.enum(["approve", "reject", "reopen"]),
+    /** requeue：投稿に失敗 → 承認済み（もう一度投稿の順に入れる。005 FR-015） */
+    action: z.enum(["approve", "reject", "reopen", "requeue"]),
     /** 操作ごとのID。同じ操作の再試行では同じ値を送り、自分の再試行だけを成功として扱う（research.md R2） */
     requestId: lowerUuid,
     items: z
@@ -458,6 +515,8 @@ export const skipReasonSchema = z.enum([
   "STALE",
   "NOT_FOUND",
   "LIMIT",
+  /** 投稿の処理中（005 FR-008） */
+  "PUBLISHING",
 ]);
 /** 状態を変えなかった理由。 */
 export type SkipReason = z.infer<typeof skipReasonSchema>;
@@ -492,6 +551,8 @@ export const promptSummarySchema = z.object({
   ngWordCount: z.number().int(),
   /** 含めた却下の下書きの件数（004） */
   rejectedCount: z.number().int(),
+  /** 投稿の設定の時刻の数（005 FR-024） */
+  dailyPostCount: z.number().int(),
 });
 /** プロンプトに実際に含めた内容の要約。 */
 export type PromptSummary = z.infer<typeof promptSummarySchema>;
@@ -553,3 +614,119 @@ export const coreRulesRequestSchema = z.object({
 export const coreRulesResponseSchema = z.object({ coreRules: z.string(), coreRulesVersion: z.number().int() });
 /** PUT /core-rules のレスポンス。 */
 export type CoreRulesResponse = z.infer<typeof coreRulesResponseSchema>;
+
+// ---- 自動投稿（specs/005-auto-post contracts/api.md）----
+
+const slotTimeSchema = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/);
+
+/** 投稿の設定のスキーマ。 */
+export const postingScheduleSchema = z.object({
+  enabled: z.boolean(),
+  /** "HH:MM"（日本時間）の昇順 */
+  slotTimes: z.array(z.string()),
+  jitter: z.boolean(),
+  /** 行がないときは 0（最初の保存は expectedVersion: 0） */
+  version: z.number().int(),
+});
+/** 投稿の設定。 */
+export type PostingSchedule = z.infer<typeof postingScheduleSchema>;
+
+/** PUT /posting-schedule のリクエストのスキーマ。並び・重複・間の検証は validatePostingSchedule で行う。 */
+export const putPostingScheduleRequestSchema = z.object({
+  enabled: z.boolean(),
+  slotTimes: z.array(slotTimeSchema).max(AUTOPOST_SLOT_LIMIT * 2),
+  jitter: z.boolean(),
+  expectedVersion: z.number().int().min(0),
+});
+/** PUT /posting-schedule のリクエスト。 */
+export type PutPostingScheduleRequest = z.infer<typeof putPostingScheduleRequestSchema>;
+
+/** 投稿の権限の確認の結果のスキーマ（005 FR-002a・FR-002b、research.md R15）。 */
+export const threadsCheckSchema = z.discriminatedUnion("status", [
+  z.object({ status: z.literal("ok"), quotaUsage: z.number().int(), quotaTotal: z.number().int() }),
+  z.object({ status: z.literal("needs_reconnect") }),
+  z.object({ status: z.literal("no_publish_permission") }),
+  z.object({ status: z.literal("unknown") }),
+]);
+/** 投稿の権限の確認の結果。 */
+export type ThreadsCheck = z.infer<typeof threadsCheckSchema>;
+
+/** GET /posting-schedule のレスポンスのスキーマ。 */
+export const postingScheduleResponseSchema = z.object({
+  schedule: postingScheduleSchema,
+  limits: z.object({ slots: z.number().int(), minGapMinutes: z.number().int(), jitterMinutes: z.number().int() }),
+});
+/** GET /posting-schedule のレスポンス。 */
+export type PostingScheduleResponse = z.infer<typeof postingScheduleResponseSchema>;
+
+/** PUT /posting-schedule のレスポンスのスキーマ。確かめなかったときの connectionCheck は null。 */
+export const putPostingScheduleResponseSchema = z.object({
+  schedule: postingScheduleSchema,
+  connectionCheck: threadsCheckSchema.nullable(),
+});
+/** PUT /posting-schedule のレスポンス。 */
+export type PutPostingScheduleResponse = z.infer<typeof putPostingScheduleResponseSchema>;
+
+/** 知らせのスキーマ（005 FR-018、research.md R8）。 */
+export const autoPostNoticeSchema = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("needs_reconnect") }),
+  z.object({ kind: z.literal("rate_limited"), until: z.string() }),
+  z.object({
+    kind: z.literal("publish_failed"),
+    count: z.number().int(),
+    latestError: publishErrorSchema,
+    latestAt: z.string(),
+  }),
+  z.object({
+    kind: z.literal("blocked"),
+    count: z.number().int(),
+    latestReason: blockedReasonSchema,
+    latestWords: z.array(z.string()),
+  }),
+  z.object({ kind: z.literal("no_approved"), nextSlotAt: z.string().nullable() }),
+]);
+/** 知らせ。 */
+export type AutoPostNotice = z.infer<typeof autoPostNoticeSchema>;
+
+/** GET /auto-post のレスポンスのスキーマ。 */
+export const autoPostStatusSchema = z.object({
+  autoPost: autoPostStateSchema,
+  next: z
+    .object({ at: z.string(), draft: z.object({ id: z.string(), excerpt: z.string() }) })
+    .nullable(),
+  approvedCount: z.number().int(),
+  /** 承認済みの件数 ÷ 時刻の数（切り捨て）。時刻が0件なら null */
+  daysLeft: z.number().int().nullable(),
+  notices: z.array(autoPostNoticeSchema),
+});
+/** GET /auto-post のレスポンス。 */
+export type AutoPostStatus = z.infer<typeof autoPostStatusSchema>;
+
+/** 投稿済みの一覧の1件のスキーマ（GET /post-drafts/published。画面で使う列だけ）。 */
+export const publishedPostSchema = z.object({
+  id: z.string(),
+  body: z.string(),
+  publishedAt: z.string(),
+  threadsMediaId: z.string().nullable(),
+  threadsPermalink: z.string().nullable(),
+});
+/** 投稿済みの一覧の1件。 */
+export type PublishedPost = z.infer<typeof publishedPostSchema>;
+
+/** GET /post-drafts/published のレスポンスのスキーマ。 */
+export const publishedPageSchema = z.object({
+  items: z.array(publishedPostSchema),
+  /** 続きを読むときに before に渡す値。続きがなければ null */
+  nextCursor: z.string().nullable(),
+});
+/** GET /post-drafts/published のレスポンス。 */
+export type PublishedPage = z.infer<typeof publishedPageSchema>;
+
+/** GET /post-drafts/published のクエリのスキーマ。 */
+export const publishedQuerySchema = z.object({
+  before: z.string().max(200).optional(),
+  limit: z.coerce.number().int().min(1).max(PUBLISHED_PAGE_SIZE).default(PUBLISHED_PAGE_SIZE),
+});
+
+/** POST /post-drafts/:id/prioritize のリクエストのスキーマ。 */
+export const prioritizeRequestSchema = z.object({ expectedVersion: z.number().int().positive() });

@@ -37,7 +37,7 @@ export function postDraftRoutes(authed: MiddlewareHandler<AppEnv>) {
       const db = createDb(c.env.DATABASE_URL);
       const user = c.get("user");
       const account = await findOwnedAccount(db, user.id, c.req.param("accountId"));
-      const [drafts, ngWordRows] = await Promise.all([listAllDrafts(db, account.id), listNgWords(db, account.id)]);
+      const [drafts, ngWordRows] = await Promise.all([listAllDrafts(db, account), listNgWords(db, account.id)]);
       return c.json({
         ...drafts,
         limits: { needsReview: NEEDS_REVIEW_LIMIT, approved: APPROVED_LIMIT },

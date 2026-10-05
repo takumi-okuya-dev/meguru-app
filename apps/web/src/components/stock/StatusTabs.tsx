@@ -1,11 +1,14 @@
 // 投稿ストックの状態のタブ（specs/004-review-approval FR-001、contracts/ui-routes.md「状態のタブ」）。
 // 選んだタブは URL のクエリ（?tab=approved など）に持ち、再読み込みしても保つ。
-import type { DraftCounts, PostDraftStatus } from "@threads-grower/shared";
+import type { DraftCounts } from "@threads-grower/shared";
 import { useCallback } from "react";
 import { useSearchParams } from "react-router";
 import { TabsList, TabsTrigger } from "@/components/ui/tabs";
 
-const TABS: { value: PostDraftStatus; label: string; count: keyof DraftCounts }[] = [
+/** 投稿ストックのタブ（下書きの状態とは別。承認済みのタブには、投稿の処理中も入る。005） */
+export type StockTab = "needs_review" | "approved" | "rejected";
+
+const TABS: { value: StockTab; label: string; count: keyof DraftCounts }[] = [
   { value: "needs_review", label: "要確認", count: "needsReview" },
   { value: "approved", label: "承認済み", count: "approved" },
   { value: "rejected", label: "却下", count: "rejected" },
@@ -15,12 +18,12 @@ const TABS: { value: PostDraftStatus; label: string; count: keyof DraftCounts }[
  * URL のクエリの tab を読み書きする。値が正しくなければ要確認にする。
  * @returns tab：表示するタブ、setTab：タブを変える
  */
-export function useStatusTab(): { tab: PostDraftStatus; setTab: (tab: PostDraftStatus) => void } {
+export function useStatusTab(): { tab: StockTab; setTab: (tab: StockTab) => void } {
   const [params, setParams] = useSearchParams();
   const raw = params.get("tab");
-  const tab = TABS.some((t) => t.value === raw) ? (raw as PostDraftStatus) : "needs_review";
+  const tab = TABS.some((t) => t.value === raw) ? (raw as StockTab) : "needs_review";
   const setTab = useCallback(
-    (next: PostDraftStatus) =>
+    (next: StockTab) =>
       setParams(
         (prev) => {
           const p = new URLSearchParams(prev);

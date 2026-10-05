@@ -91,7 +91,7 @@ Accountと1対1。最初の保存で作る。行がなければ既定値とし�
   - `threads_media_id`・`threads_permalink`は、`published`のときだけ入れてよい（`published`でも空のことがある。R6）。
 - **インデックス**：
   - 投稿の順を読むため：`(account_id, status, prioritized_at DESC NULLS LAST, reviewed_at, id)`。004の`(account_id, status, reviewed_at DESC)`は残す（却下のタブで使う）。
-  - 投稿済みの一覧と件数のため：`(account_id, published_at DESC) WHERE status = 'published'`。部分インデックスの条件に新しい列挙型の値を使うので、作るのは値を足すマイグレーションの後（下の「マイグレーション」）。
+  - 投稿済みの一覧と件数のため：`(account_id, status, published_at DESC, id)`。新しい列挙型の値を条件にした部分インデックスにはしない（下の「マイグレーション」）。
 - **件数の上限**：
   - 承認済み（処理中を含む）：500件（004）。`requeue`でも数える。
   - 投稿済み・投稿に失敗：上限なし。投稿済みは、別のAPIで新しい順に50件ずつ返す（research.md R14）。投稿に失敗は、一覧のAPIですべて返す（失敗は自動投稿の時刻の分しか増えず、ユーザーが対処すると減る）。
@@ -170,15 +170,15 @@ stateDiagram-v2
 
 ## マイグレーション
 
-`apps/api/drizzle/0005_auto_post.sql`（drizzle-kitで作り、必要なら手で直す）。004と同じく、`ALTER TYPE … ADD VALUE`で足した値は、同じトランザクションの中では使えない。そのため、2つに分ける。
+`apps/api/drizzle/0005_auto_post.sql`（drizzle-kitで作ったまま）。
 
-1. `0005_auto_post_enum.sql`：`post_draft_status`に3つの値を足す。
-2. `0006_auto_post.sql`：
-   - `publish_attempt_state`を作る
-   - `posting_schedules`・`publish_attempts`を作る
-   - `post_drafts`に列を足す
-   - CHECK制約`post_drafts_review_state`を置き換え、`post_drafts_blocked_state`を足す
-   - インデックスを作る（新しい値を使う部分インデックスを含む）
+- `ALTER TYPE … ADD VALUE`で足した値は、同じトランザクションの中では列挙型として使えない。drizzleのマイグレーションは、未適用のファイルを**まとめて1つのトランザクションで**適用するので、ファイルを2つに分けても避けられない。
+- そのため、新しい値を直接使わない形にした。
+  - CHECK制約は、004と同じく`status::text`で比べる
+  - インデックスに、新しい値を条件にした部分インデックスを使わない（投稿済みの一覧は`(account_id, status, published_at DESC, id)`の通常のインデックス）
+  - 新しい値を既定値にしない
+- `publish_attempt_state`は同じファイルで新しく作る型なので、部分インデックスの条件に使ってよい（制限は`ADD VALUE`で足した値だけ）。
+- 空のDBへの適用と、004の状態のDB（既存の下書きあり）への適用の両方を確かめた（2026-10-05）。
 
 既存の下書きは、どれも新しい列がNULLで、新しい状態を使っていないので、置き換えたCHECK制約を満たす（後方互換）。
 

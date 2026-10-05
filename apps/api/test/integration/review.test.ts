@@ -97,7 +97,7 @@ describe("POST /post-drafts/review：承認・却下・戻す（FR-002・FR-003�
       rejectNote: null,
     });
     expect(r.updated[0]!.reviewedAt).not.toBeNull();
-    expect(r.counts).toEqual({ needsReview: 0, approved: 1, rejected: 0 });
+    expect(r.counts).toEqual({ needsReview: 0, approved: 1, rejected: 0, published: 0, publishFailed: 0 });
 
     const back = await reviewOk(accountId, { action: "reopen", items: items(r.updated[0]!) });
     expect(back.updated[0]).toMatchObject({
@@ -106,7 +106,7 @@ describe("POST /post-drafts/review：承認・却下・戻す（FR-002・FR-003�
       reviewedAt: null,
       rejectReasons: [],
     });
-    expect(back.counts).toEqual({ needsReview: 1, approved: 0, rejected: 0 });
+    expect(back.counts).toEqual({ needsReview: 1, approved: 0, rejected: 0, published: 0, publishFailed: 0 });
   });
 
   it("却下で理由（候補と自由記述）が入る", async () => {
@@ -154,7 +154,7 @@ describe("承認のチェック（FR-005、SC-001）", () => {
       [long!.id, "OVER_THREADS_LIMIT"],
       [link!.id, "OVER_THREADS_LIMIT"],
     ]);
-    expect(r.counts).toEqual({ needsReview: 3, approved: 0, rejected: 0 });
+    expect(r.counts).toEqual({ needsReview: 3, approved: 0, rejected: 0, published: 0, publishFailed: 0 });
   });
 
   it("NGワードの照合は全角／半角・大文字／小文字をそろえる", async () => {
@@ -183,7 +183,7 @@ describe("承認のチェック（FR-005、SC-001）", () => {
     const r = await reviewOk(accountId, { action: "approve", items: items(...ds) });
     expect(r.updated).toHaveLength(8);
     expect(r.skipped.map((s) => s.reason)).toEqual(["NG_WORD", "NG_WORD"]);
-    expect(r.counts).toEqual({ needsReview: 2, approved: 8, rejected: 0 });
+    expect(r.counts).toEqual({ needsReview: 2, approved: 8, rejected: 0, published: 0, publishFailed: 0 });
   });
 });
 

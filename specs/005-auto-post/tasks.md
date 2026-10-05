@@ -51,17 +51,17 @@ description: "スケジュール投稿・自動投稿の実装タスク"
 
 **目的**：新しい依存とバインディングを足す。
 
-- [ ] T001 [P] shadcn/uiの`Switch`を足す。
+- [X] T001 [P] shadcn/uiの`Switch`を足す。
   - `apps/web/package.json`に`@radix-ui/react-switch`を足す（`pnpm --filter web add @radix-ui/react-switch`）。
   - `apps/web/src/components/ui/switch.tsx`を、shadcn/uiの`Switch`の標準の実装で作る（既存の`ui/tabs.tsx`と同じ書き方）。
-- [ ] T002 [P] KVのバインディングとCronを足す（research.md R3、contracts/api.md「環境変数・バインディング」）。
+- [X] T002 [P] KVのバインディングとCronを足す（research.md R3、contracts/api.md「環境変数・バインディング」）。
   - `apps/api/wrangler.toml`：
     - `[triggers] crons = ["0 18 * * *", "*/5 * * * *"]`
     - `[[kv_namespaces]] binding = "AUTOPOST_KV"`。`id`は本番のKV namespaceのIDを入れる欄としてコメントで案内し、ローカルは`wrangler dev`のメモリ上のKVを使う。
   - `apps/api/src/env.ts`：`AUTOPOST_KV: KVNamespace`を足す。
   - `apps/api/src/lib/config.ts`：`validateConfig`に、`AUTOPOST_KV`がないときは項目名`AUTOPOST_KV`を返す確認を足す。`apps/api/test/unit/config.test.ts`に、その場合のテストを足す。
-  - `apps/api/vitest.config.ts`：2つのプロジェクトの`miniflare`に`kvNamespaces: ["AUTOPOST_KV"]`を足す。
-  - `docs/external-services-setup.md`：KV namespaceの作成（`wrangler kv namespace create AUTOPOST_KV`）と、`wrangler.toml`への`id`の記入を、Cloudflareの節に足す。
+  - `apps/api/vitest.config.ts`：変更なし（`wrangler.toml`の`[[kv_namespaces]]`から、テストでもメモリ上のKVが用意される）。
+  - `docs/external-services-setup.md`：KV namespaceの作成（`wrangler kv namespace create AUTOPOST_KV`）と、`wrangler.toml`への`id`の記入を、「9. 本番公開時の追加作業」のCloudflareの項に足す。
 
 ---
 
@@ -77,7 +77,7 @@ description: "スケジュール投稿・自動投稿の実装タスク"
 
 ### 共通パッケージ
 
-- [ ] T003 [P] 共通の計算のテストを書く（失敗を確認する）。
+- [X] T003 [P] 共通の計算のテストを書く（失敗を確認する）。
   - `packages/shared/test/schedule.test.ts`：
     - `timeToMinutes("07:30") === 450`、`minutesToTime(450) === "07:30"`。`"24:00"`・`"7:30"`・`"07:60"`は不正
     - `validatePostingSchedule`：quickstart.mdの表の「設定の検証」の行。理由は`too_many`（11件）・`duplicate`・`too_close`（ずらすがオンで29分の間）・`required`（オンで0件）。ずらすがオフなら29分の間は通る。23:50と0:10の間（日付をまたぐ）は数えない
@@ -95,22 +95,22 @@ description: "スケジュール投稿・自動投稿の実装タスク"
       - オフ・時刻0件なら空
     - `isLateNightSlot(minutes)`：119・300は`false`、120・299は`true`（FR-001b）
   - `packages/shared/test/queue.test.ts`：`compareQueueOrder`が、持ち越し（`carryover: true`）→ `prioritizedAt`の新しい順 → `reviewedAt`の古い順 → `id`の順に並べること（FR-005・FR-005a、research.md R4）。
-- [ ] T004 [P] `packages/shared/src/limits.ts`に定数を足す（contracts/auto-post-job.md「定数」）。
+- [X] T004 [P] `packages/shared/src/limits.ts`に定数を足す（contracts/auto-post-job.md「定数」）。
   - `AUTOPOST_SLOT_LIMIT = 10`、`AUTOPOST_MIN_GAP_MINUTES = 30`、`AUTOPOST_JITTER_SECONDS = 600`
   - `AUTOPOST_LATE_WINDOW_MINUTES = 60`、`AUTOPOST_RETRY_MAX = 3`、`AUTOPOST_RETRY_DELAYS_MINUTES = [5, 10, 15]`
   - `AUTOPOST_DAILY_API_LIMIT = 250`、`AUTOPOST_MAX_PER_TICK = 4`、`AUTOPOST_LEASE_SECONDS = 120`
   - `AUTOPOST_GATE_MAX_SLEEP_MINUTES = 1440`、`AUTOPOST_LATE_WARN_MINUTES = 10`、`AUTOPOST_FIND_PUBLISHED_HOURS = 24`
   - `LATE_NIGHT_HINT_MINUTES = [120, 300] as const`（2:00〜4:59。終わりは含まない）
   - `PUBLISHED_PAGE_SIZE = 50`、`AUTOPOST_ATTEMPT_RETENTION_DAYS = 30`
-- [ ] T005 `packages/shared/src/schedule.ts`を作り、`packages/shared/src/index.ts`から公開する（research.md R1・R2・R9）。T003の`schedule.test.ts`を通す。
+- [X] T005 `packages/shared/src/schedule.ts`を作り、`packages/shared/src/index.ts`から公開する（research.md R1・R2・R9）。T003の`schedule.test.ts`を通す。
   - `timeToMinutes`・`minutesToTime`（`"HH:MM"`、00:00〜23:59）
   - `validatePostingSchedule({ enabled, slotTimes, jitter }): { ok: true; slotMinutes: number[] } | { ok: false; reason: "too_many" | "duplicate" | "too_close" | "required"; times?: string[] }`。`slotMinutes`は昇順。`too_close`は該当する2つの時刻を`times`に入れる
   - 日本時間：`JST_OFFSET_MS = 9 * 3600_000`、`jstDateOf(date): string`（`YYYY-MM-DD`）、`jstMidnight(jstDate): Date`、`addDays(jstDate, n)`
   - `plannedSlotTime(accountId, jstDate, slotMinute, jitter): Date`：FNV-1a 32bitで`${accountId}:${jstDate}:${slotMinute}`をハッシュし、`hash % 1201 - 600`秒をずらす。日の範囲（0:00:00〜23:59:59）に収める。ずらすがオフなら0秒
   - `projectSchedule(input): Date[]`：入力は`{ accountId, enabled, slotMinutes, jitter, effectiveFrom, pausedUntil, now, usedSlotTimesToday: Date[], publishedToday: number, count }`。今より後の予定を、早い順に最大`count`件返す。予定は`effectiveFrom`より後・`pausedUntil`以降に限る。今日は「時刻の数 − 今日の投稿済み」件までにする
   - `isLateNightSlot(minutes): boolean`
-- [ ] T006 [P] `packages/shared/src/queue.ts`を作り、`index.ts`から公開する。`compareQueueOrder(a, b)`（入力は`{ id, carryover, prioritizedAt, reviewedAt }`）。T003の`queue.test.ts`を通す。
-- [ ] T007 `packages/shared/src/schemas.ts`を変える（contracts/api.md「型」）。
+- [X] T006 [P] `packages/shared/src/queue.ts`を作り、`index.ts`から公開する。`compareQueueOrder(a, b)`（入力は`{ id, carryover, prioritizedAt, reviewedAt }`）。T003の`queue.test.ts`を通す。
+- [X] T007 `packages/shared/src/schemas.ts`を変える（contracts/api.md「型」）。
   - `postDraftStatusSchema`に`"publishing"`・`"published"`・`"publish_failed"`を足す。
   - `publishErrorSchema = z.enum(["network", "threads_server", "invalid_request", "container_error", "unknown"])`、`blockedReasonSchema = z.enum(["ng_word", "over_threads_limit"])`
   - `postDraftSchema`に足す：`prioritizedAt`・`publishedAt`・`threadsMediaId`・`threadsPermalink`・`publishFailedAt`（いずれも`string | null`）、`carryover: boolean`、`publishError: publishErrorSchema.nullable()`、`blockedAt: string | null`、`blockedReason: blockedReasonSchema.nullable()`、`blockedWords: string[]`
@@ -125,7 +125,7 @@ description: "スケジュール投稿・自動投稿の実装タスク"
   - `reviewRequestSchema`の`action`に`"requeue"`を足す（`reject`以外は却下理由なし。004の`refine`をそのまま広げる）。
   - `skipReasonSchema`に`"PUBLISHING"`を足す。
   - `promptSummarySchema`に`dailyPostCount`を足す。
-- [ ] T008 [P] `packages/shared/src/errors.ts`を変える（contracts/ui-routes.md「エラー・失敗の文言」）。
+- [X] T008 [P] `packages/shared/src/errors.ts`を変える（contracts/ui-routes.md「エラー・失敗の文言」）。
   - `ERROR_CODES`に`DRAFT_PUBLISHING`を足し、`errorMessage`で「投稿の処理中です。少し待ってからもう一度お試しください。」を返す。
   - `ERROR_CODES`に`THREADS_NOT_READY`を足す。`errorMessage`は`details`の`needs_reconnect`・`no_publish_permission`ごとに、contracts/ui-routes.md「接続を確かめる」の表の文言を返す。
   - `PUBLISH_ERROR_LABELS: Record<PublishError, string>`（`network`「Threadsとの通信に失敗しました」など5つ）
@@ -134,7 +134,7 @@ description: "スケジュール投稿・自動投稿の実装タスク"
 
 ### DB
 
-- [ ] T009 `apps/api/src/db/schema.ts`を変える（data-model.md）。
+- [X] T009 `apps/api/src/db/schema.ts`を変える（data-model.md）。
   - `postDraftStatus`の値：`["needs_review", "approved", "rejected", "publishing", "published", "publish_failed"]`
   - `publishAttemptState = pgEnum("publish_attempt_state", ["in_progress", "retry_wait", "succeeded", "carried_over", "failed", "skipped"])`
   - `postingSchedules`：data-model.mdの表のとおり。`account_id`はPKかつ`accounts.id`へのFK（CASCADE）、`enabled` boolean NOT NULL 既定false、`slot_minutes` smallint[] NOT NULL 既定`{}`、`jitter` boolean NOT NULL 既定true、`effective_from` timestamptz(6) NOT NULL 既定now()、`paused_until` timestamptz NULL可、`blocked_notice_seen_at` timestamptz(6) NULL可、`version` integer NOT NULL 既定1、`created_at`・`updated_at`。
@@ -153,17 +153,14 @@ description: "スケジュール投稿・自動投稿の実装タスク"
   - CHECK制約`post_drafts_review_state`を、data-model.mdの「状態と記録の組み合わせ」の表のとおりに置き換える。`status::text`で比べ、NULLとの比較は`coalesce`で真か偽にする（004と同じ）。
   - CHECK制約`post_drafts_blocked_state`を足す：`blocked_*`は`needs_review`のときだけ。`blocked_at`と`blocked_reason`は両方あるか両方ないか。
   - CHECK：`threads_media_id`・`threads_permalink`は`published`のときだけ入れてよい。
-  - インデックス：`(account_id, status, prioritized_at DESC NULLS LAST, reviewed_at, id)`、`(account_id, published_at DESC, id) WHERE status = 'published'`
-- [ ] T010 マイグレーションを作る（data-model.md「マイグレーション」）。
-  - `pnpm --filter api db:generate`で作り、2つに分ける。
-    - `apps/api/drizzle/0005_auto_post_enum.sql`：`ALTER TYPE post_draft_status ADD VALUE`の3つだけ
-    - `apps/api/drizzle/0006_auto_post.sql`：残りすべて（列挙型・テーブル・列・CHECK制約の置き換え・インデックス）
-  - `apps/api/drizzle/meta/_journal.json`とスナップショットを、2つに合わせて直す。
+  - インデックス：`(account_id, status, prioritized_at DESC NULLS LAST, reviewed_at, id)`、`(account_id, status, published_at DESC, id)`（新しい値を条件にした部分インデックスにはしない）
+- [X] T010 マイグレーションを作る（data-model.md「マイグレーション」）。
+  - `pnpm --filter api db:generate --name auto_post`で`apps/api/drizzle/0005_auto_post.sql`を作る（1つのファイル）。drizzleは未適用のファイルをまとめて1つのトランザクションで適用するので、2つに分けても`ADD VALUE`の制限は避けられない。代わりに、新しい値を直接使わない（CHECK制約は`status::text`、新しい値を条件にした部分インデックスを作らない）。
   - 空のDBへの適用と、004の状態のDB（既存の下書きあり）への適用の両方が通ることを、`pnpm --filter api db:migrate`で確かめる。
 
 ### Threads APIと偽のThreadsサーバー
 
-- [ ] T011 [P] 偽のThreadsサーバーに投稿の機能を足す（contracts/api.md「Threads APIの呼び出し」）。`apps/api/test/fake-threads/server.ts`
+- [X] T011 [P] 偽のThreadsサーバーに投稿の機能を足す（contracts/api.md「Threads APIの呼び出し」）。`apps/api/test/fake-threads/server.ts`
   - `POST /v1.0/:userId/threads`（`media_type=TEXT`・`text`）：コンテナーを作り`{ id }`を返す。状態は`FINISHED`
   - `POST /v1.0/:userId/threads_publish`（`creation_id`）：
     - `FINISHED`のコンテナーなら投稿を作り、コンテナーを`PUBLISHED`にして、`{ id: mediaId }`を返す
@@ -179,19 +176,19 @@ description: "スケジュール投稿・自動投稿の実装タスク"
     - `GET /__control/posts`：作った投稿の一覧（本文・ユーザー・コンテナー）
     - `POST /__control/publish-permission` `{ userId, granted }`：`granted: false`のユーザーは、`threads`・`threads_publish`・`threads_publishing_limit`がコード10（HTTP 403）になる（投稿の権限がない状態）
     - `/__control/reset`で、投稿・コンテナー・失敗の注入も消す
-- [ ] T012 [P] Threadsの投稿の呼び出しのテストを書く（失敗を確認する）。`apps/api/test/integration/threads-publish-client.test.ts`
+- [X] T012 [P] Threadsの投稿の呼び出しのテストを書く（失敗を確認する）。`apps/api/test/integration/threads-publish-client.test.ts`
   - 6つの呼び出し（`getPublishingLimit`を含む）の正常系
   - 失敗の分類（research.md R7）：コード190 → `ThreadsAuthError`、コード4 → `ThreadsRateLimitError`、HTTP 500・コード2・通信の失敗 → `ThreadsTransientError`、コード100・コード10（権限なし）→ `ThreadsApiError`
   - 10秒のタイムアウトで`ThreadsTransientError`になる（`fetchImpl`を差し替えて確かめる）
   - エラーのメッセージに、Threadsの応答の本文が入らないこと
-- [ ] T013 `apps/api/src/lib/threads-client.ts`に投稿の呼び出しを足す。T012を通す。
+- [X] T013 `apps/api/src/lib/threads-client.ts`に投稿の呼び出しを足す。T012を通す。
   - `ThreadsRateLimitError`・`ThreadsTransientError`を足す。`parseOrThrow`で、コード4・17・32・613を上限、HTTP 5xx・コード1・2を一時的に分ける。`fetch`自体の失敗とタイムアウトは`ThreadsTransientError`にする。
   - `ThreadsClient`に`createTextContainer`・`publishContainer`・`getContainerStatus`・`getMedia`・`getPublishingLimit`（`data[0].quota_usage`・`data[0].config.quota_total`を返す）・`listRecentThreads`を足す（contracts/api.mdの表）。どれも`Authorization: Bearer`で、`AbortSignal.timeout(10_000)`を付ける。
   - `error_message`はログに出すだけで、戻り値・エラーには入れない。
 
 ### 一覧のAPIの新しい形
 
-- [ ] T014 一覧・件数のテストを、新しい形に合わせて直す（失敗を確認する）。`apps/api/test/integration/post-drafts.test.ts`・`review.test.ts`・`posting-rules.test.ts`
+- [X] T014 一覧・件数のテストを、新しい形に合わせて直す（失敗を確認する）。`apps/api/test/integration/post-drafts.test.ts`・`review.test.ts`・`posting-rules.test.ts`
   - `GET /post-drafts`：
     - `approved`が投稿の順（`prioritized_at`の新しい順 → `reviewed_at`の古い順）
     - `publishFailed`・`schedule`・`autoPost`があり、`published`がない
@@ -201,18 +198,18 @@ description: "スケジュール投稿・自動投稿の実装タスク"
   - 既存の操作で新しい列が消えること（CHECK制約の違反で500にならない。analyze I2）：
     - `blocked_*`のある要確認の下書きを編集・承認・却下すると、`blocked_*`が消える。削除もできる
     - `prioritized_at`・`carryover_attempt_id`のある承認済みの下書きを、`reopen`・編集・NGワードの追加で要確認に戻すと、2つとも消える
-- [ ] T015 `apps/api/src/services/draft-service.ts`を変える。T014を通す。
+- [X] T015 `apps/api/src/services/draft-service.ts`を変える。T014を通す。
   - `toPostDraft`に新しい項目を足す（`carryover = row.carryoverAttemptId !== null`）。
   - `countDrafts`：5つの件数を返す。`publishing`は`approved`に足す。
   - `listQueueRows(db, accountId)`：`status IN ('approved', 'publishing')`を、`publishing`を先頭 → 持ち越し（`carryover_attempt_id IS NOT NULL`）→ `prioritized_at DESC NULLS LAST` → `reviewed_at ASC` → `id`の順に読む。`compareQueueOrder`と同じ並び。004の`listReviewedRows(…, "approved")`の呼び出しを置き換える。
   - `listPublishFailedRows`：`publish_failed_at`の新しい順に全件
   - `listAllDrafts`：`publishFailed`を足す。`schedule`は`{}`、`autoPost`は`posting_schedules`から読んだ値で返す（予定の計算はUS4のT056で足す）。
-- [ ] T016 既存の操作で、新しい列を消す（analyze I2。基盤でCHECK制約を入れた時点で、004の操作が制約違反にならないようにする）。T014を通す。
+- [X] T016 既存の操作で、新しい列を消す（analyze I2。基盤でCHECK制約を入れた時点で、004の操作が制約違反にならないようにする）。T014を通す。
   - `apps/api/src/services/review-service.ts`の`applyChange`：`approve`・`reject`で`blockedAt`・`blockedReason`・`blockedWords`を`null`にする。`reopen`で`prioritizedAt`・`carryoverAttemptId`を`null`にする
   - `apps/api/src/services/draft-service.ts`の`updateDraft`：保存で`blocked_*`を消す。承認済みを戻すときに`prioritized_at`・`carryover_attempt_id`も消す
   - `apps/api/src/services/posting-rules-service.ts`の`addNgWords`：戻すときに`prioritized_at`・`carryover_attempt_id`も消す
   - data-model.mdの「状態と記録の組み合わせ」：`needs_review`・`rejected`では`prioritized_at`・`carryover_attempt_id`がNULL。`blocked_*`は`needs_review`のときだけ
-- [ ] T017 Webを新しい一覧の形に合わせる（004の動きを保つ）。
+- [X] T017 Webを新しい一覧の形に合わせる（004の動きを保つ）。
   - `apps/web/src/lib/api-client.ts`：`PostDraftList`・`DraftCounts`の新しい形
   - `apps/web/src/pages/stock.tsx`・`apps/web/src/components/stock/DraftList.tsx`：`approved`は返ってきた並びのまま出す（Webで並べ替えない）
   - `apps/web/test/stock.test.tsx`：モックのレスポンスを新しい形にし、既存のテストが通ること
