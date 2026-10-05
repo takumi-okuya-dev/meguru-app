@@ -11,7 +11,7 @@ import {
 } from "@threads-grower/shared";
 import { useCallback } from "react";
 import { toast } from "sonner";
-import { api } from "@/lib/api-client";
+import { ApiError, api } from "@/lib/api-client";
 import { queryKeys } from "@/lib/query";
 import { saveErrorMessage } from "@/lib/save-error";
 import { SKIP_REASON_SHORT, skipMessage } from "./messages";
@@ -45,8 +45,41 @@ export type ReviewOptions = {
   confirmPolicyCaution?: boolean;
 };
 
-/** send の結果。unsent は、途中で失敗して送れなかった件数（error はその原因）。 */
-type SendResult = { res: ReviewResponse; unsent: number; error: unknown };
+/**
+ * send の結果。res は返事を受け取れた分をまとめたもの（1件も受け取れなければ null）。
+ * unsent は、サーバーが処理しなかったと確かな件数（入力の誤りなど、または、その後ろで送らなかった件数）。
+ * unknown は、送り直しても返事を受け取れず、処理されたかどうかを確かめられなかった件数。error は最後の失敗の原因。
+ */
+type SendResult = { res: ReviewResponse | null; unsent: number; unknown: number; error: unknown };
+
+/**
+ * 通信の失敗などで、サーバーが処理したかどうか分からない失敗か（同じ操作IDで送り直して確かめる）。
+ * @param err - 失敗の原因
+ * @returns 処理されたかどうか分からないなら true（入力の誤りなど、処理されなかったと確かなら false）
+ */
+function isUncertain(err: unknown): boolean {
+  if (!(err instanceof ApiError)) return true;
+  return (
+    err.code === "API_UNREACHABLE" ||
+    err.code === "INTERNAL_ERROR" ||
+    err.status === 0 ||
+    err.status >= 500
+  );
+}
+
+/**
+ * 途中で失敗したときの、通知の最後に添える案内。結果が分からない分があれば、一覧を読み込み直したので状態を確かめるよう促す。
+ * @param r - send の結果
+ * @returns 案内の文
+ */
+function incompleteNote(r: SendResult): string {
+  return r.unknown > 0
+    ? "一覧を読み込み直したので、それぞれの状態を確かめてから、必要ならもう一度操作してください。"
+    : saveErrorMessage(r.error);
+}
+
+/** 結果が分からないときに、同じ操作IDで送り直す回数。 */
+const UNCERTAIN_RETRIES = 2;
 
 /**
  * まとめての操作の結果の文言。飛ばしたものがあれば、理由ごとの件数を添える。
@@ -86,18 +119,46 @@ export function useReview(accountId: string) {
       let merged: ReviewResponse | null = null;
       try {
         for (let i = 0; i < drafts.length; i += REVIEW_MAX_ITEMS) {
-          const res = await api.reviewPostDrafts(accountId, {
+          const chunk = drafts.slice(i, i + REVIEW_MAX_ITEMS);
+          const body = {
             action,
-            // 操作ごとのID。APIは、同じIDの再試行だけを成功として扱う（research.md R2）
+            // 操作ごとのID。結果が確定するまで同じIDを使う（APIは、同じIDの送り直しだけを成功として扱う。research.md R2）
             requestId: crypto.randomUUID(),
-            items: drafts
-              .slice(i, i + REVIEW_MAX_ITEMS)
-              .map((d) => ({ id: d.id, expectedVersion: d.version })),
+            items: chunk.map((d) => ({ id: d.id, expectedVersion: d.version })),
             ...(action === "reject" ? { reject: options.reject } : {}),
             ...(action === "approve" && options.confirmPolicyCaution
               ? { confirmPolicyCaution: true }
               : {}),
-          });
+          };
+          let res: ReviewResponse | null = null;
+          let lastError: unknown = null;
+          // 返事が来ない・サーバーのエラーのときは、処理されたかどうか分からないので、同じIDで送り直して確かめる。
+          // 返事だけが失われていても、APIは自分の送り直しとして結果を返す（PR #5 のCodexレビュー）
+          for (let attempt = 0; attempt <= UNCERTAIN_RETRIES; attempt++) {
+            try {
+              res = await api.reviewPostDrafts(accountId, body);
+              break;
+            } catch (err) {
+              lastError = err;
+              if (!isUncertain(err)) break;
+            }
+          }
+          if (!res) {
+            const rest = drafts.length - i - chunk.length;
+            const uncertain = isUncertain(lastError);
+            const failed = {
+              res: merged,
+              unsent: rest + (uncertain ? 0 : chunk.length),
+              unknown: uncertain ? chunk.length : 0,
+              error: lastError,
+            };
+            // 1つ目のまとまりで、処理されなかったと確かな失敗なら、何も変わっていないので失敗だけを伝える
+            if (!merged && failed.unknown === 0) {
+              toast.error(`${FAILED[action]}できませんでした。${saveErrorMessage(lastError)}`);
+              return null;
+            }
+            return failed;
+          }
           merged = merged
             ? {
                 updated: [...merged.updated, ...res.updated],
@@ -106,16 +167,7 @@ export function useReview(accountId: string) {
               }
             : res;
         }
-        return merged && { res: merged, unsent: 0, error: null };
-      } catch (err) {
-        // 1回目で失敗したら何も変わっていないので、失敗だけを伝える
-        if (!merged) {
-          toast.error(`${FAILED[action]}できませんでした。${saveErrorMessage(err)}`);
-          return null;
-        }
-        // 途中まで送れた場合は、送れた分の結果と、送れなかった件数を返す（通知は呼び出し側で1つにまとめる。PR #5 のCodexレビュー）
-        const sent = merged.updated.length + merged.skipped.length;
-        return { res: merged, unsent: drafts.length - sent, error: err };
+        return merged && { res: merged, unsent: 0, unknown: 0, error: null };
       } finally {
         refresh();
       }
@@ -123,13 +175,16 @@ export function useReview(accountId: string) {
     [accountId, refresh],
   );
 
-  /** 「元に戻す」で送る。途中で失敗したら、戻せなかった件数を伝える。 */
+  /** 「元に戻す」で送る。途中で失敗したら、戻せなかった件数・確かめられなかった件数を伝える。 */
   const sendUndo = useCallback(
     async (action: Action, drafts: PostDraft[], options: ReviewOptions) => {
       const r = await send(action, drafts, options);
-      if (r && r.unsent > 0) {
-        toast.error(`${r.unsent}件を元に戻せませんでした。${saveErrorMessage(r.error)}`);
-      }
+      if (!r || (r.unsent === 0 && r.unknown === 0)) return;
+      const parts = [
+        r.unknown > 0 ? `${r.unknown}件は元に戻せたかを確認できませんでした。` : "",
+        r.unsent > 0 ? `${r.unsent}件を元に戻せませんでした。` : "",
+      ].join("");
+      toast.error(`${parts}${incompleteNote(r)}`);
     },
     [send],
   );
@@ -173,7 +228,12 @@ export function useReview(accountId: string) {
     ): Promise<ReviewResponse | null> => {
       const sent = await send(action, drafts, options);
       if (!sent) return null;
-      const { res, unsent, error } = sent;
+      const { unsent, unknown } = sent;
+      const res = sent.res ?? {
+        updated: [],
+        skipped: [],
+        counts: { needsReview: 0, approved: 0, rejected: 0 },
+      };
       const changed = res.updated.filter(
         (u) => drafts.find((d) => d.id === u.id)?.status !== u.status,
       );
@@ -181,13 +241,18 @@ export function useReview(accountId: string) {
         changed.length > 0
           ? { action: { label: "元に戻す", onClick: () => void undo(action, drafts, changed) } }
           : {};
-      if (unsent > 0) {
-        // 途中で失敗した：送れた分と、送れなかった分を1つの通知で伝える
-        const skippedPart = res.skipped.length > 0 ? `${res.skipped.length}件は${FAILED[action]}できず、` : "";
-        toast.warning(
-          `${DONE_N[action](res.updated.length)}。${skippedPart}残り${unsent}件は送れませんでした。${saveErrorMessage(error)}`,
-          { duration: UNDO_MS, ...withUndo },
-        );
+      if (unsent > 0 || unknown > 0) {
+        // 途中で失敗した：送れた分・確かめられなかった分・送れなかった分を、1つの通知で伝える
+        const parts = [
+          res.updated.length > 0 ? `${DONE_N[action](res.updated.length)}。` : "",
+          res.skipped.length > 0
+            ? `${res.skipped.length}件は${FAILED[action]}できませんでした。`
+            : "",
+          unknown > 0 ? `${unknown}件は結果を確認できませんでした。` : "",
+          unsent > 0 ? `${unsent}件は送れませんでした。` : "",
+        ].join("");
+        toast.warning(`${parts}${incompleteNote(sent)}`, { duration: UNDO_MS, ...withUndo });
+        return sent.res;
       } else if (res.skipped.length === 0) {
         toast.success(drafts.length === 1 ? DONE[action] : DONE_N[action](res.updated.length), {
           duration: UNDO_MS,
