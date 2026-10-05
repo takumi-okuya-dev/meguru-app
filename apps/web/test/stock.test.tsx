@@ -1593,7 +1593,7 @@ describe("PR #5 のCodexレビュー（3回目）への対応", () => {
     await rejectAll(user);
     await waitFor(() => expect(toastWarning).toHaveBeenCalledTimes(1));
     expect(toastWarning.mock.calls[0]![0]).toBe(
-      "500件を却下しました。1件は結果を確認できませんでした。一覧を読み込み直したので、それぞれの状態を確かめてから、必要ならもう一度操作してください。",
+      "500件を却下しました。1件は結果を確認できませんでした。一覧を読み込み直しました。それぞれの状態を確かめてから、必要ならもう一度操作してください。",
     );
     // 1回目＋2つ目のまとまりの3回（送り直し2回）
     expect(reviewPostDrafts).toHaveBeenCalledTimes(4);
@@ -1610,6 +1610,69 @@ describe("PR #5 のCodexレビュー（3回目）への対応", () => {
     await waitFor(() => expect(toastWarning).toHaveBeenCalledTimes(1));
     expect(toastWarning.mock.calls[0]![0]).toMatch(/^500件を却下しました。1件は送れませんでした。/);
     expect(reviewPostDrafts).toHaveBeenCalledTimes(2);
+  }, 60_000);
+
+  it("本文がJSONでない4xx（INTERNAL_ERROR・404）も、処理されなかったと確かな失敗として送り直さない", async () => {
+    const user = userEvent.setup();
+    reviewPostDrafts
+      .mockImplementationOnce(ok("rejected"))
+      .mockRejectedValueOnce(new ApiError("INTERNAL_ERROR", 404));
+    await rejectAll(user);
+    await waitFor(() => expect(toastWarning).toHaveBeenCalledTimes(1));
+    expect(toastWarning.mock.calls[0]![0]).toMatch(/^500件を却下しました。1件は送れませんでした。/);
+    expect(reviewPostDrafts).toHaveBeenCalledTimes(2);
+  }, 60_000);
+
+  it("1つ目のまとまりから返事が来なければ、そのまとまりは「結果を確認できませんでした」、残りは「送れませんでした」", async () => {
+    const user = userEvent.setup();
+    reviewPostDrafts.mockRejectedValue(new ApiError("API_UNREACHABLE", 0));
+    await rejectAll(user);
+    await waitFor(() => expect(toastWarning).toHaveBeenCalledTimes(1));
+    expect(toastWarning.mock.calls[0]![0]).toBe(
+      "500件は結果を確認できませんでした。1件は送れませんでした。一覧を読み込み直しました。それぞれの状態を確かめてから、必要ならもう一度操作してください。",
+    );
+    // 1つ目のまとまりを3回（送り直し2回）送り、2つ目は送らない
+    expect(reviewPostDrafts).toHaveBeenCalledTimes(3);
+    expect(new Set(requestIds()).size).toBe(1);
+  }, 60_000);
+
+  it("一覧の読み込み直しに失敗したら、読み込み直したとは言わない", async () => {
+    const user = userEvent.setup();
+    reviewPostDrafts
+      .mockImplementationOnce(ok("rejected"))
+      .mockRejectedValue(new ApiError("API_UNREACHABLE", 0));
+    // 最初の表示だけ成功し、その後の一覧の取得は失敗する
+    listPostDrafts
+      .mockResolvedValueOnce(listResponse({ items: many }))
+      .mockRejectedValue(new ApiError("API_UNREACHABLE", 0));
+    renderPage();
+    await user.click(await screen.findByRole("checkbox", { name: "すべて選択" }));
+    await user.click(screen.getByRole("button", { name: "まとめて却下" }));
+    const dialog = await screen.findByRole("dialog", { name: "501件を却下する理由" });
+    await user.click(within(dialog).getByRole("button", { name: "トーンが違う" }));
+    await user.click(within(dialog).getAllByRole("button", { name: "却下する" }).at(-1)!);
+    await waitFor(() => expect(toastWarning).toHaveBeenCalledTimes(1));
+    expect(toastWarning.mock.calls[0]![0]).toMatch(
+      /結果を確認できませんでした。一覧を読み込み直せませんでした。画面を再読み込みして/,
+    );
+  }, 60_000);
+
+  it("「元に戻す」で返事が来なければ、元に戻せたかを確認できなかったと伝える", async () => {
+    const user = userEvent.setup();
+    reviewPostDrafts
+      .mockImplementationOnce(ok("rejected"))
+      .mockImplementationOnce(ok("rejected"))
+      .mockRejectedValue(new ApiError("API_UNREACHABLE", 0));
+    await rejectAll(user);
+    await waitFor(() =>
+      expect(toastSuccess).toHaveBeenCalledWith("501件を却下しました", expect.anything()),
+    );
+    const undo = toastSuccess.mock.calls.at(-1)![1].action.onClick as () => void;
+    await act(async () => undo());
+    await waitFor(() => expect(toastError).toHaveBeenCalledTimes(1));
+    expect(toastError.mock.calls[0]![0]).toBe(
+      "500件は元に戻せたかを確認できませんでした。1件を元に戻せませんでした。一覧を読み込み直しました。それぞれの状態を確かめてから、必要ならもう一度操作してください。",
+    );
   }, 60_000);
 
   it("「元に戻す」が途中で失敗したら、戻せなかった件数を伝える", async () => {

@@ -59,23 +59,23 @@ type SendResult = { res: ReviewResponse | null; unsent: number; unknown: number;
  */
 function isUncertain(err: unknown): boolean {
   if (!(err instanceof ApiError)) return true;
-  return (
-    err.code === "API_UNREACHABLE" ||
-    err.code === "INTERNAL_ERROR" ||
-    err.status === 0 ||
-    err.status >= 500
-  );
+  // 4xx は、本文がJSONでなく INTERNAL_ERROR になった場合も含め、処理されなかったと確かな失敗（PR #5 のCodexレビュー）
+  if (err.status >= 400 && err.status < 500) return false;
+  return err.code === "API_UNREACHABLE" || err.status === 0 || err.status >= 500;
 }
 
 /**
- * 途中で失敗したときの、通知の最後に添える案内。結果が分からない分があれば、一覧を読み込み直したので状態を確かめるよう促す。
+ * 途中で失敗したときの、通知の最後に添える案内。結果が分からない分があれば、一覧を読み込み直した結果に応じて、状態を確かめるよう促す。
  * @param r - send の結果
+ * @param listReloaded - 一覧の読み込み直しが成功したか
  * @returns 案内の文
  */
-function incompleteNote(r: SendResult): string {
-  return r.unknown > 0
-    ? "一覧を読み込み直したので、それぞれの状態を確かめてから、必要ならもう一度操作してください。"
-    : saveErrorMessage(r.error);
+function incompleteNote(r: SendResult, listReloaded: boolean): string {
+  if (r.unknown === 0) return saveErrorMessage(r.error);
+  // 一覧の読み込み直しが終わってから伝える。失敗したら、終わったとは言わない（PR #5 のCodexレビュー）
+  return listReloaded
+    ? "一覧を読み込み直しました。それぞれの状態を確かめてから、必要ならもう一度操作してください。"
+    : "一覧を読み込み直せませんでした。画面を再読み込みして、それぞれの状態を確かめてください。";
 }
 
 /** 結果が分からないときに、同じ操作IDで送り直す回数。 */
@@ -102,10 +102,14 @@ function summary(action: Action, res: ReviewResponse): string {
 export function useReview(accountId: string) {
   const queryClient = useQueryClient();
 
-  const refresh = useCallback(() => {
+  /** 一覧・件数・プロンプトを取り直す。終わるまで待て、一覧を取り直せたかを返す。 */
+  const refresh = useCallback(async (): Promise<boolean> => {
     // 件数（post-drafts/counts）は post-drafts の下のキーなので、一緒に取り直す
-    void queryClient.invalidateQueries({ queryKey: queryKeys.postDrafts(accountId) });
-    void queryClient.invalidateQueries({ queryKey: queryKeys.promptAll(accountId) });
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: queryKeys.postDrafts(accountId) }),
+      queryClient.invalidateQueries({ queryKey: queryKeys.promptAll(accountId) }),
+    ]);
+    return queryClient.getQueryState(queryKeys.postDrafts(accountId))?.status !== "error";
   }, [accountId, queryClient]);
 
   const send = useCallback(
@@ -169,7 +173,7 @@ export function useReview(accountId: string) {
         }
         return merged && { res: merged, unsent: 0, unknown: 0, error: null };
       } finally {
-        refresh();
+        void refresh();
       }
     },
     [accountId, refresh],
@@ -180,13 +184,14 @@ export function useReview(accountId: string) {
     async (action: Action, drafts: PostDraft[], options: ReviewOptions) => {
       const r = await send(action, drafts, options);
       if (!r || (r.unsent === 0 && r.unknown === 0)) return;
+      const listReloaded = r.unknown > 0 ? await refresh() : true;
       const parts = [
         r.unknown > 0 ? `${r.unknown}件は元に戻せたかを確認できませんでした。` : "",
         r.unsent > 0 ? `${r.unsent}件を元に戻せませんでした。` : "",
       ].join("");
-      toast.error(`${parts}${incompleteNote(r)}`);
+      toast.error(`${parts}${incompleteNote(r, listReloaded)}`);
     },
-    [send],
+    [send, refresh],
   );
 
   /** 「元に戻す」：逆の操作を送る。元に戻す操作には、さらに「元に戻す」を付けない。 */
@@ -242,7 +247,9 @@ export function useReview(accountId: string) {
           ? { action: { label: "元に戻す", onClick: () => void undo(action, drafts, changed) } }
           : {};
       if (unsent > 0 || unknown > 0) {
-        // 途中で失敗した：送れた分・確かめられなかった分・送れなかった分を、1つの通知で伝える
+        // 途中で失敗した：送れた分・確かめられなかった分・送れなかった分を、1つの通知で伝える。
+        // 結果が分からない分があれば、一覧の読み込み直しが終わるのを待ってから伝える
+        const listReloaded = unknown > 0 ? await refresh() : true;
         const parts = [
           res.updated.length > 0 ? `${DONE_N[action](res.updated.length)}。` : "",
           res.skipped.length > 0
@@ -251,7 +258,10 @@ export function useReview(accountId: string) {
           unknown > 0 ? `${unknown}件は結果を確認できませんでした。` : "",
           unsent > 0 ? `${unsent}件は送れませんでした。` : "",
         ].join("");
-        toast.warning(`${parts}${incompleteNote(sent)}`, { duration: UNDO_MS, ...withUndo });
+        toast.warning(`${parts}${incompleteNote(sent, listReloaded)}`, {
+          duration: UNDO_MS,
+          ...withUndo,
+        });
         return sent.res;
       } else if (res.skipped.length === 0) {
         toast.success(drafts.length === 1 ? DONE[action] : DONE_N[action](res.updated.length), {
@@ -265,7 +275,7 @@ export function useReview(accountId: string) {
       }
       return res;
     },
-    [send, undo],
+    [send, undo, refresh],
   );
 
   return { review };
