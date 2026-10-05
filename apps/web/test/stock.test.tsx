@@ -10,6 +10,7 @@ import type {
   PromptResponse,
 } from "@threads-grower/shared";
 import { createMemoryRouter, Link, Outlet, RouterProvider } from "react-router";
+import { useState } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const listPostDrafts = vi.fn();
@@ -1475,5 +1476,149 @@ describe("PR #5 のCodexレビュー（2回目）への対応", () => {
       await screen.findByText("AIプロンプトの生成はプラン2以上で使えます"),
     ).toBeInTheDocument();
     await waitFor(() => expect(composer()).toHaveFocus());
+  });
+});
+
+describe("PR #5 のCodexレビュー（3回目）への対応", () => {
+  const composer = () => screen.getByRole("textbox", { name: "AIの返信を貼り付ける欄" });
+
+  /** ホームと投稿ストックを持つルーター。同じ QueryClient のまま移動できる */
+  function renderRoutes(initial: { pathname: string; state?: unknown }) {
+    const router = createMemoryRouter(
+      [
+        {
+          path: "/accounts/:accountId",
+          element: (
+            <UnsavedChangesProvider>
+              <Outlet context={{ account }} />
+            </UnsavedChangesProvider>
+          ),
+          children: [
+            { index: true, element: <p>ホームの中身</p> },
+            { path: "stock", element: <StockPage /> },
+          ],
+        },
+      ],
+      { initialEntries: [initial] },
+    );
+    render(
+      <QueryClientProvider
+        client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
+      >
+        <RouterProvider router={router} />
+      </QueryClientProvider>,
+    );
+    return router;
+  }
+
+  it("再訪で読み込み直しが失敗しても、「再読み込み」で成功した時点で「コピー」にフォーカスする", async () => {
+    const user = userEvent.setup();
+    const router = renderRoutes({ pathname: "/accounts/a1/stock" });
+    await screen.findByRole("button", { name: "コピー" });
+    await act(() => router.navigate("/accounts/a1"));
+    await screen.findByText("ホームの中身");
+    // キャッシュがある状態で、読み込み直しだけが失敗する
+    getPrompt.mockRejectedValueOnce(new ApiError("API_UNREACHABLE", 0));
+    await act(() => router.navigate("/accounts/a1/stock", { state: { startCreate: true } }));
+    await user.click(await screen.findByRole("button", { name: "再読み込み" }));
+    const copy = await screen.findByRole("button", { name: "コピー" });
+    await waitFor(() => expect(copy).toHaveFocus());
+  });
+
+  it("プラン1で送信中に「投稿をつくる」を押しても、送信が終わって欄が使えるようになった時点でフォーカスする", async () => {
+    const user = userEvent.setup();
+    listPostDrafts.mockResolvedValue(listResponse({ canGeneratePrompt: false }));
+    let finish: (v: DraftBatchResult) => void = () => {};
+    createDraftBatch.mockImplementation(() => new Promise<DraftBatchResult>((r) => (finish = r)));
+    const router = renderRoutes({ pathname: "/accounts/a1/stock" });
+    await user.type(await screen.findByRole("textbox", { name: "AIの返信を貼り付ける欄" }), "A");
+    await user.click(screen.getByRole("button", { name: "投稿ストックに登録する" }));
+    await waitFor(() => expect(composer()).toBeDisabled());
+    await act(() => router.navigate("/accounts/a1/stock", { state: { startCreate: true } }));
+    expect(composer()).not.toHaveFocus();
+    await act(async () => finish(batchResult([draft({ id: "n1", body: "A" })])));
+    await waitFor(() => expect(composer()).toHaveFocus());
+  });
+
+  it("まとめての操作が途中で失敗したら、送れた分と送れなかった分を1つの通知で伝える", async () => {
+    const user = userEvent.setup();
+    const many = Array.from({ length: 501 }, (_, i) =>
+      draft({
+        id: `m${i}`,
+        body: `途中で失敗する下書き${i}`,
+        batchId: `b${Math.floor(i / 50)}`,
+        position: i % 50,
+      }),
+    );
+    listPostDrafts.mockResolvedValue(listResponse({ items: many }));
+    reviewPostDrafts
+      .mockImplementationOnce(async (_a: string, req: { items: { id: string }[] }) => ({
+        updated: req.items.map((i) => ({
+          ...many.find((d) => d.id === i.id)!,
+          status: "rejected",
+          version: 2,
+        })),
+        skipped: [],
+        counts: { needsReview: 1, approved: 0, rejected: 500 },
+      }))
+      .mockRejectedValueOnce(new ApiError("API_UNREACHABLE", 0));
+    renderPage();
+    await user.click(await screen.findByRole("checkbox", { name: "すべて選択" }));
+    await user.click(screen.getByRole("button", { name: "まとめて却下" }));
+    const dialog = await screen.findByRole("dialog", { name: "501件を却下する理由" });
+    await user.click(within(dialog).getByRole("button", { name: "トーンが違う" }));
+    await user.click(within(dialog).getAllByRole("button", { name: "却下する" }).at(-1)!);
+    await waitFor(() => expect(toastWarning).toHaveBeenCalledTimes(1));
+    expect(toastWarning.mock.calls[0]![0]).toMatch(
+      /^500件を却下しました。残り1件は送れませんでした。/,
+    );
+    expect(toastError).not.toHaveBeenCalled();
+    expect(toastSuccess).not.toHaveBeenCalled();
+  }, 60_000);
+
+  it("プロンプトが使えない表示になったAccountから、使えるAccountに切り替えると、使える表示に戻る", async () => {
+    const user = userEvent.setup();
+    getPrompt.mockImplementation((id: string) =>
+      id === "a1"
+        ? Promise.reject(new ApiError("GROWER_FEATURE_REQUIRED", 403))
+        : Promise.resolve(promptResponse()),
+    );
+    function Layout() {
+      const [current, setCurrent] = useState(account);
+      return (
+        <UnsavedChangesProvider>
+          <button
+            type="button"
+            onClick={() => setCurrent({ ...account, id: "a2", username: "other" })}
+          >
+            切り替え
+          </button>
+          <Outlet context={{ account: current }} />
+        </UnsavedChangesProvider>
+      );
+    }
+    const router = createMemoryRouter(
+      [
+        {
+          path: "/accounts/:accountId",
+          element: <Layout />,
+          children: [{ path: "stock", element: <StockPage /> }],
+        },
+      ],
+      { initialEntries: ["/accounts/a1/stock"] },
+    );
+    render(
+      <QueryClientProvider
+        client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
+      >
+        <RouterProvider router={router} />
+      </QueryClientProvider>,
+    );
+    expect(
+      await screen.findByText("AIプロンプトの生成はプラン2以上で使えます"),
+    ).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "切り替え" }));
+    expect(await screen.findByRole("button", { name: "コピー" })).toBeInTheDocument();
+    expect(screen.queryByText("AIプロンプトの生成はプラン2以上で使えます")).not.toBeInTheDocument();
   });
 });

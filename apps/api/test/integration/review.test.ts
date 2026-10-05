@@ -165,6 +165,14 @@ describe("承認のチェック（FR-005、SC-001）", () => {
     expect(r.skipped[0]!.reason).toBe("NG_WORD");
   });
 
+  it("全角のNGワードで、濁点付きの半角カナの本文も止める（PR #5 のCodexレビュー）", async () => {
+    const { accountId } = await createUserWithAccount("u1");
+    await addNgWord(accountId, "ガンバル", "ガンバル");
+    const [a] = await register(accountId, ["今日もｶﾞﾝﾊﾞﾙ"]);
+    const r = await reviewOk(accountId, { action: "approve", items: items(a!) });
+    expect(r.skipped[0]!.reason).toBe("NG_WORD");
+  });
+
   it("まとめての承認：10件のうち2件がNGワードなら、8件が承認され2件が skipped", async () => {
     const { accountId } = await createUserWithAccount("u1");
     await addNgWord(accountId, "絶対");

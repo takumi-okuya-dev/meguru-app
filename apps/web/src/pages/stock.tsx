@@ -53,9 +53,20 @@ const TAB_VALUES: PostDraftStatus[] = ["needs_review", "approved", "rejected"];
 
 /**
  * 投稿ストックの画面。プロンプトのコピー、貼り付けによる一括登録、下書きの確認・修正・削除・承認・却下。
+ * 同じURLのままAccountを切り替えたときに、選択やプロンプトのカードの状態（使えない表示など）を持ち越さないよう、
+ * Accountごとに作り直す（PR #5 のCodexレビュー）。
  * @returns 投稿ストックの画面
  */
 export function StockPage() {
+  const account = useCurrentAccount();
+  return <StockPageContent key={account.id} />;
+}
+
+/**
+ * 投稿ストックの画面の中身（1つのAccount分）。
+ * @returns 投稿ストックの画面
+ */
+function StockPageContent() {
   const account = useCurrentAccount();
   const queryClient = useQueryClient();
   const drafts = useQuery({

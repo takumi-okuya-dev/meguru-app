@@ -68,16 +68,7 @@ export function PasteComposer({
   // 書きかけの内容は、移動・タブを閉じる前に確認する（FR-022）
   useUnsavedChanges(text.trim() !== "");
 
-  // サイドバーの「投稿をつくる」から来て、プロンプトを作れないとき（プラン1）は、欄にフォーカスを当てる
-  // （003 FR-021。プロンプトを作れるときはプロンプトのカードに移る。specs/004 Clarifications 2026-10-05）。
-  // 選択のバーで欄が隠れている間は待ち、欄が出た時点で当てる。実際に当てられたときだけ済ませた扱いにする（PR #5 のCodexレビュー）
-  const showingSelection = !!selection && selection.count > 0;
   const focusedFor = useRef<string | null>(null);
-  useEffect(() => {
-    if (!focusKey || showingSelection || focusedFor.current === focusKey || !areaRef.current) return;
-    areaRef.current.focus();
-    focusedFor.current = focusKey;
-  }, [focusKey, showingSelection]);
 
   const refresh = () => {
     void queryClient.invalidateQueries({ queryKey: queryKeys.postDrafts(accountId) });
@@ -145,6 +136,18 @@ export function PasteComposer({
   const busy = preparing || send.isPending;
   const blank = text.trim() === "";
   const canSend = !blank && !busy && !atLimit;
+
+  // サイドバーの「投稿をつくる」から来て、プロンプトを作れないとき（プラン1）は、欄にフォーカスを当てる
+  // （003 FR-021。プロンプトを作れるときはプロンプトのカードに移る。specs/004 Clarifications 2026-10-05）。
+  // 選択のバーで欄が隠れている間や、送信中で欄が使えない間は待つ。実際に欄にフォーカスが移ったときだけ
+  // 済ませた扱いにする（PR #5 のCodexレビュー）
+  const showingSelection = !!selection && selection.count > 0;
+  useEffect(() => {
+    const area = areaRef.current;
+    if (!focusKey || showingSelection || busy || focusedFor.current === focusKey || !area) return;
+    area.focus();
+    if (document.activeElement === area) focusedFor.current = focusKey;
+  }, [focusKey, showingSelection, busy]);
 
   if (selection && selection.count > 0) return <SelectionBar selection={selection} />;
 

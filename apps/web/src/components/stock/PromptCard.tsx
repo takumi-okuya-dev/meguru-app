@@ -129,14 +129,15 @@ function PromptReadyCard({
   // 作る流れの最初の一歩（プロンプトのコピー）から始められるようにする（specs/004 Clarifications 2026-10-05）。
   // 読み込みに失敗して「コピー」が出ていない間は待ち、「再読み込み」で出た時点で当てる。
   // 実際に当てられたときだけ済ませた扱いにする（PR #5 のCodexレビュー）
-  const copyShown = !!prompt.data && !prompt.error;
+  // 再訪で読み込み直している間は待つ（古い「コピー」で済ませた扱いにしない。PR #5 のCodexレビュー）
+  const copyShown = prompt.isSuccess && !prompt.isFetching;
   useEffect(() => {
     if (!startKey || !copyShown || focusedFor.current === startKey) return;
     const copyButton = sectionRef.current?.querySelector<HTMLButtonElement>("[data-prompt-copy]");
     if (!copyButton || copyButton.disabled) return;
     sectionRef.current?.scrollIntoView?.({ block: "start", behavior: "smooth" });
     copyButton.focus({ preventScroll: true });
-    focusedFor.current = startKey;
+    if (document.activeElement === copyButton) focusedFor.current = startKey;
   }, [startKey, copyShown]);
 
   const { mutate: save, isPending: saving } = useMutation({

@@ -46,3 +46,10 @@ describe("NGワードの照合（specs/004-review-approval FR-015・FR-016、res
     expect(normalizeNgWord("  ＡＢＣ ")).toBe("abc");
   });
 });
+
+describe("濁点の付いた半角カナ（PR #5 のCodexレビュー）", () => {
+  it("全角の「ガンバル」で、半角の「ｶﾞﾝﾊﾞﾙ」を検知する（逆も）", () => {
+    expect(findNgWords("今日もｶﾞﾝﾊﾞﾙ", ng("ガンバル"))).toEqual([{ word: "ガンバル", ranges: [[3, 9]] }]);
+    expect(findNgWords("今日もガンバル", ng("ｶﾞﾝﾊﾞﾙ"))).toHaveLength(1);
+  });
+});

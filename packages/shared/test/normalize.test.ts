@@ -35,3 +35,17 @@ describe("照合用の正規化（specs/004-review-approval research.md R4）", 
     expect(toOriginal.at(-1)).toBe(2);
   });
 });
+
+describe("濁点・半濁点の付いた半角カナ（PR #5 のCodexレビュー）", () => {
+  it("「ｶﾞ」「ﾊﾟ」を全角の1文字にそろえる", () => {
+    expect(normalizeForMatch("ｶﾞﾝﾊﾞﾙ").normalized).toBe("ガンバル");
+    expect(normalizeForMatch("ﾊﾟﾝ").normalized).toBe("パン");
+  });
+
+  it("まとめた範囲も、元の本文の位置に戻せる", () => {
+    const text = "朝ｶﾞﾝﾊﾞﾙ";
+    const { normalized, toOriginal } = normalizeForMatch(text);
+    const start = normalized.indexOf("ガンバル");
+    expect(toOriginalRange(toOriginal, start, start + 4)).toEqual([1, text.length]);
+  });
+});

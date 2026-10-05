@@ -45,6 +45,9 @@ export type ReviewOptions = {
   confirmPolicyCaution?: boolean;
 };
 
+/** send の結果。unsent は、途中で失敗して送れなかった件数（error はその原因）。 */
+type SendResult = { res: ReviewResponse; unsent: number; error: unknown };
+
 /**
  * まとめての操作の結果の文言。飛ばしたものがあれば、理由ごとの件数を添える。
  * @param action - 操作
@@ -77,7 +80,7 @@ export function useReview(accountId: string) {
       action: Action,
       drafts: PostDraft[],
       options: ReviewOptions,
-    ): Promise<ReviewResponse | null> => {
+    ): Promise<SendResult | null> => {
       // 1回のリクエストは REVIEW_MAX_ITEMS 件まで。NGワードの追加で要確認が500件を超えることがあるので、
       // それを超える選択は分けて順に送り、結果をまとめる（PR #5 のCodexレビュー）
       let merged: ReviewResponse | null = null;
@@ -103,11 +106,16 @@ export function useReview(accountId: string) {
               }
             : res;
         }
-        return merged;
+        return merged && { res: merged, unsent: 0, error: null };
       } catch (err) {
-        toast.error(`${FAILED[action]}できませんでした。${saveErrorMessage(err)}`);
-        // 途中までに送った分は、状態が変わっているので結果として返す
-        return merged;
+        // 1回目で失敗したら何も変わっていないので、失敗だけを伝える
+        if (!merged) {
+          toast.error(`${FAILED[action]}できませんでした。${saveErrorMessage(err)}`);
+          return null;
+        }
+        // 途中まで送れた場合は、送れた分の結果と、送れなかった件数を返す（通知は呼び出し側で1つにまとめる。PR #5 のCodexレビュー）
+        const sent = merged.updated.length + merged.skipped.length;
+        return { res: merged, unsent: drafts.length - sent, error: err };
       } finally {
         refresh();
       }
@@ -115,11 +123,22 @@ export function useReview(accountId: string) {
     [accountId, refresh],
   );
 
+  /** 「元に戻す」で送る。途中で失敗したら、戻せなかった件数を伝える。 */
+  const sendUndo = useCallback(
+    async (action: Action, drafts: PostDraft[], options: ReviewOptions) => {
+      const r = await send(action, drafts, options);
+      if (r && r.unsent > 0) {
+        toast.error(`${r.unsent}件を元に戻せませんでした。${saveErrorMessage(r.error)}`);
+      }
+    },
+    [send],
+  );
+
   /** 「元に戻す」：逆の操作を送る。元に戻す操作には、さらに「元に戻す」を付けない。 */
   const undo = useCallback(
     async (action: Action, before: PostDraft[], updated: PostDraft[]) => {
       if (action !== "reopen") {
-        await send("reopen", updated, {});
+        await sendUndo("reopen", updated, {});
         return;
       }
       // 要確認に戻す前の状態ごとに、承認・却下（元の理由）を送り直す
@@ -128,7 +147,7 @@ export function useReview(accountId: string) {
         .filter((d) => d.status === "approved" && latest.has(d.id))
         .map((d) => latest.get(d.id)!);
       // 直前に確認済みの承認を戻すだけなので、規約に注意の確認はもう一度求めない
-      if (approved.length > 0) await send("approve", approved, { confirmPolicyCaution: true });
+      if (approved.length > 0) await sendUndo("approve", approved, { confirmPolicyCaution: true });
       const groups = new Map<
         string,
         { reject: { reasons: RejectReasonCode[]; note: string }; drafts: PostDraft[] }
@@ -141,9 +160,9 @@ export function useReview(accountId: string) {
         g.drafts.push(latest.get(d.id)!);
         groups.set(key, g);
       }
-      for (const g of groups.values()) await send("reject", g.drafts, { reject: g.reject });
+      for (const g of groups.values()) await sendUndo("reject", g.drafts, { reject: g.reject });
     },
-    [send],
+    [sendUndo],
   );
 
   const review = useCallback(
@@ -152,8 +171,9 @@ export function useReview(accountId: string) {
       drafts: PostDraft[],
       options: ReviewOptions = {},
     ): Promise<ReviewResponse | null> => {
-      const res = await send(action, drafts, options);
-      if (!res) return null;
+      const sent = await send(action, drafts, options);
+      if (!sent) return null;
+      const { res, unsent, error } = sent;
       const changed = res.updated.filter(
         (u) => drafts.find((d) => d.id === u.id)?.status !== u.status,
       );
@@ -161,7 +181,14 @@ export function useReview(accountId: string) {
         changed.length > 0
           ? { action: { label: "元に戻す", onClick: () => void undo(action, drafts, changed) } }
           : {};
-      if (res.skipped.length === 0) {
+      if (unsent > 0) {
+        // 途中で失敗した：送れた分と、送れなかった分を1つの通知で伝える
+        const skippedPart = res.skipped.length > 0 ? `${res.skipped.length}件は${FAILED[action]}できず、` : "";
+        toast.warning(
+          `${DONE_N[action](res.updated.length)}。${skippedPart}残り${unsent}件は送れませんでした。${saveErrorMessage(error)}`,
+          { duration: UNDO_MS, ...withUndo },
+        );
+      } else if (res.skipped.length === 0) {
         toast.success(drafts.length === 1 ? DONE[action] : DONE_N[action](res.updated.length), {
           duration: UNDO_MS,
           ...withUndo,
