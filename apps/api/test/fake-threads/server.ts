@@ -317,6 +317,21 @@ export function createFakeThreads() {
     dropPublishResponses = ((await c.req.json()) as { times: number }).times;
     return c.json({ ok: true });
   });
+  // アプリを通さない投稿（手動の投稿など）。timestamp は任意の時刻にできる
+  app.post("/__control/add-post", async (c) => {
+    const body = (await c.req.json()) as { userId: string; text: string; timestamp: string };
+    const id = nextId();
+    const username = users.get(body.userId)?.username ?? body.userId;
+    posts.push({
+      id,
+      userId: body.userId,
+      text: body.text,
+      timestamp: new Date(body.timestamp).toISOString().replace(/\.\d{3}Z$/, "+0000"),
+      permalink: `https://www.threads.com/@${username}/post/${id}`,
+      containerId: "",
+    });
+    return c.json({ id });
+  });
   app.post("/__control/container-status", async (c) => {
     const { containerId, status } = (await c.req.json()) as { containerId: string; status: ContainerStatus };
     const container = containers.get(containerId);

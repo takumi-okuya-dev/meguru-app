@@ -104,6 +104,8 @@ export const AUTOPOST_GATE_MAX_SLEEP_MINUTES = 1440;
 export const AUTOPOST_LATE_WARN_MINUTES = 10;
 /** 結果がわからない投稿を探し続ける時間（時間。research.md R6）。 */
 export const AUTOPOST_FIND_PUBLISHED_HOURS = 24;
+/** 結果がわからない投稿を探すとき、公開を送った時刻より前に見てよい幅（秒。Threadsとの時計のずれ。R6）。 */
+export const AUTOPOST_RECONCILE_SKEW_SECONDS = 60;
 /** 投稿の試みを残す日数（日次の処理で、これより古い行を消す）。 */
 export const AUTOPOST_ATTEMPT_RETENTION_DAYS = 30;
 /** 設定の画面で深夜の案内を出す時間帯（0時からの分。2:00〜4:59。終わりは含まない。FR-001b）。 */

@@ -88,10 +88,13 @@ export async function setSchedule(
       jitter = EXCLUDED.jitter, effective_from = EXCLUDED.effective_from, paused_until = EXCLUDED.paused_until`;
 }
 
-/** 定期処理を1回動かす。既定では関所を消してから動かす（関所のテストは keepGate: true）。 */
-export async function run(now: Date, opts: { keepGate?: boolean } = {}) {
+/**
+ * 定期処理を1回動かす。既定では関所を消してから動かす（関所のテストは keepGate: true）。
+ * 実際の時刻（投稿日時の記録）は、既定では now にそろえる（clock で変えられる）。
+ */
+export async function run(now: Date, opts: { keepGate?: boolean; clock?: () => Date } = {}) {
   if (!opts.keepGate) await testEnv.AUTOPOST_KV.delete("autopost:gate");
-  return runAutoPost(testEnv, now);
+  return runAutoPost(testEnv, now, undefined, opts.clock ?? (() => now));
 }
 
 /** 下書きの行。 */

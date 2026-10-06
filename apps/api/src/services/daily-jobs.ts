@@ -3,7 +3,7 @@ import { AUTOPOST_ATTEMPT_RETENTION_DAYS, addDays, jstDateOf } from "@threads-gr
 import type { Env } from "../env";
 import { createDb } from "../db/client";
 import { oauthStates, publishAttempts } from "../db/schema";
-import { lt } from "drizzle-orm";
+import { and, lt, notInArray } from "drizzle-orm";
 import { logger } from "../lib/logger";
 import { createThreadsClient } from "../lib/threads-client";
 import { cleanupDeletionIdentifiers, retryDeletions } from "./data-deletion";
@@ -39,9 +39,13 @@ export async function runDailyJobs(env: Env, now: Date = new Date()) {
           await createDb(env.DATABASE_URL)
             .delete(publishAttempts)
             .where(
-              lt(
-                publishAttempts.slotDate,
-                addDays(jstDateOf(now), -AUTOPOST_ATTEMPT_RETENTION_DAYS),
+              and(
+                lt(
+                  publishAttempts.slotDate,
+                  addDays(jstDateOf(now), -AUTOPOST_ATTEMPT_RETENTION_DAYS),
+                ),
+                // 処理中・やり直し待ちは、下書きを publishing のまま残すので消さない（結果を確かめ終えてから消す）
+                notInArray(publishAttempts.state, ["in_progress", "retry_wait"]),
               ),
             )
             .returning({ id: publishAttempts.id })

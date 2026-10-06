@@ -21,6 +21,7 @@
 | `AUTOPOST_LATE_WARN_MINUTES` | 10 | これを超える遅れで`warn`を出す（SC-004） |
 | `LATE_NIGHT_HINT_MINUTES` | [120, 300) | 設定の画面で案内を出す時間帯（2:00〜4:59。FR-001b） |
 | `AUTOPOST_FIND_PUBLISHED_HOURS` | 24 | 結果が分からない投稿を探し続ける時間（R6） |
+| `AUTOPOST_RECONCILE_SKEW_SECONDS` | 60 | 結果が分からない投稿を探すとき、`publish_requested_at`より前に見てよい幅（Threadsとの時計のずれ。R6） |
 
 暫定値はspec Assumptionsのとおり、実運用で見直す。
 
@@ -58,7 +59,9 @@
 
 ### 3. 取り出し（1つのトランザクション）
 
-`lockAccountDrafts`（004）を取ってから、次を順に確かめる。満たさなければ、試みを`skipped`（理由）にして終わる。
+`lockAccountDrafts`（004）を取ってから、`posting_schedules`の行を共有ロック（`FOR SHARE`）で読み直す。手順2で読んだ設定の後に、設定の変更・再接続で`effective_from`が進んだり、時刻・ずらすかが変わったりして、その時刻が今の設定の予定の時刻（`slot_at > effective_from`、`slot_minutes`に含まれ、`plannedSlotTime`が一致）でなくなっていれば、試みの行を作らずに終わる（FR-012・FR-016）。共有ロックにより、設定の更新はこの取り出しの前か後のどちらかになる。
+
+続いて、次を順に確かめる。満たさなければ、試みを`skipped`（理由）にして終わる。
 
 | 確かめること | 理由 |
 |---|---|
@@ -84,6 +87,8 @@
 
 トークンを復号し（001 R5）、試みの記録から次の段階を決める。
 
+Accountが要再接続なら、`publish_requested_at`がない試み（まだ公開を送っていない）は公開に進まず、「失敗の扱い」の「認証」と同じく`skipped`（`needs_reconnect`）にして下書きを`approved`に戻す。`publish_requested_at`がある試みは、結果の確認（公開はしない）だけを続ける。
+
 | 試みの記録 | 行うこと |
 |---|---|
 | `publish_requested_at`がある（結果が分からない） | `getContainerStatus`。下の「結果の確認」へ |
@@ -92,7 +97,7 @@
 
 **公開**：
 
-1. `publish_requested_at = now`を保存する。
+1. `publish_requested_at`に、公開を送る直前の実際の時刻（Cronの予定時刻ではない）を保存する。
 2. `publishContainer`を呼ぶ。
 3. 成功したら「成功の記録」へ進む。
 4. 失敗したら「失敗の扱い」へ進む。ただし、`ThreadsTransientError`（通信の失敗・タイムアウト・HTTP 5xx）は「結果がわからない」として扱う。Threads側で公開まで済んでいる可能性があるため。`publish_requested_at`を残したまま`lease_until`を消し、次の回に「結果の確認」をする。やり直しの回数は、「結果の確認」でコンテナーが公開されていないとわかった時点で増やす。
@@ -101,7 +106,7 @@
 
 | 状態 | 行うこと |
 |---|---|
-| `PUBLISHED` | `listRecentThreads(since = publish_requested_at - 5分)`から、本文が下書きと同じ（前後の空白を除いて一致）もっとも古い投稿を探す。見つかれば「成功の記録」へ進む。見つからなければ次の回。`publish_requested_at`から24時間たっても見つからなければ、IDなしで成功にし、エラーのログを出す |
+| `PUBLISHED` | `listRecentThreads(since = publish_requested_at - 5分)`から、`timestamp`が`publish_requested_at - AUTOPOST_RECONCILE_SKEW_SECONDS`以降で、本文が下書きと同じ（前後の空白を除いて一致）もっとも古い投稿を探す（公開を送る前の同じ本文の投稿＝手動の投稿などを選ばない）。見つかれば「成功の記録」へ進む。見つからなければ次の回。`publish_requested_at`から24時間たっても見つからなければ、IDなしで成功にし、エラーのログを出す |
 | `FINISHED` | 公開されていない。`publish_requested_at`を消し、一時的な失敗として「失敗の扱い」へ進む（`container_id`は残し、次は同じコンテナーで公開する） |
 | `IN_PROGRESS` | 次の回 |
 | `EXPIRED` | 公開されていない。`container_id`・`publish_requested_at`を消し、一時的な失敗として扱う |

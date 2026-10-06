@@ -3,6 +3,7 @@
 // publish_requested_at があり結果がわからない間は、新しいコンテナーを作らない（1つのコンテナーは1回しか公開できない）。
 import {
   AUTOPOST_FIND_PUBLISHED_HOURS,
+  AUTOPOST_RECONCILE_SKEW_SECONDS,
   AUTOPOST_RETRY_DELAYS_MINUTES,
   AUTOPOST_RETRY_MAX,
   addDays,
@@ -67,6 +68,7 @@ function parseThreadsTime(ts: string): Date {
  * @param threads - Threads API のクライアント
  * @param attemptId - publish_attempts.id
  * @param now - 今の時刻（この回の基準の時刻）
+ * @param clock - 実際の時刻（公開を送った・応答を受けた時刻の記録に使う。テストで差し替えられる）
  * @returns 結果
  */
 export async function executeAttempt(
@@ -75,6 +77,7 @@ export async function executeAttempt(
   threads: ThreadsClient,
   attemptId: string,
   now: Date,
+  clock: () => Date = () => new Date(),
 ): Promise<ExecuteOutcome> {
   const [row] = await db
     .select({ attempt: publishAttempts, draft: postDrafts })
@@ -96,12 +99,16 @@ export async function executeAttempt(
       .where(eq(publishAttempts.id, attemptId));
     return { kind: "failed" };
   }
-  const ctx = new AttemptContext(env, db, threads, attempt, draft, now);
+  const ctx = new AttemptContext(env, db, threads, attempt, draft, now, clock);
   const cred = await loadThreadsCredentials(env, db, attempt.accountId);
   if (!cred?.token) {
     // 接続がない・鍵の設定ミスで復号できない。結果がわからない途中なら待ち、そうでなければ一時的な失敗として数える
     if (attempt.publishRequestedAt || attempt.containerId) return ctx.release();
     return ctx.transientFailure("unknown");
+  }
+  if (cred.connectionStatus !== "connected" && !attempt.publishRequestedAt) {
+    // 要再接続：新しく公開しない。公開の結果がわからない途中だけは、確かめる処理（公開しない）を続ける
+    return ctx.backToApproved("needs_reconnect");
   }
   return ctx.run(cred as ThreadsCredentials & { token: string });
 }
@@ -115,6 +122,7 @@ class AttemptContext {
     private readonly attempt: AttemptRow,
     private readonly draft: DraftRow,
     private readonly now: Date,
+    private readonly clock: () => Date,
   ) {}
 
   private get ids() {
@@ -179,7 +187,8 @@ class AttemptContext {
         // 公開を送る前に、コンテナーのIDを保存する（research.md R6）
         await this.updateAttempt({ containerId });
       }
-      await this.updateAttempt({ publishRequestedAt: this.now });
+      // 照合（confirm）では、この時刻より前の投稿を候補にしないので、Cron の予定時刻ではなく実際の時刻を残す
+      await this.updateAttempt({ publishRequestedAt: this.clock() });
       let mediaId: string;
       try {
         ({ mediaId } = await this.threads.publishContainer(
@@ -197,7 +206,8 @@ class AttemptContext {
         await this.updateAttempt({ publishRequestedAt: null });
         throw err;
       }
-      return await this.succeed(cred, mediaId, this.now);
+      // 投稿日時は応答を受けた時刻（Cron の予定時刻ではない。日付・24時間の件数の数え方に使う）
+      return await this.succeed(cred, mediaId, this.clock());
     } catch (err) {
       return this.failure(err, cred);
     }
@@ -239,8 +249,10 @@ class AttemptContext {
       logger.warn("auto-post: publish result resolved as not published", { ...this.ids, status });
       return this.transientFailure("threads_server");
     }
-    // PUBLISHED：投稿の一覧から、本文が同じもっとも古い投稿を探す
+    // PUBLISHED：投稿の一覧から、公開を送った後（時計のずれの分だけ前まで）で本文が同じ、もっとも古い投稿を探す。
+    // それより前の同じ本文の投稿（直前の手動の投稿など）は、この試みの投稿ではない
     let found: { id: string; timestamp: string } | undefined;
+    const earliest = requestedAt.getTime() - AUTOPOST_RECONCILE_SKEW_SECONDS * 1000;
     try {
       const recent = await this.threads.listRecentThreads(
         cred.token,
@@ -249,7 +261,10 @@ class AttemptContext {
       );
       const body = this.draft.body.trim();
       found = recent
-        .filter((p) => (p.text ?? "").trim() === body)
+        .filter(
+          (p) =>
+            (p.text ?? "").trim() === body && parseThreadsTime(p.timestamp).getTime() >= earliest,
+        )
         .sort(
           (a, b) =>
             parseThreadsTime(a.timestamp).getTime() - parseThreadsTime(b.timestamp).getTime(),
@@ -382,7 +397,7 @@ class AttemptContext {
    * @param reason - 停止の理由
    * @returns 飛ばした結果
    */
-  private async backToApproved(
+  async backToApproved(
     reason: "needs_reconnect" | "rate_limited",
   ): Promise<ExecuteOutcome> {
     await this.db.batch([

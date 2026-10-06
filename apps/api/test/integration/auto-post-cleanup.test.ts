@@ -24,6 +24,20 @@ it("30日より前の試みだけを消し、持ち越しの参照も外す", as
   ]);
 });
 
+it("30日より前でも、処理中・やり直し待ちの試みは消さない（PR #6 のCodexレビュー）", async () => {
+  const { accountId } = await connectedAccount("u1");
+  const [inProgress, retryWait] = await approvedDrafts(accountId, ["確認待ち", "やり直し待ち"]);
+  await db()`UPDATE post_drafts SET status = 'publishing' WHERE id IN (${inProgress!}, ${retryWait!})`;
+  await db()`INSERT INTO publish_attempts (account_id, slot_at, slot_date, slot_minute, state, draft_id, publish_requested_at)
+    VALUES (${accountId}, '2030-01-01T03:00:00Z', '2030-01-01', 720, 'in_progress', ${inProgress!}, '2030-01-01T03:00:00Z')`;
+  await db()`INSERT INTO publish_attempts (account_id, slot_at, slot_date, slot_minute, state, draft_id, next_retry_at, retry_count)
+    VALUES (${accountId}, '2030-01-01T04:00:00Z', '2030-01-01', 780, 'retry_wait', ${retryWait!}, '2030-01-01T04:05:00Z', 1)`;
+  await runDailyJobs(testEnv, jst("2030-02-01 00:00"));
+  expect(
+    await db()`SELECT state FROM publish_attempts WHERE account_id = ${accountId} ORDER BY slot_at`,
+  ).toMatchObject([{ state: "in_progress" }, { state: "retry_wait" }]);
+});
+
 it("再接続でeffective_fromを進め、版を変えずに過去の時刻を拾わない", async () => {
   const app = makeApp();
   const { accountId, threadsUserId } = await connectedAccount("u1", app);

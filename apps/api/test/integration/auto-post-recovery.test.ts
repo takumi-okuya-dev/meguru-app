@@ -1,5 +1,6 @@
-import { beforeEach, expect, it } from "vitest";
-import { fake, resetDb, call, makeApp } from "../helpers/app";
+import { beforeEach, describe, expect, it } from "vitest";
+import { claimSlot } from "../../src/services/publish-claim";
+import { fake, resetDb, call, makeApp, testEnv } from "../helpers/app";
 import {
   addMin,
   approvedDrafts,
@@ -36,10 +37,11 @@ it.each(["auth", "transient"] as const)(
   },
 );
 
-it("直近24時間で250件なら、翌日0時まで止める（今日の件数だけでは数えない）", async () => {
+it("直近24時間で250件ならその時刻を飛ばすが止めず、24時間の件数が減った次の時刻で投稿する（PR #6 のCodexレビュー）", async () => {
   const { accountId } = await connectedAccount("u1");
   const [id] = await approvedDrafts(accountId, ["待機する下書き"]);
-  await setSchedule(accountId, { slotMinutes: [720] });
+  // 12:00 と 21:30（日本時間）。250件は前日21:00（日本時間）なので、21:30には24時間の外になる
+  await setSchedule(accountId, { slotMinutes: [720, 1290] });
   await db()`WITH batches AS (
     INSERT INTO draft_batches (account_id, client_request_id, draft_count, delimiter_found)
     SELECT ${accountId}, gen_random_uuid(), 50, true FROM generate_series(1, 5) RETURNING id
@@ -50,10 +52,14 @@ it("直近24時間で250件なら、翌日0時まで止める（今日の件数�
     { state: "skipped", skip_reason: "rate_limited" },
   ]);
   expect(await draftRow(id!)).toMatchObject({ status: "approved" });
-  const [schedule] =
-    await db()`SELECT paused_until FROM posting_schedules WHERE account_id = ${accountId}`;
-  expect(new Date(schedule!.paused_until as string).toISOString()).toBe("2030-01-10T15:00:00.000Z");
+  // 自分の記録で数えた上限では、翌日0時まで止めない（contracts/auto-post-job.md 手順3）
+  expect(
+    await db()`SELECT paused_until FROM posting_schedules WHERE account_id = ${accountId}`,
+  ).toMatchObject([{ paused_until: null }]);
   expect(await fake.posts()).toHaveLength(0);
+  await run(jst("2030-01-10 21:30"));
+  expect(await draftRow(id!)).toMatchObject({ status: "published" });
+  expect(await fake.posts()).toHaveLength(1);
 });
 
 it("URLの取得だけが失敗しても、投稿済みを保ち次の回にURLを補う", async () => {
@@ -109,4 +115,100 @@ it("US2：要確認が500件でも、直前のチェックで安全に差し戻�
     await db()`SELECT count(*)::int AS n FROM post_drafts WHERE account_id = ${accountId} AND status = 'needs_review'`,
   ).toMatchObject([{ n: 501 }]);
   expect(await fake.posts()).toHaveLength(0);
+});
+
+describe("PR #6 のCodexレビュー", () => {
+  it("試みを取った後に要再接続になったら、新しく公開せず承認済みに戻す", async () => {
+    const now = jst("2030-01-10 12:00");
+    const { accountId } = await connectedAccount("u1");
+    const [id] = await approvedDrafts(accountId, ["再接続待ち"]);
+    await setSchedule(accountId, { slotMinutes: [720] });
+    await fake.publishFail("createContainer", "transient", 1);
+    await run(now);
+    expect(await attempts(accountId)).toMatchObject([{ state: "retry_wait" }]);
+    // トークンは残っていて復号できるが、接続は要再接続
+    await db()`UPDATE accounts SET connection_status = 'needs_reconnect' WHERE id = ${accountId}`;
+    await run(addMin(now, 5));
+    expect(await attempts(accountId)).toMatchObject([
+      { state: "skipped", skip_reason: "needs_reconnect", draft_id: null },
+    ]);
+    expect(await draftRow(id!)).toMatchObject({ status: "approved" });
+    expect(await fake.containers()).toHaveLength(0);
+    expect(await fake.posts()).toHaveLength(0);
+  });
+
+  it("要再接続でも、公開の結果がわからない途中なら確かめて投稿済みにする（新しく公開しない）", async () => {
+    // 偽サーバーの投稿の時刻は実時刻なので、実時刻で動かす
+    const now = new Date();
+    const minute = Math.floor(((now.getTime() + 9 * 3600_000) % 86_400_000) / 60_000);
+    const { accountId } = await connectedAccount("u1");
+    const [id] = await approvedDrafts(accountId, ["応答を失った投稿"]);
+    await setSchedule(accountId, { slotMinutes: [minute] });
+    await fake.dropPublishResponse(1);
+    await run(now);
+    expect(await draftRow(id!)).toMatchObject({ status: "publishing" });
+    await db()`UPDATE accounts SET connection_status = 'needs_reconnect' WHERE id = ${accountId}`;
+    await run(addMin(now, 5));
+    expect(await draftRow(id!)).toMatchObject({ status: "published" });
+    expect(await fake.posts()).toHaveLength(1);
+  });
+
+  it("定期処理が設定を読んだ後に effective_from が進んだ・時刻が変わった時刻は、取り出さない", async () => {
+    const now = jst("2030-01-10 12:05");
+    const { accountId } = await connectedAccount("u1");
+    const [id] = await approvedDrafts(accountId, ["変更前の時刻"]);
+    await setSchedule(accountId, { slotMinutes: [720] });
+    // 定期処理が先に求めた時刻（12:00）
+    const slot = { slotAt: jst("2030-01-10 12:00"), slotDate: "2030-01-10", slotMinute: 720 };
+    // その後、再接続・設定の変更で effective_from が進んだ
+    await setSchedule(accountId, { slotMinutes: [720], effectiveFrom: jst("2030-01-10 12:01") });
+    expect(await claimSlot(testEnv, accountId, slot, now)).toEqual({ kind: "stale" });
+    // 時刻そのものが変わった
+    await setSchedule(accountId, { slotMinutes: [780] });
+    expect(await claimSlot(testEnv, accountId, slot, now)).toEqual({ kind: "stale" });
+    // ずらす設定に変わった（予定の時刻が変わる）
+    await setSchedule(accountId, { slotMinutes: [720], jitter: true });
+    expect(await claimSlot(testEnv, accountId, slot, now)).toEqual({ kind: "stale" });
+    expect(await attempts(accountId)).toHaveLength(0);
+    expect(await draftRow(id!)).toMatchObject({ status: "approved" });
+    // 設定が元のままなら取り出す
+    await setSchedule(accountId, { slotMinutes: [720] });
+    expect(await claimSlot(testEnv, accountId, slot, now)).toMatchObject({ kind: "claimed" });
+  });
+
+  it("投稿日時は、Cron の予定時刻ではなく公開の応答を受けた時刻にする", async () => {
+    const { accountId } = await connectedAccount("u1");
+    const [id] = await approvedDrafts(accountId, ["日付をまたぐ"]);
+    await setSchedule(accountId, { slotMinutes: [1435] });
+    // 23:56 の回が遅れ、公開の応答を受けたのは翌日の 0:01（日本時間）
+    const publishedAt = jst("2030-01-11 00:01");
+    await run(jst("2030-01-10 23:56"), { clock: () => publishedAt });
+    const row = await draftRow(id!);
+    expect(row).toMatchObject({ status: "published" });
+    expect(new Date(row.published_at as string).toISOString()).toBe(publishedAt.toISOString());
+    const [attempt] = await attempts(accountId);
+    expect(new Date(attempt!.publish_requested_at as string).toISOString()).toBe(
+      publishedAt.toISOString(),
+    );
+  });
+
+  it("応答を失った投稿の照合で、公開を送る前の同じ本文の投稿（手動の投稿）を選ばない", async () => {
+    const now = new Date();
+    const minute = Math.floor(((now.getTime() + 9 * 3600_000) % 86_400_000) / 60_000);
+    const { accountId, threadsUserId } = await connectedAccount("u1");
+    const [id] = await approvedDrafts(accountId, ["同じ本文"]);
+    await setSchedule(accountId, { slotMinutes: [minute] });
+    // 公開を送る2分前に、同じ本文を手動で投稿していた（照合で見る5分の中）
+    const manualId = await fake.addPost(threadsUserId, "同じ本文", addMin(now, -2));
+    await fake.dropPublishResponse(1);
+    await run(now);
+    await run(addMin(now, 5));
+    const posts = await fake.posts();
+    expect(posts).toHaveLength(2);
+    const published = posts.find((p) => p.id !== manualId)!;
+    expect(await draftRow(id!)).toMatchObject({
+      status: "published",
+      threads_media_id: published.id,
+    });
+  });
 });

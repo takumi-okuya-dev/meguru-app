@@ -7,7 +7,7 @@ import {
   addDays,
   checkPublishable,
   jstMidnight,
-  jstDateOf,
+  plannedSlotTime,
   type DueSlot,
 } from "@threads-grower/shared";
 import { and, count, eq, gte, inArray, lt, sql } from "drizzle-orm";
@@ -16,8 +16,9 @@ import { lockAccountDrafts } from "../db/locks";
 import { accounts, postDrafts, postingSchedules, publishAttempts } from "../db/schema";
 import type { Env } from "../env";
 import { CLEAR_QUEUE_FIELDS, listQueueRows } from "./draft-service";
-import { readPostingSchedule } from "./posting-schedule-service";
 import { listNgWords } from "./posting-rules-service";
+
+type ScheduleRow = typeof postingSchedules.$inferSelect;
 
 /** 飛ばした理由（publish_attempts.skip_reason）。 */
 export type SkipReason =
@@ -27,13 +28,32 @@ export type SkipReason =
 export type ClaimResult =
   | { kind: "exists" }
   | { kind: "waiting" }
+  | { kind: "stale" }
   | { kind: "skipped"; attemptId: string; reason: SkipReason; blocked: number }
   | { kind: "claimed"; attemptId: string; draftId: string; blocked: number };
+
+/**
+ * 時刻が、今の設定の時刻のままかを確かめる（FR-012・FR-016）。
+ * 定期処理が設定を読んだ後に、設定の変更・再接続で effective_from が進んだり時刻が変わったりしていれば false。
+ * @param accountId - accounts.id
+ * @param slot - 来ている時刻（定期処理が先に読んだ設定で求めたもの）
+ * @param schedule - 取り出しのトランザクションで読み直した設定
+ * @returns 今の設定でも、この時刻が予定の時刻なら true
+ */
+function isCurrentSlot(accountId: string, slot: DueSlot, schedule: ScheduleRow): boolean {
+  return (
+    slot.slotAt.getTime() > schedule.effectiveFrom.getTime() &&
+    schedule.slotMinutes.includes(slot.slotMinute) &&
+    plannedSlotTime(accountId, slot.slotDate, slot.slotMinute, schedule.jitter).getTime() ===
+      slot.slotAt.getTime()
+  );
+}
 
 /**
  * 公開してよいかの条件を確かめる（手順3の表）。満たさなければ飛ばす理由を返す。
  * @param tx - トランザクション
  * @param accountId - accounts.id
+ * @param schedule - 読み直した設定
  * @param slot - 来ている時刻
  * @param now - 今の時刻
  * @returns 飛ばす理由。満たしていれば null
@@ -41,16 +61,14 @@ export type ClaimResult =
 async function skipReasonOf(
   tx: TxDb,
   accountId: string,
+  schedule: ScheduleRow | undefined,
   slot: DueSlot,
   now: Date,
 ): Promise<SkipReason | null> {
-  const [schedule, [account]] = await Promise.all([
-    readPostingSchedule(tx, accountId),
-    tx
-      .select({ connectionStatus: accounts.connectionStatus })
-      .from(accounts)
-      .where(eq(accounts.id, accountId)),
-  ]);
+  const [account] = await tx
+    .select({ connectionStatus: accounts.connectionStatus })
+    .from(accounts)
+    .where(eq(accounts.id, accountId));
   if (!schedule?.enabled) return "auto_post_off";
   if (account?.connectionStatus !== "connected") return "needs_reconnect";
   if (schedule.pausedUntil && schedule.pausedUntil.getTime() > now.getTime()) return "rate_limited";
@@ -80,12 +98,13 @@ async function skipReasonOf(
  * 来ている時刻の試みを作り、公開する下書きを選ぶ（手順2の4・手順3）。
  * - 同じ時刻の行がすでにあれば何もしない（同じ時刻を二重に処理しない）
  * - 同じAccountに処理中・やり直し待ちの試みがあれば、行を作らずに待つ（research.md R6「1つずつ進める」）
+ * - 設定を読み直し、時刻が今の設定のものでなくなっていれば、行を作らずに終える（stale。FR-012・FR-016）
  * - 投稿の順の先頭から checkPublishable で確かめ、当たった下書きは要確認に戻す（FR-007）。規約に注意では止めない
  * @param env - Workers のバインディング
  * @param accountId - accounts.id
  * @param slot - 来ている時刻
  * @param now - 今の時刻
- * @returns exists・waiting・skipped（理由）・claimed（下書き）。blocked は要確認に戻した件数
+ * @returns exists・waiting・stale・skipped（理由）・claimed（下書き）。blocked は要確認に戻した件数
  */
 export async function claimSlot(
   env: Env,
@@ -113,6 +132,15 @@ export async function claimSlot(
       .limit(1);
     if (pending) return { kind: "waiting" } as const;
 
+    // 設定の行を共有ロックで読み直す。設定の変更・再接続（effective_from を進める更新）は、この取り出しの前か後のどちらかになる
+    const [schedule] = await tx
+      .select()
+      .from(postingSchedules)
+      .where(eq(postingSchedules.accountId, accountId))
+      .for("share");
+    if (schedule?.enabled && !isCurrentSlot(accountId, slot, schedule))
+      return { kind: "stale" } as const;
+
     const base = {
       accountId,
       slotAt: slot.slotAt,
@@ -129,17 +157,9 @@ export async function claimSlot(
       return { kind: "skipped", attemptId: row!.id, reason, blocked } as const;
     };
 
-    const reason = await skipReasonOf(tx, accountId, slot, now);
-    if (reason) {
-      if (reason === "rate_limited") {
-        // 自分の記録で250件に達した場合も、APIの上限と同じ停止の知らせを出す。
-        await tx
-          .update(postingSchedules)
-          .set({ pausedUntil: jstMidnight(addDays(jstDateOf(now), 1)) })
-          .where(eq(postingSchedules.accountId, accountId));
-      }
-      return skip(reason, 0);
-    }
+    // 自分の記録で250件に達した場合は paused_until を入れない（直前24時間の件数が減れば、次の時刻から投稿する）
+    const reason = await skipReasonOf(tx, accountId, schedule, slot, now);
+    if (reason) return skip(reason, 0);
 
     const [queue, ngWordRows] = await Promise.all([
       listQueueRows(tx, accountId, { includePublishing: false }),

@@ -245,7 +245,7 @@ type ThreadsCheck =
 
 | Cron | 処理 |
 |---|---|
-| `0 18 * * *`（001） | 日次の処理（001〜004）。本featureで2つ足す：30日より前の`publish_attempts`を消す、`paused_until`を過ぎた行を NULL にする |
+| `0 18 * * *`（001） | 日次の処理（001〜004）。本featureで2つ足す：30日より前の`publish_attempts`を消す（`in_progress`・`retry_wait`は、下書きが`publishing`のまま残るので消さない）、`paused_until`を過ぎた行を NULL にする |
 | `*/5 * * * *`（新規） | 自動投稿（`runAutoPost(env, now)`）。手順は[auto-post-job.md](./auto-post-job.md) |
 
 ## 環境変数・バインディング

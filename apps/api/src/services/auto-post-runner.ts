@@ -74,12 +74,14 @@ const continuable = (now: Date) =>
  * @param env - Workers のバインディング
  * @param now - 基準にする時刻（Cron の予定時刻）
  * @param threads - Threads API のクライアント（テストで差し替えられる）
+ * @param clock - 実際の時刻（投稿日時の記録に使う。テストで差し替えられる）
  * @returns この回の結果
  */
 export async function runAutoPost(
   env: Env,
   now: Date = new Date(),
   threads: ThreadsClient = createThreadsClient(env),
+  clock: () => Date = () => new Date(),
 ): Promise<RunSummary> {
   const summary = empty();
   // 0. 関所：用がなければDBに触れずに終える（research.md R3）
@@ -107,7 +109,7 @@ export async function runAutoPost(
   };
   const execute = async (attemptId: string) => {
     try {
-      tally(await executeAttempt(env, db, threads, attemptId, now));
+      tally(await executeAttempt(env, db, threads, attemptId, now, clock));
     } catch (err) {
       // 持ち時間が切れた後、次の回の「続きの処理」で拾われる
       logger.error("auto-post: unexpected error in attempt", { attemptId, err });
@@ -208,6 +210,7 @@ export async function runAutoPost(
     try {
       const r = await claimSlot(env, d.accountId, d.slot, now);
       // この回で行を作った（またはすでにあった）時刻は、次に見る時刻の計算で「使った」に入れる。
+      // stale（設定が変わり、今の設定の時刻ではなくなった）も、この回では扱わない。
       // waiting（前の試みが終わるのを待つ）は、来ている時刻のまま残す
       if (r.kind !== "waiting")
         used.set(d.accountId, [...(used.get(d.accountId) ?? []), d.slot.slotAt]);
