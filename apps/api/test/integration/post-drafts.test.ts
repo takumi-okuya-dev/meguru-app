@@ -3,6 +3,8 @@ import { neon } from "@neondatabase/serverless";
 import { beforeEach, describe, expect, it } from "vitest";
 import { AFTER_TRIAL, call, createUserWithAccount, makeApp, resetDb, setAccount, testEnv } from "../helpers/app";
 
+import { approvedDrafts, db, setSchedule } from "../helpers/auto-post";
+
 const app = makeApp();
 
 beforeEach(async () => {
@@ -471,5 +473,115 @@ describe("005：既存の操作で新しい列が消える（CHECK制約の違�
     const ng = await call(app, "POST", `${base(accountId)}/ng-words`, { user: "u1", body: { words: ["絶対"] } });
     expect(ng.status).toBe(200);
     expect(await row(n!.id)).toMatchObject({ status: "needs_review", prioritized_at: null, carryover_attempt_id: null });
+  });
+});
+
+describe("005：処理中・投稿済みの下書き（FR-008・FR-020）と、投稿済みの一覧（research.md R14）", () => {
+  const review = (accountId: string, body: unknown) =>
+    call(app, "POST", `${base(accountId)}/post-drafts/review`, { user: "u1", body });
+
+  it("処理中の下書きの編集は 409 DRAFT_PUBLISHING、承認・却下・戻すは skipped: PUBLISHING", async () => {
+    const { accountId } = await createUserWithAccount("u1");
+    const [d] = (await register(accountId, "A")).drafts;
+    await review(accountId, { requestId: crypto.randomUUID(), action: "approve", items: [{ id: d!.id, expectedVersion: 1 }] });
+    const sql = neon(testEnv.DATABASE_URL);
+    await sql`UPDATE post_drafts SET status = 'publishing' WHERE id = ${d!.id}`;
+
+    const edit = await call(app, "PUT", `${base(accountId)}/post-drafts/${d!.id}`, { user: "u1", body: { body: "B", expectedVersion: 2 } });
+    expect(edit.status).toBe(409);
+    expect(await edit.json()).toMatchObject({ error: { code: "DRAFT_PUBLISHING" }, latest: { status: "publishing" } });
+
+    const reopen = await review(accountId, { requestId: crypto.randomUUID(), action: "reopen", items: [{ id: d!.id, expectedVersion: 2 }] });
+    expect(await reopen.json()).toMatchObject({ updated: [], skipped: [{ id: d!.id, reason: "PUBLISHING" }] });
+  });
+
+  it("投稿済みの下書きは、編集は 404、削除されない、要確認に戻すは STALE", async () => {
+    const { accountId } = await createUserWithAccount("u1");
+    const [d] = (await register(accountId, "A")).drafts;
+    await review(accountId, { requestId: crypto.randomUUID(), action: "approve", items: [{ id: d!.id, expectedVersion: 1 }] });
+    const sql = neon(testEnv.DATABASE_URL);
+    await sql`UPDATE post_drafts SET status = 'published', published_at = now() WHERE id = ${d!.id}`;
+
+    expect((await call(app, "PUT", `${base(accountId)}/post-drafts/${d!.id}`, { user: "u1", body: { body: "B", expectedVersion: 2 } })).status).toBe(404);
+    const del = await call(app, "POST", `${base(accountId)}/post-drafts/delete`, { user: "u1", body: { ids: [d!.id] } });
+    expect(await del.json()).toEqual({ deletedCount: 0 });
+    const reopen = await review(accountId, { requestId: crypto.randomUUID(), action: "reopen", items: [{ id: d!.id, expectedVersion: 2 }] });
+    expect(await reopen.json()).toMatchObject({ skipped: [{ id: d!.id, reason: "STALE" }] });
+  });
+
+  it("GET /post-drafts/published：120件を 50・50・20件に分けて、投稿した日時の新しい順に返す", async () => {
+    const { accountId } = await createUserWithAccount("u1");
+    const sql = neon(testEnv.DATABASE_URL);
+    for (let i = 0; i < 120; i += 40) {
+      const [bb] = (await sql`
+        INSERT INTO draft_batches (account_id, client_request_id, draft_count, delimiter_found)
+        VALUES (${accountId}, gen_random_uuid(), 40, true) RETURNING id`) as [{ id: string }];
+      // 2件ずつ同じ投稿日時にして、同じ日時の並び（id の順）も確かめる
+      await sql`
+        INSERT INTO post_drafts (account_id, batch_id, position, body, status, reviewed_at, published_at, threads_media_id, threads_permalink)
+        SELECT ${accountId}, ${bb.id}, g, 'p' || (${i} + g), 'published', now(),
+          timestamp '2030-01-01 00:00:00+00' + make_interval(mins => (${i} + g) / 2), 'm' || (${i} + g), 'https://t/' || (${i} + g)
+        FROM generate_series(0, 39) AS g`;
+    }
+    const page = async (before?: string) => {
+      const q = before ? `?before=${encodeURIComponent(before)}` : "";
+      const res = await call(app, "GET", `${base(accountId)}/post-drafts/published${q}`, { user: "u1" });
+      expect(res.status).toBe(200);
+      return (await res.json()) as { items: { id: string; body: string; publishedAt: string; threadsPermalink: string | null }[]; nextCursor: string | null };
+    };
+    const p1 = await page();
+    const p2 = await page(p1.nextCursor!);
+    const p3 = await page(p2.nextCursor!);
+    expect([p1.items.length, p2.items.length, p3.items.length]).toEqual([50, 50, 20]);
+    expect(p3.nextCursor).toBeNull();
+    const all = [...p1.items, ...p2.items, ...p3.items];
+    expect(new Set(all.map((d) => d.id)).size).toBe(120);
+    for (let i = 1; i < all.length; i++) {
+      const prev = all[i - 1]!;
+      const cur = all[i]!;
+      const order = Date.parse(prev.publishedAt) - Date.parse(cur.publishedAt);
+      expect(order > 0 || (order === 0 && prev.id < cur.id)).toBe(true);
+    }
+    expect(Object.keys(p1.items[0]!).sort()).toEqual(["body", "id", "publishedAt", "threadsMediaId", "threadsPermalink"]);
+  });
+
+  it("他人のAccountの GET /post-drafts/published は 404 ACCOUNT_NOT_FOUND", async () => {
+    const { accountId } = await createUserWithAccount("u1");
+    await createUserWithAccount("u2");
+    expect((await call(app, "GET", `${base(accountId)}/post-drafts/published`, { user: "u2" })).status).toBe(404);
+  });
+});
+
+
+describe("005：予定と次に投稿する操作", () => {
+  it("予定を先頭から割り当て、優先した下書きは先頭へ移りversionが増える", async () => {
+    const { accountId } = await createUserWithAccount("u1");
+    const ids = await approvedDrafts(accountId, ["A", "B", "C"]);
+    await setSchedule(accountId, { slotMinutes: [450, 720, 1260] });
+    const read = async () => (await (await call(app, "GET", `${base(accountId)}/post-drafts`, { user: "u1" })).json()) as { schedule: Record<string, string>; approved: PostDraft[] };
+    let body = await read();
+    expect(Object.keys(body.schedule)).toEqual(ids);
+    expect(Object.values(body.schedule).map(Date.parse)).toEqual([...Object.values(body.schedule).map(Date.parse)].sort((a, b) => a - b));
+    const res = await call(app, "POST", `${base(accountId)}/post-drafts/${ids[2]}/prioritize`, { user: "u1", body: { expectedVersion: 1 } });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({ draft: { id: ids[2], version: 2 } });
+    body = await read();
+    expect(body.approved.map(d => d.id)).toEqual([ids[2], ids[0], ids[1]]);
+    await db()`UPDATE post_drafts SET status = 'publishing' WHERE id = ${ids[2]!}`;
+    expect(Object.keys((await read()).schedule)).toEqual([ids[0], ids[1]]);
+    await db()`UPDATE posting_schedules SET enabled = false WHERE account_id = ${accountId}`;
+    expect((await read()).schedule).toEqual({});
+  });
+  it("古い版・処理中・対象外・他人のAccountを拒む", async () => {
+    const { accountId } = await createUserWithAccount("u1");
+    await createUserWithAccount("u2");
+    const [id] = await approvedDrafts(accountId, ["A"]);
+    const request = (version: number, user = "u1") => call(app, "POST", `${base(accountId)}/post-drafts/${id}/prioritize`, { user, body: { expectedVersion: version } });
+    expect((await request(0, "u2")).status).toBe(404);
+    expect((await request(2)).status).toBe(409);
+    await db()`UPDATE post_drafts SET status = 'publishing' WHERE id = ${id!}`;
+    expect(await (await request(1)).json()).toMatchObject({ error: { code: "DRAFT_PUBLISHING" } });
+    await db()`UPDATE post_drafts SET status = 'needs_review', reviewed_at = NULL WHERE id = ${id!}`;
+    expect((await request(1)).status).toBe(404);
   });
 });

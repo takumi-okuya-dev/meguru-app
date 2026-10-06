@@ -29,7 +29,8 @@ export function createFakeThreads() {
   let dropPublishResponses = 0;
   const noPublishPermission = new Set<string>();
   let seq = 0;
-  const nextId = () => String(17_900_000_000_000_000 + ++seq);
+  // Number の安全な整数の範囲に収める（大きすぎると丸められてIDが重なる）
+  const nextId = () => String(17_900_000_000 + ++seq);
 
   const rand = () => crypto.randomUUID().replace(/-/g, "");
   const issue = (prefix: string, userId: string) => {

@@ -1,12 +1,18 @@
 // Accountの作成・更新・上限（FR-008〜FR-017、research.md R8・R9）
 import { and, eq, gt, gte, inArray, isNull, lt, ne, or, sql } from "drizzle-orm";
-import { initialPlanFor, limitForOwnedPlans, normalizeUsername, type Plan } from "@threads-grower/shared";
+import {
+  initialPlanFor,
+  limitForOwnedPlans,
+  normalizeUsername,
+  type Plan,
+} from "@threads-grower/shared";
 import type { Env } from "../env";
 import { createDb, withTransaction, type Db, type TxDb } from "../db/client";
 import { lockThreadsUser, lockUserRow } from "../db/locks";
 import {
   accounts,
   memberships,
+  postingSchedules,
   threadsConnections,
   threadsDeletionRequests,
   threadsRevocations,
@@ -16,7 +22,12 @@ import { createTokenCipher } from "../lib/crypto";
 import { AppError } from "../lib/errors";
 import { threadsUserHmac } from "../lib/identifier-hash";
 import { logger } from "../lib/logger";
-import { THREADS_SCOPES, ThreadsAuthError, type ThreadsClient, type ThreadsProfile } from "../lib/threads-client";
+import {
+  THREADS_SCOPES,
+  ThreadsAuthError,
+  type ThreadsClient,
+  type ThreadsProfile,
+} from "../lib/threads-client";
 import { findOwnedAccount } from "./access";
 import type { ConsumedState } from "./threads-oauth";
 
@@ -57,7 +68,8 @@ export async function accountLimitFor(db: Db | TxDb, userId: string) {
  */
 export async function assertCanAddAccount(db: Db | TxDb, userId: string) {
   const limit = await accountLimitFor(db, userId);
-  if (limit.used >= limit.max) throw new AppError("ACCOUNT_LIMIT_REACHED", 409, "account limit reached");
+  if (limit.used >= limit.max)
+    throw new AppError("ACCOUNT_LIMIT_REACHED", 409, "account limit reached");
   return limit;
 }
 
@@ -89,7 +101,10 @@ export type CompleteConnectionResult = {
  * @returns 確定した Account と、その種類
  * @throws AppError THREADS_AUTH_REVOKED・THREADS_DATA_DELETION_REQUESTED・ACCOUNT_DELETED_DURING_CONNECT・RECONNECT_ACCOUNT_MISMATCH・THREADS_ACCOUNT_TAKEN・ACCOUNT_LIMIT_REACHED など
  */
-export async function completeConnection(env: Env, input: CompleteConnectionInput): Promise<CompleteConnectionResult> {
+export async function completeConnection(
+  env: Env,
+  input: CompleteConnectionInput,
+): Promise<CompleteConnectionResult> {
   const cipher = createTokenCipher(env.TOKEN_ENCRYPTION_KEYS, env.TOKEN_ENCRYPTION_KEY_VERSION);
   const hmac = await threadsUserHmac(env.IDENTIFIER_HASH_KEY, input.threadsUserId);
   const { state } = input;
@@ -103,9 +118,15 @@ export async function completeConnection(env: Env, input: CompleteConnectionInpu
     const [revoked] = await tx
       .select({ id: threadsRevocations.id })
       .from(threadsRevocations)
-      .where(and(eq(threadsRevocations.threadsUserHmac, hmac), gte(threadsRevocations.issuedAt, input.authorizedAt)))
+      .where(
+        and(
+          eq(threadsRevocations.threadsUserHmac, hmac),
+          gte(threadsRevocations.issuedAt, input.authorizedAt),
+        ),
+      )
       .limit(1);
-    if (revoked) throw new AppError("THREADS_AUTH_REVOKED", 409, "authorization revoked during callback");
+    if (revoked)
+      throw new AppError("THREADS_AUTH_REVOKED", 409, "authorization revoked during callback");
 
     // 4. 未完了の削除要求、または認可フローの開始以降に完了した削除要求があれば拒否
     const [tombstone] = await tx
@@ -121,7 +142,8 @@ export async function completeConnection(env: Env, input: CompleteConnectionInpu
         ),
       )
       .limit(1);
-    if (tombstone) throw new AppError("THREADS_DATA_DELETION_REQUESTED", 409, "data deletion requested");
+    if (tombstone)
+      throw new AppError("THREADS_DATA_DELETION_REQUESTED", 409, "data deletion requested");
 
     // 5. 認可フローの開始後にユーザーがAccountを削除していたら拒否（mode = new。research.md R13）
     if (state.mode === "new") {
@@ -130,23 +152,36 @@ export async function completeConnection(env: Env, input: CompleteConnectionInpu
         .from(users)
         .where(and(eq(users.id, state.userId), gt(users.lastAccountDeletedAt, state.createdAt)))
         .limit(1);
-      if (deletedAfter) throw new AppError("ACCOUNT_DELETED_DURING_CONNECT", 409, "account deleted during connect");
+      if (deletedAfter)
+        throw new AppError("ACCOUNT_DELETED_DURING_CONNECT", 409, "account deleted during connect");
     }
 
     // 6. Threadsユーザーで既存のAccountを探す
     const [existing] = await tx
       .select({ account: accounts, ownerId: memberships.userId })
       .from(accounts)
-      .leftJoin(memberships, and(eq(memberships.accountId, accounts.id), eq(memberships.role, "owner")))
+      .leftJoin(
+        memberships,
+        and(eq(memberships.accountId, accounts.id), eq(memberships.role, "owner")),
+      )
       .where(eq(accounts.threadsUserId, input.threadsUserId))
       .limit(1);
 
     if (state.mode === "reconnect") {
-      const [target] = await tx.select().from(accounts).where(eq(accounts.id, state.targetAccountId!)).limit(1);
-      if (!target) throw new AppError("OAUTH_STATE_INVALID", 400, "reconnect target no longer exists");
+      const [target] = await tx
+        .select()
+        .from(accounts)
+        .where(eq(accounts.id, state.targetAccountId!))
+        .limit(1);
+      if (!target)
+        throw new AppError("OAUTH_STATE_INVALID", 400, "reconnect target no longer exists");
       // 再接続は同じ Threads アカウントでだけ認める（FR-020）
       if (target.threadsUserId !== input.threadsUserId) {
-        throw new AppError("RECONNECT_ACCOUNT_MISMATCH", 409, "reconnect with a different threads account");
+        throw new AppError(
+          "RECONNECT_ACCOUNT_MISMATCH",
+          409,
+          "reconnect with a different threads account",
+        );
       }
       await writeConnection(tx, cipher, target.id, input);
       return { accountId: target.id, username: input.profile.username, kind: "reconnect" };
@@ -220,6 +255,11 @@ async function writeConnection(
       updatedAt: now,
     })
     .where(eq(accounts.id, accountId));
+  // 再接続より前の時刻を拾わない。設定の版は変えない（005 FR-016）。
+  await tx
+    .update(postingSchedules)
+    .set({ effectiveFrom: now })
+    .where(eq(postingSchedules.accountId, accountId));
 }
 
 // ---- Accountの画面を開いたとき（research.md R10・R14） ----
@@ -254,7 +294,10 @@ export async function openAccount(
     .where(
       and(
         eq(users.id, userId),
-        or(isNull(users.lastAccountOpenReceivedAt), lt(users.lastAccountOpenReceivedAt, receivedAt)),
+        or(
+          isNull(users.lastAccountOpenReceivedAt),
+          lt(users.lastAccountOpenReceivedAt, receivedAt),
+        ),
         or(
           isNull(users.lastAccountClientId),
           ne(users.lastAccountClientId, req.clientId),
@@ -277,7 +320,11 @@ export async function openAccount(
  * @param accountId - accounts.id
  * @param threads - Threads API のクライアント
  */
-export async function verifyConnection(env: Env, accountId: string, threads: ThreadsClient): Promise<void> {
+export async function verifyConnection(
+  env: Env,
+  accountId: string,
+  threads: ThreadsClient,
+): Promise<void> {
   const db = createDb(env.DATABASE_URL);
   const [row] = await db
     .select({ generation: accounts.connectionGeneration, conn: threadsConnections })
@@ -287,12 +334,19 @@ export async function verifyConnection(env: Env, accountId: string, threads: Thr
     .limit(1);
   if (!row) return;
 
-  const sameGeneration = and(eq(accounts.id, accountId), eq(accounts.connectionGeneration, row.generation));
+  const sameGeneration = and(
+    eq(accounts.id, accountId),
+    eq(accounts.connectionGeneration, row.generation),
+  );
   let token: string;
   try {
     const cipher = createTokenCipher(env.TOKEN_ENCRYPTION_KEYS, env.TOKEN_ENCRYPTION_KEY_VERSION);
     token = await cipher.decrypt(
-      { ciphertext: row.conn.accessTokenCiphertext, iv: row.conn.accessTokenIv, keyVersion: row.conn.keyVersion },
+      {
+        ciphertext: row.conn.accessTokenCiphertext,
+        iv: row.conn.accessTokenIv,
+        keyVersion: row.conn.keyVersion,
+      },
       accountId,
     );
   } catch (err) {
@@ -335,15 +389,26 @@ export async function verifyConnection(env: Env, accountId: string, threads: Thr
  * @param confirmUsername - 確認のために入力されたユーザー名（@の有無・大文字小文字は問わない）
  * @throws AppError ACCOUNT_NOT_FOUND・CONFIRMATION_MISMATCH
  */
-export async function deleteAccount(env: Env, userId: string, accountId: string, confirmUsername: string) {
+export async function deleteAccount(
+  env: Env,
+  userId: string,
+  accountId: string,
+  confirmUsername: string,
+) {
   await withTransaction(env.DATABASE_URL, async (tx) => {
     await lockUserRow(tx, userId);
     const account = await findOwnedAccount(tx, userId, accountId);
-    if (normalizeUsername(confirmUsername) !== normalizeUsername(account.username) || !confirmUsername.trim()) {
+    if (
+      normalizeUsername(confirmUsername) !== normalizeUsername(account.username) ||
+      !confirmUsername.trim()
+    ) {
       throw new AppError("CONFIRMATION_MISMATCH", 422, "confirmation does not match");
     }
     const now = new Date();
-    await tx.update(users).set({ lastAccountDeletedAt: now, updatedAt: now }).where(eq(users.id, userId));
+    await tx
+      .update(users)
+      .set({ lastAccountDeletedAt: now, updatedAt: now })
+      .where(eq(users.id, userId));
     await tx.delete(accounts).where(eq(accounts.id, account.id));
   });
 }

@@ -50,6 +50,8 @@ export function redact(value: unknown, depth = 0): unknown {
 
 /** 構造化ロガー。値は出力の前に redact で秘密情報を伏せる。 */
 export type Logger = {
+  /** 調子を確かめるための細かいログ（自動投稿の関所で何もしなかった回など。specs/005-auto-post） */
+  debug(message: string, fields?: Record<string, unknown>): void;
   info(message: string, fields?: Record<string, unknown>): void;
   warn(message: string, fields?: Record<string, unknown>): void;
   error(message: string, fields?: Record<string, unknown>): void;
@@ -62,9 +64,16 @@ export type Logger = {
  */
 export function createLogger(write: (line: string) => void = (line) => console.log(line)): Logger {
   function log(level: string, message: string, fields?: Record<string, unknown>) {
-    write(JSON.stringify({ level, message: redactString(message), ...(redact(fields ?? {}) as object) }));
+    write(
+      JSON.stringify({
+        level,
+        message: redactString(message),
+        ...(redact(fields ?? {}) as object),
+      }),
+    );
   }
   return {
+    debug: (m, f) => log("debug", m, f),
     info: (m, f) => log("info", m, f),
     warn: (m, f) => log("warn", m, f),
     error: (m, f) => log("error", m, f),

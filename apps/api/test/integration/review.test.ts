@@ -425,3 +425,27 @@ describe("規約に注意の確認（specs/004-review-approval FR-040、research
     expect(r.skipped[0]!.reason).toBe("NG_WORD");
   });
 });
+
+describe("005：投稿に失敗した下書きへの操作", () => {
+  async function failed(accountId: string) {
+    const [d] = await register(accountId, ["失敗した本文"]);
+    const sql = neon(testEnv.DATABASE_URL);
+    await sql`UPDATE post_drafts SET status = 'publish_failed', reviewed_at = '2026-01-01T00:00:00Z', publish_failed_at = now(), publish_error = 'network' WHERE id = ${d!.id}`;
+    return d!;
+  }
+  it("requeueで元の承認日時を保ち、失敗を消して先頭に入れる。同じrequestIdは成功を返す", async () => {
+    const { accountId } = await createUserWithAccount("u1");
+    const d = await failed(accountId);
+    const body = { action: "requeue", requestId: crypto.randomUUID(), items: items(d) };
+    const result = await reviewOk(accountId, body);
+    expect(result.updated[0]).toMatchObject({ status: "approved", reviewedAt: "2026-01-01T00:00:00.000Z", prioritizedAt: expect.any(String), publishError: null, publishFailedAt: null });
+    expect((await reviewOk(accountId, body)).updated[0]).toEqual(result.updated[0]);
+  });
+  it("承認済み500件ならLIMIT。reopenは承認と失敗の記録を消す", async () => {
+    const { accountId } = await createUserWithAccount("u1");
+    const d = await failed(accountId);
+    await seed(accountId, 500, "approved");
+    expect((await reviewOk(accountId, { action: "requeue", items: items(d) })).skipped).toMatchObject([{ id: d.id, reason: "LIMIT" }]);
+    expect((await reviewOk(accountId, { action: "reopen", items: items(d) })).updated[0]).toMatchObject({ status: "needs_review", reviewedAt: null, prioritizedAt: null, carryover: false, publishError: null, publishFailedAt: null });
+  });
+});

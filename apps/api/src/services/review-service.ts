@@ -14,7 +14,12 @@ import { lockAccountDrafts } from "../db/locks";
 import { postDrafts } from "../db/schema";
 import type { Env } from "../env";
 import { notFound, pgErrorCode } from "../lib/errors";
-import { CLEAR_BLOCKED_FIELDS, CLEAR_QUEUE_FIELDS, countDrafts, toPostDraft } from "./draft-service";
+import {
+  CLEAR_BLOCKED_FIELDS,
+  CLEAR_QUEUE_FIELDS,
+  countDrafts,
+  toPostDraft,
+} from "./draft-service";
 import { listNgWords } from "./posting-rules-service";
 
 type PostDraftRow = typeof postDrafts.$inferSelect;
@@ -48,7 +53,12 @@ const CLEAR_FAILURE_FIELDS = { publishFailedAt: null, publishError: null } as co
  * @param targets - 変える行
  * @returns 変えた行
  */
-async function applyChange(tx: TxDb, accountId: string, req: ReviewRequest, targets: PostDraftRow[]) {
+async function applyChange(
+  tx: TxDb,
+  accountId: string,
+  req: ReviewRequest,
+  targets: PostDraftRow[],
+) {
   if (targets.length === 0) return [];
   const now = new Date();
   // 005：要確認からの承認・却下では直前のチェックの記録を消し、要確認に戻すときは投稿の順と失敗の記録も消す。
@@ -65,7 +75,13 @@ async function applyChange(tx: TxDb, accountId: string, req: ReviewRequest, targ
           }
         : req.action === "requeue"
           ? { prioritizedAt: now, ...CLEAR_FAILURE_FIELDS }
-          : { reviewedAt: null, rejectReasons: null, rejectNote: null, ...CLEAR_QUEUE_FIELDS, ...CLEAR_FAILURE_FIELDS };
+          : {
+              reviewedAt: null,
+              rejectReasons: null,
+              rejectNote: null,
+              ...CLEAR_QUEUE_FIELDS,
+              ...CLEAR_FAILURE_FIELDS,
+            };
   // 行ごとに expectedVersion が違うので、(id, version) の組で絞る
   const pairs = sql.join(
     targets.map((t) => sql`(${t.id}::uuid, ${t.version}::int)`),
@@ -81,7 +97,12 @@ async function applyChange(tx: TxDb, accountId: string, req: ReviewRequest, targ
       version: sql`${postDrafts.version} + 1`,
       updatedAt: now,
     })
-    .where(and(eq(postDrafts.accountId, accountId), sql`(${postDrafts.id}, ${postDrafts.version}) IN (${pairs})`))
+    .where(
+      and(
+        eq(postDrafts.accountId, accountId),
+        sql`(${postDrafts.id}, ${postDrafts.version}) IN (${pairs})`,
+      ),
+    )
     .returning();
 }
 
@@ -126,6 +147,11 @@ export async function reviewDrafts(env: Env, accountId: string, req: ReviewReque
           continue;
         }
         const skip = (reason: SkipReason) => skipped.push({ id, reason, latest: toPostDraft(row) });
+        // 投稿の処理中の下書きは変えない（005 FR-008）
+        if (row.status === "publishing") {
+          skip("PUBLISHING");
+          continue;
+        }
         if (row.status === target) {
           if (row.lastReviewRequestId === req.requestId) updated.set(id, toPostDraft(row));
           else skip("STALE");
@@ -178,10 +204,13 @@ export async function reviewDrafts(env: Env, accountId: string, req: ReviewReque
       for (const row of changed) updated.set(row.id, toPostDraft(row));
       // ロックの中で読んだ行なので、通常は全件変わる。変わらなかった行（同時の更新）は STALE にする
       for (const row of toChange) {
-        if (!updated.has(row.id)) skipped.push({ id: row.id, reason: "STALE", latest: toPostDraft(row) });
+        if (!updated.has(row.id))
+          skipped.push({ id: row.id, reason: "STALE", latest: toPostDraft(row) });
       }
       return {
-        updated: req.items.map((i) => updated.get(i.id)).filter((d): d is PostDraft => d !== undefined),
+        updated: req.items
+          .map((i) => updated.get(i.id))
+          .filter((d): d is PostDraft => d !== undefined),
         skipped,
         counts: await countDrafts(tx, accountId),
       };
