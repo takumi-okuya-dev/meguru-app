@@ -3,6 +3,8 @@ import { neon } from "@neondatabase/serverless";
 import { beforeEach, describe, expect, it } from "vitest";
 import { AFTER_TRIAL, call, createUserWithAccount, makeApp, resetDb, setAccount, testEnv } from "../helpers/app";
 
+import { setSchedule } from "../helpers/auto-post";
+
 const app = makeApp();
 
 beforeEach(async () => {
@@ -184,4 +186,16 @@ describe("CORE RULES・NGワード・却下の反映（specs/004-review-approval
     expect(prompt).toMatch(/投稿ストックにある直近の下書き[^■]*承認する下書き/);
     expect(summary).toMatchObject({ coreRuleCount: 2, ngWordCount: 2, rejectedCount: 2 });
   });
+});
+
+
+it("005：オフでも設定した時刻の数を宣伝の文面とsummaryに反映する", async () => {
+  const { accountId } = await createUserWithAccount("u1");
+  expect((await getPrompt(accountId)).summary).toMatchObject({ dailyPostCount: 0 });
+  await setSchedule(accountId, { slotMinutes: [450, 720, 1080, 1260], enabled: false });
+  await call(app, "POST", `${base(accountId)}/promotions`, { user: "u1", body: { title: "サービス", content: "サービス内容" } });
+  await neon(testEnv.DATABASE_URL)`UPDATE accounts SET promotion_ratio_percent = 25 WHERE id = ${accountId}`;
+  const result = await getPrompt(accountId);
+  expect(result.summary).toMatchObject({ dailyPostCount: 4 });
+  expect(result.prompt).toContain("1日の投稿は4件の設定で、そのうち1件程度");
 });

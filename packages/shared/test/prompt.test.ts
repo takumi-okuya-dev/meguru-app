@@ -237,3 +237,15 @@ describe("CORE RULESと却下された投稿（specs/004-review-approval contrac
     expect(prompt).toContain("・断定口調は使わない\n・次の言葉は使わないこと: 絶対");
   });
 });
+
+describe("005：1日の投稿数で宣伝の件数を伝える", () => {
+  it.each([4, 2])("時刻%dつ・割合25パーセントは1日1件程度、生成30件は8件程度", (dailyPostCount) => {
+    const result = buildPrompt(input({ dailyPostCount, promotionRatioPercent: 25, promotions: [promo("サービス")] }));
+    expect(result.prompt).toContain(`1日の投稿は${dailyPostCount}件の設定で、そのうち1件程度、今回生成する30件のうち8件程度`);
+    expect(result.summary.dailyPostCount).toBe(dailyPostCount);
+  });
+  it("時刻0件は従来の文面を保つ", () => {
+    const overrides = { promotionRatioPercent: 25, promotions: [promo("サービス")] };
+    expect(buildPrompt(input({ ...overrides, dailyPostCount: 0 })).prompt).toBe(buildPrompt(input(overrides)).prompt);
+  });
+});

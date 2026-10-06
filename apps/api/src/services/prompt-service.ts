@@ -15,6 +15,7 @@ import { draftBatches, postDrafts, promotions, referencePosts } from "../db/sche
 import type { AccountRow } from "./access";
 import { listReviewedRows } from "./draft-service";
 import { listNgWords } from "./posting-rules-service";
+import { readPostingSchedule } from "./posting-schedule-service";
 import { getStrategy } from "./strategy-service";
 
 type PromotionRow = typeof promotions.$inferSelect;
@@ -61,7 +62,12 @@ async function recentDraftBodies(db: Db, accountId: string): Promise<string[]> {
     .select({ body: postDrafts.body })
     .from(postDrafts)
     .innerJoin(draftBatches, eq(draftBatches.id, postDrafts.batchId))
-    .where(and(eq(postDrafts.accountId, accountId), inArray(postDrafts.status, ["needs_review", "approved"])))
+    .where(
+      and(
+        eq(postDrafts.accountId, accountId),
+        inArray(postDrafts.status, ["needs_review", "approved"]),
+      ),
+    )
     .orderBy(desc(draftBatches.createdAt), desc(draftBatches.id), asc(postDrafts.position))
     .limit(PROMPT_RECENT_DRAFTS);
   return rows.map((r) => r.body);
@@ -88,26 +94,33 @@ function coreRuleLines(text: string): string[] {
  */
 export async function getPrompt(db: Db, account: AccountRow, count: number) {
   const now = new Date();
-  const [strategy, promotionRows, postRows, draftBodies, ngWordRows, rejectedRows] = await Promise.all([
-    getStrategy(db, account.id),
-    db.select().from(promotions).where(eq(promotions.accountId, account.id)),
-    db
-      .select()
-      .from(referencePosts)
-      .where(eq(referencePosts.accountId, account.id))
-      .orderBy(desc(referencePosts.createdAt), desc(referencePosts.id))
-      .limit(PROMPT_REFERENCE_POSTS),
-    recentDraftBodies(db, account.id),
-    listNgWords(db, account.id),
-    listReviewedRows(db, account.id, "rejected", PROMPT_REJECTED_DRAFTS),
-  ]);
+  const [strategy, promotionRows, postRows, draftBodies, ngWordRows, rejectedRows, schedule] =
+    await Promise.all([
+      getStrategy(db, account.id),
+      db.select().from(promotions).where(eq(promotions.accountId, account.id)),
+      db
+        .select()
+        .from(referencePosts)
+        .where(eq(referencePosts.accountId, account.id))
+        .orderBy(desc(referencePosts.createdAt), desc(referencePosts.id))
+        .limit(PROMPT_REFERENCE_POSTS),
+      recentDraftBodies(db, account.id),
+      listNgWords(db, account.id),
+      listReviewedRows(db, account.id, "rejected", PROMPT_REJECTED_DRAFTS),
+      readPostingSchedule(db, account.id),
+    ]);
   const { prompt, summary } = buildPrompt({
     count,
+    dailyPostCount: schedule?.slotMinutes.length ?? 0,
     displayName: account.displayName ?? `@${account.username}`,
     strategy,
     promotions: targetPromotions(promotionRows, now).map(toPromptPromotion),
     promotionRatioPercent: account.promotionRatioPercent,
-    referencePosts: postRows.map((p) => ({ body: p.body, keyword: p.keyword ?? "", whyGood: p.whyGood ?? "" })),
+    referencePosts: postRows.map((p) => ({
+      body: p.body,
+      keyword: p.keyword ?? "",
+      whyGood: p.whyGood ?? "",
+    })),
     recentDrafts: draftBodies,
     coreRules: coreRuleLines(account.coreRules),
     ngWords: ngWordRows.map((w) => w.word),
