@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/compone
 /**
  * 追加・編集のダイアログの枠。閉じる操作（✕・キャンセル・Esc・背景のクリック）は、すべて onRequestClose を通す。
  * @param props - title：見出し、submitLabel：主な操作の文言、onSubmit：保存、onRequestClose：閉じる操作、submitting：保存中、locked：保存できない、
- *   lockedNotice：保存できないときの案内（省略すると grower機能の案内）、children：入力欄
+ *   lockedNotice：保存できないときの案内（省略すると grower機能の案内）、submitDisabled：入力に誤りがあり保存できない、children：入力欄
  * @returns ダイアログ
  */
 export function FormDialogFrame({
@@ -20,6 +20,7 @@ export function FormDialogFrame({
   submitting,
   locked = false,
   lockedNotice,
+  submitDisabled = false,
   onSubmit,
   onRequestClose,
   children,
@@ -32,13 +33,20 @@ export function FormDialogFrame({
   locked?: boolean;
   /** 保存できないときに、grower機能の案内の代わりに出す案内 */
   lockedNotice?: ReactNode;
+  /** 入力に誤りがあり、保存のボタンを押せない（specs/005-auto-post の時刻の検証） */
+  submitDisabled?: boolean;
   onSubmit: () => void;
   onRequestClose: () => void;
   children: ReactNode;
 }) {
   return (
     <Dialog open onOpenChange={(v) => !v && onRequestClose()}>
-      <DialogContent mobileFullScreen showClose={false} className="gap-0 p-0 sm:max-w-xl" aria-describedby="form-dialog-desc">
+      <DialogContent
+        mobileFullScreen
+        showClose={false}
+        className="gap-0 p-0 sm:max-w-xl"
+        aria-describedby="form-dialog-desc"
+      >
         <div className="grid h-[52px] shrink-0 grid-cols-[5.5rem_minmax(0,1fr)_5.5rem] items-center border-b px-1.5 md:flex md:h-auto md:border-0 md:px-6 md:pt-5 md:pb-2">
           <button
             type="button"
@@ -53,7 +61,11 @@ export function FormDialogFrame({
           </DialogTitle>
           <div className="flex justify-end pr-1.5 md:hidden">
             {!locked && (
-              <Button className="h-9 rounded-full px-4" disabled={submitting} onClick={onSubmit}>
+              <Button
+                className="h-9 rounded-full px-4"
+                disabled={submitting || submitDisabled}
+                onClick={onSubmit}
+              >
                 {submitLabel}
               </Button>
             )}
@@ -71,7 +83,11 @@ export function FormDialogFrame({
             {locked ? "閉じる" : "キャンセル"}
           </Button>
           {!locked && (
-            <Button className="rounded-full" disabled={submitting} onClick={onSubmit}>
+            <Button
+              className="rounded-full"
+              disabled={submitting || submitDisabled}
+              onClick={onSubmit}
+            >
               {submitLabel}
             </Button>
           )}
@@ -88,8 +104,13 @@ export function FormDialogFrame({
  */
 export function DeletedElsewhereNotice({ what, onClose }: { what: string; onClose: () => void }) {
   return (
-    <div role="alert" className="flex flex-wrap items-center gap-3 rounded-xl border border-warning/40 bg-warning-bg px-4 py-3 text-sm">
-      <span className="flex-1">この{what}は、別のタブや端末で削除されています。入力した内容は、必要ならコピーしてください。</span>
+    <div
+      role="alert"
+      className="flex flex-wrap items-center gap-3 rounded-xl border border-warning/40 bg-warning-bg px-4 py-3 text-sm"
+    >
+      <span className="flex-1">
+        この{what}は、別のタブや端末で削除されています。入力した内容は、必要ならコピーしてください。
+      </span>
       <Button size="sm" variant="outline" className="rounded-full" onClick={onClose}>
         閉じる
       </Button>

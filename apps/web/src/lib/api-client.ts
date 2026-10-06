@@ -27,6 +27,13 @@ import {
   researchKeywordListSchema,
   researchKeywordSchema,
   strategySchema,
+  autoPostStatusSchema,
+  postDraftSchema,
+  postingScheduleResponseSchema,
+  publishedPageSchema,
+  putPostingScheduleResponseSchema,
+  threadsCheckSchema,
+  type PutPostingScheduleRequest,
   type ConnectRequest,
   type ReviewRequest,
   type PromotionInput,
@@ -36,10 +43,14 @@ import {
   type ErrorCode,
   type OpenAccountRequest,
 } from "@threads-grower/shared";
-import type { z } from "zod";
+import { z } from "zod";
+
+/** POST /post-drafts/:id/prioritize のレスポンス。 */
+const postDraftResponseSchema = z.object({ draft: postDraftSchema });
 
 /** API のベースURL（apps/web/.env.local の VITE_API_BASE_URL）。 */
-export const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? "http://localhost:8787";
+export const API_BASE_URL =
+  (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? "http://localhost:8787";
 
 /** API の呼び出しの失敗。エラーコードと HTTP のステータス（通信の失敗は 0）。 */
 export class ApiError extends Error {
@@ -114,20 +125,41 @@ export const api = {
       signal,
     }),
   connect: (body: ConnectRequest) =>
-    request("/api/threads/connect", connectResponseSchema, { method: "POST", body: JSON.stringify(body) }),
+    request("/api/threads/connect", connectResponseSchema, {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
   deleteAccount: (accountId: string, confirmUsername: string) =>
-    request(`/api/accounts/${accountId}`, null, { method: "DELETE", body: JSON.stringify({ confirmUsername }) }),
+    request(`/api/accounts/${accountId}`, null, {
+      method: "DELETE",
+      body: JSON.stringify({ confirmUsername }),
+    }),
   // ---- 戦略プロファイル（specs/002-strategy-profile contracts/api.md）----
   getProfileStatus: (accountId: string) =>
     request(`/api/accounts/${accountId}/profile-status`, profileStatusSchema),
-  getStrategy: (accountId: string) => request(`/api/accounts/${accountId}/strategy`, strategySchema),
+  getStrategy: (accountId: string) =>
+    request(`/api/accounts/${accountId}/strategy`, strategySchema),
   putStrategy: (accountId: string, body: PutStrategyRequest) =>
-    request(`/api/accounts/${accountId}/strategy`, strategySchema, { method: "PUT", body: JSON.stringify(body) }),
-  listPromotions: (accountId: string) => request(`/api/accounts/${accountId}/promotions`, promotionListSchema),
+    request(`/api/accounts/${accountId}/strategy`, strategySchema, {
+      method: "PUT",
+      body: JSON.stringify(body),
+    }),
+  listPromotions: (accountId: string) =>
+    request(`/api/accounts/${accountId}/promotions`, promotionListSchema),
   createPromotion: (accountId: string, body: PromotionInput) =>
-    request(`/api/accounts/${accountId}/promotions`, promotionSchema, { method: "POST", body: JSON.stringify(body) }),
-  updatePromotion: (accountId: string, id: string, body: PromotionInput & { expectedVersion: number }) =>
-    request(`/api/accounts/${accountId}/promotions/${id}`, promotionSchema, { method: "PUT", body: JSON.stringify(body) }),
+    request(`/api/accounts/${accountId}/promotions`, promotionSchema, {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+  updatePromotion: (
+    accountId: string,
+    id: string,
+    body: PromotionInput & { expectedVersion: number },
+  ) =>
+    request(`/api/accounts/${accountId}/promotions/${id}`, promotionSchema, {
+      method: "PUT",
+      body: JSON.stringify(body),
+    }),
   deletePromotion: (accountId: string, id: string) =>
     request(`/api/accounts/${accountId}/promotions/${id}`, null, { method: "DELETE" }),
   getPromotionSettings: (accountId: string) =>
@@ -140,8 +172,15 @@ export const api = {
   listReferencePosts: (accountId: string) =>
     request(`/api/accounts/${accountId}/reference-posts`, referencePostListSchema),
   createReferencePost: (accountId: string, body: ReferencePostInput) =>
-    request(`/api/accounts/${accountId}/reference-posts`, referencePostSchema, { method: "POST", body: JSON.stringify(body) }),
-  updateReferencePost: (accountId: string, id: string, body: ReferencePostInput & { expectedVersion: number }) =>
+    request(`/api/accounts/${accountId}/reference-posts`, referencePostSchema, {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+  updateReferencePost: (
+    accountId: string,
+    id: string,
+    body: ReferencePostInput & { expectedVersion: number },
+  ) =>
     request(`/api/accounts/${accountId}/reference-posts/${id}`, referencePostSchema, {
       method: "PUT",
       body: JSON.stringify(body),
@@ -155,7 +194,11 @@ export const api = {
       method: "POST",
       body: JSON.stringify(body),
     }),
-  updateResearchKeyword: (accountId: string, id: string, body: ResearchKeywordInput & { expectedVersion: number }) =>
+  updateResearchKeyword: (
+    accountId: string,
+    id: string,
+    body: ResearchKeywordInput & { expectedVersion: number },
+  ) =>
     request(`/api/accounts/${accountId}/research-keywords/${id}`, researchKeywordSchema, {
       method: "PUT",
       body: JSON.stringify(body),
@@ -173,15 +216,22 @@ export const api = {
       method: "PUT",
       body: JSON.stringify({ postCount }),
     }),
-  listPostDrafts: (accountId: string) => request(`/api/accounts/${accountId}/post-drafts`, postDraftListSchema),
+  listPostDrafts: (accountId: string) =>
+    request(`/api/accounts/${accountId}/post-drafts`, postDraftListSchema),
   createDraftBatch: (accountId: string, body: { clientRequestId: string; text: string }) =>
     request(`/api/accounts/${accountId}/draft-batches`, draftBatchResultSchema, {
       method: "POST",
       body: JSON.stringify(body),
     }),
   deleteDraftBatch: (accountId: string, batchId: string) =>
-    request(`/api/accounts/${accountId}/draft-batches/${batchId}`, deleteCountSchema, { method: "DELETE" }),
-  updatePostDraft: (accountId: string, id: string, body: { body: string; expectedVersion: number }) =>
+    request(`/api/accounts/${accountId}/draft-batches/${batchId}`, deleteCountSchema, {
+      method: "DELETE",
+    }),
+  updatePostDraft: (
+    accountId: string,
+    id: string,
+    body: { body: string; expectedVersion: number },
+  ) =>
     request(`/api/accounts/${accountId}/post-drafts/${id}`, updatePostDraftResponseSchema, {
       method: "PUT",
       body: JSON.stringify(body),
@@ -192,13 +242,15 @@ export const api = {
       body: JSON.stringify({ ids }),
     }),
   // ---- 承認・却下・投稿のルール（specs/004-review-approval contracts/api.md）----
-  getDraftCounts: (accountId: string) => request(`/api/accounts/${accountId}/post-drafts/counts`, draftCountsSchema),
+  getDraftCounts: (accountId: string) =>
+    request(`/api/accounts/${accountId}/post-drafts/counts`, draftCountsSchema),
   reviewPostDrafts: (accountId: string, body: ReviewRequest) =>
     request(`/api/accounts/${accountId}/post-drafts/review`, reviewResponseSchema, {
       method: "POST",
       body: JSON.stringify(body),
     }),
-  getPostingRules: (accountId: string) => request(`/api/accounts/${accountId}/posting-rules`, postingRulesSchema),
+  getPostingRules: (accountId: string) =>
+    request(`/api/accounts/${accountId}/posting-rules`, postingRulesSchema),
   addNgWords: (accountId: string, words: string[]) =>
     request(`/api/accounts/${accountId}/ng-words`, addNgWordsResponseSchema, {
       method: "POST",
@@ -211,8 +263,36 @@ export const api = {
       method: "PUT",
       body: JSON.stringify(body),
     }),
+  // ---- 自動投稿（specs/005-auto-post contracts/api.md）----
+  getPostingSchedule: (accountId: string) =>
+    request(`/api/accounts/${accountId}/posting-schedule`, postingScheduleResponseSchema),
+  putPostingSchedule: (accountId: string, body: PutPostingScheduleRequest) =>
+    request(`/api/accounts/${accountId}/posting-schedule`, putPostingScheduleResponseSchema, {
+      method: "PUT",
+      body: JSON.stringify(body),
+    }),
+  checkThreads: (accountId: string) =>
+    request(`/api/accounts/${accountId}/threads-check`, threadsCheckSchema, { method: "POST" }),
+  getAutoPost: (accountId: string) =>
+    request(`/api/accounts/${accountId}/auto-post`, autoPostStatusSchema),
+  dismissBlockedNotice: (accountId: string) =>
+    request(`/api/accounts/${accountId}/auto-post/notices/blocked/dismiss`, null, {
+      method: "POST",
+    }),
+  listPublished: (accountId: string, before?: string) =>
+    request(
+      `/api/accounts/${accountId}/post-drafts/published${before ? `?before=${encodeURIComponent(before)}` : ""}`,
+      publishedPageSchema,
+    ),
+  prioritizeDraft: (accountId: string, id: string, expectedVersion: number) =>
+    request(`/api/accounts/${accountId}/post-drafts/${id}/prioritize`, postDraftResponseSchema, {
+      method: "POST",
+      body: JSON.stringify({ expectedVersion }),
+    }),
   dataDeletionStatus: (code: string) =>
-    request(`/api/data-deletion/${encodeURIComponent(code)}`, dataDeletionStatusSchema, { auth: false }),
+    request(`/api/data-deletion/${encodeURIComponent(code)}`, dataDeletionStatusSchema, {
+      auth: false,
+    }),
 };
 
 /**

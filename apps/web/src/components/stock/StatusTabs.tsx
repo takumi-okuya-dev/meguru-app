@@ -6,12 +6,13 @@ import { useSearchParams } from "react-router";
 import { TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 /** 投稿ストックのタブ（下書きの状態とは別。承認済みのタブには、投稿の処理中も入る。005） */
-export type StockTab = "needs_review" | "approved" | "rejected";
+export type StockTab = "needs_review" | "approved" | "rejected" | "published";
 
 const TABS: { value: StockTab; label: string; count: keyof DraftCounts }[] = [
   { value: "needs_review", label: "要確認", count: "needsReview" },
   { value: "approved", label: "承認済み", count: "approved" },
   { value: "rejected", label: "却下", count: "rejected" },
+  { value: "published", label: "投稿済み", count: "published" },
 ];
 
 /**
@@ -39,15 +40,15 @@ export function useStatusTab(): { tab: StockTab; setTab: (tab: StockTab) => void
 }
 
 /**
- * 3つの状態のタブ（件数つき）。Tabs（Radix）の中に置く。
+ * 4つの状態のタブ（件数つき）。Tabs（Radix）の中に置く。
  * @param props - counts：状態ごとの件数（読み込み前は undefined）
  * @returns タブの一覧
  */
 export function StatusTabs({ counts }: { counts?: DraftCounts }) {
   return (
-    <TabsList>
+    <TabsList className="min-w-0 max-w-full justify-start overflow-x-auto">
       {TABS.map((t) => (
-        <TabsTrigger key={t.value} value={t.value}>
+        <TabsTrigger className="flex-none whitespace-nowrap" key={t.value} value={t.value}>
           {t.label} {counts ? counts[t.count] : ""}
         </TabsTrigger>
       ))}

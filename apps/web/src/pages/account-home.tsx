@@ -2,8 +2,16 @@
 // ChatGPTの最初の画面のように、中央に次にやることを1つだけ出し、その下に入力状況の3枚のカードを並べる。
 import { useQuery } from "@tanstack/react-query";
 import type { ProfileStatus } from "@threads-grower/shared";
-import { ChevronRightIcon, MegaphoneIcon, SearchIcon, TargetIcon, type LucideIcon } from "lucide-react";
+import {
+  ChevronRightIcon,
+  MegaphoneIcon,
+  SearchIcon,
+  TargetIcon,
+  type LucideIcon,
+} from "lucide-react";
 import { Link } from "react-router";
+import { NextPostCard } from "@/components/NextPostCard";
+import { AutoPostNotices } from "@/components/AutoPostNotices";
 import { AccountAvatar } from "@/components/AccountAvatar";
 import { ApiErrorScreen } from "@/components/ApiErrorScreen";
 import { ConnectionBadge } from "@/components/ConnectionBadge";
@@ -67,7 +75,8 @@ export function AccountHome() {
   });
   const s = status.data;
   // 読み込めなかったら、読み込み中のまま止めずに原因と再読み込みを出す
-  if (status.isError) return <ApiErrorScreen error={status.error} onRetry={() => void status.refetch()} />;
+  if (status.isError)
+    return <ApiErrorScreen error={status.error} onRetry={() => void status.refetch()} />;
   const step = s ? nextStep(s) : null;
   const canEdit = s?.access.canEdit ?? true;
 
@@ -79,8 +88,18 @@ export function AccountHome() {
           Icon: TargetIcon,
           text: `${s.strategy.filledCount}/${s.strategy.totalCount} 入力済み`,
         },
-        { area: "promotions", label: "宣伝内容", Icon: MegaphoneIcon, text: `宣伝の対象 ${s.promotions.targetableCount}件（任意）` },
-        { area: "research", label: "リサーチ", Icon: SearchIcon, text: `参考投稿 ${s.research.referencePostCount}件（任意）` },
+        {
+          area: "promotions",
+          label: "宣伝内容",
+          Icon: MegaphoneIcon,
+          text: `宣伝の対象 ${s.promotions.targetableCount}件（任意）`,
+        },
+        {
+          area: "research",
+          label: "リサーチ",
+          Icon: SearchIcon,
+          text: `参考投稿 ${s.research.referencePostCount}件（任意）`,
+        },
       ]
     : [];
 
@@ -109,7 +128,9 @@ export function AccountHome() {
             <section className="space-y-1.5 text-center">
               {canEdit ? (
                 <>
-                  <h2 className="text-[22px] leading-snug font-semibold md:text-[26px]">{step!.title}</h2>
+                  <h2 className="text-[22px] leading-snug font-semibold md:text-[26px]">
+                    {step!.title}
+                  </h2>
                   <p className="text-[15px] text-muted-foreground">{step!.body}</p>
                   {step!.area === null && (
                     <Button asChild className="mt-3 h-11 rounded-full px-5 md:h-9">
@@ -128,6 +149,8 @@ export function AccountHome() {
                 </>
               )}
             </section>
+            <NextPostCard accountId={account.id} />
+            <AutoPostNotices accountId={account.id} />
             <nav aria-label="投稿の材料" className="grid w-full gap-2.5 md:grid-cols-3 md:gap-3">
               {cards.map(({ area, label, Icon, text }) => (
                 <Link
@@ -143,7 +166,10 @@ export function AccountHome() {
                     <span className="font-semibold">{label}</span>
                     <span className="text-[13px] text-muted-foreground">{text}</span>
                   </span>
-                  <ChevronRightIcon className="size-4 text-muted-foreground md:hidden" aria-hidden="true" />
+                  <ChevronRightIcon
+                    className="size-4 text-muted-foreground md:hidden"
+                    aria-hidden="true"
+                  />
                 </Link>
               ))}
             </nav>

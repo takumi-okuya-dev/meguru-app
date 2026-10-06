@@ -1,8 +1,12 @@
 // 下書き1件のカード（specs/004-review-approval contracts/ui-routes.md「下書きのカード」、docs/ui-design.md 型C）。
 // 上から：選択・本文・ラベルの行・長さの表示・タブごとの操作。
 import type { PostDraft, PublishCheck } from "@threads-grower/shared";
-import { rejectReasonLabel } from "@threads-grower/shared";
-import { EllipsisIcon } from "lucide-react";
+import {
+  blockedReasonLabel,
+  PUBLISH_ERROR_LABELS,
+  rejectReasonLabel,
+} from "@threads-grower/shared";
+import { EllipsisIcon, LoaderCircleIcon } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import {
@@ -11,7 +15,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { formatDateTime } from "@/lib/format";
+import { formatDateTime, formatRelativeJst } from "@/lib/format";
 import { NOT_APPROVABLE_LIMIT, NOT_APPROVABLE_NG } from "./messages";
 import { ThreadsLengthBar } from "./ThreadsLengthBar";
 
@@ -37,6 +41,8 @@ export type DraftCardActions = {
   onEdit: () => void;
   onDelete: () => void;
   onReopen: () => void;
+  onRequeue?: () => void;
+  onPrioritize?: () => void;
 };
 
 /**
@@ -64,6 +70,7 @@ export function DraftCard({
   body,
   busy = false,
   actions,
+  scheduledAt,
 }: {
   draft: PostDraft;
   selected: boolean;
@@ -72,6 +79,7 @@ export function DraftCard({
   body?: ReactNode;
   busy?: boolean;
   actions: DraftCardActions;
+  scheduledAt?: string;
 }) {
   const [expanded, setExpanded] = useState(false);
   const long = draft.body.split("\n").length > LONG_LINES || draft.body.length > LONG_CHARS;
@@ -89,16 +97,25 @@ export function DraftCard({
       className="flex gap-2 rounded-2xl border bg-card px-3 py-3 transition-shadow md:px-4"
     >
       {/* タッチ操作でも押しやすいよう、押せる範囲を44px角にする */}
-      <label className="-my-1.5 -ml-1.5 flex size-11 shrink-0 cursor-pointer items-center justify-center md:size-9">
-        <input
-          type="checkbox"
-          className="size-4 accent-foreground"
-          aria-label={`${name}を選択`}
-          checked={selected}
-          onChange={actions.onToggle}
-        />
-      </label>
+      {draft.status !== "publish_failed" && (
+        <label className="-my-1.5 -ml-1.5 flex size-11 shrink-0 cursor-pointer items-center justify-center md:size-9">
+          <input
+            type="checkbox"
+            className="size-4 accent-foreground"
+            aria-label={`${name}を選択`}
+            disabled={draft.status === "publishing"}
+            checked={selected}
+            onChange={actions.onToggle}
+          />
+        </label>
+      )}
       <div className="min-w-0 flex-1 space-y-2">
+        {draft.status === "needs_review" && draft.blockedReason && draft.blockedAt && (
+          <p className="text-[13px] text-warning">
+            投稿の直前に{blockedReasonLabel(draft.blockedReason, draft.blockedWords)}
+            が見つかったため、要確認に戻しました（{formatRelativeJst(draft.blockedAt)}）
+          </p>
+        )}
         <p
           className={`text-[15px] leading-relaxed break-words whitespace-pre-wrap ${expanded ? "" : "line-clamp-6"}`}
         >
@@ -112,6 +129,38 @@ export function DraftCard({
           >
             {expanded ? "閉じる" : "もっと見る"}
           </button>
+        )}
+        {draft.status === "publishing" && (
+          <p className="flex items-center gap-2 text-[13px] text-muted-foreground">
+            <LoaderCircleIcon className="size-4 animate-spin" />
+            投稿の処理中
+          </p>
+        )}
+        {draft.carryover && (
+          <p className="text-[13px] text-warning">
+            前回の投稿に失敗したため、次の時刻にもう一度試します
+          </p>
+        )}
+        {scheduledAt && (
+          <p className="text-[13px] text-muted-foreground">
+            {formatRelativeJst(scheduledAt)}に投稿予定
+          </p>
+        )}
+        {draft.status === "publish_failed" && (
+          <div className="space-y-2">
+            <p className="text-[13px] text-destructive">
+              {draft.publishFailedAt && formatRelativeJst(draft.publishFailedAt)}に失敗：
+              {PUBLISH_ERROR_LABELS[draft.publishError ?? "unknown"]}
+            </p>
+            <Button
+              variant="outline"
+              className="h-auto min-h-11 w-full whitespace-normal md:min-h-8 md:w-auto"
+              disabled={busy}
+              onClick={actions.onRequeue}
+            >
+              もう一度投稿の順に入れる
+            </Button>
+          </div>
         )}
         {labels}
         <ThreadsLengthBar text={draft.body} />
@@ -160,18 +209,22 @@ export function DraftCard({
             size="icon"
             className="-my-1.5 -mr-1.5 size-11 shrink-0 text-muted-foreground md:size-8"
             aria-label={`${name}の操作`}
+            disabled={busy || draft.status === "publishing"}
           >
             <EllipsisIcon className="size-5" />
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
-          {draft.status !== "rejected" && (
+          {draft.status === "approved" && actions.onPrioritize && (
+            <DropdownMenuItem onSelect={actions.onPrioritize}>次に投稿する</DropdownMenuItem>
+          )}
+          {(draft.status === "needs_review" || draft.status === "approved") && (
             <DropdownMenuItem onSelect={actions.onEdit}>編集</DropdownMenuItem>
           )}
           {draft.status !== "needs_review" && (
             <DropdownMenuItem onSelect={actions.onReopen}>要確認に戻す</DropdownMenuItem>
           )}
-          {draft.status !== "approved" && (
+          {(draft.status === "needs_review" || draft.status === "rejected") && (
             <DropdownMenuItem className="text-destructive" onSelect={actions.onDelete}>
               削除
             </DropdownMenuItem>

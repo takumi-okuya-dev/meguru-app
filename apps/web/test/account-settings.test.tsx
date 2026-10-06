@@ -1,8 +1,8 @@
 // このアカウントの設定の「投稿のルール」（specs/004-review-approval FR-014・FR-019〜FR-021・FR-031・FR-042、contracts/ui-routes.md）
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { act, render, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import type { AccountSummary, NgWord, PostingRules } from "@threads-grower/shared";
+import type { AccountSummary, NgWord, PostingRules, PostingSchedule } from "@threads-grower/shared";
 import { createMemoryRouter, Outlet, RouterProvider } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -10,17 +10,34 @@ const getPostingRules = vi.fn();
 const addNgWords = vi.fn();
 const deleteNgWord = vi.fn();
 const putCoreRules = vi.fn();
+const getPostingSchedule = vi.fn();
+const putPostingSchedule = vi.fn();
+const checkThreads = vi.fn();
+const getAutoPost = vi.fn();
+const connect = vi.fn();
 vi.mock("@/lib/api-client", async (orig) => {
   const actual = await orig<typeof import("@/lib/api-client")>();
   return {
     ...actual,
-    api: { ...actual.api, getPostingRules, addNgWords, deleteNgWord, putCoreRules },
+    api: {
+      ...actual.api,
+      getPostingRules,
+      addNgWords,
+      deleteNgWord,
+      putCoreRules,
+      getPostingSchedule,
+      putPostingSchedule,
+      checkThreads,
+      getAutoPost,
+      connect,
+    },
   };
 });
 const toastSuccess = vi.fn();
 const toastError = vi.fn();
+const toastWarning = vi.fn();
 vi.mock("sonner", () => ({
-  toast: { success: toastSuccess, error: toastError, dismiss: vi.fn() },
+  toast: { success: toastSuccess, error: toastError, warning: toastWarning, dismiss: vi.fn() },
 }));
 
 const { ApiError } = await import("@/lib/api-client");
@@ -55,6 +72,13 @@ function rules(overrides: Partial<PostingRules> = {}): PostingRules {
   };
 }
 
+function scheduleResponse(schedule: Partial<PostingSchedule> = {}) {
+  return {
+    schedule: { enabled: false, slotTimes: [], jitter: true, version: 0, ...schedule },
+    limits: { slots: 10, minGapMinutes: 30, jitterMinutes: 10 },
+  };
+}
+
 function renderPage() {
   const router = createMemoryRouter(
     [
@@ -85,11 +109,25 @@ beforeEach(() => {
     addNgWords,
     deleteNgWord,
     putCoreRules,
+    getPostingSchedule,
+    putPostingSchedule,
+    checkThreads,
+    getAutoPost,
+    connect,
     toastSuccess,
     toastError,
+    toastWarning,
   ])
     fn.mockReset();
   getPostingRules.mockResolvedValue(rules({ ngWords: [word("w1", "絶対")] }));
+  getPostingSchedule.mockResolvedValue(scheduleResponse());
+  getAutoPost.mockResolvedValue({
+    autoPost: { enabled: true, slotCount: 3, stoppedReason: null },
+    next: null,
+    approvedCount: 0,
+    daysLeft: null,
+    notices: [],
+  });
 });
 
 describe("「投稿のルール」の区分（FR-031）", () => {
@@ -264,5 +302,202 @@ describe("Threadsの規約への備え（FR-042・FR-043）", () => {
     ).toBeInTheDocument();
     expect(within(dialog).queryByRole("textbox")).not.toBeInTheDocument();
     expect(within(dialog).queryByRole("button", { name: "保存" })).not.toBeInTheDocument();
+  });
+});
+
+// ---- 投稿のスケジュール（specs/005-auto-post FR-001〜FR-004・FR-001b・FR-002a・FR-002b）----
+
+describe("「投稿のスケジュール」の区分", () => {
+  it("「投稿のルール」より上にあり、3つの行に保存済みの値が出る", async () => {
+    getPostingSchedule.mockResolvedValue(scheduleResponse({ enabled: true, slotTimes: ["07:30", "12:00", "21:00"], version: 2 }));
+    renderPage();
+    const section = await screen.findByRole("region", { name: "投稿のスケジュール" });
+    const rulesSection = screen.getByRole("region", { name: "投稿のルール" });
+    expect(section.compareDocumentPosition(rulesSection) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(await within(section).findByText("7:30・12:00・21:00（1日3件）")).toBeInTheDocument();
+    expect(within(section).getByText("承認済みの下書きを、下の時刻に1件ずつ投稿します")).toBeInTheDocument();
+    expect(within(section).getAllByText("オン")).toHaveLength(2);
+  });
+
+  it("時刻が未設定なら「未設定」", async () => {
+    renderPage();
+    expect(await screen.findByText("未設定")).toBeInTheDocument();
+  });
+});
+
+describe("投稿のスケジュールのダイアログ", () => {
+  async function openDialog() {
+    const user = userEvent.setup();
+    renderPage();
+    const section = await screen.findByRole("region", { name: "投稿のスケジュール" });
+    await waitFor(() => expect(within(section).getByRole("button", { name: "編集" })).toBeEnabled());
+    await user.click(within(section).getByRole("button", { name: "編集" }));
+    return { user, dialog: await screen.findByRole("dialog", { name: "投稿のスケジュール" }) };
+  }
+
+  /** 時刻の入力に値を入れて「追加」を押す。 */
+  async function addTime(user: ReturnType<typeof userEvent.setup>, dialog: HTMLElement, t: string) {
+    fireEvent.change(within(dialog).getByLabelText("追加する時刻"), { target: { value: t } });
+    await user.click(within(dialog).getByRole("button", { name: "追加" }));
+  }
+
+  const saveButton = (dialog: HTMLElement) => within(dialog).getAllByRole("button", { name: "保存" }).at(-1)!;
+
+  it("時刻を3つ足してオンにして保存できる（SC-007）。通知に、承認済みを用意する案内が添えられる", async () => {
+    putPostingSchedule.mockResolvedValue({
+      schedule: { enabled: true, slotTimes: ["07:30", "12:00", "21:00"], jitter: true, version: 1 },
+      connectionCheck: { status: "ok", quotaUsage: 0, quotaTotal: 250 },
+    });
+    getAutoPost.mockResolvedValue({
+      autoPost: { enabled: true, slotCount: 3, stoppedReason: null },
+      next: null,
+      approvedCount: 0,
+      daysLeft: null,
+      notices: [{ kind: "no_approved", nextSlotAt: "2026-10-06T03:00:00.000Z" }],
+    });
+    const { user, dialog } = await openDialog();
+    for (const t of ["21:00", "07:30", "12:00"]) await addTime(user, dialog, t);
+    expect(within(dialog).getByText("1日 3件 投稿します")).toBeInTheDocument();
+    await user.click(within(dialog).getByRole("switch", { name: "自動投稿" }));
+    await user.click(saveButton(dialog));
+    expect(putPostingSchedule).toHaveBeenCalledWith("a1", {
+      enabled: true,
+      slotTimes: ["07:30", "12:00", "21:00"],
+      jitter: true,
+      expectedVersion: 0,
+    });
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    await waitFor(() =>
+      expect(toastSuccess).toHaveBeenCalledWith("投稿のスケジュールを保存しました。承認済みの下書きを用意してください"),
+    );
+  });
+
+  it("検証の文言：30分未満の間は too_close で保存できない。同じ時刻は足せない。オンで時刻0件は保存できない", async () => {
+    const { user, dialog } = await openDialog();
+    await user.click(within(dialog).getByRole("switch", { name: "自動投稿" }));
+    expect(within(dialog).getByText("自動投稿をオンにするには、時刻を1つ以上追加してください")).toBeInTheDocument();
+    expect(saveButton(dialog)).toBeDisabled();
+
+    await addTime(user, dialog, "07:00");
+    await addTime(user, dialog, "07:00");
+    expect(within(dialog).getByText("同じ時刻がすでにあります")).toBeInTheDocument();
+    await addTime(user, dialog, "07:29");
+    expect(
+      within(dialog).getByText("時刻を少しずらすときは、時刻どうしを30分以上あけてください（7:00と7:29）"),
+    ).toBeInTheDocument();
+    expect(saveButton(dialog)).toBeDisabled();
+    // ずらさなければ通る
+    await user.click(within(dialog).getByRole("switch", { name: "時刻を少しずらす" }));
+    expect(saveButton(dialog)).toBeEnabled();
+  });
+
+  it("10件に達したら入力を無効にし、上限の案内を出す", async () => {
+    getPostingSchedule.mockResolvedValue(
+      scheduleResponse({ slotTimes: Array.from({ length: 10 }, (_, i) => `${String(i * 2).padStart(2, "0")}:00`) }),
+    );
+    const { dialog } = await openDialog();
+    expect(within(dialog).getByLabelText("追加する時刻")).toBeDisabled();
+    expect(within(dialog).getByText("時刻は10件まで登録できます")).toBeInTheDocument();
+  });
+
+  it("深夜（2:00〜4:59）の時刻にだけ案内が出て、保存はできる（FR-001b）", async () => {
+    putPostingSchedule.mockResolvedValue({
+      schedule: { enabled: false, slotTimes: ["01:59", "02:00", "04:59", "05:00"], jitter: false, version: 1 },
+      connectionCheck: null,
+    });
+    const { user, dialog } = await openDialog();
+    await user.click(within(dialog).getByRole("switch", { name: "時刻を少しずらす" }));
+    for (const t of ["01:59", "02:00", "04:59", "05:00"]) await addTime(user, dialog, t);
+    expect(within(dialog).getAllByText("深夜の時間帯です。見られにくい可能性があります")).toHaveLength(2);
+    expect(saveButton(dialog)).toBeEnabled();
+    await user.click(saveButton(dialog));
+    expect(putPostingSchedule).toHaveBeenCalled();
+  });
+
+  it("409 STALE_UPDATE では「他の場所で更新されています」のダイアログが出る", async () => {
+    putPostingSchedule.mockRejectedValue(
+      new ApiError("STALE_UPDATE", 409, [], { enabled: true, slotTimes: ["08:00"], jitter: true, version: 3 }),
+    );
+    const { user, dialog } = await openDialog();
+    await addTime(user, dialog, "08:30");
+    await user.click(saveButton(dialog));
+    expect(await screen.findByText("他の場所で更新されています")).toBeInTheDocument();
+  });
+
+  it("オンにする保存の 409 THREADS_NOT_READY では、閉じずに理由と「再接続」を出す（FR-002a）", async () => {
+    putPostingSchedule.mockRejectedValue(new ApiError("THREADS_NOT_READY", 409, ["no_publish_permission"]));
+    connect.mockResolvedValue({ authorizeUrl: "https://threads.example/authorize" });
+    const { user, dialog } = await openDialog();
+    await addTime(user, dialog, "08:30");
+    await user.click(within(dialog).getByRole("switch", { name: "自動投稿" }));
+    await user.click(saveButton(dialog));
+    expect(
+      await within(dialog).findByText("Threadsへの投稿の権限がありません。再接続して、投稿の許可をオンにしてください"),
+    ).toBeInTheDocument();
+    expect(within(dialog).getByRole("button", { name: "再接続" })).toBeInTheDocument();
+    expect(screen.getByRole("dialog", { name: "投稿のスケジュール" })).toBeInTheDocument();
+    expect(toastError).not.toHaveBeenCalled();
+  });
+
+  it("確かめられなかった（unknown）ときは、保存して閉じ、注意の通知を出す", async () => {
+    putPostingSchedule.mockResolvedValue({
+      schedule: { enabled: true, slotTimes: ["08:30"], jitter: true, version: 1 },
+      connectionCheck: { status: "unknown" },
+    });
+    const { user, dialog } = await openDialog();
+    await addTime(user, dialog, "08:30");
+    await user.click(within(dialog).getByRole("switch", { name: "自動投稿" }));
+    await user.click(saveButton(dialog));
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    await waitFor(() =>
+      expect(toastWarning).toHaveBeenCalledWith(
+        "保存しました。Threadsとの接続は確認できませんでした。「接続を確かめる」で、あとで確かめてください",
+      ),
+    );
+  });
+});
+
+describe("「接続を確かめる」（FR-002b）", () => {
+  async function runCheck(result: unknown) {
+    checkThreads.mockResolvedValue(result);
+    const user = userEvent.setup();
+    renderPage();
+    const section = await screen.findByRole("region", { name: "投稿のスケジュール" });
+    await user.click(within(section).getByRole("button", { name: "接続を確かめる" }));
+    return section;
+  }
+
+  it("投稿できる状態なら、直近24時間の投稿数を出す", async () => {
+    const section = await runCheck({ status: "ok", quotaUsage: 3, quotaTotal: 250 });
+    expect(await within(section).findByText("投稿できる状態です（直近24時間の投稿 3/250件）")).toBeInTheDocument();
+  });
+
+  it("権限なし・要再接続は理由と「再接続」、確かめられなければその旨", async () => {
+    const s1 = await runCheck({ status: "no_publish_permission" });
+    expect(
+      await within(s1).findByText("Threadsへの投稿の権限がありません。再接続して、投稿の許可をオンにしてください"),
+    ).toBeInTheDocument();
+    expect(within(s1).getByRole("button", { name: "再接続" })).toBeInTheDocument();
+  });
+
+  it("要再接続", async () => {
+    const s = await runCheck({ status: "needs_reconnect" });
+    expect(await within(s).findByText("Threadsとの接続が切れています。再接続してください")).toBeInTheDocument();
+  });
+
+  it("確かめられなかった", async () => {
+    const s = await runCheck({ status: "unknown" });
+    expect(await within(s).findByText("Threadsとの接続を確認できませんでした。時間をおいてもう一度お試しください")).toBeInTheDocument();
+  });
+
+  it("確かめている間はボタンを無効にする", async () => {
+    let resolve: (v: unknown) => void = () => {};
+    checkThreads.mockReturnValue(new Promise((r) => (resolve = r)));
+    const user = userEvent.setup();
+    renderPage();
+    const section = await screen.findByRole("region", { name: "投稿のスケジュール" });
+    await user.click(within(section).getByRole("button", { name: "接続を確かめる" }));
+    expect(within(section).getByRole("button", { name: "確かめています…" })).toBeDisabled();
+    await act(async () => resolve({ status: "ok", quotaUsage: 0, quotaTotal: 250 }));
   });
 });

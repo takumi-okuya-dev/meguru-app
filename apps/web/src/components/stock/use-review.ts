@@ -111,6 +111,7 @@ export function useReview(accountId: string) {
     await Promise.all([
       queryClient.invalidateQueries({ queryKey: queryKeys.postDrafts(accountId) }),
       queryClient.invalidateQueries({ queryKey: queryKeys.promptAll(accountId) }),
+      queryClient.invalidateQueries({ queryKey: queryKeys.autoPost(accountId) }),
     ]);
     return queryClient.getQueryState(queryKeys.postDrafts(accountId))?.status !== "error";
   }, [accountId, queryClient]);
@@ -247,7 +248,9 @@ export function useReview(accountId: string) {
       );
       // もう一度投稿の順に入れる（005）は、投稿に失敗には戻せないので「元に戻す」を付けない
       const withUndo =
-        changed.length > 0 && action !== "requeue"
+        changed.length > 0 &&
+        action !== "requeue" &&
+        !drafts.some((d) => d.status === "publish_failed")
           ? { action: { label: "元に戻す", onClick: () => void undo(action, drafts, changed) } }
           : {};
       if (unsent > 0 || unknown > 0) {

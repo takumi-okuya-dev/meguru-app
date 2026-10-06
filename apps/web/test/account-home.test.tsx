@@ -1,17 +1,19 @@
 // US4：Accountのホーム（specs/002 FR-017・FR-024b、contracts/ui-routes.md「ホーム」、research.md R11）
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen } from "@testing-library/react";
-import type { AccountSummary, ProfileStatus } from "@threads-grower/shared";
+import type { AccountSummary, ProfileStatus, AutoPostStatus } from "@threads-grower/shared";
 import { createMemoryRouter, Outlet, RouterProvider } from "react-router";
 import { describe, expect, it, vi } from "vitest";
 
 let current: ProfileStatus | Error;
+let auto: AutoPostStatus = { autoPost: { enabled: false, slotCount: 0, stoppedReason: null }, next: null, approvedCount: 0, daysLeft: null, notices: [] };
 vi.mock("@/lib/api-client", async (orig) => {
   const actual = await orig<typeof import("@/lib/api-client")>();
   return {
     ...actual,
     api: {
       ...actual.api,
+      getAutoPost: async () => auto,
       getProfileStatus: () => (current instanceof Error ? Promise.reject(current) : Promise.resolve(current)),
     },
   };
@@ -104,5 +106,31 @@ describe("Accountのホーム", () => {
     renderHome(new ApiError("INTERNAL_ERROR", 500));
     expect(await screen.findByRole("heading", { name: "読み込めませんでした" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "再読み込み" })).toBeInTheDocument();
+  });
+});
+
+
+describe("005：次の投稿", () => {
+  it("オフでは設定を案内する", async () => {
+    renderHome(status());
+    expect(await screen.findByText("自動投稿はオフです")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "投稿のスケジュールを設定する" })).toHaveAttribute("href", "/accounts/a1/settings");
+  });
+  it("予定と書き出し・残りの日数を出す", async () => {
+    auto = { autoPost: { enabled: true, slotCount: 3, stoppedReason: null }, next: { at: "2026-10-08T03:00:00Z", draft: { id: "d", excerpt: "次の本文" } }, approvedCount: 5, daysLeft: 1, notices: [] };
+    renderHome(status());
+    expect(await screen.findByText("次の本文")).toBeInTheDocument();
+    expect(screen.getByText("承認済み 5件・あと1日分")).toBeInTheDocument();
+  });
+  it("承認済み0件では次の投稿を準備する案内を出す", async () => {
+    auto = { ...auto, next: null, approvedCount: 0, daysLeft: 0 };
+    renderHome(status());
+    expect(await screen.findByText("承認済みの下書きがありません")).toBeInTheDocument();
+  });
+  it("停止中では予定を出さず、停止理由を出す", async () => {
+    auto = { ...auto, autoPost: { enabled: true, slotCount: 3, stoppedReason: "needs_reconnect" } };
+    renderHome(status());
+    expect(await screen.findByRole("button", { name: "再接続" })).toBeInTheDocument();
+    expect(screen.getByText(/接続が切れているため/)).toBeInTheDocument();
   });
 });

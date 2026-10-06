@@ -42,6 +42,8 @@ export function DraftList({
   total,
   renderCard,
   onSelectBatch,
+  failed = [],
+  approvedNotice,
 }: {
   tab: StockTab;
   items: PostDraft[];
@@ -49,12 +51,22 @@ export function DraftList({
   canGeneratePrompt: boolean;
   total: number;
   renderCard: (draft: PostDraft) => ReactNode;
+  failed?: PostDraft[];
+  approvedNotice?: ReactNode;
   onSelectBatch?: (drafts: PostDraft[]) => void;
 }) {
   if (tab === "approved") {
     return (
       <div className="space-y-3">
-        <p className="px-1 text-[13px] text-muted-foreground">{APPROVED_TAB_NOTICE}</p>
+        <p className="px-1 text-[13px] text-muted-foreground">
+          {approvedNotice ?? APPROVED_TAB_NOTICE}
+        </p>
+        {failed.length > 0 && (
+          <section id="publish-failed" className="space-y-2" aria-label="投稿に失敗">
+            <h3 className="text-sm font-medium">投稿に失敗（{failed.length}件）</h3>
+            <ul className="space-y-2">{failed.map(renderCard)}</ul>
+          </section>
+        )}
         {items.length === 0 ? (
           <Empty>
             承認した下書きはまだありません。要確認のタブで内容を確かめて「承認」を押してください。
