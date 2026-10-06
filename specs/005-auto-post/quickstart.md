@@ -15,7 +15,7 @@
 ```bash
 pnpm install
 docker compose up -d
-pnpm --filter api db:migrate        # 0005（列挙型の値）・0006（posting_schedules・publish_attempts・post_drafts の列）
+pnpm --filter api db:migrate        # 0005_auto_post.sql（列挙型・設定・投稿の試み・下書きの列）
 pnpm dev:fake
 ```
 

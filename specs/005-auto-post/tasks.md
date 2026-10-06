@@ -47,6 +47,8 @@ description: "スケジュール投稿・自動投稿の実装タスク"
 
 ---
 
+実施内容と残っている手動確認は[verification.md](./verification.md)を参照。
+
 ## Phase 1：セットアップ
 
 **目的**：新しい依存とバインディングを足す。
@@ -229,7 +231,7 @@ description: "スケジュール投稿・自動投稿の実装タスク"
 
 ### テスト（先に書いて失敗を確認する）
 
-- [ ] T018 [P] [US1] 投稿のスケジュールのAPIのテストを書く。`apps/api/test/integration/posting-schedule.test.ts`
+- [X] T018 [P] [US1] 投稿のスケジュールのAPIのテストを書く。`apps/api/test/integration/posting-schedule.test.ts`
   - `GET`：行がなければ`{ enabled: false, slotTimes: [], jitter: true, version: 0 }`と`limits`
   - `PUT`：
     - 3つの時刻でオンにでき、`slotTimes`は昇順、`version`は1
@@ -239,7 +241,7 @@ description: "スケジュール投稿・自動投稿の実装タスク"
     - コミットの後、KVの`autopost:wake`に`{ at }`が書かれる。KVの書き込みを2回失敗させても（`AUTOPOST_KV.put`を差し替える）、3回目で書ける。4回失敗しても`200`
     - 投稿の権限の確認（FR-002a）：`enabled: true`の保存で、権限なし（`/__control/publish-permission`）は`409 THREADS_NOT_READY`（`details: ["no_publish_permission"]`）で保存されない。トークンの無効は`needs_reconnect`で、Accountが要再接続になる。一時的な失敗は保存され、`connectionCheck.status`が`unknown`。`enabled: false`の保存では確かめず`connectionCheck: null`。どの場合も偽のThreadsに投稿が作られない
   - 他人のAccountは`404 ACCOUNT_NOT_FOUND`。無料体験の後のプラン1でも使える（FR-004）
-- [ ] T019 [P] [US1] 定期処理のテストを書く（成功の経路）。`apps/api/test/integration/auto-post-runner.test.ts`
+- [X] T019 [P] [US1] 定期処理のテストを書く（成功の経路）。`apps/api/test/integration/auto-post-runner.test.ts`
   - 準備の部品（ファイルの中のヘルパー）：
     - 承認済みの下書きを作る
     - 設定を入れる（`effective_from`を過去にする）
@@ -255,22 +257,22 @@ description: "スケジュール投稿・自動投稿の実装タスク"
   - 1回の処理で最大4件：同じ時刻のAccountが5つあると4件だけ公開し、ログに`deferred`。次の回（5分後の`now`）で残りが公開される
   - 遅れのログ：予定から11分後に公開すると`warn`（`auto-post: late publish`）。61分後の処理で`warn`（`auto-post: slots expired`）（`logger`を差し替えて確かめる）
   - 直前のチェック（原則I）：先頭の下書きが、DBで書き換えてNGワードを含むとき、それは公開されず要確認に戻り、次の下書きが公開される（詳しい確認はUS2のT038）
-- [ ] T020 [P] [US1] 関所のテストを書く。`apps/api/test/integration/auto-post-gate.test.ts`（quickstart.mdの表の「関所」）
+- [X] T020 [P] [US1] 関所のテストを書く。`apps/api/test/integration/auto-post-gate.test.ts`（quickstart.mdの表の「関所」）
   - `nextCheckAt`が未来で`wake`がなければ、DBに触れずに終わる（`createDb`を呼ばないことを、DBの呼び出しを数える差し替えで確かめる）
   - `wake.at > runStartedAt`なら、DBの処理をする
   - KVの値が壊れている・読めないときは、DBの処理をする
   - DBの処理の後の`nextCheckAt`は、次の予定の時刻（間に一定の間隔の見直しが入らない）。予定がなければ`now + 24時間`
   - `gate`の書き込みに失敗させると、次の回もDBの処理が動く
-- [ ] T021 [P] [US1] 「接続を確かめる」のAPIのテストを書く。`apps/api/test/integration/threads-check.test.ts`（quickstart.mdの表の「接続を確かめる」、FR-002b）
+- [X] T021 [P] [US1] 「接続を確かめる」のAPIのテストを書く。`apps/api/test/integration/threads-check.test.ts`（quickstart.mdの表の「接続を確かめる」、FR-002b）
   - `ok`（`quotaUsage`・`quotaTotal`）、`no_publish_permission`、`needs_reconnect`（Accountが要再接続になる。世代番号が変わっていれば変えない）、`unknown`（HTTP 500）
   - Accountがすでに要再接続なら、Threadsを呼ばずに`needs_reconnect`
   - 偽のThreadsに投稿が作られない。他人のAccountは`404 ACCOUNT_NOT_FOUND`
-- [ ] T022 [P] [US1] 処理中の下書きと投稿済みの一覧のテストを書く。`apps/api/test/integration/post-drafts.test.ts`
+- [X] T022 [P] [US1] 処理中の下書きと投稿済みの一覧のテストを書く。`apps/api/test/integration/post-drafts.test.ts`
   - `publishing`の下書きの編集は`409 DRAFT_PUBLISHING`、`review`（承認・却下・戻す）は`skipped: PUBLISHING`（FR-008）
   - 投稿済みの下書きの編集・削除・`reopen`は、それぞれ`404`・削除されない・`skipped: STALE`（FR-020）
   - `GET /post-drafts/published`：投稿済み120件で、50件・50件・20件に分かれ、最後の`nextCursor`は`null`。並びは`published_at`の新しい順で、同じ日時は`id`の順（quickstart.mdの表の「投稿済みのAPI」）
   - 他人のAccountの`GET /post-drafts/published`は`404 ACCOUNT_NOT_FOUND`（FR-025）
-- [ ] T023 [P] [US1] Webのテストを書く。
+- [X] T023 [P] [US1] Webのテストを書く。
   - `apps/web/test/account-settings.test.tsx`：
     - 「投稿のスケジュール」の区分の3つの行の表示
     - ダイアログで時刻を3つ足してオンにして保存できる
@@ -288,37 +290,37 @@ description: "スケジュール投稿・自動投稿の実装タスク"
 
 ### 実装
 
-- [ ] T024 [US1] 投稿の権限の確認を作る（research.md R15、contracts/api.md「POST /threads-check」）。T021を通す。
+- [X] T024 [US1] 投稿の権限の確認を作る（research.md R15、contracts/api.md「POST /threads-check」）。T021を通す。
   - `apps/api/src/services/threads-check-service.ts`に`checkThreadsPublish(env, accountId, threads): Promise<ThreadsCheck>`
     - Accountが要再接続なら、Threadsを呼ばずに`needs_reconnect`
     - トークンを復号して`getPublishingLimit`を呼び、research.md R15の表のとおりに分ける
     - 認証エラーなら、読んだ`connection_generation`を条件に要再接続にする（`verifyConnection`と同じ書き方）
   - `apps/api/src/routes/threads-check.ts`に`POST /accounts/:accountId/threads-check`（`findOwnedAccount`）。`apps/api/src/app.ts`に登録する
-- [ ] T025 [US1] `apps/api/src/services/posting-schedule-service.ts`を作る（research.md R1、contracts/api.md）。
+- [X] T025 [US1] `apps/api/src/services/posting-schedule-service.ts`を作る（research.md R1、contracts/api.md）。
   - `getPostingSchedule(db, accountId)`：行がなければ既定値（`version: 0`）
   - `savePostingSchedule(env, ctx, accountId, req)`：`validatePostingSchedule`で確かめる。行がなければ`expectedVersion: 0`で作り、あれば`version`を条件に更新する（`updateWithVersion`）。`effective_from`の更新は、data-model.mdの3つの場合だけ。
   - `enabled: true`の保存では、検証の後、保存の前に`checkThreadsPublish`を呼ぶ。`needs_reconnect`・`no_publish_permission`なら`409 THREADS_NOT_READY`（`details`に結果）で保存しない。`unknown`なら保存し、レスポンスの`connectionCheck`に入れる。`enabled: false`の保存では呼ばず`connectionCheck: null`（FR-002a）
   - `notifyWake(env, ctx)`：コミットの後、`ctx.waitUntil`で`AUTOPOST_KV.put("autopost:wake", JSON.stringify({ at }))`。失敗したら0.5秒・1秒・2秒あけて最大3回まで書き直し、それでも失敗したら`logger.error`
-- [ ] T026 [US1] `apps/api/src/routes/posting-schedule.ts`を作り、`apps/api/src/app.ts`に登録する。`GET`・`PUT /api/accounts/:accountId/posting-schedule`（`findOwnedAccount`・`parseBody`）。T018を通す。
-- [ ] T027 [US1] `apps/api/src/services/auto-post-gate.ts`を作る（contracts/auto-post-job.md 手順0・7）。
+- [X] T026 [US1] `apps/api/src/routes/posting-schedule.ts`を作り、`apps/api/src/app.ts`に登録する。`GET`・`PUT /api/accounts/:accountId/posting-schedule`（`findOwnedAccount`・`parseBody`）。T018を通す。
+- [X] T027 [US1] `apps/api/src/services/auto-post-gate.ts`を作る（contracts/auto-post-job.md 手順0・7）。
   - `readGate(env)`：`{ gate, wake }`を読む。壊れた値・読めないときは`null`
   - `shouldRun(state, now)`
   - `writeGate(env, { nextCheckAt, runStartedAt })`
   - `computeNextCheckAt(input)`：次の予定の時刻・やり直しの時刻・続きの処理の有無・`now + 24時間`のうち、もっとも早いもの
-- [ ] T028 [US1] `apps/api/src/services/publish-claim.ts`を作る（contracts/auto-post-job.md 手順3、research.md R6・R7）。
+- [X] T028 [US1] `apps/api/src/services/publish-claim.ts`を作る（contracts/auto-post-job.md 手順3、research.md R6・R7）。
   - `claimSlot(env, attempt)`：`withTransaction`の中で`lockAccountDrafts`を取り、手順3の表のうち、自動投稿がオンか（`auto_post_off`）と、その日の投稿済みの件数（`daily_limit`）を確かめる。満たさなければ試みを`skipped`（理由付き）にする。要再接続・`paused_until`・24時間の250件は、US3のT050で足す。
   - `listQueueRows`の順に、`status = 'approved'`の下書きだけを読み（`publishing`は除く）、先頭から`checkPublishable(body, listNgWords(tx, accountId))`で確かめる。
     - 当たった下書き：要確認に戻す。`blocked_at = now`・`blocked_reason`・`blocked_words`（`ng_word`のとき当たった語の`word`）を入れ、`reviewed_at`・`prioritized_at`・`carryover_attempt_id`・`last_review_request_id`を消し、`version + 1`
     - 問題のない下書き：`publishing`にし（`version + 1`）、試みに`draft_id`・`is_carryover`を入れる。持ち越しなら`carryover_attempt_id`を消す
     - 承認済みが尽きたら`skipped`（`no_drafts`）
   - 「規約に注意」では止めない（spec エッジケース）。
-- [ ] T029 [US1] `apps/api/src/services/publish-executor.ts`を作る（成功の経路。contracts/auto-post-job.md 手順4）。
+- [X] T029 [US1] `apps/api/src/services/publish-executor.ts`を作る（成功の経路。contracts/auto-post-job.md 手順4）。
   - トークンを復号する（`createTokenCipher`、AADは`accountId`）。
   - `container_id`がなければ`createTextContainer` → `container_id`を保存 → `publish_requested_at = now`を保存 → `publishContainer`の順にする。**`container_id`の保存より前に公開を送らない**（research.md R6）。
   - 成功の記録：1回の更新（`status = 'publishing'`を条件に）で、下書きを`published`（`published_at`・`threads_media_id`を入れ、`prioritized_at`・`carryover_attempt_id`を消し、`version + 1`。data-model.mdのCHECK制約。analyze I1）、試みを`succeeded`にする。続けて`getMedia`で`threads_permalink`を保存する（失敗しても記録はそのまま）。
   - 失敗の分岐は、ここでは`ThreadsApiError`を確かな失敗（`publish_failed`・`invalid_request`。`prioritized_at`・`carryover_attempt_id`を消す）にするだけ。ほかの分岐はUS3のT048で足す。
   - ログには下書き・試み・AccountのIDだけを出す（本文・トークンは出さない）。
-- [ ] T030 [US1] `apps/api/src/services/auto-post-runner.ts`を作る（contracts/auto-post-job.md 手順0〜7）。T019・T020を通す。
+- [X] T030 [US1] `apps/api/src/services/auto-post-runner.ts`を作る（contracts/auto-post-job.md 手順0〜7）。T019・T020を通す。
   - `runAutoPost(env, now)`：
     - 関所（T027）
     - 続きの処理（`lease_until`が切れた`in_progress`、`next_retry_at`が来た`retry_wait`）
@@ -334,16 +336,16 @@ description: "スケジュール投稿・自動投稿の実装タスク"
     - 遅れが10分を超えたら`warn`（`auto-post: late publish`）
     - `expired`が1件以上なら`warn`（`auto-post: slots expired`）
     - 関所で終えたときは`debug`（`auto-post: gate closed`）
-- [ ] T031 [US1] `apps/api/src/index.ts`の`scheduled`で`controller.cron`を見て分ける：`"*/5 * * * *"`なら`runAutoPost(env, new Date(controller.scheduledTime))`、それ以外は既存の`runDailyJobs`。
-- [ ] T032 [US1] 処理中・投稿済みの下書きへの操作を拒む（FR-008・FR-020）。T022を通す。
+- [X] T031 [US1] `apps/api/src/index.ts`の`scheduled`で`controller.cron`を見て分ける：`"*/5 * * * *"`なら`runAutoPost(env, new Date(controller.scheduledTime))`、それ以外は既存の`runDailyJobs`。
+- [X] T032 [US1] 処理中・投稿済みの下書きへの操作を拒む（FR-008・FR-020）。T022を通す。
   - `apps/api/src/services/draft-service.ts`の`updateDraft`：対象が`publishing`なら`409 DRAFT_PUBLISHING`（`latest`付き）。投稿済み・投稿に失敗は今までどおり`404`（対象の状態に入れない）。
   - `apps/api/src/services/review-service.ts`：今の状態が`publishing`なら`skipped: PUBLISHING`。
   - `deleteDrafts`は変えない（要確認・却下だけ）。
-- [ ] T033 [US1] 投稿済みの一覧のAPIを作る。T022を通す。
+- [X] T033 [US1] 投稿済みの一覧のAPIを作る。T022を通す。
   - `apps/api/src/services/draft-service.ts`に`listPublishedPage(db, accountId, { before, limit })`：`status = 'published'`を`published_at DESC, id`で、カーソル（`published_at`と`id`のbase64url）の後から`limit + 1`件読む。返す列は`publishedPostSchema`の5つだけ（research.md R14）。
   - `apps/api/src/routes/post-drafts.ts`に`GET /accounts/:accountId/post-drafts/published`（`limit`は1〜50、既定50）。
-- [ ] T034 [P] [US1] 日時の表示を足す。`apps/web/src/lib/format.ts`に`formatRelativeJst(date, now)`：「今日 12:00」「明日 7:30」「10月8日 21:00」「2027年1月3日 7:30」（contracts/ui-routes.md「日時の書き方」）。`apps/web/test`にテストを足す。
-- [ ] T035 [US1] 設定の画面を作る（contracts/ui-routes.md「このアカウントの設定」）。T023の`account-settings.test.tsx`を通す。
+- [X] T034 [P] [US1] 日時の表示を足す。`apps/web/src/lib/format.ts`に`formatRelativeJst(date, now)`：「今日 12:00」「明日 7:30」「10月8日 21:00」「2027年1月3日 7:30」（contracts/ui-routes.md「日時の書き方」）。`apps/web/test`にテストを足す。
+- [X] T035 [US1] 設定の画面を作る（contracts/ui-routes.md「このアカウントの設定」）。T023の`account-settings.test.tsx`を通す。
   - `apps/web/src/lib/api-client.ts`：`getPostingSchedule`・`putPostingSchedule`・`checkThreads`
   - `apps/web/src/lib/query.ts`：`queryKeys.postingSchedule(accountId)`・`queryKeys.autoPost(accountId)`
   - `apps/web/src/components/settings/PostingScheduleSection.tsx`：3つの`SettingRow`と「編集」。「接続を確かめる」と結果の1行（FR-002b）。要再接続のときの案内
@@ -356,13 +358,13 @@ description: "スケジュール投稿・自動投稿の実装タスク"
     - `ConflictDialog`、`useUnsavedChanges`
     - オンにする保存の`409 THREADS_NOT_READY`（ダイアログの上部に理由と「再接続」）と、`connectionCheck.status`が`unknown`のときの通知（FR-002a）
   - `apps/web/src/pages/account-settings.tsx`：「投稿のルール」の上に`PostingScheduleSection`を置く
-- [ ] T036 [US1] 投稿済みのタブを作る（contracts/ui-routes.md「投稿済みのタブ」）。T023の`stock.test.tsx`を通す。
+- [X] T036 [US1] 投稿済みのタブを作る（contracts/ui-routes.md「投稿済みのタブ」）。T023の`stock.test.tsx`を通す。
   - `apps/web/src/lib/api-client.ts`：`listPublished(accountId, before?)`
   - `apps/web/src/components/stock/use-published.ts`：`useInfiniteQuery`で、タブを開いたときだけ読む。状態の変更の後には読み直さない
   - `apps/web/src/components/stock/PublishedCard.tsx`
   - `apps/web/src/components/stock/StatusTabs.tsx`：「投稿済み {n}」と`?tab=published`。`md`未満でタブの行を横にスクロールできるようにする
   - `apps/web/src/components/stock/DraftList.tsx`・`apps/web/src/pages/stock.tsx`：投稿済みのタブ、空の状態
-- [ ] T037 [US1] 「承認済みが0件」の知らせを出す（US1 シナリオ5）。
+- [X] T037 [US1] 「承認済みが0件」の知らせを出す（US1 シナリオ5）。
   - `apps/api/src/services/auto-post-status.ts`：`getAutoPostStatus(db, account, now)`。まず`autoPost`と`notices`（`no_approved`だけ。オン・接続が正常・承認済み0件のとき、`projectSchedule`の最初の時刻を`nextSlotAt`に）を返す。`next`・`approvedCount`・`daysLeft`はUS4のT057で足す（それまでは`null`・件数・`null`）。
   - `apps/api/src/routes/auto-post.ts`：`GET /accounts/:accountId/auto-post`。`apps/api/src/app.ts`に登録する。
   - `apps/api/test/integration/auto-post-status.test.ts`：`no_approved`が出る・出ない（オフ、承認済みあり）。他人のAccountは`404 ACCOUNT_NOT_FOUND`（FR-025）。
@@ -381,25 +383,25 @@ description: "スケジュール投稿・自動投稿の実装タスク"
 
 ### テスト（先に書いて失敗を確認する）
 
-- [ ] T038 [P] [US2] 直前のチェックのテストを書く。`apps/api/test/integration/auto-post-runner.test.ts`
+- [X] T038 [P] [US2] 直前のチェックのテストを書く。`apps/api/test/integration/auto-post-runner.test.ts`
   - quickstart.mdの表の「直前のチェック」：NGワード・Threadsの上限（501文字）のそれぞれで、要確認に戻り`blocked_reason`・`blocked_words`が記録され、同じ時刻に次の下書きが公開される（SC-002）
   - 1つの時刻で2件続けて当たっても、3件目が公開される
   - 規約に注意だけの下書きは公開される
   - 「NGワードの追加と取り出しの同時実行」：`addNgWords`と`runAutoPost`を同時に呼び、公開された本文に、その時点で登録済みのNGワードが含まれない（research.md R7）
-- [ ] T039 [P] [US2] 知らせのテストを書く。`apps/api/test/integration/auto-post-status.test.ts`
+- [X] T039 [P] [US2] 知らせのテストを書く。`apps/api/test/integration/auto-post-status.test.ts`
   - `blocked`：`blocked_notice_seen_at`より後に戻した下書きの件数・最新の理由・語
   - `POST /auto-post/notices/blocked/dismiss`で消え、下書きの`blockedReason`は残る。行がなくても`204`で、`version`は変わらない
   - 他人のAccountの`dismiss`は`404 ACCOUNT_NOT_FOUND`（FR-025）
-- [ ] T040 [P] [US2] Webのテストを書く。
+- [X] T040 [P] [US2] Webのテストを書く。
   - `apps/web/test/stock.test.tsx`：要確認のカードの先頭に「投稿の直前に{理由}が見つかったため、要確認に戻しました（{日時}）」
   - `blocked`の知らせの文言、「確認する」で要確認のタブへ、「閉じる」で`dismiss`を呼ぶ
 
 ### 実装
 
-- [ ] T041 [US2] 知らせに`blocked`を足し、閉じるAPIを作る。T039を通す。
+- [X] T041 [US2] 知らせに`blocked`を足し、閉じるAPIを作る。T039を通す。
   - `apps/api/src/services/auto-post-status.ts`：`blocked`の知らせ
   - `apps/api/src/routes/auto-post.ts`：`POST /accounts/:accountId/auto-post/notices/blocked/dismiss`（`posting_schedules`の行がなければ作る。`blocked_notice_seen_at = now`、`version`は変えない）
-- [ ] T042 [US2] 画面に理由と知らせを出す。T040を通す。
+- [X] T042 [US2] 画面に理由と知らせを出す。T040を通す。
   - `apps/web/src/components/stock/DraftLabels.tsx`（または`DraftCard.tsx`）：要確認のカードの、直前のチェックの理由（`blockedReasonLabel`）
   - `apps/web/src/components/AutoPostNotices.tsx`：`blocked`の文言・「確認する」・「閉じる」
   - `apps/web/src/components/stock/use-review.ts`：操作の後に`queryKeys.autoPost`も読み直す
@@ -416,7 +418,7 @@ description: "スケジュール投稿・自動投稿の実装タスク"
 
 ### テスト（先に書いて失敗を確認する）
 
-- [ ] T043 [P] [US3] 失敗とやり直しのテストを書く。`apps/api/test/integration/auto-post-runner.test.ts`（quickstart.mdの表の次の行）
+- [X] T043 [P] [US3] 失敗とやり直しのテストを書く。`apps/api/test/integration/auto-post-runner.test.ts`（quickstart.mdの表の次の行）
   - 「一時的な失敗」：2回失敗して3回目で成功（`now`を5分・10分進める）
   - 「持ち越しと失敗」：
     - 4回失敗で`carried_over`になり、下書きは承認済みで`carryover: true`
@@ -429,19 +431,19 @@ description: "スケジュール投稿・自動投稿の実装タスク"
   - 「要再接続」：要再接続の間は`skipped`。再接続（`writeConnection`）の後は、再接続より前の時刻を公開しない
   - 自動投稿をオフにしても、`retry_wait`の試みは最後まで進む
   - 「同じAccountの試みを1つずつ」：時刻をずらさず間を10分にした2つの時刻で、1つ目がやり直し中なら2つ目の試みは作られず、1つ目が終わった後に処理される。持ち越しのときは、待っていた2つ目の時刻でその下書きを試す（research.md R6）
-- [ ] T044 [P] [US3] 二重の公開の防止のテストを書く。`apps/api/test/integration/auto-post-runner.test.ts`（SC-003）
+- [X] T044 [P] [US3] 二重の公開の防止のテストを書く。`apps/api/test/integration/auto-post-runner.test.ts`（SC-003）
   - 「応答の喪失」：`/__control/drop-publish-response`で公開の応答を502にすると、試みは`in_progress`のまま（`publish_requested_at`あり）で、下書きは`publishing`。次の回で`PUBLISHED`とわかり、一覧から見つけて`published`になる。偽のThreadsの投稿は1件
   - 「未公開」：試みに`container_id`だけを入れた状態（DBで作る）で次の回を動かすと、同じコンテナーで公開し、投稿は1件
   - `IN_PROGRESS`のコンテナーは次の回に回す。`EXPIRED`は新しいコンテナーで、やり直しとして扱う。`ERROR`は`publish_failed`（`container_error`）
   - 状態の確認が認証エラーになっても、下書きは`publishing`のまま（結果を確かめるまで解かない）
   - `PUBLISHED`で一覧に見つからない状態が24時間続くと、IDなしで`published`になり、`error`のログが出る
-- [ ] T045 [P] [US3] 失敗への操作のテストを書く。`apps/api/test/integration/review.test.ts`
+- [X] T045 [P] [US3] 失敗への操作のテストを書く。`apps/api/test/integration/review.test.ts`
   - `requeue`：`publish_failed` → `approved`、`prioritized_at`が今、失敗の記録が消え、`reviewed_at`は元のまま。承認済みが500件なら`skipped: LIMIT`。同じ`requestId`の再試行は`updated`
   - `reopen`：`publish_failed` → `needs_review`。`reviewed_at`・失敗の記録・`prioritized_at`・`carryover_attempt_id`が消える
-- [ ] T046 [P] [US3] 知らせのテストを書く。`apps/api/test/integration/auto-post-status.test.ts`
+- [X] T046 [P] [US3] 知らせのテストを書く。`apps/api/test/integration/auto-post-status.test.ts`
   - `publish_failed`（件数・最新の理由と日時）、`needs_reconnect`（オンのときだけ）、`rate_limited`（`until`）
   - 並びは`needs_reconnect`・`rate_limited`・`publish_failed`・`blocked`・`no_approved`
-- [ ] T047 [P] [US3] Webのテストを書く。`apps/web/test/stock.test.tsx`・`apps/web/test/account-home.test.tsx`
+- [X] T047 [P] [US3] Webのテストを書く。`apps/web/test/stock.test.tsx`・`apps/web/test/account-home.test.tsx`
   - 承認済みのタブの先頭の「投稿に失敗（{n}件）」と、「{日時}に失敗：{理由}」
   - 「もう一度投稿の順に入れる」で`requeue`、「⋯」の「要確認に戻す」で`reopen`
   - 持ち越しのカードに「前回の投稿に失敗したため、次の時刻にもう一度試します」
@@ -451,30 +453,30 @@ description: "スケジュール投稿・自動投稿の実装タスク"
 
 ### 実装
 
-- [ ] T048 [US3] `apps/api/src/services/publish-executor.ts`に失敗の扱いを足す（contracts/auto-post-job.md 手順4「失敗の扱い」）。T043を通す。
+- [X] T048 [US3] `apps/api/src/services/publish-executor.ts`に失敗の扱いを足す（contracts/auto-post-job.md 手順4「失敗の扱い」）。T043を通す。
   - 一時的：`retry_count < 3`なら`retry_wait`（`next_retry_at = now + 5・10・15分`、`last_error`）。`retry_count = 3`なら、持ち越しでない試みは`carried_over`（下書きは`approved`、`carryover_attempt_id = 試み`）、持ち越しの試みは`failed`（下書きは`publish_failed`）
   - 確かな失敗：`failed`、下書きは`publish_failed`（`publish_failed_at`・`publish_error`）
   - 認証：Accountを`needs_reconnect`にする（読んだ`connection_generation`を条件に）。試みは`skipped`（`needs_reconnect`）、下書きは`approved`
   - 上限：`posting_schedules.paused_until`を翌日の0時（日本時間）にする。試みは`skipped`（`rate_limited`）、下書きは`approved`
   - 下書きを戻す・失敗にする更新は、`status = 'publishing'`を条件にし、`version + 1`
   - 下書きを`publish_failed`にするときは、どの経路でも`prioritized_at`・`carryover_attempt_id`を消す（data-model.mdのCHECK制約。analyze I1）
-- [ ] T049 [US3] `apps/api/src/services/publish-executor.ts`に結果の確認を足す（contracts/auto-post-job.md 手順4「結果の確認」、research.md R6）。T044を通す。
+- [X] T049 [US3] `apps/api/src/services/publish-executor.ts`に結果の確認を足す（contracts/auto-post-job.md 手順4「結果の確認」、research.md R6）。T044を通す。
   - `publishContainer`の`ThreadsTransientError`は「結果がわからない」として、`publish_requested_at`を残して`lease_until`を消す（やり直しの回数は増やさない）
   - `publish_requested_at`のある試み：`getContainerStatus`の5つの状態ごとの処理。`PUBLISHED`は`listRecentThreads(since = publish_requested_at - 5分)`で、前後の空白を除いた本文が一致するもっとも古い投稿を探す
   - `container_id`だけの試み：`FINISHED`なら公開、`IN_PROGRESS`は次の回、`EXPIRED`は`container_id`を消して作り直し、`ERROR`は確かな失敗
   - 状態の確認の呼び出しが失敗しても、下書きは`publishing`のまま。認証の失敗ならAccountを要再接続にする
   - `PUBLISHED`のまま24時間見つからなければ、IDなしで`published`にし、`logger.error`
   - 「結果がわからない」の発生・解決を`warn`で出す
-- [ ] T050 [US3] 停止と再開を足す。T043を通す。
+- [X] T050 [US3] 停止と再開を足す。T043を通す。
   - `apps/api/src/services/publish-claim.ts`：手順3の表の残りの3つを足す（要再接続 → `needs_reconnect`、`paused_until`が来ていない → `rate_limited`、直前24時間の投稿済みが250件 → `rate_limited`）
   - `apps/api/src/services/account-service.ts`の`writeConnection`：同じトランザクションで、`posting_schedules`の行があれば`effective_from = now`にする（`version`は変えない。FR-016）
-- [ ] T051 [US3] `requeue`と`reopen`の広げを足す（research.md R4、contracts/api.md「POST /post-drafts/review」）。T045を通す。
+- [X] T051 [US3] `requeue`と`reopen`の広げを足す（research.md R4、contracts/api.md「POST /post-drafts/review」）。T045を通す。
   - `apps/api/src/services/review-service.ts`：
     - `TARGET.requeue = "approved"`、`FROM.requeue = ["publish_failed"]`、`FROM.reopen`に`"publish_failed"`を足す
     - `requeue`は承認済みの上限を数え、`prioritized_at = now`にし、失敗の記録を消す
     - `reopen`は失敗の記録も消す（`prioritized_at`・`carryover_attempt_id`は、基盤のT016で消している）
-- [ ] T052 [US3] 知らせに3種類を足す。`apps/api/src/services/auto-post-status.ts`。T046を通す。
-- [ ] T053 [US3] 画面を作る（contracts/ui-routes.md「承認済みのタブ」の2、「知らせ」）。T047を通す。
+- [X] T052 [US3] 知らせに3種類を足す。`apps/api/src/services/auto-post-status.ts`。T046を通す。
+- [X] T053 [US3] 画面を作る（contracts/ui-routes.md「承認済みのタブ」の2、「知らせ」）。T047を通す。
   - `apps/web/src/components/stock/DraftList.tsx`：承認済みのタブの先頭に「投稿に失敗」のまとまり（選択のバーの対象外）
   - `apps/web/src/components/stock/DraftCard.tsx`：失敗のカードの操作、持ち越し・処理中の表示
   - `apps/web/src/components/stock/use-review.ts`：`requeue`、`skipped: PUBLISHING`の文言
@@ -493,14 +495,14 @@ description: "スケジュール投稿・自動投稿の実装タスク"
 
 ### テスト（先に書いて失敗を確認する）
 
-- [ ] T054 [P] [US4] 予定と「次に投稿する」のAPIのテストを書く。
+- [X] T054 [P] [US4] 予定と「次に投稿する」のAPIのテストを書く。
   - `apps/api/test/integration/post-drafts.test.ts`：
     - `schedule`が`approved`の先頭から予定の時刻を持つ（`publishing`は入らない、オフ・停止中は`{}`）
     - `prioritize`：承認済みが先頭に移り、`version + 1`。2回目も先頭のまま。要確認・却下は`404`、処理中は`409 DRAFT_PUBLISHING`、古い`expectedVersion`は`409 STALE_UPDATE`
     - 他人のAccountの`prioritize`は`404 ACCOUNT_NOT_FOUND`（FR-025）
   - `apps/api/test/integration/auto-post-status.test.ts`：`next`（日時と40文字までの書き出し）・`approvedCount`・`daysLeft`（承認済み5・時刻3で1、時刻0で`null`）
   - 他人のAccountの`GET /auto-post`は`404 ACCOUNT_NOT_FOUND`（FR-025）
-- [ ] T055 [P] [US4] Webのテストを書く。
+- [X] T055 [P] [US4] Webのテストを書く。
   - `apps/web/test/stock.test.tsx`：
     - 承認済みのカードの「{日時}に投稿予定」
     - オフのときの案内と設定へのリンク
@@ -509,21 +511,21 @@ description: "スケジュール投稿・自動投稿の実装タスク"
 
 ### 実装
 
-- [ ] T056 [US4] `GET /post-drafts`に予定を入れる（research.md R9）。`apps/api/src/services/draft-service.ts`の`listAllDrafts`と`apps/api/src/services/auto-post-status.ts`。T054を通す。
+- [X] T056 [US4] `GET /post-drafts`に予定を入れる（research.md R9）。`apps/api/src/services/draft-service.ts`の`listAllDrafts`と`apps/api/src/services/auto-post-status.ts`。T054を通す。
   - `projectSchedule`の材料（設定、今日の`publish_attempts`の`slot_at`、今日の投稿済みの件数）を読む。
   - `approved`のうち`publishing`でないものに、先頭から予定を割り当てる。
   - `autoPost.stoppedReason`を入れる。
-- [ ] T057 [US4] `GET /auto-post`に`next`・`approvedCount`・`daysLeft`を足す。`apps/api/src/services/auto-post-status.ts`。T054を通す。
-- [ ] T058 [US4] 「次に投稿する」のAPIを作る。
+- [X] T057 [US4] `GET /auto-post`に`next`・`approvedCount`・`daysLeft`を足す。`apps/api/src/services/auto-post-status.ts`。T054を通す。
+- [X] T058 [US4] 「次に投稿する」のAPIを作る。
   - `apps/api/src/services/draft-service.ts`に`prioritizeDraft(env, accountId, id, expectedVersion)`：`lockAccountDrafts`の中で、`status = 'approved'`かつ`version`が一致する行の`prioritized_at = now`・`version + 1`。`publishing`なら`DRAFT_PUBLISHING`
   - `apps/api/src/routes/post-drafts.ts`に`POST /accounts/:accountId/post-drafts/:draftId/prioritize`
   - T054を通す。
-- [ ] T059 [US4] 承認済みのタブを作る（contracts/ui-routes.md「承認済みのタブ」の1・3）。T055の`stock.test.tsx`を通す。
+- [X] T059 [US4] 承認済みのタブを作る（contracts/ui-routes.md「承認済みのタブ」の1・3）。T055の`stock.test.tsx`を通す。
   - `apps/web/src/components/stock/messages.ts`：004の`APPROVED_TAB_NOTICE`を、オン・オフ・停止中の3つの案内に置き換える
   - `apps/web/src/components/stock/DraftCard.tsx`：予定の表示（`formatRelativeJst`）、「⋯」の「次に投稿する」
   - `apps/web/src/lib/api-client.ts`：`prioritizeDraft`
   - 「次に投稿する」の後は、一覧を読み直し、移したカードまでスクロールして枠を一瞬強調し、「次の投稿にしました（{日時}の予定）」と通知する
-- [ ] T060 [US4] ホームの「次の投稿」のカードを作る。`apps/web/src/components/NextPostCard.tsx`を作り、`apps/web/src/pages/account-home.tsx`の「次にやること」のカードの下に置く（contracts/ui-routes.md「ホーム」）。T055の`account-home.test.tsx`を通す。
+- [X] T060 [US4] ホームの「次の投稿」のカードを作る。`apps/web/src/components/NextPostCard.tsx`を作り、`apps/web/src/pages/account-home.tsx`の「次にやること」のカードの下に置く（contracts/ui-routes.md「ホーム」）。T055の`account-home.test.tsx`を通す。
 
 **チェックポイント**：quickstart.md 手動の確認2。
 
@@ -537,13 +539,13 @@ description: "スケジュール投稿・自動投稿の実装タスク"
 
 ### テスト（先に書いて失敗を確認する）
 
-- [ ] T061 [P] [US5] `packages/shared/test/prompt.test.ts`に、contracts/prompt-template.mdの例（時刻4つ・25%・30件）と、`dailyPostCount = 0`で003の文のままであること、`round`の境目（時刻2つ・25%で0.5 → 1件）を足す。
-- [ ] T062 [P] [US5] `apps/api/test/integration/prompt.test.ts`に、設定の時刻の数が`summary.dailyPostCount`とプロンプトに反映されること（設定の行がなければ0）を足す。
+- [X] T061 [P] [US5] `packages/shared/test/prompt.test.ts`に、contracts/prompt-template.mdの例（時刻4つ・25%・30件）と、`dailyPostCount = 0`で003の文のままであること、`round`の境目（時刻2つ・25%で0.5 → 1件）を足す。
+- [X] T062 [P] [US5] `apps/api/test/integration/prompt.test.ts`に、設定の時刻の数が`summary.dailyPostCount`とプロンプトに反映されること（設定の行がなければ0）を足す。
 
 ### 実装
 
-- [ ] T063 [US5] `packages/shared/src/prompt.ts`：入力に`dailyPostCount`を足し、`promotionSection`の見出しの文をcontracts/prompt-template.mdのとおりに切り替える。要約に`dailyPostCount`を足す。T061を通す。
-- [ ] T064 [US5] `apps/api/src/services/prompt-service.ts`：`posting_schedules.slot_minutes`の数を`dailyPostCount`として渡す。T062を通す。
+- [X] T063 [US5] `packages/shared/src/prompt.ts`：入力に`dailyPostCount`を足し、`promotionSection`の見出しの文をcontracts/prompt-template.mdのとおりに切り替える。要約に`dailyPostCount`を足す。T061を通す。
+- [X] T064 [US5] `apps/api/src/services/prompt-service.ts`：`posting_schedules.slot_minutes`の数を`dailyPostCount`として渡す。T062を通す。
 
 **チェックポイント**：quickstart.mdの表の「プロンプト」の行が通る。
 
@@ -551,18 +553,18 @@ description: "スケジュール投稿・自動投稿の実装タスク"
 
 ## Phase 8：仕上げと横断的な対応
 
-- [ ] T065 [P] Account削除との関係を確かめる。`apps/api/test/integration/profile-cascade.test.ts`に、Accountを消すと`posting_schedules`・`publish_attempts`も消えることを足す（FR-026）。
-- [ ] T066 [P] 日次の処理に、古い試みの削除を足す。`apps/api/src/services/daily-jobs.ts`に「`slot_date`が30日より前の`publish_attempts`を消す」の1つ（`AUTOPOST_ATTEMPT_RETENTION_DAYS`）。テストを足す。
-- [ ] T067 [P] `docs/ui-design.md`を更新する。
+- [X] T065 [P] Account削除との関係を確かめる。`apps/api/test/integration/profile-cascade.test.ts`に、Accountを消すと`posting_schedules`・`publish_attempts`も消えることを足す（FR-026）。
+- [X] T066 [P] 日次の処理に、古い試みの削除を足す。`apps/api/src/services/daily-jobs.ts`に「`slot_date`が30日より前の`publish_attempts`を消す」の1つ（`AUTOPOST_ATTEMPT_RETENTION_DAYS`）。テストを足す。
+- [X] T067 [P] `docs/ui-design.md`を更新する。
   - 投稿ストックの4つのタブ
   - 承認済みのタブの予定・失敗のまとまり
   - ホームの「次の投稿」
   - 「このアカウントの設定」の「投稿のスケジュール」
-- [ ] T068 `pnpm lint`・`pnpm typecheck`・`pnpm test`をすべて通す。
+- [X] T068 `pnpm lint`・`pnpm typecheck`・`pnpm test`をすべて通す。
 - [ ] T069 quickstart.mdの手動の確認1〜5を行う（analyze G2）。とくに次を確かめる。
   - 手動の確認1：時刻を3つ決めてオンにするまでが2分以内（SC-007）、「接続を確かめる」と、権限がないときにオンにならないこと（FR-002a・FR-002b）
   - 手動の確認2〜5：予定の表示、自動投稿、失敗とやり直し、要再接続と上限
-- [ ] T070 4つの画面幅で確かめる（quickstart.md 手動の確認8）。
+- [X] T070 4つの画面幅で確かめる（quickstart.md 手動の確認8）。
 - [ ] T071 本物のThreadsで1回確かめる（quickstart.md 手動の確認6）。テスター招待したアカウントで公開され、Threadsで開けること。
 - [ ] T072 デプロイの後、費用と制限を確かめる（quickstart.md 手動の確認7、docs/cost-estimate.md）。
   - 本番のKV namespaceを作り、`wrangler.toml`の`id`を入れる

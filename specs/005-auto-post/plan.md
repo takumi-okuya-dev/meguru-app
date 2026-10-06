@@ -121,7 +121,7 @@
 
 **Phase 1の設計後の再確認**：data-model.md・contracts/で、新たな違反は生じていない。
 - マイグレーションは後方互換。既存の下書きは新しい列がNULLで、新しい状態を使っていないので、置き換えたCHECK制約を満たす。
-- 列挙型の値を足すマイグレーションは、004と同じく、値を使うマイグレーションと分ける（同じトランザクションで使えないため）。
+- `0005_auto_post.sql`で列挙型の値と列・表をまとめて足す。新しい値は同じトランザクションで直接使わず、CHECKは`status::text`、インデックスは通常のものにする（data-model.md「マイグレーション」）。
 - `GET /post-drafts`の`approved`の並びが変わるが、Webと同時に変えるので、外部の利用者はいない。
 - 原則Iの「配信の直前」：取り出しから公開までの数秒の間に足したNGワードは、その公開には効かない（R7）。取り出しの時点のNGワードでチェック済みの本文を公開するので、原則を満たすと判断した。
 
@@ -164,7 +164,7 @@ packages/shared/test/
 
 apps/api/
 ├── ✎ wrangler.toml                     # Cron */5、[[kv_namespaces]] AUTOPOST_KV
-├── drizzle/★ 0005_auto_post_enum.sql、★ 0006_auto_post.sql
+├── drizzle/★ 0005_auto_post.sql
 ├── src/
 │   ├── ✎ index.ts                      # scheduled の振り分け（controller.cron）
 │   ├── ✎ env.ts                        # AUTOPOST_KV
