@@ -108,6 +108,7 @@ pnpm typecheck
 ```
 
 - APIのintegrationテストは`docker compose up -d`が前提。開始時にマイグレーションを適用し、偽のThreadsサーバーを起動する。
+- テスト用のDBは、作ったときに`docker/postgres-init/`でSCRAMの反復回数を1回にする（local-neon-http-proxyが1クエリごとに認証し直すため。既定のままでは結合テストが数倍遅い）。以前に作ったコンテナでは`docker compose exec -T postgres psql -U postgres -d threads_grower < docker/postgres-init/01-cheap-scram.sql`を1回実行する。
 
 ### E2E
 
