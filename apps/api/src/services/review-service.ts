@@ -14,7 +14,12 @@ import { lockAccountDrafts } from "../db/locks";
 import { postDrafts } from "../db/schema";
 import type { Env } from "../env";
 import { notFound, pgErrorCode } from "../lib/errors";
-import { countDrafts, toPostDraft } from "./draft-service";
+import {
+  CLEAR_BLOCKED_FIELDS,
+  CLEAR_QUEUE_FIELDS,
+  countDrafts,
+  toPostDraft,
+} from "./draft-service";
 import { listNgWords } from "./posting-rules-service";
 
 type PostDraftRow = typeof postDrafts.$inferSelect;
@@ -25,14 +30,20 @@ const TARGET: Record<ReviewRequest["action"], Status> = {
   approve: "approved",
   reject: "rejected",
   reopen: "needs_review",
+  requeue: "approved",
 };
 
 /** 操作ごとの、移れる元の状態。 */
 const FROM: Record<ReviewRequest["action"], Status[]> = {
   approve: ["needs_review"],
   reject: ["needs_review"],
-  reopen: ["approved", "rejected"],
+  reopen: ["approved", "rejected", "publish_failed"],
+  // 投稿に失敗 → 承認済み（もう一度投稿の順に入れる。005 FR-015）
+  requeue: ["publish_failed"],
 };
+
+/** 投稿に失敗の記録を消す列（005 data-model.md）。 */
+const CLEAR_FAILURE_FIELDS = { publishFailedAt: null, publishError: null } as const;
 
 /**
  * 状態を変える。1回の UPDATE で、表示していた版（version）の行だけを変える。
@@ -42,19 +53,35 @@ const FROM: Record<ReviewRequest["action"], Status[]> = {
  * @param targets - 変える行
  * @returns 変えた行
  */
-async function applyChange(tx: TxDb, accountId: string, req: ReviewRequest, targets: PostDraftRow[]) {
+async function applyChange(
+  tx: TxDb,
+  accountId: string,
+  req: ReviewRequest,
+  targets: PostDraftRow[],
+) {
   if (targets.length === 0) return [];
   const now = new Date();
+  // 005：要確認からの承認・却下では直前のチェックの記録を消し、要確認に戻すときは投稿の順と失敗の記録も消す。
+  // requeue は reviewed_at を元のまま残し、投稿の順の先頭に入れる（data-model.md、research.md R4）
   const record =
     req.action === "approve"
-      ? { reviewedAt: now, rejectReasons: null, rejectNote: null }
+      ? { reviewedAt: now, rejectReasons: null, rejectNote: null, ...CLEAR_BLOCKED_FIELDS }
       : req.action === "reject"
         ? {
             reviewedAt: now,
             rejectReasons: req.reject!.reasons.length > 0 ? req.reject!.reasons : null,
             rejectNote: req.reject!.note.trim() === "" ? null : req.reject!.note.trim(),
+            ...CLEAR_BLOCKED_FIELDS,
           }
-        : { reviewedAt: null, rejectReasons: null, rejectNote: null };
+        : req.action === "requeue"
+          ? { prioritizedAt: now, ...CLEAR_FAILURE_FIELDS }
+          : {
+              reviewedAt: null,
+              rejectReasons: null,
+              rejectNote: null,
+              ...CLEAR_QUEUE_FIELDS,
+              ...CLEAR_FAILURE_FIELDS,
+            };
   // 行ごとに expectedVersion が違うので、(id, version) の組で絞る
   const pairs = sql.join(
     targets.map((t) => sql`(${t.id}::uuid, ${t.version}::int)`),
@@ -70,7 +97,12 @@ async function applyChange(tx: TxDb, accountId: string, req: ReviewRequest, targ
       version: sql`${postDrafts.version} + 1`,
       updatedAt: now,
     })
-    .where(and(eq(postDrafts.accountId, accountId), sql`(${postDrafts.id}, ${postDrafts.version}) IN (${pairs})`))
+    .where(
+      and(
+        eq(postDrafts.accountId, accountId),
+        sql`(${postDrafts.id}, ${postDrafts.version}) IN (${pairs})`,
+      ),
+    )
     .returning();
 }
 
@@ -115,6 +147,11 @@ export async function reviewDrafts(env: Env, accountId: string, req: ReviewReque
           continue;
         }
         const skip = (reason: SkipReason) => skipped.push({ id, reason, latest: toPostDraft(row) });
+        // 投稿の処理中の下書きは変えない（005 FR-008）
+        if (row.status === "publishing") {
+          skip("PUBLISHING");
+          continue;
+        }
         if (row.status === target) {
           if (row.lastReviewRequestId === req.requestId) updated.set(id, toPostDraft(row));
           else skip("STALE");
@@ -145,6 +182,14 @@ export async function reviewDrafts(env: Env, accountId: string, req: ReviewReque
           }
           approved += 1;
         }
+        if (req.action === "requeue") {
+          // 承認済みの上限は、requeue でも数える（005 research.md R4）
+          if (approved + 1 > APPROVED_LIMIT) {
+            skip("LIMIT");
+            continue;
+          }
+          approved += 1;
+        }
         if (req.action === "reopen") {
           if (needsReview + 1 > NEEDS_REVIEW_LIMIT) {
             skip("LIMIT");
@@ -159,10 +204,13 @@ export async function reviewDrafts(env: Env, accountId: string, req: ReviewReque
       for (const row of changed) updated.set(row.id, toPostDraft(row));
       // ロックの中で読んだ行なので、通常は全件変わる。変わらなかった行（同時の更新）は STALE にする
       for (const row of toChange) {
-        if (!updated.has(row.id)) skipped.push({ id: row.id, reason: "STALE", latest: toPostDraft(row) });
+        if (!updated.has(row.id))
+          skipped.push({ id: row.id, reason: "STALE", latest: toPostDraft(row) });
       }
       return {
-        updated: req.items.map((i) => updated.get(i.id)).filter((d): d is PostDraft => d !== undefined),
+        updated: req.items
+          .map((i) => updated.get(i.id))
+          .filter((d): d is PostDraft => d !== undefined),
         skipped,
         counts: await countDrafts(tx, accountId),
       };

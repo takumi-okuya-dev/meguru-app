@@ -8,8 +8,10 @@ export const queryClient = new QueryClient({
       // 認証・権限・存在しないエラーは再試行しない
       // 認証・権限・存在しない・設定の誤りは、再試行しても直らないので再試行しない
       retry: (failureCount, error) =>
-        !(error instanceof ApiError && ([401, 403, 404, 409, 422].includes(error.status) || error.code === "CONFIG_ERROR")) &&
-        failureCount < 2,
+        !(
+          error instanceof ApiError &&
+          ([401, 403, 404, 409, 422].includes(error.status) || error.code === "CONFIG_ERROR")
+        ) && failureCount < 2,
       refetchOnWindowFocus: false,
     },
   },
@@ -33,4 +35,8 @@ export const queryKeys = {
   // 承認・却下（specs/004-review-approval）。件数は post-drafts の下に置き、下書きの取り直しで一緒に取り直す
   draftCounts: (id: string) => ["account", id, "post-drafts", "counts"] as const,
   postingRules: (id: string) => ["account", id, "posting-rules"] as const,
+  // 自動投稿（specs/005-auto-post）。投稿済みの一覧は post-drafts の下に置かない（状態の変更の後に読み直さない。research.md R14）
+  postingSchedule: (id: string) => ["account", id, "posting-schedule"] as const,
+  autoPost: (id: string) => ["account", id, "auto-post"] as const,
+  published: (id: string) => ["account", id, "published"] as const,
 };

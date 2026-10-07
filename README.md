@@ -6,6 +6,8 @@ Threadsアカウントを「投稿ストック→承認→自動投稿→分析�
 - 既存の[threads-grower](https://github.com/MarronTaku/threads-grower)リポジトリ（spec-kit導入済み・実装進行中）とは**別プロジェクト**として並走する（2026-10-01、ユーザー確認済み）。
 - 開発方法論: [BMAD-METHOD](https://github.com/bmad-code-org/BMAD-METHOD)でPRD/設計の叩き台を作成し、[spec-kit](https://github.com/github/spec-kit)で仕様→計画→タスク→実装を進める。
 
+Claude CodeとCodexで開発スキルを共用する手順と、利用制限時の引き継ぎ方法は[AIスキルの共用](docs/ai-skills.md)を参照。
+
 ## 現在のフェーズ
 
 - [x] リポジトリ作成・ローカルクローン
@@ -106,6 +108,7 @@ pnpm typecheck
 ```
 
 - APIのintegrationテストは`docker compose up -d`が前提。開始時にマイグレーションを適用し、偽のThreadsサーバーを起動する。
+- テスト用のDBは、作ったときに`docker/postgres-init/`でSCRAMの反復回数を1回にする（local-neon-http-proxyが1クエリごとに認証し直すため。既定のままでは結合テストが数倍遅い）。以前に作ったコンテナでは`docker compose exec -T postgres psql -U postgres -d threads_grower < docker/postgres-init/01-cheap-scram.sql`を1回実行する。
 
 ### E2E
 

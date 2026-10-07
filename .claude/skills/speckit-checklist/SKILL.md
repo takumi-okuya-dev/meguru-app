@@ -10,6 +10,11 @@ user-invocable: true
 disable-model-invocation: false
 ---
 
+## Agent compatibility
+
+This skill is shared by Claude Code and Codex. If `$ARGUMENTS` is not expanded by the host, use the guidance supplied with the user's skill invocation as its value; a literal `$ARGUMENTS` is a placeholder, not user input. With no supplied guidance, treat it as empty.
+
+References to `/speckit-...` mean the corresponding skill: invoke it as `/speckit-...` in Claude Code or `$speckit-...` in Codex, using the host's available invocation mechanism. Follow the same workflow and use the same project artifacts in either host.
 
 ## Checklist Purpose: "Unit Tests for English"
 

@@ -49,7 +49,7 @@ export function call(
 export async function resetDb() {
   const sql = neon(testEnv.DATABASE_URL);
   createDb(testEnv.DATABASE_URL); // ローカルプロキシの設定を有効にする
-  await sql`TRUNCATE users, accounts, memberships, threads_connections, oauth_states, threads_deletion_requests, threads_revocations, strategy_designs, promotions, reference_posts, research_keywords, draft_batches, post_drafts, ng_words CASCADE`;
+  await sql`TRUNCATE users, accounts, memberships, threads_connections, oauth_states, threads_deletion_requests, threads_revocations, strategy_designs, promotions, reference_posts, research_keywords, draft_batches, post_drafts, ng_words, posting_schedules, publish_attempts CASCADE`;
 }
 
 export function db() {
@@ -77,6 +77,27 @@ export const fake = {
   delay: (endpoint: "exchangeCode" | "exchangeLongLived" | "refresh" | "getProfile", ms: number) =>
     control("delay", { endpoint, ms }),
   issuedTokens: async () => ((await control("issued-tokens")) as { tokens: string[] }).tokens,
+  // ---- 投稿（specs/005-auto-post）----
+  publishFail: (
+    endpoint: "createContainer" | "publish" | "containerStatus" | "getMedia" | "publishingLimit" | "listThreads",
+    kind: "transient" | "auth" | "rate_limit" | "invalid",
+    times: number,
+  ) => control("publish-failures", { endpoint, kind, times }),
+  dropPublishResponse: (times: number) => control("drop-publish-response", { times }),
+  setContainerStatus: (containerId: string, status: "IN_PROGRESS" | "FINISHED" | "PUBLISHED" | "ERROR" | "EXPIRED") =>
+    control("container-status", { containerId, status }),
+  setPublishPermission: (userId: string, granted: boolean) => control("publish-permission", { userId, granted }),
+  /** 投稿の権限の確認（threads_publishing_limit）を ms だけ遅らせる */
+  delayPublishingLimit: (ms: number) => control("publishing-limit-delay", { ms }),
+  /** アプリを通さない投稿（手動の投稿など）を、任意の時刻で入れる */
+  addPost: async (userId: string, text: string, at: Date) =>
+    ((await control("add-post", { userId, text, timestamp: at.toISOString() })) as { id: string }).id,
+  posts: async () =>
+    ((await control("posts")) as { posts: { id: string; userId: string; text: string; containerId: string; permalink: string }[] })
+      .posts,
+  containers: async () =>
+    ((await control("containers")) as { containers: { id: string; userId: string; text: string; status: string }[] })
+      .containers,
 };
 
 /** connect で得た authorizeUrl から、偽の認可画面で許可/拒否し、APIのcallbackを呼んだ結果（302）を返す */

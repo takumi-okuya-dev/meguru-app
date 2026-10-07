@@ -7,12 +7,13 @@ import {
   SIMILARITY_THRESHOLD,
   checkPublishable,
   type PostDraft,
-  type PostDraftStatus,
   type PublishCheck,
 } from "@threads-grower/shared";
 import { useEffect, useMemo, useState } from "react";
-import { useLocation } from "react-router";
+import { Link, useLocation } from "react-router";
 import { toast } from "sonner";
+import { AutoPostNotices } from "@/components/AutoPostNotices";
+import { PublishedList } from "@/components/stock/PublishedList";
 import { ApiErrorScreen } from "@/components/ApiErrorScreen";
 import { PageBody, PageHeader } from "@/components/layout/PageHeader";
 import { DraftCard } from "@/components/stock/DraftCard";
@@ -32,7 +33,7 @@ import { RejectDialog } from "@/components/stock/RejectDialog";
 import { REOPENED_BY_EDIT } from "@/components/stock/messages";
 import { PolicyConfirmDialog } from "@/components/stock/PolicyConfirmDialog";
 import { BulkApproveDialog } from "@/components/stock/BulkApproveDialog";
-import { StatusTabs, useStatusTab } from "@/components/stock/StatusTabs";
+import { StatusTabs, useStatusTab, type StockTab } from "@/components/stock/StatusTabs";
 import { useDeferredDelete } from "@/components/stock/use-deferred-delete";
 import { useReview, type ReviewOptions } from "@/components/stock/use-review";
 import { useSimilarities } from "@/components/stock/use-similarities";
@@ -45,11 +46,21 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { ChevronDownIcon } from "lucide-react";
-import { api } from "@/lib/api-client";
+import { api, describeError } from "@/lib/api-client";
+import { formatRelativeJst } from "@/lib/format";
 import { queryKeys } from "@/lib/query";
 import { useCurrentAccount } from "@/pages/account-layout";
 
-const TAB_VALUES: PostDraftStatus[] = ["needs_review", "approved", "rejected"];
+const TAB_VALUES: StockTab[] = ["needs_review", "approved", "rejected", "published"];
+
+/**
+ * 下書きを表示するタブ。投稿の処理中は承認済みのタブに出す（005）。
+ * @param d - 下書き
+ * @returns タブ
+ */
+function tabOf(d: PostDraft): StockTab {
+  return d.status === "needs_review" || d.status === "rejected" ? d.status : "approved";
+}
 
 /**
  * 投稿ストックの画面。プロンプトのコピー、貼り付けによる一括登録、下書きの確認・修正・削除・承認・却下。
@@ -96,10 +107,11 @@ function StockPageContent() {
   const data = drafts.data;
 
   // 削除して確定を待っている下書きは、一覧から隠す
-  const lists = useMemo<Record<PostDraftStatus, PostDraft[]>>(
+  const lists = useMemo<Record<StockTab, PostDraft[]>>(
     () => ({
       needs_review: (data?.needsReview ?? []).filter((d) => !hidden.has(d.id)),
       approved: data?.approved ?? [],
+      published: [],
       rejected: (data?.rejected ?? []).filter((d) => !hidden.has(d.id)),
     }),
     [data, hidden],
@@ -111,6 +123,8 @@ function StockPageContent() {
           data.counts.needsReview - (data.needsReview.length - lists.needs_review.length),
         approved: data.counts.approved,
         rejected: data.counts.rejected - (data.rejected.length - lists.rejected.length),
+        published: data.counts.published,
+        publishFailed: data.counts.publishFailed,
       },
     [data, lists],
   );
@@ -134,12 +148,14 @@ function StockPageContent() {
 
   const items = lists[tab];
   // 一覧から消えた下書き（取り消し・他の端末での削除・状態の変更）は、選択からも外す
-  const selected = useMemo(() => items.filter((d) => picked.has(d.id)), [items, picked]);
+  const selectable = items.filter((d) => d.status !== "publishing");
+  const selected = selectable.filter((d) => picked.has(d.id));
   const atLimit = data ? lists.needs_review.length >= data.limits.needsReview : false;
 
   const refresh = () => {
     void queryClient.invalidateQueries({ queryKey: queryKeys.postDrafts(account.id) });
     void queryClient.invalidateQueries({ queryKey: queryKeys.promptAll(account.id) });
+    void queryClient.invalidateQueries({ queryKey: queryKeys.autoPost(account.id) });
   };
 
   const unpick = (ids: string[]) =>
@@ -151,7 +167,7 @@ function StockPageContent() {
   };
 
   const runReview = async (
-    action: "approve" | "reject" | "reopen",
+    action: "approve" | "reject" | "reopen" | "requeue",
     targets: PostDraft[],
     options: ReviewOptions = {},
   ) => {
@@ -193,14 +209,14 @@ function StockPageContent() {
   }, [startKey]);
 
   const changeTab = (value: string) => {
-    if (!TAB_VALUES.includes(value as PostDraftStatus)) return;
-    setTab(value as PostDraftStatus);
+    if (!TAB_VALUES.includes(value as StockTab)) return;
+    setTab(value as StockTab);
     setPicked(new Set());
   };
 
   // 似ている相手の下書きへ移る：そのタブに切り替え、下書きまでスクロールして枠を一瞬強調する（FR-028）
   const jumpTo = (target: PostDraft) => {
-    changeTab(target.status);
+    changeTab(tabOf(target));
     setTimeout(() => {
       const el = document.getElementById(`draft-${target.id}`);
       el?.scrollIntoView?.({ block: "center", behavior: "smooth" });
@@ -219,7 +235,7 @@ function StockPageContent() {
       else next.add(id);
       return next;
     });
-  const allSelected = items.length > 0 && selected.length === items.length;
+  const allSelected = selectable.length > 0 && selected.length === selectable.length;
 
   const selectionActions =
     tab === "needs_review" ? (
@@ -273,6 +289,25 @@ function StockPageContent() {
       </>
     );
 
+  const prioritize = async (d: PostDraft) => {
+    setBusy(true);
+    try {
+      await api.prioritizeDraft(account.id, d.id, d.version);
+      const list = await drafts.refetch();
+      void queryClient.invalidateQueries({ queryKey: queryKeys.autoPost(account.id) });
+      const at = list.data?.schedule[d.id];
+      toast.success(
+        at ? `次の投稿にしました（${formatRelativeJst(at)}の予定）` : "次の投稿にしました",
+      );
+      jumpTo(d);
+    } catch (error) {
+      toast.error(describeError(error));
+      refresh();
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const renderCard = (d: PostDraft) => {
     const check = checks.get(d.id) ?? checkPublishable(d.body, []);
     // NGワードのラベルは要確認だけ（承認済みには、NGワードの追加で要確認に戻るため残らない。FR-016・FR-016a）
@@ -287,6 +322,7 @@ function StockPageContent() {
         selected={picked.has(d.id)}
         check={check}
         busy={busy}
+        scheduledAt={data?.schedule[d.id]}
         labels={
           <LabelRow
             labels={[
@@ -317,6 +353,11 @@ function StockPageContent() {
           onEdit: () => setEditing(d),
           onDelete: () => removeDrafts([d.id]),
           onReopen: () => reopen([d]),
+          onRequeue: () => void runReview("requeue", [d]),
+          onPrioritize:
+            d.status === "approved" && d.id !== lists.approved[0]?.id
+              ? () => void prioritize(d)
+              : undefined,
         }}
       />
     );
@@ -326,6 +367,7 @@ function StockPageContent() {
     <>
       <PageHeader title="投稿ストック" />
       <PageBody className="flex-1 space-y-5">
+        <AutoPostNotices accountId={account.id} />
         {data ? (
           <PromptCard
             accountId={account.id}
@@ -338,9 +380,9 @@ function StockPageContent() {
           <div className="h-32 animate-pulse rounded-2xl bg-muted" aria-busy="true" />
         )}
         <Tabs value={tab} onValueChange={changeTab}>
-          <div className="flex items-center justify-between gap-3">
+          <div className="flex min-w-0 items-center justify-between gap-3">
             <StatusTabs counts={counts ?? undefined} />
-            {items.length > 0 && (
+            {tab !== "published" && selectable.length > 0 && (
               <div className="flex shrink-0 items-center">
                 <label className="flex min-h-11 cursor-pointer items-center gap-2 px-1 text-sm md:min-h-9">
                   <input
@@ -348,7 +390,7 @@ function StockPageContent() {
                     className="size-4 accent-foreground"
                     checked={allSelected}
                     onChange={() =>
-                      setPicked(allSelected ? new Set() : new Set(items.map((d) => d.id)))
+                      setPicked(allSelected ? new Set() : new Set(selectable.map((d) => d.id)))
                     }
                   />
                   すべて選択
@@ -367,7 +409,9 @@ function StockPageContent() {
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
-                      <DropdownMenuItem onSelect={() => setPicked(new Set(items.map((d) => d.id)))}>
+                      <DropdownMenuItem
+                        onSelect={() => setPicked(new Set(selectable.map((d) => d.id)))}
+                      >
                         すべて選択
                       </DropdownMenuItem>
                       <DropdownMenuItem
@@ -390,7 +434,9 @@ function StockPageContent() {
           </div>
           {TAB_VALUES.map((value) => (
             <TabsContent key={value} value={value}>
-              {!data ? (
+              {value === "published" ? (
+                <PublishedList accountId={account.id} />
+              ) : !data ? (
                 <div className="h-32 animate-pulse rounded-2xl bg-muted" aria-busy="true" />
               ) : (
                 <DraftList
@@ -400,6 +446,26 @@ function StockPageContent() {
                   canGeneratePrompt={data.canGeneratePrompt}
                   total={value === "rejected" ? (counts?.rejected ?? 0) : lists[value].length}
                   renderCard={renderCard}
+                  failed={value === "approved" ? data.publishFailed : undefined}
+                  approvedNotice={
+                    data.autoPost.stoppedReason === "needs_reconnect" ? (
+                      "Threadsとの接続が切れているため、自動投稿を止めています"
+                    ) : data.autoPost.stoppedReason === "rate_limited" ? (
+                      "Threadsの投稿数の上限に達したため、今日の投稿を止めました"
+                    ) : data.autoPost.enabled ? (
+                      "上から順に、投稿する時刻に1件ずつThreadsへ投稿します"
+                    ) : (
+                      <>
+                        自動投稿はオフです。{" "}
+                        <Link
+                          className="text-ring underline"
+                          to={`/accounts/${account.id}/settings`}
+                        >
+                          投稿のスケジュールを設定する
+                        </Link>
+                      </>
+                    )
+                  }
                   onSelectBatch={addToSelection}
                 />
               )}

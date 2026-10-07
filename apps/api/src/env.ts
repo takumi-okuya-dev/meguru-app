@@ -12,6 +12,8 @@ export interface Env {
   IDENTIFIER_HASH_KEY: string;
   DATABASE_URL: string;
   WEB_ORIGIN: string;
+  /** 自動投稿の関所（specs/005-auto-post research.md R3） */
+  AUTOPOST_KV: KVNamespace;
   /** Threads連携の公開範囲。未設定は testers（specs/002-strategy-profile research.md R15） */
   THREADS_ACCESS_MODE?: "testers" | "public";
 }

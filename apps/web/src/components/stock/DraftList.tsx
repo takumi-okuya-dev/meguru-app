@@ -1,10 +1,11 @@
 // 状態のタブごとの下書きの一覧（specs/003 US2・US3、specs/004 FR-011・FR-012、contracts/ui-routes.md）。
 // 要確認：新しい登録が上、同じ登録の中は貼り付けた順（API の順のまま）。登録のまとまりごとに小見出しを挟む。
 // 承認済み・却下：承認・却下した日時の新しい順（API の順のまま）。
-import { REJECTED_LIST_MAX, type PostDraft, type PostDraftStatus } from "@threads-grower/shared";
+import { REJECTED_LIST_MAX, type PostDraft } from "@threads-grower/shared";
 import type { ReactNode } from "react";
 import { formatDateTime } from "@/lib/format";
 import { APPROVED_TAB_NOTICE, STOCK_LIMIT_MESSAGE } from "./messages";
+import type { StockTab } from "./StatusTabs";
 
 type Group = { batchId: string; createdAt: string; drafts: PostDraft[] };
 
@@ -41,19 +42,31 @@ export function DraftList({
   total,
   renderCard,
   onSelectBatch,
+  failed = [],
+  approvedNotice,
 }: {
-  tab: PostDraftStatus;
+  tab: StockTab;
   items: PostDraft[];
   limit: number;
   canGeneratePrompt: boolean;
   total: number;
   renderCard: (draft: PostDraft) => ReactNode;
+  failed?: PostDraft[];
+  approvedNotice?: ReactNode;
   onSelectBatch?: (drafts: PostDraft[]) => void;
 }) {
   if (tab === "approved") {
     return (
       <div className="space-y-3">
-        <p className="px-1 text-[13px] text-muted-foreground">{APPROVED_TAB_NOTICE}</p>
+        <p className="px-1 text-[13px] text-muted-foreground">
+          {approvedNotice ?? APPROVED_TAB_NOTICE}
+        </p>
+        {failed.length > 0 && (
+          <section id="publish-failed" className="space-y-2" aria-label="投稿に失敗">
+            <h3 className="text-sm font-medium">投稿に失敗（{failed.length}件）</h3>
+            <ul className="space-y-2">{failed.map(renderCard)}</ul>
+          </section>
+        )}
         {items.length === 0 ? (
           <Empty>
             承認した下書きはまだありません。要確認のタブで内容を確かめて「承認」を押してください。

@@ -1,4 +1,5 @@
 // Accountの削除で戦略プロファイルと投稿ストック・投稿のルールも消える（specs/002 FR-026、specs/003 FR-026、specs/004 FR-036）
+import { eq } from "drizzle-orm";
 import { emptyStrategyValues } from "@threads-grower/shared";
 import { beforeEach, describe, expect, it } from "vitest";
 import {
@@ -7,6 +8,8 @@ import {
   ngWords,
   postDrafts,
   promotions,
+  postingSchedules,
+  publishAttempts,
   referencePosts,
   researchKeywords,
   strategyDesigns,
@@ -53,15 +56,20 @@ async function accountWithProfile() {
   });
   await call(app, "POST", `${base}/ng-words`, { user: "u1", body: { words: ["絶対"] } });
   await call(app, "PUT", `${base}/core-rules`, { user: "u1", body: { text: "断定口調は使わない", expectedVersion: 1 } });
-  for (const t of [strategyDesigns, promotions, referencePosts, researchKeywords, draftBatches, ngWords]) {
+  await db().insert(postingSchedules).values({ accountId: a!.id, enabled: true, slotMinutes: [720] });
+  await db().insert(publishAttempts).values({ accountId: a!.id, slotAt: new Date(), slotDate: "2026-10-06", slotMinute: 720, state: "skipped", skipReason: "no_drafts" });
+  await db().update(postDrafts).set({ status: "publishing" }).where(eq(postDrafts.id, approved!.id));
+  await db().insert(publishAttempts).values({ accountId: a!.id, draftId: approved!.id, slotAt: new Date(Date.now() + 60_000), slotDate: "2026-10-06", slotMinute: 721, state: "in_progress" });
+  for (const t of [strategyDesigns, promotions, referencePosts, researchKeywords, draftBatches, ngWords, postingSchedules]) {
     expect(await db().select().from(t)).toHaveLength(1);
   }
-  expect((await db().select().from(postDrafts)).map((d) => d.status).sort()).toEqual(["approved", "needs_review", "rejected"]);
+  expect((await db().select().from(postDrafts)).map((d) => d.status).sort()).toEqual(["needs_review", "publishing", "rejected"]);
+  expect(await db().select().from(publishAttempts)).toHaveLength(2);
   return a!;
 }
 
 async function expectProfileGone() {
-  for (const t of [strategyDesigns, promotions, referencePosts, researchKeywords, draftBatches, postDrafts, ngWords]) {
+  for (const t of [strategyDesigns, promotions, referencePosts, researchKeywords, draftBatches, postDrafts, ngWords, postingSchedules, publishAttempts]) {
     expect(await db().select().from(t)).toHaveLength(0);
   }
 }

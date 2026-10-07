@@ -351,8 +351,34 @@ export const researchKeywords = pgTable(
 
 // ---- 投稿ストック（specs/003-prompt-bulk-register/data-model.md）----
 
-/** 下書きの状態の列挙型（post_draft_status）。要確認・承認済み・却下（004で approved・rejected を足した）。 */
-export const postDraftStatus = pgEnum("post_draft_status", ["needs_review", "approved", "rejected"]);
+/**
+ * 下書きの状態の列挙型（post_draft_status）。要確認・承認済み・却下（004で approved・rejected を足した）と、
+ * 投稿の処理中・投稿済み・投稿に失敗（005で足した。specs/005-auto-post data-model.md）。
+ */
+export const postDraftStatus = pgEnum("post_draft_status", [
+  "needs_review",
+  "approved",
+  "rejected",
+  "publishing",
+  "published",
+  "publish_failed",
+]);
+
+/** 投稿の試みの状態の列挙型（publish_attempt_state。specs/005-auto-post data-model.md）。 */
+export const publishAttemptState = pgEnum("publish_attempt_state", [
+  "in_progress",
+  "retry_wait",
+  "succeeded",
+  "carried_over",
+  "failed",
+  "skipped",
+]);
+
+/** 失敗の理由・飛ばした理由・直前のチェックの理由の値（text に保存し、CHECK制約で絞る）。 */
+const PUBLISH_ERRORS = ["network", "threads_server", "invalid_request", "container_error", "unknown"] as const;
+const SKIP_REASONS = ["no_drafts", "needs_reconnect", "rate_limited", "daily_limit", "auto_post_off"] as const;
+const BLOCKED_REASONS = ["ng_word", "over_threads_limit"] as const;
+const inList = (values: readonly string[]) => sql.raw(values.map((v) => `'${v}'`).join(", "));
 
 /** 登録のまとまり（data-model.md の draft_batches）。貼り付けの1回の送信。 */
 export const draftBatches = pgTable(
@@ -396,6 +422,24 @@ export const postDrafts = pgTable(
     rejectNote: text("reject_note"),
     // 最後に状態を変えた操作のID。同じ操作の再試行だけを成功として扱う（research.md R2、PR #5 のCodexレビュー）
     lastReviewRequestId: uuid("last_review_request_id"),
+    // 投稿の順（specs/005-auto-post data-model.md、research.md R4）
+    prioritizedAt: timestamp("prioritized_at", { withTimezone: true, precision: 6 }),
+    carryoverAttemptId: uuid("carryover_attempt_id").references((): AnyPgColumn => publishAttempts.id, {
+      onDelete: "set null",
+    }),
+    // 投稿済み（FR-009）
+    publishedAt: timestamp("published_at", { withTimezone: true, precision: 6 }),
+    threadsMediaId: text("threads_media_id"),
+    threadsPermalink: text("threads_permalink"),
+    /** 投稿のURLの取り直しに最後に失敗した日時（失敗し続ける投稿を後回しにする。PR #6 のCodexレビュー） */
+    permalinkCheckedAt: timestamp("permalink_checked_at", { withTimezone: true, precision: 6 }),
+    // 投稿に失敗（FR-014）
+    publishFailedAt: timestamp("publish_failed_at", { withTimezone: true, precision: 6 }),
+    publishError: text("publish_error"),
+    // 投稿の直前のチェックで要確認に戻した（FR-007）
+    blockedAt: timestamp("blocked_at", { withTimezone: true, precision: 6 }),
+    blockedReason: text("blocked_reason"),
+    blockedWords: text("blocked_words").array(),
     ...timestamps,
   },
   (t) => [
@@ -408,17 +452,130 @@ export const postDrafts = pgTable(
         AND ${t.rejectReasons} <@ ARRAY[${sql.raw(REJECT_REASON_CODES.map((c) => `'${c}'`).join(", "))}]::text[])`,
     ),
     index("post_drafts_account_status_reviewed_idx").on(t.accountId, t.status, t.reviewedAt.desc()),
+    // 投稿の順（005 research.md R4）と、投稿済みの一覧（新しい順。R14）
+    index("post_drafts_queue_idx").on(t.accountId, t.status, t.prioritizedAt.desc().nullsLast(), t.reviewedAt, t.id),
+    index("post_drafts_published_idx").on(t.accountId, t.status, t.publishedAt.desc(), t.id),
     check("post_drafts_position_range", sql`${t.position} >= 0 AND ${t.position} < 50`),
     check("post_drafts_body_length", sql`char_length(${t.body}) BETWEEN 1 AND 2000`),
     check("post_drafts_reject_note_length", sql`char_length(${t.rejectNote}) <= 200`),
     // 状態は status::text で比べる（ADD VALUE で足した値は、同じトランザクションの中で列挙型として使えないため）。
-    // NULL との比較は CHECK を通ってしまうので、coalesce で必ず真か偽にする（理由のない却下を入れない。原則II）
+    // NULL との比較は CHECK を通ってしまうので、coalesce で必ず真か偽にする（理由のない却下を入れない。原則II）。
+    // 005：投稿の記録・失敗の記録・投稿の順の列を、状態ごとに縛る（specs/005-auto-post data-model.md）
     check(
       "post_drafts_review_state",
-      sql`(${t.status}::text = 'needs_review' AND ${t.reviewedAt} IS NULL AND ${t.rejectReasons} IS NULL AND ${t.rejectNote} IS NULL)
-        OR (${t.status}::text = 'approved' AND ${t.reviewedAt} IS NOT NULL AND ${t.rejectReasons} IS NULL AND ${t.rejectNote} IS NULL)
+      sql`(${t.status}::text = 'needs_review' AND ${t.reviewedAt} IS NULL AND ${t.rejectReasons} IS NULL AND ${t.rejectNote} IS NULL
+          AND ${t.prioritizedAt} IS NULL AND ${t.carryoverAttemptId} IS NULL
+          AND ${t.publishedAt} IS NULL AND ${t.publishFailedAt} IS NULL AND ${t.publishError} IS NULL)
+        OR (${t.status}::text IN ('approved', 'publishing') AND ${t.reviewedAt} IS NOT NULL AND ${t.rejectReasons} IS NULL AND ${t.rejectNote} IS NULL
+          AND ${t.publishedAt} IS NULL AND ${t.publishFailedAt} IS NULL AND ${t.publishError} IS NULL)
         OR (${t.status}::text = 'rejected' AND ${t.reviewedAt} IS NOT NULL
-          AND (coalesce(cardinality(${t.rejectReasons}), 0) >= 1 OR coalesce(btrim(${t.rejectNote}), '') <> ''))`,
+          AND (coalesce(cardinality(${t.rejectReasons}), 0) >= 1 OR coalesce(btrim(${t.rejectNote}), '') <> '')
+          AND ${t.prioritizedAt} IS NULL AND ${t.carryoverAttemptId} IS NULL
+          AND ${t.publishedAt} IS NULL AND ${t.publishFailedAt} IS NULL AND ${t.publishError} IS NULL)
+        OR (${t.status}::text = 'published' AND ${t.reviewedAt} IS NOT NULL AND ${t.rejectReasons} IS NULL AND ${t.rejectNote} IS NULL
+          AND ${t.prioritizedAt} IS NULL AND ${t.carryoverAttemptId} IS NULL
+          AND ${t.publishedAt} IS NOT NULL AND ${t.publishFailedAt} IS NULL AND ${t.publishError} IS NULL)
+        OR (${t.status}::text = 'publish_failed' AND ${t.reviewedAt} IS NOT NULL AND ${t.rejectReasons} IS NULL AND ${t.rejectNote} IS NULL
+          AND ${t.prioritizedAt} IS NULL AND ${t.carryoverAttemptId} IS NULL
+          AND ${t.publishedAt} IS NULL AND ${t.publishFailedAt} IS NOT NULL AND ${t.publishError} IS NOT NULL)`,
+    ),
+    // 投稿の直前のチェックの記録は、要確認のときだけ。日時と理由は両方あるか両方ないか
+    check(
+      "post_drafts_blocked_state",
+      sql`(${t.blockedAt} IS NULL AND ${t.blockedReason} IS NULL AND ${t.blockedWords} IS NULL)
+        OR (${t.status}::text = 'needs_review' AND ${t.blockedAt} IS NOT NULL AND ${t.blockedReason} IS NOT NULL)`,
+    ),
+    check("post_drafts_blocked_reason_valid", sql`${t.blockedReason} IS NULL OR ${t.blockedReason} IN (${inList(BLOCKED_REASONS)})`),
+    check("post_drafts_publish_error_valid", sql`${t.publishError} IS NULL OR ${t.publishError} IN (${inList(PUBLISH_ERRORS)})`),
+    // Threadsの投稿のIDとURLは、投稿済みのときだけ（投稿済みでも空のことがある。research.md R6）
+    check(
+      "post_drafts_threads_media_state",
+      sql`(${t.threadsMediaId} IS NULL AND ${t.threadsPermalink} IS NULL) OR ${t.status}::text = 'published'`,
+    ),
+    check("post_drafts_threads_permalink_length", sql`char_length(${t.threadsPermalink}) <= 2000`),
+  ],
+);
+
+// ---- 自動投稿（specs/005-auto-post/data-model.md）----
+
+/** 投稿の設定（data-model.md の posting_schedules）。Account と1対1で、最初の保存で作る。 */
+export const postingSchedules = pgTable(
+  "posting_schedules",
+  {
+    accountId: uuid("account_id")
+      .primaryKey()
+      .references(() => accounts.id, { onDelete: "cascade" }),
+    enabled: boolean("enabled").notNull().default(false),
+    // 1日に投稿する時刻（日本時間、0時からの分）。昇順・重複なし・最大10件
+    slotMinutes: smallint("slot_minutes").array().notNull().default(sql`'{}'::smallint[]`),
+    jitter: boolean("jitter").notNull().default(true),
+    // この時刻より後の予定だけを投稿する（FR-012・FR-016。research.md R1）
+    effectiveFrom: timestamp("effective_from", { withTimezone: true, precision: 6 }).notNull().defaultNow(),
+    // Threadsの投稿数の上限で止めたとき、翌日の0時（日本時間）（FR-017）
+    pausedUntil: timestamp("paused_until", { withTimezone: true }),
+    // 「投稿の直前に要確認へ戻した」の知らせを閉じた日時（research.md R8）
+    blockedNoticeSeenAt: timestamp("blocked_notice_seen_at", { withTimezone: true, precision: 6 }),
+    version: versionColumn(),
+    ...timestamps,
+  },
+  (t) => [
+    index("posting_schedules_enabled_idx").on(t.enabled).where(sql`${t.enabled}`),
+    check("posting_schedules_slot_count", sql`cardinality(${t.slotMinutes}) <= 10`),
+    check("posting_schedules_slot_range", sql`0 <= ALL(${t.slotMinutes}) AND 1439 >= ALL(${t.slotMinutes})`),
+    check("posting_schedules_enabled_requires_slots", sql`NOT ${t.enabled} OR cardinality(${t.slotMinutes}) >= 1`),
+  ],
+);
+
+/** 投稿の試み（data-model.md の publish_attempts）。1つの時刻での、1つのAccountの投稿の処理を1行で表す。 */
+export const publishAttempts = pgTable(
+  "publish_attempts",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    accountId: uuid("account_id")
+      .notNull()
+      .references(() => accounts.id, { onDelete: "cascade" }),
+    // ずらした後の予定の時刻
+    slotAt: timestamp("slot_at", { withTimezone: true }).notNull(),
+    // 予定の日付（日本時間）と、設定の時刻（ずらす前）
+    slotDate: date("slot_date", { mode: "string" }).notNull(),
+    slotMinute: smallint("slot_minute").notNull(),
+    draftId: uuid("draft_id").references((): AnyPgColumn => postDrafts.id, { onDelete: "set null" }),
+    isCarryover: boolean("is_carryover").notNull().default(false),
+    state: publishAttemptState("state").notNull(),
+    skipReason: text("skip_reason"),
+    retryCount: smallint("retry_count").notNull().default(0),
+    nextRetryAt: timestamp("next_retry_at", { withTimezone: true }),
+    // 作ったThreadsのコンテナーのID。公開を送る前に保存する（research.md R6）
+    containerId: text("container_id"),
+    // 公開を送った時刻。これがあり結果が未確定なら、新しいコンテナーを作らない
+    publishRequestedAt: timestamp("publish_requested_at", { withTimezone: true, precision: 6 }),
+    lastError: text("last_error"),
+    // 処理している定期処理の持ち時間（待機では、次に確かめる時刻）
+    leaseUntil: timestamp("lease_until", { withTimezone: true }),
+    // 持ち時間を取った処理の札。試みの更新はこれが同じときだけ行う（持ち時間の切れた古い処理を締め出す）
+    leaseToken: uuid("lease_token"),
+    createdAt: timestamp("created_at", { withTimezone: true, precision: 6 }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true, precision: 6 }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("publish_attempts_account_slot_unique").on(t.accountId, t.slotAt),
+    index("publish_attempts_pending_idx")
+      .on(t.state, t.nextRetryAt)
+      .where(sql`${t.state} IN ('in_progress', 'retry_wait')`),
+    index("publish_attempts_account_date_idx").on(t.accountId, t.slotDate),
+    check("publish_attempts_slot_minute_range", sql`${t.slotMinute} BETWEEN 0 AND 1439`),
+    check("publish_attempts_retry_count_range", sql`${t.retryCount} BETWEEN 0 AND 3`),
+    check(
+      "publish_attempts_skip_state",
+      sql`(${t.state} = 'skipped' AND ${t.skipReason} IS NOT NULL AND ${t.draftId} IS NULL)
+        OR (${t.state} <> 'skipped' AND ${t.skipReason} IS NULL)`,
+    ),
+    check("publish_attempts_skip_reason_valid", sql`${t.skipReason} IS NULL OR ${t.skipReason} IN (${inList(SKIP_REASONS)})`),
+    check("publish_attempts_last_error_valid", sql`${t.lastError} IS NULL OR ${t.lastError} IN (${inList(PUBLISH_ERRORS)})`),
+    check("publish_attempts_retry_wait_state", sql`${t.state} <> 'retry_wait' OR ${t.nextRetryAt} IS NOT NULL`),
+    check(
+      "publish_attempts_pending_has_draft",
+      sql`${t.state} NOT IN ('in_progress', 'retry_wait') OR ${t.draftId} IS NOT NULL`,
     ),
   ],
 );

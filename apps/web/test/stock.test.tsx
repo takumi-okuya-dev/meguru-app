@@ -21,6 +21,10 @@ const deleteDraftBatch = vi.fn();
 const updatePostDraft = vi.fn();
 const deletePostDrafts = vi.fn();
 const reviewPostDrafts = vi.fn();
+const listPublished = vi.fn();
+const getAutoPost = vi.fn();
+const dismissBlockedNotice = vi.fn();
+const prioritizeDraft = vi.fn();
 vi.mock("@/lib/api-client", async (orig) => {
   const actual = await orig<typeof import("@/lib/api-client")>();
   return {
@@ -35,6 +39,10 @@ vi.mock("@/lib/api-client", async (orig) => {
       updatePostDraft,
       deletePostDrafts,
       reviewPostDrafts,
+      listPublished,
+      getAutoPost,
+      dismissBlockedNotice,
+      prioritizeDraft,
     },
   };
 });
@@ -77,6 +85,7 @@ function promptResponse(
       coreRuleCount: 0,
       ngWordCount: 0,
       rejectedCount: 0,
+      dailyPostCount: 0,
       ...overrides,
     },
   };
@@ -93,6 +102,16 @@ function draft(overrides: Partial<PostDraft> = {}): PostDraft {
     reviewedAt: null,
     rejectReasons: [],
     rejectNote: null,
+    prioritizedAt: null,
+    carryover: false,
+    publishedAt: null,
+    threadsMediaId: null,
+    threadsPermalink: null,
+    publishFailedAt: null,
+    publishError: null,
+    blockedAt: null,
+    blockedReason: null,
+    blockedWords: [],
     createdAt: "2026-10-03T00:00:00.000Z",
     updatedAt: "2026-10-03T00:00:00.000Z",
     ...overrides,
@@ -121,6 +140,9 @@ function listResponse(
     ngWords?: PostDraftList["ngWords"];
     canGeneratePrompt?: boolean;
     promptPostCount?: number;
+    publishFailed?: PostDraft[];
+    schedule?: PostDraftList["schedule"];
+    autoPost?: PostDraftList["autoPost"];
   } = {},
 ): PostDraftList {
   const { items = [], approved = [], rejected = [], ngWords = [], ...rest } = overrides;
@@ -128,7 +150,16 @@ function listResponse(
     needsReview: items,
     approved,
     rejected,
-    counts: { needsReview: items.length, approved: approved.length, rejected: rejected.length },
+    publishFailed: [],
+    schedule: {},
+    autoPost: { enabled: false, slotCount: 0, stoppedReason: null },
+    counts: {
+      needsReview: items.length,
+      approved: approved.length,
+      rejected: rejected.length,
+      published: 0,
+      publishFailed: 0,
+    },
     limits: { needsReview: 500, approved: 500 },
     ngWords,
     canGeneratePrompt: true,
@@ -180,6 +211,9 @@ beforeEach(() => {
     updatePostDraft,
     deletePostDrafts,
     reviewPostDrafts,
+    listPublished,
+    getAutoPost,
+    dismissBlockedNotice,
   ]) {
     fn.mockReset();
   }
@@ -187,6 +221,8 @@ beforeEach(() => {
   toastError.mockReset();
   toastWarning.mockReset();
   listPostDrafts.mockResolvedValue(listResponse());
+  listPublished.mockResolvedValue({ items: [], nextCursor: null });
+  getAutoPost.mockResolvedValue({ autoPost: { enabled: false, slotCount: 0, stoppedReason: null }, next: null, approvedCount: 0, daysLeft: null, notices: [] });
   getPrompt.mockImplementation((_id: string, count?: number) =>
     Promise.resolve(promptResponse({}, count ?? 30)),
   );
@@ -799,7 +835,7 @@ describe("承認・却下（004 US1）", () => {
     );
   });
 
-  it("3つのタブに件数が出て、?tab=approved で承認済みのタブが開く（FR-001）", async () => {
+  it("4つのタブに件数が出て、?tab=approved で承認済みのタブが開く（FR-001）", async () => {
     renderPage("/accounts/a1/stock?tab=approved");
     expect(await screen.findByRole("tab", { name: "要確認 3" })).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: "却下 1" })).toBeInTheDocument();
@@ -809,7 +845,7 @@ describe("承認・却下（004 US1）", () => {
     );
     expect(screen.getByText("承認した投稿")).toBeInTheDocument();
     expect(
-      screen.getByText("承認した投稿は、自動投稿の設定ができると順に投稿されます"),
+      screen.getByText("自動投稿はオフです。"),
     ).toBeInTheDocument();
   });
 
@@ -1740,5 +1776,137 @@ describe("PR #5 のCodexレビュー（3回目）への対応", () => {
     await user.click(screen.getByRole("button", { name: "切り替え" }));
     expect(await screen.findByRole("button", { name: "コピー" })).toBeInTheDocument();
     expect(screen.queryByText("AIプロンプトの生成はプラン2以上で使えます")).not.toBeInTheDocument();
+  });
+});
+
+describe("005：投稿済みの一覧と自動投稿の知らせ", () => {
+  it("投稿済みはタブを開いたときだけ読み、リンクと続きを表示する", async () => {
+    const user = userEvent.setup();
+    listPublished.mockResolvedValueOnce({ items: [{ id: "p1", body: "公開した本文", publishedAt: "2026-10-06T03:00:00Z", threadsMediaId: "m1", threadsPermalink: "https://www.threads.net/@test/post/1" }], nextCursor: "cursor1" })
+      .mockResolvedValueOnce({ items: [{ id: "p2", body: "URLはまだない投稿", publishedAt: "2026-10-05T03:00:00Z", threadsMediaId: "m2", threadsPermalink: null }], nextCursor: null });
+    renderPage();
+    await screen.findByRole("tab", { name: "投稿済み 0" });
+    expect(listPublished).not.toHaveBeenCalled();
+    await user.click(screen.getByRole("tab", { name: "投稿済み 0" }));
+    expect(await screen.findByText("公開した本文")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Threadsで開く" })).toHaveAttribute("target", "_blank");
+    expect(screen.getByRole("link", { name: "Threadsで開く" })).toHaveAttribute("rel", "noopener noreferrer");
+    expect(screen.queryByText("すべて選択")).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "もっと見る" }));
+    expect(await screen.findByText("URLを取得中")).toBeInTheDocument();
+    expect(screen.getByText("公開した本文")).toBeInTheDocument();
+    expect(listPublished).toHaveBeenLastCalledWith("a1", "cursor1");
+  });
+
+  it("?tab=published を直接開け、空の状態を表示する", async () => {
+    renderPage("/accounts/a1/stock?tab=published");
+    expect(await screen.findByText("まだ投稿はありません。承認した下書きは、投稿のスケジュールに沿って投稿されます")).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "投稿済み 0" })).toHaveAttribute("data-state", "active");
+  });
+
+  it("承認済みが0件の知らせを表示する", async () => {
+    getAutoPost.mockResolvedValue({ autoPost: { enabled: true, slotCount: 1, stoppedReason: null }, next: null, approvedCount: 0, daysLeft: null, notices: [{ kind: "no_approved", nextSlotAt: "2026-10-06T12:00:00Z" }] });
+    renderPage();
+    expect(await screen.findByText(/承認済みの下書きがありません/)).toBeInTheDocument();
+
+  });
+});
+
+
+describe("US2：直前のチェックの理由", () => {
+  it("要確認のカードの理由と知らせを出し、閉じると知らせだけを読み直す", async () => {
+    const user = userEvent.setup();
+    listPostDrafts.mockResolvedValue(listResponse({ items: [draft({ body: "戻された本文", blockedAt: "2026-10-06T03:00:00Z", blockedReason: "ng_word", blockedWords: ["NG"] })] }));
+    getAutoPost.mockResolvedValue({ autoPost: { enabled: true, slotCount: 1, stoppedReason: null }, next: null, approvedCount: 0, daysLeft: null, notices: [{ kind: "blocked", count: 1, latestReason: "ng_word", latestWords: ["NG"] }] });
+    dismissBlockedNotice.mockImplementation(async () => { getAutoPost.mockResolvedValue({ autoPost: { enabled: true, slotCount: 1, stoppedReason: null }, next: null, approvedCount: 0, daysLeft: null, notices: [] }); });
+    renderPage();
+    expect(await screen.findByText(/投稿の直前にNGワード（NG）が見つかったため、要確認に戻しました/)).toBeInTheDocument();
+    expect(screen.getByText("投稿の直前にNGワード（NG）が見つかったため、1件を要確認に戻しました")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "閉じる" }));
+    await waitFor(() => expect(screen.queryByText("投稿の直前にNGワード（NG）が見つかったため、1件を要確認に戻しました")).not.toBeInTheDocument());
+    expect(dismissBlockedNotice).toHaveBeenCalledWith("a1");
+    expect(screen.getByText(/投稿の直前にNGワード（NG）が見つかったため、要確認に戻しました/)).toBeInTheDocument();
+  });
+});
+
+
+describe("US3：失敗・持ち越し・処理中", () => {
+  it("失敗のまとまりは選択の対象外で、もう一度投稿の順に入れられる", async () => {
+    const failed = draft({ status: "publish_failed", publishError: "network", publishFailedAt: "2026-10-06T03:00:00Z" });
+    listPostDrafts.mockResolvedValue(listResponse({ publishFailed: [failed] }));
+    reviewPostDrafts.mockResolvedValue({ updated: [{ ...failed, status: "approved" }], skipped: [], counts: { needsReview: 0, approved: 1, rejected: 0, published: 0, publishFailed: 0 } });
+    renderPage("/accounts/a1/stock?tab=approved");
+    expect(await screen.findByText("投稿に失敗（1件）")).toBeInTheDocument();
+    expect(screen.getByText(/に失敗：Threadsとの通信に失敗しました/)).toBeInTheDocument();
+    expect(screen.queryByRole("checkbox")).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "もう一度投稿の順に入れる" }));
+    await waitFor(() => expect(reviewPostDrafts).toHaveBeenCalledWith("a1", expect.objectContaining({ action: "requeue" })));
+  });
+  it("処理中の操作を無効にし、持ち越しの理由を出す", async () => {
+    listPostDrafts.mockResolvedValue(listResponse({ approved: [draft({ id: "busy", status: "publishing" }), draft({ id: "carry", status: "approved", carryover: true })] }));
+    renderPage("/accounts/a1/stock?tab=approved");
+    expect(await screen.findByText("投稿の処理中")).toBeInTheDocument();
+    expect(within(document.getElementById("draft-busy")!).getByRole("checkbox")).toBeDisabled();
+    expect(within(document.getElementById("draft-busy")!).getByRole("button", { name: /の操作/ })).toBeDisabled();
+    expect(screen.getByText("前回の投稿に失敗したため、次の時刻にもう一度試します")).toBeInTheDocument();
+    await userEvent.click(screen.getByLabelText("すべて選択"));
+    expect(screen.getByText("1件を選択中")).toBeInTheDocument();
+  });
+  it("切断・上限・失敗の知らせと確認先を出す", async () => {
+    getAutoPost.mockResolvedValue({ autoPost: { enabled: true, slotCount: 1, stoppedReason: "needs_reconnect" }, next: null, approvedCount: 0, daysLeft: 0, notices: [{ kind: "needs_reconnect" }, { kind: "rate_limited", until: "2026-10-06T15:00:00Z" }, { kind: "publish_failed", count: 2, latestError: "network", latestAt: "2026-10-06T03:00:00Z" }] });
+    renderPage();
+    expect(await screen.findByRole("button", { name: "再接続" })).toBeInTheDocument();
+    expect(screen.getByText(/Threadsの投稿数の上限に達したため/)).toBeInTheDocument();
+    expect(screen.getByText("2件の投稿に失敗しました（Threadsとの通信に失敗しました）")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "確認する" })).toHaveAttribute("href", "/accounts/a1/stock?tab=approved#publish-failed");
+  });
+});
+
+
+describe("US4：予定と投稿の順", () => {
+  it("各カードの予定を出し、先頭以外を次に投稿する操作で移す", async () => {
+    const a = draft({ id: "a", body: "先頭", status: "approved" });
+    const b = draft({ id: "b", body: "次の本文", status: "approved" });
+    const initial = listResponse({ approved: [a, b], schedule: { a: "2026-10-08T03:00:00Z", b: "2026-10-08T12:00:00Z" }, autoPost: { enabled: true, slotCount: 2, stoppedReason: null } });
+    listPostDrafts.mockResolvedValue(initial);
+    prioritizeDraft.mockImplementation(async () => { listPostDrafts.mockResolvedValue({ ...initial, approved: [b, a], schedule: { b: "2026-10-08T03:00:00Z", a: "2026-10-08T12:00:00Z" } }); return { ...b, version: 2 }; });
+    renderPage("/accounts/a1/stock?tab=approved");
+    expect(await screen.findByText(/12:00に投稿予定/)).toBeInTheDocument();
+    await userEvent.click(within(document.getElementById("draft-a")!).getByRole("button", { name: /の操作/ }));
+    expect(screen.queryByRole("menuitem", { name: "次に投稿する" })).not.toBeInTheDocument();
+    await userEvent.keyboard("{Escape}");
+    await userEvent.click(within(document.getElementById("draft-b")!).getByRole("button", { name: /の操作/ }));
+    await userEvent.click(screen.getByRole("menuitem", { name: "次に投稿する" }));
+    await waitFor(() => expect(prioritizeDraft).toHaveBeenCalledWith("a1", "b", 1));
+    await waitFor(() => expect(toastSuccess).toHaveBeenCalledWith(expect.stringMatching(/次の投稿にしました.*12:00/)));
+  });
+  it("オフでは設定への案内を出す", async () => {
+    renderPage("/accounts/a1/stock?tab=approved");
+    expect(await screen.findByText("自動投稿はオフです。")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "投稿のスケジュールを設定する" })).toHaveAttribute("href", "/accounts/a1/settings");
+  });
+});
+
+describe("005：画面を開いた後に投稿の処理が始まる", () => {
+  it("編集の保存がDRAFT_PUBLISHINGなら、知らせて一覧を読み直す", async () => {
+    listPostDrafts.mockResolvedValue(listResponse({ approved: [draft({ status: "approved" })] }));
+    updatePostDraft.mockRejectedValue(new ApiError("DRAFT_PUBLISHING", 409));
+    renderPage("/accounts/a1/stock?tab=approved");
+    await userEvent.click(await screen.findByRole("button", { name: "「下書きの本文」の操作" }));
+    await userEvent.click(screen.getByRole("menuitem", { name: "編集" }));
+    const dialog = await screen.findByRole("dialog", { name: "下書きを編集" });
+    await userEvent.type(within(dialog).getByRole("textbox", { name: /本文/ }), "を直す");
+    await userEvent.click(within(dialog).getAllByRole("button", { name: "保存" }).at(-1)!);
+    await waitFor(() => expect(toastError).toHaveBeenCalledWith("投稿の処理中です。少し待ってからもう一度お試しください。"));
+    await waitFor(() => expect(listPostDrafts.mock.calls.length).toBeGreaterThan(1));
+  });
+  it("要確認に戻す操作がPUBLISHINGで飛ばされたら、理由を知らせる", async () => {
+    const d = draft({ status: "approved" });
+    listPostDrafts.mockResolvedValue(listResponse({ approved: [d] }));
+    reviewPostDrafts.mockResolvedValue({ updated: [], skipped: [{ id: d.id, reason: "PUBLISHING" }], counts: { needsReview: 0, approved: 1, rejected: 0, published: 0, publishFailed: 0 } });
+    renderPage("/accounts/a1/stock?tab=approved");
+    await userEvent.click(await screen.findByRole("button", { name: "「下書きの本文」の操作" }));
+    await userEvent.click(screen.getByRole("menuitem", { name: "要確認に戻す" }));
+    await waitFor(() => expect(toastError).toHaveBeenCalledWith("投稿の処理中です。少し待ってからもう一度お試しください。"));
   });
 });

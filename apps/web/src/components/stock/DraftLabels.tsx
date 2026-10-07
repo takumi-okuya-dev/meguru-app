@@ -100,6 +100,9 @@ const STATUS_LABEL: Record<PostDraftStatus, string> = {
   needs_review: "要確認",
   approved: "承認済み",
   rejected: "却下",
+  publishing: "投稿の処理中",
+  published: "投稿済み",
+  publish_failed: "投稿に失敗",
 };
 
 /**

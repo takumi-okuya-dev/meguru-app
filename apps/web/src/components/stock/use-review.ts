@@ -25,16 +25,19 @@ const DONE: Record<Action, string> = {
   approve: "承認しました",
   reject: "却下しました",
   reopen: "要確認に戻しました",
+  requeue: "もう一度投稿の順に入れました",
 };
 const DONE_N: Record<Action, (n: number) => string> = {
   approve: (n) => `${n}件を承認しました`,
   reject: (n) => `${n}件を却下しました`,
   reopen: (n) => `${n}件を要確認に戻しました`,
+  requeue: (n) => `${n}件をもう一度投稿の順に入れました`,
 };
 const FAILED: Record<Action, string> = {
   approve: "承認",
   reject: "却下",
   reopen: "要確認に戻すことが",
+  requeue: "投稿の順に入れることが",
 };
 
 /** 状態を変える下書きの指定。 */
@@ -108,6 +111,7 @@ export function useReview(accountId: string) {
     await Promise.all([
       queryClient.invalidateQueries({ queryKey: queryKeys.postDrafts(accountId) }),
       queryClient.invalidateQueries({ queryKey: queryKeys.promptAll(accountId) }),
+      queryClient.invalidateQueries({ queryKey: queryKeys.autoPost(accountId) }),
     ]);
     return queryClient.getQueryState(queryKeys.postDrafts(accountId))?.status !== "error";
   }, [accountId, queryClient]);
@@ -237,13 +241,16 @@ export function useReview(accountId: string) {
       const res = sent.res ?? {
         updated: [],
         skipped: [],
-        counts: { needsReview: 0, approved: 0, rejected: 0 },
+        counts: { needsReview: 0, approved: 0, rejected: 0, published: 0, publishFailed: 0 },
       };
       const changed = res.updated.filter(
         (u) => drafts.find((d) => d.id === u.id)?.status !== u.status,
       );
+      // もう一度投稿の順に入れる（005）は、投稿に失敗には戻せないので「元に戻す」を付けない
       const withUndo =
-        changed.length > 0
+        changed.length > 0 &&
+        action !== "requeue" &&
+        !drafts.some((d) => d.status === "publish_failed")
           ? { action: { label: "元に戻す", onClick: () => void undo(action, drafts, changed) } }
           : {};
       if (unsent > 0 || unknown > 0) {

@@ -321,6 +321,7 @@ pnpm e2e
 - **Clerk**：本番インスタンスを作り、Google Cloud ConsoleでOAuthクライアント（種類は「ウェブアプリケーション」）を作成して、ClerkのGoogle接続で「Use custom credentials」をオンにする。Clerkの画面に出る「Authorized Redirect URI」を、Google側の「承認済みのリダイレクトURI」に登録する。
 - **Meta**：App Review（各権限の用途の説明）と、必要に応じてビジネス認証。データ削除の状況確認ページの中身も、この時点で見直す（[research.md R7](../specs/001-login-account-setup/research.md)）。
 - **Cloudflare**：APIをWorkersにデプロイし、秘密情報は`wrangler secret put`で設定する。WebはCloudflare Pagesにデプロイする。
+  - 自動投稿（005）の関所のKVを作る：`pnpm --filter api exec wrangler kv namespace create AUTOPOST_KV`。表示された`id`を、`apps/api/wrangler.toml`の`[[kv_namespaces]]`の`id`に入れる（ローカルとテストは、入れなくても動く）。
 - **Neon**：本番のDBを作り、`DATABASE_URL`を本番の接続文字列にする。
 - 本番用のURLで、3-3の3つのURLと`THREADS_REDIRECT_URI`・`WEB_ORIGIN`を設定し直す。
 

@@ -12,7 +12,7 @@ export const STOCK_LIMIT_MESSAGE = `要確認の下書きが上限（${NEEDS_REV
  * @param action - 操作
  * @returns 文言
  */
-export function skipMessage(reason: SkipReason, action: "approve" | "reject" | "reopen"): string {
+export function skipMessage(reason: SkipReason, action: "approve" | "reject" | "reopen" | "requeue"): string {
   switch (reason) {
     case "NG_WORD":
       return "NGワードを含むため承認できませんでした。";
@@ -28,6 +28,8 @@ export function skipMessage(reason: SkipReason, action: "approve" | "reject" | "
       return action === "reopen"
         ? STOCK_LIMIT_MESSAGE
         : `承認済みの下書きが上限（${APPROVED_LIMIT}件）に達しています。`;
+    case "PUBLISHING":
+      return PUBLISHING_MESSAGE;
   }
 }
 
@@ -39,7 +41,11 @@ export const SKIP_REASON_SHORT: Record<SkipReason, string> = {
   STALE: "他の場所で更新",
   NOT_FOUND: "削除済み",
   LIMIT: "上限",
+  PUBLISHING: "投稿の処理中",
 };
+
+/** 投稿の処理中の下書きを操作しようとしたときの文言（005 FR-008）。 */
+export const PUBLISHING_MESSAGE = "投稿の処理中です。少し待ってからもう一度お試しください。";
 
 /** 承認ボタンを押せないときの、ボタンの下に出す理由。 */
 export const NOT_APPROVABLE_NG = "NGワードを含むため承認できません。本文を直すか却下してください";

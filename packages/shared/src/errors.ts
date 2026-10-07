@@ -23,6 +23,8 @@ export const ERROR_CODES = [
   "KEYWORD_DUPLICATE",
   "GROWER_FEATURE_REQUIRED",
   "PASTE_TOO_LARGE",
+  "DRAFT_PUBLISHING",
+  "THREADS_NOT_READY",
   "CONFIG_ERROR",
   "API_UNREACHABLE",
   "INTERNAL_ERROR",
@@ -147,6 +149,12 @@ export function errorMessage(code: ErrorCode, ctx: ErrorMessageContext = {}): Er
         message: "一度に登録できるのは50件・50,000文字まで、1件は2,000文字までです。分けて貼り付けてください。",
         action: "none",
       };
+    case "DRAFT_PUBLISHING":
+      return { message: "投稿の処理中です。少し待ってからもう一度お試しください。", action: "reload" };
+    case "THREADS_NOT_READY":
+      return ctx.details?.[0] === "needs_reconnect"
+        ? { message: THREADS_CHECK_MESSAGES.needs_reconnect, action: "retry-connect" }
+        : { message: THREADS_CHECK_MESSAGES.no_publish_permission, action: "retry-connect" };
     case "GROWER_FEATURE_REQUIRED":
       return {
         message: "この機能はプラン2以上で使えます。保存済みの内容はそのまま残っています。",
@@ -198,3 +206,44 @@ export function connectedMessage(kind: "new" | "updated" | "reconnect", username
       return `@${username} を再接続しました`;
   }
 }
+
+// ---- 自動投稿（specs/005-auto-post contracts/ui-routes.md）----
+
+/** 投稿に失敗した理由の文言（PublishError のコードから）。 */
+export const PUBLISH_ERROR_LABELS = {
+  network: "Threadsとの通信に失敗しました",
+  threads_server: "Threads側でエラーが起きました",
+  invalid_request: "Threadsが投稿を受け付けませんでした。本文を確かめてください",
+  container_error: "Threadsでの投稿の処理に失敗しました",
+  unknown: "投稿に失敗しました",
+} as const;
+
+/** 投稿の権限の確認の結果の文言（FR-002a・FR-002b）。ok は件数を埋め込むので threadsCheckOkMessage を使う。 */
+export const THREADS_CHECK_MESSAGES = {
+  needs_reconnect: "Threadsとの接続が切れています。再接続してください",
+  no_publish_permission: "Threadsへの投稿の権限がありません。再接続して、投稿の許可をオンにしてください",
+  unknown: "Threadsとの接続を確認できませんでした。時間をおいてもう一度お試しください",
+} as const;
+
+/**
+ * 投稿の権限の確認で、投稿できる状態だったときの文言。
+ * @param quotaUsage - 直近24時間の投稿数
+ * @param quotaTotal - 上限（250）
+ * @returns 文言
+ */
+export function threadsCheckOkMessage(quotaUsage: number, quotaTotal: number): string {
+  return `投稿できる状態です（直近24時間の投稿 ${quotaUsage}/${quotaTotal}件）`;
+}
+
+/**
+ * 投稿の直前のチェックで要確認に戻した理由の文言（FR-007、US2 シナリオ2）。
+ * @param reason - ng_word か over_threads_limit
+ * @param words - 当たったNGワード
+ * @returns 「NGワード（絶対、必ず）」など
+ */
+export function blockedReasonLabel(reason: "ng_word" | "over_threads_limit", words: string[]): string {
+  return reason === "ng_word" ? `NGワード（${words.join("、")}）` : "Threadsの上限を超える本文";
+}
+
+/** 深夜の時刻の案内（FR-001b）。設定は止めない。 */
+export const LATE_NIGHT_HINT = "深夜の時間帯です。見られにくい可能性があります";

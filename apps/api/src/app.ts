@@ -6,13 +6,21 @@ import type { Env } from "./env";
 import { validateConfig } from "./lib/config";
 import { AppError } from "./lib/errors";
 import { logger } from "./lib/logger";
-import { authMiddleware, clerkVerifier, type AuthVerifier, type AuthVariables } from "./middleware/auth";
+import {
+  authMiddleware,
+  clerkVerifier,
+  type AuthVerifier,
+  type AuthVariables,
+} from "./middleware/auth";
 import { accountRoutes } from "./routes/accounts";
 import { dataDeletionRoutes } from "./routes/data-deletion";
 import { threadsWebhookRoutes } from "./routes/threads-webhooks";
 import { meRoutes } from "./routes/me";
 import { postDraftRoutes } from "./routes/post-drafts";
+import { autoPostRoutes } from "./routes/auto-post";
 import { postingRulesRoutes } from "./routes/posting-rules";
+import { postingScheduleRoutes } from "./routes/posting-schedule";
+import { threadsCheckRoutes } from "./routes/threads-check";
 import { promotionRoutes } from "./routes/promotions";
 import { promptRoutes } from "./routes/prompt";
 import { researchRoutes } from "./routes/research";
@@ -60,28 +68,50 @@ export function createApp(deps: AppDeps = defaultDeps) {
       problems = validateConfig(c.env);
       checked.set(c.env, problems);
       if (problems.length > 0) {
-        logger.error("server configuration error: fix these variables and restart the API", { variables: problems });
+        logger.error("server configuration error: fix these variables and restart the API", {
+          variables: problems,
+        });
       }
     }
     if (problems.length === 0) return next();
     if (c.req.path === "/api/threads/callback") {
       try {
         const web = new URL(c.env.WEB_ORIGIN).origin;
-        return c.redirect(`${web}/accounts/new?${new URLSearchParams({ error: "CONFIG_ERROR" })}`, 302);
+        return c.redirect(
+          `${web}/accounts/new?${new URLSearchParams({ error: "CONFIG_ERROR" })}`,
+          302,
+        );
       } catch {
-        return c.text(`サーバーの設定に誤りがあります（${problems.join("、")}）。apps/api/.dev.vars を確認し、APIを起動し直してください。`, 500);
+        return c.text(
+          `サーバーの設定に誤りがあります（${problems.join("、")}）。apps/api/.dev.vars を確認し、APIを起動し直してください。`,
+          500,
+        );
       }
     }
     return c.json(
-      { error: { code: "CONFIG_ERROR" as const, message: "server configuration error", details: problems } },
+      {
+        error: {
+          code: "CONFIG_ERROR" as const,
+          message: "server configuration error",
+          details: problems,
+        },
+      },
       500,
     );
   });
 
   app.onError((err, c) => {
     if (err instanceof AppError) {
-      const error = { code: err.code, message: err.message, ...(err.details ? { details: err.details } : {}) };
-      return c.json(err.latest === undefined ? { error } : { error, latest: err.latest }, err.status);
+      const error = {
+        code: err.code,
+        message: err.message,
+        ...(err.details ? { details: err.details } : {}),
+        ...(err.extra ?? {}),
+      };
+      return c.json(
+        err.latest === undefined ? { error } : { error, latest: err.latest },
+        err.status,
+      );
     }
     logger.error("unhandled error", { err });
     return c.json({ error: { code: "INTERNAL_ERROR" as const, message: "internal error" } }, 500);
@@ -104,6 +134,9 @@ export function createApp(deps: AppDeps = defaultDeps) {
     .route("/", promptRoutes(authed))
     .route("/", postDraftRoutes(authed))
     .route("/", postingRulesRoutes(authed))
+    .route("/", postingScheduleRoutes(authed))
+    .route("/", threadsCheckRoutes(authed))
+    .route("/", autoPostRoutes(authed))
     .route("/", threadsConnectRoutes(authed))
     .route("/", threadsWebhookRoutes())
     .route("/", dataDeletionRoutes());

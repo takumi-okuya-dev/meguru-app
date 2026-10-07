@@ -13,7 +13,7 @@ import { FieldWithCounter } from "@/components/FieldWithCounter";
 import { DeletedElsewhereNotice, FormDialogFrame } from "@/components/items/FormDialogFrame";
 import { useItemForm, type FormErrors } from "@/components/items/use-item-form";
 import { useRef } from "react";
-import { api } from "@/lib/api-client";
+import { api, ApiError } from "@/lib/api-client";
 import { LabelRow, NgWordLabel, PolicyCautionLabels } from "./DraftLabels";
 import { ThreadsLengthBar } from "./ThreadsLengthBar";
 
@@ -56,10 +56,16 @@ export function DraftEditDialog({
     onGrowerLost: () => {},
     onDeletedElsewhere,
     save: async (form, expectedVersion) => {
-      const res = await api.updatePostDraft(accountId, item.id, {
-        body: form.body,
-        expectedVersion: expectedVersion ?? item.version,
-      });
+      let res;
+      try {
+        res = await api.updatePostDraft(accountId, item.id, {
+          body: form.body,
+          expectedVersion: expectedVersion ?? item.version,
+        });
+      } catch (error) {
+        if (error instanceof ApiError && error.code === "DRAFT_PUBLISHING") onDeletedElsewhere();
+        throw error;
+      }
       reopened.current = res.reopened;
       return res.draft;
     },

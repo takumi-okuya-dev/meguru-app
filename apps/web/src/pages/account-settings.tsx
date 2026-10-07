@@ -1,4 +1,5 @@
-// Account設定（FR-013・FR-019・FR-020・FR-022、規則9・10）。004で「投稿のルール」の区分を、既存の区分より上に足した
+// Account設定（FR-013・FR-019・FR-020・FR-022、規則9・10）。004で「投稿のルール」の区分を、既存の区分より上に足した。
+// 005で「投稿のスケジュール」の区分を、「投稿のルール」の上に足した
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { normalizeUsername } from "@threads-grower/shared";
 import { useState } from "react";
@@ -6,6 +7,7 @@ import { useNavigate } from "react-router";
 import { ConnectionBadge } from "@/components/ConnectionBadge";
 import { PageBody, PageHeader } from "@/components/layout/PageHeader";
 import { PostingRulesSection } from "@/components/settings/PostingRulesSection";
+import { PostingScheduleSection } from "@/components/settings/PostingScheduleSection";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
@@ -64,6 +66,8 @@ export function AccountSettings() {
             <ConnectionBadge status={account.connectionStatus} />
           </div>
         </section>
+
+        <PostingScheduleSection account={account} onReconnect={() => reconnect.mutate()} />
 
         <PostingRulesSection accountId={account.id} />
 

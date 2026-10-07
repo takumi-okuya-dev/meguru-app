@@ -77,3 +77,47 @@ export const SIMILARITY_MIN_LENGTH = 10;
 export const SIMILARITY_TOP_MATCHES = 3;
 /** 編集距離を求める本文の長さの上限（正規化した後）。超える組はDice係数だけで判定する。 */
 export const SIMILARITY_EDIT_DISTANCE_MAX_LENGTH = 300;
+
+// ---- 自動投稿（specs/005-auto-post contracts/auto-post-job.md「定数」）----
+
+/** 1日に投稿する時刻の上限（FR-001）。 */
+export const AUTOPOST_SLOT_LIMIT = 10;
+/** 時刻をずらすときの、時刻どうしの間（分。FR-001a）。 */
+export const AUTOPOST_MIN_GAP_MINUTES = 30;
+/** ずらす幅（秒。前後10分）。 */
+export const AUTOPOST_JITTER_SECONDS = 600;
+/** 予定を過ぎても投稿してよい幅（分。FR-011）。 */
+export const AUTOPOST_LATE_WINDOW_MINUTES = 60;
+/** 1つの時刻の中でのやり直しの回数（FR-013）。 */
+export const AUTOPOST_RETRY_MAX = 3;
+/** やり直しまでの間（分。1回目・2回目・3回目）。 */
+export const AUTOPOST_RETRY_DELAYS_MINUTES = [5, 10, 15] as const;
+/** 24時間の投稿の上限（FR-017）。 */
+export const AUTOPOST_DAILY_API_LIMIT = 250;
+/** 1回の定期処理で進める試みの数（Workers Freeのサブリクエストの上限のため。research.md R3）。 */
+export const AUTOPOST_MAX_PER_TICK = 4;
+/** 試みを進める処理の持ち時間（秒）。 */
+export const AUTOPOST_LEASE_SECONDS = 120;
+/** 関所の待ちの上限（分。research.md R3）。 */
+export const AUTOPOST_GATE_MAX_SLEEP_MINUTES = 1440;
+/** これを超える遅れ（分）で warn を出す（SC-004）。 */
+export const AUTOPOST_LATE_WARN_MINUTES = 10;
+/** 結果がわからない投稿を探し続ける時間（時間。research.md R6）。 */
+export const AUTOPOST_FIND_PUBLISHED_HOURS = 24;
+/** 結果がわからない投稿を探すとき、公開を送った時刻より前に見てよい幅（秒。Threadsとの時計のずれ。R6）。 */
+export const AUTOPOST_RECONCILE_SKEW_SECONDS = 60;
+/**
+ * 結果を確かめられず待機にした試みを、次に確かめるまでの間の最小（分。research.md R6）。
+ * 間は試みの古さの1/4をこの範囲に収める。最初は次の回（5分ごと）に確かめ、解決しない試みほど間をあける。
+ */
+export const AUTOPOST_RECHECK_MIN_MINUTES = 4;
+/** 結果を確かめられず待機にした試みを、次に確かめるまでの間の最大（分）。 */
+export const AUTOPOST_RECHECK_MAX_MINUTES = 60;
+/** 投稿のURLの取り直しに失敗した投稿を、次に取り直すまでの間（分。contracts/auto-post-job.md 手順5）。 */
+export const AUTOPOST_PERMALINK_RETRY_MINUTES = 60;
+/** 投稿の試みを残す日数（日次の処理で、これより古い行を消す）。 */
+export const AUTOPOST_ATTEMPT_RETENTION_DAYS = 30;
+/** 設定の画面で深夜の案内を出す時間帯（0時からの分。2:00〜4:59。終わりは含まない。FR-001b）。 */
+export const LATE_NIGHT_HINT_MINUTES = [120, 300] as const;
+/** 投稿済みの一覧の1回の件数（research.md R14）。 */
+export const PUBLISHED_PAGE_SIZE = 50;

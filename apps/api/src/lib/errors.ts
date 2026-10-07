@@ -11,6 +11,8 @@ export class AppError extends Error {
     readonly latest?: unknown,
     /** VALIDATION_FAILED のときに返す、違反した項目名 */
     readonly details?: string[],
+    /** エラーの本文に足す値（投稿のスケジュールの検証の reason など。specs/005-auto-post contracts/api.md） */
+    readonly extra?: Record<string, unknown>,
   ) {
     super(message);
   }

@@ -43,3 +43,56 @@ export function formatMonthDay(ymd: string): string {
   const [, m, d] = ymd.split("-");
   return `${Number(m)}/${Number(d)}`;
 }
+
+const JST_OFFSET_MS = 9 * 3600_000;
+
+/**
+ * 日本時間の年月日・時分を求める。
+ * @param d - 日時
+ * @returns 日本時間の各部分
+ */
+function jstParts(d: Date) {
+  const j = new Date(d.getTime() + JST_OFFSET_MS);
+  return {
+    y: j.getUTCFullYear(),
+    m: j.getUTCMonth() + 1,
+    day: j.getUTCDate(),
+    h: j.getUTCHours(),
+    min: j.getUTCMinutes(),
+  };
+}
+
+/**
+ * 日本時間の日付を比較する通し番号を求める。
+ * @param d - 日時
+ * @returns 1970年からの日数
+ */
+const jstDayIndex = (d: Date) => Math.floor((d.getTime() + JST_OFFSET_MS) / 86_400_000);
+
+/**
+ * 予定・投稿の日時を、今日・明日を言葉にして出す（日本時間。specs/005-auto-post contracts/ui-routes.md「日時の書き方」）。
+ * 「今日 12:00」「明日 7:30」「10月8日 21:00」、年が違えば「2027年1月3日 7:30」。
+ * @param iso - ISO 8601 の日時（または Date）
+ * @param now - 今の時刻
+ * @returns 表示用の文字列
+ */
+export function formatRelativeJst(iso: string | Date, now: Date = new Date()): string {
+  const d = typeof iso === "string" ? new Date(iso) : iso;
+  const p = jstParts(d);
+  const time = `${p.h}:${String(p.min).padStart(2, "0")}`;
+  const diff = jstDayIndex(d) - jstDayIndex(now);
+  if (diff === 0) return `今日 ${time}`;
+  if (diff === 1) return `明日 ${time}`;
+  if (p.y !== jstParts(now).y) return `${p.y}年${p.m}月${p.day}日 ${time}`;
+  return `${p.m}月${p.day}日 ${time}`;
+}
+
+/**
+ * 設定の時刻（"07:30"）を「7:30」にする。
+ * @param hhmm - "HH:MM"
+ * @returns 表示用の文字列
+ */
+export function formatSlotTime(hhmm: string): string {
+  const [h, m] = hhmm.split(":");
+  return `${Number(h)}:${m}`;
+}

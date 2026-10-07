@@ -68,6 +68,7 @@ export function validateConfig(env: Env): string[] {
   }
   if (!env.DATABASE_URL || !/^postgres(ql)?:\/\//.test(env.DATABASE_URL)) problems.push("DATABASE_URL");
   if (!isHttpUrl(env.WEB_ORIGIN)) problems.push("WEB_ORIGIN");
+  if (!env.AUTOPOST_KV) problems.push("AUTOPOST_KV");
   if (env.THREADS_ACCESS_MODE !== undefined && !["testers", "public"].includes(env.THREADS_ACCESS_MODE)) {
     problems.push("THREADS_ACCESS_MODE");
   }

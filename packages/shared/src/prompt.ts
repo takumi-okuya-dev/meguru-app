@@ -49,6 +49,8 @@ export type PromptInput = {
   ngWords: string[];
   /** 却下の下書き。新しく却下した順。先頭の PROMPT_REJECTED_DRAFTS 件まで使う（004） */
   rejectedDrafts: PromptRejectedDraft[];
+  /** 投稿の設定の時刻の数（0〜10。自動投稿のオン・オフは問わない。005 FR-024）。省略は0 */
+  dailyPostCount?: number;
 };
 
 /** 課題の項目のプロンプトでの見出し（prompt-template.md「アカウントの戦略設計」の順）。 */
@@ -107,7 +109,9 @@ function strategySection(strategy: StrategyValues): string | null {
     }
   }
   if (lines.length === 0) return null;
-  return ["■アカウントの戦略設計(設定済みの項目。方向性として必ず踏まえること)", ...lines].join("\n");
+  return ["■アカウントの戦略設計(設定済みの項目。方向性として必ず踏まえること)", ...lines].join(
+    "\n",
+  );
 }
 
 function promotionLine(p: PromptPromotion, i: number): string {
@@ -137,14 +141,26 @@ function promotionGuidance(n: number): string[] {
       `下に${n}件掲載している宣伝内容のうち、特定の1〜2件だけに偏らせないこと。`,
     ];
   }
-  if (n === 2) return ["掲載期限が近い順に並んでいます。期限が近いものはやや多めに扱ってよいが、2件ともきちんと扱うこと。"];
+  if (n === 2)
+    return [
+      "掲載期限が近い順に並んでいます。期限が近いものはやや多めに扱ってよいが、2件ともきちんと扱うこと。",
+    ];
   return [];
 }
 
-function promotionSection(count: number, ratio: number, promotions: PromptPromotion[]): string {
+function promotionSection(
+  count: number,
+  ratio: number,
+  promotions: PromptPromotion[],
+  dailyPostCount: number,
+): string {
   const share = Math.max(1, Math.round((count * ratio) / 100));
+  const daily =
+    dailyPostCount > 0
+      ? `1日の投稿は${dailyPostCount}件の設定で、そのうち${Math.max(1, Math.round((dailyPostCount * ratio) / 100))}件程度、`
+      : "";
   return [
-    `■今回組み込む宣伝内容(宣伝投稿の割合は${ratio}%の設定です。今回生成する${count}件のうち${share}件程度に自然に絡めること。残りは宣伝色のない共感・気づき系の投稿にすること)`,
+    `■今回組み込む宣伝内容(宣伝投稿の割合は${ratio}%の設定です。${daily}今回生成する${count}件のうち${share}件程度に自然に絡めること。残りは宣伝色のない共感・気づき系の投稿にすること)`,
     ...promotionGuidance(promotions.length),
     ...promotions.map(promotionLine),
     "",
@@ -181,7 +197,11 @@ function dedupeSection(count: number, drafts: string[], withRejected: boolean): 
     `- 生成の最後に、${count}件同士を見比べて「言いたいことが似すぎているペア」が無いか自分で確認し、あれば書き直してから出力すること。`,
   ];
   if (drafts.length > 0) {
-    lines.push("", "投稿ストックにある直近の下書き(これらと核が被らないこと):", ...drafts.map((d, i) => `${i + 1}. ${d}`));
+    lines.push(
+      "",
+      "投稿ストックにある直近の下書き(これらと核が被らないこと):",
+      ...drafts.map((d, i) => `${i + 1}. ${d}`),
+    );
   }
   return lines.join("\n");
 }
@@ -237,14 +257,25 @@ function outputSection(count: number): string {
 
 type Parts = { posts: PromptReferencePost[]; drafts: string[]; rejected: PromptRejectedDraft[] };
 
-function assemble(input: PromptInput, { posts, drafts, rejected }: Parts, withPromotions: boolean): string {
+function assemble(
+  input: PromptInput,
+  { posts, drafts, rejected }: Parts,
+  withPromotions: boolean,
+): string {
   const { count } = input;
   const sections = [
     `以下の情報をもとに、Threadsに投稿する文章を${count}件作ってください。`,
     `■話者\n表示名: ${input.displayName}`,
     coreRulesSection(input.coreRules, input.ngWords),
     strategySection(input.strategy),
-    withPromotions ? promotionSection(count, input.promotionRatioPercent, input.promotions) : null,
+    withPromotions
+      ? promotionSection(
+          count,
+          input.promotionRatioPercent,
+          input.promotions,
+          input.dailyPostCount ?? 0,
+        )
+      : null,
     rejected.length > 0 ? rejectedSection(rejected) : null,
     posts.length > 0 ? researchSection(count, posts) : null,
     dedupeSection(count, drafts, rejected.length > 0),
@@ -271,7 +302,10 @@ export function buildPrompt(input: PromptInput): { prompt: string; summary: Prom
   };
   let prompt = assemble(input, parts, withPromotions);
   let length = [...prompt].length;
-  while (length > PROMPT_LENGTH_TARGET && (parts.drafts.length > 0 || parts.rejected.length > 0 || parts.posts.length > 0)) {
+  while (
+    length > PROMPT_LENGTH_TARGET &&
+    (parts.drafts.length > 0 || parts.rejected.length > 0 || parts.posts.length > 0)
+  ) {
     if (parts.drafts.length > 0) parts.drafts = parts.drafts.slice(0, -1);
     else if (parts.rejected.length > 0) parts.rejected = parts.rejected.slice(0, -1);
     else parts.posts = parts.posts.slice(0, -1);
@@ -290,6 +324,7 @@ export function buildPrompt(input: PromptInput): { prompt: string; summary: Prom
       coreRuleCount: input.coreRules.length,
       ngWordCount: input.ngWords.length,
       rejectedCount: rejected.length,
+      dailyPostCount: input.dailyPostCount ?? 0,
     },
   };
 }

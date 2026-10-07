@@ -2,6 +2,8 @@
 // - ベースURLは環境変数から取る（テストでは偽のThreadsサーバーに向ける）
 // - トークンはできるだけ Authorization ヘッダーで渡す。クエリで渡すしかないエンドポイントでは、URLをログに出さない
 // - 認証エラー（OAuthエラー190、HTTP 401）は ThreadsAuthError として区別する
+// - 投稿（specs/005-auto-post research.md R7）：上限は ThreadsRateLimitError、通信の失敗・5xx は ThreadsTransientError、
+//   それ以外は ThreadsApiError（確かな失敗）。Graph API は上限・権限のエラーも type を OAuthException で返すので、code で見分ける
 import type { Env } from "../env";
 
 /** 接続時にまとめて要求する Threads の権限（research.md R3）。 */
@@ -23,6 +25,28 @@ export class ThreadsApiError extends Error {
   }
 }
 
+/**
+ * Threads の上限のエラー（Graph APIのコード4・17・32・613）。
+ * ThreadsApiError の一種なので、001 の「認証エラー以外の失敗」の扱いはそのまま働く。分けるときは先にこちらを見る。
+ */
+export class ThreadsRateLimitError extends ThreadsApiError {
+  override name = "ThreadsRateLimitError";
+}
+
+/**
+ * Threads の一時的な失敗（通信の失敗・タイムアウト・HTTP 5xx・コード1・2）。やり直せば成功しうる。
+ * ThreadsApiError の一種（通信の失敗は status 0）。分けるときは先にこちらを見る。
+ */
+export class ThreadsTransientError extends ThreadsApiError {
+  override name = "ThreadsTransientError";
+}
+
+/** コンテナーの状態（GET /{container-id}?fields=status）。 */
+export type ContainerStatus = "IN_PROGRESS" | "FINISHED" | "PUBLISHED" | "ERROR" | "EXPIRED";
+
+/** Threads の投稿（一覧・取得）。 */
+export type ThreadsMedia = { id: string; text: string | null; permalink: string | null; timestamp: string };
+
 /** Threads のプロフィール。 */
 export type ThreadsProfile = {
   id: string;
@@ -41,7 +65,24 @@ export type ThreadsClient = {
   exchangeLongLived(shortLivedToken: string): Promise<LongLivedToken>;
   refresh(longLivedToken: string): Promise<LongLivedToken>;
   getProfile(accessToken: string): Promise<ThreadsProfile>;
+  /** テキストのコンテナーを作る（2段階の1つ目）。 */
+  createTextContainer(accessToken: string, userId: string, text: string): Promise<{ containerId: string }>;
+  /** コンテナーを公開する（2段階の2つ目）。1つのコンテナーは1回しか公開できない。 */
+  publishContainer(accessToken: string, userId: string, containerId: string): Promise<{ mediaId: string }>;
+  /** コンテナーの状態を読む。公開した投稿のIDは返らない。 */
+  getContainerStatus(accessToken: string, containerId: string): Promise<{ status: ContainerStatus }>;
+  /** 投稿のURLと日時を読む。 */
+  getMedia(accessToken: string, mediaId: string): Promise<{ id: string; permalink: string | null; timestamp: string }>;
+  /** 投稿数の使用量を読む。投稿の権限（threads_content_publish）がないと呼べない（research.md R15）。 */
+  getPublishingLimit(accessToken: string, userId: string): Promise<{ quotaUsage: number; quotaTotal: number }>;
+  /** since 以降の自分の投稿を、新しい順に読む（最大25件）。 */
+  listRecentThreads(accessToken: string, userId: string, since: Date): Promise<ThreadsMedia[]>;
 };
+
+const TIMEOUT_MS = 10_000;
+const RATE_LIMIT_CODES = new Set([4, 17, 32, 613]);
+const TRANSIENT_CODES = new Set([1, 2]);
+const AUTH_CODES = new Set([102, 190]);
 
 type GraphError = { error?: { message?: string; code?: number; type?: string } };
 
@@ -54,11 +95,19 @@ async function parseOrThrow<T>(res: Response, what: string): Promise<T> {
   }
   if (res.ok) return body as T;
   const err = (body as GraphError | undefined)?.error;
-  if (res.status === 401 || err?.code === 190 || err?.type === "OAuthException") {
+  const code = err?.code;
+  // 上限・権限のエラーも type は OAuthException なので、code を先に見る（research.md R7）
+  if (code !== undefined && RATE_LIMIT_CODES.has(code)) {
+    throw new ThreadsRateLimitError(`${what}: rate limited (code ${code})`, res.status);
+  }
+  if (res.status === 401 || (code !== undefined && AUTH_CODES.has(code)) || (code === undefined && err?.type === "OAuthException")) {
     throw new ThreadsAuthError(`${what}: authentication failed`);
   }
+  if (res.status >= 500 || (code !== undefined && TRANSIENT_CODES.has(code))) {
+    throw new ThreadsTransientError(`${what}: temporary failure with status ${res.status}`, res.status);
+  }
   // メッセージにトークン等が含まれる可能性があるため、本文はそのまま使わない
-  throw new ThreadsApiError(`${what}: request failed with status ${res.status}`, res.status);
+  throw new ThreadsApiError(`${what}: request failed with status ${res.status}${code !== undefined ? ` (code ${code})` : ""}`, res.status);
 }
 
 /**
@@ -70,6 +119,33 @@ async function parseOrThrow<T>(res: Response, what: string): Promise<T> {
 export function createThreadsClient(env: Env, fetchImpl: typeof fetch = fetch): ThreadsClient {
   const graph = env.THREADS_GRAPH_BASE_URL.replace(/\/$/, "");
   const auth = env.THREADS_AUTH_BASE_URL.replace(/\/$/, "");
+
+  /**
+   * 投稿の呼び出しの fetch。10秒でタイムアウトにし、通信の失敗は ThreadsTransientError にする。
+   * @param what - 呼び出しの名前（エラーのメッセージに使う）
+   * @param url - 呼び出すURL
+   * @param init - fetch の設定と、Authorization ヘッダーに入れるトークン
+   * @returns 応答の本文
+   */
+  async function call<T>(what: string, url: URL | string, init: RequestInit & { token: string }): Promise<T> {
+    const { token, ...rest } = init;
+    let res: Response;
+    try {
+      res = await fetchImpl(url, {
+        ...rest,
+        headers: { ...(rest.headers ?? {}), Authorization: `Bearer ${token}` },
+        signal: AbortSignal.timeout(TIMEOUT_MS),
+      });
+    } catch {
+      // 原因（タイムアウト・通信の失敗）のメッセージにURLなどが入りうるので、使わない
+      throw new ThreadsTransientError(`${what}: network error`, 0);
+    }
+    return parseOrThrow<T>(res, what);
+  }
+  const form = (values: Record<string, string>) => ({
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams(values),
+  });
 
   return {
     buildAuthorizeUrl(state) {
@@ -134,6 +210,70 @@ export function createThreadsClient(env: Env, fetchImpl: typeof fetch = fetch): 
         name: body.name ?? null,
         profilePictureUrl: body.threads_profile_picture_url ?? null,
       };
+    },
+
+    async createTextContainer(accessToken, userId, text) {
+      const body = await call<{ id: string | number }>("createTextContainer", `${graph}/v1.0/${userId}/threads`, {
+        method: "POST",
+        token: accessToken,
+        ...form({ media_type: "TEXT", text }),
+      });
+      return { containerId: String(body.id) };
+    },
+
+    async publishContainer(accessToken, userId, containerId) {
+      const body = await call<{ id: string | number }>("publishContainer", `${graph}/v1.0/${userId}/threads_publish`, {
+        method: "POST",
+        token: accessToken,
+        ...form({ creation_id: containerId }),
+      });
+      return { mediaId: String(body.id) };
+    },
+
+    async getContainerStatus(accessToken, containerId) {
+      const url = new URL(`${graph}/v1.0/${containerId}`);
+      url.searchParams.set("fields", "status");
+      const body = await call<{ status: ContainerStatus }>("getContainerStatus", url, { token: accessToken });
+      return { status: body.status };
+    },
+
+    async getMedia(accessToken, mediaId) {
+      const url = new URL(`${graph}/v1.0/${mediaId}`);
+      url.searchParams.set("fields", "id,permalink,timestamp");
+      const body = await call<{ id: string | number; permalink?: string; timestamp: string }>("getMedia", url, {
+        token: accessToken,
+      });
+      return { id: String(body.id), permalink: body.permalink ?? null, timestamp: body.timestamp };
+    },
+
+    async getPublishingLimit(accessToken, userId) {
+      const url = new URL(`${graph}/v1.0/${userId}/threads_publishing_limit`);
+      url.searchParams.set("fields", "quota_usage,config");
+      const body = await call<{ data?: { quota_usage?: number; config?: { quota_total?: number } }[] }>(
+        "getPublishingLimit",
+        url,
+        { token: accessToken },
+      );
+      const row = body.data?.[0];
+      return { quotaUsage: row?.quota_usage ?? 0, quotaTotal: row?.config?.quota_total ?? 250 };
+    },
+
+    async listRecentThreads(accessToken, userId, since) {
+      const url = new URL(`${graph}/v1.0/${userId}/threads`);
+      url.searchParams.set("fields", "id,text,permalink,timestamp");
+      url.searchParams.set("since", String(Math.floor(since.getTime() / 1000)));
+      url.searchParams.set("limit", "25");
+      const body = await call<{ data?: { id: string | number; text?: string; permalink?: string; timestamp: string }[] }>(
+        "listRecentThreads",
+        url,
+        { token: accessToken },
+      );
+      return (body.data ?? []).map((p) => ({
+        id: String(p.id),
+        text: p.text ?? null,
+        permalink: p.permalink ?? null,
+        timestamp: p.timestamp,
+      }));
     },
   };
 }

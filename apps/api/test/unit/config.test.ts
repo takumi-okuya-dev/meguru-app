@@ -4,7 +4,10 @@ import { validateConfig } from "../../src/lib/config";
 import type { Env } from "../../src/env";
 import { testBindings } from "../env";
 
-const good = testBindings("http://127.0.0.1:8790", "postgres://postgres:postgres@db.localtest.me:5432/threads_grower") as Env;
+const good = {
+  ...testBindings("http://127.0.0.1:8790", "postgres://postgres:postgres@db.localtest.me:5432/threads_grower"),
+  AUTOPOST_KV: {} as KVNamespace,
+} as Env;
 
 describe("validateConfig", () => {
   it("正しい設定なら問題なし", () => {
@@ -26,6 +29,10 @@ describe("validateConfig", () => {
 
   it("鍵リングに現在のバージョンの鍵がなければ指摘する", () => {
     expect(validateConfig({ ...good, TOKEN_ENCRYPTION_KEY_VERSION: "2" } as Env)).toEqual(["TOKEN_ENCRYPTION_KEYS"]);
+  });
+
+  it("自動投稿の関所のKV（AUTOPOST_KV）がなければ指摘する", () => {
+    expect(validateConfig({ ...good, AUTOPOST_KV: undefined } as unknown as Env)).toEqual(["AUTOPOST_KV"]);
   });
 
   it("DATABASE_URL と WEB_ORIGIN の形を確かめる", () => {
