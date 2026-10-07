@@ -67,7 +67,8 @@ it("URLの取得だけが失敗しても、投稿済みを保ち次の回にURL�
   const { accountId } = await connectedAccount("u1");
   const [id] = await approvedDrafts(accountId, ["URLを待つ"]);
   await setSchedule(accountId, { slotMinutes: [720] });
-  await fake.publishFail("getMedia", "transient", 2);
+  // 公開の直後に取れなければ、同じ回では取り直さず、次の回に取り直す
+  await fake.publishFail("getMedia", "transient", 1);
   await run(now);
   expect(await draftRow(id!)).toMatchObject({ status: "published", threads_permalink: null });
   await run(addMin(now, 5));
@@ -210,5 +211,37 @@ describe("PR #6 のCodexレビュー", () => {
       status: "published",
       threads_media_id: published.id,
     });
+  });
+
+  it("上限で止める期限は、上限の応答を受けた時刻（実際の時刻）の翌日0時にする", async () => {
+    const { accountId } = await connectedAccount("u1");
+    await approvedDrafts(accountId, ["上限"]);
+    await setSchedule(accountId, { slotMinutes: [1435] });
+    await fake.publishFail("createContainer", "rate_limit", 1);
+    // 23:56 の回が遅れ、上限の応答を受けたのは翌日の 0:01（日本時間）
+    await run(jst("2030-01-10 23:56"), { clock: () => jst("2030-01-11 00:01") });
+    const [schedule] =
+      await db()`SELECT paused_until FROM posting_schedules WHERE account_id = ${accountId}`;
+    expect(new Date(schedule!.paused_until as string).toISOString()).toBe(
+      jst("2030-01-12 00:00").toISOString(),
+    );
+  });
+
+  it("URLの取り直しに失敗し続ける投稿があっても、後の投稿のURLを取り直す", async () => {
+    const now = jst("2030-01-10 12:00");
+    const { accountId, threadsUserId } = await connectedAccount("u1");
+    const [bad1, bad2, good] = await approvedDrafts(accountId, ["取れない1", "取れない2", "取れる"]);
+    const mediaId = await fake.addPost(threadsUserId, "取れる", addMin(now, -120));
+    // 取れない2件のほうが新しい（並び順だけでは、毎回この2件が選ばれる）
+    await db()`UPDATE post_drafts SET status = 'published', prioritized_at = NULL, published_at = ${addMin(now, -30).toISOString()},
+      threads_media_id = 'missing-' || id WHERE id IN (${bad1!}, ${bad2!})`;
+    await db()`UPDATE post_drafts SET status = 'published', prioritized_at = NULL, published_at = ${addMin(now, -120).toISOString()},
+      threads_media_id = ${mediaId} WHERE id = ${good!}`;
+    await run(now);
+    expect(await draftRow(good!)).toMatchObject({ threads_permalink: null });
+    expect(await draftRow(bad1!)).toMatchObject({ permalink_checked_at: expect.anything() });
+    await run(addMin(now, 5));
+    expect(await draftRow(good!)).toMatchObject({ threads_permalink: expect.any(String) });
+    expect(await draftRow(bad1!)).toMatchObject({ threads_permalink: null });
   });
 });

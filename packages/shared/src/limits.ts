@@ -106,6 +106,8 @@ export const AUTOPOST_LATE_WARN_MINUTES = 10;
 export const AUTOPOST_FIND_PUBLISHED_HOURS = 24;
 /** 結果がわからない投稿を探すとき、公開を送った時刻より前に見てよい幅（秒。Threadsとの時計のずれ。R6）。 */
 export const AUTOPOST_RECONCILE_SKEW_SECONDS = 60;
+/** 投稿のURLの取り直しに失敗した投稿を、次に取り直すまでの間（分。contracts/auto-post-job.md 手順5）。 */
+export const AUTOPOST_PERMALINK_RETRY_MINUTES = 60;
 /** 投稿の試みを残す日数（日次の処理で、これより古い行を消す）。 */
 export const AUTOPOST_ATTEMPT_RETENTION_DAYS = 30;
 /** 設定の画面で深夜の案内を出す時間帯（0時からの分。2:00〜4:59。終わりは含まない。FR-001b）。 */

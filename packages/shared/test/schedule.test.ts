@@ -169,6 +169,11 @@ describe("予定の計算（FR-021、US4 シナリオ1、research.md R9）", () 
     expect(fmt(r)).toEqual(fmt([jst("2026-10-07 07:30"), jst("2026-10-07 12:00")]));
   });
 
+  it("何日も前に過ぎた paused_until でも、先の予定を返す（PR #6 のCodexレビュー）", () => {
+    const r = projectSchedule({ ...base, pausedUntil: jst("2026-09-20 00:00"), count: 2 });
+    expect(fmt(r)).toEqual(fmt([jst("2026-10-06 12:00"), jst("2026-10-06 21:00")]));
+  });
+
   it("今日の投稿済みが時刻の数に達していれば、今日の残りは飛ばす", () => {
     const r = projectSchedule({ ...base, slotMinutes: [450, 720, 1260], publishedToday: 3, count: 1 });
     expect(fmt(r)).toEqual(fmt([jst("2026-10-07 07:30")]));

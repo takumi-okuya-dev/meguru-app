@@ -35,7 +35,13 @@ type PublishError =
 
 /** 公開まで進めた結果。 */
 export type ExecuteOutcome =
-  | { kind: "published"; slotAt: Date }
+  | {
+      kind: "published";
+      slotAt: Date;
+      draftId: string;
+      /** 投稿のIDはあるが、URLを取れなかった（次の回に取り直す） */
+      needsPermalink: boolean;
+    }
   | { kind: "waiting" }
   | { kind: "retry" }
   | { kind: "carried_over" }
@@ -310,8 +316,15 @@ class AttemptContext {
       }),
       this.updateAttempt({ state: "succeeded", leaseUntil: null }),
     ]);
-    if (mediaId) await fillPermalink(this.db, this.threads, cred.token, this.draft.id, mediaId);
-    return { kind: "published", slotAt: this.attempt.slotAt };
+    const saved = mediaId
+      ? await fillPermalink(this.db, this.threads, cred.token, this.draft.id, mediaId)
+      : false;
+    return {
+      kind: "published",
+      slotAt: this.attempt.slotAt,
+      draftId: this.draft.id,
+      needsPermalink: mediaId !== null && !saved,
+    };
   }
 
   /**
@@ -408,11 +421,12 @@ class AttemptContext {
   }
 
   /**
-   * 上限では翌日の0時（日本時間）まで止める。
+   * 上限では、上限の応答を受けた日の翌日の0時（日本時間）まで止める。
+   * Cron の予定時刻で求めると、0時の直前の回が遅れて0時を過ぎたとき、止める期限がすでに過ぎている。
    * @returns 飛ばした結果
    */
   private async rateLimited(): Promise<ExecuteOutcome> {
-    const pausedUntil = jstMidnight(addDays(jstDateOf(this.now), 1));
+    const pausedUntil = jstMidnight(addDays(jstDateOf(this.clock()), 1));
     await this.db
       .update(postingSchedules)
       .set({ pausedUntil })

@@ -2,8 +2,8 @@
 import { AUTOPOST_ATTEMPT_RETENTION_DAYS, addDays, jstDateOf } from "@threads-grower/shared";
 import type { Env } from "../env";
 import { createDb } from "../db/client";
-import { oauthStates, publishAttempts } from "../db/schema";
-import { and, lt, notInArray } from "drizzle-orm";
+import { oauthStates, postingSchedules, publishAttempts } from "../db/schema";
+import { and, isNotNull, lt, notInArray } from "drizzle-orm";
 import { logger } from "../lib/logger";
 import { createThreadsClient } from "../lib/threads-client";
 import { cleanupDeletionIdentifiers, retryDeletions } from "./data-deletion";
@@ -49,6 +49,19 @@ export async function runDailyJobs(env: Env, now: Date = new Date()) {
               ),
             )
             .returning({ id: publishAttempts.id })
+        ).length,
+      }),
+    ],
+    [
+      // 過ぎた停止を消す（contracts/api.md「定期処理」。設定の版は変えない。data-model.md）
+      "expired publish pauses",
+      async () => ({
+        cleared: (
+          await createDb(env.DATABASE_URL)
+            .update(postingSchedules)
+            .set({ pausedUntil: null })
+            .where(and(isNotNull(postingSchedules.pausedUntil), lt(postingSchedules.pausedUntil, now)))
+            .returning({ accountId: postingSchedules.accountId })
         ).length,
       }),
     ],

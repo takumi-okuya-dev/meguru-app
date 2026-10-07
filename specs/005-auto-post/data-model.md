@@ -70,6 +70,7 @@ Accountと1対1。最初の保存で作る。行がなければ既定値とし�
 | `published_at` | timestamptz(6) | NULL可 | 投稿した日時（FR-009） |
 | `threads_media_id` | text | NULL可 | Threadsの投稿のID |
 | `threads_permalink` | text | NULL可、`char_length <= 2000` | Threadsの投稿のURL。公開の後に取るので、一時的に空のことがある（R6） |
+| `permalink_checked_at` | timestamptz | NULL可 | URLの取り直しに最後に失敗した日時。失敗した投稿を`AUTOPOST_PERMALINK_RETRY_MINUTES`の間は選ばない（contracts/auto-post-job.md 手順5） |
 | `publish_failed_at` | timestamptz(6) | NULL可 | 投稿に失敗にした日時 |
 | `publish_error` | text | NULL可、値は上の表 | 投稿に失敗の理由 |
 | `blocked_at` | timestamptz(6) | NULL可 | 投稿の直前のチェックで要確認に戻した日時（FR-007） |

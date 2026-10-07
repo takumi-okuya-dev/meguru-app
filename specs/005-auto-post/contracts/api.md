@@ -214,6 +214,7 @@ type ThreadsCheck =
 - **200**：`{ "items": PostDraft[], "nextCursor": string | null }`
   - `items`は`published_at`の新しい順（同じ日時は`id`の順）。
   - `nextCursor`は、最後の項目の`published_at`と`id`を組にした不透明な文字列。続きがなければ`null`。
+  - `before`が読めない（形が壊れている・IDがUUIDでない）ときは **400** `VALIDATION_FAILED`（`details: ["before"]`）。
 - 件数は`GET /post-drafts`の`counts.published`を使う。
 - 列は画面で使うもの（`id`・`body`・`publishedAt`・`threadsPermalink`・`threadsMediaId`）に絞ってよい。型は`PostDraft`の一部（`PublishedPost`）とする。
 

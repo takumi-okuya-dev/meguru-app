@@ -431,6 +431,8 @@ export const postDrafts = pgTable(
     publishedAt: timestamp("published_at", { withTimezone: true, precision: 6 }),
     threadsMediaId: text("threads_media_id"),
     threadsPermalink: text("threads_permalink"),
+    /** 投稿のURLの取り直しに最後に失敗した日時（失敗し続ける投稿を後回しにする。PR #6 のCodexレビュー） */
+    permalinkCheckedAt: timestamp("permalink_checked_at", { withTimezone: true, precision: 6 }),
     // 投稿に失敗（FR-014）
     publishFailedAt: timestamp("publish_failed_at", { withTimezone: true, precision: 6 }),
     publishError: text("publish_error"),

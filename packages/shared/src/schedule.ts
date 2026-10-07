@@ -208,7 +208,9 @@ export function projectSchedule(input: ProjectScheduleInput): Date[] {
     }
   }
 
-  const maxDays = Math.ceil(input.count / input.slotMinutes.length) + 2 + (pausedUntil ? Math.ceil((pausedUntil - input.now.getTime()) / DAY_MS) : 0);
+  // 止めている間の日数だけ先まで見る。過ぎた paused_until では足さない（負にすると先読みが縮み、時刻を返さなくなる）
+  const pausedDays = pausedUntil ? Math.max(0, Math.ceil((pausedUntil - input.now.getTime()) / DAY_MS)) : 0;
+  const maxDays = Math.ceil(input.count / input.slotMinutes.length) + 2 + pausedDays;
   for (let d = 0; d <= maxDays && result.length < input.count; d++) {
     const date = addDays(today, d);
     for (const minute of input.slotMinutes) {

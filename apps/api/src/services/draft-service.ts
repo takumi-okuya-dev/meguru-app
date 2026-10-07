@@ -12,6 +12,7 @@ import {
   type RejectReasonCode,
 } from "@threads-grower/shared";
 import { and, asc, count, desc, eq, inArray, sql } from "drizzle-orm";
+import { z } from "zod";
 import { withTransaction, type Db, type TxDb } from "../db/client";
 import { lockAccountDrafts } from "../db/locks";
 import { draftBatches, postDrafts } from "../db/schema";
@@ -438,12 +439,8 @@ function decodeCursor(cursor: string): { publishedAt: Date; id: string } | null 
       string,
     ];
     const publishedAt = new Date(at);
-    if (
-      Number.isNaN(publishedAt.getTime()) ||
-      typeof id !== "string" ||
-      !/^[0-9a-f-]{36}$/i.test(id)
-    )
-      return null;
+    // uuid 型と比べるので、UUID の形でなければ DB に渡さない（"-" が36個などで 500 になる。PR #6 のCodexレビュー）
+    if (Number.isNaN(publishedAt.getTime()) || !z.string().uuid().safeParse(id).success) return null;
     return { publishedAt, id };
   } catch {
     return null;
@@ -464,6 +461,8 @@ export async function listPublishedPage(
   opts: { before?: string; limit: number },
 ) {
   const cursor = opts.before ? decodeCursor(opts.before) : null;
+  if (opts.before && !cursor)
+    throw new AppError("VALIDATION_FAILED", 400, "invalid cursor", undefined, ["before"]);
   const rows = await db
     .select({
       id: postDrafts.id,

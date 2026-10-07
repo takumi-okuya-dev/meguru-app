@@ -38,6 +38,20 @@ it("30日より前でも、処理中・やり直し待ちの試みは消さな�
   ).toMatchObject([{ state: "in_progress" }, { state: "retry_wait" }]);
 });
 
+it("過ぎた paused_until だけを消し、設定の版は変えない（PR #6 のCodexレビュー）", async () => {
+  const { accountId: past } = await connectedAccount("u1");
+  const { accountId: future } = await connectedAccount("u2");
+  await setSchedule(past, { slotMinutes: [720], pausedUntil: jst("2030-01-20 00:00") });
+  await setSchedule(future, { slotMinutes: [720], pausedUntil: jst("2030-02-02 00:00") });
+  await runDailyJobs(testEnv, jst("2030-02-01 03:00"));
+  const rows = await db()`SELECT account_id, paused_until, version FROM posting_schedules`;
+  const byId = new Map(rows.map((r) => [r.account_id as string, r]));
+  expect(byId.get(past)).toMatchObject({ paused_until: null, version: 1 });
+  expect(new Date(byId.get(future)!.paused_until as string).toISOString()).toBe(
+    jst("2030-02-02 00:00").toISOString(),
+  );
+});
+
 it("再接続でeffective_fromを進め、版を変えずに過去の時刻を拾わない", async () => {
   const app = makeApp();
   const { accountId, threadsUserId } = await connectedAccount("u1", app);

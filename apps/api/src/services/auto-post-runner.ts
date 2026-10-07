@@ -5,6 +5,7 @@ import {
   AUTOPOST_LATE_WINDOW_MINUTES,
   AUTOPOST_LEASE_SECONDS,
   AUTOPOST_MAX_PER_TICK,
+  AUTOPOST_PERMALINK_RETRY_MINUTES,
   addDays,
   findDueSlot,
   jstDateOf,
@@ -12,7 +13,21 @@ import {
   projectSchedule,
   type DueSlot,
 } from "@threads-grower/shared";
-import { and, asc, eq, gte, inArray, isNull, lt, lte, min, or, sql } from "drizzle-orm";
+import {
+  and,
+  asc,
+  desc,
+  eq,
+  gte,
+  inArray,
+  isNull,
+  lt,
+  lte,
+  min,
+  notInArray,
+  or,
+  sql,
+} from "drizzle-orm";
 import { createDb, type Db } from "../db/client";
 import { accounts, postDrafts, postingSchedules, publishAttempts } from "../db/schema";
 import type { Env } from "../env";
@@ -93,10 +108,15 @@ export async function runAutoPost(
   summary.ran = true;
   const db = createDb(env.DATABASE_URL);
   let budget = AUTOPOST_MAX_PER_TICK;
+  // この回に公開した下書き（URLの取り直しはこの回では行わず、取れなかったものは次の回に取り直す）
+  const publishedNow: string[] = [];
+  let permalinkSoon = false;
 
   const tally = (o: ExecuteOutcome) => {
     if (o.kind === "published") {
       summary.published += 1;
+      publishedNow.push(o.draftId);
+      if (o.needsPermalink) permalinkSoon = true;
       const lag = (now.getTime() - o.slotAt.getTime()) / 60_000;
       logger.info("auto-post: published", { lagMinutes: Math.round(lag) });
       if (lag > AUTOPOST_LATE_WARN_MINUTES)
@@ -229,8 +249,9 @@ export async function runAutoPost(
   }
 
   // 5. 投稿のURLの取り直し（余裕があるときだけ。SC-006）
-  let permalinkPending = false;
-  if (budget > 0) permalinkPending = await refillPermalinks(env, db, threads, now);
+  let permalinkPending = permalinkSoon;
+  if (budget > 0 && (await refillPermalinks(env, db, threads, now, publishedNow)))
+    permalinkPending = true;
 
   // 7. 関所の書き込み
   const [[nextRetry], [inProgress]] = await Promise.all([
@@ -282,40 +303,53 @@ export async function runAutoPost(
 
 /**
  * URLの空いた投稿済み（7日以内）を、最大2件取り直す（contracts/auto-post-job.md 手順5）。
+ * 接続済みのAccountの投稿だけを、試していない・前に試したのが古い順に選ぶ。失敗したら permalink_checked_at を入れ、
+ * AUTOPOST_PERMALINK_RETRY_MINUTES の間は選ばない（失敗し続ける投稿が、後の投稿の取り直しを止めない）。
  * @param env - Workers のバインディング
  * @param db - データベース
  * @param threads - Threads API のクライアント
  * @param now - 今の時刻
- * @returns URLを取り直す投稿があるか（次の回にも取り直す）
+ * @param exclude - この回に公開した下書き（公開の直後に一度試しているので、この回では選ばない）
+ * @returns すぐに取り直せる投稿が残っているか（次の回にも取り直す）
  */
 async function refillPermalinks(
   env: Env,
   db: Db,
   threads: ThreadsClient,
   now: Date,
+  exclude: string[],
 ): Promise<boolean> {
+  const retryBefore = new Date(now.getTime() - AUTOPOST_PERMALINK_RETRY_MINUTES * 60_000);
   const rows = await db
     .select({
       id: postDrafts.id,
       accountId: postDrafts.accountId,
       mediaId: postDrafts.threadsMediaId,
-      publishedAt: postDrafts.publishedAt,
     })
     .from(postDrafts)
+    .innerJoin(accounts, eq(accounts.id, postDrafts.accountId))
     .where(
       and(
         eq(postDrafts.status, "published"),
         isNull(postDrafts.threadsPermalink),
         sql`${postDrafts.threadsMediaId} IS NOT NULL`,
         gte(postDrafts.publishedAt, new Date(now.getTime() - 7 * 86_400_000)),
+        eq(accounts.connectionStatus, "connected"),
+        or(isNull(postDrafts.permalinkCheckedAt), lt(postDrafts.permalinkCheckedAt, retryBefore)),
+        exclude.length ? notInArray(postDrafts.id, exclude) : undefined,
       ),
     )
-    .limit(2);
-  let pendingRecent = rows.length === 2;
-  for (const r of rows) {
+    .orderBy(sql`${postDrafts.permalinkCheckedAt} ASC NULLS FIRST`, desc(postDrafts.publishedAt))
+    .limit(3);
+  for (const r of rows.slice(0, 2)) {
     const cred = await loadThreadsCredentials(env, db, r.accountId);
     const ok = cred?.token ? await fillPermalink(db, threads, cred.token, r.id, r.mediaId!) : false;
-    if (!ok) pendingRecent = true;
+    if (!ok)
+      await db
+        .update(postDrafts)
+        .set({ permalinkCheckedAt: now })
+        .where(eq(postDrafts.id, r.id));
   }
-  return pendingRecent;
+  // 3件目があれば、次の回にすぐ続ける。失敗した投稿は、間をあけてから（ほかの用で起きた回に）取り直す
+  return rows.length > 2;
 }

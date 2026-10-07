@@ -21,6 +21,7 @@
 | `AUTOPOST_LATE_WARN_MINUTES` | 10 | これを超える遅れで`warn`を出す（SC-004） |
 | `LATE_NIGHT_HINT_MINUTES` | [120, 300) | 設定の画面で案内を出す時間帯（2:00〜4:59。FR-001b） |
 | `AUTOPOST_FIND_PUBLISHED_HOURS` | 24 | 結果が分からない投稿を探し続ける時間（R6） |
+| `AUTOPOST_PERMALINK_RETRY_MINUTES` | 60 | URLの取り直しに失敗した投稿を、次に取り直すまでの間（手順5） |
 | `AUTOPOST_RECONCILE_SKEW_SECONDS` | 60 | 結果が分からない投稿を探すとき、`publish_requested_at`より前に見てよい幅（Threadsとの時計のずれ。R6） |
 
 暫定値はspec Assumptionsのとおり、実運用で見直す。
@@ -137,6 +138,11 @@ Accountが要再接続なら、`publish_requested_at`がない試み（まだ公
 ### 5. 投稿のURLの取り直し
 
 `status = 'published'`で`threads_permalink`が空、かつ`published_at`が7日以内の下書きを、1回に最大2件、`getMedia`で取り直す。サブリクエストに余裕があるときだけ行う。
+
+- 対象は接続済みのAccountの投稿だけ。`permalink_checked_at`が空のもの、次に古いものの順（同じなら`published_at`の新しい順）に選ぶ。
+- 取り直しに失敗したら`permalink_checked_at = now`を入れ、`AUTOPOST_PERMALINK_RETRY_MINUTES`の間は選ばない。失敗し続ける投稿が、後の投稿の取り直しを止めないため。
+- この回に公開した投稿は、公開の直後に一度試しているので選ばない。そこで取れなかったら、次の回にすぐ取り直す。
+- すぐ次の回に起こすのは、すぐ取り直せる対象がこの回の2件のほかに残っているとき、またはこの回に公開した投稿のURLを取れなかったときだけ。
 
 ### 6. 1件の失敗で全体を止めない
 

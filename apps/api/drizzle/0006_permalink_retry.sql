@@ -1,0 +1,1 @@
+ALTER TABLE "post_drafts" ADD COLUMN "permalink_checked_at" timestamp (6) with time zone;

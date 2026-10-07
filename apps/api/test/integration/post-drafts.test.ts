@@ -545,6 +545,22 @@ describe("005：処理中・投稿済みの下書き（FR-008・FR-020）と、�
     expect(Object.keys(p1.items[0]!).sort()).toEqual(["body", "id", "publishedAt", "threadsMediaId", "threadsPermalink"]);
   });
 
+  it("GET /post-drafts/published：読めないカーソル（IDがUUIDでない など）は 400 VALIDATION_FAILED（PR #6 のCodexレビュー）", async () => {
+    const { accountId } = await createUserWithAccount("u1");
+    const cursor = (v: unknown) =>
+      btoa(JSON.stringify(v)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+    for (const before of [
+      cursor(["2030-01-01T00:00:00.000Z", "-".repeat(36)]),
+      cursor(["2030-01-01T00:00:00.000Z", "zzzzzzzz-zzzz-zzzz-zzzz-zzzzzzzzzzzz"]),
+      cursor(["not a date", crypto.randomUUID()]),
+      "@@@",
+    ]) {
+      const res = await call(app, "GET", `${base(accountId)}/post-drafts/published?before=${encodeURIComponent(before)}`, { user: "u1" });
+      expect(res.status).toBe(400);
+      expect(await res.json()).toMatchObject({ error: { code: "VALIDATION_FAILED", details: ["before"] } });
+    }
+  });
+
   it("他人のAccountの GET /post-drafts/published は 404 ACCOUNT_NOT_FOUND", async () => {
     const { accountId } = await createUserWithAccount("u1");
     await createUserWithAccount("u2");
