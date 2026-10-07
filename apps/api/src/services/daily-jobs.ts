@@ -2,8 +2,8 @@
 import { AUTOPOST_ATTEMPT_RETENTION_DAYS, addDays, jstDateOf } from "@threads-grower/shared";
 import type { Env } from "../env";
 import { createDb } from "../db/client";
-import { oauthStates, postingSchedules, publishAttempts } from "../db/schema";
-import { and, isNotNull, lt, notInArray } from "drizzle-orm";
+import { oauthStates, postDrafts, postingSchedules, publishAttempts } from "../db/schema";
+import { and, eq, isNotNull, lt, notExists, notInArray } from "drizzle-orm";
 import { logger } from "../lib/logger";
 import { createThreadsClient } from "../lib/threads-client";
 import { cleanupDeletionIdentifiers, retryDeletions } from "./data-deletion";
@@ -46,6 +46,13 @@ export async function runDailyJobs(env: Env, now: Date = new Date()) {
                 ),
                 // 処理中・やり直し待ちは、下書きを publishing のまま残すので消さない（結果を確かめ終えてから消す）
                 notInArray(publishAttempts.state, ["in_progress", "retry_wait"]),
+                // 持ち越し（carried_over）で下書きが参照している試みは、次の時刻の優先と「持ち越しは1回だけ」を決めるので消さない
+                notExists(
+                  createDb(env.DATABASE_URL)
+                    .select({ id: postDrafts.id })
+                    .from(postDrafts)
+                    .where(eq(postDrafts.carryoverAttemptId, publishAttempts.id)),
+                ),
               ),
             )
             .returning({ id: publishAttempts.id })

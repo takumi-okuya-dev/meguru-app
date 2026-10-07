@@ -12,7 +12,9 @@ import { lockThreadsUser, lockUserRow } from "../db/locks";
 import {
   accounts,
   memberships,
+  postDrafts,
   postingSchedules,
+  publishAttempts,
   threadsConnections,
   threadsDeletionRequests,
   threadsRevocations,
@@ -260,6 +262,42 @@ async function writeConnection(
     .update(postingSchedules)
     .set({ effectiveFrom: now })
     .where(eq(postingSchedules.accountId, accountId));
+  // 再接続より前に取り、まだ公開を送っていない試みは進めない：飛ばして（要再接続）、下書きを承認済みに戻す。
+  // 札を消すので、実行中の古い処理は以後の更新も公開もできない。公開の結果がわからない試みは確かめ続ける（005 PR #6）
+  const stale = await tx
+    .select({ id: publishAttempts.id, draftId: publishAttempts.draftId })
+    .from(publishAttempts)
+    .where(
+      and(
+        eq(publishAttempts.accountId, accountId),
+        inArray(publishAttempts.state, ["in_progress", "retry_wait"]),
+        isNull(publishAttempts.publishRequestedAt),
+      ),
+    )
+    .for("update");
+  if (stale.length === 0) return;
+  await tx
+    .update(publishAttempts)
+    .set({
+      state: "skipped",
+      skipReason: "needs_reconnect",
+      draftId: null,
+      leaseUntil: null,
+      leaseToken: null,
+      updatedAt: now,
+    })
+    .where(
+      inArray(
+        publishAttempts.id,
+        stale.map((a) => a.id),
+      ),
+    );
+  const draftIds = stale.flatMap((a) => (a.draftId ? [a.draftId] : []));
+  if (draftIds.length > 0)
+    await tx
+      .update(postDrafts)
+      .set({ status: "approved", version: sql`${postDrafts.version} + 1`, updatedAt: now })
+      .where(and(inArray(postDrafts.id, draftIds), eq(postDrafts.status, "publishing")));
 }
 
 // ---- Accountの画面を開いたとき（research.md R10・R14） ----

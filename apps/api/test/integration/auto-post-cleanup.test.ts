@@ -8,19 +8,24 @@ beforeEach(async () => {
   await fake.reset();
 });
 
-it("30日より前の試みだけを消し、持ち越しの参照も外す", async () => {
+it("30日より前の試みだけを消す。持ち越しで下書きが参照している試みは残す（PR #6 のCodexレビュー）", async () => {
   const { accountId } = await connectedAccount("u1");
-  const [old] =
-    await db()`INSERT INTO publish_attempts (account_id, slot_at, slot_date, slot_minute, state, skip_reason) VALUES (${accountId}, '2030-01-01T03:00:00Z', '2030-01-01', 720, 'skipped', 'no_drafts') RETURNING id`;
+  const [carried] =
+    await db()`INSERT INTO publish_attempts (account_id, slot_at, slot_date, slot_minute, state, last_error) VALUES (${accountId}, '2030-01-01T03:00:00Z', '2030-01-01', 720, 'carried_over', 'threads_server') RETURNING id`;
+  await db()`INSERT INTO publish_attempts (account_id, slot_at, slot_date, slot_minute, state, skip_reason) VALUES (${accountId}, '2030-01-01T04:00:00Z', '2030-01-01', 780, 'skipped', 'no_drafts')`;
   await db()`INSERT INTO publish_attempts (account_id, slot_at, slot_date, slot_minute, state, skip_reason) VALUES (${accountId}, '2030-01-02T03:00:00Z', '2030-01-02', 720, 'skipped', 'no_drafts')`;
   const [id] = await approvedDrafts(accountId, ["持ち越し"]);
-  await db()`UPDATE post_drafts SET carryover_attempt_id = ${old!.id as string} WHERE id = ${id!}`;
+  await db()`UPDATE post_drafts SET carryover_attempt_id = ${carried!.id as string} WHERE id = ${id!}`;
   await runDailyJobs(testEnv, jst("2030-02-01 00:00"));
-  expect(await db()`SELECT slot_date FROM publish_attempts`).toMatchObject([
-    { slot_date: "2030-01-02" },
+  // 参照されていない古い試み（2030-01-01 の skipped）だけが消える
+  expect(
+    await db()`SELECT slot_date, state FROM publish_attempts ORDER BY slot_at`,
+  ).toMatchObject([
+    { slot_date: "2030-01-01", state: "carried_over" },
+    { slot_date: "2030-01-02", state: "skipped" },
   ]);
   expect(await db()`SELECT carryover_attempt_id FROM post_drafts WHERE id = ${id!}`).toMatchObject([
-    { carryover_attempt_id: null },
+    { carryover_attempt_id: carried!.id },
   ]);
 });
 

@@ -50,6 +50,14 @@ export type ExecuteOutcome =
   | { kind: "failed" }
   | { kind: "skipped"; reason: "needs_reconnect" | "rate_limited" };
 
+/** 持ち時間を別の処理に取られた（再接続の片付けを含む）。この処理では、それ以上何も書かず、公開もしない。 */
+class LeaseLostError extends Error {
+  constructor() {
+    super("publish attempt lease lost");
+    this.name = "LeaseLostError";
+  }
+}
+
 /**
  * 一時的な失敗の理由を分類する。
  * @param err - 失敗
@@ -70,11 +78,14 @@ function parseThreadsTime(ts: string): Date {
 }
 
 /**
- * 試みを1つ、公開まで進める（手順4）。呼ぶ側が試みの持ち時間（lease_until）を取ってあること。
+ * 試みを1つ、公開まで進める（手順4）。呼ぶ側が試みの持ち時間（lease_until）と持ち主の札（lease_token）を取ってあること。
+ * 試みの更新は、すべて「処理中で、札が同じ」ことを条件にする。持ち時間が切れてほかの処理に取られた古い処理は、
+ * 何も書かず、公開も送らずに終える（PR #6 のCodexレビュー）。
  * @param env - Workers のバインディング
  * @param db - データベース
  * @param threads - Threads API のクライアント
  * @param attemptId - publish_attempts.id
+ * @param leaseToken - 持ち時間を取ったときの札（publish_attempts.lease_token）
  * @param now - 今の時刻（この回の基準の時刻）
  * @param clock - 実際の時刻（公開を送った・応答を受けた時刻の記録に使う。テストで差し替えられる）
  * @returns 結果
@@ -84,8 +95,27 @@ export async function executeAttempt(
   db: Db,
   threads: ThreadsClient,
   attemptId: string,
+  leaseToken: string,
   now: Date,
   clock: () => Date = () => new Date(),
+): Promise<ExecuteOutcome> {
+  try {
+    return await executeOwned(env, db, threads, attemptId, leaseToken, now, clock);
+  } catch (err) {
+    if (!(err instanceof LeaseLostError)) throw err;
+    logger.warn("auto-post: lease lost, stopped without writing", { attemptId });
+    return { kind: "waiting" };
+  }
+}
+
+async function executeOwned(
+  env: Env,
+  db: Db,
+  threads: ThreadsClient,
+  attemptId: string,
+  leaseToken: string,
+  now: Date,
+  clock: () => Date,
 ): Promise<ExecuteOutcome> {
   const [row] = await db
     .select({ attempt: publishAttempts, draft: postDrafts })
@@ -93,7 +123,8 @@ export async function executeAttempt(
     .leftJoin(postDrafts, eq(postDrafts.id, publishAttempts.draftId))
     .where(eq(publishAttempts.id, attemptId))
     .limit(1);
-  if (!row || row.attempt.state !== "in_progress") return { kind: "waiting" };
+  if (!row || row.attempt.state !== "in_progress" || row.attempt.leaseToken !== leaseToken)
+    return { kind: "waiting" };
   const { attempt, draft } = row;
   if (!draft || draft.status !== "publishing") {
     // 処理中の下書きは消せないので、通常は起きない
@@ -104,10 +135,10 @@ export async function executeAttempt(
     await db
       .update(publishAttempts)
       .set({ state: "failed", lastError: "unknown", leaseUntil: null, updatedAt: now })
-      .where(eq(publishAttempts.id, attemptId));
+      .where(and(eq(publishAttempts.id, attemptId), eq(publishAttempts.leaseToken, leaseToken)));
     return { kind: "failed" };
   }
-  const ctx = new AttemptContext(env, db, threads, attempt, draft, now, clock);
+  const ctx = new AttemptContext(env, db, threads, attempt, draft, leaseToken, now, clock);
   const cred = await loadThreadsCredentials(env, db, attempt.accountId);
   if (cred && cred.connectionStatus !== "connected" && !attempt.publishRequestedAt) {
     // 要再接続：トークンの有無によらず、新しく公開しない（連携の取り消しで接続の行が消えても、ここで止める）。
@@ -130,6 +161,7 @@ class AttemptContext {
     private readonly threads: ThreadsClient,
     private readonly attempt: AttemptRow,
     private readonly draft: DraftRow,
+    private readonly leaseToken: string,
     private readonly now: Date,
     private readonly clock: () => Date,
   ) {}
@@ -142,15 +174,35 @@ class AttemptContext {
     };
   }
 
-  private updateAttempt(values: Partial<typeof publishAttempts.$inferInsert>) {
+  /**
+   * 試みの更新（処理中で、札が同じときだけ）。
+   * @param values - 更新する列
+   * @returns 更新できた行のID（持ち主でなければ空）
+   */
+  private attemptUpdate(values: Partial<typeof publishAttempts.$inferInsert>) {
     return this.db
       .update(publishAttempts)
       .set({ ...values, updatedAt: this.now })
-      .where(eq(publishAttempts.id, this.attempt.id));
+      .where(
+        and(
+          eq(publishAttempts.id, this.attempt.id),
+          eq(publishAttempts.state, "in_progress"),
+          eq(publishAttempts.leaseToken, this.leaseToken),
+        ),
+      )
+      .returning({ id: publishAttempts.id });
   }
 
   /**
-   * 下書きをpublishingから変える。
+   * 試みを更新する。持ち主でなくなっていれば LeaseLostError（公開を送る前の記録では、公開を送らずに終える）。
+   * @param values - 更新する列
+   */
+  private async setAttempt(values: Partial<typeof publishAttempts.$inferInsert>) {
+    if ((await this.attemptUpdate(values)).length === 0) throw new LeaseLostError();
+  }
+
+  /**
+   * 下書きをpublishingから変える。同じトランザクションで、先に試みを更新してあること（札がまだ同じことを確かめる）。
    * @param values - 更新する列
    * @returns 処理中だけを対象にする更新
    */
@@ -158,7 +210,29 @@ class AttemptContext {
     return this.db
       .update(postDrafts)
       .set({ ...values, version: sql`${postDrafts.version} + 1`, updatedAt: this.now })
-      .where(and(eq(postDrafts.id, this.draft.id), eq(postDrafts.status, "publishing")));
+      .where(
+        and(
+          eq(postDrafts.id, this.draft.id),
+          eq(postDrafts.status, "publishing"),
+          sql`EXISTS (SELECT 1 FROM publish_attempts pa WHERE pa.id = ${this.attempt.id} AND pa.lease_token = ${this.leaseToken})`,
+        ),
+      );
+  }
+
+  /**
+   * 試みと下書きを1つのトランザクションで更新する。試みを先に更新して行をロックし、持ち主でなければ下書きも変えない。
+   * @param attemptValues - 試みの列
+   * @param draftValues - 下書きの列
+   */
+  private async commit(
+    attemptValues: Partial<typeof publishAttempts.$inferInsert>,
+    draftValues: Partial<typeof postDrafts.$inferInsert>,
+  ) {
+    const [updated] = await this.db.batch([
+      this.attemptUpdate(attemptValues),
+      this.updateDraft(draftValues),
+    ]);
+    if (updated.length === 0) throw new LeaseLostError();
   }
 
   async run(cred: ThreadsCredentials & { token: string }): Promise<ExecuteOutcome> {
@@ -183,7 +257,7 @@ class AttemptContext {
         // 公開要求の記録が欠けていても、新しく公開しない。作成日時を基準に照合する
         if (status === "PUBLISHED") return await this.confirm(cred, this.attempt.createdAt);
         if (status === "EXPIRED") {
-          await this.updateAttempt({ containerId: null });
+          await this.setAttempt({ containerId: null });
           return this.transientFailure("threads_server");
         }
       }
@@ -194,10 +268,10 @@ class AttemptContext {
           this.draft.body,
         ));
         // 公開を送る前に、コンテナーのIDを保存する（research.md R6）
-        await this.updateAttempt({ containerId });
+        await this.setAttempt({ containerId });
       }
       // 照合（confirm）では、この時刻より前の投稿を候補にしないので、Cron の予定時刻ではなく実際の時刻を残す
-      await this.updateAttempt({ publishRequestedAt: this.clock() });
+      await this.setAttempt({ publishRequestedAt: this.clock() });
       let mediaId: string;
       try {
         ({ mediaId } = await this.threads.publishContainer(
@@ -212,7 +286,7 @@ class AttemptContext {
           return this.release();
         }
         // 確かな応答（4xx など）なら公開されていない
-        await this.updateAttempt({ publishRequestedAt: null });
+        await this.setAttempt({ publishRequestedAt: null });
         throw err;
       }
       // 投稿日時は応答を受けた時刻（Cron の予定時刻ではない。日付・24時間の件数の数え方に使う）
@@ -234,7 +308,7 @@ class AttemptContext {
   ): Promise<ExecuteOutcome> {
     const containerId = this.attempt.containerId;
     if (!containerId) {
-      await this.updateAttempt({ publishRequestedAt: null });
+      await this.setAttempt({ publishRequestedAt: null });
       return this.transientFailure("unknown");
     }
     let status;
@@ -251,7 +325,7 @@ class AttemptContext {
     if (status === "ERROR") return this.definiteFailure("container_error");
     if (status === "FINISHED" || status === "EXPIRED") {
       // 公開されていない。FINISHED は同じコンテナーで、EXPIRED は作り直してやり直す
-      await this.updateAttempt({
+      await this.setAttempt({
         publishRequestedAt: null,
         ...(status === "EXPIRED" ? { containerId: null } : {}),
       });
@@ -308,17 +382,14 @@ class AttemptContext {
     mediaId: string | null,
     publishedAt: Date,
   ): Promise<ExecuteOutcome> {
-    await this.db.batch([
-      this.updateDraft({
+    await this.commit({ state: "succeeded", leaseUntil: null }, {
         status: "published",
         publishedAt,
         threadsMediaId: mediaId,
         // 投稿済みでは、投稿の順の記録を持たない（data-model.md の CHECK制約。analyze I1）
         prioritizedAt: null,
         carryoverAttemptId: null,
-      }),
-      this.updateAttempt({ state: "succeeded", leaseUntil: null }),
-    ]);
+      });
     const saved = mediaId
       ? await fillPermalink(this.db, this.threads, cred.token, this.draft.id, mediaId)
       : false;
@@ -341,11 +412,12 @@ class AttemptContext {
       AUTOPOST_RECHECK_MAX_MINUTES,
       Math.max(AUTOPOST_RECHECK_MIN_MINUTES, ageMinutes / 4),
     );
-    await this.updateAttempt({ leaseUntil: new Date(this.now.getTime() + delay * 60_000) });
+    await this.setAttempt({ leaseUntil: new Date(this.now.getTime() + delay * 60_000) });
     return { kind: "waiting" };
   }
 
   private async failure(err: unknown, cred: ThreadsCredentials): Promise<ExecuteOutcome> {
+    if (err instanceof LeaseLostError) throw err;
     // 上限・一時的な失敗も ThreadsApiError の一種なので、先に見る
     if (err instanceof ThreadsRateLimitError) return this.rateLimited();
     if (err instanceof ThreadsAuthError) {
@@ -370,7 +442,7 @@ class AttemptContext {
     const retries = this.attempt.retryCount;
     if (retries < AUTOPOST_RETRY_MAX) {
       const delay = AUTOPOST_RETRY_DELAYS_MINUTES[retries] ?? AUTOPOST_RETRY_DELAYS_MINUTES.at(-1)!;
-      await this.updateAttempt({
+      await this.setAttempt({
         state: "retry_wait",
         retryCount: retries + 1,
         nextRetryAt: new Date(this.now.getTime() + delay * 60_000),
@@ -381,10 +453,7 @@ class AttemptContext {
     }
     if (!this.attempt.isCarryover) {
       // 次の時刻に、同じ下書きで1回だけもう一度試す（投稿の順の先頭に置く）
-      await this.db.batch([
-        this.updateDraft({ status: "approved", carryoverAttemptId: this.attempt.id }),
-        this.updateAttempt({ state: "carried_over", lastError, leaseUntil: null }),
-      ]);
+      await this.commit({ state: "carried_over", lastError, leaseUntil: null }, { status: "approved", carryoverAttemptId: this.attempt.id });
       return { kind: "carried_over" };
     }
     return this.markFailed(lastError);
@@ -400,17 +469,14 @@ class AttemptContext {
   }
 
   private async markFailed(lastError: PublishError): Promise<ExecuteOutcome> {
-    await this.db.batch([
-      this.updateDraft({
+    await this.commit({ state: "failed", lastError, leaseUntil: null }, {
         status: "publish_failed",
         publishFailedAt: this.now,
         publishError: lastError,
         // 投稿に失敗では、投稿の順の記録を持たない（data-model.md の CHECK制約。analyze I1）
         prioritizedAt: null,
         carryoverAttemptId: null,
-      }),
-      this.updateAttempt({ state: "failed", lastError, leaseUntil: null }),
-    ]);
+      });
     return { kind: "failed" };
   }
 
@@ -422,10 +488,7 @@ class AttemptContext {
   async backToApproved(
     reason: "needs_reconnect" | "rate_limited",
   ): Promise<ExecuteOutcome> {
-    await this.db.batch([
-      this.updateDraft({ status: "approved" }),
-      this.updateAttempt({ state: "skipped", skipReason: reason, draftId: null, leaseUntil: null }),
-    ]);
+    await this.commit({ state: "skipped", skipReason: reason, draftId: null, leaseUntil: null }, { status: "approved" });
     return { kind: "skipped", reason };
   }
 

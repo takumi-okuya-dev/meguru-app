@@ -127,9 +127,9 @@ export async function runAutoPost(
     else if (o.kind === "skipped") summary.skipped += 1;
     else summary.waiting += 1;
   };
-  const execute = async (attemptId: string) => {
+  const execute = async (attemptId: string, leaseToken: string) => {
     try {
-      tally(await executeAttempt(env, db, threads, attemptId, now, clock));
+      tally(await executeAttempt(env, db, threads, attemptId, leaseToken, now, clock));
     } catch (err) {
       // 持ち時間が切れた後、次の回の「続きの処理」で拾われる
       logger.error("auto-post: unexpected error in attempt", { attemptId, err });
@@ -149,18 +149,21 @@ export async function runAutoPost(
       summary.deferred += 1;
       continue;
     }
+    // 新しい札で取る。前に持っていた処理（持ち時間が切れた古い処理）は、以後の更新ができなくなる
+    const leaseToken = crypto.randomUUID();
     const [got] = await db
       .update(publishAttempts)
       .set({
         state: "in_progress",
         leaseUntil: new Date(now.getTime() + AUTOPOST_LEASE_SECONDS * 1000),
+        leaseToken,
         updatedAt: now,
       })
       .where(and(eq(publishAttempts.id, a.id), continuable(now)))
       .returning({ id: publishAttempts.id });
     if (!got) continue; // ほかの処理が進めている
     budget -= 1;
-    await execute(a.id);
+    await execute(a.id, leaseToken);
   }
 
   // 2. 時刻の処理（来ている時刻の試みを作り、公開する）
@@ -241,7 +244,7 @@ export async function runAutoPost(
       } else if (r.kind === "claimed") {
         summary.blocked += r.blocked;
         budget -= 1;
-        await execute(r.attemptId);
+        await execute(r.attemptId, r.leaseToken);
       }
     } catch (err) {
       summary.deferred += 1;

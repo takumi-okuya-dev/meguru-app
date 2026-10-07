@@ -1,6 +1,16 @@
 import { beforeEach, describe, expect, it } from "vitest";
+import { createDb } from "../../src/db/client";
+import { createThreadsClient } from "../../src/lib/threads-client";
 import { claimSlot } from "../../src/services/publish-claim";
-import { fake, resetDb, call, makeApp, testEnv } from "../helpers/app";
+import { executeAttempt } from "../../src/services/publish-executor";
+import {
+  authorizeAndCallback,
+  call,
+  fake,
+  makeApp,
+  resetDb,
+  testEnv,
+} from "../helpers/app";
 import {
   addMin,
   approvedDrafts,
@@ -287,5 +297,66 @@ describe("PR #6 のCodexレビュー", () => {
     // 関所は、次に確かめる時刻（60分後）に起こす（処理中の試みがあるだけで毎回起こさない）
     const gate = JSON.parse((await testEnv.AUTOPOST_KV.get("autopost:gate"))!) as { nextCheckAt: string };
     expect(gate.nextCheckAt).toBe(addMin(now, 60).toISOString());
+  });
+
+  it("取り消しの後、次の回より前に再接続されても、再接続より前の試みは公開せず承認済みに戻す", async () => {
+    const app = makeApp();
+    const now = jst("2030-01-10 12:00");
+    const { accountId, threadsUserId } = await connectedAccount("u1", app);
+    const [id] = await approvedDrafts(accountId, ["再接続前の試み"]);
+    await setSchedule(accountId, { slotMinutes: [720] });
+    await fake.publishFail("createContainer", "transient", 1);
+    await run(now);
+    expect(await attempts(accountId)).toMatchObject([{ state: "retry_wait" }]);
+    // 連携の取り消し → 次の回より前に再接続
+    await db()`DELETE FROM threads_connections WHERE account_id = ${accountId}`;
+    await db()`UPDATE accounts SET connection_status = 'needs_reconnect' WHERE id = ${accountId}`;
+    const res = await call(app, "POST", "/api/threads/connect", {
+      user: "u1",
+      body: { mode: "reconnect", accountId },
+    });
+    const { authorizeUrl } = (await res.json()) as { authorizeUrl: string };
+    expect(
+      (await authorizeAndCallback(app, authorizeUrl, { fakeUser: threadsUserId })).status,
+    ).toBe(302);
+    expect(await attempts(accountId)).toMatchObject([
+      { state: "skipped", skip_reason: "needs_reconnect", draft_id: null, lease_token: null },
+    ]);
+    expect(await draftRow(id!)).toMatchObject({ status: "approved" });
+    await run(addMin(now, 5));
+    expect(await fake.posts()).toHaveLength(0);
+  });
+
+  it("持ち時間が切れてほかの処理に取られた古い処理は、コンテナーを記録せず公開も送らない", async () => {
+    const now = jst("2030-01-10 12:00");
+    const { accountId } = await connectedAccount("u1");
+    const [id] = await approvedDrafts(accountId, ["古い処理"]);
+    await db()`UPDATE post_drafts SET status = 'publishing', prioritized_at = NULL WHERE id = ${id!}`;
+    const token = crypto.randomUUID();
+    const [attempt] = await db()`INSERT INTO publish_attempts (account_id, slot_at, slot_date, slot_minute, state, draft_id, lease_until, lease_token)
+      VALUES (${accountId}, ${now.toISOString()}, '2030-01-10', 720, 'in_progress', ${id!}, ${addMin(now, 2).toISOString()}, ${token}) RETURNING id`;
+    const attemptId = attempt!.id as string;
+    const real = createThreadsClient(testEnv);
+    // コンテナーを作っている間に処理が止まり、持ち時間が切れて、ほかの処理が新しい札で取った
+    const threads = {
+      ...real,
+      createTextContainer: async (...args: Parameters<typeof real.createTextContainer>) => {
+        const r = await real.createTextContainer(...args);
+        await db()`UPDATE publish_attempts SET lease_token = gen_random_uuid() WHERE id = ${attemptId}`;
+        return r;
+      },
+    };
+    const out = await executeAttempt(testEnv, createDb(testEnv.DATABASE_URL), threads, attemptId, token, now);
+    expect(out).toEqual({ kind: "waiting" });
+    expect(await fake.posts()).toHaveLength(0);
+    expect(await attempts(accountId)).toMatchObject([
+      { state: "in_progress", container_id: null, publish_requested_at: null },
+    ]);
+    expect(await draftRow(id!)).toMatchObject({ status: "publishing" });
+    // 札が違えば、最初から何もしない
+    expect(
+      await executeAttempt(testEnv, createDb(testEnv.DATABASE_URL), real, attemptId, token, now),
+    ).toEqual({ kind: "waiting" });
+    expect(await fake.containers()).toHaveLength(1);
   });
 });

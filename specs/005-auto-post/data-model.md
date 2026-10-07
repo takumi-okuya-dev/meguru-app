@@ -141,7 +141,8 @@ stateDiagram-v2
 | `container_id` | text | NULL可 | 作ったThreadsのコンテナーのID。公開を送る前に保存する |
 | `publish_requested_at` | timestamptz(6) | NULL可 | 公開を送った時刻。これがあり結果が未確定なら、新しいコンテナーを作らない（R6） |
 | `last_error` | text | NULL可、値は上の表 | 最後の失敗の理由 |
-| `lease_until` | timestamptz | NULL可 | 処理している定期処理の持ち時間。過ぎていれば、ほかの処理が引き継げる |
+| `lease_until` | timestamptz | NULL可 | 処理している定期処理の持ち時間。過ぎていれば、ほかの処理が引き継げる。待機では「次に確かめる時刻」 |
+| `lease_token` | uuid | NULL可 | 持ち時間を取った処理の札。取るたびに新しくし、試みの更新は札が同じときだけ行う（持ち時間の切れた古い処理を締め出す）。再接続の片付けでは消す |
 | `created_at`・`updated_at` | timestamptz(6) | NOT NULL | |
 
 - **一意**：`(account_id, slot_at)`。同じ時刻を二重に処理しない。

@@ -30,7 +30,7 @@ export type ClaimResult =
   | { kind: "waiting" }
   | { kind: "stale" }
   | { kind: "skipped"; attemptId: string; reason: SkipReason; blocked: number }
-  | { kind: "claimed"; attemptId: string; draftId: string; blocked: number };
+  | { kind: "claimed"; attemptId: string; draftId: string; leaseToken: string; blocked: number };
 
 /**
  * 時刻が、今の設定の時刻のままかを確かめる（FR-012・FR-016）。
@@ -188,6 +188,7 @@ export async function claimSlot(
         blocked += 1;
         continue;
       }
+      const leaseToken = crypto.randomUUID();
       const [row] = await tx
         .insert(publishAttempts)
         .values({
@@ -196,6 +197,7 @@ export async function claimSlot(
           draftId: draft.id,
           isCarryover: draft.carryoverAttemptId !== null,
           leaseUntil: new Date(now.getTime() + AUTOPOST_LEASE_SECONDS * 1000),
+          leaseToken,
         })
         .returning({ id: publishAttempts.id });
       await tx
@@ -207,7 +209,13 @@ export async function claimSlot(
           updatedAt: now,
         })
         .where(eq(postDrafts.id, draft.id));
-      return { kind: "claimed", attemptId: row!.id, draftId: draft.id, blocked } as const;
+      return {
+        kind: "claimed",
+        attemptId: row!.id,
+        draftId: draft.id,
+        leaseToken,
+        blocked,
+      } as const;
     }
     return skip("no_drafts", blocked);
   });

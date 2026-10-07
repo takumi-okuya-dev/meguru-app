@@ -50,6 +50,13 @@
       "when": 1791331968610,
       "tag": "0006_permalink_retry",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1791333686153,
+      "tag": "0007_attempt_lease_token",
+      "breakpoints": true
     }
   ]
 }

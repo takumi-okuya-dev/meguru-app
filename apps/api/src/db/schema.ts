@@ -550,8 +550,10 @@ export const publishAttempts = pgTable(
     // 公開を送った時刻。これがあり結果が未確定なら、新しいコンテナーを作らない
     publishRequestedAt: timestamp("publish_requested_at", { withTimezone: true, precision: 6 }),
     lastError: text("last_error"),
-    // 処理している定期処理の持ち時間
+    // 処理している定期処理の持ち時間（待機では、次に確かめる時刻）
     leaseUntil: timestamp("lease_until", { withTimezone: true }),
+    // 持ち時間を取った処理の札。試みの更新はこれが同じときだけ行う（持ち時間の切れた古い処理を締め出す）
+    leaseToken: uuid("lease_token"),
     createdAt: timestamp("created_at", { withTimezone: true, precision: 6 }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true, precision: 6 }).notNull().defaultNow(),
   },
