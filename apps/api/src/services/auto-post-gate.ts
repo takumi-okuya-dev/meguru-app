@@ -65,7 +65,7 @@ export async function writeGate(kv: KVNamespace, value: GateValue): Promise<bool
 }
 
 /**
- * 次に見る時刻を求める（research.md R3）。候補のうちもっとも早い時刻。続きの処理があれば今。上限は24時間後。
+ * 次に見る時刻を求める（research.md R3）。候補のうちもっとも早い時刻。すぐ続ける処理があれば今。上限は24時間後。
  * 一定の間隔での見直しは入れない（予定の時刻に起きたついでに、全員の設定を読み直すため）。
  * @param input - now：今、candidates：予定の時刻・やり直しの時刻、immediate：次の回にも続きがあるか
  * @returns 次に見る時刻

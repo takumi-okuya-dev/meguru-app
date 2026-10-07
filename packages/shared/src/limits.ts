@@ -106,6 +106,13 @@ export const AUTOPOST_LATE_WARN_MINUTES = 10;
 export const AUTOPOST_FIND_PUBLISHED_HOURS = 24;
 /** 結果がわからない投稿を探すとき、公開を送った時刻より前に見てよい幅（秒。Threadsとの時計のずれ。R6）。 */
 export const AUTOPOST_RECONCILE_SKEW_SECONDS = 60;
+/**
+ * 結果を確かめられず待機にした試みを、次に確かめるまでの間の最小（分。research.md R6）。
+ * 間は試みの古さの1/4をこの範囲に収める。最初は次の回（5分ごと）に確かめ、解決しない試みほど間をあける。
+ */
+export const AUTOPOST_RECHECK_MIN_MINUTES = 4;
+/** 結果を確かめられず待機にした試みを、次に確かめるまでの間の最大（分）。 */
+export const AUTOPOST_RECHECK_MAX_MINUTES = 60;
 /** 投稿のURLの取り直しに失敗した投稿を、次に取り直すまでの間（分。contracts/auto-post-job.md 手順5）。 */
 export const AUTOPOST_PERMALINK_RETRY_MINUTES = 60;
 /** 投稿の試みを残す日数（日次の処理で、これより古い行を消す）。 */

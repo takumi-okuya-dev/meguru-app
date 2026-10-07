@@ -87,6 +87,8 @@ export const fake = {
   setContainerStatus: (containerId: string, status: "IN_PROGRESS" | "FINISHED" | "PUBLISHED" | "ERROR" | "EXPIRED") =>
     control("container-status", { containerId, status }),
   setPublishPermission: (userId: string, granted: boolean) => control("publish-permission", { userId, granted }),
+  /** 投稿の権限の確認（threads_publishing_limit）を ms だけ遅らせる */
+  delayPublishingLimit: (ms: number) => control("publishing-limit-delay", { ms }),
   /** アプリを通さない投稿（手動の投稿など）を、任意の時刻で入れる */
   addPost: async (userId: string, text: string, at: Date) =>
     ((await control("add-post", { userId, text, timestamp: at.toISOString() })) as { id: string }).id,

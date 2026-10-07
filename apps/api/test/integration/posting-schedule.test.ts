@@ -124,6 +124,17 @@ describe("PUT /posting-schedule", () => {
     expect(await effectiveFrom(accountId)).toBeGreaterThan(t2);
   });
 
+  it("autopost:wake の at は、保存が終わった後の時刻（接続の確認で遅れた間に終わった回より新しい。PR #6 のCodexレビュー）", async () => {
+    const { accountId } = await connectedAccount("u1", app);
+    await fake.delayPublishingLimit(300);
+    const res = await putSchedule(app, accountId, on(["07:30"], 0));
+    expect(res.status).toBe(200);
+    const [row] = await db()`SELECT updated_at FROM posting_schedules WHERE account_id = ${accountId}`;
+    const wake = JSON.parse((await testEnv.AUTOPOST_KV.get("autopost:wake"))!) as { at: string };
+    // 保存の行の時刻（リクエストの始め）より、接続の確認の分（300ms）以上あと
+    expect(Date.parse(wake.at) - new Date(row!.updated_at as string).getTime()).toBeGreaterThanOrEqual(300);
+  });
+
   it("保存の後、KV の autopost:wake に at を書く。2回失敗しても3回目で書け、4回失敗しても 200", async () => {
     const { accountId } = await connectedAccount("u1", app);
     let failures = 2;

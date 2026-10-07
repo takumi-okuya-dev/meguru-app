@@ -2,7 +2,7 @@
 
 **対象feature**：[spec.md](../spec.md) ／ **根拠**：[research.md](../research.md) R3・R6・R7 ／ **データモデル**：[data-model.md](../data-model.md)
 
-5分ごとのCron（`*/5 * * * *`）で呼ぶ`runAutoPost(env, now)`の手順。テストでは、`now`を渡して直接呼ぶ。
+5分ごとのCron（`*/5 * * * *`）で呼ぶ`runAutoPost(env, now)`の手順。`now`は回の実際の開始時刻（`new Date()`。Cronの予定時刻`scheduledTime`ではない。開始が遅れても、60分の幅・持ち時間・やり直しを実際の時刻で判断するため）。テストでは、`now`を渡して直接呼ぶ。
 
 ## 定数（`packages/shared/src/limits.ts`）
 
@@ -21,6 +21,7 @@
 | `AUTOPOST_LATE_WARN_MINUTES` | 10 | これを超える遅れで`warn`を出す（SC-004） |
 | `LATE_NIGHT_HINT_MINUTES` | [120, 300) | 設定の画面で案内を出す時間帯（2:00〜4:59。FR-001b） |
 | `AUTOPOST_FIND_PUBLISHED_HOURS` | 24 | 結果が分からない投稿を探し続ける時間（R6） |
+| `AUTOPOST_RECHECK_MIN_MINUTES`・`AUTOPOST_RECHECK_MAX_MINUTES` | 4・60 | 結果を確かめられず待機にした試みを、次に確かめるまでの間（試みの古さの1/4をこの範囲に収める。R6） |
 | `AUTOPOST_PERMALINK_RETRY_MINUTES` | 60 | URLの取り直しに失敗した投稿を、次に取り直すまでの間（手順5） |
 | `AUTOPOST_RECONCILE_SKEW_SECONDS` | 60 | 結果が分からない投稿を探すとき、`publish_requested_at`より前に見てよい幅（Threadsとの時計のずれ。R6） |
 
@@ -39,12 +40,12 @@
 
 ### 1. 続きの処理（試みを先に進める）
 
-次の試みを、`slot_at`の古い順に読む。
+次の試みを読む。
 
-- `state = 'in_progress'`で、`lease_until`が過ぎている（前の処理が途中で止まった）
+- `state = 'in_progress'`で、`lease_until`が過ぎている（前の処理が途中で止まった、または待機の「次に確かめる時刻」が来た）
 - `state = 'retry_wait'`で、`next_retry_at <= now`
 
-1件ずつ`lease_until`を条件付きの更新で取る（取れなければ、ほかの処理が進めているので飛ばす）。そのうえで、下の「4. 公開まで進める」を行う。
+前に確かめたのが古い順（`lease_until`の早い順。空のものが先。同じなら`slot_at`の古い順）に、1件ずつ`lease_until`を条件付きの更新で取る（取れなければ、ほかの処理が進めているので飛ばす）。そのうえで、下の「4. 公開まで進める」を行う。
 
 ### 2. 時刻の処理（新しい試みを作る）
 
@@ -88,7 +89,7 @@
 
 トークンを復号し（001 R5）、試みの記録から次の段階を決める。
 
-Accountが要再接続なら、`publish_requested_at`がない試み（まだ公開を送っていない）は公開に進まず、「失敗の扱い」の「認証」と同じく`skipped`（`needs_reconnect`）にして下書きを`approved`に戻す。`publish_requested_at`がある試みは、結果の確認（公開はしない）だけを続ける。
+Accountが要再接続なら（トークンを復号できるか・接続の行が残っているかによらず。連携の取り消しでは接続の行が消える）、`publish_requested_at`がない試み（まだ公開を送っていない）は公開に進まず、「失敗の扱い」の「認証」と同じく`skipped`（`needs_reconnect`）にして下書きを`approved`に戻す。`publish_requested_at`がある試みは、結果の確認（公開はしない）だけを続ける。
 
 | 試みの記録 | 行うこと |
 |---|---|
@@ -101,7 +102,9 @@ Accountが要再接続なら、`publish_requested_at`がない試み（まだ公
 1. `publish_requested_at`に、公開を送る直前の実際の時刻（Cronの予定時刻ではない）を保存する。
 2. `publishContainer`を呼ぶ。
 3. 成功したら「成功の記録」へ進む。
-4. 失敗したら「失敗の扱い」へ進む。ただし、`ThreadsTransientError`（通信の失敗・タイムアウト・HTTP 5xx）は「結果がわからない」として扱う。Threads側で公開まで済んでいる可能性があるため。`publish_requested_at`を残したまま`lease_until`を消し、次の回に「結果の確認」をする。やり直しの回数は、「結果の確認」でコンテナーが公開されていないとわかった時点で増やす。
+4. 失敗したら「失敗の扱い」へ進む。ただし、`ThreadsTransientError`（通信の失敗・タイムアウト・HTTP 5xx）は「結果がわからない」として扱う。Threads側で公開まで済んでいる可能性があるため。`publish_requested_at`を残したまま`lease_until`を「次に確かめる時刻」にし（下の「待機」）、後の回に「結果の確認」をする。やり直しの回数は、「結果の確認」でコンテナーが公開されていないとわかった時点で増やす。
+
+**待機**：結果を確かめられず次の回以降に続ける（下の表の「次の回」）ときは、`lease_until`を「次に確かめる時刻」＝`now + clamp(試みの古さ / 4, AUTOPOST_RECHECK_MIN_MINUTES, AUTOPOST_RECHECK_MAX_MINUTES)`にする。最初は次の回（5分ごと）に確かめ、解決しない試み（接続が消えたままなど）ほど間をあける。解決しない試みが、毎回の上限（`AUTOPOST_MAX_PER_TICK`）を使い切って、ほかのAccountの時刻を止めないため。
 
 **結果の確認**（`getContainerStatus`の結果ごと）：
 
@@ -154,7 +157,8 @@ DBの処理の最後に、次のうちもっとも早い時刻を`nextCheckAt`�
 
 - オンのAccountの、今より後の予定の時刻（`plannedSlotTime`。`effective_from`より後、`paused_until`の後）
 - `retry_wait`の試みの`next_retry_at`
-- `in_progress`の試みがある、扱いきれなかった時刻がある、URLを取り直す下書きがある：`now`（次の回）
+- `in_progress`の試みの`lease_until`（次に確かめる時刻）のうちもっとも早いもの
+- `lease_until`が空の`in_progress`の試みがある、扱いきれなかった時刻がある、URLを取り直す下書きがある：`now`（次の回）
 - 上限：`now + 24時間`
 
 一定の間隔での見直しは入れない（research.md R3「見直しをやめた理由」）。DBの処理のたびに、オンのAccountすべての設定を読み直して求め直すので、ほかの人の予定の時刻に起きたついでに、設定の変更も拾える。

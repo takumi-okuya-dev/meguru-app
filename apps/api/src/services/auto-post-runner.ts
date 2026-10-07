@@ -87,7 +87,7 @@ const continuable = (now: Date) =>
 /**
  * 自動投稿の定期処理を1回行う（contracts/auto-post-job.md）。1件・1つのAccountの失敗で全体を止めない。
  * @param env - Workers のバインディング
- * @param now - 基準にする時刻（Cron の予定時刻）
+ * @param now - 基準にする時刻（回の実際の開始時刻。Cron の予定時刻ではない）
  * @param threads - Threads API のクライアント（テストで差し替えられる）
  * @param clock - 実際の時刻（投稿日時の記録に使う。テストで差し替えられる）
  * @returns この回の結果
@@ -138,11 +138,12 @@ export async function runAutoPost(
   };
 
   // 1. 続きの処理（結果を確かめる途中・やり直し待ち）
+  // 前に確かめたのが古い順（やり直し待ち・持ち時間のないものが先）。同じ試みばかりを選ばない
   const pending = await db
     .select()
     .from(publishAttempts)
     .where(continuable(now))
-    .orderBy(asc(publishAttempts.slotAt));
+    .orderBy(sql`${publishAttempts.leaseUntil} ASC NULLS FIRST`, asc(publishAttempts.slotAt));
   for (const a of pending) {
     if (budget <= 0) {
       summary.deferred += 1;
@@ -259,14 +260,20 @@ export async function runAutoPost(
       .select({ at: min(publishAttempts.nextRetryAt) })
       .from(publishAttempts)
       .where(eq(publishAttempts.state, "retry_wait")),
+    // 処理中の試みは、次に確かめる時刻（lease_until）に起こす。持ち時間のないものがあれば次の回
     db
-      .select({ id: publishAttempts.id })
+      .select({
+        at: min(publishAttempts.leaseUntil),
+        unleased: sql<number>`count(*) filter (where ${publishAttempts.leaseUntil} is null)`.mapWith(
+          Number,
+        ),
+      })
       .from(publishAttempts)
-      .where(eq(publishAttempts.state, "in_progress"))
-      .limit(1),
+      .where(eq(publishAttempts.state, "in_progress")),
   ]);
   const candidates: Date[] = [];
   if (nextRetry?.at) candidates.push(nextRetry.at);
+  if (inProgress?.at) candidates.push(inProgress.at);
   for (const { schedule: s } of schedules) {
     const [next] = projectSchedule({
       accountId: s.accountId,
@@ -285,7 +292,7 @@ export async function runAutoPost(
   const nextCheckAt = computeNextCheckAt({
     now,
     candidates,
-    immediate: summary.deferred > 0 || inProgress !== undefined || permalinkPending,
+    immediate: summary.deferred > 0 || (inProgress?.unleased ?? 0) > 0 || permalinkPending,
   });
   if (
     !(await writeGate(env.AUTOPOST_KV, {

@@ -13,7 +13,7 @@ import { refreshExpiringTokens } from "./token-refresh";
 /**
  * 日次の定期処理をまとめて行う（contracts/api.md「定期処理」）。1つの処理の失敗で全体を止めない。
  * @param env - Workers のバインディング
- * @param now - 基準にする時刻（Cron Trigger の予定時刻）
+ * @param now - 基準にする時刻（回の実際の開始時刻）
  */
 export async function runDailyJobs(env: Env, now: Date = new Date()) {
   const steps: [string, () => Promise<unknown>][] = [

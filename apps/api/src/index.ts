@@ -11,7 +11,8 @@ const AUTO_POST_CRON = "*/5 * * * *";
 export default {
   fetch: app.fetch,
   async scheduled(controller: ScheduledController, env: Env, ctx: ExecutionContext) {
-    const at = new Date(controller.scheduledTime);
+    // 判断（60分の幅・持ち時間・やり直し）には実際の開始時刻を使う。回の開始が遅れても、予定時刻で判断しない
+    const at = new Date();
     ctx.waitUntil(
       controller.cron === AUTO_POST_CRON
         ? runAutoPost(env, at).then(() => undefined)

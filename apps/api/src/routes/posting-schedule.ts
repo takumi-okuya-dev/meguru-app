@@ -67,8 +67,9 @@ export function postingScheduleRoutes(authed: MiddlewareHandler<AppEnv>) {
         createThreadsClient(c.env),
         now,
       );
-      // コミットの後、定期処理に設定の変更を知らせる（research.md R3）
-      await afterResponse(c, notifyWake(c.env.AUTOPOST_KV, now));
+      // コミットの後、定期処理に設定の変更を知らせる（research.md R3）。時刻は保存が終わった後のもの
+      // （接続の確認の間に定期処理の回が終わっていても、その回より新しい知らせにする）
+      await afterResponse(c, notifyWake(c.env.AUTOPOST_KV, new Date()));
       return c.json(result);
     });
 }

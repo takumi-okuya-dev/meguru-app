@@ -244,4 +244,48 @@ describe("PR #6 のCodexレビュー", () => {
     expect(await draftRow(good!)).toMatchObject({ threads_permalink: expect.any(String) });
     expect(await draftRow(bad1!)).toMatchObject({ threads_permalink: null });
   });
+
+  it("試みを取った後に連携が取り消され（接続の行が消え）ても、やり直しにせず承認済みに戻す", async () => {
+    const now = jst("2030-01-10 12:00");
+    const { accountId } = await connectedAccount("u1");
+    const [id] = await approvedDrafts(accountId, ["取り消し"]);
+    await setSchedule(accountId, { slotMinutes: [720] });
+    await fake.publishFail("createContainer", "transient", 1);
+    await run(now);
+    expect(await attempts(accountId)).toMatchObject([{ state: "retry_wait", retry_count: 1 }]);
+    // 連携の取り消し（revokeConnection）と同じく、接続の行を消して要再接続にする
+    await db()`DELETE FROM threads_connections WHERE account_id = ${accountId}`;
+    await db()`UPDATE accounts SET connection_status = 'needs_reconnect' WHERE id = ${accountId}`;
+    await run(addMin(now, 5));
+    expect(await attempts(accountId)).toMatchObject([
+      { state: "skipped", skip_reason: "needs_reconnect", draft_id: null },
+    ]);
+    expect(await draftRow(id!)).toMatchObject({ status: "approved" });
+  });
+
+  it("結果を確かめられない試みが4件あっても、毎回の上限を使い切らず、ほかのAccountの時刻を処理する", async () => {
+    const now = jst("2030-01-10 12:00");
+    const stuck = await connectedAccount("u1");
+    const drafts = await approvedDrafts(stuck.accountId, ["a", "b", "c", "d"]);
+    for (const [i, draftId] of drafts.entries()) {
+      await db()`UPDATE post_drafts SET status = 'publishing', prioritized_at = NULL WHERE id = ${draftId}`;
+      // 4時間前に公開を送ったが、結果を確かめられないまま（接続の行が消えている）
+      await db()`INSERT INTO publish_attempts (account_id, slot_at, slot_date, slot_minute, state, draft_id, container_id, publish_requested_at, created_at)
+        VALUES (${stuck.accountId}, ${addMin(now, -240 - i).toISOString()}, '2030-01-10', ${480 - i}, 'in_progress', ${draftId}, ${`c${i}`},
+          ${addMin(now, -240).toISOString()}, ${addMin(now, -240).toISOString()})`;
+    }
+    await db()`DELETE FROM threads_connections WHERE account_id = ${stuck.accountId}`;
+    const other = await connectedAccount("u2");
+    const [otherDraft] = await approvedDrafts(other.accountId, ["ほかのAccount"]);
+    await setSchedule(other.accountId, { slotMinutes: [720] });
+
+    expect(await run(now)).toMatchObject({ waiting: 4, deferred: 1 });
+    // 4時間たった試みは、60分後まで確かめない。次の回はほかのAccountの時刻を処理する
+    const r = await run(addMin(now, 5));
+    expect(r).toMatchObject({ waiting: 0, published: 1 });
+    expect(await draftRow(otherDraft!)).toMatchObject({ status: "published" });
+    // 関所は、次に確かめる時刻（60分後）に起こす（処理中の試みがあるだけで毎回起こさない）
+    const gate = JSON.parse((await testEnv.AUTOPOST_KV.get("autopost:gate"))!) as { nextCheckAt: string };
+    expect(gate.nextCheckAt).toBe(addMin(now, 60).toISOString());
+  });
 });

@@ -1,5 +1,11 @@
 // 定期処理の関所（specs/005-auto-post research.md R3、contracts/auto-post-job.md 手順0・7）
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  createExecutionContext,
+  createScheduledController,
+  waitOnExecutionContext,
+} from "cloudflare:test";
+import worker from "../../src/index";
 import { runAutoPost } from "../../src/services/auto-post-runner";
 import { fake, makeApp, resetDb, testEnv } from "../helpers/app";
 import { addMin, connectedAccount, jst, setSchedule } from "../helpers/auto-post";
@@ -102,5 +108,18 @@ describe("関所（DBに触れずに終える）", () => {
     } as unknown as KVNamespace;
     expect((await runAutoPost({ ...testEnv, AUTOPOST_KV: failingKv }, NOON)).ran).toBe(true);
     expect((await runAutoPost(testEnv, addMin(NOON, 5))).ran).toBe(true);
+  });
+
+  it("Cron の回は、予定時刻（scheduledTime）ではなく実際の開始時刻で判断する（PR #6 のCodexレビュー）", async () => {
+    const before = Date.now();
+    const controller = createScheduledController({
+      cron: "*/5 * * * *",
+      // 2時間遅れて始まった回
+      scheduledTime: before - 2 * 3600_000,
+    });
+    const ctx = createExecutionContext();
+    await worker.scheduled(controller, testEnv, ctx);
+    await waitOnExecutionContext(ctx);
+    expect(Date.parse((await gate()).runStartedAt)).toBeGreaterThanOrEqual(before);
   });
 });

@@ -3,6 +3,8 @@
 // publish_requested_at があり結果がわからない間は、新しいコンテナーを作らない（1つのコンテナーは1回しか公開できない）。
 import {
   AUTOPOST_FIND_PUBLISHED_HOURS,
+  AUTOPOST_RECHECK_MAX_MINUTES,
+  AUTOPOST_RECHECK_MIN_MINUTES,
   AUTOPOST_RECONCILE_SKEW_SECONDS,
   AUTOPOST_RETRY_DELAYS_MINUTES,
   AUTOPOST_RETRY_MAX,
@@ -107,14 +109,15 @@ export async function executeAttempt(
   }
   const ctx = new AttemptContext(env, db, threads, attempt, draft, now, clock);
   const cred = await loadThreadsCredentials(env, db, attempt.accountId);
+  if (cred && cred.connectionStatus !== "connected" && !attempt.publishRequestedAt) {
+    // 要再接続：トークンの有無によらず、新しく公開しない（連携の取り消しで接続の行が消えても、ここで止める）。
+    // 公開の結果がわからない途中だけは、確かめる処理（公開しない）を続ける
+    return ctx.backToApproved("needs_reconnect");
+  }
   if (!cred?.token) {
     // 接続がない・鍵の設定ミスで復号できない。結果がわからない途中なら待ち、そうでなければ一時的な失敗として数える
     if (attempt.publishRequestedAt || attempt.containerId) return ctx.release();
     return ctx.transientFailure("unknown");
-  }
-  if (cred.connectionStatus !== "connected" && !attempt.publishRequestedAt) {
-    // 要再接続：新しく公開しない。公開の結果がわからない途中だけは、確かめる処理（公開しない）を続ける
-    return ctx.backToApproved("needs_reconnect");
   }
   return ctx.run(cred as ThreadsCredentials & { token: string });
 }
@@ -328,11 +331,17 @@ class AttemptContext {
   }
 
   /**
-   * 持ち時間を返し、次の回に続ける。
+   * 持ち時間を返し、後の回に続ける。lease_until を「次に確かめる時刻」にして、それまでは続きの処理で選ばない。
+   * 解決しない試みが、毎回の上限（AUTOPOST_MAX_PER_TICK）を使い切らないようにするため（PR #6 のCodexレビュー）。
    * @returns 待機の結果
    */
   async release(): Promise<ExecuteOutcome> {
-    await this.updateAttempt({ leaseUntil: null });
+    const ageMinutes = (this.now.getTime() - this.attempt.createdAt.getTime()) / 60_000;
+    const delay = Math.min(
+      AUTOPOST_RECHECK_MAX_MINUTES,
+      Math.max(AUTOPOST_RECHECK_MIN_MINUTES, ageMinutes / 4),
+    );
+    await this.updateAttempt({ leaseUntil: new Date(this.now.getTime() + delay * 60_000) });
     return { kind: "waiting" };
   }
 

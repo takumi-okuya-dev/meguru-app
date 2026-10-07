@@ -27,6 +27,7 @@ export function createFakeThreads() {
   const posts: Post[] = [];
   const publishFailures = new Map<PublishEndpoint, { times: number; kind: PublishFailureKind }>();
   let dropPublishResponses = 0;
+  let publishingLimitDelayMs = 0;
   const noPublishPermission = new Set<string>();
   let seq = 0;
   // Number の安全な整数の範囲に収める（大きすぎると丸められてIDが重なる）
@@ -220,7 +221,8 @@ export function createFakeThreads() {
     return c.json({ id });
   });
 
-  app.get("/v1.0/:userId/threads_publishing_limit", (c) => {
+  app.get("/v1.0/:userId/threads_publishing_limit", async (c) => {
+    if (publishingLimitDelayMs) await new Promise((r) => setTimeout(r, publishingLimitDelayMs));
     const injected = injectPublish("publishingLimit");
     if (injected) return injected;
     const u = bearerUser(c);
@@ -274,6 +276,7 @@ export function createFakeThreads() {
     issued.length = 0;
     failures.clear();
     delays.clear();
+    publishingLimitDelayMs = 0;
     defaultUserId = null;
     containers.clear();
     posts.length = 0;
@@ -315,6 +318,11 @@ export function createFakeThreads() {
   });
   app.post("/__control/drop-publish-response", async (c) => {
     dropPublishResponses = ((await c.req.json()) as { times: number }).times;
+    return c.json({ ok: true });
+  });
+  // 投稿の権限の確認（threads_publishing_limit）を遅らせる
+  app.post("/__control/publishing-limit-delay", async (c) => {
+    publishingLimitDelayMs = ((await c.req.json()) as { ms: number }).ms;
     return c.json({ ok: true });
   });
   // アプリを通さない投稿（手動の投稿など）。timestamp は任意の時刻にできる
