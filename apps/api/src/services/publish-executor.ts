@@ -280,11 +280,8 @@ class AttemptContext {
       let mediaId: string;
       try {
         const sent = await this.publishFenced(cred, containerId);
-        if (sent.kind === "stale") {
-          // 記録の後に再接続された（または要再接続になった）：公開は送っていない。記録を消し、承認済みに戻す
-          await this.setAttempt({ publishRequestedAt: null });
-          return await this.backToApproved("needs_reconnect");
-        }
+        // 記録の後に再接続された（または要再接続になった）：公開は送らず、同じトランザクションで承認済みに戻した
+        if (sent.kind === "stale") return { kind: "skipped", reason: "needs_reconnect" };
         ({ mediaId } = sent);
       } catch (err) {
         if (err instanceof LeaseLostError) throw err;
@@ -315,7 +312,9 @@ class AttemptContext {
    * ロックの順は再接続と同じ（Account → 試み）にして、デッドロックを避ける。
    * @param cred - 接続情報
    * @param containerId - 公開するコンテナー
-   * @returns 送った結果。要再接続・接続の世代番号が読んだときと違う（その間に再接続された）なら stale（送っていない）
+   * @returns 送った結果。要再接続・接続の世代番号が読んだときと違う（その間に再接続された）なら stale。
+   *   stale では送らず、ロックを持ったまま同じトランザクションで、記録を消して試みを skipped（needs_reconnect）にし、
+   *   下書きを approved に戻す（別のトランザクションに分けると、その間にほかの処理が引き継いで公開しうる）
    */
   private publishFenced(
     cred: ThreadsCredentials & { token: string },
@@ -344,8 +343,24 @@ class AttemptContext {
       if (!owned) throw new LeaseLostError();
       // 世代番号は再接続のコミットで増える（authorized_at は callback に入った時刻なので使わない）。
       // トークンの更新でも増えるが、その場合も送らずに戻す（まれで、下書きは次の時刻に投稿される）
-      if (account?.status !== "connected" || account.generation !== cred.generation)
+      if (account?.status !== "connected" || account.generation !== cred.generation) {
+        await tx
+          .update(publishAttempts)
+          .set({
+            state: "skipped",
+            skipReason: "needs_reconnect",
+            draftId: null,
+            publishRequestedAt: null,
+            leaseUntil: null,
+            updatedAt: this.now,
+          })
+          .where(eq(publishAttempts.id, this.attempt.id));
+        await tx
+          .update(postDrafts)
+          .set({ status: "approved", version: sql`${postDrafts.version} + 1`, updatedAt: this.now })
+          .where(and(eq(postDrafts.id, this.draft.id), eq(postDrafts.status, "publishing")));
         return { kind: "stale" } as const;
+      }
       const { mediaId } = await this.threads.publishContainer(
         cred.token,
         cred.threadsUserId,
