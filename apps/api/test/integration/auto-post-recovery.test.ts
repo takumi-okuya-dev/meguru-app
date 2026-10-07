@@ -150,9 +150,10 @@ describe("PR #6 のCodexレビュー", () => {
 
   it("要再接続でも、公開の結果がわからない途中なら確かめて投稿済みにする（新しく公開しない）", async () => {
     // 偽サーバーの投稿の時刻は実時刻なので、実時刻で動かす
+    const { accountId } = await connectedAccount("u1");
+    // 試みは接続の後に作る（接続の authorized_at より前に作った試みは、再接続より前のものとして公開しない）
     const now = new Date();
     const minute = Math.floor(((now.getTime() + 9 * 3600_000) % 86_400_000) / 60_000);
-    const { accountId } = await connectedAccount("u1");
     const [id] = await approvedDrafts(accountId, ["応答を失った投稿"]);
     await setSchedule(accountId, { slotMinutes: [minute] });
     await fake.dropPublishResponse(1);
@@ -204,9 +205,10 @@ describe("PR #6 のCodexレビュー", () => {
   });
 
   it("応答を失った投稿の照合で、公開を送る前の同じ本文の投稿（手動の投稿）を選ばない", async () => {
+    const { accountId, threadsUserId } = await connectedAccount("u1");
+    // 試みは接続の後に作る（接続の authorized_at より前に作った試みは、再接続より前のものとして公開しない）
     const now = new Date();
     const minute = Math.floor(((now.getTime() + 9 * 3600_000) % 86_400_000) / 60_000);
-    const { accountId, threadsUserId } = await connectedAccount("u1");
     const [id] = await approvedDrafts(accountId, ["同じ本文"]);
     await setSchedule(accountId, { slotMinutes: [minute] });
     // 公開を送る2分前に、同じ本文を手動で投稿していた（照合で見る5分の中）
@@ -358,5 +360,37 @@ describe("PR #6 のCodexレビュー", () => {
       await executeAttempt(testEnv, createDb(testEnv.DATABASE_URL), real, attemptId, token, now),
     ).toEqual({ kind: "waiting" });
     expect(await fake.containers()).toHaveLength(1);
+  });
+
+  it("公開の記録の後に再接続された（片付けから漏れた）試みは、公開を送らず承認済みに戻す", async () => {
+    const now = jst("2030-01-10 12:00");
+    const { accountId } = await connectedAccount("u1");
+    const [id] = await approvedDrafts(accountId, ["記録の後の再接続"]);
+    await db()`UPDATE post_drafts SET status = 'publishing', prioritized_at = NULL WHERE id = ${id!}`;
+    const real = createThreadsClient(testEnv);
+    const { containerId } = await real.createTextContainer(
+      (await fake.issuedTokens()).at(-1)!,
+      (await db()`SELECT threads_user_id FROM accounts WHERE id = ${accountId}`)[0]!.threads_user_id as string,
+      "記録の後の再接続",
+    );
+    const token = crypto.randomUUID();
+    const [attempt] = await db()`INSERT INTO publish_attempts (account_id, slot_at, slot_date, slot_minute, state, draft_id, container_id, lease_until, lease_token, created_at)
+      VALUES (${accountId}, ${now.toISOString()}, '2030-01-10', 720, 'in_progress', ${id!}, ${containerId}, ${addMin(now, 2).toISOString()}, ${token}, ${now.toISOString()}) RETURNING id`;
+    // コンテナーの状態を確かめた後、公開を送るまでの間に再接続が済んだ（試みを作った後に認可された）
+    const threads = {
+      ...real,
+      getContainerStatus: async (...args: Parameters<typeof real.getContainerStatus>) => {
+        const r = await real.getContainerStatus(...args);
+        await db()`UPDATE threads_connections SET authorized_at = ${addMin(now, 1).toISOString()} WHERE account_id = ${accountId}`;
+        return r;
+      },
+    };
+    const out = await executeAttempt(testEnv, createDb(testEnv.DATABASE_URL), threads, attempt!.id as string, token, now);
+    expect(out).toEqual({ kind: "skipped", reason: "needs_reconnect" });
+    expect(await fake.posts()).toHaveLength(0);
+    expect(await attempts(accountId)).toMatchObject([
+      { state: "skipped", skip_reason: "needs_reconnect", publish_requested_at: null },
+    ]);
+    expect(await draftRow(id!)).toMatchObject({ status: "approved" });
   });
 });

@@ -13,8 +13,14 @@ import {
   jstMidnight,
 } from "@threads-grower/shared";
 import { and, eq, sql } from "drizzle-orm";
-import type { Db } from "../db/client";
-import { postDrafts, postingSchedules, publishAttempts } from "../db/schema";
+import { withTransaction, type Db } from "../db/client";
+import {
+  accounts,
+  postDrafts,
+  postingSchedules,
+  publishAttempts,
+  threadsConnections,
+} from "../db/schema";
 import type { Env } from "../env";
 import { logger } from "../lib/logger";
 import {
@@ -274,26 +280,83 @@ class AttemptContext {
       await this.setAttempt({ publishRequestedAt: this.clock() });
       let mediaId: string;
       try {
-        ({ mediaId } = await this.threads.publishContainer(
-          cred.token,
-          cred.threadsUserId,
-          containerId,
-        ));
-      } catch (err) {
-        if (err instanceof ThreadsTransientError) {
-          // 通信の失敗・5xx：Threads側で公開まで済んでいる可能性がある。次の回に結果を確かめる（やり直しの回数は数えない）
-          logger.warn("auto-post: publish result unknown", this.ids);
-          return this.release();
+        const sent = await this.publishFenced(cred, containerId);
+        if (sent.kind === "stale") {
+          // 記録の後に再接続された（または要再接続になった）：公開は送っていない。記録を消し、承認済みに戻す
+          await this.setAttempt({ publishRequestedAt: null });
+          return await this.backToApproved("needs_reconnect");
         }
-        // 確かな応答（4xx など）なら公開されていない
-        await this.setAttempt({ publishRequestedAt: null });
-        throw err;
+        ({ mediaId } = sent);
+      } catch (err) {
+        if (err instanceof LeaseLostError) throw err;
+        if (
+          err instanceof ThreadsAuthError ||
+          (err instanceof ThreadsApiError && !(err instanceof ThreadsTransientError))
+        ) {
+          // 確かな応答（4xx など）なら公開されていない
+          await this.setAttempt({ publishRequestedAt: null });
+          throw err;
+        }
+        // 通信の失敗・5xx・DBの失敗（送った後のコミットの失敗を含む）：Threads側で公開まで済んでいる可能性がある。
+        // 次の回に結果を確かめる（やり直しの回数は数えない）
+        logger.warn("auto-post: publish result unknown", { ...this.ids, err });
+        return this.release();
       }
       // 投稿日時は応答を受けた時刻（Cron の予定時刻ではない。日付・24時間の件数の数え方に使う）
       return await this.succeed(cred, mediaId, this.clock());
     } catch (err) {
       return this.failure(err, cred);
     }
+  }
+
+  /**
+   * 公開を送る（手順4「公開」の2）。Account の行（共有ロック）と試みの行（排他ロック）をこの順にロックした
+   * トランザクションの中で送る。再接続（Account の行を更新し、続けて試みを片付ける）・ほかの処理の引き継ぎ
+   * （試みの行を更新する）は、送り終わるまで待つので、公開と再接続の順番が必ずどちらかに決まる（PR #6 のCodexレビュー）。
+   * ロックの順は再接続と同じ（Account → 試み）にして、デッドロックを避ける。
+   * @param cred - 接続情報
+   * @param containerId - 公開するコンテナー
+   * @returns 送った結果。要再接続・試みを作った後に再接続された（authorized_at が新しい）なら stale（送っていない）
+   */
+  private publishFenced(
+    cred: ThreadsCredentials & { token: string },
+    containerId: string,
+  ): Promise<{ kind: "sent"; mediaId: string } | { kind: "stale" }> {
+    return withTransaction(this.env.DATABASE_URL, async (tx) => {
+      const [account] = await tx
+        .select({
+          status: accounts.connectionStatus,
+          authorizedAt: threadsConnections.authorizedAt,
+        })
+        .from(accounts)
+        .leftJoin(threadsConnections, eq(threadsConnections.accountId, accounts.id))
+        .where(eq(accounts.id, this.attempt.accountId))
+        .for("share", { of: accounts });
+      const [owned] = await tx
+        .select({ id: publishAttempts.id })
+        .from(publishAttempts)
+        .where(
+          and(
+            eq(publishAttempts.id, this.attempt.id),
+            eq(publishAttempts.state, "in_progress"),
+            eq(publishAttempts.leaseToken, this.leaseToken),
+          ),
+        )
+        .for("update");
+      if (!owned) throw new LeaseLostError();
+      if (
+        account?.status !== "connected" ||
+        !account.authorizedAt ||
+        account.authorizedAt.getTime() > this.attempt.createdAt.getTime()
+      )
+        return { kind: "stale" } as const;
+      const { mediaId } = await this.threads.publishContainer(
+        cred.token,
+        cred.threadsUserId,
+        containerId,
+      );
+      return { kind: "sent", mediaId } as const;
+    });
   }
 
   /**

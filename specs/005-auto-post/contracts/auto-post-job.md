@@ -104,7 +104,7 @@ Accountが要再接続なら（トークンを復号できるか・接続の行�
 **公開**：
 
 1. `publish_requested_at`に、公開を送る直前の実際の時刻（Cronの予定時刻ではない）を保存する。
-2. `publishContainer`を呼ぶ。
+2. `publishContainer`を呼ぶ。呼び出しは、Accountの行（`FOR SHARE`）と試みの行（`FOR UPDATE`、`lease_token`が同じこと）をこの順にロックしたトランザクションの中で行う。再接続（Accountの行を更新し、続けて試みを片付ける）・ほかの処理の引き継ぎは送り終わるまで待つので、公開と再接続の順番が必ずどちらかに決まる。ロックを取った時点で、Accountが要再接続、または接続の`authorized_at`が試みの`created_at`より後（試みを作った後に再接続された）なら、送らずに`publish_requested_at`を消し、`skipped`（`needs_reconnect`）にして下書きを`approved`に戻す。送った後のコミットの失敗は「結果がわからない」として扱う。
 3. 成功したら「成功の記録」へ進む。
 4. 失敗したら「失敗の扱い」へ進む。ただし、`ThreadsTransientError`（通信の失敗・タイムアウト・HTTP 5xx）は「結果がわからない」として扱う。Threads側で公開まで済んでいる可能性があるため。`publish_requested_at`を残したまま`lease_until`を「次に確かめる時刻」にし（下の「待機」）、後の回に「結果の確認」をする。やり直しの回数は、「結果の確認」でコンテナーが公開されていないとわかった時点で増やす。
 
