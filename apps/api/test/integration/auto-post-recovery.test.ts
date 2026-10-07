@@ -393,4 +393,58 @@ describe("PR #6 のCodexレビュー", () => {
     ]);
     expect(await draftRow(id!)).toMatchObject({ status: "approved" });
   });
+
+  /** 前の時刻で持ち越した下書きを作る（carried_over の試みを参照する）。 */
+  async function carriedDraft(accountId: string, body: string) {
+    const [id] = await approvedDrafts(accountId, [body]);
+    const [carried] = await db()`INSERT INTO publish_attempts (account_id, slot_at, slot_date, slot_minute, state, last_error, retry_count)
+      VALUES (${accountId}, ${jst("2030-01-10 07:30").toISOString()}, '2030-01-10', 450, 'carried_over', 'threads_server', 3) RETURNING id`;
+    await db()`UPDATE post_drafts SET carryover_attempt_id = ${carried!.id as string} WHERE id = ${id!}`;
+    return id!;
+  }
+
+  it("持ち越しの試みを認証の失敗で承認済みに戻すとき、持ち越しの印を付け直す", async () => {
+    const now = jst("2030-01-10 12:00");
+    const { accountId } = await connectedAccount("u1");
+    const id = await carriedDraft(accountId, "持ち越し・認証");
+    await setSchedule(accountId, { slotMinutes: [450, 720] });
+    await fake.publishFail("createContainer", "auth", 1);
+    await run(now);
+    const current = (await attempts(accountId)).find((a) => a.slot_minute === 720)!;
+    expect(current).toMatchObject({ state: "skipped", skip_reason: "needs_reconnect", is_carryover: true });
+    expect(await draftRow(id)).toMatchObject({ status: "approved", carryover_attempt_id: current.id });
+  });
+
+  it("再接続の片付けで持ち越しの試みを承認済みに戻すとき、持ち越しの印を付け直し、次も持ち越しとして扱う", async () => {
+    const app = makeApp();
+    const now = jst("2030-01-10 12:00");
+    const { accountId, threadsUserId } = await connectedAccount("u1", app);
+    const id = await carriedDraft(accountId, "持ち越し・再接続");
+    await setSchedule(accountId, { slotMinutes: [450, 720, 1260] });
+    await fake.publishFail("createContainer", "transient", 1);
+    await run(now);
+    expect((await attempts(accountId)).find((a) => a.slot_minute === 720)).toMatchObject({
+      state: "retry_wait",
+      is_carryover: true,
+    });
+    await db()`UPDATE accounts SET connection_status = 'needs_reconnect' WHERE id = ${accountId}`;
+    const res = await call(app, "POST", "/api/threads/connect", {
+      user: "u1",
+      body: { mode: "reconnect", accountId },
+    });
+    const { authorizeUrl } = (await res.json()) as { authorizeUrl: string };
+    expect(
+      (await authorizeAndCallback(app, authorizeUrl, { fakeUser: threadsUserId })).status,
+    ).toBe(302);
+    const skipped = (await attempts(accountId)).find((a) => a.slot_minute === 720)!;
+    expect(skipped).toMatchObject({ state: "skipped", skip_reason: "needs_reconnect" });
+    expect(await draftRow(id)).toMatchObject({ status: "approved", carryover_attempt_id: skipped.id });
+    // 再接続の後の次の時刻（21:00）でも、持ち越しとして取り出す
+    await setSchedule(accountId, { slotMinutes: [450, 720, 1260] });
+    await run(jst("2030-01-10 21:00"));
+    expect((await attempts(accountId)).find((a) => a.slot_minute === 1260)).toMatchObject({
+      is_carryover: true,
+    });
+    expect(await draftRow(id)).toMatchObject({ status: "published" });
+  });
 });

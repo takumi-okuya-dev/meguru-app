@@ -265,7 +265,11 @@ async function writeConnection(
   // 再接続より前に取り、まだ公開を送っていない試みは進めない：飛ばして（要再接続）、下書きを承認済みに戻す。
   // 札を消すので、実行中の古い処理は以後の更新も公開もできない。公開の結果がわからない試みは確かめ続ける（005 PR #6）
   const stale = await tx
-    .select({ id: publishAttempts.id, draftId: publishAttempts.draftId })
+    .select({
+      id: publishAttempts.id,
+      draftId: publishAttempts.draftId,
+      isCarryover: publishAttempts.isCarryover,
+    })
     .from(publishAttempts)
     .where(
       and(
@@ -292,12 +296,19 @@ async function writeConnection(
         stale.map((a) => a.id),
       ),
     );
-  const draftIds = stale.flatMap((a) => (a.draftId ? [a.draftId] : []));
-  if (draftIds.length > 0)
+  // 持ち越しの試みなら、持ち越しの印を付け直す（取り出しで消しているので。次の時刻の優先と「持ち越しは1回だけ」を保つ）
+  for (const a of stale) {
+    if (!a.draftId) continue;
     await tx
       .update(postDrafts)
-      .set({ status: "approved", version: sql`${postDrafts.version} + 1`, updatedAt: now })
-      .where(and(inArray(postDrafts.id, draftIds), eq(postDrafts.status, "publishing")));
+      .set({
+        status: "approved",
+        ...(a.isCarryover ? { carryoverAttemptId: a.id } : {}),
+        version: sql`${postDrafts.version} + 1`,
+        updatedAt: now,
+      })
+      .where(and(eq(postDrafts.id, a.draftId), eq(postDrafts.status, "publishing")));
+  }
 }
 
 // ---- Accountの画面を開いたとき（research.md R10・R14） ----

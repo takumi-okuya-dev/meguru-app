@@ -139,6 +139,7 @@ Accountが要再接続なら（トークンを復号できるか・接続の行�
 | 上限 | `skipped`（`rate_limited`）。`posting_schedules.paused_until`を翌日の0時（日本時間）にする | `approved`に戻す |
 
 - 下書きを`approved`に戻すときは、`version + 1`。`reviewed_at`・`prioritized_at`は元のまま（投稿の順は変わらない）。
+- 持ち越しの試み（`is_carryover`）で下書きを`approved`に戻すとき（認証・上限・要再接続・再接続の片付け）は、`carryover_attempt_id`をその試みにして付け直す。取り出しで消しているので、付け直さないと次の時刻の優先と「持ち越しは1回だけ」が失われる。
 - 下書きを`publish_failed`にするときは、`prioritized_at`・`carryover_attempt_id`を消す（data-model.mdのCHECK制約。`publish_failed`ではNULL）。
 - 下書きを戻す・失敗にする更新は、`status = 'publishing'`を条件にする。
 

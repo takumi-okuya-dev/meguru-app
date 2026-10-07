@@ -357,7 +357,11 @@ class AttemptContext {
           .where(eq(publishAttempts.id, this.attempt.id));
         await tx
           .update(postDrafts)
-          .set({ status: "approved", version: sql`${postDrafts.version} + 1`, updatedAt: this.now })
+          .set({
+            ...this.backToApprovedDraft(),
+            version: sql`${postDrafts.version} + 1`,
+            updatedAt: this.now,
+          })
           .where(and(eq(postDrafts.id, this.draft.id), eq(postDrafts.status, "publishing")));
         return { kind: "stale" } as const;
       }
@@ -562,8 +566,23 @@ class AttemptContext {
   async backToApproved(
     reason: "needs_reconnect" | "rate_limited",
   ): Promise<ExecuteOutcome> {
-    await this.commit({ state: "skipped", skipReason: reason, draftId: null, leaseUntil: null }, { status: "approved" });
+    await this.commit(
+      { state: "skipped", skipReason: reason, draftId: null, leaseUntil: null },
+      this.backToApprovedDraft(),
+    );
     return { kind: "skipped", reason };
+  }
+
+  /**
+   * 承認済みに戻すときの下書きの列。持ち越しの試みなら、持ち越しの印（carryover_attempt_id）をこの試みにして付け直す。
+   * 取り出しで印を消しているので、付け直さないと次の時刻の優先と「持ち越しは1回だけ」が失われる（PR #6 のCodexレビュー）。
+   * @returns 下書きの列
+   */
+  private backToApprovedDraft(): Partial<typeof postDrafts.$inferInsert> {
+    return {
+      status: "approved",
+      ...(this.attempt.isCarryover ? { carryoverAttemptId: this.attempt.id } : {}),
+    };
   }
 
   /**
