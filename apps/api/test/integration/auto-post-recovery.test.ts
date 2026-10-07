@@ -150,10 +150,9 @@ describe("PR #6 のCodexレビュー", () => {
 
   it("要再接続でも、公開の結果がわからない途中なら確かめて投稿済みにする（新しく公開しない）", async () => {
     // 偽サーバーの投稿の時刻は実時刻なので、実時刻で動かす
-    const { accountId } = await connectedAccount("u1");
-    // 試みは接続の後に作る（接続の authorized_at より前に作った試みは、再接続より前のものとして公開しない）
     const now = new Date();
     const minute = Math.floor(((now.getTime() + 9 * 3600_000) % 86_400_000) / 60_000);
+    const { accountId } = await connectedAccount("u1");
     const [id] = await approvedDrafts(accountId, ["応答を失った投稿"]);
     await setSchedule(accountId, { slotMinutes: [minute] });
     await fake.dropPublishResponse(1);
@@ -205,10 +204,9 @@ describe("PR #6 のCodexレビュー", () => {
   });
 
   it("応答を失った投稿の照合で、公開を送る前の同じ本文の投稿（手動の投稿）を選ばない", async () => {
-    const { accountId, threadsUserId } = await connectedAccount("u1");
-    // 試みは接続の後に作る（接続の authorized_at より前に作った試みは、再接続より前のものとして公開しない）
     const now = new Date();
     const minute = Math.floor(((now.getTime() + 9 * 3600_000) % 86_400_000) / 60_000);
+    const { accountId, threadsUserId } = await connectedAccount("u1");
     const [id] = await approvedDrafts(accountId, ["同じ本文"]);
     await setSchedule(accountId, { slotMinutes: [minute] });
     // 公開を送る2分前に、同じ本文を手動で投稿していた（照合で見る5分の中）
@@ -376,12 +374,14 @@ describe("PR #6 のCodexレビュー", () => {
     const token = crypto.randomUUID();
     const [attempt] = await db()`INSERT INTO publish_attempts (account_id, slot_at, slot_date, slot_minute, state, draft_id, container_id, lease_until, lease_token, created_at)
       VALUES (${accountId}, ${now.toISOString()}, '2030-01-10', 720, 'in_progress', ${id!}, ${containerId}, ${addMin(now, 2).toISOString()}, ${token}, ${now.toISOString()}) RETURNING id`;
-    // コンテナーの状態を確かめた後、公開を送るまでの間に再接続が済んだ（試みを作った後に認可された）
+    // コンテナーの状態を確かめた後、公開を送るまでの間に再接続がコミットされた（世代番号が増えた）。
+    // 再接続の callback に入った時刻（authorized_at）は、試みを作るより前のまま
     const threads = {
       ...real,
       getContainerStatus: async (...args: Parameters<typeof real.getContainerStatus>) => {
         const r = await real.getContainerStatus(...args);
-        await db()`UPDATE threads_connections SET authorized_at = ${addMin(now, 1).toISOString()} WHERE account_id = ${accountId}`;
+        await db()`UPDATE accounts SET connection_generation = connection_generation + 1 WHERE id = ${accountId}`;
+        await db()`UPDATE threads_connections SET authorized_at = ${addMin(now, -1).toISOString()} WHERE account_id = ${accountId}`;
         return r;
       },
     };

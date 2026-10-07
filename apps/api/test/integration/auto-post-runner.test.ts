@@ -295,10 +295,9 @@ describe("US3：失敗とやり直し", () => {
 
 /** 公開要求を送ったが応答が不明の試みを作る。偽サーバーの実時刻と検索のsinceを合わせる。 */
 async function pendingPublish(drop = false) {
-  const { accountId } = await connectedAccount("u1", app);
-  // 試みは接続の後に作る（接続の authorized_at より前に作った試みは、再接続より前のものとして公開しない）
   const now = new Date();
   const minute = Math.floor(((now.getTime() + 9 * 3600_000) % 86_400_000) / 60_000);
+  const { accountId } = await connectedAccount("u1", app);
   const [id] = await approvedDrafts(accountId, ["ONCE"]);
   await setSchedule(accountId, { slotMinutes: [minute] });
   if (drop) await fake.dropPublishResponse(1);

@@ -19,7 +19,6 @@ import {
   postDrafts,
   postingSchedules,
   publishAttempts,
-  threadsConnections,
 } from "../db/schema";
 import type { Env } from "../env";
 import { logger } from "../lib/logger";
@@ -316,7 +315,7 @@ class AttemptContext {
    * ロックの順は再接続と同じ（Account → 試み）にして、デッドロックを避ける。
    * @param cred - 接続情報
    * @param containerId - 公開するコンテナー
-   * @returns 送った結果。要再接続・試みを作った後に再接続された（authorized_at が新しい）なら stale（送っていない）
+   * @returns 送った結果。要再接続・接続の世代番号が読んだときと違う（その間に再接続された）なら stale（送っていない）
    */
   private publishFenced(
     cred: ThreadsCredentials & { token: string },
@@ -326,12 +325,11 @@ class AttemptContext {
       const [account] = await tx
         .select({
           status: accounts.connectionStatus,
-          authorizedAt: threadsConnections.authorizedAt,
+          generation: accounts.connectionGeneration,
         })
         .from(accounts)
-        .leftJoin(threadsConnections, eq(threadsConnections.accountId, accounts.id))
         .where(eq(accounts.id, this.attempt.accountId))
-        .for("share", { of: accounts });
+        .for("share");
       const [owned] = await tx
         .select({ id: publishAttempts.id })
         .from(publishAttempts)
@@ -344,11 +342,9 @@ class AttemptContext {
         )
         .for("update");
       if (!owned) throw new LeaseLostError();
-      if (
-        account?.status !== "connected" ||
-        !account.authorizedAt ||
-        account.authorizedAt.getTime() > this.attempt.createdAt.getTime()
-      )
+      // 世代番号は再接続のコミットで増える（authorized_at は callback に入った時刻なので使わない）。
+      // トークンの更新でも増えるが、その場合も送らずに戻す（まれで、下書きは次の時刻に投稿される）
+      if (account?.status !== "connected" || account.generation !== cred.generation)
         return { kind: "stale" } as const;
       const { mediaId } = await this.threads.publishContainer(
         cred.token,
