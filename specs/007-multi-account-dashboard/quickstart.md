@@ -52,20 +52,25 @@ pnpm lint
    curl -fsS -X POST http://localhost:8790/__control/users -H 'Content-Type: application/json' -d '{"id":"9003","username":"design_soudan","name":"デザイン相談室","picture":null}'
    ```
 
-2. Clerkでログインし、1件目を接続する。必要なら既存の `pnpm --filter api admin:set-plan <accountId> multi-account` で登録上限を上げる。2件目・3件目の接続の前に、偽のThreadsの既定ユーザーを切り替える。
+2. Clerkでログインし、1件目を接続する。必要なら既存の `pnpm --filter api admin:set-plan <accountId> multi-account` で登録上限を上げる。
+
+3. 次のコマンドで偽のThreadsの既定ユーザーを `marron_studio` に切り替えてから、画面で「アカウントを追加」を選び、認可を完了する。
 
    ```bash
    curl -fsS -X POST http://localhost:8790/__control/default-user -H 'Content-Type: application/json' -d '{"id":"9002"}'
-   # 2件目を画面から接続する
-   curl -fsS -X POST http://localhost:8790/__control/default-user -H 'Content-Type: application/json' -d '{"id":"9003"}'
-   # 3件目を画面から接続する
    ```
 
-3. 投稿ストックで、3件のAccountそれぞれに要確認の下書きを5件・2件・0件用意する。切り替えメニューを開く。
-4. **期待**：同じメニュー内に5件・2件・0件と表示される。表示名、@ユーザー名、現在表示中の印が分かる。件数の多いAccountを選んで投稿ストックへ進める。3件のとき、選択から投稿ストックまで30秒以内。
-5. 1件を承認または却下して、メニューを開き直す。**期待**：対象の件数が1減り、投稿ストックの「要確認」と一致する。別のAccountの件数は変わらない。
-6. 3件目の偽ユーザーのトークンを無効にし、そのAccountを開き直して切断を検知させる。**期待**：次にメニューを開くと「要再接続」とそのAccountの要確認件数が一緒に表示される。
-7. Accountを1件削除してメニューを開く。**期待**：削除したAccountの行がない。追加は既存の「アカウントを追加」から始められる。
+4. `marron_studio` が一覧に追加されたことを確認してから、既定ユーザーを `design_soudan` に切り替え、3件目を画面から接続する。2つの切り替えコマンドを続けて実行すると、2件目にも `design_soudan` が使われる。
+
+   ```bash
+   curl -fsS -X POST http://localhost:8790/__control/default-user -H 'Content-Type: application/json' -d '{"id":"9003"}'
+   ```
+
+5. 投稿ストックで、3件のAccountそれぞれに要確認の下書きを5件・2件・0件用意する。切り替えメニューを開く。
+6. **期待**：同じメニュー内に5件・2件・0件と表示される。表示名、@ユーザー名、現在表示中の印が分かる。件数の多いAccountを選んで投稿ストックへ進める。3件のとき、選択から投稿ストックまで30秒以内。
+7. 1件を承認または却下して、メニューを開き直す。**期待**：対象の件数が1減り、投稿ストックの「要確認」と一致する。別のAccountの件数は変わらない。
+8. 3件目の偽ユーザーのトークンを無効にし、そのAccountを開き直して切断を検知させる。**期待**：次にメニューを開くと「要再接続」とそのAccountの要確認件数が一緒に表示される。
+9. Accountを1件削除してメニューを開く。**期待**：削除したAccountの行がない。追加は既存の「アカウントを追加」から始められる。
 
 ## 手動確認：アカウント数と切り替え後の導線
 
