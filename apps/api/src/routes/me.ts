@@ -6,6 +6,7 @@ import type { AppEnv } from "../app";
 import { createDb } from "../db/client";
 import { accounts, memberships } from "../db/schema";
 import { toAccountSummary, type AccountRow } from "../services/access";
+import { countOwnedAccountNeedsReview } from "../services/account-review-counts";
 
 /**
  * ログイン後の遷移先の Account を決める（FR-004、research.md R10）。
@@ -48,5 +49,10 @@ export function meRoutes(authed: MiddlewareHandler<AppEnv>) {
       // Threads連携の公開範囲。Web はアカウント追加画面の案内の有無に使う（specs/002 FR-028）
       threadsAccessMode: c.env.THREADS_ACCESS_MODE ?? "testers",
     });
+  }).get("/me/needs-review-counts", authed, async (c) => {
+    const user = c.get("user");
+    const counts = await countOwnedAccountNeedsReview(createDb(c.env.DATABASE_URL), user.id);
+    c.header("Cache-Control", "no-store");
+    return c.json({ counts });
   });
 }

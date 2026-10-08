@@ -12,6 +12,8 @@ coverage/
 .env
 .env.local
 .env.*.local
+.env*
+!.env.example
 
 # Playwright
 e2e/test-results/

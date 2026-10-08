@@ -22,6 +22,7 @@ import {
   errorMessage,
   errorResponseSchema,
   meResponseSchema,
+  needsReviewCountsResponseSchema,
   profileStatusSchema,
   promotionListSchema,
   promotionSchema,
@@ -124,6 +125,7 @@ type FeedbackRequestInput = { memo?: string | null; includeInPrompt?: boolean };
 /** API の呼び出し。レスポンスは共通のスキーマで検証する。 */
 export const api = {
   me: () => request("/api/me", meResponseSchema),
+  needsReviewCounts: () => request("/api/me/needs-review-counts", needsReviewCountsResponseSchema),
   account: (accountId: string) => request(`/api/accounts/${accountId}`, accountSummarySchema),
   openAccount: (accountId: string, body: OpenAccountRequest, signal?: AbortSignal) =>
     request(`/api/accounts/${accountId}/open`, accountSummarySchema, {
