@@ -234,7 +234,7 @@ shadcn/uiの色の変数（`apps/web/src/index.css`）を使う。画面イメ�
 | 宣伝内容 | `/accounts/:id/promotions` | B | 002 |
 | リサーチ | `/accounts/:id/research` | B | 002 |
 | 投稿ストック | `/accounts/:id/stock` | C | 003・004 |
-| パフォーマンス | `/accounts/:id/performance` | 未定 | 006 |
+| パフォーマンス | `/accounts/:id/performance` | Cに近い1カラム（基準値の欄・アイコンのタブ・投稿のカード。006で決定） | 006 |
 | このアカウントの設定 | `/accounts/:id/settings` | Accountのサイドバーの中で、Dの右側の見た目（004で決定） | 001（004で「投稿のルール」を追加） |
 | アプリ全体の設定 | `/settings/*` | D | 001 |
 
@@ -258,6 +258,6 @@ shadcn/uiの色の変数（`apps/web/src/index.css`）を使う。画面イメ�
 
 - **リサーチの画面の細部**：型Bに沿って002のplanで決める。
 - ~~投稿ストックの細部~~：003・004の画面契約（[003](../specs/003-prompt-bulk-register/contracts/ui-routes.md)、[004](../specs/004-review-approval/contracts/ui-routes.md)）で決めた。
-- **パフォーマンスの画面の型**：006の仕様で決める。
+- ~~パフォーマンスの画面の型~~：006で、型Cに近い1カラム（上部バーにCSVのメニュー、基準値の欄、判定のアイコンのタブ、投稿のカード）にすると決めた（[006 画面契約](../specs/006-performance-feedback/contracts/ui-routes.md)）。サイドバーの「分析 > パフォーマンス」も006で足した。
 - ~~このアカウントの設定を型Dにする時期~~：004で、2列にはせず、Accountのサイドバーの中で型Dの右側の見た目にそろえると決めた（[004 spec](../specs/004-review-approval/spec.md) Clarifications）。005の投稿のスケジュールも同じ1列に置く。
 - **タブレット（768〜1023px）の画面イメージ**：今回の画面イメージには含めていない。002の実装時に確認する。
