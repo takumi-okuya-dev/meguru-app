@@ -10,6 +10,8 @@
 
 **Source**: [PRD §4.3](../../_bmad-output/initiative-threads-grower-app/prd-threads-grower-app/prd-threads-grower-app.md)（FR-4、FR-5）、UJ-1の後半（プロンプト生成 → 外部LLM → 貼り戻し → 投稿ストックへの一括登録）。画面は[UI全体設計](../../docs/ui-design.md)の型C（作業画面型）。
 
+> **2026-10-08の料金の見直しによる注記**：料金を「無料体験（1か月）の後、基本料金1,000円（Threadsアカウント1件目を含む）＋2件目以降1件500円。有料ならすべての機能」に改めた。このspecの「プロンプトの生成はプラン2以上（grower機能）」は「有料の契約中か無料体験中」に変わる。「貼り付けの一括登録・下書きの編集は全プラン」は、無料体験が終わり契約していない場合は読むだけになる（`[ASSUMPTION]`）。当時の記録としてこのspecの本文は変えない。コード（プランの値・grower機能の判定・アカウント数の上限など）は、課金のfeature（PRD FR-12）で置き換える。詳しくは[PRD FR-12](../../_bmad-output/initiative-threads-grower-app/prd-threads-grower-app/prd-threads-grower-app.md)・Product Brief addendum「料金」・Constitution 2.0.0。
+
 ## Clarifications
 
 ### Session 2026-10-03

@@ -10,6 +10,8 @@
 
 **Source**: [PRD §4.1](../../_bmad-output/initiative-threads-grower-app/prd-threads-grower-app/prd-threads-grower-app.md)（FR-1, FR-2）、UJ-1・UJ-4の入口部分
 
+> **2026-10-08の料金の見直しによる注記**：料金を「無料体験（1か月）の後、基本料金1,000円（Threadsアカウント1件目を含む）＋2件目以降1件500円。有料ならすべての機能」に改めた。このspecの「プラン1〜2は1Account、プラン3以上は複数Account」は、Account数の上限なし・2件目以降は1件ごとに料金を加算（無料体験中は上限あり。`[ASSUMPTION]`3件）に変わる。`Account.plan`（4段階）は、支払うユーザー単位の契約に置き換わる。当時の記録としてこのspecの本文は変えない。コード（プランの値・grower機能の判定・アカウント数の上限など）は、課金のfeature（PRD FR-12）で置き換える。詳しくは[PRD FR-12](../../_bmad-output/initiative-threads-grower-app/prd-threads-grower-app/prd-threads-grower-app.md)・Product Brief addendum「料金」・Constitution 2.0.0。
+
 ## Clarifications
 
 ### Session 2026-10-01
