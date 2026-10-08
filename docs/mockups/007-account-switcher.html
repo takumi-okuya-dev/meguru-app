@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Feature 007 — アカウント切り替えメニューの画面イメージ</title>
+<style>
+  :root{--bg:#fff;--sidebar:#f9f9f9;--fg:#0d0d0d;--muted:#5d5d5d;--line:#e3e3e3;--soft:#f0f0f0;--hover:#ececec;--warn:#8f4700;--warnbg:#fff0dc}
+  *{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;font-family:-apple-system,BlinkMacSystemFont,"Hiragino Kaku Gothic ProN","Hiragino Sans","Noto Sans CJK JP",Meiryo,sans-serif;color:var(--fg);background:var(--bg)}
+  svg.icon{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round;flex:none}
+  .app{display:flex;width:100%;min-height:100vh;overflow:hidden}.sidebar{width:260px;min-width:260px;background:var(--sidebar);border-right:1px solid #efefef;height:100vh;display:flex;flex-direction:column;padding:8px;position:relative;z-index:2}.switch-bar{display:flex;align-items:center;gap:4px}.switch-trigger{display:flex;align-items:center;gap:10px;padding:7px 8px;width:210px;height:51px;border-radius:9px;background:#eee}.avatar{width:32px;height:32px;border-radius:50%;display:grid;place-items:center;font-weight:700;font-size:14px;flex:none}.avatar.kigi{background:#e6efdf;color:#406a35}.avatar.marron{background:#ece5df;color:#674c3f}.avatar.design{background:#e2e7f4;color:#3c5b93}.account-text{min-width:0;flex:1}.account-text strong{font-size:13px;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.account-text small{font-size:11px;color:var(--muted);display:block;margin-top:2px;white-space:nowrap}.switch-trigger .icon{width:15px;color:#666}.collapse{width:31px;height:31px;display:grid;place-items:center;color:#777}
+  .navigation{padding-top:12px;flex:1}.nav-row{height:37px;display:flex;align-items:center;gap:11px;padding:0 11px;border-radius:8px;font-size:13px}.nav-row.active{background:#ececec;font-weight:600}.nav-row.create{font-weight:600;margin-bottom:7px}.nav-row .icon{width:18px}.nav-row .numbadge{margin-left:auto;font-size:12px;color:#666}.nav-heading{font-size:11px;color:#777;padding:18px 11px 7px}.sidebar-bottom{border-top:1px solid #e5e5e5;padding-top:9px}.user{display:flex;align-items:center;gap:8px;padding:8px 9px;font-size:12px}.user .avatar{width:26px;height:26px;background:#e7e7e7;color:#333;font-size:11px}.user .icon{margin-left:auto;width:14px}
+  .main{flex:1;min-width:0;background:#fff}.topbar{height:56px;border-bottom:1px solid var(--line);display:flex;align-items:center;padding:0 22px;font-size:16px;font-weight:600}.content{width:min(100% - 64px,720px);margin:0 auto;padding-top:65px}.hero{text-align:center}.hero .avatar{width:58px;height:58px;font-size:22px;margin:0 auto 12px}.hero h1{font-size:18px;margin:0 0 5px}.handle{color:var(--muted);font-size:13px}.hero h2{font-size:26px;margin:42px 0 7px;letter-spacing:-.03em}.hero p{font-size:14px;color:var(--muted);margin:0}.button{display:inline-flex;align-items:center;justify-content:center;background:#0d0d0d;color:#fff;border-radius:999px;font-size:13px;font-weight:600;padding:10px 20px;margin-top:16px}.next-card{margin-top:46px;border:1px solid var(--line);border-radius:16px;padding:18px 20px;display:flex;justify-content:space-between;align-items:center}.eyebrow{font-size:11px;color:var(--muted);margin:0 0 7px}.next-card strong{font-size:14px}.next-card .sub{font-size:12px;color:var(--muted);margin-top:4px}.next-card .pill{background:var(--soft);color:#555;border-radius:999px;padding:7px 11px;font-size:11px;white-space:nowrap}.section-title{font-size:12px;color:var(--muted);margin:26px 0 11px}.cards{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}.card{border:1px solid var(--line);border-radius:15px;padding:16px}.card .icon{color:#555}.card strong{display:block;font-size:13px;margin:10px 0 6px}.card small{font-size:11px;color:var(--muted)}
+  .dropdown{position:absolute;left:8px;top:63px;width:344px;background:#fff;border:1px solid #dedede;border-radius:14px;box-shadow:0 18px 50px rgba(0,0,0,.18),0 3px 10px rgba(0,0,0,.08);padding:7px;z-index:10}.drop-row{display:flex;align-items:center;gap:10px;min-height:63px;padding:8px 9px;border-radius:9px}.drop-row.selected{background:#f1f1f1}.drop-row .avatar{width:32px;height:32px}.row-label{flex:1;min-width:0}.row-label .name{display:flex;align-items:center;gap:5px;font-size:13px;font-weight:600;white-space:nowrap}.name .check{color:#3b3b3b;width:14px;height:14px}.row-label .details{font-size:11px;color:#666;white-space:nowrap;margin-top:3px}.row-label .details.warning{color:var(--warn)}.count{flex:none;min-width:64px;display:flex;flex-direction:column;align-items:flex-end;gap:2px}.count .label{font-size:10px;color:#777}.count .number{font-size:13px;font-weight:700;font-variant-numeric:tabular-nums}.count.attention .number{color:#8f4700}.count.zero .number{font-weight:500;color:#777}.divider{height:1px;background:var(--line);margin:6px 3px}.add{height:41px;display:flex;align-items:center;gap:11px;padding:0 10px;font-size:13px;font-weight:500;border-radius:8px}.add .icon{width:17px}.desktop-note{position:fixed;right:24px;bottom:19px;font-size:11px;color:#888}
+  .shade{display:none}.mobile-menu-icon{display:none}
+  @media(max-width:600px){.app{height:100vh}.main{width:100%}.topbar{justify-content:center;position:relative;height:52px}.mobile-menu-icon{display:grid;position:absolute;left:16px;top:16px}.content{width:calc(100% - 32px);padding-top:35px}.hero h2{font-size:22px}.next-card{margin-top:35px}.cards{grid-template-columns:1fr}.cards .card:not(:first-child){display:none}.shade{display:block;position:fixed;inset:0;background:rgba(0,0,0,.34);z-index:1}.sidebar{position:fixed;width:282px;min-width:282px;left:0;top:0;bottom:0;height:100vh;z-index:2;box-shadow:8px 0 32px rgba(0,0,0,.08)}.switch-trigger{width:231px}.dropdown{position:fixed;left:8px;top:64px;width:calc(100vw - 16px);max-width:350px;z-index:5}.desktop-note{display:none}}
+</style>
+</head>
+<body>
+<svg xmlns="http://www.w3.org/2000/svg" style="position:absolute;width:0;height:0;overflow:hidden">
+<symbol id="chev" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
+<symbol id="panel" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16"/></symbol>
+<symbol id="pen" viewBox="0 0 24 24"><path d="M12 20h9M4 17l11-11 3 3L7 20H4zM17 4l3 3"/></symbol>
+<symbol id="house" viewBox="0 0 24 24"><path d="m3 10 9-7 9 7v10h-7v-7h-4v7H3z"/></symbol>
+<symbol id="inbox" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 14h5l2 3h4l2-3h5"/></symbol>
+<symbol id="target" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4"/><path d="M12 12h.01"/></symbol>
+<symbol id="megaphone" viewBox="0 0 24 24"><path d="M3 10v4h4l11 5V5L7 10zM7 14l2 7h3l-2-6"/></symbol>
+<symbol id="search" viewBox="0 0 24 24"><circle cx="10" cy="10" r="6"/><path d="m15 15 6 6"/></symbol>
+<symbol id="chart" viewBox="0 0 24 24"><path d="M4 20V4M4 20h17M8 16v-5M13 16V7M18 16v-8"/></symbol>
+<symbol id="gear" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3m0 14v3M2 12h3m14 0h3M5 5l2 2m10 10 2 2M19 5l-2 2M7 17l-2 2"/></symbol>
+<symbol id="check" viewBox="0 0 24 24"><path d="m5 12 4 4L19 6"/></symbol>
+<symbol id="plus" viewBox="0 0 24 24"><path d="M12 4v16M4 12h16"/></symbol>
+<symbol id="bars" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"/></symbol>
+</svg>
+<div class="app">
+  <aside class="sidebar">
+    <div class="switch-bar"><div class="switch-trigger"><div class="avatar kigi">K</div><div class="account-text"><strong>Kigi Cafe</strong><small>@kigi_cafe</small></div><svg class="icon"><use href="#chev"/></svg></div><div class="collapse"><svg class="icon"><use href="#panel"/></svg></div></div>
+    <nav class="navigation">
+      <div class="nav-row create"><svg class="icon"><use href="#pen"/></svg>投稿をつくる</div>
+      <div class="nav-row active"><svg class="icon"><use href="#house"/></svg>ホーム</div>
+      <div class="nav-row"><svg class="icon"><use href="#inbox"/></svg>投稿ストック <span class="numbadge">2</span></div>
+      <div class="nav-heading">戦略</div><div class="nav-row"><svg class="icon"><use href="#target"/></svg>課題</div><div class="nav-row"><svg class="icon"><use href="#megaphone"/></svg>宣伝内容</div><div class="nav-row"><svg class="icon"><use href="#search"/></svg>リサーチ</div>
+      <div class="nav-heading">分析</div><div class="nav-row"><svg class="icon"><use href="#chart"/></svg>パフォーマンス</div>
+    </nav>
+    <div class="sidebar-bottom"><div class="nav-row"><svg class="icon"><use href="#gear"/></svg>このアカウントの設定</div><div class="user"><div class="avatar">T</div>Takumi<svg class="icon"><use href="#chev"/></svg></div></div>
+  </aside>
+  <div class="shade"></div>
+  <main class="main"><header class="topbar"><svg class="icon mobile-menu-icon"><use href="#bars"/></svg>ホーム</header><div class="content"><div class="hero"><div class="avatar kigi">K</div><h1>Kigi Cafe</h1><div class="handle">@kigi_cafe</div><h2>投稿をつくりましょう</h2><p>プロンプトを使って、次の投稿を準備しましょう。</p><div class="button">投稿ストックへ</div></div><div class="next-card"><div><p class="eyebrow">次の投稿</p><strong>明日 9:00 に公開予定</strong><div class="sub">承認済みの投稿が3件あります</div></div><span class="pill">自動投稿オン</span></div><div class="section-title">投稿の材料</div><div class="cards"><div class="card"><svg class="icon"><use href="#target"/></svg><strong>課題</strong><small>12 / 16 入力済み</small></div><div class="card"><svg class="icon"><use href="#megaphone"/></svg><strong>宣伝内容</strong><small>宣伝の対象 2件</small></div><div class="card"><svg class="icon"><use href="#search"/></svg><strong>リサーチ</strong><small>参考投稿 8件</small></div></div></div></main>
+  <div class="dropdown" role="presentation">
+    <div class="drop-row selected"><div class="avatar kigi">K</div><div class="row-label"><div class="name">Kigi Cafe <svg class="icon check"><use href="#check"/></svg></div><div class="details">@kigi_cafe ・ 表示中</div></div><div class="count"><span class="label">要確認</span><span class="number">2件</span></div></div>
+    <div class="drop-row"><div class="avatar marron">M</div><div class="row-label"><div class="name">Marron Studio</div><div class="details">@marron_studio</div></div><div class="count attention"><span class="label">要確認</span><span class="number">5件</span></div></div>
+    <div class="drop-row"><div class="avatar design">D</div><div class="row-label"><div class="name">デザイン相談室</div><div class="details warning">@design_soudan ・ 要再接続</div></div><div class="count zero"><span class="label">要確認</span><span class="number">0件</span></div></div>
+    <div class="divider"></div><div class="add"><svg class="icon"><use href="#plus"/></svg>アカウントを追加</div>
+  </div>
+  <div class="desktop-note">画面イメージ · Feature 007</div>
+</div>
+</body>
+</html>
