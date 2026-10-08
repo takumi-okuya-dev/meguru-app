@@ -96,3 +96,37 @@ export function formatSlotTime(hhmm: string): string {
   const [h, m] = hhmm.split(":");
   return `${Number(h)}:${m}`;
 }
+
+const WEEKDAYS = ["日", "月", "火", "水", "木", "金", "土"];
+
+/**
+ * 日本時間の「月/日」（specs/006 contracts/ui-routes.md）。
+ * @param iso - ISO 8601 の日時
+ * @returns 「10/12」
+ */
+export function formatJstMonthDay(iso: string): string {
+  const p = jstParts(new Date(iso));
+  return `${p.m}/${p.day}`;
+}
+
+/**
+ * 日本時間の「月/日 時:分」。
+ * @param iso - ISO 8601 の日時
+ * @returns 「10/8 21:00」
+ */
+export function formatJstShort(iso: string): string {
+  const p = jstParts(new Date(iso));
+  return `${p.m}/${p.day} ${p.h}:${String(p.min).padStart(2, "0")}`;
+}
+
+/**
+ * 日本時間の「月/日(曜) 時:分」。投稿のカードの日時。
+ * @param iso - ISO 8601 の日時
+ * @returns 「9/25(木) 19:01」
+ */
+export function formatJstWithWeekday(iso: string): string {
+  const d = new Date(iso);
+  const p = jstParts(d);
+  const w = WEEKDAYS[new Date(d.getTime() + JST_OFFSET_MS).getUTCDay()];
+  return `${p.m}/${p.day}(${w}) ${p.h}:${String(p.min).padStart(2, "0")}`;
+}

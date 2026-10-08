@@ -8,6 +8,7 @@ import { AccountSettings } from "@/pages/account-settings";
 import { DataDeletion } from "@/pages/data-deletion";
 import { Landing } from "@/pages/landing";
 import { NotFound } from "@/pages/not-found";
+import { PerformancePage } from "@/pages/performance";
 import { SignInPage } from "@/pages/sign-in";
 import { AccountSettingsPage } from "@/pages/settings/account";
 import { AppearanceSettings } from "@/pages/settings/appearance";
@@ -45,6 +46,7 @@ export const routes = [
           { path: "promotions", element: <PromotionsPage /> },
           { path: "research", element: <ResearchPage /> },
           { path: "stock", element: <StockPage /> },
+          { path: "performance", element: <PerformancePage /> },
         ],
       },
     ],

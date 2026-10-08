@@ -2,6 +2,7 @@
 // 上から：Accountの切り替えと畳むボタン → 「投稿をつくる」 → 機能の移動 → 区切り線 → このアカウントの設定・ユーザーメニュー。
 // まだ作っていない機能は出さない（各featureで画面を作ったときに NAV_GROUPS に足す）。
 import {
+  ChartColumnIcon,
   HouseIcon,
   InboxIcon,
   MegaphoneIcon,
@@ -39,6 +40,10 @@ const NAV_GROUPS: NavGroup[] = [
       { path: "promotions", label: "宣伝内容", Icon: MegaphoneIcon },
       { path: "research", label: "リサーチ", Icon: SearchIcon },
     ],
+  },
+  {
+    label: "分析",
+    items: [{ path: "performance", label: "パフォーマンス", Icon: ChartColumnIcon }],
   },
 ];
 
