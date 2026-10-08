@@ -39,4 +39,7 @@ export const queryKeys = {
   postingSchedule: (id: string) => ["account", id, "posting-schedule"] as const,
   autoPost: (id: string) => ["account", id, "auto-post"] as const,
   published: (id: string) => ["account", id, "published"] as const,
+  // パフォーマンス（specs/006-performance-feedback）。タブごとのキーで、取り直しは ["account", id, "performance"] の範囲で行う
+  performance: (id: string, tab: string) => ["account", id, "performance", tab] as const,
+  performanceAll: (id: string) => ["account", id, "performance"] as const,
 };

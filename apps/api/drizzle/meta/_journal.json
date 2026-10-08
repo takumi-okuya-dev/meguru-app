@@ -57,6 +57,13 @@
       "when": 1791333686153,
       "tag": "0007_attempt_lease_token",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1791456434545,
+      "tag": "0008_performance",
+      "breakpoints": true
     }
   ]
 }

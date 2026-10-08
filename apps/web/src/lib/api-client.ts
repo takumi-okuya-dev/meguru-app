@@ -2,6 +2,10 @@
 // 401 を受けたら、セッション切れとして案内してから /sign-in へ遷移する（contracts/ui-routes.md の規則7）。
 import {
   accountSummarySchema,
+  exportPageSchema,
+  feedbackResponseSchema,
+  performancePageSchema,
+  type PerformanceTab,
   connectResponseSchema,
   deleteCountSchema,
   draftBatchResultSchema,
@@ -113,6 +117,9 @@ async function request<T>(
   if (schema === null || res.status === 204) return undefined as T;
   return schema.parse(await res.json());
 }
+
+/** 傾向メモ・切り替えの保存の入力（specs/006 contracts/api.md）。 */
+type FeedbackRequestInput = { memo?: string | null; includeInPrompt?: boolean };
 
 /** API の呼び出し。レスポンスは共通のスキーマで検証する。 */
 export const api = {
@@ -279,6 +286,21 @@ export const api = {
     request(`/api/accounts/${accountId}/auto-post/notices/blocked/dismiss`, null, {
       method: "POST",
     }),
+  getPerformance: (accountId: string, tab: PerformanceTab, before?: string) => {
+    const q = new URLSearchParams({ tab });
+    if (before) q.set("before", before);
+    return request(`/api/accounts/${accountId}/performance?${q}`, performancePageSchema);
+  },
+  updateFeedback: (accountId: string, draftId: string, body: FeedbackRequestInput) =>
+    request(`/api/accounts/${accountId}/performance/${draftId}/feedback`, feedbackResponseSchema, {
+      method: "PATCH",
+      body: JSON.stringify(body),
+    }),
+  exportPerformance: (accountId: string, kind: "posts" | "snapshots", before?: string) => {
+    const q = new URLSearchParams({ kind });
+    if (before) q.set("before", before);
+    return request(`/api/accounts/${accountId}/performance/export?${q}`, exportPageSchema);
+  },
   listPublished: (accountId: string, before?: string) =>
     request(
       `/api/accounts/${accountId}/post-drafts/published${before ? `?before=${encodeURIComponent(before)}` : ""}`,

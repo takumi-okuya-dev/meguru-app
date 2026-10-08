@@ -254,6 +254,8 @@ async function writeConnection(
       profilePictureUrl: input.profile.profilePictureUrl,
       connectionStatus: "connected",
       connectionGeneration: sql`${accounts.connectionGeneration} + 1`,
+      // 再接続で反応数を読む権限が戻りうるので、権限のない印を消す（specs/006 research.md R11）
+      insightsDeniedAt: null,
       updatedAt: now,
     })
     .where(eq(accounts.id, accountId));

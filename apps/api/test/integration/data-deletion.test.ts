@@ -1,7 +1,7 @@
 // US4：Metaのデータ削除要求（research.md R7、quickstart.md の該当行）
 import { eq } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
-import { accounts, threadsDeletionRequests } from "../../src/db/schema";
+import { accounts, followerSnapshots, postMetricSnapshots, postMetrics, threadsDeletionRequests } from "../../src/db/schema";
 import {
   attemptDeletion,
   cleanupDeletionIdentifiers,
@@ -11,6 +11,7 @@ import {
 import { TEST_APP_SECRET } from "../env";
 import { call, connectNew, db, fake, makeApp, redirectTarget, resetDb, testEnv } from "../helpers/app";
 import { makeSignedRequest } from "../helpers/signed-request";
+import { confirmedMetrics, publishedDrafts } from "../helpers/auto-post";
 
 const app = makeApp();
 const MIN = 60_000;
@@ -51,6 +52,23 @@ describe("POST /api/threads/webhooks/data-deletion", () => {
     const row = await request(body.confirmation_code);
     expect(row.threadsUserId).toBeNull();
     expect(row.threadsUserHmac).not.toBeNull();
+  });
+
+  it("反応数の記録・取り込みの履歴・フォロワー数の記録も一緒に消える（specs/006 前提）", async () => {
+    await connectNew(app, "u1", "1001");
+    const [a] = await db().select().from(accounts);
+    const [p] = await publishedDrafts(a!.id, [{ publishedAt: new Date(Date.now() - 200 * 3600_000) }]);
+    await confirmedMetrics(a!.id, p!.id, 10);
+    await db().insert(postMetricSnapshots).values({
+      draftId: p!.id, accountId: a!.id, kind: "d7", method: "slot", fetchedAt: new Date(), elapsedMinutes: 10080, views: 10,
+    });
+    await db().insert(followerSnapshots).values({ accountId: a!.id, snapshotDate: "2026-10-08", followersCount: 5, capturedAt: new Date() });
+
+    const res = await postDeletion(await makeSignedRequest(TEST_APP_SECRET, { user_id: "1001", issued_at: 1 }));
+    expect(res.status).toBe(200);
+    expect(await db().select().from(postMetrics)).toHaveLength(0);
+    expect(await db().select().from(postMetricSnapshots)).toHaveLength(0);
+    expect(await db().select().from(followerSnapshots)).toHaveLength(0);
   });
 
   it("同じ signed_request の再送は、同じ確認コードを返して新しい行を作らず、再接続したAccountは残る", async () => {

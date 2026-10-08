@@ -15,7 +15,7 @@ import { and, asc, count, desc, eq, inArray, sql } from "drizzle-orm";
 import { z } from "zod";
 import { withTransaction, type Db, type TxDb } from "../db/client";
 import { lockAccountDrafts } from "../db/locks";
-import { draftBatches, postDrafts } from "../db/schema";
+import { accounts, draftBatches, postDrafts, strategyDesigns } from "../db/schema";
 import type { Env } from "../env";
 import { AppError, itemNotFound, notFound, pgErrorCode } from "../lib/errors";
 import type { AccountRow } from "./access";
@@ -283,6 +283,18 @@ export async function createDraftBatch(
         )) as [{ n: number }];
       if (n + parts.length > NEEDS_REVIEW_LIMIT)
         throw new AppError("ITEM_LIMIT_REACHED", 409, "item limit reached");
+      // 登録した時点のプロンプトの材料の版（specs/006 FR-002g、research.md R9）
+      const [materials] = await tx
+        .select({
+          strategyUpdatedAt: strategyDesigns.updatedAt,
+          promotionsChangedAt: accounts.promotionsChangedAt,
+          researchChangedAt: accounts.researchChangedAt,
+          coreRulesChangedAt: accounts.coreRulesChangedAt,
+        })
+        .from(accounts)
+        .leftJoin(strategyDesigns, eq(strategyDesigns.accountId, accounts.id))
+        .where(eq(accounts.id, accountId))
+        .limit(1);
       const [batch] = await tx
         .insert(draftBatches)
         .values({
@@ -290,6 +302,10 @@ export async function createDraftBatch(
           clientRequestId: req.clientRequestId,
           draftCount: parts.length,
           delimiterFound,
+          strategyUpdatedAt: materials?.strategyUpdatedAt ?? null,
+          promotionsChangedAt: materials?.promotionsChangedAt ?? null,
+          researchChangedAt: materials?.researchChangedAt ?? null,
+          coreRulesChangedAt: materials?.coreRulesChangedAt ?? null,
         })
         .returning();
       const drafts = await tx
@@ -374,6 +390,8 @@ export async function updateDraft(
           .update(postDrafts)
           .set({
             body: req.body.trim(),
+            // 登録の後に人が本文を直した（specs/006 FR-002e）。前後の空白だけの違いは直したことにしない
+            ...(before && before.body.trim() !== req.body.trim() ? { bodyEditedAt: new Date() } : {}),
             status: "needs_review",
             reviewedAt: null,
             lastReviewRequestId: null,
@@ -420,7 +438,7 @@ export async function deleteDrafts(db: Db, accountId: string, ids: string[]): Pr
  * @param id - 下書きのID
  * @returns カーソル
  */
-function encodeCursor(publishedAt: Date, id: string): string {
+export function encodeCursor(publishedAt: Date, id: string): string {
   return btoa(JSON.stringify([publishedAt.toISOString(), id]))
     .replace(/\+/g, "-")
     .replace(/\//g, "_")
@@ -432,7 +450,7 @@ function encodeCursor(publishedAt: Date, id: string): string {
  * @param cursor - 一覧のカーソル
  * @returns 投稿日時とID。壊れていればnull
  */
-function decodeCursor(cursor: string): { publishedAt: Date; id: string } | null {
+export function decodeCursor(cursor: string): { publishedAt: Date; id: string } | null {
   try {
     const [at, id] = JSON.parse(atob(cursor.replace(/-/g, "+").replace(/_/g, "/"))) as [
       string,

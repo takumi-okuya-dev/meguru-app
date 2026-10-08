@@ -464,6 +464,10 @@ class AttemptContext {
         status: "published",
         publishedAt,
         threadsMediaId: mediaId,
+        // 分析のための公開の時点の情報（specs/006 FR-002f）。publish_attempts は保存期間を過ぎると消えるので写す
+        publishedSlotMinute: this.attempt.slotMinute,
+        publishedCarryover: this.attempt.isCarryover,
+        publishedPrioritized: this.draft.prioritizedAt !== null,
         // 投稿済みでは、投稿の順の記録を持たない（data-model.md の CHECK制約。analyze I1）
         prioritizedAt: null,
         carryoverAttemptId: null,

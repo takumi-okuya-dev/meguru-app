@@ -86,6 +86,7 @@ function promptResponse(
       ngWordCount: 0,
       rejectedCount: 0,
       dailyPostCount: 0,
+      poorPostCount: 0,
       ...overrides,
     },
   };
@@ -1122,6 +1123,16 @@ describe("プロンプトのカードの要約（004 FR-025）", () => {
         "課題 11/16・宣伝の対象 1件・参考投稿 3件・ルール 3件・NGワード 2語を反映",
         { normalizer: (s) => s.replace(/\s+/g, " ").trim() },
       ),
+    ).toBeInTheDocument();
+  });
+
+  it("反応が低かった投稿の件数が足される（006）", async () => {
+    getPrompt.mockResolvedValue(promptResponse({ rejectedCount: 2, poorPostCount: 5 }));
+    renderPage();
+    expect(
+      await screen.findByText("課題 11/16・宣伝の対象 1件・参考投稿 3件・却下 2件・反応が低かった投稿 5件を反映", {
+        normalizer: (s) => s.replace(/\s+/g, " ").trim(),
+      }),
     ).toBeInTheDocument();
   });
 });

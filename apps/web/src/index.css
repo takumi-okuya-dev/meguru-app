@@ -30,6 +30,11 @@
   --success-bg: #e6f4ea;
   --warning: #8f4700;
   --warning-bg: #fff0dc;
+  /* パフォーマンスの判定（specs/006 contracts/ui-routes.md）。好調はオレンジ、低調は青 */
+  --perf-good-bg: #fff0dc;
+  --perf-good-fg: #8f4700;
+  --perf-poor-bg: #e3eefb;
+  --perf-poor-fg: #0b4f9e;
 }
 
 .dark {
@@ -57,6 +62,10 @@
   --success-bg: #173a25;
   --warning: #ffb866;
   --warning-bg: #3b2a12;
+  --perf-good-bg: #3b2a12;
+  --perf-good-fg: #ffb866;
+  --perf-poor-bg: #16304f;
+  --perf-poor-fg: #8ec2ff;
 }
 
 @theme inline {
@@ -84,6 +93,10 @@
   --color-sidebar: var(--sidebar);
   --color-warning: var(--warning);
   --color-warning-bg: var(--warning-bg);
+  --color-perf-good-bg: var(--perf-good-bg);
+  --color-perf-good-fg: var(--perf-good-fg);
+  --color-perf-poor-bg: var(--perf-poor-bg);
+  --color-perf-poor-fg: var(--perf-poor-fg);
   --color-success: var(--success);
   --color-success-bg: var(--success-bg);
   --font-sans: "Hiragino Sans", "Noto Sans JP", system-ui, sans-serif;

@@ -33,7 +33,8 @@ import { accounts, postDrafts, postingSchedules, publishAttempts } from "../db/s
 import type { Env } from "../env";
 import { logger } from "../lib/logger";
 import { createThreadsClient, type ThreadsClient } from "../lib/threads-client";
-import { computeNextCheckAt, readGate, shouldRun, writeGate } from "./auto-post-gate";
+import { computeNextCheckAt, readGate, shouldRun, writeCatchupDate, writeGate } from "./auto-post-gate";
+import { nextCatchupAt, runMetricsStage } from "./metrics-runner";
 import { claimSlot } from "./publish-claim";
 import { executeAttempt, fillPermalink, type ExecuteOutcome } from "./publish-executor";
 import { loadThreadsCredentials } from "./threads-credentials";
@@ -55,6 +56,8 @@ export type RunSummary = {
   expired: number;
   /** 結果を確かめる途中・コンテナーの処理中で、次の回に続ける試みの数 */
   waiting: number;
+  /** 反応数の段階で次の回に続けたいものがあるか（specs/006） */
+  metricsRemaining: boolean;
 };
 
 const empty = (): RunSummary => ({
@@ -68,6 +71,7 @@ const empty = (): RunSummary => ({
   deferred: 0,
   expired: 0,
   waiting: 0,
+  metricsRemaining: false,
 });
 
 /**
@@ -257,6 +261,23 @@ export async function runAutoPost(
   if (budget > 0 && (await refillPermalinks(env, db, threads, now, publishedNow)))
     permalinkPending = true;
 
+  // 6. 反応数の段階（specs/006 contracts/metrics-job.md）。失敗しても公開の結果に影響させない
+  let catchupDate = gateState.catchupDate;
+  try {
+    const metrics = await runMetricsStage(env, db, threads, {
+      now,
+      publishedThisTick: AUTOPOST_MAX_PER_TICK - budget,
+      catchupDate,
+    });
+    summary.metricsRemaining = metrics.remaining;
+    if (metrics.catchupFinished) {
+      catchupDate = jstDateOf(now);
+      if (!(await writeCatchupDate(env.AUTOPOST_KV, catchupDate))) logger.warn("metrics: failed to write catch-up date");
+    }
+  } catch (err) {
+    logger.error("metrics: stage failed", { err });
+  }
+
   // 7. 関所の書き込み
   const [[nextRetry], [inProgress]] = await Promise.all([
     db
@@ -274,7 +295,8 @@ export async function runAutoPost(
       .from(publishAttempts)
       .where(eq(publishAttempts.state, "in_progress")),
   ]);
-  const candidates: Date[] = [];
+  // 反応数の補い（日本時間3:00）も候補にする（specs/006 research.md R2）
+  const candidates: Date[] = [nextCatchupAt(now, catchupDate)];
   if (nextRetry?.at) candidates.push(nextRetry.at);
   if (inProgress?.at) candidates.push(inProgress.at);
   for (const { schedule: s } of schedules) {
@@ -295,7 +317,8 @@ export async function runAutoPost(
   const nextCheckAt = computeNextCheckAt({
     now,
     candidates,
-    immediate: summary.deferred > 0 || (inProgress?.unleased ?? 0) > 0 || permalinkPending,
+    immediate:
+      summary.deferred > 0 || (inProgress?.unleased ?? 0) > 0 || permalinkPending || summary.metricsRemaining,
   });
   if (
     !(await writeGate(env.AUTOPOST_KV, {

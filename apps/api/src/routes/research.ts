@@ -17,6 +17,7 @@ import { referencePosts, researchKeywords } from "../db/schema";
 import { AppError, pgErrorCode } from "../lib/errors";
 import { parseBody } from "../lib/validate";
 import { findOwnedAccount } from "../services/access";
+import { touchMaterials } from "../services/materials";
 import { canEditProfile, requireGrowerAccess } from "../services/grower-access";
 import { assertItemId, insertWithLimit, updateWithVersion } from "../services/item-service";
 
@@ -116,6 +117,7 @@ export function researchRoutes(authed: MiddlewareHandler<AppEnv>) {
           async (tx) =>
             (await tx.insert(referencePosts).values({ accountId: account.id, ...referenceColumns(input) }).returning())[0]!,
         );
+        await touchMaterials(db, account.id, "research");
         return c.json(toReferencePost(row), 201);
       })
       .put("/accounts/:accountId/reference-posts/:referencePostId", authed, async (c) => {
@@ -136,6 +138,7 @@ export function researchRoutes(authed: MiddlewareHandler<AppEnv>) {
           async () => (await db.select().from(referencePosts).where(where).limit(1))[0],
           toReferencePost,
         );
+        await touchMaterials(db, account.id, "research");
         return c.json(toReferencePost(row));
       })
       .delete("/accounts/:accountId/reference-posts/:referencePostId", authed, async (c) => {
@@ -145,6 +148,7 @@ export function researchRoutes(authed: MiddlewareHandler<AppEnv>) {
         requireGrowerAccess(account, user);
         const id = assertItemId(c.req.param("referencePostId"));
         await db.delete(referencePosts).where(and(eq(referencePosts.id, id), eq(referencePosts.accountId, account.id)));
+        await touchMaterials(db, account.id, "research");
         return c.body(null, 204);
       })
       // ---- キーワード ----
@@ -187,6 +191,7 @@ export function researchRoutes(authed: MiddlewareHandler<AppEnv>) {
               )[0]!,
           ),
         );
+        await touchMaterials(db, account.id, "research");
         return c.json(toKeyword(row), 201);
       })
       .put("/accounts/:accountId/research-keywords/:keywordId", authed, async (c) => {
@@ -215,6 +220,7 @@ export function researchRoutes(authed: MiddlewareHandler<AppEnv>) {
             toKeyword,
           ),
         );
+        await touchMaterials(db, account.id, "research");
         return c.json(toKeyword(row));
       })
       .delete("/accounts/:accountId/research-keywords/:keywordId", authed, async (c) => {
@@ -224,6 +230,7 @@ export function researchRoutes(authed: MiddlewareHandler<AppEnv>) {
         requireGrowerAccess(account, user);
         const id = assertItemId(c.req.param("keywordId"));
         await db.delete(researchKeywords).where(and(eq(researchKeywords.id, id), eq(researchKeywords.accountId, account.id)));
+        await touchMaterials(db, account.id, "research");
         return c.body(null, 204);
       })
   );

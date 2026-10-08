@@ -44,6 +44,16 @@ describe("mode = reconnect", () => {
     expect(after!.connectionStatus).toBe("connected");
   });
 
+  it("再接続すると、反応数を読む権限のない印が消える（specs/006 research.md R11）", async () => {
+    await connectNew(app, "u1", "1001");
+    const [a] = await db().select().from(accounts);
+    await db().update(accounts).set({ insightsDeniedAt: new Date() }).where(eq(accounts.id, a!.id));
+    const { authorizeUrl } = (await (await startReconnect("u1", a!.id)).json()) as { authorizeUrl: string };
+    await authorizeAndCallback(app, authorizeUrl, { fakeUser: "1001" });
+    const [after] = await db().select().from(accounts);
+    expect(after!.insightsDeniedAt).toBeNull();
+  });
+
   it("別のThreadsアカウントで認可すると RECONNECT_ACCOUNT_MISMATCH で、接続は変わらない", async () => {
     await connectNew(app, "u1", "1001");
     const [a] = await db().select().from(accounts);

@@ -16,6 +16,7 @@ import { createDb, type Db } from "../db/client";
 import { accounts, promotions } from "../db/schema";
 import { parseBody } from "../lib/validate";
 import { findOwnedAccount } from "../services/access";
+import { touchMaterials } from "../services/materials";
 import { canEditProfile, requireGrowerAccess } from "../services/grower-access";
 import { assertItemId, insertWithLimit, updateWithVersion } from "../services/item-service";
 
@@ -127,6 +128,7 @@ export function promotionRoutes(authed: MiddlewareHandler<AppEnv>) {
         async (tx) => (await tx.select({ n: count() }).from(promotions).where(eq(promotions.accountId, account.id)))[0]!.n,
         async (tx) => (await tx.insert(promotions).values({ accountId: account.id, ...toColumns(input) }).returning())[0]!,
       );
+      await touchMaterials(db, account.id, "promotions");
       return c.json(toPromotion(row, new Date()), 201);
     })
     .put("/accounts/:accountId/promotions/:promotionId", authed, async (c) => {
@@ -147,6 +149,7 @@ export function promotionRoutes(authed: MiddlewareHandler<AppEnv>) {
         () => findPromotion(db, account.id, id),
         (current) => toPromotion(current, now),
       );
+      await touchMaterials(db, account.id, "promotions");
       return c.json(toPromotion(row, now));
     })
     .delete("/accounts/:accountId/promotions/:promotionId", authed, async (c) => {
@@ -157,6 +160,7 @@ export function promotionRoutes(authed: MiddlewareHandler<AppEnv>) {
       const id = assertItemId(c.req.param("promotionId"));
       // すでに消えていても成功とする（contracts/api.md）
       await db.delete(promotions).where(and(eq(promotions.id, id), eq(promotions.accountId, account.id)));
+      await touchMaterials(db, account.id, "promotions");
       return c.body(null, 204);
     });
 }

@@ -95,7 +95,7 @@ curl https://api-dev.example.com/api/health
 
 | 項目 | 選ぶもの | 理由 |
 |---|---|---|
-| Select a project type | **Consumer** | B2Bを選ぶとClerkのOrganizations（組織・ロール）が有効になる。Organizationsはプラン4（チーム管理）でだけ使うと決めているため、今は使わない（Constitution「技術スタック制約」） |
+| Select a project type | **Consumer** | B2Bを選ぶとClerkのOrganizations（組織・ロール）が有効になる。Organizationsは使わない。チーム運用のチーム・役割は、アプリのDBで管理する（2026-10-08決定。addendum「契約と役割の設計」） |
 | Application name | `ThreadsGrower`など | 後から変えられる |
 | Sign in options：Email | **オフ** | 初期状態はオン。オフにできなければ、作成後に2-2でオフにする |
 | Sign in options：Phone number | オフ | |

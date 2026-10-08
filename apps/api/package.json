@@ -13,7 +13,8 @@
     "db:migrate": "drizzle-kit migrate",
     "db:psql": "docker compose exec -T postgres psql -U postgres -d threads_grower",
     "admin:set-plan": "tsx scripts/set-plan.ts",
-    "admin:rotate-token-key": "tsx scripts/rotate-token-key.ts"
+    "admin:rotate-token-key": "tsx scripts/rotate-token-key.ts",
+    "seed:performance": "tsx scripts/seed-performance.ts"
   },
   "dependencies": {
     "@clerk/backend": "^3.22.0",

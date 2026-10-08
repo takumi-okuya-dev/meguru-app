@@ -10,6 +10,8 @@
 
 **Source**: [PRD §4.3](../../_bmad-output/initiative-threads-grower-app/prd-threads-grower-app/prd-threads-grower-app.md)（FR-8）、UJ-2の後半（承認 → スケジュール投稿の時間枠に沿って自動的にThreadsへ公開される）。[Constitution](../../.specify/memory/constitution.md)原則I（配信前のNGワードのチェック）・II（承認を経ない限り投稿しない）。004の[spec](../004-review-approval/spec.md)（承認済み・`checkPublishable`）の続き。画面は[UI全体設計](../../docs/ui-design.md)の型C（投稿ストック）・ホーム・このアカウントの設定。
 
+> **2026-10-08の料金の見直しによる注記**：料金を「無料体験（1か月）の後、基本料金1,000円（Threadsアカウント1件目を含む）＋2件目以降1件500円。有料ならすべての機能」に改めた。このspecの「自動投稿は全プランで使える（プラン1を含む）」は、無料体験が終わり契約していない場合は自動投稿を止める、に変わる（`[ASSUMPTION]`）。配信の直前のNGワードのチェックは、契約の有無にかかわらず働く（Constitution原則I、変更なし）。当時の記録としてこのspecの本文は変えない。コード（プランの値・grower機能の判定・アカウント数の上限など）は、課金のfeature（PRD FR-12）で置き換える。詳しくは[PRD FR-12](../../_bmad-output/initiative-threads-grower-app/prd-threads-grower-app/prd-threads-grower-app.md)・Product Brief addendum「料金」・Constitution 2.0.0。
+
 ## Clarifications
 
 ### Session 2026-10-05

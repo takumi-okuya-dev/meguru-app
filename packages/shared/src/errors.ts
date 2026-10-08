@@ -247,3 +247,15 @@ export function blockedReasonLabel(reason: "ng_word" | "over_threads_limit", wor
 
 /** 深夜の時刻の案内（FR-001b）。設定は止めない。 */
 export const LATE_NIGHT_HINT = "深夜の時間帯です。見られにくい可能性があります";
+
+/** パフォーマンスの画面の文言（specs/006-performance-feedback contracts/ui-routes.md）。 */
+export const PERFORMANCE_MESSAGES = {
+  insightsDenied: "反応数を読む許可がありません。再接続して、インサイトの許可をオンにしてください",
+  unmeasurable:
+    "Threadsでこの投稿を見つけられないため、反応数を取れません。Threads側で消した投稿などが当たります。判定と基準値には含めません。",
+  growerRequiredTitle: "パフォーマンス分析は有料の契約で使えます",
+  growerRequiredBody:
+    "無料体験が終わりました。契約すると、投稿ごとの反応数・伸びたかどうかの判定・改善メモ・CSVの書き出しを使えます。これまでの記録は残っているので、契約すると続きから見られます。",
+  feedbackSaveFailed: "保存できませんでした。もう一度お試しください",
+  exportFailed: "書き出せませんでした。もう一度お試しください",
+} as const;

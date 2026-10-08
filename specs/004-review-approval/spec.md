@@ -10,6 +10,8 @@
 
 **Source**: [PRD §4.3](../../_bmad-output/initiative-threads-grower-app/prd-threads-grower-app/prd-threads-grower-app.md)（FR-6、FR-7）、UJ-2の前半（下書き一覧を確認 → 類似度を見て似た投稿を却下 → 残りを承認）。[Constitution](../../.specify/memory/constitution.md)原則I（NGワードのチェック）・II（人間承認ゲート）・VI（却下ログのプロンプトへの反映）。画面は[UI全体設計](../../docs/ui-design.md)の型C（投稿ストック）と、このアカウントの設定。003の[spec](../003-prompt-bulk-register/spec.md)・[参考プロダクトのプロンプトの型](../003-prompt-bulk-register/reference-prompt.md)の続き。
 
+> **2026-10-08の料金の見直しによる注記**：料金を「無料体験（1か月）の後、基本料金1,000円（Threadsアカウント1件目を含む）＋2件目以降1件500円。有料ならすべての機能」に改めた。このspecの「投稿ルールの編集はプラン2以上（grower機能）」は「有料の契約中か無料体験中」に変わる。NGワードのチェックは、契約の有無にかかわらず働く（Constitution原則I、変更なし）。当時の記録としてこのspecの本文は変えない。コード（プランの値・grower機能の判定・アカウント数の上限など）は、課金のfeature（PRD FR-12）で置き換える。詳しくは[PRD FR-12](../../_bmad-output/initiative-threads-grower-app/prd-threads-grower-app/prd-threads-grower-app.md)・Product Brief addendum「料金」・Constitution 2.0.0。
+
 ## Clarifications
 
 ### Session 2026-10-04

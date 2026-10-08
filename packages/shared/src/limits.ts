@@ -121,3 +121,36 @@ export const AUTOPOST_ATTEMPT_RETENTION_DAYS = 30;
 export const LATE_NIGHT_HINT_MINUTES = [120, 300] as const;
 /** 投稿済みの一覧の1回の件数（research.md R14）。 */
 export const PUBLISHED_PAGE_SIZE = 50;
+
+// ---- パフォーマンス分析と改善フィードバック（specs/006-performance-feedback plan.md「制約」） ----
+
+/** 反応数を取り込む時点（投稿からの時間。research.md R4）。 */
+export const METRICS_MILESTONE_HOURS = { h24: 24, d3: 72, d7: 168 } as const;
+/** 時点の取り込みの幅（前後の分。FR-002d）。 */
+export const METRICS_WINDOW_MINUTES = 60;
+/** これを超えてから確定の値を取ったら「遅れて確定」（時間。FR-002a）。 */
+export const METRICS_LATE_AFTER_HOURS = 192;
+/** 公開のない回に、反応数の段階で使える外部への呼び出しの数（research.md R3）。 */
+export const METRICS_MAX_CALLS_PER_TICK = 24;
+/** 公開を1件進めるごとに、反応数の段階から引く呼び出しの数（research.md R3）。 */
+export const METRICS_CALLS_PER_PUBLISH = 8;
+/** 補い（毎日の処理）を始める時刻（日本時間の時。research.md R2）。 */
+export const METRICS_CATCHUP_HOUR_JST = 3;
+/** 基準値に使う確定の投稿の数（FR-007）。 */
+export const PERFORMANCE_BASELINE_SAMPLE = 30;
+/** 判定を始める確定の投稿の数（FR-009）。 */
+export const PERFORMANCE_MIN_JUDGEABLE = 5;
+/** これ以上で好調（基準値に対する倍率。FR-008）。 */
+export const PERFORMANCE_GOOD_RATIO = 2;
+/** これ以下で低調（基準値に対する倍率。FR-008）。 */
+export const PERFORMANCE_POOR_RATIO = 0.5;
+/** パフォーマンスの一覧の1回の件数（FR-019）。 */
+export const PERFORMANCE_PAGE_SIZE = 50;
+/** 書き出しの1回の件数（research.md R7）。 */
+export const PERFORMANCE_EXPORT_PAGE_SIZE = 200;
+/** 傾向メモの上限（文字。FR-021）。 */
+export const FEEDBACK_MEMO_MAX = 200;
+/** プロンプトに入れる低調の投稿の数（FR-026）。 */
+export const PROMPT_POOR_POSTS = 5;
+/** フォロワー数を記録するAccountの条件：この日数のうちに自動投稿した投稿がある（FR-002c）。 */
+export const FOLLOWER_ACTIVE_DAYS = 30;

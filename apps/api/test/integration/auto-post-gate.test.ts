@@ -18,6 +18,7 @@ beforeEach(async () => {
   await resetDb();
   await fake.reset();
   await KV().delete("autopost:gate");
+  await KV().delete("metrics:catchup");
   await KV().delete("autopost:wake");
 });
 
@@ -75,10 +76,10 @@ describe("関所（DBに触れずに終える）", () => {
     expect((await runAutoPost(testEnv, NOON)).ran).toBe(true);
   });
 
-  it("次に見る時刻は、次の予定の時刻（間に一定の間隔の見直しは入らない）。予定がなければ24時間後", async () => {
+  it("次に見る時刻は、次の予定の時刻（間に一定の間隔の見直しは入らない）。予定がなければ翌日の3:00（反応数の補い。specs/006）", async () => {
     await runAutoPost(testEnv, NOON);
     expect(await gate()).toEqual({
-      nextCheckAt: addMin(NOON, 1440).toISOString(),
+      nextCheckAt: jst("2030-01-11 03:00").toISOString(),
       runStartedAt: NOON.toISOString(),
     });
 
@@ -121,5 +122,14 @@ describe("関所（DBに触れずに終える）", () => {
     await worker.scheduled(controller, testEnv, ctx);
     await waitOnExecutionContext(ctx);
     expect(Date.parse((await gate()).runStartedAt)).toBeGreaterThanOrEqual(before);
+  });
+
+  it("その日の補いが済んでいなければ、3:00より前の回の次に見る時刻は今日の3:00（specs/006 contracts/metrics-job.md 手順7）", async () => {
+    await KV().delete("metrics:catchup");
+    await runAutoPost(testEnv, jst("2030-01-10 01:00"));
+    expect((await gate()).nextCheckAt).toBe(jst("2030-01-10 03:00").toISOString());
+    await runAutoPost(testEnv, jst("2030-01-10 03:01"));
+    expect(await KV().get("metrics:catchup")).toBe("2030-01-10");
+    expect((await gate()).nextCheckAt).toBe(jst("2030-01-11 03:00").toISOString());
   });
 });
