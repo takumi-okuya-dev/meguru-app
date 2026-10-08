@@ -95,6 +95,20 @@ export const fake = {
   posts: async () =>
     ((await control("posts")) as { posts: { id: string; userId: string; text: string; containerId: string; permalink: string }[] })
       .posts,
+  // ---- 反応数（specs/006-performance-feedback）----
+  /** 投稿の反応数を決める。omit の指標は応答に入れない */
+  setInsights: (
+    mediaId: string,
+    metrics: Partial<Record<"views" | "likes" | "replies" | "reposts" | "quotes" | "shares", number>>,
+    omit?: ("views" | "likes" | "replies" | "reposts" | "quotes" | "shares")[],
+  ) => control("insights", { mediaId, metrics, omit }),
+  /** 反応数の応答の形（values か total_value） */
+  setInsightsShape: (shape: "values" | "total_value") => control("insights-shape", { shape }),
+  /** 反応数・フォロワー数の呼び出しを失敗させる。key は mediaId、"user:{userId}"、"*"。times が -1 なら解除まで */
+  insightsFail: (key: string, kind: "not_found" | "permission" | "rate_limit" | "transient" | "auth", times: number) =>
+    control("insights-failure", { key, kind, times }),
+  setFollowers: (userId: string, count: number) => control("followers", { userId, count }),
+  callCounts: async () => (await control("call-counts")) as { insights: number; followers: number },
   containers: async () =>
     ((await control("containers")) as { containers: { id: string; userId: string; text: string; status: string }[] })
       .containers,

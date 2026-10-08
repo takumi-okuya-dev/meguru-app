@@ -7,6 +7,8 @@ import {
   check,
   customType,
   date,
+  doublePrecision,
+  primaryKey,
   index,
   integer,
   pgEnum,
@@ -90,6 +92,12 @@ export const accounts = pgTable("accounts", {
   // 投稿ルール（CORE RULES。specs/004-review-approval data-model.md、research.md R11）
   coreRules: text("core_rules").notNull().default(""),
   coreRulesVersion: integer("core_rules_version").notNull().default(1),
+  // プロンプトの材料を最後に変えた日時（specs/006-performance-feedback research.md R9。削除も含む）
+  promotionsChangedAt: timestamp("promotions_changed_at", { withTimezone: true, precision: 6 }),
+  researchChangedAt: timestamp("research_changed_at", { withTimezone: true, precision: 6 }),
+  coreRulesChangedAt: timestamp("core_rules_changed_at", { withTimezone: true, precision: 6 }),
+  // 反応数を読む権限がないと分かった日時（006 research.md R11）。再接続で消す
+  insightsDeniedAt: timestamp("insights_denied_at", { withTimezone: true, precision: 6 }),
   ...timestamps,
 }, (t) => [
   check("accounts_promotion_ratio_range", sql`${t.promotionRatioPercent} BETWEEN 0 AND 100`),
@@ -393,6 +401,11 @@ export const draftBatches = pgTable(
     draftCount: smallint("draft_count").notNull(),
     delimiterFound: boolean("delimiter_found").notNull(),
     createdAt: timestamp("created_at", { withTimezone: true, precision: 6 }).notNull().defaultNow(),
+    // 登録した時点のプロンプトの材料の版（specs/006-performance-feedback FR-002g）。006より前のバッチは NULL
+    strategyUpdatedAt: timestamp("strategy_updated_at", { withTimezone: true, precision: 6 }),
+    promotionsChangedAt: timestamp("promotions_changed_at", { withTimezone: true, precision: 6 }),
+    researchChangedAt: timestamp("research_changed_at", { withTimezone: true, precision: 6 }),
+    coreRulesChangedAt: timestamp("core_rules_changed_at", { withTimezone: true, precision: 6 }),
   },
   (t) => [
     uniqueIndex("draft_batches_account_request_unique").on(t.accountId, t.clientRequestId),
@@ -436,6 +449,14 @@ export const postDrafts = pgTable(
     // 投稿に失敗（FR-014）
     publishFailedAt: timestamp("publish_failed_at", { withTimezone: true, precision: 6 }),
     publishError: text("publish_error"),
+    // 分析のための記録（specs/006-performance-feedback FR-002e・FR-002f、research.md R9）。
+    // 本文を人が直したか：006より前の行は false（不明）、それ以後は true（記録している）
+    bodyEditTracked: boolean("body_edit_tracked").notNull().default(true),
+    bodyEditedAt: timestamp("body_edited_at", { withTimezone: true, precision: 6 }),
+    // 公開した時点の情報。publish_attempts は保存期間を過ぎると消えるので写しておく
+    publishedSlotMinute: smallint("published_slot_minute"),
+    publishedCarryover: boolean("published_carryover"),
+    publishedPrioritized: boolean("published_prioritized"),
     // 投稿の直前のチェックで要確認に戻した（FR-007）
     blockedAt: timestamp("blocked_at", { withTimezone: true, precision: 6 }),
     blockedReason: text("blocked_reason"),
@@ -486,6 +507,10 @@ export const postDrafts = pgTable(
         OR (${t.status}::text = 'needs_review' AND ${t.blockedAt} IS NOT NULL AND ${t.blockedReason} IS NOT NULL)`,
     ),
     check("post_drafts_blocked_reason_valid", sql`${t.blockedReason} IS NULL OR ${t.blockedReason} IN (${inList(BLOCKED_REASONS)})`),
+    check(
+      "post_drafts_published_slot_minute_range",
+      sql`${t.publishedSlotMinute} IS NULL OR ${t.publishedSlotMinute} BETWEEN 0 AND 1439`,
+    ),
     check("post_drafts_publish_error_valid", sql`${t.publishError} IS NULL OR ${t.publishError} IN (${inList(PUBLISH_ERRORS)})`),
     // Threadsの投稿のIDとURLは、投稿済みのときだけ（投稿済みでも空のことがある。research.md R6）
     check(
@@ -599,5 +624,121 @@ export const ngWords = pgTable(
   (t) => [
     uniqueIndex("ng_words_account_normalized_unique").on(t.accountId, t.normalized),
     check("ng_words_word_length", sql`char_length(${t.word}) BETWEEN 1 AND 50`),
+  ],
+);
+
+// ---- パフォーマンス分析と改善フィードバック（specs/006-performance-feedback data-model.md） ----
+
+/** 反応数の記録の状態（metrics_state）。行がない投稿は「確定待ち（まだ取っていない）」。 */
+export const metricsState = pgEnum("metrics_state", ["updating", "confirmed", "late_confirmed", "unmeasurable"]);
+/** 取り込みの種類（metrics_kind）。24時間・3日・7日・遅れて確定。 */
+export const metricsKind = pgEnum("metrics_kind", ["h24", "d3", "d7", "late"]);
+/** 判定（judgment）。 */
+export const judgment = pgEnum("judgment", ["good", "normal", "poor"]);
+
+const UNMEASURABLE_REASONS = ["no_media_id", "not_found"] as const;
+const METRICS_METHODS = ["slot", "daily"] as const;
+
+const metricColumns = {
+  views: integer("views"),
+  likes: integer("likes"),
+  replies: integer("replies"),
+  reposts: integer("reposts"),
+  quotes: integer("quotes"),
+  shares: integer("shares"),
+};
+
+/** 反応数の記録（post_metrics）。投稿済みの下書きに0か1行。最初に取り込んだとき（または計測できないと分かったとき）に作る。 */
+export const postMetrics = pgTable(
+  "post_metrics",
+  {
+    draftId: uuid("draft_id")
+      .primaryKey()
+      .references(() => postDrafts.id, { onDelete: "cascade" }),
+    accountId: uuid("account_id")
+      .notNull()
+      .references(() => accounts.id, { onDelete: "cascade" }),
+    state: metricsState("state").notNull(),
+    ...metricColumns,
+    lastFetchedAt: timestamp("last_fetched_at", { withTimezone: true, precision: 6 }),
+    lastElapsedMinutes: integer("last_elapsed_minutes"),
+    lastKind: metricsKind("last_kind"),
+    confirmedAt: timestamp("confirmed_at", { withTimezone: true, precision: 6 }),
+    unmeasurableReason: text("unmeasurable_reason"),
+    // 確定したときに1回だけ入れる（research.md R5）
+    judgment: judgment("judgment"),
+    judgmentRatio: doublePrecision("judgment_ratio"),
+    judgmentBaseline: doublePrecision("judgment_baseline"),
+    judgedAt: timestamp("judged_at", { withTimezone: true, precision: 6 }),
+    // 改善フィードバック（低調の投稿。FR-021）
+    feedbackMemo: text("feedback_memo"),
+    includeInPrompt: boolean("include_in_prompt").notNull().default(true),
+    feedbackUpdatedAt: timestamp("feedback_updated_at", { withTimezone: true, precision: 6 }),
+    createdAt: timestamp("created_at", { withTimezone: true, precision: 6 }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true, precision: 6 }).notNull().defaultNow(),
+  },
+  (t) => [
+    index("post_metrics_account_state_idx").on(t.accountId, t.state),
+    index("post_metrics_account_poor_idx").on(t.accountId, t.judgment).where(sql`${t.judgment} = 'poor'`),
+    check(
+      "post_metrics_unmeasurable_reason",
+      sql`(${t.state}::text = 'unmeasurable') = (${t.unmeasurableReason} IS NOT NULL)`,
+    ),
+    check("post_metrics_unmeasurable_reason_valid", sql`${t.unmeasurableReason} IS NULL OR ${t.unmeasurableReason} IN (${inList(UNMEASURABLE_REASONS)})`),
+    check(
+      "post_metrics_confirmed_at",
+      sql`(${t.state}::text IN ('confirmed', 'late_confirmed')) = (${t.confirmedAt} IS NOT NULL)`,
+    ),
+    check(
+      "post_metrics_judgment",
+      sql`${t.judgment} IS NULL OR (${t.state}::text IN ('confirmed', 'late_confirmed') AND ${t.judgmentRatio} IS NOT NULL AND ${t.judgmentBaseline} > 0)`,
+    ),
+    check("post_metrics_feedback_memo_length", sql`char_length(${t.feedbackMemo}) <= 200`),
+    check(
+      "post_metrics_counts_nonnegative",
+      sql`coalesce(${t.views}, 0) >= 0 AND coalesce(${t.likes}, 0) >= 0 AND coalesce(${t.replies}, 0) >= 0
+        AND coalesce(${t.reposts}, 0) >= 0 AND coalesce(${t.quotes}, 0) >= 0 AND coalesce(${t.shares}, 0) >= 0`,
+    ),
+  ],
+);
+
+/** 取り込みの履歴（post_metric_snapshots）。1回の取り込みで1行。上書きしない（FR-002b）。 */
+export const postMetricSnapshots = pgTable(
+  "post_metric_snapshots",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    draftId: uuid("draft_id")
+      .notNull()
+      .references(() => postDrafts.id, { onDelete: "cascade" }),
+    accountId: uuid("account_id")
+      .notNull()
+      .references(() => accounts.id, { onDelete: "cascade" }),
+    kind: metricsKind("kind").notNull(),
+    method: text("method").notNull(),
+    fetchedAt: timestamp("fetched_at", { withTimezone: true, precision: 6 }).notNull(),
+    elapsedMinutes: integer("elapsed_minutes").notNull(),
+    ...metricColumns,
+  },
+  (t) => [
+    uniqueIndex("post_metric_snapshots_draft_kind_unique").on(t.draftId, t.kind),
+    index("post_metric_snapshots_account_fetched_idx").on(t.accountId, t.fetchedAt),
+    check("post_metric_snapshots_method_valid", sql`${t.method} IN (${inList(METRICS_METHODS)})`),
+  ],
+);
+
+/** フォロワー数の記録（follower_snapshots）。Accountに1日（日本時間）1行（FR-002c）。 */
+export const followerSnapshots = pgTable(
+  "follower_snapshots",
+  {
+    accountId: uuid("account_id")
+      .notNull()
+      .references(() => accounts.id, { onDelete: "cascade" }),
+    snapshotDate: date("snapshot_date", { mode: "string" }).notNull(),
+    followersCount: integer("followers_count").notNull(),
+    capturedAt: timestamp("captured_at", { withTimezone: true, precision: 6 }).notNull(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.accountId, t.snapshotDate] }),
+    check("follower_snapshots_count_nonnegative", sql`${t.followersCount} >= 0`),
   ],
 );

@@ -249,3 +249,55 @@ describe("005：1日の投稿数で宣伝の件数を伝える", () => {
     expect(buildPrompt(input({ ...overrides, dailyPostCount: 0 })).prompt).toBe(buildPrompt(input(overrides)).prompt);
   });
 });
+
+describe("反応が低かった投稿の節（specs/006 contracts/prompt-template.md、FR-025〜FR-027）", () => {
+  const HEADING = "■反応が低かった投稿(このアカウントで閲覧数が基準の半分以下だった投稿。同じ書き方・切り口は避けること)";
+  const poor = [
+    { body: "AI初心者の人ほど、\n完璧を目指さなくていい。", memo: null },
+    { body: "AIに文章を書いてもらうとき。", memo: "前置きが長く、結論が最後まで出てこない" },
+  ];
+
+  it("却下の節の直後に、本文とメモ付きで入る", () => {
+    const { prompt, summary } = buildPrompt(
+      input({ rejectedDrafts: [{ body: "却下の本文", reasonLabels: ["抽象的"], note: null }], poorPosts: poor }),
+    );
+    const rejectedAt = prompt.indexOf("■過去に却下された投稿");
+    const poorAt = prompt.indexOf(HEADING);
+    expect(rejectedAt).toBeGreaterThan(-1);
+    expect(poorAt).toBeGreaterThan(rejectedAt);
+    expect(prompt).toContain(
+      `${HEADING}\n1. AI初心者の人ほど、\n完璧を目指さなくていい。\n2. AIに文章を書いてもらうとき。(傾向メモ: 前置きが長く、結論が最後まで出てこない)`,
+    );
+    expect(summary.poorPostCount).toBe(2);
+  });
+
+  it("却下が0件でも、宣伝内容の後・リサーチの前に入る", () => {
+    const { prompt } = buildPrompt(
+      input({ poorPosts: poor, referencePosts: [{ body: "参考", keyword: "", whyGood: "" }] }),
+    );
+    expect(prompt.indexOf(HEADING)).toBeGreaterThan(-1);
+    expect(prompt.indexOf(HEADING)).toBeLessThan(prompt.indexOf("■リサーチで見つけた"));
+  });
+
+  it("0件なら節ごと省く", () => {
+    const { prompt, summary } = buildPrompt(input({ poorPosts: [] }));
+    expect(prompt).not.toContain("■反応が低かった投稿");
+    expect(summary.poorPostCount).toBe(0);
+    expect(buildPrompt(input()).prompt).not.toContain("■反応が低かった投稿");
+  });
+
+  it("長さの調整で、直近の下書き・却下・参考投稿を減らしても、この節は減らさない", () => {
+    const long = "あ".repeat(800);
+    const { prompt, summary } = buildPrompt(
+      input({
+        recentDrafts: Array.from({ length: 20 }, () => long),
+        rejectedDrafts: Array.from({ length: 10 }, () => ({ body: long, reasonLabels: ["抽象的"], note: null })),
+        referencePosts: Array.from({ length: 10 }, () => ({ body: long, keyword: "", whyGood: "" })),
+        poorPosts: Array.from({ length: 5 }, (_, i) => ({ body: `低調${i}${long}`, memo: null })),
+      }),
+    );
+    expect(summary.recentDraftCount).toBeLessThan(20);
+    expect(summary.poorPostCount).toBe(5);
+    for (let i = 0; i < 5; i++) expect(prompt).toContain(`${i + 1}. 低調${i}`);
+  });
+});

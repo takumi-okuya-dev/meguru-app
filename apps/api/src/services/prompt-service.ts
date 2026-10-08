@@ -1,5 +1,6 @@
 // プロンプトの材料を集めて組み立てる（specs/003-prompt-bulk-register research.md R1、contracts/prompt-template.md「入力」）。
 import {
+  PROMPT_POOR_POSTS,
   PROMPT_RECENT_DRAFTS,
   PROMPT_REFERENCE_POSTS,
   PROMPT_REJECTED_DRAFTS,
@@ -11,9 +12,10 @@ import {
 } from "@threads-grower/shared";
 import { and, asc, desc, eq, inArray } from "drizzle-orm";
 import type { Db } from "../db/client";
-import { draftBatches, postDrafts, promotions, referencePosts } from "../db/schema";
+import { draftBatches, postDrafts, postMetrics, promotions, referencePosts } from "../db/schema";
 import type { AccountRow } from "./access";
 import { listReviewedRows } from "./draft-service";
+import { poorForPrompt } from "./performance-service";
 import { listNgWords } from "./posting-rules-service";
 import { readPostingSchedule } from "./posting-schedule-service";
 import { getStrategy } from "./strategy-service";
@@ -94,7 +96,7 @@ function coreRuleLines(text: string): string[] {
  */
 export async function getPrompt(db: Db, account: AccountRow, count: number) {
   const now = new Date();
-  const [strategy, promotionRows, postRows, draftBodies, ngWordRows, rejectedRows, schedule] =
+  const [strategy, promotionRows, postRows, draftBodies, ngWordRows, rejectedRows, schedule, poorRows] =
     await Promise.all([
       getStrategy(db, account.id),
       db.select().from(promotions).where(eq(promotions.accountId, account.id)),
@@ -108,6 +110,14 @@ export async function getPrompt(db: Db, account: AccountRow, count: number) {
       listNgWords(db, account.id),
       listReviewedRows(db, account.id, "rejected", PROMPT_REJECTED_DRAFTS),
       readPostingSchedule(db, account.id),
+      // 反応が低かった投稿（006 research.md R8）。投稿の新しい順に5件
+      db
+        .select({ body: postDrafts.body, memo: postMetrics.feedbackMemo })
+        .from(postMetrics)
+        .innerJoin(postDrafts, eq(postDrafts.id, postMetrics.draftId))
+        .where(poorForPrompt(account.id))
+        .orderBy(desc(postDrafts.publishedAt), asc(postDrafts.id))
+        .limit(PROMPT_POOR_POSTS),
     ]);
   const { prompt, summary } = buildPrompt({
     count,
@@ -129,6 +139,7 @@ export async function getPrompt(db: Db, account: AccountRow, count: number) {
       reasonLabels: ((r.rejectReasons ?? []) as RejectReasonCode[]).map(rejectReasonLabel),
       note: r.rejectNote,
     })),
+    poorPosts: poorRows,
   });
   return { prompt, count, summary };
 }

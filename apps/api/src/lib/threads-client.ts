@@ -41,6 +41,32 @@ export class ThreadsTransientError extends ThreadsApiError {
   override name = "ThreadsTransientError";
 }
 
+/**
+ * 投稿が見つからない（HTTP 404、またはGraph APIのコード100・サブコード33）。消された投稿など（specs/006 research.md R1）。
+ * ThreadsApiError の一種。
+ */
+export class ThreadsNotFoundError extends ThreadsApiError {
+  override name = "ThreadsNotFoundError";
+}
+
+/**
+ * 権限がない（Graph APIのコード10・200番台）。反応数を読む許可がない場合など（specs/006 research.md R1・R11）。
+ * ThreadsApiError の一種。
+ */
+export class ThreadsPermissionError extends ThreadsApiError {
+  override name = "ThreadsPermissionError";
+}
+
+/** 投稿の反応数（specs/006 contracts/api.md）。返らなかった指標は null。 */
+export type ThreadsMediaInsights = {
+  views: number | null;
+  likes: number | null;
+  replies: number | null;
+  reposts: number | null;
+  quotes: number | null;
+  shares: number | null;
+};
+
 /** コンテナーの状態（GET /{container-id}?fields=status）。 */
 export type ContainerStatus = "IN_PROGRESS" | "FINISHED" | "PUBLISHED" | "ERROR" | "EXPIRED";
 
@@ -77,6 +103,10 @@ export type ThreadsClient = {
   getPublishingLimit(accessToken: string, userId: string): Promise<{ quotaUsage: number; quotaTotal: number }>;
   /** since 以降の自分の投稿を、新しい順に読む（最大25件）。 */
   listRecentThreads(accessToken: string, userId: string, since: Date): Promise<ThreadsMedia[]>;
+  /** 投稿の6つの反応数を1回で読む（specs/006 research.md R1）。 */
+  getMediaInsights(accessToken: string, mediaId: string): Promise<ThreadsMediaInsights>;
+  /** Accountの今のフォロワー数を読む（specs/006 FR-002c）。 */
+  getFollowersCount(accessToken: string, userId: string): Promise<number>;
 };
 
 const TIMEOUT_MS = 10_000;
@@ -84,7 +114,7 @@ const RATE_LIMIT_CODES = new Set([4, 17, 32, 613]);
 const TRANSIENT_CODES = new Set([1, 2]);
 const AUTH_CODES = new Set([102, 190]);
 
-type GraphError = { error?: { message?: string; code?: number; type?: string } };
+type GraphError = { error?: { message?: string; code?: number; type?: string; error_subcode?: number } };
 
 async function parseOrThrow<T>(res: Response, what: string): Promise<T> {
   let body: unknown;
@@ -99,6 +129,13 @@ async function parseOrThrow<T>(res: Response, what: string): Promise<T> {
   // 上限・権限のエラーも type は OAuthException なので、code を先に見る（research.md R7）
   if (code !== undefined && RATE_LIMIT_CODES.has(code)) {
     throw new ThreadsRateLimitError(`${what}: rate limited (code ${code})`, res.status);
+  }
+  // 見つからない・権限のエラーも type が OAuthException のことがあるので、認証の判定より先に見る（specs/006 research.md R1）
+  if (res.status === 404 || (code === 100 && err?.error_subcode === 33)) {
+    throw new ThreadsNotFoundError(`${what}: not found`, res.status);
+  }
+  if (code !== undefined && (code === 10 || (code >= 200 && code < 300))) {
+    throw new ThreadsPermissionError(`${what}: permission denied (code ${code})`, res.status);
   }
   if (res.status === 401 || (code !== undefined && AUTH_CODES.has(code)) || (code === undefined && err?.type === "OAuthException")) {
     throw new ThreadsAuthError(`${what}: authentication failed`);
@@ -275,5 +312,38 @@ export function createThreadsClient(env: Env, fetchImpl: typeof fetch = fetch): 
         timestamp: p.timestamp,
       }));
     },
+
+    async getMediaInsights(accessToken, mediaId) {
+      const url = new URL(`${graph}/v1.0/${mediaId}/insights`);
+      url.searchParams.set("metric", INSIGHT_METRICS.join(","));
+      const body = await call<{ data?: InsightRow[] }>("getMediaInsights", url, { token: accessToken });
+      const found = new Map((body.data ?? []).map((row) => [row.name, insightValue(row)]));
+      return Object.fromEntries(INSIGHT_METRICS.map((m) => [m, found.get(m) ?? null])) as ThreadsMediaInsights;
+    },
+
+    async getFollowersCount(accessToken, userId) {
+      const url = new URL(`${graph}/v1.0/${userId}/threads_insights`);
+      url.searchParams.set("metric", "followers_count");
+      const body = await call<{ data?: InsightRow[] }>("getFollowersCount", url, { token: accessToken });
+      const row = (body.data ?? []).find((r) => r.name === "followers_count");
+      const value = row ? insightValue(row) : null;
+      if (value === null) throw new ThreadsApiError("getFollowersCount: no value", 200);
+      return value;
+    },
   };
+}
+
+const INSIGHT_METRICS = ["views", "likes", "replies", "reposts", "quotes", "shares"] as const;
+
+type InsightRow = { name: string; values?: { value?: unknown }[]; total_value?: { value?: unknown } };
+
+/**
+ * 反応数の1行から値を取る。応答の形は values[0].value と total_value.value の2通りがある（research.md R1）。
+ * @param row - insights の data の1行
+ * @returns 0以上の整数。取れなければ null
+ */
+function insightValue(row: InsightRow): number | null {
+  const raw = row.values?.[0]?.value ?? row.total_value?.value;
+  const n = typeof raw === "string" ? Number(raw) : raw;
+  return typeof n === "number" && Number.isFinite(n) && n >= 0 ? Math.floor(n) : null;
 }

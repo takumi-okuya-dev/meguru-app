@@ -3,7 +3,7 @@ import { neon } from "@neondatabase/serverless";
 import { beforeEach, describe, expect, it } from "vitest";
 import { AFTER_TRIAL, call, createUserWithAccount, makeApp, resetDb, setAccount, testEnv } from "../helpers/app";
 
-import { setSchedule } from "../helpers/auto-post";
+import { confirmedMetrics, db, publishedDrafts, setSchedule } from "../helpers/auto-post";
 
 const app = makeApp();
 
@@ -198,4 +198,46 @@ it("005：オフでも設定した時刻の数を宣伝の文面とsummaryに反
   const result = await getPrompt(accountId);
   expect(result.summary).toMatchObject({ dailyPostCount: 4 });
   expect(result.prompt).toContain("1日の投稿は4件の設定で、そのうち1件程度");
+});
+
+describe("反応が低かった投稿の反映（specs/006 FR-025〜FR-027、SC-003）", () => {
+  const ago = (h: number) => new Date(Date.now() - h * 3600_000);
+  const HEADING = "■反応が低かった投稿(このアカウントで閲覧数が基準の半分以下だった投稿。同じ書き方・切り口は避けること)";
+
+  it("外していない低調の新しい5件がメモ付きで入り、外した投稿・好調・普通・確定待ちは入らない", async () => {
+    const { accountId } = await createUserWithAccount("u1", { plan: "auto-grower" });
+    const poor = await publishedDrafts(
+      accountId,
+      [200, 201, 202, 203, 204, 205, 206].map((h, i) => ({ body: `低調${i + 1}`, publishedAt: ago(h) })),
+    );
+    for (const [i, d] of poor.entries()) {
+      await confirmedMetrics(accountId, d.id, 10, i === 6 ? "late_confirmed" : "confirmed");
+      await db()`UPDATE post_metrics SET judgment = 'poor', judgment_ratio = 0.2, judgment_baseline = 50 WHERE draft_id = ${d.id}`;
+    }
+    await db()`UPDATE post_metrics SET feedback_memo = '前置きが長い' WHERE draft_id = ${poor[1]!.id}`;
+    await db()`UPDATE post_metrics SET include_in_prompt = false WHERE draft_id = ${poor[0]!.id}`;
+    const [good, normal, pending] = await publishedDrafts(accountId, [
+      { body: "好調", publishedAt: ago(150) },
+      { body: "普通", publishedAt: ago(151) },
+      { body: "確定待ち", publishedAt: ago(10) },
+    ]);
+    await confirmedMetrics(accountId, good!.id, 100);
+    await db()`UPDATE post_metrics SET judgment = 'good', judgment_ratio = 2, judgment_baseline = 50 WHERE draft_id = ${good!.id}`;
+    await confirmedMetrics(accountId, normal!.id, 50);
+    await db()`UPDATE post_metrics SET judgment = 'normal', judgment_ratio = 1, judgment_baseline = 50 WHERE draft_id = ${normal!.id}`;
+    void pending;
+
+    const { prompt, summary } = (await getPrompt(accountId)) as PromptResponse & { summary: { poorPostCount: number } };
+    expect(prompt).toContain(
+      `${HEADING}\n1. 低調2(傾向メモ: 前置きが長い)\n2. 低調3\n3. 低調4\n4. 低調5\n5. 低調6`,
+    );
+    for (const body of ["低調1", "低調7", "好調", "普通", "確定待ち"]) expect(prompt).not.toContain(`. ${body}`);
+    expect(summary.poorPostCount).toBe(5);
+  });
+
+  it("低調の投稿がなければ節ごと省く", async () => {
+    const { accountId } = await createUserWithAccount("u1", { plan: "auto-grower" });
+    const { prompt } = await getPrompt(accountId);
+    expect(prompt).not.toContain("■反応が低かった投稿");
+  });
 });

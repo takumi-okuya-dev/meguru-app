@@ -1,6 +1,8 @@
 // 定期処理：自動投稿（specs/005-auto-post contracts/auto-post-job.md、FR-005〜FR-012・FR-017、SC-001〜SC-003・SC-006・SC-008）
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { fake, makeApp, resetDb } from "../helpers/app";
+import { fake, makeApp, resetDb, testEnv } from "../helpers/app";
+import { createThreadsClient } from "../../src/lib/threads-client";
+import { runAutoPost } from "../../src/services/auto-post-runner";
 import {
   addMin,
   approvedDrafts,
@@ -9,6 +11,7 @@ import {
   db,
   draftRow,
   jst,
+  publishedDrafts,
   run,
   setSchedule,
 } from "../helpers/auto-post";
@@ -373,5 +376,26 @@ describe("US3：公開の結果の確認", () => {
       ),
     ).toBe(true);
     expect(await fake.posts()).toHaveLength(0);
+  });
+});
+
+describe("反応数の段階との関係（specs/006 plan.md「Phase 1の設計後の再確認」）", () => {
+  it("反応数の段階が失敗しても、公開の結果に影響しない", async () => {
+    const { accountId } = await connectedAccount("u1", app);
+    await db()`UPDATE accounts SET plan = 'auto-grower' WHERE id = ${accountId}`;
+    await approvedDrafts(accountId, ["A"]);
+    await setSchedule(accountId, { slotMinutes: [720] });
+    await publishedDrafts(accountId, [{ publishedAt: addMin(NOON, 1 - 24 * 60) }]);
+    // 反応数の書き込みがCHECK制約で失敗する値を返す
+    const threads = {
+      ...createThreadsClient(testEnv),
+      getMediaInsights: async () => ({ views: -1, likes: 0, replies: 0, reposts: 0, quotes: 0, shares: 0 }),
+    };
+    await testEnv.AUTOPOST_KV.delete("autopost:gate");
+    const at = addMin(NOON, 1);
+    const r = await runAutoPost(testEnv, at, threads, () => at);
+    expect(r.published).toBe(1);
+    expect((await fake.posts()).map((p) => p.text)).toEqual(["A"]);
+    expect(await db()`SELECT * FROM post_metrics`).toEqual([]);
   });
 });

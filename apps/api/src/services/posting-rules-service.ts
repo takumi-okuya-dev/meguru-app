@@ -153,6 +153,8 @@ export async function saveCoreRules(db: Db, accountId: string, req: { text: stri
     .set({
       coreRules: req.text.trim(),
       coreRulesVersion: sql`${accounts.coreRulesVersion} + 1`,
+      // プロンプトの材料を最後に変えた日時（specs/006 research.md R9）
+      coreRulesChangedAt: new Date(),
       updatedAt: new Date(),
     })
     .where(and(eq(accounts.id, accountId), eq(accounts.coreRulesVersion, req.expectedVersion)))

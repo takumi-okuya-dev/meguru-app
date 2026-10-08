@@ -18,6 +18,8 @@ import {
   NG_WORD_MAX,
   REJECT_NOTE_MAX,
   REVIEW_MAX_ITEMS,
+  FEEDBACK_MEMO_MAX,
+  PERFORMANCE_PAGE_SIZE,
   AUTOPOST_SLOT_LIMIT,
   PUBLISHED_PAGE_SIZE,
 } from "./limits";
@@ -553,6 +555,8 @@ export const promptSummarySchema = z.object({
   rejectedCount: z.number().int(),
   /** 投稿の設定の時刻の数（005 FR-024） */
   dailyPostCount: z.number().int(),
+  /** 含めた反応が低かった投稿の件数（006） */
+  poorPostCount: z.number().int(),
 });
 /** プロンプトに実際に含めた内容の要約。 */
 export type PromptSummary = z.infer<typeof promptSummarySchema>;
@@ -730,3 +734,198 @@ export const publishedQuerySchema = z.object({
 
 /** POST /post-drafts/:id/prioritize のリクエストのスキーマ。 */
 export const prioritizeRequestSchema = z.object({ expectedVersion: z.number().int().positive() });
+
+// ---- パフォーマンス分析と改善フィードバック（specs/006-performance-feedback contracts/api.md「型」） ----
+
+/** 判定。 */
+export const judgmentSchema = z.enum(["good", "normal", "poor"]);
+/** 判定（好調・普通・低調）（specs/006）。 */
+export type Judgment = z.infer<typeof judgmentSchema>;
+
+/** 反応数の記録の状態。pending は記録の行がない（まだ一度も取っていない）。 */
+export const metricsStateSchema = z.enum(["pending", "updating", "confirmed", "late_confirmed", "unmeasurable"]);
+/** 反応数の記録の状態（specs/006）。 */
+export type MetricsState = z.infer<typeof metricsStateSchema>;
+
+/** 取り込みの種類。 */
+export const metricsKindSchema = z.enum(["h24", "d3", "d7", "late"]);
+/** 取り込みの種類（specs/006）。 */
+export type MetricsKind = z.infer<typeof metricsKindSchema>;
+
+/** 取り方（自動投稿の時刻の処理か、毎日の処理か）。 */
+export const metricsMethodSchema = z.enum(["slot", "daily"]);
+/** 取り方（specs/006）。 */
+export type MetricsMethod = z.infer<typeof metricsMethodSchema>;
+
+/** 絞り込みのタブ。pending は確定待ち（pending と updating）。 */
+export const performanceTabSchema = z.enum(["all", "good", "normal", "poor", "pending"]);
+/** 絞り込みのタブ（specs/006）。 */
+export type PerformanceTab = z.infer<typeof performanceTabSchema>;
+
+/** 6つの反応数。返らなかった指標は null。 */
+export const metricsSchema = z.object({
+  views: z.number().int().nullable(),
+  likes: z.number().int().nullable(),
+  replies: z.number().int().nullable(),
+  reposts: z.number().int().nullable(),
+  quotes: z.number().int().nullable(),
+  shares: z.number().int().nullable(),
+});
+/** 6つの反応数（specs/006）。 */
+export type Metrics = z.infer<typeof metricsSchema>;
+
+/** 低調の投稿の改善フィードバック。 */
+export const feedbackSchema = z.object({
+  memo: z.string().nullable(),
+  includeInPrompt: z.boolean(),
+  /** 次のプロンプトに入る5件か（FR-022） */
+  inNextPrompt: z.boolean(),
+});
+/** 低調の投稿の改善フィードバック（specs/006）。 */
+export type Feedback = z.infer<typeof feedbackSchema>;
+
+/** パフォーマンスの一覧の1件。 */
+export const performanceItemSchema = z.object({
+  id: z.string(),
+  body: z.string(),
+  publishedAt: z.string(),
+  threadsPermalink: z.string().nullable(),
+  state: metricsStateSchema,
+  metrics: metricsSchema.nullable(),
+  lastFetchedAt: z.string().nullable(),
+  lastElapsedHours: z.number().int().nullable(),
+  nextFetchAt: z.string().nullable(),
+  confirmAt: z.string().nullable(),
+  judgment: judgmentSchema.nullable(),
+  ratio: z.number().nullable(),
+  unmeasurableReason: z.enum(["no_media_id", "not_found"]).nullable(),
+  feedback: feedbackSchema.nullable(),
+});
+/** パフォーマンスの一覧の1件（specs/006）。 */
+export type PerformanceItem = z.infer<typeof performanceItemSchema>;
+
+/** パフォーマンスの画面の上の集計。 */
+export const performanceSummarySchema = z.object({
+  /** 基準値。基準値に使える確定の投稿が5件未満なら null */
+  baseline: z.number().nullable(),
+  /** 基準値に使った確定の件数（最大30） */
+  baselineSampleCount: z.number().int(),
+  /** 確定した投稿の数（5件未満のとき「いま{n}件」に使う） */
+  judgeableCount: z.number().int(),
+  /** 5件以上あるが基準値が0（FR-009） */
+  baselineIsZero: z.boolean(),
+  lastFetchedAt: z.string().nullable(),
+  insightsDenied: z.boolean(),
+  needsReconnect: z.boolean(),
+  counts: z.object({
+    all: z.number().int(),
+    good: z.number().int(),
+    normal: z.number().int(),
+    poor: z.number().int(),
+    pending: z.number().int(),
+  }),
+});
+/** パフォーマンスの画面の上の集計（specs/006）。 */
+export type PerformanceSummary = z.infer<typeof performanceSummarySchema>;
+
+/** GET /performance のレスポンスのスキーマ。 */
+export const performancePageSchema = z.object({
+  summary: performanceSummarySchema,
+  items: z.array(performanceItemSchema),
+  nextCursor: z.string().nullable(),
+});
+/** GET /performance のレスポンス（specs/006）。 */
+export type PerformancePage = z.infer<typeof performancePageSchema>;
+
+/** GET /performance のクエリのスキーマ。 */
+export const performanceQuerySchema = z.object({
+  tab: performanceTabSchema.default("all"),
+  before: z.string().max(200).optional(),
+  limit: z.coerce.number().int().min(1).max(PERFORMANCE_PAGE_SIZE).default(PERFORMANCE_PAGE_SIZE),
+});
+
+/** PATCH /performance/:draftId/feedback のリクエストのスキーマ（FR-021）。 */
+export const feedbackRequestSchema = z
+  .object({
+    memo: z
+      .string()
+      .nullable()
+      .optional()
+      .transform((v) => (v === undefined ? undefined : v === null ? null : v.trim() === "" ? null : v.trim()))
+      .refine((v) => v === undefined || v === null || [...v].length <= FEEDBACK_MEMO_MAX, {
+        message: "memo is too long",
+      }),
+    includeInPrompt: z.boolean().optional(),
+  })
+  .refine((v) => v.memo !== undefined || v.includeInPrompt !== undefined, { message: "nothing to update" });
+/** PATCH /performance/:draftId/feedback のリクエスト（specs/006）。 */
+export type FeedbackRequest = z.infer<typeof feedbackRequestSchema>;
+
+/** PATCH /performance/:draftId/feedback のレスポンスのスキーマ。 */
+export const feedbackResponseSchema = z.object({
+  item: performanceItemSchema,
+  /** 次のプロンプトに入る低調の投稿（最大5件） */
+  promptIds: z.array(z.string()),
+});
+/** PATCH /performance/:draftId/feedback のレスポンス（specs/006）。 */
+export type FeedbackResponse = z.infer<typeof feedbackResponseSchema>;
+
+/** GET /performance/export のクエリのスキーマ。 */
+export const exportQuerySchema = z.object({
+  kind: z.enum(["posts", "snapshots"]),
+  before: z.string().max(200).optional(),
+});
+
+/** 書き出しの「投稿ごと」の1行（contracts/csv.md）。日時はISOの文字列（UTC）。CSVの整形はWebで行う。 */
+export const postExportRowSchema = z.object({
+  id: z.string(),
+  publishedAt: z.string(),
+  body: z.string(),
+  metrics: metricsSchema.nullable(),
+  ratio: z.number().nullable(),
+  state: metricsStateSchema,
+  judgment: judgmentSchema.nullable(),
+  permalink: z.string().nullable(),
+  lastFetchedAt: z.string().nullable(),
+  lastElapsedMinutes: z.number().int().nullable(),
+  followersAtPost: z.number().int().nullable(),
+  h24: metricsSchema.nullable(),
+  batchId: z.string(),
+  batchPosition: z.number().int(),
+  batchCreatedAt: z.string(),
+  approvedAt: z.string().nullable(),
+  prioritized: z.boolean().nullable(),
+  carryover: z.boolean().nullable(),
+  /** 登録の後に本文を直したか。不明は null */
+  bodyEdited: z.boolean().nullable(),
+  slotMinute: z.number().int().nullable(),
+  strategyUpdatedAt: z.string().nullable(),
+  promotionsChangedAt: z.string().nullable(),
+  researchChangedAt: z.string().nullable(),
+  coreRulesChangedAt: z.string().nullable(),
+});
+/** 書き出しの「投稿ごと」の1行（specs/006）。 */
+export type PostExportRow = z.infer<typeof postExportRowSchema>;
+
+/** 書き出しの「取り込みごと」の1行（contracts/csv.md）。 */
+export const snapshotExportRowSchema = z.object({
+  id: z.string(),
+  publishedAt: z.string(),
+  fetchedAt: z.string(),
+  elapsedMinutes: z.number().int(),
+  kind: metricsKindSchema,
+  method: metricsMethodSchema,
+  metrics: metricsSchema,
+  followersOnDay: z.number().int().nullable(),
+});
+/** 書き出しの「取り込みごと」の1行（specs/006）。 */
+export type SnapshotExportRow = z.infer<typeof snapshotExportRowSchema>;
+
+/** GET /performance/export のレスポンスのスキーマ。 */
+export const exportPageSchema = z.object({
+  rows: z.union([z.array(postExportRowSchema), z.array(snapshotExportRowSchema)]),
+  nextCursor: z.string().nullable(),
+  generatedAt: z.string(),
+});
+/** GET /performance/export のレスポンス（specs/006）。 */
+export type ExportPage = z.infer<typeof exportPageSchema>;

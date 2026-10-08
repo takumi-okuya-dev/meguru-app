@@ -29,6 +29,9 @@ export type PromptReferencePost = { body: string; keyword: string; whyGood: stri
 /** プロンプトに含める却下の下書き（004）。reasonLabels は却下理由の候補の表示名。 */
 export type PromptRejectedDraft = { body: string; reasonLabels: string[]; note: string | null };
 
+/** 反応が低かった投稿（006 FR-026）。本文と傾向メモ。 */
+export type PromptPoorPost = { body: string; memo: string | null };
+
 /** buildPrompt の入力（contracts/prompt-template.md「入力」）。 */
 export type PromptInput = {
   /** 作る件数（1〜50） */
@@ -51,6 +54,8 @@ export type PromptInput = {
   rejectedDrafts: PromptRejectedDraft[];
   /** 投稿の設定の時刻の数（0〜10。自動投稿のオン・オフは問わない。005 FR-024）。省略は0 */
   dailyPostCount?: number;
+  /** 反応が低かった投稿。投稿の新しい順で、呼び出し側が最大 PROMPT_POOR_POSTS 件にする（006 FR-026）。省略は [] */
+  poorPosts?: PromptPoorPost[];
 };
 
 /** 課題の項目のプロンプトでの見出し（prompt-template.md「アカウントの戦略設計」の順）。 */
@@ -277,6 +282,8 @@ function assemble(
         )
       : null,
     rejected.length > 0 ? rejectedSection(rejected) : null,
+    // 長さの調整で減らさない（006 contracts/prompt-template.md、Constitution原則VI）
+    (input.poorPosts ?? []).length > 0 ? poorSection(input.poorPosts!) : null,
     posts.length > 0 ? researchSection(count, posts) : null,
     dedupeSection(count, drafts, rejected.length > 0),
     lengthMixSection(count),
@@ -325,6 +332,20 @@ export function buildPrompt(input: PromptInput): { prompt: string; summary: Prom
       ngWordCount: input.ngWords.length,
       rejectedCount: rejected.length,
       dailyPostCount: input.dailyPostCount ?? 0,
+      poorPostCount: (input.poorPosts ?? []).length,
     },
   };
+}
+
+/**
+ * 「■反応が低かった投稿」の節（006 FR-025・FR-026、contracts/prompt-template.md）。
+ * @param posts - 反応が低かった投稿（投稿の新しい順）
+ * @returns 節の文面
+ */
+function poorSection(posts: PromptPoorPost[]): string {
+  const items = posts.map((p, i) => `${i + 1}. ${p.body}${p.memo ? `(傾向メモ: ${p.memo})` : ""}`);
+  return [
+    "■反応が低かった投稿(このアカウントで閲覧数が基準の半分以下だった投稿。同じ書き方・切り口は避けること)",
+    ...items,
+  ].join("\n");
 }

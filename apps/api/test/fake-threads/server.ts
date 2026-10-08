@@ -4,6 +4,8 @@
 // - 投稿（specs/005-auto-post contracts/api.md「Threads APIの呼び出し」）：コンテナーの作成・公開・状態、投稿の取得・一覧、投稿数の使用量
 // - 制御用：/__control/*（ユーザーの登録、トークンの無効化、失敗・遅延の注入、発行済みトークンの一覧、
 //   投稿の失敗・応答の喪失・権限なしの注入、コンテナーの状態の上書き、作った投稿の一覧）
+// - 反応数（specs/006-performance-feedback contracts/api.md「偽のThreadsサーバー」）：投稿の insights、Accountの followers_count。
+//   値・返さない指標・応答の形・削除・権限・上限・5xx の注入、呼び出しの回数
 import { Hono, type Context } from "hono";
 
 type FakeUser = { id: string; username: string; name: string | null; picture: string | null };
@@ -14,6 +16,9 @@ type PublishFailureKind = "transient" | "auth" | "rate_limit" | "invalid";
 type ContainerStatus = "IN_PROGRESS" | "FINISHED" | "PUBLISHED" | "ERROR" | "EXPIRED";
 type Container = { id: string; userId: string; text: string; status: ContainerStatus; mediaId: string | null };
 type Post = { id: string; userId: string; text: string; timestamp: string; permalink: string; containerId: string };
+type MetricName = "views" | "likes" | "replies" | "reposts" | "quotes" | "shares";
+const METRIC_NAMES: MetricName[] = ["views", "likes", "replies", "reposts", "quotes", "shares"];
+type InsightsFailureKind = "not_found" | "permission" | "rate_limit" | "transient" | "auth";
 
 export function createFakeThreads() {
   const users = new Map<string, FakeUser>();
@@ -29,6 +34,14 @@ export function createFakeThreads() {
   let dropPublishResponses = 0;
   let publishingLimitDelayMs = 0;
   const noPublishPermission = new Set<string>();
+  // 反応数（006）
+  const insights = new Map<string, Partial<Record<MetricName, number>>>();
+  const omitted = new Map<string, MetricName[]>();
+  let insightsShape: "values" | "total_value" = "values";
+  // キーは mediaId か、Accountの全投稿なら "user:{userId}"、すべてなら "*"
+  const insightsFailures = new Map<string, { kind: InsightsFailureKind; times: number }>();
+  const followers = new Map<string, number>();
+  const callCounts = { insights: 0, followers: 0 };
   let seq = 0;
   // Number の安全な整数の範囲に収める（大きすぎると丸められてIDが重なる）
   const nextId = () => String(17_900_000_000 + ++seq);
@@ -104,7 +117,58 @@ export function createFakeThreads() {
     return out;
   }
 
+  const insightsFailure = (kind: InsightsFailureKind) => {
+    if (kind === "not_found") {
+      return Response.json(
+        { error: { message: "Unsupported get request. Object does not exist", type: "GraphMethodException", code: 100, error_subcode: 33 } },
+        { status: 400 },
+      );
+    }
+    if (kind === "permission") return noPermission();
+    if (kind === "rate_limit") return publishFailure("rate_limit");
+    if (kind === "auth") return invalidToken();
+    return publishFailure("transient");
+  };
+  function injectInsights(keys: string[]): Response | null {
+    for (const key of keys) {
+      const f = insightsFailures.get(key);
+      if (f && f.times !== 0) {
+        if (f.times > 0) f.times -= 1;
+        return insightsFailure(f.kind);
+      }
+    }
+    return null;
+  }
+
   const app = new Hono();
+
+  app.get("/v1.0/:mediaId/insights", (c) => {
+    callCounts.insights += 1;
+    const u = bearerUser(c);
+    const mediaId = c.req.param("mediaId");
+    const injected = injectInsights([mediaId, ...(u ? [`user:${u.id}`] : []), "*"]);
+    if (injected) return injected;
+    if (!u) return invalidToken();
+    const values = insights.get(mediaId) ?? {};
+    const skip = new Set(omitted.get(mediaId) ?? []);
+    const data = METRIC_NAMES.filter((n) => !skip.has(n)).map((name) =>
+      insightsShape === "values"
+        ? { name, period: "lifetime", values: [{ value: values[name] ?? 0 }], id: `${mediaId}/insights/${name}/lifetime` }
+        : { name, period: "lifetime", total_value: { value: values[name] ?? 0 }, id: `${mediaId}/insights/${name}/lifetime` },
+    );
+    return c.json({ data });
+  });
+
+  app.get("/v1.0/:userId/threads_insights", (c) => {
+    callCounts.followers += 1;
+    const u = bearerUser(c);
+    const injected = injectInsights([...(u ? [`user:${u.id}`] : []), "*"]);
+    if (injected) return injected;
+    if (!u) return invalidToken();
+    return c.json({
+      data: [{ name: "followers_count", period: "day", total_value: { value: followers.get(u.id) ?? 0 }, id: `${u.id}/insights/followers_count/day` }],
+    });
+  });
 
   app.get("/oauth/authorize", (c) => {
     const redirectUri = c.req.query("redirect_uri");
@@ -283,6 +347,13 @@ export function createFakeThreads() {
     publishFailures.clear();
     dropPublishResponses = 0;
     noPublishPermission.clear();
+    insights.clear();
+    omitted.clear();
+    insightsShape = "values";
+    insightsFailures.clear();
+    followers.clear();
+    callCounts.insights = 0;
+    callCounts.followers = 0;
     return c.json({ ok: true });
   });
   app.post("/__control/users", async (c) => {
@@ -354,6 +425,28 @@ export function createFakeThreads() {
     return c.json({ ok: true });
   });
   app.get("/__control/posts", (c) => c.json({ posts }));
+  app.post("/__control/insights", async (c) => {
+    const body = (await c.req.json()) as { mediaId: string; metrics: Partial<Record<MetricName, number>>; omit?: MetricName[] };
+    insights.set(body.mediaId, body.metrics);
+    if (body.omit) omitted.set(body.mediaId, body.omit);
+    return c.json({ ok: true });
+  });
+  app.post("/__control/insights-shape", async (c) => {
+    insightsShape = ((await c.req.json()) as { shape: "values" | "total_value" }).shape;
+    return c.json({ ok: true });
+  });
+  app.post("/__control/insights-failure", async (c) => {
+    // times が -1 なら、解除するまで失敗し続ける
+    const body = (await c.req.json()) as { key: string; kind: InsightsFailureKind; times: number };
+    insightsFailures.set(body.key, { kind: body.kind, times: body.times });
+    return c.json({ ok: true });
+  });
+  app.post("/__control/followers", async (c) => {
+    const body = (await c.req.json()) as { userId: string; count: number };
+    followers.set(body.userId, body.count);
+    return c.json({ ok: true });
+  });
+  app.get("/__control/call-counts", (c) => c.json(callCounts));
   app.get("/__control/containers", (c) => c.json({ containers: [...containers.values()] }));
 
   return app;
