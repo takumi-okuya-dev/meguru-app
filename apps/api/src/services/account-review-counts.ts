@@ -1,0 +1,22 @@
+import { and, count, eq } from "drizzle-orm";
+import type { Db } from "../db/client";
+import { accounts, memberships, postDrafts } from "../db/schema";
+
+/**
+ * ログイン中のユーザーがownerとして保有する全Accountの要確認件数を1回で読む。
+ * @param db - データベース
+ * @param userId - 認証済み users.id
+ * @returns Account IDと要確認件数。下書きがないAccountも0件で含む
+ */
+export async function countOwnedAccountNeedsReview(db: Db, userId: string) {
+  return db
+    .select({ accountId: accounts.id, needsReview: count(postDrafts.id) })
+    .from(memberships)
+    .innerJoin(accounts, eq(accounts.id, memberships.accountId))
+    .leftJoin(
+      postDrafts,
+      and(eq(postDrafts.accountId, accounts.id), eq(postDrafts.status, "needs_review")),
+    )
+    .where(and(eq(memberships.userId, userId), eq(memberships.role, "owner")))
+    .groupBy(accounts.id);
+}

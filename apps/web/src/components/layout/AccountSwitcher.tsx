@@ -1,7 +1,8 @@
-// サイドバー左上のAccountの切り替え（docs/ui-design.md「2. 画面の骨格」、001 FR-007・FR-019）。
-// 表示中のAccountのボタンからドロップダウンを開く。選んだら /accounts/:id へ遷移するだけで、記録は遷移先の open で行う。
-import { useQuery } from "@tanstack/react-query";
+// サイドバー左上のAccount切り替え。開くたびに所有Accountと要確認件数を読み直す。
+import { isCancelledError, useQuery, useQueryClient } from "@tanstack/react-query";
+import type { AccountSummary } from "@threads-grower/shared";
 import { CheckIcon, ChevronDownIcon, PlusIcon, TriangleAlertIcon } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router";
 import { AccountAvatar } from "@/components/AccountAvatar";
 import {
@@ -14,19 +15,119 @@ import {
 import { api } from "@/lib/api-client";
 import { queryKeys } from "@/lib/query";
 
+type MenuState = {
+  phase: "loading-accounts" | "accounts-error" | "loading-counts" | "ready" | "counts-error";
+  accounts: AccountSummary[];
+  counts: Record<string, number>;
+};
+
+const emptyMenu: MenuState = { phase: "loading-accounts", accounts: [], counts: {} };
+
 /**
- * Account の切り替え。表示中の Account のボタンから、全 Account の一覧と「アカウントを追加」を開く。
+ * Accountの切り替え。件数取得が失敗しても、最新のAccount一覧で切り替えられる。
  * @param props - onNavigate：項目を選んだときの処理（ドロワーを閉じるなど）
- * @returns Account の切り替え
+ * @returns Accountの切り替えメニュー
  */
 export function AccountSwitcher({ onNavigate }: { onNavigate?: () => void }) {
   const { accountId } = useParams<{ accountId: string }>();
+  const queryClient = useQueryClient();
   const me = useQuery({ queryKey: queryKeys.me, queryFn: api.me });
-  const accounts = me.data?.accounts ?? [];
-  const current = accounts.find((a) => a.id === accountId) ?? accounts[0];
+  const current = me.data?.accounts.find((a) => a.id === accountId) ?? me.data?.accounts[0];
+  const [open, setOpen] = useState(false);
+  const [menu, setMenu] = useState<MenuState>(emptyMenu);
+  const requestVersion = useRef(0);
+
+  useEffect(
+    () => () => {
+      requestVersion.current += 1;
+    },
+    [],
+  );
+
+  /**
+   * Account一覧を取り直す。/api/me のクエリを通して取り、キャッシュと表示を同じ結果にそろえる。
+   * 開く前に始まった取得だけを取り消し、後から始まった取得に置き換えられたらその結果を待つ。
+   * @param version - この読み込みの番号
+   * @returns 取り直したAccount一覧。新しい読み込みに追い越されたら null
+   */
+  async function refreshMe(version: number) {
+    await queryClient.cancelQueries({ queryKey: queryKeys.me, exact: true });
+    for (let attempt = 0; ; attempt += 1) {
+      try {
+        const fresh = await queryClient.fetchQuery({ queryKey: queryKeys.me, queryFn: api.me });
+        return version === requestVersion.current ? fresh : null;
+      } catch (error) {
+        // 後から始まった取得に置き換えられたときだけ、その取得を待ち直す。
+        if (!isCancelledError(error) || attempt >= 3) throw error;
+      }
+    }
+  }
+
+  async function loadCounts(accounts: AccountSummary[], version: number) {
+    setMenu({ phase: "loading-counts", accounts, counts: {} });
+    let response: Awaited<ReturnType<typeof api.needsReviewCounts>>;
+    try {
+      // APIを毎回呼び、キャッシュ済みの数字を今回の結果として表示しない。
+      response = await api.needsReviewCounts();
+    } catch {
+      if (version === requestVersion.current)
+        setMenu({ phase: "counts-error", accounts, counts: {} });
+      return;
+    }
+    if (version !== requestVersion.current) return;
+    queryClient.setQueryData(queryKeys.needsReviewCounts, response);
+    const counts = Object.fromEntries(
+      response.counts.map((row) => [row.accountId, row.needsReview]),
+    );
+    let latestAccounts = accounts;
+    if (accounts.some((account) => counts[account.id] === undefined)) {
+      // 一覧と件数の間にAccountが削除された可能性がある。
+      setMenu(emptyMenu);
+      try {
+        const refreshed = await refreshMe(version);
+        if (!refreshed) return;
+        latestAccounts = refreshed.accounts;
+      } catch {
+        if (version === requestVersion.current)
+          setMenu({ phase: "accounts-error", accounts: [], counts: {} });
+        return;
+      }
+    }
+    if (version === requestVersion.current)
+      setMenu({ phase: "ready", accounts: latestAccounts, counts });
+  }
+
+  async function loadAccounts(version: number) {
+    setMenu(emptyMenu);
+    try {
+      const fresh = await refreshMe(version);
+      if (!fresh) return;
+      await loadCounts(fresh.accounts, version);
+    } catch {
+      if (version === requestVersion.current)
+        setMenu({ phase: "accounts-error", accounts: [], counts: {} });
+    }
+  }
+
+  function onOpenChange(nextOpen: boolean) {
+    setOpen(nextOpen);
+    const version = ++requestVersion.current;
+    if (nextOpen) void loadAccounts(version);
+  }
+
+  function retryAccounts() {
+    void loadAccounts(++requestVersion.current);
+  }
+
+  function retryCounts() {
+    void loadCounts(menu.accounts, ++requestVersion.current);
+  }
+
+  const missingCount =
+    menu.phase === "ready" && menu.accounts.some((a) => menu.counts[a.id] === undefined);
 
   return (
-    <DropdownMenu>
+    <DropdownMenu open={open} onOpenChange={onOpenChange}>
       <DropdownMenuTrigger
         aria-label="Accountを切り替える"
         className="flex min-h-11 min-w-0 flex-1 items-center gap-2.5 rounded-lg px-2 py-1.5 text-left hover:bg-accent data-[state=open]:bg-accent"
@@ -35,7 +136,9 @@ export function AccountSwitcher({ onNavigate }: { onNavigate?: () => void }) {
           <>
             <AccountAvatar account={current} className="size-8" />
             <span className="flex min-w-0 flex-1 flex-col leading-tight">
-              <span className="truncate text-sm font-semibold">{current.displayName ?? current.username}</span>
+              <span className="truncate text-sm font-semibold">
+                {current.displayName ?? current.username}
+              </span>
               <span className="truncate text-xs text-muted-foreground">@{current.username}</span>
             </span>
           </>
@@ -44,32 +147,90 @@ export function AccountSwitcher({ onNavigate }: { onNavigate?: () => void }) {
         )}
         <ChevronDownIcon className="size-4 shrink-0 text-muted-foreground" />
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" className="w-72 rounded-xl p-1.5">
-        {accounts.map((a) => (
-          <DropdownMenuItem key={a.id} asChild className="gap-2.5 rounded-lg py-2">
-            <Link to={`/accounts/${a.id}`} onClick={onNavigate}>
-              <AccountAvatar account={a} className="size-7" />
-              <span className="flex min-w-0 flex-1 flex-col leading-tight">
-                <span className="truncate font-medium">{a.displayName ?? a.username}</span>
-                {a.connectionStatus === "needs_reconnect" ? (
-                  <span className="text-xs text-warning">@{a.username}・要再接続</span>
-                ) : (
-                  <span className="truncate text-xs text-muted-foreground">@{a.username}</span>
-                )}
-              </span>
-              {a.connectionStatus === "needs_reconnect" && (
-                <TriangleAlertIcon className="size-4 text-warning" aria-hidden="true" />
-              )}
-              {a.id === current?.id && <CheckIcon className="size-4" aria-label="表示中" />}
-            </Link>
-          </DropdownMenuItem>
-        ))}
-        <DropdownMenuSeparator />
-        <DropdownMenuItem asChild className="rounded-lg py-2">
-          <Link to="/accounts/new" onClick={onNavigate}>
-            <PlusIcon className="size-4" /> アカウントを追加
-          </Link>
-        </DropdownMenuItem>
+      <DropdownMenuContent
+        align="start"
+        className="w-[min(18rem,calc(100vw-1rem))] max-h-[calc(100dvh-1rem-env(safe-area-inset-bottom))] overflow-y-auto rounded-xl p-1.5"
+      >
+        {menu.phase === "loading-accounts" && (
+          <p className="px-2 py-3 text-sm text-muted-foreground">アカウントを確認中</p>
+        )}
+        {menu.phase === "accounts-error" && (
+          <>
+            <p className="px-2 py-3 text-sm text-muted-foreground">アカウントを読み込めません</p>
+            <DropdownMenuItem
+              onSelect={(event) => {
+                event.preventDefault();
+                retryAccounts();
+              }}
+            >
+              再試行
+            </DropdownMenuItem>
+          </>
+        )}
+        {menu.phase !== "loading-accounts" && menu.phase !== "accounts-error" && (
+          <>
+            {menu.accounts.map((account) => (
+              <DropdownMenuItem
+                key={account.id}
+                asChild
+                className="min-h-11 gap-2.5 rounded-lg py-2"
+              >
+                <Link to={`/accounts/${account.id}`} onClick={onNavigate}>
+                  <AccountAvatar account={account} className="size-7" />
+                  <span className="flex min-w-0 flex-1 flex-col leading-tight">
+                    <span className="truncate font-medium">
+                      {account.displayName ?? account.username}
+                    </span>
+                    <span className="truncate text-xs text-muted-foreground">
+                      @{account.username}
+                    </span>
+                    <span className="text-xs text-muted-foreground">
+                      {menu.phase === "loading-counts"
+                        ? "取得中"
+                        : menu.phase === "counts-error" || menu.counts[account.id] === undefined
+                          ? "取得できません"
+                          : `要確認 ${menu.counts[account.id]}件`}
+                    </span>
+                    {account.connectionStatus === "needs_reconnect" && (
+                      <span className="text-xs text-warning">要再接続</span>
+                    )}
+                    {account.id === accountId && (
+                      <span className="text-xs text-muted-foreground">表示中</span>
+                    )}
+                  </span>
+                  {account.connectionStatus === "needs_reconnect" && (
+                    <TriangleAlertIcon
+                      className="size-4 shrink-0 text-warning"
+                      aria-hidden="true"
+                    />
+                  )}
+                  {account.id === accountId && (
+                    <CheckIcon className="size-4 shrink-0" aria-hidden="true" />
+                  )}
+                </Link>
+              </DropdownMenuItem>
+            ))}
+            {(menu.phase === "counts-error" || missingCount) && (
+              <DropdownMenuItem
+                onSelect={(event) => {
+                  event.preventDefault();
+                  retryCounts();
+                }}
+              >
+                件数を再試行
+              </DropdownMenuItem>
+            )}
+            {menu.accounts.length === 0 && (
+              <p className="px-2 py-3 text-sm text-muted-foreground">アカウントがありません</p>
+            )}
+            <DropdownMenuSeparator />
+            <DropdownMenuItem asChild className="min-h-11 rounded-lg py-2">
+              <Link to="/accounts/new" onClick={onNavigate}>
+                <PlusIcon className="size-4" aria-hidden="true" /> アカウントを追加
+              </Link>
+            </DropdownMenuItem>
+          </>
+        )}
       </DropdownMenuContent>
     </DropdownMenu>
   );

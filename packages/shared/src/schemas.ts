@@ -75,6 +75,18 @@ export const meResponseSchema = z.object({
 /** GET /api/me のレスポンス。ログイン中のユーザー、Account一覧、ログイン後の遷移先、登録数上限。 */
 export type MeResponse = z.infer<typeof meResponseSchema>;
 
+/** GET /api/me/needs-review-counts の応答。所有Accountが0件なら空配列。 */
+export const needsReviewCountsResponseSchema = z.object({
+  counts: z.array(
+    z.object({
+      accountId: z.string(),
+      needsReview: z.number().int().nonnegative(),
+    }),
+  ),
+});
+/** 所有Accountごとの要確認件数。 */
+export type NeedsReviewCountsResponse = z.infer<typeof needsReviewCountsResponseSchema>;
+
 /** POST /api/threads/connect のリクエストのスキーマ。新規（new）か再接続（reconnect）。 */
 export const connectRequestSchema = z.discriminatedUnion("mode", [
   z.object({ mode: z.literal("new") }),
