@@ -13,7 +13,8 @@ import { LoadingSkeleton } from "@/components/guards";
 export function Landing() {
   const me = useQuery({ queryKey: queryKeys.me, queryFn: api.me });
   if (me.isPending) return <LoadingSkeleton />;
-  if (me.isError) return <ApiErrorScreen error={me.error} onRetry={() => void me.refetch()} />;
+  // 一度読めていれば、裏での取り直しの失敗では画面を差し替えず、手元の一覧で表示を続ける。
+  if (me.isLoadingError) return <ApiErrorScreen error={me.error} onRetry={() => void me.refetch()} />;
   const target = me.data.landingAccountId ? `/accounts/${me.data.landingAccountId}` : "/accounts/new";
   return <Navigate to={target} replace />;
 }

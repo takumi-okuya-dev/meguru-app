@@ -496,6 +496,19 @@ describe("AccountSwitcherの状態と操作", () => {
     expect(onNavigate).toHaveBeenCalledOnce();
   });
 
+  it("メニューで一覧の取り直しが失敗しても、表示中の画面は差し替えずメニューで再試行できる", async () => {
+    renderAccountRoutes();
+    expect(await screen.findByText("投稿: Aの投稿")).toBeInTheDocument();
+    await waitFor(() => expect(mocks.me).toHaveBeenCalledTimes(2)); // 初期表示と、開いた後の取り直し
+    mocks.me.mockRejectedValueOnce(new Error("network"));
+    const menu = await openMenu();
+    expect(await within(menu).findByText("アカウントを読み込めません")).toBeInTheDocument();
+    expect(screen.getByText("投稿: Aの投稿")).toBeInTheDocument();
+    expect(screen.queryByText("読み込めませんでした")).not.toBeInTheDocument();
+    await userEvent.click(within(menu).getByRole("menuitem", { name: "再試行" }));
+    expect(await within(menu).findByText("要確認 2件")).toBeInTheDocument();
+  });
+
   it("AからBへ切り替えると、投稿・設定の画面コンテキストもBに変わる", async () => {
     const router = renderAccountRoutes();
     expect(await screen.findByText("投稿: Aの投稿")).toBeInTheDocument();
