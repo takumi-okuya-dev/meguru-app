@@ -40,6 +40,11 @@ describe("GET /api/me", () => {
     expect(me.accountLimit).toEqual({ max: 1, used: 1 });
   });
 
+  it("ブラウザのキャッシュに残さない（Cache-Control: no-store）", async () => {
+    const res = await call(app, "GET", "/api/me", { user: "u1" });
+    expect(res.headers.get("Cache-Control")).toBe("no-store");
+  });
+
   it("未ログインなら 401", async () => {
     expect((await call(app, "GET", "/api/me")).status).toBe(401);
   });

@@ -41,6 +41,8 @@ export function meRoutes(authed: MiddlewareHandler<AppEnv>) {
       .where(and(eq(memberships.userId, user.id), eq(memberships.role, "owner")))
       .orderBy(sql`${accounts.lastUsedAt} DESC NULLS LAST`, desc(accounts.createdAt));
     const owned = rows.map((r) => r.account);
+    // Account切り替えメニューは開くたびに一覧を読み直すため、ブラウザに保存させない。
+    c.header("Cache-Control", "no-store");
     return c.json({
       user: { id: user.id, email: user.email, displayName: user.displayName },
       accounts: owned.map(toAccountSummary),

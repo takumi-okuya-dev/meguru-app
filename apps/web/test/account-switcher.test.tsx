@@ -351,6 +351,39 @@ describe("AccountSwitcherの状態と操作", () => {
     expect(screen.queryByRole("menu")).not.toBeInTheDocument();
   });
 
+  it("キーボードで一覧の再試行を選んでも、矢印キーで復旧したAccountへ進める", async () => {
+    mocks.me
+      .mockResolvedValueOnce(me([account("a1"), account("a2", "needs_reconnect")]))
+      .mockRejectedValueOnce(new Error("network"));
+    renderSwitcher();
+    screen.getByRole("button", { name: "Accountを切り替える" }).focus();
+    await userEvent.keyboard("{Enter}");
+    const menu = await screen.findByRole("menu");
+    await within(menu).findByRole("menuitem", { name: "再試行" });
+    await userEvent.keyboard("{ArrowDown}");
+    expect(within(menu).getByRole("menuitem", { name: "再試行" })).toHaveFocus();
+    await userEvent.keyboard("{Enter}");
+    expect(await within(menu).findByText("要確認 2件")).toBeInTheDocument();
+    expect(menu).toContainElement(document.activeElement as HTMLElement);
+    await userEvent.keyboard("{ArrowDown}");
+    expect(within(menu).getByRole("menuitem", { name: /Account a1/ })).toHaveFocus();
+  });
+
+  it("キーボードで件数の再試行を選んでも、フォーカスがメニュー内に残る", async () => {
+    mocks.needsReviewCounts.mockRejectedValueOnce(new Error("network"));
+    renderSwitcher();
+    screen.getByRole("button", { name: "Accountを切り替える" }).focus();
+    await userEvent.keyboard("{Enter}");
+    const menu = await screen.findByRole("menu");
+    const retry = await within(menu).findByRole("menuitem", { name: "件数を再試行" });
+    retry.focus();
+    await userEvent.keyboard("{Enter}");
+    expect(await within(menu).findByText("要確認 2件")).toBeInTheDocument();
+    expect(menu).toContainElement(document.activeElement as HTMLElement);
+    await userEvent.keyboard("{End}");
+    expect(within(menu).getByRole("menuitem", { name: /アカウントを追加/ })).toHaveFocus();
+  });
+
   it("ドロワーから行を選ぶとonNavigateを呼ぶ", async () => {
     const onNavigate = vi.fn();
     renderSwitcher("/accounts/a1", onNavigate);
