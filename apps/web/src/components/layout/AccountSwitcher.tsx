@@ -45,17 +45,28 @@ export function AccountSwitcher({ onNavigate }: { onNavigate?: () => void }) {
   );
 
   /**
-   * メニューで取り直したAccount一覧をキャッシュに入れる。
-   * 先に始まった /api/me の取得が後から終わり、古い一覧で上書きしないよう取り消してから入れる。
-   * @param fresh - 取り直した /api/me の応答
+   * Account一覧を取り直し、キャッシュも新しい一覧にそろえる。
+   * 取り消すのは取り直しより前に始まった /api/me の取得だけ。後から始まった取得があれば、
+   * そちらの方が新しいので、キャッシュはそれに任せて上書きしない。
    * @param version - この読み込みの番号
-   * @returns 新しい読み込みに追い越されていなければ true
+   * @returns 取り直したAccount一覧。新しい読み込みに追い越されたら null
    */
-  async function storeMe(fresh: MeResponse, version: number) {
+  async function refreshMe(version: number) {
     await queryClient.cancelQueries({ queryKey: queryKeys.me, exact: true });
-    if (version !== requestVersion.current) return false;
-    queryClient.setQueryData(queryKeys.me, fresh);
-    return true;
+    const updatesBefore = queryClient.getQueryState(queryKeys.me)?.dataUpdateCount ?? 0;
+    let fresh: MeResponse;
+    try {
+      fresh = await api.me();
+    } catch (error) {
+      // 取り消した取得をやり直し、キャッシュを古い一覧のままにしない。
+      void queryClient.invalidateQueries({ queryKey: queryKeys.me, exact: true });
+      throw error;
+    }
+    const state = queryClient.getQueryState(queryKeys.me);
+    const newerStarted =
+      state?.fetchStatus === "fetching" || (state?.dataUpdateCount ?? 0) > updatesBefore;
+    if (!newerStarted) queryClient.setQueryData(queryKeys.me, fresh);
+    return version === requestVersion.current ? fresh : null;
   }
 
   async function loadCounts(accounts: AccountSummary[], version: number) {
@@ -79,8 +90,8 @@ export function AccountSwitcher({ onNavigate }: { onNavigate?: () => void }) {
       // 一覧と件数の間にAccountが削除された可能性がある。
       setMenu(emptyMenu);
       try {
-        const refreshed = await api.me();
-        if (!(await storeMe(refreshed, version))) return;
+        const refreshed = await refreshMe(version);
+        if (!refreshed) return;
         latestAccounts = refreshed.accounts;
       } catch {
         if (version === requestVersion.current)
@@ -95,8 +106,8 @@ export function AccountSwitcher({ onNavigate }: { onNavigate?: () => void }) {
   async function loadAccounts(version: number) {
     setMenu(emptyMenu);
     try {
-      const fresh = await api.me();
-      if (!(await storeMe(fresh, version))) return;
+      const fresh = await refreshMe(version);
+      if (!fresh) return;
       await loadCounts(fresh.accounts, version);
     } catch {
       if (version === requestVersion.current)

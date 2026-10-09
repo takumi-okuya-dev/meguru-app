@@ -277,6 +277,70 @@ describe("AccountSwitcherの横断要確認件数", () => {
     ]);
   });
 
+  it("一覧の取り直し中に後から始まった取得を取り消さず、その新しい一覧を残す", async () => {
+    let finishMenu: (value: MeResponse) => void = () => {};
+    let finishTracked: (value: MeResponse) => void = () => {};
+    mocks.me
+      .mockResolvedValueOnce(me(accounts))
+      .mockImplementationOnce(
+        () =>
+          new Promise<MeResponse>((resolve) => {
+            finishMenu = resolve;
+          }),
+      )
+      .mockImplementationOnce(
+        () =>
+          new Promise<MeResponse>((resolve) => {
+            finishTracked = resolve;
+          }),
+      );
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    renderSwitcher("/accounts/a1", undefined, client);
+    await waitFor(() => expect(client.getQueryData(queryKeys.me)).toBeDefined());
+    const menu = await openMenu();
+    await waitFor(() => expect(mocks.me).toHaveBeenCalledTimes(2));
+    void client.invalidateQueries({ queryKey: queryKeys.me, exact: true });
+    await waitFor(() => expect(mocks.me).toHaveBeenCalledTimes(3));
+    finishMenu(me(accounts));
+    expect(await within(menu).findByText("要確認 5件")).toBeInTheDocument();
+    finishTracked(me([...accounts, account("added")]));
+    await waitFor(() =>
+      expect(client.getQueryData<MeResponse>(queryKeys.me)?.accounts.map((a) => a.id)).toEqual([
+        "a1",
+        "a2",
+        "a3",
+        "added",
+      ]),
+    );
+  });
+
+  it("一覧の取り直し中に後から始まった取得が先に終われば、その新しい一覧を残す", async () => {
+    let finishMenu: (value: MeResponse) => void = () => {};
+    mocks.me
+      .mockResolvedValueOnce(me(accounts))
+      .mockImplementationOnce(
+        () =>
+          new Promise<MeResponse>((resolve) => {
+            finishMenu = resolve;
+          }),
+      )
+      .mockResolvedValueOnce(me([...accounts, account("added")]));
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    renderSwitcher("/accounts/a1", undefined, client);
+    await waitFor(() => expect(client.getQueryData(queryKeys.me)).toBeDefined());
+    const menu = await openMenu();
+    await waitFor(() => expect(mocks.me).toHaveBeenCalledTimes(2));
+    await client.invalidateQueries({ queryKey: queryKeys.me, exact: true });
+    finishMenu(me(accounts));
+    expect(await within(menu).findByText("要確認 5件")).toBeInTheDocument();
+    expect(client.getQueryData<MeResponse>(queryKeys.me)?.accounts.map((a) => a.id)).toEqual([
+      "a1",
+      "a2",
+      "a3",
+      "added",
+    ]);
+  });
+
   it("連続した開閉の古い応答で新しい件数を上書きしない", async () => {
     let finishOld: (value: NeedsReviewCountsResponse) => void = () => {};
     mocks.needsReviewCounts
