@@ -1,6 +1,6 @@
 // サイドバー左上のAccount切り替え。開くたびに所有Accountと要確認件数を読み直す。
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import type { AccountSummary } from "@threads-grower/shared";
+import type { AccountSummary, MeResponse } from "@threads-grower/shared";
 import { CheckIcon, ChevronDownIcon, PlusIcon, TriangleAlertIcon } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router";
@@ -44,6 +44,20 @@ export function AccountSwitcher({ onNavigate }: { onNavigate?: () => void }) {
     [],
   );
 
+  /**
+   * メニューで取り直したAccount一覧をキャッシュに入れる。
+   * 先に始まった /api/me の取得が後から終わり、古い一覧で上書きしないよう取り消してから入れる。
+   * @param fresh - 取り直した /api/me の応答
+   * @param version - この読み込みの番号
+   * @returns 新しい読み込みに追い越されていなければ true
+   */
+  async function storeMe(fresh: MeResponse, version: number) {
+    await queryClient.cancelQueries({ queryKey: queryKeys.me, exact: true });
+    if (version !== requestVersion.current) return false;
+    queryClient.setQueryData(queryKeys.me, fresh);
+    return true;
+  }
+
   async function loadCounts(accounts: AccountSummary[], version: number) {
     setMenu({ phase: "loading-counts", accounts, counts: {} });
     let response: Awaited<ReturnType<typeof api.needsReviewCounts>>;
@@ -66,8 +80,7 @@ export function AccountSwitcher({ onNavigate }: { onNavigate?: () => void }) {
       setMenu(emptyMenu);
       try {
         const refreshed = await api.me();
-        if (version !== requestVersion.current) return;
-        queryClient.setQueryData(queryKeys.me, refreshed);
+        if (!(await storeMe(refreshed, version))) return;
         latestAccounts = refreshed.accounts;
       } catch {
         if (version === requestVersion.current)
@@ -83,8 +96,7 @@ export function AccountSwitcher({ onNavigate }: { onNavigate?: () => void }) {
     setMenu(emptyMenu);
     try {
       const fresh = await api.me();
-      if (version !== requestVersion.current) return;
-      queryClient.setQueryData(queryKeys.me, fresh);
+      if (!(await storeMe(fresh, version))) return;
       await loadCounts(fresh.accounts, version);
     } catch {
       if (version === requestVersion.current)

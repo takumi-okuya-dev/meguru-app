@@ -5,6 +5,7 @@ import type { AccountSummary, MeResponse, NeedsReviewCountsResponse } from "@thr
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { PageHeader } from "@/components/layout/PageHeader";
+import { queryKeys } from "@/lib/query";
 
 const mocks = vi.hoisted(() => ({
   me: vi.fn(),
@@ -62,8 +63,11 @@ const counts = (rows: [string, number][]): NeedsReviewCountsResponse => ({
   counts: rows.map(([accountId, needsReview]) => ({ accountId, needsReview })),
 });
 
-function renderSwitcher(initial = "/accounts/a1", onNavigate?: () => void) {
-  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+function renderSwitcher(
+  initial = "/accounts/a1",
+  onNavigate?: () => void,
+  client = new QueryClient({ defaultOptions: { queries: { retry: false } } }),
+) {
   const router = createMemoryRouter(
     [
       { path: "/accounts/:accountId", element: <AccountSwitcher onNavigate={onNavigate} /> },
@@ -248,6 +252,29 @@ describe("AccountSwitcherの横断要確認件数", () => {
     await waitFor(() => expect(within(menu).getByText("要確認 4件")).toBeInTheDocument());
     expect(within(menu).queryByText("Account a3")).not.toBeInTheDocument();
     expect(mocks.needsReviewCounts).toHaveBeenCalledTimes(2);
+  });
+
+  it("先に始まった一覧の取得が後から終わっても、キャッシュを古い一覧に戻さない", async () => {
+    let finishOld: (value: MeResponse) => void = () => {};
+    mocks.me
+      .mockImplementationOnce(
+        () =>
+          new Promise<MeResponse>((resolve) => {
+            finishOld = resolve;
+          }),
+      )
+      .mockResolvedValueOnce(me(accounts));
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    renderSwitcher("/accounts/a1", undefined, client);
+    const menu = await openMenu();
+    expect(await within(menu).findByText("要確認 5件")).toBeInTheDocument();
+    finishOld(me([...accounts, account("deleted")]));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(client.getQueryData<MeResponse>(queryKeys.me)?.accounts.map((a) => a.id)).toEqual([
+      "a1",
+      "a2",
+      "a3",
+    ]);
   });
 
   it("連続した開閉の古い応答で新しい件数を上書きしない", async () => {
