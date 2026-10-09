@@ -69,7 +69,7 @@ Accountのオーナーが、運用代行・コンサルのパートナーを招�
 | II. 人間承認ゲート | 合格 | 承認は`review`の権限（オーナー、または任されたパートナー）で、人の明示的な操作だけ。編集者は承認できない。承認済みを直すと要確認に戻る（004 FR-007）のは全員に同じ。却下の理由は今のとおり記録する |
 | III. 外部LLM前提・API依存ゼロ | 合格 | アプリの中でAIを呼ばない |
 | IV. 契約／ロール分離 | 合格 | 役割は`memberships.role`（owner・partner・editor）でAccountごとに持つ（R1）。パートナーの役割はオーナーの招待だけ、編集者の役割（担当）はパートナーの操作だけで付く（FR-025）。契約（`accounts.plan`・無料体験）には触れず、grower機能はオーナーの状態で判定する（R3）。役割と契約を1つの値にしない |
-| V. 個人運用起点のシンプルさ | 合格（例外を記録） | 判定を`authorizeAccount`の1か所に集め、すべてのAPIが通る（R2）。個人運用の画面に足すのは「運用を手伝ってもらう」の1区分だけで、spec FR-006に原則Vの例外として記録した（2026-10-09ユーザー決定）。匿名ベンチマーク・PINは作らない |
+| V. 個人運用起点のシンプルさ | 合格（例外を記録） | 判定を`access.ts`の1か所（Accountは`authorizeAccount`、チームは`authorizeTeam`・`listTeamAccounts`・`authorizeAssignment`）に集め、すべてのAPIが通る（R2。/speckit-analyze C1で`/api/team/*`も含めた）。個人運用の画面に足すのは「運用を手伝ってもらう」の1区分だけで、spec FR-006に原則Vの例外として記録した（2026-10-09ユーザー決定）。匿名ベンチマーク・PINは作らない |
 | VI. 改善フィードバックループの忠実性 | 合格 | 改善メモ・プロンプトの流れは変えない。編集者・パートナーも改善メモを書ける（`content`） |
 | 技術スタック制約 | 合格 | 既存のスタック。Clerkはログインだけ、チームはアプリのDB。依存は`uqr`だけ足す |
 | 運用コスト制約（固定費$0） | 合格 | Cron・KVを足さない。判定の往復は増えない。記録は90日で数MB未満（R14） |
@@ -125,7 +125,7 @@ apps/api/
 │   │   ├── ✎ me.ts                     # 役割つきの一覧・landing・partnerTeam・editorWaiting
 │   │   └── ✎ その他のAccountのルート    # findOwnedAccount → authorizeAccount（permissions.md の表のとおり）
 │   └── services/
-│       ├── ✎ access.ts                 # authorizeAccount・AccountAccess（findOwnedAccount を置き換え）
+│       ├── ✎ access.ts                 # authorizeAccount・AccountAccess（findOwnedAccount を置き換え）、authorizeTeam・listTeamAccounts・authorizeAssignment
 │       ├── ★ team-service.ts           # チーム・編集者・担当・手伝いの関係（memberships と同じトランザクション）
 │       ├── ★ invite-service.ts         # 文字列の生成・照合・暗号化した写し・参加
 │       ├── ★ activity-log.ts           # recordActivity（hasTeam のときだけ）・一覧・90日の削除

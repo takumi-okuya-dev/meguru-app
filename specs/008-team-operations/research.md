@@ -21,6 +21,7 @@ Phase 0 の調査と決定。spec の Clarifications（2026-10-09）と、001〜
   - Accountに関わっていない（行がない） → 404 `ACCOUNT_NOT_FOUND`（存在の有無を漏らさない。001から同じ）。
   - 関わっているが、その操作が許されていない → 403 `ROLE_FORBIDDEN`（`details`に必要な権限）。
 - 許可の表は`packages/shared/src/permissions.ts`に置き、APIの判定と画面の出し分けの両方で使う（[contracts/permissions.md](./contracts/permissions.md)）。
+- チームの判定（`authorizeTeam`・`listTeamAccounts`・`authorizeAssignment`）も同じ`access.ts`に置き、`/api/team/*`と`team-service.ts`・`partner-summary.ts`はそこを通す（[contracts/permissions.md](./contracts/permissions.md)「チームの判定」）。役割による判定がAccountとチームで別々の場所に散らないようにする。
 - 既存の59か所の`findOwnedAccount`を、操作に合った権限で`authorizeAccount`に置き換える。置き換えの漏れは、ルートの一覧を役割×権限で全部たたくテスト（SC-002）で見つける。
 - **理由**：Constitution原則V（3.0.0）「判定を1か所に集め、すべてのAPIがそこを通す」。009（決済）は、この関数の中に「オーナーが契約中か」を足すだけで済む（FR-080）。
 - **代わりの案**：Honoのミドルウェアで`/accounts/:accountId/*`をまとめて判定 → 操作ごとの権限（承認・設定など）はルートごとに違うので、結局ルートの中で2回目の判定が要る。トランザクションの中で読み直したい処理（承認・設定の保存）とも合わない。

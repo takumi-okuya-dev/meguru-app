@@ -24,9 +24,22 @@ spec FR-001〜FR-003・FR-002a・FR-030〜FR-032 の実装の契約。表は`pac
 | `activity` | ○ | ○ | × |
 | `owner` | ○ | × | × |
 
-- 編集者を招待する・外す・担当を決めるのは、Accountの権限ではなくチームの権限（チームのパートナー本人だけ）。`/api/team/*`で判定する（[api.md](./api.md)）。
+- 編集者を招待する・外す・担当を決めるのは、Accountの権限ではなくチームの権限（チームのパートナー本人だけ）。この判定も`apps/api/src/services/access.ts`に置き、`/api/team/*`はすべてそこを通す（下の「チームの判定」。Constitution原則V）。
 - 判定の結果（`AccountAccess`）：`account`、`role`、`permissions`（上の表で許された権限の集合）、`owner`（`{ id, name, createdAt }`）、`delegation`（`{ review, settings } | null`）、`hasTeam`、`teamName`。
 - 403 `ROLE_FORBIDDEN`の`details`には足りない権限（例：`["review"]`）を入れる。Webはこれを見て、任せる範囲がオフになった（FR-041 US3-4）と案内し、権限を読み直す。
+
+## チームの判定（`access.ts`）
+
+Accountの判定（`authorizeAccount`）と同じファイルに、次の3つを置く。`team-service.ts`・`partner-summary.ts`・`/api/team/*`のルートは、チームやAccountの読み取り・書き込みの前に必ずこれらを通し、`teams`・`account_partners`・`memberships`を自分で読んで権限を決めない。
+
+| 関数 | 何を判定するか | 拒否のとき |
+|---|---|---|
+| `authorizeTeam(db, user)` | ログインした人がチームのパートナーか。`TeamAccess`（チーム・パートナー）を返す | 404 `TEAM_NOT_FOUND` |
+| `listTeamAccounts(db, teamAccess)` | チームが関われるAccountの一覧（手伝う先＋パートナー自身がオーナーのAccount、`own`の印つき）。まとめの画面と担当の表の列はこの一覧だけを使う | — |
+| `authorizeAssignment(db, teamAccess, editorUserId, accountId)` | 相手がチームの編集者で、Accountが`listTeamAccounts`に含まれるか | 404 `TEAM_NOT_FOUND`（編集者でない）、409 `ASSIGNMENT_NOT_ALLOWED`（Accountが対象外） |
+
+- 009（決済）で、オーナーが未払いのAccountを読むだけにするときは、`authorizeAccount`と`listTeamAccounts`（まとめの画面での表示と、担当の付け外しの可否）の両方にこの1か所で足す。
+- 招待の確認（`GET /api/invites/:token`）と参加（`POST .../accept`）は、Accountやチームの権限ではなく「リンクを持っているか」で判定する（research.md R4・R7）。
 
 ## 削除の扱い（FR-002a）
 
@@ -82,4 +95,4 @@ spec FR-001〜FR-003・FR-002a・FR-030〜FR-032 の実装の契約。表は`pac
 ## テスト（SC-002）
 
 - `packages/shared`：役割×任せる範囲（4通り）×権限の表のテスト。
-- `apps/api`：上の表のすべてのAPIを、owner・partner（任せる範囲の4通り）・editor・関係のない人で呼び、許される／403／404を確かめる表のテスト。ルートの一覧（Honoのルート）から、表にないAccountのAPIがあれば失敗させる（置き換えの漏れを見つける）。
+- `apps/api`：上の表のすべてのAPIを、owner・partner（任せる範囲の4通り）・editor・関係のない人で呼び、許される／403／404を確かめる表のテスト。`/api/team/*`も、チームのパートナー・そのチームの編集者・別のチームのパートナー・関係のない人で呼ぶ。ルートの一覧（Honoのルート）から、`/accounts/:accountId`または`/team`を含むルートで表にないものがあれば失敗させる（置き換えの漏れを見つける）。

@@ -100,7 +100,7 @@
 
 ## パートナーのチーム（パートナー本人だけ）
 
-`/api/team/*`は、ログインした人がチームのパートナーであることを確かめる（そうでなければ404 `TEAM_NOT_FOUND`）。
+`/api/team/*`は、すべて`access.ts`の`authorizeTeam`を通す（そうでなければ404 `TEAM_NOT_FOUND`）。Accountの一覧は`listTeamAccounts`、担当の付け外しは`authorizeAssignment`で判定する（[permissions.md](./permissions.md)「チームの判定」）。
 
 | API | 説明 |
 |---|---|
