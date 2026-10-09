@@ -1,6 +1,6 @@
 // サイドバー左上のAccount切り替え。開くたびに所有Accountと要確認件数を読み直す。
-import { useQuery, useQueryClient } from "@tanstack/react-query";
-import type { AccountSummary, MeResponse } from "@threads-grower/shared";
+import { isCancelledError, useQuery, useQueryClient } from "@tanstack/react-query";
+import type { AccountSummary } from "@threads-grower/shared";
 import { CheckIcon, ChevronDownIcon, PlusIcon, TriangleAlertIcon } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router";
@@ -45,28 +45,22 @@ export function AccountSwitcher({ onNavigate }: { onNavigate?: () => void }) {
   );
 
   /**
-   * Account一覧を取り直し、キャッシュも新しい一覧にそろえる。
-   * 取り消すのは取り直しより前に始まった /api/me の取得だけ。後から始まった取得があれば、
-   * そちらの方が新しいので、キャッシュはそれに任せて上書きしない。
+   * Account一覧を取り直す。/api/me のクエリを通して取り、キャッシュと表示を同じ結果にそろえる。
+   * 開く前に始まった取得だけを取り消し、後から始まった取得に置き換えられたらその結果を待つ。
    * @param version - この読み込みの番号
    * @returns 取り直したAccount一覧。新しい読み込みに追い越されたら null
    */
   async function refreshMe(version: number) {
     await queryClient.cancelQueries({ queryKey: queryKeys.me, exact: true });
-    const updatesBefore = queryClient.getQueryState(queryKeys.me)?.dataUpdateCount ?? 0;
-    let fresh: MeResponse;
-    try {
-      fresh = await api.me();
-    } catch (error) {
-      // 取り消した取得をやり直し、キャッシュを古い一覧のままにしない。
-      void queryClient.invalidateQueries({ queryKey: queryKeys.me, exact: true });
-      throw error;
+    for (let attempt = 0; ; attempt += 1) {
+      try {
+        const fresh = await queryClient.fetchQuery({ queryKey: queryKeys.me, queryFn: api.me });
+        return version === requestVersion.current ? fresh : null;
+      } catch (error) {
+        // 後から始まった取得に置き換えられたときだけ、その取得を待ち直す。
+        if (!isCancelledError(error) || attempt >= 3) throw error;
+      }
     }
-    const state = queryClient.getQueryState(queryKeys.me);
-    const newerStarted =
-      state?.fetchStatus === "fetching" || (state?.dataUpdateCount ?? 0) > updatesBefore;
-    if (!newerStarted) queryClient.setQueryData(queryKeys.me, fresh);
-    return version === requestVersion.current ? fresh : null;
   }
 
   async function loadCounts(accounts: AccountSummary[], version: number) {
