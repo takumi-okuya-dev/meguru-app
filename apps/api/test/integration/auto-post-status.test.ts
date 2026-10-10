@@ -1,9 +1,13 @@
 // 自動投稿の状態と知らせ（specs/005-auto-post FR-018・FR-022、research.md R8・R9、contracts/api.md「GET /auto-post」）
+import { AUTOPOST_LATE_WINDOW_MINUTES } from "@threads-grower/shared";
 import { beforeEach, describe, expect, it } from "vitest";
 import { call, createUserWithAccount, fake, makeApp, resetDb } from "../helpers/app";
 import { approvedDrafts, connectedAccount, db, setSchedule } from "../helpers/auto-post";
 
 const app = makeApp();
+// 予定を過ぎて60分以内の時刻は、まだ試みていなければ「次の時刻」になる（findDueSlot）。
+// 時刻の直後（例：12:00の枠の12:22）に流しても落ちないよう、その幅を含めて確かめる
+const notBeforeLateWindow = () => Date.now() - AUTOPOST_LATE_WINDOW_MINUTES * 60_000;
 const status = (accountId: string, user = "u1") =>
   call(app, "GET", `/api/accounts/${accountId}/auto-post`, { user });
 
@@ -27,7 +31,7 @@ describe("GET /auto-post：承認済みが0件の知らせ（US1 シナリオ5�
     expect(body.approvedCount).toBe(0);
     expect(body.notices).toHaveLength(1);
     expect(body.notices[0]!.kind).toBe("no_approved");
-    expect(Date.parse(body.notices[0]!.nextSlotAt!)).toBeGreaterThan(Date.now());
+    expect(Date.parse(body.notices[0]!.nextSlotAt!)).toBeGreaterThan(notBeforeLateWindow());
   });
 
   it("オフ、または承認済みがあるときは出さない", async () => {
@@ -140,7 +144,7 @@ describe("US4：次の投稿と残りの日数", () => {
       daysLeft: 1,
       next: { draft: { id: ids[0], excerpt: "あ".repeat(40) } },
     });
-    expect(Date.parse(body.next.at)).toBeGreaterThan(Date.now());
+    expect(Date.parse(body.next.at)).toBeGreaterThan(notBeforeLateWindow());
     await db()`UPDATE accounts SET connection_status = 'needs_reconnect' WHERE id = ${accountId}`;
     expect(await (await status(accountId)).json()).toMatchObject({ next: null });
     await setSchedule(accountId, { slotMinutes: [], enabled: false });
