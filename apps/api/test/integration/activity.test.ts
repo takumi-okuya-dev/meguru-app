@@ -175,7 +175,7 @@ describe("記録と保存の一体性（PR #9 のCodexレビュー2回目）", (
       expect(failed.status).toBe(500);
       const saved = (await sql()`SELECT count(*)::int AS n FROM strategy_designs WHERE account_id = ${accountId}`) as { n: number }[];
       expect(saved[0]!.n).toBe(0);
-      const promo = await call(app, "PUT", `/api/accounts/${accountId}/promotion-settings`, { user: "p1", body: { ratioPercent: 30 } });
+      const promo = await call(app, "PUT", `/api/accounts/${accountId}/promotion-settings`, { user: "p1", body: { ratioPercent: 30, expectedVersion: 1 } });
       expect(promo.status).toBe(500);
       const ratio = (await sql()`SELECT promotion_ratio_percent AS r FROM accounts WHERE id = ${accountId}`) as { r: number }[];
       expect(ratio[0]!.r).not.toBe(30);
@@ -207,5 +207,41 @@ describe("記録と保存の一体性（PR #9 のCodexレビュー2回目）", (
     expect(both.items.map((i) => i.action).sort()).toEqual(["core_rules_saved", "strategy_saved"]);
     const bad = await call(app, "GET", `/api/accounts/${accountId}/activity?kind=content,unknown`, { user: "o1" });
     expect(bad.status).toBe(400);
+  });
+});
+
+describe("宣伝投稿の割合・作る件数の同時の保存（specs/008 FR-007、PR #9 のCodexレビュー3回目）", () => {
+  it("古い版での宣伝投稿の割合の保存は 409 STALE_UPDATE。最新の値と先に保存した人の名前を返し、黙って上書きしない", async () => {
+    const { accountId } = await createUserWithAccount("o1");
+    await makePartner(accountId, "p1");
+    const first = await json<{ ratioPercent: number; version: number }>(
+      await call(app, "PUT", `/api/accounts/${accountId}/promotion-settings`, { user: "p1", body: { ratioPercent: 40, expectedVersion: 1 } }),
+    );
+    expect(first).toMatchObject({ ratioPercent: 40, version: 2 });
+    const stale = await call(app, "PUT", `/api/accounts/${accountId}/promotion-settings`, { user: "o1", body: { ratioPercent: 10, expectedVersion: 1 } });
+    expect(stale.status).toBe(409);
+    const body = (await stale.json()) as { error: { code: string }; latest: unknown; updatedBy: { name: string } | null };
+    expect(body.error.code).toBe("STALE_UPDATE");
+    expect(body.latest).toEqual({ ratioPercent: 40, version: 2, canEdit: true });
+    expect(body.updatedBy?.name).toBeTruthy();
+    const get = await json<{ ratioPercent: number }>(await call(app, "GET", `/api/accounts/${accountId}/promotion-settings`, { user: "o1" }));
+    expect(get.ratioPercent).toBe(40);
+    // 最新の版を送れば上書きできる
+    await json(await call(app, "PUT", `/api/accounts/${accountId}/promotion-settings`, { user: "o1", body: { ratioPercent: 10, expectedVersion: 2 } }));
+  });
+
+  it("古い版での作る件数の保存は 409 STALE_UPDATE。GET /post-drafts は版を返す", async () => {
+    const { accountId } = await createUserWithAccount("o1");
+    await makePartner(accountId, "p1");
+    await json(await call(app, "PUT", `/api/accounts/${accountId}/prompt-settings`, { user: "p1", body: { postCount: 12, expectedVersion: 1 } }));
+    const stale = await call(app, "PUT", `/api/accounts/${accountId}/prompt-settings`, { user: "o1", body: { postCount: 5, expectedVersion: 1 } });
+    expect(stale.status).toBe(409);
+    const body = (await stale.json()) as { error: { code: string }; latest: unknown; updatedBy: { name: string } | null };
+    expect(body.latest).toEqual({ postCount: 12, version: 2 });
+    expect(body.updatedBy?.name).toBeTruthy();
+    const drafts = await json<{ promptPostCount: number; promptPostCountVersion: number }>(
+      await call(app, "GET", `/api/accounts/${accountId}/post-drafts`, { user: "o1" }),
+    );
+    expect(drafts).toMatchObject({ promptPostCount: 12, promptPostCountVersion: 2 });
   });
 });

@@ -1,6 +1,6 @@
 // 宣伝内容の画面（specs/002 US2、contracts/ui-routes.md「宣伝内容の画面」、docs/ui-design.md 型B）
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { PROMOTION_LIMIT, type Promotion, type PromotionInput } from "@threads-grower/shared";
+import { PROMOTION_LIMIT, type Promotion, type PromotionInput, type PromotionSettings } from "@threads-grower/shared";
 import { EllipsisIcon, ExternalLinkIcon, PlusIcon } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -175,6 +175,7 @@ export function PromotionsPage() {
         <RatioRow
           accountId={account.id}
           value={settings.data?.ratioPercent}
+          version={settings.data?.version ?? 1}
           canEdit={canEdit}
           onGrowerLost={() => setGrowerDialog(true)}
         />
@@ -329,16 +330,20 @@ function PromotionCard({ item, menu }: { item: Promotion; menu: React.ReactNode 
 function RatioRow({
   accountId,
   value,
+  version,
   canEdit,
   onGrowerLost,
 }: {
   accountId: string;
   value: number | undefined;
+  version: number;
   canEdit: boolean;
   onGrowerLost: () => void;
 }) {
   const queryClient = useQueryClient();
   const [draft, setDraft] = useState<string | null>(null);
+  // 先に他の人が保存していたとき（409 STALE_UPDATE）の最新の値と、保存した人（specs/008 FR-007、PR #9 のCodexレビュー）
+  const [conflict, setConflict] = useState<{ latest: PromotionSettings; by: string | null } | null>(null);
   const shown = draft ?? (value === undefined ? "" : String(value));
   const valid = /^\d+$/.test(shown) && Number(shown) <= 100;
   const changed = draft !== null && draft !== String(value);
@@ -346,13 +351,17 @@ function RatioRow({
   useUnsavedChanges(canEdit && changed);
 
   const save = useMutation({
-    mutationFn: () => api.putPromotionSettings(accountId, Number(shown)),
+    mutationFn: (expectedVersion: number) => api.putPromotionSettings(accountId, Number(shown), expectedVersion),
     onSuccess: (s) => {
       queryClient.setQueryData(queryKeys.promotionSettings(accountId), s);
       setDraft(null);
       toast.success("保存しました");
     },
-    onError: (err) => (isGrowerRequired(err) ? onGrowerLost() : toast.error(saveErrorMessage(err))),
+    onError: (err) => {
+      if (isStale(err)) setConflict({ latest: err.latest as PromotionSettings, by: err.updatedBy?.name ?? null });
+      else if (isGrowerRequired(err)) onGrowerLost();
+      else toast.error(saveErrorMessage(err));
+    },
   });
 
   return (
@@ -378,12 +387,27 @@ function RatioRow({
         />
         <span>%</span>
         {canEdit && changed && (
-          <Button size="sm" className="rounded-full" disabled={!valid || save.isPending} onClick={() => save.mutate()}>
+          <Button size="sm" className="rounded-full" disabled={!valid || save.isPending} onClick={() => save.mutate(version)}>
             保存
           </Button>
         )}
       </div>
       {!valid && <p className="w-full text-[13px] text-warning">0〜100の整数で入力してください</p>}
+      <ConflictDialog
+        open={conflict !== null}
+        updatedAt={null}
+        updatedByName={conflict?.by ?? null}
+        onCancel={() => setConflict(null)}
+        onReload={() => {
+          if (conflict) queryClient.setQueryData(queryKeys.promotionSettings(accountId), conflict.latest);
+          setDraft(null);
+          setConflict(null);
+        }}
+        onOverwrite={() => {
+          if (conflict) save.mutate(conflict.latest.version);
+          setConflict(null);
+        }}
+      />
     </div>
   );
 }

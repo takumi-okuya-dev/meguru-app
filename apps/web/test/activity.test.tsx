@@ -128,6 +128,16 @@ describe("操作の記録", () => {
     expect(await screen.findByText("まだ記録はありません。")).toBeInTheDocument();
   });
 
+  it("読み込みに失敗したら「まだ記録はありません」と出さず、再読み込みで出す（PR #9 のCodexレビュー）", async () => {
+    listActivity.mockRejectedValueOnce(new Error("network")).mockResolvedValue(page1);
+    const user = userEvent.setup();
+    renderPage();
+    expect(await screen.findByText("操作の記録を読み込めませんでした。")).toBeInTheDocument();
+    expect(screen.queryByText("まだ記録はありません。")).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "再読み込み" }));
+    expect(await screen.findByText(/3件を承認しました/)).toBeInTheDocument();
+  });
+
   it("編集者はAccountのホームへ移る", async () => {
     access = EDITOR_ACCESS;
     renderPage();

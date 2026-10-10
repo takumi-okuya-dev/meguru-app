@@ -5,12 +5,12 @@
 | 確認 | 結果 |
 |---|---|
 | `pnpm --filter shared test` | 成功。192件（権限の表 `permissions.test.ts` 11件を含む） |
-| `pnpm --filter api test` | 成功。470件（PR #9 のCodexレビュー2回目の修正後）。役割×APIの表（`permissions-matrix.test.ts`：Accountの既存・新規のAPIを owner・partner（任せる範囲4通り）・editor（担当あり・なし）・関係のない人で、`/api/team/*` をチームのパートナー・編集者・別のチームのパートナー・関係のない人で確認。Honoのルートの一覧から表にないルートがあれば失敗）、判定の本体（`access.test.ts`）、招待（`invites.test.ts`：同時参加・10人の上限の同時参加・平文を保存しないことを含む）、チーム（`team.test.ts`：外す・任せる範囲・NGワード入りの承認の拒否・まとめ）、操作の記録（`activity.test.ts`：同じトランザクション・まとめて1行・再試行で増えない・90日・外した後も残る・衝突の名前）、grower機能のオーナー基準（`strategy.test.ts`）、編集者の削除（`post-drafts.test.ts`）、再接続はオーナーだけ（`reconnect.test.ts`） |
-| `pnpm --filter web test` | 成功。260件（自動投稿の知らせの権限による出し分けを含む。権限のエラーの扱い、設定の区分、招待のダイアログ・確認画面、投稿ストックの出し分けと作成者の名前、編集者と担当、待機の案内、操作の記録、まとめの画面と切り替えメニューの見出し、個人運用の画面が変わらないこと、通知の位置） |
+| `pnpm --filter api test` | 成功。472件（PR #9 のCodexレビュー3回目の修正後）。役割×APIの表（`permissions-matrix.test.ts`：Accountの既存・新規のAPIを owner・partner（任せる範囲4通り）・editor（担当あり・なし）・関係のない人で、`/api/team/*` をチームのパートナー・編集者・別のチームのパートナー・関係のない人で確認。Honoのルートの一覧から表にないルートがあれば失敗）、判定の本体（`access.test.ts`）、招待（`invites.test.ts`：同時参加・10人の上限の同時参加・平文を保存しないことを含む）、チーム（`team.test.ts`：外す・任せる範囲・NGワード入りの承認の拒否・まとめ）、操作の記録（`activity.test.ts`：同じトランザクション・まとめて1行・再試行で増えない・90日・外した後も残る・衝突の名前）、grower機能のオーナー基準（`strategy.test.ts`）、編集者の削除（`post-drafts.test.ts`）、再接続はオーナーだけ（`reconnect.test.ts`） |
+| `pnpm --filter web test` | 成功。265件（自動投稿の知らせの権限による出し分け、宣伝投稿の割合・作る件数の衝突、操作の記録・招待リンクの読み込みの失敗を含む。権限のエラーの扱い、設定の区分、招待のダイアログ・確認画面、投稿ストックの出し分けと作成者の名前、編集者と担当、待機の案内、操作の記録、まとめの画面と切り替えメニューの見出し、個人運用の画面が変わらないこと、通知の位置） |
 | `pnpm lint` | 成功 |
 | `pnpm -r typecheck` | 成功 |
 | `pnpm build` | 成功。既存の大きなチャンク（500 kB超）に関するViteの警告あり（008より前から） |
-| マイグレーション `0009_team_operations` | ローカルのPostgres 17で適用。既存の `memberships` の行は `owner`・`team_id` NULL のまま、`membership_role` は `{owner,member,partner,editor}` |
+| マイグレーション `0009_team_operations`・`0010_setting_versions` | ローカルのPostgres 17で適用。既存の `memberships` の行は `owner`・`team_id` NULL のまま、`membership_role` は `{owner,member,partner,editor}` |
 
 ### 実行時に気づいたこと
 

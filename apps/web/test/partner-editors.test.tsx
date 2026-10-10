@@ -109,4 +109,18 @@ describe("編集者と担当", () => {
     await user.click(within(dialog).getByRole("button", { name: "リンクを作り直す" }));
     expect(toastSuccess).toHaveBeenCalledWith("新しいリンクを作りました。前のリンクは使えません。");
   });
+
+  it("招待リンクの読み込みに失敗したら「作っています…」のままにせず、再読み込みで出す（PR #9 のCodexレビュー）", async () => {
+    getTeamInvite.mockReset();
+    getTeamInvite
+      .mockRejectedValueOnce(new ApiError("INTERNAL_ERROR", 500))
+      .mockResolvedValue({ url: "http://localhost:5173/invite/e_" + "d".repeat(43), rotatedAt: "2026-10-09T00:00:00Z" });
+    const user = userEvent.setup();
+    renderPage();
+    await user.click((await screen.findAllByRole("button", { name: "編集者を招待" }))[0]!);
+    const dialog = await screen.findByRole("dialog", { name: "編集者を招待" });
+    expect(await within(dialog).findByText("招待リンクを読み込めませんでした。")).toBeInTheDocument();
+    await user.click(within(dialog).getByRole("button", { name: "再読み込み" }));
+    expect(await within(dialog).findByRole("img", { name: "招待リンクのQRコード" })).toBeInTheDocument();
+  });
 });

@@ -240,6 +240,8 @@ export function PartnerEditorsPage() {
           title="編集者を招待"
           description={`${teamLabel}のメンバーに、このリンクかQRコードを共有してください。参加した人は編集者になり、どのアカウントを担当するかは、参加した後にあなたが決めます。`}
           url={invite.data?.url ?? null}
+          loadFailed={invite.isError}
+          onRetry={() => void invite.refetch()}
           qrNote={`このリンクは${teamLabel}に1本で、期限はありません。編集者は合わせて${data.editorLimit}人まで、無料です。知らない人に広まったときは「リンクを作り直す」で古いリンクを使えなくし、参加してしまった人は「⋯」から外してください。`}
           onRotate={() => rotate.mutate()}
           rotating={rotate.isPending}

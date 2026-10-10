@@ -5,6 +5,7 @@ import {
   PROMPT_COUNT_MAX,
   PROMPT_COUNT_MIN,
   STRATEGY_TOTAL,
+  staleUpdateTitle,
   type PostDraftList,
   type PromptSummary,
 } from "@threads-grower/shared";
@@ -17,7 +18,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { api, describeError } from "@/lib/api-client";
 import { queryKeys } from "@/lib/query";
-import { isGrowerRequired, saveErrorMessage } from "@/lib/save-error";
+import { isGrowerRequired, isStale, saveErrorMessage } from "@/lib/save-error";
 import { cn } from "@/lib/utils";
 
 /**
@@ -51,12 +52,14 @@ export function PromptCard({
   accountId,
   canGeneratePrompt,
   promptPostCount,
+  promptPostCountVersion = 1,
   startKey,
   onLocked,
 }: {
   accountId: string;
   canGeneratePrompt: boolean;
   promptPostCount: number;
+  promptPostCountVersion?: number;
   startKey?: string;
   onLocked?: () => void;
 }) {
@@ -66,6 +69,7 @@ export function PromptCard({
     <PromptReadyCard
       accountId={accountId}
       savedCount={promptPostCount}
+      savedVersion={promptPostCountVersion}
       startKey={startKey}
       onGrowerLost={() => {
         setGrowerLost(true);
@@ -92,11 +96,13 @@ function PromptLockedCard() {
 function PromptReadyCard({
   accountId,
   savedCount,
+  savedVersion,
   startKey,
   onGrowerLost,
 }: {
   accountId: string;
   savedCount: number;
+  savedVersion: number;
   startKey?: string;
   onGrowerLost: () => void;
 }) {
@@ -109,6 +115,8 @@ function PromptReadyCard({
   const [count, setCount] = useState(savedCount);
   const [countInput, setCountInput] = useState(String(savedCount));
   const [saved, setSaved] = useState(savedCount);
+  // 保存に使う版（先に他の人が保存していたら 409 になる。specs/008 FR-007、PR #9 のCodexレビュー）
+  const version = useRef(savedVersion);
   const [failed, setFailed] = useState<{ count: number; message: string } | null>(null);
   const [open, setOpen] = useState(false);
   const [edited, setEdited] = useState<string | null>(null);
@@ -142,16 +150,26 @@ function PromptReadyCard({
   }, [startKey, copyShown]);
 
   const { mutate: save, isPending: saving } = useMutation({
-    mutationFn: (n: number) => api.putPromptSettings(accountId, n),
-    onSuccess: ({ postCount }) => {
+    mutationFn: (n: number) => api.putPromptSettings(accountId, n, version.current),
+    onSuccess: ({ postCount, version: v }) => {
+      version.current = v;
       setSaved(postCount);
       setFailed(null);
       queryClient.setQueryData<PostDraftList>(queryKeys.postDrafts(accountId), (old) =>
-        old ? { ...old, promptPostCount: postCount } : old,
+        old ? { ...old, promptPostCount: postCount, promptPostCountVersion: v } : old,
       );
     },
     onError: (err, n) => {
-      if (isGrowerRequired(err)) onGrowerLost();
+      if (isStale(err)) {
+        // 自動で保存する欄なので、黙って上書きせず、最新の件数に合わせて知らせる
+        const latest = err.latest as { postCount: number; version: number };
+        version.current = latest.version;
+        setSaved(latest.postCount);
+        setCount(latest.postCount);
+        setCountInput(String(latest.postCount));
+        setFailed(null);
+        toast.info(`${staleUpdateTitle(err.updatedBy?.name)}。作る件数を最新の${latest.postCount}件にしました`);
+      } else if (isGrowerRequired(err)) onGrowerLost();
       else setFailed({ count: n, message: saveErrorMessage(err) });
     },
   });

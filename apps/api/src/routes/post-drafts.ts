@@ -55,6 +55,7 @@ export function postDraftRoutes(authed: MiddlewareHandler<AppEnv>) {
         ngWords: ngWordRows.map(toNgWord),
         canGeneratePrompt: canEditProfile(account, access.owner),
         promptPostCount: account.promptPostCount,
+        promptPostCountVersion: account.promptPostCountVersion,
         // 作った人・直した人の名前（チームがあるAccountだけ出す。specs/008 FR-053）
         people: access.hasTeam ? await peopleOf(db, [drafts.needsReview, drafts.approved, drafts.rejected, drafts.publishFailed].flat()) : {},
       });

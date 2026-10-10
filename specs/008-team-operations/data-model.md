@@ -148,6 +148,9 @@ Accountに0か1行。オーナーが「招待リンクを作る」で作り、�
 | `research_keywords` | `updated_by_user_id` |
 | `posting_schedules` | `updated_by_user_id` |
 | `accounts` | `core_rules_updated_by_user_id`（投稿のルール） |
+| `accounts` | `promotion_ratio_updated_by_user_id`（宣伝投稿の割合）・`prompt_post_count_updated_by_user_id`（プロンプトで作る件数） |
+
+宣伝投稿の割合とプロンプトで作る件数には版がなかったため、`accounts`に`promotion_ratio_version`・`prompt_post_count_version`（integer NOT NULL DEFAULT 1）も足す（マイグレーション`0010_setting_versions`。PR #9 のCodexレビューで、後勝ちのままでは共同で保存したときに黙って上書きされるとの指摘を受けて追加）。
 
 ## 状態の移り変わり
 

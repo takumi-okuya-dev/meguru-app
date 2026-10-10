@@ -269,8 +269,16 @@ export const promotionSettingsInputSchema = z.object({
   ratioPercent: z.number().int().min(0).max(100),
 });
 
+/** 宣伝投稿の割合の保存（PUT）のスキーマ。読み込んだときの版を送る（specs/008 FR-007、PR #9 のCodexレビュー）。 */
+export const putPromotionSettingsRequestSchema = promotionSettingsInputSchema.extend({
+  expectedVersion: z.number().int().min(1),
+});
+
 /** 宣伝投稿の割合（レスポンス）のスキーマ。 */
-export const promotionSettingsSchema = promotionSettingsInputSchema.extend({ canEdit: z.boolean() });
+export const promotionSettingsSchema = promotionSettingsInputSchema.extend({
+  version: z.number().int(),
+  canEdit: z.boolean(),
+});
 /** 宣伝投稿の割合（レスポンス）。 */
 export type PromotionSettings = z.infer<typeof promotionSettingsSchema>;
 
@@ -459,6 +467,8 @@ export const postDraftListSchema = z.object({
   canGeneratePrompt: z.boolean(),
   /** 保存済みの作る件数 */
   promptPostCount: z.number().int(),
+  /** 作る件数の版（保存のときに送る。specs/008 FR-007） */
+  promptPostCountVersion: z.number().int().default(1),
   /** createdBy・editedBy の users.id から名前へ（チームがあるAccountだけ。specs/008 FR-053） */
   people: z.record(z.string(), z.string()).default({}),
 });
@@ -605,9 +615,16 @@ export const promptResponseSchema = z.object({
 /** GET /prompt のレスポンス。 */
 export type PromptResponse = z.infer<typeof promptResponseSchema>;
 
-/** 作る件数のスキーマ（PUT /prompt-settings のリクエストとレスポンス）。 */
+/** 作る件数の保存（PUT /prompt-settings のリクエスト）のスキーマ。読み込んだときの版を送る（specs/008 FR-007、PR #9 のCodexレビュー）。 */
+export const putPromptSettingsRequestSchema = z.object({
+  postCount: z.number().int().min(PROMPT_COUNT_MIN).max(PROMPT_COUNT_MAX),
+  expectedVersion: z.number().int().min(1),
+});
+
+/** 作る件数のスキーマ（PUT /prompt-settings のレスポンス）。 */
 export const promptSettingsSchema = z.object({
   postCount: z.number().int().min(PROMPT_COUNT_MIN).max(PROMPT_COUNT_MAX),
+  version: z.number().int(),
 });
 
 // ---- 投稿のルール（specs/004-review-approval contracts/api.md）----

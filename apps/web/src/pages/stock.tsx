@@ -381,6 +381,7 @@ function StockPageContent() {
             accountId={account.id}
             canGeneratePrompt={data.canGeneratePrompt}
             promptPostCount={data.promptPostCount}
+            promptPostCountVersion={data.promptPostCountVersion}
             startKey={startKey}
             onLocked={() => setPromptLocked(true)}
           />

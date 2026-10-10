@@ -16,6 +16,12 @@
 
 `STALE_UPDATE`（409、既存）の応答に`updatedBy: { name: string } | null`を足す（research.md R8）。
 
+宣伝投稿の割合（`GET/PUT /api/accounts/:accountId/promotion-settings`）とプロンプトで作る件数（`PUT /api/accounts/:accountId/prompt-settings`）は、これまで後勝ちだったが、版を持たせる（PR #9 のCodexレビュー）。
+
+- 応答に`version`を足す（作る件数の版は`GET /post-drafts`の`promptPostCountVersion`でも返す）。
+- `PUT`は`expectedVersion`（必須）を受け、一致しなければ`STALE_UPDATE`（`latest`に最新の値、`updatedBy`に先に保存した人）。
+- Webは、宣伝投稿の割合では選択のダイアログ（読み直す・上書きする）を出す。作る件数は自動で保存する欄なので、最新の件数に合わせて「（名前）さんが先に保存しました。作る件数を最新のN件にしました」と知らせる。
+
 ## 権限
 
 ### `GET /api/accounts/:accountId/access`

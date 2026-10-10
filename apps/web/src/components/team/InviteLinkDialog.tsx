@@ -9,7 +9,8 @@ import { QrCode } from "./QrCode";
 /**
  * 招待リンクのダイアログ。
  * @param props - title：見出し、description：本文、url：招待リンク（読み込み中はNULL）、qrNote：QRコードの横の説明、
- *   children：できること等の説明、onRotate：作り直す、rotating：作り直し中、onClose：閉じる
+ *   children：できること等の説明、onRotate：作り直す、rotating：作り直し中、onClose：閉じる、
+ *   loadFailed：リンクの読み込みに失敗した、onRetry：読み込み直す（読み込み中と失敗を分ける。PR #9 のCodexレビュー）
  * @returns ダイアログ
  */
 export function InviteLinkDialog({
@@ -21,6 +22,8 @@ export function InviteLinkDialog({
   onRotate,
   rotating = false,
   onClose,
+  loadFailed = false,
+  onRetry,
 }: {
   title: string;
   description: string;
@@ -30,6 +33,8 @@ export function InviteLinkDialog({
   onRotate: () => void;
   rotating?: boolean;
   onClose: () => void;
+  loadFailed?: boolean;
+  onRetry?: () => void;
 }) {
   const [copied, setCopied] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -77,31 +82,42 @@ export function InviteLinkDialog({
             <label htmlFor="invite-link" className="text-sm font-medium">
               招待リンク
             </label>
-            <div className="flex flex-wrap gap-2">
-              <input
-                id="invite-link"
-                ref={inputRef}
-                readOnly
-                value={url ?? "作っています…"}
-                className="h-11 min-w-0 flex-1 rounded-xl border bg-muted/40 px-3 text-base md:text-sm"
-                onFocus={(e) => e.currentTarget.select()}
-              />
-              {canShare && (
-                <Button className="h-11 rounded-full" disabled={!url} onClick={() => void share()}>
-                  <ShareIcon className="size-4" />
-                  送る
+            {!url && loadFailed ? (
+              <div role="alert" className="flex flex-wrap items-center gap-2 rounded-xl border px-3 py-2.5 text-sm">
+                <span className="flex-1">招待リンクを読み込めませんでした。</span>
+                {onRetry && (
+                  <Button variant="outline" size="sm" className="rounded-full" onClick={onRetry}>
+                    再読み込み
+                  </Button>
+                )}
+              </div>
+            ) : (
+              <div className="flex flex-wrap gap-2">
+                <input
+                  id="invite-link"
+                  ref={inputRef}
+                  readOnly
+                  value={url ?? "作っています…"}
+                  className="h-11 min-w-0 flex-1 rounded-xl border bg-muted/40 px-3 text-base md:text-sm"
+                  onFocus={(e) => e.currentTarget.select()}
+                />
+                {canShare && (
+                  <Button className="h-11 rounded-full" disabled={!url} onClick={() => void share()}>
+                    <ShareIcon className="size-4" />
+                    送る
+                  </Button>
+                )}
+                <Button
+                  variant={canShare ? "outline" : "default"}
+                  className="h-11 rounded-full"
+                  disabled={!url}
+                  onClick={() => void copy()}
+                >
+                  <CopyIcon className="size-4" />
+                  {copied ? "コピーしました" : "コピー"}
                 </Button>
-              )}
-              <Button
-                variant={canShare ? "outline" : "default"}
-                className="h-11 rounded-full"
-                disabled={!url}
-                onClick={() => void copy()}
-              >
-                <CopyIcon className="size-4" />
-                {copied ? "コピーしました" : "コピー"}
-              </Button>
-            </div>
+              </div>
+            )}
           </div>
           {url && (
             <div className="flex items-center gap-4">

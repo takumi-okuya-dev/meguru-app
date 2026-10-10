@@ -52,8 +52,9 @@ vi.mock("@/lib/api-client", async (orig) => {
 const toastSuccess = vi.fn();
 const toastError = vi.fn();
 const toastWarning = vi.fn();
+const toastInfo = vi.fn();
 vi.mock("sonner", () => ({
-  toast: { success: toastSuccess, error: toastError, warning: toastWarning, dismiss: vi.fn() },
+  toast: { success: toastSuccess, error: toastError, warning: toastWarning, info: toastInfo, dismiss: vi.fn() },
 }));
 
 const { ApiError } = await import("@/lib/api-client");
@@ -173,6 +174,7 @@ function listResponse(
     ngWords,
     canGeneratePrompt: true,
     promptPostCount: 30,
+    promptPostCountVersion: 1,
     people: {},
     ...rest,
   };
@@ -289,13 +291,13 @@ describe("プロンプトのカード（US1）", () => {
 
   it("作る件数を変えると、0.5秒後に保存してその件数のプロンプトを取り直す（FR-004）", async () => {
     const user = userEvent.setup();
-    putPromptSettings.mockResolvedValue({ postCount: 10 });
+    putPromptSettings.mockResolvedValue({ postCount: 10, version: 2 });
     renderPage();
     const input = await screen.findByRole("spinbutton", { name: "作る件数" });
     expect(input).toHaveValue(30);
     await user.clear(input);
     await user.type(input, "10");
-    await waitFor(() => expect(putPromptSettings).toHaveBeenCalledWith("a1", 10), {
+    await waitFor(() => expect(putPromptSettings).toHaveBeenCalledWith("a1", 10, 1), {
       timeout: 2000,
     });
     expect(putPromptSettings).toHaveBeenCalledTimes(1);
@@ -304,29 +306,44 @@ describe("プロンプトのカード（US1）", () => {
 
   it("保存中に件数を変えても並行して保存せず、終わってから最新の件数を保存する（Codexレビュー）", async () => {
     const user = userEvent.setup();
-    let resolveFirst: (v: { postCount: number }) => void = () => {};
+    let resolveFirst: (v: { postCount: number; version: number }) => void = () => {};
     putPromptSettings.mockImplementationOnce(() => new Promise((r) => (resolveFirst = r)));
-    putPromptSettings.mockImplementation(async (_id: string, n: number) => ({ postCount: n }));
+    putPromptSettings.mockImplementation(async (_id: string, n: number, v: number) => ({ postCount: n, version: v + 1 }));
     renderPage();
     const input = await screen.findByRole("spinbutton", { name: "作る件数" });
     await user.clear(input);
     await user.type(input, "10");
-    await waitFor(() => expect(putPromptSettings).toHaveBeenCalledWith("a1", 10), {
+    await waitFor(() => expect(putPromptSettings).toHaveBeenCalledWith("a1", 10, 1), {
       timeout: 2000,
     });
     await user.clear(input);
     await user.type(input, "20");
     await waitFor(() => expect(getPrompt).toHaveBeenCalledWith("a1", 20), { timeout: 2000 });
     expect(putPromptSettings).toHaveBeenCalledTimes(1);
-    act(() => resolveFirst({ postCount: 10 }));
+    act(() => resolveFirst({ postCount: 10, version: 2 }));
     await waitFor(() => expect(putPromptSettings).toHaveBeenCalledTimes(2));
-    expect(putPromptSettings).toHaveBeenLastCalledWith("a1", 20);
+    // 1回目の保存で上がった版で送る（specs/008 FR-007）
+    expect(putPromptSettings).toHaveBeenLastCalledWith("a1", 20, 2);
+  });
+
+  it("件数の保存で先に他の人が保存していたら（409）、黙って上書きせず最新の件数に合わせて知らせる（specs/008 FR-007、PR #9 のCodexレビュー）", async () => {
+    const user = userEvent.setup();
+    putPromptSettings.mockRejectedValueOnce(
+      new ApiError("STALE_UPDATE", 409, [], { postCount: 12, version: 3 }, { name: "田中 健" }),
+    );
+    renderPage();
+    const input = await screen.findByRole("spinbutton", { name: "作る件数" });
+    await user.clear(input);
+    await user.type(input, "10");
+    await waitFor(() => expect(input).toHaveValue(12), { timeout: 2000 });
+    expect(toastInfo).toHaveBeenCalledWith("田中 健さんが先に保存しました。作る件数を最新の12件にしました");
+    expect(putPromptSettings).toHaveBeenCalledTimes(1);
   });
 
   it("件数の保存に失敗したら、案内と「もう一度保存」を出し、押すまで送り直さない（Codexレビュー）", async () => {
     const user = userEvent.setup();
     putPromptSettings.mockRejectedValueOnce(new ApiError("API_UNREACHABLE", 0));
-    putPromptSettings.mockResolvedValueOnce({ postCount: 10 });
+    putPromptSettings.mockResolvedValueOnce({ postCount: 10, version: 2 });
     renderPage();
     const input = await screen.findByRole("spinbutton", { name: "作る件数" });
     await user.clear(input);

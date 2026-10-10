@@ -255,6 +255,8 @@ export function TeamSection({ accountId, access }: { accountId: string; access: 
           title="パートナーを招待"
           description="運用を手伝ってもらう方に、このリンクをLINEやメールで送ってください。相手がGoogleでログインして参加すると、パートナーになります。"
           url={invite.data?.invite?.url ?? null}
+          loadFailed={invite.isError}
+          onRetry={() => void invite.refetch()}
           qrNote="会って招くときは、相手のスマホでこのQRコードを読み取ってもらいます。パートナーになれるのは、最初に参加した1人（1社）だけです。"
           onRotate={() => rotate.mutate()}
           rotating={rotate.isPending}

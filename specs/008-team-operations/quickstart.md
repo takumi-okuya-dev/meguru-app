@@ -13,7 +13,7 @@
 ```bash
 pnpm install
 docker compose up -d
-pnpm --filter api db:migrate   # 0009_team_operations を適用
+pnpm --filter api db:migrate   # 0009_team_operations・0010_setting_versions を適用
 pnpm dev:fake
 ```
 

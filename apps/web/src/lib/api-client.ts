@@ -244,10 +244,10 @@ export const api = {
     request(`/api/accounts/${accountId}/promotions/${id}`, null, { method: "DELETE" }),
   getPromotionSettings: (accountId: string) =>
     request(`/api/accounts/${accountId}/promotion-settings`, promotionSettingsSchema),
-  putPromotionSettings: (accountId: string, ratioPercent: number) =>
+  putPromotionSettings: (accountId: string, ratioPercent: number, expectedVersion: number) =>
     request(`/api/accounts/${accountId}/promotion-settings`, promotionSettingsSchema, {
       method: "PUT",
-      body: JSON.stringify({ ratioPercent }),
+      body: JSON.stringify({ ratioPercent, expectedVersion }),
     }),
   listReferencePosts: (accountId: string) =>
     request(`/api/accounts/${accountId}/reference-posts`, referencePostListSchema),
@@ -291,10 +291,10 @@ export const api = {
       `/api/accounts/${accountId}/prompt${count === undefined ? "" : `?count=${count}`}`,
       promptResponseSchema,
     ),
-  putPromptSettings: (accountId: string, postCount: number) =>
+  putPromptSettings: (accountId: string, postCount: number, expectedVersion: number) =>
     request(`/api/accounts/${accountId}/prompt-settings`, promptSettingsSchema, {
       method: "PUT",
-      body: JSON.stringify({ postCount }),
+      body: JSON.stringify({ postCount, expectedVersion }),
     }),
   listPostDrafts: (accountId: string) =>
     request(`/api/accounts/${accountId}/post-drafts`, postDraftListSchema),

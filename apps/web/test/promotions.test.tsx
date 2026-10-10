@@ -9,9 +9,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const listPromotions = vi.fn();
 const updatePromotion = vi.fn();
 const getPromotionSettings = vi.fn();
+const putPromotionSettings = vi.fn();
 vi.mock("@/lib/api-client", async (orig) => {
   const actual = await orig<typeof import("@/lib/api-client")>();
-  return { ...actual, api: { ...actual.api, listPromotions, updatePromotion, getPromotionSettings } };
+  return { ...actual, api: { ...actual.api, listPromotions, updatePromotion, getPromotionSettings, putPromotionSettings } };
 });
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
@@ -85,8 +86,42 @@ function renderPage() {
 describe("宣伝内容の画面", () => {
   beforeEach(() => {
     listPromotions.mockResolvedValue({ items: [promotion()], limit: 50, canEdit: true });
-    getPromotionSettings.mockResolvedValue({ ratioPercent: 20, canEdit: true });
+    getPromotionSettings.mockResolvedValue({ ratioPercent: 20, version: 1, canEdit: true });
     updatePromotion.mockReset();
+    putPromotionSettings.mockReset();
+  });
+
+  it("宣伝投稿の割合を先に他の人が保存していたら、名前つきのダイアログを出し、「上書き」で最新の版を送る（specs/008 FR-007、PR #9 のCodexレビュー）", async () => {
+    putPromotionSettings
+      .mockRejectedValueOnce(new ApiError("STALE_UPDATE", 409, [], { ratioPercent: 40, version: 2, canEdit: true }, { name: "田中 健" }))
+      .mockResolvedValueOnce({ ratioPercent: 30, version: 3, canEdit: true });
+    renderPage();
+    const input = await screen.findByRole("spinbutton", { name: "宣伝投稿の割合" });
+    await waitFor(() => expect(input).toHaveValue(20));
+    await waitFor(() => expect(input).not.toHaveAttribute("readonly"));
+    await userEvent.clear(input);
+    await userEvent.type(input, "30");
+    await userEvent.click(screen.getByRole("button", { name: "保存" }));
+    expect(putPromotionSettings).toHaveBeenLastCalledWith("a1", 30, 1);
+    expect(await screen.findByText("田中 健さんが先に保存しました")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "自分の内容で上書きする" }));
+    await waitFor(() => expect(putPromotionSettings).toHaveBeenLastCalledWith("a1", 30, 2));
+  });
+
+  it("宣伝投稿の割合の競合で「最新の内容を読み込み直す」を選ぶと、先に保存された値を出す", async () => {
+    putPromotionSettings.mockRejectedValueOnce(
+      new ApiError("STALE_UPDATE", 409, [], { ratioPercent: 40, version: 2, canEdit: true }, { name: "田中 健" }),
+    );
+    renderPage();
+    const input = await screen.findByRole("spinbutton", { name: "宣伝投稿の割合" });
+    await waitFor(() => expect(input).toHaveValue(20));
+    await waitFor(() => expect(input).not.toHaveAttribute("readonly"));
+    await userEvent.clear(input);
+    await userEvent.type(input, "30");
+    await userEvent.click(screen.getByRole("button", { name: "保存" }));
+    await userEvent.click(await screen.findByRole("button", { name: "最新の内容を読み込み直す" }));
+    await waitFor(() => expect(input).toHaveValue(40));
+    expect(putPromotionSettings).toHaveBeenCalledTimes(1);
   });
 
   it("メニューからの状態の変更が他で先に更新されていたら、選択のダイアログを出し、「上書き」で最新の version に選んだ状態を当てて保存し直す（Codexレビュー P2）", async () => {

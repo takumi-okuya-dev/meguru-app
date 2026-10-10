@@ -104,6 +104,15 @@ export const accounts = pgTable("accounts", {
   coreRulesUpdatedByUserId: uuid("core_rules_updated_by_user_id").references((): AnyPgColumn => users.id, {
     onDelete: "set null",
   }),
+  // 宣伝投稿の割合・プロンプトで作る件数の版と、最後に保存した人（同時の保存を知らせる。specs/008 FR-007、PR #9 のCodexレビュー）
+  promotionRatioVersion: integer("promotion_ratio_version").notNull().default(1),
+  promotionRatioUpdatedByUserId: uuid("promotion_ratio_updated_by_user_id").references((): AnyPgColumn => users.id, {
+    onDelete: "set null",
+  }),
+  promptPostCountVersion: integer("prompt_post_count_version").notNull().default(1),
+  promptPostCountUpdatedByUserId: uuid("prompt_post_count_updated_by_user_id").references((): AnyPgColumn => users.id, {
+    onDelete: "set null",
+  }),
   // 反応数を読む権限がないと分かった日時（006 research.md R11）。再接続で消す
   insightsDeniedAt: timestamp("insights_denied_at", { withTimezone: true, precision: 6 }),
   ...timestamps,

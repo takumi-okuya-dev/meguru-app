@@ -261,6 +261,14 @@ export function ActivityPage() {
         </div>
         {list.isPending ? (
           <div className="h-40 animate-pulse rounded-2xl bg-muted" aria-busy="true" />
+        ) : list.isError && items.length === 0 ? (
+          // 読み込みに失敗したときは「まだ記録はありません」と出さず、読み直せるようにする（PR #9 のCodexレビュー）
+          <div role="alert" className="flex flex-wrap items-center justify-center gap-2 rounded-2xl border px-4 py-6 text-sm">
+            <span>操作の記録を読み込めませんでした。</span>
+            <Button variant="outline" size="sm" className="rounded-full" onClick={() => void list.refetch()}>
+              再読み込み
+            </Button>
+          </div>
         ) : items.length === 0 ? (
           <p className="rounded-2xl border px-4 py-6 text-center text-sm text-muted-foreground">まだ記録はありません。</p>
         ) : (

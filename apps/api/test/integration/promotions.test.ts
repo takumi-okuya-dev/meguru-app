@@ -163,7 +163,7 @@ describe("宣伝内容", () => {
       ["GET", "promotions", undefined],
       ["POST", "promotions", input()],
       ["GET", "promotion-settings", undefined],
-      ["PUT", "promotion-settings", { ratioPercent: 50 }],
+      ["PUT", "promotion-settings", { ratioPercent: 50, expectedVersion: 1 }],
     ] as const) {
       const res = await call(app, method, `${base(accountId)}/${p}`, { user: "other", body });
       expect(res.status).toBe(404);
@@ -175,7 +175,7 @@ describe("宣伝内容", () => {
     const { accountId } = await createUserWithAccount("u1");
     await setAccount(accountId, { connectionStatus: "needs_reconnect" });
     await create(accountId);
-    expect((await call(app, "PUT", `${base(accountId)}/promotion-settings`, { user: "u1", body: { ratioPercent: 30 } })).status).toBe(200);
+    expect((await call(app, "PUT", `${base(accountId)}/promotion-settings`, { user: "u1", body: { ratioPercent: 30, expectedVersion: 1 } })).status).toBe(200);
   });
 
   it("grower機能の判定：無料体験の後のプラン1は書き込みが 403、読み取りは canEdit: false（FR-024、SC-008）", async () => {
@@ -186,7 +186,7 @@ describe("宣伝内容", () => {
       call(app, "POST", `${base(accountId)}/promotions`, { user: "u1", body: input() }),
       call(app, "PUT", `${base(accountId)}/promotions/${p.id}`, { user: "u1", body: { ...input(), expectedVersion: 1 } }),
       call(app, "DELETE", `${base(accountId)}/promotions/${p.id}`, { user: "u1" }),
-      call(app, "PUT", `${base(accountId)}/promotion-settings`, { user: "u1", body: { ratioPercent: 30 } }),
+      call(app, "PUT", `${base(accountId)}/promotion-settings`, { user: "u1", body: { ratioPercent: 30, expectedVersion: 1 } }),
     ];
     for (const res of await Promise.all(writes)) {
       expect(res.status).toBe(403);
@@ -202,12 +202,12 @@ describe("宣伝投稿の割合", () => {
   it("既定は20%。0〜100の整数で保存でき、101 と 1.5 は 400", async () => {
     const { accountId } = await createUserWithAccount("u1");
     const get = await call(app, "GET", `${base(accountId)}/promotion-settings`, { user: "u1" });
-    expect(await get.json()).toEqual({ ratioPercent: 20, canEdit: true });
-    const put = await call(app, "PUT", `${base(accountId)}/promotion-settings`, { user: "u1", body: { ratioPercent: 30 } });
+    expect(await get.json()).toEqual({ ratioPercent: 20, version: 1, canEdit: true });
+    const put = await call(app, "PUT", `${base(accountId)}/promotion-settings`, { user: "u1", body: { ratioPercent: 30, expectedVersion: 1 } });
     expect(put.status).toBe(200);
     expect(((await put.json()) as { ratioPercent: number }).ratioPercent).toBe(30);
     for (const ratioPercent of [101, 1.5, -1]) {
-      const res = await call(app, "PUT", `${base(accountId)}/promotion-settings`, { user: "u1", body: { ratioPercent } });
+      const res = await call(app, "PUT", `${base(accountId)}/promotion-settings`, { user: "u1", body: { ratioPercent, expectedVersion: 1 } });
       expect(res.status).toBe(400);
     }
   });

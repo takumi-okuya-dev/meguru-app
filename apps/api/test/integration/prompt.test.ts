@@ -98,9 +98,9 @@ describe("GET /prompt", () => {
 describe("PUT /prompt-settings", () => {
   it("保存した件数が次の GET /prompt と GET /post-drafts の promptPostCount に反映される", async () => {
     const { accountId } = await createUserWithAccount("u1");
-    const res = await call(app, "PUT", `${base(accountId)}/prompt-settings`, { user: "u1", body: { postCount: 10 } });
+    const res = await call(app, "PUT", `${base(accountId)}/prompt-settings`, { user: "u1", body: { postCount: 10, expectedVersion: 1 } });
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ postCount: 10 });
+    expect(await res.json()).toEqual({ postCount: 10, version: 2 });
     expect((await getPrompt(accountId)).count).toBe(10);
     const drafts = await call(app, "GET", `${base(accountId)}/post-drafts`, { user: "u1" });
     expect(await drafts.json()).toMatchObject({ promptPostCount: 10, canGeneratePrompt: true });
@@ -109,7 +109,7 @@ describe("PUT /prompt-settings", () => {
   it("0・51・1.5 は 400", async () => {
     const { accountId } = await createUserWithAccount("u1");
     for (const postCount of [0, 51, 1.5]) {
-      const res = await call(app, "PUT", `${base(accountId)}/prompt-settings`, { user: "u1", body: { postCount } });
+      const res = await call(app, "PUT", `${base(accountId)}/prompt-settings`, { user: "u1", body: { postCount, expectedVersion: 1 } });
       expect(res.status).toBe(400);
     }
   });
@@ -121,7 +121,7 @@ describe("プランと権限", () => {
     const get = await call(app, "GET", `${base(accountId)}/prompt`, { user: "u1" });
     expect(get.status).toBe(403);
     expect(await get.json()).toMatchObject({ error: { code: "GROWER_FEATURE_REQUIRED" } });
-    const put = await call(app, "PUT", `${base(accountId)}/prompt-settings`, { user: "u1", body: { postCount: 10 } });
+    const put = await call(app, "PUT", `${base(accountId)}/prompt-settings`, { user: "u1", body: { postCount: 10, expectedVersion: 1 } });
     expect(put.status).toBe(403);
     const drafts = await call(app, "GET", `${base(accountId)}/post-drafts`, { user: "u1" });
     expect(drafts.status).toBe(200);
@@ -138,7 +138,7 @@ describe("プランと権限", () => {
     await createUserWithAccount("u2");
     for (const [method, path, body] of [
       ["GET", "/prompt", undefined],
-      ["PUT", "/prompt-settings", { postCount: 10 }],
+      ["PUT", "/prompt-settings", { postCount: 10, expectedVersion: 1 }],
       ["GET", "/post-drafts", undefined],
     ] as const) {
       const res = await call(app, method, `${base(accountId)}${path}`, { user: "u2", body });
@@ -151,7 +151,7 @@ describe("プランと権限", () => {
     const { accountId } = await createUserWithAccount("u1");
     await setAccount(accountId, { connectionStatus: "needs_reconnect" });
     expect((await getPrompt(accountId)).count).toBe(30);
-    const put = await call(app, "PUT", `${base(accountId)}/prompt-settings`, { user: "u1", body: { postCount: 3 } });
+    const put = await call(app, "PUT", `${base(accountId)}/prompt-settings`, { user: "u1", body: { postCount: 3, expectedVersion: 1 } });
     expect(put.status).toBe(200);
   });
 });

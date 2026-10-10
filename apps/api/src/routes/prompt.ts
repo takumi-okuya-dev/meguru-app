@@ -1,14 +1,14 @@
 // /api/accounts/:accountId/prompt と /prompt-settings（specs/003-prompt-bulk-register contracts/api.md）
-import { PROMPT_COUNT_MAX, PROMPT_COUNT_MIN, promptSettingsSchema } from "@threads-grower/shared";
-import { eq } from "drizzle-orm";
+import { PROMPT_COUNT_MAX, PROMPT_COUNT_MIN, putPromptSettingsRequestSchema } from "@threads-grower/shared";
+import { and, eq, sql } from "drizzle-orm";
 import { Hono, type MiddlewareHandler } from "hono";
 import type { AppEnv } from "../app";
 import { createDb } from "../db/client";
 import { accounts } from "../db/schema";
-import { AppError } from "../lib/errors";
+import { AppError, notFound } from "../lib/errors";
 import { parseBody } from "../lib/validate";
 import { authorizeAccount } from "../services/access";
-import { recordActivity, withActivityTx } from "../services/activity-log";
+import { recordActivity, updatedByOf, withActivityTx } from "../services/activity-log";
 import { requireGrowerAccess } from "../services/grower-access";
 import { getPrompt } from "../services/prompt-service";
 
@@ -49,13 +49,35 @@ export function promptRoutes(authed: MiddlewareHandler<AppEnv>) {
       const access = await authorizeAccount(db, user, c.req.param("accountId"), "content");
       const account = access.account;
       requireGrowerAccess(account, access.owner);
-      const { postCount } = await parseBody(promptSettingsSchema, c.req.json());
-      // 競合は検知しない（後勝ち。research.md R11）
-      // 保存と操作の記録を同じトランザクションにする（PR #9 のCodexレビュー）
-      await withActivityTx(c.env.DATABASE_URL, db, access, async (q) => {
-        await q.update(accounts).set({ promptPostCount: postCount, updatedAt: new Date() }).where(eq(accounts.id, account.id));
-        await recordActivity(q, access, { kind: "content", action: "prompt_count_saved", summary: `${postCount}件` });
+      const { postCount, expectedVersion } = await parseBody(putPromptSettingsRequestSchema, c.req.json());
+      // 読み込んだときの版が一致するときだけ保存する（黙って上書きしない。specs/008 FR-007、PR #9 のCodexレビュー）。
+      // 保存と操作の記録は同じトランザクションにする
+      const saved = await withActivityTx(c.env.DATABASE_URL, db, access, async (q) => {
+        const [row] = await q
+          .update(accounts)
+          .set({
+            promptPostCount: postCount,
+            promptPostCountVersion: sql`${accounts.promptPostCountVersion} + 1`,
+            promptPostCountUpdatedByUserId: access.actor.id,
+            updatedAt: new Date(),
+          })
+          .where(and(eq(accounts.id, account.id), eq(accounts.promptPostCountVersion, expectedVersion)))
+          .returning();
+        if (row) await recordActivity(q, access, { kind: "content", action: "prompt_count_saved", summary: `${postCount}件` });
+        return row;
       });
-      return c.json({ postCount });
+      if (!saved) {
+        const [current] = await db.select().from(accounts).where(eq(accounts.id, account.id)).limit(1);
+        if (!current) throw notFound();
+        throw new AppError(
+          "STALE_UPDATE",
+          409,
+          "updated elsewhere",
+          { postCount: current.promptPostCount, version: current.promptPostCountVersion },
+          undefined,
+          { updatedBy: await updatedByOf(db, current.promptPostCountUpdatedByUserId) },
+        );
+      }
+      return c.json({ postCount: saved.promptPostCount, version: saved.promptPostCountVersion });
     });
 }

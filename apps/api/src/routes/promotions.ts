@@ -4,7 +4,7 @@ import {
   isExpired,
   isTargetable,
   promotionInputSchema,
-  promotionSettingsInputSchema,
+  putPromotionSettingsRequestSchema,
   sortPromotions,
   updatePromotionRequestSchema,
   type PromotionInput,
@@ -14,6 +14,7 @@ import { Hono, type MiddlewareHandler } from "hono";
 import type { AppEnv } from "../app";
 import { createDb, type Db, type TxDb } from "../db/client";
 import { accounts, promotions } from "../db/schema";
+import { AppError, notFound } from "../lib/errors";
 import { parseBody } from "../lib/validate";
 import { authorizeAccount } from "../services/access";
 import { recordActivity, updatedByOf, withActivityTx } from "../services/activity-log";
@@ -92,7 +93,11 @@ export function promotionRoutes(authed: MiddlewareHandler<AppEnv>) {
       const user = c.get("user");
       const access = await authorizeAccount(db, user, c.req.param("accountId"), "view");
       const account = access.account;
-      return c.json({ ratioPercent: account.promotionRatioPercent, canEdit: canEditProfile(account, access.owner) });
+      return c.json({
+        ratioPercent: account.promotionRatioPercent,
+        version: account.promotionRatioVersion,
+        canEdit: canEditProfile(account, access.owner),
+      });
     })
     .put("/accounts/:accountId/promotion-settings", authed, async (c) => {
       const db = createDb(c.env.DATABASE_URL);
@@ -100,14 +105,36 @@ export function promotionRoutes(authed: MiddlewareHandler<AppEnv>) {
       const access = await authorizeAccount(db, user, c.req.param("accountId"), "content");
       const account = access.account;
       requireGrowerAccess(account, access.owner);
-      const { ratioPercent } = await parseBody(promotionSettingsInputSchema, c.req.json());
-      // 競合は検知しない（後勝ち。research.md R7）
-      // 保存と操作の記録を同じトランザクションにする（PR #9 のCodexレビュー）
-      await withActivityTx(c.env.DATABASE_URL, db, access, async (q) => {
-        await q.update(accounts).set({ promotionRatioPercent: ratioPercent, updatedAt: new Date() }).where(eq(accounts.id, account.id));
-        await recordActivity(q, access, { kind: "content", action: "promotion_ratio_saved", summary: `${ratioPercent}%` });
+      const { ratioPercent, expectedVersion } = await parseBody(putPromotionSettingsRequestSchema, c.req.json());
+      // 読み込んだときの版が一致するときだけ保存する（黙って上書きしない。specs/008 FR-007、PR #9 のCodexレビュー）。
+      // 保存と操作の記録は同じトランザクションにする
+      const saved = await withActivityTx(c.env.DATABASE_URL, db, access, async (q) => {
+        const [row] = await q
+          .update(accounts)
+          .set({
+            promotionRatioPercent: ratioPercent,
+            promotionRatioVersion: sql`${accounts.promotionRatioVersion} + 1`,
+            promotionRatioUpdatedByUserId: access.actor.id,
+            updatedAt: new Date(),
+          })
+          .where(and(eq(accounts.id, account.id), eq(accounts.promotionRatioVersion, expectedVersion)))
+          .returning();
+        if (row) await recordActivity(q, access, { kind: "content", action: "promotion_ratio_saved", summary: `${ratioPercent}%` });
+        return row;
       });
-      return c.json({ ratioPercent, canEdit: true });
+      if (!saved) {
+        const [current] = await db.select().from(accounts).where(eq(accounts.id, account.id)).limit(1);
+        if (!current) throw notFound();
+        throw new AppError(
+          "STALE_UPDATE",
+          409,
+          "updated elsewhere",
+          { ratioPercent: current.promotionRatioPercent, version: current.promotionRatioVersion, canEdit: true },
+          undefined,
+          { updatedBy: await updatedByOf(db, current.promotionRatioUpdatedByUserId) },
+        );
+      }
+      return c.json({ ratioPercent: saved.promotionRatioPercent, version: saved.promotionRatioVersion, canEdit: true });
     })
     .get("/accounts/:accountId/promotions", authed, async (c) => {
       const db = createDb(c.env.DATABASE_URL);
