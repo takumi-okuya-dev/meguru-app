@@ -8,11 +8,16 @@ import { AppError } from "./lib/errors";
 import { logger } from "./lib/logger";
 import {
   authMiddleware,
+  optionalAuthMiddleware,
   clerkVerifier,
   type AuthVerifier,
   type AuthVariables,
 } from "./middleware/auth";
 import { accountRoutes } from "./routes/accounts";
+import { accountTeamRoutes } from "./routes/account-team";
+import { inviteRoutes } from "./routes/invites";
+import { teamRoutes } from "./routes/team";
+import { activityRoutes } from "./routes/activity";
 import { dataDeletionRoutes } from "./routes/data-deletion";
 import { threadsWebhookRoutes } from "./routes/threads-webhooks";
 import { meRoutes } from "./routes/me";
@@ -53,7 +58,8 @@ export function createApp(deps: AppDeps = defaultDeps) {
     const corsMiddleware = cors({
       origin: c.env.WEB_ORIGIN,
       allowHeaders: ["Authorization", "Content-Type"],
-      allowMethods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+      // PATCH：チーム名・任せる範囲・改善メモ（specs/006・008。PR #9 のCodexレビュー）
+      allowMethods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
       credentials: false,
     });
     return corsMiddleware(c, next);
@@ -103,14 +109,20 @@ export function createApp(deps: AppDeps = defaultDeps) {
 
   app.onError((err, c) => {
     if (err instanceof AppError) {
+      // 保存の衝突の「先に保存した人」は本文の一番上に置く（specs/008 FR-007、contracts/api.md）
+      const { updatedBy, ...extra } = err.extra ?? {};
       const error = {
         code: err.code,
         message: err.message,
         ...(err.details ? { details: err.details } : {}),
-        ...(err.extra ?? {}),
+        ...extra,
       };
       return c.json(
-        err.latest === undefined ? { error } : { error, latest: err.latest },
+        {
+          error,
+          ...(err.latest === undefined ? {} : { latest: err.latest }),
+          ...(updatedBy === undefined ? {} : { updatedBy }),
+        },
         err.status,
       );
     }
@@ -119,6 +131,7 @@ export function createApp(deps: AppDeps = defaultDeps) {
   });
 
   const authed = authMiddleware(deps.verifyAuth);
+  const maybeAuthed = optionalAuthMiddleware(deps.verifyAuth) as unknown as typeof authed;
 
   const routes = app
     .basePath("/api")
@@ -129,6 +142,10 @@ export function createApp(deps: AppDeps = defaultDeps) {
     })
     .route("/", meRoutes(authed))
     .route("/", accountRoutes(authed))
+    .route("/", accountTeamRoutes(authed))
+    .route("/", inviteRoutes(authed, maybeAuthed))
+    .route("/", teamRoutes(authed))
+    .route("/", activityRoutes(authed))
     .route("/", strategyRoutes(authed))
     .route("/", promotionRoutes(authed))
     .route("/", researchRoutes(authed))

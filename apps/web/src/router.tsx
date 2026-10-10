@@ -5,9 +5,14 @@ import { AccountLayout } from "@/pages/account-layout";
 import { AccountHome } from "@/pages/account-home";
 import { AccountNew } from "@/pages/account-new";
 import { AccountSettings } from "@/pages/account-settings";
+import { ActivityPage } from "@/pages/activity";
 import { DataDeletion } from "@/pages/data-deletion";
+import { InvitePage } from "@/pages/invite";
 import { Landing } from "@/pages/landing";
 import { NotFound } from "@/pages/not-found";
+import { PartnerAccountsPage } from "@/pages/partner/partner-accounts";
+import { PartnerEditorsPage } from "@/pages/partner/partner-editors";
+import { PartnerLayout } from "@/pages/partner/partner-layout";
 import { PerformancePage } from "@/pages/performance";
 import { SignInPage } from "@/pages/sign-in";
 import { AccountSettingsPage } from "@/pages/settings/account";
@@ -22,6 +27,8 @@ import { StrategyPage } from "@/pages/strategy";
 export const routes = [
   { path: "/sign-in/*", element: <SignInPage /> },
   { path: "/data-deletion/:code", element: <DataDeletion /> },
+  // 招待の確認はログインなしで開ける（specs/008 research.md R7）
+  { path: "/invite/:token", element: <InvitePage /> },
   {
     element: <RequireAuth />,
     children: [
@@ -36,6 +43,15 @@ export const routes = [
           { path: "account", element: <AccountSettingsPage /> },
         ],
       },
+      // パートナーの画面（specs/008 FR-060）。チームのパートナーでなければ / へ移す
+      {
+        path: "/partner",
+        element: <PartnerLayout />,
+        children: [
+          { path: "accounts", element: <PartnerAccountsPage /> },
+          { path: "editors", element: <PartnerEditorsPage /> },
+        ],
+      },
       {
         path: "/accounts/:accountId",
         element: <AccountLayout />,
@@ -47,6 +63,8 @@ export const routes = [
           { path: "research", element: <ResearchPage /> },
           { path: "stock", element: <StockPage /> },
           { path: "performance", element: <PerformancePage /> },
+          // 操作の記録（specs/008 FR-052）。オーナー・パートナーだけ
+          { path: "activity", element: <ActivityPage /> },
         ],
       },
     ],

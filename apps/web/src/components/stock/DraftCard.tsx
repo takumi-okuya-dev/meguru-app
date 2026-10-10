@@ -59,7 +59,8 @@ function rejectReasonText(draft: PostDraft): string {
  * 下書き1件のカード。
  * @param props - draft：下書き、selected：選ばれているか、check：承認できるかの判定、
  *   labels：ラベルの行（類似度・NGワード・規約に注意）、body：本文の表示（強調つき。省略すると文字のまま）、
- *   busy：状態を変えている途中、actions：操作
+ *   busy：状態を変えている途中、actions：操作、canReview：承認の操作ができる（できない人には「オーナーの確認待ち」。specs/008 FR-041）、
+ *   people：作った人・直した人の名前（チームがあるAccountだけ渡す。specs/008 FR-053）
  * @returns カード
  */
 export function DraftCard({
@@ -71,6 +72,8 @@ export function DraftCard({
   busy = false,
   actions,
   scheduledAt,
+  canReview = true,
+  people,
 }: {
   draft: PostDraft;
   selected: boolean;
@@ -80,6 +83,8 @@ export function DraftCard({
   busy?: boolean;
   actions: DraftCardActions;
   scheduledAt?: string;
+  canReview?: boolean;
+  people?: Record<string, string>;
 }) {
   const [expanded, setExpanded] = useState(false);
   const long = draft.body.split("\n").length > LONG_LINES || draft.body.length > LONG_CHARS;
@@ -97,7 +102,7 @@ export function DraftCard({
       className="flex gap-2 rounded-2xl border bg-card px-3 py-3 transition-shadow md:px-4"
     >
       {/* タッチ操作でも押しやすいよう、押せる範囲を44px角にする */}
-      {draft.status !== "publish_failed" && (
+      {canReview && draft.status !== "publish_failed" && (
         <label className="-my-1.5 -ml-1.5 flex size-11 shrink-0 cursor-pointer items-center justify-center md:size-9">
           <input
             type="checkbox"
@@ -152,19 +157,25 @@ export function DraftCard({
               {draft.publishFailedAt && formatRelativeJst(draft.publishFailedAt)}に失敗：
               {PUBLISH_ERROR_LABELS[draft.publishError ?? "unknown"]}
             </p>
-            <Button
-              variant="outline"
-              className="h-auto min-h-11 w-full whitespace-normal md:min-h-8 md:w-auto"
-              disabled={busy}
-              onClick={actions.onRequeue}
-            >
-              もう一度投稿の順に入れる
-            </Button>
+            {canReview && (
+              <Button
+                variant="outline"
+                className="h-auto min-h-11 w-full whitespace-normal md:min-h-8 md:w-auto"
+                disabled={busy}
+                onClick={actions.onRequeue}
+              >
+                もう一度投稿の順に入れる
+              </Button>
+            )}
           </div>
         )}
         {labels}
+        {people && <DraftAuthors draft={draft} people={people} />}
         <ThreadsLengthBar text={draft.body} />
-        {draft.status === "needs_review" && (
+        {draft.status === "needs_review" && !canReview && (
+          <p className="text-[13px] text-muted-foreground md:text-right">オーナーの確認待ち</p>
+        )}
+        {draft.status === "needs_review" && canReview && (
           <div className="space-y-1">
             <div className="flex gap-2 md:justify-end">
               <Button
@@ -202,6 +213,7 @@ export function DraftCard({
           </div>
         )}
       </div>
+      {(canReview || draft.status === "needs_review" || draft.status === "approved") && (
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button
@@ -215,22 +227,41 @@ export function DraftCard({
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
-          {draft.status === "approved" && actions.onPrioritize && (
+          {canReview && draft.status === "approved" && actions.onPrioritize && (
             <DropdownMenuItem onSelect={actions.onPrioritize}>次に投稿する</DropdownMenuItem>
           )}
           {(draft.status === "needs_review" || draft.status === "approved") && (
             <DropdownMenuItem onSelect={actions.onEdit}>編集</DropdownMenuItem>
           )}
-          {draft.status !== "needs_review" && (
+          {canReview && draft.status !== "needs_review" && (
             <DropdownMenuItem onSelect={actions.onReopen}>要確認に戻す</DropdownMenuItem>
           )}
-          {(draft.status === "needs_review" || draft.status === "rejected") && (
+          {(draft.status === "needs_review" || (canReview && draft.status === "rejected")) && (
             <DropdownMenuItem className="text-destructive" onSelect={actions.onDelete}>
               削除
             </DropdownMenuItem>
           )}
         </DropdownMenuContent>
       </DropdownMenu>
+      )}
     </li>
+  );
+}
+
+/**
+ * 作った人・直した人の名前と時刻（specs/008 FR-053）。名前が分からなければ出さない。
+ * @param props - draft：下書き、people：users.id から名前へ
+ * @returns 表示
+ */
+function DraftAuthors({ draft, people }: { draft: PostDraft; people: Record<string, string> }) {
+  const created = draft.createdBy ? people[draft.createdBy] : undefined;
+  const edited = draft.editedBy ? people[draft.editedBy] : undefined;
+  if (!created && !edited) return null;
+  return (
+    <p className="text-[13px] text-muted-foreground">
+      {created && `作成 ${created} · ${formatDateTime(draft.createdAt)}`}
+      {created && edited && "　"}
+      {edited && `編集 ${edited}${draft.editedAt ? ` ${formatDateTime(draft.editedAt)}` : ""}`}
+    </p>
   );
 }

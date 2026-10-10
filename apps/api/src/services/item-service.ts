@@ -59,6 +59,7 @@ export async function insertWithLimit<T>(
  * @param update - `version = expectedVersion` を条件に更新し、更新した行を返す処理（0行なら空配列）
  * @param findCurrent - 今の行を取得する処理（なければ undefined）
  * @param toLatest - 409 のときに返す形にする関数
+ * @param updatedByOf - 409 のときに、先に保存した人を求める関数（specs/008 FR-007）
  * @returns 更新した行
  * @throws AppError STALE_UPDATE（他で先に更新された。latest 付き）、ITEM_NOT_FOUND（削除された）
  */
@@ -66,10 +67,13 @@ export async function updateWithVersion<T>(
   update: () => Promise<T[]>,
   findCurrent: () => Promise<T | undefined>,
   toLatest: (row: T) => unknown,
+  updatedByOf?: (row: T) => Promise<{ name: string } | null>,
 ): Promise<T> {
   const [updated] = await update();
   if (updated) return updated;
   const current = await findCurrent();
   if (!current) throw itemNotFound();
-  throw new AppError("STALE_UPDATE", 409, "updated elsewhere", toLatest(current));
+  // 先に保存した人の名前を添える（specs/008 FR-007、research.md R8）
+  const updatedBy = updatedByOf ? await updatedByOf(current) : undefined;
+  throw new AppError("STALE_UPDATE", 409, "updated elsewhere", toLatest(current), undefined, updatedBy === undefined ? undefined : { updatedBy });
 }

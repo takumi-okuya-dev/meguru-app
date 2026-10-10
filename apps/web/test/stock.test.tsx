@@ -12,6 +12,7 @@ import type {
 import { createMemoryRouter, Link, Outlet, RouterProvider } from "react-router";
 import { useState } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { EDITOR_ACCESS, OWNER_ACCESS } from "./helpers/access";
 
 const listPostDrafts = vi.fn();
 const getPrompt = vi.fn();
@@ -25,12 +26,14 @@ const listPublished = vi.fn();
 const getAutoPost = vi.fn();
 const dismissBlockedNotice = vi.fn();
 const prioritizeDraft = vi.fn();
+const accountAccess = vi.fn(async () => OWNER_ACCESS);
 vi.mock("@/lib/api-client", async (orig) => {
   const actual = await orig<typeof import("@/lib/api-client")>();
   return {
     ...actual,
     api: {
       ...actual.api,
+      accountAccess,
       listPostDrafts,
       getPrompt,
       putPromptSettings,
@@ -49,8 +52,9 @@ vi.mock("@/lib/api-client", async (orig) => {
 const toastSuccess = vi.fn();
 const toastError = vi.fn();
 const toastWarning = vi.fn();
+const toastInfo = vi.fn();
 vi.mock("sonner", () => ({
-  toast: { success: toastSuccess, error: toastError, warning: toastWarning, dismiss: vi.fn() },
+  toast: { success: toastSuccess, error: toastError, warning: toastWarning, info: toastInfo, dismiss: vi.fn() },
 }));
 
 const { ApiError } = await import("@/lib/api-client");
@@ -65,6 +69,8 @@ const account: AccountSummary = {
   plan: "auto-grower",
   connectionStatus: "connected",
   lastUsedAt: null,
+  role: "owner" as const,
+  ownerName: null,
 };
 
 const PROMPT = "以下の情報をもとに、Threadsに投稿する文章を30件作ってください。";
@@ -113,6 +119,9 @@ function draft(overrides: Partial<PostDraft> = {}): PostDraft {
     blockedAt: null,
     blockedReason: null,
     blockedWords: [],
+    createdBy: null,
+    editedBy: null,
+    editedAt: null,
     createdAt: "2026-10-03T00:00:00.000Z",
     updatedAt: "2026-10-03T00:00:00.000Z",
     ...overrides,
@@ -165,6 +174,8 @@ function listResponse(
     ngWords,
     canGeneratePrompt: true,
     promptPostCount: 30,
+    promptPostCountVersion: 1,
+    people: {},
     ...rest,
   };
 }
@@ -280,13 +291,13 @@ describe("プロンプトのカード（US1）", () => {
 
   it("作る件数を変えると、0.5秒後に保存してその件数のプロンプトを取り直す（FR-004）", async () => {
     const user = userEvent.setup();
-    putPromptSettings.mockResolvedValue({ postCount: 10 });
+    putPromptSettings.mockResolvedValue({ postCount: 10, version: 2 });
     renderPage();
     const input = await screen.findByRole("spinbutton", { name: "作る件数" });
     expect(input).toHaveValue(30);
     await user.clear(input);
     await user.type(input, "10");
-    await waitFor(() => expect(putPromptSettings).toHaveBeenCalledWith("a1", 10), {
+    await waitFor(() => expect(putPromptSettings).toHaveBeenCalledWith("a1", 10, 1), {
       timeout: 2000,
     });
     expect(putPromptSettings).toHaveBeenCalledTimes(1);
@@ -295,29 +306,81 @@ describe("プロンプトのカード（US1）", () => {
 
   it("保存中に件数を変えても並行して保存せず、終わってから最新の件数を保存する（Codexレビュー）", async () => {
     const user = userEvent.setup();
-    let resolveFirst: (v: { postCount: number }) => void = () => {};
+    let resolveFirst: (v: { postCount: number; version: number }) => void = () => {};
     putPromptSettings.mockImplementationOnce(() => new Promise((r) => (resolveFirst = r)));
-    putPromptSettings.mockImplementation(async (_id: string, n: number) => ({ postCount: n }));
+    putPromptSettings.mockImplementation(async (_id: string, n: number, v: number) => ({ postCount: n, version: v + 1 }));
     renderPage();
     const input = await screen.findByRole("spinbutton", { name: "作る件数" });
     await user.clear(input);
     await user.type(input, "10");
-    await waitFor(() => expect(putPromptSettings).toHaveBeenCalledWith("a1", 10), {
+    await waitFor(() => expect(putPromptSettings).toHaveBeenCalledWith("a1", 10, 1), {
       timeout: 2000,
     });
     await user.clear(input);
     await user.type(input, "20");
     await waitFor(() => expect(getPrompt).toHaveBeenCalledWith("a1", 20), { timeout: 2000 });
     expect(putPromptSettings).toHaveBeenCalledTimes(1);
-    act(() => resolveFirst({ postCount: 10 }));
+    act(() => resolveFirst({ postCount: 10, version: 2 }));
     await waitFor(() => expect(putPromptSettings).toHaveBeenCalledTimes(2));
-    expect(putPromptSettings).toHaveBeenLastCalledWith("a1", 20);
+    // 1回目の保存で上がった版で送る（specs/008 FR-007）
+    expect(putPromptSettings).toHaveBeenLastCalledWith("a1", 20, 2);
+  });
+
+  it("件数の保存で先に他の人が保存していたら（409）、黙って上書きせず最新の件数に合わせて知らせる（specs/008 FR-007、PR #9 のCodexレビュー）", async () => {
+    const user = userEvent.setup();
+    putPromptSettings.mockRejectedValueOnce(
+      new ApiError("STALE_UPDATE", 409, [], { postCount: 12, version: 3 }, { name: "田中 健" }),
+    );
+    renderPage();
+    const input = await screen.findByRole("spinbutton", { name: "作る件数" });
+    await user.clear(input);
+    await user.type(input, "10");
+    await waitFor(() => expect(input).toHaveValue(12), { timeout: 2000 });
+    expect(toastInfo).toHaveBeenCalledWith("田中 健さんが先に保存しました。作る件数を最新の12件にしました");
+    expect(putPromptSettings).toHaveBeenCalledTimes(1);
+  });
+
+  it("保存中に次の件数を入力していたら、競合（409）でもその入力を捨てず、最新の版で保存し直す（PR #9 のCodexレビュー4回目）", async () => {
+    const user = userEvent.setup();
+    let rejectFirst: (e: unknown) => void = () => {};
+    putPromptSettings.mockImplementationOnce(() => new Promise((_, reject) => (rejectFirst = reject)));
+    putPromptSettings.mockImplementation(async (_id: string, n: number, v: number) => ({ postCount: n, version: v + 1 }));
+    renderPage();
+    const input = await screen.findByRole("spinbutton", { name: "作る件数" });
+    await user.clear(input);
+    await user.type(input, "10");
+    await waitFor(() => expect(putPromptSettings).toHaveBeenCalledWith("a1", 10, 1), { timeout: 2000 });
+    await user.clear(input);
+    await user.type(input, "20");
+    act(() => rejectFirst(new ApiError("STALE_UPDATE", 409, [], { postCount: 12, version: 3 }, { name: "田中 健" })));
+    await waitFor(() => expect(putPromptSettings).toHaveBeenLastCalledWith("a1", 20, 3), { timeout: 2000 });
+    expect(input).toHaveValue(20);
+    expect(toastInfo).toHaveBeenCalledWith("田中 健さんが先に保存しました（12件）。入力した件数で保存し直します");
+  });
+
+  it("保存中に20へ変えて10へ戻しても、続けて入力したものとして扱い、競合の後に最新の版で保存し直す（PR #9 のCodexレビュー5回目）", async () => {
+    const user = userEvent.setup();
+    let rejectFirst: (e: unknown) => void = () => {};
+    putPromptSettings.mockImplementationOnce(() => new Promise((_, reject) => (rejectFirst = reject)));
+    putPromptSettings.mockImplementation(async (_id: string, n: number, v: number) => ({ postCount: n, version: v + 1 }));
+    renderPage();
+    const input = await screen.findByRole("spinbutton", { name: "作る件数" });
+    await user.clear(input);
+    await user.type(input, "10");
+    await waitFor(() => expect(putPromptSettings).toHaveBeenCalledWith("a1", 10, 1), { timeout: 2000 });
+    await user.clear(input);
+    await user.type(input, "20");
+    await user.clear(input);
+    await user.type(input, "10");
+    act(() => rejectFirst(new ApiError("STALE_UPDATE", 409, [], { postCount: 12, version: 3 }, { name: "田中 健" })));
+    await waitFor(() => expect(putPromptSettings).toHaveBeenLastCalledWith("a1", 10, 3), { timeout: 2000 });
+    expect(input).toHaveValue(10);
   });
 
   it("件数の保存に失敗したら、案内と「もう一度保存」を出し、押すまで送り直さない（Codexレビュー）", async () => {
     const user = userEvent.setup();
     putPromptSettings.mockRejectedValueOnce(new ApiError("API_UNREACHABLE", 0));
-    putPromptSettings.mockResolvedValueOnce({ postCount: 10 });
+    putPromptSettings.mockResolvedValueOnce({ postCount: 10, version: 2 });
     renderPage();
     const input = await screen.findByRole("spinbutton", { name: "作る件数" });
     await user.clear(input);
@@ -1919,5 +1982,68 @@ describe("005：画面を開いた後に投稿の処理が始まる", () => {
     await userEvent.click(await screen.findByRole("button", { name: "「下書きの本文」の操作" }));
     await userEvent.click(screen.getByRole("menuitem", { name: "要確認に戻す" }));
     await waitFor(() => expect(toastError).toHaveBeenCalledWith("投稿の処理中です。少し待ってからもう一度お試しください。"));
+  });
+});
+
+// ---- チーム運用：承認の操作ができない人の出し分け（specs/008 FR-041・FR-002a、contracts/ui-routes.md「投稿ストック」）----
+describe("投稿ストック（承認の権限がない人）", () => {
+  it("要確認に「オーナーの確認待ち」と出し、承認・却下・選択・まとめての操作を出さない。案内を出す", async () => {
+    accountAccess.mockResolvedValue(EDITOR_ACCESS);
+    listPostDrafts.mockResolvedValue(listResponse({ items: [draft({ id: "d1", body: "編集者が作った案" })] }));
+    renderPage();
+    expect(await screen.findByText("オーナーの確認待ち")).toBeInTheDocument();
+    expect(
+      screen.getByText("承認と却下は、オーナー（鈴木 花子）さんが行います。あなたは投稿の案を登録したり、直したりできます。"),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /を承認$/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /を却下$/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("checkbox", { name: /を選択$/ })).not.toBeInTheDocument();
+    expect(screen.queryByText("すべて選択")).not.toBeInTheDocument();
+    // 「⋯」には編集と削除がある
+    await userEvent.setup().click(screen.getByRole("button", { name: "「編集者が作った案」の操作" }));
+    expect(await screen.findByRole("menuitem", { name: "編集" })).toBeInTheDocument();
+    expect(screen.getByRole("menuitem", { name: "削除" })).toBeInTheDocument();
+    accountAccess.mockResolvedValue(OWNER_ACCESS);
+  });
+
+  it("承認済みには「次に投稿する」「要確認に戻す」を出さず、却下の案には操作を出さない", async () => {
+    accountAccess.mockResolvedValue(EDITOR_ACCESS);
+    listPostDrafts.mockResolvedValue(
+      listResponse({
+        approved: [draft({ id: "a1", status: "approved", body: "承認済み1" }), draft({ id: "a2", status: "approved", body: "承認済み2" })],
+        rejected: [draft({ id: "r1", status: "rejected", body: "却下の案" })],
+      }),
+    );
+    const user = userEvent.setup();
+    renderPage("/accounts/a1/stock?tab=approved");
+    await user.click(await screen.findByRole("button", { name: "「承認済み2」の操作" }));
+    expect(await screen.findByRole("menuitem", { name: "編集" })).toBeInTheDocument();
+    expect(screen.queryByRole("menuitem", { name: "次に投稿する" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("menuitem", { name: "要確認に戻す" })).not.toBeInTheDocument();
+    accountAccess.mockResolvedValue(OWNER_ACCESS);
+  });
+});
+
+describe("投稿ストック（作った人・直した人。specs/008 FR-053）", () => {
+  it("チームがあるAccountでは名前と時刻を出し、個人運用では出さない", async () => {
+    const withAuthors = listResponse({
+      items: [draft({ id: "d1", body: "名前つきの案", createdBy: "u1", editedBy: "u2", editedAt: "2026-10-09T06:10:00.000Z" })],
+    });
+    withAuthors.people = { u1: "高橋 涼", u2: "佐藤 美咲" };
+    listPostDrafts.mockResolvedValue(withAuthors);
+    accountAccess.mockResolvedValue({ ...OWNER_ACCESS, hasTeam: true });
+    renderPage();
+    expect(await screen.findByText(/作成 高橋 涼 · /)).toBeInTheDocument();
+    expect(screen.getByText(/編集 佐藤 美咲/)).toBeInTheDocument();
+    accountAccess.mockResolvedValue(OWNER_ACCESS);
+  });
+
+  it("個人運用（hasTeam = false）では、名前を出さない", async () => {
+    const withAuthors = listResponse({ items: [draft({ id: "d1", body: "個人の案", createdBy: "u1" })] });
+    withAuthors.people = { u1: "たくみ" };
+    listPostDrafts.mockResolvedValue(withAuthors);
+    renderPage();
+    expect(await screen.findByText("個人の案")).toBeInTheDocument();
+    expect(screen.queryByText(/作成 たくみ/)).not.toBeInTheDocument();
   });
 });

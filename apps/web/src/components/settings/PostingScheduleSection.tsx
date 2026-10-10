@@ -41,14 +41,19 @@ async function savedMessage(accountId: string, schedule: PostingSchedule): Promi
 
 /**
  * 「投稿のスケジュール」の区分。自動投稿・投稿する時刻・時刻を少しずらすの3つの行と、「接続を確かめる」。
- * @param props - account：Account、onReconnect：再接続を始める
+ * 設定の権限がない人（任されていないパートナー・編集者）には、読むだけで出す（specs/008 FR-041）。
+ * @param props - account：Account、canEdit：設定の権限、canReconnect：再接続できる（オーナー）、onReconnect：再接続を始める
  * @returns 区分
  */
 export function PostingScheduleSection({
   account,
+  canEdit = true,
+  canReconnect = true,
   onReconnect,
 }: {
   account: AccountSummary;
+  canEdit?: boolean;
+  canReconnect?: boolean;
   onReconnect: () => void;
 }) {
   const accountId = account.id;
@@ -95,24 +100,31 @@ export function PostingScheduleSection({
         <h2 id="posting-schedule-heading" className="font-medium">
           投稿のスケジュール
         </h2>
-        <Button
-          variant="outline"
-          className="h-10 rounded-full md:h-9"
-          disabled={!schedule}
-          onClick={() => setEditing(true)}
-        >
-          編集
-        </Button>
+        {canEdit && (
+          <Button
+            variant="outline"
+            className="h-10 rounded-full md:h-9"
+            disabled={!schedule}
+            onClick={() => setEditing(true)}
+          >
+            編集
+          </Button>
+        )}
       </div>
+      {!canEdit && <p className="text-xs text-muted-foreground">変更できるのはオーナーです</p>}
       {account.connectionStatus === "needs_reconnect" && (
         <Alert variant="destructive">
           <AlertDescription className="flex flex-wrap items-center gap-3 text-foreground">
             <span className="flex-1">
-              Threadsとの接続が切れているため、自動投稿は止まっています
+              {canReconnect
+                ? "Threadsとの接続が切れているため、自動投稿は止まっています"
+                : "Threadsとの接続が切れているため、自動投稿は止まっています。オーナーの再接続を待っています"}
             </span>
-            <Button size="sm" className="rounded-full" onClick={onReconnect}>
-              再接続
-            </Button>
+            {canReconnect && (
+              <Button size="sm" className="rounded-full" onClick={onReconnect}>
+                再接続
+              </Button>
+            )}
           </AlertDescription>
         </Alert>
       )}
@@ -160,6 +172,7 @@ export function PostingScheduleSection({
         </SettingCard>
       )}
 
+      {canEdit && (
       <div className="flex flex-wrap items-center gap-3">
         <Button
           variant="outline"
@@ -187,7 +200,7 @@ export function PostingScheduleSection({
             {checkResult.status === "ok"
               ? threadsCheckOkMessage(checkResult.quotaUsage, checkResult.quotaTotal)
               : THREADS_CHECK_MESSAGES[checkResult.status]}
-            {(checkResult.status === "needs_reconnect" ||
+            {canReconnect && (checkResult.status === "needs_reconnect" ||
               checkResult.status === "no_publish_permission") && (
               <Button size="sm" className="rounded-full" onClick={onReconnect}>
                 再接続
@@ -196,6 +209,7 @@ export function PostingScheduleSection({
           </span>
         )}
       </div>
+      )}
 
       {editing && schedule && (
         <PostingScheduleDialog

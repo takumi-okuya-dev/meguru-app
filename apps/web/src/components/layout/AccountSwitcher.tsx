@@ -1,8 +1,8 @@
 // サイドバー左上のAccount切り替え。開くたびに所有Accountと要確認件数を読み直す。
 import { isCancelledError, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { AccountSummary } from "@threads-grower/shared";
-import { CheckIcon, ChevronDownIcon, PlusIcon, TriangleAlertIcon } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { CheckIcon, ChevronDownIcon, LayoutGridIcon, PlusIcon, TriangleAlertIcon } from "lucide-react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router";
 import { AccountAvatar } from "@/components/AccountAvatar";
 import {
@@ -169,9 +169,13 @@ export function AccountSwitcher({ onNavigate }: { onNavigate?: () => void }) {
         )}
         {menu.phase !== "loading-accounts" && menu.phase !== "accounts-error" && (
           <>
-            {menu.accounts.map((account) => (
+            {menu.accounts.map((account, i) => (
+              <Fragment key={account.id}>
+              {groupHeading(menu.accounts, i) && (
+                // 手伝っているAccountがあるときだけ、見出しで2つに分ける（specs/008 FR-043）
+                <p className="px-2 pt-2 pb-1 text-xs text-muted-foreground">{groupHeading(menu.accounts, i)}</p>
+              )}
               <DropdownMenuItem
-                key={account.id}
                 asChild
                 className="min-h-11 gap-2.5 rounded-lg py-2"
               >
@@ -183,6 +187,7 @@ export function AccountSwitcher({ onNavigate }: { onNavigate?: () => void }) {
                     </span>
                     <span className="truncate text-xs text-muted-foreground">
                       @{account.username}
+                      {account.ownerName ? ` · オーナー ${account.ownerName}` : ""}
                     </span>
                     <span className="text-xs text-muted-foreground">
                       {menu.phase === "loading-counts"
@@ -192,7 +197,9 @@ export function AccountSwitcher({ onNavigate }: { onNavigate?: () => void }) {
                           : `要確認 ${menu.counts[account.id]}件`}
                     </span>
                     {account.connectionStatus === "needs_reconnect" && (
-                      <span className="text-xs text-warning">要再接続</span>
+                      <span className="text-xs text-warning">
+                        {account.role === "owner" ? "要再接続" : "オーナーの再接続待ち"}
+                      </span>
                     )}
                     {account.id === accountId && (
                       <span className="text-xs text-muted-foreground">表示中</span>
@@ -209,6 +216,7 @@ export function AccountSwitcher({ onNavigate }: { onNavigate?: () => void }) {
                   )}
                 </Link>
               </DropdownMenuItem>
+              </Fragment>
             ))}
             {(menu.phase === "counts-error" || missingCount) && (
               <DropdownMenuItem
@@ -223,6 +231,20 @@ export function AccountSwitcher({ onNavigate }: { onNavigate?: () => void }) {
             {menu.accounts.length === 0 && (
               <p className="px-2 py-3 text-sm text-muted-foreground">アカウントがありません</p>
             )}
+            {me.data?.partnerTeam && (
+              // パートナーの画面への入口（specs/008 FR-043・FR-060）。担当未定の編集者がいれば人数を出す（FR-047(2)）
+              <DropdownMenuItem asChild className="min-h-11 rounded-lg py-2">
+                <Link to="/partner/accounts" onClick={onNavigate}>
+                  <LayoutGridIcon className="size-4" aria-hidden="true" />
+                  <span className="flex-1">手伝っているアカウントをまとめて見る</span>
+                  {me.data.partnerTeam.unassignedEditorCount > 0 && (
+                    <span className="text-xs text-muted-foreground">
+                      担当未定 {me.data.partnerTeam.unassignedEditorCount}人
+                    </span>
+                  )}
+                </Link>
+              </DropdownMenuItem>
+            )}
             <DropdownMenuSeparator />
             <DropdownMenuItem asChild className="min-h-11 rounded-lg py-2">
               <Link to="/accounts/new" onClick={onNavigate}>
@@ -234,4 +256,19 @@ export function AccountSwitcher({ onNavigate }: { onNavigate?: () => void }) {
       </DropdownMenuContent>
     </DropdownMenu>
   );
+}
+
+/**
+ * 切り替えメニューの見出し（specs/008 FR-043）。手伝っているAccountがあるときだけ、各まとまりの最初の行の上に出す。
+ * 自分のAccountがなければ「自分のアカウント」は出さない。
+ * @param accounts - メニューのAccount（自分のAccount → 手伝っているAccountの順）
+ * @param i - 行の番号
+ * @returns 見出し。出さないならNULL
+ */
+export function groupHeading(accounts: AccountSummary[], i: number): string | null {
+  if (!accounts.some((a) => a.role !== "owner")) return null;
+  const isHelper = accounts[i]!.role !== "owner";
+  const prevHelper = i > 0 ? accounts[i - 1]!.role !== "owner" : null;
+  if (i === 0) return isHelper ? "手伝っているアカウント" : "自分のアカウント";
+  return isHelper && prevHelper === false ? "手伝っているアカウント" : null;
 }

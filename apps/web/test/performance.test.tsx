@@ -26,6 +26,8 @@ const account: AccountSummary = {
   plan: "auto-grower",
   connectionStatus: "connected",
   lastUsedAt: null,
+  role: "owner" as const,
+  ownerName: null,
 };
 
 const summary = (over: Partial<PerformanceSummary> = {}): PerformanceSummary => ({
@@ -201,16 +203,16 @@ describe("US2：伸びなかった投稿の傾向メモ", () => {
       id,
       judgment: "poor",
       ratio: 0.2,
-      feedback: { memo: null, includeInPrompt: true, inNextPrompt: true },
+      feedback: { memo: null, includeInPrompt: true, inNextPrompt: true, version: 1 },
       ...over,
     });
 
   it("低調のタブの説明と、メモの入力欄・切り替え・入るかどうかの説明（FR-021・FR-022）", async () => {
     getPerformance.mockResolvedValue(
       page([
-        poor("a", { feedback: { memo: "前置きが長い", includeInPrompt: true, inNextPrompt: true } }),
-        poor("b", { feedback: { memo: null, includeInPrompt: false, inNextPrompt: false } }),
-        poor("c", { feedback: { memo: null, includeInPrompt: true, inNextPrompt: false } }),
+        poor("a", { feedback: { memo: "前置きが長い", includeInPrompt: true, inNextPrompt: true, version: 1 } }),
+        poor("b", { feedback: { memo: null, includeInPrompt: false, inNextPrompt: false, version: 1 } }),
+        poor("c", { feedback: { memo: null, includeInPrompt: true, inNextPrompt: false, version: 1 } }),
       ]),
     );
     renderPage();
@@ -226,9 +228,9 @@ describe("US2：伸びなかった投稿の傾向メモ", () => {
   });
 
   it("メモは入力欄から離れたときに保存し（変わっていなければ呼ばない）、切り替えは押したときに保存する", async () => {
-    getPerformance.mockResolvedValue(page([poor("a"), poor("b", { feedback: { memo: null, includeInPrompt: true, inNextPrompt: false } })]));
+    getPerformance.mockResolvedValue(page([poor("a"), poor("b", { feedback: { memo: null, includeInPrompt: true, inNextPrompt: false, version: 1 } })]));
     updateFeedback.mockImplementation(async (_a: string, id: string, body: { memo?: string; includeInPrompt?: boolean }) => ({
-      item: poor(id, { feedback: { memo: body.memo ?? null, includeInPrompt: body.includeInPrompt ?? true, inNextPrompt: id !== "a" } }),
+      item: poor(id, { feedback: { memo: body.memo ?? null, includeInPrompt: body.includeInPrompt ?? true, inNextPrompt: id !== "a", version: 2 } }),
       promptIds: ["b"],
     }));
     renderPage();
@@ -240,12 +242,12 @@ describe("US2：伸びなかった投稿の傾向メモ", () => {
     expect(updateFeedback).not.toHaveBeenCalled();
     await userEvent.type(memo, "結論が遅い");
     await userEvent.tab();
-    await waitFor(() => expect(updateFeedback).toHaveBeenCalledWith("a1", "a", { memo: "結論が遅い" }));
+    await waitFor(() => expect(updateFeedback).toHaveBeenCalledWith("a1", "a", { memo: "結論が遅い", expectedVersion: 1 }));
     // 応答の promptIds で、ほかのカードの表示が変わる（繰り上がり）
     expect(await within(screen.getByTestId("card-b")).findByText("次のプロンプトに入ります")).toBeInTheDocument();
 
     await userEvent.click(within(a).getByRole("checkbox", { name: "プロンプトに入れる" }));
-    await waitFor(() => expect(updateFeedback).toHaveBeenCalledWith("a1", "a", { includeInPrompt: false }));
+    await waitFor(() => expect(updateFeedback).toHaveBeenCalledWith("a1", "a", { includeInPrompt: false, expectedVersion: 2 }));
   });
 
   it("保存に失敗したら案内を出し、入力を残す", async () => {
@@ -263,9 +265,9 @@ describe("US2：伸びなかった投稿の傾向メモ", () => {
   it("すべてのタブの低調の投稿に、メモの要約・「改善メモを開く」・次のプロンプトに入る印を出す（FR-023）", async () => {
     getPerformance.mockResolvedValue(
       page([
-        poor("a", { feedback: { memo: "前置きが長い", includeInPrompt: true, inNextPrompt: true } }),
-        poor("b", { feedback: { memo: null, includeInPrompt: true, inNextPrompt: false } }),
-        poor("c", { feedback: { memo: null, includeInPrompt: false, inNextPrompt: false } }),
+        poor("a", { feedback: { memo: "前置きが長い", includeInPrompt: true, inNextPrompt: true, version: 1 } }),
+        poor("b", { feedback: { memo: null, includeInPrompt: true, inNextPrompt: false, version: 1 } }),
+        poor("c", { feedback: { memo: null, includeInPrompt: false, inNextPrompt: false, version: 1 } }),
       ]),
     );
     const router = renderPage();

@@ -30,7 +30,7 @@ import {
   type ThreadsClient,
   type ThreadsProfile,
 } from "../lib/threads-client";
-import { findOwnedAccount } from "./access";
+import { authorizeAccount } from "./access";
 import type { ConsumedState } from "./threads-oauth";
 
 // ---- 登録数の上限（FR-015〜FR-017） ----
@@ -323,6 +323,7 @@ async function writeConnection(
  * @param accountId - 開いた Account の ID
  * @param req - ページごとの乱数ID（clientId）と連番（openSeq）
  * @param receivedAt - サーバーがリクエストを受け取った時刻
+ * @param touchAccount - オーナーのときだけ accounts.last_used_at を変える（specs/008 research.md R11）
  * @returns 記録を更新したら true。古いリクエストで反映しなかったら false
  */
 export async function openAccount(
@@ -331,6 +332,8 @@ export async function openAccount(
   accountId: string,
   req: { clientId: string; openSeq: number },
   receivedAt: Date,
+  /** オーナーのときだけ accounts.last_used_at を変える（手伝う人の操作でオーナーの並びを動かさない。specs/008 research.md R11） */
+  touchAccount = true,
 ): Promise<boolean> {
   const db = createDb(env.DATABASE_URL);
   const updated = await db
@@ -359,7 +362,7 @@ export async function openAccount(
     )
     .returning({ id: users.id });
   if (updated.length === 0) return false;
-  await db.update(accounts).set({ lastUsedAt: receivedAt }).where(eq(accounts.id, accountId));
+  if (touchAccount) await db.update(accounts).set({ lastUsedAt: receivedAt }).where(eq(accounts.id, accountId));
   return true;
 }
 
@@ -448,7 +451,7 @@ export async function deleteAccount(
 ) {
   await withTransaction(env.DATABASE_URL, async (tx) => {
     await lockUserRow(tx, userId);
-    const account = await findOwnedAccount(tx, userId, accountId);
+    const { account } = await authorizeAccount(tx, { id: userId }, accountId, "owner");
     if (
       normalizeUsername(confirmUsername) !== normalizeUsername(account.username) ||
       !confirmUsername.trim()

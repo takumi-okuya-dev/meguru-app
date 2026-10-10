@@ -1,9 +1,16 @@
 // 低調の投稿の傾向メモと「プロンプトに入れる」（specs/006-performance-feedback FR-021・FR-022、contracts/ui-routes.md）。
 // 保存ボタンはなく、メモは入力欄から離れたとき（変わっていれば）、切り替えは押したときに保存する。
 import { useMutation } from "@tanstack/react-query";
-import { FEEDBACK_MEMO_MAX, PERFORMANCE_MESSAGES, type FeedbackResponse, type PerformanceItem } from "@threads-grower/shared";
+import {
+  FEEDBACK_MEMO_MAX,
+  PERFORMANCE_MESSAGES,
+  staleUpdateTitle,
+  type FeedbackResponse,
+  type PerformanceItem,
+} from "@threads-grower/shared";
 import { useEffect, useId, useState } from "react";
 import { api } from "@/lib/api-client";
+import { isStale } from "@/lib/save-error";
 
 /**
  * プロンプトに入るかどうかの説明（FR-022）。
@@ -35,7 +42,9 @@ export function FeedbackEditor({
   const [memo, setMemo] = useState(feedback.memo ?? "");
   const [saved, setSaved] = useState(false);
   const save = useMutation({
-    mutationFn: (body: { memo?: string | null; includeInPrompt?: boolean }) => api.updateFeedback(accountId, item.id, body),
+    // 読み込んだ版を送り、他の人が先に保存していたら 409 にする（specs/008 FR-007）
+    mutationFn: (body: { memo?: string | null; includeInPrompt?: boolean }) =>
+      api.updateFeedback(accountId, item.id, { ...body, expectedVersion: feedback.version }),
     onSuccess: (res) => {
       onSaved(res);
       setSaved(true);
@@ -87,7 +96,9 @@ export function FeedbackEditor({
       </div>
       {save.isError && (
         <p role="alert" className="text-sm text-destructive">
-          {PERFORMANCE_MESSAGES.feedbackSaveFailed}
+          {isStale(save.error)
+            ? `${staleUpdateTitle(save.error.updatedBy?.name)}。画面を読み込み直してから、もう一度保存してください。`
+            : PERFORMANCE_MESSAGES.feedbackSaveFailed}
         </p>
       )}
     </div>

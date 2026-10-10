@@ -23,6 +23,8 @@ import { Input } from "@/components/ui/input";
 import { api, describeError } from "@/lib/api-client";
 import { useCallbackResult } from "@/lib/callback-result";
 import { useCurrentAccount } from "@/pages/account-layout";
+import { TeamSection } from "@/components/team/TeamSection";
+import { useAccountAccess } from "@/lib/use-account-access";
 
 /**
  * Account の設定（FR-013・FR-019・FR-020・FR-022、規則9・10）。認可し直す操作と、確認つきの削除。
@@ -31,6 +33,8 @@ import { useCurrentAccount } from "@/pages/account-layout";
 export function AccountSettings() {
   const account = useCurrentAccount();
   useCallbackResult({ username: account.username });
+  // 役割で出し分ける（specs/008 FR-041）。設定の操作は settings、接続・削除・パートナーは owner の権限
+  const { access, can } = useAccountAccess(account.id);
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
@@ -67,10 +71,16 @@ export function AccountSettings() {
           </div>
         </section>
 
-        <PostingScheduleSection account={account} onReconnect={() => reconnect.mutate()} />
+        <PostingScheduleSection
+          account={account}
+          canEdit={can("settings")}
+          canReconnect={can("owner")}
+          onReconnect={() => reconnect.mutate()}
+        />
 
-        <PostingRulesSection accountId={account.id} />
+        <PostingRulesSection accountId={account.id} canEdit={can("settings")} />
 
+        {can("owner") && (
         <section className="space-y-3">
           <h2 className="font-medium">Threadsとの接続</h2>
           <p className="text-sm text-muted-foreground">
@@ -91,7 +101,11 @@ export function AccountSettings() {
             {needsReconnect ? "再接続" : "Threadsとの接続を認可し直す"}
           </Button>
         </section>
+        )}
 
+        {access && <TeamSection accountId={account.id} access={access} />}
+
+        {can("owner") && (
         <section className="space-y-3">
           <h2 className="font-medium text-destructive">Accountの削除</h2>
           <p className="text-sm text-muted-foreground">
@@ -139,6 +153,7 @@ export function AccountSettings() {
             </DialogContent>
           </Dialog>
         </section>
+        )}
       </PageBody>
     </>
   );

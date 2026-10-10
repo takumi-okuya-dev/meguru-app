@@ -12,6 +12,8 @@ const sample: AccountSummary = {
   plan: "auto-only",
   connectionStatus: "connected",
   lastUsedAt: null,
+  role: "owner" as const,
+  ownerName: null,
 };
 
 describe("useAccountOpen", () => {

@@ -3,7 +3,8 @@ import { Hono, type MiddlewareHandler } from "hono";
 import type { AppEnv } from "../app";
 import { createDb } from "../db/client";
 import { createThreadsClient } from "../lib/threads-client";
-import { findOwnedAccount } from "../services/access";
+import { authorizeAccount } from "../services/access";
+import { recordActivity } from "../services/activity-log";
 import { checkThreadsPublish } from "../services/threads-check-service";
 
 /**
@@ -14,7 +15,10 @@ import { checkThreadsPublish } from "../services/threads-check-service";
 export function threadsCheckRoutes(authed: MiddlewareHandler<AppEnv>) {
   return new Hono<AppEnv>().post("/accounts/:accountId/threads-check", authed, async (c) => {
     const db = createDb(c.env.DATABASE_URL);
-    const account = await findOwnedAccount(db, c.get("user").id, c.req.param("accountId"));
-    return c.json(await checkThreadsPublish(c.env, db, account.id, createThreadsClient(c.env)));
+    const access = await authorizeAccount(db, c.get("user"), c.req.param("accountId"), "settings");
+    const account = access.account;
+    const result = await checkThreadsPublish(c.env, db, account.id, createThreadsClient(c.env));
+    await recordActivity(db, access, { kind: "settings", action: "threads_checked", summary: result.status });
+    return c.json(result);
   });
 }

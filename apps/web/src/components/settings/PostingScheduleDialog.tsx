@@ -120,6 +120,7 @@ export function PostingScheduleDialog({
             err.status,
             err.details,
             toItem(err.latest as PostingSchedule),
+            err.updatedBy,
           );
         throw err;
       }

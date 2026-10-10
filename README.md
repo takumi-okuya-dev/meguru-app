@@ -96,6 +96,7 @@ pnpm dev:fake    # 偽のThreads（:8790）・api（:8787）・web（:5173）を
 - Meta App Reviewの前は、アプリのテスターに追加し、Threadsアプリの「設定 → アカウント → ウェブサイトのアクセス許可 → 招待」で承認したアカウントしか接続できない。
 - その間は`apps/api/.dev.vars`の`THREADS_ACCESS_MODE`を`testers`（既定）のままにする。アカウント追加画面に「招待されたアカウントのみ接続できます」の案内が出る。App Reviewに通り、Metaのアプリを公開したら`public`にすると案内が消える（[research.md R15](specs/002-strategy-profile/research.md)）。
 - 手順の全体は[quickstart.md](specs/001-login-account-setup/quickstart.md)を参照。
+- チーム運用（パートナー・編集者の招待と担当）の役割は[docs/team-roles.md](docs/team-roles.md)。流れはE2Eで自動で確かめられる（`pnpm e2e -- team`。下の「E2E」）。手で触るときは、`pnpm dev:fake`を起動した後に`pnpm team:open`で、3人がログインしたブラウザを並べて開ける（`--setup`を付けると、DBを空にしてパートナー・編集者の参加と担当まで済ませる）。3人のメールアドレスは`e2e/.env.local`に書く（`e2e/.env.example`）。自分のブラウザで手で開くときは、Cookieが分かれるように開く（Chromeの別のプロファイル・別のブラウザ。シークレットウィンドウ同士はログインを共有するので不可）。パートナー・編集者はThreadsに接続しないので、Metaのテスターの招待は要らない。偽のThreadsの認可画面では「@partner_co で許可する」などで2件目・3件目のアカウントを接続できる。手順は[008 quickstart.md](specs/008-team-operations/quickstart.md)。
 
 ## テスト
 
@@ -122,7 +123,10 @@ pnpm --filter e2e exec playwright install chromium   # 初回のみ
 pnpm e2e
 ```
 
-- Playwrightが偽のThreadsサーバー（:8790）・API（Threadsを偽サーバーに向けた設定）・Webを起動する。DBはテストごとに空にする。
+- Playwrightが偽のThreadsサーバー（:8790）・API（Threadsを偽サーバーに向けた設定）・Webを起動する（`pnpm dev:fake`で起動中なら、それを使う）。DBはテストごとに空にする。ローカルの開発用のDBと同じなので、手で作ったデータも消える。
+- チーム運用（`pnpm e2e -- team`）は、オーナー・パートナー・編集者の3人を別々のブラウザ（Cookieが別）でログインさせる。3人には、Clerk の開発用インスタンスに一度Googleでログインしたことのあるアカウントを使い、メールアドレスを`e2e/.env.local`の`E2E_OWNER_EMAIL`・`E2E_PARTNER_EMAIL`・`E2E_EDITOR_EMAIL`に書く（`e2e/.env.example`をコピー）。`@clerk/testing`がメールアドレスからユーザーを探し、ログイン用のチケットで入るので、Googleのパスワードは使わない（Googleだけでログインする設定では、APIで作ったユーザーはチケットでログインできないため）。
+- Clerk のキーは、環境変数になければ`apps/api/.dev.vars`から読む。画面を見ながら流すときは`pnpm e2e -- team --headed`。
+- `pnpm team:open`（`e2e/scripts/team-open.ts`）は、同じ3人でログインしたブラウザを左から並べて開き、そのまま手で操作できる（右下に役割の印）。`--setup`でDBを空にして、接続・パートナーの参加・編集者の参加と担当まで済ませてから開く。付けなければ今のデータのまま開く。`pnpm dev:fake`の起動が前提。
 
 ## コードの書き方
 

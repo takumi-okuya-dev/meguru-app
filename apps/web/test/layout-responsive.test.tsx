@@ -13,7 +13,7 @@ vi.mock("@clerk/react", () => ({
 }));
 
 function account(id: string, username: string, connectionStatus: "connected" | "needs_reconnect" = "connected") {
-  return { id, username, displayName: username, profilePictureUrl: null, plan: "auto-grower" as const, connectionStatus, lastUsedAt: null };
+  return { id, username, displayName: username, profilePictureUrl: null, plan: "auto-grower" as const, connectionStatus, lastUsedAt: null, role: "owner" as const, ownerName: null };
 }
 const meResponse: MeResponse = {
   user: { id: "u", email: "t@example.com", displayName: "Takumi" },
@@ -21,6 +21,8 @@ const meResponse: MeResponse = {
   landingAccountId: "a1",
   accountLimit: { max: 5, used: 2 },
   threadsAccessMode: "testers",
+  partnerTeam: null,
+  editorWaiting: null,
 };
 const getDraftCounts = vi.fn();
 vi.mock("@/lib/api-client", async (orig) => {

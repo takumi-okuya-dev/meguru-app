@@ -11,7 +11,7 @@ import type { AppEnv } from "../app";
 import { createDb } from "../db/client";
 import { createThreadsClient } from "../lib/threads-client";
 import { parseBody } from "../lib/validate";
-import { findOwnedAccount } from "../services/access";
+import { authorizeAccount } from "../services/access";
 import {
   notifyWake,
   readPostingSchedule,
@@ -44,7 +44,8 @@ export function postingScheduleRoutes(authed: MiddlewareHandler<AppEnv>) {
   return new Hono<AppEnv>()
     .get("/accounts/:accountId/posting-schedule", authed, async (c) => {
       const db = createDb(c.env.DATABASE_URL);
-      const account = await findOwnedAccount(db, c.get("user").id, c.req.param("accountId"));
+      const access = await authorizeAccount(db, c.get("user"), c.req.param("accountId"), "view");
+      const account = access.account;
       return c.json({
         schedule: toPostingSchedule(await readPostingSchedule(db, account.id)),
         limits: {
@@ -56,7 +57,8 @@ export function postingScheduleRoutes(authed: MiddlewareHandler<AppEnv>) {
     })
     .put("/accounts/:accountId/posting-schedule", authed, async (c) => {
       const db = createDb(c.env.DATABASE_URL);
-      const account = await findOwnedAccount(db, c.get("user").id, c.req.param("accountId"));
+      const access = await authorizeAccount(db, c.get("user"), c.req.param("accountId"), "settings");
+      const account = access.account;
       const req = await parseBody(putPostingScheduleRequestSchema, c.req.json());
       const now = new Date();
       const result = await savePostingSchedule(
@@ -66,6 +68,7 @@ export function postingScheduleRoutes(authed: MiddlewareHandler<AppEnv>) {
         req,
         createThreadsClient(c.env),
         now,
+        access,
       );
       // コミットの後、定期処理に設定の変更を知らせる（research.md R3）。時刻は保存が終わった後のもの
       // （接続の確認の間に定期処理の回が終わっていても、その回より新しい知らせにする）

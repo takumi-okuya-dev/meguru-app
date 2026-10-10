@@ -9,6 +9,7 @@ import { createThreadsClient } from "../lib/threads-client";
 import { cleanupDeletionIdentifiers, retryDeletions } from "./data-deletion";
 import { cleanupRevocations } from "./revocation";
 import { refreshExpiringTokens } from "./token-refresh";
+import { purgeOldActivity } from "./activity-log";
 
 /**
  * 日次の定期処理をまとめて行う（contracts/api.md「定期処理」）。1つの処理の失敗で全体を止めない。
@@ -30,6 +31,8 @@ export async function runDailyJobs(env: Env, now: Date = new Date()) {
       }),
     ],
     ["revocations cleanup", () => cleanupRevocations(env, now)],
+    // 操作の記録は90日で消す（specs/008 FR-051、research.md R9）
+    ["activity logs cleanup", () => purgeOldActivity(createDb(env.DATABASE_URL), now)],
     ["data deletion retry", () => retryDeletions(env, now)],
     ["deletion identifiers cleanup", () => cleanupDeletionIdentifiers(env, now)],
     [

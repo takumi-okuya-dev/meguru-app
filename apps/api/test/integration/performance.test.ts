@@ -208,7 +208,7 @@ describe("PATCH /performance/:draftId/feedback（FR-021〜FR-024、SC-003）", (
     const memo = await patch(accountId, posts[0]!.id, { memo: "  前置きが長い  " });
     expect(memo.status).toBe(200);
     const memoBody = (await memo.json()) as { item: { feedback: Record<string, unknown> }; promptIds: string[] };
-    expect(memoBody.item.feedback).toEqual({ memo: "前置きが長い", includeInPrompt: true, inNextPrompt: true });
+    expect(memoBody.item.feedback).toEqual({ memo: "前置きが長い", includeInPrompt: true, inNextPrompt: true, version: 2 });
     expect(memoBody.promptIds).toEqual(posts.slice(0, 5).map((p) => p.id));
 
     const off = (await (await patch(accountId, posts[1]!.id, { includeInPrompt: false })).json()) as {

@@ -3,6 +3,7 @@ import { eq } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
 import { accounts, threadsConnections } from "../../src/db/schema";
 import { authorizeAndCallback, call, connectNew, db, fake, makeApp, redirectTarget, resetDb } from "../helpers/app";
+import { makeEditor, makePartner } from "../helpers/team";
 
 const app = makeApp();
 
@@ -72,5 +73,20 @@ describe("mode = reconnect", () => {
     await connectNew(app, "u1", "1001");
     const [a] = await db().select().from(accounts);
     expect((await startReconnect("intruder", a!.id)).status).toBe(404);
+  });
+});
+
+// ---- チーム運用：再接続はオーナーだけ（specs/008 FR-044）----
+describe("再接続（チーム運用）", () => {
+  it("パートナー・編集者は再接続を始められない（403 ROLE_FORBIDDEN）", async () => {
+    await connectNew(app, "u1", "1001");
+    const [row] = await db().select().from(accounts);
+    const { teamId } = await makePartner(row!.id, "p1", { review: true, settings: true });
+    await makeEditor(teamId, "e1", [row!.id]);
+    for (const user of ["p1", "e1"]) {
+      const res = await call(app, "POST", "/api/threads/connect", { user, body: { mode: "reconnect", accountId: row!.id } });
+      expect(res.status).toBe(403);
+      expect(((await res.json()) as { error: { code: string } }).error.code).toBe("ROLE_FORBIDDEN");
+    }
   });
 });

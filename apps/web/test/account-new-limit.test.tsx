@@ -22,6 +22,8 @@ function account(id: string) {
     plan: "auto-only" as const,
     connectionStatus: "connected" as const,
     lastUsedAt: null,
+    role: "owner" as const,
+    ownerName: null,
   };
 }
 
@@ -32,6 +34,8 @@ function renderWith(max: number, used: number, threadsAccessMode: "testers" | "p
     landingAccountId: used > 0 ? "a0" : null,
     accountLimit: { max, used },
     threadsAccessMode,
+    partnerTeam: null,
+    editorWaiting: null,
   };
   render(
     <QueryClientProvider client={new QueryClient()}>

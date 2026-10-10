@@ -82,6 +82,8 @@ function StrategyEditor({ accountId, initial }: { accountId: string; initial: St
   const [values, setValues] = useState<StrategyValues>(() => pickValues(initial));
   const [canEdit, setCanEdit] = useState(initial.canEdit);
   const [conflict, setConflict] = useState<Strategy | null>(null);
+  // 先に保存した人（specs/008 FR-007）
+  const [conflictBy, setConflictBy] = useState<string | null>(null);
   const [growerDialog, setGrowerDialog] = useState(false);
 
   const baseline = pickValues(saved);
@@ -111,6 +113,7 @@ function StrategyEditor({ accountId, initial }: { accountId: string; initial: St
     },
     onError: (err) => {
       if (isStale(err)) {
+        setConflictBy(err.updatedBy?.name ?? null);
         // サーバーの latest には canEdit がないことがあるので、いまの値で補う（保存できた＝編集できる）
         setConflict({ ...(err.latest as Strategy), canEdit: true });
       } else if (isGrowerRequired(err)) {
@@ -240,6 +243,7 @@ function StrategyEditor({ accountId, initial }: { accountId: string; initial: St
       <ConflictDialog
         open={conflict !== null}
         updatedAt={conflict?.updatedAt ?? null}
+        updatedByName={conflictBy}
         onCancel={() => setConflict(null)}
         onReload={() => {
           if (conflict) applySaved(conflict);

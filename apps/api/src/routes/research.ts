@@ -16,7 +16,8 @@ import { createDb } from "../db/client";
 import { referencePosts, researchKeywords } from "../db/schema";
 import { AppError, pgErrorCode } from "../lib/errors";
 import { parseBody } from "../lib/validate";
-import { findOwnedAccount } from "../services/access";
+import { authorizeAccount } from "../services/access";
+import { recordActivity, updatedByOf, withActivityTx } from "../services/activity-log";
 import { touchMaterials } from "../services/materials";
 import { canEditProfile, requireGrowerAccess } from "../services/grower-access";
 import { assertItemId, insertWithLimit, updateWithVersion } from "../services/item-service";
@@ -93,19 +94,21 @@ export function researchRoutes(authed: MiddlewareHandler<AppEnv>) {
       .get("/accounts/:accountId/reference-posts", authed, async (c) => {
         const db = createDb(c.env.DATABASE_URL);
         const user = c.get("user");
-        const account = await findOwnedAccount(db, user.id, c.req.param("accountId"));
+        const access = await authorizeAccount(db, user, c.req.param("accountId"), "view");
+        const account = access.account;
         const rows = await db
           .select()
           .from(referencePosts)
           .where(eq(referencePosts.accountId, account.id))
           .orderBy(desc(referencePosts.createdAt), desc(referencePosts.id));
-        return c.json({ items: rows.map(toReferencePost), limit: REFERENCE_POST_LIMIT, canEdit: canEditProfile(account, user) });
+        return c.json({ items: rows.map(toReferencePost), limit: REFERENCE_POST_LIMIT, canEdit: canEditProfile(account, access.owner) });
       })
       .post("/accounts/:accountId/reference-posts", authed, async (c) => {
         const db = createDb(c.env.DATABASE_URL);
         const user = c.get("user");
-        const account = await findOwnedAccount(db, user.id, c.req.param("accountId"));
-        requireGrowerAccess(account, user);
+        const access = await authorizeAccount(db, user, c.req.param("accountId"), "content");
+        const account = access.account;
+        requireGrowerAccess(account, access.owner);
         const input = await parseBody(referencePostInputSchema, c.req.json());
         const row = await insertWithLimit(
           c.env,
@@ -114,8 +117,15 @@ export function researchRoutes(authed: MiddlewareHandler<AppEnv>) {
           REFERENCE_POST_LIMIT,
           async (tx) =>
             (await tx.select({ n: count() }).from(referencePosts).where(eq(referencePosts.accountId, account.id)))[0]!.n,
-          async (tx) =>
-            (await tx.insert(referencePosts).values({ accountId: account.id, ...referenceColumns(input) }).returning())[0]!,
+          async (tx) => {
+            const [inserted] = await tx
+              .insert(referencePosts)
+              .values({ accountId: account.id, ...referenceColumns(input), updatedByUserId: access.actor.id })
+              .returning();
+            // 追加と操作の記録を同じトランザクションにする（PR #9 のCodexレビュー）
+            await recordActivity(tx, access, { kind: "content", action: "reference_post_added", excerpts: [inserted!.body] });
+            return inserted!;
+          },
         );
         await touchMaterials(db, account.id, "research");
         return c.json(toReferencePost(row), 201);
@@ -123,31 +133,53 @@ export function researchRoutes(authed: MiddlewareHandler<AppEnv>) {
       .put("/accounts/:accountId/reference-posts/:referencePostId", authed, async (c) => {
         const db = createDb(c.env.DATABASE_URL);
         const user = c.get("user");
-        const account = await findOwnedAccount(db, user.id, c.req.param("accountId"));
-        requireGrowerAccess(account, user);
+        const access = await authorizeAccount(db, user, c.req.param("accountId"), "content");
+        const account = access.account;
+        requireGrowerAccess(account, access.owner);
         const id = assertItemId(c.req.param("referencePostId"));
         const { expectedVersion, ...input } = await parseBody(updateReferencePostRequestSchema, c.req.json());
         const where = and(eq(referencePosts.id, id), eq(referencePosts.accountId, account.id));
-        const row = await updateWithVersion(
-          () =>
-            db
-              .update(referencePosts)
-              .set({ ...referenceColumns(input), version: sql`${referencePosts.version} + 1`, updatedAt: new Date() })
-              .where(and(where, eq(referencePosts.version, expectedVersion)))
-              .returning(),
-          async () => (await db.select().from(referencePosts).where(where).limit(1))[0],
-          toReferencePost,
-        );
+        // 保存と操作の記録を同じトランザクションにする（PR #9 のCodexレビュー）
+        const row = await withActivityTx(c.env.DATABASE_URL, db, access, async (q) => {
+          const updated = await updateWithVersion(
+            () =>
+              q
+                .update(referencePosts)
+                .set({
+                  ...referenceColumns(input),
+                  updatedByUserId: access.actor.id,
+                  version: sql`${referencePosts.version} + 1`,
+                  updatedAt: new Date(),
+                })
+                .where(and(where, eq(referencePosts.version, expectedVersion)))
+                .returning(),
+            async () => (await q.select().from(referencePosts).where(where).limit(1))[0],
+            toReferencePost,
+            (current) => updatedByOf(q, current.updatedByUserId),
+          );
+          await recordActivity(q, access, { kind: "content", action: "reference_post_updated", excerpts: [updated.body] });
+          return updated;
+        });
         await touchMaterials(db, account.id, "research");
         return c.json(toReferencePost(row));
       })
       .delete("/accounts/:accountId/reference-posts/:referencePostId", authed, async (c) => {
         const db = createDb(c.env.DATABASE_URL);
         const user = c.get("user");
-        const account = await findOwnedAccount(db, user.id, c.req.param("accountId"));
-        requireGrowerAccess(account, user);
+        const access = await authorizeAccount(db, user, c.req.param("accountId"), "content");
+        const account = access.account;
+        requireGrowerAccess(account, access.owner);
         const id = assertItemId(c.req.param("referencePostId"));
-        await db.delete(referencePosts).where(and(eq(referencePosts.id, id), eq(referencePosts.accountId, account.id)));
+        // 削除と操作の記録を同じトランザクションにする（PR #9 のCodexレビュー）
+        await withActivityTx(c.env.DATABASE_URL, db, access, async (q) => {
+          const removed = await q
+            .delete(referencePosts)
+            .where(and(eq(referencePosts.id, id), eq(referencePosts.accountId, account.id)))
+            .returning();
+          if (removed[0]) {
+            await recordActivity(q, access, { kind: "content", action: "reference_post_deleted", excerpts: [removed[0].body] });
+          }
+        });
         await touchMaterials(db, account.id, "research");
         return c.body(null, 204);
       })
@@ -155,19 +187,21 @@ export function researchRoutes(authed: MiddlewareHandler<AppEnv>) {
       .get("/accounts/:accountId/research-keywords", authed, async (c) => {
         const db = createDb(c.env.DATABASE_URL);
         const user = c.get("user");
-        const account = await findOwnedAccount(db, user.id, c.req.param("accountId"));
+        const access = await authorizeAccount(db, user, c.req.param("accountId"), "view");
+        const account = access.account;
         const rows = await db
           .select()
           .from(researchKeywords)
           .where(eq(researchKeywords.accountId, account.id))
           .orderBy(desc(researchKeywords.createdAt), desc(researchKeywords.id));
-        return c.json({ items: rows.map(toKeyword), limit: KEYWORD_LIMIT, canEdit: canEditProfile(account, user) });
+        return c.json({ items: rows.map(toKeyword), limit: KEYWORD_LIMIT, canEdit: canEditProfile(account, access.owner) });
       })
       .post("/accounts/:accountId/research-keywords", authed, async (c) => {
         const db = createDb(c.env.DATABASE_URL);
         const user = c.get("user");
-        const account = await findOwnedAccount(db, user.id, c.req.param("accountId"));
-        requireGrowerAccess(account, user);
+        const access = await authorizeAccount(db, user, c.req.param("accountId"), "content");
+        const account = access.account;
+        requireGrowerAccess(account, access.owner);
         const input = await parseBody(researchKeywordInputSchema, c.req.json());
         const row = await withDuplicateCheck(() =>
           insertWithLimit(
@@ -177,18 +211,21 @@ export function researchRoutes(authed: MiddlewareHandler<AppEnv>) {
             KEYWORD_LIMIT,
             async (tx) =>
               (await tx.select({ n: count() }).from(researchKeywords).where(eq(researchKeywords.accountId, account.id)))[0]!.n,
-            async (tx) =>
-              (
-                await tx
-                  .insert(researchKeywords)
-                  .values({
-                    accountId: account.id,
-                    keyword: input.keyword,
-                    keywordNormalized: normalizeKeyword(input.keyword),
-                    purpose: orNull(input.purpose),
-                  })
-                  .returning()
-              )[0]!,
+            async (tx) => {
+              const [inserted] = await tx
+                .insert(researchKeywords)
+                .values({
+                  accountId: account.id,
+                  keyword: input.keyword,
+                  keywordNormalized: normalizeKeyword(input.keyword),
+                  purpose: orNull(input.purpose),
+                  updatedByUserId: access.actor.id,
+                })
+                .returning();
+              // 追加と操作の記録を同じトランザクションにする（PR #9 のCodexレビュー）
+              await recordActivity(tx, access, { kind: "content", action: "research_keyword_added", summary: inserted!.keyword });
+              return inserted!;
+            },
           ),
         );
         await touchMaterials(db, account.id, "research");
@@ -197,28 +234,36 @@ export function researchRoutes(authed: MiddlewareHandler<AppEnv>) {
       .put("/accounts/:accountId/research-keywords/:keywordId", authed, async (c) => {
         const db = createDb(c.env.DATABASE_URL);
         const user = c.get("user");
-        const account = await findOwnedAccount(db, user.id, c.req.param("accountId"));
-        requireGrowerAccess(account, user);
+        const access = await authorizeAccount(db, user, c.req.param("accountId"), "content");
+        const account = access.account;
+        requireGrowerAccess(account, access.owner);
         const id = assertItemId(c.req.param("keywordId"));
         const { expectedVersion, ...input } = await parseBody(updateResearchKeywordRequestSchema, c.req.json());
         const where = and(eq(researchKeywords.id, id), eq(researchKeywords.accountId, account.id));
+        // 保存と操作の記録を同じトランザクションにする（PR #9 のCodexレビュー）
         const row = await withDuplicateCheck(() =>
-          updateWithVersion(
-            () =>
-              db
-                .update(researchKeywords)
-                .set({
-                  keyword: input.keyword,
-                  keywordNormalized: normalizeKeyword(input.keyword),
-                  purpose: orNull(input.purpose),
-                  version: sql`${researchKeywords.version} + 1`,
-                  updatedAt: new Date(),
-                })
-                .where(and(where, eq(researchKeywords.version, expectedVersion)))
-                .returning(),
-            async () => (await db.select().from(researchKeywords).where(where).limit(1))[0],
-            toKeyword,
-          ),
+          withActivityTx(c.env.DATABASE_URL, db, access, async (q) => {
+            const updated = await updateWithVersion(
+              () =>
+                q
+                  .update(researchKeywords)
+                  .set({
+                    keyword: input.keyword,
+                    keywordNormalized: normalizeKeyword(input.keyword),
+                    purpose: orNull(input.purpose),
+                    updatedByUserId: access.actor.id,
+                    version: sql`${researchKeywords.version} + 1`,
+                    updatedAt: new Date(),
+                  })
+                  .where(and(where, eq(researchKeywords.version, expectedVersion)))
+                  .returning(),
+              async () => (await q.select().from(researchKeywords).where(where).limit(1))[0],
+              toKeyword,
+              (current) => updatedByOf(q, current.updatedByUserId),
+            );
+            await recordActivity(q, access, { kind: "content", action: "research_keyword_updated", summary: updated.keyword });
+            return updated;
+          }),
         );
         await touchMaterials(db, account.id, "research");
         return c.json(toKeyword(row));
@@ -226,10 +271,20 @@ export function researchRoutes(authed: MiddlewareHandler<AppEnv>) {
       .delete("/accounts/:accountId/research-keywords/:keywordId", authed, async (c) => {
         const db = createDb(c.env.DATABASE_URL);
         const user = c.get("user");
-        const account = await findOwnedAccount(db, user.id, c.req.param("accountId"));
-        requireGrowerAccess(account, user);
+        const access = await authorizeAccount(db, user, c.req.param("accountId"), "content");
+        const account = access.account;
+        requireGrowerAccess(account, access.owner);
         const id = assertItemId(c.req.param("keywordId"));
-        await db.delete(researchKeywords).where(and(eq(researchKeywords.id, id), eq(researchKeywords.accountId, account.id)));
+        // 削除と操作の記録を同じトランザクションにする（PR #9 のCodexレビュー）
+        await withActivityTx(c.env.DATABASE_URL, db, access, async (q) => {
+          const removed = await q
+            .delete(researchKeywords)
+            .where(and(eq(researchKeywords.id, id), eq(researchKeywords.accountId, account.id)))
+            .returning();
+          if (removed[0]) {
+            await recordActivity(q, access, { kind: "content", action: "research_keyword_deleted", summary: removed[0].keyword });
+          }
+        });
         await touchMaterials(db, account.id, "research");
         return c.body(null, 204);
       })

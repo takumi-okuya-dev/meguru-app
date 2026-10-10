@@ -1,5 +1,7 @@
 // 課題の読み書き（specs/002-strategy-profile research.md R1〜R3）。
 // 全項目をまとめて置き換え、version が一致する場合だけ保存する。
+import type { AccountAccess } from "./access";
+import { recordActivity, updatedByOf } from "./activity-log";
 import {
   STRATEGY_TEXT_KEYS,
   STRATEGY_TOTAL,
@@ -10,7 +12,7 @@ import {
   type StrategyValues,
 } from "@threads-grower/shared";
 import { and, eq } from "drizzle-orm";
-import type { Db } from "../db/client";
+import type { Db, TxDb } from "../db/client";
 import { strategyDesigns } from "../db/schema";
 import { AppError } from "../lib/errors";
 
@@ -53,7 +55,7 @@ function toColumns(req: StrategyValues) {
   return { ...cols, tonePreset: req.tonePreset };
 }
 
-async function findRow(db: Db, accountId: string) {
+async function findRow(db: Db | TxDb, accountId: string) {
   const [row] = await db.select().from(strategyDesigns).where(eq(strategyDesigns.accountId, accountId)).limit(1);
   return row;
 }
@@ -75,11 +77,17 @@ export async function getStrategy(db: Db, accountId: string): Promise<StrategyBo
  * @param db - データベース
  * @param accountId - accounts.id（所有と grower機能の確認は呼び出し側で済ませる）
  * @param req - 全項目の値と expectedVersion
+ * @param access - 操作した人（操作の記録と、保存した人に使う。specs/008）。省略すると記録しない
  * @returns 保存後の課題
  * @throws AppError STALE_UPDATE（latest に最新の課題）
  */
-export async function saveStrategy(db: Db, accountId: string, req: PutStrategyRequest): Promise<StrategyBody> {
-  const cols = toColumns(req);
+export async function saveStrategy(
+  db: Db | TxDb,
+  accountId: string,
+  req: PutStrategyRequest,
+  access?: AccountAccess,
+): Promise<StrategyBody> {
+  const cols = { ...toColumns(req), ...(access ? { updatedByUserId: access.actor.id } : {}) };
   let saved: StrategyRow | undefined;
   if (req.expectedVersion === 0) {
     [saved] = await db
@@ -94,11 +102,20 @@ export async function saveStrategy(db: Db, accountId: string, req: PutStrategyRe
       .where(and(eq(strategyDesigns.accountId, accountId), eq(strategyDesigns.version, req.expectedVersion)))
       .returning();
   }
-  if (saved) return toBody(saved);
+  if (saved) {
+    if (access) await recordActivity(db, access, { kind: "content", action: "strategy_saved" });
+    return toBody(saved);
+  }
   // 他で先に保存された（または行が消えた）。最新の課題を latest に入れて 409。
   // GET と同じ形にするため canEdit も入れる（保存は grower機能を確かめた後にだけ呼ぶので true）
-  throw new AppError("STALE_UPDATE", 409, "updated elsewhere", {
-    ...toBody(await findRow(db, accountId)),
-    canEdit: true,
-  });
+  const current = await findRow(db, accountId);
+  // 先に保存した人の名前を添える（specs/008 FR-007）
+  throw new AppError(
+    "STALE_UPDATE",
+    409,
+    "updated elsewhere",
+    { ...toBody(current), canEdit: true },
+    undefined,
+    { updatedBy: await updatedByOf(db, current?.updatedByUserId) },
+  );
 }

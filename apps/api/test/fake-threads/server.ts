@@ -181,9 +181,18 @@ export function createFakeThreads() {
       allow.searchParams.set("fake_action", "allow");
       const deny = new URL(here);
       deny.searchParams.set("fake_action", "deny");
+      // 登録済みのユーザーごとに「（ユーザー名）で許可する」を出す（3人での動作確認・E2E用。docs/team-roles.md）
+      const choices = [...users.values()]
+        .map((u) => {
+          const as = new URL(allow);
+          as.searchParams.set("fake_user", u.id);
+          return `<li><a id="allow-${u.id}" href="${as}">@${u.username} で許可する</a></li>`;
+        })
+        .join("");
       return c.html(
         `<!doctype html><meta charset="utf-8"><title>Fake Threads</title><h1>偽のThreads認可画面</h1>` +
-          `<a id="allow" href="${allow}">許可する</a> <a id="deny" href="${deny}">キャンセル</a>`,
+          `<a id="allow" href="${allow}">許可する</a> <a id="deny" href="${deny}">キャンセル</a>` +
+          (users.size > 1 ? `<p>別のアカウントで許可する：</p><ul>${choices}</ul>` : ""),
       );
     }
     const target = new URL(redirectUri);

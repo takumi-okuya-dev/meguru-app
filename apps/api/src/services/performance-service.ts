@@ -18,10 +18,11 @@ import {
 } from "@threads-grower/shared";
 import { alias } from "drizzle-orm/pg-core";
 import { and, asc, desc, eq, inArray, isNull, or, sql, type SQL } from "drizzle-orm";
-import type { Db } from "../db/client";
+import type { Db, TxDb } from "../db/client";
 import { draftBatches, postDrafts, postMetricSnapshots, postMetrics } from "../db/schema";
 import { AppError, itemNotFound } from "../lib/errors";
-import type { AccountRow } from "./access";
+import type { AccountAccess, AccountRow } from "./access";
+import { recordActivity, updatedByOf } from "./activity-log";
 import { decodeCursor, encodeCursor } from "./draft-service";
 import { assertItemId } from "./item-service";
 
@@ -44,6 +45,7 @@ type Row = {
   unmeasurableReason: string | null;
   memo: string | null;
   includeInPrompt: boolean | null;
+  feedbackVersion: number | null;
 };
 
 /**
@@ -108,7 +110,7 @@ export async function getPerformanceSummary(db: Db, account: AccountRow): Promis
  * @param accountId - accounts.id
  * @returns 下書きのID（投稿した日時の新しい順、最大5件）
  */
-export async function nextPromptIds(db: Db, accountId: string): Promise<string[]> {
+export async function nextPromptIds(db: Db | TxDb, accountId: string): Promise<string[]> {
   const rows = await db
     .select({ id: postDrafts.id })
     .from(postMetrics)
@@ -190,7 +192,7 @@ export async function listPerformancePage(
  * @param db - データベース
  * @returns where・orderBy をつなげるクエリ
  */
-function selectItems(db: Db) {
+function selectItems(db: Db | TxDb) {
   return db
       .select({
         id: postDrafts.id,
@@ -211,6 +213,7 @@ function selectItems(db: Db) {
         unmeasurableReason: postMetrics.unmeasurableReason,
         memo: postMetrics.feedbackMemo,
         includeInPrompt: postMetrics.includeInPrompt,
+        feedbackVersion: postMetrics.feedbackVersion,
       })
       .from(postDrafts)
       .leftJoin(postMetrics, eq(postMetrics.draftId, postDrafts.id));
@@ -223,40 +226,71 @@ function selectItems(db: Db) {
  * @param draftId - post_drafts.id
  * @param req - memo・includeInPrompt（検証済み）
  * @param now - 今
+ * @param access - 保存した人（記録と、保存の衝突の名前に使う。specs/008）
  * @returns 更新後の項目と、次のプロンプトに入る投稿
  * @throws AppError ITEM_NOT_FOUND（そのAccountの低調の投稿でない）
  */
 export async function updateFeedback(
-  db: Db,
+  db: Db | TxDb,
   accountId: string,
   draftId: string,
   req: FeedbackRequest,
   now: Date = new Date(),
+  access?: AccountAccess,
 ): Promise<{ item: PerformanceItem; promptIds: string[] }> {
   assertItemId(draftId);
+  const target = and(
+    eq(postMetrics.draftId, draftId),
+    eq(postMetrics.accountId, accountId),
+    eq(postMetrics.judgment, "poor"),
+    inArray(postMetrics.state, ["confirmed", "late_confirmed"]),
+  );
   const updated = await db
     .update(postMetrics)
     .set({
       ...(req.memo !== undefined ? { feedbackMemo: req.memo } : {}),
       ...(req.includeInPrompt !== undefined ? { includeInPrompt: req.includeInPrompt } : {}),
+      feedbackVersion: sql`${postMetrics.feedbackVersion} + 1`,
+      ...(access ? { feedbackUpdatedByUserId: access.actor.id } : {}),
       feedbackUpdatedAt: now,
       updatedAt: now,
     })
-    .where(
-      and(
-        eq(postMetrics.draftId, draftId),
-        eq(postMetrics.accountId, accountId),
-        eq(postMetrics.judgment, "poor"),
-        inArray(postMetrics.state, ["confirmed", "late_confirmed"]),
-      ),
-    )
-    .returning({ id: postMetrics.draftId });
-  if (updated.length === 0) throw itemNotFound();
+    .where(req.expectedVersion === undefined ? target : and(target, eq(postMetrics.feedbackVersion, req.expectedVersion)))
+    .returning();
+  if (updated.length === 0) {
+    // 版が違う（他の人が先に保存した）なら 409、そもそも対象でなければ 404（specs/008 FR-007）
+    const [current] = await db
+      .select({ by: postMetrics.feedbackUpdatedByUserId })
+      .from(postMetrics)
+      .where(target)
+      .limit(1);
+    if (!current) throw itemNotFound();
+    throw new AppError("STALE_UPDATE", 409, "updated elsewhere", undefined, undefined, {
+      updatedBy: await updatedByOf(db, current.by),
+    });
+  }
+  if (access) {
+    await recordActivity(db, access, {
+      kind: "content",
+      action: "feedback_saved",
+      summary: feedbackSummary(req),
+    });
+  }
   const [[row], promptIds] = await Promise.all([
     selectItems(db).where(eq(postDrafts.id, draftId)).limit(1),
     nextPromptIds(db, accountId),
   ]);
   return { item: toItem(row as Row, new Set(promptIds)), promptIds };
+}
+
+/**
+ * 改善メモの保存の記録に出す要約。
+ * @param req - 保存した内容
+ * @returns 要約
+ */
+function feedbackSummary(req: FeedbackRequest): string {
+  if (req.memo !== undefined) return req.memo ?? "（メモを消した）";
+  return req.includeInPrompt ? "プロンプトに入れる" : "プロンプトから外す";
 }
 
 /**
@@ -288,7 +322,12 @@ export function toItem(r: Row, inPrompt: Set<string>): PerformanceItem {
     unmeasurableReason: (r.unmeasurableReason as PerformanceItem["unmeasurableReason"]) ?? null,
     feedback:
       confirmed && r.judgment === "poor"
-        ? { memo: r.memo, includeInPrompt: r.includeInPrompt ?? true, inNextPrompt: inPrompt.has(r.id) }
+        ? {
+            memo: r.memo,
+            includeInPrompt: r.includeInPrompt ?? true,
+            inNextPrompt: inPrompt.has(r.id),
+            version: r.feedbackVersion ?? 1,
+          }
         : null,
   };
 }

@@ -4,16 +4,19 @@ import { Link } from "react-router";
 import { api, describeError } from "@/lib/api-client";
 import { formatRelativeJst } from "@/lib/format";
 import { queryKeys } from "@/lib/query";
+import { useAccountAccess } from "@/lib/use-account-access";
 import { ReconnectButton } from "@/components/ReconnectButton";
 import { Button } from "@/components/ui/button";
 
 /**
- * ホームと投稿ストックに出す自動投稿の知らせ。
+ * ホームと投稿ストックに出す自動投稿の知らせ。手伝う人には、権限のない操作を出さない
+ * （「閉じる」は review、再接続は owner。specs/008 contracts/permissions.md。PR #9 のCodexレビュー）。
  * @param props - accountId：AccountのID
  * @returns 知らせ。読み込み失敗時は再試行の案内
  */
 export function AutoPostNotices({ accountId }: { accountId: string }) {
   const client = useQueryClient();
+  const { can } = useAccountAccess(accountId);
   const query = useQuery({
     queryKey: queryKeys.autoPost(accountId),
     queryFn: () => api.getAutoPost(accountId),
@@ -62,14 +65,16 @@ export function AutoPostNotices({ accountId }: { accountId: string }) {
                 <Button asChild variant="outline" size="sm">
                   <Link to={`/accounts/${accountId}/stock`}>確認する</Link>
                 </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  disabled={dismiss.isPending}
-                  onClick={() => dismiss.mutate()}
-                >
-                  閉じる
-                </Button>
+                {can("review") && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    disabled={dismiss.isPending}
+                    onClick={() => dismiss.mutate()}
+                  >
+                    閉じる
+                  </Button>
+                )}
               </div>
               {dismiss.isError && <p role="alert">{describeError(dismiss.error)}</p>}
             </div>
@@ -81,8 +86,15 @@ export function AutoPostNotices({ accountId }: { accountId: string }) {
               role="status"
               className="space-y-2 rounded-xl border border-destructive/40 bg-destructive/5 px-4 py-3 text-sm"
             >
-              <p>Threadsとの接続が切れているため、自動投稿を止めています。再接続してください</p>
-              <ReconnectButton accountId={accountId} />
+              {can("owner") ? (
+                <>
+                  <p>Threadsとの接続が切れているため、自動投稿を止めています。再接続してください</p>
+                  <ReconnectButton accountId={accountId} />
+                </>
+              ) : (
+                // 再接続はオーナーだけができる（specs/008 FR-044）
+                <p>Threadsとの接続が切れているため、自動投稿を止めています。オーナーの再接続を待っています</p>
+              )}
             </div>
           );
         if (notice.kind === "rate_limited")

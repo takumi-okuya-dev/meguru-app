@@ -29,6 +29,7 @@ import {
 import { DraftList } from "@/components/stock/DraftList";
 import { PasteComposer } from "@/components/stock/PasteComposer";
 import { PromptCard } from "@/components/stock/PromptCard";
+import { useAccountAccess } from "@/lib/use-account-access";
 import { RejectDialog } from "@/components/stock/RejectDialog";
 import { REOPENED_BY_EDIT } from "@/components/stock/messages";
 import { PolicyConfirmDialog } from "@/components/stock/PolicyConfirmDialog";
@@ -104,6 +105,9 @@ function StockPageContent() {
   const [promptLocked, setPromptLocked] = useState(false);
   const { hidden, remove, flush } = useDeferredDelete(account.id);
   const { review } = useReview(account.id);
+  // 承認の操作ができるか（specs/008 FR-041）。読み込み中は出さない
+  const { access, can } = useAccountAccess(account.id);
+  const canReview = can("review");
   const data = drafts.data;
 
   // 削除して確定を待っている下書きは、一覧から隠す
@@ -147,8 +151,9 @@ function StockPageContent() {
   const isSimilar = (d: PostDraft) => (similarities?.get(d.id)?.score ?? 0) >= SIMILARITY_THRESHOLD;
 
   const items = lists[tab];
-  // 一覧から消えた下書き（取り消し・他の端末での削除・状態の変更）は、選択からも外す
-  const selectable = items.filter((d) => d.status !== "publishing");
+  // 一覧から消えた下書き（取り消し・他の端末での削除・状態の変更）は、選択からも外す。
+  // 承認の操作ができない人（編集者・任されていないパートナー）は選ばない（まとめての操作は承認・却下のため。specs/008 FR-041）
+  const selectable = canReview ? items.filter((d) => d.status !== "publishing") : [];
   const selected = selectable.filter((d) => picked.has(d.id));
   const atLimit = data ? lists.needs_review.length >= data.limits.needsReview : false;
 
@@ -319,6 +324,9 @@ function StockPageContent() {
       <DraftCard
         key={d.id}
         draft={d}
+        canReview={canReview}
+        // チームがあるAccountだけ、作った人・直した人を出す（specs/008 FR-053）
+        people={access?.hasTeam ? data?.people : undefined}
         selected={picked.has(d.id)}
         check={check}
         busy={busy}
@@ -373,11 +381,17 @@ function StockPageContent() {
             accountId={account.id}
             canGeneratePrompt={data.canGeneratePrompt}
             promptPostCount={data.promptPostCount}
+            promptPostCountVersion={data.promptPostCountVersion}
             startKey={startKey}
             onLocked={() => setPromptLocked(true)}
           />
         ) : (
           <div className="h-32 animate-pulse rounded-2xl bg-muted" aria-busy="true" />
+        )}
+        {access && !canReview && (
+          <p className="rounded-xl bg-muted/60 px-4 py-2.5 text-sm text-foreground/80">
+            承認と却下は、オーナー（{access.owner.name}）さんが行います。あなたは投稿の案を登録したり、直したりできます。
+          </p>
         )}
         <Tabs value={tab} onValueChange={changeTab}>
           <div className="flex min-w-0 items-center justify-between gap-3">

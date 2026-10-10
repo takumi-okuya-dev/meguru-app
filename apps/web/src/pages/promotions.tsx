@@ -1,6 +1,6 @@
 // 宣伝内容の画面（specs/002 US2、contracts/ui-routes.md「宣伝内容の画面」、docs/ui-design.md 型B）
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { PROMOTION_LIMIT, type Promotion, type PromotionInput } from "@threads-grower/shared";
+import { PROMOTION_LIMIT, type Promotion, type PromotionInput, type PromotionSettings } from "@threads-grower/shared";
 import { EllipsisIcon, ExternalLinkIcon, PlusIcon } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -67,7 +67,12 @@ export function PromotionsPage() {
   const [growerLost, setGrowerLost] = useState(false);
   const [growerDialog, setGrowerDialog] = useState(false);
   // カードのメニューからの状態の変更が、他で先に更新されていた（contracts/ui-routes.md 規則5）
-  const [statusConflict, setStatusConflict] = useState<{ latest: Promotion; status: Promotion["status"] } | null>(null);
+  const [statusConflict, setStatusConflict] = useState<{
+    latest: Promotion;
+    status: Promotion["status"];
+    // 先に保存した人（specs/008 FR-007）
+    by?: string | null;
+  } | null>(null);
 
   const refresh = () => {
     void queryClient.invalidateQueries({ queryKey: queryKeys.promotions(account.id) });
@@ -90,7 +95,7 @@ export function PromotionsPage() {
       toast.success("保存しました");
     },
     onError: (err, { status }) => {
-      if (isStale(err)) return setStatusConflict({ latest: err.latest as Promotion, status });
+      if (isStale(err)) return setStatusConflict({ latest: err.latest as Promotion, status, by: err.updatedBy?.name ?? null });
       onMutationError(err);
     },
   });
@@ -170,6 +175,7 @@ export function PromotionsPage() {
         <RatioRow
           accountId={account.id}
           value={settings.data?.ratioPercent}
+          version={settings.data?.version ?? 1}
           canEdit={canEdit}
           onGrowerLost={() => setGrowerDialog(true)}
         />
@@ -248,6 +254,7 @@ export function PromotionsPage() {
       <ConflictDialog
         open={statusConflict !== null}
         updatedAt={statusConflict?.latest.updatedAt ?? null}
+        updatedByName={statusConflict?.by ?? null}
         onCancel={() => setStatusConflict(null)}
         onReload={() => {
           setStatusConflict(null);
@@ -323,30 +330,42 @@ function PromotionCard({ item, menu }: { item: Promotion; menu: React.ReactNode 
 function RatioRow({
   accountId,
   value,
+  version,
   canEdit,
   onGrowerLost,
 }: {
   accountId: string;
   value: number | undefined;
+  version: number;
   canEdit: boolean;
   onGrowerLost: () => void;
 }) {
   const queryClient = useQueryClient();
-  const [draft, setDraft] = useState<string | null>(null);
-  const shown = draft ?? (value === undefined ? "" : String(value));
+  // 入力中の値と、編集を始めたときの版（裏で読み直して版が上がっても、編集を始めたときの版で保存する。
+  // 先に他の人が保存していれば 409 になり、黙って上書きしない。PR #9 のCodexレビュー）
+  const [draft, setDraft] = useState<{ text: string; version: number } | null>(null);
+  // 先に他の人が保存していたとき（409 STALE_UPDATE）の最新の値と、保存した人（specs/008 FR-007、PR #9 のCodexレビュー）
+  const [conflict, setConflict] = useState<{ latest: PromotionSettings; by: string | null } | null>(null);
+  const shown = draft?.text ?? (value === undefined ? "" : String(value));
   const valid = /^\d+$/.test(shown) && Number(shown) <= 100;
-  const changed = draft !== null && draft !== String(value);
+  const changed = draft !== null && draft.text !== String(value);
   // 保存していない割合も、移動・タブを閉じる前に確認する（FR-019）
   useUnsavedChanges(canEdit && changed);
 
   const save = useMutation({
-    mutationFn: () => api.putPromotionSettings(accountId, Number(shown)),
-    onSuccess: (s) => {
+    mutationFn: (v: { text: string; expectedVersion: number }) =>
+      api.putPromotionSettings(accountId, Number(v.text), v.expectedVersion),
+    onSuccess: (s, v) => {
       queryClient.setQueryData(queryKeys.promotionSettings(accountId), s);
-      setDraft(null);
+      // 保存中に次の値を入力していたら、その入力は残す（版は保存した後のもの。PR #9 のCodexレビュー）
+      setDraft((d) => (d && d.text !== v.text ? { text: d.text, version: s.version } : null));
       toast.success("保存しました");
     },
-    onError: (err) => (isGrowerRequired(err) ? onGrowerLost() : toast.error(saveErrorMessage(err))),
+    onError: (err) => {
+      if (isStale(err)) setConflict({ latest: err.latest as PromotionSettings, by: err.updatedBy?.name ?? null });
+      else if (isGrowerRequired(err)) onGrowerLost();
+      else toast.error(saveErrorMessage(err));
+    },
   });
 
   return (
@@ -367,17 +386,39 @@ function RatioRow({
           value={shown}
           readOnly={!canEdit}
           aria-invalid={!valid}
-          onChange={(e) => setDraft(e.target.value)}
+          onChange={(e) => {
+            const text = e.target.value;
+            setDraft((d) => ({ text, version: d?.version ?? version }));
+          }}
           className="h-11 w-20 rounded-xl border border-input bg-card px-3 text-right text-base md:h-9 md:text-[15px]"
         />
         <span>%</span>
         {canEdit && changed && (
-          <Button size="sm" className="rounded-full" disabled={!valid || save.isPending} onClick={() => save.mutate()}>
+          <Button size="sm" className="rounded-full" disabled={!valid || save.isPending} onClick={() => save.mutate({ text: shown, expectedVersion: draft?.version ?? version })}>
             保存
           </Button>
         )}
       </div>
       {!valid && <p className="w-full text-[13px] text-warning">0〜100の整数で入力してください</p>}
+      <ConflictDialog
+        open={conflict !== null}
+        updatedAt={null}
+        updatedByName={conflict?.by ?? null}
+        onCancel={() => setConflict(null)}
+        onReload={() => {
+          if (conflict) queryClient.setQueryData(queryKeys.promotionSettings(accountId), conflict.latest);
+          setDraft(null);
+          setConflict(null);
+        }}
+        onOverwrite={() => {
+          if (conflict) {
+            const latestVersion = conflict.latest.version;
+            setDraft((d) => (d ? { ...d, version: latestVersion } : d));
+            save.mutate({ text: shown, expectedVersion: latestVersion });
+          }
+          setConflict(null);
+        }}
+      />
     </div>
   );
 }

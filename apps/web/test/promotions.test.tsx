@@ -1,6 +1,6 @@
 // US2：宣伝内容の画面（Codexレビューへの対応：状態の変更の競合、宣伝投稿の割合の未保存の警告）
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen, waitFor } from "@testing-library/react";
+import { focusManager, QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { AccountSummary, Promotion } from "@threads-grower/shared";
 import { createMemoryRouter, Link, Outlet, RouterProvider } from "react-router";
@@ -9,9 +9,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const listPromotions = vi.fn();
 const updatePromotion = vi.fn();
 const getPromotionSettings = vi.fn();
+const putPromotionSettings = vi.fn();
 vi.mock("@/lib/api-client", async (orig) => {
   const actual = await orig<typeof import("@/lib/api-client")>();
-  return { ...actual, api: { ...actual.api, listPromotions, updatePromotion, getPromotionSettings } };
+  return { ...actual, api: { ...actual.api, listPromotions, updatePromotion, getPromotionSettings, putPromotionSettings } };
 });
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
@@ -27,6 +28,8 @@ const account: AccountSummary = {
   plan: "auto-grower",
   connectionStatus: "connected",
   lastUsedAt: null,
+  role: "owner" as const,
+  ownerName: null,
 };
 
 function promotion(overrides: Partial<Promotion> = {}): Promotion {
@@ -83,8 +86,88 @@ function renderPage() {
 describe("宣伝内容の画面", () => {
   beforeEach(() => {
     listPromotions.mockResolvedValue({ items: [promotion()], limit: 50, canEdit: true });
-    getPromotionSettings.mockResolvedValue({ ratioPercent: 20, canEdit: true });
+    getPromotionSettings.mockResolvedValue({ ratioPercent: 20, version: 1, canEdit: true });
     updatePromotion.mockReset();
+    putPromotionSettings.mockReset();
+  });
+
+  it("宣伝投稿の割合を先に他の人が保存していたら、名前つきのダイアログを出し、「上書き」で最新の版を送る（specs/008 FR-007、PR #9 のCodexレビュー）", async () => {
+    putPromotionSettings
+      .mockRejectedValueOnce(new ApiError("STALE_UPDATE", 409, [], { ratioPercent: 40, version: 2, canEdit: true }, { name: "田中 健" }))
+      .mockResolvedValueOnce({ ratioPercent: 30, version: 3, canEdit: true });
+    renderPage();
+    const input = await screen.findByRole("spinbutton", { name: "宣伝投稿の割合" });
+    await waitFor(() => expect(input).toHaveValue(20));
+    await waitFor(() => expect(input).not.toHaveAttribute("readonly"));
+    await userEvent.clear(input);
+    await userEvent.type(input, "30");
+    await userEvent.click(screen.getByRole("button", { name: "保存" }));
+    expect(putPromotionSettings).toHaveBeenLastCalledWith("a1", 30, 1);
+    expect(await screen.findByText("田中 健さんが先に保存しました")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "自分の内容で上書きする" }));
+    await waitFor(() => expect(putPromotionSettings).toHaveBeenLastCalledWith("a1", 30, 2));
+  });
+
+  it("編集中に裏で読み直して版が上がっても、編集を始めたときの版で保存する（PR #9 のCodexレビュー4回目）", async () => {
+    getPromotionSettings
+      .mockResolvedValueOnce({ ratioPercent: 20, version: 1, canEdit: true })
+      .mockResolvedValue({ ratioPercent: 40, version: 2, canEdit: true });
+    putPromotionSettings.mockRejectedValueOnce(
+      new ApiError("STALE_UPDATE", 409, [], { ratioPercent: 40, version: 2, canEdit: true }, { name: "田中 健" }),
+    );
+    renderPage();
+    const input = await screen.findByRole("spinbutton", { name: "宣伝投稿の割合" });
+    await waitFor(() => expect(input).toHaveValue(20));
+    await waitFor(() => expect(input).not.toHaveAttribute("readonly"));
+    await userEvent.clear(input);
+    await userEvent.type(input, "30");
+    // 通信の復帰などで裏で読み直す
+    act(() => {
+      focusManager.setFocused(false);
+      focusManager.setFocused(true);
+    });
+    await waitFor(() => expect(getPromotionSettings.mock.calls.length).toBeGreaterThan(1));
+    expect(input).toHaveValue(30);
+    await userEvent.click(screen.getByRole("button", { name: "保存" }));
+    expect(putPromotionSettings).toHaveBeenLastCalledWith("a1", 30, 1);
+    expect(await screen.findByText("田中 健さんが先に保存しました")).toBeInTheDocument();
+    focusManager.setFocused(undefined);
+  });
+
+  it("保存中に次の割合を入力していたら、保存が終わってもその入力を残す（PR #9 のCodexレビュー5回目）", async () => {
+    let resolveFirst: (v: unknown) => void = () => {};
+    putPromotionSettings.mockImplementationOnce(() => new Promise((r) => (resolveFirst = r)));
+    renderPage();
+    const input = await screen.findByRole("spinbutton", { name: "宣伝投稿の割合" });
+    await waitFor(() => expect(input).toHaveValue(20));
+    await waitFor(() => expect(input).not.toHaveAttribute("readonly"));
+    await userEvent.clear(input);
+    await userEvent.type(input, "30");
+    await userEvent.click(screen.getByRole("button", { name: "保存" }));
+    await userEvent.clear(input);
+    await userEvent.type(input, "40");
+    act(() => resolveFirst({ ratioPercent: 30, version: 2, canEdit: true }));
+    await waitFor(() => expect(screen.getByRole("button", { name: "保存" })).toBeEnabled());
+    expect(input).toHaveValue(40);
+    putPromotionSettings.mockResolvedValueOnce({ ratioPercent: 40, version: 3, canEdit: true });
+    await userEvent.click(screen.getByRole("button", { name: "保存" }));
+    expect(putPromotionSettings).toHaveBeenLastCalledWith("a1", 40, 2);
+  });
+
+  it("宣伝投稿の割合の競合で「最新の内容を読み込み直す」を選ぶと、先に保存された値を出す", async () => {
+    putPromotionSettings.mockRejectedValueOnce(
+      new ApiError("STALE_UPDATE", 409, [], { ratioPercent: 40, version: 2, canEdit: true }, { name: "田中 健" }),
+    );
+    renderPage();
+    const input = await screen.findByRole("spinbutton", { name: "宣伝投稿の割合" });
+    await waitFor(() => expect(input).toHaveValue(20));
+    await waitFor(() => expect(input).not.toHaveAttribute("readonly"));
+    await userEvent.clear(input);
+    await userEvent.type(input, "30");
+    await userEvent.click(screen.getByRole("button", { name: "保存" }));
+    await userEvent.click(await screen.findByRole("button", { name: "最新の内容を読み込み直す" }));
+    await waitFor(() => expect(input).toHaveValue(40));
+    expect(putPromotionSettings).toHaveBeenCalledTimes(1);
   });
 
   it("メニューからの状態の変更が他で先に更新されていたら、選択のダイアログを出し、「上書き」で最新の version に選んだ状態を当てて保存し直す（Codexレビュー P2）", async () => {

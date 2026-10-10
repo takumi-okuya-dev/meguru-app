@@ -7,7 +7,7 @@ import { oauthStates } from "../db/schema";
 import { sha256Hex } from "../lib/identifier-hash";
 import type { ThreadsClient } from "../lib/threads-client";
 import { assertCanAddAccount } from "./account-service";
-import { findOwnedAccount } from "./access";
+import { authorizeAccount } from "./access";
 
 const STATE_TTL_MS = 10 * 60 * 1000;
 
@@ -24,7 +24,7 @@ function randomState(): string {
  * @param userId - users.id
  * @param req - 新規（new）か再接続（reconnect と accountId）
  * @returns Threads の認可URL（state を含む）
- * @throws AppError ACCOUNT_LIMIT_REACHED（新規で上限に達している）・ACCOUNT_NOT_FOUND（再接続で自分の Account ではない）
+ * @throws AppError ACCOUNT_LIMIT_REACHED（新規で上限に達している）・ACCOUNT_NOT_FOUND（再接続で関わっていない Account）・ROLE_FORBIDDEN（オーナーではない）
  */
 export async function startConnect(
   db: Db,
@@ -38,7 +38,8 @@ export async function startConnect(
     await assertCanAddAccount(db, userId);
   } else {
     // 再接続は既存Accountの認可し直し。上限の判定はしない（FR-013・FR-020）
-    targetAccountId = (await findOwnedAccount(db, userId, req.accountId)).id;
+    // 再接続はオーナーだけ（specs/008 FR-044。パートナー・編集者は ROLE_FORBIDDEN）
+    targetAccountId = (await authorizeAccount(db, { id: userId }, req.accountId, "owner")).account.id;
   }
 
   const state = randomState();

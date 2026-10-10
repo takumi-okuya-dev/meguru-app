@@ -3,7 +3,7 @@ import { Hono, type MiddlewareHandler } from "hono";
 import type { AppEnv } from "../app";
 import { createDb } from "../db/client";
 import { postingSchedules } from "../db/schema";
-import { findOwnedAccount } from "../services/access";
+import { authorizeAccount } from "../services/access";
 import { getAutoPostStatus } from "../services/auto-post-status";
 
 /**
@@ -15,12 +15,14 @@ export function autoPostRoutes(authed: MiddlewareHandler<AppEnv>) {
   return new Hono<AppEnv>()
     .get("/accounts/:accountId/auto-post", authed, async (c) => {
       const db = createDb(c.env.DATABASE_URL);
-      const account = await findOwnedAccount(db, c.get("user").id, c.req.param("accountId"));
+      const access = await authorizeAccount(db, c.get("user"), c.req.param("accountId"), "view");
+      const account = access.account;
       return c.json(await getAutoPostStatus(db, account));
     })
     .post("/accounts/:accountId/auto-post/notices/blocked/dismiss", authed, async (c) => {
       const db = createDb(c.env.DATABASE_URL);
-      const account = await findOwnedAccount(db, c.get("user").id, c.req.param("accountId"));
+      const access = await authorizeAccount(db, c.get("user"), c.req.param("accountId"), "review");
+      const account = access.account;
       const now = new Date();
       await db
         .insert(postingSchedules)

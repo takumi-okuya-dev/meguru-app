@@ -13,18 +13,61 @@ export function testUserEmail(): string {
   return email;
 }
 
+/** チーム運用のE2Eで使う3人（specs/008-team-operations、docs/team-roles.md）。 */
+export type TeamRole = "owner" | "partner" | "editor";
+
+const TEAM_ENV: Record<TeamRole, string> = {
+  owner: "E2E_OWNER_EMAIL",
+  partner: "E2E_PARTNER_EMAIL",
+  editor: "E2E_EDITOR_EMAIL",
+};
+
+/**
+ * 役割のテスト用ユーザーのメールアドレス。Clerk の開発用インスタンスに、一度Googleでログインしたことのある
+ * 3つのアカウントを使う（Googleだけでログインする設定では、APIでユーザーを作ってもチケットでログインできないため）。
+ * @param role - 役割
+ * @returns メールアドレス
+ * @throws Error 環境変数がないとき
+ */
+export function teamEmail(role: TeamRole): string {
+  const email = process.env[TEAM_ENV[role]];
+  if (!email) throw new Error(`${TEAM_ENV[role]} を設定してください（README の E2E の項を参照）`);
+  return email;
+}
+
+/**
+ * 役割のテスト用ユーザーとしてログインする（@clerk/testing がメールアドレスからユーザーを探し、ログイン用のチケットで入る）。
+ * @param page - ページ（役割ごとに別の BrowserContext のもの）
+ * @param role - 役割
+ */
+export async function signInAs(page: Page, role: TeamRole) {
+  await signIn(page, teamEmail(role));
+}
+
 export async function resetAll() {
   const client = new pg.Client({ connectionString: DIRECT_DB });
   await client.connect();
   try {
-    await client.query(
-      "TRUNCATE users, accounts, memberships, threads_connections, oauth_states, threads_deletion_requests, threads_revocations, strategy_designs, promotions, reference_posts, research_keywords, draft_batches, post_drafts, ng_words CASCADE",
+    // 表を足しても漏れないよう、public のすべての表を空にする（マイグレーションの記録は drizzle スキーマにあるので残る）
+    const { rows } = await client.query<{ name: string }>(
+      "SELECT quote_ident(tablename) AS name FROM pg_tables WHERE schemaname = 'public'",
     );
+    if (rows.length > 0) await client.query(`TRUNCATE ${rows.map((r) => r.name).join(", ")} CASCADE`);
   } finally {
     await client.end();
   }
   await control("reset", {});
+  await registerFakeUsers();
+}
+
+/**
+ * 偽のThreadsにユーザーを登録する（何度呼んでもよい）。最初の1人が「許可する」の既定で、
+ * ほかは認可画面の「@… で許可する」で選ぶ（チーム運用の確認で2件目・3件目を接続する）。
+ */
+export async function registerFakeUsers() {
   await control("users", { id: "9001", username: "e2e_user", name: "E2E User" });
+  await control("users", { id: "9002", username: "partner_co", name: "Partner Co" });
+  await control("users", { id: "9003", username: "cafe_b", name: "Cafe B" });
 }
 
 export async function control(path: string, body: unknown) {
@@ -36,10 +79,15 @@ export async function control(path: string, body: unknown) {
   if (!res.ok) throw new Error(`fake threads control ${path} failed: ${res.status}`);
 }
 
-export async function signIn(page: Page) {
+/**
+ * Clerk のテスト用ログイン。
+ * @param page - ページ
+ * @param email - ログインするユーザー（省略すると E2E_CLERK_USER_EMAIL）
+ */
+export async function signIn(page: Page, email: string = testUserEmail()) {
   await setupClerkTestingToken({ page });
   await page.goto("/sign-in");
-  await clerk.signIn({ page, emailAddress: testUserEmail() });
+  await clerk.signIn({ page, emailAddress: email });
 }
 
 export async function signOut(page: Page) {
