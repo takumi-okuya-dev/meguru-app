@@ -261,3 +261,52 @@ describe("手伝っているアカウントのまとめ（US5、FR-061）", () =
     expect([notPartner.status, await codeOf(notPartner)]).toEqual([404, "TEAM_NOT_FOUND"]);
   });
 });
+
+describe("同時の操作（PR #9 のCodexレビュー）", () => {
+  it("担当の追加とパートナーを外す操作が同時でも、外した後に担当が残らない", async () => {
+    for (let round = 0; round < 3; round++) {
+      await resetDb();
+      const { accountId } = await createUserWithAccount("o1");
+      const { teamId } = await makePartner(accountId, "p1");
+      const e1 = await makeEditor(teamId, "e1");
+      const [assign, remove] = await Promise.all([
+        call(app, "PUT", `/api/team/editors/${e1}/accounts/${accountId}`, { user: "p1" }),
+        call(app, "DELETE", `/api/accounts/${accountId}/partner`, { user: "o1" }),
+      ]);
+      expect([204, 409]).toContain(assign.status);
+      expect(remove.status).toBe(204);
+      const helpers = (await sql()`SELECT count(*)::int AS n FROM memberships WHERE account_id = ${accountId} AND role <> 'owner'`) as { n: number }[];
+      expect(helpers[0]!.n).toBe(0);
+    }
+  });
+
+  it("担当の追加と編集者を外す操作が同時でも、外した後に担当が残らない", async () => {
+    for (let round = 0; round < 3; round++) {
+      await resetDb();
+      const { accountId } = await createUserWithAccount("o1");
+      const { teamId } = await makePartner(accountId, "p1");
+      const e1 = await makeEditor(teamId, "e1");
+      const [assign, remove] = await Promise.all([
+        call(app, "PUT", `/api/team/editors/${e1}/accounts/${accountId}`, { user: "p1" }),
+        call(app, "DELETE", `/api/team/editors/${e1}`, { user: "p1" }),
+      ]);
+      expect([204, 404]).toContain(assign.status);
+      expect(remove.status).toBe(204);
+      const rows = (await sql()`SELECT count(*)::int AS n FROM memberships WHERE user_id = ${e1}`) as { n: number }[];
+      expect(rows[0]!.n).toBe(0);
+    }
+  });
+
+  it("同じ担当の追加が同時に届いても、どちらも成功し、記録は1行", async () => {
+    const { accountId } = await createUserWithAccount("o1");
+    const { teamId } = await makePartner(accountId, "p1");
+    const e1 = await makeEditor(teamId, "e1");
+    const results = await Promise.all([
+      call(app, "PUT", `/api/team/editors/${e1}/accounts/${accountId}`, { user: "p1" }),
+      call(app, "PUT", `/api/team/editors/${e1}/accounts/${accountId}`, { user: "p1" }),
+    ]);
+    expect(results.map((r) => r.status)).toEqual([204, 204]);
+    const logs = (await sql()`SELECT count(*)::int AS n FROM activity_logs WHERE action = 'assignment_added'`) as { n: number }[];
+    expect(logs[0]!.n).toBe(1);
+  });
+});

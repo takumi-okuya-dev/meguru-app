@@ -12,7 +12,7 @@ import type { Db, TxDb } from "../db/client";
 import { activityLogs, users } from "../db/schema";
 import { AppError } from "../lib/errors";
 import type { Role } from "@threads-grower/shared";
-import { personName, type AccountAccess } from "./access";
+import { isUuid, personName, type AccountAccess } from "./access";
 
 /** 操作の記録の種類（画面の絞り込みの単位）。 */
 export type ActivityKind = "review" | "draft" | "content" | "settings" | "member";
@@ -112,7 +112,8 @@ function decodeCursor(cursor: string): { at: Date; id: string } {
   try {
     const [at, id] = JSON.parse(atob(cursor)) as [string, string];
     const date = new Date(at);
-    if (Number.isNaN(date.getTime()) || !/^[0-9a-f-]{36}$/i.test(id)) throw new Error("bad cursor");
+    // UUID の形を厳密に確かめる（DBのエラーにしない。PR #9 のCodexレビュー）
+    if (Number.isNaN(date.getTime()) || typeof id !== "string" || !isUuid(id)) throw new Error("bad cursor");
     return { at: date, id };
   } catch {
     throw new AppError("VALIDATION_FAILED", 400, "invalid cursor", undefined, ["cursor"]);

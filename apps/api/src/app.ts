@@ -58,7 +58,8 @@ export function createApp(deps: AppDeps = defaultDeps) {
     const corsMiddleware = cors({
       origin: c.env.WEB_ORIGIN,
       allowHeaders: ["Authorization", "Content-Type"],
-      allowMethods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+      // PATCH：チーム名・任せる範囲・改善メモ（specs/006・008。PR #9 のCodexレビュー）
+      allowMethods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
       credentials: false,
     });
     return corsMiddleware(c, next);

@@ -151,3 +151,14 @@ describe("保存の衝突で、先に保存した人の名前を返す（FR-007�
     expect(((await cr.json()) as { updatedBy: { name: string } }).updatedBy).toEqual({ name: "p1" });
   });
 });
+
+describe("カーソルの検証（PR #9 のCodexレビュー）", () => {
+  it("UUIDでないID（ハイフンだけ）のカーソルは 400 VALIDATION_FAILED", async () => {
+    const { accountId } = await createUserWithAccount("o1");
+    await makePartner(accountId, "p1");
+    const cursor = btoa(JSON.stringify([new Date().toISOString(), "-".repeat(36)])).replace(/=+$/, "");
+    const res = await call(app, "GET", `/api/accounts/${accountId}/activity?cursor=${encodeURIComponent(cursor)}`, { user: "o1" });
+    expect(res.status).toBe(400);
+    expect(((await res.json()) as { error: { code: string } }).error.code).toBe("VALIDATION_FAILED");
+  });
+});

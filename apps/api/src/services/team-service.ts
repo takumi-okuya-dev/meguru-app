@@ -128,10 +128,18 @@ export async function getAccountTeam(db: Db | TxDb, access: AccountAccess) {
  * @returns 外したパートナーと、担当が外れた編集者（記録に使う）。パートナーがいなければNULL
  */
 export async function removePartner(tx: TxDb, accountId: string) {
-  const [rel] = await tx
+  // 担当の追加・編集者を外す操作と同じく、チームの行 → 手伝いの関係の行の順で鍵をかける（PR #9 のCodexレビュー）
+  const [found] = await tx
     .select({ teamId: accountPartners.teamId })
     .from(accountPartners)
     .where(eq(accountPartners.accountId, accountId))
+    .limit(1);
+  if (!found) return null;
+  await tx.select({ id: teams.id }).from(teams).where(eq(teams.id, found.teamId)).for("update");
+  const [rel] = await tx
+    .select({ teamId: accountPartners.teamId })
+    .from(accountPartners)
+    .where(and(eq(accountPartners.accountId, accountId), eq(accountPartners.teamId, found.teamId)))
     .for("update");
   if (!rel) return null;
   const removed = await tx
@@ -220,18 +228,25 @@ export async function renameTeam(db: Db | TxDb, teamId: string, name: string) {
  * @throws AppError TEAM_NOT_FOUND・ASSIGNMENT_NOT_ALLOWED
  */
 export async function assignEditor(tx: TxDb, teamAccess: TeamAccess, editorUserId: string, accountId: string) {
+  // 呼び出し側でチームの行に鍵をかけてある（authorizeTeam の lock）。編集者を外す・パートナーを外す操作も
+  // 同じ行に鍵をかけるので、外した後に担当が残ることはない（PR #9 のCodexレビュー）
   const target = await authorizeAssignment(tx, teamAccess, editorUserId, accountId);
-  const [existing] = await tx
-    .select({ role: memberships.role, teamId: memberships.teamId })
-    .from(memberships)
-    .where(and(eq(memberships.userId, editorUserId), eq(memberships.accountId, accountId)))
-    .limit(1);
-  if (existing) {
-    if (existing.role === "editor" && existing.teamId === teamAccess.team.id) return false;
+  // 同じ担当の追加が同時に届いても失敗しないよう、挿入そのものを冪等にする（PR #9 のCodexレビュー）
+  const inserted = await tx
+    .insert(memberships)
+    .values({ userId: editorUserId, accountId, role: "editor", teamId: teamAccess.team.id })
+    .onConflictDoNothing({ target: [memberships.userId, memberships.accountId] })
+    .returning();
+  if (inserted.length === 0) {
+    const [existing] = await tx
+      .select({ role: memberships.role, teamId: memberships.teamId })
+      .from(memberships)
+      .where(and(eq(memberships.userId, editorUserId), eq(memberships.accountId, accountId)))
+      .limit(1);
+    if (existing?.role === "editor" && existing.teamId === teamAccess.team.id) return false;
     // 同じAccountで別の役割を持っている人は担当にできない（spec Edge Cases）
     throw new AppError("ASSIGNMENT_NOT_ALLOWED", 409, "already has another role");
   }
-  await tx.insert(memberships).values({ userId: editorUserId, accountId, role: "editor", teamId: teamAccess.team.id });
   await recordTeamActivity(tx, teamAccess, target.own, accountId, "assignment_added", editorUserId);
   return true;
 }

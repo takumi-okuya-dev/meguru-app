@@ -56,7 +56,8 @@ export function teamRoutes(authed: MiddlewareHandler<AppEnv>) {
     .put("/team/editors/:userId/accounts/:accountId", authed, async (c) => {
       const user = c.get("user");
       await withTransaction(c.env.DATABASE_URL, async (tx) => {
-        const team = await authorizeTeam(tx, user);
+        // チームの行に鍵をかけて、担当の追加・外す・編集者を外す・パートナーを外すを直列にする（PR #9 のCodexレビュー）
+        const team = await authorizeTeam(tx, user, { lock: true });
         assertIds(c.req.param("userId"), c.req.param("accountId"));
         await assignEditor(tx, team, c.req.param("userId"), c.req.param("accountId"));
       });
@@ -65,7 +66,8 @@ export function teamRoutes(authed: MiddlewareHandler<AppEnv>) {
     .delete("/team/editors/:userId/accounts/:accountId", authed, async (c) => {
       const user = c.get("user");
       await withTransaction(c.env.DATABASE_URL, async (tx) => {
-        const team = await authorizeTeam(tx, user);
+        // チームの行に鍵をかけて、担当の追加・外す・編集者を外す・パートナーを外すを直列にする（PR #9 のCodexレビュー）
+        const team = await authorizeTeam(tx, user, { lock: true });
         assertIds(c.req.param("userId"), c.req.param("accountId"));
         await unassignEditor(tx, team, c.req.param("userId"), c.req.param("accountId"));
       });
@@ -74,7 +76,8 @@ export function teamRoutes(authed: MiddlewareHandler<AppEnv>) {
     .delete("/team/editors/:userId", authed, async (c) => {
       const user = c.get("user");
       await withTransaction(c.env.DATABASE_URL, async (tx) => {
-        const team = await authorizeTeam(tx, user);
+        // チームの行に鍵をかけて、担当の追加・外す・編集者を外す・パートナーを外すを直列にする（PR #9 のCodexレビュー）
+        const team = await authorizeTeam(tx, user, { lock: true });
         assertIds(c.req.param("userId"));
         await removeEditor(tx, team, c.req.param("userId"));
       });

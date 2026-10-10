@@ -46,7 +46,8 @@ function kindOf(token: string): InviteKind | null {
  * @returns URL
  */
 export function inviteUrl(env: Env, token: string): string {
-  return `${env.WEB_ORIGIN}/invite/${token}`;
+  // 末尾の「/」を除いてからつなぐ（二重スラッシュにしない。threads-connect と同じ。PR #9 のCodexレビュー）
+  return `${env.WEB_ORIGIN.replace(/\/+$/, "")}/invite/${token}`;
 }
 
 /**
@@ -265,10 +266,19 @@ export async function acceptInvite(env: Env, user: { id: string }, token: string
   const hash = await sha256Hex(token);
   return withTransaction(env.DATABASE_URL, async (tx) => {
     if (kind === "partner") {
-      const [invite] = await tx
+      // リンクの作り直し（upsertPartnerInvite）と同じ「Account の行 → 招待の行」の順で鍵をかけ、
+      // 鍵をかけた後に文字列をもう一度確かめる（デッドロックを避ける。PR #9 のCodexレビュー）
+      const [found] = await tx
         .select({ accountId: accountPartnerInvites.accountId })
         .from(accountPartnerInvites)
         .where(eq(accountPartnerInvites.tokenHash, hash))
+        .limit(1);
+      if (!found) throw inviteInvalid();
+      await tx.select({ id: accounts.id }).from(accounts).where(eq(accounts.id, found.accountId)).for("update");
+      const [invite] = await tx
+        .select({ accountId: accountPartnerInvites.accountId })
+        .from(accountPartnerInvites)
+        .where(and(eq(accountPartnerInvites.tokenHash, hash), eq(accountPartnerInvites.accountId, found.accountId)))
         .for("update");
       if (!invite) throw inviteInvalid();
       const accountId = invite.accountId;
