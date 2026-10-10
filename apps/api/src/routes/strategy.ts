@@ -4,7 +4,7 @@ import { Hono, type MiddlewareHandler } from "hono";
 import type { AppEnv } from "../app";
 import { createDb } from "../db/client";
 import { AppError } from "../lib/errors";
-import { findOwnedAccount } from "../services/access";
+import { authorizeAccount } from "../services/access";
 import { canEditProfile, requireGrowerAccess } from "../services/grower-access";
 import { getProfileStatus } from "../services/profile-status";
 import { getStrategy, saveStrategy } from "../services/strategy-service";
@@ -20,25 +20,28 @@ export function strategyRoutes(authed: MiddlewareHandler<AppEnv>) {
       // ホームの入力状況（FR-017）。読み取りなので grower機能の判定はしない
       const db = createDb(c.env.DATABASE_URL);
       const user = c.get("user");
-      const account = await findOwnedAccount(db, user.id, c.req.param("accountId"));
-      return c.json(await getProfileStatus(db, account, user));
+      const access = await authorizeAccount(db, user, c.req.param("accountId"), "view");
+      const account = access.account;
+      return c.json(await getProfileStatus(db, account, access.owner));
     })
     .get("/accounts/:accountId/strategy", authed, async (c) => {
       const db = createDb(c.env.DATABASE_URL);
       const user = c.get("user");
-      const account = await findOwnedAccount(db, user.id, c.req.param("accountId"));
-      return c.json({ ...(await getStrategy(db, account.id)), canEdit: canEditProfile(account, user) });
+      const access = await authorizeAccount(db, user, c.req.param("accountId"), "view");
+      const account = access.account;
+      return c.json({ ...(await getStrategy(db, account.id)), canEdit: canEditProfile(account, access.owner) });
     })
     .put("/accounts/:accountId/strategy", authed, async (c) => {
       const db = createDb(c.env.DATABASE_URL);
       const user = c.get("user");
       // 必ず「所有 → grower機能 → 入力の検証」の順で確かめる（FR-023・FR-024）
-      const account = await findOwnedAccount(db, user.id, c.req.param("accountId"));
-      requireGrowerAccess(account, user);
+      const access = await authorizeAccount(db, user, c.req.param("accountId"), "content");
+      const account = access.account;
+      requireGrowerAccess(account, access.owner);
       const parsed = putStrategyRequestSchema.safeParse(await c.req.json().catch(() => null));
       if (!parsed.success) {
         throw new AppError("VALIDATION_FAILED", 400, "invalid strategy", undefined, invalidFields(parsed.error));
       }
-      return c.json({ ...(await saveStrategy(db, account.id, parsed.data)), canEdit: true });
+      return c.json({ ...(await saveStrategy(db, account.id, parsed.data, access)), canEdit: true });
     });
 }

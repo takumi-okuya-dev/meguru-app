@@ -7,7 +7,8 @@ import { createDb } from "../db/client";
 import { accounts } from "../db/schema";
 import { AppError } from "../lib/errors";
 import { parseBody } from "../lib/validate";
-import { findOwnedAccount } from "../services/access";
+import { authorizeAccount } from "../services/access";
+import { recordActivity } from "../services/activity-log";
 import { requireGrowerAccess } from "../services/grower-access";
 import { getPrompt } from "../services/prompt-service";
 
@@ -36,19 +37,22 @@ export function promptRoutes(authed: MiddlewareHandler<AppEnv>) {
     .get("/accounts/:accountId/prompt", authed, async (c) => {
       const db = createDb(c.env.DATABASE_URL);
       const user = c.get("user");
-      const account = await findOwnedAccount(db, user.id, c.req.param("accountId"));
-      requireGrowerAccess(account, user);
+      const access = await authorizeAccount(db, user, c.req.param("accountId"), "view");
+      const account = access.account;
+      requireGrowerAccess(account, access.owner);
       const count = parseCount(c.req.query("count")) ?? account.promptPostCount;
       return c.json(await getPrompt(db, account, count));
     })
     .put("/accounts/:accountId/prompt-settings", authed, async (c) => {
       const db = createDb(c.env.DATABASE_URL);
       const user = c.get("user");
-      const account = await findOwnedAccount(db, user.id, c.req.param("accountId"));
-      requireGrowerAccess(account, user);
+      const access = await authorizeAccount(db, user, c.req.param("accountId"), "content");
+      const account = access.account;
+      requireGrowerAccess(account, access.owner);
       const { postCount } = await parseBody(promptSettingsSchema, c.req.json());
       // 競合は検知しない（後勝ち。research.md R11）
       await db.update(accounts).set({ promptPostCount: postCount, updatedAt: new Date() }).where(eq(accounts.id, account.id));
+      await recordActivity(db, access, { kind: "content", action: "prompt_count_saved", summary: `${postCount}件` });
       return c.json({ postCount });
     });
 }

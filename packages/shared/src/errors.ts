@@ -25,6 +25,15 @@ export const ERROR_CODES = [
   "PASTE_TOO_LARGE",
   "DRAFT_PUBLISHING",
   "THREADS_NOT_READY",
+  // チーム運用（specs/008-team-operations contracts/api.md「新しいエラーコード」）
+  "ROLE_FORBIDDEN",
+  "INVITE_INVALID",
+  "INVITE_SELF",
+  "INVITE_ALREADY_MEMBER",
+  "PARTNER_ALREADY_EXISTS",
+  "TEAM_EDITOR_LIMIT",
+  "ASSIGNMENT_NOT_ALLOWED",
+  "TEAM_NOT_FOUND",
   "CONFIG_ERROR",
   "API_UNREACHABLE",
   "INTERNAL_ERROR",
@@ -160,6 +169,29 @@ export function errorMessage(code: ErrorCode, ctx: ErrorMessageContext = {}): Er
         message: "この機能はプラン2以上で使えます。保存済みの内容はそのまま残っています。",
         action: "plan-guidance",
       };
+    case "ROLE_FORBIDDEN":
+      return { message: ROLE_FORBIDDEN_MESSAGE, action: "reload" };
+    case "INVITE_INVALID":
+      return {
+        message:
+          "このリンクは使えません。作り直されたか、取り消されたか、すでにパートナーが参加しています。招待した方に、新しいリンクを頼んでください。",
+        action: "none",
+      };
+    case "INVITE_SELF":
+      return { message: "自分のアカウント（またはチーム）には参加できません。", action: "none" };
+    case "INVITE_ALREADY_MEMBER":
+      return { message: "すでに参加しています。", action: "none" };
+    case "PARTNER_ALREADY_EXISTS":
+      return { message: "このアカウントには、すでにパートナーが参加しています。", action: "reload" };
+    case "TEAM_EDITOR_LIMIT":
+      return {
+        message: "編集者が上限（10人）に達しています。パートナーに相談してください。",
+        action: "none",
+      };
+    case "ASSIGNMENT_NOT_ALLOWED":
+      return { message: "このアカウントは担当にできません。", action: "reload" };
+    case "TEAM_NOT_FOUND":
+      return { message: "チームが見つかりません。", action: "back-to-accounts" };
     case "CONFIG_ERROR":
       return {
         message: `サーバーの設定に誤りがあります${ctx.details?.length ? `（${ctx.details.join("、")}）` : ""}。開発環境では apps/api/.dev.vars を確認し、APIを起動し直してください。`,
@@ -175,6 +207,21 @@ export function errorMessage(code: ErrorCode, ctx: ErrorMessageContext = {}): Er
   }
 }
 
+/** 任せる範囲がオフになったなどで、権限のない操作をしたときの文言（FR-041、US3-4）。 */
+export const ROLE_FORBIDDEN_MESSAGE = "この操作はオーナーだけができるようになりました";
+
+/** 開いていたAccountを開けなくなったときの文言（FR-046）。 */
+export const ACCOUNT_ACCESS_LOST_MESSAGE = "このアカウントを開けなくなりました";
+
+/**
+ * 保存の衝突のときの見出し（FR-007、research.md R8）。先に保存した人の名前があれば添える。
+ * @param name - 先に保存した人の名前（不明ならNULL）
+ * @returns 見出しの文言
+ */
+export function staleUpdateTitle(name: string | null | undefined): string {
+  return name ? `${name}さんが先に保存しました` : "他の場所で更新されています";
+}
+
 /** Googleでのログインに失敗したときの文言。 */
 export const GOOGLE_SIGN_IN_FAILED_MESSAGE = "Googleでのログインに失敗しました。もう一度お試しください。";
 
@@ -185,6 +232,10 @@ export const TESTER_NOTICE =
 /** 要再接続のAccountの画面の上部に出すバナーの文言（FR-019）。 */
 export const NEEDS_RECONNECT_BANNER =
   "Threadsとの接続が切れています。再接続するまで、このAccountの自動処理は止まります。";
+
+/** 要再接続のAccountを、パートナー・編集者が開いたときのバナーの文言（specs/008 FR-044）。再接続はオーナーだけができる。 */
+export const NEEDS_RECONNECT_BANNER_HELPER =
+  "Threadsとの接続が切れています。オーナーの再接続を待っています。再接続するまで、このAccountの自動処理は止まります。";
 
 /** 上限到達時に添える、既存Accountを認可し直す方法の案内。 */
 export const RECONNECT_FROM_SETTINGS_HINT =

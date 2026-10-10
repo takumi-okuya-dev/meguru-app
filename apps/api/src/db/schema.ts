@@ -11,6 +11,7 @@ import {
   primaryKey,
   index,
   integer,
+  jsonb,
   pgEnum,
   pgTable,
   smallint,
@@ -51,8 +52,11 @@ const timestamps = {
 
 /** Accountの契約プランの列挙型（account_plan）。 */
 export const accountPlan = pgEnum("account_plan", PLANS);
-/** Membershipのロールの列挙型（membership_role）。member はプラン4限定で、本featureでは作らない。 */
-export const membershipRole = pgEnum("membership_role", ["owner", "member"]);
+/**
+ * Membershipのロールの列挙型（membership_role。Constitution原則IV）。
+ * partner・editor は specs/008-team-operations で足した。member は旧プラン4の名残で使わない（列挙型から値は消せないので残す）。
+ */
+export const membershipRole = pgEnum("membership_role", ["owner", "member", "partner", "editor"]);
 /** Threads接続の状態の列挙型（connection_status）。 */
 export const connectionStatus = pgEnum("connection_status", ["connected", "needs_reconnect"]);
 /** 接続フローの種類の列挙型（oauth_mode）。 */
@@ -96,6 +100,10 @@ export const accounts = pgTable("accounts", {
   promotionsChangedAt: timestamp("promotions_changed_at", { withTimezone: true, precision: 6 }),
   researchChangedAt: timestamp("research_changed_at", { withTimezone: true, precision: 6 }),
   coreRulesChangedAt: timestamp("core_rules_changed_at", { withTimezone: true, precision: 6 }),
+  // 投稿のルールを最後に保存した人（specs/008 research.md R8）
+  coreRulesUpdatedByUserId: uuid("core_rules_updated_by_user_id").references((): AnyPgColumn => users.id, {
+    onDelete: "set null",
+  }),
   // 反応数を読む権限がないと分かった日時（006 research.md R11）。再接続で消す
   insightsDeniedAt: timestamp("insights_denied_at", { withTimezone: true, precision: 6 }),
   ...timestamps,
@@ -117,12 +125,17 @@ export const memberships = pgTable(
       .notNull()
       .references(() => accounts.id, { onDelete: "cascade" }),
     role: membershipRole("role").notNull(),
+    // partner・editor の行が経由するチーム（specs/008 data-model.md）。owner はNULL
+    teamId: uuid("team_id").references((): AnyPgColumn => teams.id, { onDelete: "cascade" }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
     uniqueIndex("memberships_user_account_unique").on(t.userId, t.accountId),
     // 1つのAccountにownerは1人だけ
     uniqueIndex("memberships_one_owner_per_account").on(t.accountId).where(sql`${t.role} = 'owner'`),
+    // owner だけがチームなし（新しい列挙型の値はマイグレーションの中で書けないので owner だけで書く）
+    check("memberships_team_matches_role", sql`(${t.role} = 'owner') = (${t.teamId} IS NULL)`),
+    index("memberships_team_role_idx").on(t.teamId, t.role),
   ],
 );
 
@@ -249,6 +262,8 @@ export const strategyDesigns = pgTable(
     pinnedPostDraft2: text("pinned_post_draft_2"),
     pinnedPostDraft3: text("pinned_post_draft_3"),
     version: versionColumn(),
+    // 最後に保存した人（specs/008 research.md R8。保存の衝突で名前を出す）
+    updatedByUserId: uuid("updated_by_user_id").references((): AnyPgColumn => users.id, { onDelete: "set null" }),
     ...timestamps,
   },
   (t) =>
@@ -296,6 +311,8 @@ export const promotions = pgTable(
     status: promotionStatus("status").notNull().default("active"),
     validUntil: date("valid_until", { mode: "string" }),
     version: versionColumn(),
+    // 最後に保存した人（specs/008 research.md R8。保存の衝突で名前を出す）
+    updatedByUserId: uuid("updated_by_user_id").references((): AnyPgColumn => users.id, { onDelete: "set null" }),
     ...timestamps,
   },
   (t) => [
@@ -324,6 +341,8 @@ export const referencePosts = pgTable(
     postUrl: text("post_url"),
     whyGood: text("why_good"),
     version: versionColumn(),
+    // 最後に保存した人（specs/008 research.md R8。保存の衝突で名前を出す）
+    updatedByUserId: uuid("updated_by_user_id").references((): AnyPgColumn => users.id, { onDelete: "set null" }),
     ...timestamps,
   },
   (t) => [
@@ -348,6 +367,8 @@ export const researchKeywords = pgTable(
     keywordNormalized: text("keyword_normalized").notNull(),
     purpose: text("purpose"),
     version: versionColumn(),
+    // 最後に保存した人（specs/008 research.md R8。保存の衝突で名前を出す）
+    updatedByUserId: uuid("updated_by_user_id").references((): AnyPgColumn => users.id, { onDelete: "set null" }),
     ...timestamps,
   },
   (t) => [
@@ -453,6 +474,9 @@ export const postDrafts = pgTable(
     // 本文を人が直したか：006より前の行は false（不明）、それ以後は true（記録している）
     bodyEditTracked: boolean("body_edit_tracked").notNull().default(true),
     bodyEditedAt: timestamp("body_edited_at", { withTimezone: true, precision: 6 }),
+    // 登録した人と、最後に本文を直した人（specs/008 FR-053、research.md R10）。008より前の行はNULL
+    createdByUserId: uuid("created_by_user_id").references((): AnyPgColumn => users.id, { onDelete: "set null" }),
+    editedByUserId: uuid("edited_by_user_id").references((): AnyPgColumn => users.id, { onDelete: "set null" }),
     // 公開した時点の情報。publish_attempts は保存期間を過ぎると消えるので写しておく
     publishedSlotMinute: smallint("published_slot_minute"),
     publishedCarryover: boolean("published_carryover"),
@@ -541,6 +565,8 @@ export const postingSchedules = pgTable(
     // 「投稿の直前に要確認へ戻した」の知らせを閉じた日時（research.md R8）
     blockedNoticeSeenAt: timestamp("blocked_notice_seen_at", { withTimezone: true, precision: 6 }),
     version: versionColumn(),
+    // 最後に保存した人（specs/008 research.md R8。保存の衝突で名前を出す）
+    updatedByUserId: uuid("updated_by_user_id").references((): AnyPgColumn => users.id, { onDelete: "set null" }),
     ...timestamps,
   },
   (t) => [
@@ -674,6 +700,11 @@ export const postMetrics = pgTable(
     feedbackMemo: text("feedback_memo"),
     includeInPrompt: boolean("include_in_prompt").notNull().default(true),
     feedbackUpdatedAt: timestamp("feedback_updated_at", { withTimezone: true, precision: 6 }),
+    // 改善メモの保存の衝突を見つける版と、最後に変えた人（specs/008 research.md R8）
+    feedbackVersion: integer("feedback_version").notNull().default(1),
+    feedbackUpdatedByUserId: uuid("feedback_updated_by_user_id").references((): AnyPgColumn => users.id, {
+      onDelete: "set null",
+    }),
     createdAt: timestamp("created_at", { withTimezone: true, precision: 6 }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true, precision: 6 }).notNull().defaultNow(),
   },
@@ -740,5 +771,114 @@ export const followerSnapshots = pgTable(
   (t) => [
     primaryKey({ columns: [t.accountId, t.snapshotDate] }),
     check("follower_snapshots_count_nonnegative", sql`${t.followersCount} >= 0`),
+  ],
+);
+
+// ---- チーム運用（specs/008-team-operations data-model.md）----
+
+/** 操作の記録の種類の列挙型（activity_kind。FR-052の絞り込みの単位）。 */
+export const activityKind = pgEnum("activity_kind", ["review", "draft", "content", "settings", "member"]);
+
+/** パートナーのチーム（data-model.md の teams）。パートナー1人に0か1行。 */
+export const teams = pgTable(
+  "teams",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    partnerUserId: uuid("partner_user_id")
+      .notNull()
+      .unique()
+      .references(() => users.id, { onDelete: "cascade" }),
+    name: text("name"),
+    // 編集者の招待リンク（research.md R4）。照合はハッシュ、表示は暗号化した写し。最初に表示したときに作る
+    editorInviteTokenHash: text("editor_invite_token_hash").unique(),
+    editorInviteTokenCiphertext: bytea("editor_invite_token_ciphertext"),
+    editorInviteTokenIv: bytea("editor_invite_token_iv"),
+    editorInviteKeyVersion: smallint("editor_invite_key_version"),
+    editorInviteRotatedAt: timestamp("editor_invite_rotated_at", { withTimezone: true, precision: 6 }),
+    ...timestamps,
+  },
+  (t) => [
+    check("teams_name_length", sql`char_length(${t.name}) <= 50`),
+    check(
+      "teams_editor_invite_complete",
+      sql`(${t.editorInviteTokenHash} IS NULL) = (${t.editorInviteTokenCiphertext} IS NULL) AND (${t.editorInviteTokenHash} IS NULL) = (${t.editorInviteTokenIv} IS NULL) AND (${t.editorInviteTokenHash} IS NULL) = (${t.editorInviteKeyVersion} IS NULL)`,
+    ),
+  ],
+);
+
+/** チームの編集者（data-model.md の team_editors）。1チーム10人まで（参加のトランザクションで数える）。 */
+export const teamEditors = pgTable(
+  "team_editors",
+  {
+    teamId: uuid("team_id")
+      .notNull()
+      .references(() => teams.id, { onDelete: "cascade" }),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    joinedAt: timestamp("joined_at", { withTimezone: true, precision: 6 }).notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.teamId, t.userId] }), index("team_editors_user_idx").on(t.userId)],
+);
+
+/** 手伝いの関係（data-model.md の account_partners）。将来の複数パートナーに備えて主キーは Account＋チーム。 */
+export const accountPartners = pgTable(
+  "account_partners",
+  {
+    accountId: uuid("account_id")
+      .notNull()
+      .references(() => accounts.id, { onDelete: "cascade" }),
+    teamId: uuid("team_id")
+      .notNull()
+      .references(() => teams.id, { onDelete: "cascade" }),
+    delegateReview: boolean("delegate_review").notNull().default(false),
+    delegateSettings: boolean("delegate_settings").notNull().default(false),
+    joinedAt: timestamp("joined_at", { withTimezone: true, precision: 6 }).notNull().defaultNow(),
+    joinedNoticeDismissedAt: timestamp("joined_notice_dismissed_at", { withTimezone: true, precision: 6 }),
+    updatedAt: timestamp("updated_at", { withTimezone: true, precision: 6 }).notNull().defaultNow(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.accountId, t.teamId] }),
+    // 本featureでは1つのAccountにパートナーは1チームまで（FR-016。複数にするときはこのインデックスを外す）
+    uniqueIndex("account_partners_one_per_account").on(t.accountId),
+    index("account_partners_team_idx").on(t.teamId),
+  ],
+);
+
+/** パートナーの招待リンク（data-model.md の account_partner_invites）。Accountに0か1行。 */
+export const accountPartnerInvites = pgTable("account_partner_invites", {
+  accountId: uuid("account_id")
+    .primaryKey()
+    .references(() => accounts.id, { onDelete: "cascade" }),
+  tokenHash: text("token_hash").notNull().unique(),
+  tokenCiphertext: bytea("token_ciphertext").notNull(),
+  tokenIv: bytea("token_iv").notNull(),
+  keyVersion: smallint("key_version").notNull(),
+  createdByUserId: uuid("created_by_user_id").references(() => users.id, { onDelete: "set null" }),
+  createdAt: timestamp("created_at", { withTimezone: true, precision: 6 }).notNull().defaultNow(),
+});
+
+/** 操作の記録（data-model.md の activity_logs）。チームがあるAccountだけ。90日で消す。 */
+export const activityLogs = pgTable(
+  "activity_logs",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    accountId: uuid("account_id")
+      .notNull()
+      .references(() => accounts.id, { onDelete: "cascade" }),
+    actorUserId: uuid("actor_user_id").references(() => users.id, { onDelete: "set null" }),
+    actorName: text("actor_name").notNull(),
+    actorRole: membershipRole("actor_role").notNull(),
+    kind: activityKind("kind").notNull(),
+    action: text("action").notNull(),
+    itemCount: integer("item_count").notNull().default(1),
+    summary: text("summary"),
+    details: jsonb("details"),
+    createdAt: timestamp("created_at", { withTimezone: true, precision: 6 }).notNull().defaultNow(),
+  },
+  (t) => [
+    index("activity_logs_account_created_idx").on(t.accountId, t.createdAt.desc()),
+    index("activity_logs_account_actor_idx").on(t.accountId, t.actorUserId, t.createdAt.desc()),
+    index("activity_logs_created_idx").on(t.createdAt),
   ],
 );

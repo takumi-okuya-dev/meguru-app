@@ -5,7 +5,7 @@ import { Hono, type MiddlewareHandler } from "hono";
 import type { AppEnv } from "../app";
 import { createDb } from "../db/client";
 import { AppError } from "../lib/errors";
-import { findOwnedAccount } from "../services/access";
+import { authorizeAccount } from "../services/access";
 import { requireGrowerAccess } from "../services/grower-access";
 import { getPerformanceSummary, listExportRows, listPerformancePage, updateFeedback } from "../services/performance-service";
 
@@ -18,8 +18,9 @@ export function performanceRoutes(authed: MiddlewareHandler<AppEnv>) {
   return new Hono<AppEnv>().get("/accounts/:accountId/performance", authed, async (c) => {
     const db = createDb(c.env.DATABASE_URL);
     const user = c.get("user");
-    const account = await findOwnedAccount(db, user.id, c.req.param("accountId"));
-    requireGrowerAccess(account, user);
+    const access = await authorizeAccount(db, user, c.req.param("accountId"), "view");
+    const account = access.account;
+    requireGrowerAccess(account, access.owner);
     const parsed = performanceQuerySchema.safeParse(c.req.query());
     if (!parsed.success) {
       throw new AppError("VALIDATION_FAILED", 400, "invalid query", undefined, invalidFields(parsed.error));
@@ -34,20 +35,22 @@ export function performanceRoutes(authed: MiddlewareHandler<AppEnv>) {
       // 傾向メモと「プロンプトに入れる」（FR-021）。保存ボタンなしで、Webが入力欄から離れたとき・切り替えたときに呼ぶ
       const db = createDb(c.env.DATABASE_URL);
       const user = c.get("user");
-      const account = await findOwnedAccount(db, user.id, c.req.param("accountId"));
-      requireGrowerAccess(account, user);
+      const access = await authorizeAccount(db, user, c.req.param("accountId"), "content");
+      const account = access.account;
+      requireGrowerAccess(account, access.owner);
       const parsed = feedbackRequestSchema.safeParse(await c.req.json().catch(() => null));
       if (!parsed.success) {
         throw new AppError("VALIDATION_FAILED", 400, "invalid feedback", undefined, invalidFields(parsed.error));
       }
-      return c.json(await updateFeedback(db, account.id, c.req.param("draftId"), parsed.data));
+      return c.json(await updateFeedback(db, account.id, c.req.param("draftId"), parsed.data, new Date(), access));
     })
     .get("/accounts/:accountId/performance/export", authed, async (c) => {
       // CSVの行のデータ（FR-028〜FR-030）。CSVはWebで組み立てる（research.md R7）
       const db = createDb(c.env.DATABASE_URL);
       const user = c.get("user");
-      const account = await findOwnedAccount(db, user.id, c.req.param("accountId"));
-      requireGrowerAccess(account, user);
+      const access = await authorizeAccount(db, user, c.req.param("accountId"), "view");
+      const account = access.account;
+      requireGrowerAccess(account, access.owner);
       const parsed = exportQuerySchema.safeParse(c.req.query());
       if (!parsed.success) {
         throw new AppError("VALIDATION_FAILED", 400, "invalid query", undefined, invalidFields(parsed.error));

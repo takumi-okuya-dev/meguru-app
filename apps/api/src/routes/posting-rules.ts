@@ -5,7 +5,7 @@ import { Hono, type MiddlewareHandler } from "hono";
 import type { AppEnv } from "../app";
 import { createDb } from "../db/client";
 import { parseBody } from "../lib/validate";
-import { findOwnedAccount } from "../services/access";
+import { authorizeAccount } from "../services/access";
 import { requireGrowerAccess } from "../services/grower-access";
 import { assertItemId } from "../services/item-service";
 import { addNgWords, deleteNgWord, getPostingRules, saveCoreRules } from "../services/posting-rules-service";
@@ -20,27 +20,31 @@ export function postingRulesRoutes(authed: MiddlewareHandler<AppEnv>) {
     .get("/accounts/:accountId/posting-rules", authed, async (c) => {
       const db = createDb(c.env.DATABASE_URL);
       const user = c.get("user");
-      const account = await findOwnedAccount(db, user.id, c.req.param("accountId"));
-      return c.json(await getPostingRules(db, account, user));
+      const access = await authorizeAccount(db, user, c.req.param("accountId"), "view");
+      const account = access.account;
+      return c.json(await getPostingRules(db, account, access.owner));
     })
     .post("/accounts/:accountId/ng-words", authed, async (c) => {
       const db = createDb(c.env.DATABASE_URL);
-      const account = await findOwnedAccount(db, c.get("user").id, c.req.param("accountId"));
+      const access = await authorizeAccount(db, c.get("user"), c.req.param("accountId"), "settings");
+      const account = access.account;
       const { words } = await parseBody(addNgWordsRequestSchema, c.req.json());
-      return c.json(await addNgWords(c.env, account.id, words));
+      return c.json(await addNgWords(c.env, account.id, words, access));
     })
     .delete("/accounts/:accountId/ng-words/:ngWordId", authed, async (c) => {
       const db = createDb(c.env.DATABASE_URL);
-      const account = await findOwnedAccount(db, c.get("user").id, c.req.param("accountId"));
-      await deleteNgWord(c.env, account.id, assertItemId(c.req.param("ngWordId")));
+      const access = await authorizeAccount(db, c.get("user"), c.req.param("accountId"), "settings");
+      const account = access.account;
+      await deleteNgWord(c.env, account.id, assertItemId(c.req.param("ngWordId")), access);
       return c.body(null, 204);
     })
     .put("/accounts/:accountId/core-rules", authed, async (c) => {
       const db = createDb(c.env.DATABASE_URL);
       const user = c.get("user");
-      const account = await findOwnedAccount(db, user.id, c.req.param("accountId"));
-      requireGrowerAccess(account, user);
+      const access = await authorizeAccount(db, user, c.req.param("accountId"), "settings");
+      const account = access.account;
+      requireGrowerAccess(account, access.owner);
       const req = await parseBody(coreRulesRequestSchema, c.req.json());
-      return c.json(await saveCoreRules(db, account.id, req));
+      return c.json(await saveCoreRules(db, account.id, req, access));
     });
 }

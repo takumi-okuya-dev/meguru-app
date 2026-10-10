@@ -1,7 +1,8 @@
 import { and, eq } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
 import { accounts, memberships } from "../../src/db/schema";
-import { call, connectNew, db, fake, makeApp, resetDb } from "../helpers/app";
+import { call, connectNew, createUserWithAccount, db, fake, makeApp, resetDb } from "../helpers/app";
+import { ensureTeam, makeEditor, makePartner } from "../helpers/team";
 
 const app = makeApp();
 const endpoint = "/api/me/needs-review-counts";
@@ -54,9 +55,11 @@ describe("GET /api/me/needs-review-counts", () => {
     await addDrafts(first, 5);
     await addDrafts(second, 2);
     await addDrafts(memberOnly, 1);
+    // 旧プラン4の member（使わない役割）は数えない。owner 以外の行にはチームが要る（specs/008 data-model.md）
+    const { teamId: legacyTeam } = await ensureTeam("legacy");
     await db()
       .update(memberships)
-      .set({ role: "member" })
+      .set({ role: "member", teamId: legacyTeam })
       .where(and(eq(memberships.accountId, memberOnly), eq(memberships.role, "owner")));
     const otherRes = await call(app, "POST", `/api/accounts/${other}/draft-batches`, {
       user: "u2",
@@ -118,5 +121,29 @@ describe("GET /api/me/needs-review-counts", () => {
       counts: { accountId: string; needsReview: number }[];
     };
     expect(afterDeletion.counts.map((row) => row.accountId).sort()).toEqual([first, third].sort());
+  });
+});
+
+// ---- チーム運用：手伝っているAccountも数える（specs/008 /speckit-analyze O1）----
+describe("GET /api/me/needs-review-counts（チーム運用）", () => {
+  it("パートナー・担当の編集者には手伝っているAccountの件数も返り、関係のないAccountは返らない", async () => {
+    const { accountId: helped } = await createUserWithAccount("o1");
+    const { accountId: unrelated } = await createUserWithAccount("o2");
+    const { teamId } = await makePartner(helped, "p1");
+    await makeEditor(teamId, "e1", [helped]);
+    for (const accountId of [helped, unrelated]) {
+      const owner = accountId === helped ? "o1" : "o2";
+      const res = await call(app, "POST", `/api/accounts/${accountId}/draft-batches`, {
+        user: owner,
+        body: { clientRequestId: crypto.randomUUID(), text: "案1\n@@@\n案2" },
+      });
+      expect(res.status).toBe(201);
+    }
+    for (const user of ["p1", "e1"]) {
+      const body = (await (await call(app, "GET", endpoint, { user })).json()) as {
+        counts: { accountId: string; needsReview: number }[];
+      };
+      expect(body.counts).toEqual([{ accountId: helped, needsReview: 2 }]);
+    }
   });
 });

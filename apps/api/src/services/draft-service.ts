@@ -18,7 +18,8 @@ import { lockAccountDrafts } from "../db/locks";
 import { accounts, draftBatches, postDrafts, strategyDesigns } from "../db/schema";
 import type { Env } from "../env";
 import { AppError, itemNotFound, notFound, pgErrorCode } from "../lib/errors";
-import type { AccountRow } from "./access";
+import type { AccountAccess, AccountRow } from "./access";
+import { recordActivity, updatedByOf } from "./activity-log";
 import { updateWithVersion } from "./item-service";
 import { upcomingSlots } from "./auto-post-status";
 import { readPostingSchedule, toAutoPostState } from "./posting-schedule-service";
@@ -52,6 +53,10 @@ export function toPostDraft(row: PostDraftRow) {
     blockedAt: row.blockedAt?.toISOString() ?? null,
     blockedReason: row.blockedReason as BlockedReason | null,
     blockedWords: row.blockedWords ?? [],
+    // 作った人・直した人（specs/008 FR-053）
+    createdBy: row.createdByUserId,
+    editedBy: row.editedByUserId,
+    editedAt: row.bodyEditedAt?.toISOString() ?? null,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   };
@@ -238,6 +243,7 @@ function toBatchResult(batch: BatchRow, drafts: PostDraftRow[]) {
  * @param env - Workers のバインディング（DATABASE_URL を使う）
  * @param accountId - accounts.id
  * @param req - clientRequestId：送信ごとのID（再試行では同じ値）、text：貼り付けたテキスト
+ * @param access - 操作した人（操作の記録と、保存した人に使う。specs/008）。省略すると記録しない
  * @returns created：新しく登録したか（false は同じ clientRequestId の2回目）、result：DraftBatchResult
  * @throws AppError VALIDATION_FAILED（下書きが0件）、PASTE_TOO_LARGE（1回の上限を超える）、
  *   ITEM_LIMIT_REACHED（要確認が500件を超える）、ACCOUNT_NOT_FOUND（登録の途中でAccountが削除された）
@@ -246,6 +252,7 @@ export async function createDraftBatch(
   env: Env,
   accountId: string,
   req: { clientRequestId: string; text: string },
+  access?: AccountAccess,
 ) {
   const { parts, delimiterFound } = splitDrafts(req.text);
   if (parts.length === 0)
@@ -310,9 +317,26 @@ export async function createDraftBatch(
         .returning();
       const drafts = await tx
         .insert(postDrafts)
-        .values(parts.map((body, position) => ({ accountId, batchId: batch!.id, position, body })))
+        .values(
+          parts.map((body, position) => ({
+            accountId,
+            batchId: batch!.id,
+            position,
+            body,
+            // 登録した人（specs/008 FR-053）
+            createdByUserId: access?.actor.id ?? null,
+          })),
+        )
         .returning();
       drafts.sort((a, b) => a.position - b.position);
+      if (access) {
+        await recordActivity(tx, access, {
+          kind: "draft",
+          action: "drafts_registered",
+          itemCount: drafts.length,
+          excerpts: drafts.map((d) => d.body),
+        });
+      }
       return { created: true, result: toBatchResult(batch!, drafts) };
     });
   } catch (err) {
@@ -327,10 +351,16 @@ export async function createDraftBatch(
  * @param db - データベース
  * @param accountId - accounts.id
  * @param batchId - draft_batches.id（UUID の形は確かめてあること）
+ * @param access - 操作した人（操作の記録と、保存した人に使う。specs/008）。省略すると記録しない
  * @returns 削除した件数（すでに消えていれば0）
  * @throws AppError ITEM_NOT_FOUND（登録のまとまりがない、または別のAccountのもの）
  */
-export async function deleteBatch(db: Db, accountId: string, batchId: string): Promise<number> {
+export async function deleteBatch(
+  db: Db | TxDb,
+  accountId: string,
+  batchId: string,
+  access?: AccountAccess,
+): Promise<number> {
   const [batch] = await db
     .select({ id: draftBatches.id })
     .from(draftBatches)
@@ -346,7 +376,15 @@ export async function deleteBatch(db: Db, accountId: string, batchId: string): P
         eq(postDrafts.status, "needs_review"),
       ),
     )
-    .returning({ id: postDrafts.id });
+    .returning();
+  if (access && deleted.length > 0) {
+    await recordActivity(db, access, {
+      kind: "draft",
+      action: "batch_undone",
+      itemCount: deleted.length,
+      excerpts: deleted.map((d) => d.body),
+    });
+  }
   return deleted.length;
 }
 
@@ -358,6 +396,7 @@ export async function deleteBatch(db: Db, accountId: string, batchId: string): P
  * @param accountId - accounts.id
  * @param id - post_drafts.id（UUID の形は確かめてあること）
  * @param req - body：新しい本文、expectedVersion：読み込んだときの version
+ * @param access - 操作した人（操作の記録と、保存した人に使う。specs/008）。省略すると記録しない
  * @returns draft：更新した PostDraft、reopened：承認済みから要確認に戻したか
  * @throws AppError STALE_UPDATE（他で先に更新された。latest 付き）、ITEM_NOT_FOUND（ない・別のAccountのもの・却下・投稿済み・投稿に失敗の下書き）、
  *   DRAFT_PUBLISHING（投稿の処理中。latest 付き。005 FR-008）
@@ -367,6 +406,7 @@ export async function updateDraft(
   accountId: string,
   id: string,
   req: { body: string; expectedVersion: number },
+  access?: AccountAccess,
 ) {
   return withTransaction(env.DATABASE_URL, async (tx) => {
     await lockAccountDrafts(tx, accountId);
@@ -391,7 +431,9 @@ export async function updateDraft(
           .set({
             body: req.body.trim(),
             // 登録の後に人が本文を直した（specs/006 FR-002e）。前後の空白だけの違いは直したことにしない
-            ...(before && before.body.trim() !== req.body.trim() ? { bodyEditedAt: new Date() } : {}),
+            ...(before && before.body.trim() !== req.body.trim()
+              ? { bodyEditedAt: new Date(), ...(access ? { editedByUserId: access.actor.id } : {}) }
+              : {}),
             status: "needs_review",
             reviewedAt: null,
             lastReviewRequestId: null,
@@ -405,30 +447,58 @@ export async function updateDraft(
           .returning(),
       async () => (await tx.select().from(postDrafts).where(mine).limit(1))[0],
       toPostDraft,
+      (current) => updatedByOf(tx, current.editedByUserId),
     );
-    return { draft: toPostDraft(row), reopened: before?.status === "approved" };
+    const reopened = before?.status === "approved";
+    if (access) {
+      await recordActivity(tx, access, {
+        kind: "draft",
+        action: "draft_edited",
+        excerpts: [row.body],
+        ...(reopened ? { details: { reopened: true } } : {}),
+      });
+    }
+    return { draft: toPostDraft(row), reopened };
   });
 }
 
 /**
  * 下書きをまとめて削除する（003 FR-020、004 FR-009）。そのAccountの要確認と却下の下書きを消し、それ以外のIDは無視する。
  * 承認済みの下書きは、要確認に戻してから削除する。
+ * 承認の操作を許されていない人（編集者・承認を任されていないパートナー）は、要確認の下書きだけを消せる（specs/008 FR-002a）。
  * @param db - データベース
  * @param accountId - accounts.id
  * @param ids - post_drafts.id の一覧（UUID の形は確かめてあること）
+ * @param canReview - 承認の操作を許されているか（false なら却下の下書きは消さずに飛ばす）
+ * @param access - 操作した人（操作の記録と、保存した人に使う。specs/008）。省略すると記録しない
  * @returns 削除した件数
  */
-export async function deleteDrafts(db: Db, accountId: string, ids: string[]): Promise<number> {
+export async function deleteDrafts(
+  db: Db | TxDb,
+  accountId: string,
+  ids: string[],
+  canReview = true,
+  access?: AccountAccess,
+): Promise<number> {
   const deleted = await db
     .delete(postDrafts)
     .where(
       and(
         inArray(postDrafts.id, ids),
         eq(postDrafts.accountId, accountId),
-        inArray(postDrafts.status, ["needs_review", "rejected"]),
+        inArray(postDrafts.status, canReview ? ["needs_review", "rejected"] : ["needs_review"]),
       ),
     )
-    .returning({ id: postDrafts.id });
+    .returning();
+  // 削除の確定（取り消しの猶予の後にWebが送る）を記録する（specs/008 FR-050a）
+  if (access && deleted.length > 0) {
+    await recordActivity(db, access, {
+      kind: "draft",
+      action: "drafts_deleted",
+      itemCount: deleted.length,
+      excerpts: deleted.map((d) => d.body),
+    });
+  }
   return deleted.length;
 }
 
@@ -516,6 +586,7 @@ export async function listPublishedPage(
  * @param accountId - AccountのID
  * @param id - 下書きのID
  * @param expectedVersion - 読み込んだ版
+ * @param access - 操作した人（操作の記録と、保存した人に使う。specs/008）。省略すると記録しない
  * @returns 更新後の下書き
  */
 export async function prioritizeDraft(
@@ -523,6 +594,7 @@ export async function prioritizeDraft(
   accountId: string,
   id: string,
   expectedVersion: number,
+  access?: AccountAccess,
 ) {
   return withTransaction(env.DATABASE_URL, async (tx) => {
     await lockAccountDrafts(tx, accountId);
@@ -542,6 +614,7 @@ export async function prioritizeDraft(
       async () => (await tx.select().from(postDrafts).where(approved).limit(1))[0],
       toPostDraft,
     );
+    if (access) await recordActivity(tx, access, { kind: "review", action: "draft_prioritized", excerpts: [row.body] });
     return { draft: toPostDraft(row) };
   });
 }

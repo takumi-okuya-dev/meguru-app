@@ -154,3 +154,21 @@ export const FEEDBACK_MEMO_MAX = 200;
 export const PROMPT_POOR_POSTS = 5;
 /** フォロワー数を記録するAccountの条件：この日数のうちに自動投稿した投稿がある（FR-002c）。 */
 export const FOLLOWER_ACTIVE_DAYS = 30;
+
+// ---- チーム運用（specs/008-team-operations plan.md「制約」）----
+/** 1チームの編集者の上限（FR-021）。 */
+export const TEAM_EDITOR_LIMIT = 10;
+/** 操作の記録を残す日数（FR-051）。 */
+export const ACTIVITY_LOG_RETENTION_DAYS = 90;
+/** まとめての操作の記録に入れる、対象の書き出しの件数（FR-050a）。 */
+export const ACTIVITY_DETAILS_EXCERPT_LIMIT = 50;
+/** 操作の記録の要約に入れる投稿の書き出しの文字数。 */
+export const ACTIVITY_SUMMARY_CHARS = 30;
+/** チーム名の上限（文字。FR-015）。 */
+export const TEAM_NAME_MAX = 50;
+/** 手伝っているアカウントのまとめに出す件数の上限（research.md R12）。 */
+export const PARTNER_SUMMARY_LIMIT = 100;
+/** 操作の記録の1回の件数（既定。FR-052）。 */
+export const ACTIVITY_PAGE_SIZE = 50;
+/** 操作の記録の1回の件数の上限。 */
+export const ACTIVITY_PAGE_MAX = 100;

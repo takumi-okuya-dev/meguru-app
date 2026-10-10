@@ -64,6 +64,13 @@
       "when": 1791456434545,
       "tag": "0008_performance",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1791559929189,
+      "tag": "0009_team_operations",
+      "breakpoints": true
     }
   ]
 }

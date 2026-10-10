@@ -1,5 +1,7 @@
 // 投稿の設定（specs/005-auto-post research.md R1、contracts/api.md「GET・PUT /posting-schedule」）。
 // 自動投稿は全プランで使えるので、grower機能は判定しない（FR-004）。
+import type { AccountAccess } from "./access";
+import { recordActivity, updatedByOf } from "./activity-log";
 import {
   minutesToTime,
   validatePostingSchedule,
@@ -96,6 +98,7 @@ function sameMinutes(a: number[], b: number[]): boolean {
  * @param req - リクエスト（スキーマで形を確かめてあること）
  * @param threads - Threads API のクライアント
  * @param now - 今の時刻
+ * @param access - 操作した人（操作の記録と、保存した人に使う。specs/008）。省略すると記録しない
  * @returns 保存した設定と、投稿の権限の確認の結果（オフの保存では null）
  * @throws AppError VALIDATION_FAILED（details と reason）、THREADS_NOT_READY（details に結果）、STALE_UPDATE（latest 付き）、ACCOUNT_NOT_FOUND
  */
@@ -106,6 +109,7 @@ export async function savePostingSchedule(
   req: PutPostingScheduleRequest,
   threads: ThreadsClient,
   now: Date = new Date(),
+  access?: AccountAccess,
 ): Promise<{ schedule: PostingSchedule; connectionCheck: ThreadsCheck | null }> {
   const v = validatePostingSchedule(req);
   if (!v.ok) {
@@ -121,9 +125,12 @@ export async function savePostingSchedule(
     );
   }
   const current = await readPostingSchedule(db, accountId);
-  const stale = () =>
-    new AppError("STALE_UPDATE", 409, "updated elsewhere", toPostingSchedule(current));
-  if ((current?.version ?? 0) !== req.expectedVersion) throw stale();
+  if ((current?.version ?? 0) !== req.expectedVersion) {
+    // 先に保存した人の名前を添える（specs/008 FR-007）
+    throw new AppError("STALE_UPDATE", 409, "updated elsewhere", toPostingSchedule(current), undefined, {
+      updatedBy: await updatedByOf(db, current?.updatedByUserId),
+    });
+  }
 
   let connectionCheck: ThreadsCheck | null = null;
   if (req.enabled) {
@@ -148,6 +155,7 @@ export async function savePostingSchedule(
     slotMinutes: v.slotMinutes,
     jitter: req.jitter,
     ...(timingChanged ? { effectiveFrom: now } : {}),
+    ...(access ? { updatedByUserId: access.actor.id } : {}),
     updatedAt: now,
   };
   try {
@@ -167,13 +175,19 @@ export async function savePostingSchedule(
           .values({ accountId, ...values, effectiveFrom: now })
           .onConflictDoNothing()
           .returning();
-    if (!row)
-      throw new AppError(
-        "STALE_UPDATE",
-        409,
-        "updated elsewhere",
-        toPostingSchedule(await readPostingSchedule(db, accountId)),
-      );
+    if (!row) {
+      const latest = await readPostingSchedule(db, accountId);
+      throw new AppError("STALE_UPDATE", 409, "updated elsewhere", toPostingSchedule(latest), undefined, {
+        updatedBy: await updatedByOf(db, latest?.updatedByUserId),
+      });
+    }
+    if (access) {
+      await recordActivity(db, access, {
+        kind: "settings",
+        action: "schedule_saved",
+        summary: `自動投稿${row.enabled ? "オン" : "オフ"}・1日${row.slotMinutes.length}件`,
+      });
+    }
     return { schedule: toPostingSchedule(row), connectionCheck };
   } catch (err) {
     // 外部キー違反：途中でAccountが削除された

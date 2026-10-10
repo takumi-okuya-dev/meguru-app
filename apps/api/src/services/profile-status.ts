@@ -11,7 +11,7 @@ import { getStrategy } from "./strategy-service";
  * 件数は1回のクエリでまとめて数える。
  * @param db - データベース
  * @param account - Account の行（所有の確認は呼び出し側で済ませる）
- * @param user - リクエストしたユーザー（登録日時で無料体験を判定する）
+ * @param user - Accountのオーナー（登録日時で無料体験を判定する。specs/008 research.md R3）
  * @param now - 現在時刻
  * @returns 入力状況
  */

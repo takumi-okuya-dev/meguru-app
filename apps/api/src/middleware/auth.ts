@@ -116,3 +116,21 @@ export function authMiddleware(makeVerifier: (env: Env) => AuthVerifier) {
     await next();
   });
 }
+
+/**
+ * ログインが任意の認証のミドルウェアを作る（specs/008 招待の確認。research.md R7）。
+ * Authorization があれば authMiddleware と同じく検証して user を置き、なければ user なしで次へ進む。
+ * @param makeVerifier - バインディングから AuthVerifier を作る関数
+ * @returns Hono のミドルウェア
+ */
+export function optionalAuthMiddleware(makeVerifier: (env: Env) => AuthVerifier) {
+  const required = authMiddleware(makeVerifier);
+  return createMiddleware<{ Bindings: Env; Variables: Partial<AuthVariables> }>(async (c, next) => {
+    if (!c.req.header("Authorization")) {
+      await next();
+      return;
+    }
+    // 認証済みのときの処理は authMiddleware と同じ（JIT作成を含む）
+    await required(c as never, next);
+  });
+}

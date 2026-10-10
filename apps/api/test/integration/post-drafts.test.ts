@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { AFTER_TRIAL, call, createUserWithAccount, makeApp, resetDb, setAccount, testEnv } from "../helpers/app";
 
 import { approvedDrafts, db, setSchedule } from "../helpers/auto-post";
+import { makeEditor, makePartner } from "../helpers/team";
 
 const app = makeApp();
 
@@ -599,5 +600,38 @@ describe("005：予定と次に投稿する操作", () => {
     expect(await (await request(1)).json()).toMatchObject({ error: { code: "DRAFT_PUBLISHING" } });
     await db()`UPDATE post_drafts SET status = 'needs_review', reviewed_at = NULL WHERE id = ${id!}`;
     expect((await request(1)).status).toBe(404);
+  });
+});
+
+// ---- チーム運用：削除の範囲（specs/008 FR-002a）----
+describe("編集者の削除（チーム運用）", () => {
+  it("編集者は要確認の案だけを消せ、却下の案は消さずに飛ばす", async () => {
+    const { accountId } = await createUserWithAccount("o1");
+    const { teamId } = await makePartner(accountId, "p1");
+    await makeEditor(teamId, "e1", [accountId]);
+    const reg = await call(app, "POST", `/api/accounts/${accountId}/draft-batches`, {
+      user: "e1",
+      body: { clientRequestId: crypto.randomUUID(), text: "残す案\n@@@\n却下する案" },
+    });
+    expect(reg.status).toBe(201);
+    const [keep, rejected] = ((await reg.json()) as { drafts: { id: string; version: number }[] }).drafts;
+    const rej = await call(app, "POST", `/api/accounts/${accountId}/post-drafts/review`, {
+      user: "o1",
+      body: {
+        requestId: crypto.randomUUID(),
+        action: "reject",
+        items: [{ id: rejected!.id, expectedVersion: rejected!.version }],
+        reject: { reasons: [], note: "違う" },
+      },
+    });
+    expect(rej.status).toBe(200);
+    const del = await call(app, "POST", `/api/accounts/${accountId}/post-drafts/delete`, {
+      user: "e1",
+      body: { ids: [keep!.id, rejected!.id] },
+    });
+    expect(del.status).toBe(200);
+    expect(await del.json()).toEqual({ deletedCount: 1 });
+    const left = (await neon(testEnv.DATABASE_URL)`SELECT id FROM post_drafts WHERE account_id = ${accountId}`) as { id: string }[];
+    expect(left.map((r) => r.id)).toEqual([rejected!.id]);
   });
 });

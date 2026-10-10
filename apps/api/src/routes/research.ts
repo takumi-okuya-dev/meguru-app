@@ -16,7 +16,8 @@ import { createDb } from "../db/client";
 import { referencePosts, researchKeywords } from "../db/schema";
 import { AppError, pgErrorCode } from "../lib/errors";
 import { parseBody } from "../lib/validate";
-import { findOwnedAccount } from "../services/access";
+import { authorizeAccount } from "../services/access";
+import { recordActivity, updatedByOf } from "../services/activity-log";
 import { touchMaterials } from "../services/materials";
 import { canEditProfile, requireGrowerAccess } from "../services/grower-access";
 import { assertItemId, insertWithLimit, updateWithVersion } from "../services/item-service";
@@ -93,19 +94,21 @@ export function researchRoutes(authed: MiddlewareHandler<AppEnv>) {
       .get("/accounts/:accountId/reference-posts", authed, async (c) => {
         const db = createDb(c.env.DATABASE_URL);
         const user = c.get("user");
-        const account = await findOwnedAccount(db, user.id, c.req.param("accountId"));
+        const access = await authorizeAccount(db, user, c.req.param("accountId"), "view");
+        const account = access.account;
         const rows = await db
           .select()
           .from(referencePosts)
           .where(eq(referencePosts.accountId, account.id))
           .orderBy(desc(referencePosts.createdAt), desc(referencePosts.id));
-        return c.json({ items: rows.map(toReferencePost), limit: REFERENCE_POST_LIMIT, canEdit: canEditProfile(account, user) });
+        return c.json({ items: rows.map(toReferencePost), limit: REFERENCE_POST_LIMIT, canEdit: canEditProfile(account, access.owner) });
       })
       .post("/accounts/:accountId/reference-posts", authed, async (c) => {
         const db = createDb(c.env.DATABASE_URL);
         const user = c.get("user");
-        const account = await findOwnedAccount(db, user.id, c.req.param("accountId"));
-        requireGrowerAccess(account, user);
+        const access = await authorizeAccount(db, user, c.req.param("accountId"), "content");
+        const account = access.account;
+        requireGrowerAccess(account, access.owner);
         const input = await parseBody(referencePostInputSchema, c.req.json());
         const row = await insertWithLimit(
           c.env,
@@ -115,16 +118,23 @@ export function researchRoutes(authed: MiddlewareHandler<AppEnv>) {
           async (tx) =>
             (await tx.select({ n: count() }).from(referencePosts).where(eq(referencePosts.accountId, account.id)))[0]!.n,
           async (tx) =>
-            (await tx.insert(referencePosts).values({ accountId: account.id, ...referenceColumns(input) }).returning())[0]!,
+            (
+              await tx
+                .insert(referencePosts)
+                .values({ accountId: account.id, ...referenceColumns(input), updatedByUserId: access.actor.id })
+                .returning()
+            )[0]!,
         );
         await touchMaterials(db, account.id, "research");
+        await recordActivity(db, access, { kind: "content", action: "reference_post_added", excerpts: [row.body] });
         return c.json(toReferencePost(row), 201);
       })
       .put("/accounts/:accountId/reference-posts/:referencePostId", authed, async (c) => {
         const db = createDb(c.env.DATABASE_URL);
         const user = c.get("user");
-        const account = await findOwnedAccount(db, user.id, c.req.param("accountId"));
-        requireGrowerAccess(account, user);
+        const access = await authorizeAccount(db, user, c.req.param("accountId"), "content");
+        const account = access.account;
+        requireGrowerAccess(account, access.owner);
         const id = assertItemId(c.req.param("referencePostId"));
         const { expectedVersion, ...input } = await parseBody(updateReferencePostRequestSchema, c.req.json());
         const where = and(eq(referencePosts.id, id), eq(referencePosts.accountId, account.id));
@@ -132,42 +142,58 @@ export function researchRoutes(authed: MiddlewareHandler<AppEnv>) {
           () =>
             db
               .update(referencePosts)
-              .set({ ...referenceColumns(input), version: sql`${referencePosts.version} + 1`, updatedAt: new Date() })
+              .set({
+                ...referenceColumns(input),
+                updatedByUserId: access.actor.id,
+                version: sql`${referencePosts.version} + 1`,
+                updatedAt: new Date(),
+              })
               .where(and(where, eq(referencePosts.version, expectedVersion)))
               .returning(),
           async () => (await db.select().from(referencePosts).where(where).limit(1))[0],
           toReferencePost,
+          (current) => updatedByOf(db, current.updatedByUserId),
         );
         await touchMaterials(db, account.id, "research");
+        await recordActivity(db, access, { kind: "content", action: "reference_post_updated", excerpts: [row.body] });
         return c.json(toReferencePost(row));
       })
       .delete("/accounts/:accountId/reference-posts/:referencePostId", authed, async (c) => {
         const db = createDb(c.env.DATABASE_URL);
         const user = c.get("user");
-        const account = await findOwnedAccount(db, user.id, c.req.param("accountId"));
-        requireGrowerAccess(account, user);
+        const access = await authorizeAccount(db, user, c.req.param("accountId"), "content");
+        const account = access.account;
+        requireGrowerAccess(account, access.owner);
         const id = assertItemId(c.req.param("referencePostId"));
-        await db.delete(referencePosts).where(and(eq(referencePosts.id, id), eq(referencePosts.accountId, account.id)));
+        const removed = await db
+          .delete(referencePosts)
+          .where(and(eq(referencePosts.id, id), eq(referencePosts.accountId, account.id)))
+          .returning({ body: referencePosts.body });
         await touchMaterials(db, account.id, "research");
+        if (removed[0]) {
+          await recordActivity(db, access, { kind: "content", action: "reference_post_deleted", excerpts: [removed[0].body] });
+        }
         return c.body(null, 204);
       })
       // ---- キーワード ----
       .get("/accounts/:accountId/research-keywords", authed, async (c) => {
         const db = createDb(c.env.DATABASE_URL);
         const user = c.get("user");
-        const account = await findOwnedAccount(db, user.id, c.req.param("accountId"));
+        const access = await authorizeAccount(db, user, c.req.param("accountId"), "view");
+        const account = access.account;
         const rows = await db
           .select()
           .from(researchKeywords)
           .where(eq(researchKeywords.accountId, account.id))
           .orderBy(desc(researchKeywords.createdAt), desc(researchKeywords.id));
-        return c.json({ items: rows.map(toKeyword), limit: KEYWORD_LIMIT, canEdit: canEditProfile(account, user) });
+        return c.json({ items: rows.map(toKeyword), limit: KEYWORD_LIMIT, canEdit: canEditProfile(account, access.owner) });
       })
       .post("/accounts/:accountId/research-keywords", authed, async (c) => {
         const db = createDb(c.env.DATABASE_URL);
         const user = c.get("user");
-        const account = await findOwnedAccount(db, user.id, c.req.param("accountId"));
-        requireGrowerAccess(account, user);
+        const access = await authorizeAccount(db, user, c.req.param("accountId"), "content");
+        const account = access.account;
+        requireGrowerAccess(account, access.owner);
         const input = await parseBody(researchKeywordInputSchema, c.req.json());
         const row = await withDuplicateCheck(() =>
           insertWithLimit(
@@ -186,19 +212,22 @@ export function researchRoutes(authed: MiddlewareHandler<AppEnv>) {
                     keyword: input.keyword,
                     keywordNormalized: normalizeKeyword(input.keyword),
                     purpose: orNull(input.purpose),
+                    updatedByUserId: access.actor.id,
                   })
                   .returning()
               )[0]!,
           ),
         );
         await touchMaterials(db, account.id, "research");
+        await recordActivity(db, access, { kind: "content", action: "research_keyword_added", summary: row.keyword });
         return c.json(toKeyword(row), 201);
       })
       .put("/accounts/:accountId/research-keywords/:keywordId", authed, async (c) => {
         const db = createDb(c.env.DATABASE_URL);
         const user = c.get("user");
-        const account = await findOwnedAccount(db, user.id, c.req.param("accountId"));
-        requireGrowerAccess(account, user);
+        const access = await authorizeAccount(db, user, c.req.param("accountId"), "content");
+        const account = access.account;
+        requireGrowerAccess(account, access.owner);
         const id = assertItemId(c.req.param("keywordId"));
         const { expectedVersion, ...input } = await parseBody(updateResearchKeywordRequestSchema, c.req.json());
         const where = and(eq(researchKeywords.id, id), eq(researchKeywords.accountId, account.id));
@@ -211,6 +240,7 @@ export function researchRoutes(authed: MiddlewareHandler<AppEnv>) {
                   keyword: input.keyword,
                   keywordNormalized: normalizeKeyword(input.keyword),
                   purpose: orNull(input.purpose),
+                  updatedByUserId: access.actor.id,
                   version: sql`${researchKeywords.version} + 1`,
                   updatedAt: new Date(),
                 })
@@ -218,19 +248,28 @@ export function researchRoutes(authed: MiddlewareHandler<AppEnv>) {
                 .returning(),
             async () => (await db.select().from(researchKeywords).where(where).limit(1))[0],
             toKeyword,
+            (current) => updatedByOf(db, current.updatedByUserId),
           ),
         );
         await touchMaterials(db, account.id, "research");
+        await recordActivity(db, access, { kind: "content", action: "research_keyword_updated", summary: row.keyword });
         return c.json(toKeyword(row));
       })
       .delete("/accounts/:accountId/research-keywords/:keywordId", authed, async (c) => {
         const db = createDb(c.env.DATABASE_URL);
         const user = c.get("user");
-        const account = await findOwnedAccount(db, user.id, c.req.param("accountId"));
-        requireGrowerAccess(account, user);
+        const access = await authorizeAccount(db, user, c.req.param("accountId"), "content");
+        const account = access.account;
+        requireGrowerAccess(account, access.owner);
         const id = assertItemId(c.req.param("keywordId"));
-        await db.delete(researchKeywords).where(and(eq(researchKeywords.id, id), eq(researchKeywords.accountId, account.id)));
+        const removed = await db
+          .delete(researchKeywords)
+          .where(and(eq(researchKeywords.id, id), eq(researchKeywords.accountId, account.id)))
+          .returning({ keyword: researchKeywords.keyword });
         await touchMaterials(db, account.id, "research");
+        if (removed[0]) {
+          await recordActivity(db, access, { kind: "content", action: "research_keyword_deleted", summary: removed[0].keyword });
+        }
         return c.body(null, 204);
       })
   );

@@ -9,6 +9,8 @@ import { AppError, itemNotFound, notFound, pgErrorCode } from "../lib/errors";
 import type { AccountRow } from "./access";
 import { CLEAR_QUEUE_FIELDS } from "./draft-service";
 import { canEditProfile } from "./grower-access";
+import type { AccountAccess } from "./access";
+import { recordActivity, updatedByOf } from "./activity-log";
 
 type NgWordRow = typeof ngWords.$inferSelect;
 
@@ -35,7 +37,7 @@ export async function listNgWords(db: Db | TxDb, accountId: string): Promise<NgW
  * 「このアカウントの設定」の「投稿のルール」に必要な値（GET /posting-rules）。
  * @param db - データベース
  * @param account - Account の行
- * @param user - リクエストしたユーザー（無料体験の判定に使う）
+ * @param user - Accountのオーナー（無料体験の判定に使う。specs/008 research.md R3）
  * @returns NGワード・上限・投稿ルール・投稿ルールを編集できるか
  */
 export async function getPostingRules(db: Db, account: AccountRow, user: { createdAt: Date }) {
@@ -55,10 +57,11 @@ export async function getPostingRules(db: Db, account: AccountRow, user: { creat
  * @param env - Workers のバインディング（DATABASE_URL を使う）
  * @param accountId - accounts.id
  * @param words - 入力された語（スキーマで長さを確かめてあること）
+ * @param access - 操作した人（操作の記録と、保存した人に使う。specs/008）。省略すると記録しない
  * @returns added：足した語、duplicates：重複で足さなかった語（入力のまま）、reopenedCount：要確認に戻した下書きの件数
  * @throws AppError ITEM_LIMIT_REACHED（200語を超える。何も足さない）、ACCOUNT_NOT_FOUND（途中でAccountが削除された）
  */
-export async function addNgWords(env: Env, accountId: string, words: string[]) {
+export async function addNgWords(env: Env, accountId: string, words: string[], access?: AccountAccess) {
   try {
     return await withTransaction(env.DATABASE_URL, async (tx) => {
       await lockAccountDrafts(tx, accountId);
@@ -110,6 +113,15 @@ export async function addNgWords(env: Env, accountId: string, words: string[]) {
           .where(and(eq(postDrafts.accountId, accountId), inArray(postDrafts.id, hitIds)));
       }
       added.sort((a, b) => a.seq - b.seq);
+      if (access) {
+        await recordActivity(tx, access, {
+          kind: "settings",
+          action: "ng_word_added",
+          itemCount: added.length,
+          summary: added.map((w) => w.word).join("、"),
+          ...(hitIds.length > 0 ? { details: { reopenedCount: hitIds.length } } : {}),
+        });
+      }
       return { added: added.map(toNgWord), duplicates, reopenedCount: hitIds.length };
     });
   } catch (err) {
@@ -124,17 +136,19 @@ export async function addNgWords(env: Env, accountId: string, words: string[]) {
  * @param env - Workers のバインディング（DATABASE_URL を使う）
  * @param accountId - accounts.id
  * @param id - ng_words.id（UUID の形は確かめてあること）
+ * @param access - 操作した人（操作の記録と、保存した人に使う。specs/008）。省略すると記録しない
  * @throws AppError ITEM_NOT_FOUND（ない・別のAccountのもの）
  */
-export async function deleteNgWord(env: Env, accountId: string, id: string): Promise<void> {
+export async function deleteNgWord(env: Env, accountId: string, id: string, access?: AccountAccess): Promise<void> {
   await withTransaction(env.DATABASE_URL, async (tx) => {
     // 承認のチェックと順序をそろえる（消した直後の承認が、消す前の語で止まらないように）
     await lockAccountDrafts(tx, accountId);
     const deleted = await tx
       .delete(ngWords)
       .where(and(eq(ngWords.id, id), eq(ngWords.accountId, accountId)))
-      .returning({ id: ngWords.id });
+      .returning({ id: ngWords.id, word: ngWords.word });
     if (deleted.length === 0) throw itemNotFound();
+    if (access) await recordActivity(tx, access, { kind: "settings", action: "ng_word_deleted", summary: deleted[0]!.word });
   });
 }
 
@@ -144,10 +158,16 @@ export async function deleteNgWord(env: Env, accountId: string, id: string): Pro
  * @param db - データベース
  * @param accountId - accounts.id
  * @param req - text：投稿ルール、expectedVersion：読み込んだときの core_rules_version
+ * @param access - 操作した人（操作の記録と、保存した人に使う。specs/008）。省略すると記録しない
  * @returns 保存した投稿ルールと版
  * @throws AppError STALE_UPDATE（他で先に保存された。latest 付き）、ACCOUNT_NOT_FOUND（Accountがない）
  */
-export async function saveCoreRules(db: Db, accountId: string, req: { text: string; expectedVersion: number }) {
+export async function saveCoreRules(
+  db: Db,
+  accountId: string,
+  req: { text: string; expectedVersion: number },
+  access?: AccountAccess,
+) {
   const [row] = await db
     .update(accounts)
     .set({
@@ -155,16 +175,32 @@ export async function saveCoreRules(db: Db, accountId: string, req: { text: stri
       coreRulesVersion: sql`${accounts.coreRulesVersion} + 1`,
       // プロンプトの材料を最後に変えた日時（specs/006 research.md R9）
       coreRulesChangedAt: new Date(),
+      ...(access ? { coreRulesUpdatedByUserId: access.actor.id } : {}),
       updatedAt: new Date(),
     })
     .where(and(eq(accounts.id, accountId), eq(accounts.coreRulesVersion, req.expectedVersion)))
     .returning({ coreRules: accounts.coreRules, coreRulesVersion: accounts.coreRulesVersion });
-  if (row) return row;
+  if (row) {
+    if (access) await recordActivity(db, access, { kind: "settings", action: "core_rules_saved" });
+    return row;
+  }
   const [current] = await db
-    .select({ coreRules: accounts.coreRules, coreRulesVersion: accounts.coreRulesVersion })
+    .select({
+      coreRules: accounts.coreRules,
+      coreRulesVersion: accounts.coreRulesVersion,
+      by: accounts.coreRulesUpdatedByUserId,
+    })
     .from(accounts)
     .where(eq(accounts.id, accountId))
     .limit(1);
   if (!current) throw notFound();
-  throw new AppError("STALE_UPDATE", 409, "updated elsewhere", current);
+  // 先に保存した人の名前を添える（specs/008 FR-007）
+  throw new AppError(
+    "STALE_UPDATE",
+    409,
+    "updated elsewhere",
+    { coreRules: current.coreRules, coreRulesVersion: current.coreRulesVersion },
+    undefined,
+    { updatedBy: await updatedByOf(db, current.by) },
+  );
 }

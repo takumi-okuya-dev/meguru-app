@@ -2,6 +2,7 @@
 import { emptyStrategyValues } from "@threads-grower/shared";
 import { beforeEach, describe, expect, it } from "vitest";
 import { AFTER_TRIAL, call, createUserWithAccount, makeApp, resetDb, setAccount } from "../helpers/app";
+import { ensureUser, makeEditor, makePartner } from "../helpers/team";
 
 const app = makeApp();
 
@@ -190,5 +191,33 @@ describe("GET・PUT /api/accounts/:id/strategy", () => {
       expect(s.canEdit).toBe(false);
       expect(s.finalAction).toBe("保存済み");
     });
+  });
+});
+
+// ---- チーム運用：grower機能はオーナーの登録日時で判定する（specs/008 research.md R3）----
+describe("grower機能の判定（チーム運用）", () => {
+  it("無料体験の終わった編集者でも、無料体験中のオーナーのAccountは編集できる", async () => {
+    const { accountId } = await createUserWithAccount("o1");
+    const { teamId } = await makePartner(accountId, "p1");
+    await ensureUser("e1", AFTER_TRIAL());
+    await makeEditor(teamId, "e1", [accountId]);
+    const res = await call(app, "PUT", path(accountId), {
+      user: "e1",
+      body: { ...fullValues(), expectedVersion: 0 },
+    });
+    expect(res.status).toBe(200);
+  });
+
+  it("無料体験中の編集者でも、無料体験の終わったオーナー（プラン1）のAccountは編集できない", async () => {
+    const { accountId } = await createUserWithAccount("o1", { userCreatedAt: AFTER_TRIAL() });
+    const { teamId } = await makePartner(accountId, "p1");
+    await makeEditor(teamId, "e1", [accountId]);
+    const res = await call(app, "PUT", path(accountId), {
+      user: "e1",
+      body: { ...fullValues(), expectedVersion: 0 },
+    });
+    expect(res.status).toBe(403);
+    expect(((await res.json()) as { error: { code: string } }).error.code).toBe("GROWER_FEATURE_REQUIRED");
+    expect((await getStrategy(accountId, "e1")).canEdit).toBe(false);
   });
 });

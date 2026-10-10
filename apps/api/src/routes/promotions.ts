@@ -15,7 +15,8 @@ import type { AppEnv } from "../app";
 import { createDb, type Db } from "../db/client";
 import { accounts, promotions } from "../db/schema";
 import { parseBody } from "../lib/validate";
-import { findOwnedAccount } from "../services/access";
+import { authorizeAccount } from "../services/access";
+import { recordActivity, updatedByOf } from "../services/activity-log";
 import { touchMaterials } from "../services/materials";
 import { canEditProfile, requireGrowerAccess } from "../services/grower-access";
 import { assertItemId, insertWithLimit, updateWithVersion } from "../services/item-service";
@@ -89,36 +90,41 @@ export function promotionRoutes(authed: MiddlewareHandler<AppEnv>) {
     .get("/accounts/:accountId/promotion-settings", authed, async (c) => {
       const db = createDb(c.env.DATABASE_URL);
       const user = c.get("user");
-      const account = await findOwnedAccount(db, user.id, c.req.param("accountId"));
-      return c.json({ ratioPercent: account.promotionRatioPercent, canEdit: canEditProfile(account, user) });
+      const access = await authorizeAccount(db, user, c.req.param("accountId"), "view");
+      const account = access.account;
+      return c.json({ ratioPercent: account.promotionRatioPercent, canEdit: canEditProfile(account, access.owner) });
     })
     .put("/accounts/:accountId/promotion-settings", authed, async (c) => {
       const db = createDb(c.env.DATABASE_URL);
       const user = c.get("user");
-      const account = await findOwnedAccount(db, user.id, c.req.param("accountId"));
-      requireGrowerAccess(account, user);
+      const access = await authorizeAccount(db, user, c.req.param("accountId"), "content");
+      const account = access.account;
+      requireGrowerAccess(account, access.owner);
       const { ratioPercent } = await parseBody(promotionSettingsInputSchema, c.req.json());
       // 競合は検知しない（後勝ち。research.md R7）
       await db.update(accounts).set({ promotionRatioPercent: ratioPercent, updatedAt: new Date() }).where(eq(accounts.id, account.id));
+      await recordActivity(db, access, { kind: "content", action: "promotion_ratio_saved", summary: `${ratioPercent}%` });
       return c.json({ ratioPercent, canEdit: true });
     })
     .get("/accounts/:accountId/promotions", authed, async (c) => {
       const db = createDb(c.env.DATABASE_URL);
       const user = c.get("user");
-      const account = await findOwnedAccount(db, user.id, c.req.param("accountId"));
+      const access = await authorizeAccount(db, user, c.req.param("accountId"), "view");
+      const account = access.account;
       const now = new Date();
       const rows = await db.select().from(promotions).where(eq(promotions.accountId, account.id));
       return c.json({
         items: sortPromotions(rows.map((r) => toPromotion(r, now)), now),
         limit: PROMOTION_LIMIT,
-        canEdit: canEditProfile(account, user, now),
+        canEdit: canEditProfile(account, access.owner, now),
       });
     })
     .post("/accounts/:accountId/promotions", authed, async (c) => {
       const db = createDb(c.env.DATABASE_URL);
       const user = c.get("user");
-      const account = await findOwnedAccount(db, user.id, c.req.param("accountId"));
-      requireGrowerAccess(account, user);
+      const access = await authorizeAccount(db, user, c.req.param("accountId"), "content");
+      const account = access.account;
+      requireGrowerAccess(account, access.owner);
       const input = await parseBody(promotionInputSchema, c.req.json());
       const row = await insertWithLimit(
         c.env,
@@ -126,7 +132,14 @@ export function promotionRoutes(authed: MiddlewareHandler<AppEnv>) {
         "promotions",
         PROMOTION_LIMIT,
         async (tx) => (await tx.select({ n: count() }).from(promotions).where(eq(promotions.accountId, account.id)))[0]!.n,
-        async (tx) => (await tx.insert(promotions).values({ accountId: account.id, ...toColumns(input) }).returning())[0]!,
+        async (tx) => {
+          const [inserted] = await tx
+            .insert(promotions)
+            .values({ accountId: account.id, ...toColumns(input), updatedByUserId: access.actor.id })
+            .returning();
+          await recordActivity(tx, access, { kind: "content", action: "promotion_added", summary: inserted!.title });
+          return inserted!;
+        },
       );
       await touchMaterials(db, account.id, "promotions");
       return c.json(toPromotion(row, new Date()), 201);
@@ -134,8 +147,9 @@ export function promotionRoutes(authed: MiddlewareHandler<AppEnv>) {
     .put("/accounts/:accountId/promotions/:promotionId", authed, async (c) => {
       const db = createDb(c.env.DATABASE_URL);
       const user = c.get("user");
-      const account = await findOwnedAccount(db, user.id, c.req.param("accountId"));
-      requireGrowerAccess(account, user);
+      const access = await authorizeAccount(db, user, c.req.param("accountId"), "content");
+      const account = access.account;
+      requireGrowerAccess(account, access.owner);
       const id = assertItemId(c.req.param("promotionId"));
       const { expectedVersion, ...input } = await parseBody(updatePromotionRequestSchema, c.req.json());
       const now = new Date();
@@ -143,24 +157,31 @@ export function promotionRoutes(authed: MiddlewareHandler<AppEnv>) {
         () =>
           db
             .update(promotions)
-            .set({ ...toColumns(input), version: sql`${promotions.version} + 1`, updatedAt: now })
+            .set({ ...toColumns(input), updatedByUserId: access.actor.id, version: sql`${promotions.version} + 1`, updatedAt: now })
             .where(and(eq(promotions.id, id), eq(promotions.accountId, account.id), eq(promotions.version, expectedVersion)))
             .returning(),
         () => findPromotion(db, account.id, id),
         (current) => toPromotion(current, now),
+        (current) => updatedByOf(db, current.updatedByUserId),
       );
       await touchMaterials(db, account.id, "promotions");
+      await recordActivity(db, access, { kind: "content", action: "promotion_updated", summary: row.title });
       return c.json(toPromotion(row, now));
     })
     .delete("/accounts/:accountId/promotions/:promotionId", authed, async (c) => {
       const db = createDb(c.env.DATABASE_URL);
       const user = c.get("user");
-      const account = await findOwnedAccount(db, user.id, c.req.param("accountId"));
-      requireGrowerAccess(account, user);
+      const access = await authorizeAccount(db, user, c.req.param("accountId"), "content");
+      const account = access.account;
+      requireGrowerAccess(account, access.owner);
       const id = assertItemId(c.req.param("promotionId"));
       // すでに消えていても成功とする（contracts/api.md）
-      await db.delete(promotions).where(and(eq(promotions.id, id), eq(promotions.accountId, account.id)));
+      const removed = await db
+        .delete(promotions)
+        .where(and(eq(promotions.id, id), eq(promotions.accountId, account.id)))
+        .returning({ title: promotions.title });
       await touchMaterials(db, account.id, "promotions");
+      if (removed[0]) await recordActivity(db, access, { kind: "content", action: "promotion_deleted", summary: removed[0].title });
       return c.body(null, 204);
     });
 }

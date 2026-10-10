@@ -21,6 +21,8 @@ import {
   toPostDraft,
 } from "./draft-service";
 import { listNgWords } from "./posting-rules-service";
+import type { AccountAccess } from "./access";
+import { recordActivity } from "./activity-log";
 
 type PostDraftRow = typeof postDrafts.$inferSelect;
 type Status = PostDraftRow["status"];
@@ -106,6 +108,14 @@ async function applyChange(
     .returning();
 }
 
+/** 操作の記録のコード（specs/008 contracts/api.md「操作の記録のコード」）。 */
+const REVIEW_ACTIONS = {
+  approve: "drafts_approved",
+  reject: "drafts_rejected",
+  reopen: "drafts_reopened",
+  requeue: "drafts_requeued",
+} as const;
+
 /**
  * 下書きの状態を、1件でもまとめてでも変える（FR-002〜FR-006・FR-010、contracts/api.md「POST /post-drafts/review」）。
  * 同じ操作（requestId）の再試行で、すでにその操作で目的の状態になっている下書きは、何もせず updated に入れる
@@ -114,10 +124,11 @@ async function applyChange(
  * @param env - Workers のバインディング（DATABASE_URL を使う）
  * @param accountId - accounts.id
  * @param req - リクエスト（スキーマで確かめてあること）
+ * @param access - 操作した人（操作の記録と、保存した人に使う。specs/008）。省略すると記録しない
  * @returns updated：状態を変えた（またはすでに目的の状態だった）下書き、skipped：変えなかった下書きと理由、counts：変えた後の件数
  * @throws AppError ACCOUNT_NOT_FOUND（処理の途中でAccountが削除された）
  */
-export async function reviewDrafts(env: Env, accountId: string, req: ReviewRequest) {
+export async function reviewDrafts(env: Env, accountId: string, req: ReviewRequest, access?: AccountAccess) {
   try {
     return await withTransaction(env.DATABASE_URL, async (tx) => {
       // NGワードの追加と同じロックで直列化する（承認とNGワードの追加が同時でも、NGワードを含む承認済みを残さない。R3）
@@ -202,6 +213,18 @@ export async function reviewDrafts(env: Env, accountId: string, req: ReviewReque
 
       const changed = await applyChange(tx, accountId, req, toChange);
       for (const row of changed) updated.set(row.id, toPostDraft(row));
+      // 1回の操作を1行で記録する（specs/008 FR-050a）。同じ requestId の再試行では changed が空なので書かない
+      if (access && changed.length > 0) {
+        await recordActivity(tx, access, {
+          kind: "review",
+          action: REVIEW_ACTIONS[req.action],
+          itemCount: changed.length,
+          excerpts: changed.map((r) => r.body),
+          ...(req.action === "reject" && req.reject
+            ? { details: { reasons: req.reject.reasons, note: req.reject.note ?? null } }
+            : {}),
+        });
+      }
       // ロックの中で読んだ行なので、通常は全件変わる。変わらなかった行（同時の更新）は STALE にする
       for (const row of toChange) {
         if (!updated.has(row.id))
