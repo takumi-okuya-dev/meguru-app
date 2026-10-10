@@ -341,12 +341,14 @@ function RatioRow({
   onGrowerLost: () => void;
 }) {
   const queryClient = useQueryClient();
-  const [draft, setDraft] = useState<string | null>(null);
+  // 入力中の値と、編集を始めたときの版（裏で読み直して版が上がっても、編集を始めたときの版で保存する。
+  // 先に他の人が保存していれば 409 になり、黙って上書きしない。PR #9 のCodexレビュー）
+  const [draft, setDraft] = useState<{ text: string; version: number } | null>(null);
   // 先に他の人が保存していたとき（409 STALE_UPDATE）の最新の値と、保存した人（specs/008 FR-007、PR #9 のCodexレビュー）
   const [conflict, setConflict] = useState<{ latest: PromotionSettings; by: string | null } | null>(null);
-  const shown = draft ?? (value === undefined ? "" : String(value));
+  const shown = draft?.text ?? (value === undefined ? "" : String(value));
   const valid = /^\d+$/.test(shown) && Number(shown) <= 100;
-  const changed = draft !== null && draft !== String(value);
+  const changed = draft !== null && draft.text !== String(value);
   // 保存していない割合も、移動・タブを閉じる前に確認する（FR-019）
   useUnsavedChanges(canEdit && changed);
 
@@ -382,12 +384,15 @@ function RatioRow({
           value={shown}
           readOnly={!canEdit}
           aria-invalid={!valid}
-          onChange={(e) => setDraft(e.target.value)}
+          onChange={(e) => {
+            const text = e.target.value;
+            setDraft((d) => ({ text, version: d?.version ?? version }));
+          }}
           className="h-11 w-20 rounded-xl border border-input bg-card px-3 text-right text-base md:h-9 md:text-[15px]"
         />
         <span>%</span>
         {canEdit && changed && (
-          <Button size="sm" className="rounded-full" disabled={!valid || save.isPending} onClick={() => save.mutate(version)}>
+          <Button size="sm" className="rounded-full" disabled={!valid || save.isPending} onClick={() => save.mutate(draft?.version ?? version)}>
             保存
           </Button>
         )}
@@ -404,7 +409,11 @@ function RatioRow({
           setConflict(null);
         }}
         onOverwrite={() => {
-          if (conflict) save.mutate(conflict.latest.version);
+          if (conflict) {
+            const latestVersion = conflict.latest.version;
+            setDraft((d) => (d ? { ...d, version: latestVersion } : d));
+            save.mutate(latestVersion);
+          }
           setConflict(null);
         }}
       />

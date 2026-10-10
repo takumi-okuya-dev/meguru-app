@@ -340,6 +340,24 @@ describe("プロンプトのカード（US1）", () => {
     expect(putPromptSettings).toHaveBeenCalledTimes(1);
   });
 
+  it("保存中に次の件数を入力していたら、競合（409）でもその入力を捨てず、最新の版で保存し直す（PR #9 のCodexレビュー4回目）", async () => {
+    const user = userEvent.setup();
+    let rejectFirst: (e: unknown) => void = () => {};
+    putPromptSettings.mockImplementationOnce(() => new Promise((_, reject) => (rejectFirst = reject)));
+    putPromptSettings.mockImplementation(async (_id: string, n: number, v: number) => ({ postCount: n, version: v + 1 }));
+    renderPage();
+    const input = await screen.findByRole("spinbutton", { name: "作る件数" });
+    await user.clear(input);
+    await user.type(input, "10");
+    await waitFor(() => expect(putPromptSettings).toHaveBeenCalledWith("a1", 10, 1), { timeout: 2000 });
+    await user.clear(input);
+    await user.type(input, "20");
+    act(() => rejectFirst(new ApiError("STALE_UPDATE", 409, [], { postCount: 12, version: 3 }, { name: "田中 健" })));
+    await waitFor(() => expect(putPromptSettings).toHaveBeenLastCalledWith("a1", 20, 3), { timeout: 2000 });
+    expect(input).toHaveValue(20);
+    expect(toastInfo).toHaveBeenCalledWith("田中 健さんが先に保存しました（12件）。入力した件数で保存し直します");
+  });
+
   it("件数の保存に失敗したら、案内と「もう一度保存」を出し、押すまで送り直さない（Codexレビュー）", async () => {
     const user = userEvent.setup();
     putPromptSettings.mockRejectedValueOnce(new ApiError("API_UNREACHABLE", 0));

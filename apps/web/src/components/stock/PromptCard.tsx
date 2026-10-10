@@ -117,6 +117,11 @@ function PromptReadyCard({
   const [saved, setSaved] = useState(savedCount);
   // 保存に使う版（先に他の人が保存していたら 409 になる。specs/008 FR-007、PR #9 のCodexレビュー）
   const version = useRef(savedVersion);
+  // 保存の応答が返ったときの入力欄の文字（保存中に入力が続いたかを確かめる）
+  const countInputRef = useRef(String(savedCount));
+  useEffect(() => {
+    countInputRef.current = countInput;
+  }, [countInput]);
   const [failed, setFailed] = useState<{ count: number; message: string } | null>(null);
   const [open, setOpen] = useState(false);
   const [edited, setEdited] = useState<string | null>(null);
@@ -166,9 +171,14 @@ function PromptReadyCard({
         version.current = latest.version;
         setSaved(latest.postCount);
         setCount(latest.postCount);
-        setCountInput(String(latest.postCount));
         setFailed(null);
-        toast.info(`${staleUpdateTitle(err.updatedBy?.name)}。作る件数を最新の${latest.postCount}件にしました`);
+        if (countInputRef.current === String(n)) {
+          setCountInput(String(latest.postCount));
+          toast.info(`${staleUpdateTitle(err.updatedBy?.name)}。作る件数を最新の${latest.postCount}件にしました`);
+        } else {
+          // 保存中に入力が続いていたら、その入力は捨てない（入力が止まった後に、最新の版で保存し直す。PR #9 のCodexレビュー）
+          toast.info(`${staleUpdateTitle(err.updatedBy?.name)}（${latest.postCount}件）。入力した件数で保存し直します`);
+        }
       } else if (isGrowerRequired(err)) onGrowerLost();
       else setFailed({ count: n, message: saveErrorMessage(err) });
     },
