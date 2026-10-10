@@ -17,6 +17,31 @@ pnpm --filter api db:migrate   # 0009_team_operations・0010_setting_versions �
 pnpm dev:fake
 ```
 
+## 自動の確認（E2E）
+
+手順3〜6・8の流れは、E2Eで3人（オーナー・パートナー・編集者）を別々のブラウザでログインさせて自動で確かめられる（`e2e/tests/team.spec.ts`）。3人には、Clerk の開発用インスタンスに一度Googleでログインしたことのあるアカウントを使う（README「E2E」）。
+
+```bash
+cp e2e/.env.example e2e/.env.local   # 3人のメールアドレスを書く（初回のみ）
+pnpm e2e -- team                     # 画面を見ながら流すときは -- team --headed
+```
+
+## 3人の画面をまとめて開く（手で触る）
+
+毎回3つのGoogleアカウントでログインし直さなくてよいよう、3人がログインしたブラウザを並べて開くスクリプトがある（`e2e/scripts/team-open.ts`）。開いた後は、ふつうに手で操作できる。
+
+```bash
+pnpm dev:fake                # 別のターミナルで起動しておく
+pnpm team:open --setup       # DBを空にし、接続・パートナーの参加・編集者の参加と担当まで済ませて開く
+pnpm team:open               # 今のデータのまま、3人でログインして開く
+```
+
+- 左からオーナー・パートナー・編集者。右下の印（役割・メールアドレス）で見分ける。ウィンドウの幅は`TEAM_WINDOW_WIDTH`（既定560）。
+- すべて閉じるか、ターミナルでCtrl+Cを押すと終わる。
+
+- E2Eは、ローカルのDB（`threads_grower`）を空にしてから流す。手で作ったデータは消えるので、手動の確認の途中では流さない（APIの結合テストも同じ）。
+- 手動の確認は、見た目（役割の図・通知の位置）・実機のスマートフォン・本物のGoogleログインに絞れる。偽のThreadsの認可画面では「@partner_co で許可する」などで、2件目・3件目のアカウントを接続できる。
+
 ## 1. マイグレーション
 
 - ローカルのPostgres 17で`0009_team_operations`が通る。`membership_role`に`partner`・`editor`が足され、既存の`memberships`の行はすべて`owner`・`team_id`はNULLのまま。

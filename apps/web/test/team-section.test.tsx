@@ -1,6 +1,6 @@
 // このアカウントの設定の「運用を手伝ってもらう」（specs/008-team-operations contracts/ui-routes.md「このアカウントの設定」、US1）
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { AccountTeam } from "@threads-grower/shared";
 import { createMemoryRouter, RouterProvider } from "react-router";
@@ -104,6 +104,30 @@ describe("TeamSection（オーナー）", () => {
     expect(confirm).toHaveTextContent("編集者2人（佐藤 美咲・高橋 涼）");
     await user.click(screen.getAllByRole("button", { name: "外す" }).at(-1)!);
     expect(removePartner).toHaveBeenCalledWith("a1");
+  });
+});
+
+describe("役割の図（FR-048）", () => {
+  it("オーナーは「3つの役割と、できることを見る」で図を開け、オーナーに「あなた」の印が付く", async () => {
+    accountTeam.mockResolvedValue(joined);
+    const user = userEvent.setup();
+    renderSection();
+    const toggle = await screen.findByRole("button", { name: "3つの役割と、できることを見る" });
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByRole("figure", { name: "チーム運用の役割の図" })).not.toBeInTheDocument();
+    await user.click(toggle);
+    const figure = screen.getByRole("figure", { name: "チーム運用の役割の図" });
+    expect(within(figure).getByText("あなた").closest("li")).toHaveTextContent("オーナー");
+    expect(within(figure).getByLabelText("オーナーがパートナーを招く（1アカウントに1人）")).toBeInTheDocument();
+  });
+
+  it("編集者が開くと、編集者に「あなた」の印が付く", async () => {
+    accountTeam.mockResolvedValue(joined);
+    const user = userEvent.setup();
+    renderSection(EDITOR_ACCESS);
+    await user.click(await screen.findByRole("button", { name: "3つの役割と、できることを見る" }));
+    const figure = screen.getByRole("figure", { name: "チーム運用の役割の図" });
+    expect(within(figure).getByText("あなた").closest("li")).toHaveTextContent("編集者");
   });
 });
 

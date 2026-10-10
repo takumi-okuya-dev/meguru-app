@@ -13,7 +13,8 @@
     "test": "pnpm -r --filter '!e2e' test",
     "typecheck": "pnpm -r typecheck",
     "lint": "eslint .",
-    "e2e": "pnpm --filter e2e test"
+    "e2e": "pnpm --filter e2e test",
+    "team:open": "node e2e/scripts/team-open.ts"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

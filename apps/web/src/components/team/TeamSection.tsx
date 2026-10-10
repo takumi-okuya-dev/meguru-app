@@ -2,6 +2,7 @@
 // 個人運用のオーナーに足すのは、この区分1つだけ（FR-006。原則Vの例外）。
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { AccountAccessResponse, AccountTeam } from "@threads-grower/shared";
+import { ChevronDownIcon } from "lucide-react";
 import { useState } from "react";
 import { Link } from "react-router";
 import { toast } from "sonner";
@@ -11,8 +12,34 @@ import { Switch } from "@/components/ui/switch";
 import { api, describeError } from "@/lib/api-client";
 import { formatDate } from "@/lib/format";
 import { queryKeys } from "@/lib/query";
+import { cn } from "@/lib/utils";
 import { InviteLinkDialog } from "./InviteLinkDialog";
 import { RemovePartnerDialog } from "./RemovePartnerDialog";
+import { RoleDiagram, type DiagramRole } from "./RoleDiagram";
+
+/**
+ * 役割の図を開く・閉じる行（FR-048）。区分を読む人の役割に「あなた」の印を付ける。
+ * @param props - role：見ている人の役割
+ * @returns 行と図
+ */
+function RolesHelp({ role }: { role: string }) {
+  const [open, setOpen] = useState(false);
+  const you: DiagramRole | undefined = role === "owner" || role === "partner" || role === "editor" ? role : undefined;
+  return (
+    <div className="space-y-3">
+      <button
+        type="button"
+        aria-expanded={open}
+        onClick={() => setOpen((v) => !v)}
+        className="flex items-center gap-1 text-sm text-foreground underline underline-offset-4"
+      >
+        3つの役割と、できることを見る
+        <ChevronDownIcon aria-hidden="true" className={cn("size-4 transition-transform", open && "rotate-180")} />
+      </button>
+      {open && <RoleDiagram you={you} />}
+    </div>
+  );
+}
 
 /**
  * パートナーを招くときの説明（できること・オーナーだけができること）。
@@ -247,6 +274,8 @@ export function TeamSection({ accountId, access }: { accountId: string; access: 
               </div>
             </div>
           )}
+
+          <RolesHelp role={access.role} />
         </div>
       )}
 

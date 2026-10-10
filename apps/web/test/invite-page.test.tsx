@@ -1,6 +1,6 @@
 // 招待の確認画面（specs/008-team-operations contracts/ui-routes.md「招待の確認」、research.md R7）
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { InvitePreview } from "@threads-grower/shared";
 import { createMemoryRouter, RouterProvider } from "react-router";
@@ -93,6 +93,13 @@ describe("招待の確認画面", () => {
     renderAt();
     expect(await screen.findByText("すでに参加しています。")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "開く" })).toHaveAttribute("href", "/accounts/a1");
+  });
+
+  it("役割の図を出し、招かれた役割（パートナー）に「あなた」の印を付ける（FR-048）", async () => {
+    previewInvite.mockResolvedValue(preview());
+    renderAt();
+    const figure = await screen.findByRole("figure", { name: "チーム運用の役割の図" });
+    expect(within(figure).getByText("あなた").closest("li")).toHaveTextContent("パートナー");
   });
 
   it("使えないリンクは理由と、新しいリンクを頼む案内を出す", async () => {

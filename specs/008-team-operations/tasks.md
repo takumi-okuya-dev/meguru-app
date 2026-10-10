@@ -266,6 +266,18 @@ T031: apps/web/test/stock-roles.test.tsx
 
 ---
 
+## Phase 10: 追加（2026-10-10、手動確認のフィードバック）
+
+- [X] T087 [P] `docs/team-roles.md` を作る：3つの役割の関係の図（mermaid）、できることの表、よくある組み合わせの図、動作確認への案内。`README.md`・`docs/ui-design.md` から案内する（FR-048）。
+- [X] T088 `apps/web/src/components/team/RoleDiagram.tsx` を作り、`TeamSection`（「3つの役割と、できることを見る」）と `pages/invite.tsx`（カードの最後）に置く。`apps/web/test/team-section.test.tsx`・`invite-page.test.tsx` に、図が開くこと・「あなた」の印が役割に付くことのテストを足す（FR-048、contracts/ui-routes.md「役割の図」）。
+- [X] T089 偽のThreadsに3人（`@e2e_user`・`@partner_co`・`@cafe_b`）を起動時に登録し、認可画面で「@… で許可する」を選べるようにする（`apps/api/test/fake-threads/serve.ts`・`server.ts`）。
+- [X] T090 `e2e/tests/helpers.ts`：3人（`E2E_OWNER_EMAIL`・`E2E_PARTNER_EMAIL`・`E2E_EDITOR_EMAIL`。一度Googleでログインしたことのあるアカウント）でチケットでログインする `signInAs`、public のすべての表を空にする `resetAll`。`e2e/env.ts` で Clerk のキー（`apps/api/.dev.vars`）と3人（`e2e/.env.local`）を読む。Googleだけの設定のClerkでは、APIで作ったユーザーはチケットでログインできないため、テスト用ユーザーは作らない。
+- [X] T091 `e2e/tests/team.spec.ts` を作る：3人を別々の BrowserContext でログインさせ、quickstart.md 手順3〜6・8（招待・参加・登録・承認できないこと・編集者の招待・担当・任せる範囲・承認・記録・外す）を流す。
+- [X] T092 `pnpm e2e -- team` を流して通ることを確かめ、verification.md に結果を書く。
+- [X] T093 `e2e/scripts/team-open.ts`（`pnpm team:open`）を作る：3人がログインしたブラウザを並べて開き、手で操作できるようにする（右下に役割の印）。`--setup` でDBを空にして、接続・パートナーの参加・編集者の参加と担当まで済ませる。操作の手順は `e2e/tests/team-flow.ts` にまとめ、E2Eと共用する。
+
+---
+
 ## Implementation Strategy
 
 ### MVP First（US1＋US2）

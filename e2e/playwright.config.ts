@@ -1,4 +1,8 @@
 import { defineConfig } from "@playwright/test";
+import { loadLocalEnv } from "./env";
+
+// Clerk のキー（apps/api/.dev.vars）と、チーム運用の3人（e2e/.env.local）を読む。環境変数にあればそちらを使う
+loadLocalEnv();
 
 // E2E：Web・API・偽のThreadsサーバーを起動し、ログインは @clerk/testing で自動化する（research.md R12）
 // 本物のMetaの認可画面は使わない（quickstart.md の手動確認で行う）

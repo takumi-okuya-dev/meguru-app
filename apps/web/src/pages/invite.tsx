@@ -8,6 +8,7 @@ import { Link, useNavigate, useParams } from "react-router";
 import { AccountAvatar } from "@/components/AccountAvatar";
 import { CenteredLayout } from "@/components/layout/AppShell";
 import { LoadingSkeleton } from "@/components/guards";
+import { RoleDiagram } from "@/components/team/RoleDiagram";
 import { Button } from "@/components/ui/button";
 import { ApiError, api, describeError } from "@/lib/api-client";
 import { queryKeys } from "@/lib/query";
@@ -177,6 +178,12 @@ export function InvitePage() {
               編集者が上限（10人）に達しています。パートナーに相談してください。
             </p>
           )}
+          {/* 他のアプリにあまりない仕組みなので、3つの役割の中での自分の位置を図で示す。
+              「参加する」を押し下げないよう、カードの最後に置く（FR-048） */}
+          <div className="space-y-2 border-t pt-5">
+            <h2 className="text-sm font-medium">チーム運用のしくみ</h2>
+            <RoleDiagram you={p.kind} vertical />
+          </div>
         </div>
       </div>
     </CenteredLayout>
