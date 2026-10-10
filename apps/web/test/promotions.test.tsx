@@ -134,6 +134,26 @@ describe("宣伝内容の画面", () => {
     focusManager.setFocused(undefined);
   });
 
+  it("保存中に次の割合を入力していたら、保存が終わってもその入力を残す（PR #9 のCodexレビュー5回目）", async () => {
+    let resolveFirst: (v: unknown) => void = () => {};
+    putPromotionSettings.mockImplementationOnce(() => new Promise((r) => (resolveFirst = r)));
+    renderPage();
+    const input = await screen.findByRole("spinbutton", { name: "宣伝投稿の割合" });
+    await waitFor(() => expect(input).toHaveValue(20));
+    await waitFor(() => expect(input).not.toHaveAttribute("readonly"));
+    await userEvent.clear(input);
+    await userEvent.type(input, "30");
+    await userEvent.click(screen.getByRole("button", { name: "保存" }));
+    await userEvent.clear(input);
+    await userEvent.type(input, "40");
+    act(() => resolveFirst({ ratioPercent: 30, version: 2, canEdit: true }));
+    await waitFor(() => expect(screen.getByRole("button", { name: "保存" })).toBeEnabled());
+    expect(input).toHaveValue(40);
+    putPromotionSettings.mockResolvedValueOnce({ ratioPercent: 40, version: 3, canEdit: true });
+    await userEvent.click(screen.getByRole("button", { name: "保存" }));
+    expect(putPromotionSettings).toHaveBeenLastCalledWith("a1", 40, 2);
+  });
+
   it("宣伝投稿の割合の競合で「最新の内容を読み込み直す」を選ぶと、先に保存された値を出す", async () => {
     putPromotionSettings.mockRejectedValueOnce(
       new ApiError("STALE_UPDATE", 409, [], { ratioPercent: 40, version: 2, canEdit: true }, { name: "田中 健" }),

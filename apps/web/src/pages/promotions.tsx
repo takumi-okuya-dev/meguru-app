@@ -353,10 +353,12 @@ function RatioRow({
   useUnsavedChanges(canEdit && changed);
 
   const save = useMutation({
-    mutationFn: (expectedVersion: number) => api.putPromotionSettings(accountId, Number(shown), expectedVersion),
-    onSuccess: (s) => {
+    mutationFn: (v: { text: string; expectedVersion: number }) =>
+      api.putPromotionSettings(accountId, Number(v.text), v.expectedVersion),
+    onSuccess: (s, v) => {
       queryClient.setQueryData(queryKeys.promotionSettings(accountId), s);
-      setDraft(null);
+      // 保存中に次の値を入力していたら、その入力は残す（版は保存した後のもの。PR #9 のCodexレビュー）
+      setDraft((d) => (d && d.text !== v.text ? { text: d.text, version: s.version } : null));
       toast.success("保存しました");
     },
     onError: (err) => {
@@ -392,7 +394,7 @@ function RatioRow({
         />
         <span>%</span>
         {canEdit && changed && (
-          <Button size="sm" className="rounded-full" disabled={!valid || save.isPending} onClick={() => save.mutate(draft?.version ?? version)}>
+          <Button size="sm" className="rounded-full" disabled={!valid || save.isPending} onClick={() => save.mutate({ text: shown, expectedVersion: draft?.version ?? version })}>
             保存
           </Button>
         )}
@@ -412,7 +414,7 @@ function RatioRow({
           if (conflict) {
             const latestVersion = conflict.latest.version;
             setDraft((d) => (d ? { ...d, version: latestVersion } : d));
-            save.mutate(latestVersion);
+            save.mutate({ text: shown, expectedVersion: latestVersion });
           }
           setConflict(null);
         }}

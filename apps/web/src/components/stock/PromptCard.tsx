@@ -117,11 +117,9 @@ function PromptReadyCard({
   const [saved, setSaved] = useState(savedCount);
   // 保存に使う版（先に他の人が保存していたら 409 になる。specs/008 FR-007、PR #9 のCodexレビュー）
   const version = useRef(savedVersion);
-  // 保存の応答が返ったときの入力欄の文字（保存中に入力が続いたかを確かめる）
-  const countInputRef = useRef(String(savedCount));
-  useEffect(() => {
-    countInputRef.current = countInput;
-  }, [countInput]);
+  // 入力欄を手で変えた回数。保存を始めたときの回数と比べて、保存中に入力が続いたかを確かめる
+  // （値の一致では、20に変えて10に戻した場合を見分けられない。PR #9 のCodexレビュー）
+  const editGeneration = useRef(0);
   const [failed, setFailed] = useState<{ count: number; message: string } | null>(null);
   const [open, setOpen] = useState(false);
   const [edited, setEdited] = useState<string | null>(null);
@@ -156,6 +154,7 @@ function PromptReadyCard({
 
   const { mutate: save, isPending: saving } = useMutation({
     mutationFn: (n: number) => api.putPromptSettings(accountId, n, version.current),
+    onMutate: () => ({ generation: editGeneration.current }),
     onSuccess: ({ postCount, version: v }) => {
       version.current = v;
       setSaved(postCount);
@@ -164,7 +163,7 @@ function PromptReadyCard({
         old ? { ...old, promptPostCount: postCount, promptPostCountVersion: v } : old,
       );
     },
-    onError: (err, n) => {
+    onError: (err, n, context) => {
       if (isStale(err)) {
         // 自動で保存する欄なので、黙って上書きせず、最新の件数に合わせて知らせる
         const latest = err.latest as { postCount: number; version: number };
@@ -172,7 +171,7 @@ function PromptReadyCard({
         setSaved(latest.postCount);
         setCount(latest.postCount);
         setFailed(null);
-        if (countInputRef.current === String(n)) {
+        if (context?.generation === editGeneration.current) {
           setCountInput(String(latest.postCount));
           toast.info(`${staleUpdateTitle(err.updatedBy?.name)}。作る件数を最新の${latest.postCount}件にしました`);
         } else {
@@ -256,7 +255,10 @@ function PromptReadyCard({
             max={PROMPT_COUNT_MAX}
             value={countInput}
             aria-invalid={!isValidCount(countInput)}
-            onChange={(e) => setCountInput(e.target.value)}
+            onChange={(e) => {
+              editGeneration.current += 1;
+              setCountInput(e.target.value);
+            }}
             className="h-11 w-20 rounded-xl border border-input bg-card px-3 text-right text-base md:h-9 md:text-[15px]"
           />
           <span className="text-sm">件</span>
