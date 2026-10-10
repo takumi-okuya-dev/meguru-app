@@ -152,7 +152,7 @@ description: "Task list for feature 010 token account add"
 ## Phase 8: Polish & Cross-Cutting Concerns
 
 - [X] T044 [P] FR-060：`.specify/memory/constitution.md`を3.0.1（PATCH、Last Amended 2026-10-10）にし、原則Vの「決済（feature 009）」を「決済（feature 011）」に直す（Sync Impact Reportはファイルの先頭に残さない。research.md R12）。`specs/008-team-operations/spec.md` FR-080・`research.md` R15・`contracts/permissions.md`、`_bmad-output/initiative-threads-grower-app/prd-threads-grower-app/prd-threads-grower-app.md` §6.1の「009（決済）」を「011（決済）」に直す。`grep -rn "009（決済）\|feature 009" specs .specify _bmad-output docs`で残りがないことを確かめる。
-- [ ] T045 [P] `e2e/tests/token.spec.ts`を作る：偽のThreadsの`/__control/token-page`で作ったトークンを貼って追加 →「今の接続：自分のMetaアプリのトークン」→ 同じアカウントの別アプリのトークンで「すでに登録されています」→ 接続し直しで「Threadsで許可する」に切り替え、投稿ストックが残る（quickstart.md 2）。`pnpm e2e -- token`で通す。
+- [X] T045 [P] `e2e/tests/token.spec.ts`を作る：偽のThreadsの`/__control/token-page`で作ったトークンを貼って追加 →「今の接続：自分のMetaアプリのトークン」→ 同じアカウントの別アプリのトークンで「すでに登録されています」→ 接続し直しで「Threadsで許可する」に切り替え、投稿ストックが残る（quickstart.md 2）。`pnpm e2e -- token`で通す。
 - [X] T046 [P] `docs/ui-design.md`に、追加の画面の折りたたみ・接続し直しのダイアログ・公開の読み物のページ（`/terms`・`/guide/threads-token`）の項を足す。
 - [ ] T047 実際のMetaアプリ（ThreadsAutomation）のトークンで`debug_token`を呼び、応答の形（`data`の下か、`expires_at`・`scopes`の有無）を確かめてresearch.md R3の末尾に1行で書く。形が違えばT005の`debugToken`を直す。トークンの値は記録しない（ユーザーの手を借りる）。
 - [ ] T048 `pnpm lint`・`pnpm typecheck`・`pnpm test`・`pnpm build`・`pnpm e2e -- token`・`pnpm e2e -- team`を流し、`specs/010-token-account-add/verification.md`に結果（件数・気づいたこと・計画からの変更）と、手動の確認（quickstart.md 3、SC-002）の予定を書く。手動の確認で、実際のトークンを貼り付けてから追加が終わるまでの時間（planの目標はふつう3秒以内）と、追加の画面を開いてから終わるまでの時間（SC-001の2分以内）を測り、verification.mdに書く。

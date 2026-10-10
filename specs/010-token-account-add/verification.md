@@ -11,11 +11,12 @@
 | `pnpm -r typecheck` | 成功 |
 | `pnpm build` | 成功 |
 | マイグレーション`0011_token_connect` | ローカルのPostgres 17で適用。既存の`accounts`は`connection_method = 'app'` |
-| `pnpm e2e -- token` | 未実施（下の「実行時に気づいたこと」） |
+| `pnpm e2e -- token` | 成功。4件（約16秒）。偽のThreadsのトークンで追加 → 別のアプリのトークンで「すでに登録されています」と設定へのリンク → 「Threadsで許可する」で接続し直して投稿ストックが残る → トークンで接続し直して今の接続が戻る |
+| `pnpm e2e -- team` | 成功。6件（008の流れが変わらない） |
 
 ### 実行時に気づいたこと
 
-- 13:29から動いていた開発用のサーバー（偽のThreads・API・Web）が残っていて、Playwright はそれを使い回す（`reuseExistingServer`）。偽のThreadsは古いコードのままで、トークンを作る画面が404になるため、E2Eは偽のThreadsを起動し直してから流す。
+- 13:29から動いていた開発用のサーバー（偽のThreads・API・Web）が残っていて、Playwright はそれを使い回す（`reuseExistingServer`）。偽のThreadsは古いコードのままで、トークンを作る画面が404になったため、ユーザーの了承を得て3つを止めてから流した。
 - テストの`beforeEach(() => mock.mockReset())`は、戻り値（モック）を後片付けの関数として呼ばれてしまう。波かっこで包む。
 
 ## 計画からの変更（実装時に決定）

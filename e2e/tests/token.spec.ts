@@ -45,7 +45,7 @@ test("トークンを貼り付けてアカウントを追加する（US1）", as
   await page.goto("/accounts/new");
   await page.getByRole("button", { name: "自分のMetaアプリのトークンで追加する" }).click();
   await page.getByLabel("アクセストークン").fill(token);
-  await page.getByRole("button", { name: "追加する" }).click();
+  await page.getByRole("button", { name: "追加する", exact: true }).click();
   await page.waitForURL(ACCOUNT_URL);
   accountId = ACCOUNT_URL.exec(page.url())![1]!;
 
@@ -65,7 +65,7 @@ test("同じアカウントの別のアプリのトークンは「すでに登�
   await page.goto("/accounts/new");
   await page.getByRole("button", { name: "自分のMetaアプリのトークンで追加する" }).click();
   await page.getByLabel("アクセストークン").fill(token);
-  await page.getByRole("button", { name: "追加する" }).click();
+  await page.getByRole("button", { name: "追加する", exact: true }).click();
   await expect(page.getByText(/このアカウントはすでに登録されています/)).toBeVisible();
   await page.getByRole("link", { name: "そのアカウントの設定を開く" }).click();
   await expect(page).toHaveURL(new RegExp(`/accounts/${accountId}/settings$`));
@@ -73,7 +73,7 @@ test("同じアカウントの別のアプリのトークンは「すでに登�
 
 test("接続し直しで「Threadsで許可する」に切り替えても、投稿ストックが残る（US3）", async () => {
   await page.goto(`/accounts/${accountId}/settings`);
-  await page.getByRole("button", { name: "接続し直す" }).click();
+  await page.getByRole("button", { name: "接続し直す", exact: true }).click();
   const dialog = page.getByRole("dialog", { name: "Threadsとの接続し直し" });
   await expect(dialog.getByRole("button", { name: /トークンを貼り付ける/ })).toContainText("今の接続");
   await dialog.getByRole("button", { name: /Threadsで許可する/ }).click();
@@ -89,11 +89,11 @@ test("接続し直しで「Threadsで許可する」に切り替えても、投�
 test("トークンを貼り付けて接続し直すと、今の接続がトークンに戻る（US3）", async () => {
   const token = await makeToken("myapp");
   await page.goto(`/accounts/${accountId}/settings`);
-  await page.getByRole("button", { name: "接続し直す" }).click();
+  await page.getByRole("button", { name: "接続し直す", exact: true }).click();
   const dialog = page.getByRole("dialog", { name: "Threadsとの接続し直し" });
   await dialog.getByRole("button", { name: /トークンを貼り付ける/ }).click();
   await dialog.getByLabel("アクセストークン").fill(token);
-  await dialog.getByRole("button", { name: "接続し直す" }).click();
+  await dialog.getByRole("button", { name: "接続し直す", exact: true }).click();
   await expect(page.getByText("接続し直しました")).toBeVisible();
   await expect(page.getByText(/今の接続：自分のMetaアプリのトークン/)).toBeVisible();
 });
