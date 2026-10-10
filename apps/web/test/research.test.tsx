@@ -30,6 +30,8 @@ const account: AccountSummary = {
   plan: "auto-grower",
   connectionStatus: "connected",
   lastUsedAt: null,
+  role: "owner" as const,
+  ownerName: null,
 };
 
 const meta = { version: 1, createdAt: "2026-10-03T00:00:00.000Z", updatedAt: "2026-10-03T00:00:00.000Z" };

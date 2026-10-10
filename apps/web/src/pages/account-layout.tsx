@@ -3,8 +3,14 @@
 // - 他人・存在しないAccountは404画面（規則4）
 // - 画面を開いたら open を呼び、接続状態とプロフィールを最新にする（規則5）
 // - needs_reconnect ならバナーを出す（FR-019）
+// - パートナー・編集者として関わるAccountも開ける（specs/008。/api/me の accounts は全役割）
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { NEEDS_RECONNECT_BANNER, errorMessage, type AccountSummary } from "@threads-grower/shared";
+import {
+  NEEDS_RECONNECT_BANNER,
+  NEEDS_RECONNECT_BANNER_HELPER,
+  errorMessage,
+  type AccountSummary,
+} from "@threads-grower/shared";
 import { Link, Navigate, Outlet, useOutletContext, useParams } from "react-router";
 import { AppShell } from "@/components/layout/AppShell";
 import { UnsavedChangesProvider } from "@/components/UnsavedChangesProvider";
@@ -13,6 +19,7 @@ import { Button } from "@/components/ui/button";
 import { ApiError, api } from "@/lib/api-client";
 import { queryKeys } from "@/lib/query";
 import { useAccountOpen } from "@/lib/use-account-open";
+import { useAccountAccessErrors } from "@/lib/use-account-access";
 import { NotFound } from "@/pages/not-found";
 import { ApiErrorScreen } from "@/components/ApiErrorScreen";
 import { LoadingSkeleton } from "@/components/guards";
@@ -43,6 +50,9 @@ export function AccountLayout() {
     enabled: Boolean(accountId) && (me.data?.accounts.length ?? 0) > 0,
   });
 
+  // 権限がなくなった・開けなくなったときの扱い（specs/008 contracts/ui-routes.md「共通の振る舞い」2・3）
+  useAccountAccessErrors(accountId);
+
   useAccountOpen(accountId, (latest) => {
     queryClient.setQueryData(queryKeys.account(latest.id), latest);
     // 一覧の接続状態・並び順も最新にする
@@ -68,10 +78,17 @@ export function AccountLayout() {
         variant="warning"
         className="flex flex-col gap-3 rounded-none border-x-0 border-t-0 px-4 sm:flex-row sm:items-center sm:justify-between md:px-5"
       >
-        <AlertDescription className="text-foreground">{NEEDS_RECONNECT_BANNER}</AlertDescription>
-        <Button asChild size="sm">
-          <Link to={`/accounts/${account.data.id}/settings`}>再接続</Link>
-        </Button>
+        {account.data.role === "owner" ? (
+          <>
+            <AlertDescription className="text-foreground">{NEEDS_RECONNECT_BANNER}</AlertDescription>
+            <Button asChild size="sm">
+              <Link to={`/accounts/${account.data.id}/settings`}>再接続</Link>
+            </Button>
+          </>
+        ) : (
+          // 再接続はオーナーだけができる（specs/008 FR-044）
+          <AlertDescription className="text-foreground">{NEEDS_RECONNECT_BANNER_HELPER}</AlertDescription>
+        )}
       </Alert>
     ) : null;
 

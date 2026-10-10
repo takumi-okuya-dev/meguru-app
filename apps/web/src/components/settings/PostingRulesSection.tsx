@@ -21,10 +21,10 @@ const ruleCount = (text: string) => text.split("\n").filter((l) => l.trim() !== 
 
 /**
  * 「投稿のルール」の区分。NGワードの行（US2）、投稿ルールの行（US4）、Threadsの規約への備えの行（US5）。
- * @param props - accountId：Account の ID
+ * @param props - accountId：Account の ID、canEdit：設定の権限（ないときは読むだけ。specs/008 FR-041）
  * @returns 区分
  */
-export function PostingRulesSection({ accountId }: { accountId: string }) {
+export function PostingRulesSection({ accountId, canEdit = true }: { accountId: string; canEdit?: boolean }) {
   const rules = useQuery({
     queryKey: queryKeys.postingRules(accountId),
     queryFn: () => api.getPostingRules(accountId),
@@ -38,6 +38,7 @@ export function PostingRulesSection({ accountId }: { accountId: string }) {
       <h2 id="posting-rules-heading" className="font-medium">
         投稿のルール
       </h2>
+      {!canEdit && <p className="text-xs text-muted-foreground">変更できるのはオーナーです</p>}
       {rules.isError ? (
         <p className="text-sm text-muted-foreground">
           読み込めませんでした。{" "}
@@ -55,14 +56,16 @@ export function PostingRulesSection({ accountId }: { accountId: string }) {
             label="NGワード"
             description={`この言葉を含む下書きは承認できません。${data ? `${data.ngWords.length}語` : ""}`}
           >
-            <Button
-              variant="outline"
-              className="h-10 rounded-full md:h-9"
-              disabled={!data}
-              onClick={() => setOpen("ng-words")}
-            >
-              編集
-            </Button>
+            {canEdit && (
+              <Button
+                variant="outline"
+                className="h-10 rounded-full md:h-9"
+                disabled={!data}
+                onClick={() => setOpen("ng-words")}
+              >
+                編集
+              </Button>
+            )}
           </SettingRow>
           <SettingRow
             label="投稿ルール（CORE RULES）"
@@ -80,7 +83,7 @@ export function PostingRulesSection({ accountId }: { accountId: string }) {
               disabled={!data}
               onClick={() => setOpen("core-rules")}
             >
-              {data && !data.canEditCoreRules ? "見る" : "編集"}
+              {data && (!data.canEditCoreRules || !canEdit) ? "見る" : "編集"}
             </Button>
           </SettingRow>
           <SettingRow
@@ -103,7 +106,7 @@ export function PostingRulesSection({ accountId }: { accountId: string }) {
           accountId={accountId}
           coreRules={data.coreRules}
           version={data.coreRulesVersion}
-          readOnly={!data.canEditCoreRules}
+          readOnly={!data.canEditCoreRules || !canEdit}
           onSaved={() => {
             setOpen(null);
             void queryClient.invalidateQueries({ queryKey: queryKeys.postingRules(accountId) });

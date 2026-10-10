@@ -29,6 +29,8 @@ const account: AccountSummary = {
   plan: "auto-only",
   connectionStatus: "connected",
   lastUsedAt: null,
+  role: "owner" as const,
+  ownerName: null,
 };
 
 function status(overrides: Partial<ProfileStatus> = {}): ProfileStatus {

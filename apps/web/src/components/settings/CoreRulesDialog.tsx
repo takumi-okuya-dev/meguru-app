@@ -65,6 +65,7 @@ export function CoreRulesDialog({
             err.status,
             err.details,
             toItem(err.latest as CoreRulesResponse),
+            err.updatedBy,
           );
         throw err;
       }

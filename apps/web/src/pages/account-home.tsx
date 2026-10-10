@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { Link } from "react-router";
 import { NextPostCard } from "@/components/NextPostCard";
+import { PartnerJoinedNotice } from "@/components/team/PartnerJoinedNotice";
 import { AutoPostNotices } from "@/components/AutoPostNotices";
 import { AccountAvatar } from "@/components/AccountAvatar";
 import { ApiErrorScreen } from "@/components/ApiErrorScreen";
@@ -107,6 +108,7 @@ export function AccountHome() {
     <>
       <PageHeader title="ホーム" />
       <PageBody className="flex flex-col items-center gap-7 pt-10 md:pt-16">
+        {account.role === "owner" && <PartnerJoinedNotice accountId={account.id} />}
         <section className="flex flex-col items-center gap-1.5 text-center">
           <AccountAvatar account={account} className="size-14 text-lg" />
           <h1 className="text-[17px] font-semibold">{account.displayName ?? account.username}</h1>

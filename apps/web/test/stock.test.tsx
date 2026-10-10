@@ -12,6 +12,7 @@ import type {
 import { createMemoryRouter, Link, Outlet, RouterProvider } from "react-router";
 import { useState } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { EDITOR_ACCESS, OWNER_ACCESS } from "./helpers/access";
 
 const listPostDrafts = vi.fn();
 const getPrompt = vi.fn();
@@ -25,12 +26,14 @@ const listPublished = vi.fn();
 const getAutoPost = vi.fn();
 const dismissBlockedNotice = vi.fn();
 const prioritizeDraft = vi.fn();
+const accountAccess = vi.fn(async () => OWNER_ACCESS);
 vi.mock("@/lib/api-client", async (orig) => {
   const actual = await orig<typeof import("@/lib/api-client")>();
   return {
     ...actual,
     api: {
       ...actual.api,
+      accountAccess,
       listPostDrafts,
       getPrompt,
       putPromptSettings,
@@ -65,6 +68,8 @@ const account: AccountSummary = {
   plan: "auto-grower",
   connectionStatus: "connected",
   lastUsedAt: null,
+  role: "owner" as const,
+  ownerName: null,
 };
 
 const PROMPT = "以下の情報をもとに、Threadsに投稿する文章を30件作ってください。";
@@ -113,6 +118,9 @@ function draft(overrides: Partial<PostDraft> = {}): PostDraft {
     blockedAt: null,
     blockedReason: null,
     blockedWords: [],
+    createdBy: null,
+    editedBy: null,
+    editedAt: null,
     createdAt: "2026-10-03T00:00:00.000Z",
     updatedAt: "2026-10-03T00:00:00.000Z",
     ...overrides,
@@ -165,6 +173,7 @@ function listResponse(
     ngWords,
     canGeneratePrompt: true,
     promptPostCount: 30,
+    people: {},
     ...rest,
   };
 }
@@ -1919,5 +1928,68 @@ describe("005：画面を開いた後に投稿の処理が始まる", () => {
     await userEvent.click(await screen.findByRole("button", { name: "「下書きの本文」の操作" }));
     await userEvent.click(screen.getByRole("menuitem", { name: "要確認に戻す" }));
     await waitFor(() => expect(toastError).toHaveBeenCalledWith("投稿の処理中です。少し待ってからもう一度お試しください。"));
+  });
+});
+
+// ---- チーム運用：承認の操作ができない人の出し分け（specs/008 FR-041・FR-002a、contracts/ui-routes.md「投稿ストック」）----
+describe("投稿ストック（承認の権限がない人）", () => {
+  it("要確認に「オーナーの確認待ち」と出し、承認・却下・選択・まとめての操作を出さない。案内を出す", async () => {
+    accountAccess.mockResolvedValue(EDITOR_ACCESS);
+    listPostDrafts.mockResolvedValue(listResponse({ items: [draft({ id: "d1", body: "編集者が作った案" })] }));
+    renderPage();
+    expect(await screen.findByText("オーナーの確認待ち")).toBeInTheDocument();
+    expect(
+      screen.getByText("承認と却下は、オーナー（鈴木 花子）さんが行います。あなたは投稿の案を登録したり、直したりできます。"),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /を承認$/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /を却下$/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("checkbox", { name: /を選択$/ })).not.toBeInTheDocument();
+    expect(screen.queryByText("すべて選択")).not.toBeInTheDocument();
+    // 「⋯」には編集と削除がある
+    await userEvent.setup().click(screen.getByRole("button", { name: "「編集者が作った案」の操作" }));
+    expect(await screen.findByRole("menuitem", { name: "編集" })).toBeInTheDocument();
+    expect(screen.getByRole("menuitem", { name: "削除" })).toBeInTheDocument();
+    accountAccess.mockResolvedValue(OWNER_ACCESS);
+  });
+
+  it("承認済みには「次に投稿する」「要確認に戻す」を出さず、却下の案には操作を出さない", async () => {
+    accountAccess.mockResolvedValue(EDITOR_ACCESS);
+    listPostDrafts.mockResolvedValue(
+      listResponse({
+        approved: [draft({ id: "a1", status: "approved", body: "承認済み1" }), draft({ id: "a2", status: "approved", body: "承認済み2" })],
+        rejected: [draft({ id: "r1", status: "rejected", body: "却下の案" })],
+      }),
+    );
+    const user = userEvent.setup();
+    renderPage("/accounts/a1/stock?tab=approved");
+    await user.click(await screen.findByRole("button", { name: "「承認済み2」の操作" }));
+    expect(await screen.findByRole("menuitem", { name: "編集" })).toBeInTheDocument();
+    expect(screen.queryByRole("menuitem", { name: "次に投稿する" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("menuitem", { name: "要確認に戻す" })).not.toBeInTheDocument();
+    accountAccess.mockResolvedValue(OWNER_ACCESS);
+  });
+});
+
+describe("投稿ストック（作った人・直した人。specs/008 FR-053）", () => {
+  it("チームがあるAccountでは名前と時刻を出し、個人運用では出さない", async () => {
+    const withAuthors = listResponse({
+      items: [draft({ id: "d1", body: "名前つきの案", createdBy: "u1", editedBy: "u2", editedAt: "2026-10-09T06:10:00.000Z" })],
+    });
+    withAuthors.people = { u1: "高橋 涼", u2: "佐藤 美咲" };
+    listPostDrafts.mockResolvedValue(withAuthors);
+    accountAccess.mockResolvedValue({ ...OWNER_ACCESS, hasTeam: true });
+    renderPage();
+    expect(await screen.findByText(/作成 高橋 涼 · /)).toBeInTheDocument();
+    expect(screen.getByText(/編集 佐藤 美咲/)).toBeInTheDocument();
+    accountAccess.mockResolvedValue(OWNER_ACCESS);
+  });
+
+  it("個人運用（hasTeam = false）では、名前を出さない", async () => {
+    const withAuthors = listResponse({ items: [draft({ id: "d1", body: "個人の案", createdBy: "u1" })] });
+    withAuthors.people = { u1: "たくみ" };
+    listPostDrafts.mockResolvedValue(withAuthors);
+    renderPage();
+    expect(await screen.findByText("個人の案")).toBeInTheDocument();
+    expect(screen.queryByText(/作成 たくみ/)).not.toBeInTheDocument();
   });
 });

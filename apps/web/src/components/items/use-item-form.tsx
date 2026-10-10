@@ -58,6 +58,8 @@ export function useItemForm<F, T extends { version: number; updatedAt: string }>
   const [showErrors, setShowErrors] = useState(false);
   const [serverErrors, setServerErrors] = useState<FormErrors<F>>({});
   const [conflict, setConflict] = useState<T | null>(null);
+  // 先に保存した人（specs/008 FR-007）
+  const [conflictBy, setConflictBy] = useState<string | null>(null);
   const [growerLost, setGrowerLost] = useState(false);
   const [deleted, setDeleted] = useState(false);
   const [confirmClose, setConfirmClose] = useState(false);
@@ -75,7 +77,10 @@ export function useItemForm<F, T extends { version: number; updatedAt: string }>
       opts.onSaved(item);
     },
     onError: (err) => {
-      if (isStale(err)) return setConflict(err.latest as T);
+      if (isStale(err)) {
+        setConflictBy(err.updatedBy?.name ?? null);
+        return setConflict(err.latest as T);
+      }
       if (isGrowerRequired(err)) return setGrowerLost(true);
       if (err instanceof ApiError && err.code === "ITEM_NOT_FOUND") return setDeleted(true);
       if (err instanceof ApiError && err.code === "ITEM_LIMIT_REACHED") {
@@ -116,6 +121,7 @@ export function useItemForm<F, T extends { version: number; updatedAt: string }>
       <ConflictDialog
         open={conflict !== null}
         updatedAt={conflict?.updatedAt ?? null}
+        updatedByName={conflictBy}
         onCancel={() => setConflict(null)}
         onReload={() => {
           if (conflict) {

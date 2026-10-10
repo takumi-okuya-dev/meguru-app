@@ -49,6 +49,8 @@ const account = (
   plan: "multi-account",
   connectionStatus,
   lastUsedAt: null,
+  role: "owner" as const,
+  ownerName: null,
 });
 
 const accounts = [account("a1"), account("a2"), account("a3")];
@@ -58,6 +60,8 @@ const me = (rows: AccountSummary[]): MeResponse => ({
   landingAccountId: rows[0]?.id ?? null,
   accountLimit: { max: 5, used: rows.length },
   threadsAccessMode: "testers",
+  partnerTeam: null,
+  editorWaiting: null,
 });
 const counts = (rows: [string, number][]): NeedsReviewCountsResponse => ({
   counts: rows.map(([accountId, needsReview]) => ({ accountId, needsReview })),

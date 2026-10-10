@@ -67,7 +67,12 @@ export function PromotionsPage() {
   const [growerLost, setGrowerLost] = useState(false);
   const [growerDialog, setGrowerDialog] = useState(false);
   // カードのメニューからの状態の変更が、他で先に更新されていた（contracts/ui-routes.md 規則5）
-  const [statusConflict, setStatusConflict] = useState<{ latest: Promotion; status: Promotion["status"] } | null>(null);
+  const [statusConflict, setStatusConflict] = useState<{
+    latest: Promotion;
+    status: Promotion["status"];
+    // 先に保存した人（specs/008 FR-007）
+    by?: string | null;
+  } | null>(null);
 
   const refresh = () => {
     void queryClient.invalidateQueries({ queryKey: queryKeys.promotions(account.id) });
@@ -90,7 +95,7 @@ export function PromotionsPage() {
       toast.success("保存しました");
     },
     onError: (err, { status }) => {
-      if (isStale(err)) return setStatusConflict({ latest: err.latest as Promotion, status });
+      if (isStale(err)) return setStatusConflict({ latest: err.latest as Promotion, status, by: err.updatedBy?.name ?? null });
       onMutationError(err);
     },
   });
@@ -248,6 +253,7 @@ export function PromotionsPage() {
       <ConflictDialog
         open={statusConflict !== null}
         updatedAt={statusConflict?.latest.updatedAt ?? null}
+        updatedByName={statusConflict?.by ?? null}
         onCancel={() => setStatusConflict(null)}
         onReload={() => {
           setStatusConflict(null);

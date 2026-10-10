@@ -3,6 +3,7 @@
 // まだ作っていない機能は出さない（各featureで画面を作ったときに NAV_GROUPS に足す）。
 import {
   ChartColumnIcon,
+  HistoryIcon,
   HouseIcon,
   InboxIcon,
   MegaphoneIcon,
@@ -18,6 +19,7 @@ import { Link, NavLink, useParams } from "react-router";
 import { Button } from "@/components/ui/button";
 import { api } from "@/lib/api-client";
 import { queryKeys } from "@/lib/query";
+import { useAccountAccess } from "@/lib/use-account-access";
 import { cn } from "@/lib/utils";
 import { AccountSwitcher } from "./AccountSwitcher";
 import { UserMenu } from "./UserMenu";
@@ -67,6 +69,7 @@ export function Sidebar({ onCollapse, onNavigate }: { onCollapse?: () => void; o
     queryFn: () => api.getDraftCounts(accountId!),
     enabled: !!accountId,
   });
+  const { access } = useAccountAccess(accountId);
   return (
     <div className="flex h-full flex-col">
       <div className="flex items-center gap-1 p-2">
@@ -83,6 +86,15 @@ export function Sidebar({ onCollapse, onNavigate }: { onCollapse?: () => void; o
           </Button>
         )}
       </div>
+      {access && access.role !== "owner" && (
+        // 手伝う人に、自分の立場とオーナーを示す（specs/008 FR-040）。オーナーには出さない
+        <div className="mx-3 mb-1 rounded-xl border bg-background px-3 py-2 text-xs leading-snug">
+          <div className="font-medium">
+            {access.role === "partner" ? "パートナーとして手伝っています" : "編集者として担当しています"}
+          </div>
+          <div className="text-muted-foreground">オーナー：{access.owner.name}</div>
+        </div>
+      )}
       <nav aria-label="このアカウント" className="flex-1 space-y-0.5 overflow-y-auto px-2 py-1">
         {accountId && (
           // 投稿ストックの画面へ移動し、プロンプトのカード（作る流れの最初の一歩）から始める。
@@ -115,6 +127,15 @@ export function Sidebar({ onCollapse, onNavigate }: { onCollapse?: () => void; o
             })}
           </div>
         ))}
+        {access?.hasTeam && access.permissions.includes("activity") && (
+          // チームがあるAccountだけ（specs/008 FR-052）。個人運用・編集者には出さない
+          <div className="space-y-0.5">
+            <div className="px-3 pt-4 pb-1 text-xs text-muted-foreground lg:px-2.5">チーム</div>
+            <NavLink to={`${base}/activity`} className={itemClass} onClick={onNavigate}>
+              <HistoryIcon className="size-5 lg:size-[18px]" /> 操作の記録
+            </NavLink>
+          </div>
+        )}
       </nav>
       <div className="space-y-0.5 border-t p-2 pb-[max(0.5rem,env(safe-area-inset-bottom))]">
         {accountId && (

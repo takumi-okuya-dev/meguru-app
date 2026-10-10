@@ -5,6 +5,7 @@ import userEvent from "@testing-library/user-event";
 import type { AccountSummary, NgWord, PostingRules, PostingSchedule } from "@threads-grower/shared";
 import { createMemoryRouter, Outlet, RouterProvider } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { OWNER_ACCESS } from "./helpers/access";
 
 const getPostingRules = vi.fn();
 const addNgWords = vi.fn();
@@ -15,12 +16,14 @@ const putPostingSchedule = vi.fn();
 const checkThreads = vi.fn();
 const getAutoPost = vi.fn();
 const connect = vi.fn();
+const accountAccess = vi.fn(async () => OWNER_ACCESS);
 vi.mock("@/lib/api-client", async (orig) => {
   const actual = await orig<typeof import("@/lib/api-client")>();
   return {
     ...actual,
     api: {
       ...actual.api,
+      accountAccess,
       getPostingRules,
       addNgWords,
       deleteNgWord,
@@ -52,6 +55,8 @@ const account: AccountSummary = {
   plan: "auto-grower",
   connectionStatus: "connected",
   lastUsedAt: null,
+  role: "owner" as const,
+  ownerName: null,
 };
 
 const word = (id: string, w: string): NgWord => ({
@@ -134,7 +139,8 @@ describe("「投稿のルール」の区分（FR-031）", () => {
   it("「Threadsとの接続」より上にあり、NGワードの行に語数と「編集」がある", async () => {
     renderPage();
     const section = await screen.findByRole("region", { name: "投稿のルール" });
-    const heading = screen.getByRole("heading", { name: "Threadsとの接続" });
+    // 「Threadsとの接続」はオーナーの権限を読み込んでから出す（specs/008 FR-041）
+    const heading = await screen.findByRole("heading", { name: "Threadsとの接続" });
     expect(
       section.compareDocumentPosition(heading) & Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
@@ -463,7 +469,8 @@ describe("「接続を確かめる」（FR-002b）", () => {
     const user = userEvent.setup();
     renderPage();
     const section = await screen.findByRole("region", { name: "投稿のスケジュール" });
-    await user.click(within(section).getByRole("button", { name: "接続を確かめる" }));
+    // 「接続を確かめる」は設定の権限を読み込んでから出す（specs/008 FR-041）
+    await user.click(await within(section).findByRole("button", { name: "接続を確かめる" }));
     return section;
   }
 
@@ -496,7 +503,8 @@ describe("「接続を確かめる」（FR-002b）", () => {
     const user = userEvent.setup();
     renderPage();
     const section = await screen.findByRole("region", { name: "投稿のスケジュール" });
-    await user.click(within(section).getByRole("button", { name: "接続を確かめる" }));
+    // 「接続を確かめる」は設定の権限を読み込んでから出す（specs/008 FR-041）
+    await user.click(await within(section).findByRole("button", { name: "接続を確かめる" }));
     expect(within(section).getByRole("button", { name: "確かめています…" })).toBeDisabled();
     await act(async () => resolve({ status: "ok", quotaUsage: 0, quotaTotal: 250 }));
   });

@@ -27,6 +27,8 @@ const account: AccountSummary = {
   plan: "auto-grower",
   connectionStatus: "connected",
   lastUsedAt: null,
+  role: "owner" as const,
+  ownerName: null,
 };
 
 function promotion(overrides: Partial<Promotion> = {}): Promotion {
