@@ -53,7 +53,7 @@
 
 `url`は`{WEB_ORIGIN}/invite/{token}`（research.md R4）。
 
-## チーム（このAccountを手伝っている人）
+## チーム（このアカウントのチーム）
 
 ### `GET /api/accounts/:accountId/team`
 
@@ -61,6 +61,8 @@
 
 ```json
 {
+  "owner": { "userId": "…", "name": "鈴木 花子" },
+  "viewerUserId": "…",
   "partner": { "userId": "…", "name": "田中 健", "teamName": "A社", "joinedAt": "…" } ,
   "delegation": { "review": false, "settings": false },
   "editors": [{ "userId": "…", "name": "佐藤 美咲" }],
@@ -69,6 +71,7 @@
 ```
 
 - パートナーがいなければ`partner`・`delegation`はNULL、`editors`は空（パートナー自身のAccountで自社の編集者が担当している場合は、`editors`だけ入る）。
+- `owner`はAccountのオーナー、`viewerUserId`は要求したユーザー（カードの「あなた」の印に使う。FR-042）。
 - `joinedNotice.show`は、オーナーで、パートナーの参加の知らせを閉じていないときだけtrue（FR-047(1)）。
 
 | API | 権限 | 説明 |

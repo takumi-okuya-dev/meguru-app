@@ -71,6 +71,22 @@ test("パートナーが編集者を招いて担当を決めると、編集者�
   await expect(editor.getByText("編集者として担当しています").first()).toBeVisible();
 });
 
+test("3人とも「このアカウントのチーム」でオーナー → パートナー → 編集者が見え、自分に「あなた」が付く（FR-042）", async () => {
+  const tiers = { owner: "オーナー", partner: "パートナー", editor: "編集者" } as const;
+  for (const role of ["owner", "partner", "editor"] as const) {
+    const page = pages[role];
+    await page.goto(`/accounts/${accountId}/settings`);
+    const roster = page.getByRole("list", { name: "このアカウントのチーム" });
+    await expect(roster).toBeVisible();
+    for (const [key, name] of Object.entries(tiers)) {
+      const tier = roster.getByRole("listitem", { name, exact: true });
+      await expect(tier).toBeVisible();
+      await expect(tier.getByText("あなた")).toHaveCount(key === role ? 1 : 0);
+    }
+    await expect(roster.getByRole("listitem", { name: "パートナー", exact: true })).toContainText("A社");
+  }
+});
+
 test("オーナーが承認を任せると、パートナーが承認でき、操作の記録に残る（US3・US4）", async () => {
   const { owner, partner, editor } = pages;
   await owner.goto(`/accounts/${accountId}/settings`);

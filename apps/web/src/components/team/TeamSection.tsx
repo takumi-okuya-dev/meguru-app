@@ -16,6 +16,7 @@ import { cn } from "@/lib/utils";
 import { InviteLinkDialog } from "./InviteLinkDialog";
 import { RemovePartnerDialog } from "./RemovePartnerDialog";
 import { RoleDiagram, type DiagramRole } from "./RoleDiagram";
+import { rosterTiers, TeamRoster } from "./TeamRoster";
 
 /**
  * 役割の図を開く・閉じる行（FR-048）。区分を読む人の役割に「あなた」の印を付ける。
@@ -66,8 +67,8 @@ function PartnerAbilities() {
 }
 
 /**
- * 「運用を手伝ってもらう」の区分。オーナーには招待・パートナー・任せる範囲・手伝っている人を、
- * パートナー・編集者には手伝っている人の一覧だけを出す（FR-042）。
+ * 「運用を手伝ってもらう」の区分。オーナーには招待・パートナー・任せる範囲・このアカウントのチームを、
+ * パートナー・編集者にはこのアカウントのチームのカードだけを出す（FR-042）。
  * @param props - accountId：Account、access：役割と権限
  * @returns 区分。出すものがなければ何も出さない
  */
@@ -143,15 +144,10 @@ export function TeamSection({ accountId, access }: { accountId: string; access: 
   });
 
   const data = team.data;
-  const helpers = data
-    ? [
-        ...(data.partner ? [{ name: data.partner.name, role: "パートナー" }] : []),
-        ...data.editors.map((e) => ({ name: e.name, role: "編集者（投稿の案を作る人）" })),
-      ]
-    : [];
-  // パートナー・編集者には、手伝っている人の一覧だけを出す。読み込みに失敗したときは、区分を消さずに
+  const hasRoster = data ? rosterTiers(data).length > 0 : false;
+  // パートナー・編集者には、このアカウントのチームのカードだけを出す。読み込みに失敗したときは、区分を消さずに
   // 再読み込みを出す（PR #9 のCodexレビュー）
-  if (!isOwner && !team.isError && helpers.length === 0) return null;
+  if (!isOwner && !team.isError && !hasRoster) return null;
 
   return (
     <section aria-labelledby="team-heading" className="space-y-3">
@@ -253,16 +249,10 @@ export function TeamSection({ accountId, access }: { accountId: string; access: 
             </div>
           )}
 
-          {helpers.length > 0 && (
+          {data && hasRoster && (
             <div className="space-y-2">
-              <h3 className="text-sm font-medium text-foreground/80">このアカウントを手伝っている人</h3>
-              <SettingCard>
-                {helpers.map((h) => (
-                  <SettingRow key={`${h.role}-${h.name}`} label={h.name}>
-                    <span className="text-sm text-muted-foreground">{h.role}</span>
-                  </SettingRow>
-                ))}
-              </SettingCard>
+              <h3 className="text-sm font-medium text-foreground/80">このアカウントのチーム</h3>
+              <TeamRoster team={data} />
               <div className="flex flex-wrap items-center justify-between gap-2">
                 {isOwner && (
                   <p className="text-xs text-muted-foreground">編集者は、パートナーが自社のスタッフから割り当てます。</p>

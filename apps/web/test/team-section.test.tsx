@@ -5,7 +5,7 @@ import userEvent from "@testing-library/user-event";
 import type { AccountTeam } from "@threads-grower/shared";
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { EDITOR_ACCESS, OWNER_ACCESS } from "./helpers/access";
+import { EDITOR_ACCESS, OWNER_ACCESS, PARTNER_ACCESS } from "./helpers/access";
 
 const accountTeam = vi.fn();
 const getPartnerInvite = vi.fn();
@@ -39,8 +39,10 @@ const { TeamSection } = await import("@/components/team/TeamSection");
 const URL1 = "http://localhost:5173/invite/p_" + "a".repeat(43);
 const URL2 = "http://localhost:5173/invite/p_" + "b".repeat(43);
 
-const empty: AccountTeam = { partner: null, delegation: null, editors: [], joinedNotice: { show: false } };
+const empty: AccountTeam = { owner: { userId: "o1", name: "鈴木 花子" }, viewerUserId: "o1", partner: null, delegation: null, editors: [], joinedNotice: { show: false } };
 const joined: AccountTeam = {
+  owner: { userId: "o1", name: "鈴木 花子" },
+  viewerUserId: "o1",
   partner: { userId: "p1", name: "田中 健", teamName: "A社", joinedAt: "2026-10-09T09:00:00.000Z" },
   delegation: { review: false, settings: false },
   editors: [
@@ -91,13 +93,14 @@ describe("TeamSection（オーナー）", () => {
     expect(screen.getByRole("button", { name: "取り消す" })).toBeInTheDocument();
   });
 
-  it("パートナーあり：名前・チーム名・外す、手伝っている人の一覧。外すの確認に編集者の名前が出る", async () => {
+  it("パートナーあり：名前・チーム名・外す、このアカウントのチーム。外すの確認に編集者の名前が出る", async () => {
     accountTeam.mockResolvedValue(joined);
     removePartner.mockResolvedValue(undefined);
     const user = userEvent.setup();
     renderSection();
-    expect(await screen.findByText("田中 健 · A社")).toBeInTheDocument();
-    expect(screen.getByText("佐藤 美咲")).toBeInTheDocument();
+    // パートナーの行と、カードの両方に出る
+    expect(await screen.findAllByText("田中 健 · A社")).toHaveLength(2);
+    expect(within(screen.getByRole("list", { name: "このアカウントのチーム" })).getByText("佐藤 美咲")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "外す" }));
     const confirm = await screen.findByRole("alertdialog");
     expect(confirm).toHaveTextContent("田中 健さん（A社）を外しますか？");
@@ -138,16 +141,76 @@ describe("TeamSection（パートナー・編集者）", () => {
     renderSection(EDITOR_ACCESS);
     expect(await screen.findByText(/読み込めませんでした/)).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "再読み込み" }));
-    expect(await screen.findByText("このアカウントを手伝っている人")).toBeInTheDocument();
+    expect(await screen.findByText("このアカウントのチーム", { selector: "h3" })).toBeInTheDocument();
   });
 
   it("手伝っている人の一覧だけを出し、招待・外すは出さない", async () => {
     accountTeam.mockResolvedValue(joined);
     renderSection(EDITOR_ACCESS);
-    expect(await screen.findByText("このアカウントを手伝っている人")).toBeInTheDocument();
+    expect(await screen.findByText("このアカウントのチーム", { selector: "h3" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "外す" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "招待リンクを作る" })).not.toBeInTheDocument();
     expect(getPartnerInvite).not.toHaveBeenCalled();
+  });
+});
+
+describe("このアカウントのチーム（FR-042）", () => {
+  /**
+   * カードの「あなた」の印が付いた人の行と、各段の文字を読む。
+   * @returns あなたの行・段ごとの「役割:文字」
+   */
+  async function readRoster() {
+    const roster = await screen.findByRole("list", { name: "このアカウントのチーム" });
+    const tiers = within(roster)
+      .getAllByRole("listitem")
+      .filter((li) => li.getAttribute("aria-label"))
+      .map((li) => `${li.getAttribute("aria-label")}:${li.textContent}`);
+    return { you: within(roster).getByText("あなた").closest("li")!.textContent, tiers };
+  }
+
+  it("オーナーには、オーナー（あなた）→ パートナー（チーム名）→ 担当の編集者の順に出る", async () => {
+    accountTeam.mockResolvedValue(joined);
+    renderSection();
+    const { you, tiers } = await readRoster();
+    expect(you).toBe("鈴木 花子あなた");
+    expect(tiers).toHaveLength(3);
+    expect(tiers[0]).toMatch(/^オーナー:.*鈴木 花子/);
+    expect(tiers[1]).toMatch(/^パートナー:.*田中 健 · A社/);
+    expect(tiers[2]).toMatch(/^編集者:.*佐藤 美咲.*高橋 涼/);
+  });
+
+  it("パートナーが開くと、パートナーに「あなた」の印が付く", async () => {
+    accountTeam.mockResolvedValue({ ...joined, viewerUserId: "p1" });
+    renderSection(PARTNER_ACCESS);
+    expect((await readRoster()).you).toBe("田中 健 · A社あなた");
+  });
+
+  it("編集者が開くと、自分の名前に「あなた」の印が付き、任せる範囲は出ない", async () => {
+    accountTeam.mockResolvedValue({ ...joined, viewerUserId: "e2" });
+    renderSection(EDITOR_ACCESS);
+    expect((await readRoster()).you).toBe("高橋 涼あなた");
+    expect(screen.queryByRole("switch")).not.toBeInTheDocument();
+  });
+
+  it("パートナー自身のAccountを自社の編集者が担当しているときは、オーナー → 編集者", async () => {
+    accountTeam.mockResolvedValue({
+      ...empty,
+      owner: { userId: "p1", name: "田中 健" },
+      viewerUserId: "p1",
+      editors: [{ userId: "e1", name: "佐藤 美咲" }],
+    });
+    renderSection();
+    const { you, tiers } = await readRoster();
+    expect(you).toBe("田中 健あなた");
+    expect(tiers.map((t) => t.split(":")[0])).toEqual(["オーナー", "編集者"]);
+  });
+
+  it("手伝う人が誰もいなければ、カードを出さない", async () => {
+    accountTeam.mockResolvedValue(empty);
+    getPartnerInvite.mockResolvedValue({ invite: null });
+    renderSection();
+    expect(await screen.findByRole("button", { name: "招待リンクを作る" })).toBeInTheDocument();
+    expect(screen.queryByRole("list", { name: "このアカウントのチーム" })).not.toBeInTheDocument();
   });
 });
 

@@ -14,6 +14,8 @@ async function json<T>(res: Response, status = 200): Promise<T> {
 const codeOf = async (res: Response) => ((await res.json()) as { error: { code: string } }).error.code;
 
 type AccountTeam = {
+  owner: { userId: string; name: string };
+  viewerUserId: string;
   partner: { userId: string; name: string; teamName: string | null; joinedAt: string } | null;
   delegation: { review: boolean; settings: boolean } | null;
   editors: { userId: string; name: string }[];
@@ -36,15 +38,41 @@ describe("このAccountを手伝っている人（オーナー側）", () => {
       expect(team.delegation).toEqual({ review: false, settings: false });
       expect(team.editors.map((e) => e.name)).toEqual(["e1"]);
       expect(team.joinedNotice.show).toBe(user === "o1");
+      expect(team.owner.name).toBe("o1");
     }
     expect((await call(app, "POST", `/api/accounts/${accountId}/partner/joined-notice/dismiss`, { user: "p1" })).status).toBe(403);
     expect((await call(app, "POST", `/api/accounts/${accountId}/partner/joined-notice/dismiss`, { user: "o1" })).status).toBe(204);
     expect((await json<AccountTeam>(await call(app, "GET", `/api/accounts/${accountId}/team`, { user: "o1" }))).joinedNotice.show).toBe(false);
   });
 
+  it("このアカウントのチーム：見ている人のIDで「あなた」が分かり、他のAccountの人は出ない（FR-042）", async () => {
+    const { accountId } = await createUserWithAccount("o1");
+    const { accountId: otherId } = await createUserWithAccount("o2");
+    const { teamId } = await makePartner(accountId, "p1");
+    await makePartner(otherId, "p1");
+    await makeEditor(teamId, "e1", [accountId]);
+    await makeEditor(teamId, "e2", [otherId]);
+    const ids = new Map<string, string>();
+    for (const user of ["o1", "p1", "e1"]) {
+      const team = await json<AccountTeam>(await call(app, "GET", `/api/accounts/${accountId}/team`, { user }));
+      ids.set(user, team.viewerUserId);
+      expect(team.editors.map((e) => e.name)).toEqual(["e1"]);
+      if (user === "o1") expect(team.viewerUserId).toBe(team.owner.userId);
+      if (user === "p1") expect(team.viewerUserId).toBe(team.partner!.userId);
+      if (user === "e1") expect(team.viewerUserId).toBe(team.editors[0]!.userId);
+    }
+    expect(new Set(ids.values()).size).toBe(3);
+    // 担当していない編集者は開けない
+    expect((await call(app, "GET", `/api/accounts/${accountId}/team`, { user: "e2" })).status).toBe(404);
+  });
+
   it("パートナーがいなければ partner・delegation は NULL、editors は空", async () => {
     const { accountId } = await createUserWithAccount("o1");
-    expect(await json<AccountTeam>(await call(app, "GET", `/api/accounts/${accountId}/team`, { user: "o1" }))).toEqual({
+    const team = await json<AccountTeam>(await call(app, "GET", `/api/accounts/${accountId}/team`, { user: "o1" }));
+    expect(team.viewerUserId).toBe(team.owner.userId);
+    expect(team).toEqual({
+      owner: { userId: team.owner.userId, name: "o1" },
+      viewerUserId: team.owner.userId,
       partner: null,
       delegation: null,
       editors: [],

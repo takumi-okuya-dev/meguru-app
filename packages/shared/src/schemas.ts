@@ -1044,6 +1044,10 @@ export const inviteAcceptResponseSchema = z.object({
 
 /** GET /api/accounts/:id/team の応答（contracts/api.md「チーム」）。 */
 export const accountTeamSchema = z.object({
+  /** Accountのオーナー（カード「このアカウントのチーム」の一番上。FR-042） */
+  owner: z.object({ userId: z.string(), name: z.string() }),
+  /** 要求したユーザー（カードの「あなた」の印に使う） */
+  viewerUserId: z.string(),
   partner: z
     .object({ userId: z.string(), name: z.string(), teamName: z.string().nullable(), joinedAt: z.string() })
     .nullable(),
@@ -1051,7 +1055,7 @@ export const accountTeamSchema = z.object({
   editors: z.array(z.object({ userId: z.string(), name: z.string() })),
   joinedNotice: z.object({ show: z.boolean() }),
 });
-/** このAccountを手伝っている人。 */
+/** このアカウントのチーム（オーナー・パートナー・担当の編集者）。 */
 export type AccountTeam = z.infer<typeof accountTeamSchema>;
 
 /** GET /api/team の応答（contracts/api.md「パートナーのチーム」）。 */
