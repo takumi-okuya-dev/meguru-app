@@ -2,7 +2,7 @@
 // Threads のトークンの形は公開されていないので、先頭の文字列では判定しない。
 import { TOKEN_MAX_LENGTH, TOKEN_MIN_LENGTH } from "./limits";
 
-const EDGE = /^[\s"'`　]+|[\s"'`　]+$/g;
+const EDGE = /^[\s"'`\u3000]+|[\s"'`\u3000]+$/g;
 const SHAPE = /^[A-Za-z0-9_\-.|]+$/;
 
 /**

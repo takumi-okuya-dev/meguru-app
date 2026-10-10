@@ -207,7 +207,7 @@ export async function completeConnection(
       .where(or(eq(accounts.threadsUserId, input.threadsUserId), sql`lower(${accounts.username}) = ${norm}`));
     // ユーザーIDの一致を先に見る
     const existing = candidates.find((c) => c.account.threadsUserId === input.threadsUserId) ?? candidates[0];
-    /** 同じThreadsアカウントの別のAccountがあるときのエラー（自分のものなら接続し直しへ、他人なら登録した人を明かさない） */
+    // 同じThreadsアカウントの別のAccountがあるときのエラー（自分のものなら接続し直しへ、他人なら登録した人を明かさない）
     const duplicateError = (c: (typeof candidates)[number]) =>
       c.ownerId === state.userId
         ? new AppError("ACCOUNT_ALREADY_REGISTERED", 409, "threads account already registered", undefined, [c.account.id])

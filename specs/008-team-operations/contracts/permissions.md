@@ -38,7 +38,7 @@ Accountの判定（`authorizeAccount`）と同じファイルに、次の3つを
 | `listTeamAccounts(db, teamAccess)` | チームが関われるAccountの一覧（手伝う先＋パートナー自身がオーナーのAccount、`own`の印つき）。まとめの画面と担当の表の列はこの一覧だけを使う | — |
 | `authorizeAssignment(db, teamAccess, editorUserId, accountId)` | 相手がチームの編集者で、Accountが`listTeamAccounts`に含まれるか | 404 `TEAM_NOT_FOUND`（編集者でない）、409 `ASSIGNMENT_NOT_ALLOWED`（Accountが対象外） |
 
-- 009（決済）で、オーナーが未払いのAccountを読むだけにするときは、`authorizeAccount`と`listTeamAccounts`（まとめの画面での表示と、担当の付け外しの可否）の両方にこの1か所で足す。
+- 011（決済）で、オーナーが未払いのAccountを読むだけにするときは、`authorizeAccount`と`listTeamAccounts`（まとめの画面での表示と、担当の付け外しの可否）の両方にこの1か所で足す。
 - 招待の確認（`GET /api/invites/:token`）と参加（`POST .../accept`）は、Accountやチームの権限ではなく「リンクを持っているか」で判定する（research.md R4・R7）。
 
 ## 削除の扱い（FR-002a）

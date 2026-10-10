@@ -33,7 +33,7 @@ description: "Task list for feature 010 token account add"
 
 - [X] T004 `apps/api/src/db/schema.ts`に、列挙型`connection_method`（`app`・`token`）、`accounts.connection_method`（「`'app'`（NOT NULL）」）・`accounts.reconnect_hint`（`text` NULL、値は`short_lived_token`だけ）、`threads_connections.recheck_at`（`timestamptz` NULL）、表`token_check_failures`（`id` uuid PK、`user_id` uuid NOT NULL → `users.id` ON DELETE CASCADE、`failed_at` timestamptz NOT NULL、`reason` text NOT NULL：`invalid_format`・`invalid`・`short_lived`・`account_mismatch`）、索引`accounts_username_lower_idx`（`lower(username)`、一意にしない）・`threads_connections_recheck_idx`（`WHERE recheck_at IS NOT NULL`）・`token_check_failures_user_time_idx`（`(user_id, failed_at)`）を足す（data-model.md）。`pnpm --filter api db:generate`で`apps/api/drizzle/0011_token_connect.sql`を作り、既存の行が`app`になることを確かめる。`apps/api/test/helpers/app.ts`の`resetDb`のTRUNCATEに`token_check_failures`を足す。
 - [X] T005 [P] `apps/api/test/integration/threads-debug-client.test.ts`を先に書き、`apps/api/src/lib/threads-client.ts`の`ThreadsClient`に`debugToken(token)`（`GET /v1.0/debug_token?access_token=<T>&input_token=<T>`。`{ isValid, expiresAt: Date | null（0はnull）, issuedAt: Date | null, scopes: string[] }`を返す。エラーの分け方は他の呼び出しと同じ）を足す（research.md R3）。トークンをURLに載せるのはこの呼び出しだけなので、`logger`に出すURLからクエリを落とすことを確かめるテストを含める。
-- [X] T006 [P] `apps/api/test/fake-threads/server.ts`に、(1) `POST /__test/tokens`（`{ user, appScope, lifetime: "long" | "short", debug: boolean, scopes: string[] }`でトークンを発行）、(2) `GET /v1.0/debug_token`（`debug: false`のトークンは権限のエラー）、(3) `appScope`ごとに違うユーザーIDを返す`/me`、(4) `scopes`に`threads_content_publish`・`threads_manage_insights`がなければ投稿の上限・フォロワー数で権限のエラー、(5)トークンを無効にする`POST /__test/tokens/:token/revoke`、(6)画面で作る`GET /__test/token`（ユーザー・アプリ・長期／短期・debugの有無・権限を選んでトークンを表示する簡単なHTML）を足す（research.md R13）。`apps/api/test/helpers/app.ts`の`fake`に`issueToken(opts)`・`revokeToken(token)`を足す。
+- [X] T006 [P] `apps/api/test/fake-threads/server.ts`に、(1) `POST /__control/tokens`（`{ user, appScope, lifetime: "long" | "short", debug: boolean, scopes: string[] }`でトークンを発行）、(2) `GET /v1.0/debug_token`（`debug: false`のトークンは権限のエラー）、(3) `appScope`ごとに違うユーザーIDを返す`/me`、(4) `scopes`に`threads_content_publish`・`threads_manage_insights`がなければ投稿の上限・フォロワー数で権限のエラー、(5)トークンを無効にする`POST /__control/tokens/revoke`、(6)画面で作る`GET /__control/token-page`（ユーザー・アプリ・長期／短期・debugの有無・権限を選んでトークンを表示する簡単なHTML）を足す（research.md R13）。`apps/api/test/helpers/app.ts`の`fake`に`issueToken(opts)`・`revokeToken(token)`を足す。
 - [X] T007 `apps/api/test/integration/threads-connect.test.ts`・`reconnect.test.ts`・`threads-callback-guards.test.ts`が通ったまま、`apps/api/src/services/account-service.ts`の`completeConnection`の入力を`ConnectionRequest = { userId, mode: "new" | "reconnect", targetAccountId, startedAt, method: "app" | "token" }`＋トークン・期限・`issuedAt`・`scopes`・`recheckAt`・`insightsDenied`に広げ、`writeConnection`で`connection_method`・`threads_user_id`・`scopes`・`issued_at`・`recheck_at`を書き、`reconnect_hint`を消す（research.md R5・R7）。`apps/api/src/routes/threads-connect.ts`のcallbackはstateの行から`ConnectionRequest`（`method: "app"`）を作る。
 - [X] T008 `apps/api/src/db/locks.ts`に`lockThreadsUsername(tx, normalizedUsername)`（`threads_username:<name>`のアドバイザリーロック）を足し、`completeConnection`のロックの順序を「Threadsユーザー → ユーザー名 → usersの行」にする。`apps/api/src/db/locks.ts`の先頭の説明（ロックの順序）を直す（research.md R6）。
 - [X] T009 [P] `packages/shared/src/schemas.ts`のAccountの要約に`connectionMethod`（`app`・`token`）と`reconnectHint`（`short_lived_token`またはNULL）を足し、`apps/api/src/services/access.ts`の`toAccountSummary`で返す。`apps/api/test/integration/me.test.ts`に、既存のAccountが`connectionMethod: "app"`・`reconnectHint: null`になることのテストを足す（contracts/api.md「変わるAPI」）。
@@ -55,7 +55,7 @@ description: "Task list for feature 010 token account add"
 - [X] T012 [P] [US1] `apps/api/test/integration/secrets.test.ts`に、`token-connect`の成功・失敗の応答・`console`へのログ・`activity_logs`・CSVの書き出しに、貼り付けたトークンの文字列が含まれないことのテストを足す（SC-004、FR-043）。
 - [X] T013 [P] [US1] `apps/api/test/integration/permissions-matrix.test.ts`の表に`POST /api/threads/token-connect`（`mode: "new"`はログイン済みなら誰でも、`mode: "reconnect"`は`owner`）を足す。
 - [X] T014 [P] [US1] `apps/web/test/account-new-token.test.tsx`（新規。上限の表示は既存の`account-new-limit.test.tsx`のまま）に：2つ目の方法は初め閉じていて、開くまで入力欄が出ない（SC-007）、開くと手順5つ・「詳しい手順を見る」・入力欄（`type="text"`・`autocomplete="off"`・`data-1p-ignore`・文字を隠すclass、「表示」で外れる）・説明・利用規約のリンク・「追加する」、形の違う文字列では送信しない、`TOKEN_CHECK_LOCKED`で残りの分とボタンの無効、`ACCOUNT_ALREADY_REGISTERED`で設定へのリンク、成功で`/accounts/:id?connected=new&warn=…`へ移る、のテストを書く（contracts/ui-routes.md）。
-- [X] T015 [P] [US1] `apps/web/test/terms-page.test.tsx`に、`/terms`がログインなしで開け、FR-052の項目（トークンでの接続の扱い・禁止事項・データの削除の案内）が出ること、トップページの足元に「利用規約」のリンクがあることのテストを書く。
+- [X] T015 [P] [US1] `apps/web/test/terms-page.test.tsx`に、`/terms`がログインなしで開け、FR-052の項目（トークンでの接続の扱い・禁止事項・データの削除の案内）が出ること、ログイン画面の足元に「利用規約」のリンクがあることのテストを書く。
 
 ### Implementation for User Story 1
 
@@ -64,7 +64,7 @@ description: "Task list for feature 010 token account add"
 - [X] T018 [US1] `apps/web/src/lib/api-client.ts`に`tokenConnect(req)`を足す。`apps/web/src/components/connect/TokenConnectForm.tsx`を作る：手順5つ・「詳しい手順を見る」（`/guide/threads-token`、新しいタブ）・入力欄（`type="text"`・`autocomplete="off"`・`autoCorrect="off"`・`autoCapitalize="off"`・`spellCheck={false}`・`data-1p-ignore`・`data-lpignore="true"`。文字はCSSの`-webkit-text-security: disc`で隠し、「表示」で外す。パスワード欄にしないのは、ブラウザやパスワード管理ツールにトークンを保存させないため（FR-003）。対応していないブラウザでは文字が見えるので、欄の下に「周りに人がいないところで貼り付けてください」と添える）・`isTokenShaped`での先の判定・説明と利用規約のリンク・送信ボタン・エラーの`Alert`（`TOKEN_CHECK_LOCKED`は残りの時間だけボタンを無効）。`mode`と送信の後の動きはpropsで受ける（contracts/ui-routes.md）。
 - [X] T019 [US1] `apps/web/src/pages/account-new.tsx`の主のボタンと検証期間の案内の下に、折りたたみの行「自分のMetaアプリのトークンで追加する」（`aria-expanded`）を足し、開くと`TokenConnectForm`（`mode: "new"`）を出す。上限に達していれば、開いても上限の案内を出す。成功で`/accounts/:id?connected=new`（`warnings`があれば`&warn=publish,insights`）へ移る。
 - [X] T020 [US1] `apps/web/src/lib/callback-result.ts`と`apps/web/src/pages/account-home.tsx`で`warn`のクエリを読み、ホームの上部に`Alert`を1回出す（文言はcontracts/ui-routes.md 6）。
-- [X] T021 [P] [US1] `apps/web/src/pages/terms.tsx`を作り（FR-052の項目、最終更新日2026-10-10、`CenteredLayout`の幅）、`apps/web/src/router.tsx`にログイン不要の`/terms`を足し、`apps/web/src/pages/landing.tsx`の足元に「利用規約」のリンクを置く。
+- [X] T021 [P] [US1] `apps/web/src/pages/terms.tsx`を作り（FR-052の項目、最終更新日2026-10-10、`CenteredLayout`の幅）、`apps/web/src/router.tsx`にログイン不要の`/terms`を足し、`apps/web/src/pages/sign-in.tsx`の足元に「利用規約」のリンクを置く（`/`はログイン後の振り分けだけのため）。
 - [X] T022 [P] [US1] `specs/001-login-account-setup/spec.md`のFR-008の末尾に「ただし、利用者が自分のMetaアプリで作ったトークンを貼り付ける方法（[010](../010-token-account-add/spec.md)）を除く。」を書き足す（FR-004）。
 
 **Checkpoint**：トークンでの追加が単独で動く。OAuthの追加の画面は、2つ目の方法を開かなければ今と同じ。
@@ -124,13 +124,13 @@ description: "Task list for feature 010 token account add"
 
 ### Tests for User Story 4
 
-- [ ] T036 [P] [US4] `apps/api/test/integration/token-refresh.test.ts`に、`connection_method = 'token'`の接続が001と同じ条件で延長され、プロフィールの取り直しでユーザー名が新しくなることのテストを足す（SC-006、FR-040）。
-- [ ] T037 [P] [US4] `apps/api/test/integration/token-recheck.test.ts`を作る：`recheck_at`を過ぎた接続で、有効なら`recheck_at`が消える（`debug_token`が読めれば期限を直す）、認証のエラーなら要再接続・`reconnect_hint = 'short_lived_token'`・`recheck_at`が消える、一時的な失敗なら`recheck_at`が10分延びる、その間に接続し直していれば（世代番号が違う）結果を捨てる、1回で最大20件（FR-012、research.md R8）。
-- [ ] T038 [P] [US4] `apps/api/test/integration/auto-post-gate.test.ts`に、関所の「次に見る時刻」に`recheck_at`の最も早い時刻が入ること、`recheck_at`がなければ今と同じ時刻になること、`token-connect`が`autopost:wake`を書くことのテストを足す。
+- [X] T036 [P] [US4] `apps/api/test/integration/token-refresh.test.ts`に、`connection_method = 'token'`の接続が001と同じ条件で延長され、プロフィールの取り直しでユーザー名が新しくなることのテストを足す（SC-006、FR-040）。
+- [X] T037 [P] [US4] `apps/api/test/integration/token-recheck.test.ts`を作る：`recheck_at`を過ぎた接続で、有効なら`recheck_at`が消える（`debug_token`が読めれば期限を直す）、認証のエラーなら要再接続・`reconnect_hint = 'short_lived_token'`・`recheck_at`が消える、一時的な失敗なら`recheck_at`が10分延びる、その間に接続し直していれば（世代番号が違う）結果を捨てる、1回で最大20件（FR-012、research.md R8）。
+- [X] T038 [P] [US4] `apps/api/test/integration/auto-post-gate.test.ts`に、関所の「次に見る時刻」に`recheck_at`の最も早い時刻が入ること、`recheck_at`がなければ今と同じ時刻になること、`token-connect`が`autopost:wake`を書くことのテストを足す。
 
 ### Implementation for User Story 4
 
-- [ ] T039 [US4] `apps/api/src/services/token-recheck.ts`を作り（`selectRecheckDue`・`recheckOne`、世代番号を条件に書く）、`apps/api/src/services/auto-post-runner.ts`のDBの処理で呼び、関所の候補に`min(recheck_at)`を足す（research.md R8、contracts/api.md「定期処理」）。
+- [X] T039 [US4] `apps/api/src/services/token-recheck.ts`を作り（`selectRecheckDue`・`recheckOne`、世代番号を条件に書く）、`apps/api/src/services/auto-post-runner.ts`のDBの処理で呼び、関所の候補に`min(recheck_at)`を足す（research.md R8、contracts/api.md「定期処理」）。
 - [X] T040 [US4] `apps/api/src/services/daily-jobs.ts`に「`token_check_failures`の`failed_at`が1日より前の行を消す」を足し、`apps/api/test/integration/token-connect.test.ts`に消えることのテストを足す。
 
 **Checkpoint**：トークンの接続が、利用者の操作なしで接続中のまま保たれる。
@@ -145,15 +145,15 @@ description: "Task list for feature 010 token account add"
 
 - [X] T041 [P] [US5] `apps/web/test/guide-page.test.tsx`に、`/guide/threads-token`がログインなしで開け、節（はじめに・1〜6・取り消し・うまくいかないとき）と各手順の「この手順の目的」、確かめた日が出ることのテストを書く。
 - [X] T042 [US5] `apps/web/src/pages/guide-threads-token.tsx`を作り（contracts/ui-routes.md「トークンの作り方」、画面の写真なし）、`apps/web/src/router.tsx`にログイン不要の`/guide/threads-token`を足す。
-- [ ] T043 [P] [US5] `docs/threads-token-guide.md`を作る：画面の手順（追加の画面の5つ・`/guide/threads-token`）の元の文、Metaの画面の名前が変わったときに直すファイル（`TokenConnectForm.tsx`・`guide-threads-token.tsx`）、確かめた日、`debug_token`の応答の形（T047の結果）。`README.md`と`docs/external-services-setup.md`から案内する。
+- [X] T043 [P] [US5] `docs/threads-token-guide.md`を作る：画面の手順（追加の画面の5つ・`/guide/threads-token`）の元の文、Metaの画面の名前が変わったときに直すファイル（`TokenConnectForm.tsx`・`guide-threads-token.tsx`）、確かめた日、`debug_token`の応答の形（T047の結果）。`README.md`と`docs/external-services-setup.md`から案内する。
 
 ---
 
 ## Phase 8: Polish & Cross-Cutting Concerns
 
-- [ ] T044 [P] FR-060：`.specify/memory/constitution.md`を3.0.1（PATCH、Last Amended 2026-10-10）にし、原則Vの「決済（feature 009）」を「決済（feature 011）」に直す（Sync Impact Reportはファイルの先頭に残さない。research.md R12）。`specs/008-team-operations/spec.md` FR-080・`research.md` R15・`contracts/permissions.md`、`_bmad-output/initiative-threads-grower-app/prd-threads-grower-app/prd-threads-grower-app.md` §6.1の「009（決済）」を「011（決済）」に直す。`grep -rn "009（決済）\|feature 009" specs .specify _bmad-output docs`で残りがないことを確かめる。
-- [ ] T045 [P] `e2e/tests/token.spec.ts`を作る：偽のThreadsの`/__test/token`で作ったトークンを貼って追加 →「今の接続：自分のMetaアプリのトークン」→ 同じアカウントの別アプリのトークンで「すでに登録されています」→ 接続し直しで「Threadsで許可する」に切り替え、投稿ストックが残る（quickstart.md 2）。`pnpm e2e -- token`で通す。
-- [ ] T046 [P] `docs/ui-design.md`に、追加の画面の折りたたみ・接続し直しのダイアログ・公開の読み物のページ（`/terms`・`/guide/threads-token`）の項を足す。
+- [X] T044 [P] FR-060：`.specify/memory/constitution.md`を3.0.1（PATCH、Last Amended 2026-10-10）にし、原則Vの「決済（feature 009）」を「決済（feature 011）」に直す（Sync Impact Reportはファイルの先頭に残さない。research.md R12）。`specs/008-team-operations/spec.md` FR-080・`research.md` R15・`contracts/permissions.md`、`_bmad-output/initiative-threads-grower-app/prd-threads-grower-app/prd-threads-grower-app.md` §6.1の「009（決済）」を「011（決済）」に直す。`grep -rn "009（決済）\|feature 009" specs .specify _bmad-output docs`で残りがないことを確かめる。
+- [ ] T045 [P] `e2e/tests/token.spec.ts`を作る：偽のThreadsの`/__control/token-page`で作ったトークンを貼って追加 →「今の接続：自分のMetaアプリのトークン」→ 同じアカウントの別アプリのトークンで「すでに登録されています」→ 接続し直しで「Threadsで許可する」に切り替え、投稿ストックが残る（quickstart.md 2）。`pnpm e2e -- token`で通す。
+- [X] T046 [P] `docs/ui-design.md`に、追加の画面の折りたたみ・接続し直しのダイアログ・公開の読み物のページ（`/terms`・`/guide/threads-token`）の項を足す。
 - [ ] T047 実際のMetaアプリ（ThreadsAutomation）のトークンで`debug_token`を呼び、応答の形（`data`の下か、`expires_at`・`scopes`の有無）を確かめてresearch.md R3の末尾に1行で書く。形が違えばT005の`debugToken`を直す。トークンの値は記録しない（ユーザーの手を借りる）。
 - [ ] T048 `pnpm lint`・`pnpm typecheck`・`pnpm test`・`pnpm build`・`pnpm e2e -- token`・`pnpm e2e -- team`を流し、`specs/010-token-account-add/verification.md`に結果（件数・気づいたこと・計画からの変更）と、手動の確認（quickstart.md 3、SC-002）の予定を書く。手動の確認で、実際のトークンを貼り付けてから追加が終わるまでの時間（planの目標はふつう3秒以内）と、追加の画面を開いてから終わるまでの時間（SC-001の2分以内）を測り、verification.mdに書く。
 

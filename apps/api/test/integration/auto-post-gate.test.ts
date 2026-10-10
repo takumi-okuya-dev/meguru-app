@@ -1,4 +1,5 @@
 // 定期処理の関所（specs/005-auto-post research.md R3、contracts/auto-post-job.md 手順0・7）
+import { neon } from "@neondatabase/serverless";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   createExecutionContext,
@@ -7,7 +8,7 @@ import {
 } from "cloudflare:test";
 import worker from "../../src/index";
 import { runAutoPost } from "../../src/services/auto-post-runner";
-import { fake, makeApp, resetDb, testEnv } from "../helpers/app";
+import { call, fake, makeApp, resetDb, testEnv } from "../helpers/app";
 import { addMin, connectedAccount, jst, setSchedule } from "../helpers/auto-post";
 
 const app = makeApp();
@@ -90,6 +91,26 @@ describe("関所（DBに触れずに終える）", () => {
     const r = await runAutoPost(testEnv, addMin(NOON, 5));
     expect(r.ran).toBe(true);
     expect((await gate()).nextCheckAt).toBe(jst("2030-01-10 21:00").toISOString());
+  });
+
+  it("トークンの確かめ直しの時刻が、次に見る時刻の候補に入る（specs/010 research.md R8）", async () => {
+    await runAutoPost(testEnv, NOON);
+    const base = (await gate()).nextCheckAt;
+    await fake.addUser("9003", "cafe_b");
+    const res = await call(app, "POST", "/api/threads/token-connect", {
+      user: "u1",
+      body: { mode: "new", token: await fake.issueToken({ user: "9003", debug: false }) },
+    });
+    expect(res.status).toBe(200);
+    // トークンの追加は autopost:wake を書く
+    expect(await KV().get("autopost:wake")).not.toBeNull();
+    const at = addMin(NOON, 30);
+    await neon(testEnv.DATABASE_URL)`UPDATE threads_connections SET recheck_at = ${at.toISOString()}`;
+    // 試験の時刻（2030年）に合わせて、知らせの時刻を入れ直す
+    await KV().put("autopost:wake", JSON.stringify({ at: addMin(NOON, 1).toISOString() }));
+    await runAutoPost(testEnv, addMin(NOON, 5));
+    expect((await gate()).nextCheckAt).toBe(at.toISOString());
+    expect(base).toBe(jst("2030-01-11 03:00").toISOString());
   });
 
   it("関所の書き込みに失敗すると、前の値（過ぎた時刻）が残り、次の回もDBの処理が動く", async () => {

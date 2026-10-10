@@ -147,6 +147,8 @@ APIは、セッショントークンにメールアドレスが含まれてい�
 
 ## 3. Meta（Threadsアカウントの接続）
 
+> ここは、このアプリのMetaアプリ（OAuthの「Threadsで許可する」）の準備です。利用者が自分のMetaアプリのトークンを貼り付ける方法（010）では、このアプリ側の準備は要りません。利用者向けの手順は`/guide/threads-token`、運営者向けの説明は[threads-token-guide.md](threads-token-guide.md)。
+
 ### 3-1. アプリを作る
 
 1. [Meta for Developers](https://developers.facebook.com/apps/)で「アプリを作成」を選ぶ。

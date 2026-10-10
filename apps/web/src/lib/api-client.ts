@@ -206,7 +206,7 @@ export const api = {
       body: JSON.stringify(body),
       signal,
     }),
-  /** 自分のMetaアプリのトークンで追加・接続し直す（specs/010 contracts/api.md） */
+  // 自分のMetaアプリのトークンで追加・接続し直す（specs/010 contracts/api.md）
   tokenConnect: (body: TokenConnectRequestBody) =>
     request("/api/threads/token-connect", tokenConnectResponseSchema, {
       method: "POST",

@@ -33,7 +33,7 @@ pnpm e2e -- team          # 008の流れが変わらないこと
 ## 2.偽のThreadsで手で確かめる
 
 1. `pnpm dev:fake`で起動し、`http://localhost:5173`でログインする。
-2. 偽のThreads（`http://localhost:8790/__test/token`）の「トークンを作る」で、@cafe_b・長期・`debug_token`あり・3つの権限のトークンを作り、コピーする。
+2. 偽のThreads（`http://localhost:8790/__control/token-page`）の「トークンを作る」で、@cafe_b・長期・`debug_token`あり・3つの権限のトークンを作り、コピーする。
 3. 「Threadsアカウントを追加」→「自分のMetaアプリのトークンで追加する」を開き、貼り付けて「追加する」。@cafe_bのホームに移る。
 4. 設定の「Threadsとの接続」に「今の接続：自分のMetaアプリのトークン」が出る。
 5. もう一度、同じ@cafe_bで別のアプリ（`appScope`を変える）のトークンを作って追加 →「このアカウントはすでに登録されています」。

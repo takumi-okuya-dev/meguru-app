@@ -80,7 +80,7 @@
 
 ## R11.利用規約と詳しい手順のページ
 
-- **決定**：ログイン不要の`/terms`（利用規約）と`/guide/threads-token`（トークンの作り方）をWebに置く。どちらも静的な文面（TSX）。運営者向けの`docs/threads-token-guide.md`には、画面の手順の元・Metaの画面の名前が変わったときに直す場所・確かめた日を書く。トップページの足元に「利用規約」、追加の画面と手順のページから利用規約へリンクする。
+- **決定**：ログイン不要の`/terms`（利用規約）と`/guide/threads-token`（トークンの作り方）をWebに置く。どちらも静的な文面（TSX）。運営者向けの`docs/threads-token-guide.md`には、画面の手順の元・Metaの画面の名前が変わったときに直す場所・確かめた日を書く。ログイン画面の足元に「利用規約」、追加の画面と手順のページから利用規約へリンクする。
 - **理由**：利用者はリポジトリのdocsを読めないため、「詳しい手順」はアプリの公開ページとして出す（specの「ドキュメントのページ」をこう解釈した。2026-10-10）。文面の元をdocsに置くと、Metaの画面が変わったときの直し方が残る。
 - **利用規約の文面**：spec FR-052の項目を下書きとして書き、運営者が公開の前に確かめる（Assumptions）。運営者の名前・連絡先は環境変数ではなく文面に書く（011で特商法の表示と合わせて見直す）。
 
@@ -96,5 +96,5 @@
 
 ## R13.偽のThreads（テスト・E2E）
 
-- **決定**：`apps/api/test/fake-threads`に、(1)任意の利用者のトークンを発行する開発用のエンドポイント（`POST /__test/tokens`：`{ user, appScope, lifetime: "long" | "short", debug: true | false, scopes }`）、(2) `debug_token`、(3)アプリごとに違うユーザーIDを返す`/me`（`appScope`ごとにIDを変える）を足す。E2Eの画面では、偽のThreadsの「トークンを作る」ページで作ったトークンを貼り付ける。
+- **決定**：`apps/api/test/fake-threads`に、(1)任意の利用者のトークンを発行する開発用のエンドポイント（`POST /__control/tokens`：`{ user, appScope, lifetime: "long" | "short", debug: true | false, scopes }`）、(2) `debug_token`、(3)アプリごとに違うユーザーIDを返す`/me`（`appScope`ごとにIDを変える）を足す。E2Eの画面では、偽のThreadsの「トークンを作る」ページで作ったトークンを貼り付ける。
 - **理由**：二重登録の3通り（SC-003）と、短期・`debug_token`が読めない場合を、実際のMetaアプリなしで確かめる。

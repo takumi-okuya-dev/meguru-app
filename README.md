@@ -90,6 +90,8 @@ pnpm dev:fake    # 偽のThreads（:8790）・api（:8787）・web（:5173）を
 ### 本物のThreads（Meta）につなぐ場合
 
 > Clerk・Meta・Cloudflare Tunnelの具体的な準備手順は[docs/external-services-setup.md](docs/external-services-setup.md)にまとめています。
+>
+> 利用者が自分のMetaアプリのトークンでアカウントを追加する機能（010）の、画面の手順の元とMetaの画面が変わったときの直し方は[docs/threads-token-guide.md](docs/threads-token-guide.md)。
 
 - Threadsのredirect URIはHTTPS必須で`localhost`は登録できない。Cloudflare Tunnelで固定のホスト名をローカルのAPI（`localhost:8787`）に向け、そのURLを`THREADS_REDIRECT_URI`とMetaのアプリ設定に登録する。
 - Metaのアプリ設定には、リダイレクトのほかに**アンインストール**（`/api/threads/webhooks/uninstall`）と**データ削除**（`/api/threads/webhooks/data-deletion`）のcallback URLも登録する（登録しないと保存できない）。

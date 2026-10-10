@@ -15,6 +15,19 @@ import { refreshUsernameOnlyMatch } from "../services/username-match";
 const TOKEN_BODY_MAX_BYTES = 2048;
 
 /**
+ * JSONを読む。読めなければ null（エラーのメッセージに本文を含めない）。
+ * @param raw - 本文
+ * @returns 読んだ値
+ */
+function parseJson(raw: string): unknown {
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+}
+
+/**
  * POST /api/threads/connect と GET /api/threads/callback のルート（research.md R3・R4・R8）。
  * @param authed - 認証のミドルウェア（connect だけに使う。callback は state で本人を確かめる）
  * @returns Hono のルート
@@ -38,13 +51,7 @@ export function threadsConnectRoutes(authed: MiddlewareHandler<AppEnv>) {
       if (new TextEncoder().encode(raw).length > TOKEN_BODY_MAX_BYTES) {
         throw new AppError("VALIDATION_FAILED", 400, "token request too large");
       }
-      let json: unknown = null;
-      try {
-        json = JSON.parse(raw);
-      } catch {
-        json = null;
-      }
-      const parsed = tokenConnectRequestSchema.safeParse(json);
+      const parsed = tokenConnectRequestSchema.safeParse(parseJson(raw));
       if (!parsed.success) throw new AppError("VALIDATION_FAILED", 400, "invalid token connect request");
       const result = await connectWithToken(c.env, createThreadsClient(c.env), c.get("user"), parsed.data);
       return c.json(result);

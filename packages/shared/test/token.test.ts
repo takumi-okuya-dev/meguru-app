@@ -9,7 +9,7 @@ describe("cleanToken", () => {
     expect(cleanToken(`  "${TOKEN}"\n`)).toBe(TOKEN);
     expect(cleanToken(`'${TOKEN}'`)).toBe(TOKEN);
     expect(cleanToken("`" + TOKEN + "`\r\n")).toBe(TOKEN);
-    expect(cleanToken(`\t${TOKEN}　`)).toBe(TOKEN);
+    expect(cleanToken(`\t${TOKEN}\u3000`)).toBe(TOKEN);
   });
 
   it("中の文字は変えない", () => {
