@@ -28,7 +28,7 @@ import {
   type TokenDebugInfo,
 } from "../lib/threads-client";
 import { authorizeAccount } from "./access";
-import { assertCanAddAccount, completeConnection } from "./account-service";
+import { completeConnection } from "./account-service";
 import { notifyWake } from "./posting-schedule-service";
 import { refreshUsernameOnlyMatch } from "./username-match";
 
@@ -171,7 +171,8 @@ export async function connectWithToken(
   await assertNotLocked(db, user.id, now);
   const token = cleanToken(req.token);
   if (!isTokenShaped(token)) await fail(db, user.id, "invalid_format", invalid(), now);
-  if (req.mode === "new") await assertCanAddAccount(db, user.id);
+  // 登録の上限は、同じアカウントの照合の後に completeConnection の中で判定する。上限に達していても、登録済みの
+  // アカウントのトークンなら「すでに登録されています」と接続し直しへ案内できるようにするため（US2-1）
 
   const found = await inspectToken(threads, token);
   if (!found) return fail(db, user.id, "invalid", invalid(), now);

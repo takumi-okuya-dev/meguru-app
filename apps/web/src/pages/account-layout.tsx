@@ -8,6 +8,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   NEEDS_RECONNECT_BANNER,
   NEEDS_RECONNECT_BANNER_HELPER,
+  NEEDS_RECONNECT_BANNER_TOKEN,
   errorMessage,
   type AccountSummary,
 } from "@threads-grower/shared";
@@ -33,6 +34,17 @@ export type AccountOutletContext = { account: AccountSummary };
  */
 export function useCurrentAccount() {
   return useOutletContext<AccountOutletContext>().account;
+}
+
+/**
+ * 要再接続のバナーの文言（001 FR-019、specs/008 FR-044、specs/010 FR-041）。
+ * オーナーには再接続を、トークンで接続していれば新しいトークンの貼り付けを案内し、パートナー・編集者にはオーナーを待つ案内を出す。
+ * @param account - 要再接続のAccount
+ * @returns バナーの文言
+ */
+export function reconnectBannerText(account: Pick<AccountSummary, "role" | "connectionMethod">): string {
+  if (account.role !== "owner") return NEEDS_RECONNECT_BANNER_HELPER;
+  return account.connectionMethod === "token" ? NEEDS_RECONNECT_BANNER_TOKEN : NEEDS_RECONNECT_BANNER;
 }
 
 /**
@@ -80,14 +92,14 @@ export function AccountLayout() {
       >
         {account.data.role === "owner" ? (
           <>
-            <AlertDescription className="text-foreground">{NEEDS_RECONNECT_BANNER}</AlertDescription>
+            <AlertDescription className="text-foreground">{reconnectBannerText(account.data)}</AlertDescription>
             <Button asChild size="sm">
               <Link to={`/accounts/${account.data.id}/settings`}>再接続</Link>
             </Button>
           </>
         ) : (
           // 再接続はオーナーだけができる（specs/008 FR-044）
-          <AlertDescription className="text-foreground">{NEEDS_RECONNECT_BANNER_HELPER}</AlertDescription>
+          <AlertDescription className="text-foreground">{reconnectBannerText(account.data)}</AlertDescription>
         )}
       </Alert>
     ) : null;

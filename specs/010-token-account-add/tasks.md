@@ -79,14 +79,14 @@ description: "Task list for feature 010 token account add"
 
 ### Tests for User Story 2
 
-- [ ] T023 [P] [US2] `apps/api/test/integration/token-duplicate.test.ts`を作る：(a)このアプリの接続 → 同じユーザー名・別IDのトークンで`ACCOUNT_ALREADY_REGISTERED`（`details: [accountId]`）、(b)トークン → このアプリの接続で`kind: "updated"`（新しいAccountを作らず、接続の方法が`app`になる）、(c)トークン → 別の`appScope`のトークンで`ACCOUNT_ALREADY_REGISTERED`、(d)他の利用者のAccountと一致で`THREADS_ACCOUNT_TAKEN`（登録した人を明かさない）、(e)ユーザー名の大文字・小文字の違いでも一致、(f) 2つの要求が同時に同じユーザー名で来てもAccountは1つ（SC-003、FR-020〜FR-022）。
-- [ ] T024 [US2] 同じファイルにFR-023のテストを足す：ユーザー名だけが一致し、相手のAccountのプロフィールを取り直すと別の名前 → 相手の`username`を更新して追加を続ける。相手が要再接続・取り直せない → 一致したものとして`THREADS_ACCOUNT_TAKEN`または`ACCOUNT_ALREADY_REGISTERED`。取り直しのやり直しは1回まで。
+- [X] T023 [P] [US2] `apps/api/test/integration/token-duplicate.test.ts`を作る：(a)このアプリの接続 → 同じユーザー名・別IDのトークンで`ACCOUNT_ALREADY_REGISTERED`（`details: [accountId]`）、(b)トークン → このアプリの接続で`kind: "updated"`（新しいAccountを作らず、接続の方法が`app`になる）、(c)トークン → 別の`appScope`のトークンで`ACCOUNT_ALREADY_REGISTERED`、(d)他の利用者のAccountと一致で`THREADS_ACCOUNT_TAKEN`（登録した人を明かさない）、(e)ユーザー名の大文字・小文字の違いでも一致、(f) 2つの要求が同時に同じユーザー名で来てもAccountは1つ（SC-003、FR-020〜FR-022）。
+- [X] T024 [US2] 同じファイルにFR-023のテストを足す：ユーザー名だけが一致し、相手のAccountのプロフィールを取り直すと別の名前 → 相手の`username`を更新して追加を続ける。相手が要再接続・取り直せない → 一致したものとして`THREADS_ACCOUNT_TAKEN`または`ACCOUNT_ALREADY_REGISTERED`。取り直しのやり直しは1回まで。
 
 ### Implementation for User Story 2
 
-- [ ] T025 [US2] `apps/api/src/services/account-service.ts`の既存のAccountの探し方を`threads_user_id = ID OR lower(username) =正規化したユーザー名`に変え、新規の要求で自分のものと一致したら、`method: "app"`は001どおり更新（`kind: "updated"`、方法を`app`に）、`method: "token"`は`ACCOUNT_ALREADY_REGISTERED`（`details: [accountId]`）、他人なら`THREADS_ACCOUNT_TAKEN`にする。新しいIDが別のAccountの`threads_user_id`と重なるときも同じ扱いにする（research.md R6・R7）。
-- [ ] T026 [US2] `apps/api/src/services/token-connect.ts`と`apps/api/src/routes/threads-connect.ts`のcallbackで、確定の前に「ユーザー名だけが一致するAccount」を探し、その保存済みトークンでプロフィールを取り直して、名前が違えば`accounts.username`を更新してから確定する（1回まで。復号できない・要再接続・認証のエラーなら取り直さない）（FR-023）。
-- [ ] T027 [US2] `apps/web/src/components/connect/TokenConnectForm.tsx`の`ACCOUNT_ALREADY_REGISTERED`の`Alert`に「そのアカウントの設定を開く」（`/accounts/:id/settings`）を出す（US2-1）。
+- [X] T025 [US2] `apps/api/src/services/account-service.ts`の既存のAccountの探し方を`threads_user_id = ID OR lower(username) =正規化したユーザー名`に変え、新規の要求で自分のものと一致したら、`method: "app"`は001どおり更新（`kind: "updated"`、方法を`app`に）、`method: "token"`は`ACCOUNT_ALREADY_REGISTERED`（`details: [accountId]`）、他人なら`THREADS_ACCOUNT_TAKEN`にする。新しいIDが別のAccountの`threads_user_id`と重なるときも同じ扱いにする（research.md R6・R7）。
+- [X] T026 [US2] `apps/api/src/services/token-connect.ts`と`apps/api/src/routes/threads-connect.ts`のcallbackで、確定の前に「ユーザー名だけが一致するAccount」を探し、その保存済みトークンでプロフィールを取り直して、名前が違えば`accounts.username`を更新してから確定する（1回まで。復号できない・要再接続・認証のエラーなら取り直さない）（FR-023）。
+- [X] T027 [US2] `apps/web/src/components/connect/TokenConnectForm.tsx`の`ACCOUNT_ALREADY_REGISTERED`の`Alert`に「そのアカウントの設定を開く」（`/accounts/:id/settings`）を出す（US2-1）。
 
 **Checkpoint**：MVP（US1＋US2）。二重登録の3通りで、Accountは1つしかできない。
 
@@ -100,17 +100,17 @@ description: "Task list for feature 010 token account add"
 
 ### Tests for User Story 3
 
-- [ ] T028 [P] [US3] `apps/api/test/integration/token-reconnect.test.ts`を作る：トークンでの接続し直し（要再接続から接続中、`connection_generation`が増える、登録の上限でも使える）、`app` → `token`と`token` → `app`の切り替えで、投稿ストック・戦略・設定・NGワード・操作の記録の件数が同じでユーザーIDが新しい値になる（SC-005、FR-033）、別のThreadsアカウントのトークンで`RECONNECT_ACCOUNT_MISMATCH`（失敗に数える）、OAuthでの接続し直しも「IDが同じ、またはユーザー名が同じ」で通る（FR-032）、パートナー・編集者は`ROLE_FORBIDDEN`（FR-034）、`reconnect_hint`が消える。トークンで接続し直したとき、`debug_token`で期限を読めなければ`recheck_at`が2時間後に入り、読めれば入らないこと（FR-012）。
-- [ ] T029 [P] [US3] `apps/api/test/integration/activity.test.ts`に、チームがあるAccountで、どちらの方法の接続し直しも`threads_reconnected`（`kind: settings`、`details.method`）が1行ずつ記録され、チームがなければ記録されないことのテストを足す（FR-035、research.md R11a）。
-- [ ] T030 [P] [US3] `apps/web/test/reconnect-dialog.test.tsx`を作る：設定の「Threadsとの接続」に「今の接続：…」が出る、ボタンでダイアログが開き2つの選択と「今の接続」のラベル、「トークンを貼り付ける」で`TokenConnectForm`（ボタン「接続し直す」）、成功でトースト「接続し直しました」、`reconnectHint`で短期トークンの文、パートナー・編集者には出ない、削除の確認に「Metaアプリ側のトークンは…」（`token`のときだけ）。要再接続のバナーは、オーナーで`connectionMethod === "token"`なら「トークンが使えなくなりました。新しいトークンを貼り付けて接続し直してください。」、`app`なら001の文のまま、パートナー・編集者には008の「オーナーの再接続待ち」のままであること（FR-041）。
+- [X] T028 [P] [US3] `apps/api/test/integration/token-reconnect.test.ts`を作る：トークンでの接続し直し（要再接続から接続中、`connection_generation`が増える、登録の上限でも使える）、`app` → `token`と`token` → `app`の切り替えで、投稿ストック・戦略・設定・NGワード・操作の記録の件数が同じでユーザーIDが新しい値になる（SC-005、FR-033）、別のThreadsアカウントのトークンで`RECONNECT_ACCOUNT_MISMATCH`（失敗に数える）、OAuthでの接続し直しも「IDが同じ、またはユーザー名が同じ」で通る（FR-032）、パートナー・編集者は`ROLE_FORBIDDEN`（FR-034）、`reconnect_hint`が消える。トークンで接続し直したとき、`debug_token`で期限を読めなければ`recheck_at`が2時間後に入り、読めれば入らないこと（FR-012）。
+- [X] T029 [P] [US3] `apps/api/test/integration/activity.test.ts`に、チームがあるAccountで、どちらの方法の接続し直しも`threads_reconnected`（`kind: settings`、`details.method`）が1行ずつ記録され、チームがなければ記録されないことのテストを足す（FR-035、research.md R11a）。
+- [X] T030 [P] [US3] `apps/web/test/reconnect-dialog.test.tsx`を作る：設定の「Threadsとの接続」に「今の接続：…」が出る、ボタンでダイアログが開き2つの選択と「今の接続」のラベル、「トークンを貼り付ける」で`TokenConnectForm`（ボタン「接続し直す」）、成功でトースト「接続し直しました」、`reconnectHint`で短期トークンの文、パートナー・編集者には出ない、削除の確認に「Metaアプリ側のトークンは…」（`token`のときだけ）。要再接続のバナーは、オーナーで`connectionMethod === "token"`なら「トークンが使えなくなりました。新しいトークンを貼り付けて接続し直してください。」、`app`なら001の文のまま、パートナー・編集者には008の「オーナーの再接続待ち」のままであること（FR-041）。
 
 ### Implementation for User Story 3
 
-- [ ] T031 [US3] `apps/api/src/services/account-service.ts`の接続し直しの判定を「IDが同じ、またはユーザー名が同じ」に広げ（research.md R7）、`apps/api/src/services/token-connect.ts`の`mode: "reconnect"`をルートとトランザクションの中の両方で`authorizeAccount(..., "owner")`に通す。
-- [ ] T032 [US3] `apps/api/src/services/activity-log.ts`と`completeConnection`の接続し直しの枝で、チームがあるAccountだけ`threads_reconnected`（`kind: "settings"`、`details: { method }`）を同じトランザクションで記録する（OAuthのcallbackでも）。`apps/web/src/pages/activity.tsx`に文言「Threadsとの接続し直しをしました（このアプリで許可）」／「（自分のMetaアプリのトークン）」を足す。
-- [ ] T033 [US3] `apps/web/src/components/connect/ReconnectDialog.tsx`を作る（PCは中央のダイアログ、スマートフォンは下からのシート。見出し「Threadsとの接続し直し」、本文、2つの選択と「今の接続」、トークンを選ぶと`TokenConnectForm`（`mode: "reconnect"`））。`apps/web/src/components/ReconnectButton.tsx`をダイアログを開く形に変える（`accountId`のほかに、今の方法とユーザー名を受け取る）。
-- [ ] T034 [US3] `apps/web/src/pages/account-settings.tsx`の「Threadsとの接続」に「今の接続：このアプリで許可／自分のMetaアプリのトークン」と`reconnectHint`の文を出し、ボタン（「接続し直す」）でダイアログを開く。Accountの削除の確認に、`connectionMethod === "token"`のときだけ「Metaアプリ側のトークンは、必要なら自分で取り消してください。」を足す（FR-050）。
-- [ ] T035 [US3] 要再接続のバナー（`apps/web/src/pages/account-layout.tsx`のバナーと`packages/shared/src/errors.ts`のバナーの文言）で、オーナー・`connectionMethod === "token"`のときは「トークンが使えなくなりました。新しいトークンを貼り付けて接続し直してください。」を出す（FR-041）。パートナー・編集者は008のまま。
+- [X] T031 [US3] `apps/api/src/services/account-service.ts`の接続し直しの判定を「IDが同じ、またはユーザー名が同じ」に広げ（research.md R7）、`apps/api/src/services/token-connect.ts`の`mode: "reconnect"`をルートとトランザクションの中の両方で`authorizeAccount(..., "owner")`に通す。
+- [X] T032 [US3] `apps/api/src/services/activity-log.ts`と`completeConnection`の接続し直しの枝で、チームがあるAccountだけ`threads_reconnected`（`kind: "settings"`、`details: { method }`）を同じトランザクションで記録する（OAuthのcallbackでも）。`apps/web/src/pages/activity.tsx`に文言「Threadsとの接続し直しをしました（このアプリで許可）」／「（自分のMetaアプリのトークン）」を足す。
+- [X] T033 [US3] `apps/web/src/components/connect/ReconnectDialog.tsx`を作る（PCは中央のダイアログ、スマートフォンは下からのシート。見出し「Threadsとの接続し直し」、本文、2つの選択と「今の接続」、トークンを選ぶと`TokenConnectForm`（`mode: "reconnect"`））。`apps/web/src/components/ReconnectButton.tsx`をダイアログを開く形に変える（`accountId`のほかに、今の方法とユーザー名を受け取る）。
+- [X] T034 [US3] `apps/web/src/pages/account-settings.tsx`の「Threadsとの接続」に「今の接続：このアプリで許可／自分のMetaアプリのトークン」と`reconnectHint`の文を出し、ボタン（「接続し直す」）でダイアログを開く。Accountの削除の確認に、`connectionMethod === "token"`のときだけ「Metaアプリ側のトークンは、必要なら自分で取り消してください。」を足す（FR-050）。
+- [X] T035 [US3] 要再接続のバナー（`apps/web/src/pages/account-layout.tsx`のバナーと`packages/shared/src/errors.ts`のバナーの文言）で、オーナー・`connectionMethod === "token"`のときは「トークンが使えなくなりました。新しいトークンを貼り付けて接続し直してください。」を出す（FR-041）。パートナー・編集者は008のまま。
 
 **Checkpoint**：どちらの方法からでも、どちらの方法へも接続し直せる。
 

@@ -31,6 +31,7 @@ import {
   type ThreadsProfile,
 } from "../lib/threads-client";
 import { authorizeAccount } from "./access";
+import { recordActivity } from "./activity-log";
 import type { ConsumedState } from "./threads-oauth";
 
 // ---- 登録数の上限（FR-015〜FR-017） ----
@@ -231,7 +232,15 @@ export async function completeConnection(
       // 同じThreadsアカウントが別のAccountとしても登録されているときは、書き換えない（specs/010 research.md R7）
       const other = candidates.find((c) => c.account.id !== target.id);
       if (other) throw duplicateError(other);
+      // 接続し直しはオーナーだけ（specs/008 FR-044）。トランザクションの中でも確かめ、記録に使う
+      const access = await authorizeAccount(tx, { id: state.userId }, target.id, "owner");
       await writeConnection(tx, cipher, target.id, input);
+      // チームがあるAccountでは、どちらの方法の接続し直しも記録する（specs/010 FR-035、research.md R11a）
+      await recordActivity(tx, access, {
+        kind: "settings",
+        action: "threads_reconnected",
+        details: { method: state.method },
+      });
       return { accountId: target.id, username: input.profile.username, kind: "reconnect" };
     }
 

@@ -269,6 +269,13 @@ export const TESTER_NOTICE =
 export const NEEDS_RECONNECT_BANNER =
   "Threadsとの接続が切れています。再接続するまで、このAccountの自動処理は止まります。";
 
+/** トークンで接続したAccountが要再接続になったときの、オーナー向けのバナーの文言（specs/010 FR-041）。 */
+export const NEEDS_RECONNECT_BANNER_TOKEN = "トークンが使えなくなりました。新しいトークンを貼り付けて接続し直してください。";
+
+/** 2時間後の確かめ直しで使えなかったときに添える文（specs/010 FR-012、reconnect_hint = short_lived_token）。 */
+export const SHORT_LIVED_TOKEN_HINT =
+  "短期トークンだった可能性があります。ユーザートークン生成ツールで作った長期トークンを貼り付けてください。";
+
 /** 要再接続のAccountを、パートナー・編集者が開いたときのバナーの文言（specs/008 FR-044）。再接続はオーナーだけができる。 */
 export const NEEDS_RECONNECT_BANNER_HELPER =
   "Threadsとの接続が切れています。オーナーの再接続を待っています。再接続するまで、このAccountの自動処理は止まります。";

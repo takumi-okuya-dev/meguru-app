@@ -9,6 +9,7 @@ import { createThreadsClient, ThreadsApiError, ThreadsAuthError } from "../lib/t
 import { completeConnection, requestFromState } from "../services/account-service";
 import { consumeState, startConnect, type ConsumedState } from "../services/threads-oauth";
 import { connectWithToken } from "../services/token-connect";
+import { refreshUsernameOnlyMatch } from "../services/username-match";
 
 /** トークンの要求の本文の上限（バイト。contracts/api.md） */
 const TOKEN_BODY_MAX_BYTES = 2048;
@@ -91,6 +92,8 @@ export function threadsConnectRoutes(authed: MiddlewareHandler<AppEnv>) {
           return fail("THREADS_PROFILE_FETCH_FAILED");
         }
 
+        // ユーザー名だけが一致するAccountの、今の名前を確かめる（specs/010 FR-023）
+        await refreshUsernameOnlyMatch(c.env, threads, profile);
         try {
           const result = await completeConnection(c.env, {
             request: requestFromState(state as ConsumedState),
