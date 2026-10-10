@@ -5,7 +5,7 @@ export class AppError extends Error {
   override name = "AppError";
   constructor(
     readonly code: ErrorCode,
-    readonly status: 400 | 401 | 403 | 404 | 409 | 422 | 500,
+    readonly status: 400 | 401 | 403 | 404 | 409 | 422 | 429 | 500 | 503,
     message: string = code,
     /** 409 STALE_UPDATE のときに返す、DBにある最新の値（specs/002 contracts/api.md「共通事項」） */
     readonly latest?: unknown,

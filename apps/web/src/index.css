@@ -110,3 +110,8 @@
     @apply bg-background text-foreground antialiased;
   }
 }
+
+/* 貼り付けたトークンを隠す（specs/010 research.md R10）。パスワード欄にすると、ブラウザやパスワード管理ツールが保存しようとするため */
+.token-masked {
+  -webkit-text-security: disc;
+}

@@ -158,6 +158,28 @@ describe("役割×APIの表（SC-002）", () => {
   });
 });
 
+describe("トークンでの接続し直しの表（specs/010 FR-034）", () => {
+  it("POST /api/threads/token-connect（mode = reconnect）はオーナーだけ。関係のない人は404、パートナー・編集者は403", async () => {
+    const body = { mode: "reconnect", accountId, token: "t".repeat(40) };
+    for (const user of ["stranger1", "editor-unassigned"]) {
+      const res = await call(app, "POST", "/api/threads/token-connect", { user, body });
+      expect([res.status, await errorCode(res)], user).toEqual([404, "ACCOUNT_NOT_FOUND"]);
+    }
+    for (const user of ["editor1", "partner1"]) {
+      const res = await call(app, "POST", "/api/threads/token-connect", { user, body });
+      expect([res.status, await errorCode(res)], user).toEqual([403, "ROLE_FORBIDDEN"]);
+    }
+    // オーナーは判定を通り、トークンの確認に進む（偽のトークンなので TOKEN_INVALID）
+    const res = await call(app, "POST", "/api/threads/token-connect", { user: "owner1", body });
+    expect(await errorCode(res)).toBe("TOKEN_INVALID");
+  });
+
+  it("mode = new はログインしていれば誰でも呼べる（自分のAccountを作る）", async () => {
+    const res = await call(app, "POST", "/api/threads/token-connect", { user: "editor1", body: { mode: "new", token: "bad" } });
+    expect(await errorCode(res)).toBe("TOKEN_INVALID");
+  });
+});
+
 /** [メソッド, パス]。チームのパートナー本人だけ（contracts/permissions.md「チームの判定」）。消す操作は最後に呼ぶ */
 const TEAM_ROUTES: [string, string][] = [
   ["GET", "/api/team"],

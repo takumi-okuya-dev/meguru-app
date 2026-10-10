@@ -18,12 +18,14 @@ type Container = { id: string; userId: string; text: string; status: ContainerSt
 type Post = { id: string; userId: string; text: string; timestamp: string; permalink: string; containerId: string };
 type MetricName = "views" | "likes" | "replies" | "reposts" | "quotes" | "shares";
 const METRIC_NAMES: MetricName[] = ["views", "likes", "replies", "reposts", "quotes", "shares"];
+/** 利用者のMetaアプリで作ったトークンの情報（specs/010 research.md R13）。appScope ごとにユーザーIDが変わる。 */
+type TokenMeta = { appScope: string; lifetime: "long" | "short"; debug: boolean; scopes: string[]; issuedAt: number };
 type InsightsFailureKind = "not_found" | "permission" | "rate_limit" | "transient" | "auth";
 
 export function createFakeThreads() {
   const users = new Map<string, FakeUser>();
   const codes = new Map<string, string>(); // code -> userId
-  const tokens = new Map<string, { userId: string; valid: boolean }>();
+  const tokens = new Map<string, { userId: string; valid: boolean; meta?: TokenMeta }>();
   const issued: string[] = [];
   const failures = new Map<Endpoint, Failure>();
   const delays = new Map<Endpoint, number>();
@@ -47,9 +49,9 @@ export function createFakeThreads() {
   const nextId = () => String(17_900_000_000 + ++seq);
 
   const rand = () => crypto.randomUUID().replace(/-/g, "");
-  const issue = (prefix: string, userId: string) => {
+  const issue = (prefix: string, userId: string, meta?: TokenMeta) => {
     const t = `${prefix}_${rand()}`;
-    tokens.set(t, { userId, valid: true });
+    tokens.set(t, { userId, valid: true, ...(meta ? { meta } : {}) });
     issued.push(t);
     return t;
   };
@@ -102,9 +104,34 @@ export function createFakeThreads() {
     return null;
   }
 
-  function bearerUser(c: Context): FakeUser | null {
+  function bearerToken(c: Context): string | undefined {
     const header = c.req.header("Authorization") ?? "";
-    return tokenUser(header.startsWith("Bearer ") ? header.slice(7) : c.req.query("access_token"));
+    return header.startsWith("Bearer ") ? header.slice(7) : c.req.query("access_token");
+  }
+  function bearerUser(c: Context): FakeUser | null {
+    return tokenUser(bearerToken(c));
+  }
+  /** 利用者のMetaアプリのトークンで、その権限がないか（このアプリのトークンは3つの権限を持つ）。 */
+  function lacksScope(c: Context, scope: string): boolean {
+    const token = bearerToken(c);
+    const meta = token ? tokens.get(token)?.meta : undefined;
+    return meta !== undefined && !meta.scopes.includes(scope);
+  }
+  /** アプリごとのユーザーID。このアプリのトークンはユーザーのIDのまま。 */
+  function scopedId(u: FakeUser, token: string | undefined): string {
+    const meta = token ? tokens.get(token)?.meta : undefined;
+    return meta ? `${u.id}-${meta.appScope}` : u.id;
+  }
+  const ALL_SCOPES = ["threads_basic", "threads_content_publish", "threads_manage_insights"];
+  /** 利用者のMetaアプリのトークンを作る（ユーザートークン生成ツールの代わり）。 */
+  function issueAppToken(opts: { user: string; appScope?: string; lifetime?: "long" | "short"; debug?: boolean; scopes?: string[] }) {
+    return issue("app", opts.user, {
+      appScope: opts.appScope ?? "myapp",
+      lifetime: opts.lifetime ?? "long",
+      debug: opts.debug ?? true,
+      scopes: opts.scopes ?? ALL_SCOPES,
+      issuedAt: Date.now(),
+    });
   }
 
   async function form(c: Context): Promise<Record<string, string>> {
@@ -165,6 +192,7 @@ export function createFakeThreads() {
     const injected = injectInsights([...(u ? [`user:${u.id}`] : []), "*"]);
     if (injected) return injected;
     if (!u) return invalidToken();
+    if (lacksScope(c, "threads_manage_insights")) return noPermission();
     return c.json({
       data: [{ name: "followers_count", period: "day", total_value: { value: followers.get(u.id) ?? 0 }, id: `${u.id}/insights/followers_count/day` }],
     });
@@ -232,22 +260,50 @@ export function createFakeThreads() {
   app.get("/refresh_access_token", async (c) => {
     const injected = await inject("refresh");
     if (injected) return injected;
-    const u = tokenUser(c.req.query("access_token"));
+    const old = c.req.query("access_token");
+    const u = tokenUser(old);
     if (!u) return invalidToken();
-    return c.json({ access_token: issue("long", u.id), token_type: "bearer", expires_in: 60 * 24 * 3600 });
+    // 利用者のMetaアプリのトークンは、延長してもアプリ・権限を引き継ぐ
+    const meta = old ? tokens.get(old)?.meta : undefined;
+    return c.json({
+      access_token: issue("long", u.id, meta ? { ...meta, lifetime: "long", issuedAt: Date.now() } : undefined),
+      token_type: "bearer",
+      expires_in: 60 * 24 * 3600,
+    });
   });
 
   app.get("/v1.0/me", async (c) => {
     const injected = await inject("getProfile");
     if (injected) return injected;
-    const header = c.req.header("Authorization") ?? "";
-    const u = tokenUser(header.startsWith("Bearer ") ? header.slice(7) : c.req.query("access_token"));
+    const token = bearerToken(c);
+    const u = tokenUser(token);
     if (!u) return invalidToken();
     return c.json({
-      id: u.id,
+      id: scopedId(u, token),
       username: u.username,
       ...(u.name ? { name: u.name } : {}),
       ...(u.picture ? { threads_profile_picture_url: u.picture } : {}),
+    });
+  });
+
+  // トークンを調べる（specs/010 research.md R3）。同じアプリのトークンで、そのトークン自身を調べる
+  app.get("/v1.0/debug_token", (c) => {
+    if (!bearerUser(c)) return invalidToken();
+    const input = c.req.query("input_token") ?? "";
+    const t = tokens.get(input);
+    if (t?.meta && !t.meta.debug) return noPermission();
+    if (!t || !t.valid) return c.json({ data: { is_valid: false, scopes: [] } });
+    const u = users.get(t.userId)!;
+    const issuedAt = Math.floor((t.meta?.issuedAt ?? Date.now()) / 1000);
+    const lifetime = t.meta?.lifetime === "short" ? 3600 : 60 * 24 * 3600;
+    return c.json({
+      data: {
+        is_valid: true,
+        issued_at: issuedAt,
+        expires_at: issuedAt + lifetime,
+        scopes: t.meta?.scopes ?? ALL_SCOPES,
+        user_id: scopedId(u, input),
+      },
     });
   });
 
@@ -257,7 +313,7 @@ export function createFakeThreads() {
     if (injected) return injected;
     const u = bearerUser(c);
     if (!u) return invalidToken();
-    if (noPublishPermission.has(u.id)) return noPermission();
+    if (noPublishPermission.has(u.id) || lacksScope(c, "threads_content_publish")) return noPermission();
     const body = await form(c);
     if (body.media_type !== "TEXT" || !body.text) return publishFailure("invalid");
     const id = nextId();
@@ -270,7 +326,7 @@ export function createFakeThreads() {
     if (injected) return injected;
     const u = bearerUser(c);
     if (!u) return invalidToken();
-    if (noPublishPermission.has(u.id)) return noPermission();
+    if (noPublishPermission.has(u.id) || lacksScope(c, "threads_content_publish")) return noPermission();
     const { creation_id: creationId } = await form(c);
     const container = creationId ? containers.get(creationId) : undefined;
     if (!container || container.userId !== u.id || container.status !== "FINISHED") return publishFailure("invalid");
@@ -300,7 +356,7 @@ export function createFakeThreads() {
     if (injected) return injected;
     const u = bearerUser(c);
     if (!u) return invalidToken();
-    if (noPublishPermission.has(u.id)) return noPermission();
+    if (noPublishPermission.has(u.id) || lacksScope(c, "threads_content_publish")) return noPermission();
     const since = Date.now() - 86_400_000;
     const usage = posts.filter((p) => p.userId === u.id && Date.parse(p.timestamp.replace("+0000", "Z")) >= since).length;
     return c.json({ data: [{ quota_usage: usage, config: { quota_total: 250, quota_duration: 86400 } }] });
@@ -456,6 +512,44 @@ export function createFakeThreads() {
     return c.json({ ok: true });
   });
   app.get("/__control/call-counts", (c) => c.json(callCounts));
+  // 利用者のMetaアプリのトークン（specs/010 research.md R13）
+  app.post("/__control/tokens", async (c) => {
+    const body = (await c.req.json()) as Parameters<typeof issueAppToken>[0];
+    return c.json({ token: issueAppToken(body) });
+  });
+  app.post("/__control/tokens/revoke", async (c) => {
+    const { token } = (await c.req.json()) as { token: string };
+    const t = tokens.get(token);
+    if (t) t.valid = false;
+    return c.json({ ok: !!t });
+  });
+  // 画面で作る（E2E・手での確認用）。クエリがあれば作って表示する
+  app.get("/__control/token-page", (c) => {
+    const user = c.req.query("user");
+    const esc = (v: string) => v.replace(/[&<>"']/g, (ch) => `&#${ch.charCodeAt(0)};`);
+    let made = "";
+    if (user && users.has(user)) {
+      const scopes = c.req.queries("scope") ?? ALL_SCOPES;
+      const token = issueAppToken({
+        user,
+        appScope: c.req.query("appScope") || "myapp",
+        lifetime: c.req.query("lifetime") === "short" ? "short" : "long",
+        debug: c.req.query("debug") !== "0",
+        scopes,
+      });
+      made = `<p>トークン：<code id="token">${esc(token)}</code></p>`;
+    }
+    const options = [...users.values()].map((u) => `<option value="${esc(u.id)}">@${esc(u.username)}</option>`).join("");
+    return c.html(
+      `<!doctype html><meta charset="utf-8"><title>Fake Threads token</title><h1>偽のユーザートークン生成ツール</h1>` +
+        `<form method="get"><label>ユーザー <select name="user">${options}</select></label> ` +
+        `<label>アプリ <input name="appScope" value="myapp"></label> ` +
+        `<label>期限 <select name="lifetime"><option value="long">長期</option><option value="short">短期</option></select></label> ` +
+        `<label>debug_token <select name="debug"><option value="1">読める</option><option value="0">読めない</option></select></label> ` +
+        ALL_SCOPES.map((sc) => `<label><input type="checkbox" name="scope" value="${sc}" checked>${sc}</label>`).join(" ") +
+        ` <button type="submit">トークンを作る</button></form>${made}`,
+    );
+  });
   app.get("/__control/containers", (c) => c.json({ containers: [...containers.values()] }));
 
   return app;

@@ -22,11 +22,16 @@ import { PromotionsPage } from "@/pages/promotions";
 import { ResearchPage } from "@/pages/research";
 import { StockPage } from "@/pages/stock";
 import { StrategyPage } from "@/pages/strategy";
+import { TermsPage } from "@/pages/terms";
+import { GuideThreadsTokenPage } from "@/pages/guide-threads-token";
 
 /** 画面のルート（contracts/ui-routes.md「ルート」）。認証が必要な画面は RequireAuth で包む。 */
 export const routes = [
   { path: "/sign-in/*", element: <SignInPage /> },
   { path: "/data-deletion/:code", element: <DataDeletion /> },
+  // 利用規約・トークンの作り方はログインなしで読める（specs/010 FR-052・FR-030）
+  { path: "/terms", element: <TermsPage /> },
+  { path: "/guide/threads-token", element: <GuideThreadsTokenPage /> },
   // 招待の確認はログインなしで開ける（specs/008 research.md R7）
   { path: "/invite/:token", element: <InvitePage /> },
   {

@@ -271,5 +271,7 @@ export function toAccountSummary(a: AccountRow, role: Role = "owner", ownerName:
     lastUsedAt: a.lastUsedAt ? a.lastUsedAt.toISOString() : null,
     role,
     ownerName,
+    connectionMethod: a.connectionMethod,
+    reconnectHint: a.reconnectHint === "short_lived_token" ? ("short_lived_token" as const) : null,
   };
 }

@@ -49,7 +49,7 @@ export function call(
 export async function resetDb() {
   const sql = neon(testEnv.DATABASE_URL);
   createDb(testEnv.DATABASE_URL); // ローカルプロキシの設定を有効にする
-  await sql`TRUNCATE users, accounts, memberships, threads_connections, oauth_states, threads_deletion_requests, threads_revocations, strategy_designs, promotions, reference_posts, research_keywords, draft_batches, post_drafts, ng_words, posting_schedules, publish_attempts, teams, team_editors, account_partners, account_partner_invites, activity_logs CASCADE`;
+  await sql`TRUNCATE users, accounts, memberships, threads_connections, oauth_states, threads_deletion_requests, threads_revocations, strategy_designs, promotions, reference_posts, research_keywords, draft_batches, post_drafts, ng_words, posting_schedules, publish_attempts, teams, team_editors, account_partners, account_partner_invites, activity_logs, token_check_failures CASCADE`;
 }
 
 export function db() {
@@ -77,6 +77,17 @@ export const fake = {
   delay: (endpoint: "exchangeCode" | "exchangeLongLived" | "refresh" | "getProfile", ms: number) =>
     control("delay", { endpoint, ms }),
   issuedTokens: async () => ((await control("issued-tokens")) as { tokens: string[] }).tokens,
+  // ---- 利用者のMetaアプリのトークン（specs/010 research.md R13）----
+  /** ユーザートークン生成ツールの代わりにトークンを作る。appScope ごとにユーザーIDが変わる */
+  issueToken: async (opts: {
+    user: string;
+    appScope?: string;
+    lifetime?: "long" | "short";
+    debug?: boolean;
+    scopes?: string[];
+  }) => ((await control("tokens", opts)) as { token: string }).token,
+  /** トークンを無効にする（Metaアプリ側での取り消し） */
+  revokeToken: (token: string) => control("tokens/revoke", { token }),
   // ---- 投稿（specs/005-auto-post）----
   publishFail: (
     endpoint: "createContainer" | "publish" | "containerStatus" | "getMedia" | "publishingLimit" | "listThreads",

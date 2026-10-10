@@ -1,5 +1,8 @@
-// アカウント追加画面（FR-008・FR-017、規則8、「常時表示する案内」）
+// アカウント追加画面（FR-008・FR-017、規則8、「常時表示する案内」。specs/010 でトークンでの追加を足した）
 import { useMutation, useQuery } from "@tanstack/react-query";
+import { ChevronDownIcon } from "lucide-react";
+import { useState } from "react";
+import { useNavigate } from "react-router";
 import {
   RECONNECT_FROM_SETTINGS_HINT,
   TESTER_NOTICE,
@@ -13,6 +16,8 @@ import { useCallbackResult } from "@/lib/callback-result";
 import { queryKeys } from "@/lib/query";
 import { ApiErrorScreen } from "@/components/ApiErrorScreen";
 import { LoadingSkeleton } from "@/components/guards";
+import { TokenConnectForm, warnParam } from "@/components/connect/TokenConnectForm";
+import { cn } from "@/lib/utils";
 
 /**
  * アカウント追加画面（FR-008・FR-017、規則8）。上限の案内とテスター制限の案内を出す。
@@ -20,6 +25,8 @@ import { LoadingSkeleton } from "@/components/guards";
  */
 export function AccountNew() {
   const me = useQuery({ queryKey: queryKeys.me, queryFn: api.me });
+  const navigate = useNavigate();
+  const [tokenOpen, setTokenOpen] = useState(false);
   useCallbackResult({ max: me.data?.accountLimit.max });
   const connect = useMutation({
     mutationFn: () => api.connect({ mode: "new" }),
@@ -68,6 +75,31 @@ export function AccountNew() {
           <AlertDescription>{TESTER_NOTICE}</AlertDescription>
         </Alert>
       )}
+
+      {/* 2つ目の方法（specs/010 FR-001）。開くまで手順と入力欄を出さない。検証期間かどうかにかかわらず出す */}
+      <div className="space-y-4 border-t pt-4">
+        <button
+          type="button"
+          aria-expanded={tokenOpen}
+          onClick={() => setTokenOpen((v) => !v)}
+          className="flex w-full items-center justify-between text-left text-sm font-medium"
+        >
+          自分のMetaアプリのトークンで追加する
+          <ChevronDownIcon aria-hidden="true" className={cn("size-4 transition-transform", tokenOpen && "rotate-180")} />
+        </button>
+        {tokenOpen &&
+          (limitReached ? (
+            <p className="text-sm text-muted-foreground">{errorMessage("ACCOUNT_LIMIT_REACHED", { max }).message}</p>
+          ) : (
+            <TokenConnectForm
+              mode="new"
+              onSuccess={(result) => {
+                const warn = warnParam(result.warnings);
+                void navigate(`/accounts/${result.accountId}?connected=new${warn ? `&warn=${warn}` : ""}`);
+              }}
+            />
+          ))}
+      </div>
     </div>
   );
 

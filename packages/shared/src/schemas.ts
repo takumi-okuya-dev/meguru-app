@@ -35,6 +35,10 @@ export const planSchema = z.enum(PLANS);
 export const connectionStatusSchema = z.enum(["connected", "needs_reconnect"]);
 /** Threads接続の状態。connected（接続中）か needs_reconnect（要再接続）。 */
 export type ConnectionStatus = z.infer<typeof connectionStatusSchema>;
+/** 接続の方法（specs/010-token-account-add）。app はこのアプリで許可、token は自分のMetaアプリのトークン。 */
+export const connectionMethodSchema = z.enum(["app", "token"]);
+/** 接続の方法。 */
+export type ConnectionMethod = z.infer<typeof connectionMethodSchema>;
 
 /** Accountに対する役割のスキーマ（specs/008 contracts/permissions.md）。 */
 export const roleSchema = z.enum(["owner", "partner", "editor"]);
@@ -58,6 +62,10 @@ export const accountSummarySchema = z.object({
   role: roleSchema,
   /** 手伝っているAccountのオーナーの名前。自分のAccountならNULL */
   ownerName: z.string().nullable(),
+  /** 今の接続の方法（specs/010 contracts/api.md）。APIは必ず返す。省略は app として扱う */
+  connectionMethod: connectionMethodSchema.optional(),
+  /** 要再接続の理由の補い（short_lived_token）。省略は NULL として扱う */
+  reconnectHint: z.enum(["short_lived_token"]).nullable().optional(),
 });
 /** 画面に出すAccountの要約。 */
 export type AccountSummary = z.infer<typeof accountSummarySchema>;
@@ -109,6 +117,24 @@ export const connectRequestSchema = z.discriminatedUnion("mode", [
 ]);
 /** POST /api/threads/connect のリクエスト。 */
 export type ConnectRequest = z.infer<typeof connectRequestSchema>;
+
+/** POST /api/threads/token-connect のリクエスト（specs/010 contracts/api.md）。トークンは前後を取り除く前のもの。 */
+export const tokenConnectRequestSchema = z.discriminatedUnion("mode", [
+  z.object({ mode: z.literal("new"), token: z.string().min(1).max(4096) }),
+  z.object({ mode: z.literal("reconnect"), accountId: z.string().uuid(), token: z.string().min(1).max(4096) }),
+]);
+/** POST /api/threads/token-connect のリクエスト。 */
+export type TokenConnectRequestBody = z.infer<typeof tokenConnectRequestSchema>;
+
+/** POST /api/threads/token-connect のレスポンス。warnings は権限がないもの。 */
+export const tokenConnectResponseSchema = z.object({
+  accountId: z.string(),
+  kind: z.enum(["new", "reconnect"]),
+  username: z.string(),
+  warnings: z.array(z.enum(["no_publish_permission", "no_insights_permission"])),
+});
+/** POST /api/threads/token-connect のレスポンス。 */
+export type TokenConnectResponse = z.infer<typeof tokenConnectResponseSchema>;
 
 /** POST /api/threads/connect のレスポンスのスキーマ。Threadsの認可URLを返す。 */
 export const connectResponseSchema = z.object({ authorizeUrl: z.string().url() });

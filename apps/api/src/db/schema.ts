@@ -59,6 +59,8 @@ export const accountPlan = pgEnum("account_plan", PLANS);
 export const membershipRole = pgEnum("membership_role", ["owner", "member", "partner", "editor"]);
 /** Threads接続の状態の列挙型（connection_status）。 */
 export const connectionStatus = pgEnum("connection_status", ["connected", "needs_reconnect"]);
+/** 今の接続の方法（specs/010-token-account-add data-model.md）。app は001のOAuth、token は利用者のMetaアプリのトークン。 */
+export const connectionMethod = pgEnum("connection_method", ["app", "token"]);
 /** 接続フローの種類の列挙型（oauth_mode）。 */
 export const oauthMode = pgEnum("oauth_mode", ["new", "reconnect"]);
 /** Metaのデータ削除要求の進み具合の列挙型（deletion_status）。 */
@@ -115,8 +117,13 @@ export const accounts = pgTable("accounts", {
   }),
   // 反応数を読む権限がないと分かった日時（006 research.md R11）。再接続で消す
   insightsDeniedAt: timestamp("insights_denied_at", { withTimezone: true, precision: 6 }),
+  // 今の接続の方法と、要再接続の理由の補い（specs/010 data-model.md。hint は short_lived_token だけ）
+  connectionMethod: connectionMethod("connection_method").notNull().default("app"),
+  reconnectHint: text("reconnect_hint"),
   ...timestamps,
 }, (t) => [
+  // ユーザー名での照合（specs/010 research.md R6）。古い名前が残る間は重なりうるので一意にしない
+  index("accounts_username_lower_idx").on(sql`lower(${t.username})`),
   check("accounts_promotion_ratio_range", sql`${t.promotionRatioPercent} BETWEEN 0 AND 100`),
   check("accounts_prompt_post_count_range", sql`${t.promptPostCount} BETWEEN 1 AND 50`),
   check("accounts_core_rules_length", sql`char_length(${t.coreRules}) <= 2000`),
@@ -162,8 +169,27 @@ export const threadsConnections = pgTable("threads_connections", {
   issuedAt: timestamp("issued_at", { withTimezone: true }).notNull(),
   // callbackがリダイレクトを受け取った時刻。定期更新では変えない（research.md R7）
   authorizedAt: timestamp("authorized_at", { withTimezone: true, precision: 6 }).notNull(),
+  // 期限を確かめられなかったトークンの、確かめ直しの時刻（specs/010 research.md R8）。OAuthでは入れない
+  recheckAt: timestamp("recheck_at", { withTimezone: true }),
   ...timestamps,
-});
+}, (t) => [
+  index("threads_connections_recheck_idx").on(t.recheckAt).where(sql`${t.recheckAt} IS NOT NULL`),
+]);
+
+/** トークンの確認の失敗の時刻（specs/010 data-model.md、FR-015）。トークンの値は持たない。 */
+export const tokenCheckFailures = pgTable(
+  "token_check_failures",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    failedAt: timestamp("failed_at", { withTimezone: true }).notNull(),
+    // invalid_format・invalid・short_lived・account_mismatch
+    reason: text("reason").notNull(),
+  },
+  (t) => [index("token_check_failures_user_time_idx").on(t.userId, t.failedAt)],
+);
 
 /** Threads接続フローの使い捨ての state（data-model.md の oauth_states）。平文は保存しない。 */
 export const oauthStates = pgTable(

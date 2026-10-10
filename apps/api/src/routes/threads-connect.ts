@@ -1,13 +1,17 @@
 // POST /api/threads/connect と GET /api/threads/callback（contracts/api.md、research.md R3・R4・R8）
-import { connectRequestSchema, type ErrorCode } from "@threads-grower/shared";
+import { connectRequestSchema, tokenConnectRequestSchema, type ErrorCode } from "@threads-grower/shared";
 import { Hono, type MiddlewareHandler } from "hono";
 import type { AppEnv } from "../app";
 import { createDb } from "../db/client";
 import { AppError } from "../lib/errors";
 import { logger } from "../lib/logger";
 import { createThreadsClient, ThreadsApiError, ThreadsAuthError } from "../lib/threads-client";
-import { completeConnection } from "../services/account-service";
+import { completeConnection, requestFromState } from "../services/account-service";
 import { consumeState, startConnect, type ConsumedState } from "../services/threads-oauth";
+import { connectWithToken } from "../services/token-connect";
+
+/** トークンの要求の本文の上限（バイト。contracts/api.md） */
+const TOKEN_BODY_MAX_BYTES = 2048;
 
 /**
  * POST /api/threads/connect と GET /api/threads/callback のルート（research.md R3・R4・R8）。
@@ -26,6 +30,23 @@ export function threadsConnectRoutes(authed: MiddlewareHandler<AppEnv>) {
         parsed.data,
       );
       return c.json({ authorizeUrl });
+    })
+    .post("/threads/token-connect", authed, async (c) => {
+      // 自分のMetaアプリのトークンでの追加・接続し直し（specs/010 contracts/api.md）。本文はログに出さない
+      const raw = await c.req.text();
+      if (new TextEncoder().encode(raw).length > TOKEN_BODY_MAX_BYTES) {
+        throw new AppError("VALIDATION_FAILED", 400, "token request too large");
+      }
+      let json: unknown = null;
+      try {
+        json = JSON.parse(raw);
+      } catch {
+        json = null;
+      }
+      const parsed = tokenConnectRequestSchema.safeParse(json);
+      if (!parsed.success) throw new AppError("VALIDATION_FAILED", 400, "invalid token connect request");
+      const result = await connectWithToken(c.env, createThreadsClient(c.env), c.get("user"), parsed.data);
+      return c.json(result);
     })
     .get("/threads/callback", async (c) => {
       // ユーザーが認可した直後にリダイレクトされるので、受け取った時刻を認可の時刻とみなす（research.md R7）
@@ -72,7 +93,7 @@ export function threadsConnectRoutes(authed: MiddlewareHandler<AppEnv>) {
 
         try {
           const result = await completeConnection(c.env, {
-            state: state as ConsumedState,
+            request: requestFromState(state as ConsumedState),
             threadsUserId: profile.id,
             profile,
             accessToken: longLived.accessToken,

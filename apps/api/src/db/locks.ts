@@ -1,5 +1,6 @@
 // ロックの部品（research.md R8）。
-// ロックの順序は、どの処理でも必ず「Threadsユーザー単位のアドバイザリーロック → users の行ロック」とする。
+// ロックの順序は、どの処理でも必ず「Threadsユーザー単位のアドバイザリーロック →（接続の確定では）ユーザー名の
+// アドバイザリーロック → users の行ロック」とする（specs/010 research.md R6）。
 // 順序をそろえないと、callback とデータ削除処理が互いの持つロックを待ってデッドロックする。
 import { sql } from "drizzle-orm";
 import type { TxDb } from "./client";
@@ -11,6 +12,16 @@ import type { TxDb } from "./client";
  */
 export async function lockThreadsUser(tx: TxDb, threadsUserId: string): Promise<void> {
   await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${"threads_user:" + threadsUserId}, 0))`);
+}
+
+/**
+ * Threadsのユーザー名単位のアドバイザリーロックを取る（specs/010 research.md R6）。ユーザーIDがMetaアプリごとに
+ * 違っても、同じユーザー名の接続の確定を直列にする。トランザクションの終わりで自動的に外れる。
+ * @param tx - トランザクション
+ * @param normalizedUsername - 正規化したユーザー名（normalizeUsername の結果）
+ */
+export async function lockThreadsUsername(tx: TxDb, normalizedUsername: string): Promise<void> {
+  await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${"threads_username:" + normalizedUsername}, 0))`);
 }
 
 /**

@@ -16,6 +16,7 @@ import {
   performancePageSchema,
   type PerformanceTab,
   connectResponseSchema,
+  tokenConnectResponseSchema,
   deleteCountSchema,
   draftBatchResultSchema,
   postDraftListSchema,
@@ -49,6 +50,7 @@ import {
   threadsCheckSchema,
   type PutPostingScheduleRequest,
   type ConnectRequest,
+  TokenConnectRequestBody,
   type ReviewRequest,
   type PromotionInput,
   type PutStrategyRequest,
@@ -203,6 +205,12 @@ export const api = {
       method: "POST",
       body: JSON.stringify(body),
       signal,
+    }),
+  /** 自分のMetaアプリのトークンで追加・接続し直す（specs/010 contracts/api.md） */
+  tokenConnect: (body: TokenConnectRequestBody) =>
+    request("/api/threads/token-connect", tokenConnectResponseSchema, {
+      method: "POST",
+      body: JSON.stringify(body),
     }),
   connect: (body: ConnectRequest) =>
     request("/api/threads/connect", connectResponseSchema, {
