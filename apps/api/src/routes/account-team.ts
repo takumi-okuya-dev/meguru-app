@@ -47,9 +47,12 @@ export function accountTeamRoutes(authed: MiddlewareHandler<AppEnv>) {
     .delete("/accounts/:accountId/partner-invite", authed, async (c) => {
       const db = createDb(c.env.DATABASE_URL);
       const access = await authorizeAccount(db, c.get("user"), c.req.param("accountId"), "owner");
-      if (await cancelPartnerInvite(db, access.account.id)) {
-        await recordActivity(db, access, { kind: "member", action: "partner_invite_canceled", force: true });
-      }
+      // 取り消しと操作の記録を同じトランザクションにする（PR #9 のCodexレビュー）
+      await withTransaction(c.env.DATABASE_URL, async (tx) => {
+        if (await cancelPartnerInvite(tx, access.account.id)) {
+          await recordActivity(tx, access, { kind: "member", action: "partner_invite_canceled", force: true });
+        }
+      });
       return c.body(null, 204);
     })
     .get("/accounts/:accountId/team", authed, async (c) => {

@@ -140,7 +140,7 @@
 
 ### `GET /api/accounts/:accountId/activity`
 
-権限：`activity`。クエリ：`kind`（`review`・`draft`・`content`・`settings`・`member`、省略ですべて）、`actor`（userId）、`cursor`、`limit`（既定50、最大100）。
+権限：`activity`。クエリ：`kind`（`review`・`draft`・`content`・`settings`・`member`をカンマ区切りで1つ以上。画面の「設定・戦略」は`content,settings`。省略ですべて）、`actor`（userId）、`cursor`、`limit`（既定50、最大100）。
 
 ```json
 {

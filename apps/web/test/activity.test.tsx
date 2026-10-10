@@ -117,6 +117,9 @@ describe("操作の記録", () => {
     expect(listActivity).toHaveBeenLastCalledWith("a1", { kind: "member", actor: "", cursor: undefined });
     await user.selectOptions(screen.getByLabelText("人で絞り込む"), "u-p");
     expect(listActivity).toHaveBeenLastCalledWith("a1", { kind: "member", actor: "u-p", cursor: undefined });
+    // 「設定・戦略」は戦略・素材と設定の両方（PR #9 のCodexレビュー2回目）
+    await user.click(screen.getByRole("button", { name: "設定・戦略" }));
+    expect(listActivity).toHaveBeenLastCalledWith("a1", { kind: "content,settings", actor: "u-p", cursor: undefined });
   });
 
   it("空の状態", async () => {

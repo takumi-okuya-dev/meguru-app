@@ -3,6 +3,7 @@ import { invalidFields, putStrategyRequestSchema } from "@threads-grower/shared"
 import { Hono, type MiddlewareHandler } from "hono";
 import type { AppEnv } from "../app";
 import { createDb } from "../db/client";
+import { withActivityTx } from "../services/activity-log";
 import { AppError } from "../lib/errors";
 import { authorizeAccount } from "../services/access";
 import { canEditProfile, requireGrowerAccess } from "../services/grower-access";
@@ -42,6 +43,8 @@ export function strategyRoutes(authed: MiddlewareHandler<AppEnv>) {
       if (!parsed.success) {
         throw new AppError("VALIDATION_FAILED", 400, "invalid strategy", undefined, invalidFields(parsed.error));
       }
-      return c.json({ ...(await saveStrategy(db, account.id, parsed.data, access)), canEdit: true });
+      // 保存と操作の記録を同じトランザクションにする（PR #9 のCodexレビュー）
+      const saved = await withActivityTx(c.env.DATABASE_URL, db, access, (q) => saveStrategy(q, account.id, parsed.data, access));
+      return c.json({ ...saved, canEdit: true });
     });
 }

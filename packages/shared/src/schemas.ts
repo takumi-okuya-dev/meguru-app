@@ -1080,7 +1080,13 @@ export const delegationUpdateSchema = z.object({
 export const activityKindSchema = z.enum(["review", "draft", "content", "settings", "member"]);
 /** GET /api/accounts/:id/activity のクエリのスキーマ。 */
 export const activityQuerySchema = z.object({
-  kind: activityKindSchema.optional(),
+  // カンマ区切りで複数を選べる（画面の「設定・戦略」は content と settings。PR #9 のCodexレビュー）
+  kind: z
+    .string()
+    .max(100)
+    .transform((s) => [...new Set(s.split(",").filter(Boolean))])
+    .pipe(z.array(activityKindSchema).min(1))
+    .optional(),
   actor: z.string().uuid().optional(),
   cursor: z.string().max(200).optional(),
   limit: z.coerce.number().int().min(1).max(100).optional(),

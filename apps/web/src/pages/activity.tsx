@@ -18,7 +18,8 @@ const KINDS = [
   { value: "", label: "すべて" },
   { value: "review", label: "承認・却下" },
   { value: "draft", label: "投稿の案" },
-  { value: "content", label: "設定・戦略" },
+  // 戦略・素材（content）と設定（settings）の両方（PR #9 のCodexレビュー）
+  { value: "content,settings", label: "設定・戦略" },
   { value: "member", label: "メンバー" },
 ] as const;
 

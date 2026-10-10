@@ -4,6 +4,7 @@ import { addNgWordsRequestSchema, coreRulesRequestSchema } from "@threads-grower
 import { Hono, type MiddlewareHandler } from "hono";
 import type { AppEnv } from "../app";
 import { createDb } from "../db/client";
+import { withActivityTx } from "../services/activity-log";
 import { parseBody } from "../lib/validate";
 import { authorizeAccount } from "../services/access";
 import { requireGrowerAccess } from "../services/grower-access";
@@ -45,6 +46,7 @@ export function postingRulesRoutes(authed: MiddlewareHandler<AppEnv>) {
       const account = access.account;
       requireGrowerAccess(account, access.owner);
       const req = await parseBody(coreRulesRequestSchema, c.req.json());
-      return c.json(await saveCoreRules(db, account.id, req, access));
+      // 保存と操作の記録を同じトランザクションにする（PR #9 のCodexレビュー）
+      return c.json(await withActivityTx(c.env.DATABASE_URL, db, access, (q) => saveCoreRules(q, account.id, req, access)));
     });
 }

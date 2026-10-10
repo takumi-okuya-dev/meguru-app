@@ -1,7 +1,7 @@
 // 投稿の設定（specs/005-auto-post research.md R1、contracts/api.md「GET・PUT /posting-schedule」）。
 // 自動投稿は全プランで使えるので、grower機能は判定しない（FR-004）。
 import type { AccountAccess } from "./access";
-import { recordActivity, updatedByOf } from "./activity-log";
+import { recordActivity, updatedByOf, withActivityTx } from "./activity-log";
 import {
   minutesToTime,
   validatePostingSchedule,
@@ -127,9 +127,16 @@ export async function savePostingSchedule(
   const current = await readPostingSchedule(db, accountId);
   if ((current?.version ?? 0) !== req.expectedVersion) {
     // 先に保存した人の名前を添える（specs/008 FR-007）
-    throw new AppError("STALE_UPDATE", 409, "updated elsewhere", toPostingSchedule(current), undefined, {
-      updatedBy: await updatedByOf(db, current?.updatedByUserId),
-    });
+    throw new AppError(
+      "STALE_UPDATE",
+      409,
+      "updated elsewhere",
+      toPostingSchedule(current),
+      undefined,
+      {
+        updatedBy: await updatedByOf(db, current?.updatedByUserId),
+      },
+    );
   }
 
   let connectionCheck: ThreadsCheck | null = null;
@@ -159,36 +166,46 @@ export async function savePostingSchedule(
     updatedAt: now,
   };
   try {
-    const [row] = current
-      ? await db
-          .update(postingSchedules)
-          .set({ ...values, version: sql`${postingSchedules.version} + 1` })
-          .where(
-            and(
-              eq(postingSchedules.accountId, accountId),
-              eq(postingSchedules.version, req.expectedVersion),
-            ),
-          )
-          .returning()
-      : await db
-          .insert(postingSchedules)
-          .values({ accountId, ...values, effectiveFrom: now })
-          .onConflictDoNothing()
-          .returning();
-    if (!row) {
-      const latest = await readPostingSchedule(db, accountId);
-      throw new AppError("STALE_UPDATE", 409, "updated elsewhere", toPostingSchedule(latest), undefined, {
-        updatedBy: await updatedByOf(db, latest?.updatedByUserId),
-      });
-    }
-    if (access) {
-      await recordActivity(db, access, {
-        kind: "settings",
-        action: "schedule_saved",
-        summary: `自動投稿${row.enabled ? "オン" : "オフ"}・1日${row.slotMinutes.length}件`,
-      });
-    }
-    return { schedule: toPostingSchedule(row), connectionCheck };
+    // 保存と操作の記録を同じトランザクションにする（接続の確認は外部の呼び出しなので、その前に済ませる。PR #9 のCodexレビュー）
+    return await withActivityTx(env.DATABASE_URL, db, access, async (q) => {
+      const [row] = current
+        ? await q
+            .update(postingSchedules)
+            .set({ ...values, version: sql`${postingSchedules.version} + 1` })
+            .where(
+              and(
+                eq(postingSchedules.accountId, accountId),
+                eq(postingSchedules.version, req.expectedVersion),
+              ),
+            )
+            .returning()
+        : await q
+            .insert(postingSchedules)
+            .values({ accountId, ...values, effectiveFrom: now })
+            .onConflictDoNothing()
+            .returning();
+      if (!row) {
+        const latest = await readPostingSchedule(q, accountId);
+        throw new AppError(
+          "STALE_UPDATE",
+          409,
+          "updated elsewhere",
+          toPostingSchedule(latest),
+          undefined,
+          {
+            updatedBy: await updatedByOf(q, latest?.updatedByUserId),
+          },
+        );
+      }
+      if (access) {
+        await recordActivity(q, access, {
+          kind: "settings",
+          action: "schedule_saved",
+          summary: `自動投稿${row.enabled ? "オン" : "オフ"}・1日${row.slotMinutes.length}件`,
+        });
+      }
+      return { schedule: toPostingSchedule(row), connectionCheck };
+    });
   } catch (err) {
     // 外部キー違反：途中でAccountが削除された
     if (pgErrorCode(err) === "23503") throw notFound();

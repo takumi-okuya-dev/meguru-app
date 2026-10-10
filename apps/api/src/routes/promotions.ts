@@ -12,11 +12,11 @@ import {
 import { and, count, eq, sql } from "drizzle-orm";
 import { Hono, type MiddlewareHandler } from "hono";
 import type { AppEnv } from "../app";
-import { createDb, type Db } from "../db/client";
+import { createDb, type Db, type TxDb } from "../db/client";
 import { accounts, promotions } from "../db/schema";
 import { parseBody } from "../lib/validate";
 import { authorizeAccount } from "../services/access";
-import { recordActivity, updatedByOf } from "../services/activity-log";
+import { recordActivity, updatedByOf, withActivityTx } from "../services/activity-log";
 import { touchMaterials } from "../services/materials";
 import { canEditProfile, requireGrowerAccess } from "../services/grower-access";
 import { assertItemId, insertWithLimit, updateWithVersion } from "../services/item-service";
@@ -71,7 +71,7 @@ function toColumns(input: PromotionInput) {
   };
 }
 
-async function findPromotion(db: Db, accountId: string, id: string) {
+async function findPromotion(db: Db | TxDb, accountId: string, id: string) {
   const [row] = await db
     .select()
     .from(promotions)
@@ -102,8 +102,11 @@ export function promotionRoutes(authed: MiddlewareHandler<AppEnv>) {
       requireGrowerAccess(account, access.owner);
       const { ratioPercent } = await parseBody(promotionSettingsInputSchema, c.req.json());
       // 競合は検知しない（後勝ち。research.md R7）
-      await db.update(accounts).set({ promotionRatioPercent: ratioPercent, updatedAt: new Date() }).where(eq(accounts.id, account.id));
-      await recordActivity(db, access, { kind: "content", action: "promotion_ratio_saved", summary: `${ratioPercent}%` });
+      // 保存と操作の記録を同じトランザクションにする（PR #9 のCodexレビュー）
+      await withActivityTx(c.env.DATABASE_URL, db, access, async (q) => {
+        await q.update(accounts).set({ promotionRatioPercent: ratioPercent, updatedAt: new Date() }).where(eq(accounts.id, account.id));
+        await recordActivity(q, access, { kind: "content", action: "promotion_ratio_saved", summary: `${ratioPercent}%` });
+      });
       return c.json({ ratioPercent, canEdit: true });
     })
     .get("/accounts/:accountId/promotions", authed, async (c) => {
@@ -153,19 +156,23 @@ export function promotionRoutes(authed: MiddlewareHandler<AppEnv>) {
       const id = assertItemId(c.req.param("promotionId"));
       const { expectedVersion, ...input } = await parseBody(updatePromotionRequestSchema, c.req.json());
       const now = new Date();
-      const row = await updateWithVersion(
-        () =>
-          db
-            .update(promotions)
-            .set({ ...toColumns(input), updatedByUserId: access.actor.id, version: sql`${promotions.version} + 1`, updatedAt: now })
-            .where(and(eq(promotions.id, id), eq(promotions.accountId, account.id), eq(promotions.version, expectedVersion)))
-            .returning(),
-        () => findPromotion(db, account.id, id),
-        (current) => toPromotion(current, now),
-        (current) => updatedByOf(db, current.updatedByUserId),
-      );
+      // 保存と操作の記録を同じトランザクションにする（PR #9 のCodexレビュー）
+      const row = await withActivityTx(c.env.DATABASE_URL, db, access, async (q) => {
+        const updated = await updateWithVersion(
+          () =>
+            q
+              .update(promotions)
+              .set({ ...toColumns(input), updatedByUserId: access.actor.id, version: sql`${promotions.version} + 1`, updatedAt: now })
+              .where(and(eq(promotions.id, id), eq(promotions.accountId, account.id), eq(promotions.version, expectedVersion)))
+              .returning(),
+          () => findPromotion(q, account.id, id),
+          (current) => toPromotion(current, now),
+          (current) => updatedByOf(q, current.updatedByUserId),
+        );
+        await recordActivity(q, access, { kind: "content", action: "promotion_updated", summary: updated.title });
+        return updated;
+      });
       await touchMaterials(db, account.id, "promotions");
-      await recordActivity(db, access, { kind: "content", action: "promotion_updated", summary: row.title });
       return c.json(toPromotion(row, now));
     })
     .delete("/accounts/:accountId/promotions/:promotionId", authed, async (c) => {
@@ -176,12 +183,15 @@ export function promotionRoutes(authed: MiddlewareHandler<AppEnv>) {
       requireGrowerAccess(account, access.owner);
       const id = assertItemId(c.req.param("promotionId"));
       // すでに消えていても成功とする（contracts/api.md）
-      const removed = await db
-        .delete(promotions)
-        .where(and(eq(promotions.id, id), eq(promotions.accountId, account.id)))
-        .returning({ title: promotions.title });
+      // 削除と操作の記録を同じトランザクションにする（PR #9 のCodexレビュー）
+      await withActivityTx(c.env.DATABASE_URL, db, access, async (q) => {
+        const removed = await q
+          .delete(promotions)
+          .where(and(eq(promotions.id, id), eq(promotions.accountId, account.id)))
+          .returning();
+        if (removed[0]) await recordActivity(q, access, { kind: "content", action: "promotion_deleted", summary: removed[0].title });
+      });
       await touchMaterials(db, account.id, "promotions");
-      if (removed[0]) await recordActivity(db, access, { kind: "content", action: "promotion_deleted", summary: removed[0].title });
       return c.body(null, 204);
     });
 }

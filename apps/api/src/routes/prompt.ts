@@ -8,7 +8,7 @@ import { accounts } from "../db/schema";
 import { AppError } from "../lib/errors";
 import { parseBody } from "../lib/validate";
 import { authorizeAccount } from "../services/access";
-import { recordActivity } from "../services/activity-log";
+import { recordActivity, withActivityTx } from "../services/activity-log";
 import { requireGrowerAccess } from "../services/grower-access";
 import { getPrompt } from "../services/prompt-service";
 
@@ -51,8 +51,11 @@ export function promptRoutes(authed: MiddlewareHandler<AppEnv>) {
       requireGrowerAccess(account, access.owner);
       const { postCount } = await parseBody(promptSettingsSchema, c.req.json());
       // 競合は検知しない（後勝ち。research.md R11）
-      await db.update(accounts).set({ promptPostCount: postCount, updatedAt: new Date() }).where(eq(accounts.id, account.id));
-      await recordActivity(db, access, { kind: "content", action: "prompt_count_saved", summary: `${postCount}件` });
+      // 保存と操作の記録を同じトランザクションにする（PR #9 のCodexレビュー）
+      await withActivityTx(c.env.DATABASE_URL, db, access, async (q) => {
+        await q.update(accounts).set({ promptPostCount: postCount, updatedAt: new Date() }).where(eq(accounts.id, account.id));
+        await recordActivity(q, access, { kind: "content", action: "prompt_count_saved", summary: `${postCount}件` });
+      });
       return c.json({ postCount });
     });
 }

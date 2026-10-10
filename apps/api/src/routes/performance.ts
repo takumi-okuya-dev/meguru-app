@@ -4,6 +4,7 @@ import { exportQuerySchema, feedbackRequestSchema, invalidFields, performanceQue
 import { Hono, type MiddlewareHandler } from "hono";
 import type { AppEnv } from "../app";
 import { createDb } from "../db/client";
+import { withActivityTx } from "../services/activity-log";
 import { AppError } from "../lib/errors";
 import { authorizeAccount } from "../services/access";
 import { requireGrowerAccess } from "../services/grower-access";
@@ -42,7 +43,12 @@ export function performanceRoutes(authed: MiddlewareHandler<AppEnv>) {
       if (!parsed.success) {
         throw new AppError("VALIDATION_FAILED", 400, "invalid feedback", undefined, invalidFields(parsed.error));
       }
-      return c.json(await updateFeedback(db, account.id, c.req.param("draftId"), parsed.data, new Date(), access));
+      // 保存と操作の記録を同じトランザクションにする（PR #9 のCodexレビュー）
+      return c.json(
+        await withActivityTx(c.env.DATABASE_URL, db, access, (q) =>
+          updateFeedback(q, account.id, c.req.param("draftId"), parsed.data, new Date(), access),
+        ),
+      );
     })
     .get("/accounts/:accountId/performance/export", authed, async (c) => {
       // CSVの行のデータ（FR-028〜FR-030）。CSVはWebで組み立てる（research.md R7）

@@ -12,7 +12,7 @@ import { createTokenCipher, KeyRingError } from "../lib/crypto";
  * 暗号鍵のローテーション（research.md R5 の手順3・4）。古いバージョンの行を、新しいIVと現在の鍵で暗号化し直す。
  * 各行の書き込みは key_version と connection_generation を条件にし、その間に書き換わった行は飛ばす。
  * 招待リンクの暗号化した写し（account_partner_invites・teams の編集者の招待。specs/008 research.md R4）も同じ鍵なので、
- * 不足の検査・暗号化し直し・残りの件数に含める。招待は、読んだ時点の照合用ハッシュを条件にする（作り直された行は飛ばす）。
+ * 不足の検査・暗号化し直し・残りの件数に含める。招待は、読んだ時点の照合用ハッシュと鍵のバージョンを条件にする（作り直された・先に入れ替えられた行は飛ばす）。
  * @param env - バインディング（鍵リング・現在のバージョン・DATABASE_URL）
  * @returns 暗号化し直した件数、飛ばした件数、旧バージョンの残りの件数
  * @throws KeyRingError 鍵が欠けているバージョンの行があるとき（開始しない）
@@ -79,7 +79,14 @@ export async function rotateTokenKeys(env: Env) {
     const updated = await db
       .update(accountPartnerInvites)
       .set({ tokenCiphertext: enc.ciphertext, tokenIv: enc.iv, keyVersion: enc.keyVersion })
-      .where(and(eq(accountPartnerInvites.accountId, inv.accountId), eq(accountPartnerInvites.tokenHash, inv.tokenHash)))
+      // 読んだ時点の鍵のバージョンも条件にする（別の入れ替えが先に新しい鍵へ移した行を、古い鍵で上書きしない。PR #9 のCodexレビュー）
+      .where(
+        and(
+          eq(accountPartnerInvites.accountId, inv.accountId),
+          eq(accountPartnerInvites.tokenHash, inv.tokenHash),
+          eq(accountPartnerInvites.keyVersion, inv.keyVersion),
+        ),
+      )
       .returning({ id: accountPartnerInvites.accountId });
     if (updated.length > 0) rotated += 1;
     else skipped += 1;
@@ -99,7 +106,13 @@ export async function rotateTokenKeys(env: Env) {
     const updated = await db
       .update(teams)
       .set({ editorInviteTokenCiphertext: enc.ciphertext, editorInviteTokenIv: enc.iv, editorInviteKeyVersion: enc.keyVersion })
-      .where(and(eq(teams.id, team.id), eq(teams.editorInviteTokenHash, team.editorInviteTokenHash!)))
+      .where(
+        and(
+          eq(teams.id, team.id),
+          eq(teams.editorInviteTokenHash, team.editorInviteTokenHash!),
+          eq(teams.editorInviteKeyVersion, team.editorInviteKeyVersion!),
+        ),
+      )
       .returning({ id: teams.id });
     if (updated.length > 0) rotated += 1;
     else skipped += 1;

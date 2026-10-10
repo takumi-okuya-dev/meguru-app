@@ -7,8 +7,8 @@ import {
   ACTIVITY_PAGE_SIZE,
   ACTIVITY_SUMMARY_CHARS,
 } from "@threads-grower/shared";
-import { and, desc, eq, gte, lt, or, sql } from "drizzle-orm";
-import type { Db, TxDb } from "../db/client";
+import { and, desc, eq, gte, inArray, lt, or, sql } from "drizzle-orm";
+import { withTransaction, type Db, type TxDb } from "../db/client";
 import { activityLogs, users } from "../db/schema";
 import { AppError } from "../lib/errors";
 import type { Role } from "@threads-grower/shared";
@@ -42,6 +42,26 @@ export function excerptOf(body: string): string {
   const line = body.trim().split("\n")[0] ?? "";
   const chars = [...line];
   return chars.length > ACTIVITY_SUMMARY_CHARS ? `${chars.slice(0, ACTIVITY_SUMMARY_CHARS).join("")}…` : line;
+}
+
+/**
+ * 内容の保存と操作の記録を、同じトランザクションで行う（記録だけが失敗して、保存済みなのに500になることを防ぐ。
+ * PR #9 のCodexレビュー）。記録を書かない（チームがない・access がない）ときは、トランザクションを開かずに
+ * これまでどおり1回の書き込みで行う（個人運用の速さを変えない）。
+ * @param connectionString - DATABASE_URL
+ * @param db - トランザクションを開かないときに使うデータベース
+ * @param access - 操作した人の判定の結果
+ * @param fn - 保存と recordActivity を行う処理
+ * @returns fn の戻り値
+ */
+export async function withActivityTx<T>(
+  connectionString: string,
+  db: Db,
+  access: AccountAccess | undefined,
+  fn: (q: Db | TxDb) => Promise<T>,
+): Promise<T> {
+  if (!access?.hasTeam) return fn(db);
+  return withTransaction(connectionString, fn);
 }
 
 /**
@@ -131,13 +151,13 @@ function decodeCursor(cursor: string): { at: Date; id: string } {
 export async function listActivity(
   db: Db,
   accountId: string,
-  query: { kind?: ActivityKind; actor?: string; cursor?: string; limit?: number },
+  query: { kind?: ActivityKind[]; actor?: string; cursor?: string; limit?: number },
   now: Date = new Date(),
 ) {
   const limit = Math.min(Math.max(query.limit ?? ACTIVITY_PAGE_SIZE, 1), ACTIVITY_PAGE_MAX);
   const since = retentionStart(now);
   const conds = [eq(activityLogs.accountId, accountId), gte(activityLogs.createdAt, since)];
-  if (query.kind) conds.push(eq(activityLogs.kind, query.kind));
+  if (query.kind && query.kind.length > 0) conds.push(inArray(activityLogs.kind, query.kind));
   if (query.actor) conds.push(eq(activityLogs.actorUserId, query.actor));
   if (query.cursor) {
     const c = decodeCursor(query.cursor);

@@ -113,7 +113,8 @@ export async function addNgWords(env: Env, accountId: string, words: string[], a
           .where(and(eq(postDrafts.accountId, accountId), inArray(postDrafts.id, hitIds)));
       }
       added.sort((a, b) => a.seq - b.seq);
-      if (access) {
+      // すべて登録済みの語だけなら、変更していないので記録しない（PR #9 のCodexレビュー）
+      if (access && added.length > 0) {
         await recordActivity(tx, access, {
           kind: "settings",
           action: "ng_word_added",
@@ -163,12 +164,13 @@ export async function deleteNgWord(env: Env, accountId: string, id: string, acce
  * @throws AppError STALE_UPDATE（他で先に保存された。latest 付き）、ACCOUNT_NOT_FOUND（Accountがない）
  */
 export async function saveCoreRules(
-  db: Db,
+  db: Db | TxDb,
   accountId: string,
   req: { text: string; expectedVersion: number },
   access?: AccountAccess,
 ) {
-  const [row] = await db
+  // Db と TxDb のどちらでも型が合うよう、returning は列を指定せずに受けて取り出す
+  const [saved] = await db
     .update(accounts)
     .set({
       coreRules: req.text.trim(),
@@ -179,10 +181,10 @@ export async function saveCoreRules(
       updatedAt: new Date(),
     })
     .where(and(eq(accounts.id, accountId), eq(accounts.coreRulesVersion, req.expectedVersion)))
-    .returning({ coreRules: accounts.coreRules, coreRulesVersion: accounts.coreRulesVersion });
-  if (row) {
+    .returning();
+  if (saved) {
     if (access) await recordActivity(db, access, { kind: "settings", action: "core_rules_saved" });
-    return row;
+    return { coreRules: saved.coreRules, coreRulesVersion: saved.coreRulesVersion };
   }
   const [current] = await db
     .select({

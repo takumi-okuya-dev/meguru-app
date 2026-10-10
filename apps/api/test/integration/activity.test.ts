@@ -162,3 +162,50 @@ describe("カーソルの検証（PR #9 のCodexレビュー）", () => {
     expect(((await res.json()) as { error: { code: string } }).error.code).toBe("VALIDATION_FAILED");
   });
 });
+
+describe("記録と保存の一体性（PR #9 のCodexレビュー2回目）", () => {
+  it("記録の書き込みが失敗したら保存も戻り、同じ版での再試行で保存と記録ができる", async () => {
+    const { accountId } = await createUserWithAccount("o1");
+    await makePartner(accountId, "p1");
+    // 記録の書き込みだけを失敗させる
+    await sql()`CREATE FUNCTION fail_activity() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'activity down'; END $$`;
+    await sql()`CREATE TRIGGER fail_activity BEFORE INSERT ON activity_logs FOR EACH ROW EXECUTE FUNCTION fail_activity()`;
+    try {
+      const failed = await call(app, "PUT", `/api/accounts/${accountId}/strategy`, { user: "p1", body: strategy("x", 0) });
+      expect(failed.status).toBe(500);
+      const saved = (await sql()`SELECT count(*)::int AS n FROM strategy_designs WHERE account_id = ${accountId}`) as { n: number }[];
+      expect(saved[0]!.n).toBe(0);
+      const promo = await call(app, "PUT", `/api/accounts/${accountId}/promotion-settings`, { user: "p1", body: { ratioPercent: 30 } });
+      expect(promo.status).toBe(500);
+      const ratio = (await sql()`SELECT promotion_ratio_percent AS r FROM accounts WHERE id = ${accountId}`) as { r: number }[];
+      expect(ratio[0]!.r).not.toBe(30);
+    } finally {
+      await sql()`DROP TRIGGER fail_activity ON activity_logs`;
+      await sql()`DROP FUNCTION fail_activity()`;
+    }
+    await json(await call(app, "PUT", `/api/accounts/${accountId}/strategy`, { user: "p1", body: strategy("x", 0) }));
+    expect((await activityRows(accountId)).map((r) => r.action)).toContain("strategy_saved");
+  });
+
+  it("すべて登録済みのNGワードだけを送っても、記録を作らない", async () => {
+    const { accountId } = await createUserWithAccount("o1");
+    await makePartner(accountId, "p1");
+    await json(await call(app, "POST", `/api/accounts/${accountId}/ng-words`, { user: "o1", body: { words: ["絶対"] } }));
+    await call(app, "POST", `/api/accounts/${accountId}/ng-words`, { user: "o1", body: { words: ["絶対"] } });
+    const added = (await activityRows(accountId)).filter((r) => r.action === "ng_word_added");
+    expect(added).toHaveLength(1);
+    expect(added[0]!.item_count).toBe(1);
+  });
+
+  it("種類はカンマ区切りで複数を選べる（「設定・戦略」は content と settings）。知らない種類は 400", async () => {
+    const { accountId } = await createUserWithAccount("o1");
+    await makePartner(accountId, "p1");
+    await json(await call(app, "PUT", `/api/accounts/${accountId}/strategy`, { user: "o1", body: strategy("x", 0) }));
+    await json(await call(app, "PUT", `/api/accounts/${accountId}/core-rules`, { user: "o1", body: { text: "ルール", expectedVersion: 1 } }));
+    type List = { items: { action: string }[] };
+    const both = await json<List>(await call(app, "GET", `/api/accounts/${accountId}/activity?kind=content,settings`, { user: "o1" }));
+    expect(both.items.map((i) => i.action).sort()).toEqual(["core_rules_saved", "strategy_saved"]);
+    const bad = await call(app, "GET", `/api/accounts/${accountId}/activity?kind=content,unknown`, { user: "o1" });
+    expect(bad.status).toBe(400);
+  });
+});

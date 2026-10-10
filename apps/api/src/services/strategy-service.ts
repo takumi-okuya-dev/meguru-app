@@ -12,7 +12,7 @@ import {
   type StrategyValues,
 } from "@threads-grower/shared";
 import { and, eq } from "drizzle-orm";
-import type { Db } from "../db/client";
+import type { Db, TxDb } from "../db/client";
 import { strategyDesigns } from "../db/schema";
 import { AppError } from "../lib/errors";
 
@@ -55,7 +55,7 @@ function toColumns(req: StrategyValues) {
   return { ...cols, tonePreset: req.tonePreset };
 }
 
-async function findRow(db: Db, accountId: string) {
+async function findRow(db: Db | TxDb, accountId: string) {
   const [row] = await db.select().from(strategyDesigns).where(eq(strategyDesigns.accountId, accountId)).limit(1);
   return row;
 }
@@ -82,7 +82,7 @@ export async function getStrategy(db: Db, accountId: string): Promise<StrategyBo
  * @throws AppError STALE_UPDATE（latest に最新の課題）
  */
 export async function saveStrategy(
-  db: Db,
+  db: Db | TxDb,
   accountId: string,
   req: PutStrategyRequest,
   access?: AccountAccess,

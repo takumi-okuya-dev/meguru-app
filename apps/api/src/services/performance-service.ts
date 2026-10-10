@@ -18,7 +18,7 @@ import {
 } from "@threads-grower/shared";
 import { alias } from "drizzle-orm/pg-core";
 import { and, asc, desc, eq, inArray, isNull, or, sql, type SQL } from "drizzle-orm";
-import type { Db } from "../db/client";
+import type { Db, TxDb } from "../db/client";
 import { draftBatches, postDrafts, postMetricSnapshots, postMetrics } from "../db/schema";
 import { AppError, itemNotFound } from "../lib/errors";
 import type { AccountAccess, AccountRow } from "./access";
@@ -110,7 +110,7 @@ export async function getPerformanceSummary(db: Db, account: AccountRow): Promis
  * @param accountId - accounts.id
  * @returns 下書きのID（投稿した日時の新しい順、最大5件）
  */
-export async function nextPromptIds(db: Db, accountId: string): Promise<string[]> {
+export async function nextPromptIds(db: Db | TxDb, accountId: string): Promise<string[]> {
   const rows = await db
     .select({ id: postDrafts.id })
     .from(postMetrics)
@@ -192,7 +192,7 @@ export async function listPerformancePage(
  * @param db - データベース
  * @returns where・orderBy をつなげるクエリ
  */
-function selectItems(db: Db) {
+function selectItems(db: Db | TxDb) {
   return db
       .select({
         id: postDrafts.id,
@@ -231,7 +231,7 @@ function selectItems(db: Db) {
  * @throws AppError ITEM_NOT_FOUND（そのAccountの低調の投稿でない）
  */
 export async function updateFeedback(
-  db: Db,
+  db: Db | TxDb,
   accountId: string,
   draftId: string,
   req: FeedbackRequest,
@@ -256,7 +256,7 @@ export async function updateFeedback(
       updatedAt: now,
     })
     .where(req.expectedVersion === undefined ? target : and(target, eq(postMetrics.feedbackVersion, req.expectedVersion)))
-    .returning({ id: postMetrics.draftId, memo: postMetrics.feedbackMemo });
+    .returning();
   if (updated.length === 0) {
     // 版が違う（他の人が先に保存した）なら 409、そもそも対象でなければ 404（specs/008 FR-007）
     const [current] = await db
