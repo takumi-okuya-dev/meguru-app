@@ -1,7 +1,9 @@
 // /api/accounts/:accountId のチーム運用（specs/008-team-operations contracts/api.md「権限」「パートナーの招待」「チーム」）。
 import { Hono, type MiddlewareHandler } from "hono";
 import type { AppEnv } from "../app";
+import { eq } from "drizzle-orm";
 import { createDb, withTransaction } from "../db/client";
+import { accounts } from "../db/schema";
 import { authorizeAccount } from "../services/access";
 import { recordActivity, updatedByOf } from "../services/activity-log";
 import { cancelPartnerInvite, getPartnerInvite, upsertPartnerInvite } from "../services/invite-service";
@@ -49,6 +51,8 @@ export function accountTeamRoutes(authed: MiddlewareHandler<AppEnv>) {
       const access = await authorizeAccount(db, c.get("user"), c.req.param("accountId"), "owner");
       // 取り消しと操作の記録を同じトランザクションにする（PR #9 のCodexレビュー）
       await withTransaction(c.env.DATABASE_URL, async (tx) => {
+        // 参加・作り直しと同じ「Accountの行 → 招待の行」の順で鍵をかける（逆の順だとデッドロックになる。PR #9 のCodexレビュー）
+        await tx.select({ id: accounts.id }).from(accounts).where(eq(accounts.id, access.account.id)).for("update");
         if (await cancelPartnerInvite(tx, access.account.id)) {
           await recordActivity(tx, access, { kind: "member", action: "partner_invite_canceled", force: true });
         }

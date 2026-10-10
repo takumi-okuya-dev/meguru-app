@@ -132,6 +132,15 @@ describe("役割の図（FR-048）", () => {
 });
 
 describe("TeamSection（パートナー・編集者）", () => {
+  it("読み込みに失敗したら、区分を消さずに再読み込みを出す（PR #9 のCodexレビュー）", async () => {
+    accountTeam.mockRejectedValueOnce(new Error("network")).mockResolvedValue(joined);
+    const user = userEvent.setup();
+    renderSection(EDITOR_ACCESS);
+    expect(await screen.findByText(/読み込めませんでした/)).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "再読み込み" }));
+    expect(await screen.findByText("このアカウントを手伝っている人")).toBeInTheDocument();
+  });
+
   it("手伝っている人の一覧だけを出し、招待・外すは出さない", async () => {
     accountTeam.mockResolvedValue(joined);
     renderSection(EDITOR_ACCESS);

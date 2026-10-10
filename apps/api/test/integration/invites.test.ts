@@ -220,6 +220,23 @@ describe("招待の安全性（PR #9 のCodexレビュー）", () => {
     }
   });
 
+  it("取り消しと、参加・作り直しが同時でも、500にならない（同じ順番で鍵をかける。PR #9 のCodexレビュー）", async () => {
+    for (let round = 0; round < 3; round++) {
+      await resetDb();
+      const { accountId } = await createUserWithAccount("o1");
+      const token = tokenOf((await createInvite(accountId)).url);
+      await ensureUser("p1");
+      const [cancel, accept, rotate] = await Promise.all([
+        call(app, "DELETE", `/api/accounts/${accountId}/partner-invite`, { user: "o1" }),
+        call(app, "POST", `/api/invites/${token}/accept`, { user: "p1", body: {} }),
+        call(app, "POST", `/api/accounts/${accountId}/partner-invite/rotate`, { user: "o1" }),
+      ]);
+      expect(cancel.status).toBe(204);
+      expect([200, 404]).toContain(accept.status);
+      expect([200, 409]).toContain(rotate.status);
+    }
+  });
+
   it("WEB_ORIGIN の末尾が「/」でも、招待のURLに二重スラッシュを入れない", async () => {
     const { accountId } = await createUserWithAccount("o1");
     const res = await app.request(

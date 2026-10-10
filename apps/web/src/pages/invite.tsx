@@ -182,7 +182,8 @@ export function InvitePage() {
               「参加する」を押し下げないよう、カードの最後に置く（FR-048） */}
           <div className="space-y-2 border-t pt-5">
             <h2 className="text-sm font-medium">チーム運用のしくみ</h2>
-            <RoleDiagram you={p.kind} vertical />
+            {/* 「あなた」は、参加すればその役割になる人にだけ付ける（自分のアカウント・参加済み・上限では付けない。PR #9 のCodexレビュー） */}
+            <RoleDiagram you={status === "can_join" || status === "anonymous" ? p.kind : undefined} vertical />
           </div>
         </div>
       </div>

@@ -102,6 +102,14 @@ describe("招待の確認画面", () => {
     expect(within(figure).getByText("あなた").closest("li")).toHaveTextContent("パートナー");
   });
 
+  it("自分のアカウントの招待を開いた人（参加できない人）には「あなた」の印を付けない（PR #9 のCodexレビュー）", async () => {
+    signedIn = true;
+    previewInvite.mockResolvedValue(preview({ status: "self" }));
+    renderAt();
+    const figure = await screen.findByRole("figure", { name: "チーム運用の役割の図" });
+    expect(within(figure).queryByText("あなた")).not.toBeInTheDocument();
+  });
+
   it("使えないリンクは理由と、新しいリンクを頼む案内を出す", async () => {
     previewInvite.mockRejectedValue(new ApiError("INVITE_INVALID", 404));
     renderAt();

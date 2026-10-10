@@ -8,6 +8,9 @@ loadLocalEnv();
 // 本物のMetaの認可画面は使わない（quickstart.md の手動確認で行う）
 export default defineConfig({
   testDir: "./tests",
+  // すべてのファイルが同じローカルのDBを空にして使うので、ファイルどうしも並べて流さない（PR #9 のCodexレビュー）
+  workers: 1,
+  fullyParallel: false,
   timeout: 60_000,
   use: {
     baseURL: "http://localhost:5173",

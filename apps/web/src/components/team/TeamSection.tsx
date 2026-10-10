@@ -149,8 +149,9 @@ export function TeamSection({ accountId, access }: { accountId: string; access: 
         ...data.editors.map((e) => ({ name: e.name, role: "編集者（投稿の案を作る人）" })),
       ]
     : [];
-  // パートナー・編集者には、手伝っている人の一覧だけを出す
-  if (!isOwner && helpers.length === 0) return null;
+  // パートナー・編集者には、手伝っている人の一覧だけを出す。読み込みに失敗したときは、区分を消さずに
+  // 再読み込みを出す（PR #9 のCodexレビュー）
+  if (!isOwner && !team.isError && helpers.length === 0) return null;
 
   return (
     <section aria-labelledby="team-heading" className="space-y-3">
