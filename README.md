@@ -96,6 +96,7 @@ pnpm dev:fake    # 偽のThreads（:8790）・api（:8787）・web（:5173）を
 - Meta App Reviewの前は、アプリのテスターに追加し、Threadsアプリの「設定 → アカウント → ウェブサイトのアクセス許可 → 招待」で承認したアカウントしか接続できない。
 - その間は`apps/api/.dev.vars`の`THREADS_ACCESS_MODE`を`testers`（既定）のままにする。アカウント追加画面に「招待されたアカウントのみ接続できます」の案内が出る。App Reviewに通り、Metaのアプリを公開したら`public`にすると案内が消える（[research.md R15](specs/002-strategy-profile/research.md)）。
 - 手順の全体は[quickstart.md](specs/001-login-account-setup/quickstart.md)を参照。
+- チーム運用（パートナー・編集者の招待と担当）は、Googleアカウントを3つ（オーナー役・パートナー役・編集者役）用意し、別のブラウザのプロファイルで確かめる。パートナー・編集者はThreadsに接続しないので、Metaのテスターの招待は要らない。手順は[008 quickstart.md](specs/008-team-operations/quickstart.md)。
 
 ## テスト
 

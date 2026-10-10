@@ -50,7 +50,7 @@ Accountの判定（`authorizeAccount`）と同じファイルに、次の3つを
 | `needs_review` | `content` |
 | それ以外 | `review` |
 
-1回の要求に両方が混ざり、`review`がないときは、要確認のものだけを消し、残りは`skipped`（理由`ROLE_FORBIDDEN`）として返す。登録の取り消し（`DELETE /draft-batches/:batchId`）は、まとまりの中がすべて要確認のときだけ`content`で許す（今の取り消しの条件と同じ）。
+1回の要求に両方が混ざり、`review`がないときは、要確認のものだけを消し、残りは消さずに飛ばす（`deletedCount`に含めない。003からの「対象外のIDは無視する」と同じ扱い）。消せる状態はもともと要確認と却下だけ。登録の取り消し（`DELETE /draft-batches/:batchId`）は、もともとまとまりの中の要確認の下書きだけを消すので、`content`で許す。
 
 ## APIごとの必要な権限
 

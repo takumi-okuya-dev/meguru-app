@@ -81,13 +81,13 @@
   "account": { "displayName": "カフェ B店", "username": "cafe_b_tokyo", "profilePictureUrl": "…" },
   "inviterName": "鈴木 花子",
   "team": { "name": "A社", "partnerName": "田中 健", "editorsRemaining": 7 },
-  "viewer": { "status": "anonymous | can_join | already_member | self | limit_reached", "accountId": "…" }
+  "viewer": { "status": "anonymous | can_join | already_member | self | limit_reached", "accountId": "… | null", "needsTeamName": true }
 }
 ```
 
 - `kind = partner`：`account`と`inviterName`（オーナー）。すでにパートナーがいれば`INVITE_INVALID`。
 - `kind = editor`：`team`と`inviterName`（パートナー）。`account`はNULL。
-- `viewer`は、ログインしていれば、その人が参加できるかを返す（ボタンの出し分け）。ログインしていなければ`anonymous`。
+- `viewer`は、ログインしていれば、その人が参加できるかを返す（ボタンの出し分け）。ログインしていなければ`anonymous`。`accountId`は参加済み（`already_member`）のパートナーの招待で、開くAccount。`needsTeamName`は、初めてパートナーになる人（チーム名の入力欄を出す）。
 - 見つからなければ404 `INVITE_INVALID`。
 
 ### `POST /api/invites/:token/accept`（ログイン必須）
@@ -177,7 +177,7 @@
 | `schedule_saved`・`threads_checked`・`ng_word_added`・`ng_word_deleted`・`core_rules_saved` | settings | 設定の操作 |
 | `partner_invite_created`・`partner_invite_rotated`・`partner_invite_canceled`・`partner_joined`・`partner_removed`・`delegation_changed`・`assignment_added`・`assignment_removed`・`editor_removed` | member | メンバーの出入り・担当・任せる範囲 |
 
-- 書くのは`AccountAccess.hasTeam`のときだけ。ただし`partner_removed`は、外したことで`hasTeam`がfalseになっても書く。
+- 書くのは`AccountAccess.hasTeam`のときだけ。ただし`partner_removed`（外したことで`hasTeam`がfalseになる）と、パートナーの招待リンクの`partner_invite_created`・`partner_invite_rotated`・`partner_invite_canceled`（まだチームがない時点の操作）は必ず書く（実装時に決定。チームの始まりの経緯を残すため）。
 - 同じ`requestId`の再試行（004）では書かない。
 
 ## `/api/me`の変更（research.md R11）
