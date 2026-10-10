@@ -75,7 +75,7 @@ export async function getMeTeamInfo(db: Db | TxDb, userId: string, hasAccounts: 
 }
 
 /**
- * このAccountを手伝っている人（contracts/api.md「GET /api/accounts/:id/team」、FR-042・FR-047(1)）。
+ * このアカウントのチーム（contracts/api.md「GET /api/accounts/:id/team」、FR-042・FR-047(1)）。
  * @param db - データベース
  * @param access - 判定の結果（全役割で読める）
  * @returns パートナー・任せる範囲・担当の編集者・参加の知らせ
@@ -106,6 +106,8 @@ export async function getAccountTeam(db: Db | TxDb, access: AccountAccess) {
     .where(and(eq(memberships.accountId, accountId), eq(memberships.role, "editor")))
     .orderBy(asc(memberships.createdAt));
   return {
+    owner: { userId: access.owner.id, name: access.owner.name },
+    viewerUserId: access.actor.id,
     partner: partner
       ? {
           userId: partner.userId,

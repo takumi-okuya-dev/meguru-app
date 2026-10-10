@@ -77,7 +77,7 @@ describe("個人運用のオーナー", () => {
   });
 
   it("パートナーがいなければ、ホームに参加の知らせは出ない", async () => {
-    accountTeam.mockResolvedValue({ partner: null, delegation: null, editors: [], joinedNotice: { show: false } });
+    accountTeam.mockResolvedValue({ owner: { userId: "o1", name: "たくみ" }, viewerUserId: "o1", partner: null, delegation: null, editors: [], joinedNotice: { show: false } });
     renderAt(<PartnerJoinedNotice accountId="a1" />);
     await new Promise((r) => setTimeout(r, 10));
     expect(screen.queryByRole("status")).not.toBeInTheDocument();

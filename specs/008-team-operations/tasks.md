@@ -276,6 +276,8 @@ T031: apps/web/test/stock-roles.test.tsx
 - [X] T092 `pnpm e2e -- team` を流して通ることを確かめ、verification.md に結果を書く。
 - [X] T093 `e2e/scripts/team-open.ts`（`pnpm team:open`）を作る：3人がログインしたブラウザを並べて開き、手で操作できるようにする（右下に役割の印）。`--setup` でDBを空にして、接続・パートナーの参加・編集者の参加と担当まで済ませる。操作の手順は `e2e/tests/team-flow.ts` にまとめ、E2Eと共用する。
 
+- 「このアカウントを手伝っている人」の一覧をカード「このアカウントのチーム」に置き換える作業は、[009 このアカウントのチーム](../009-team-roster/tasks.md) で行った（FR-042 を更新）。
+
 ---
 
 ## Implementation Strategy

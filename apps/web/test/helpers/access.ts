@@ -20,3 +20,13 @@ export const EDITOR_ACCESS: AccountAccessResponse = {
   team: { name: "A社", partnerName: "田中 健" },
   delegation: { review: false, settings: false },
 };
+
+/** パートナー（承認・設定は任されていない）。 */
+export const PARTNER_ACCESS: AccountAccessResponse = {
+  role: "partner",
+  permissions: ["view", "content", "activity"],
+  owner: { name: "鈴木 花子" },
+  hasTeam: true,
+  team: { name: "A社", partnerName: "田中 健" },
+  delegation: { review: false, settings: false },
+};
