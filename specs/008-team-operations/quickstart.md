@@ -31,6 +31,9 @@ pnpm e2e -- team                     # 画面を見ながら流すときは -- t
 毎回3つのGoogleアカウントでログインし直さなくてよいよう、3人がログインしたブラウザを並べて開くスクリプトがある（`e2e/scripts/team-open.ts`）。開いた後は、ふつうに手で操作できる。
 
 ```bash
+pnpm team:demo               # 1回で：DB・偽のThreads・api・webを起動し、下の --setup まで済ませて開く（閉じるとサーバーも止まる）
+
+# 分けて行うとき
 pnpm dev:fake                # 別のターミナルで起動しておく
 pnpm team:open --setup       # DBを空にし、接続・パートナーの参加・編集者の参加と担当まで済ませて開く
 pnpm team:open               # 今のデータのまま、3人でログインして開く

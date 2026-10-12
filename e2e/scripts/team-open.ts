@@ -4,6 +4,7 @@
 //
 //   pnpm team:open            # 今のデータのまま、3人でログインして開く
 //   pnpm team:open --setup    # DBを空にし、接続・パートナーの参加・編集者の参加と担当まで済ませてから開く
+//   pnpm team:demo            # 上の --setup を、偽のThreads・API・Webの起動からまとめて1回で行う（--wait で起動を待つ）
 //   （--headless を付けると、画面を出さずに準備までを確かめて終わる。スクリプト自体の確認用）
 import { clerkSetup } from "@clerk/testing/playwright";
 import { chromium, type Browser, type Page } from "@playwright/test";
@@ -66,6 +67,8 @@ async function addRoleBadge(page: Page, label: string, color: string) {
 async function main() {
   const setup = process.argv.includes("--setup");
   const headless = process.argv.includes("--headless");
+  // pnpm team:demo から呼ぶときは、同時に起動したサーバーが応答するまで待つ（最大120秒）
+  const wait = process.argv.includes("--wait");
   loadLocalEnv();
 
   for (const role of ["owner", "partner", "editor"] as const) teamEmail(role); // 足りなければここで止める
@@ -74,7 +77,13 @@ async function main() {
     ["API", "http://localhost:8787/"],
     ["偽のThreads", "http://localhost:8790/__control/posts"],
   ] as const) {
-    if (!(await isUp(url))) throw new Error(`${name}（${url}）が起動していません。先に別のターミナルで pnpm dev:fake を起動してください`);
+    const deadline = Date.now() + (wait ? 120_000 : 0);
+    while (!(await isUp(url))) {
+      if (Date.now() >= deadline) {
+        throw new Error(`${name}（${url}）が起動していません。先に別のターミナルで pnpm dev:fake を起動してください`);
+      }
+      await new Promise((r) => setTimeout(r, 1000));
+    }
   }
 
   await clerkSetup();
@@ -127,7 +136,21 @@ async function main() {
   await Promise.all(browsers.map((b) => new Promise((resolve) => b.once("disconnected", resolve))));
 }
 
+/**
+ * 失敗の理由を、読める文にする。DBにつながらないとき（AggregateError で message が空）は、起動の仕方を案内する。
+ * @param err - 失敗
+ * @returns 表示する文
+ */
+function describe(err: unknown): string {
+  const code = (err as { code?: string } | null)?.code;
+  if (code === "ECONNREFUSED") {
+    return "DB（localhost:5432）につながりません。OrbStack（Docker）を起動し、docker compose up -d を実行してください";
+  }
+  if (err instanceof Error) return err.message || String(code ?? err.name);
+  return String(err);
+}
+
 main().catch((err: unknown) => {
-  console.error(err instanceof Error ? err.message : err);
+  console.error(describe(err));
   process.exit(1);
 });
