@@ -19,6 +19,8 @@ const { ApiError } = await import("@/lib/api-client");
 
 const TOKEN = "THAAG" + "x".repeat(60);
 
+let client: QueryClient;
+
 function renderPage(used = 0, max = 1) {
   meResponse = {
     user: { id: "u", email: "u@example.com", displayName: null },
@@ -38,7 +40,7 @@ function renderPage(used = 0, max = 1) {
     { initialEntries: ["/accounts/new"] },
   );
   render(
-    <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+    <QueryClientProvider client={(client = new QueryClient({ defaultOptions: { queries: { retry: false } } }))}>
       <RouterProvider router={router} />
     </QueryClientProvider>,
   );
@@ -133,5 +135,17 @@ describe("トークンで追加する（US1）", () => {
     await open();
     expect(screen.queryByLabelText("アクセストークン")).not.toBeInTheDocument();
     expect(screen.getAllByText(/プラン3にすると最大5件まで登録できます/).length).toBeGreaterThan(0);
+  });
+
+  it("送ったトークンを mutation cache に残さない（成功・失敗とも。PR #12 のCodexレビュー）", async () => {
+    tokenConnect.mockRejectedValueOnce(new ApiError("TOKEN_INVALID", 400));
+    renderPage();
+    const user = await open();
+    await user.type(screen.getByLabelText("アクセストークン"), TOKEN);
+    await user.click(screen.getByRole("button", { name: "追加する" }));
+    expect(await screen.findByText(/トークンを確かめられませんでした/)).toBeInTheDocument();
+    const cached = JSON.stringify(client.getMutationCache().getAll().map((m) => m.state));
+    expect(cached).not.toContain(TOKEN);
+    expect(tokenConnect).toHaveBeenCalledWith({ mode: "new", token: TOKEN });
   });
 });

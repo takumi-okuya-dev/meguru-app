@@ -2,7 +2,7 @@
 // 追加の画面と、接続し直しのダイアログで共用する。トークンの値はこの部品の中だけで持ち、保存しない。
 import { useMutation } from "@tanstack/react-query";
 import { cleanToken, errorMessage, isTokenShaped, type TokenConnectResponse } from "@threads-grower/shared";
-import { useEffect, useId, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { Link } from "react-router";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -43,10 +43,19 @@ export function TokenConnectForm(props: Props) {
   const [visible, setVisible] = useState(false);
   const [shapeError, setShapeError] = useState(false);
   const [lockedUntil, setLockedUntil] = useState<number | null>(null);
+  // 送るトークンは、mutation の変数にしない（QueryClient の mutation cache に variables として残るため。
+  // PR #12 のCodexレビュー）。送る直前にここへ置き、mutationFn で読んだらすぐ消す
+  const pending = useRef<string | null>(null);
 
   const submit = useMutation({
-    mutationFn: (token: string) =>
-      api.tokenConnect(props.mode === "new" ? { mode: "new", token } : { mode: "reconnect", accountId: props.accountId, token }),
+    mutationFn: () => {
+      const token = pending.current;
+      pending.current = null;
+      if (!token) throw new Error("no token");
+      return api.tokenConnect(
+        props.mode === "new" ? { mode: "new", token } : { mode: "reconnect", accountId: props.accountId, token },
+      );
+    },
     onSuccess: (result) => {
       setValue("");
       props.onSuccess(result);
@@ -73,7 +82,8 @@ export function TokenConnectForm(props: Props) {
       return;
     }
     setShapeError(false);
-    submit.mutate(token);
+    pending.current = token;
+    submit.mutate();
   };
 
   const err = submit.error;

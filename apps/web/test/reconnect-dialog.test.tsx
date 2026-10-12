@@ -1,6 +1,6 @@
 // US3：接続し直すときに方法を選ぶ（specs/010-token-account-add contracts/ui-routes.md「接続し直すのダイアログ」、FR-031・FR-041・FR-050）
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen, within } from "@testing-library/react";
+import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { AccountSummary } from "@threads-grower/shared";
 import { createMemoryRouter, Outlet, RouterProvider } from "react-router";
@@ -32,6 +32,7 @@ vi.mock("sonner", () => ({ toast: { success: toastSuccess, error: vi.fn(), warni
 const { UnsavedChangesProvider } = await import("@/components/UnsavedChangesProvider");
 const { AccountSettings } = await import("@/pages/account-settings");
 const { reconnectBannerText } = await import("@/pages/account-layout");
+const { ReconnectButton } = await import("@/components/ReconnectButton");
 
 const TOKEN = "THAAG" + "y".repeat(60);
 
@@ -140,6 +141,51 @@ describe("要再接続のバナー（FR-041）", () => {
     expect(reconnectBannerText({ role: "owner", connectionMethod: "app" })).toMatch(/^Threadsとの接続が切れています。再接続するまで/);
     for (const role of ["partner", "editor"] as const) {
       expect(reconnectBannerText({ role, connectionMethod: "token" })).toMatch(/オーナーの再接続を待っています/);
+    }
+  });
+});
+
+describe("ReconnectButton（PR #12 のCodexレビュー）", () => {
+  function renderButton(account: AccountSummary) {
+    const router = createMemoryRouter(
+      [
+        {
+          path: "/accounts/:accountId",
+          element: <Outlet context={{ account }} />,
+          children: [
+            {
+              index: true,
+              element: (
+                <>
+                  <p>描画済み</p>
+                  <ReconnectButton accountId={account.id} />
+                </>
+              ),
+            },
+          ],
+        },
+      ],
+      { initialEntries: [`/accounts/${account.id}`] },
+    );
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <RouterProvider router={router} />
+      </QueryClientProvider>,
+    );
+  }
+
+  it("オーナーには出し、押すと接続し直しのダイアログが開く", async () => {
+    renderButton(makeAccount());
+    await userEvent.click(await screen.findByRole("button", { name: "再接続" }));
+    expect(await screen.findByRole("dialog", { name: "Threadsとの接続し直し" })).toBeInTheDocument();
+  });
+
+  it("パートナー・編集者には出さない（トークンの入力欄を見せない）", async () => {
+    for (const role of ["partner", "editor"] as const) {
+      renderButton(makeAccount({ role }));
+      await screen.findByText("描画済み");
+      expect(screen.queryByRole("button", { name: "再接続" })).not.toBeInTheDocument();
+      cleanup();
     }
   });
 });

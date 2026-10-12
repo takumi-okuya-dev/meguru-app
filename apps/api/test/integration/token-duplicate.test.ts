@@ -84,6 +84,26 @@ describe("ユーザー名だけが一致したとき（FR-023）", () => {
     expect(rows.map((r) => r.username)).toEqual(["cafe_b", "renamed_shop"]);
   });
 
+  it("名前を新しくした後に、新しい名前を別のアプリで追加しようとしても、照合で見つかる（PR #12 のCodexレビュー）", async () => {
+    await fake.addUser("9005", "cafe_b");
+    await add(await fake.issueToken({ user: "9005" }), "u2");
+    await fake.addUser("9005", "renamed_shop");
+    expect((await add(await fake.issueToken({ user: "9003" }))).status).toBe(200);
+    const res = await add(await fake.issueToken({ user: "9005", appScope: "other" }), "u2");
+    expect((await errorOf(res)).code).toBe("ACCOUNT_ALREADY_REGISTERED");
+    expect(await accountCount()).toBe(2);
+  });
+
+  it("新しい名前が先に別のAccountで登録されていても、名前の更新は止めず、追加も続ける", async () => {
+    await fake.addUser("9005", "cafe_b");
+    await add(await fake.issueToken({ user: "9005" }), "u2");
+    await fake.addUser("9006", "renamed_shop");
+    await add(await fake.issueToken({ user: "9006" }), "u3");
+    await fake.addUser("9005", "renamed_shop");
+    expect((await add(await fake.issueToken({ user: "9003" }))).status).toBe(200);
+    expect(await accountCount()).toBe(3);
+  });
+
   it("相手が要再接続で取り直せないときは、一致したものとして扱う", async () => {
     await fake.addUser("9005", "cafe_b");
     await add(await fake.issueToken({ user: "9005" }), "u2");

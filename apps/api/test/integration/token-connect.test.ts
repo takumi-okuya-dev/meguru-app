@@ -66,6 +66,15 @@ describe("トークンで追加する（US1）", () => {
     expect(await testEnv.AUTOPOST_KV.get("autopost:wake")).not.toBeNull();
   });
 
+  it("関所への知らせは、確定した後の時刻（確認の間に定期処理が動いても無視されない。PR #12 のCodexレビュー）", async () => {
+    const token = await fake.issueToken({ user: "9003", debug: false });
+    await fake.delay("getProfile", 1500);
+    const started = Date.now();
+    await add(token);
+    const wake = JSON.parse((await testEnv.AUTOPOST_KV.get("autopost:wake"))!) as { at: string };
+    expect(Date.parse(wake.at) - started).toBeGreaterThanOrEqual(1500);
+  });
+
   it("投稿・反応数の権限がないトークンでも作り、warnings と反応数の印を返す（US1-4・US1-5、FR-011）", async () => {
     const token = await fake.issueToken({ user: "9003", scopes: ["threads_basic"] });
     const body = (await (await add(token)).json()) as Ok;
@@ -126,6 +135,21 @@ describe("確認の失敗の待ち（FR-015、research.md R9）", () => {
     expect(Number(err.details[0])).toBeLessThanOrEqual(10 * 60);
     // 待ちの間の要求は数えない（待ちが延び続けない）
     expect((await q()`SELECT count(*)::int AS n FROM token_check_failures`)[0]).toEqual({ n: 5 });
+  });
+
+  it("並べて送っても、確認中の要求も数えるので、5回を超えて確かめない（PR #12 のCodexレビュー）", async () => {
+    const shaped = Array.from({ length: 8 }, (_, i) => `badtoken${i}`.padEnd(40, "x"));
+    const results = await Promise.all(shaped.map((t) => add(t)));
+    const codes = await Promise.all(results.map(codeOf));
+    expect(codes.filter((c) => c === "TOKEN_INVALID")).toHaveLength(5);
+    expect(codes.filter((c) => c === "TOKEN_CHECK_LOCKED")).toHaveLength(3);
+    const rows = (await q()`SELECT reason FROM token_check_failures`) as { reason: string }[];
+    expect(rows.map((r) => r.reason)).toEqual(Array(5).fill("invalid"));
+  });
+
+  it("成功した確認の予約は残らない", async () => {
+    await add(await fake.issueToken({ user: "9003" }));
+    expect((await q()`SELECT count(*)::int AS n FROM token_check_failures`)[0]).toEqual({ n: 0 });
   });
 
   it("10分たてば確かめられる。成功しても失敗の数は消えない。他の人の失敗は数えない", async () => {

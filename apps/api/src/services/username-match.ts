@@ -2,7 +2,8 @@
 // Threadsでは手放されたユーザー名を別の人が取れるので、名前だけの一致で二重登録と決めつけない。
 import { normalizeUsername } from "@threads-grower/shared";
 import { and, eq, ne, sql } from "drizzle-orm";
-import { createDb } from "../db/client";
+import { createDb, withTransaction } from "../db/client";
+import { lockThreadsUsername } from "../db/locks";
 import { accounts } from "../db/schema";
 import type { Env } from "../env";
 import { logger } from "../lib/logger";
@@ -33,12 +34,28 @@ export async function refreshUsernameOnlyMatch(env: Env, threads: ThreadsClient,
     if (!cred?.token || cred.connectionStatus !== "connected") continue;
     try {
       const current = await threads.getProfile(cred.token);
-      if (normalizeUsername(current.username) === normalizeUsername(m.username)) continue;
-      // 世代番号を条件にし、その間の接続し直しを上書きしない
-      await db
-        .update(accounts)
-        .set({ username: current.username, displayName: current.name, updatedAt: new Date() })
-        .where(and(eq(accounts.id, m.id), eq(accounts.connectionGeneration, cred.generation)));
+      const next = normalizeUsername(current.username);
+      if (next === normalizeUsername(m.username)) continue;
+      // 新しい名前のロックを取り、同じトランザクションで重なりを確かめてから書く（PR #12 のCodexレビュー）。
+      // 同じ名前の接続の確定（completeConnection も同じロックを取る）と順番に並ぶので、この更新の後に
+      // 別のMetaアプリで新しい名前を追加しようとしても、照合で見つかる
+      await withTransaction(env.DATABASE_URL, async (tx) => {
+        await lockThreadsUsername(tx, next);
+        const [other] = await tx
+          .select({ id: accounts.id })
+          .from(accounts)
+          .where(and(sql`lower(${accounts.username}) = ${next}`, ne(accounts.id, m.id)))
+          .limit(1);
+        if (other) {
+          // 先に別のAccountとして登録されていた（同じ人が別のアプリのIDで2つ持つ）。自動では1つにできないので記録だけ残す
+          logger.warn("username refreshed onto an already registered username", { accountId: m.id, otherAccountId: other.id });
+        }
+        // 世代番号を条件にし、その間の接続し直しを上書きしない
+        await tx
+          .update(accounts)
+          .set({ username: current.username, displayName: current.name, updatedAt: new Date() })
+          .where(and(eq(accounts.id, m.id), eq(accounts.connectionGeneration, cred.generation)));
+      });
     } catch (err) {
       logger.info("could not refresh profile of username-only match", { accountId: m.id, kind: (err as Error).name });
     }
