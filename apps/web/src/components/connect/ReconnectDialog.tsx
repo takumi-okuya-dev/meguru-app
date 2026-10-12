@@ -9,7 +9,9 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { api, describeError } from "@/lib/api-client";
 import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
 import { TokenConnectForm } from "./TokenConnectForm";
+import { TokenWarnings } from "./TokenWarnings";
 
 /** 接続し直すAccount。 */
 export type ReconnectTarget = { id: string; username: string; connectionMethod?: ConnectionMethod };
@@ -30,6 +32,8 @@ export function ReconnectDialog({
 }) {
   const queryClient = useQueryClient();
   const [choice, setChoice] = useState<"choose" | "token">("choose");
+  // 呼び出し側が権限の案内を受け取らないとき（共通の「再接続」ボタンなど）は、ダイアログの中で出す（PR #12 のCodexレビュー）
+  const [doneWarnings, setDoneWarnings] = useState<TokenConnectResponse["warnings"] | null>(null);
   const method = account.connectionMethod ?? "app";
   const oauth = useMutation({
     mutationFn: () => api.connect({ mode: "reconnect", accountId: account.id }),
@@ -59,7 +63,15 @@ export function ReconnectDialog({
           <DialogDescription id="reconnect-desc" className="text-sm text-foreground/80">
             @{account.username}の接続を更新します。投稿ストックや設定はそのまま残ります。
           </DialogDescription>
-          {choice === "choose" ? (
+          {doneWarnings ? (
+            <div className="space-y-4">
+              <p className="text-sm">接続し直しました。</p>
+              <TokenWarnings warnings={doneWarnings.map((w) => (w === "no_publish_permission" ? "publish" : "insights"))} />
+              <Button className="w-full rounded-full" onClick={onClose}>
+                閉じる
+              </Button>
+            </div>
+          ) : choice === "choose" ? (
             <div className="space-y-2">
               {options.map((o) => (
                 <button
@@ -99,8 +111,14 @@ export function ReconnectDialog({
                 toast.success("接続し直しました");
                 void queryClient.invalidateQueries({ queryKey: ["me"] });
                 void queryClient.invalidateQueries({ queryKey: ["account", account.id] });
-                onTokenSuccess?.(result);
-                onClose();
+                if (onTokenSuccess) {
+                  onTokenSuccess(result);
+                  onClose();
+                } else if (result.warnings.length > 0) {
+                  setDoneWarnings(result.warnings);
+                } else {
+                  onClose();
+                }
               }}
             />
           )}

@@ -180,6 +180,20 @@ describe("ReconnectButton（PR #12 のCodexレビュー）", () => {
     expect(await screen.findByRole("dialog", { name: "Threadsとの接続し直し" })).toBeInTheDocument();
   });
 
+  it("共通のボタンから接続し直しても、権限がなければダイアログの中で案内する（PR #12 のCodexレビュー）", async () => {
+    tokenConnect.mockResolvedValue({ accountId: "a1", kind: "reconnect", username: "cafe_b", warnings: ["no_publish_permission"] });
+    const user = userEvent.setup();
+    renderButton(makeAccount());
+    await user.click(await screen.findByRole("button", { name: "再接続" }));
+    const dialog = await screen.findByRole("dialog", { name: "Threadsとの接続し直し" });
+    await user.click(within(dialog).getByRole("button", { name: /トークンを貼り付ける/ }));
+    await user.type(within(dialog).getByLabelText("アクセストークン"), TOKEN);
+    await user.click(within(dialog).getByRole("button", { name: "接続し直す" }));
+    expect(await within(dialog).findByText(/このトークンには投稿の権限がありません/)).toBeInTheDocument();
+    await user.click(within(dialog).getAllByRole("button", { name: "閉じる" }).at(-1)!);
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+
   it("パートナー・編集者には出さない（トークンの入力欄を見せない）", async () => {
     for (const role of ["partner", "editor"] as const) {
       renderButton(makeAccount({ role }));

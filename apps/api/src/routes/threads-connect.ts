@@ -11,8 +11,11 @@ import { consumeState, startConnect, type ConsumedState } from "../services/thre
 import { connectWithToken } from "../services/token-connect";
 import { refreshUsernameOnlyMatch } from "../services/username-match";
 
-/** トークンの要求の本文の上限（バイト。contracts/api.md） */
-const TOKEN_BODY_MAX_BYTES = 2048;
+/**
+ * トークンの要求の本文の上限（バイト）。トークンは2,048文字までだが、前後の空白・引用符も含めて受け取り（スキーマは4,096文字まで）、
+ * mode・accountId・キー名などのJSONの分も要るので、余裕をもって8KBにする（PR #12 のCodexレビュー）
+ */
+const TOKEN_BODY_MAX_BYTES = 8192;
 
 /**
  * JSONを読む。読めなければ null（エラーのメッセージに本文を含めない）。

@@ -2,7 +2,7 @@
 // Threadsでは手放されたユーザー名を別の人が取れるので、名前だけの一致で二重登録と決めつけない。
 import { normalizeUsername } from "@threads-grower/shared";
 import { and, eq, ne, sql } from "drizzle-orm";
-import { createDb, withTransaction } from "../db/client";
+import { createDb, withTransaction, type TxDb } from "../db/client";
 import { lockThreadsUsername } from "../db/locks";
 import { accounts } from "../db/schema";
 import type { Env } from "../env";
@@ -34,22 +34,9 @@ export async function refreshUsernameOnlyMatch(env: Env, threads: ThreadsClient,
     if (!cred?.token || cred.connectionStatus !== "connected") continue;
     try {
       const current = await threads.getProfile(cred.token);
-      const next = normalizeUsername(current.username);
-      if (next === normalizeUsername(m.username)) continue;
-      // 新しい名前のロックを取り、同じトランザクションで重なりを確かめてから書く（PR #12 のCodexレビュー）。
-      // 同じ名前の接続の確定（completeConnection も同じロックを取る）と順番に並ぶので、この更新の後に
-      // 別のMetaアプリで新しい名前を追加しようとしても、照合で見つかる
+      if (normalizeUsername(current.username) === normalizeUsername(m.username)) continue;
       await withTransaction(env.DATABASE_URL, async (tx) => {
-        await lockThreadsUsername(tx, next);
-        const [other] = await tx
-          .select({ id: accounts.id })
-          .from(accounts)
-          .where(and(sql`lower(${accounts.username}) = ${next}`, ne(accounts.id, m.id)))
-          .limit(1);
-        if (other) {
-          // 先に別のAccountとして登録されていた（同じ人が別のアプリのIDで2つ持つ）。自動では1つにできないので記録だけ残す
-          logger.warn("username refreshed onto an already registered username", { accountId: m.id, otherAccountId: other.id });
-        }
+        await lockUsernameForUpdate(tx, m.id, current.username);
         // 世代番号を条件にし、その間の接続し直しを上書きしない
         await tx
           .update(accounts)
@@ -59,5 +46,29 @@ export async function refreshUsernameOnlyMatch(env: Env, threads: ThreadsClient,
     } catch (err) {
       logger.info("could not refresh profile of username-only match", { accountId: m.id, kind: (err as Error).name });
     }
+  }
+}
+
+/**
+ * Accountのユーザー名を書き換える前に、新しい名前のアドバイザリーロックを取り、同じ名前の別のAccountがないかを照合する
+ * （PR #12 のCodexレビュー）。接続の確定（completeConnection）も同じロックを取るので、書き換えの後に別のMetaアプリで
+ * 新しい名前を追加しようとしても、照合で見つかる。先に別のAccountとして登録されていた（同じ人が別のアプリのIDで2行
+ * 持つ）ときは、自動では1つにできないので、警告のログだけを残す（名前は事実に合わせて書き換える）。
+ * 名前の取り直し（refreshUsernameOnlyMatch）と、日次のトークン更新（token-refresh）の両方で、書き換えと同じ
+ * トランザクションの中で呼ぶ。
+ * @param tx - 書き換えと同じトランザクション
+ * @param accountId - 書き換えるAccount
+ * @param username - 新しいユーザー名
+ */
+export async function lockUsernameForUpdate(tx: TxDb, accountId: string, username: string): Promise<void> {
+  const next = normalizeUsername(username);
+  await lockThreadsUsername(tx, next);
+  const [other] = await tx
+    .select({ id: accounts.id })
+    .from(accounts)
+    .where(and(sql`lower(${accounts.username}) = ${next}`, ne(accounts.id, accountId)))
+    .limit(1);
+  if (other) {
+    logger.warn("username updated onto an already registered username", { accountId, otherAccountId: other.id });
   }
 }

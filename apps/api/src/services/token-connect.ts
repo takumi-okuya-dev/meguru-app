@@ -207,11 +207,16 @@ export async function connectWithToken(
     }
     throw err;
   } finally {
-    // 失敗なら理由を書き、それ以外（成功・数えない失敗）は予約を消す
-    if (failure) {
-      await db.update(tokenCheckFailures).set({ reason: failure }).where(eq(tokenCheckFailures.id, reservation));
-    } else {
-      await db.delete(tokenCheckFailures).where(eq(tokenCheckFailures.id, reservation));
+    // 失敗なら理由を書き、それ以外（成功・数えない失敗）は予約を消す。後片付けの失敗で、確定した結果や本来の
+    // エラーを上書きしない（PR #12 のCodexレビュー）。消せなかった予約は失敗として数えられ、日次の処理で消える
+    try {
+      if (failure) {
+        await db.update(tokenCheckFailures).set({ reason: failure }).where(eq(tokenCheckFailures.id, reservation));
+      } else {
+        await db.delete(tokenCheckFailures).where(eq(tokenCheckFailures.id, reservation));
+      }
+    } catch (err) {
+      logger.error("failed to settle token check reservation", { err });
     }
   }
 }

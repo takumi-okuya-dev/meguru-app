@@ -115,6 +115,18 @@ describe("トークンで追加する（US1）", () => {
     expect((await q()`SELECT count(*)::int AS n FROM accounts`)[0]).toEqual({ n: 1 });
   });
 
+  it("2,048文字のトークン（形の上限）は、本文の上限に引っかからず確かめに進む。8KBを超える本文は VALIDATION_FAILED（PR #12 のCodexレビュー）", async () => {
+    const res = await add("a".repeat(2048));
+    expect(await codeOf(res)).toBe("TOKEN_INVALID");
+    const reconnect = await call(app, "POST", "/api/threads/token-connect", {
+      user: "u1",
+      body: { mode: "reconnect", accountId: crypto.randomUUID(), token: `  "${"a".repeat(2048)}"\n` },
+    });
+    expect(await codeOf(reconnect)).not.toBe("VALIDATION_FAILED");
+    const huge = await call(app, "POST", "/api/threads/token-connect", { user: "u1", body: { mode: "new", token: "a".repeat(9000) } });
+    expect(await codeOf(huge)).toBe("VALIDATION_FAILED");
+  });
+
   it("本文がなければ VALIDATION_FAILED、未ログインは 401", async () => {
     const bad = await call(app, "POST", "/api/threads/token-connect", { user: "u1", body: { mode: "new" } });
     expect(await codeOf(bad)).toBe("VALIDATION_FAILED");
@@ -159,6 +171,21 @@ describe("確認の失敗の待ち（FR-015、research.md R9）", () => {
     expect(res.status).toBe(200);
     expect((await q()`SELECT count(*)::int AS n FROM token_check_failures`)[0]).toEqual({ n: 5 });
     expect((await add("bad token", "u2")).status).toBe(400);
+  });
+
+  it("予約の後片付けに失敗しても、確定した結果・本来のエラーを上書きしない（PR #12 のCodexレビュー）", async () => {
+    // 予約の行を消す・書き換えるとエラーになるようにする（この試験の間だけ）
+    await q()`CREATE OR REPLACE FUNCTION tcf_fail() RETURNS trigger AS $$ BEGIN RAISE EXCEPTION 'settle failed'; END $$ LANGUAGE plpgsql`;
+    await q()`CREATE TRIGGER tcf_fail BEFORE DELETE OR UPDATE ON token_check_failures FOR EACH ROW EXECUTE FUNCTION tcf_fail()`;
+    try {
+      const ok = await add(await fake.issueToken({ user: "9003" }));
+      expect(ok.status).toBe(200);
+      expect((await q()`SELECT count(*)::int AS n FROM accounts`)[0]).toEqual({ n: 1 });
+      expect(await codeOf(await add("bad token"))).toBe("TOKEN_INVALID");
+    } finally {
+      await q()`DROP TRIGGER tcf_fail ON token_check_failures`;
+      await q()`DROP FUNCTION tcf_fail()`;
+    }
   });
 
   it("日次の処理で、1日より前の失敗を消す", async () => {
