@@ -65,5 +65,5 @@ flowchart TB
 ## 動作確認
 
 - 自動：`pnpm e2e -- team`（3人のブラウザでの招待・参加・担当・任せる範囲・記録・外す。README「E2E」）
-- 手で触る：`pnpm team:open --setup`（3人がログインしたブラウザを並べて開く。`pnpm dev:fake`の起動が前提）
+- 手で触る：`pnpm team:demo`（サーバーの起動からチームの用意まで1回で行い、3人がログインしたブラウザを並べて開く）。データを残したまま開くときは、`pnpm dev:fake`の後に`pnpm team:open`
 - 手順の全体：[quickstart.md](../specs/008-team-operations/quickstart.md)

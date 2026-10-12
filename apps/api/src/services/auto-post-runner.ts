@@ -35,6 +35,7 @@ import { logger } from "../lib/logger";
 import { createThreadsClient, type ThreadsClient } from "../lib/threads-client";
 import { computeNextCheckAt, readGate, shouldRun, writeCatchupDate, writeGate } from "./auto-post-gate";
 import { nextCatchupAt, runMetricsStage } from "./metrics-runner";
+import { nextRecheckAt, runTokenRecheck } from "./token-recheck";
 import { claimSlot } from "./publish-claim";
 import { executeAttempt, fillPermalink, type ExecuteOutcome } from "./publish-executor";
 import { loadThreadsCredentials } from "./threads-credentials";
@@ -278,6 +279,14 @@ export async function runAutoPost(
     logger.error("metrics: stage failed", { err });
   }
 
+  // 6b. 期限を確かめられなかったトークンの確かめ直し（specs/010 research.md R8）。失敗しても他に影響させない
+  let recheckRemaining = false;
+  try {
+    recheckRemaining = (await runTokenRecheck(env, db, threads, now)).remaining;
+  } catch (err) {
+    logger.error("token recheck: stage failed", { err });
+  }
+
   // 7. 関所の書き込み
   const [[nextRetry], [inProgress]] = await Promise.all([
     db
@@ -299,6 +308,9 @@ export async function runAutoPost(
   const candidates: Date[] = [nextCatchupAt(now, catchupDate)];
   if (nextRetry?.at) candidates.push(nextRetry.at);
   if (inProgress?.at) candidates.push(inProgress.at);
+  // トークンの確かめ直しの時刻も候補にする（specs/010 research.md R8）
+  const recheck = await nextRecheckAt(db);
+  if (recheck) candidates.push(recheck);
   for (const { schedule: s } of schedules) {
     const [next] = projectSchedule({
       accountId: s.accountId,
@@ -318,7 +330,11 @@ export async function runAutoPost(
     now,
     candidates,
     immediate:
-      summary.deferred > 0 || (inProgress?.unleased ?? 0) > 0 || permalinkPending || summary.metricsRemaining,
+      summary.deferred > 0 ||
+      (inProgress?.unleased ?? 0) > 0 ||
+      permalinkPending ||
+      summary.metricsRemaining ||
+      recheckRemaining,
   });
   if (
     !(await writeGate(env.AUTOPOST_KV, {

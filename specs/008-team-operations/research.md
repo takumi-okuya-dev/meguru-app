@@ -23,13 +23,13 @@ Phase 0 の調査と決定。spec の Clarifications（2026-10-09）と、001〜
 - 許可の表は`packages/shared/src/permissions.ts`に置き、APIの判定と画面の出し分けの両方で使う（[contracts/permissions.md](./contracts/permissions.md)）。
 - チームの判定（`authorizeTeam`・`listTeamAccounts`・`authorizeAssignment`）も同じ`access.ts`に置き、`/api/team/*`と`team-service.ts`・`partner-summary.ts`はそこを通す（[contracts/permissions.md](./contracts/permissions.md)「チームの判定」）。役割による判定がAccountとチームで別々の場所に散らないようにする。
 - 既存の59か所の`findOwnedAccount`を、操作に合った権限で`authorizeAccount`に置き換える。置き換えの漏れは、ルートの一覧を役割×権限で全部たたくテスト（SC-002）で見つける。
-- **理由**：Constitution原則V（3.0.0）「判定を1か所に集め、すべてのAPIがそこを通す」。009（決済）は、この関数の中に「オーナーが契約中か」を足すだけで済む（FR-080）。
+- **理由**：Constitution原則V（3.0.0）「判定を1か所に集め、すべてのAPIがそこを通す」。011（決済）は、この関数の中に「オーナーが契約中か」を足すだけで済む（FR-080）。
 - **代わりの案**：Honoのミドルウェアで`/accounts/:accountId/*`をまとめて判定 → 操作ごとの権限（承認・設定など）はルートごとに違うので、結局ルートの中で2回目の判定が要る。トランザクションの中で読み直したい処理（承認・設定の保存）とも合わない。
 
 ## R3. grower機能の判定：オーナーの登録日時で行う
 
 - **決定**：`canEditProfile`・`requireGrowerAccess`（002〜006）は、リクエストした人ではなく、Accountのオーナーの`users.created_at`で無料体験を判定する。`AccountAccess`にオーナーの登録日時を入れて渡す。
-- **理由**：今は「操作した人の登録日時」で判定しているため、パートナー・編集者が操作すると、オーナーの状態と違う結果になる。spec の前提「各Accountのオーナーの状態で判定する扱いのまま、パートナー・編集者にも同じ結果を適用する」。009の課金の判定もオーナー単位になる。
+- **理由**：今は「操作した人の登録日時」で判定しているため、パートナー・編集者が操作すると、オーナーの状態と違う結果になる。spec の前提「各Accountのオーナーの状態で判定する扱いのまま、パートナー・編集者にも同じ結果を適用する」。011の課金の判定もオーナー単位になる。
 
 ## R4. 招待リンク：推測できない文字列。照合はハッシュ、表示は暗号化した写し
 
@@ -120,7 +120,7 @@ Phase 0 の調査と決定。spec の Clarifications（2026-10-09）と、001〜
 - QRコードはブラウザで作る。API・DBへの影響はない。
 - 操作の記録の容量：1Accountで1日最大数十行、1行数百バイト。90日で数MB未満。Neon Freeの容量（0.5GB）に収まる。
 
-## R15. 009（決済）への申し送り
+## R15. 011（決済）への申し送り
 
 - 契約による制限は、`authorizeAccount`の中で「オーナーの契約の状態」を見て、書き込みの権限を外す形で足す（読むだけ）。
 - 旧プランの`PLANS`・`accounts.plan`・`limitForOwnedPlans`・`hasGrowerAccess`は、本featureでは触らない。

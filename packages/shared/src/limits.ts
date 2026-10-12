@@ -172,3 +172,25 @@ export const PARTNER_SUMMARY_LIMIT = 100;
 export const ACTIVITY_PAGE_SIZE = 50;
 /** 操作の記録の1回の件数の上限。 */
 export const ACTIVITY_PAGE_MAX = 100;
+
+// 自分のMetaアプリのトークンでの接続（specs/010-token-account-add plan.md「制約」）
+/** トークンの確認の失敗を数える回数（FR-015）。 */
+export const TOKEN_CHECK_FAILURE_LIMIT = 5;
+/** トークンの確認の失敗を数える時間（分）。 */
+export const TOKEN_CHECK_WINDOW_MINUTES = 10;
+/** 失敗が上限に達した後に待ってもらう時間（分）。 */
+export const TOKEN_CHECK_LOCK_MINUTES = 10;
+/** 期限を確かめられなかったトークンを確かめ直すまでの時間（分。FR-012）。 */
+export const TOKEN_RECHECK_DELAY_MINUTES = 120;
+/** 確かめ直しが一時的に失敗したときに、やり直すまでの時間（分）。 */
+export const TOKEN_RECHECK_RETRY_MINUTES = 10;
+/** 1回の定期処理で確かめ直す接続の数。 */
+export const TOKEN_RECHECK_BATCH = 20;
+/** これより短い期限のトークンは短期トークンとみなす（時間）。 */
+export const TOKEN_MIN_LIFETIME_HOURS = 48;
+/** 期限を確かめられないトークンの期限とみなす日数（長期トークンの期限）。 */
+export const TOKEN_ASSUMED_LIFETIME_DAYS = 60;
+/** トークンの長さの下限（文字）。 */
+export const TOKEN_MIN_LENGTH = 32;
+/** トークンの長さの上限（文字）。 */
+export const TOKEN_MAX_LENGTH = 2048;

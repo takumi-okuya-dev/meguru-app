@@ -9,6 +9,7 @@ import { createThreadsClient } from "../lib/threads-client";
 import { cleanupDeletionIdentifiers, retryDeletions } from "./data-deletion";
 import { cleanupRevocations } from "./revocation";
 import { refreshExpiringTokens } from "./token-refresh";
+import { purgeTokenCheckFailures } from "./token-connect";
 import { purgeOldActivity } from "./activity-log";
 
 /**
@@ -33,6 +34,8 @@ export async function runDailyJobs(env: Env, now: Date = new Date()) {
     ["revocations cleanup", () => cleanupRevocations(env, now)],
     // 操作の記録は90日で消す（specs/008 FR-051、research.md R9）
     ["activity logs cleanup", () => purgeOldActivity(createDb(env.DATABASE_URL), now)],
+    // トークンの確認の失敗は1日で消す（specs/010 data-model.md）
+    ["token check failures cleanup", () => purgeTokenCheckFailures(env, now)],
     ["data deletion retry", () => retryDeletions(env, now)],
     ["deletion identifiers cleanup", () => cleanupDeletionIdentifiers(env, now)],
     [

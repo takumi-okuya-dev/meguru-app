@@ -81,6 +81,9 @@ export type ThreadsProfile = {
   profilePictureUrl: string | null;
 };
 
+/** トークンを調べた結果（specs/010 research.md R3）。期限なし（0）は null。 */
+export type TokenDebugInfo = { isValid: boolean; expiresAt: Date | null; issuedAt: Date | null; scopes: string[] };
+
 /** 長期トークン（有効期間60日）と有効期限。 */
 export type LongLivedToken = { accessToken: string; expiresAt: Date };
 
@@ -91,6 +94,11 @@ export type ThreadsClient = {
   exchangeLongLived(shortLivedToken: string): Promise<LongLivedToken>;
   refresh(longLivedToken: string): Promise<LongLivedToken>;
   getProfile(accessToken: string): Promise<ThreadsProfile>;
+  /**
+   * トークン自身で、そのトークンを調べる（GET /debug_token。specs/010 research.md R3）。
+   * 同じアプリのトークンでしか調べられないので、利用者のMetaアプリのトークンを自分自身で調べる。
+   */
+  debugToken(token: string): Promise<TokenDebugInfo>;
   /** テキストのコンテナーを作る（2段階の1つ目）。 */
   createTextContainer(accessToken: string, userId: string, text: string): Promise<{ containerId: string }>;
   /** コンテナーを公開する（2段階の2つ目）。1つのコンテナーは1回しか公開できない。 */
@@ -233,7 +241,14 @@ export function createThreadsClient(env: Env, fetchImpl: typeof fetch = fetch): 
     async getProfile(accessToken) {
       const url = new URL(`${graph}/v1.0/me`);
       url.searchParams.set("fields", "id,username,name,threads_profile_picture_url");
-      const res = await fetchImpl(url, { headers: { Authorization: `Bearer ${accessToken}` } });
+      let res: Response;
+      try {
+        res = await fetchImpl(url, { headers: { Authorization: `Bearer ${accessToken}` }, signal: AbortSignal.timeout(TIMEOUT_MS) });
+      } catch {
+        // DNSの失敗・タイムアウト・接続のリセットは一時的な失敗にする（呼び出し側が503にできるように。PR #12 のCodexレビュー）。
+        // 原因のメッセージにURLなどが入りうるので、使わない
+        throw new ThreadsTransientError("getProfile: network error", 0);
+      }
       const body = await parseOrThrow<{
         id: string | number;
         username?: string;
@@ -247,6 +262,19 @@ export function createThreadsClient(env: Env, fetchImpl: typeof fetch = fetch): 
         name: body.name ?? null,
         profilePictureUrl: body.threads_profile_picture_url ?? null,
       };
+    },
+
+    async debugToken(token) {
+      const url = new URL(`${graph}/v1.0/debug_token`);
+      url.searchParams.set("input_token", token);
+      type Raw = { is_valid?: boolean; expires_at?: number; issued_at?: number; scopes?: string[] };
+      const body = await call<{ data?: Raw } & Raw>("debugToken", url, { token });
+      // 応答は data の下（Graph API の形）。下にないときもそのまま読む
+      const d = body.data ?? body;
+      const at = (sec: number | undefined) => (sec ? new Date(sec * 1000) : null);
+      // 無効なトークンは、ほかの呼び出しと同じく認証のエラーとして扱う
+      if (d.is_valid === false) throw new ThreadsAuthError("debugToken: token is not valid");
+      return { isValid: true, expiresAt: at(d.expires_at), issuedAt: at(d.issued_at), scopes: d.scopes ?? [] };
     },
 
     async createTextContainer(accessToken, userId, text) {

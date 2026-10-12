@@ -118,7 +118,7 @@ Threads側の接続が期限切れ・取り消しなどで無効になったAcco
 
 **Threadsアカウントの登録・接続（PRD FR-2）**
 
-- **FR-008**: Users MUST be able to アカウント追加画面からThreads側の認可画面へ進み、自分のThreadsアカウントへのアクセスを許可することでAccountを登録できる。アクセストークン等の認証情報をユーザーが手で入力・貼り付ける方式は提供しない。
+- **FR-008**: Users MUST be able to アカウント追加画面からThreads側の認可画面へ進み、自分のThreadsアカウントへのアクセスを許可することでAccountを登録できる。アクセストークン等の認証情報をユーザーが手で入力・貼り付ける方式は提供しない。ただし、利用者が自分のMetaアプリで作ったトークンを貼り付ける方法（[010](../010-token-account-add/spec.md)）を除く。
 - **FR-009**: System MUST Account作成時に、Threadsアカウントのユーザー名・表示名・プロフィール画像を取得してAccountに表示する。
 - **FR-010**: System MUST Threads接続の認証情報を保存時に暗号化し、画面・ログ・エラーメッセージ・エクスポートのいずれにも平文で出さない。
 - **FR-011**: System MUST Account作成時に、作成したユーザーをそのAccountの`owner`とするMembershipを作成する。プラン1〜3ではMembershipやロールの概念を画面に表示しない（Constitution 原則IV・V）。

@@ -8,7 +8,7 @@ import {
 } from "@threads-grower/shared";
 import type { Env } from "../env";
 import { createDb, withTransaction, type Db, type TxDb } from "../db/client";
-import { lockThreadsUser, lockUserRow } from "../db/locks";
+import { lockThreadsUser, lockThreadsUsername, lockUserRow } from "../db/locks";
 import {
   accounts,
   memberships,
@@ -31,6 +31,7 @@ import {
   type ThreadsProfile,
 } from "../lib/threads-client";
 import { authorizeAccount } from "./access";
+import { recordActivity } from "./activity-log";
 import type { ConsumedState } from "./threads-oauth";
 
 // ---- 登録数の上限（FR-015〜FR-017） ----
@@ -75,17 +76,52 @@ export async function assertCanAddAccount(db: Db | TxDb, userId: string) {
   return limit;
 }
 
-// ---- callback での接続の確定（research.md R8 の手順） ----
+// ---- 接続の確定（research.md R8 の手順。specs/010 research.md R5 でトークンの接続と共通にした） ----
 
-/** callback で接続を確定するときの入力。 */
+/** 接続の要求。OAuth では state の行から、トークンではリクエストから作る（specs/010 research.md R5）。 */
+export type ConnectionRequest = {
+  userId: string;
+  mode: "new" | "reconnect";
+  /** 接続し直すAccount（mode = reconnect） */
+  targetAccountId: string | null;
+  /** 接続を始めた時刻（OAuth は state の作成、トークンは要求を受け取った時刻） */
+  startedAt: Date;
+  /** 接続の方法 */
+  method: "app" | "token";
+};
+
+/**
+ * OAuth の state の行から接続の要求を作る。
+ * @param state - 消費した state
+ * @returns 接続の要求
+ */
+export function requestFromState(state: ConsumedState): ConnectionRequest {
+  return {
+    userId: state.userId,
+    mode: state.mode,
+    targetAccountId: state.targetAccountId,
+    startedAt: state.createdAt,
+    method: "app",
+  };
+}
+
+/** 接続を確定するときの入力。 */
 export type CompleteConnectionInput = {
-  state: ConsumedState;
+  request: ConnectionRequest;
   threadsUserId: string;
   profile: ThreadsProfile;
   accessToken: string;
   expiresAt: Date;
-  /** callback がリダイレクトを受け取った時刻（research.md R7） */
+  /** callback がリダイレクトを受け取った時刻（research.md R7）。トークンでは要求を受け取った時刻 */
   authorizedAt: Date;
+  /** トークンの発行の時刻（トークンで debug_token が読めたとき。なければ今） */
+  issuedAt?: Date;
+  /** 許可された権限（トークンで debug_token が読めたとき。なければ001の3つ） */
+  scopes?: readonly string[];
+  /** 確かめ直しの時刻（トークンで期限を読めなかったとき。specs/010 research.md R8） */
+  recheckAt?: Date | null;
+  /** 反応数を読む権限がない（specs/006 の insights_denied_at を今にする） */
+  insightsDenied?: boolean;
 };
 
 /** callback で接続を確定した結果。new（新規）、updated（既存を更新）、reconnect（再接続）。 */
@@ -109,11 +145,12 @@ export async function completeConnection(
 ): Promise<CompleteConnectionResult> {
   const cipher = createTokenCipher(env.TOKEN_ENCRYPTION_KEYS, env.TOKEN_ENCRYPTION_KEY_VERSION);
   const hmac = await threadsUserHmac(env.IDENTIFIER_HASH_KEY, input.threadsUserId);
-  const { state } = input;
+  const state = input.request;
 
   return withTransaction(env.DATABASE_URL, async (tx) => {
-    // 1・2. ロックの順序は「アドバイザリーロック → users の行ロック」
+    // 1・2. ロックの順序は「Threadsユーザー → ユーザー名（specs/010 research.md R6）→ users の行ロック」
     await lockThreadsUser(tx, input.threadsUserId);
+    await lockThreadsUsername(tx, normalizeUsername(input.profile.username));
     await lockUserRow(tx, state.userId);
 
     // 3. 認可の後に発行された取り消しがあれば拒否（callback の最中の連携解除）
@@ -139,7 +176,7 @@ export async function completeConnection(
           eq(threadsDeletionRequests.threadsUserHmac, hmac),
           or(
             inArray(threadsDeletionRequests.status, ["pending", "failed"]),
-            gte(threadsDeletionRequests.completedAt, state.createdAt),
+            gte(threadsDeletionRequests.completedAt, state.startedAt),
           ),
         ),
       )
@@ -152,22 +189,29 @@ export async function completeConnection(
       const [deletedAfter] = await tx
         .select({ id: users.id })
         .from(users)
-        .where(and(eq(users.id, state.userId), gt(users.lastAccountDeletedAt, state.createdAt)))
+        .where(and(eq(users.id, state.userId), gt(users.lastAccountDeletedAt, state.startedAt)))
         .limit(1);
       if (deletedAfter)
         throw new AppError("ACCOUNT_DELETED_DURING_CONNECT", 409, "account deleted during connect");
     }
 
-    // 6. Threadsユーザーで既存のAccountを探す
-    const [existing] = await tx
+    // 6. 既存のAccountを、ユーザーIDとユーザー名で探す（ユーザーIDはMetaアプリごとに違いうる。specs/010 research.md R6）
+    const norm = normalizeUsername(input.profile.username);
+    const candidates = await tx
       .select({ account: accounts, ownerId: memberships.userId })
       .from(accounts)
       .leftJoin(
         memberships,
         and(eq(memberships.accountId, accounts.id), eq(memberships.role, "owner")),
       )
-      .where(eq(accounts.threadsUserId, input.threadsUserId))
-      .limit(1);
+      .where(or(eq(accounts.threadsUserId, input.threadsUserId), sql`lower(${accounts.username}) = ${norm}`));
+    // ユーザーIDの一致を先に見る
+    const existing = candidates.find((c) => c.account.threadsUserId === input.threadsUserId) ?? candidates[0];
+    // 同じThreadsアカウントの別のAccountがあるときのエラー（自分のものなら接続し直しへ、他人なら登録した人を明かさない）
+    const duplicateError = (c: (typeof candidates)[number]) =>
+      c.ownerId === state.userId
+        ? new AppError("ACCOUNT_ALREADY_REGISTERED", 409, "threads account already registered", undefined, [c.account.id])
+        : new AppError("THREADS_ACCOUNT_TAKEN", 409, "threads account owned by another user");
 
     if (state.mode === "reconnect") {
       const [target] = await tx
@@ -177,23 +221,33 @@ export async function completeConnection(
         .limit(1);
       if (!target)
         throw new AppError("OAUTH_STATE_INVALID", 400, "reconnect target no longer exists");
-      // 再接続は同じ Threads アカウントでだけ認める（FR-020）
-      if (target.threadsUserId !== input.threadsUserId) {
+      // 再接続は同じ Threads アカウントでだけ認める（FR-020）。同じかはユーザーIDかユーザー名で見る（specs/010 FR-032）
+      if (target.threadsUserId !== input.threadsUserId && normalizeUsername(target.username) !== norm) {
         throw new AppError(
           "RECONNECT_ACCOUNT_MISMATCH",
           409,
           "reconnect with a different threads account",
         );
       }
+      // 同じThreadsアカウントが別のAccountとしても登録されているときは、書き換えない（specs/010 research.md R7）
+      const other = candidates.find((c) => c.account.id !== target.id);
+      if (other) throw duplicateError(other);
+      // 接続し直しはオーナーだけ（specs/008 FR-044）。トランザクションの中でも確かめ、記録に使う
+      const access = await authorizeAccount(tx, { id: state.userId }, target.id, "owner");
       await writeConnection(tx, cipher, target.id, input);
+      // チームがあるAccountでは、どちらの方法の接続し直しも記録する（specs/010 FR-035、research.md R11a）
+      await recordActivity(tx, access, {
+        kind: "settings",
+        action: "threads_reconnected",
+        details: { method: state.method },
+      });
       return { accountId: target.id, username: input.profile.username, kind: "reconnect" };
     }
 
     if (existing) {
-      // 7. 自分のAccountなら接続を更新（FR-013）。他人なら拒否（FR-012）
-      if (existing.ownerId !== state.userId) {
-        throw new AppError("THREADS_ACCOUNT_TAKEN", 409, "threads account owned by another user");
-      }
+      // 7. 他人なら拒否（FR-012）。自分のAccountなら、このアプリの接続は接続を更新し（FR-013）、
+      //    トークンは接続し直しへ案内する（黙って接続の方法を変えない。specs/010 research.md R6）
+      if (existing.ownerId !== state.userId || state.method === "token") throw duplicateError(existing);
       await writeConnection(tx, cipher, existing.account.id, input);
       return { accountId: existing.account.id, username: input.profile.username, kind: "updated" };
     }
@@ -209,6 +263,7 @@ export async function completeConnection(
       profilePictureUrl: input.profile.profilePictureUrl,
       plan: initialPlanFor(limit.plans),
       connectionStatus: "connected",
+      connectionMethod: state.method,
       connectionGeneration: 0,
     });
     await tx.insert(memberships).values({ userId: state.userId, accountId, role: "owner" });
@@ -236,10 +291,11 @@ async function writeConnection(
     accessTokenCiphertext: enc.ciphertext,
     accessTokenIv: enc.iv,
     keyVersion: enc.keyVersion,
-    scopes: [...THREADS_SCOPES],
+    scopes: [...(input.scopes ?? THREADS_SCOPES)],
     expiresAt: input.expiresAt,
-    issuedAt: now,
+    issuedAt: input.issuedAt ?? now,
     authorizedAt: input.authorizedAt,
+    recheckAt: input.recheckAt ?? null,
     updatedAt: now,
   };
   await tx
@@ -249,13 +305,18 @@ async function writeConnection(
   await tx
     .update(accounts)
     .set({
+      // 接続の方法を変えるとユーザーIDも変わりうる（specs/010 research.md R7）
+      threadsUserId: input.threadsUserId,
       username: input.profile.username,
       displayName: input.profile.name,
       profilePictureUrl: input.profile.profilePictureUrl,
       connectionStatus: "connected",
+      connectionMethod: input.request.method,
+      reconnectHint: null,
       connectionGeneration: sql`${accounts.connectionGeneration} + 1`,
-      // 再接続で反応数を読む権限が戻りうるので、権限のない印を消す（specs/006 research.md R11）
-      insightsDeniedAt: null,
+      // 再接続で反応数を読む権限が戻りうるので、権限のない印を消す（specs/006 research.md R11）。
+      // トークンで権限がないと分かっているときは、今にする（specs/010 research.md R4）
+      insightsDeniedAt: input.insightsDenied ? now : null,
       updatedAt: now,
     })
     .where(eq(accounts.id, accountId));

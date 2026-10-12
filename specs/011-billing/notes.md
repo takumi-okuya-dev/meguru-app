@@ -46,4 +46,4 @@
 ## 3. 番号の変更（2026-10-10）
 
 - 009 = このアカウントのチーム（実装済み）、010 = 自分のMetaアプリのトークンでアカウントを追加、011 = 決済。
-- Constitution（「決済（feature 009）」）、008 spec FR-080、research.md R15、contracts/permissions.md、PRD §6.1 に「009（決済）」の記述が残っている。010か011の仕様を作るときに直す。
+- Constitution（「決済（feature 009）」）、008 spec FR-080、research.md R15、contracts/permissions.md、PRD §6.1 に残っていた「009（決済）」の記述は、010で「011（決済）」に直した（010 FR-060。Constitution 3.0.1）。

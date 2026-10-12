@@ -250,6 +250,10 @@ shadcn/uiの色の変数（`apps/web/src/index.css`）を使う。画面イメ�
 | 招待の確認 | `/invite/:token` | 中央の1枚のカード（ログイン不要） | 008 |
 | 手伝っているアカウント | `/partner/accounts` | D | 008 |
 | 編集者と担当 | `/partner/editors` | D | 008 |
+| 利用規約 | `/terms` | 1カラムの読み物（ログイン不要） | 010 |
+| トークンの作り方 | `/guide/threads-token` | 1カラムの読み物（ログイン不要） | 010 |
+
+- **010で足したもの**：「Threadsアカウントを追加」の主のボタンの下に、折りたたみの行「自分のMetaアプリのトークンで追加する」（開くまで手順と入力欄を出さない）。「接続し直す」は、2つの方法（Threadsで許可する／トークンを貼り付ける）を選ぶダイアログ（PCは中央、スマートフォンは全画面のシート）。ログイン画面の足元に「利用規約」。詳しくは[010 contracts/ui-routes.md](../specs/010-token-account-add/contracts/ui-routes.md)。
 
 ## 8. 001からの変更点
 

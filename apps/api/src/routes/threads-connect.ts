@@ -1,13 +1,35 @@
 // POST /api/threads/connect と GET /api/threads/callback（contracts/api.md、research.md R3・R4・R8）
-import { connectRequestSchema, type ErrorCode } from "@threads-grower/shared";
+import { connectRequestSchema, tokenConnectRequestSchema, type ErrorCode } from "@threads-grower/shared";
 import { Hono, type MiddlewareHandler } from "hono";
+import { bodyLimit } from "hono/body-limit";
 import type { AppEnv } from "../app";
 import { createDb } from "../db/client";
 import { AppError } from "../lib/errors";
 import { logger } from "../lib/logger";
 import { createThreadsClient, ThreadsApiError, ThreadsAuthError } from "../lib/threads-client";
-import { completeConnection } from "../services/account-service";
+import { completeConnection, requestFromState } from "../services/account-service";
 import { consumeState, startConnect, type ConsumedState } from "../services/threads-oauth";
+import { connectWithToken } from "../services/token-connect";
+import { refreshUsernameOnlyMatch } from "../services/username-match";
+
+/**
+ * トークンの要求の本文の上限（バイト）。トークンは2,048文字までだが、前後の空白・引用符も含めて受け取り（スキーマは4,096文字まで）、
+ * mode・accountId・キー名などのJSONの分も要るので、余裕をもって8KBにする（PR #12 のCodexレビュー）
+ */
+const TOKEN_BODY_MAX_BYTES = 8192;
+
+/**
+ * JSONを読む。読めなければ null（エラーのメッセージに本文を含めない）。
+ * @param raw - 本文
+ * @returns 読んだ値
+ */
+function parseJson(raw: string): unknown {
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+}
 
 /**
  * POST /api/threads/connect と GET /api/threads/callback のルート（research.md R3・R4・R8）。
@@ -27,6 +49,25 @@ export function threadsConnectRoutes(authed: MiddlewareHandler<AppEnv>) {
       );
       return c.json({ authorizeUrl });
     })
+    .post(
+      "/threads/token-connect",
+      authed,
+      // 本文を読み込む途中で上限を当て、超えたらそこで止める（読み終えてから測らない。PR #12 のCodexレビュー）
+      bodyLimit({
+        maxSize: TOKEN_BODY_MAX_BYTES,
+        onError: () => {
+          throw new AppError("VALIDATION_FAILED", 400, "token request too large");
+        },
+      }),
+      async (c) => {
+        // 自分のMetaアプリのトークンでの追加・接続し直し（specs/010 contracts/api.md）。本文はログに出さない
+        const raw = await c.req.text();
+        const parsed = tokenConnectRequestSchema.safeParse(parseJson(raw));
+        if (!parsed.success) throw new AppError("VALIDATION_FAILED", 400, "invalid token connect request");
+        const result = await connectWithToken(c.env, createThreadsClient(c.env), c.get("user"), parsed.data);
+        return c.json(result);
+      },
+    )
     .get("/threads/callback", async (c) => {
       // ユーザーが認可した直後にリダイレクトされるので、受け取った時刻を認可の時刻とみなす（research.md R7）
       const authorizedAt = new Date();
@@ -70,9 +111,11 @@ export function threadsConnectRoutes(authed: MiddlewareHandler<AppEnv>) {
           return fail("THREADS_PROFILE_FETCH_FAILED");
         }
 
+        // ユーザー名だけが一致するAccountの、今の名前を確かめる（specs/010 FR-023）
+        await refreshUsernameOnlyMatch(c.env, threads, profile);
         try {
           const result = await completeConnection(c.env, {
-            state: state as ConsumedState,
+            request: requestFromState(state as ConsumedState),
             threadsUserId: profile.id,
             profile,
             accessToken: longLived.accessToken,

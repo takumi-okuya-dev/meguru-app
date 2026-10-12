@@ -9,6 +9,7 @@ import { accounts, threadsConnections } from "../db/schema";
 import { createTokenCipher } from "../lib/crypto";
 import { logger } from "../lib/logger";
 import { ThreadsAuthError, type ThreadsClient } from "../lib/threads-client";
+import { lockUsernameForUpdate } from "./username-match";
 
 const DAY_MS = 24 * 3600_000;
 
@@ -97,6 +98,8 @@ export async function refreshOne(
   const enc = await cipher.encrypt(refreshed.accessToken, c.accountId);
   const now = new Date();
   return withTransaction(env.DATABASE_URL, async (tx) => {
+    // プロフィールの名前を書き換えるので、接続の確定と同じユーザー名のロックに並ぶ（specs/010、PR #12 のCodexレビュー）
+    await lockUsernameForUpdate(tx, c.accountId, profile.username);
     const bumped = await tx
       .update(accounts)
       .set({

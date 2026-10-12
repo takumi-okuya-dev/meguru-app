@@ -82,6 +82,11 @@ export function actionText(item: ActivityItem): string {
       return "投稿のスケジュールを変えました";
     case "threads_checked":
       return "Threadsとの接続を確かめました";
+    case "threads_reconnected":
+      // 接続し直し（specs/010 FR-035）。方法を添える
+      return item.details?.method === "token"
+        ? "Threadsとの接続し直しをしました（自分のMetaアプリのトークン）"
+        : "Threadsとの接続し直しをしました（このアプリで許可）";
     case "ng_word_added":
       return `NGワードを${n}語追加しました`;
     case "ng_word_deleted":

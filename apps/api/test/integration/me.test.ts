@@ -41,6 +41,14 @@ describe("GET /api/me", () => {
     expect(me.accountLimit).toEqual({ max: 1, used: 1 });
   });
 
+  it("Accountの要約に接続の方法を出す。このアプリで接続したAccountは app、補いは NULL（specs/010）", async () => {
+    await connectNew(app, "u1", "1001");
+    const me = (await (await call(app, "GET", "/api/me", { user: "u1" })).json()) as {
+      accounts: { connectionMethod: string; reconnectHint: string | null }[];
+    };
+    expect(me.accounts[0]).toMatchObject({ connectionMethod: "app", reconnectHint: null });
+  });
+
   it("ブラウザのキャッシュに残さない（Cache-Control: no-store）", async () => {
     const res = await call(app, "GET", "/api/me", { user: "u1" });
     expect(res.headers.get("Cache-Control")).toBe("no-store");

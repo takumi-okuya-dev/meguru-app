@@ -14,7 +14,8 @@
     "typecheck": "pnpm -r typecheck",
     "lint": "eslint .",
     "e2e": "pnpm --filter e2e test",
-    "team:open": "pnpm --filter e2e exec tsx scripts/team-open.ts"
+    "team:open": "pnpm --filter e2e exec tsx scripts/team-open.ts",
+    "team:demo": "docker compose up -d --wait && concurrently -k -s first -n servers,team -c gray,cyan \"pnpm dev:fake\" \"pnpm team:open --setup --wait\""
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

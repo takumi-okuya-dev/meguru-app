@@ -1,7 +1,7 @@
 // Account設定（FR-013・FR-019・FR-020・FR-022、規則9・10）。004で「投稿のルール」の区分を、既存の区分より上に足した。
 // 005で「投稿のスケジュール」の区分を、「投稿のルール」の上に足した
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { normalizeUsername } from "@threads-grower/shared";
+import { SHORT_LIVED_TOKEN_HINT, normalizeUsername, type TokenConnectResponse } from "@threads-grower/shared";
 import { useState } from "react";
 import { useNavigate } from "react-router";
 import { ConnectionBadge } from "@/components/ConnectionBadge";
@@ -24,6 +24,8 @@ import { api, describeError } from "@/lib/api-client";
 import { useCallbackResult } from "@/lib/callback-result";
 import { useCurrentAccount } from "@/pages/account-layout";
 import { TeamSection } from "@/components/team/TeamSection";
+import { ReconnectDialog } from "@/components/connect/ReconnectDialog";
+import { TokenWarnings } from "@/components/connect/TokenWarnings";
 import { useAccountAccess } from "@/lib/use-account-access";
 
 /**
@@ -40,10 +42,9 @@ export function AccountSettings() {
   const [open, setOpen] = useState(false);
   const [confirm, setConfirm] = useState("");
 
-  const reconnect = useMutation({
-    mutationFn: () => api.connect({ mode: "reconnect", accountId: account.id }),
-    onSuccess: ({ authorizeUrl }) => window.location.assign(authorizeUrl),
-  });
+  // 接続し直しは、このアプリで許可かトークンの貼り付けを選ぶダイアログから（specs/010 FR-031）
+  const [reconnectOpen, setReconnectOpen] = useState(false);
+  const [tokenWarnings, setTokenWarnings] = useState<TokenConnectResponse["warnings"]>([]);
 
   const remove = useMutation({
     // 入力した値はそのまま送る（正規化はサーバーでも行う）
@@ -75,7 +76,7 @@ export function AccountSettings() {
           account={account}
           canEdit={can("settings")}
           canReconnect={can("owner")}
-          onReconnect={() => reconnect.mutate()}
+          onReconnect={() => setReconnectOpen(true)}
         />
 
         <PostingRulesSection accountId={account.id} canEdit={can("settings")} />
@@ -84,21 +85,16 @@ export function AccountSettings() {
         <section className="space-y-3">
           <h2 className="font-medium">Threadsとの接続</h2>
           <p className="text-sm text-muted-foreground">
-            同じThreadsアカウント（@{account.username}）で認可し直すと、接続情報を更新できます。
+            今の接続：{account.connectionMethod === "token" ? "自分のMetaアプリのトークン" : "このアプリで許可"}。同じThreadsアカウント（@{account.username}）で接続し直すと、接続情報を更新できます。
           </p>
-          {reconnect.isError && (
-            <Alert variant="destructive">
-              <AlertDescription className="text-foreground">
-                {describeError(reconnect.error)}
-              </AlertDescription>
+          {needsReconnect && account.reconnectHint === "short_lived_token" && (
+            <Alert variant="warning">
+              <AlertDescription className="text-foreground">{SHORT_LIVED_TOKEN_HINT}</AlertDescription>
             </Alert>
           )}
-          <Button
-            variant={needsReconnect ? "default" : "outline"}
-            disabled={reconnect.isPending}
-            onClick={() => reconnect.mutate()}
-          >
-            {needsReconnect ? "再接続" : "Threadsとの接続を認可し直す"}
+          <TokenWarnings warnings={tokenWarnings.map((w) => (w === "no_publish_permission" ? "publish" : "insights"))} />
+          <Button variant={needsReconnect ? "default" : "outline"} onClick={() => setReconnectOpen(true)}>
+            {needsReconnect ? "再接続" : "接続し直す"}
           </Button>
         </section>
         )}
@@ -129,6 +125,9 @@ export function AccountSettings() {
                 <DialogTitle>Accountを削除しますか？</DialogTitle>
                 <DialogDescription>
                   この操作は取り消せません。確認のため、@{account.username} と入力してください。
+                  {account.connectionMethod === "token" && (
+                    <span className="mt-1 block">Metaアプリ側のトークンは、必要なら自分で取り消してください。</span>
+                  )}
                 </DialogDescription>
               </DialogHeader>
               <Input
@@ -155,6 +154,13 @@ export function AccountSettings() {
         </section>
         )}
       </PageBody>
+      {reconnectOpen && (
+        <ReconnectDialog
+          account={account}
+          onClose={() => setReconnectOpen(false)}
+          onTokenSuccess={(result) => setTokenWarnings(result.warnings)}
+        />
+      )}
     </>
   );
 }

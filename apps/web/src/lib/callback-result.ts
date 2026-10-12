@@ -29,6 +29,8 @@ export function useCallbackResult(opts: { username?: string; max?: number } = {}
     const next = new URLSearchParams(params);
     next.delete("connected");
     next.delete("error");
+    // トークンでの追加の権限の案内（specs/010）は、TokenWarnings が最初の表示で読み終えている
+    next.delete("warn");
     setParams(next, { replace: true });
   }, [connected, error, opts, params, setParams]);
 

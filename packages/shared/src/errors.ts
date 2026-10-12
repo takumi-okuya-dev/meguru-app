@@ -34,6 +34,12 @@ export const ERROR_CODES = [
   "TEAM_EDITOR_LIMIT",
   "ASSIGNMENT_NOT_ALLOWED",
   "TEAM_NOT_FOUND",
+  // 自分のMetaアプリのトークンでの接続（specs/010-token-account-add contracts/api.md）
+  "TOKEN_INVALID",
+  "TOKEN_SHORT_LIVED",
+  "TOKEN_CHECK_LOCKED",
+  "ACCOUNT_ALREADY_REGISTERED",
+  "THREADS_UNAVAILABLE",
   "CONFIG_ERROR",
   "API_UNREACHABLE",
   "INTERNAL_ERROR",
@@ -61,6 +67,10 @@ export type ErrorMessageContext = {
   details?: string[];
   /** API_UNREACHABLE で使う、接続しようとしたAPIのURL */
   apiUrl?: string;
+  /** TOKEN_CHECK_LOCKED で使う、待ちの残り（分） */
+  minutes?: number;
+  /** RECONNECT_ACCOUNT_MISMATCH で、トークンを貼り付けたときは "token"（文言を変える。specs/010） */
+  method?: "app" | "token";
 };
 
 /** エラーのときに利用者が次に取れる操作。 */
@@ -119,6 +129,12 @@ export function errorMessage(code: ErrorCode, ctx: ErrorMessageContext = {}): Er
     case "THREADS_ACCOUNT_TAKEN":
       return { message: "このThreadsアカウントは別のユーザーが登録済みです。", action: "retry-connect" };
     case "RECONNECT_ACCOUNT_MISMATCH":
+      if (ctx.method === "token") {
+        return {
+          message: `別のThreadsアカウントのトークンです。@${ctx.username ?? ""}のトークンを貼り付けてください。`,
+          action: "retype",
+        };
+      }
       return {
         message: `再接続には、元の@${ctx.username ?? ""}で認可してください。別のアカウントで認可されました。`,
         action: "retry-connect",
@@ -192,6 +208,26 @@ export function errorMessage(code: ErrorCode, ctx: ErrorMessageContext = {}): Er
       return { message: "このアカウントは担当にできません。", action: "reload" };
     case "TEAM_NOT_FOUND":
       return { message: "チームが見つかりません。", action: "back-to-accounts" };
+    case "TOKEN_INVALID":
+      return { message: "トークンを確かめられませんでした。トークンを作り直して貼り付けてください。", action: "retype" };
+    case "TOKEN_SHORT_LIVED":
+      return {
+        message: "短期のトークンのようです。ユーザートークン生成ツールで作った長期トークンを貼り付けてください。",
+        action: "retype",
+      };
+    case "TOKEN_CHECK_LOCKED":
+      return {
+        message: `しばらく待ってから、もう一度お試しください（あと${Math.max(1, ctx.minutes ?? 1)}分）。`,
+        action: "retry-later",
+      };
+    case "ACCOUNT_ALREADY_REGISTERED":
+      return {
+        message:
+          "このアカウントはすでに登録されています。接続を更新するときは、そのアカウントの設定の「接続し直す」を使ってください。",
+        action: "none",
+      };
+    case "THREADS_UNAVAILABLE":
+      return { message: "Threadsに接続できませんでした。時間をおいて、もう一度お試しください。", action: "retry-later" };
     case "CONFIG_ERROR":
       return {
         message: `サーバーの設定に誤りがあります${ctx.details?.length ? `（${ctx.details.join("、")}）` : ""}。開発環境では apps/api/.dev.vars を確認し、APIを起動し直してください。`,
@@ -232,6 +268,13 @@ export const TESTER_NOTICE =
 /** 要再接続のAccountの画面の上部に出すバナーの文言（FR-019）。 */
 export const NEEDS_RECONNECT_BANNER =
   "Threadsとの接続が切れています。再接続するまで、このAccountの自動処理は止まります。";
+
+/** トークンで接続したAccountが要再接続になったときの、オーナー向けのバナーの文言（specs/010 FR-041）。 */
+export const NEEDS_RECONNECT_BANNER_TOKEN = "トークンが使えなくなりました。新しいトークンを貼り付けて接続し直してください。";
+
+/** 2時間後の確かめ直しで使えなかったときに添える文（specs/010 FR-012、reconnect_hint = short_lived_token）。 */
+export const SHORT_LIVED_TOKEN_HINT =
+  "短期トークンだった可能性があります。ユーザートークン生成ツールで作った長期トークンを貼り付けてください。";
 
 /** 要再接続のAccountを、パートナー・編集者が開いたときのバナーの文言（specs/008 FR-044）。再接続はオーナーだけができる。 */
 export const NEEDS_RECONNECT_BANNER_HELPER =
