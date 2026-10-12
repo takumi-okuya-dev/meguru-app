@@ -17,7 +17,9 @@ Claude CodeとCodexで開発スキルを共用する手順と、利用制限時�
 - [ ] 本物のGoogle・Threadsでの手動確認（[quickstart.md](specs/001-login-account-setup/quickstart.md)「手動での確認」）
 - [x] UI全体設計（ChatGPT風。[docs/ui-design.md](docs/ui-design.md)）
 - [x] feature 002「戦略プロファイル（課題・宣伝内容・リサーチ）」：仕様・計画・タスク・実装（[specs/002-strategy-profile/](specs/002-strategy-profile/)）
-- [ ] 次のfeature（003：AIプロンプト生成と投稿案の一括登録）
+- [x] feature 003〜009：プロンプト生成と一括登録・承認とNGワード・自動投稿・パフォーマンスと改善・複数アカウント・チーム運用・このアカウントのチーム（[specs/](specs/)）
+- [ ] feature 010「自分のMetaアプリのトークンでアカウントを追加」（[specs/010-token-account-add/](specs/010-token-account-add/)、レビュー中）
+- [ ] 次：チームの見直し → アカウントを先に作る → 決済（仕様の前のメモは[docs/next-features.md](docs/next-features.md)）
 
 ## 構成
 
