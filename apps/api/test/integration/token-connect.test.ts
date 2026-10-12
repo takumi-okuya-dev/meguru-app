@@ -127,6 +127,40 @@ describe("トークンで追加する（US1）", () => {
     expect(await codeOf(huge)).toBe("VALIDATION_FAILED");
   });
 
+  it("長さを名乗らずに流し込まれた大きな本文も、読み込みの途中で止めて VALIDATION_FAILED（PR #12 のCodexレビュー）", async () => {
+    const chunk = new TextEncoder().encode("a".repeat(4096));
+    let sent = 0;
+    const body = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        if (sent >= 64) return controller.close();
+        sent += 1;
+        controller.enqueue(chunk);
+      },
+    });
+    const res = await app.request(
+      "/api/threads/token-connect",
+      // @ts-expect-error duplex は Request の初期化で要る（型に入っていない）
+      { method: "POST", headers: { Authorization: "Bearer test:u1", "Content-Type": "application/json" }, body, duplex: "half" },
+      testEnv,
+    );
+    expect(await codeOf(res)).toBe("VALIDATION_FAILED");
+    // 64回（256KB）すべてを読み込む前に止まる
+    expect(sent).toBeLessThan(64);
+  });
+
+  it("最初のプロフィールの取得で通信が失敗したら THREADS_UNAVAILABLE（503）にし、失敗に数えない（PR #12 のCodexレビュー）", async () => {
+    const { connectWithToken } = await import("../../src/services/token-connect");
+    const { createThreadsClient } = await import("../../src/lib/threads-client");
+    const { AppError } = await import("../../src/lib/errors");
+    await call(app, "GET", "/api/me", { user: "u1" });
+    const id = ((await q()`SELECT id FROM users WHERE clerk_user_id = 'u1'`) as { id: string }[])[0]!.id;
+    const broken = createThreadsClient(testEnv, () => Promise.reject(new TypeError("fetch failed: getaddrinfo ENOTFOUND")));
+    const err = await connectWithToken(testEnv, broken, { id }, { mode: "new", token: "a".repeat(40) }).catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(AppError);
+    expect(err).toMatchObject({ code: "THREADS_UNAVAILABLE", status: 503 });
+    expect((await q()`SELECT count(*)::int AS n FROM token_check_failures`)[0]).toEqual({ n: 0 });
+  });
+
   it("本文がなければ VALIDATION_FAILED、未ログインは 401", async () => {
     const bad = await call(app, "POST", "/api/threads/token-connect", { user: "u1", body: { mode: "new" } });
     expect(await codeOf(bad)).toBe("VALIDATION_FAILED");

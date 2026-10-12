@@ -241,7 +241,14 @@ export function createThreadsClient(env: Env, fetchImpl: typeof fetch = fetch): 
     async getProfile(accessToken) {
       const url = new URL(`${graph}/v1.0/me`);
       url.searchParams.set("fields", "id,username,name,threads_profile_picture_url");
-      const res = await fetchImpl(url, { headers: { Authorization: `Bearer ${accessToken}` } });
+      let res: Response;
+      try {
+        res = await fetchImpl(url, { headers: { Authorization: `Bearer ${accessToken}` }, signal: AbortSignal.timeout(TIMEOUT_MS) });
+      } catch {
+        // DNSの失敗・タイムアウト・接続のリセットは一時的な失敗にする（呼び出し側が503にできるように。PR #12 のCodexレビュー）。
+        // 原因のメッセージにURLなどが入りうるので、使わない
+        throw new ThreadsTransientError("getProfile: network error", 0);
+      }
       const body = await parseOrThrow<{
         id: string | number;
         username?: string;

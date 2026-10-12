@@ -77,17 +77,32 @@ describe("トークンで追加する（US1）", () => {
     expect(input).toHaveAttribute("type", "text");
     expect(input).toHaveAttribute("autocomplete", "off");
     expect(input).toHaveAttribute("data-1p-ignore");
-    expect(input.className).toContain("token-masked");
     expect(screen.getByText(/トークンは暗号化して保存し、画面に二度と表示しません/)).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "利用規約" })).toHaveAttribute("href", "/terms");
     expect(screen.getByRole("button", { name: "追加する" })).toBeInTheDocument();
   });
 
-  it("「表示」で文字を隠すのを外せる", async () => {
+  it("隠している間は欄に「•」だけを出し、「表示」で本当の値が見える（どのブラウザでも隠れる。PR #12 のCodexレビュー）", async () => {
     renderPage();
     const user = await open();
+    const input = screen.getByLabelText("アクセストークン");
+    await user.click(input);
+    await user.paste(TOKEN);
+    expect(input).toHaveValue("•".repeat(TOKEN.length));
     await user.click(screen.getByRole("button", { name: "表示" }));
-    expect(screen.getByLabelText("アクセストークン").className).not.toContain("token-masked");
+    expect(input).toHaveValue(TOKEN);
+    await user.click(screen.getByRole("button", { name: "隠す" }));
+    expect(input).toHaveValue("•".repeat(TOKEN.length));
+  });
+
+  it("隠している間に1文字でも消すと、全部を消す（どこを消したか分からないため）", async () => {
+    renderPage();
+    const user = await open();
+    const input = screen.getByLabelText("アクセストークン");
+    await user.click(input);
+    await user.paste(TOKEN);
+    await user.keyboard("{Backspace}");
+    expect(input).toHaveValue("");
   });
 
   it("形の違う文字列では送らない", async () => {

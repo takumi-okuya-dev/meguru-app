@@ -8,7 +8,21 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ApiError, api, describeError } from "@/lib/api-client";
-import { cn } from "@/lib/utils";
+
+/** 隠している間に欄に出す文字。 */
+const MASK = "•";
+
+/**
+ * 隠している間の入力を、本当の値に反映する。打った文字は最後に足し、消したら全部を消す
+ * （隠している間は、どこを消したか分からないため。貼り直してもらう）。
+ * @param value - 今の本当の値
+ * @param shown - 欄に入った文字（「•」と、打った文字）
+ * @returns 新しい本当の値
+ */
+export function unmask(value: string, shown: string): string {
+  if (shown.length < value.length) return "";
+  return value + shown.replaceAll(MASK, "");
+}
 
 /** 追加の画面と同じ、トークンの作り方の短い手順（contracts/ui-routes.md）。 */
 export const TOKEN_STEPS = [
@@ -116,20 +130,28 @@ export function TokenConnectForm(props: Props) {
           アクセストークン
         </label>
         <div className="flex gap-2">
-          {/* パスワード欄にしない：ブラウザやパスワード管理ツールにトークンを保存させないため（FR-003、research.md R10） */}
+          {/* パスワード欄にしない：ブラウザやパスワード管理ツールにトークンを保存させないため（FR-003、research.md R10）。
+              隠している間は、欄に「•」だけを出し、本当の値はこの部品の状態だけで持つ（-webkit-text-security は
+              Firefox で効かないため。PR #12 のCodexレビュー） */}
           <Input
             id={inputId}
             type="text"
             name="threads-access-token"
-            value={value}
-            onChange={(e) => setValue(e.target.value)}
+            value={visible ? value : MASK.repeat(value.length)}
+            onChange={(e) => setValue(visible ? e.target.value : unmask(value, e.target.value))}
+            onPaste={(e) => {
+              if (visible) return;
+              // 隠している間の貼り付けは、欄の中身を貼った文字列で置き換える（ふつうは1回で全部を貼る）
+              e.preventDefault();
+              setValue(e.clipboardData.getData("text"));
+            }}
             autoComplete="off"
             autoCorrect="off"
             autoCapitalize="off"
             spellCheck={false}
             data-1p-ignore=""
             data-lpignore="true"
-            className={cn("font-mono", !visible && "token-masked")}
+            className="font-mono"
           />
           <Button type="button" variant="outline" onClick={() => setVisible((v) => !v)}>
             {visible ? "隠す" : "表示"}

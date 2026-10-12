@@ -1,6 +1,7 @@
 // POST /api/threads/connect と GET /api/threads/callback（contracts/api.md、research.md R3・R4・R8）
 import { connectRequestSchema, tokenConnectRequestSchema, type ErrorCode } from "@threads-grower/shared";
 import { Hono, type MiddlewareHandler } from "hono";
+import { bodyLimit } from "hono/body-limit";
 import type { AppEnv } from "../app";
 import { createDb } from "../db/client";
 import { AppError } from "../lib/errors";
@@ -48,17 +49,25 @@ export function threadsConnectRoutes(authed: MiddlewareHandler<AppEnv>) {
       );
       return c.json({ authorizeUrl });
     })
-    .post("/threads/token-connect", authed, async (c) => {
-      // 自分のMetaアプリのトークンでの追加・接続し直し（specs/010 contracts/api.md）。本文はログに出さない
-      const raw = await c.req.text();
-      if (new TextEncoder().encode(raw).length > TOKEN_BODY_MAX_BYTES) {
-        throw new AppError("VALIDATION_FAILED", 400, "token request too large");
-      }
-      const parsed = tokenConnectRequestSchema.safeParse(parseJson(raw));
-      if (!parsed.success) throw new AppError("VALIDATION_FAILED", 400, "invalid token connect request");
-      const result = await connectWithToken(c.env, createThreadsClient(c.env), c.get("user"), parsed.data);
-      return c.json(result);
-    })
+    .post(
+      "/threads/token-connect",
+      authed,
+      // 本文を読み込む途中で上限を当て、超えたらそこで止める（読み終えてから測らない。PR #12 のCodexレビュー）
+      bodyLimit({
+        maxSize: TOKEN_BODY_MAX_BYTES,
+        onError: () => {
+          throw new AppError("VALIDATION_FAILED", 400, "token request too large");
+        },
+      }),
+      async (c) => {
+        // 自分のMetaアプリのトークンでの追加・接続し直し（specs/010 contracts/api.md）。本文はログに出さない
+        const raw = await c.req.text();
+        const parsed = tokenConnectRequestSchema.safeParse(parseJson(raw));
+        if (!parsed.success) throw new AppError("VALIDATION_FAILED", 400, "invalid token connect request");
+        const result = await connectWithToken(c.env, createThreadsClient(c.env), c.get("user"), parsed.data);
+        return c.json(result);
+      },
+    )
     .get("/threads/callback", async (c) => {
       // ユーザーが認可した直後にリダイレクトされるので、受け取った時刻を認可の時刻とみなす（research.md R7）
       const authorizedAt = new Date();
