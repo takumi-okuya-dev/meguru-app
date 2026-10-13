@@ -183,7 +183,8 @@ describe("記録と保存の一体性（PR #9 のCodexレビュー2回目）", (
       expect(failed.status).toBe(500);
       const saved = (await sql()`SELECT count(*)::int AS n FROM strategy_designs WHERE account_id = ${accountId}`) as { n: number }[];
       expect(saved[0]!.n).toBe(0);
-      const promo = await call(app, "PUT", `/api/accounts/${accountId}/promotion-settings`, { user: "a1", body: { ratioPercent: 30, expectedVersion: 1 } });
+      // 宣伝投稿の割合は設定なので、オーナーが保存する（PR #14 のCodexレビュー）
+      const promo = await call(app, "PUT", `/api/accounts/${accountId}/promotion-settings`, { user: "o1", body: { ratioPercent: 30, expectedVersion: 1 } });
       expect(promo.status).toBe(500);
       const ratio = (await sql()`SELECT promotion_ratio_percent AS r FROM accounts WHERE id = ${accountId}`) as { r: number }[];
       expect(ratio[0]!.r).not.toBe(30);
@@ -219,11 +220,25 @@ describe("記録と保存の一体性（PR #9 のCodexレビュー2回目）", (
 });
 
 describe("宣伝投稿の割合・作る件数の同時の保存（specs/008 FR-007、PR #9 のCodexレビュー3回目）", () => {
+  // どちらも設定なので、担当の人は保存できない（オーナーの別のタブどうしの衝突を確かめる。PR #14 のCodexレビュー）
+  it("担当の人（編集者・管理者）は宣伝投稿の割合・作る件数を保存できない（403）。GETの canEdit も false", async () => {
+    const { accountId } = await createUserWithAccount("o1");
+    await teamFor(accountId);
+    for (const user of ["a1", "e1"]) {
+      const promo = await call(app, "PUT", `/api/accounts/${accountId}/promotion-settings`, { user, body: { ratioPercent: 40, expectedVersion: 1 } });
+      expect(promo.status, user).toBe(403);
+      const prompt = await call(app, "PUT", `/api/accounts/${accountId}/prompt-settings`, { user, body: { postCount: 12, expectedVersion: 1 } });
+      expect(prompt.status, user).toBe(403);
+      const get = await json<{ canEdit: boolean }>(await call(app, "GET", `/api/accounts/${accountId}/promotion-settings`, { user }));
+      expect(get.canEdit, user).toBe(false);
+    }
+  });
+
   it("古い版での宣伝投稿の割合の保存は 409 STALE_UPDATE。最新の値と先に保存した人の名前を返し、黙って上書きしない", async () => {
     const { accountId } = await createUserWithAccount("o1");
     await teamFor(accountId);
     const first = await json<{ ratioPercent: number; version: number }>(
-      await call(app, "PUT", `/api/accounts/${accountId}/promotion-settings`, { user: "a1", body: { ratioPercent: 40, expectedVersion: 1 } }),
+      await call(app, "PUT", `/api/accounts/${accountId}/promotion-settings`, { user: "o1", body: { ratioPercent: 40, expectedVersion: 1 } }),
     );
     expect(first).toMatchObject({ ratioPercent: 40, version: 2 });
     const stale = await call(app, "PUT", `/api/accounts/${accountId}/promotion-settings`, { user: "o1", body: { ratioPercent: 10, expectedVersion: 1 } });
@@ -241,7 +256,7 @@ describe("宣伝投稿の割合・作る件数の同時の保存（specs/008 FR-
   it("古い版での作る件数の保存は 409 STALE_UPDATE。GET /post-drafts は版を返す", async () => {
     const { accountId } = await createUserWithAccount("o1");
     await teamFor(accountId);
-    await json(await call(app, "PUT", `/api/accounts/${accountId}/prompt-settings`, { user: "a1", body: { postCount: 12, expectedVersion: 1 } }));
+    await json(await call(app, "PUT", `/api/accounts/${accountId}/prompt-settings`, { user: "o1", body: { postCount: 12, expectedVersion: 1 } }));
     const stale = await call(app, "PUT", `/api/accounts/${accountId}/prompt-settings`, { user: "o1", body: { postCount: 5, expectedVersion: 1 } });
     expect(stale.status).toBe(409);
     const body = (await stale.json()) as { error: { code: string }; latest: unknown; updatedBy: { name: string } | null };

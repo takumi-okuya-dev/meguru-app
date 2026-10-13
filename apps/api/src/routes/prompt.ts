@@ -46,7 +46,8 @@ export function promptRoutes(authed: MiddlewareHandler<AppEnv>) {
     .put("/accounts/:accountId/prompt-settings", authed, async (c) => {
       const db = createDb(c.env.DATABASE_URL);
       const user = c.get("user");
-      const access = await authorizeAccount(db, user, c.req.param("accountId"), "content");
+      // 作る件数は設定（オーナーだけ。specs/011 contracts/permissions.md、PR #14 のCodexレビュー）
+      const access = await authorizeAccount(db, user, c.req.param("accountId"), "settings");
       const account = access.account;
       requireGrowerAccess(account, access.owner);
       const { postCount, expectedVersion } = await parseBody(putPromptSettingsRequestSchema, c.req.json());

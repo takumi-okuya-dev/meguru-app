@@ -76,14 +76,22 @@ describe("PATCH /api/teams/:teamId/accounts/:accountId（チームに見せる�
     expect((await call(app, "GET", `/api/accounts/${ownerAcc}/post-drafts`, { user: "e1" })).status).toBe(200);
   });
 
-  it("見せてもらっている人には、投稿の一覧にNGワードを返さない（設定は見せない。FR-031）", async () => {
+  it("見せてもらっている人には、投稿の一覧にNGワード・作る件数を返さない（設定は見せない。FR-031）", async () => {
     const { teamId, ownerAcc } = await setup();
     await call(app, "POST", `/api/accounts/${ownerAcc}/ng-words`, { user: "o1", body: { words: ["秘密の言葉"] } });
     expect((await share(teamId, ownerAcc, "o1", true)).status).toBe(204);
     const res = await call(app, "GET", `/api/accounts/${ownerAcc}/post-drafts`, { user: "m1" });
-    const body = (await res.json()) as { ngWords: unknown[]; canGeneratePrompt: boolean };
+    const body = (await res.json()) as {
+      ngWords: unknown[];
+      canGeneratePrompt: boolean;
+      promptPostCount: number | null;
+      promptPostCountVersion: number | null;
+    };
     expect(body.ngWords).toEqual([]);
     expect(body.canGeneratePrompt).toBe(false);
+    // 作る件数も設定なので返さない（PR #14 のCodexレビュー）
+    expect(body.promptPostCount).toBeNull();
+    expect(body.promptPostCountVersion).toBeNull();
     expect(JSON.stringify(body)).not.toContain("秘密の言葉");
   });
 });

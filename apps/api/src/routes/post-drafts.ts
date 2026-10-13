@@ -45,7 +45,7 @@ export function postDraftRoutes(authed: MiddlewareHandler<AppEnv>) {
       const user = c.get("user");
       const access = await authorizeAccount(db, user, c.req.param("accountId"), "read");
       const account = access.account;
-      // 見せてもらっている人には、設定（NGワード）を見せない（specs/011 FR-031、Constitution原則V）
+      // 見せてもらっている人には、設定（NGワード・作る件数）を見せない（specs/011 FR-031、Constitution原則V）
       const viewer = access.relation === "shared_viewer";
       const [drafts, ngWordRows] = await Promise.all([
         listAllDrafts(db, account),
@@ -56,8 +56,9 @@ export function postDraftRoutes(authed: MiddlewareHandler<AppEnv>) {
         limits: { needsReview: NEEDS_REVIEW_LIMIT, approved: APPROVED_LIMIT },
         ngWords: ngWordRows.map(toNgWord),
         canGeneratePrompt: !viewer && canEditProfile(account, access.owner),
-        promptPostCount: account.promptPostCount,
-        promptPostCountVersion: account.promptPostCountVersion,
+        // 作る件数も設定なので、見せてもらっている人には返さない（PR #14 のCodexレビュー）
+        promptPostCount: viewer ? null : account.promptPostCount,
+        promptPostCountVersion: viewer ? null : account.promptPostCountVersion,
         // 作った人・直した人の名前（チームがあるAccountだけ出す。specs/008 FR-053）
         people: access.hasTeam ? await peopleOf(db, [drafts.needsReview, drafts.approved, drafts.rejected, drafts.publishFailed].flat()) : {},
       });

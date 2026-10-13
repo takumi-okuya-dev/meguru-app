@@ -4,6 +4,7 @@
 // 承認・却下・要確認に戻すも、トーストの「元に戻す」で取り消せる（004 FR-008）。
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
+  PROMPT_COUNT_DEFAULT,
   SIMILARITY_THRESHOLD,
   checkPublishable,
   type PostDraft,
@@ -380,8 +381,9 @@ function StockPageContent() {
           <PromptCard
             accountId={account.id}
             canGeneratePrompt={data.canGeneratePrompt}
-            promptPostCount={data.promptPostCount}
-            promptPostCountVersion={data.promptPostCountVersion}
+            promptPostCount={data.promptPostCount ?? PROMPT_COUNT_DEFAULT}
+            promptPostCountVersion={data.promptPostCountVersion ?? 1}
+            canSaveCount={can("settings")}
             startKey={startKey}
             onLocked={() => setPromptLocked(true)}
           />

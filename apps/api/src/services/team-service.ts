@@ -570,9 +570,15 @@ async function detachMember(tx: TxDb, teamId: string, userId: string, actor: Tea
  * @param tx - トランザクション
  * @param teamAccess - authorizeTeamAdmin の結果（鍵をかけてある）
  * @param newAdminUserId - 新しい管理者（チームの人）
- * @throws AppError TEAM_NOT_FOUND（チームの人でない）、VALIDATION_FAILED（自分）
+ * @param opts - leaving：引き継いだ後にそのまま抜ける（編集者の上限を数えない）
+ * @throws AppError TEAM_NOT_FOUND（チームの人でない）、VALIDATION_FAILED（自分）、TEAM_FULL（編集者が上限を超える）
  */
-export async function transferAdmin(tx: TxDb, teamAccess: TeamAccess, newAdminUserId: string) {
+export async function transferAdmin(
+  tx: TxDb,
+  teamAccess: TeamAccess,
+  newAdminUserId: string,
+  opts: { leaving?: boolean } = {},
+) {
   const teamId = teamAccess.team.id;
   const from = teamAccess.member;
   if (newAdminUserId === from.id) throw new AppError("VALIDATION_FAILED", 400, "already admin", undefined, ["userId"]);
@@ -582,6 +588,12 @@ export async function transferAdmin(tx: TxDb, teamAccess: TeamAccess, newAdminUs
     .from(memberships)
     .where(and(eq(memberships.userId, from.id), eq(memberships.teamId, teamId), eq(memberships.role, "editor")));
   const fromRole: TeamRole = Number(assigned?.n ?? 0) > 0 ? "editor" : "member";
+  // 前の管理者が編集者になるときも、編集者は10人まで（changeRole と同じ上限。PR #14 のCodexレビュー）。
+  // 引き継いでそのまま抜けるとき（抜ける・最後のアカウントの削除）は、編集者として残らないので数えない
+  if (!opts.leaving && fromRole === "editor") {
+    const after = (await editorCount(tx, teamId)) - (to.role === "editor" ? 1 : 0) + 1;
+    if (after > TEAM_EDITOR_LIMIT) throw new AppError("TEAM_FULL", 409, "editor limit", undefined, ["editors"]);
+  }
   // 部分一意索引（管理者は1人）を守るため、前の管理者を先に変える
   await tx.update(teamMembers).set({ role: fromRole }).where(and(eq(teamMembers.teamId, teamId), eq(teamMembers.userId, from.id)));
   await tx.update(teamMembers).set({ role: "admin" }).where(and(eq(teamMembers.teamId, teamId), eq(teamMembers.userId, to.id)));
@@ -609,7 +621,7 @@ export async function leaveTeam(tx: TxDb, teamAccess: TeamAccess, newAdminUserId
       .where(and(eq(teamMembers.teamId, teamId), ne(teamMembers.userId, teamAccess.member.id)));
     if (Number(others?.n ?? 0) === 0) throw new AppError("TEAM_ADMIN_ALONE", 409, "admin alone");
     if (!newAdminUserId) throw new AppError("TEAM_ADMIN_MUST_TRANSFER", 409, "admin must transfer");
-    await transferAdmin(tx, teamAccess, newAdminUserId);
+    await transferAdmin(tx, teamAccess, newAdminUserId, { leaving: true });
   }
   const [me] = await tx
     .select({ role: teamMembers.role })
@@ -644,6 +656,13 @@ export async function beforeAccountDeleted(tx: TxDb, accountId: string, ownerUse
   const teamId = row.teamId;
   // 抜ける・引き継ぐと同じく、チームの行に鍵をかけてから数える
   await tx.select({ id: teams.id }).from(teams).where(eq(teams.id, teamId)).for("update");
+  // 鍵を待つ間に、このアカウントがチームから外れたかもしれないので読み直す（外れていれば、ほかのアカウントを
+  // 最後の1件と取り違えてオーナーを抜けさせない。PR #14 のCodexレビュー）
+  const [still] = await tx
+    .select({ teamId: teamAccounts.teamId })
+    .from(teamAccounts)
+    .where(and(eq(teamAccounts.teamId, teamId), eq(teamAccounts.accountId, accountId)));
+  if (!still) return;
   if ((await teamAccountIds(tx, teamId, ownerUserId)).length > 1) {
     // ほかにもアカウントがあれば、このアカウントだけが外れる（担当は ON DELETE CASCADE で消える）
     return;
@@ -661,7 +680,7 @@ export async function beforeAccountDeleted(tx: TxDb, accountId: string, ownerUse
       return;
     }
     const [team] = await tx.select().from(teams).where(eq(teams.id, teamId));
-    await transferAdmin(tx, { team: team!, member: { id: me.id, name: me.name, role: "admin" } }, next.userId);
+    await transferAdmin(tx, { team: team!, member: { id: me.id, name: me.name, role: "admin" } }, next.userId, { leaving: true });
   }
   const [now] = await tx
     .select({ role: teamMembers.role })

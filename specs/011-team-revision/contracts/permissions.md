@@ -49,6 +49,13 @@
 
 消すルート：`/api/accounts/:accountId/partner-invite*`、`PATCH・DELETE /api/accounts/:accountId/partner`、`POST /api/accounts/:accountId/partner/joined-notice/dismiss`、`/api/team/*`。
 
+`settings`に上げるPUT（宣伝の割合・作る件数は設定。PR #14 のCodexレビュー）：
+
+| ルート | 008 | 011 |
+|---|---|---|
+| `PUT /api/accounts/:accountId/promotion-settings` | content | settings |
+| `PUT /api/accounts/:accountId/prompt-settings` | content | settings |
+
 ほかのAccountのルートは、008の表の権限のまま（`review`・`settings`はオーナーだけになる）。
 
 ## チームのAPIの判定

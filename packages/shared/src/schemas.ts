@@ -505,10 +505,10 @@ export const postDraftListSchema = z.object({
   ngWords: z.array(ngWordSchema),
   /** そのAccountで、プロンプトの生成（grower機能）を使えるか */
   canGeneratePrompt: z.boolean(),
-  /** 保存済みの作る件数 */
-  promptPostCount: z.number().int(),
-  /** 作る件数の版（保存のときに送る。specs/008 FR-007） */
-  promptPostCountVersion: z.number().int().default(1),
+  /** 保存済みの作る件数。見せてもらっている人にはNULL（設定は見せない。specs/011 FR-031） */
+  promptPostCount: z.number().int().nullable(),
+  /** 作る件数の版（保存のときに送る。specs/008 FR-007）。見せてもらっている人にはNULL */
+  promptPostCountVersion: z.number().int().nullable().default(1),
   /** createdBy・editedBy の users.id から名前へ（チームがあるAccountだけ。specs/008 FR-053） */
   people: z.record(z.string(), z.string()).default({}),
 });

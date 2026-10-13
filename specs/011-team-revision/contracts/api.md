@@ -98,5 +98,5 @@
 |---|---|
 | `GET /api/accounts/:accountId/access` | `read`。応答に`relation`・`team`（`{ id, name, myRole } \| null`）・`assignedNotice`（担当の知らせを出すか）。`role`・`delegation`を消し、`hasTeam`の意味を改める（`hasTeam`＝チームに入っている） |
 | `GET /api/accounts/:accountId/team` | `read`。応答：`{ team: { id, name, admin: { userId, name }, shared } \| null, owner, viewerUserId, assignees: [{ userId, name, role }] }`（009のカードを改める。FR-055。`shared`は設定の「チームに見せる」のスイッチに使う） |
-| 投稿ストック・戦略のGET | `read`（permissions.mdの表）。見せてもらっている人には、`GET /post-drafts`の`ngWords`を空、`canGeneratePrompt`をfalseで返す（設定は見せない。FR-031） |
+| 投稿ストック・戦略のGET | `read`（permissions.mdの表）。見せてもらっている人には、`GET /post-drafts`の`ngWords`を空、`canGeneratePrompt`をfalse、`promptPostCount`・`promptPostCountVersion`をNULLで返す（設定は見せない。FR-031） |
 | `POST /api/accounts/:accountId/assigned-notice/dismiss` | `assigned`。担当の知らせを閉じる（R9） |

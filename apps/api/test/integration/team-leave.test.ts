@@ -110,6 +110,28 @@ describe("POST /api/teams/:teamId/admin（抜けずに引き継ぐ）", () => {
   });
 });
 
+describe("引き継ぎと編集者の上限（PR #14 のCodexレビュー）", () => {
+  it("編集者が10人のとき、担当のある管理者がメンバーへ引き継ぐと TEAM_FULL。引き継いで抜けるときは通る", async () => {
+    const { teamId, adminUserId, m1, editorAcc } = await setup();
+    // e1 を入れて編集者は1人。あと9人足して10人にする
+    for (let i = 0; i < 9; i++) {
+      const { accountId } = await createUserWithAccount(`x${i}`);
+      await joinTeam(teamId, `x${i}`, [accountId]);
+      await setRole(teamId, `x${i}`, "editor");
+    }
+    // 管理者は担当を持つ（引き継ぐと編集者になる）
+    expect((await call(app, "PUT", `/api/teams/${teamId}/assignments/${adminUserId}/accounts/${editorAcc}`, { user: "a1" })).status).toBe(204);
+    const res = await call(app, "POST", `/api/teams/${teamId}/admin`, { user: "a1", body: { userId: m1 } });
+    expect([res.status, await errorOf(res)]).toEqual([409, "TEAM_FULL"]);
+    expect(await adminCount(teamId)).toBe(1);
+    expect((await teamMemberRows(teamId)).find((m) => m.user === "a1")!.role).toBe("admin");
+    // 抜けるときは編集者として残らないので通る
+    expect((await call(app, "POST", `/api/teams/${teamId}/leave`, { user: "a1", body: { newAdminUserId: m1 } })).status).toBe(204);
+    const [editors] = (await sql()`SELECT count(*)::int AS n FROM team_members WHERE team_id = ${teamId} AND role = 'editor'`) as { n: number }[];
+    expect(editors!.n).toBe(10);
+  });
+});
+
 describe("DELETE /api/teams/:teamId/members/:userId（外す）", () => {
   it("管理者だけが外せる。自分は外せない。外すとその人のアカウントと担当が外れる", async () => {
     const { teamId, adminUserId, memberAcc, e1 } = await setup();
@@ -152,6 +174,20 @@ describe("アカウントの削除（FR-046）", () => {
     expect((await deleteAccount(accountId, "solo")).status).toBe(204);
     const [row] = (await sql()`SELECT count(*)::int AS n FROM teams WHERE id = ${teamId}`) as { n: number }[];
     expect(row!.n).toBe(0);
+  });
+
+  it("同じアカウントの削除とチームから外すが同時に届いても、残ったアカウントを最後の1件と取り違えない（PR #14 のCodexレビュー）", async () => {
+    for (let round = 0; round < 3; round++) {
+      await resetDb();
+      const { teamId, memberAcc } = await setup();
+      const { accountId: second } = await createUserWithAccount("m1");
+      await call(app, "POST", `/api/teams/${teamId}/accounts`, { user: "m1", body: { accountId: second } });
+      await Promise.all([deleteAccount(memberAcc, "m1"), call(app, "DELETE", `/api/teams/${teamId}/accounts/${memberAcc}`, { user: "m1" })]);
+      // どちらの順で終わっても、m1 は2つ目のアカウントでチームに残る
+      expect((await teamMemberRows(teamId)).map((m) => m.user), `round ${round}`).toContain("m1");
+      const [left] = (await sql()`SELECT count(*)::int AS n FROM team_accounts WHERE account_id = ${second}`) as { n: number }[];
+      expect(left!.n, `round ${round}`).toBe(1);
+    }
   });
 
   it("ほかにもアカウントがあれば、そのアカウントだけが外れ、チームには残る", async () => {

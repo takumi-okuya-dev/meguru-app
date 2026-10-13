@@ -96,13 +96,14 @@ export function promotionRoutes(authed: MiddlewareHandler<AppEnv>) {
       return c.json({
         ratioPercent: account.promotionRatioPercent,
         version: account.promotionRatioVersion,
-        canEdit: canEditProfile(account, access.owner),
+        // 宣伝投稿の割合は設定（オーナーだけ。specs/011 contracts/permissions.md、PR #14 のCodexレビュー）
+        canEdit: canEditProfile(account, access.owner) && access.permissions.has("settings"),
       });
     })
     .put("/accounts/:accountId/promotion-settings", authed, async (c) => {
       const db = createDb(c.env.DATABASE_URL);
       const user = c.get("user");
-      const access = await authorizeAccount(db, user, c.req.param("accountId"), "content");
+      const access = await authorizeAccount(db, user, c.req.param("accountId"), "settings");
       const account = access.account;
       requireGrowerAccess(account, access.owner);
       const { ratioPercent, expectedVersion } = await parseBody(putPromotionSettingsRequestSchema, c.req.json());
