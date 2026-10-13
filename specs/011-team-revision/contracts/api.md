@@ -31,7 +31,7 @@
 
 - 入っているチームを`joined_at`の順に。チームに入っていなければ空（サイドバーに出さない）。
 - `accounts`の`role`は`owner`か`editor`（担当）。担当のアカウントには`ownerName`を付ける（008のまま）。見せてもらっているアカウントは入れない。
-- `GET /api/accounts/:accountId`の`role`は、見せてもらっている人には`viewer`（実装で足した。画面はこれを見て読むだけの画面へ移す）。
+- `GET /api/accounts/:accountId`の`role`は、見せてもらっている人には`viewer`（実装で足した。画面はこれを見て読むだけの画面へ移す）。このとき`plan`・`connectionStatus`・`connectionMethod`・`reconnectHint`・`lastUsedAt`は決まった値（`auto-only`・`connected`・`app`・NULL・NULL）で伏せる（PR #14 のCodexレビュー）。
 
 ## チーム
 

@@ -99,6 +99,26 @@ describe("PATCH /api/teams/:teamId/accounts/:accountId（チームに見せる�
     expect(JSON.stringify(body)).not.toContain("秘密の言葉");
   });
 
+  it("見せてもらっている人の GET /accounts/:id は、名前とアイコンだけが本当の値で、プラン・接続・最後に使った日時は伏せる（PR #14 のCodexレビュー）", async () => {
+    const { teamId, ownerAcc } = await setup();
+    await sql()`UPDATE accounts SET plan = 'team', connection_status = 'needs_reconnect', connection_method = 'token', last_used_at = now() WHERE id = ${ownerAcc}`;
+    expect((await share(teamId, ownerAcc, "o1", true)).status).toBe(204);
+    const viewer = (await (await call(app, "GET", `/api/accounts/${ownerAcc}`, { user: "m1" })).json()) as Record<string, unknown>;
+    expect(viewer).toMatchObject({
+      id: ownerAcc,
+      role: "viewer",
+      ownerName: "o1",
+      plan: "auto-only",
+      connectionStatus: "connected",
+      connectionMethod: "app",
+      reconnectHint: null,
+      lastUsedAt: null,
+    });
+    // オーナーには本当の値
+    const owner = (await (await call(app, "GET", `/api/accounts/${ownerAcc}`, { user: "o1" })).json()) as Record<string, unknown>;
+    expect(owner).toMatchObject({ plan: "team", connectionStatus: "needs_reconnect", connectionMethod: "token" });
+  });
+
   it("見せてもらっている人には、戦略・宣伝内容・参考投稿・キーワードの canEdit が false（読むだけ。PR #14 のCodexレビュー）", async () => {
     const { teamId, ownerAcc } = await setup();
     await sql()`UPDATE accounts SET plan = 'team' WHERE id = ${ownerAcc}`;

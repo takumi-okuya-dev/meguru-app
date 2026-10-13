@@ -14,7 +14,18 @@ import { deleteAccount, openAccount, verifyConnection } from "../services/accoun
  * @returns AccountSummary
  */
 function summaryOf(access: AccountAccess) {
-  return toAccountSummary(access.account, summaryRoleOf(access.relation), access.relation === "owner" ? null : access.owner.name);
+  const summary = toAccountSummary(access.account, summaryRoleOf(access.relation), access.relation === "owner" ? null : access.owner.name);
+  if (access.relation !== "shared_viewer") return summary;
+  // 見せてもらっている人には、表示に使う名前・アイコンだけを渡し、プラン・接続の状態と方法・最後に使った日時は伏せる
+  // （読むだけの画面では使わない。型をそろえるための決まった値で、本当の値ではない。PR #14 のCodexレビュー）
+  return {
+    ...summary,
+    plan: "auto-only" as const,
+    connectionStatus: "connected" as const,
+    connectionMethod: "app" as const,
+    reconnectHint: null,
+    lastUsedAt: null,
+  };
 }
 
 /**

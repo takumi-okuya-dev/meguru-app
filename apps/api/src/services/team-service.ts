@@ -701,13 +701,21 @@ export async function beforeAccountDeleted(tx: TxDb, accountId: string, ownerUse
       .from(teamMembers)
       .where(and(eq(teamMembers.teamId, teamId), ne(teamMembers.userId, ownerUserId)))
       .orderBy(asc(teamMembers.joinedAt), asc(teamMembers.userId));
-    let next: { userId: string } | undefined;
-    for (const o of others) {
-      if (await canAdminMore(tx, o.userId)) {
-        next = o;
-        break;
-      }
-    }
+    // 候補のロックは、いつもユーザーIDの順に先にまとめて取る（別のチームの削除と、逆の順で待ち合わないように。
+    // PR #14 のCodexレビュー）。取った後に、管理者のチームの数をまとめて数え、在籍の順で選ぶ
+    for (const id of others.map((o) => o.userId).sort()) await lockAdminTeams(tx, id);
+    const counts = new Map(
+      others.length === 0
+        ? []
+        : (
+            await tx
+              .select({ userId: teams.adminUserId, n: count() })
+              .from(teams)
+              .where(inArray(teams.adminUserId, others.map((o) => o.userId)))
+              .groupBy(teams.adminUserId)
+          ).map((r) => [r.userId, Number(r.n)]),
+    );
+    const next = others.find((o) => (counts.get(o.userId) ?? 0) < TEAMS_PER_ADMIN);
     // 引き継げる人がいなければ、チームを消す（管理者のいないチームを残さない）
     if (!next) {
       await tx.delete(teams).where(eq(teams.id, teamId));
