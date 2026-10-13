@@ -27,7 +27,8 @@ const FILTERS: { key: StockFilter; label: string }[] = [
  * @param err - エラー
  * @returns 開けないなら true
  */
-const isLost = (err: unknown) => err instanceof ApiError && (err.code === "ACCOUNT_NOT_FOUND" || err.code === "ROLE_FORBIDDEN");
+const isLost = (err: unknown) =>
+  err instanceof ApiError && (err.code === "ACCOUNT_NOT_FOUND" || err.code === "ROLE_FORBIDDEN");
 
 /** 見られなくなったときの文言（specs/008 FR-046 と同じ考え方）。 */
 const LOST_MESSAGE = "このアカウントを見られなくなりました";
@@ -44,13 +45,35 @@ function useReportLost(error: unknown, onLost: () => void) {
 }
 
 /**
+ * 一部の読み込みに失敗したときの案内（「まだありません」と取り違えないよう、失敗と再読み込みを出す。PR #14 のCodexレビュー）。
+ * @param props - onRetry：読み込み直す
+ * @returns 案内
+ */
+function LoadFailed({ onRetry }: { onRetry: () => void }) {
+  return (
+    <p
+      role="alert"
+      className="flex flex-wrap items-center gap-2 rounded-2xl border px-4 py-3 text-sm"
+    >
+      <span className="flex-1">読み込めませんでした。</span>
+      <Button variant="outline" size="sm" className="rounded-full" onClick={onRetry}>
+        再読み込み
+      </Button>
+    </p>
+  );
+}
+
+/**
  * 投稿ストックのタブ。
  * @param props - accountId：アカウント、onLost：見られなくなった
  * @returns タブの中身
  */
 function StockTab({ accountId, onLost }: { accountId: string; onLost: () => void }) {
   const [filter, setFilter] = useState<StockFilter>("approved");
-  const drafts = useQuery({ queryKey: queryKeys.postDrafts(accountId), queryFn: () => api.listPostDrafts(accountId) });
+  const drafts = useQuery({
+    queryKey: queryKeys.postDrafts(accountId),
+    queryFn: () => api.listPostDrafts(accountId),
+  });
   const published = useQuery({
     queryKey: queryKeys.published(accountId),
     queryFn: () => api.listPublished(accountId),
@@ -58,15 +81,20 @@ function StockTab({ accountId, onLost }: { accountId: string; onLost: () => void
   });
   useReportLost(drafts.error ?? published.error, onLost);
   if (drafts.isPending) return <LoadingSkeleton />;
-  if (drafts.isError) return isLost(drafts.error) ? null : <ApiErrorScreen error={drafts.error} onRetry={() => void drafts.refetch()} />;
+  if (drafts.isError)
+    return isLost(drafts.error) ? null : (
+      <ApiErrorScreen error={drafts.error} onRetry={() => void drafts.refetch()} />
+    );
   const items: { id: string; body: string; note: string }[] =
     filter === "published"
       ? (published.data?.items ?? []).map((p) => ({ id: p.id, body: p.body, note: "投稿済み" }))
-      : (filter === "approved" ? drafts.data.approved : drafts.data.needsReview).map((d: PostDraft, i) => ({
-          id: d.id,
-          body: d.body,
-          note: filter === "approved" ? `承認済み · 次の投稿の順 ${i + 1}番目` : "要確認",
-        }));
+      : (filter === "approved" ? drafts.data.approved : drafts.data.needsReview).map(
+          (d: PostDraft, i) => ({
+            id: d.id,
+            body: d.body,
+            note: filter === "approved" ? `承認済み · 次の投稿の順 ${i + 1}番目` : "要確認",
+          }),
+        );
   return (
     <section aria-label="投稿の案" className="space-y-3">
       <div role="group" aria-label="状態で絞る" className="flex flex-wrap gap-2">
@@ -87,6 +115,10 @@ function StockTab({ accountId, onLost }: { accountId: string; onLost: () => void
       </div>
       {filter === "published" && published.isPending ? (
         <LoadingSkeleton />
+      ) : filter === "published" && published.isError ? (
+        isLost(published.error) ? null : (
+          <LoadFailed onRetry={() => void published.refetch()} />
+        )
       ) : items.length === 0 ? (
         <p className="text-sm text-muted-foreground">この状態の投稿はありません。</p>
       ) : (
@@ -112,14 +144,32 @@ function StockTab({ accountId, onLost }: { accountId: string; onLost: () => void
  * @returns タブの中身
  */
 function StrategyTab({ accountId, onLost }: { accountId: string; onLost: () => void }) {
-  const strategy = useQuery({ queryKey: queryKeys.strategy(accountId), queryFn: () => api.getStrategy(accountId) });
-  const promotions = useQuery({ queryKey: queryKeys.promotions(accountId), queryFn: () => api.listPromotions(accountId) });
-  const references = useQuery({ queryKey: queryKeys.referencePosts(accountId), queryFn: () => api.listReferencePosts(accountId) });
-  const keywords = useQuery({ queryKey: queryKeys.researchKeywords(accountId), queryFn: () => api.listResearchKeywords(accountId) });
+  const strategy = useQuery({
+    queryKey: queryKeys.strategy(accountId),
+    queryFn: () => api.getStrategy(accountId),
+  });
+  const promotions = useQuery({
+    queryKey: queryKeys.promotions(accountId),
+    queryFn: () => api.listPromotions(accountId),
+  });
+  const references = useQuery({
+    queryKey: queryKeys.referencePosts(accountId),
+    queryFn: () => api.listReferencePosts(accountId),
+  });
+  const keywords = useQuery({
+    queryKey: queryKeys.researchKeywords(accountId),
+    queryFn: () => api.listResearchKeywords(accountId),
+  });
   useReportLost(strategy.error ?? promotions.error ?? references.error ?? keywords.error, onLost);
   if (strategy.isPending) return <LoadingSkeleton />;
-  if (strategy.isError) return isLost(strategy.error) ? null : <ApiErrorScreen error={strategy.error} onRetry={() => void strategy.refetch()} />;
-  const filled = STRATEGY_FIELDS.filter((f) => f.kind === "text" && String(strategy.data[f.key as keyof typeof strategy.data] ?? "").trim());
+  if (strategy.isError)
+    return isLost(strategy.error) ? null : (
+      <ApiErrorScreen error={strategy.error} onRetry={() => void strategy.refetch()} />
+    );
+  const filled = STRATEGY_FIELDS.filter(
+    (f) =>
+      f.kind === "text" && String(strategy.data[f.key as keyof typeof strategy.data] ?? "").trim(),
+  );
   return (
     <div className="space-y-6">
       <section aria-labelledby="s-strategy" className="space-y-2.5">
@@ -133,7 +183,9 @@ function StrategyTab({ accountId, onLost }: { accountId: string; onLost: () => v
             {filled.map((f) => (
               <div key={f.key} className="space-y-1 px-4 py-3">
                 <dt className="text-xs text-muted-foreground">{f.label}</dt>
-                <dd className="text-sm whitespace-pre-wrap">{String(strategy.data[f.key as keyof typeof strategy.data])}</dd>
+                <dd className="text-sm whitespace-pre-wrap">
+                  {String(strategy.data[f.key as keyof typeof strategy.data])}
+                </dd>
               </div>
             ))}
           </dl>
@@ -143,7 +195,13 @@ function StrategyTab({ accountId, onLost }: { accountId: string; onLost: () => v
         <h2 id="s-promotions" className="font-medium">
           宣伝内容
         </h2>
-        {(promotions.data?.items ?? []).length === 0 ? (
+        {promotions.isError ? (
+          isLost(promotions.error) ? null : (
+            <LoadFailed onRetry={() => void promotions.refetch()} />
+          )
+        ) : promotions.isPending ? (
+          <LoadingSkeleton />
+        ) : promotions.data.items.length === 0 ? (
           <p className="text-sm text-muted-foreground">まだありません。</p>
         ) : (
           <ul className="space-y-2">
@@ -160,26 +218,43 @@ function StrategyTab({ accountId, onLost }: { accountId: string; onLost: () => v
         <h2 id="s-research" className="font-medium">
           リサーチ
         </h2>
-        {(keywords.data?.items ?? []).length > 0 && (
-          <div className="flex flex-wrap gap-2">
-            {keywords.data!.items.map((k) => (
-              <span key={k.id} className="rounded-full bg-muted px-3 py-1 text-[13px]">
-                {k.keyword}
-              </span>
-            ))}
-          </div>
-        )}
-        {(references.data?.items ?? []).length === 0 && (keywords.data?.items ?? []).length === 0 ? (
-          <p className="text-sm text-muted-foreground">まだありません。</p>
+        {(keywords.isError && !isLost(keywords.error)) ||
+        (references.isError && !isLost(references.error)) ? (
+          <LoadFailed
+            onRetry={() => {
+              void keywords.refetch();
+              void references.refetch();
+            }}
+          />
+        ) : keywords.isPending || references.isPending ? (
+          <LoadingSkeleton />
         ) : (
-          <ul className="space-y-2">
-            {(references.data?.items ?? []).map((r) => (
-              <li key={r.id} className="space-y-1 rounded-2xl border p-4">
-                <p className="text-sm whitespace-pre-wrap">{r.body}</p>
-                {r.whyGood && <p className="text-xs text-muted-foreground">良いところ：{r.whyGood}</p>}
-              </li>
-            ))}
-          </ul>
+          <>
+            {(keywords.data?.items ?? []).length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                {keywords.data!.items.map((k) => (
+                  <span key={k.id} className="rounded-full bg-muted px-3 py-1 text-[13px]">
+                    {k.keyword}
+                  </span>
+                ))}
+              </div>
+            )}
+            {(references.data?.items ?? []).length === 0 &&
+            (keywords.data?.items ?? []).length === 0 ? (
+              <p className="text-sm text-muted-foreground">まだありません。</p>
+            ) : (
+              <ul className="space-y-2">
+                {(references.data?.items ?? []).map((r) => (
+                  <li key={r.id} className="space-y-1 rounded-2xl border p-4">
+                    <p className="text-sm whitespace-pre-wrap">{r.body}</p>
+                    {r.whyGood && (
+                      <p className="text-xs text-muted-foreground">良いところ：{r.whyGood}</p>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </>
         )}
         <p className="rounded-2xl bg-muted/60 px-4 py-3 text-[13px] text-foreground/80">
           参考にしたい投稿があれば、自分のアカウントの「リサーチ」に手で書き写してください（ほかのアカウントの内容を自動で取り込むことはしません）。
@@ -198,13 +273,21 @@ export function TeamSharedAccountPage() {
   const [params, setParams] = useSearchParams();
   const tab = params.get("tab") === "strategy" ? "strategy" : "stock";
   const navigate = useNavigate();
-  const access = useQuery({ queryKey: queryKeys.access(accountId), queryFn: () => api.accountAccess(accountId) });
-  const account = useQuery({ queryKey: queryKeys.account(accountId), queryFn: () => api.account(accountId) });
+  const access = useQuery({
+    queryKey: queryKeys.access(accountId),
+    queryFn: () => api.accountAccess(accountId),
+  });
+  const account = useQuery({
+    queryKey: queryKeys.account(accountId),
+    queryFn: () => api.account(accountId),
+  });
   const team = useQuery({ queryKey: queryKeys.team(teamId), queryFn: () => api.getTeam(teamId) });
   const [childLost, setChildLost] = useState(false);
   const onLost = useCallback(() => setChildLost(true), []);
   const lost =
-    childLost || [access.error, account.error].some(isLost) || Boolean(access.data && access.data.team?.id !== teamId);
+    childLost ||
+    [access.error, account.error].some(isLost) ||
+    Boolean(access.data && access.data.team?.id !== teamId);
 
   useEffect(() => {
     if (!lost) return;
@@ -214,16 +297,22 @@ export function TeamSharedAccountPage() {
 
   if (lost) return null;
   if (access.isPending || account.isPending) return <LoadingSkeleton />;
-  if (access.isError) return <ApiErrorScreen error={access.error} onRetry={() => void access.refetch()} />;
-  if (account.isError) return <ApiErrorScreen error={account.error} onRetry={() => void account.refetch()} />;
+  if (access.isError)
+    return <ApiErrorScreen error={access.error} onRetry={() => void access.refetch()} />;
+  if (account.isError)
+    return <ApiErrorScreen error={account.error} onRetry={() => void account.refetch()} />;
   // オーナー・担当の人は、ふつうのAccountの画面で開く
-  if (access.data.relation !== "shared_viewer") return <Navigate to={`/accounts/${accountId}`} replace />;
+  if (access.data.relation !== "shared_viewer")
+    return <Navigate to={`/accounts/${accountId}`} replace />;
   const a = account.data;
   const owner = access.data.owner.name;
 
   return (
     <div className="flex min-h-svh flex-col">
-      <div role="status" className="flex flex-wrap items-center gap-3 border-b bg-muted px-4 py-2.5 text-sm md:px-6">
+      <div
+        role="status"
+        className="flex flex-wrap items-center gap-3 border-b bg-muted px-4 py-2.5 text-sm md:px-6"
+      >
         <EyeIcon aria-hidden="true" className="size-[18px] shrink-0" />
         <span className="min-w-0 flex-1">
           {owner}さんのアカウントを見ています（読むだけ）{team.data ? ` · ${team.data.name}` : ""}
@@ -241,7 +330,10 @@ export function TeamSharedAccountPage() {
           </span>
         </span>
       </header>
-      <nav aria-label="見る内容" className="mx-auto mt-3 flex w-full max-w-3xl gap-1 border-b px-4 md:px-6">
+      <nav
+        aria-label="見る内容"
+        className="mx-auto mt-3 flex w-full max-w-3xl gap-1 border-b px-4 md:px-6"
+      >
         {(
           [
             ["stock", "投稿ストック"],
@@ -252,10 +344,14 @@ export function TeamSharedAccountPage() {
             key={key}
             type="button"
             aria-current={tab === key ? "page" : undefined}
-            onClick={() => setParams(key === "strategy" ? { tab: "strategy" } : {}, { replace: true })}
+            onClick={() =>
+              setParams(key === "strategy" ? { tab: "strategy" } : {}, { replace: true })
+            }
             className={cn(
               "h-10 border-b-2 px-3.5 text-sm",
-              tab === key ? "border-foreground font-semibold" : "border-transparent text-muted-foreground",
+              tab === key
+                ? "border-foreground font-semibold"
+                : "border-transparent text-muted-foreground",
             )}
           >
             {label}
@@ -263,7 +359,11 @@ export function TeamSharedAccountPage() {
         ))}
       </nav>
       <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-5 md:px-6">
-        {tab === "stock" ? <StockTab accountId={accountId} onLost={onLost} /> : <StrategyTab accountId={accountId} onLost={onLost} />}
+        {tab === "stock" ? (
+          <StockTab accountId={accountId} onLost={onLost} />
+        ) : (
+          <StrategyTab accountId={accountId} onLost={onLost} />
+        )}
       </main>
     </div>
   );

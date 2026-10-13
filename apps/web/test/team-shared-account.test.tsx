@@ -122,6 +122,27 @@ describe("見せてもらっているアカウント", () => {
     expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
   });
 
+  it("投稿済みの読み込みに失敗したら、「ありません」と出さずに失敗と再読み込みを出す（PR #14 のCodexレビュー）", async () => {
+    mocks.listPublished.mockRejectedValueOnce(new ApiError("INTERNAL_ERROR", 500)).mockResolvedValue({ items: [], nextCursor: null });
+    const user = userEvent.setup();
+    renderPage();
+    await screen.findByText("朝いちばんの焼き上がりの話");
+    await user.click(screen.getByRole("button", { name: "投稿済み" }));
+    expect(await screen.findByText("読み込めませんでした。")).toBeInTheDocument();
+    expect(screen.queryByText("この状態の投稿はありません。")).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "再読み込み" }));
+    expect(await screen.findByText("この状態の投稿はありません。")).toBeInTheDocument();
+  });
+
+  it("戦略のタブで宣伝内容・リサーチの読み込みに失敗したら、「まだありません」と出さずに失敗を出す（PR #14 のCodexレビュー）", async () => {
+    mocks.listPromotions.mockRejectedValue(new ApiError("INTERNAL_ERROR", 500));
+    mocks.listReferencePosts.mockRejectedValue(new ApiError("INTERNAL_ERROR", 500));
+    renderPage("/teams/team-1/accounts/acc-1?tab=strategy");
+    expect(await screen.findByText("来店してもらう")).toBeInTheDocument();
+    expect(await screen.findAllByText("読み込めませんでした。")).toHaveLength(2);
+    expect(screen.queryByText("まだありません。")).not.toBeInTheDocument();
+  });
+
   it("見られなくなったら「このアカウントを見られなくなりました」と出して、チームの画面へ移す", async () => {
     mocks.listPostDrafts.mockRejectedValue(new ApiError("ACCOUNT_NOT_FOUND", 404));
     renderPage();
