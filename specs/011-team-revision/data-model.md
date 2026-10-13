@@ -17,7 +17,7 @@
 |---|---|---|
 | `id` | `uuid` PK | |
 | `name` | `text` NOT NULL | 1〜50文字（`char_length`の検査） |
-| `admin_user_id` | `uuid` NOT NULL → `users.id`（ON DELETE RESTRICT） | 管理者。`team_members`の`admin`の行と同じ値を同じトランザクションで書く |
+| `admin_user_id` | `uuid` NOT NULL → `users.id`（ON DELETE RESTRICT） | 管理者。`team_members`の`admin`の行と同じ値を同じトランザクションで書く。今のアプリに利用者の削除（退会）はない。退会は011の次のfeatureで作り、退会した人はチームから自動で外れる（管理者なら、FR-046と同じく、いちばん長くいる人へ引き継ぎ、誰もいなければチームを消す）。その処理が`users`の行を消す前に済むので、RESTRICTのままにする |
 | `invite_token_hash` | `text` NOT NULL UNIQUE | 招待リンクの照合（008 R4と同じ仕組み） |
 | `invite_token_ciphertext`・`invite_token_iv`・`invite_key_version` | `bytea`・`bytea`・`smallint` NOT NULL | 表示用の暗号化した写し |
 | `invite_rotated_at` | `timestamptz` NULL | 作り直した日時 |

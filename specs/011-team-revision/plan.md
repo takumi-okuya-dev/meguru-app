@@ -2,7 +2,7 @@
 
 **ブランチ**：`feature/011-team-revision` | **日付**：2026-10-13 | **仕様**：[spec.md](./spec.md) | **画面案**：[011チームの見直し 画面案](https://claude.ai/artifact/G2gCHhu6i1VDxUCQ8pFGp7)（非公開） | **UI全体設計**：[docs/ui-design.md](../../docs/ui-design.md)
 
-**入力**：`specs/011-team-revision/spec.md`の機能仕様（Clarifications 2026-10-12・2026-10-13を含む）、Constitution 4.0.0
+**入力**：`specs/011-team-revision/spec.md`の機能仕様（Clarifications 2026-10-12・2026-10-13を含む）、Constitution 4.0.1
 
 ## 概要（Summary）
 
@@ -50,7 +50,7 @@
 
 ## Constitution Check
 
-*GATE：Phase 0の前に確かめ、Phase 1の後にもう一度確かめた。Constitution 4.0.0。*
+*GATE：Phase 0の前に確かめ、Phase 1の後にもう一度確かめた。Constitution 4.0.1。*
 
 | 原則 | 確かめたこと | 結果 |
 |---|---|---|
@@ -58,7 +58,7 @@
 | II.人間承認ゲート | 承認はいつもオーナーだけ（任せる範囲をなくす）。見せてもらっている人・担当の人には承認の操作がない | 合格 |
 | III.外部LLM前提 | 変更なし | 合格 |
 | IV.契約／ロール分離 | オーナー（アカウントの持ち主）と、チームのロール（`team_members.role`）を別に持つ。チームの人になるには自分のアカウントを1つ以上入れる。ロールは招待リンク（初めはmember）と管理者の切り替えでだけ付く。管理者は1チームに1人（部分一意索引）で、抜ける前に引き継ぐ | 合格 |
-| V.個人運用起点のシンプルさ | チームに入っていなければ、サイドバーのチーム名・チームの区分を出さない（`/api/me`の`teams`が空）。判定は`authorizeAccount`と`authorizeTeam*`に集める。見せてもらっているアカウントは`read`（投稿ストック・戦略のGET）だけ | 合格 |
+| V.個人運用起点のシンプルさ | チームに入っていなければ、サイドバーのチーム名を出さない（`/api/me`の`teams`が空）。「このアカウントの設定」には、4.0.1の例外のチームの区分の1行（「チームに入っていません」と「チームを作る」）だけを出す。判定は`authorizeAccount`と`authorizeTeam*`に集める。見せてもらっているアカウントは`read`（投稿ストック・戦略のGET）だけ | 合格 |
 | VI.改善フィードバック | 変更なし | 合格 |
 | 技術スタック・運用コスト | 新しい依存・有料のサービスを足さない | 合格 |
 | 開発ワークフロー | spec-kitの順。`main`＋`feature/*` | 合格 |
