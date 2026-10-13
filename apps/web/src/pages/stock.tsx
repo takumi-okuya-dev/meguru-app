@@ -152,7 +152,7 @@ function StockPageContent() {
 
   const items = lists[tab];
   // 一覧から消えた下書き（取り消し・他の端末での削除・状態の変更）は、選択からも外す。
-  // 承認の操作ができない人（編集者・任されていないパートナー）は選ばない（まとめての操作は承認・却下のため。specs/008 FR-041）
+  // 承認の操作ができない人（担当の人。承認はオーナーだけ）は選ばない（まとめての操作は承認・却下のため。specs/008 FR-041）
   const selectable = canReview ? items.filter((d) => d.status !== "publishing") : [];
   const selected = selectable.filter((d) => picked.has(d.id));
   const atLimit = data ? lists.needs_review.length >= data.limits.needsReview : false;

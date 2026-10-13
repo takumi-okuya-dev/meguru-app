@@ -28,3 +28,34 @@ describe("トークンでの接続のエラー文言", () => {
     expect(errorMessage("RECONNECT_ACCOUNT_MISMATCH", { username: "cafe_b" }).message).toContain("認可してください");
   });
 });
+
+describe("チームの見直しのエラー文言（specs/011 contracts/api.md）", () => {
+  it("新しいコードはエラーコードとして扱え、008のコードは消えている", () => {
+    for (const code of [
+      "TEAM_LIMIT_REACHED",
+      "TEAM_FULL",
+      "TEAM_NEEDS_ACCOUNT",
+      "ACCOUNT_IN_OTHER_TEAM",
+      "TEAM_LAST_ACCOUNT",
+      "TEAM_ADMIN_MUST_TRANSFER",
+      "TEAM_ADMIN_ALONE",
+    ]) {
+      expect(isErrorCode(code)).toBe(true);
+    }
+    for (const code of ["PARTNER_ALREADY_EXISTS", "INVITE_SELF", "TEAM_EDITOR_LIMIT"]) {
+      expect(isErrorCode(code)).toBe(false);
+    }
+  });
+
+  it("文言", () => {
+    expect(errorMessage("TEAM_LIMIT_REACHED").message).toBe("管理者として作れるチームは20までです。");
+    expect(errorMessage("TEAM_FULL").message).toContain("上限（50人）");
+    expect(errorMessage("TEAM_FULL", { details: ["editors"] }).message).toBe("編集者が上限（10人）に達しています。");
+    expect(errorMessage("TEAM_NEEDS_ACCOUNT").message).toContain("1つ以上選んでください");
+    expect(errorMessage("ACCOUNT_IN_OTHER_TEAM").message).toContain("ほかのチームに入っています");
+    expect(errorMessage("TEAM_LAST_ACCOUNT").message).toContain("「チームを抜ける」");
+    expect(errorMessage("TEAM_ADMIN_MUST_TRANSFER").message).toContain("管理者を引き継ぐ人を選んでください");
+    expect(errorMessage("TEAM_ADMIN_ALONE").message).toContain("チームを削除してください");
+    expect(errorMessage("INVITE_INVALID").message).toContain("このリンクは使えません");
+  });
+});

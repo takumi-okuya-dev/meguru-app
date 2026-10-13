@@ -2,7 +2,7 @@ import { and, eq } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
 import { accounts, memberships } from "../../src/db/schema";
 import { call, connectNew, createUserWithAccount, db, fake, makeApp, resetDb } from "../helpers/app";
-import { ensureTeam, makeEditor, makePartner } from "../helpers/team";
+import { makeTeam, putInTeam } from "../helpers/team";
 
 const app = makeApp();
 const endpoint = "/api/me/needs-review-counts";
@@ -56,7 +56,8 @@ describe("GET /api/me/needs-review-counts", () => {
     await addDrafts(second, 2);
     await addDrafts(memberOnly, 1);
     // 旧プラン4の member（使わない役割）は数えない。owner 以外の行にはチームが要る（specs/008 data-model.md）
-    const { teamId: legacyTeam } = await ensureTeam("legacy");
+    const { accountId: legacyAcc } = await createUserWithAccount("legacy");
+    const { teamId: legacyTeam } = await makeTeam("legacy", [legacyAcc]);
     await db()
       .update(memberships)
       .set({ role: "member", teamId: legacyTeam })
@@ -124,13 +125,12 @@ describe("GET /api/me/needs-review-counts", () => {
   });
 });
 
-// ---- チーム運用：手伝っているAccountも数える（specs/008 /speckit-analyze O1）----
-describe("GET /api/me/needs-review-counts（チーム運用）", () => {
-  it("パートナー・担当の編集者には手伝っているAccountの件数も返り、関係のないAccountは返らない", async () => {
+// ---- チーム：担当のアカウントの件数も数える（specs/008 /speckit-analyze O1、specs/011 T008）----
+describe("GET /api/me/needs-review-counts（チーム）", () => {
+  it("担当の編集者には担当のアカウントの件数も返り、見せてもらっている・関係のないアカウントは返らない", async () => {
     const { accountId: helped } = await createUserWithAccount("o1");
     const { accountId: unrelated } = await createUserWithAccount("o2");
-    const { teamId } = await makePartner(helped, "p1");
-    await makeEditor(teamId, "e1", [helped]);
+    await putInTeam(helped, "o1", { editor: "e1", shared: true });
     for (const accountId of [helped, unrelated]) {
       const owner = accountId === helped ? "o1" : "o2";
       const res = await call(app, "POST", `/api/accounts/${accountId}/draft-batches`, {
@@ -139,11 +139,13 @@ describe("GET /api/me/needs-review-counts（チーム運用）", () => {
       });
       expect(res.status).toBe(201);
     }
-    for (const user of ["p1", "e1"]) {
-      const body = (await (await call(app, "GET", endpoint, { user })).json()) as {
-        counts: { accountId: string; needsReview: number }[];
-      };
-      expect(body.counts).toEqual([{ accountId: helped, needsReview: 2 }]);
-    }
+    const body = (await (await call(app, "GET", endpoint, { user: "e1" })).json()) as {
+      counts: { accountId: string; needsReview: number }[];
+    };
+    expect(body.counts.filter((c) => c.accountId === helped)).toEqual([{ accountId: helped, needsReview: 2 }]);
+    expect(body.counts.map((c) => c.accountId)).not.toContain(unrelated);
+    // 管理者（a1）は見せてもらっているだけなので、o1 のアカウントは返らない
+    const admin = (await (await call(app, "GET", endpoint, { user: "a1" })).json()) as { counts: { accountId: string }[] };
+    expect(admin.counts.map((c) => c.accountId)).not.toContain(helped);
   });
 });

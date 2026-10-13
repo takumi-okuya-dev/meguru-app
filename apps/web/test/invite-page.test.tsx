@@ -1,4 +1,4 @@
-// 招待の確認画面（specs/008-team-operations contracts/ui-routes.md「招待の確認」、research.md R7）
+// 招待の確認画面（specs/011-team-revision contracts/ui-routes.md「招待の確認」、T019、FR-012〜FR-016）
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -23,16 +23,20 @@ vi.mock("@/lib/api-client", async (orig) => {
 const { ApiError } = await import("@/lib/api-client");
 const { InvitePage } = await import("@/pages/invite");
 const { safeNext } = await import("@/pages/sign-in");
+const { isInvitePath } = await import("@/lib/invite-return");
 
-const TOKEN = "p_" + "a".repeat(43);
+const TOKEN = "t_" + "a".repeat(43);
+
+const ACCOUNTS = [
+  { id: "acc-1", displayName: "ベーカリー E", username: "bakery_e", profilePictureUrl: null, inOtherTeam: null },
+  { id: "acc-2", displayName: "ベーカリー E 焼き菓子", username: "bakery_e_sweets", profilePictureUrl: null, inOtherTeam: null },
+  { id: "acc-3", displayName: "整体院 D", username: "seitai_d", profilePictureUrl: null, inOtherTeam: "美容チーム" },
+];
 
 function preview(viewer: Partial<InvitePreview["viewer"]> = {}): InvitePreview {
   return {
-    kind: "partner",
-    account: { displayName: "カフェ B店", username: "cafe_b_tokyo", profilePictureUrl: null },
-    inviterName: "鈴木 花子",
-    team: null,
-    viewer: { status: "anonymous", accountId: null, needsTeamName: false, ...viewer },
+    team: { name: "飲食チーム", adminName: "田中 健", memberCount: 5 },
+    viewer: { status: "anonymous", teamId: null, accounts: [], ...viewer },
   };
 }
 
@@ -41,7 +45,8 @@ function renderAt() {
     [
       { path: "/invite/:token", element: <InvitePage /> },
       { path: "/sign-in", element: <p>ログイン画面</p> },
-      { path: "/accounts/:id", element: <p>Accountのホーム</p> },
+      { path: "/accounts/new", element: <p>アカウント追加</p> },
+      { path: "/teams/:teamId", element: <p>チームの画面</p> },
       { path: "/", element: <p>最初の画面</p> },
     ],
     { initialEntries: [`/invite/${TOKEN}`] },
@@ -57,72 +62,98 @@ function renderAt() {
 beforeEach(() => {
   signedIn = false;
   for (const fn of [previewInvite, acceptInvite, me, signOut]) fn.mockReset();
-  me.mockResolvedValue({ user: { id: "u", email: "tanaka@example.com", displayName: "田中 健" }, accounts: [] });
+  me.mockResolvedValue({ user: { id: "u", email: "yamaguchi@example.com", displayName: "山口 誠" }, accounts: [], teams: [] });
 });
 
-describe("招待の確認画面", () => {
-  it("ログインなしで確認でき、「Googleでログインして参加」でログインへ進む（戻り先つき）", async () => {
+describe("招待の確認", () => {
+  it("ログイン前：チーム名・管理者・人数と「メンバーとして入ります」、「Googleで続ける」でログインへ（戻り先はこのリンク）", async () => {
     previewInvite.mockResolvedValue(preview());
     const user = userEvent.setup();
     const router = renderAt();
-    expect(await screen.findByText("鈴木 花子さんから、運用を手伝うパートナーとして招待されました")).toBeInTheDocument();
-    expect(screen.getByText("カフェ B店")).toBeInTheDocument();
-    expect(screen.getByText("このアカウントの料金は、鈴木 花子さんが払います。")).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "Googleでログインして参加" }));
+    expect(await screen.findByRole("heading", { name: "「飲食チーム」に招待されています" })).toBeInTheDocument();
+    expect(screen.getByText("管理者：田中 健 · 5人")).toBeInTheDocument();
+    expect(screen.getByText("メンバーとして入ります")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Googleで続ける" }));
     expect(router.state.location.pathname).toBe("/sign-in");
-    expect(router.state.location.search).toBe(`?next=${encodeURIComponent(`/invite/${TOKEN}`)}`);
+    expect(new URLSearchParams(router.state.location.search).get("next")).toBe(`/invite/${TOKEN}`);
   });
 
-  it("初めてのパートナーはチーム名を入れて参加し、そのAccountのホームへ移る", async () => {
+  it("needs_account：先にThreadsアカウントを追加するよう案内し、追加の画面へ（戻り先つき）", async () => {
     signedIn = true;
-    previewInvite.mockResolvedValue(preview({ status: "can_join", needsTeamName: true }));
-    acceptInvite.mockResolvedValue({ kind: "partner", accountId: "a1" });
+    previewInvite.mockResolvedValue(preview({ status: "needs_account" }));
+    renderAt();
+    expect(await screen.findByText("先に、自分のThreadsアカウントをつないでください")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Threadsアカウントを追加" })).toHaveAttribute(
+      "href",
+      `/accounts/new?next=${encodeURIComponent(`/invite/${TOKEN}`)}`,
+    );
+  });
+
+  it("ready：アカウントを選ぶまで押せない。選んだアカウントごとに「チームに見せる」（初めはオフ）。ほかのチームのものは選べない", async () => {
+    signedIn = true;
+    previewInvite.mockResolvedValue(preview({ status: "ready", accounts: ACCOUNTS }));
+    acceptInvite.mockResolvedValue({ teamId: "t1" });
     const user = userEvent.setup();
     const router = renderAt();
-    expect(await screen.findByText("田中 健 としてログイン中")).toBeInTheDocument();
-    await user.type(screen.getByLabelText(/チーム名（会社名）/), "A社");
-    await user.click(screen.getByRole("button", { name: "参加する" }));
-    expect(acceptInvite).toHaveBeenCalledWith(TOKEN, "A社");
-    expect(await screen.findByText("Accountのホーム")).toBeInTheDocument();
-    expect(router.state.location.pathname).toBe("/accounts/a1");
+    const join = await screen.findByRole("button", { name: "アカウントを選んでください" });
+    expect(join).toBeDisabled();
+    expect(screen.getByRole("checkbox", { name: "整体院 Dをチームに入れる" })).toBeDisabled();
+    expect(screen.getByText("美容チームに入っています")).toBeInTheDocument();
+    await user.click(screen.getByRole("checkbox", { name: "ベーカリー Eをチームに入れる" }));
+    await user.click(screen.getByRole("checkbox", { name: "ベーカリー E 焼き菓子をチームに入れる" }));
+    const share = screen.getByRole("switch", { name: "ベーカリー Eをチームに見せる" });
+    expect(share).not.toBeChecked();
+    await user.click(share);
+    await user.click(screen.getByRole("button", { name: "2件のアカウントで参加する" }));
+    expect(acceptInvite).toHaveBeenCalledWith(TOKEN, [
+      { id: "acc-1", shared: true },
+      { id: "acc-2", shared: false },
+    ]);
+    expect(await screen.findByText("チームの画面")).toBeInTheDocument();
+    expect(router.state.location.pathname).toBe("/teams/t1");
   });
 
-  it("参加済み・自分のAccountの文言", async () => {
+  it("already_member：「すでにこのチームに入っています」と「チームを開く」", async () => {
     signedIn = true;
-    previewInvite.mockResolvedValue(preview({ status: "already_member", accountId: "a1" }));
+    previewInvite.mockResolvedValue(preview({ status: "already_member", teamId: "t1" }));
     renderAt();
-    expect(await screen.findByText("すでに参加しています。")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "開く" })).toHaveAttribute("href", "/accounts/a1");
+    expect(await screen.findByText("すでにこのチームに入っています。")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "チームを開く" })).toHaveAttribute("href", "/teams/t1");
   });
 
-  it("役割の図を出し、招かれた役割（パートナー）に「あなた」の印を付ける（FR-048）", async () => {
-    previewInvite.mockResolvedValue(preview());
-    renderAt();
-    const figure = await screen.findByRole("figure", { name: "チーム運用の役割の図" });
-    expect(within(figure).getByText("あなた").closest("li")).toHaveTextContent("パートナー");
-  });
-
-  it("自分のアカウントの招待を開いた人（参加できない人）には「あなた」の印を付けない（PR #9 のCodexレビュー）", async () => {
-    signedIn = true;
-    previewInvite.mockResolvedValue(preview({ status: "self" }));
-    renderAt();
-    const figure = await screen.findByRole("figure", { name: "チーム運用の役割の図" });
-    expect(within(figure).queryByText("あなた")).not.toBeInTheDocument();
-  });
-
-  it("使えないリンクは理由と、新しいリンクを頼む案内を出す", async () => {
+  it("無効なリンク（作り直した後の古いリンク・チームの削除の後）：「このリンクは使えません」", async () => {
     previewInvite.mockRejectedValue(new ApiError("INVITE_INVALID", 404));
     renderAt();
     expect(await screen.findByRole("heading", { name: "このリンクは使えません" })).toBeInTheDocument();
-    expect(screen.getByText(/招待した方に、新しいリンクを頼んでください。/)).toBeInTheDocument();
+    expect(screen.getByText(/リンクが作り直されたか、チームが削除されました/)).toBeInTheDocument();
+  });
+
+  it("参加に失敗したら文言を出す（ほかのチームに入った・人数の上限）", async () => {
+    signedIn = true;
+    previewInvite.mockResolvedValue(preview({ status: "ready", accounts: ACCOUNTS }));
+    acceptInvite.mockRejectedValue(new ApiError("TEAM_FULL", 409, ["members"]));
+    const user = userEvent.setup();
+    renderAt();
+    await user.click(await screen.findByRole("checkbox", { name: "ベーカリー Eをチームに入れる" }));
+    await user.click(screen.getByRole("button", { name: "1件のアカウントで参加する" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("上限（50人）");
+  });
+
+  it("ロールの図に、入ったときのロール（メンバー）の「あなた」を付ける", async () => {
+    previewInvite.mockResolvedValue(preview());
+    renderAt();
+    const figure = await screen.findByRole("figure", { name: "チームのロールの図" });
+    const current = within(figure).getAllByRole("listitem").find((li) => li.getAttribute("aria-current") === "true");
+    expect(current).toHaveTextContent("メンバー");
   });
 });
 
-describe("ログイン後の戻り先", () => {
-  it("招待のURLだけを許し、それ以外は /", () => {
+describe("ログインの戻り先（safeNext）", () => {
+  it("チームの招待リンク（t_）だけを許し、ほかは / にする", () => {
     expect(safeNext(`/invite/${TOKEN}`)).toBe(`/invite/${TOKEN}`);
-    expect(safeNext("https://evil.example.com")).toBe("/");
-    expect(safeNext("/accounts/a1")).toBe("/");
-    expect(safeNext(null)).toBe("/");
+    for (const bad of [null, "/accounts/x", "https://evil.example.com", `/invite/p_${"a".repeat(43)}`, `/invite/${TOKEN}/x`]) {
+      expect(safeNext(bad)).toBe("/");
+    }
+    expect(isInvitePath(`/invite/${TOKEN}`)).toBe(true);
   });
 });

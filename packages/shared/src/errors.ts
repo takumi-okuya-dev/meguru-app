@@ -1,5 +1,6 @@
 // エラーコードと、画面に出す日本語の文言（contracts/ui-routes.md「エラー文言」）。
 // APIは code だけを返し、Webがここから文言を引く。
+import { TEAM_EDITOR_LIMIT, TEAM_MEMBER_LIMIT, TEAMS_PER_ADMIN } from "./limits";
 
 /** APIとWebで共有するエラーコードの一覧（contracts/api.md・ui-routes.md）。 */
 export const ERROR_CODES = [
@@ -25,15 +26,19 @@ export const ERROR_CODES = [
   "PASTE_TOO_LARGE",
   "DRAFT_PUBLISHING",
   "THREADS_NOT_READY",
-  // チーム運用（specs/008-team-operations contracts/api.md「新しいエラーコード」）
+  // チーム運用（specs/008-team-operations・specs/011-team-revision contracts/api.md「新しいエラーコード」）
   "ROLE_FORBIDDEN",
   "INVITE_INVALID",
-  "INVITE_SELF",
   "INVITE_ALREADY_MEMBER",
-  "PARTNER_ALREADY_EXISTS",
-  "TEAM_EDITOR_LIMIT",
   "ASSIGNMENT_NOT_ALLOWED",
   "TEAM_NOT_FOUND",
+  "TEAM_LIMIT_REACHED",
+  "TEAM_FULL",
+  "TEAM_NEEDS_ACCOUNT",
+  "ACCOUNT_IN_OTHER_TEAM",
+  "TEAM_LAST_ACCOUNT",
+  "TEAM_ADMIN_MUST_TRANSFER",
+  "TEAM_ADMIN_ALONE",
   // 自分のMetaアプリのトークンでの接続（specs/010-token-account-add contracts/api.md）
   "TOKEN_INVALID",
   "TOKEN_SHORT_LIVED",
@@ -189,25 +194,34 @@ export function errorMessage(code: ErrorCode, ctx: ErrorMessageContext = {}): Er
       return { message: ROLE_FORBIDDEN_MESSAGE, action: "reload" };
     case "INVITE_INVALID":
       return {
-        message:
-          "このリンクは使えません。作り直されたか、取り消されたか、すでにパートナーが参加しています。招待した方に、新しいリンクを頼んでください。",
+        message: "このリンクは使えません。作り直されたか、チームが削除されました。管理者に、新しいリンクを頼んでください。",
         action: "none",
       };
-    case "INVITE_SELF":
-      return { message: "自分のアカウント（またはチーム）には参加できません。", action: "none" };
     case "INVITE_ALREADY_MEMBER":
-      return { message: "すでに参加しています。", action: "none" };
-    case "PARTNER_ALREADY_EXISTS":
-      return { message: "このアカウントには、すでにパートナーが参加しています。", action: "reload" };
-    case "TEAM_EDITOR_LIMIT":
-      return {
-        message: "編集者が上限（10人）に達しています。パートナーに相談してください。",
-        action: "none",
-      };
+      return { message: "すでにこのチームに入っています。", action: "none" };
     case "ASSIGNMENT_NOT_ALLOWED":
       return { message: "このアカウントは担当にできません。", action: "reload" };
     case "TEAM_NOT_FOUND":
       return { message: "チームが見つかりません。", action: "back-to-accounts" };
+    case "TEAM_LIMIT_REACHED":
+      return { message: `管理者として作れるチームは${TEAMS_PER_ADMIN}までです。`, action: "none" };
+    case "TEAM_FULL":
+      return ctx.details?.[0] === "editors"
+        ? { message: `編集者が上限（${TEAM_EDITOR_LIMIT}人）に達しています。`, action: "none" }
+        : { message: `このチームは上限（${TEAM_MEMBER_LIMIT}人）に達しています。管理者に相談してください。`, action: "none" };
+    case "TEAM_NEEDS_ACCOUNT":
+      return { message: "チームに入れる自分のアカウントを、1つ以上選んでください。", action: "none" };
+    case "ACCOUNT_IN_OTHER_TEAM":
+      return { message: "選んだアカウントは、ほかのチームに入っています。", action: "reload" };
+    case "TEAM_LAST_ACCOUNT":
+      return {
+        message: "最後のアカウントは、チームから外せません。チームを抜けるときは「チームを抜ける」を使ってください。",
+        action: "none",
+      };
+    case "TEAM_ADMIN_MUST_TRANSFER":
+      return { message: "抜ける前に、管理者を引き継ぐ人を選んでください。", action: "none" };
+    case "TEAM_ADMIN_ALONE":
+      return { message: "チームにはあなたしかいません。抜けるときは、チームを削除してください。", action: "none" };
     case "TOKEN_INVALID":
       return { message: "トークンを確かめられませんでした。トークンを作り直して貼り付けてください。", action: "retype" };
     case "TOKEN_SHORT_LIVED":
@@ -243,8 +257,8 @@ export function errorMessage(code: ErrorCode, ctx: ErrorMessageContext = {}): Er
   }
 }
 
-/** 任せる範囲がオフになったなどで、権限のない操作をしたときの文言（FR-041、US3-4）。 */
-export const ROLE_FORBIDDEN_MESSAGE = "この操作はオーナーだけができるようになりました";
+/** ロールが変わったなどで、権限のない操作をしたときの文言（specs/011 FR-060）。 */
+export const ROLE_FORBIDDEN_MESSAGE = "この操作はできません。ロールや担当が変わった可能性があります";
 
 /** 開いていたAccountを開けなくなったときの文言（FR-046）。 */
 export const ACCOUNT_ACCESS_LOST_MESSAGE = "このアカウントを開けなくなりました";

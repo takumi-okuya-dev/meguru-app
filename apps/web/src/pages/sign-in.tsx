@@ -4,6 +4,7 @@ import { Link, Navigate, useSearchParams } from "react-router";
 import { CenteredLayout } from "@/components/layout/AppShell";
 import { ClerkLoadFailedScreen } from "@/components/ErrorScreen";
 import { LoadingSkeleton, useLoadTimeout } from "@/components/guards";
+import { isInvitePath } from "@/lib/invite-return";
 
 /**
  * ログイン画面（FR-001）。Clerk 側で Google だけを有効にしているので、「Googleで続ける」だけが出る。
@@ -37,5 +38,5 @@ export function SignInPage() {
  * @returns 戻る先のパス
  */
 export function safeNext(next: string | null): string {
-  return next && /^\/invite\/[pe]_[A-Za-z0-9_-]{43}$/.test(next) ? next : "/";
+  return isInvitePath(next) ? next : "/";
 }

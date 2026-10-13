@@ -13,12 +13,16 @@ export function testUserEmail(): string {
   return email;
 }
 
-/** チーム運用のE2Eで使う3人（specs/008-team-operations、docs/team-roles.md）。 */
-export type TeamRole = "owner" | "partner" | "editor";
+/**
+ * チームのE2Eで使う3人（specs/011-team-revision quickstart.md 2、docs/team-roles.md）。
+ * admin＝チームを作る管理者（田中役）、owner＝アカウントを見せるメンバー（鈴木役）、editor＝担当になる編集者（佐藤役）。
+ */
+export type TeamRole = "admin" | "owner" | "editor";
 
+// 環境変数の名前は008のまま（管理者は、008のパートナーの E2E_PARTNER_EMAIL を使う）
 const TEAM_ENV: Record<TeamRole, string> = {
+  admin: "E2E_PARTNER_EMAIL",
   owner: "E2E_OWNER_EMAIL",
-  partner: "E2E_PARTNER_EMAIL",
   editor: "E2E_EDITOR_EMAIL",
 };
 
@@ -62,7 +66,7 @@ export async function resetAll() {
 
 /**
  * 偽のThreadsにユーザーを登録する（何度呼んでもよい）。最初の1人が「許可する」の既定で、
- * ほかは認可画面の「@… で許可する」で選ぶ（チーム運用の確認で2件目・3件目を接続する）。
+ * ほかは認可画面の「@… で許可する」で選ぶ（チームの確認で、3人がそれぞれ自分のアカウントを接続する）。
  */
 export async function registerFakeUsers() {
   await control("users", { id: "9001", username: "e2e_user", name: "E2E User" });

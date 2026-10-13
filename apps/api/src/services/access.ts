@@ -1,11 +1,11 @@
-// 役割による判定（specs/008-team-operations contracts/permissions.md、research.md R2）。
+// 関わりによる判定（specs/011-team-revision contracts/permissions.md、research.md R3・R4）。
 // 「誰がどのAccount（とチーム）で何をできるか」の判定はこのファイルだけに置き、すべてのAPIがここを通す（Constitution原則V）。
 // Accountに関わっていない人には、存在の有無を漏らさないよう 404 ACCOUNT_NOT_FOUND を返す（001から同じ）。
-import { permissionsFor, type Delegation, type Permission, type Role } from "@threads-grower/shared";
-import { and, eq, exists, sql } from "drizzle-orm";
+import { permissionsFor, type Permission, type Relation, type Role, type TeamRole } from "@threads-grower/shared";
+import { and, eq } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import type { Db, TxDb } from "../db/client";
-import { accountPartners, accounts, memberships, teamEditors, teams, users } from "../db/schema";
+import { accounts, memberships, teamAccounts, teamMembers, teams, users } from "../db/schema";
 import { AppError, notFound } from "../lib/errors";
 
 /** accounts の行。 */
@@ -16,20 +16,23 @@ export type TeamRow = typeof teams.$inferSelect;
 /** 判定に使うユーザー（認証のミドルウェアが入れる users の行の一部）。 */
 type RequestUser = { id: string };
 
-/** authorizeAccount の結果。Accountでの役割・権限と、画面・記録に使う情報。 */
+/** 操作の記録に写す、した人の役割（data-model.md「activity_logs」）。 */
+export type ActorRole = "owner" | "admin" | "editor" | "member";
+
+/** authorizeAccount の結果。Accountとの関わり・権限と、画面・記録に使う情報。 */
 export type AccountAccess = {
   account: AccountRow;
-  role: Role;
+  relation: Relation;
   permissions: ReadonlySet<Permission>;
-  /** Accountのオーナー。grower機能（無料体験）はオーナーの登録日時で判定する（research.md R3） */
+  /** Accountのオーナー。grower機能（無料体験）はオーナーの登録日時で判定する（specs/002 research.md R3） */
   owner: { id: string; name: string; createdAt: Date };
-  /** 判定したユーザーの名前（操作の記録に写す） */
-  actor: { id: string; name: string };
-  /** パートナーがいれば、その任せる範囲。いなければNULL */
-  delegation: Delegation | null;
-  /** 手伝っているチーム（パートナーがいるとき） */
-  team: { id: string; name: string | null; partnerName: string } | null;
-  /** チームがあるか（パートナーがいる、または編集者が担当している。FR-050） */
+  /** 判定したユーザーの名前と、操作の記録に写す役割 */
+  actor: { id: string; name: string; role: ActorRole };
+  /** このAccountが入っているチームと、判定したユーザーのそのチームでのロール。入っていなければNULL */
+  team: { id: string; name: string; myRole: TeamRole } | null;
+  /** 判定したユーザーが、このAccountのチームの管理者か */
+  isTeamAdmin: boolean;
+  /** このAccountがチームに入っているか（操作の記録を書く。research.md R8） */
   hasTeam: boolean;
 };
 
@@ -54,8 +57,22 @@ export function personName(u: { displayName: string | null; email: string }): st
 }
 
 /**
- * ユーザーがAccountで、その権限の操作をしてよいかを判定する（contracts/permissions.md）。
- * 1回の問い合わせで、Account・自分の役割・オーナー・手伝いの関係・チームの有無を読む。
+ * 関わりとチームのロールから、操作の記録に写す役割を決める（research.md R8）。
+ * @param relation - Accountとの関わり
+ * @param teamRole - そのチームでのロール（チームに入っていなければNULL）
+ * @returns 記録に写す役割
+ */
+function actorRoleOf(relation: Relation, teamRole: TeamRole | null): ActorRole {
+  if (relation === "owner") return "owner";
+  if (teamRole === "admin") return "admin";
+  if (relation === "assigned") return "editor";
+  return "member";
+}
+
+/**
+ * ユーザーがAccountで、その権限の操作をしてよいかを判定する（contracts/permissions.md「関わり」）。
+ * 1回の問い合わせで、Account・自分の memberships・オーナー・チーム・自分のチームでのロールを読み、
+ * オーナー → 担当の人 → 見せてもらっている人 の順に決める。どれでもなければ ACCOUNT_NOT_FOUND。
  * @param db - データベース（トランザクションの中でもよい）
  * @param user - リクエストしたユーザー
  * @param accountId - accounts.id
@@ -74,193 +91,188 @@ export async function authorizeAccount(
   const ownerM = alias(memberships, "owner_m");
   const ownerU = alias(users, "owner_u");
   const meU = alias(users, "me_u");
-  const partnerU = alias(users, "partner_u");
-  const editorM = alias(memberships, "editor_m");
   const [row] = await db
     .select({
       account: accounts,
-      role: own.role,
+      ownRole: own.role,
+      ownTeamId: own.teamId,
       ownerId: ownerU.id,
       ownerDisplayName: ownerU.displayName,
       ownerEmail: ownerU.email,
       ownerCreatedAt: ownerU.createdAt,
       meDisplayName: meU.displayName,
       meEmail: meU.email,
-      partnerTeamId: accountPartners.teamId,
-      delegateReview: accountPartners.delegateReview,
-      delegateSettings: accountPartners.delegateSettings,
+      teamId: teamAccounts.teamId,
+      shared: teamAccounts.shared,
       teamName: teams.name,
-      partnerDisplayName: partnerU.displayName,
-      partnerEmail: partnerU.email,
-      hasEditor: exists(
-        db
-          .select({ one: sql`1` })
-          .from(editorM)
-          .where(and(eq(editorM.accountId, accounts.id), eq(editorM.role, "editor"))),
-      ),
+      myTeamRole: teamMembers.role,
     })
     .from(accounts)
-    .innerJoin(own, and(eq(own.accountId, accounts.id), eq(own.userId, user.id)))
-    .innerJoin(meU, eq(meU.id, own.userId))
     .innerJoin(ownerM, and(eq(ownerM.accountId, accounts.id), eq(ownerM.role, "owner")))
     .innerJoin(ownerU, eq(ownerU.id, ownerM.userId))
-    .leftJoin(accountPartners, eq(accountPartners.accountId, accounts.id))
-    .leftJoin(teams, eq(teams.id, accountPartners.teamId))
-    .leftJoin(partnerU, eq(partnerU.id, teams.partnerUserId))
+    .innerJoin(meU, eq(meU.id, user.id))
+    .leftJoin(own, and(eq(own.accountId, accounts.id), eq(own.userId, user.id)))
+    .leftJoin(teamAccounts, eq(teamAccounts.accountId, accounts.id))
+    .leftJoin(teams, eq(teams.id, teamAccounts.teamId))
+    .leftJoin(teamMembers, and(eq(teamMembers.teamId, teamAccounts.teamId), eq(teamMembers.userId, user.id)))
     .where(eq(accounts.id, accountId))
     .limit(1);
-  // 旧プラン4の member は使わない（関わっていない扱い）
-  if (!row || (row.role !== "owner" && row.role !== "partner" && row.role !== "editor")) throw notFound();
-  const role: Role = row.role;
-  const delegation: Delegation | null =
-    row.partnerTeamId !== null ? { review: !!row.delegateReview, settings: !!row.delegateSettings } : null;
-  const permissions = permissionsFor(role, role === "partner" ? delegation : null);
+  if (!row) throw notFound();
+  const inTeam = row.teamId !== null && row.myTeamRole !== null;
+  let relation: Relation;
+  if (row.ownRole === "owner") relation = "owner";
+  // 担当は、そのアカウントのチームの人で、同じチーム経由の行だけ（抜けた・外れた後に残った行では開けない）
+  else if (row.ownRole === "editor" && inTeam && row.ownTeamId === row.teamId) relation = "assigned";
+  else if (inTeam && row.shared) relation = "shared_viewer";
+  else throw notFound();
+  const isTeamAdmin = row.myTeamRole === "admin";
+  const permissions = permissionsFor(relation, { isTeamAdmin });
   if (!permissions.has(permission)) {
     throw new AppError("ROLE_FORBIDDEN", 403, "role forbidden", undefined, [permission]);
   }
   return {
     account: row.account,
-    role,
+    relation,
     permissions,
     owner: {
       id: row.ownerId,
       name: personName({ displayName: row.ownerDisplayName, email: row.ownerEmail }),
       createdAt: row.ownerCreatedAt,
     },
-    actor: { id: user.id, name: personName({ displayName: row.meDisplayName, email: row.meEmail }) },
-    delegation,
-    team:
-      row.partnerTeamId !== null
-        ? {
-            id: row.partnerTeamId,
-            name: row.teamName,
-            partnerName: personName({ displayName: row.partnerDisplayName, email: row.partnerEmail ?? "" }),
-          }
-        : null,
-    hasTeam: row.partnerTeamId !== null || !!row.hasEditor,
+    actor: {
+      id: user.id,
+      name: personName({ displayName: row.meDisplayName, email: row.meEmail }),
+      role: actorRoleOf(relation, row.myTeamRole),
+    },
+    team: row.teamId !== null && row.teamName !== null ? { id: row.teamId, name: row.teamName, myRole: row.myTeamRole ?? "member" } : null,
+    isTeamAdmin,
+    hasTeam: row.teamId !== null,
   };
 }
 
-/** チームのパートナー本人であることの判定の結果（contracts/permissions.md「チームの判定」）。 */
-export type TeamAccess = { team: TeamRow; partner: { id: string; name: string } };
+/** チームの人であることの判定の結果（contracts/permissions.md「チームのAPIの判定」）。 */
+export type TeamAccess = { team: TeamRow; member: { id: string; name: string; role: TeamRole } };
 
 /**
- * ログインした人がチームのパートナーかを判定する。
+ * ログインした人がチームの人かを判定する。
  * @param db - データベース（トランザクションの中でもよい）
  * @param user - リクエストしたユーザー
- * @param opts - lock：チームの行を FOR UPDATE で取る（編集者の数を数えるとき）
+ * @param teamId - teams.id
+ * @param opts - lock：チームの行を FOR UPDATE で取る（人数を数える・ロールや担当を書くとき。research.md R7）
  * @returns TeamAccess
- * @throws AppError TEAM_NOT_FOUND（チームのパートナーではない）
+ * @throws AppError TEAM_NOT_FOUND（IDの形が違う・チームがない・チームの人でない）
  */
-export async function authorizeTeam(
+export async function authorizeTeamMember(
   db: Db | TxDb,
   user: RequestUser,
+  teamId: string,
   opts: { lock?: boolean } = {},
 ): Promise<TeamAccess> {
-  const base = db
-    .select({ team: teams, displayName: users.displayName, email: users.email })
+  if (!UUID.test(teamId)) throw teamNotFound();
+  if (opts.lock) {
+    // 先にチームの行だけに鍵をかけ、待った後の最新のチームの人とロールを次の文で読む
+    // （結合したまま FOR UPDATE で待つと、待つ前のロールのまま判定してしまう。同時の引き継ぎなど）
+    const [locked] = await db.select({ id: teams.id }).from(teams).where(eq(teams.id, teamId)).for("update");
+    if (!locked) throw teamNotFound();
+  }
+  const [row] = await db
+    .select({ team: teams, role: teamMembers.role, displayName: users.displayName, email: users.email })
     .from(teams)
-    .innerJoin(users, eq(users.id, teams.partnerUserId))
-    .where(eq(teams.partnerUserId, user.id))
+    .innerJoin(teamMembers, and(eq(teamMembers.teamId, teams.id), eq(teamMembers.userId, user.id)))
+    .innerJoin(users, eq(users.id, teamMembers.userId))
+    .where(eq(teams.id, teamId))
     .limit(1);
-  const [row] = opts.lock ? await base.for("update", { of: teams }) : await base;
   if (!row) throw teamNotFound();
-  return { team: row.team, partner: { id: user.id, name: personName(row) } };
+  return { team: row.team, member: { id: user.id, name: personName(row), role: row.role } };
 }
 
-/** チームが関われるAccount（listTeamAccounts の1行）。 */
-export type TeamAccount = {
-  account: AccountRow;
-  /** パートナー自身がオーナーのAccount（自社） */
-  own: boolean;
-  owner: { id: string; name: string };
-  /** 手伝う先のときの任せる範囲。自社ならNULL */
-  delegation: Delegation | null;
-};
-
 /**
- * チームが関われるAccountの一覧（手伝う先と、パートナー自身がオーナーのAccount）。
- * まとめの画面と担当の表の列はこの一覧だけを使う（contracts/permissions.md「チームの判定」）。
+ * ログインした人がチームの管理者かを判定する。
  * @param db - データベース（トランザクションの中でもよい）
- * @param teamAccess - authorizeTeam の結果
- * @returns Accountの一覧（自社が先、それぞれ表示名の順）
+ * @param user - リクエストしたユーザー
+ * @param teamId - teams.id
+ * @param opts - lock：チームの行を FOR UPDATE で取る
+ * @returns TeamAccess
+ * @throws AppError TEAM_NOT_FOUND（チームの人でない）、ROLE_FORBIDDEN（チームの人だが管理者でない）
  */
-export async function listTeamAccounts(db: Db | TxDb, teamAccess: TeamAccess): Promise<TeamAccount[]> {
-  const ownerM = alias(memberships, "owner_m");
-  const ownerU = alias(users, "owner_u");
-  const rows = await db
-    .select({
-      account: accounts,
-      ownerId: ownerU.id,
-      ownerDisplayName: ownerU.displayName,
-      ownerEmail: ownerU.email,
-      partnerTeamId: accountPartners.teamId,
-      delegateReview: accountPartners.delegateReview,
-      delegateSettings: accountPartners.delegateSettings,
-    })
-    .from(accounts)
-    .innerJoin(ownerM, and(eq(ownerM.accountId, accounts.id), eq(ownerM.role, "owner")))
-    .innerJoin(ownerU, eq(ownerU.id, ownerM.userId))
-    .leftJoin(
-      accountPartners,
-      and(eq(accountPartners.accountId, accounts.id), eq(accountPartners.teamId, teamAccess.team.id)),
-    )
-    .where(sql`${accountPartners.teamId} IS NOT NULL OR ${ownerM.userId} = ${teamAccess.partner.id}`);
-  const list = rows.map((r) => {
-    const own = r.ownerId === teamAccess.partner.id;
-    return {
-      account: r.account,
-      own,
-      owner: { id: r.ownerId, name: personName({ displayName: r.ownerDisplayName, email: r.ownerEmail }) },
-      delegation:
-        !own && r.partnerTeamId !== null ? { review: !!r.delegateReview, settings: !!r.delegateSettings } : null,
-    };
-  });
-  const label = (a: AccountRow) => a.displayName ?? a.username;
-  return list.sort((a, b) => Number(b.own) - Number(a.own) || label(a.account).localeCompare(label(b.account), "ja"));
+export async function authorizeTeamAdmin(
+  db: Db | TxDb,
+  user: RequestUser,
+  teamId: string,
+  opts: { lock?: boolean } = {},
+): Promise<TeamAccess> {
+  const access = await authorizeTeamMember(db, user, teamId, opts);
+  if (access.member.role !== "admin") throw new AppError("ROLE_FORBIDDEN", 403, "team admin only");
+  return access;
 }
 
+/** 担当にしてよいAccount（authorizeAssignment の結果）。 */
+export type AssignmentTarget = { account: AccountRow; ownerUserId: string; person: { id: string; role: TeamRole } };
+
 /**
- * 編集者をそのAccountの担当にしてよいかを判定する（contracts/permissions.md「チームの判定」）。
+ * その人をAccountの担当にしてよいかを判定する（data-model.md「memberships」、FR-022）。
+ * 担当にできるのは、チームのアカウント × そのチームの編集者・管理者で、自分のアカウントは不可。
  * @param db - データベース（トランザクションの中でもよい）
- * @param teamAccess - authorizeTeam の結果
- * @param editorUserId - 担当にする人
+ * @param teamAccess - authorizeTeamAdmin の結果
+ * @param personUserId - 担当にする人
  * @param accountId - 担当にするAccount
- * @returns 対象のAccount（listTeamAccounts の行）
- * @throws AppError TEAM_NOT_FOUND（相手がチームの編集者ではない）、ASSIGNMENT_NOT_ALLOWED（Accountが対象外）
+ * @returns 対象のAccountとオーナー
+ * @throws AppError TEAM_NOT_FOUND（相手がチームの人でない・アカウントがチームにない）、ASSIGNMENT_NOT_ALLOWED（メンバー・自分のアカウント）
  */
 export async function authorizeAssignment(
   db: Db | TxDb,
   teamAccess: TeamAccess,
-  editorUserId: string,
+  personUserId: string,
   accountId: string,
-): Promise<TeamAccount> {
-  if (!UUID.test(editorUserId)) throw teamNotFound();
-  const [member] = await db
-    .select({ userId: teamEditors.userId })
-    .from(teamEditors)
-    .where(and(eq(teamEditors.teamId, teamAccess.team.id), eq(teamEditors.userId, editorUserId)))
+): Promise<AssignmentTarget> {
+  if (!UUID.test(personUserId) || !UUID.test(accountId)) throw teamNotFound();
+  const [person] = await db
+    .select({ role: teamMembers.role })
+    .from(teamMembers)
+    .where(and(eq(teamMembers.teamId, teamAccess.team.id), eq(teamMembers.userId, personUserId)))
     .limit(1);
-  if (!member) throw teamNotFound();
-  const target = (await listTeamAccounts(db, teamAccess)).find((a) => a.account.id === accountId);
-  if (!target) throw new AppError("ASSIGNMENT_NOT_ALLOWED", 409, "account not assignable");
-  return target;
+  if (!person) throw teamNotFound();
+  const ownerM = alias(memberships, "owner_m");
+  const [target] = await db
+    .select({ account: accounts, ownerUserId: ownerM.userId })
+    .from(teamAccounts)
+    .innerJoin(accounts, eq(accounts.id, teamAccounts.accountId))
+    .innerJoin(ownerM, and(eq(ownerM.accountId, accounts.id), eq(ownerM.role, "owner")))
+    .where(and(eq(teamAccounts.teamId, teamAccess.team.id), eq(teamAccounts.accountId, accountId)))
+    .limit(1);
+  if (!target) throw teamNotFound();
+  if (person.role === "member" || target.ownerUserId === personUserId) {
+    throw new AppError("ASSIGNMENT_NOT_ALLOWED", 409, "account not assignable");
+  }
+  return { account: target.account, ownerUserId: target.ownerUserId, person: { id: personUserId, role: person.role } };
 }
 
 /**
- * チームが見つからない（チームのパートナーではない）ことを表すエラーを作る。
+ * チームが見つからない（チームの人ではない）ことを表すエラーを作る。
  * @returns 404 TEAM_NOT_FOUND の AppError
  */
 export const teamNotFound = () => new AppError("TEAM_NOT_FOUND", 404, "team not found");
+
+/** 画面に出す、このAccountでの役割（viewer は見せてもらっている人）。 */
+export type SummaryRole = Role | "viewer";
+
+/**
+ * 関わりを、画面に出す役割にする。
+ * @param relation - Accountとの関わり
+ * @returns 役割
+ */
+export function summaryRoleOf(relation: Relation): SummaryRole {
+  return relation === "owner" ? "owner" : relation === "assigned" ? "editor" : "viewer";
+}
 
 /**
  * Account の行を、画面に出す AccountSummary にする。
  * @param a - Account の行
  * @param role - ログインした人の役割
- * @param ownerName - 手伝っているAccountのオーナーの名前（自分のAccountならNULL）
+ * @param ownerName - 担当している・見せてもらっているAccountのオーナーの名前（自分のAccountならNULL）
  * @returns AccountSummary
  */
-export function toAccountSummary(a: AccountRow, role: Role = "owner", ownerName: string | null = null) {
+export function toAccountSummary(a: AccountRow, role: SummaryRole = "owner", ownerName: string | null = null) {
   return {
     id: a.id,
     username: a.username,

@@ -5,16 +5,16 @@ import type { AppEnv } from "../app";
 import { createDb } from "../db/client";
 import { AppError } from "../lib/errors";
 import { createThreadsClient } from "../lib/threads-client";
-import { authorizeAccount, toAccountSummary, type AccountAccess } from "../services/access";
+import { authorizeAccount, summaryRoleOf, toAccountSummary, type AccountAccess } from "../services/access";
 import { deleteAccount, openAccount, verifyConnection } from "../services/account-service";
 
 /**
- * 判定の結果を、ログインした人から見た AccountSummary にする（specs/008 research.md R11）。
+ * 判定の結果を、ログインした人から見た AccountSummary にする（specs/011 contracts/permissions.md）。
  * @param access - authorizeAccount の結果
  * @returns AccountSummary
  */
 function summaryOf(access: AccountAccess) {
-  return toAccountSummary(access.account, access.role, access.role === "owner" ? null : access.owner.name);
+  return toAccountSummary(access.account, summaryRoleOf(access.relation), access.relation === "owner" ? null : access.owner.name);
 }
 
 /**
@@ -27,7 +27,7 @@ export function accountRoutes(authed: MiddlewareHandler<AppEnv>) {
   return new Hono<AppEnv>()
     .get("/accounts/:accountId", authed, async (c) => {
       // 副作用なし：DBに保存されている状態のまま返す
-      const access = await authorizeAccount(createDb(c.env.DATABASE_URL), c.get("user"), c.req.param("accountId"), "view");
+      const access = await authorizeAccount(createDb(c.env.DATABASE_URL), c.get("user"), c.req.param("accountId"), "read");
       return c.json(summaryOf(access));
     })
     .post("/accounts/:accountId/open", authed, async (c) => {
@@ -38,7 +38,7 @@ export function accountRoutes(authed: MiddlewareHandler<AppEnv>) {
       const access = await authorizeAccount(db, user, c.req.param("accountId"), "view");
       const parsed = openAccountRequestSchema.safeParse(await c.req.json().catch(() => null));
       if (!parsed.success) throw new AppError("VALIDATION_FAILED", 400, "invalid open request");
-      await openAccount(c.env, user.id, access.account.id, parsed.data, receivedAt, access.role === "owner");
+      await openAccount(c.env, user.id, access.account.id, parsed.data, receivedAt, access.relation === "owner");
       await verifyConnection(c.env, access.account.id, createThreadsClient(c.env));
       return c.json(summaryOf(await authorizeAccount(db, user, access.account.id, "view")));
     })

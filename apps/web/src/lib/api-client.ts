@@ -5,11 +5,11 @@ import {
   accountTeamSchema,
   inviteAcceptResponseSchema,
   invitePreviewSchema,
-  partnerInviteResponseSchema,
   activityListSchema,
-  partnerSummarySchema,
+  teamAssignmentsSchema,
+  teamCreateResponseSchema,
+  teamDetailSchema,
   teamInviteSchema,
-  teamSchema,
   accountSummarySchema,
   exportPageSchema,
   feedbackResponseSchema,
@@ -60,9 +60,6 @@ import {
   type OpenAccountRequest,
 } from "@threads-grower/shared";
 import { z } from "zod";
-
-/** PATCH /accounts/:id/partner のレスポンス（specs/008 FR-030）。 */
-const delegationResponseSchema = z.object({ delegation: z.object({ review: z.boolean(), settings: z.boolean() }) });
 
 /** POST /post-drafts/:id/prioritize のレスポンス。 */
 const postDraftResponseSchema = z.object({ draft: postDraftSchema });
@@ -160,45 +157,52 @@ export const api = {
   me: () => request("/api/me", meResponseSchema),
   needsReviewCounts: () => request("/api/me/needs-review-counts", needsReviewCountsResponseSchema),
   account: (accountId: string) => request(`/api/accounts/${accountId}`, accountSummarySchema),
-  // ---- チーム運用（specs/008-team-operations contracts/api.md）----
+  // ---- チーム（specs/011-team-revision contracts/api.md）----
   accountAccess: (accountId: string) => request(`/api/accounts/${accountId}/access`, accountAccessResponseSchema),
-  getPartnerInvite: (accountId: string) =>
-    request(`/api/accounts/${accountId}/partner-invite`, partnerInviteResponseSchema),
-  createPartnerInvite: (accountId: string) =>
-    request(`/api/accounts/${accountId}/partner-invite`, partnerInviteResponseSchema, { method: "POST" }),
-  rotatePartnerInvite: (accountId: string) =>
-    request(`/api/accounts/${accountId}/partner-invite/rotate`, partnerInviteResponseSchema, { method: "POST" }),
-  cancelPartnerInvite: (accountId: string) =>
-    request(`/api/accounts/${accountId}/partner-invite`, null, { method: "DELETE" }),
   accountTeam: (accountId: string) => request(`/api/accounts/${accountId}/team`, accountTeamSchema),
-  removePartner: (accountId: string) => request(`/api/accounts/${accountId}/partner`, null, { method: "DELETE" }),
-  setDelegation: (accountId: string, delegation: { review?: boolean; settings?: boolean }) =>
-    request(`/api/accounts/${accountId}/partner`, delegationResponseSchema, {
-      method: "PATCH",
-      body: JSON.stringify({ delegation }),
-    }),
-  dismissPartnerJoined: (accountId: string) =>
-    request(`/api/accounts/${accountId}/partner/joined-notice/dismiss`, null, { method: "POST" }),
   listActivity: (accountId: string, q: { kind?: string; actor?: string; cursor?: string }) => {
     const params = new URLSearchParams(Object.entries(q).filter((e): e is [string, string] => Boolean(e[1])));
     const qs = params.toString();
     return request(`/api/accounts/${accountId}/activity${qs ? `?${qs}` : ""}`, activityListSchema);
   },
-  getTeam: () => request("/api/team", teamSchema),
-  getTeamAccounts: () => request("/api/team/accounts", partnerSummarySchema),
-  renameTeam: (name: string) => request("/api/team", teamSchema, { method: "PATCH", body: JSON.stringify({ name }) }),
-  getTeamInvite: () => request("/api/team/invite", teamInviteSchema),
-  rotateTeamInvite: () => request("/api/team/invite/rotate", teamInviteSchema, { method: "POST" }),
-  assignEditor: (userId: string, accountId: string) =>
-    request(`/api/team/editors/${userId}/accounts/${accountId}`, null, { method: "PUT" }),
-  unassignEditor: (userId: string, accountId: string) =>
-    request(`/api/team/editors/${userId}/accounts/${accountId}`, null, { method: "DELETE" }),
-  removeEditor: (userId: string) => request(`/api/team/editors/${userId}`, null, { method: "DELETE" }),
+  dismissAssignedNotice: (accountId: string) =>
+    request(`/api/accounts/${accountId}/assigned-notice/dismiss`, null, { method: "POST" }),
+  createTeam: (body: { name: string; accountIds: string[] }) =>
+    request("/api/teams", teamCreateResponseSchema, { method: "POST", body: JSON.stringify(body) }),
+  getTeam: (teamId: string) => request(`/api/teams/${teamId}`, teamDetailSchema),
+  renameTeam: (teamId: string, name: string) =>
+    request(`/api/teams/${teamId}`, null, { method: "PATCH", body: JSON.stringify({ name }) }),
+  deleteTeam: (teamId: string) => request(`/api/teams/${teamId}`, null, { method: "DELETE" }),
+  getTeamInvite: (teamId: string) => request(`/api/teams/${teamId}/invite`, teamInviteSchema),
+  rotateTeamInvite: (teamId: string) => request(`/api/teams/${teamId}/invite/rotate`, teamInviteSchema, { method: "POST" }),
+  setMemberRole: (teamId: string, userId: string, role: "member" | "editor") =>
+    request(`/api/teams/${teamId}/members/${userId}`, null, { method: "PATCH", body: JSON.stringify({ role }) }),
+  removeMember: (teamId: string, userId: string) => request(`/api/teams/${teamId}/members/${userId}`, null, { method: "DELETE" }),
+  dismissJoinedNotice: (teamId: string, userId: string) =>
+    request(`/api/teams/${teamId}/members/${userId}/joined-notice/dismiss`, null, { method: "POST" }),
+  leaveTeam: (teamId: string, newAdminUserId?: string) =>
+    request(`/api/teams/${teamId}/leave`, null, {
+      method: "POST",
+      body: JSON.stringify(newAdminUserId ? { newAdminUserId } : {}),
+    }),
+  transferAdmin: (teamId: string, userId: string) =>
+    request(`/api/teams/${teamId}/admin`, null, { method: "POST", body: JSON.stringify({ userId }) }),
+  addTeamAccount: (teamId: string, accountId: string, shared = false) =>
+    request(`/api/teams/${teamId}/accounts`, null, { method: "POST", body: JSON.stringify({ accountId, shared }) }),
+  setTeamShared: (teamId: string, accountId: string, shared: boolean) =>
+    request(`/api/teams/${teamId}/accounts/${accountId}`, null, { method: "PATCH", body: JSON.stringify({ shared }) }),
+  removeTeamAccount: (teamId: string, accountId: string) =>
+    request(`/api/teams/${teamId}/accounts/${accountId}`, null, { method: "DELETE" }),
+  getAssignments: (teamId: string) => request(`/api/teams/${teamId}/assignments`, teamAssignmentsSchema),
+  assign: (teamId: string, userId: string, accountId: string) =>
+    request(`/api/teams/${teamId}/assignments/${userId}/accounts/${accountId}`, null, { method: "PUT" }),
+  unassign: (teamId: string, userId: string, accountId: string) =>
+    request(`/api/teams/${teamId}/assignments/${userId}/accounts/${accountId}`, null, { method: "DELETE" }),
   previewInvite: (token: string) => request(`/api/invites/${encodeURIComponent(token)}`, invitePreviewSchema),
-  acceptInvite: (token: string, teamName?: string) =>
+  acceptInvite: (token: string, accounts: { id: string; shared: boolean }[]) =>
     request(`/api/invites/${encodeURIComponent(token)}/accept`, inviteAcceptResponseSchema, {
       method: "POST",
-      body: JSON.stringify(teamName === undefined ? {} : { teamName }),
+      body: JSON.stringify({ accounts }),
     }),
   openAccount: (accountId: string, body: OpenAccountRequest, signal?: AbortSignal) =>
     request(`/api/accounts/${accountId}/open`, accountSummarySchema, {

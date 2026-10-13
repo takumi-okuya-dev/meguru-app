@@ -1,4 +1,5 @@
-// GET /api/me（FR-004・FR-005、research.md R10。specs/008 research.md R11 で役割つきに広げた）
+// GET /api/me（FR-004・FR-005、research.md R10。specs/008 research.md R11 で役割つきに広げ、
+// specs/011 research.md R5 で入っているチームを足した）
 import { limitForOwnedPlans, type Role } from "@threads-grower/shared";
 import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
@@ -8,15 +9,15 @@ import { createDb } from "../db/client";
 import { accounts, memberships, users } from "../db/schema";
 import { personName, toAccountSummary, type AccountRow } from "../services/access";
 import { countOwnedAccountNeedsReview } from "../services/account-review-counts";
-import { getMeTeamInfo } from "../services/team-service";
+import { listMyTeams } from "../services/team-service";
 
 /**
  * ログイン後の遷移先の Account を決める（FR-004、research.md R10。specs/008 FR-045）。
  * last_account_id（開けるAccountなら）→ オーナーのAccountで last_used_at が最新 → created_at が最新
- * → 手伝っているAccountの最初 → null の順。
+ * → 担当しているAccountの最初 → null の順。
  * @param owned - ownerとして保有するAccount
  * @param lastAccountId - users.last_account_id
- * @param helped - 手伝っているAccount（並びは /api/me の順）
+ * @param helped - 担当しているAccount（並びは /api/me の順）
  * @returns 遷移先の Account の ID。開けるAccountが0件なら null
  */
 export function resolveLandingAccountId(
@@ -50,7 +51,7 @@ export function meRoutes(authed: MiddlewareHandler<AppEnv>) {
       .innerJoin(memberships, eq(memberships.accountId, accounts.id))
       .innerJoin(ownerM, and(eq(ownerM.accountId, accounts.id), eq(ownerM.role, "owner")))
       .innerJoin(ownerU, eq(ownerU.id, ownerM.userId))
-      .where(and(eq(memberships.userId, user.id), inArray(memberships.role, ["owner", "partner", "editor"])))
+      .where(and(eq(memberships.userId, user.id), inArray(memberships.role, ["owner", "editor"])))
       .orderBy(
         sql`CASE WHEN ${memberships.role} = 'owner' THEN 0 ELSE 1 END`,
         sql`${accounts.lastUsedAt} DESC NULLS LAST`,
@@ -58,7 +59,7 @@ export function meRoutes(authed: MiddlewareHandler<AppEnv>) {
       );
     const owned = rows.filter((r) => r.role === "owner").map((r) => r.account);
     const helped = rows.filter((r) => r.role !== "owner").map((r) => r.account);
-    const team = await getMeTeamInfo(db, user.id, rows.length > 0);
+    const teams = await listMyTeams(db, user.id);
     // Account切り替えメニューは開くたびに一覧を読み直すため、ブラウザに保存させない。
     c.header("Cache-Control", "no-store");
     return c.json({
@@ -74,8 +75,7 @@ export function meRoutes(authed: MiddlewareHandler<AppEnv>) {
       accountLimit: { max: limitForOwnedPlans(owned.map((a) => a.plan)), used: owned.length },
       // Threads連携の公開範囲。Web はアカウント追加画面の案内の有無に使う（specs/002 FR-028）
       threadsAccessMode: c.env.THREADS_ACCESS_MODE ?? "testers",
-      partnerTeam: team.partnerTeam,
-      editorWaiting: team.editorWaiting,
+      teams,
     });
   }).get("/me/needs-review-counts", authed, async (c) => {
     const user = c.get("user");

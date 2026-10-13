@@ -28,8 +28,7 @@ function renderPage(used = 0, max = 1) {
     landingAccountId: null,
     accountLimit: { max, used },
     threadsAccessMode: "testers",
-    partnerTeam: null,
-    editorWaiting: null,
+    teams: [],
   };
   const router = createMemoryRouter(
     [

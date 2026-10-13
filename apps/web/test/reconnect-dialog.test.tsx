@@ -139,7 +139,7 @@ describe("要再接続のバナー（FR-041）", () => {
       "トークンが使えなくなりました。新しいトークンを貼り付けて接続し直してください。",
     );
     expect(reconnectBannerText({ role: "owner", connectionMethod: "app" })).toMatch(/^Threadsとの接続が切れています。再接続するまで/);
-    for (const role of ["partner", "editor"] as const) {
+    for (const role of ["editor", "viewer"] as const) {
       expect(reconnectBannerText({ role, connectionMethod: "token" })).toMatch(/オーナーの再接続を待っています/);
     }
   });
@@ -194,8 +194,8 @@ describe("ReconnectButton（PR #12 のCodexレビュー）", () => {
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 
-  it("パートナー・編集者には出さない（トークンの入力欄を見せない）", async () => {
-    for (const role of ["partner", "editor"] as const) {
+  it("担当の人・見せてもらっている人には出さない（トークンの入力欄を見せない）", async () => {
+    for (const role of ["editor", "viewer"] as const) {
       renderButton(makeAccount({ role }));
       await screen.findByText("描画済み");
       expect(screen.queryByRole("button", { name: "再接続" })).not.toBeInTheDocument();

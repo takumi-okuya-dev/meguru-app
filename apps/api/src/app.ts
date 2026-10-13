@@ -16,7 +16,7 @@ import {
 import { accountRoutes } from "./routes/accounts";
 import { accountTeamRoutes } from "./routes/account-team";
 import { inviteRoutes } from "./routes/invites";
-import { teamRoutes } from "./routes/team";
+import { teamsRoutes } from "./routes/teams";
 import { activityRoutes } from "./routes/activity";
 import { dataDeletionRoutes } from "./routes/data-deletion";
 import { threadsWebhookRoutes } from "./routes/threads-webhooks";
@@ -144,7 +144,7 @@ export function createApp(deps: AppDeps = defaultDeps) {
     .route("/", accountRoutes(authed))
     .route("/", accountTeamRoutes(authed))
     .route("/", inviteRoutes(authed, maybeAuthed))
-    .route("/", teamRoutes(authed))
+    .route("/", teamsRoutes(authed))
     .route("/", activityRoutes(authed))
     .route("/", strategyRoutes(authed))
     .route("/", promotionRoutes(authed))

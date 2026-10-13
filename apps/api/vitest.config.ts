@@ -32,6 +32,10 @@ export default defineConfig({
           testTimeout: 30_000,
         },
       },
+      {
+        // マイグレーションのテスト（specs/011 T004）。使い捨てのDBに pg で直接つなぐので、Workers の外（Node）で動かす
+        test: { name: "migration", include: ["test/migration/**/*.test.ts"], environment: "node", testTimeout: 60_000 },
+      },
     ],
   },
 });

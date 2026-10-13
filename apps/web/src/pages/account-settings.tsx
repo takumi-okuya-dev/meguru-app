@@ -35,7 +35,7 @@ import { useAccountAccess } from "@/lib/use-account-access";
 export function AccountSettings() {
   const account = useCurrentAccount();
   useCallbackResult({ username: account.username });
-  // 役割で出し分ける（specs/008 FR-041）。設定の操作は settings、接続・削除・パートナーは owner の権限
+  // 関わりで出し分ける（specs/008 FR-041、specs/011 FR-060）。設定の操作は settings、接続・削除・チームに見せるは owner の権限
   const { access, can } = useAccountAccess(account.id);
   const queryClient = useQueryClient();
   const navigate = useNavigate();

@@ -2,7 +2,7 @@
 import { emptyStrategyValues } from "@threads-grower/shared";
 import { beforeEach, describe, expect, it } from "vitest";
 import { AFTER_TRIAL, call, createUserWithAccount, makeApp, resetDb, setAccount } from "../helpers/app";
-import { ensureUser, makeEditor, makePartner } from "../helpers/team";
+import { putInTeam } from "../helpers/team";
 
 const app = makeApp();
 
@@ -198,9 +198,7 @@ describe("GET・PUT /api/accounts/:id/strategy", () => {
 describe("grower機能の判定（チーム運用）", () => {
   it("無料体験の終わった編集者でも、無料体験中のオーナーのAccountは編集できる", async () => {
     const { accountId } = await createUserWithAccount("o1");
-    const { teamId } = await makePartner(accountId, "p1");
-    await ensureUser("e1", AFTER_TRIAL());
-    await makeEditor(teamId, "e1", [accountId]);
+    await putInTeam(accountId, "o1", { editor: "e1", editorCreatedAt: AFTER_TRIAL() });
     const res = await call(app, "PUT", path(accountId), {
       user: "e1",
       body: { ...fullValues(), expectedVersion: 0 },
@@ -210,8 +208,7 @@ describe("grower機能の判定（チーム運用）", () => {
 
   it("無料体験中の編集者でも、無料体験の終わったオーナー（プラン1）のAccountは編集できない", async () => {
     const { accountId } = await createUserWithAccount("o1", { userCreatedAt: AFTER_TRIAL() });
-    const { teamId } = await makePartner(accountId, "p1");
-    await makeEditor(teamId, "e1", [accountId]);
+    await putInTeam(accountId, "o1", { editor: "e1" });
     const res = await call(app, "PUT", path(accountId), {
       user: "e1",
       body: { ...fullValues(), expectedVersion: 0 },

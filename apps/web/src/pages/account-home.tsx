@@ -9,9 +9,10 @@ import {
   TargetIcon,
   type LucideIcon,
 } from "lucide-react";
-import { Link } from "react-router";
+import { useEffect } from "react";
+import { Link, useNavigate } from "react-router";
 import { NextPostCard } from "@/components/NextPostCard";
-import { PartnerJoinedNotice } from "@/components/team/PartnerJoinedNotice";
+import { AssignedNotice } from "@/components/team/AssignedNotice";
 import { TokenWarnings } from "@/components/connect/TokenWarnings";
 import { AutoPostNotices } from "@/components/AutoPostNotices";
 import { AccountAvatar } from "@/components/AccountAvatar";
@@ -22,6 +23,7 @@ import { PageBody, PageHeader } from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/button";
 import { api } from "@/lib/api-client";
 import { useCallbackResult } from "@/lib/callback-result";
+import { takeInviteReturn } from "@/lib/invite-return";
 import { formatDate } from "@/lib/format";
 import { queryKeys } from "@/lib/query";
 import { cn } from "@/lib/utils";
@@ -70,7 +72,14 @@ function nextStep(s: ProfileStatus): { area: Area | null; title: string; body: s
  */
 export function AccountHome() {
   const account = useCurrentAccount();
-  useCallbackResult({ username: account.username });
+  const { connected } = useCallbackResult({ username: account.username });
+  // 招待リンクから追加に進んだ人は、このアプリで許可して戻ってきたら、リンクへ戻す（specs/011 T019）
+  const navigate = useNavigate();
+  useEffect(() => {
+    if (connected !== "new") return;
+    const back = takeInviteReturn();
+    if (back) void navigate(back, { replace: true });
+  }, [connected, navigate]);
   const status = useQuery({
     queryKey: queryKeys.profileStatus(account.id),
     queryFn: () => api.getProfileStatus(account.id),
@@ -109,7 +118,7 @@ export function AccountHome() {
     <>
       <PageHeader title="ホーム" />
       <PageBody className="flex flex-col items-center gap-7 pt-10 md:pt-16">
-        {account.role === "owner" && <PartnerJoinedNotice accountId={account.id} />}
+        <AssignedNotice account={account} />
         <TokenWarnings />
         <section className="flex flex-col items-center gap-1.5 text-center">
           <AccountAvatar account={account} className="size-14 text-lg" />

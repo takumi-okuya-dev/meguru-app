@@ -34,8 +34,7 @@ function renderWith(max: number, used: number, threadsAccessMode: "testers" | "p
     landingAccountId: used > 0 ? "a0" : null,
     accountLimit: { max, used },
     threadsAccessMode,
-    partnerTeam: null,
-    editorWaiting: null,
+    teams: [],
   };
   render(
     <QueryClientProvider client={new QueryClient()}>

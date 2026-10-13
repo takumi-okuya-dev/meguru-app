@@ -1,6 +1,8 @@
 // サイドバーの中身（docs/ui-design.md「2. 画面の骨格」）。
-// 上から：Accountの切り替えと畳むボタン → 「投稿をつくる」 → 機能の移動 → 区切り線 → このアカウントの設定・ユーザーメニュー。
+// 上から：Accountの切り替えと畳むボタン → 「投稿をつくる」 → 機能の移動 → チーム → 区切り線 → このアカウントの設定・ユーザーメニュー。
 // まだ作っていない機能は出さない（各featureで画面を作ったときに NAV_GROUPS に足す）。
+// 「チーム」の見出しの下に、入っているチームの名前を並べる（specs/011 contracts/ui-routes.md「サイドバー」）。
+// チームに入っていない人には、チームのものを何も出さない（Constitution原則V）。
 import {
   ChartColumnIcon,
   HistoryIcon,
@@ -8,6 +10,7 @@ import {
   InboxIcon,
   MegaphoneIcon,
   PanelLeftIcon,
+  PlusIcon,
   SearchIcon,
   SlidersHorizontalIcon,
   SquarePenIcon,
@@ -15,7 +18,10 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
-import { Link, NavLink, useParams } from "react-router";
+import { useState } from "react";
+import { Link, NavLink, useMatch, useParams } from "react-router";
+import { CreateTeamDialog } from "@/components/team/CreateTeamDialog";
+import { TeamMark } from "@/components/team/TeamMark";
 import { Button } from "@/components/ui/button";
 import { api } from "@/lib/api-client";
 import { queryKeys } from "@/lib/query";
@@ -61,15 +67,21 @@ const itemClass = ({ isActive }: { isActive: boolean }) =>
  * @returns サイドバー
  */
 export function Sidebar({ onCollapse, onNavigate }: { onCollapse?: () => void; onNavigate?: () => void }) {
-  const { accountId } = useParams<{ accountId: string }>();
+  const params = useParams<{ accountId: string }>();
+  const me = useQuery({ queryKey: queryKeys.me, queryFn: api.me });
+  // チームの画面（/teams/*）では、最後に使ったAccountの機能へ移れるようにする
+  const accountId = params.accountId ?? me.data?.landingAccountId ?? undefined;
   const base = accountId ? `/accounts/${accountId}` : "/";
+  const teams = me.data?.teams ?? [];
+  const openTeam = useMatch("/teams/:teamId/*")?.params.teamId;
+  const [creating, setCreating] = useState(false);
   // 投稿ストックの右に出す要確認の件数（specs/004 FR-013）。本文を含まない軽いAPIで読む
   const counts = useQuery({
     queryKey: queryKeys.draftCounts(accountId ?? ""),
     queryFn: () => api.getDraftCounts(accountId!),
     enabled: !!accountId,
   });
-  const { access } = useAccountAccess(accountId);
+  const { access } = useAccountAccess(params.accountId);
   return (
     <div className="flex h-full flex-col">
       <div className="flex items-center gap-1 p-2">
@@ -86,12 +98,10 @@ export function Sidebar({ onCollapse, onNavigate }: { onCollapse?: () => void; o
           </Button>
         )}
       </div>
-      {access && access.role !== "owner" && (
-        // 手伝う人に、自分の立場とオーナーを示す（specs/008 FR-040）。オーナーには出さない
+      {params.accountId && access?.relation === "assigned" && (
+        // 担当の人に、自分の立場とオーナーを示す（specs/011 T025）。オーナーには出さない
         <div className="mx-3 mb-1 rounded-xl border bg-background px-3 py-2 text-xs leading-snug">
-          <div className="font-medium">
-            {access.role === "partner" ? "パートナーとして手伝っています" : "編集者として担当しています"}
-          </div>
+          <div className="font-medium">担当しています</div>
           <div className="text-muted-foreground">オーナー：{access.owner.name}</div>
         </div>
       )}
@@ -127,13 +137,34 @@ export function Sidebar({ onCollapse, onNavigate }: { onCollapse?: () => void; o
             })}
           </div>
         ))}
-        {access?.hasTeam && access.permissions.includes("activity") && (
-          // チームがあるAccountだけ（specs/008 FR-052）。個人運用・編集者には出さない
+        {(teams.length > 0 || (access?.hasTeam && access.permissions.includes("activity"))) && (
           <div className="space-y-0.5">
             <div className="px-3 pt-4 pb-1 text-xs text-muted-foreground lg:px-2.5">チーム</div>
-            <NavLink to={`${base}/activity`} className={itemClass} onClick={onNavigate}>
-              <HistoryIcon className="size-5 lg:size-[18px]" /> 操作の記録
-            </NavLink>
+            {teams.map((t) => (
+              <Link
+                key={t.id}
+                to={`/teams/${t.id}`}
+                aria-current={openTeam === t.id ? "page" : undefined}
+                className={itemClass({ isActive: openTeam === t.id })}
+                onClick={onNavigate}
+              >
+                <TeamMark name={t.name} className="size-5 text-[11px] lg:size-[18px]" />
+                <span className="min-w-0 flex-1 truncate">{t.name}</span>
+                <span className="text-xs text-muted-foreground tabular-nums">{t.memberCount}人</span>
+              </Link>
+            ))}
+            {teams.some((t) => t.role === "admin") && (
+              // どれかのチームの管理者には「チームを作る」も出す（FR-050）。ほかの人は、このアカウントの設定から作る
+              <button type="button" className={cn(itemClass({ isActive: false }), "w-full text-left text-muted-foreground")} onClick={() => setCreating(true)}>
+                <PlusIcon className="size-5 lg:size-[18px]" /> チームを作る
+              </button>
+            )}
+            {access?.hasTeam && access.permissions.includes("activity") && (
+              // チームに入っているAccountで、オーナーと担当の管理者だけ（specs/008 FR-052、specs/011 FR-002）
+              <NavLink to={`${base}/activity`} className={itemClass} onClick={onNavigate}>
+                <HistoryIcon className="size-5 lg:size-[18px]" /> 操作の記録
+              </NavLink>
+            )}
           </div>
         )}
       </nav>
@@ -145,6 +176,7 @@ export function Sidebar({ onCollapse, onNavigate }: { onCollapse?: () => void; o
         )}
         <UserMenu />
       </div>
+      {creating && <CreateTeamDialog onClose={() => setCreating(false)} onCreated={() => onNavigate?.()} />}
     </div>
   );
 }

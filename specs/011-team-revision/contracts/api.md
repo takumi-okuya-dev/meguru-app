@@ -14,7 +14,7 @@
 | `TEAM_NEEDS_ACCOUNT` | 409 | 自分のアカウントを1つも選んでいない・持っていない |
 | `ACCOUNT_IN_OTHER_TEAM` | 409 | 選んだアカウントがほかのチームに入っている（`details: [accountId]`） |
 | `TEAM_LAST_ACCOUNT` | 409 | 最後のアカウントを外そうとした |
-| `TEAM_ADMIN_MUST _TRANSFER` | 409 | 管理者が引き継ぎ先なしで抜けようとした |
+| `TEAM_ADMIN_MUST_TRANSFER` | 409 | 管理者が引き継ぎ先なしで抜けようとした |
 | `TEAM_ADMIN_ALONE` | 409 | 管理者しかいないチームで抜けようとした（チームの削除を案内） |
 | `INVITE_INVALID` | 404 | 使えない招待リンク（008のまま） |
 | `INVITE_ALREADY_MEMBER` | 409 | すでにチームの人（008のまま） |
@@ -30,7 +30,8 @@
 ```
 
 - 入っているチームを`joined_at`の順に。チームに入っていなければ空（サイドバーに出さない）。
-- `accounts`の`role`は`owner`か`editor`（担当）。担当のアカウントには`ownerName`を付ける（008のまま）。
+- `accounts`の`role`は`owner`か`editor`（担当）。担当のアカウントには`ownerName`を付ける（008のまま）。見せてもらっているアカウントは入れない。
+- `GET /api/accounts/:accountId`の`role`は、見せてもらっている人には`viewer`（実装で足した。画面はこれを見て読むだけの画面へ移す）。
 
 ## チーム
 
@@ -44,7 +45,7 @@
 | `POST /api/teams/:teamId/invite/rotate` | admin | 文字列を差し替える。前のリンクはすぐ使えない |
 | `PATCH /api/teams/:teamId/members/:userId` | admin | `{ role: "member" \| "editor" }`。管理者自身は不可。editor→memberで担当を消す。記録`team_role_changed` |
 | `DELETE /api/teams/:teamId/members/:userId` | admin | 外す（自分は不可）。記録`team_member_removed` |
-| `POST /api/teams/:teamId/leave` | member | `{ newAdminUserId?: string }`。管理者は`newAdminUserId`が必須（なければ`TEAM_ADMIN_MUST _TRANSFER`、ほかに誰もいなければ`TEAM_ADMIN_ALONE`）。記録`team_member_left`（と`team_admin_transferred`） |
+| `POST /api/teams/:teamId/leave` | member | `{ newAdminUserId?: string }`。管理者は`newAdminUserId`が必須（なければ`TEAM_ADMIN_MUST_TRANSFER`、ほかに誰もいなければ`TEAM_ADMIN_ALONE`）。記録`team_member_left`（と`team_admin_transferred`） |
 | `POST /api/teams/:teamId/admin` | admin | `{ userId }`。抜けずに引き継ぐ。前の管理者は担当があれば編集者、なければメンバー。記録`team_admin_transferred` |
 | `POST /api/teams/:teamId/accounts` | member | `{ accountId, shared?: boolean }`。自分がオーナーのアカウントを足す。記録`team_account_added` |
 | `DELETE /api/teams/:teamId/accounts/:accountId` | member（そのアカウントのオーナー）／admin | チームから外す。最後の1つは`TEAM_LAST_ACCOUNT`。担当を消す。記録`team_account_removed` |
@@ -79,7 +80,8 @@
 }
 ```
 
-- `canOpen`：見ている人が、そのアカウントを開けるか（オーナー・担当・見せている）。開けないアカウントは`username`・`displayName`だけ。
+- `canOpen`：見ている人が、そのアカウントを開けるか（オーナー・担当・見せている）。開けないアカウントは`username`・`displayName`だけ（`profilePictureUrl`はNULL）。
+- `relation`（実装で足した）：見ている人の関わり（`owner`・`assigned`・`shared_viewer`、開けなければNULL）。チップの「見る」の行き先を決める。
 - `joinedNotice`は、見ている人が管理者で、閉じていない参加の知らせのときだけtrue。
 - 管理者以外には、招待のリンクと担当の表は返さない。
 
@@ -87,14 +89,14 @@
 
 | API | 判定 | 説明 |
 |---|---|---|
-| `GET /api/invites/:token` | ログインなしでも可 | `{ team: { name, adminName, memberCount }, viewer: { status, accounts?: [{ id, displayName, username, inOtherTeam }] } }`。`status`：`anonymous`（ログイン前）・`needs_account`（自分のアカウントがない）・`ready`・`already_member` |
+| `GET /api/invites/:token` | ログインなしでも可 | `{ team: { name, adminName, memberCount }, viewer: { status, teamId, accounts: [{ id, displayName, username, profilePictureUrl, inOtherTeam }] } }`。`status`：`anonymous`（ログイン前）・`needs_account`（自分のアカウントがない）・`ready`・`already_member`。`inOtherTeam`はほかのチームの名前（入っていなければNULL）。`teamId`は`already_member`のときだけ |
 | `POST /api/invites/:token/accept` | ログイン済み | `{ accounts: [{ id, shared }] }`（1件以上）。メンバーとして入り、アカウントを入れる。同じ人の同時の参加でも1回。記録`team_member_joined`（入れたアカウントに）。応答`{ teamId }` |
 
 ## Account（変わる）
 
 | API | 変更 |
 |---|---|
-| `GET /api/accounts/:accountId/access` | `read`。応答に`relation`・`team`（`{ id, name, myRole } \| null`）。`delegation`・`hasTeam`の意味を改める（`hasTeam`＝チームに入っている） |
-| `GET /api/accounts/:accountId/team` | `read`。応答：`{ team: { id, name, admin: { userId, name } } \| null, owner, viewerUserId, assignees: [{ userId, name, role }] }`（009のカードを改める。FR-055） |
-| 投稿ストック・戦略のGET | `read`（permissions.mdの表） |
+| `GET /api/accounts/:accountId/access` | `read`。応答に`relation`・`team`（`{ id, name, myRole } \| null`）・`assignedNotice`（担当の知らせを出すか）。`role`・`delegation`を消し、`hasTeam`の意味を改める（`hasTeam`＝チームに入っている） |
+| `GET /api/accounts/:accountId/team` | `read`。応答：`{ team: { id, name, admin: { userId, name }, shared } \| null, owner, viewerUserId, assignees: [{ userId, name, role }] }`（009のカードを改める。FR-055。`shared`は設定の「チームに見せる」のスイッチに使う） |
+| 投稿ストック・戦略のGET | `read`（permissions.mdの表）。見せてもらっている人には、`GET /post-drafts`の`ngWords`を空、`canGeneratePrompt`をfalseで返す（設定は見せない。FR-031） |
 | `POST /api/accounts/:accountId/assigned-notice/dismiss` | `assigned`。担当の知らせを閉じる（R9） |

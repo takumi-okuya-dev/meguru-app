@@ -1,5 +1,5 @@
 // 操作の記録（specs/008-team-operations contracts/ui-routes.md「操作の記録」、US4・FR-052）。
-// オーナー・パートナーだけ。チームがあるAccountの、90日分の操作を新しい順に出す。
+// オーナーと、担当の管理者だけ（specs/011 FR-002）。チームに入っているAccountの、90日分の操作を新しい順に出す。
 import { useInfiniteQuery } from "@tanstack/react-query";
 import type { ActivityItem } from "@threads-grower/shared";
 import { ChevronDownIcon } from "lucide-react";
@@ -23,7 +23,14 @@ const KINDS = [
   { value: "member", label: "メンバー" },
 ] as const;
 
-const ROLE_LABELS: Record<string, string> = { owner: "オーナー", partner: "パートナー", editor: "編集者", member: "メンバー" };
+// partner は008の記録にだけ残る（specs/011 research.md R2）
+const ROLE_LABELS: Record<string, string> = {
+  owner: "オーナー",
+  admin: "管理者",
+  editor: "編集者",
+  member: "メンバー",
+  partner: "パートナー（008）",
+};
 
 /**
  * 操作の文言（contracts/api.md「操作の記録のコード」）。
@@ -93,6 +100,30 @@ export function actionText(item: ActivityItem): string {
       return "NGワードを削除しました";
     case "core_rules_saved":
       return "投稿のルールを保存しました";
+    // チームの操作（specs/011 data-model.md「activity_logs」）
+    case "team_created":
+      return `チーム「${s}」を作りました`;
+    case "team_renamed":
+      return `チーム名を「${s}」に変えました`;
+    case "team_deleted":
+      return `チーム「${s}」を削除しました`;
+    case "team_member_joined":
+      return `${s}さんがチームに参加しました`;
+    case "team_member_left":
+      return `${s}さんがチームを抜けました`;
+    case "team_member_removed":
+      return `${s}さんをチームから外しました`;
+    case "team_role_changed":
+      return `${s}さんのロールを${ROLE_LABELS[String(item.details?.to)] ?? String(item.details?.to)}にしました`;
+    case "team_admin_transferred":
+      return `管理者を${s}さんに引き継ぎました`;
+    case "team_account_added":
+      return "このアカウントをチームに入れました";
+    case "team_account_removed":
+      return "このアカウントをチームから外しました";
+    case "team_share_changed":
+      return item.details?.shared ? "チームに見せるようにしました" : "チームに見せないようにしました";
+    // 008の記録（チームの見直しの前）
     case "partner_invite_created":
       return "パートナーの招待リンクを作りました";
     case "partner_invite_rotated":
@@ -122,7 +153,7 @@ export function actionText(item: ActivityItem): string {
  * @returns 対象。なければ空
  */
 function targetText(item: ActivityItem): string {
-  if (item.action.startsWith("assignment_") || item.action === "editor_removed") return "";
+  if (item.action.startsWith("assignment_") || item.action.startsWith("team_") || item.action === "editor_removed") return "";
   if (item.action === "delegation_changed") {
     const after = (item.details?.after ?? {}) as { review?: boolean; settings?: boolean };
     return `承認・却下：${after.review ? "任せる" : "任せない"} ／ 設定：${after.settings ? "任せる" : "任せない"}`;
@@ -294,7 +325,7 @@ export function ActivityPage() {
           </Button>
         )}
         <p className="text-xs text-muted-foreground">
-          記録は、チームで運用しているアカウントだけに、90日分残ります。オーナーとパートナーが見られます。
+          記録は、チームに入っているアカウントだけに、90日分残ります。オーナーと、このアカウントを担当している管理者が見られます。
         </p>
       </PageBody>
     </>

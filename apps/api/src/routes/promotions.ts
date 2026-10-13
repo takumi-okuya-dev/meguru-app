@@ -139,7 +139,7 @@ export function promotionRoutes(authed: MiddlewareHandler<AppEnv>) {
     .get("/accounts/:accountId/promotions", authed, async (c) => {
       const db = createDb(c.env.DATABASE_URL);
       const user = c.get("user");
-      const access = await authorizeAccount(db, user, c.req.param("accountId"), "view");
+      const access = await authorizeAccount(db, user, c.req.param("accountId"), "read");
       const account = access.account;
       const now = new Date();
       const rows = await db.select().from(promotions).where(eq(promotions.accountId, account.id));

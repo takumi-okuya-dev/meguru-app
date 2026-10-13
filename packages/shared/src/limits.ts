@@ -166,8 +166,10 @@ export const ACTIVITY_DETAILS_EXCERPT_LIMIT = 50;
 export const ACTIVITY_SUMMARY_CHARS = 30;
 /** チーム名の上限（文字。FR-015）。 */
 export const TEAM_NAME_MAX = 50;
-/** 手伝っているアカウントのまとめに出す件数の上限（research.md R12）。 */
-export const PARTNER_SUMMARY_LIMIT = 100;
+/** 1チームの人数の上限（管理者・メンバー・編集者を合わせて。specs/011 Assumptions）。 */
+export const TEAM_MEMBER_LIMIT = 50;
+/** 1人が管理者のチームの上限（specs/011 Assumptions）。 */
+export const TEAMS_PER_ADMIN = 20;
 /** 操作の記録の1回の件数（既定。FR-052）。 */
 export const ACTIVITY_PAGE_SIZE = 50;
 /** 操作の記録の1回の件数の上限。 */

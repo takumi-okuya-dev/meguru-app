@@ -94,7 +94,7 @@ export function researchRoutes(authed: MiddlewareHandler<AppEnv>) {
       .get("/accounts/:accountId/reference-posts", authed, async (c) => {
         const db = createDb(c.env.DATABASE_URL);
         const user = c.get("user");
-        const access = await authorizeAccount(db, user, c.req.param("accountId"), "view");
+        const access = await authorizeAccount(db, user, c.req.param("accountId"), "read");
         const account = access.account;
         const rows = await db
           .select()
@@ -187,7 +187,7 @@ export function researchRoutes(authed: MiddlewareHandler<AppEnv>) {
       .get("/accounts/:accountId/research-keywords", authed, async (c) => {
         const db = createDb(c.env.DATABASE_URL);
         const user = c.get("user");
-        const access = await authorizeAccount(db, user, c.req.param("accountId"), "view");
+        const access = await authorizeAccount(db, user, c.req.param("accountId"), "read");
         const account = access.account;
         const rows = await db
           .select()

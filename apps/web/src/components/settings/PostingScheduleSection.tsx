@@ -41,7 +41,7 @@ async function savedMessage(accountId: string, schedule: PostingSchedule): Promi
 
 /**
  * 「投稿のスケジュール」の区分。自動投稿・投稿する時刻・時刻を少しずらすの3つの行と、「接続を確かめる」。
- * 設定の権限がない人（任されていないパートナー・編集者）には、読むだけで出す（specs/008 FR-041）。
+ * 設定の権限がない人（担当の人。設定はオーナーだけ。specs/011 FR-060）には、読むだけで出す（specs/008 FR-041）。
  * @param props - account：Account、canEdit：設定の権限、canReconnect：再接続できる（オーナー）、onReconnect：再接続を始める
  * @returns 区分
  */

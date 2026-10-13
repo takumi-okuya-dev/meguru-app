@@ -1,5 +1,5 @@
-// 招待リンクのダイアログ（specs/008-team-operations contracts/ui-routes.md「招待のダイアログ」、research.md R6）。
-// パートナーの招待と編集者の招待で共用する。PCは中央のダイアログ、767px以下は全画面のシート。
+// チームの招待リンクのダイアログ（specs/011-team-revision contracts/ui-routes.md「チームの画面」、仕組みは specs/008 research.md R6）。
+// PCは中央のダイアログ、767px以下は全画面のシート。
 import { CopyIcon, ShareIcon, XIcon } from "lucide-react";
 import { useRef, useState, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
