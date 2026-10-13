@@ -101,7 +101,8 @@ export function researchRoutes(authed: MiddlewareHandler<AppEnv>) {
           .from(referencePosts)
           .where(eq(referencePosts.accountId, account.id))
           .orderBy(desc(referencePosts.createdAt), desc(referencePosts.id));
-        return c.json({ items: rows.map(toReferencePost), limit: REFERENCE_POST_LIMIT, canEdit: canEditProfile(account, access.owner) });
+        // 直せるのは content の権限がある人だけ（見せてもらっている人は読むだけ。PR #14 のCodexレビュー）
+        return c.json({ items: rows.map(toReferencePost), limit: REFERENCE_POST_LIMIT, canEdit: canEditProfile(account, access.owner) && access.permissions.has("content") });
       })
       .post("/accounts/:accountId/reference-posts", authed, async (c) => {
         const db = createDb(c.env.DATABASE_URL);
@@ -194,7 +195,8 @@ export function researchRoutes(authed: MiddlewareHandler<AppEnv>) {
           .from(researchKeywords)
           .where(eq(researchKeywords.accountId, account.id))
           .orderBy(desc(researchKeywords.createdAt), desc(researchKeywords.id));
-        return c.json({ items: rows.map(toKeyword), limit: KEYWORD_LIMIT, canEdit: canEditProfile(account, access.owner) });
+        // 直せるのは content の権限がある人だけ（PR #14 のCodexレビュー）
+        return c.json({ items: rows.map(toKeyword), limit: KEYWORD_LIMIT, canEdit: canEditProfile(account, access.owner) && access.permissions.has("content") });
       })
       .post("/accounts/:accountId/research-keywords", authed, async (c) => {
         const db = createDb(c.env.DATABASE_URL);

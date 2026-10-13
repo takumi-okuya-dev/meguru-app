@@ -464,11 +464,11 @@ function StockPageContent() {
                   renderCard={renderCard}
                   failed={value === "approved" ? data.publishFailed : undefined}
                   approvedNotice={
-                    data.autoPost.stoppedReason === "needs_reconnect" ? (
+                    data.autoPost?.stoppedReason === "needs_reconnect" ? (
                       "Threadsとの接続が切れているため、自動投稿を止めています"
-                    ) : data.autoPost.stoppedReason === "rate_limited" ? (
+                    ) : data.autoPost?.stoppedReason === "rate_limited" ? (
                       "Threadsの投稿数の上限に達したため、今日の投稿を止めました"
-                    ) : data.autoPost.enabled ? (
+                    ) : data.autoPost?.enabled ? (
                       "上から順に、投稿する時刻に1件ずつThreadsへ投稿します"
                     ) : (
                       <>

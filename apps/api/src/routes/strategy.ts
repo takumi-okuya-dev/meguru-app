@@ -30,7 +30,11 @@ export function strategyRoutes(authed: MiddlewareHandler<AppEnv>) {
       const user = c.get("user");
       const access = await authorizeAccount(db, user, c.req.param("accountId"), "read");
       const account = access.account;
-      return c.json({ ...(await getStrategy(db, account.id)), canEdit: canEditProfile(account, access.owner) });
+      // 直せるのは content の権限がある人だけ（見せてもらっている人は読むだけ。PR #14 のCodexレビュー）
+      return c.json({
+        ...(await getStrategy(db, account.id)),
+        canEdit: canEditProfile(account, access.owner) && access.permissions.has("content"),
+      });
     })
     .put("/accounts/:accountId/strategy", authed, async (c) => {
       const db = createDb(c.env.DATABASE_URL);

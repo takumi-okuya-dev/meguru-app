@@ -45,7 +45,7 @@ export function postDraftRoutes(authed: MiddlewareHandler<AppEnv>) {
       const user = c.get("user");
       const access = await authorizeAccount(db, user, c.req.param("accountId"), "read");
       const account = access.account;
-      // 見せてもらっている人には、設定（NGワード・作る件数）を見せない（specs/011 FR-031、Constitution原則V）
+      // 見せてもらっている人には、設定（NGワード・作る件数）と自動投稿の状態を見せない（specs/011 FR-031、Constitution原則V）
       const viewer = access.relation === "shared_viewer";
       const [drafts, ngWordRows] = await Promise.all([
         listAllDrafts(db, account),
@@ -53,6 +53,8 @@ export function postDraftRoutes(authed: MiddlewareHandler<AppEnv>) {
       ]);
       return c.json({
         ...drafts,
+        // 自動投稿の状態と投稿の予定の時刻も view なので、見せてもらっている人には返さない（PR #14 のCodexレビュー）
+        ...(viewer ? { autoPost: null, schedule: {} } : {}),
         limits: { needsReview: NEEDS_REVIEW_LIMIT, approved: APPROVED_LIMIT },
         ngWords: ngWordRows.map(toNgWord),
         canGeneratePrompt: !viewer && canEditProfile(account, access.owner),

@@ -147,7 +147,8 @@ export function promotionRoutes(authed: MiddlewareHandler<AppEnv>) {
       return c.json({
         items: sortPromotions(rows.map((r) => toPromotion(r, now)), now),
         limit: PROMOTION_LIMIT,
-        canEdit: canEditProfile(account, access.owner, now),
+        // 直せるのは content の権限がある人だけ（見せてもらっている人は読むだけ。PR #14 のCodexレビュー）
+        canEdit: canEditProfile(account, access.owner, now) && access.permissions.has("content"),
       });
     })
     .post("/accounts/:accountId/promotions", authed, async (c) => {

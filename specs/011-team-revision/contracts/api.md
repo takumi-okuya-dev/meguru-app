@@ -9,8 +9,8 @@
 | code | HTTP | いつ |
 |---|---|---|
 | `TEAM_NOT_FOUND` | 404 | チームがない・チームの人でない（008のまま） |
-| `TEAM_LIMIT_REACHED` | 409 | 管理者のチームが20に達した |
-| `TEAM_FULL` | 409 | チームが50人、または編集者が10人に達した（`details: ["members"]`／`["editors"]`） |
+| `TEAM_LIMIT_REACHED` | 409 | 管理者のチームが20に達した（作るとき、また引き継ぐ相手がすでに20チームの管理者のとき。PR #14 のCodexレビュー） |
+| `TEAM_FULL` | 409 | チームが50人、または編集者が10人に達した（`details: ["members"]`／`["editors"]`）。抜けずに引き継いで前の管理者が編集者になり、10人を超えるときも |
 | `TEAM_NEEDS_ACCOUNT` | 409 | 自分のアカウントを1つも選んでいない・持っていない |
 | `ACCOUNT_IN_OTHER_TEAM` | 409 | 選んだアカウントがほかのチームに入っている（`details: [accountId]`） |
 | `TEAM_LAST_ACCOUNT` | 409 | 最後のアカウントを外そうとした |
@@ -98,5 +98,5 @@
 |---|---|
 | `GET /api/accounts/:accountId/access` | `read`。応答に`relation`・`team`（`{ id, name, myRole } \| null`）・`assignedNotice`（担当の知らせを出すか）。`role`・`delegation`を消し、`hasTeam`の意味を改める（`hasTeam`＝チームに入っている） |
 | `GET /api/accounts/:accountId/team` | `read`。応答：`{ team: { id, name, admin: { userId, name }, shared } \| null, owner, viewerUserId, assignees: [{ userId, name, role }] }`（009のカードを改める。FR-055。`shared`は設定の「チームに見せる」のスイッチに使う） |
-| 投稿ストック・戦略のGET | `read`（permissions.mdの表）。見せてもらっている人には、`GET /post-drafts`の`ngWords`を空、`canGeneratePrompt`をfalse、`promptPostCount`・`promptPostCountVersion`をNULLで返す（設定は見せない。FR-031） |
+| 投稿ストック・戦略のGET | `read`（permissions.mdの表）。見せてもらっている人には、`GET /post-drafts`の`ngWords`を空、`canGeneratePrompt`をfalse、`promptPostCount`・`promptPostCountVersion`・`autoPost`をNULL、`schedule`を空で返す（設定と自動投稿の状態は見せない。FR-031）。戦略・宣伝内容・参考投稿・キーワードの`canEdit`は、`content`の権限がなければfalse |
 | `POST /api/accounts/:accountId/assigned-notice/dismiss` | `assigned`。担当の知らせを閉じる（R9） |

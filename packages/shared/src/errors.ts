@@ -204,7 +204,7 @@ export function errorMessage(code: ErrorCode, ctx: ErrorMessageContext = {}): Er
     case "TEAM_NOT_FOUND":
       return { message: "チームが見つかりません。", action: "back-to-accounts" };
     case "TEAM_LIMIT_REACHED":
-      return { message: `管理者として作れるチームは${TEAMS_PER_ADMIN}までです。`, action: "none" };
+      return { message: `1人が管理者になれるチームは${TEAMS_PER_ADMIN}までです。`, action: "none" };
     case "TEAM_FULL":
       return ctx.details?.[0] === "editors"
         ? { message: `編集者が上限（${TEAM_EDITOR_LIMIT}人）に達しています。`, action: "none" }

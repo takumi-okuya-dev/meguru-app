@@ -7,6 +7,7 @@ import { alias } from "drizzle-orm/pg-core";
 import type { Env } from "../env";
 import type { Db, TxDb } from "../db/client";
 import { accounts, memberships, teamAccounts, teamMembers, teams, users } from "../db/schema";
+import { lockAdminTeams } from "../db/locks";
 import { AppError } from "../lib/errors";
 import { insertActivity } from "./activity-log";
 import {
@@ -119,9 +120,9 @@ export async function listMyTeams(db: Db | TxDb, userId: string) {
  */
 export async function createTeam(env: Env, tx: TxDb, user: { id: string }, input: { name: string; accountIds: string[] }) {
   await tx.select({ id: users.id }).from(users).where(eq(users.id, user.id)).for("update");
-  const [owned] = await tx.select({ n: count() }).from(teams).where(eq(teams.adminUserId, user.id));
-  if (Number(owned?.n ?? 0) >= TEAMS_PER_ADMIN) throw new AppError("TEAM_LIMIT_REACHED", 409, "team limit reached");
   await assertOwnFreeAccounts(tx, user.id, input.accountIds);
+  // 管理者のチームの数のロックは、行ロックの後に取る（db/locks.ts の lockAdminTeams）
+  await assertCanAdminMore(tx, user.id);
   const teamId = crypto.randomUUID();
   const sealed = await sealInviteToken(env, newInviteToken(), teamId);
   const now = new Date();
@@ -142,6 +143,28 @@ export async function createTeam(env: Env, tx: TxDb, user: { id: string }, input
   const name = await nameOf(tx, user.id);
   await recordTeam(tx, { id: user.id, name, role: "admin" }, ids, { action: "team_created", summary: input.name });
   return teamId;
+}
+
+/**
+ * その人が、もう1つのチームの管理者になれるか（20チームまで）。引き継ぎと同じロックで数える。
+ * @param tx - トランザクション
+ * @param userId - 管理者になる人
+ * @returns なれるなら true
+ */
+async function canAdminMore(tx: TxDb, userId: string): Promise<boolean> {
+  await lockAdminTeams(tx, userId);
+  const [owned] = await tx.select({ n: count() }).from(teams).where(eq(teams.adminUserId, userId));
+  return Number(owned?.n ?? 0) < TEAMS_PER_ADMIN;
+}
+
+/**
+ * その人が、もう1つのチームの管理者になれることを確かめる。
+ * @param tx - トランザクション
+ * @param userId - 管理者になる人
+ * @throws AppError TEAM_LIMIT_REACHED（すでに20チームの管理者）
+ */
+async function assertCanAdminMore(tx: TxDb, userId: string) {
+  if (!(await canAdminMore(tx, userId))) throw new AppError("TEAM_LIMIT_REACHED", 409, "team limit reached");
 }
 
 /**
@@ -571,7 +594,8 @@ async function detachMember(tx: TxDb, teamId: string, userId: string, actor: Tea
  * @param teamAccess - authorizeTeamAdmin の結果（鍵をかけてある）
  * @param newAdminUserId - 新しい管理者（チームの人）
  * @param opts - leaving：引き継いだ後にそのまま抜ける（編集者の上限を数えない）
- * @throws AppError TEAM_NOT_FOUND（チームの人でない）、VALIDATION_FAILED（自分）、TEAM_FULL（編集者が上限を超える）
+ * @throws AppError TEAM_NOT_FOUND（チームの人でない）、VALIDATION_FAILED（自分）、TEAM_FULL（編集者が上限を超える）、
+ *   TEAM_LIMIT_REACHED（引き継ぐ人がすでに20チームの管理者）
  */
 export async function transferAdmin(
   tx: TxDb,
@@ -594,6 +618,8 @@ export async function transferAdmin(
     const after = (await editorCount(tx, teamId)) - (to.role === "editor" ? 1 : 0) + 1;
     if (after > TEAM_EDITOR_LIMIT) throw new AppError("TEAM_FULL", 409, "editor limit", undefined, ["editors"]);
   }
+  // 引き継ぐ人が管理者のチームも20まで（createTeam と同じ上限。PR #14 のCodexレビュー）
+  await assertCanAdminMore(tx, to.id);
   // 部分一意索引（管理者は1人）を守るため、前の管理者を先に変える
   await tx.update(teamMembers).set({ role: fromRole }).where(and(eq(teamMembers.teamId, teamId), eq(teamMembers.userId, from.id)));
   await tx.update(teamMembers).set({ role: "admin" }).where(and(eq(teamMembers.teamId, teamId), eq(teamMembers.userId, to.id)));
@@ -669,12 +695,20 @@ export async function beforeAccountDeleted(tx: TxDb, accountId: string, ownerUse
   }
   const me = await memberOf(tx, teamId, ownerUserId);
   if (me.role === "admin") {
-    const [next] = await tx
+    // いちばん長くいる人へ引き継ぐ。ただし、すでに20チームの管理者の人は飛ばす（PR #14 のCodexレビュー）
+    const others = await tx
       .select({ userId: teamMembers.userId })
       .from(teamMembers)
       .where(and(eq(teamMembers.teamId, teamId), ne(teamMembers.userId, ownerUserId)))
-      .orderBy(asc(teamMembers.joinedAt), asc(teamMembers.userId))
-      .limit(1);
+      .orderBy(asc(teamMembers.joinedAt), asc(teamMembers.userId));
+    let next: { userId: string } | undefined;
+    for (const o of others) {
+      if (await canAdminMore(tx, o.userId)) {
+        next = o;
+        break;
+      }
+    }
+    // 引き継げる人がいなければ、チームを消す（管理者のいないチームを残さない）
     if (!next) {
       await tx.delete(teams).where(eq(teams.id, teamId));
       return;

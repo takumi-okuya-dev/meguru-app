@@ -92,7 +92,25 @@ describe("PATCH /api/teams/:teamId/accounts/:accountId（チームに見せる�
     // 作る件数も設定なので返さない（PR #14 のCodexレビュー）
     expect(body.promptPostCount).toBeNull();
     expect(body.promptPostCountVersion).toBeNull();
+    // 自動投稿の状態と投稿の予定の時刻も view なので返さない（PR #14 のCodexレビュー）
+    const raw = body as unknown as { autoPost: unknown; schedule: Record<string, string> };
+    expect(raw.autoPost).toBeNull();
+    expect(raw.schedule).toEqual({});
     expect(JSON.stringify(body)).not.toContain("秘密の言葉");
+  });
+
+  it("見せてもらっている人には、戦略・宣伝内容・参考投稿・キーワードの canEdit が false（読むだけ。PR #14 のCodexレビュー）", async () => {
+    const { teamId, ownerAcc } = await setup();
+    await sql()`UPDATE accounts SET plan = 'team' WHERE id = ${ownerAcc}`;
+    expect((await share(teamId, ownerAcc, "o1", true)).status).toBe(204);
+    for (const path of ["strategy", "promotions", "reference-posts", "research-keywords"]) {
+      const viewer = (await (await call(app, "GET", `/api/accounts/${ownerAcc}/${path}`, { user: "m1" })).json()) as { canEdit: boolean };
+      expect(viewer.canEdit, `viewer ${path}`).toBe(false);
+      const owner = (await (await call(app, "GET", `/api/accounts/${ownerAcc}/${path}`, { user: "o1" })).json()) as { canEdit: boolean };
+      expect(owner.canEdit, `owner ${path}`).toBe(true);
+      const editor = (await (await call(app, "GET", `/api/accounts/${ownerAcc}/${path}`, { user: "e1" })).json()) as { canEdit: boolean };
+      expect(editor.canEdit, `editor ${path}`).toBe(true);
+    }
   });
 });
 

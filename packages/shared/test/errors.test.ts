@@ -48,7 +48,7 @@ describe("チームの見直しのエラー文言（specs/011 contracts/api.md�
   });
 
   it("文言", () => {
-    expect(errorMessage("TEAM_LIMIT_REACHED").message).toBe("管理者として作れるチームは20までです。");
+    expect(errorMessage("TEAM_LIMIT_REACHED").message).toBe("1人が管理者になれるチームは20までです。");
     expect(errorMessage("TEAM_FULL").message).toContain("上限（50人）");
     expect(errorMessage("TEAM_FULL", { details: ["editors"] }).message).toBe("編集者が上限（10人）に達しています。");
     expect(errorMessage("TEAM_NEEDS_ACCOUNT").message).toContain("1つ以上選んでください");

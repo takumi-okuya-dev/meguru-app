@@ -132,6 +132,42 @@ describe("引き継ぎと編集者の上限（PR #14 のCodexレビュー）", (
   });
 });
 
+describe("引き継ぎと管理者のチームの上限（PR #14 のCodexレビュー）", () => {
+  it("引き継ぐ人がすでに20チームの管理者なら TEAM_LIMIT_REACHED。抜けるときの引き継ぎでも止まる", async () => {
+    const { teamId, m1 } = await setup();
+    for (let i = 0; i < 20; i++) await makeTeam("m1", []);
+    for (const [path, body] of [
+      [`/api/teams/${teamId}/admin`, { userId: m1 }],
+      [`/api/teams/${teamId}/leave`, { newAdminUserId: m1 }],
+    ] as const) {
+      const res = await call(app, "POST", path, { user: "a1", body });
+      expect([res.status, await errorOf(res)], path).toEqual([409, "TEAM_LIMIT_REACHED"]);
+    }
+    expect((await teamMemberRows(teamId)).find((m) => m.user === "a1")!.role).toBe("admin");
+  });
+
+  it("最後のアカウントの削除での引き継ぎは、20チームの管理者を飛ばして次に長くいる人へ", async () => {
+    const { teamId, adminAcc } = await setup();
+    for (let i = 0; i < 20; i++) await makeTeam("m1", []);
+    expect((await deleteAccount(adminAcc, "a1")).status).toBe(204);
+    expect(await teamMemberRows(teamId)).toEqual([
+      { user: "m1", role: "member" },
+      { user: "e1", role: "admin" },
+    ]);
+  });
+
+  it("引き継げる人が誰もいなければ、チームを消す", async () => {
+    const { accountId: adminAcc } = await createUserWithAccount("a1");
+    const { accountId: memberAcc } = await createUserWithAccount("m1");
+    const { teamId } = await makeTeam("a1", [adminAcc]);
+    await joinTeam(teamId, "m1", [memberAcc]);
+    for (let i = 0; i < 20; i++) await makeTeam("m1", []);
+    expect((await deleteAccount(adminAcc, "a1")).status).toBe(204);
+    const [row] = (await sql()`SELECT count(*)::int AS n FROM teams WHERE id = ${teamId}`) as { n: number }[];
+    expect(row!.n).toBe(0);
+  });
+});
+
 describe("DELETE /api/teams/:teamId/members/:userId（外す）", () => {
   it("管理者だけが外せる。自分は外せない。外すとその人のアカウントと担当が外れる", async () => {
     const { teamId, adminUserId, memberAcc, e1 } = await setup();

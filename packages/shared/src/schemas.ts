@@ -496,7 +496,8 @@ export const postDraftListSchema = z.object({
   publishFailed: z.array(postDraftSchema),
   /** 下書きのIDから、投稿の予定の時刻（ISO 8601）へ。オフ・停止中は {}（005） */
   schedule: z.record(z.string(), z.string()),
-  autoPost: autoPostStateSchema,
+  /** 自動投稿の状態。見せてもらっている人にはNULL（自動投稿の状態は view。specs/011 FR-031、PR #14 のCodexレビュー） */
+  autoPost: autoPostStateSchema.nullable(),
   /** reviewedAt の新しい順に最大500件 */
   rejected: z.array(postDraftSchema),
   counts: draftCountsSchema,

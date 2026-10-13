@@ -43,3 +43,15 @@ export async function lockUserRow(tx: TxDb, userId: string): Promise<void> {
 export async function lockAccountDrafts(tx: TxDb, accountId: string): Promise<void> {
   await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${`account_items:${accountId}:post_drafts`}, 0))`);
 }
+
+/**
+ * 「その人が管理者のチームの数」のアドバイザリーロックを取る（specs/011 TEAMS_PER_ADMIN、PR #14 のCodexレビュー）。
+ * チームを作る・管理者を引き継ぐで、20チームの上限の数え方を直列にする。トランザクションの終わりで自動的に外れる。
+ * 行ロック（users・teams）を取った後に、最後に取る（このロックを持ったまま行ロックを待たない。アカウントの削除の
+ * 「users → teams」の順とぶつからないよう、users の行ロックの代わりに使う）。
+ * @param tx - トランザクション
+ * @param userId - users.id
+ */
+export async function lockAdminTeams(tx: TxDb, userId: string): Promise<void> {
+  await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${"admin_teams:" + userId}, 0))`);
+}
