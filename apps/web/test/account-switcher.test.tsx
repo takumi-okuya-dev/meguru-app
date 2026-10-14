@@ -184,7 +184,7 @@ describe("AccountSwitcherの横断要確認件数", () => {
     await userEvent.click(within(menu).getByRole("menuitem", { name: /Account a2/ }));
     expect(router.state.location.pathname).toBe("/accounts/a2");
     const secondMenu = await openMenu();
-    await userEvent.click(within(secondMenu).getByRole("menuitem", { name: /アカウントを追加/ }));
+    await userEvent.click(within(secondMenu).getByRole("menuitem", { name: /アカウントを作る/ }));
     expect(router.state.location.pathname).toBe("/accounts/new");
   });
 
@@ -437,7 +437,7 @@ describe("AccountSwitcherの状態と操作", () => {
     renderSwitcher();
     const menu = await openMenu();
     expect(await within(menu).findByRole("menuitem", { name: /Account a20/ })).toBeInTheDocument();
-    expect(within(menu).getByRole("menuitem", { name: /アカウントを追加/ })).toBeInTheDocument();
+    expect(within(menu).getByRole("menuitem", { name: /アカウントを作る/ })).toBeInTheDocument();
     expect(menu.className).toContain("overflow-y-auto");
     expect(menu.className).toContain("max-h-");
   });
@@ -455,7 +455,7 @@ describe("AccountSwitcherの状態と操作", () => {
     expect(row).toHaveTextContent("要確認 2件");
     expect(row).toHaveTextContent("要再接続");
     await userEvent.keyboard("{End}");
-    expect(within(menu).getByRole("menuitem", { name: /アカウントを追加/ })).toHaveFocus();
+    expect(within(menu).getByRole("menuitem", { name: /アカウントを作る/ })).toHaveFocus();
     await userEvent.keyboard("{Escape}");
     expect(screen.queryByRole("menu")).not.toBeInTheDocument();
   });
@@ -490,7 +490,7 @@ describe("AccountSwitcherの状態と操作", () => {
     expect(await within(menu).findByText("要確認 2件")).toBeInTheDocument();
     expect(menu).toContainElement(document.activeElement as HTMLElement);
     await userEvent.keyboard("{End}");
-    expect(within(menu).getByRole("menuitem", { name: /アカウントを追加/ })).toHaveFocus();
+    expect(within(menu).getByRole("menuitem", { name: /アカウントを作る/ })).toHaveFocus();
   });
 
   it("ドロワーから行を選ぶとonNavigateを呼ぶ", async () => {

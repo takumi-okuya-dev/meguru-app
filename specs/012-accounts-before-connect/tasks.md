@@ -144,13 +144,16 @@ description: "Task list for feature 012 accounts before connect"
 
 ### Tests for User Story 5
 
-- [ ] T036 [P] [US5] `apps/api/test/integration/account-rename.test.ts`を作り、`apps/api/test/integration/account-delete.test.ts`を直す：`PATCH /api/accounts/:id { name }`はオーナーだけ（担当の人・見せてもらっている人は拒まれる）、名前「1〜50文字」、チームがあるアカウントなら記録`account_renamed`（`{ from, to }`）。`DELETE`は`{ confirmName }`で、前後の空白を除いたアカウントの名前と一致しなければ`CONFIRMATION_MISMATCH`、未接続のアカウントも消せる（FR-040・FR-043）。
+- [X] T036 [P] [US5] `apps/api/test/integration/account-rename.test.ts`を作り、`apps/api/test/integration/account-delete.test.ts`を直す：`PATCH /api/accounts/:id { name }`はオーナーだけ（担当の人・見せてもらっている人は拒まれる）、名前「1〜50文字」、チームがあるアカウントなら記録`account_renamed`（`{ from, to }`）。`DELETE`は`{ confirmName }`で、前後の空白を除いたアカウントの名前と一致しなければ`CONFIRMATION_MISMATCH`、未接続のアカウントも消せる（FR-040・FR-043）。
+  - 実装メモ：削除の確認（`confirmName`）は Phase 2 で型を変えたときに先に直した（`account-delete.test.ts`・`profile-cascade.test.ts`・`team-leave.test.ts`）。権限の表（`test/helpers/routes.ts`）に`PATCH /api/accounts/:accountId`（owner）を足した。
 
 ### Implementation for User Story 5
 
-- [ ] T037 [US5] `apps/api/src/services/account-service.ts`に`renameAccount`を作り（`authorizeAccount(..., "owner")`、チームがあれば記録）、`deleteAccount`の確認を`confirmName`にする。`apps/api/src/routes/accounts.ts`に`PATCH /api/accounts/:accountId`を足し、`DELETE`の本文を直す。`apps/web/src/pages/activity.tsx`に`account_renamed`・`threads_connected`の文言を足す。
-- [ ] T038 [US5] `apps/web/test/account-settings.test.tsx`を先に直し、`apps/web/src/pages/account-settings.tsx`の一番上に「アカウントの名前」の区分（オーナーだけ。入力欄と「保存」、保存後に`queryKeys.me`とアカウントのクエリを取り直す）を足し、削除の確認を「確認のため、{name} と入力してください」・プレースホルダー`{name}`にし、未接続ならトークンの注意（010 FR-050）を出さない（contracts/ui-routes.md「このアカウントの設定」）。`apps/web/src/lib/api-client.ts`に`renameAccount`を足し、`deleteAccount`を`confirmName`にする。
-- [ ] T039 [US5] `apps/web/test/account-switcher.test.tsx`を先に直し、`apps/web/src/components/layout/AccountSwitcher.tsx`の一覧の各行と今のアカウントで、未接続に「未接続」の印（`ConnectionBadge`）を出す（US5-1）。
+- [X] T037 [US5] `apps/api/src/services/account-service.ts`に`renameAccount`を作り（`authorizeAccount(..., "owner")`、チームがあれば記録）、`deleteAccount`の確認を`confirmName`にする。`apps/api/src/routes/accounts.ts`に`PATCH /api/accounts/:accountId`を足し、`DELETE`の本文を直す。`apps/web/src/pages/activity.tsx`に`account_renamed`・`threads_connected`の文言を足す。
+- [X] T038 [US5] `apps/web/test/account-settings.test.tsx`を先に直し、`apps/web/src/pages/account-settings.tsx`の一番上に「アカウントの名前」の区分（オーナーだけ。入力欄と「保存」、保存後に`queryKeys.me`とアカウントのクエリを取り直す）を足し、削除の確認を「確認のため、{name} と入力してください」・プレースホルダー`{name}`にし、未接続ならトークンの注意（010 FR-050）を出さない（contracts/ui-routes.md「このアカウントの設定」）。`apps/web/src/lib/api-client.ts`に`renameAccount`を足し、`deleteAccount`を`confirmName`にする。
+  - 実装メモ：区分は`apps/web/src/components/settings/AccountNameSection.tsx`に分けた。見出しは「アカウントの名前」、入力欄のラベルは「名前」（同じ名前だと見出しとぶつかるため）。テストは`settings-connect.test.tsx`。
+- [X] T039 [US5] `apps/web/test/account-switcher.test.tsx`を先に直し、`apps/web/src/components/layout/AccountSwitcher.tsx`の一覧の各行と今のアカウントで、未接続に「未接続」の印（`ConnectionBadge`）を出す（US5-1）。
+  - 実装メモ：`ConnectionBadge`ではなく、切り替えメニューの2行目に「未接続」を出す形にした（@ユーザー名の位置。Phase 2 の T009 で実装し、`account-label-usage.test.tsx`で確かめる）。
 
 **Checkpoint**：未接続のアカウントを迷わず見分けられる。
 
@@ -162,7 +165,7 @@ description: "Task list for feature 012 accounts before connect"
 
 **Independent Test**：アカウントを1つ持つ利用者が、切り替えメニューから2つ目を名前だけで作る。上限なら作れない。
 
-- [ ] T040 [US6] `apps/web/test/account-switcher.test.tsx`・`apps/web/test/account-create.test.tsx`に足してから、`apps/web/src/components/layout/AccountSwitcher.tsx`の「Threadsアカウントを追加」を「アカウントを作る」（`/accounts/new`）にする。上限に達していても出し、押した先で案内する。2つ目以降はサイドバーの中（`AppShell`）で「登録済み n/m件」を出す（US6-1〜US6-4）。
+- [X] T040 [US6] `apps/web/test/account-switcher.test.tsx`・`apps/web/test/account-create.test.tsx`に足してから、`apps/web/src/components/layout/AccountSwitcher.tsx`の「Threadsアカウントを追加」を「アカウントを作る」（`/accounts/new`）にする。上限に達していても出し、押した先で案内する。2つ目以降はサイドバーの中（`AppShell`）で「登録済み n/m件」を出す（US6-1〜US6-4）。
 
 ---
 

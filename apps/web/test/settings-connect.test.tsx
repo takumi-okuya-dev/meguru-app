@@ -7,7 +7,7 @@ import { createMemoryRouter, Outlet, RouterProvider } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { OWNER_ACCESS } from "./helpers/access";
 
-const mocks = vi.hoisted(() => ({ me: vi.fn(), tokenConnect: vi.fn(), getPostingSchedule: vi.fn() }));
+const mocks = vi.hoisted(() => ({ me: vi.fn(), tokenConnect: vi.fn(), getPostingSchedule: vi.fn(), renameAccount: vi.fn() }));
 vi.mock("@/lib/api-client", async (orig) => {
   const actual = await orig<typeof import("@/lib/api-client")>();
   return {
@@ -16,6 +16,7 @@ vi.mock("@/lib/api-client", async (orig) => {
       ...actual.api,
       me: mocks.me,
       tokenConnect: mocks.tokenConnect,
+      renameAccount: mocks.renameAccount,
       accountAccess: vi.fn(async () => OWNER_ACCESS),
       getPostingRules: vi.fn(() => new Promise(() => {})),
       getPostingSchedule: mocks.getPostingSchedule,
@@ -76,6 +77,7 @@ beforeEach(() => {
   sessionStorage.clear();
   toastSuccess.mockReset();
   mocks.tokenConnect.mockReset();
+  mocks.renameAccount.mockReset();
   const me: MeResponse = {
     user: { id: "u", email: "u@example.com", displayName: null },
     accounts: [unconnected],
@@ -150,5 +152,43 @@ describe("未接続の投稿のスケジュール（specs/012 FR-032）", () => 
     const sw = within(dialog).getByRole("switch", { name: "自動投稿" });
     expect(sw).toBeDisabled();
     expect(sw).toHaveAccessibleDescription("Threadsにつなぐと使えます。時刻は先に決めておけます");
+  });
+});
+
+describe("アカウントの名前（specs/012 FR-040・FR-043、US5-3・US5-4）", () => {
+  it("オーナーは一番上の区分で名前を直せる。保存すると前後の空白を除いて送る", async () => {
+    mocks.renameAccount.mockResolvedValue({ ...connected, name: "カフェ本店" });
+    renderSettings(connected);
+    const input = await screen.findByRole("textbox", { name: "名前" });
+    expect(input).toHaveValue("カフェの公式");
+    const user = userEvent.setup();
+    await user.clear(input);
+    await user.type(input, " カフェ本店 ");
+    await user.click(screen.getByRole("button", { name: "名前を保存" }));
+    await vi.waitFor(() => expect(mocks.renameAccount).toHaveBeenCalledWith("a1", { name: "カフェ本店" }));
+    expect(toastSuccess).toHaveBeenCalledWith("名前を保存しました");
+  });
+
+  it("空・空白だけ・変えていないときは保存できない", async () => {
+    renderSettings(connected);
+    const input = await screen.findByRole("textbox", { name: "名前" });
+    const save = screen.getByRole("button", { name: "名前を保存" });
+    expect(save).toBeDisabled();
+    await userEvent.clear(input);
+    await userEvent.type(input, "   ");
+    expect(save).toBeDisabled();
+  });
+
+  it("削除の確認は、アカウントの名前を入れる。未接続ならトークンの注意を出さない", async () => {
+    renderSettings({ ...unconnected, connectionMethod: null });
+    await userEvent.click(await screen.findByRole("button", { name: "Accountを削除" }));
+    const dialog = await screen.findByRole("dialog");
+    expect(dialog).toHaveTextContent("確認のため、カフェの公式 と入力してください。");
+    expect(dialog).not.toHaveTextContent("Metaアプリ側のトークン");
+    const remove = within(dialog).getByRole("button", { name: "削除する" });
+    await userEvent.type(within(dialog).getByLabelText("確認のためのアカウントの名前"), "カフェ");
+    expect(remove).toBeDisabled();
+    await userEvent.type(within(dialog).getByLabelText("確認のためのアカウントの名前"), "の公式");
+    expect(remove).toBeEnabled();
   });
 });

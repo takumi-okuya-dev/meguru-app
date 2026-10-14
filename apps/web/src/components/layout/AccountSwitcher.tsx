@@ -235,7 +235,7 @@ export function AccountSwitcher({ onNavigate }: { onNavigate?: () => void }) {
             <DropdownMenuSeparator />
             <DropdownMenuItem asChild className="min-h-11 rounded-lg py-2">
               <Link to="/accounts/new" onClick={onNavigate}>
-                <PlusIcon className="size-4" aria-hidden="true" /> アカウントを追加
+                <PlusIcon className="size-4" aria-hidden="true" /> アカウントを作る
               </Link>
             </DropdownMenuItem>
           </>

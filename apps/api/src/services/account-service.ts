@@ -500,6 +500,33 @@ export async function verifyConnection(
   }
 }
 
+// ---- 名前を直す（specs/012 FR-040） ----
+
+/**
+ * アカウントの名前を直す。オーナーだけ。チームに入っているアカウントでは、前後の名前を操作の記録に残す。
+ * @param env - Workers のバインディング
+ * @param userId - users.id
+ * @param accountId - accounts.id
+ * @param name - 新しい名前（前後の空白を除いたもの）
+ * @returns 直した後の Account の行
+ * @throws AppError ACCOUNT_NOT_FOUND・ROLE_FORBIDDEN
+ */
+export async function renameAccount(env: Env, userId: string, accountId: string, name: string) {
+  return withTransaction(env.DATABASE_URL, async (tx) => {
+    const access = await authorizeAccount(tx, { id: userId }, accountId, "owner");
+    const from = access.account.name;
+    const [row] = await tx
+      .update(accounts)
+      .set({ name, updatedAt: new Date() })
+      .where(eq(accounts.id, access.account.id))
+      .returning();
+    if (from !== name) {
+      await recordActivity(tx, access, { kind: "settings", action: "account_renamed", details: { from, to: name } });
+    }
+    return row!;
+  });
+}
+
 // ---- Accountの削除（FR-022、research.md R13） ----
 
 /**

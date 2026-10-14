@@ -84,7 +84,7 @@ describe("Accountの切り替え（ドロップダウン）", () => {
     localStorage.clear();
   });
 
-  it("表示中のAccountのボタンからドロップダウンを開くと、一覧と「アカウントを追加」が出て、要再接続のAccountには「要再接続」と出る", async () => {
+  it("表示中のAccountのボタンからドロップダウンを開くと、一覧と「アカウントを作る」が出て、要再接続のAccountには「要再接続」と出る", async () => {
     renderShell();
     const trigger = await screen.findByRole("button", { name: /Accountを切り替える/ });
     await screen.findByText("@takumi");
@@ -93,7 +93,7 @@ describe("Accountの切り替え（ドロップダウン）", () => {
     expect(await screen.findByRole("menuitem", { name: /@takumi/ })).toBeInTheDocument();
     const aibu = screen.getByRole("menuitem", { name: /@aibu/ });
     expect(aibu).toHaveTextContent("要再接続");
-    expect(screen.getByRole("menuitem", { name: /アカウントを追加/ })).toBeInTheDocument();
+    expect(screen.getByRole("menuitem", { name: /アカウントを作る/ })).toBeInTheDocument();
   });
 });
 

@@ -1,12 +1,17 @@
 // /api/accounts/*（contracts/api.md）
-import { createAccountRequestSchema, deleteAccountRequestSchema, openAccountRequestSchema } from "@threads-grower/shared";
+import {
+  createAccountRequestSchema,
+  deleteAccountRequestSchema,
+  openAccountRequestSchema,
+  renameAccountRequestSchema,
+} from "@threads-grower/shared";
 import { Hono, type MiddlewareHandler } from "hono";
 import type { AppEnv } from "../app";
 import { createDb } from "../db/client";
 import { AppError } from "../lib/errors";
 import { createThreadsClient } from "../lib/threads-client";
 import { authorizeAccount, summaryRoleOf, toAccountSummary, type AccountAccess } from "../services/access";
-import { createAccount, deleteAccount, openAccount, verifyConnection } from "../services/account-service";
+import { createAccount, deleteAccount, openAccount, renameAccount, verifyConnection } from "../services/account-service";
 import { parseBody } from "../lib/validate";
 
 /**
@@ -59,6 +64,14 @@ export function accountRoutes(authed: MiddlewareHandler<AppEnv>) {
       await openAccount(c.env, user.id, access.account.id, parsed.data, receivedAt, access.relation === "owner");
       await verifyConnection(c.env, access.account.id, createThreadsClient(c.env));
       return c.json(summaryOf(await authorizeAccount(db, user, access.account.id, "view")));
+    })
+    .patch("/accounts/:accountId", authed, async (c) => {
+      // 名前を直す（オーナーだけ。specs/012 FR-040）。権限 → 入力の検証の順
+      const user = c.get("user");
+      await authorizeAccount(createDb(c.env.DATABASE_URL), user, c.req.param("accountId"), "owner");
+      const req = await parseBody(renameAccountRequestSchema, c.req.json());
+      const account = await renameAccount(c.env, user.id, c.req.param("accountId"), req.name);
+      return c.json(toAccountSummary(account));
     })
     .delete("/accounts/:accountId", authed, async (c) => {
       const user = c.get("user");

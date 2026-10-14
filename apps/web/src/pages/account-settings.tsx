@@ -13,6 +13,7 @@ import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router";
 import { toast } from "sonner";
 import { ConnectMethods } from "@/components/connect/ConnectMethods";
+import { AccountNameSection } from "@/components/settings/AccountNameSection";
 import { ConnectionBadge } from "@/components/ConnectionBadge";
 import { PageBody, PageHeader } from "@/components/layout/PageHeader";
 import { PostingRulesSection } from "@/components/settings/PostingRulesSection";
@@ -118,6 +119,9 @@ export function AccountSettings() {
             <ConnectionBadge status={account.connectionStatus} />
           </div>
         </section>
+
+        {/* 一番上に、主に出す名前（オーナーだけ。specs/012 FR-040） */}
+        {can("owner") && <AccountNameSection account={account} />}
 
         {/* つないだ直後の案内（specs/012 contracts/ui-routes.md「Threadsとの接続」） */}
         {justConnected && !notConnected && (
