@@ -13,6 +13,7 @@ import { TeamMark } from "@/components/team/TeamMark";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { ApiError, api, describeError } from "@/lib/api-client";
+import { rememberInviteReturn } from "@/lib/invite-return";
 import { queryKeys } from "@/lib/query";
 import { cn } from "@/lib/utils";
 
@@ -77,7 +78,7 @@ export function InvitePage() {
 
   const p = preview.data;
   const status = p.viewer.status;
-  const count = p.viewer.accounts.filter((a) => picked[a.id] && !a.inOtherTeam).length;
+  const count = p.viewer.accounts.filter((a) => picked[a.id] && !a.inOtherTeam && a.connected).length;
 
   return (
     <CenteredLayout>
@@ -130,12 +131,30 @@ export function InvitePage() {
 
           {status === "needs_account" && (
             <div className="space-y-2.5 rounded-xl border p-4">
-              <div className="font-medium">先に、自分のThreadsアカウントをつないでください</div>
+              <div className="font-medium">先に、自分のアカウントを作り、Threadsにつないでください</div>
               <p className="text-[13px] text-foreground/80">
-                チームに入るには、自分のThreadsアカウントが1つ以上要ります。つないだ後、このリンクに戻ってくると続きから参加できます。
+                チームに入るには、Threadsにつないだ自分のアカウントが1つ以上要ります。つないだ後、このリンクに戻ってくると続きから参加できます。
               </p>
               <Button asChild className="h-10 rounded-full">
-                <Link to={`/accounts/new?next=${encodeURIComponent(here)}`}>Threadsアカウントを追加</Link>
+                <Link to={`/accounts/new?next=${encodeURIComponent(here)}`}>アカウントを作る</Link>
+              </Button>
+            </div>
+          )}
+
+          {/* アカウントはあるが、どれもつないでいない（specs/012 FR-051）。つないだ後に、このリンクへ戻す */}
+          {status === "needs_connection" && p.viewer.accounts[0] && (
+            <div className="space-y-2.5 rounded-xl border p-4">
+              <div className="font-medium">先に、自分のアカウントをThreadsにつないでください</div>
+              <p className="text-[13px] text-foreground/80">
+                チームに入るには、Threadsにつないだ自分のアカウントが1つ以上要ります。つないだ後、このリンクに戻ってきます。
+              </p>
+              <Button asChild className="h-10 rounded-full">
+                <Link
+                  to={`/accounts/${p.viewer.accounts[0].id}/settings#threads`}
+                  onClick={() => rememberInviteReturn(here)}
+                >
+                  「{p.viewer.accounts[0].name}」をThreadsにつなぐ
+                </Link>
               </Button>
             </div>
           )}
@@ -145,7 +164,9 @@ export function InvitePage() {
               <fieldset className="space-y-2.5">
                 <legend className="mb-1 text-sm font-medium">チームに入れる自分のアカウント（1つ以上）</legend>
                 {p.viewer.accounts.map((a) => {
-                  const on = Boolean(picked[a.id]) && !a.inOtherTeam;
+                  // 未接続のアカウントは選べない（specs/012 FR-050）
+                  const unavailable = Boolean(a.inOtherTeam) || !a.connected;
+                  const on = Boolean(picked[a.id]) && !unavailable;
                   const label = a.name;
                   return (
                     <div
@@ -153,7 +174,7 @@ export function InvitePage() {
                       className={cn(
                         "flex flex-wrap items-center gap-3 rounded-xl border px-3 py-2.5",
                         on && "border-foreground",
-                        a.inOtherTeam && "opacity-60",
+                        unavailable && "opacity-60",
                       )}
                     >
                       <label className="flex min-w-0 flex-1 cursor-pointer items-center gap-3">
@@ -161,7 +182,7 @@ export function InvitePage() {
                           type="checkbox"
                           className="size-5 accent-foreground"
                           checked={on}
-                          disabled={Boolean(a.inOtherTeam)}
+                          disabled={unavailable}
                           onChange={(e) => setPicked((prev) => ({ ...prev, [a.id]: e.target.checked }))}
                           aria-label={`${label}をチームに入れる`}
                         />
@@ -169,7 +190,13 @@ export function InvitePage() {
                         <span className="flex min-w-0 flex-col leading-tight">
                           <span className="truncate font-medium">{label}</span>
                           <span className="truncate text-xs text-muted-foreground">
-                            {a.inOtherTeam ? `${a.inOtherTeam}に入っています` : (a.username ? `@${a.username}` : "未接続")}
+                            {a.inOtherTeam
+                              ? `${a.inOtherTeam}に入っています`
+                              : !a.connected
+                                ? "Threadsにつなぐと入れられます"
+                                : a.username
+                                  ? `@${a.username}`
+                                  : ""}
                           </span>
                         </span>
                       </label>

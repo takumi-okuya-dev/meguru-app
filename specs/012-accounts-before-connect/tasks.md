@@ -177,12 +177,14 @@ description: "Task list for feature 012 accounts before connect"
 
 ### Tests for User Story 7
 
-- [ ] T041 [P] [US7] `apps/api/test/integration/teams.test.ts`・`apps/api/test/integration/invites.test.ts`に足す：未接続のアカウントで`POST /api/teams`・`POST /api/teams/:teamId/accounts`・`POST /api/invites/:token/accept`が`ACCOUNT_NOT_CONNECTED`（`details: [accountId]`）。`GET /api/invites/:token`が、アカウントがあって未接続だけなら`needs_connection`（未接続のアカウントを`connected: false`で返す）、0件なら`needs_account`、つないだものがあれば`ready`で各行に`name`・`connected`（FR-050〜FR-052）。
+- [X] T041 [P] [US7] `apps/api/test/integration/teams.test.ts`・`apps/api/test/integration/invites.test.ts`に足す：未接続のアカウントで`POST /api/teams`・`POST /api/teams/:teamId/accounts`・`POST /api/invites/:token/accept`が`ACCOUNT_NOT_CONNECTED`（`details: [accountId]`）。`GET /api/invites/:token`が、アカウントがあって未接続だけなら`needs_connection`（未接続のアカウントを`connected: false`で返す）、0件なら`needs_account`、つないだものがあれば`ready`で各行に`name`・`connected`（FR-050〜FR-052）。
+  - 実装メモ：`teams.test.ts`・`invites.test.ts`には足さず、`apps/api/test/integration/team-unconnected.test.ts`にまとめた。
 
 ### Implementation for User Story 7
 
-- [ ] T042 [US7] `apps/api/src/services/invite-service.ts`の`assertOwnFreeAccounts`で`not_connected`のアカウントを`ACCOUNT_NOT_CONNECTED`で拒み、`ownedAccountsWithTeam`に`name`・`connected`を足し、`previewTeamInvite`の`needs_connection`を足す（research.md R7）。
-- [ ] T043 [US7] `apps/web/test/invite-page.test.tsx`・`apps/web/test/team-section.test.tsx`を先に直し、`apps/web/src/pages/invite.tsx`（`needs_account`：「先に、自分のアカウントを作り、Threadsにつないでください」と`/accounts/new?next=/invite/:token`、`needs_connection`：「先に、自分のアカウントをThreadsにつないでください」と最初の未接続のアカウントの`/accounts/:id/settings#threads`（押す前に`rememberInviteReturn`）、`ready`：未接続のアカウントを`disabled`で「Threadsにつなぐと入れられます」）と`apps/web/src/components/team/CreateTeamDialog.tsx`（同じ選べない形。つないだアカウントがなければ「先にThreadsにつないでください」と作るボタンを止める）を直す（contracts/ui-routes.md「招待の確認とチームを作る」）。
+- [X] T042 [US7] `apps/api/src/services/invite-service.ts`の`assertOwnFreeAccounts`で`not_connected`のアカウントを`ACCOUNT_NOT_CONNECTED`で拒み、`ownedAccountsWithTeam`に`name`・`connected`を足し、`previewTeamInvite`の`needs_connection`を足す（research.md R7）。
+- [X] T043 [US7] `apps/web/test/invite-page.test.tsx`・`apps/web/test/team-section.test.tsx`を先に直し、`apps/web/src/pages/invite.tsx`（`needs_account`：「先に、自分のアカウントを作り、Threadsにつないでください」と`/accounts/new?next=/invite/:token`、`needs_connection`：「先に、自分のアカウントをThreadsにつないでください」と最初の未接続のアカウントの`/accounts/:id/settings#threads`（押す前に`rememberInviteReturn`）、`ready`：未接続のアカウントを`disabled`で「Threadsにつなぐと入れられます」）と`apps/web/src/components/team/CreateTeamDialog.tsx`（同じ選べない形。つないだアカウントがなければ「先にThreadsにつないでください」と作るボタンを止める）を直す（contracts/ui-routes.md「招待の確認とチームを作る」）。
+  - 実装メモ：チームの画面の「アカウントを足す」の一覧（`apps/web/src/pages/team.tsx`）でも、未接続のアカウントを選べなくした（FR-052。テストは`team-page.test.tsx`）。
 
 **Checkpoint**：011の「1人1Threadsアカウント」が、未接続のアカウントでも守られる（quickstart.md 2の6）。
 

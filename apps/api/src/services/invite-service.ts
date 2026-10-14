@@ -147,6 +147,9 @@ export async function previewTeamInvite(env: Env, token: string, viewer: Viewer)
   const owned = await ownedAccountsWithTeam(db, viewer.id);
   // チームに入るには、自分のアカウントが1つ以上要る（FR-013）
   if (owned.length === 0) return { team, viewer: { status: "needs_account" as const, teamId: null, accounts: [] } };
+  // つないだアカウントがなければ、先につなぐよう案内する（未接続のアカウントを返し、画面が「Threadsとの接続」へ案内する。specs/012 FR-051）
+  if (!owned.some((a) => a.connected))
+    return { team, viewer: { status: "needs_connection" as const, teamId: null, accounts: owned } };
   return { team, viewer: { status: "ready" as const, teamId: null, accounts: owned } };
 }
 
@@ -155,7 +158,9 @@ export async function previewTeamInvite(env: Env, token: string, viewer: Viewer)
  * @param tx - トランザクション
  * @param userId - 利用者
  * @param accountIds - 選んだアカウント
- * @throws AppError TEAM_NEEDS_ACCOUNT（0件）、ACCOUNT_NOT_FOUND（自分のアカウントでない）、ACCOUNT_IN_OTHER_TEAM（ほかのチームに入っている）
+ * 未接続のアカウントは入れない（チームのアカウントは、どれも一度はThreadsにつないだもの。specs/012 FR-050・FR-052）。
+ * @throws AppError TEAM_NEEDS_ACCOUNT（0件）、ACCOUNT_NOT_FOUND（自分のアカウントでない）、ACCOUNT_NOT_CONNECTED（未接続）、
+ *   ACCOUNT_IN_OTHER_TEAM（ほかのチームに入っている）
  */
 export async function assertOwnFreeAccounts(tx: TxDb, userId: string, accountIds: string[]) {
   const ids = [...new Set(accountIds)];
@@ -167,6 +172,14 @@ export async function assertOwnFreeAccounts(tx: TxDb, userId: string, accountIds
     // 同じアカウントを同時に別のチームへ入れる操作と直列にする（入った後は一意索引でも守る）
     .for("update");
   if (owned.length !== ids.length) throw new AppError("ACCOUNT_NOT_FOUND", 404, "account not owned");
+  // 接続中のアカウントが未接続に戻ることはないので、ここで見た状態のまま入れてよい（specs/012 data-model.md「状態の移り変わり」）
+  const unconnected = await tx
+    .select({ id: accounts.id })
+    .from(accounts)
+    .where(and(inArray(accounts.id, ids), eq(accounts.connectionStatus, "not_connected")));
+  if (unconnected.length > 0) {
+    throw new AppError("ACCOUNT_NOT_CONNECTED", 409, "account not connected", undefined, unconnected.map((r) => r.id));
+  }
   const inTeam = await tx
     .select({ accountId: teamAccounts.accountId })
     .from(teamAccounts)

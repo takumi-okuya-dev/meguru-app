@@ -104,6 +104,24 @@ describe("TeamSection（チームに入っていないオーナー）", () => {
     expect(router.state.location.pathname).toBe("/teams/t-new");
   });
 
+  it("未接続のアカウントだけなら「先にThreadsにつないでください」で、選べず作れない（specs/012 FR-050・FR-051）", async () => {
+    me.mockResolvedValue({
+      ...meData,
+      accounts: [{ ...meData.accounts[0]!, name: "カフェの公式", username: null, displayName: null, connectionStatus: "not_connected" }],
+    });
+    const user = userEvent.setup();
+    renderSection();
+    await user.click(screen.getByRole("button", { name: "チームを作る" }));
+    const dialog = await screen.findByRole("dialog", { name: "チームを作る" });
+    expect(await within(dialog).findByText(/先にThreadsにつないでください/)).toBeInTheDocument();
+    const box = within(dialog).getByRole("checkbox", { name: "カフェの公式をチームに入れる" });
+    expect(box).toBeDisabled();
+    expect(box).not.toBeChecked();
+    expect(within(dialog).getByText("Threadsにつなぐと入れられます")).toBeInTheDocument();
+    await user.type(within(dialog).getByLabelText("チーム名"), "飲食チーム");
+    expect(within(dialog).getByRole("button", { name: "作る" })).toBeDisabled();
+  });
+
   it("担当の人には（チームに入っていなければ）何も出さない", () => {
     const { container } = render(
       <QueryClientProvider client={new QueryClient()}>

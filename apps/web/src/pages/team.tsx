@@ -560,16 +560,19 @@ export function TeamPage() {
             <ul className="space-y-2">
               {addable.map((a) => (
                 <li key={a.id}>
+                  {/* 未接続のアカウントは足せない（specs/012 FR-050） */}
                   <button
                     type="button"
-                    disabled={action.isPending}
+                    disabled={action.isPending || a.connectionStatus === "not_connected"}
                     onClick={() => action.mutate(() => api.addTeamAccount(teamId, a.id))}
-                    className="flex min-h-11 w-full items-center gap-3 rounded-xl border px-3 py-2 text-left hover:bg-accent"
+                    className="flex min-h-11 w-full items-center gap-3 rounded-xl border px-3 py-2 text-left hover:bg-accent disabled:opacity-60 disabled:hover:bg-transparent"
                   >
                     <AccountAvatar account={a} className="size-8" />
                     <span className="flex min-w-0 flex-col leading-tight">
                       <span className="truncate font-medium">{a.name}</span>
-                      <span className="truncate text-xs text-muted-foreground">{a.username ? `@${a.username}` : "未接続"}</span>
+                      <span className="truncate text-xs text-muted-foreground">
+                        {a.connectionStatus === "not_connected" ? "Threadsにつなぐと入れられます" : a.username ? `@${a.username}` : ""}
+                      </span>
                     </span>
                   </button>
                 </li>
