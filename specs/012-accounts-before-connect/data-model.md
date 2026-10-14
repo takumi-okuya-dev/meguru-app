@@ -49,9 +49,12 @@ OR (connection_status::text <> 'not_connected'
 
 未接続のアカウントには行を作らない。つないだときに`writeConnection`が作る（今のまま）。
 
-## oauth_states（変更なし、値だけ）
+## oauth_states（変更）
 
-`mode = connect`のとき、`target_account_id`は未接続のアカウント。`reconnect`は今のまま。
+- `mode = connect`のとき、`target_account_id`は未接続のアカウント。`reconnect`は今のまま。
+- `target_account_id`の外部キーを`ON DELETE CASCADE`から`ON DELETE SET NULL`にする。許可の画面にいる間に対象のアカウントが消されたとき、`state`ごと消えて「使えない`state`」になるのではなく、callbackで「見つからない」（`ACCOUNT_NOT_FOUND`）と分かるようにするため（contracts/api.md）。
+- CHECK `oauth_states_target_required_for_reconnect`を、`oauth_states_no_target_for_new`（`mode::text <> 'new' OR target_account_id IS NULL`）に置き換える（実装のときに足した）。
+- 列挙型の値の追加は`ADD VALUE IF NOT EXISTS`にする（実装の途中で0013を作り直したため、手元のDBで2回当たっても失敗しないように）。
 
 ## 操作の記録（activity_logs、変更なし）
 

@@ -2,7 +2,7 @@
 import { neon } from "@neondatabase/serverless";
 import { beforeEach, describe, expect, it } from "vitest";
 import { addMin, approvedDrafts, draftRow, jst, run, setSchedule } from "../helpers/auto-post";
-import { call, fake, makeApp, resetDb, testEnv } from "../helpers/app";
+import { fake, makeApp, resetDb, testEnv, tokenConnectNew } from "../helpers/app";
 
 const app = makeApp();
 const q = () => neon(testEnv.DATABASE_URL);
@@ -16,7 +16,7 @@ beforeEach(async () => {
 
 async function tokenAccount() {
   const token = await fake.issueToken({ user: "9003" });
-  const res = await call(app, "POST", "/api/threads/token-connect", { user: "u1", body: { mode: "new", token } });
+  const { res } = await tokenConnectNew(app, "u1", token);
   expect(res.status).toBe(200);
   return ((await res.json()) as { accountId: string }).accountId;
 }

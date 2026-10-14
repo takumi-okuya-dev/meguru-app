@@ -141,13 +141,58 @@ export async function authorizeAndCallback(
   return app.request(`${cb.pathname}${cb.search}`, { method: "GET" }, testEnv);
 }
 
-/** connect（mode=new）→ 認可 → callback をまとめて行う */
-export async function connectNew(app: TestApp, user: string, fakeUser: string, action: "allow" | "deny" = "allow") {
-  const res = await call(app, "POST", "/api/threads/connect", { user, body: { mode: "new" } });
-  if (res.status !== 200) return { connectRes: res, callbackRes: null as Response | null };
+/**
+ * 名前だけでアカウントを作る（POST /api/accounts。specs/012）。
+ * @returns 作ったアカウントのID。作れなければ（上限など）NULL と応答
+ */
+export async function createAccountVia(app: TestApp, user: string, name = "テストのアカウント") {
+  const res = await call(app, "POST", "/api/accounts", { user, body: { name } });
+  if (res.status !== 201) return { accountId: null as string | null, res };
+  return { accountId: ((await res.clone().json()) as { id: string }).id, res };
+}
+
+/**
+ * 未接続のアカウントに、このアプリの接続ではじめてつなぐ（connect（mode=connect）→ 認可 → callback）。
+ * @returns connect の応答と callback の応答（302）
+ */
+export async function connectExisting(
+  app: TestApp,
+  user: string,
+  accountId: string,
+  fakeUser: string,
+  action: "allow" | "deny" = "allow",
+) {
+  const res = await call(app, "POST", "/api/threads/connect", { user, body: { mode: "connect", accountId } });
+  if (res.status !== 200) return { connectRes: res, callbackRes: null as Response | null, authorizeUrl: undefined };
   const { authorizeUrl } = (await res.json()) as { authorizeUrl: string };
   const callbackRes = await authorizeAndCallback(app, authorizeUrl, { fakeUser, action });
   return { connectRes: res, callbackRes, authorizeUrl };
+}
+
+/**
+ * アカウントを作ってから、このアプリの接続でつなぐ（012 より前の「つないで追加」の代わり）。
+ * 作れなければ（上限など）、作る応答を connectRes に入れ、callbackRes は NULL。
+ * @returns 作ったアカウントのID・connect の応答・callback の応答
+ */
+export async function connectNew(app: TestApp, user: string, fakeUser: string, action: "allow" | "deny" = "allow") {
+  const created = await createAccountVia(app, user, `アカウント ${fakeUser}`);
+  if (!created.accountId) return { accountId: null, connectRes: created.res, callbackRes: null as Response | null, authorizeUrl: undefined };
+  return { accountId: created.accountId, ...(await connectExisting(app, user, created.accountId, fakeUser, action)) };
+}
+
+/**
+ * アカウントを作ってから、トークンでつなぐ（POST /api/threads/token-connect、mode=connect）。
+ * 作れなければ、作る応答を返す。
+ * @returns token-connect の応答（作れなければ作る応答）と、作ったアカウントのID
+ */
+export async function tokenConnectNew(app: TestApp, user: string, token: string, name = "トークンのアカウント") {
+  const created = await createAccountVia(app, user, name);
+  if (!created.accountId) return { accountId: null, res: created.res };
+  const res = await call(app, "POST", "/api/threads/token-connect", {
+    user,
+    body: { mode: "connect", accountId: created.accountId, token },
+  });
+  return { accountId: created.accountId, res };
 }
 
 export function redirectTarget(res: Response) {

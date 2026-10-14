@@ -1,12 +1,13 @@
 // /api/accounts/*（contracts/api.md）
-import { deleteAccountRequestSchema, openAccountRequestSchema } from "@threads-grower/shared";
+import { createAccountRequestSchema, deleteAccountRequestSchema, openAccountRequestSchema } from "@threads-grower/shared";
 import { Hono, type MiddlewareHandler } from "hono";
 import type { AppEnv } from "../app";
 import { createDb } from "../db/client";
 import { AppError } from "../lib/errors";
 import { createThreadsClient } from "../lib/threads-client";
 import { authorizeAccount, summaryRoleOf, toAccountSummary, type AccountAccess } from "../services/access";
-import { deleteAccount, openAccount, verifyConnection } from "../services/account-service";
+import { createAccount, deleteAccount, openAccount, verifyConnection } from "../services/account-service";
+import { parseBody } from "../lib/validate";
 
 /**
  * 判定の結果を、ログインした人から見た AccountSummary にする（specs/011 contracts/permissions.md）。
@@ -36,6 +37,12 @@ function summaryOf(access: AccountAccess) {
  */
 export function accountRoutes(authed: MiddlewareHandler<AppEnv>) {
   return new Hono<AppEnv>()
+    .post("/accounts", authed, async (c) => {
+      // 名前だけで、Threadsにつないでいないアカウントを作る（specs/012 contracts/api.md）
+      const req = await parseBody(createAccountRequestSchema, c.req.json());
+      const account = await createAccount(c.env, c.get("user").id, req.name);
+      return c.json(toAccountSummary(account), 201);
+    })
     .get("/accounts/:accountId", authed, async (c) => {
       // 副作用なし：DBに保存されている状態のまま返す
       const access = await authorizeAccount(createDb(c.env.DATABASE_URL), c.get("user"), c.req.param("accountId"), "read");

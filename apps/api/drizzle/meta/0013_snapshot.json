@@ -1,5 +1,5 @@
 {
-  "id": "ffe88a1a-3e0d-4c36-acce-2b7ae4458705",
+  "id": "b8dea1d5-9cf8-470e-8683-fc29787bd635",
   "prevId": "30610f06-5646-4791-9acd-c8753d3d28cc",
   "version": "7",
   "dialect": "postgresql",
@@ -967,7 +967,7 @@
           "columnsTo": [
             "id"
           ],
-          "onDelete": "cascade",
+          "onDelete": "set null",
           "onUpdate": "no action"
         }
       },
@@ -975,9 +975,9 @@
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {
-        "oauth_states_target_required_for_reconnect": {
-          "name": "oauth_states_target_required_for_reconnect",
-          "value": "(\"oauth_states\".\"mode\" = 'reconnect') = (\"oauth_states\".\"target_account_id\" IS NOT NULL)"
+        "oauth_states_no_target_for_new": {
+          "name": "oauth_states_no_target_for_new",
+          "value": "\"oauth_states\".\"mode\"::text <> 'new' OR \"oauth_states\".\"target_account_id\" IS NULL"
         }
       },
       "isRLSEnabled": false

@@ -2,7 +2,7 @@
 import { neon } from "@neondatabase/serverless";
 import { beforeEach, describe, expect, it } from "vitest";
 import { approvedDrafts } from "../helpers/auto-post";
-import { authorizeAndCallback, call, connectNew, fake, makeApp, redirectTarget, resetDb, testEnv } from "../helpers/app";
+import { authorizeAndCallback, call, connectNew, fake, makeApp, redirectTarget, resetDb, testEnv, tokenConnectNew } from "../helpers/app";
 import { activityRows, putInTeam } from "../helpers/team";
 
 const app = makeApp();
@@ -22,10 +22,7 @@ const account = async () =>
   ((await q()`SELECT a.*, c.recheck_at FROM accounts a JOIN threads_connections c ON c.account_id = a.id`) as Record<string, unknown>[])[0]!;
 
 async function tokenAccount(user = "u1") {
-  const res = await call(app, "POST", "/api/threads/token-connect", {
-    user,
-    body: { mode: "new", token: await fake.issueToken({ user: "9003" }) },
-  });
+  const { res } = await tokenConnectNew(app, user, await fake.issueToken({ user: "9003" }));
   return ((await res.json()) as { accountId: string }).accountId;
 }
 

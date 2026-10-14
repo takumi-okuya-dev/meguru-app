@@ -9,8 +9,7 @@ import {
   TargetIcon,
   type LucideIcon,
 } from "lucide-react";
-import { useEffect } from "react";
-import { Link, useNavigate } from "react-router";
+import { Link } from "react-router";
 import { NextPostCard } from "@/components/NextPostCard";
 import { AssignedNotice } from "@/components/team/AssignedNotice";
 import { TokenWarnings } from "@/components/connect/TokenWarnings";
@@ -22,8 +21,6 @@ import { PLAN_CHANGE_CONTACT } from "@/components/GrowerRequiredNotice";
 import { PageBody, PageHeader } from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/button";
 import { api } from "@/lib/api-client";
-import { useCallbackResult } from "@/lib/callback-result";
-import { takeInviteReturn } from "@/lib/invite-return";
 import { formatDate } from "@/lib/format";
 import { queryKeys } from "@/lib/query";
 import { cn } from "@/lib/utils";
@@ -72,14 +69,7 @@ function nextStep(s: ProfileStatus): { area: Area | null; title: string; body: s
  */
 export function AccountHome() {
   const account = useCurrentAccount();
-  const { connected } = useCallbackResult({ name: account.name, username: account.username });
-  // 招待リンクから追加に進んだ人は、このアプリで許可して戻ってきたら、リンクへ戻す（specs/011 T019）
-  const navigate = useNavigate();
-  useEffect(() => {
-    if (connected !== "new") return;
-    const back = takeInviteReturn();
-    if (back) void navigate(back, { replace: true });
-  }, [connected, navigate]);
+  // Threadsとつないだ結果と、招待へ戻す処理は「このアカウントの設定」で扱う（specs/012 research.md R4・R7）
   const status = useQuery({
     queryKey: queryKeys.profileStatus(account.id),
     queryFn: () => api.getProfileStatus(account.id),

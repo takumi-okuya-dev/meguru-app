@@ -127,9 +127,12 @@ export const needsReviewCountsResponseSchema = z.object({
 /** 所有Accountごとの要確認件数。 */
 export type NeedsReviewCountsResponse = z.infer<typeof needsReviewCountsResponseSchema>;
 
-/** POST /api/threads/connect のリクエストのスキーマ。新規（new）か再接続（reconnect）。 */
+/**
+ * POST /api/threads/connect のリクエストのスキーマ。未接続のアカウントにはじめてつなぐ（connect）か、接続し直す（reconnect）。
+ * つないでアカウントを作る（new）は specs/012 でなくした（research.md R4）。
+ */
 export const connectRequestSchema = z.discriminatedUnion("mode", [
-  z.object({ mode: z.literal("new") }),
+  z.object({ mode: z.literal("connect"), accountId: z.string().uuid() }),
   z.object({ mode: z.literal("reconnect"), accountId: z.string().uuid() }),
 ]);
 /** POST /api/threads/connect のリクエスト。 */
@@ -137,7 +140,7 @@ export type ConnectRequest = z.infer<typeof connectRequestSchema>;
 
 /** POST /api/threads/token-connect のリクエスト（specs/010 contracts/api.md）。トークンは前後を取り除く前のもの。 */
 export const tokenConnectRequestSchema = z.discriminatedUnion("mode", [
-  z.object({ mode: z.literal("new"), token: z.string().min(1).max(4096) }),
+  z.object({ mode: z.literal("connect"), accountId: z.string().uuid(), token: z.string().min(1).max(4096) }),
   z.object({ mode: z.literal("reconnect"), accountId: z.string().uuid(), token: z.string().min(1).max(4096) }),
 ]);
 /** POST /api/threads/token-connect のリクエスト。 */
@@ -146,7 +149,7 @@ export type TokenConnectRequestBody = z.infer<typeof tokenConnectRequestSchema>;
 /** POST /api/threads/token-connect のレスポンス。warnings は権限がないもの。 */
 export const tokenConnectResponseSchema = z.object({
   accountId: z.string(),
-  kind: z.enum(["new", "reconnect"]),
+  kind: z.enum(["connect", "reconnect"]),
   username: z.string(),
   warnings: z.array(z.enum(["no_publish_permission", "no_insights_permission"])),
 });

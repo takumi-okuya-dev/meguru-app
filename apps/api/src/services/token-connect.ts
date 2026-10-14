@@ -35,16 +35,16 @@ import { refreshUsernameOnlyMatch } from "./username-match";
 
 const MIN = 60_000;
 
-/** POST /api/threads/token-connect の要求（トークンは前後を取り除く前のもの）。 */
-export type TokenConnectRequest = { mode: "new"; token: string } | { mode: "reconnect"; accountId: string; token: string };
+/** POST /api/threads/token-connect の要求（トークンは前後を取り除く前のもの）。connect ははじめてつなぐ（specs/012）。 */
+export type TokenConnectRequest = { mode: "connect" | "reconnect"; accountId: string; token: string };
 
 /** 権限がないものの案内（contracts/api.md）。 */
 export type TokenWarning = "no_publish_permission" | "no_insights_permission";
 
-/** 追加・接続し直しの結果。 */
+/** つなぐ・接続し直しの結果。 */
 export type TokenConnectResult = {
   accountId: string;
-  kind: "new" | "reconnect";
+  kind: "connect" | "reconnect";
   username: string;
   warnings: TokenWarning[];
 };
@@ -176,7 +176,7 @@ async function inspectToken(threads: ThreadsClient, token: string): Promise<Insp
 }
 
 /**
- * トークンでAccountを追加する、または接続し直す（contracts/api.md の手順）。
+ * トークンで、未接続のAccountにはじめてつなぐ、または接続し直す（specs/010 contracts/api.md の手順、specs/012 research.md R4）。
  * @param env - Workers のバインディング
  * @param threads - Threads API のクライアント
  * @param user - ログインしたユーザー
@@ -192,9 +192,14 @@ export async function connectWithToken(
   now: Date = new Date(),
 ): Promise<TokenConnectResult> {
   const db = createDb(env.DATABASE_URL);
-  // 接続し直しはオーナーだけ（FR-034）。判定を先にして、権限のない人の要求を失敗に数えない
-  const targetAccountId =
-    req.mode === "reconnect" ? (await authorizeAccount(db, user, req.accountId, "owner")).account.id : null;
+  // つなぐ・接続し直すのはオーナーだけ（FR-034、specs/012 FR-015）。判定を先にして、権限のない人の要求や、
+  // もうつながっているアカウントへの connect を失敗に数えない（specs/012 contracts/api.md）
+  const { account } = await authorizeAccount(db, user, req.accountId, "owner");
+  if (req.mode === "connect" && account.connectionStatus !== "not_connected")
+    throw new AppError("ACCOUNT_ALREADY_CONNECTED", 409, "account already connected");
+  if (req.mode === "reconnect" && account.connectionStatus === "not_connected")
+    throw new AppError("ACCOUNT_NOT_CONNECTED", 409, "account not connected yet");
+  const targetAccountId = account.id;
 
   const reservation = await reserveCheck(env, user.id, now);
   let failure: FailureReason | null = null;
@@ -227,7 +232,7 @@ export async function connectWithToken(
  * @param threads - Threads API のクライアント
  * @param user - ログインしたユーザー
  * @param req - 要求
- * @param targetAccountId - 接続し直すAccount（新規なら null）
+ * @param targetAccountId - つなぐ・接続し直すAccount
  * @param now - 要求を受け取った時刻
  * @returns 確定したAccountと、権限の案内
  * @throws CountedFailure（数える失敗）、AppError（数えない失敗）
@@ -237,13 +242,12 @@ async function checkAndConnect(
   threads: ThreadsClient,
   user: { id: string },
   req: TokenConnectRequest,
-  targetAccountId: string | null,
+  targetAccountId: string,
   now: Date,
 ): Promise<TokenConnectResult> {
   const token = cleanToken(req.token);
   if (!isTokenShaped(token)) throw fail("invalid_format", invalid());
-  // 登録の上限は、同じアカウントの照合の後に completeConnection の中で判定する。上限に達していても、登録済みの
-  // アカウントのトークンなら「すでに登録されています」と接続し直しへ案内できるようにするため（US2-1）
+  // つなぐことではアカウントは増えないので、登録の上限は判定しない（specs/012 FR-016）
 
   const found = await inspectToken(threads, token);
   if (!found) throw fail("invalid", invalid());
@@ -282,7 +286,7 @@ async function checkAndConnect(
   if (recheckAt) await notifyWake(env.AUTOPOST_KV, new Date());
   return {
     accountId: result.accountId,
-    kind: result.kind === "reconnect" ? "reconnect" : "new",
+    kind: result.kind,
     username: profile.username,
     warnings,
   };

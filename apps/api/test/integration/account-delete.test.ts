@@ -2,7 +2,7 @@
 import { eq } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
 import { accounts, memberships, threadsConnections, users } from "../../src/db/schema";
-import { authorizeAndCallback, call, connectNew, db, fake, makeApp, redirectTarget, resetDb } from "../helpers/app";
+import { authorizeAndCallback, call, connectNew, createAccountVia, db, fake, makeApp, redirectTarget, resetDb } from "../helpers/app";
 
 const app = makeApp();
 
@@ -47,15 +47,13 @@ describe("DELETE /api/accounts/:id", () => {
     expect(u!.lastAccountDeletedAt).not.toBeNull();
   });
 
-  it("mode = new の認可の開始後に削除すると、その callback は ACCOUNT_DELETED_DURING_CONNECT で作り直されない", async () => {
-    await connectNew(app, "u1", "1001");
-    await db().update(accounts).set({ plan: "multi-account" });
-    const [a] = await db().select().from(accounts);
-    const res = await call(app, "POST", "/api/threads/connect", { user: "u1", body: { mode: "new" } });
+  it("認可の開始後にそのアカウントを削除すると、その callback は何も作らず /?error=ACCOUNT_NOT_FOUND（specs/012）", async () => {
+    const { accountId } = await createAccountVia(app, "u1", "消すアカウント");
+    const res = await call(app, "POST", "/api/threads/connect", { user: "u1", body: { mode: "connect", accountId } });
     const { authorizeUrl } = (await res.json()) as { authorizeUrl: string };
-    await call(app, "DELETE", `/api/accounts/${a!.id}`, { user: "u1", body: { confirmName: a!.name } });
+    await call(app, "DELETE", `/api/accounts/${accountId}`, { user: "u1", body: { confirmName: "消すアカウント" } });
     const cb = await authorizeAndCallback(app, authorizeUrl, { fakeUser: "1001" });
-    expect(redirectTarget(cb).searchParams.get("error")).toBe("ACCOUNT_DELETED_DURING_CONNECT");
+    expect(redirectTarget(cb).searchParams.get("error")).toBe("ACCOUNT_NOT_FOUND");
     expect(await db().select().from(accounts)).toHaveLength(0);
   });
 
@@ -64,7 +62,7 @@ describe("DELETE /api/accounts/:id", () => {
     const [a] = await db().select().from(accounts);
     await call(app, "DELETE", `/api/accounts/${a!.id}`, { user: "u1", body: { confirmName: a!.name } });
     const { callbackRes } = await connectNew(app, "u1", "1001");
-    expect(redirectTarget(callbackRes!).searchParams.get("connected")).toBe("new");
+    expect(redirectTarget(callbackRes!).searchParams.get("connected")).toBe("connect");
   });
 
   it("他人のAccountは 404", async () => {

@@ -1,0 +1,140 @@
+// US2：「このアカウントの設定」の「Threadsとの接続」（specs/012 FR-010〜FR-014、contracts/ui-routes.md「このアカウントの設定」）
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import type { AccountSummary, MeResponse } from "@threads-grower/shared";
+import { createMemoryRouter, Outlet, RouterProvider } from "react-router";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { OWNER_ACCESS } from "./helpers/access";
+
+const mocks = vi.hoisted(() => ({ me: vi.fn(), tokenConnect: vi.fn(), getPostingSchedule: vi.fn() }));
+vi.mock("@/lib/api-client", async (orig) => {
+  const actual = await orig<typeof import("@/lib/api-client")>();
+  return {
+    ...actual,
+    api: {
+      ...actual.api,
+      me: mocks.me,
+      tokenConnect: mocks.tokenConnect,
+      accountAccess: vi.fn(async () => OWNER_ACCESS),
+      getPostingRules: vi.fn(() => new Promise(() => {})),
+      getPostingSchedule: mocks.getPostingSchedule,
+      getAutoPost: vi.fn(() => new Promise(() => {})),
+      accountTeam: vi.fn(() => new Promise(() => {})),
+    },
+  };
+});
+const toastSuccess = vi.fn();
+vi.mock("sonner", () => ({ toast: { success: toastSuccess, error: vi.fn(), warning: vi.fn(), dismiss: vi.fn() } }));
+
+const { UnsavedChangesProvider } = await import("@/components/UnsavedChangesProvider");
+const { AccountSettings } = await import("@/pages/account-settings");
+
+const TOKEN = "THAAG" + "x".repeat(60);
+const INVITE = `/invite/t_${"b".repeat(43)}`;
+
+const unconnected: AccountSummary = {
+  id: "a1",
+  name: "カフェの公式",
+  username: null,
+  displayName: null,
+  profilePictureUrl: null,
+  plan: "auto-only",
+  connectionStatus: "not_connected",
+  connectionMethod: null,
+  lastUsedAt: null,
+  role: "owner",
+  ownerName: null,
+};
+const connected: AccountSummary = { ...unconnected, username: "cafe_b", displayName: "Cafe B", connectionStatus: "connected", connectionMethod: "app" };
+
+function renderSettings(account: AccountSummary, path = "/accounts/a1/settings") {
+  const router = createMemoryRouter(
+    [
+      {
+        path: "/accounts/:accountId",
+        element: (
+          <UnsavedChangesProvider>
+            <Outlet context={{ account }} />
+          </UnsavedChangesProvider>
+        ),
+        children: [{ path: "settings", element: <AccountSettings /> }],
+      },
+      { path: "/invite/:token", element: <p>招待の画面</p> },
+    ],
+    { initialEntries: [path] },
+  );
+  render(
+    <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+      <RouterProvider router={router} />
+    </QueryClientProvider>,
+  );
+  return router;
+}
+
+beforeEach(() => {
+  sessionStorage.clear();
+  toastSuccess.mockReset();
+  mocks.tokenConnect.mockReset();
+  const me: MeResponse = {
+    user: { id: "u", email: "u@example.com", displayName: null },
+    accounts: [unconnected],
+    landingAccountId: "a1",
+    accountLimit: { max: 1, used: 1 },
+    threadsAccessMode: "public",
+    teams: [],
+  };
+  mocks.me.mockResolvedValue(me);
+  mocks.getPostingSchedule.mockResolvedValue({
+    schedule: { enabled: false, slotTimes: [], jitter: true, version: 0 },
+    limits: { slots: 10, minGapMinutes: 30, jitterMinutes: 10 },
+  });
+});
+
+describe("このアカウントの設定の「Threadsとの接続」", () => {
+  it("未接続なら、2つの方法を出す。接続し直す・再接続は出さない（FR-010・FR-036）", async () => {
+    renderSettings(unconnected);
+    expect(await screen.findByRole("button", { name: "Threadsで許可する" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /自分のMetaアプリのトークンでつなぐ/ })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /接続し直す|再接続/ })).not.toBeInTheDocument();
+    expect(screen.queryByText(/今の接続/)).not.toBeInTheDocument();
+  });
+
+  it("許可の画面からつながって戻る（?connected=connect）と、「つながりました」と「自動投稿を始める」。トーストは出さない（US2-2）", async () => {
+    renderSettings(connected, "/accounts/a1/settings?connected=connect");
+    expect(await screen.findByText("カフェの公式をThreadsにつなぎました（@cafe_b）")).toBeInTheDocument();
+    expect(screen.getByText(/自動投稿はオフのままです/)).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "自動投稿を始める" })).toBeInTheDocument();
+    expect(toastSuccess).not.toHaveBeenCalled();
+  });
+
+  it("「自動投稿を始める」で、投稿のスケジュールの設定を開く（FR-014）", async () => {
+    renderSettings(connected, "/accounts/a1/settings?connected=connect");
+    await userEvent.click(await screen.findByRole("button", { name: "自動投稿を始める" }));
+    expect(await screen.findByRole("dialog", { name: "投稿のスケジュール" })).toBeInTheDocument();
+  });
+
+  it("接続し直して戻ったとき（?connected=reconnect）は、今までどおりトースト", async () => {
+    renderSettings(connected, "/accounts/a1/settings?connected=reconnect");
+    await vi.waitFor(() => expect(toastSuccess).toHaveBeenCalledWith("カフェの公式を再接続しました"));
+    expect(screen.queryByText(/をThreadsにつなぎました/)).not.toBeInTheDocument();
+  });
+
+  it("トークンでつなぐと、同じ画面で「つながりました」を出す（US2-3）", async () => {
+    mocks.tokenConnect.mockResolvedValue({ accountId: "a1", kind: "connect", username: "cafe_b", warnings: [] });
+    renderSettings(unconnected);
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("button", { name: /自分のMetaアプリのトークンでつなぐ/ }));
+    await user.type(screen.getByLabelText("アクセストークン"), TOKEN);
+    await user.click(screen.getByRole("button", { name: "つなぐ" }));
+    // アカウントの表示が読み直されるまでは未接続の表示のまま。つないだ直後の合図は立っている
+    await vi.waitFor(() => expect(mocks.tokenConnect).toHaveBeenCalled());
+  });
+
+  it("招待のリンクから来た人は、つないだら招待の画面へ戻る（specs/011 T019、specs/012 research.md R7）", async () => {
+    sessionStorage.setItem("tg.inviteReturn", INVITE);
+    const router = renderSettings(connected, "/accounts/a1/settings?connected=connect");
+    expect(await screen.findByText("招待の画面")).toBeInTheDocument();
+    expect(router.state.location.pathname).toBe(INVITE);
+  });
+});

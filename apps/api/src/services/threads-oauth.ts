@@ -6,7 +6,7 @@ import type { Db } from "../db/client";
 import { oauthStates } from "../db/schema";
 import { sha256Hex } from "../lib/identifier-hash";
 import type { ThreadsClient } from "../lib/threads-client";
-import { assertCanAddAccount } from "./account-service";
+import { AppError } from "../lib/errors";
 import { authorizeAccount } from "./access";
 
 const STATE_TTL_MS = 10 * 60 * 1000;
@@ -18,13 +18,14 @@ function randomState(): string {
 
 /**
  * Threads接続フローを始め、認可URLを返す（research.md R3・R4）。
- * 新規なら認可に進む前に上限を判定する。再接続なら自分の Account かを確かめ、上限は判定しない。
+ * はじめてつなぐ（connect）も接続し直す（reconnect）も、対象のアカウントのオーナーかを確かめる。上限は判定しない
+ * （アカウントは増えない。specs/012 FR-016）。connect は、対象がもうつながっていれば止める（specs/012 FR-018）。
  * @param db - データベース
  * @param threads - Threads API のクライアント
  * @param userId - users.id
- * @param req - 新規（new）か再接続（reconnect と accountId）
+ * @param req - connect か reconnect と、対象のアカウント
  * @returns Threads の認可URL（state を含む）
- * @throws AppError ACCOUNT_LIMIT_REACHED（新規で上限に達している）・ACCOUNT_NOT_FOUND（再接続で関わっていない Account）・ROLE_FORBIDDEN（オーナーではない）
+ * @throws AppError ACCOUNT_NOT_FOUND（関わっていない Account）・ROLE_FORBIDDEN（オーナーではない）・ACCOUNT_ALREADY_CONNECTED
  */
 export async function startConnect(
   db: Db,
@@ -32,15 +33,12 @@ export async function startConnect(
   userId: string,
   req: ConnectRequest,
 ): Promise<string> {
-  let targetAccountId: string | null = null;
-  if (req.mode === "new") {
-    // 認可に進む前に上限を判定する（FR-017）。callback でも行ロックを取って再判定する
-    await assertCanAddAccount(db, userId);
-  } else {
-    // 再接続は既存Accountの認可し直し。上限の判定はしない（FR-013・FR-020）
-    // 再接続はオーナーだけ（specs/008 FR-044。パートナー・編集者は ROLE_FORBIDDEN）
-    targetAccountId = (await authorizeAccount(db, { id: userId }, req.accountId, "owner")).account.id;
+  // 接続はオーナーだけ（specs/008 FR-044、specs/012 FR-015。担当の人は ROLE_FORBIDDEN）
+  const { account } = await authorizeAccount(db, { id: userId }, req.accountId, "owner");
+  if (req.mode === "connect" && account.connectionStatus !== "not_connected") {
+    throw new AppError("ACCOUNT_ALREADY_CONNECTED", 409, "account already connected");
   }
+  const targetAccountId = account.id;
 
   const state = randomState();
   const now = Date.now();

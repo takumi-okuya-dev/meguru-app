@@ -78,10 +78,10 @@ describe("GET /prompt", () => {
     expect(summary).toMatchObject({ strategyFilledCount: 2, promotionCount: 1, referencePostCount: 1, recentDraftCount: 3 });
   });
 
-  it("表示名がなければ @ユーザー名 を話者にする", async () => {
-    const { accountId } = await createUserWithAccount("u1");
+  it("話者はアカウントの名前（Threadsの表示名・ユーザー名は使わない。specs/012 FR-037）", async () => {
+    const { accountId } = await createUserWithAccount("u1", { name: "カフェの公式" });
     const { prompt } = await getPrompt(accountId);
-    expect(prompt).toMatch(/表示名: @u1_\d+/);
+    expect(prompt).toContain("表示名: カフェの公式");
   });
 
   it("count を指定するとその件数で作る。0・51・1.5・数字でない値は 400", async () => {

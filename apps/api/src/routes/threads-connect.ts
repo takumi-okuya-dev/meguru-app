@@ -8,7 +8,7 @@ import { AppError } from "../lib/errors";
 import { logger } from "../lib/logger";
 import { createThreadsClient, ThreadsApiError, ThreadsAuthError } from "../lib/threads-client";
 import { completeConnection, requestFromState } from "../services/account-service";
-import { consumeState, startConnect, type ConsumedState } from "../services/threads-oauth";
+import { consumeState, startConnect } from "../services/threads-oauth";
 import { connectWithToken } from "../services/token-connect";
 import { refreshUsernameOnlyMatch } from "../services/username-match";
 
@@ -75,18 +75,28 @@ export function threadsConnectRoutes(authed: MiddlewareHandler<AppEnv>) {
       const redirect = (path: string, params: Record<string, string>) =>
         c.redirect(`${web}${path}?${new URLSearchParams(params)}`, 302);
 
-      // 想定外の失敗でも、JSON の画面で止めずに Web へ戻してエラーの案内を出す
-      let failTarget = "/accounts/new";
+      // 想定外の失敗でも、JSON の画面で止めずに Web へ戻してエラーの案内を出す。
+      // 対象のアカウントが分からない・なくなったときは、振り分け（/）へ戻す（specs/012 contracts/api.md）
+      let failTarget = "/";
       try {
         const stateParam = c.req.query("state");
         const state = stateParam ? await consumeState(createDb(c.env.DATABASE_URL), stateParam) : null;
-        if (!state) return redirect("/accounts/new", { error: "OAUTH_STATE_INVALID" });
+        // 012 より前の「つないで作る」（mode = new）の state は、使えないものとして扱う。
+        // 許可の画面にいる間に対象が消されていたら、振り分けへ戻して「見つからない」と出す
+        let request;
+        try {
+          request = state ? requestFromState(state) : null;
+        } catch (err) {
+          if (err instanceof AppError) return redirect("/", { error: err.code });
+          throw err;
+        }
+        if (!request) return redirect("/", { error: "OAUTH_STATE_INVALID" });
 
-        if (state.mode === "reconnect") failTarget = `/accounts/${state.targetAccountId}/settings`;
+        const settings = `/accounts/${request.targetAccountId}/settings`;
+        failTarget = settings;
         const fail = (code: ErrorCode) =>
-          state.mode === "reconnect"
-            ? redirect(`/accounts/${state.targetAccountId}/settings`, { error: code })
-            : redirect("/accounts/new", { error: code });
+          // 許可の画面にいる間に消された・オーナーでなくなったアカウントの画面へは戻さない
+          code === "ACCOUNT_NOT_FOUND" || code === "ROLE_FORBIDDEN" ? redirect("/", { error: code }) : redirect(settings, { error: code });
 
         if (c.req.query("error")) return fail("THREADS_AUTH_CANCELLED");
         const code = c.req.query("code");
@@ -115,20 +125,21 @@ export function threadsConnectRoutes(authed: MiddlewareHandler<AppEnv>) {
         await refreshUsernameOnlyMatch(c.env, threads, profile);
         try {
           const result = await completeConnection(c.env, {
-            request: requestFromState(state as ConsumedState),
+            request,
             threadsUserId: profile.id,
             profile,
             accessToken: longLived.accessToken,
             expiresAt: longLived.expiresAt,
             authorizedAt,
           });
-          if (result.kind === "reconnect") {
-            return redirect(`/accounts/${result.accountId}/settings`, { connected: "reconnect" });
-          }
-          return redirect(`/accounts/${result.accountId}`, { connected: result.kind });
+          // はじめてつないだときも、接続し直したときも、設定の画面へ戻す（specs/012 US2-2）
+          return redirect(`/accounts/${result.accountId}/settings`, { connected: result.kind });
         } catch (err) {
-          if (err instanceof AppError) return fail(err.code);
-          throw err;
+          if (!(err instanceof AppError)) throw err;
+          // 自分の別のアカウントと重なったときは、そのアカウントを添える（画面がその名前とリンクを出す。specs/012 US3-1）
+          if (err.code === "ACCOUNT_ALREADY_REGISTERED" && err.details?.[0])
+            return redirect(settings, { error: err.code, account: err.details[0] });
+          return fail(err.code);
         }
       } catch (err) {
         logger.error("threads callback failed unexpectedly", { err });

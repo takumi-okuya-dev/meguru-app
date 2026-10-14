@@ -1,9 +1,18 @@
 // Account設定（FR-013・FR-019・FR-020・FR-022、規則9・10）。004で「投稿のルール」の区分を、既存の区分より上に足した。
 // 005で「投稿のスケジュール」の区分を、「投稿のルール」の上に足した
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { SHORT_LIVED_TOKEN_HINT, accountLabel, type TokenConnectResponse } from "@threads-grower/shared";
-import { useState } from "react";
+import {
+  SHORT_LIVED_TOKEN_HINT,
+  accountLabel,
+  connectedMessage,
+  errorMessage,
+  type TokenConnectResponse,
+} from "@threads-grower/shared";
+import { CheckCircle2Icon } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router";
+import { toast } from "sonner";
+import { ConnectMethods } from "@/components/connect/ConnectMethods";
 import { ConnectionBadge } from "@/components/ConnectionBadge";
 import { PageBody, PageHeader } from "@/components/layout/PageHeader";
 import { PostingRulesSection } from "@/components/settings/PostingRulesSection";
@@ -22,6 +31,8 @@ import {
 import { Input } from "@/components/ui/input";
 import { api, describeError } from "@/lib/api-client";
 import { useCallbackResult } from "@/lib/callback-result";
+import { takeInviteReturn } from "@/lib/invite-return";
+import { queryKeys } from "@/lib/query";
 import { useCurrentAccount } from "@/pages/account-layout";
 import { TeamSection } from "@/components/team/TeamSection";
 import { ReconnectDialog } from "@/components/connect/ReconnectDialog";
@@ -34,7 +45,9 @@ import { useAccountAccess } from "@/lib/use-account-access";
  */
 export function AccountSettings() {
   const account = useCurrentAccount();
-  useCallbackResult({ name: account.name, username: account.username });
+  // callback の結果は、はじめてつないだとき・未接続のままのエラーは区分の中に出し、接続し直しはトーストで出す（specs/012）
+  const callback = useCallbackResult({ silent: true });
+  const notConnected = account.connectionStatus === "not_connected";
   // 関わりで出し分ける（specs/008 FR-041、specs/011 FR-060）。設定の操作は settings、接続・削除・チームに見せるは owner の権限
   const { access, can } = useAccountAccess(account.id);
   const queryClient = useQueryClient();
@@ -45,6 +58,39 @@ export function AccountSettings() {
   // 接続し直しは、このアプリで許可かトークンの貼り付けを選ぶダイアログから（specs/010 FR-031）
   const [reconnectOpen, setReconnectOpen] = useState(false);
   const [tokenWarnings, setTokenWarnings] = useState<TokenConnectResponse["warnings"]>([]);
+  // つないだ直後の案内（はじめてつないだときだけ。specs/012 FR-014）と、「自動投稿を始める」で設定のダイアログを開く合図
+  const [justConnected, setJustConnected] = useState(callback.connected === "connect");
+  const [editRequest, setEditRequest] = useState(0);
+
+  // 接続し直しの結果と、つながっているアカウントの接続のエラーは、今までどおりトーストで出す
+  const toasted = useRef(false);
+  useEffect(() => {
+    if (toasted.current) return;
+    toasted.current = true;
+    if (callback.connected === "reconnect") toast.success(connectedMessage("reconnect", account.name));
+    else if (callback.error && !notConnected)
+      toast.error(errorMessage(callback.error, { username: account.username ?? undefined }).message);
+  }, [callback, account.name, account.username, notConnected]);
+
+  // 招待のリンクから来た人は、つないだら招待へ戻す（specs/011 T019、specs/012 research.md R7）
+  useEffect(() => {
+    if (!justConnected) return;
+    const back = takeInviteReturn();
+    if (back) void navigate(back, { replace: true });
+  }, [justConnected, navigate]);
+
+  /**
+   * トークンでつながったとき：表示を読み直し、つないだ直後の案内を出す。
+   * @param warnings - 権限がないものの案内
+   */
+  const onTokenConnected = async (warnings: TokenConnectResponse["warnings"]) => {
+    setTokenWarnings(warnings);
+    setJustConnected(true);
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: queryKeys.me }),
+      queryClient.invalidateQueries({ queryKey: queryKeys.account(account.id) }),
+    ]);
+  };
 
   const remove = useMutation({
     // 入力した値はそのまま送る（正規化はサーバーでも行う）
@@ -73,17 +119,49 @@ export function AccountSettings() {
           </div>
         </section>
 
+        {/* つないだ直後の案内（specs/012 contracts/ui-routes.md「Threadsとの接続」） */}
+        {justConnected && !notConnected && (
+          <Alert role="status">
+            <AlertDescription className="space-y-3 text-foreground">
+              <p className="flex items-center gap-2 font-medium">
+                <CheckCircle2Icon aria-hidden="true" className="size-4" />
+                {account.name}をThreadsにつなぎました{account.username ? `（@${account.username}）` : ""}
+              </p>
+              <p className="text-sm text-muted-foreground">
+                自動投稿はオフのままです。投稿の時刻を決めてオンにすると、承認した案の投稿が始まります。
+              </p>
+              {can("settings") && (
+                <Button className="rounded-full" onClick={() => setEditRequest((n) => n + 1)}>
+                  自動投稿を始める
+                </Button>
+              )}
+              <TokenWarnings warnings={tokenWarnings.map((w) => (w === "no_publish_permission" ? "publish" : "insights"))} />
+            </AlertDescription>
+          </Alert>
+        )}
+
         <PostingScheduleSection
           account={account}
           canEdit={can("settings")}
           canReconnect={can("owner")}
           onReconnect={() => setReconnectOpen(true)}
+          editRequest={editRequest}
         />
 
         <PostingRulesSection accountId={account.id} canEdit={can("settings")} />
 
-        {can("owner") && (
-        <section className="space-y-3">
+        {notConnected ? (
+          <section id="threads" className="space-y-3">
+            <h2 className="font-medium">Threadsとの接続</h2>
+            <ConnectMethods
+              account={account}
+              canConnect={can("owner")}
+              initialError={callback.error ? { code: callback.error, account: callback.account } : null}
+              onConnected={(warnings) => void onTokenConnected(warnings)}
+            />
+          </section>
+        ) : can("owner") && (
+        <section id="threads" className="space-y-3">
           <h2 className="font-medium">Threadsとの接続</h2>
           <p className="text-sm text-muted-foreground">
             今の接続：{account.connectionMethod === "token" ? "自分のMetaアプリのトークン" : "このアプリで許可"}。同じThreadsアカウント（@{account.username}）で接続し直すと、接続情報を更新できます。
@@ -93,7 +171,9 @@ export function AccountSettings() {
               <AlertDescription className="text-foreground">{SHORT_LIVED_TOKEN_HINT}</AlertDescription>
             </Alert>
           )}
-          <TokenWarnings warnings={tokenWarnings.map((w) => (w === "no_publish_permission" ? "publish" : "insights"))} />
+          {!justConnected && (
+            <TokenWarnings warnings={tokenWarnings.map((w) => (w === "no_publish_permission" ? "publish" : "insights"))} />
+          )}
           <Button variant={needsReconnect ? "default" : "outline"} onClick={() => setReconnectOpen(true)}>
             {needsReconnect ? "再接続" : "接続し直す"}
           </Button>
@@ -126,6 +206,7 @@ export function AccountSettings() {
                 <DialogTitle>Accountを削除しますか？</DialogTitle>
                 <DialogDescription>
                   この操作は取り消せません。確認のため、{account.name} と入力してください。
+                  {/* 未接続ならトークンはないので出さない（specs/012 FR-043） */}
                   {account.connectionMethod === "token" && (
                     <span className="mt-1 block">Metaアプリ側のトークンは、必要なら自分で取り消してください。</span>
                   )}

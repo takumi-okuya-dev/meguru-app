@@ -60,7 +60,7 @@
 | API | 判定 | 説明 |
 |---|---|---|
 | `POST /api/threads/connect` | `owner`（対象のアカウント） | 本文を`{ mode: "connect", accountId }`か`{ mode: "reconnect", accountId }`にする（`new`をなくす）。`connect`は対象が未接続でなければ`ACCOUNT_ALREADY_CONNECTED`。上限は判定しない。応答は今のまま`{ authorizeUrl }` |
-| `GET /api/threads/callback` | `state` | 戻り先：成功は`/accounts/:id/settings?connected=connect`（または`reconnect`）、失敗は`/accounts/:id/settings?error=CODE`。ただし、許可の画面にいる間に対象のアカウントが消された・オーナーでなくなった（`ACCOUNT_NOT_FOUND`・`ROLE_FORBIDDEN`）ときは、消えた画面へ戻さず`/?error=CODE`（振り分けで最後に使ったアカウントへ移し、エラーをトーストで出す）。`state`が読めないときは`/?error=OAUTH_STATE_INVALID`。`mode = new`の古い`state`は`OAUTH_STATE_INVALID` |
+| `GET /api/threads/callback` | `state` | 自分の別のアカウントと重なった（`ACCOUNT_ALREADY_REGISTERED`）ときは、`account=<そのアカウントのID>`を添える（画面が名前を自分のアカウントの一覧から引き、リンクを出す）。戻り先：成功は`/accounts/:id/settings?connected=connect`（または`reconnect`）、失敗は`/accounts/:id/settings?error=CODE`。ただし、許可の画面にいる間に対象のアカウントが消された・オーナーでなくなった（`ACCOUNT_NOT_FOUND`・`ROLE_FORBIDDEN`）ときは、消えた画面へ戻さず`/?error=CODE`（振り分けで最後に使ったアカウントへ移し、エラーをトーストで出す）。`state`が読めないときは`/?error=OAUTH_STATE_INVALID`。`mode = new`の古い`state`は`OAUTH_STATE_INVALID` |
 | `POST /api/threads/token-connect` | `owner`（対象のアカウント） | 本文を`{ mode: "connect", accountId, token }`か`{ mode: "reconnect", accountId, token }`にする。応答の`kind`は`connect`・`reconnect`。確認の失敗の数え方・待ち（010 FR-015）は今のまま。判定（オーナーか、`connect`なら未接続か）を、失敗の予約より先に行う（権限のない要求・つながっているアカウントへの`connect`を失敗に数えない） |
 
 `connect`の確定の手順は[research.md R4](../research.md)。照合の結果：

@@ -1,7 +1,6 @@
 // Accountの作成・更新・上限（FR-008〜FR-017、research.md R8・R9）
-import { and, eq, gt, gte, inArray, isNull, lt, ne, or, sql } from "drizzle-orm";
+import { and, eq, gte, inArray, isNull, lt, ne, or, sql } from "drizzle-orm";
 import {
-  ACCOUNT_NAME_MAX,
   initialPlanFor,
   limitForOwnedPlans,
   normalizeUsername,
@@ -78,14 +77,47 @@ export async function assertCanAddAccount(db: Db | TxDb, userId: string) {
   return limit;
 }
 
+// ---- アカウントを作る（specs/012 research.md R3） ----
+
+/**
+ * 名前だけで、Threadsにつないでいないアカウントを作る（specs/012 FR-002〜FR-004）。
+ * 利用者の行に鍵をかけて上限を数え直し、アカウントとオーナーの Membership を同じトランザクションで作る。
+ * 初期の設定（宣伝投稿の割合・プロンプトで作る件数など）は列の既定値で、つないで作っていたときと同じ。
+ * @param env - Workers のバインディング
+ * @param userId - users.id
+ * @param name - アカウントの名前（前後の空白を除いたもの）
+ * @returns 作ったアカウントの行
+ * @throws AppError ACCOUNT_LIMIT_REACHED
+ */
+export async function createAccount(env: Env, userId: string, name: string) {
+  return withTransaction(env.DATABASE_URL, async (tx) => {
+    await lockUserRow(tx, userId);
+    const limit = await assertCanAddAccount(tx, userId);
+    const [account] = await tx
+      .insert(accounts)
+      .values({
+        name,
+        plan: initialPlanFor(limit.plans),
+        connectionStatus: "not_connected",
+        connectionMethod: null,
+      })
+      .returning();
+    await tx.insert(memberships).values({ userId, accountId: account!.id, role: "owner" });
+    return account!;
+  });
+}
+
 // ---- 接続の確定（research.md R8 の手順。specs/010 research.md R5 でトークンの接続と共通にした） ----
 
-/** 接続の要求。OAuth では state の行から、トークンではリクエストから作る（specs/010 research.md R5）。 */
+/**
+ * 接続の要求。OAuth では state の行から、トークンではリクエストから作る（specs/010 research.md R5）。
+ * connect は未接続のアカウントにはじめてつなぐ、reconnect は接続し直す（specs/012 research.md R4）。
+ */
 export type ConnectionRequest = {
   userId: string;
-  mode: "new" | "reconnect" | "connect";
-  /** 接続し直すAccount（mode = reconnect）・はじめてつなぐAccount（mode = connect） */
-  targetAccountId: string | null;
+  mode: "connect" | "reconnect";
+  /** つなぐ・接続し直すAccount */
+  targetAccountId: string;
   /** 接続を始めた時刻（OAuth は state の作成、トークンは要求を受け取った時刻） */
   startedAt: Date;
   /** 接続の方法 */
@@ -95,9 +127,12 @@ export type ConnectionRequest = {
 /**
  * OAuth の state の行から接続の要求を作る。
  * @param state - 消費した state
- * @returns 接続の要求
+ * @returns 接続の要求。012 より前の「つないで作る」（mode = new）の state なら NULL
+ * @throws AppError ACCOUNT_NOT_FOUND（許可の画面にいる間に対象のアカウントが消された。specs/012 contracts/api.md）
  */
-export function requestFromState(state: ConsumedState): ConnectionRequest {
+export function requestFromState(state: ConsumedState): ConnectionRequest | null {
+  if (state.mode === "new") return null;
+  if (!state.targetAccountId) throw new AppError("ACCOUNT_NOT_FOUND", 404, "target account deleted during connect");
   return {
     userId: state.userId,
     mode: state.mode,
@@ -126,20 +161,22 @@ export type CompleteConnectionInput = {
   insightsDenied?: boolean;
 };
 
-/** callback で接続を確定した結果。new（新規）、updated（既存を更新）、reconnect（再接続）。 */
+/** 接続を確定した結果。connect（はじめてつないだ）、reconnect（接続し直した）。 */
 export type CompleteConnectionResult = {
   accountId: string;
   username: string;
-  kind: "new" | "updated" | "reconnect";
+  kind: "connect" | "reconnect";
 };
 
 /**
- * callback で接続を確定する（research.md R8 の手順を1つのトランザクションで行う）。
- * ロック → 取り消し・削除要求・Account削除の確認 → 既存の Account の更新、または上限を再判定して作成。
+ * 接続を確定する（research.md R8 の手順を1つのトランザクションで行う。specs/012 research.md R4 で connect を足した）。
+ * ロック → 取り消し・削除要求の確認 → 対象のアカウント（オーナーか・状態）→ 同じThreadsアカウントの照合 → 書き込み。
+ * アカウントは作らない（名前だけで作る。createAccount）。
  * @param env - Workers のバインディング
- * @param input - 消費した state・Threadsのユーザー・プロフィール・トークンなど
+ * @param input - 接続の要求・Threadsのユーザー・プロフィール・トークンなど
  * @returns 確定した Account と、その種類
- * @throws AppError THREADS_AUTH_REVOKED・THREADS_DATA_DELETION_REQUESTED・ACCOUNT_DELETED_DURING_CONNECT・RECONNECT_ACCOUNT_MISMATCH・THREADS_ACCOUNT_TAKEN・ACCOUNT_LIMIT_REACHED など
+ * @throws AppError THREADS_AUTH_REVOKED・THREADS_DATA_DELETION_REQUESTED・ACCOUNT_NOT_FOUND・ROLE_FORBIDDEN・
+ *   ACCOUNT_ALREADY_CONNECTED・ACCOUNT_NOT_CONNECTED・RECONNECT_ACCOUNT_MISMATCH・ACCOUNT_ALREADY_REGISTERED・THREADS_ACCOUNT_TAKEN
  */
 export async function completeConnection(
   env: Env,
@@ -186,106 +223,60 @@ export async function completeConnection(
     if (tombstone)
       throw new AppError("THREADS_DATA_DELETION_REQUESTED", 409, "data deletion requested");
 
-    // 5. 認可フローの開始後にユーザーがAccountを削除していたら拒否（mode = new。research.md R13）
-    if (state.mode === "new") {
-      const [deletedAfter] = await tx
-        .select({ id: users.id })
-        .from(users)
-        .where(and(eq(users.id, state.userId), gt(users.lastAccountDeletedAt, state.startedAt)))
-        .limit(1);
-      if (deletedAfter)
-        throw new AppError("ACCOUNT_DELETED_DURING_CONNECT", 409, "account deleted during connect");
+    // 5. 対象のアカウント。許可の画面にいる間に消された・オーナーでなくなったら止める（specs/012 contracts/api.md）。
+    //    接続はオーナーだけ（specs/008 FR-044、specs/012 FR-015）。トランザクションの中でも確かめ、記録に使う
+    const [target] = await tx.select().from(accounts).where(eq(accounts.id, state.targetAccountId)).for("update").limit(1);
+    if (!target) throw new AppError("ACCOUNT_NOT_FOUND", 404, "target account no longer exists");
+    const access = await authorizeAccount(tx, { id: state.userId }, target.id, "owner");
+    const norm = normalizeUsername(input.profile.username);
+    if (state.mode === "connect") {
+      // 同じアカウントへの同時のつなぐ操作は、後の方を止める（黙って接続し直しにしない。specs/012 FR-018）
+      if (target.connectionStatus !== "not_connected")
+        throw new AppError("ACCOUNT_ALREADY_CONNECTED", 409, "account already connected");
+    } else {
+      if (target.connectionStatus === "not_connected" || target.username === null)
+        throw new AppError("ACCOUNT_NOT_CONNECTED", 409, "account not connected yet");
+      // 再接続は同じ Threads アカウントでだけ認める（FR-020）。同じかはユーザーIDかユーザー名で見る（specs/010 FR-032）
+      if (target.threadsUserId !== input.threadsUserId && normalizeUsername(target.username) !== norm) {
+        throw new AppError("RECONNECT_ACCOUNT_MISMATCH", 409, "reconnect with a different threads account");
+      }
     }
 
-    // 6. 既存のAccountを、ユーザーIDとユーザー名で探す（ユーザーIDはMetaアプリごとに違いうる。specs/010 research.md R6）
-    const norm = normalizeUsername(input.profile.username);
-    const candidates = await tx
+    // 6. 同じThreadsアカウントの別のAccountを、ユーザーIDとユーザー名で探す（ユーザーIDはMetaアプリごとに違いうる。
+    //    specs/010 research.md R6）。あれば書き換えない。自分のものならその名前を添え、他人なら登録した人を明かさない
+    //    （specs/012 FR-021・FR-022。中身を移す操作はない）
+    const [other] = await tx
       .select({ account: accounts, ownerId: memberships.userId })
       .from(accounts)
-      .leftJoin(
-        memberships,
-        and(eq(memberships.accountId, accounts.id), eq(memberships.role, "owner")),
+      .leftJoin(memberships, and(eq(memberships.accountId, accounts.id), eq(memberships.role, "owner")))
+      .where(
+        and(
+          ne(accounts.id, target.id),
+          or(eq(accounts.threadsUserId, input.threadsUserId), sql`lower(${accounts.username}) = ${norm}`),
+        ),
       )
-      .where(or(eq(accounts.threadsUserId, input.threadsUserId), sql`lower(${accounts.username}) = ${norm}`));
-    // ユーザーIDの一致を先に見る
-    const existing = candidates.find((c) => c.account.threadsUserId === input.threadsUserId) ?? candidates[0];
-    // 同じThreadsアカウントの別のAccountがあるときのエラー（自分のものなら接続し直しへ、他人なら登録した人を明かさない）
-    const duplicateError = (c: (typeof candidates)[number]) =>
-      c.ownerId === state.userId
-        ? new AppError("ACCOUNT_ALREADY_REGISTERED", 409, "threads account already registered", undefined, [c.account.id])
-        : new AppError("THREADS_ACCOUNT_TAKEN", 409, "threads account owned by another user");
-
-    if (state.mode === "reconnect") {
-      const [target] = await tx
-        .select()
-        .from(accounts)
-        .where(eq(accounts.id, state.targetAccountId!))
-        .limit(1);
-      if (!target)
-        throw new AppError("OAUTH_STATE_INVALID", 400, "reconnect target no longer exists");
-      // 再接続は同じ Threads アカウントでだけ認める（FR-020）。同じかはユーザーIDかユーザー名で見る（specs/010 FR-032）
-      if (target.threadsUserId !== input.threadsUserId && (target.username === null || normalizeUsername(target.username) !== norm)) {
-        throw new AppError(
-          "RECONNECT_ACCOUNT_MISMATCH",
-          409,
-          "reconnect with a different threads account",
-        );
+      .orderBy(sql`${accounts.threadsUserId} = ${input.threadsUserId} DESC`)
+      .limit(1);
+    if (other) {
+      if (other.ownerId === state.userId) {
+        throw new AppError("ACCOUNT_ALREADY_REGISTERED", 409, "threads account already registered", undefined, [
+          other.account.id,
+          other.account.name,
+          other.account.username ?? input.profile.username,
+        ]);
       }
-      // 同じThreadsアカウントが別のAccountとしても登録されているときは、書き換えない（specs/010 research.md R7）
-      const other = candidates.find((c) => c.account.id !== target.id);
-      if (other) throw duplicateError(other);
-      // 接続し直しはオーナーだけ（specs/008 FR-044）。トランザクションの中でも確かめ、記録に使う
-      const access = await authorizeAccount(tx, { id: state.userId }, target.id, "owner");
-      await writeConnection(tx, cipher, target.id, input);
-      // チームがあるAccountでは、どちらの方法の接続し直しも記録する（specs/010 FR-035、research.md R11a）
-      await recordActivity(tx, access, {
-        kind: "settings",
-        action: "threads_reconnected",
-        details: { method: state.method },
-      });
-      return { accountId: target.id, username: input.profile.username, kind: "reconnect" };
+      throw new AppError("THREADS_ACCOUNT_TAKEN", 409, "threads account owned by another user");
     }
 
-    // はじめてつなぐ流れ（specs/012 research.md R4）は US2 で足す。それまでは受け付けない
-    if (state.mode === "connect") throw new AppError("OAUTH_STATE_INVALID", 400, "connect mode not supported yet");
-
-    if (existing) {
-      // 7. 他人なら拒否（FR-012）。自分のAccountなら、このアプリの接続は接続を更新し（FR-013）、
-      //    トークンは接続し直しへ案内する（黙って接続の方法を変えない。specs/010 research.md R6）
-      if (existing.ownerId !== state.userId || state.method === "token") throw duplicateError(existing);
-      await writeConnection(tx, cipher, existing.account.id, input);
-      return { accountId: existing.account.id, username: input.profile.username, kind: "updated" };
-    }
-
-    // 8. 上限を行ロックを持ったまま再判定してから作成する（FR-017、research.md R8）
-    const limit = await assertCanAddAccount(tx, state.userId);
-    const accountId = crypto.randomUUID();
-    await tx.insert(accounts).values({
-      id: accountId,
-      name: nameFromProfile(input.profile),
-      threadsUserId: input.threadsUserId,
-      username: input.profile.username,
-      displayName: input.profile.name,
-      profilePictureUrl: input.profile.profilePictureUrl,
-      plan: initialPlanFor(limit.plans),
-      connectionStatus: "connected",
-      connectionMethod: state.method,
-      connectionGeneration: 0,
+    // 7. 書き込む。チームがあるAccountでは、どちらの方法でも記録する（specs/010 FR-035、specs/012 FR-019）
+    await writeConnection(tx, cipher, target.id, input);
+    await recordActivity(tx, access, {
+      kind: "settings",
+      action: state.mode === "connect" ? "threads_connected" : "threads_reconnected",
+      details: { method: state.method },
     });
-    await tx.insert(memberships).values({ userId: state.userId, accountId, role: "owner" });
-    await writeConnection(tx, cipher, accountId, input);
-    return { accountId, username: input.profile.username, kind: "new" };
+    return { accountId: target.id, username: input.profile.username, kind: state.mode };
   });
-}
-
-/**
- * Threadsのプロフィールから、アカウントの名前を作る（表示名、空ならユーザー名。前後の空白を除いて50文字まで。specs/012 data-model.md）。
- * @param profile - Threadsのプロフィール
- * @returns アカウントの名前
- */
-function nameFromProfile(profile: ThreadsProfile): string {
-  const base = profile.name?.trim() || profile.username;
-  return Array.from(base).slice(0, ACCOUNT_NAME_MAX).join("").trim();
 }
 
 /**

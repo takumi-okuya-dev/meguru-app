@@ -3,7 +3,7 @@
 // 各APIは「権限 → 入力の検証」の順で確かめるので、空の本文で呼ぶと、許された人は 400 VALIDATION_FAILED などになる。
 import { permissionsFor, type Relation } from "@threads-grower/shared";
 import { beforeAll, describe, expect, it } from "vitest";
-import { call, createUserWithAccount, makeApp, resetDb } from "../helpers/app";
+import { call, createUnconnectedAccount, createUserWithAccount, makeApp, resetDb } from "../helpers/app";
 import { ACCOUNT_ROUTES } from "../helpers/routes";
 import { assign, joinTeam, makeTeam, setRole } from "../helpers/team";
 
@@ -122,9 +122,18 @@ describe("トークンでの接続し直しの表（specs/010 FR-034）", () => 
     expect(await errorCode(res)).toBe("TOKEN_INVALID");
   });
 
-  it("mode = new はログインしていれば誰でも呼べる（自分のAccountを作る）", async () => {
-    const res = await call(app, "POST", "/api/threads/token-connect", { user: "editor1", body: { mode: "new", token: "bad" } });
-    expect(await errorCode(res)).toBe("TOKEN_INVALID");
+  it("mode = connect も、オーナーでなければ判定で止まる（specs/012 FR-015）。自分の未接続のアカウントなら確認に進む", async () => {
+    const { accountId: unconnected } = await createUnconnectedAccount("owner1", { name: "未接続", plan: "multi-account" });
+    const denied = await call(app, "POST", "/api/threads/token-connect", {
+      user: "editor1",
+      body: { mode: "connect", accountId: unconnected, token: "x".repeat(40) },
+    });
+    expect(await errorCode(denied)).toBe("ACCOUNT_NOT_FOUND");
+    const own = await call(app, "POST", "/api/threads/token-connect", {
+      user: "owner1",
+      body: { mode: "connect", accountId: unconnected, token: "bad" },
+    });
+    expect(await errorCode(own)).toBe("TOKEN_INVALID");
   });
 });
 

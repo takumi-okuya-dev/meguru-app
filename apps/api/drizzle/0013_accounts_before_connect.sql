@@ -1,5 +1,8 @@
-ALTER TYPE "public"."connection_status" ADD VALUE 'not_connected';--> statement-breakpoint
-ALTER TYPE "public"."oauth_mode" ADD VALUE 'connect';--> statement-breakpoint
+ALTER TYPE "public"."connection_status" ADD VALUE IF NOT EXISTS 'not_connected';--> statement-breakpoint
+ALTER TYPE "public"."oauth_mode" ADD VALUE IF NOT EXISTS 'connect';--> statement-breakpoint
+ALTER TABLE "oauth_states" DROP CONSTRAINT "oauth_states_target_required_for_reconnect";--> statement-breakpoint
+ALTER TABLE "oauth_states" DROP CONSTRAINT "oauth_states_target_account_id_accounts_id_fk";
+--> statement-breakpoint
 ALTER TABLE "accounts" ALTER COLUMN "threads_user_id" DROP NOT NULL;--> statement-breakpoint
 ALTER TABLE "accounts" ALTER COLUMN "username" DROP NOT NULL;--> statement-breakpoint
 ALTER TABLE "accounts" ALTER COLUMN "connection_method" DROP NOT NULL;--> statement-breakpoint
@@ -8,6 +11,8 @@ ALTER TABLE "accounts" ALTER COLUMN "connection_method" DROP NOT NULL;--> statem
 ALTER TABLE "accounts" ADD COLUMN "name" text;--> statement-breakpoint
 UPDATE "accounts" SET "name" = btrim(left(btrim(COALESCE(NULLIF(btrim("display_name"), ''), "username")), 50));--> statement-breakpoint
 ALTER TABLE "accounts" ALTER COLUMN "name" SET NOT NULL;--> statement-breakpoint
+ALTER TABLE "oauth_states" ADD CONSTRAINT "oauth_states_target_account_id_accounts_id_fk" FOREIGN KEY ("target_account_id") REFERENCES "public"."accounts"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "accounts" ADD CONSTRAINT "accounts_name_length" CHECK (char_length("accounts"."name") BETWEEN 1 AND 50 AND "accounts"."name" = btrim("accounts"."name"));--> statement-breakpoint
 ALTER TABLE "accounts" ADD CONSTRAINT "accounts_connection_consistency" CHECK (("accounts"."connection_status"::text = 'not_connected' AND "accounts"."threads_user_id" IS NULL AND "accounts"."username" IS NULL AND "accounts"."connection_method" IS NULL)
-      OR ("accounts"."connection_status"::text <> 'not_connected' AND "accounts"."threads_user_id" IS NOT NULL AND "accounts"."username" IS NOT NULL AND "accounts"."connection_method" IS NOT NULL));
+      OR ("accounts"."connection_status"::text <> 'not_connected' AND "accounts"."threads_user_id" IS NOT NULL AND "accounts"."username" IS NOT NULL AND "accounts"."connection_method" IS NOT NULL));--> statement-breakpoint
+ALTER TABLE "oauth_states" ADD CONSTRAINT "oauth_states_no_target_for_new" CHECK ("oauth_states"."mode"::text <> 'new' OR "oauth_states"."target_account_id" IS NULL);

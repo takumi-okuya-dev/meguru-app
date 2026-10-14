@@ -122,7 +122,8 @@ export async function getPrompt(db: Db, account: AccountRow, count: number) {
   const { prompt, summary } = buildPrompt({
     count,
     dailyPostCount: schedule?.slotMinutes.length ?? 0,
-    displayName: account.displayName ?? `@${account.username}`,
+    // 話者はアカウントの名前（つなぐ前後でプロンプトを変えない。specs/012 FR-037）
+    displayName: account.name,
     strategy,
     promotions: targetPromotions(promotionRows, now).map(toPromptPromotion),
     promotionRatioPercent: account.promotionRatioPercent,

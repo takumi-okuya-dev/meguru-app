@@ -1,42 +1,39 @@
-// アカウント追加画面（FR-008・FR-017、規則8、「常時表示する案内」。specs/010 でトークンでの追加を足した）
-import { useMutation, useQuery } from "@tanstack/react-query";
-import { ChevronDownIcon } from "lucide-react";
-import { useEffect, useState } from "react";
+// アカウントを作る画面（specs/012 FR-001〜FR-006、contracts/ui-routes.md「アカウントを作る」）。
+// 名前だけで作り、Threadsには後で「このアカウントの設定」の「Threadsとの接続」からつなぐ。上限の案内は001 FR-017のまま。
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { ACCOUNT_NAME_MAX, RECONNECT_FROM_SETTINGS_HINT, countChars, errorMessage } from "@threads-grower/shared";
+import { useEffect, useState, type FormEvent } from "react";
 import { useNavigate, useSearchParams } from "react-router";
-import {
-  RECONNECT_FROM_SETTINGS_HINT,
-  TESTER_NOTICE,
-  errorMessage,
-} from "@threads-grower/shared";
+import { ApiErrorScreen } from "@/components/ApiErrorScreen";
+import { FieldWithCounter } from "@/components/FieldWithCounter";
+import { LoadingSkeleton } from "@/components/guards";
 import { AppShell, CenteredLayout } from "@/components/layout/AppShell";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { ApiError, api, describeError } from "@/lib/api-client";
-import { useCallbackResult } from "@/lib/callback-result";
+import { isInvitePath, rememberInviteReturn } from "@/lib/invite-return";
 import { queryKeys } from "@/lib/query";
-import { ApiErrorScreen } from "@/components/ApiErrorScreen";
-import { LoadingSkeleton } from "@/components/guards";
-import { TokenConnectForm, warnParam } from "@/components/connect/TokenConnectForm";
-import { isInvitePath, rememberInviteReturn, takeInviteReturn } from "@/lib/invite-return";
-import { cn } from "@/lib/utils";
 
 /**
- * アカウント追加画面（FR-008・FR-017、規則8）。上限の案内とテスター制限の案内を出す。
- * @returns アカウント追加画面
+ * アカウントを作る画面。名前の入力欄1つと「作る」。上限に達していれば、入力欄の代わりに上限の案内を出す。
+ * @returns アカウントを作る画面
  */
 export function AccountNew() {
   const me = useQuery({ queryKey: queryKeys.me, queryFn: api.me });
+  const queryClient = useQueryClient();
   const navigate = useNavigate();
-  const [tokenOpen, setTokenOpen] = useState(false);
-  useCallbackResult({ max: me.data?.accountLimit.max });
-  // 招待リンクから来たときは、追加の後にリンクへ戻す（specs/011 T019）
+  const [name, setName] = useState("");
+  // 招待リンクから来たときは、つないだ後にリンクへ戻す（specs/011 T019、specs/012 research.md R7）
   const next = useSearchParams()[0].get("next");
   useEffect(() => {
     if (isInvitePath(next)) rememberInviteReturn(next);
   }, [next]);
-  const connect = useMutation({
-    mutationFn: () => api.connect({ mode: "new" }),
-    onSuccess: ({ authorizeUrl }) => window.location.assign(authorizeUrl),
+  const create = useMutation({
+    mutationFn: () => api.createAccount({ name: name.trim() }),
+    onSuccess: async (account) => {
+      await queryClient.invalidateQueries({ queryKey: queryKeys.me });
+      void navigate(`/accounts/${account.id}`);
+    },
   });
 
   if (me.isPending) return <LoadingSkeleton />;
@@ -45,15 +42,26 @@ export function AccountNew() {
 
   const { max, used } = me.data.accountLimit;
   const limitReached =
-    used >= max || (connect.error instanceof ApiError && connect.error.code === "ACCOUNT_LIMIT_REACHED");
+    used >= max || (create.error instanceof ApiError && create.error.code === "ACCOUNT_LIMIT_REACHED");
+  const trimmed = name.trim();
+  const canSubmit = trimmed !== "" && countChars(trimmed) <= ACCOUNT_NAME_MAX && !create.isPending;
+
+  function submit(e: FormEvent) {
+    e.preventDefault();
+    if (canSubmit) create.mutate();
+  }
 
   const content = (
     <div className="w-full max-w-md space-y-6">
       <div className="space-y-2">
-        <h1 className="text-xl font-semibold">Threadsアカウントを追加</h1>
-        <p className="text-sm text-muted-foreground">
-          登録済み {used} / {max} 件
-        </p>
+        <h1 className="text-xl font-semibold">アカウントを作る</h1>
+        <p className="text-sm text-muted-foreground">運用するThreadsアカウントごとに1つ作ります。</p>
+        {/* はじめての人には数を見せない（contracts/ui-routes.md） */}
+        {used > 0 && (
+          <p className="text-sm text-muted-foreground">
+            登録済み {used}/{max}件
+          </p>
+        )}
       </div>
 
       {limitReached ? (
@@ -64,49 +72,27 @@ export function AccountNew() {
           </AlertDescription>
         </Alert>
       ) : (
-        connect.isError && (
-          <Alert variant="destructive">
-            <AlertDescription className="text-foreground">{describeError(connect.error, { max })}</AlertDescription>
-          </Alert>
-        )
+        <form className="space-y-4" onSubmit={submit}>
+          <FieldWithCounter
+            id="account-name"
+            label="アカウントの名前"
+            placeholder="例：カフェの公式"
+            value={name}
+            onChange={setName}
+            max={ACCOUNT_NAME_MAX}
+            multiline={false}
+          />
+          {create.isError && (
+            <Alert variant="destructive">
+              <AlertDescription className="text-foreground">{describeError(create.error, { max })}</AlertDescription>
+            </Alert>
+          )}
+          <Button type="submit" className="w-full" disabled={!canSubmit}>
+            作る
+          </Button>
+          <p className="text-sm text-muted-foreground">Threadsには、あとで「このアカウントの設定」からつなげます。</p>
+        </form>
       )}
-
-      <Button className="w-full" disabled={limitReached || connect.isPending} onClick={() => connect.mutate()}>
-        Threadsアカウントを接続
-      </Button>
-
-      {/* Meta App Review の前（テスターだけが接続できる間）だけ出す（specs/002 FR-028） */}
-      {me.data.threadsAccessMode === "testers" && (
-        <Alert>
-          <AlertDescription>{TESTER_NOTICE}</AlertDescription>
-        </Alert>
-      )}
-
-      {/* 2つ目の方法（specs/010 FR-001）。開くまで手順と入力欄を出さない。検証期間かどうかにかかわらず出す */}
-      <div className="space-y-4 border-t pt-4">
-        <button
-          type="button"
-          aria-expanded={tokenOpen}
-          onClick={() => setTokenOpen((v) => !v)}
-          className="flex w-full items-center justify-between text-left text-sm font-medium"
-        >
-          自分のMetaアプリのトークンで追加する
-          <ChevronDownIcon aria-hidden="true" className={cn("size-4 transition-transform", tokenOpen && "rotate-180")} />
-        </button>
-        {tokenOpen &&
-          (limitReached ? (
-            <p className="text-sm text-muted-foreground">{errorMessage("ACCOUNT_LIMIT_REACHED", { max }).message}</p>
-          ) : (
-            <TokenConnectForm
-              mode="new"
-              onSuccess={(result) => {
-                const warn = warnParam(result.warnings);
-                const back = takeInviteReturn();
-                void navigate(back ?? `/accounts/${result.accountId}?connected=new${warn ? `&warn=${warn}` : ""}`);
-              }}
-            />
-          ))}
-      </div>
     </div>
   );
 

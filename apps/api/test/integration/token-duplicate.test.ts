@@ -1,7 +1,9 @@
-// US2：同じアカウントの二重登録を防ぐ（specs/010-token-account-add SC-003、FR-020〜FR-023、research.md R6）
+// US2：同じアカウントの二重登録を防ぐ（specs/010-token-account-add SC-003、FR-020〜FR-023、research.md R6）。
+// specs/012 で、名前で作った未接続のアカウントにつなぐ形になった。自分の別のアカウントと重なっても、接続を更新せず止める
+// （specs/012 FR-020〜FR-022、SC-004）。二重のときに残る未接続のアカウントは数えない。
 import { neon } from "@neondatabase/serverless";
 import { beforeEach, describe, expect, it } from "vitest";
-import { call, connectNew, fake, makeApp, redirectTarget, resetDb, testEnv } from "../helpers/app";
+import { call, connectNew, createUnconnectedAccount, fake, makeApp, redirectTarget, resetDb, testEnv } from "../helpers/app";
 
 const app = makeApp();
 const q = () => neon(testEnv.DATABASE_URL);
@@ -12,31 +14,38 @@ beforeEach(async () => {
   await fake.addUser("9003", "cafe_b");
 });
 
-const add = (token: string, user = "u1") =>
-  call(app, "POST", "/api/threads/token-connect", { user, body: { mode: "new", token } });
+/** 新しい未接続のアカウントを（上限に関係なく）作り、トークンではじめてつなぐ */
+const add = async (token: string, user = "u1", name = "トークンのアカウント") => {
+  const { accountId } = await createUnconnectedAccount(user, { name, plan: "multi-account" });
+  return call(app, "POST", "/api/threads/token-connect", { user, body: { mode: "connect", accountId, token } });
+};
 const errorOf = async (res: Response) => ((await res.json()) as { error: { code: string; details?: string[] } }).error;
-const accountCount = async () => ((await q()`SELECT count(*)::int AS n FROM accounts`) as { n: number }[])[0]!.n;
+/** Threadsにつながっているアカウントの数（二重のときに残る未接続のアカウントは数えない） */
+const accountCount = async () =>
+  ((await q()`SELECT count(*)::int AS n FROM accounts WHERE connection_status <> 'not_connected'`) as { n: number }[])[0]!.n;
 
 describe("二重登録の3通り（SC-003）", () => {
   it("(a) このアプリで接続 → 同じアカウントの別のアプリのトークン：ACCOUNT_ALREADY_REGISTERED と、そのAccount", async () => {
     await connectNew(app, "u1", "9003");
-    const id = ((await q()`SELECT id FROM accounts`) as { id: string }[])[0]!.id;
+    const id = ((await q()`SELECT id FROM accounts WHERE connection_status = 'connected'`) as { id: string }[])[0]!.id;
     const res = await add(await fake.issueToken({ user: "9003" }));
     expect(res.status).toBe(409);
-    expect(await errorOf(res)).toMatchObject({ code: "ACCOUNT_ALREADY_REGISTERED", details: [id] });
+    // 重なったアカウントのID・名前・ユーザー名を返す（specs/012 contracts/api.md）
+    expect(await errorOf(res)).toMatchObject({ code: "ACCOUNT_ALREADY_REGISTERED", details: [id, "アカウント 9003", "cafe_b"] });
     expect(await accountCount()).toBe(1);
   });
 
-  it("(b) トークン → このアプリで接続：新しいAccountを作らず更新し、接続の方法が app になる（US2-3）", async () => {
-    const created = (await (await add(await fake.issueToken({ user: "9003" }))).json()) as { accountId: string };
-    // このアプリでの追加は、認可に進む前に上限を判定するので（001 FR-017）、上限を上げておく
+  it("(b) トークン → このアプリで接続：自分の別のアカウントなので、つながず ACCOUNT_ALREADY_REGISTERED（specs/012 FR-022）", async () => {
+    const created = (await (await add(await fake.issueToken({ user: "9003" }), "u1", "トークンで")).json()) as { accountId: string };
     await q()`UPDATE accounts SET plan = 'multi-account'`;
-    const { callbackRes } = await connectNew(app, "u1", "9003");
+    const { accountId, callbackRes } = await connectNew(app, "u1", "9003");
     const target = redirectTarget(callbackRes!);
-    expect([target.pathname, target.searchParams.get("connected")]).toEqual([`/accounts/${created.accountId}`, "updated"]);
+    expect([target.pathname, target.searchParams.get("error")]).toEqual([`/accounts/${accountId}/settings`, "ACCOUNT_ALREADY_REGISTERED"]);
+    expect(target.searchParams.get("connected")).toBeNull();
     expect(await accountCount()).toBe(1);
-    const [a] = (await q()`SELECT connection_method, threads_user_id FROM accounts`) as Record<string, string>[];
-    expect(a).toEqual({ connection_method: "app", threads_user_id: "9003" });
+    // つないであったアカウントは、トークンのまま変わらない
+    const [a] = (await q()`SELECT connection_method FROM accounts WHERE id = ${created.accountId}`) as Record<string, string>[];
+    expect(a).toEqual({ connection_method: "token" });
   });
 
   it("(c) トークン → 別のMetaアプリのトークン：ACCOUNT_ALREADY_REGISTERED", async () => {
@@ -118,7 +127,7 @@ describe("ユーザー名だけが一致したとき（FR-023）", () => {
     await add(await fake.issueToken({ user: "9005" }), "u2");
     await fake.addUser("9005", "renamed_shop");
     const { callbackRes } = await connectNew(app, "u1", "9003");
-    expect(redirectTarget(callbackRes!).searchParams.get("connected")).toBe("new");
+    expect(redirectTarget(callbackRes!).searchParams.get("connected")).toBe("connect");
     expect(await accountCount()).toBe(2);
   });
 });

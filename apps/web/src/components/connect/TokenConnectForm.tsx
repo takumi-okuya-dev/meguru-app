@@ -1,8 +1,8 @@
 // トークンの貼り付け（specs/010-token-account-add contracts/ui-routes.md、FR-002・FR-003・FR-051）。
-// 追加の画面と、接続し直しのダイアログで共用する。トークンの値はこの部品の中だけで持ち、保存しない。
+// 「Threadsとの接続」（はじめてつなぐ。specs/012）と、接続し直しのダイアログで共用する。トークンの値はこの部品の中だけで持ち、保存しない。
 import { useMutation } from "@tanstack/react-query";
 import { cleanToken, errorMessage, isTokenShaped, type TokenConnectResponse } from "@threads-grower/shared";
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { Link } from "react-router";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -24,18 +24,22 @@ export function unmask(value: string, shown: string): string {
   return value + shown.replaceAll(MASK, "");
 }
 
-/** 追加の画面と同じ、トークンの作り方の短い手順（contracts/ui-routes.md）。 */
+/** トークンの作り方の短い手順（specs/010 contracts/ui-routes.md）。 */
 export const TOKEN_STEPS = [
   "Metaの開発者サイトで、自分のアプリを作る（Threadsの使い方を選ぶ）",
   "権限に「threads_basic」「threads_content_publish」「threads_manage_insights」を加える",
   "自分のThreadsアカウントをテスターに加え、Threadsのアプリで招待を承認する",
   "「ユーザートークン生成ツール」で、長期トークンを作ってコピーする",
-  "下の欄に貼り付けて「追加する」を押す",
+  "下の欄に貼り付けて「つなぐ」を押す",
 ];
 
-type Props =
-  | { mode: "new"; onSuccess: (result: TokenConnectResponse) => void }
-  | { mode: "reconnect"; accountId: string; username: string; onSuccess: (result: TokenConnectResponse) => void };
+type Props = (
+  | { mode: "connect"; accountId: string; onSuccess: (result: TokenConnectResponse) => void }
+  | { mode: "reconnect"; accountId: string; username: string; onSuccess: (result: TokenConnectResponse) => void }
+) & {
+  /** エラーの出し方を変えるとき（NULL を返せば既定の出し方。specs/012 で、重なった自分のアカウントの案内に使う） */
+  renderError?: (err: unknown) => ReactNode | null;
+};
 
 /**
  * 権限がないものを、移った先の画面で案内するためのクエリの値にする（contracts/ui-routes.md 6）。
@@ -48,7 +52,7 @@ export function warnParam(warnings: TokenConnectResponse["warnings"]): string {
 
 /**
  * トークンの貼り付けの部品。手順・詳しい手順・入力欄・説明・送信・エラーを出す。
- * @param props - mode（new／reconnect）、接続し直すAccountとユーザー名、成功したときの動き
+ * @param props - mode（connect：はじめてつなぐ／reconnect：接続し直す）、対象のAccount（接続し直しはユーザー名も）、成功したときの動き
  * @returns 部品
  */
 export function TokenConnectForm(props: Props) {
@@ -66,9 +70,7 @@ export function TokenConnectForm(props: Props) {
       const token = pending.current;
       pending.current = null;
       if (!token) throw new Error("no token");
-      return api.tokenConnect(
-        props.mode === "new" ? { mode: "new", token } : { mode: "reconnect", accountId: props.accountId, token },
-      );
+      return api.tokenConnect({ mode: props.mode, accountId: props.accountId, token });
     },
     onSuccess: (result) => {
       setValue("");
@@ -168,7 +170,8 @@ export function TokenConnectForm(props: Props) {
         </a>
       </p>
 
-      {message && (
+      {err && props.renderError?.(err)}
+      {message && !(err && props.renderError?.(err)) && (
         <Alert variant="destructive">
           <AlertDescription className="space-y-1 text-foreground">
             <p>{message}</p>
@@ -182,7 +185,7 @@ export function TokenConnectForm(props: Props) {
       )}
 
       <Button type="submit" className="w-full rounded-full" disabled={submit.isPending || lockedUntil !== null}>
-        {props.mode === "new" ? "追加する" : "接続し直す"}
+        {props.mode === "connect" ? "つなぐ" : "接続し直す"}
       </Button>
     </form>
   );

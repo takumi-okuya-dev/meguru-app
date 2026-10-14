@@ -220,15 +220,14 @@ export const oauthStates = pgTable(
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
     mode: oauthMode("mode").notNull(),
-    targetAccountId: uuid("target_account_id").references(() => accounts.id, { onDelete: "cascade" }),
+    // 許可の画面にいる間に対象が消されたら NULL にし、callback で「見つからない」と分かるようにする（specs/012 contracts/api.md）
+    targetAccountId: uuid("target_account_id").references(() => accounts.id, { onDelete: "set null" }),
     expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
     createdAt: timestamp("created_at", { withTimezone: true, precision: 6 }).notNull().defaultNow(),
   },
   (t) => [
-    check(
-      "oauth_states_target_required_for_reconnect",
-      sql`(${t.mode} = 'reconnect') = (${t.targetAccountId} IS NOT NULL)`,
-    ),
+    // new（012 より前の「つないで作る」）は対象を持たない。connect・reconnect の対象は、消されると NULL になる
+    check("oauth_states_no_target_for_new", sql`${t.mode}::text <> 'new' OR ${t.targetAccountId} IS NULL`),
   ],
 );
 
