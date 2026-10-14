@@ -106,7 +106,8 @@ export async function assignEditor(page: Page, teamId: string, accountName: stri
   await page.goto(`/teams/${teamId}/assign`);
   // 行の名前の下に「編集者」（担当がなければ「編集者 · 担当を決めてください」）と出る
   const row = page.getByRole("row").filter({ hasText: "編集者" });
-  const cell = row.getByRole("checkbox", { name: new RegExp(`を${accountName}の担当にする$`) });
+  // 読み上げの名前は「（名前）（@ユーザー名）の担当にする」（012。名前が重なっても見分けられるように）
+  const cell = row.getByRole("checkbox", { name: new RegExp(`を${accountName}(（@[^）]+）)?の担当にする$`) });
   await cell.click();
   await row.locator(`[role="checkbox"][aria-checked="true"]`).first().waitFor();
 }

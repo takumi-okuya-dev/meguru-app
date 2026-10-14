@@ -58,6 +58,7 @@ function renderSection(access = OWNER_ACCESS) {
     [
       { path: "/", element: <TeamSection accountId="a1" access={access} /> },
       { path: "/teams/:teamId", element: <p>チームの画面</p> },
+      { path: "/accounts/:accountId/settings", element: <p>設定の画面</p> },
     ],
     { initialEntries: ["/"] },
   );
@@ -120,6 +121,11 @@ describe("TeamSection（チームに入っていないオーナー）", () => {
     expect(within(dialog).getByText("Threadsにつなぐと入れられます")).toBeInTheDocument();
     await user.type(within(dialog).getByLabelText("チーム名"), "飲食チーム");
     expect(within(dialog).getByRole("button", { name: "作る" })).toBeDisabled();
+    // 「Threadsとの接続」へ進む入口を添える（PR #15 のCodexレビュー）
+    const link = within(dialog).getByRole("link", { name: "「カフェの公式」をThreadsにつなぐ" });
+    expect(link).toHaveAttribute("href", "/accounts/a1/settings#threads");
+    await user.click(link);
+    expect(screen.queryByRole("dialog", { name: "チームを作る" })).not.toBeInTheDocument();
   });
 
   it("担当の人には（チームに入っていなければ）何も出さない", () => {

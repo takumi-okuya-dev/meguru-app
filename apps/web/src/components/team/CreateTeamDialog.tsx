@@ -3,7 +3,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { TEAM_NAME_MAX, countChars } from "@threads-grower/shared";
 import { useState } from "react";
-import { useNavigate } from "react-router";
+import { Link, useNavigate } from "react-router";
 import { AccountAvatar } from "@/components/AccountAvatar";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
@@ -94,9 +94,15 @@ export function CreateTeamDialog({
           <fieldset className="space-y-2">
             <legend className="mb-1 text-sm font-medium">チームに入れる自分のアカウント（1つ以上）</legend>
             {noConnected && (
-              <p role="status" className="rounded-xl border bg-muted/40 px-3 py-2 text-sm">
-                先にThreadsにつないでください。チームに入れられるのは、Threadsにつないだアカウントだけです。
-              </p>
+              <div role="status" className="space-y-1.5 rounded-xl border bg-muted/40 px-3 py-2 text-sm">
+                <p>先にThreadsにつないでください。チームに入れられるのは、Threadsにつないだアカウントだけです。</p>
+                {/* 「Threadsとの接続」へ進む入口（PR #15 のCodexレビュー） */}
+                {own[0] && (
+                  <Link className="font-medium underline underline-offset-4" to={`/accounts/${own[0].id}/settings#threads`} onClick={onClose}>
+                    「{own[0].name}」をThreadsにつなぐ
+                  </Link>
+                )}
+              </div>
             )}
             {own.map((a) => {
               const inOther = busy.has(a.id);

@@ -63,8 +63,8 @@ describe("担当を決める", () => {
     expect(within(rows[1]!).getByText("田中 健（あなた）")).toBeInTheDocument();
     expect(within(rows[1]!).getByText("自分")).toBeInTheDocument();
     expect(within(rows[2]!).getByText("自分")).toBeInTheDocument();
-    expect(screen.getByRole("checkbox", { name: "佐藤 美咲をカフェ B店の担当にする" })).toHaveAttribute("aria-checked", "true");
-    expect(screen.getByRole("checkbox", { name: "田中 健をカフェ B店の担当にする" })).toHaveAttribute("aria-checked", "false");
+    expect(screen.getByRole("checkbox", { name: "佐藤 美咲をカフェ B店（@cafe_b）の担当にする" })).toHaveAttribute("aria-checked", "true");
+    expect(screen.getByRole("checkbox", { name: "田中 健をカフェ B店（@cafe_b）の担当にする" })).toHaveAttribute("aria-checked", "false");
     expect(screen.getByRole("link", { name: "チームの画面に戻る" })).toHaveAttribute("href", "/teams/t1");
   });
 
@@ -72,19 +72,36 @@ describe("担当を決める", () => {
     mocks.assign.mockRejectedValue(new ApiError("ASSIGNMENT_NOT_ALLOWED", 409));
     const user = userEvent.setup();
     renderPage();
-    const cell = await screen.findByRole("checkbox", { name: "田中 健をカフェ B店の担当にする" });
+    const cell = await screen.findByRole("checkbox", { name: "田中 健をカフェ B店（@cafe_b）の担当にする" });
     expect(cell).toHaveClass("size-11");
     await user.click(cell);
     expect(mocks.assign).toHaveBeenCalledWith("t1", "u-a", "a-s");
     expect(toast.error).toHaveBeenCalledWith("このアカウントは担当にできません。");
-    expect(await screen.findByRole("checkbox", { name: "田中 健をカフェ B店の担当にする" })).toHaveAttribute("aria-checked", "false");
+    expect(await screen.findByRole("checkbox", { name: "田中 健をカフェ B店（@cafe_b）の担当にする" })).toHaveAttribute("aria-checked", "false");
+  });
+
+  it("同じオーナーの同じ名前のアカウントも、列の見出しと読み上げの名前で@ユーザー名により見分けられる（PR #15 のCodexレビュー）", async () => {
+    mocks.getAssignments.mockResolvedValue({
+      ...table,
+      accounts: [
+        ...table.accounts,
+        { id: "a-s2", name: "カフェ B店", username: "cafe_b2", displayName: "カフェ B店", profilePictureUrl: null, ownerUserId: "u-s", ownerName: "鈴木 花子" },
+      ],
+    });
+    renderPage();
+    const headers = await screen.findAllByRole("columnheader");
+    expect(headers.map((h) => h.textContent)).toEqual(
+      expect.arrayContaining([expect.stringContaining("@cafe_b鈴木"), expect.stringContaining("@cafe_b2鈴木")]),
+    );
+    expect(screen.getByRole("checkbox", { name: "佐藤 美咲をカフェ B店（@cafe_b）の担当にする" })).toHaveAttribute("aria-checked", "true");
+    expect(screen.getByRole("checkbox", { name: "佐藤 美咲をカフェ B店（@cafe_b2）の担当にする" })).toHaveAttribute("aria-checked", "false");
   });
 
   it("担当を外す", async () => {
     mocks.unassign.mockResolvedValue(undefined);
     const user = userEvent.setup();
     renderPage();
-    await user.click(await screen.findByRole("checkbox", { name: "佐藤 美咲をカフェ B店の担当にする" }));
+    await user.click(await screen.findByRole("checkbox", { name: "佐藤 美咲をカフェ B店（@cafe_b）の担当にする" }));
     expect(mocks.unassign).toHaveBeenCalledWith("t1", "u-e", "a-s");
   });
 
