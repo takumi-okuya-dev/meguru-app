@@ -24,6 +24,7 @@ import {
   lt,
   lte,
   min,
+  ne,
   notInArray,
   or,
   sql,
@@ -176,7 +177,8 @@ export async function runAutoPost(
     .select({ schedule: postingSchedules })
     .from(postingSchedules)
     .innerJoin(accounts, eq(accounts.id, postingSchedules.accountId))
-    .where(eq(postingSchedules.enabled, true));
+    // 未接続のアカウントは見ない（オンにはできないが、試み（飛ばした記録）も作らない。specs/012 FR-035）
+    .where(and(eq(postingSchedules.enabled, true), ne(accounts.connectionStatus, "not_connected")));
   const accountIds = schedules.map((s) => s.schedule.accountId);
   const recent = accountIds.length
     ? await db

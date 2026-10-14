@@ -4,8 +4,10 @@ import { render, screen } from "@testing-library/react";
 import type { AccountSummary, ProfileStatus, AutoPostStatus } from "@threads-grower/shared";
 import { createMemoryRouter, Outlet, RouterProvider } from "react-router";
 import { describe, expect, it, vi } from "vitest";
+import { OWNER_ACCESS } from "./helpers/access";
 
 let current: ProfileStatus | Error;
+let approved = 0;
 let auto: AutoPostStatus = { autoPost: { enabled: false, slotCount: 0, stoppedReason: null }, next: null, approvedCount: 0, daysLeft: null, notices: [] };
 vi.mock("@/lib/api-client", async (orig) => {
   const actual = await orig<typeof import("@/lib/api-client")>();
@@ -14,6 +16,8 @@ vi.mock("@/lib/api-client", async (orig) => {
     api: {
       ...actual.api,
       getAutoPost: async () => auto,
+      getDraftCounts: async () => ({ needsReview: 0, approved, rejected: 0, published: 0, publishFailed: 0 }),
+      accountAccess: async () => OWNER_ACCESS,
       getProfileStatus: () => (current instanceof Error ? Promise.reject(current) : Promise.resolve(current)),
     },
   };
@@ -44,10 +48,10 @@ function status(overrides: Partial<ProfileStatus> = {}): ProfileStatus {
   };
 }
 
-function renderHome(s: ProfileStatus | Error) {
+function renderHome(s: ProfileStatus | Error, acc: AccountSummary = account) {
   current = s;
   const router = createMemoryRouter(
-    [{ path: "/accounts/:accountId", element: <Outlet context={{ account }} />, children: [{ index: true, element: <AccountHome /> }] }],
+    [{ path: "/accounts/:accountId", element: <Outlet context={{ account: acc }} />, children: [{ index: true, element: <AccountHome /> }] }],
     { initialEntries: ["/accounts/a1"] },
   );
   render(
@@ -135,5 +139,46 @@ describe("005：次の投稿", () => {
     renderHome(status());
     expect(await screen.findByRole("button", { name: "再接続" })).toBeInTheDocument();
     expect(screen.getByText(/接続が切れているため/)).toBeInTheDocument();
+  });
+});
+
+describe("未接続のアカウントのホーム（specs/012 US4、Clarifications 2026-10-14）", () => {
+  const unconnected: AccountSummary = {
+    ...account,
+    name: "カフェの公式",
+    username: null,
+    displayName: null,
+    connectionStatus: "not_connected",
+    connectionMethod: null,
+  };
+
+  it("一番上に控えめな帯「未接続」と「Threadsにつなぐ」。名前と「未接続」が出て、@null は出ない（FR-034、SC-006）", async () => {
+    auto = { autoPost: { enabled: false, slotCount: 0, stoppedReason: null }, next: null, approvedCount: 0, daysLeft: null, notices: [{ kind: "not_connected" }] };
+    approved = 0;
+    renderHome(status(), unconnected);
+    const banner = await screen.findByRole("region", { name: "Threadsとの接続" });
+    expect(banner).toHaveTextContent("未接続：Threadsにつなぐと、承認した案を自動で投稿し、反応を分析できます");
+    expect(await screen.findByRole("link", { name: "Threadsにつなぐ" })).toHaveAttribute("href", "/accounts/a1/settings#threads");
+    expect(screen.getByRole("heading", { name: "カフェの公式" })).toBeInTheDocument();
+    expect(document.body.textContent).not.toMatch(/@null|@undefined/);
+    // 承認済みが0件なら、次にやることは今までどおり
+    expect(await screen.findByRole("heading", { name: "まずは「課題」から埋めましょう" })).toBeInTheDocument();
+  });
+
+  it("承認済みの案が1件以上なら、次にやることが「Threadsにつないで自動投稿を始めましょう」になる", async () => {
+    approved = 2;
+    renderHome(status(), unconnected);
+    expect(await screen.findByRole("heading", { name: "Threadsにつないで自動投稿を始めましょう" })).toBeInTheDocument();
+    const links = screen.getAllByRole("link", { name: "Threadsにつなぐ" });
+    expect(links.every((l) => l.getAttribute("href") === "/accounts/a1/settings#threads")).toBe(true);
+  });
+
+  it("つないだアカウントには帯も「つなぐ」も出さない", async () => {
+    approved = 2;
+    auto = { ...auto, notices: [] };
+    renderHome(status());
+    await screen.findByRole("heading", { name: "まずは「課題」から埋めましょう" });
+    expect(screen.queryByRole("region", { name: "Threadsとの接続" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Threadsにつなぐ" })).not.toBeInTheDocument();
   });
 });

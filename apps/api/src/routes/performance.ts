@@ -57,6 +57,9 @@ export function performanceRoutes(authed: MiddlewareHandler<AppEnv>) {
       const access = await authorizeAccount(db, user, c.req.param("accountId"), "view");
       const account = access.account;
       requireGrowerAccess(account, access.owner);
+      // 未接続のアカウントには書き出すものがない（specs/012 FR-033）
+      if (account.connectionStatus === "not_connected")
+        throw new AppError("ACCOUNT_NOT_CONNECTED", 409, "account not connected", undefined, [account.id]);
       const parsed = exportQuerySchema.safeParse(c.req.query());
       if (!parsed.success) {
         throw new AppError("VALIDATION_FAILED", 400, "invalid query", undefined, invalidFields(parsed.error));

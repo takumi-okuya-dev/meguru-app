@@ -1,6 +1,6 @@
 // US2：「このアカウントの設定」の「Threadsとの接続」（specs/012 FR-010〜FR-014、contracts/ui-routes.md「このアカウントの設定」）
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { AccountSummary, MeResponse } from "@threads-grower/shared";
 import { createMemoryRouter, Outlet, RouterProvider } from "react-router";
@@ -136,5 +136,19 @@ describe("このアカウントの設定の「Threadsとの接続」", () => {
     const router = renderSettings(connected, "/accounts/a1/settings?connected=connect");
     expect(await screen.findByText("招待の画面")).toBeInTheDocument();
     expect(router.state.location.pathname).toBe(INVITE);
+  });
+});
+
+describe("未接続の投稿のスケジュール（specs/012 FR-032）", () => {
+  it("区分に「Threadsにつなぐと使えます」。設定のダイアログでは自動投稿のスイッチを使えず、理由を示す。「接続を確かめる」は出さない", async () => {
+    renderSettings(unconnected);
+    const section = (await screen.findByRole("heading", { name: "投稿のスケジュール" })).closest("section")!;
+    expect(await within(section).findByText("Threadsにつなぐと使えます")).toBeInTheDocument();
+    expect(within(section).queryByRole("button", { name: "接続を確かめる" })).not.toBeInTheDocument();
+    await userEvent.click(await within(section).findByRole("button", { name: "編集" }));
+    const dialog = await screen.findByRole("dialog", { name: "投稿のスケジュール" });
+    const sw = within(dialog).getByRole("switch", { name: "自動投稿" });
+    expect(sw).toBeDisabled();
+    expect(sw).toHaveAccessibleDescription("Threadsにつなぐと使えます。時刻は先に決めておけます");
   });
 });

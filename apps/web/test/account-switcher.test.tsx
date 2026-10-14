@@ -537,6 +537,21 @@ describe("AccountSwitcherの状態と操作", () => {
   });
 });
 
+describe("未接続のアカウントの画面（specs/012 FR-036）", () => {
+  it("要再接続のバナーと「再接続」を出さない", async () => {
+    vi.clearAllMocks();
+    const unconnected = { ...account("a1", "not_connected"), username: null, connectionMethod: null };
+    mocks.me.mockResolvedValue(me([unconnected]));
+    mocks.needsReviewCounts.mockResolvedValue(counts([["a1", 0]]));
+    mocks.account.mockResolvedValue(unconnected);
+    mocks.openAccount.mockResolvedValue(unconnected);
+    renderAccountRoutes();
+    expect(await screen.findByText("投稿: Aの投稿")).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "再接続" })).not.toBeInTheDocument();
+    expect(screen.queryByText(/接続が切れ/)).not.toBeInTheDocument();
+  });
+});
+
 describe("切り替えメニューの見出し（specs/011 T025）", () => {
   const make = (id: string, role: AccountSummary["role"]): AccountSummary => ({
     id,

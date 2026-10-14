@@ -305,7 +305,7 @@ describe("対象のAccount（FR-005）", () => {
     await publishedDrafts(recon.accountId, [{ publishedAt: hoursAgo(24) }]);
     await publishedDrafts(trial.accountId, [{ publishedAt: hoursAgo(24) }]);
     await run(NOON);
-    expect(await fake.callCounts()).toEqual({ insights: 0, followers: 0 });
+    expect(await fake.callCounts()).toMatchObject({ insights: 0, followers: 0 });
   });
 });
 

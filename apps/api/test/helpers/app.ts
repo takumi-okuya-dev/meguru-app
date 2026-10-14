@@ -119,7 +119,7 @@ export const fake = {
   insightsFail: (key: string, kind: "not_found" | "permission" | "rate_limit" | "transient" | "auth", times: number) =>
     control("insights-failure", { key, kind, times }),
   setFollowers: (userId: string, count: number) => control("followers", { userId, count }),
-  callCounts: async () => (await control("call-counts")) as { insights: number; followers: number },
+  callCounts: async () => (await control("call-counts")) as { insights: number; followers: number; total: number },
   containers: async () =>
     ((await control("containers")) as { containers: { id: string; userId: string; text: string; status: string }[] })
       .containers,

@@ -18,6 +18,7 @@ import { queryKeys } from "@/lib/query";
 import { cn } from "@/lib/utils";
 import { PostingScheduleDialog } from "./PostingScheduleDialog";
 import { SettingCard, SettingRow } from "./SettingRow";
+import { NotConnectedNotice } from "@/components/NotConnectedNotice";
 
 /**
  * 保存の後の通知の文言。オンにしたときは次の投稿の予定を添える（contracts/ui-routes.md）。
@@ -121,6 +122,8 @@ export function PostingScheduleSection({
         )}
       </div>
       {!canEdit && <p className="text-xs text-muted-foreground">変更できるのはオーナーです</p>}
+      {/* 未接続：オンにはできない。時刻は先に決めておける（specs/012 FR-032・FR-033） */}
+      {account.connectionStatus === "not_connected" && <NotConnectedNotice accountId={accountId} />}
       {account.connectionStatus === "needs_reconnect" && (
         <Alert variant="destructive">
           <AlertDescription className="flex flex-wrap items-center gap-3 text-foreground">
@@ -181,7 +184,7 @@ export function PostingScheduleSection({
         </SettingCard>
       )}
 
-      {canEdit && (
+      {canEdit && account.connectionStatus !== "not_connected" && (
       <div className="flex flex-wrap items-center gap-3">
         <Button
           variant="outline"
@@ -227,6 +230,7 @@ export function PostingScheduleSection({
           onSaved={(s, c) => void onSaved(s, c)}
           onReconnect={onReconnect}
           onClose={() => setEditing(false)}
+          notConnected={account.connectionStatus === "not_connected"}
         />
       )}
     </section>

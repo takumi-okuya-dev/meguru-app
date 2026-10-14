@@ -71,6 +71,7 @@ export function toAutoPostState(
   const enabled = row?.enabled ?? false;
   let stoppedReason: AutoPostState["stoppedReason"] = null;
   if (enabled && account.connectionStatus === "needs_reconnect") stoppedReason = "needs_reconnect";
+  else if (enabled && account.connectionStatus === "not_connected") stoppedReason = "not_connected";
   else if (enabled && row?.pausedUntil && row.pausedUntil.getTime() > now.getTime())
     stoppedReason = "rate_limited";
   return { enabled, slotCount: row?.slotMinutes.length ?? 0, stoppedReason };
@@ -144,7 +145,9 @@ export async function savePostingSchedule(
     connectionCheck = await checkThreadsPublish(env, db, accountId, threads);
     if (
       connectionCheck.status === "needs_reconnect" ||
-      connectionCheck.status === "no_publish_permission"
+      connectionCheck.status === "no_publish_permission" ||
+      // 未接続ではオンにできない（specs/012 FR-032）
+      connectionCheck.status === "not_connected"
     ) {
       throw new AppError("THREADS_NOT_READY", 409, "threads not ready", undefined, [
         connectionCheck.status,

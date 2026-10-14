@@ -5,16 +5,17 @@ import { api, describeError } from "@/lib/api-client";
 import { formatRelativeJst } from "@/lib/format";
 import { queryKeys } from "@/lib/query";
 import { useAccountAccess } from "@/lib/use-account-access";
+import { NotConnectedNotice } from "@/components/NotConnectedNotice";
 import { ReconnectButton } from "@/components/ReconnectButton";
 import { Button } from "@/components/ui/button";
 
 /**
  * ホームと投稿ストックに出す自動投稿の知らせ。手伝う人には、権限のない操作を出さない
  * （「閉じる」は review、再接続は owner。specs/008 contracts/permissions.md。PR #9 のCodexレビュー）。
- * @param props - accountId：AccountのID
+ * @param props - accountId：AccountのID、hideNotConnected：未接続の知らせを出さない（ホームは上の帯で出す。specs/012）
  * @returns 知らせ。読み込み失敗時は再試行の案内
  */
-export function AutoPostNotices({ accountId }: { accountId: string }) {
+export function AutoPostNotices({ accountId, hideNotConnected = false }: { accountId: string; hideNotConnected?: boolean }) {
   const client = useQueryClient();
   const { can } = useAccountAccess(accountId);
   const query = useQuery({
@@ -78,6 +79,15 @@ export function AutoPostNotices({ accountId }: { accountId: string }) {
               </div>
               {dismiss.isError && <p role="alert">{describeError(dismiss.error)}</p>}
             </div>
+          );
+        // 未接続：承認した案は、つないで自動投稿をオンにすると投稿される（specs/012 FR-033）
+        if (notice.kind === "not_connected")
+          return hideNotConnected ? null : (
+            <NotConnectedNotice
+              key={notice.kind}
+              accountId={accountId}
+              message="承認した案は、Threadsにつないで自動投稿をオンにすると投稿されます"
+            />
           );
         if (notice.kind === "needs_reconnect")
           return (

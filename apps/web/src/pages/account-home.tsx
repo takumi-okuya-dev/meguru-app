@@ -14,6 +14,8 @@ import { NextPostCard } from "@/components/NextPostCard";
 import { AssignedNotice } from "@/components/team/AssignedNotice";
 import { TokenWarnings } from "@/components/connect/TokenWarnings";
 import { AutoPostNotices } from "@/components/AutoPostNotices";
+import { NotConnectedBanner, connectPath } from "@/components/NotConnectedNotice";
+import { useAccountAccess } from "@/lib/use-account-access";
 import { AccountAvatar } from "@/components/AccountAvatar";
 import { ApiErrorScreen } from "@/components/ApiErrorScreen";
 import { ConnectionBadge } from "@/components/ConnectionBadge";
@@ -70,6 +72,15 @@ function nextStep(s: ProfileStatus): { area: Area | null; title: string; body: s
 export function AccountHome() {
   const account = useCurrentAccount();
   // Threadsとつないだ結果と、招待へ戻す処理は「このアカウントの設定」で扱う（specs/012 research.md R4・R7）
+  const notConnected = account.connectionStatus === "not_connected";
+  const { can } = useAccountAccess(account.id);
+  // 未接続で承認済みの案があれば、次にやることを「つなぐ」にする（Clarifications 2026-10-14）
+  const counts = useQuery({
+    queryKey: queryKeys.draftCounts(account.id),
+    queryFn: () => api.getDraftCounts(account.id),
+    enabled: notConnected,
+  });
+  const connectFirst = notConnected && can("owner") && (counts.data?.approved ?? 0) > 0;
   const status = useQuery({
     queryKey: queryKeys.profileStatus(account.id),
     queryFn: () => api.getProfileStatus(account.id),
@@ -108,6 +119,7 @@ export function AccountHome() {
     <>
       <PageHeader title="ホーム" />
       <PageBody className="flex flex-col items-center gap-7 pt-10 md:pt-16">
+        {notConnected && <NotConnectedBanner accountId={account.id} />}
         <AssignedNotice account={account} />
         <TokenWarnings />
         <section className="flex flex-col items-center gap-1.5 text-center">
@@ -129,7 +141,19 @@ export function AccountHome() {
         ) : (
           <>
             <section className="space-y-1.5 text-center">
-              {canEdit ? (
+              {connectFirst ? (
+                <>
+                  <h2 className="text-[22px] leading-snug font-semibold md:text-[26px]">
+                    Threadsにつないで自動投稿を始めましょう
+                  </h2>
+                  <p className="text-[15px] text-muted-foreground">
+                    承認した案は、Threadsにつないで自動投稿をオンにすると投稿されます。
+                  </p>
+                  <Button asChild className="mt-3 h-11 rounded-full px-5 md:h-9">
+                    <Link to={connectPath(account.id)}>Threadsにつなぐ</Link>
+                  </Button>
+                </>
+              ) : canEdit ? (
                 <>
                   <h2 className="text-[22px] leading-snug font-semibold md:text-[26px]">
                     {step!.title}
@@ -153,7 +177,8 @@ export function AccountHome() {
               )}
             </section>
             <NextPostCard accountId={account.id} />
-            <AutoPostNotices accountId={account.id} />
+            {/* 未接続の知らせは、上の帯で出しているので重ねない */}
+            <AutoPostNotices accountId={account.id} hideNotConnected />
             <nav aria-label="投稿の材料" className="grid w-full gap-2.5 md:grid-cols-3 md:gap-3">
               {cards.map(({ area, label, Icon, text }) => (
                 <Link
@@ -161,7 +186,7 @@ export function AccountHome() {
                   to={`/accounts/${account.id}/${area}`}
                   className={cn(
                     "flex items-center gap-3.5 rounded-2xl border bg-card px-4 py-3 hover:bg-accent md:flex-col md:items-start md:gap-1.5 md:py-4",
-                    canEdit && step?.area === area && "border-foreground",
+                    canEdit && !connectFirst && step?.area === area && "border-foreground",
                   )}
                 >
                   <Icon className="size-5 shrink-0" aria-hidden="true" />

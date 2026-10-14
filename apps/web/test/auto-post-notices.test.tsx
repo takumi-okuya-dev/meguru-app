@@ -52,3 +52,19 @@ describe("AutoPostNotices の権限による出し分け", () => {
     expect(screen.queryByText(/再接続してください/)).not.toBeInTheDocument();
   });
 });
+
+describe("未接続の知らせ（specs/012 FR-033）", () => {
+  it("投稿ストックでは「承認した案は、Threadsにつないで…」と、オーナーには「Threadsとの接続」への入口", async () => {
+    status.notices = [{ kind: "not_connected" }];
+    renderNotices(OWNER_ACCESS);
+    expect(await screen.findByText("承認した案は、Threadsにつないで自動投稿をオンにすると投稿されます")).toBeInTheDocument();
+    expect(await screen.findByRole("link", { name: "Threadsとの接続" })).toHaveAttribute("href", "/accounts/a1/settings#threads");
+  });
+
+  it("オーナーでなければ入口を出さない", async () => {
+    status.notices = [{ kind: "not_connected" }];
+    renderNotices(EDITOR_ACCESS);
+    expect(await screen.findByText("承認した案は、Threadsにつないで自動投稿をオンにすると投稿されます")).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Threadsとの接続" })).not.toBeInTheDocument();
+  });
+});

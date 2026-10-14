@@ -24,6 +24,7 @@ import { Tabs } from "@/components/ui/tabs";
 import { formatJstShort } from "@/lib/format";
 import { queryKeys } from "@/lib/query";
 import { isGrowerRequired } from "@/lib/save-error";
+import { NotConnectedNotice } from "@/components/NotConnectedNotice";
 import { useCurrentAccount } from "@/pages/account-layout";
 
 /**
@@ -31,6 +32,26 @@ import { useCurrentAccount } from "@/pages/account-layout";
  * @returns パフォーマンスの画面
  */
 export function PerformancePage() {
+  const account = useCurrentAccount();
+  // 未接続なら、数字・グラフ・一覧・書き出しの代わりに案内だけを出す（specs/012 FR-033）
+  if (account.connectionStatus === "not_connected") {
+    return (
+      <>
+        <PageHeader title="パフォーマンス" />
+        <PageBody>
+          <NotConnectedNotice accountId={account.id} />
+        </PageBody>
+      </>
+    );
+  }
+  return <ConnectedPerformance />;
+}
+
+/**
+ * つないでいるアカウントのパフォーマンス（012 より前の画面のまま）。
+ * @returns パフォーマンスの画面
+ */
+function ConnectedPerformance() {
   const account = useCurrentAccount();
   const { tab, setTab } = usePerformanceTab();
   const query = usePerformance(account.id, tab);

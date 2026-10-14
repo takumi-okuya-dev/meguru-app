@@ -352,3 +352,17 @@ describe("US3：CSVで書き出す", () => {
     await waitFor(() => expect(toast.error).toHaveBeenCalledWith("書き出せませんでした。もう一度お試しください"));
   });
 });
+
+describe("未接続のアカウント（specs/012 FR-033）", () => {
+  it("数字・一覧・書き出しの代わりに「Threadsにつなぐと使えます」だけを出す", async () => {
+    Object.assign(account, { connectionStatus: "not_connected", username: null, connectionMethod: null });
+    try {
+      renderPage();
+      expect(await screen.findByText("Threadsにつなぐと使えます")).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: /CSV/ })).not.toBeInTheDocument();
+      expect(screen.queryByText(/基準値/)).not.toBeInTheDocument();
+    } finally {
+      Object.assign(account, { connectionStatus: "connected", username: "takumi", connectionMethod: undefined });
+    }
+  });
+});
