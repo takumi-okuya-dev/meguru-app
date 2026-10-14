@@ -17,6 +17,7 @@ const { ActivityPage, actionText } = await import("@/pages/activity");
 
 const account: AccountSummary = {
   id: "a1",
+  name: "カフェ B店",
   username: "cafe_b",
   displayName: "カフェ B店",
   profilePictureUrl: null,

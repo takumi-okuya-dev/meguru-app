@@ -63,7 +63,7 @@ function download(text: string, fileName: string) {
 
 /**
  * 「CSVで書き出す」のメニュー。スマートフォンではアイコンだけのボタンにする。
- * @param props - accountId：AccountのID、username：Threadsのユーザー名（ファイル名に使う）
+ * @param props - accountId：AccountのID、username：ファイル名に使う名前（Threadsのユーザー名。なければアカウントの名前。specs/012）
  * @returns メニュー
  */
 export function CsvExportMenu({ accountId, username }: { accountId: string; username: string }) {

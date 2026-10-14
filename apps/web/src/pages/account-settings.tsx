@@ -1,7 +1,7 @@
 // Account設定（FR-013・FR-019・FR-020・FR-022、規則9・10）。004で「投稿のルール」の区分を、既存の区分より上に足した。
 // 005で「投稿のスケジュール」の区分を、「投稿のルール」の上に足した
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { SHORT_LIVED_TOKEN_HINT, normalizeUsername, type TokenConnectResponse } from "@threads-grower/shared";
+import { SHORT_LIVED_TOKEN_HINT, accountLabel, type TokenConnectResponse } from "@threads-grower/shared";
 import { useState } from "react";
 import { useNavigate } from "react-router";
 import { ConnectionBadge } from "@/components/ConnectionBadge";
@@ -34,7 +34,7 @@ import { useAccountAccess } from "@/lib/use-account-access";
  */
 export function AccountSettings() {
   const account = useCurrentAccount();
-  useCallbackResult({ username: account.username });
+  useCallbackResult({ name: account.name, username: account.username });
   // 関わりで出し分ける（specs/008 FR-041、specs/011 FR-060）。設定の操作は settings、接続・削除・チームに見せるは owner の権限
   const { access, can } = useAccountAccess(account.id);
   const queryClient = useQueryClient();
@@ -58,8 +58,8 @@ export function AccountSettings() {
   });
 
   const needsReconnect = account.connectionStatus === "needs_reconnect";
-  const confirmed =
-    normalizeUsername(confirm) === normalizeUsername(account.username) && confirm.trim() !== "";
+  // 削除の確認はアカウントの名前で（specs/012 FR-043）。前後の空白は問わない
+  const confirmed = confirm.trim() !== "" && confirm.trim() === account.name;
 
   return (
     <>
@@ -67,7 +67,8 @@ export function AccountSettings() {
       <PageBody className="space-y-10">
         <section className="space-y-3">
           <div className="flex items-center gap-2 text-sm">
-            <span>@{account.username}</span>
+            <span className="font-medium">{accountLabel(account).primary}</span>
+            {accountLabel(account).secondary && <span className="text-muted-foreground">{accountLabel(account).secondary}</span>}
             <ConnectionBadge status={account.connectionStatus} />
           </div>
         </section>
@@ -124,7 +125,7 @@ export function AccountSettings() {
               <DialogHeader>
                 <DialogTitle>Accountを削除しますか？</DialogTitle>
                 <DialogDescription>
-                  この操作は取り消せません。確認のため、@{account.username} と入力してください。
+                  この操作は取り消せません。確認のため、{account.name} と入力してください。
                   {account.connectionMethod === "token" && (
                     <span className="mt-1 block">Metaアプリ側のトークンは、必要なら自分で取り消してください。</span>
                   )}
@@ -133,8 +134,8 @@ export function AccountSettings() {
               <Input
                 value={confirm}
                 onChange={(e) => setConfirm(e.target.value)}
-                placeholder={`@${account.username}`}
-                aria-label="確認のためのユーザー名"
+                placeholder={account.name}
+                aria-label="確認のためのアカウントの名前"
                 autoFocus
               />
               {remove.isError && (

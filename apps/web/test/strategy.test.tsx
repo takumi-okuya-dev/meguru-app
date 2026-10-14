@@ -20,6 +20,7 @@ const { StrategyPage } = await import("@/pages/strategy");
 
 const account: AccountSummary = {
   id: "a1",
+  name: "たくみ",
   username: "takumi",
   displayName: "たくみ",
   profilePictureUrl: null,

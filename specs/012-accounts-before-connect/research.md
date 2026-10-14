@@ -46,7 +46,7 @@
   - `mode = new`の手順（ユーザーの`last_account_deleted_at`の確認、上限の再判定と作成）は消す。
   - 自分の別のアカウントと重なったとき、`existing`の更新（001 FR-013「接続を更新する」）は`connect`ではしない（Clarifications：止めて案内する）。
 - **callbackの戻り先**：`connect`・`reconnect`とも、成功は`/accounts/:id/settings?connected=connect|reconnect`、失敗は`/accounts/:id/settings?error=CODE`。許可の画面にいる間に対象のアカウントが消された・オーナーでなくなった（`ACCOUNT_NOT_FOUND`・`ROLE_FORBIDDEN`）ときと、`state`が読めないときは`/?error=CODE`（振り分け。消えたアカウントの画面へ戻すと404になるため）。
-- **重なりのエラーの`details`**：`ACCOUNT_ALREADY_REGISTERED`は、`connect`でも`reconnect`でも`[accountId, name]`を返す（文言を1つにそろえる）。
+- **重なりのエラーの`details`**：`ACCOUNT_ALREADY_REGISTERED`は、`connect`でも`reconnect`でも`[accountId, name, username]`を返す（文言を1つにそろえる）。
 - **理由**：つなぐ入口を「このアカウントの設定」の1つにすると、照合の分岐（新規・更新・接続し直し）が「はじめてつなぐ」と「接続し直す」の2つに減る。`ACCOUNT_ALREADY_CONNECTED`を分けるのは、2つのタブで別々のThreadsアカウントにつなごうとしたときに、後の方が`RECONNECT_ACCOUNT_MISMATCH`の「別のThreadsアカウントです」と出るのを避けるため（spec US3-4）。
 - **検討した案**：`connect`を作らず、`reconnect`の中で「対象が未接続ならはじめての接続」と分ける → 上のFR-018の文言を出せず、二重の照合（自分の別のアカウント）の扱いも`reconnect`と混ざるので不採用。
 

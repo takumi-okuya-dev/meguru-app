@@ -1,6 +1,7 @@
 // Accountの作成・更新・上限（FR-008〜FR-017、research.md R8・R9）
 import { and, eq, gt, gte, inArray, isNull, lt, ne, or, sql } from "drizzle-orm";
 import {
+  ACCOUNT_NAME_MAX,
   initialPlanFor,
   limitForOwnedPlans,
   normalizeUsername,
@@ -82,8 +83,8 @@ export async function assertCanAddAccount(db: Db | TxDb, userId: string) {
 /** 接続の要求。OAuth では state の行から、トークンではリクエストから作る（specs/010 research.md R5）。 */
 export type ConnectionRequest = {
   userId: string;
-  mode: "new" | "reconnect";
-  /** 接続し直すAccount（mode = reconnect） */
+  mode: "new" | "reconnect" | "connect";
+  /** 接続し直すAccount（mode = reconnect）・はじめてつなぐAccount（mode = connect） */
   targetAccountId: string | null;
   /** 接続を始めた時刻（OAuth は state の作成、トークンは要求を受け取った時刻） */
   startedAt: Date;
@@ -223,7 +224,7 @@ export async function completeConnection(
       if (!target)
         throw new AppError("OAUTH_STATE_INVALID", 400, "reconnect target no longer exists");
       // 再接続は同じ Threads アカウントでだけ認める（FR-020）。同じかはユーザーIDかユーザー名で見る（specs/010 FR-032）
-      if (target.threadsUserId !== input.threadsUserId && normalizeUsername(target.username) !== norm) {
+      if (target.threadsUserId !== input.threadsUserId && (target.username === null || normalizeUsername(target.username) !== norm)) {
         throw new AppError(
           "RECONNECT_ACCOUNT_MISMATCH",
           409,
@@ -245,6 +246,9 @@ export async function completeConnection(
       return { accountId: target.id, username: input.profile.username, kind: "reconnect" };
     }
 
+    // はじめてつなぐ流れ（specs/012 research.md R4）は US2 で足す。それまでは受け付けない
+    if (state.mode === "connect") throw new AppError("OAUTH_STATE_INVALID", 400, "connect mode not supported yet");
+
     if (existing) {
       // 7. 他人なら拒否（FR-012）。自分のAccountなら、このアプリの接続は接続を更新し（FR-013）、
       //    トークンは接続し直しへ案内する（黙って接続の方法を変えない。specs/010 research.md R6）
@@ -258,6 +262,7 @@ export async function completeConnection(
     const accountId = crypto.randomUUID();
     await tx.insert(accounts).values({
       id: accountId,
+      name: nameFromProfile(input.profile),
       threadsUserId: input.threadsUserId,
       username: input.profile.username,
       displayName: input.profile.name,
@@ -271,6 +276,16 @@ export async function completeConnection(
     await writeConnection(tx, cipher, accountId, input);
     return { accountId, username: input.profile.username, kind: "new" };
   });
+}
+
+/**
+ * Threadsのプロフィールから、アカウントの名前を作る（表示名、空ならユーザー名。前後の空白を除いて50文字まで。specs/012 data-model.md）。
+ * @param profile - Threadsのプロフィール
+ * @returns アカウントの名前
+ */
+function nameFromProfile(profile: ThreadsProfile): string {
+  const base = profile.name?.trim() || profile.username;
+  return Array.from(base).slice(0, ACCOUNT_NAME_MAX).join("").trim();
 }
 
 /**
@@ -502,22 +517,19 @@ export async function verifyConnection(
  * @param env - Workers のバインディング
  * @param userId - users.id
  * @param accountId - 削除する Account の ID
- * @param confirmUsername - 確認のために入力されたユーザー名（@の有無・大文字小文字は問わない）
+ * @param confirmName - 確認のために入力されたアカウントの名前（前後の空白は問わない。specs/012 FR-043）
  * @throws AppError ACCOUNT_NOT_FOUND・CONFIRMATION_MISMATCH
  */
 export async function deleteAccount(
   env: Env,
   userId: string,
   accountId: string,
-  confirmUsername: string,
+  confirmName: string,
 ) {
   await withTransaction(env.DATABASE_URL, async (tx) => {
     await lockUserRow(tx, userId);
     const { account } = await authorizeAccount(tx, { id: userId }, accountId, "owner");
-    if (
-      normalizeUsername(confirmUsername) !== normalizeUsername(account.username) ||
-      !confirmUsername.trim()
-    ) {
+    if (!confirmName.trim() || confirmName.trim() !== account.name) {
       throw new AppError("CONFIRMATION_MISMATCH", 422, "confirmation does not match");
     }
     // チームの最後のアカウントなら、同じトランザクションでチームを抜けたものとする（specs/011 FR-046、research.md R7）

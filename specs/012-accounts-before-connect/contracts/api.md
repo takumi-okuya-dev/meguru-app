@@ -13,7 +13,7 @@
 
 今のcodeの使い方の変更：
 
-- `ACCOUNT_ALREADY_REGISTERED`（010）：はじめてつなぐときに、自分の別のアカウントと重なったときにも使う。`details: [accountId, name]`（重なったアカウントのIDと名前）。接続し直し（010 US2-1）で重なったときも、同じく`[accountId, name]`を返す（文言を1つにそろえる）。文言は「@{username}は、あなたのアカウント『{name}』につながっています」（spec US3-1）。
+- `ACCOUNT_ALREADY_REGISTERED`（010）：はじめてつなぐときに、自分の別のアカウントと重なったときにも使う。`details: [accountId, name, username]`（重なったアカウントのIDと名前）。接続し直し（010 US2-1）で重なったときも、同じく`[accountId, name, username]`を返す（文言を1つにそろえる）。文言は「@{username}は、あなたのアカウント『{name}』につながっています」（spec US3-1）。
 - `THREADS_ACCOUNT_TAKEN`（001）：はじめてつなぐときに、他の利用者のアカウントと重なったとき（今のまま）。
 - `ACCOUNT_DELETED_DURING_CONNECT`（001）：使わなくなる（つなぐことでアカウントを作らないため）。codeは残す。
 - `THREADS_NOT_READY`（005）：`details`に`not_connected`が入りうる。
@@ -68,7 +68,7 @@
 | 照合 | 結果 |
 |---|---|
 | 一致なし | つなぐ。`connected`にし、方法を記録する |
-| 自分の別のアカウント（ユーザーIDかユーザー名） | `ACCOUNT_ALREADY_REGISTERED`（`details: [そのアカウントのID, 名前]`）。つながない |
+| 自分の別のアカウント（ユーザーIDかユーザー名） | `ACCOUNT_ALREADY_REGISTERED`（`details: [そのアカウントのID, 名前, ユーザー名]`）。つながない |
 | 他の利用者のアカウント | `THREADS_ACCOUNT_TAKEN`。つながない |
 | ユーザー名だけ一致 | 010 FR-023のまま、登録済みのアカウントのプロフィールを取り直してから照合する |
 

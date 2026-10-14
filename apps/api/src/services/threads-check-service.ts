@@ -28,6 +28,8 @@ export async function checkThreadsPublish(
   threads: ThreadsClient,
 ): Promise<ThreadsCheck> {
   const cred = await loadThreadsCredentials(env, db, accountId);
+  // 未接続ならThreadsに問い合わせない（specs/012 research.md R5）
+  if (cred?.connectionStatus === "not_connected") return { status: "not_connected" };
   if (!cred || cred.connectionStatus === "needs_reconnect") return { status: "needs_reconnect" };
   // 鍵の設定ミスなどで復号できないときは、接続の状態を変えずに「確かめられなかった」にする（001 R5）
   if (!cred.token) return { status: "unknown" };

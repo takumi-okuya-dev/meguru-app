@@ -166,7 +166,7 @@ let accountSeq = 0;
  */
 export async function createUserWithAccount(
   user: string,
-  opts: { plan?: "auto-only" | "auto-grower" | "multi-account" | "team"; userCreatedAt?: Date } = {},
+  opts: { plan?: "auto-only" | "auto-grower" | "multi-account" | "team"; userCreatedAt?: Date; name?: string } = {},
 ) {
   const sql = neon(testEnv.DATABASE_URL);
   createDb(testEnv.DATABASE_URL);
@@ -178,9 +178,35 @@ export async function createUserWithAccount(
     RETURNING id`) as [{ id: string }];
   accountSeq += 1;
   const threadsUserId = `tu_${user}_${Date.now()}_${accountSeq}`;
+  const username = `${user}_${accountSeq}`;
   const [a] = (await sql`
-    INSERT INTO accounts (threads_user_id, username, plan)
-    VALUES (${threadsUserId}, ${`${user}_${accountSeq}`}, ${opts.plan ?? "auto-only"})
+    INSERT INTO accounts (name, threads_user_id, username, plan)
+    VALUES (${opts.name ?? username}, ${threadsUserId}, ${username}, ${opts.plan ?? "auto-only"})
+    RETURNING id`) as [{ id: string }];
+  await sql`INSERT INTO memberships (user_id, account_id, role) VALUES (${u.id}, ${a.id}, 'owner')`;
+  return { userId: u.id, accountId: a.id };
+}
+
+/**
+ * ユーザーと、Threadsにつないでいない owner の Account を直接作る（specs/012 data-model.md）。
+ * @param user - Clerk のユーザーID
+ * @param opts - name：アカウントの名前（既定「未接続のアカウント」）、plan、userCreatedAt
+ * @returns users.id と accounts.id
+ */
+export async function createUnconnectedAccount(
+  user: string,
+  opts: { name?: string; plan?: "auto-only" | "auto-grower" | "multi-account" | "team"; userCreatedAt?: Date } = {},
+) {
+  const sql = neon(testEnv.DATABASE_URL);
+  const createdAt = (opts.userCreatedAt ?? new Date()).toISOString();
+  const [u] = (await sql`
+    INSERT INTO users (clerk_user_id, email, display_name, created_at, updated_at)
+    VALUES (${user}, ${`${user}@example.com`}, ${user}, ${createdAt}, ${createdAt})
+    ON CONFLICT (clerk_user_id) DO UPDATE SET updated_at = users.updated_at
+    RETURNING id`) as [{ id: string }];
+  const [a] = (await sql`
+    INSERT INTO accounts (name, plan, connection_status, connection_method)
+    VALUES (${opts.name ?? "未接続のアカウント"}, ${opts.plan ?? "auto-only"}, 'not_connected', NULL)
     RETURNING id`) as [{ id: string }];
   await sql`INSERT INTO memberships (user_id, account_id, role) VALUES (${u.id}, ${a.id}, 'owner')`;
   return { userId: u.id, accountId: a.id };

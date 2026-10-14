@@ -20,6 +20,7 @@ const { PerformancePage: Page } = await import("@/pages/performance");
 
 const account: AccountSummary = {
   id: "a1",
+  name: "たくみ",
   username: "takumi",
   displayName: "たくみ",
   profilePictureUrl: null,
@@ -38,6 +39,7 @@ const summary = (over: Partial<PerformanceSummary> = {}): PerformanceSummary => 
   lastFetchedAt: "2026-10-07T18:00:00.000Z",
   insightsDenied: false,
   needsReconnect: false,
+  notConnected: false,
   counts: { all: 37, good: 7, normal: 16, poor: 9, pending: 4 },
   ...over,
 });

@@ -146,7 +146,7 @@ export function InvitePage() {
                 <legend className="mb-1 text-sm font-medium">チームに入れる自分のアカウント（1つ以上）</legend>
                 {p.viewer.accounts.map((a) => {
                   const on = Boolean(picked[a.id]) && !a.inOtherTeam;
-                  const label = a.displayName ?? a.username;
+                  const label = a.name;
                   return (
                     <div
                       key={a.id}
@@ -169,7 +169,7 @@ export function InvitePage() {
                         <span className="flex min-w-0 flex-col leading-tight">
                           <span className="truncate font-medium">{label}</span>
                           <span className="truncate text-xs text-muted-foreground">
-                            {a.inOtherTeam ? `${a.inOtherTeam}に入っています` : `@${a.username}`}
+                            {a.inOtherTeam ? `${a.inOtherTeam}に入っています` : (a.username ? `@${a.username}` : "未接続")}
                           </span>
                         </span>
                       </label>

@@ -28,9 +28,9 @@ const { isInvitePath } = await import("@/lib/invite-return");
 const TOKEN = "t_" + "a".repeat(43);
 
 const ACCOUNTS = [
-  { id: "acc-1", displayName: "ベーカリー E", username: "bakery_e", profilePictureUrl: null, inOtherTeam: null },
-  { id: "acc-2", displayName: "ベーカリー E 焼き菓子", username: "bakery_e_sweets", profilePictureUrl: null, inOtherTeam: null },
-  { id: "acc-3", displayName: "整体院 D", username: "seitai_d", profilePictureUrl: null, inOtherTeam: "美容チーム" },
+  { id: "acc-1", name: "ベーカリー E", displayName: "ベーカリー E", username: "bakery_e", profilePictureUrl: null, connected: true, inOtherTeam: null },
+  { id: "acc-2", name: "ベーカリー E 焼き菓子", displayName: "ベーカリー E 焼き菓子", username: "bakery_e_sweets", profilePictureUrl: null, connected: true, inOtherTeam: null },
+  { id: "acc-3", name: "整体院 D", displayName: "整体院 D", username: "seitai_d", profilePictureUrl: null, connected: true, inOtherTeam: "美容チーム" },
 ];
 
 function preview(viewer: Partial<InvitePreview["viewer"]> = {}): InvitePreview {

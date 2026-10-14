@@ -109,9 +109,9 @@ export function CreateTeamDialog({
                   />
                   <AccountAvatar account={a} className="size-8" />
                   <span className="flex min-w-0 flex-1 flex-col leading-tight">
-                    <span className="truncate font-medium">{a.displayName ?? a.username}</span>
+                    <span className="truncate font-medium">{a.name}</span>
                     <span className="truncate text-xs text-muted-foreground">
-                      @{a.username}
+                      {a.username ? `@${a.username}` : "未接続"}
                       {inOther ? " · ほかのチームに入っています" : ""}
                     </span>
                   </span>

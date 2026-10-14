@@ -6,6 +6,7 @@ import { OPEN_RETRY_DELAYS_MS, useAccountOpen } from "@/lib/use-account-open";
 
 const sample: AccountSummary = {
   id: "a1",
+  name: "takumi",
   username: "takumi",
   displayName: null,
   profilePictureUrl: null,

@@ -102,7 +102,7 @@ export function TeamAssignPage() {
                   </th>
                   {table.data.accounts.map((a) => (
                     <th key={a.id} scope="col" className="px-2 py-2.5 text-center font-normal leading-tight">
-                      <span className="block text-foreground">{a.displayName ?? a.username}</span>
+                      <span className="block text-foreground">{a.name}</span>
                       <span className="text-[11px]">{a.ownerName}</span>
                     </th>
                   ))}
@@ -132,7 +132,7 @@ export function TeamAssignPage() {
                               type="button"
                               role="checkbox"
                               aria-checked={on}
-                              aria-label={`${p.name}を${a.displayName ?? a.username}の担当にする`}
+                              aria-label={`${p.name}を${a.name}の担当にする`}
                               onClick={() => toggle.mutate({ userId: p.userId, accountId: a.id, on: !on })}
                               className="inline-flex size-11 items-center justify-center"
                             >

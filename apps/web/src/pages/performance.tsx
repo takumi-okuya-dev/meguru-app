@@ -90,7 +90,7 @@ export function PerformancePage() {
                   反応数の最終更新 {formatJstShort(summary.lastFetchedAt)}
                 </span>
               )}
-              <CsvExportMenu accountId={account.id} username={account.username} />
+              <CsvExportMenu accountId={account.id} username={account.username ?? account.name} />
             </>
           ) : null
         }

@@ -13,7 +13,7 @@ vi.mock("@clerk/react", () => ({
 }));
 
 function account(id: string, username: string, connectionStatus: "connected" | "needs_reconnect" = "connected") {
-  return { id, username, displayName: username, profilePictureUrl: null, plan: "auto-grower" as const, connectionStatus, lastUsedAt: null, role: "owner" as const, ownerName: null };
+  return { id, name: username, username, displayName: username, profilePictureUrl: null, plan: "auto-grower" as const, connectionStatus, lastUsedAt: null, role: "owner" as const, ownerName: null };
 }
 const meResponse: MeResponse = {
   user: { id: "u", email: "t@example.com", displayName: "Takumi" },

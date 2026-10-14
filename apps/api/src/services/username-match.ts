@@ -34,7 +34,7 @@ export async function refreshUsernameOnlyMatch(env: Env, threads: ThreadsClient,
     if (!cred?.token || cred.connectionStatus !== "connected") continue;
     try {
       const current = await threads.getProfile(cred.token);
-      if (normalizeUsername(current.username) === normalizeUsername(m.username)) continue;
+      if (m.username !== null && normalizeUsername(current.username) === normalizeUsername(m.username)) continue;
       await withTransaction(env.DATABASE_URL, async (tx) => {
         await lockUsernameForUpdate(tx, m.id, current.username);
         // 世代番号を条件にし、その間の接続し直しを上書きしない

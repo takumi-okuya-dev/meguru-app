@@ -1,7 +1,7 @@
 // Accountのホーム（001 US1、specs/002 US4・FR-017・FR-024b、contracts/ui-routes.md「ホーム」、docs/ui-design.md「ホーム」）。
 // ChatGPTの最初の画面のように、中央に次にやることを1つだけ出し、その下に入力状況の3枚のカードを並べる。
 import { useQuery } from "@tanstack/react-query";
-import type { ProfileStatus } from "@threads-grower/shared";
+import { accountLabel, type ProfileStatus } from "@threads-grower/shared";
 import {
   ChevronRightIcon,
   MegaphoneIcon,
@@ -72,7 +72,7 @@ function nextStep(s: ProfileStatus): { area: Area | null; title: string; body: s
  */
 export function AccountHome() {
   const account = useCurrentAccount();
-  const { connected } = useCallbackResult({ username: account.username });
+  const { connected } = useCallbackResult({ name: account.name, username: account.username });
   // 招待リンクから追加に進んだ人は、このアプリで許可して戻ってきたら、リンクへ戻す（specs/011 T019）
   const navigate = useNavigate();
   useEffect(() => {
@@ -122,9 +122,9 @@ export function AccountHome() {
         <TokenWarnings />
         <section className="flex flex-col items-center gap-1.5 text-center">
           <AccountAvatar account={account} className="size-14 text-lg" />
-          <h1 className="text-[17px] font-semibold">{account.displayName ?? account.username}</h1>
+          <h1 className="text-[17px] font-semibold">{accountLabel(account).primary}</h1>
           <div className="flex items-center gap-2 text-[13px] text-muted-foreground">
-            <span>@{account.username}</span>
+            {accountLabel(account).secondary && <span>{accountLabel(account).secondary}</span>}
             <ConnectionBadge status={account.connectionStatus} />
           </div>
           {s?.access.inTrial && s.access.trialEndsAt && (

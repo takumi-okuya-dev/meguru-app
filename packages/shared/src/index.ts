@@ -1,3 +1,4 @@
+export * from "./account-label";
 export * from "./access";
 export * from "./csv";
 export * from "./drafts";

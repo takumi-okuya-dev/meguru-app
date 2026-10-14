@@ -19,6 +19,7 @@ const meResponse: MeResponse = {
   accounts: [
     {
       id: "a1",
+      name: "たくみ",
       username: "takumi",
       displayName: "たくみ",
       profilePictureUrl: null,

@@ -26,7 +26,8 @@ export function ReconnectButton({ accountId }: { accountId: string }) {
         <ReconnectDialog
           account={{
             id: accountId,
-            username: account?.id === accountId ? account.username : "",
+            name: account?.id === accountId ? account.name : "",
+            username: account?.id === accountId ? account.username : null,
             connectionMethod: account?.id === accountId ? account.connectionMethod : undefined,
           }}
           onClose={() => setOpen(false)}

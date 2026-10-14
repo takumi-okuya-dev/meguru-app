@@ -23,6 +23,7 @@ const { AccountHome } = await import("@/pages/account-home");
 
 const account: AccountSummary = {
   id: "a1",
+  name: "たくみ",
   username: "takumi",
   displayName: "たくみ",
   profilePictureUrl: null,

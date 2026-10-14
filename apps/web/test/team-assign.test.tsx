@@ -19,9 +19,9 @@ const { TeamAssignPage } = await import("@/pages/team-assign");
 
 const table: TeamAssignments = {
   accounts: [
-    { id: "a-a", username: "a_sha", displayName: "A社 SNS運用", profilePictureUrl: null, ownerUserId: "u-a", ownerName: "田中 健" },
-    { id: "a-s", username: "cafe_b", displayName: "カフェ B店", profilePictureUrl: null, ownerUserId: "u-s", ownerName: "鈴木 花子" },
-    { id: "a-e", username: "sato", displayName: "佐藤のおうちごはん", profilePictureUrl: null, ownerUserId: "u-e", ownerName: "佐藤 美咲" },
+    { id: "a-a", name: "A社 SNS運用", username: "a_sha", displayName: "A社 SNS運用", profilePictureUrl: null, ownerUserId: "u-a", ownerName: "田中 健" },
+    { id: "a-s", name: "カフェ B店", username: "cafe_b", displayName: "カフェ B店", profilePictureUrl: null, ownerUserId: "u-s", ownerName: "鈴木 花子" },
+    { id: "a-e", name: "佐藤のおうちごはん", username: "sato", displayName: "佐藤のおうちごはん", profilePictureUrl: null, ownerUserId: "u-e", ownerName: "佐藤 美咲" },
   ],
   people: [
     { userId: "u-a", name: "田中 健", role: "admin", isMe: true, accountIds: [] },

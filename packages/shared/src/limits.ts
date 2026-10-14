@@ -196,3 +196,7 @@ export const TOKEN_ASSUMED_LIFETIME_DAYS = 60;
 export const TOKEN_MIN_LENGTH = 32;
 /** トークンの長さの上限（文字）。 */
 export const TOKEN_MAX_LENGTH = 2048;
+
+// ---- アカウントを先に作る（specs/012-accounts-before-connect data-model.md「定数」）----
+/** アカウントの名前の上限（文字。FR-002・FR-040）。 */
+export const ACCOUNT_NAME_MAX = 50;

@@ -36,6 +36,7 @@ const meData: MeResponse = {
   accounts: [
     {
       id: "a1",
+      name: "カフェ B店",
       username: "cafe_b",
       displayName: "カフェ B店",
       profilePictureUrl: null,

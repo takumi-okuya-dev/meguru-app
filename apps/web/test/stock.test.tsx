@@ -63,6 +63,7 @@ const { StockPage } = await import("@/pages/stock");
 
 const account: AccountSummary = {
   id: "a1",
+  name: "たくみ",
   username: "takumi",
   displayName: "たくみ",
   profilePictureUrl: null,

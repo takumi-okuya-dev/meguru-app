@@ -49,6 +49,7 @@ const { AccountSettings } = await import("@/pages/account-settings");
 
 const account: AccountSummary = {
   id: "a1",
+  name: "たくみ",
   username: "takumi",
   displayName: "たくみ",
   profilePictureUrl: null,

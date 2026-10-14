@@ -58,7 +58,7 @@ export function accountRoutes(authed: MiddlewareHandler<AppEnv>) {
       await authorizeAccount(createDb(c.env.DATABASE_URL), user, c.req.param("accountId"), "owner");
       const parsed = deleteAccountRequestSchema.safeParse(await c.req.json().catch(() => null));
       if (!parsed.success) throw new AppError("VALIDATION_FAILED", 400, "invalid delete request");
-      await deleteAccount(c.env, user.id, c.req.param("accountId"), parsed.data.confirmUsername);
+      await deleteAccount(c.env, user.id, c.req.param("accountId"), parsed.data.confirmName);
       return c.body(null, 204);
     });
 }

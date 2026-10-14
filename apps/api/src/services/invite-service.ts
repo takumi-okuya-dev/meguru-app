@@ -93,9 +93,11 @@ async function ownedAccountsWithTeam(db: Db | TxDb, userId: string) {
     .orderBy(asc(accounts.createdAt));
   return rows.map((r) => ({
     id: r.account.id,
+    name: r.account.name,
     displayName: r.account.displayName,
     username: r.account.username,
     profilePictureUrl: r.account.profilePictureUrl,
+    connected: r.account.connectionStatus !== "not_connected",
     inOtherTeam: r.teamName,
   }));
 }

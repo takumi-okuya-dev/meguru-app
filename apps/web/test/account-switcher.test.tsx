@@ -43,6 +43,7 @@ const account = (
   connectionStatus: AccountSummary["connectionStatus"] = "connected",
 ): AccountSummary => ({
   id,
+  name: `Account ${id}`,
   username: `user_${id}`,
   displayName: `Account ${id}`,
   profilePictureUrl: null,
@@ -444,7 +445,8 @@ describe("AccountSwitcherの状態と操作", () => {
   it("長い表示名でも件数と状態が残り、キーボードで追加へ進める", async () => {
     const long = {
       ...account("a2", "needs_reconnect"),
-      displayName: "とても長い表示名".repeat(12),
+      // 主に出すのはアカウントの名前（specs/012）
+      name: "とても長い表示名".repeat(12),
     };
     mocks.me.mockResolvedValue(me([account("a1"), long]));
     renderSwitcher();
@@ -538,6 +540,7 @@ describe("AccountSwitcherの状態と操作", () => {
 describe("切り替えメニューの見出し（specs/011 T025）", () => {
   const make = (id: string, role: AccountSummary["role"]): AccountSummary => ({
     id,
+    name: id,
     username: id,
     displayName: id,
     profilePictureUrl: null,

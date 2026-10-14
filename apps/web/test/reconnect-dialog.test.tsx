@@ -39,6 +39,7 @@ const TOKEN = "THAAG" + "y".repeat(60);
 function makeAccount(overrides: Partial<AccountSummary> = {}): AccountSummary {
   return {
     id: "a1",
+    name: "Cafe B",
     username: "cafe_b",
     displayName: "Cafe B",
     profilePictureUrl: null,
@@ -92,7 +93,7 @@ describe("接続し直しのダイアログ（US3）", () => {
     renderSettings(makeAccount());
     await user.click(await screen.findByRole("button", { name: "接続し直す" }));
     const dialog = await screen.findByRole("dialog", { name: "Threadsとの接続し直し" });
-    expect(dialog).toHaveTextContent("@cafe_bの接続を更新します。投稿ストックや設定はそのまま残ります。");
+    expect(dialog).toHaveTextContent("Cafe B（@cafe_b）の接続を更新します。投稿ストックや設定はそのまま残ります。");
     const tokenOption = within(dialog).getByRole("button", { name: /トークンを貼り付ける/ });
     expect(tokenOption).toHaveTextContent("今の接続");
     expect(within(dialog).getByRole("button", { name: /Threadsで許可する/ })).not.toHaveTextContent("今の接続");

@@ -34,6 +34,7 @@ const { TeamPage } = await import("@/pages/team");
 
 const acc = (id: string, name: string, extra: Partial<TeamDetail["members"][number]["accounts"][number]> = {}) => ({
   id,
+  name: name,
   username: id,
   displayName: name,
   profilePictureUrl: null,
@@ -76,8 +77,8 @@ function memberView(): TeamDetail {
 const meData: MeResponse = {
   user: { id: "u-s", email: "s@example.com", displayName: "鈴木 花子" },
   accounts: [
-    { id: "a-s", username: "a-s", displayName: "カフェ B店", profilePictureUrl: null, plan: "auto-only", connectionStatus: "connected", lastUsedAt: null, role: "owner", ownerName: null },
-    { id: "a-s2", username: "a-s2", displayName: "カフェ B店 2号店", profilePictureUrl: null, plan: "auto-only", connectionStatus: "connected", lastUsedAt: null, role: "owner", ownerName: null },
+    { id: "a-s", name: "カフェ B店", username: "a-s", displayName: "カフェ B店", profilePictureUrl: null, plan: "auto-only", connectionStatus: "connected", lastUsedAt: null, role: "owner", ownerName: null },
+    { id: "a-s2", name: "カフェ B店 2号店", username: "a-s2", displayName: "カフェ B店 2号店", profilePictureUrl: null, plan: "auto-only", connectionStatus: "connected", lastUsedAt: null, role: "owner", ownerName: null },
   ],
   landingAccountId: "a-s",
   accountLimit: { max: 3, used: 2 },

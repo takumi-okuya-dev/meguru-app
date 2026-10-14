@@ -7,10 +7,10 @@ import { toast } from "sonner";
 
 /**
  * API の callback からのリダイレクトのクエリ（connected・error）を読み、トーストで表示してから URL から消す（contracts/ui-routes.md）。
- * @param opts - 文言に埋め込む値（ユーザー名・上限）
+ * @param opts - 文言に埋め込む値（アカウントの名前・ユーザー名・上限）
  * @returns 読み取った connected と error
  */
-export function useCallbackResult(opts: { username?: string; max?: number } = {}) {
+export function useCallbackResult(opts: { name?: string; username?: string | null; max?: number } = {}) {
   const [params, setParams] = useSearchParams();
   const shown = useRef(false);
   const connected = params.get("connected");
@@ -18,13 +18,13 @@ export function useCallbackResult(opts: { username?: string; max?: number } = {}
 
   useEffect(() => {
     if (shown.current || (!connected && !error)) return;
-    if (connected && !opts.username) return; // 表示に使うユーザー名が読み込まれるのを待つ
+    if (connected && !opts.name) return; // 表示に使うアカウントの名前が読み込まれるのを待つ
     shown.current = true;
-    if (connected === "new" || connected === "updated" || connected === "reconnect") {
-      toast.success(connectedMessage(connected, opts.username ?? ""));
+    if (connected === "connect" || connected === "reconnect") {
+      toast.success(connectedMessage(connected, opts.name ?? ""));
     } else if (error) {
       const code = isErrorCode(error) ? error : "INTERNAL_ERROR";
-      toast.error(errorMessage(code, opts).message);
+      toast.error(errorMessage(code, { max: opts.max, username: opts.username ?? undefined }).message);
     }
     const next = new URLSearchParams(params);
     next.delete("connected");

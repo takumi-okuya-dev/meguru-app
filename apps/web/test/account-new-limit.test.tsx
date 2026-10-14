@@ -16,6 +16,7 @@ const { AccountNew } = await import("@/pages/account-new");
 function account(id: string) {
   return {
     id,
+    name: `user_${id}`,
     username: `user_${id}`,
     displayName: null,
     profilePictureUrl: null,

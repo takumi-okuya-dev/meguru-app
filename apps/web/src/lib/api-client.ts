@@ -221,10 +221,10 @@ export const api = {
       method: "POST",
       body: JSON.stringify(body),
     }),
-  deleteAccount: (accountId: string, confirmUsername: string) =>
+  deleteAccount: (accountId: string, confirmName: string) =>
     request(`/api/accounts/${accountId}`, null, {
       method: "DELETE",
-      body: JSON.stringify({ confirmUsername }),
+      body: JSON.stringify({ confirmName }),
     }),
   // ---- 戦略プロファイル（specs/002-strategy-profile contracts/api.md）----
   getProfileStatus: (accountId: string) =>
