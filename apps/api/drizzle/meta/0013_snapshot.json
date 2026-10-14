@@ -270,7 +270,7 @@
         },
         "accounts_name_length": {
           "name": "accounts_name_length",
-          "value": "char_length(\"accounts\".\"name\") BETWEEN 1 AND 50 AND \"accounts\".\"name\" = btrim(\"accounts\".\"name\")"
+          "value": "char_length(\"accounts\".\"name\") BETWEEN 1 AND 50 AND \"accounts\".\"name\" !~ '^[\\t\\n\\u000b\\f\\r \\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000\\ufeff]' AND \"accounts\".\"name\" !~ '[\\t\\n\\u000b\\f\\r \\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000\\ufeff]$'"
         },
         "accounts_connection_consistency": {
           "name": "accounts_connection_consistency",

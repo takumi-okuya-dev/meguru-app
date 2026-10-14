@@ -93,6 +93,16 @@ describe("POST /api/threads/connect（mode = connect）", () => {
     expect(await errorOf(res)).toBe("ACCOUNT_ALREADY_CONNECTED");
   });
 
+  it("未接続のアカウントへの reconnect は、Threadsに問い合わせる前に ACCOUNT_NOT_CONNECTED（PR #15 のCodexレビュー）", async () => {
+    const { accountId } = await createAccountVia(app, "u1");
+    const before = await fake.callCounts();
+    const res = await call(app, "POST", "/api/threads/connect", { user: "u1", body: { mode: "reconnect", accountId } });
+    expect(res.status).toBe(409);
+    expect(await errorOf(res)).toBe("ACCOUNT_NOT_CONNECTED");
+    expect(await db().select().from(oauthStates)).toHaveLength(0);
+    expect((await fake.callCounts()).total).toBe(before.total);
+  });
+
   it("上限に達していてもつなげる（アカウントは増えない。FR-016）", async () => {
     const { accountId } = await createAccountVia(app, "u1");
     expect((await createAccountVia(app, "u1")).accountId).toBeNull(); // プラン1は1件

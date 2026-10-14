@@ -60,6 +60,12 @@ describe("POST /api/accounts", () => {
     expect(await db().select().from(accounts)).toHaveLength(0);
   });
 
+  it("全角スペース・タブなどで囲まれた名前も、前後を除いて保存する（DBの制約と同じ空白の規則。PR #15 のCodexレビュー）", async () => {
+    const res = await create("u1", "\u3000\tカフェの公式\u00a0");
+    expect(res.status).toBe(201);
+    expect(((await res.json()) as { name: string }).name).toBe("カフェの公式");
+  });
+
   it("50文字ちょうどは作れる（絵文字も1文字）", async () => {
     const res = await create("u1", "😀".repeat(50));
     expect(res.status).toBe(201);

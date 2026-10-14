@@ -18,6 +18,8 @@
 | 列 | 変更 | 内容 |
 |---|---|---|
 | `name` | 足す（`text NOT NULL`。既定値なし） | アカウントの名前。前後の空白を除いて1〜50文字。CHECK `accounts_name_length`：`char_length(name) BETWEEN 1 AND 50 AND name = btrim(name)`。今のアカウントは`left(COALESCE(NULLIF(btrim(display_name), ''), username), 50)`で埋めてから`NOT NULL`にする（spec FR-044） |
+
+※ PR #15 のCodexレビューで、`name`の「前後の空白」を JavaScript の`trim()`と同じ文字（タブ・改行・NBSP・全角スペースなど）にそろえた。CHECKは`btrim`ではなく、その文字の集まりで始まる・終わる名前を拒む形にし、埋め方も同じ集まりで前後を除く（`0013_accounts_before_connect.sql`）。
 | `threads_user_id` | `NOT NULL`を外す | 未接続の間は`NULL`。一意制約はそのまま |
 | `username` | `NOT NULL`を外す | 未接続の間は`NULL`。`lower(username)`の索引はそのまま |
 | `connection_method` | `NOT NULL`を外す（既定値`app`は残す） | 未接続の間は`NULL`（作る時にアプリが`NULL`を書く）。つないだときに`app`か`token`が入る |

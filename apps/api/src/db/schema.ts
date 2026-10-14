@@ -137,8 +137,12 @@ export const accounts = pgTable("accounts", {
   check("accounts_promotion_ratio_range", sql`${t.promotionRatioPercent} BETWEEN 0 AND 100`),
   check("accounts_prompt_post_count_range", sql`${t.promptPostCount} BETWEEN 1 AND 50`),
   check("accounts_core_rules_length", sql`char_length(${t.coreRules}) <= 2000`),
-  // アカウントの名前は前後の空白を除いて1〜50文字（specs/012 data-model.md）
-  check("accounts_name_length", sql`char_length(${t.name}) BETWEEN 1 AND 50 AND ${t.name} = btrim(${t.name})`),
+  // アカウントの名前は前後の空白を除いて1〜50文字（specs/012 data-model.md）。空白は JavaScript の trim() と同じもの
+  // （タブ・改行・NBSP・全角スペースなど。PR #15 のCodexレビュー）。0013 の名前の埋め方も同じ文字の集まりを使う
+  check(
+    "accounts_name_length",
+    sql`char_length(${t.name}) BETWEEN 1 AND 50 AND ${t.name} !~ '^[\\t\\n\\u000b\\f\\r \\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000\\ufeff]' AND ${t.name} !~ '[\\t\\n\\u000b\\f\\r \\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000\\ufeff]$'`,
+  ),
   // 未接続 ⇔ Threadsのユーザー・ユーザー名・接続の方法がそろって NULL（同じマイグレーションで足した値を使えないので ::text で比べる）
   check(
     "accounts_connection_consistency",

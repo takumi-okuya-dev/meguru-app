@@ -25,7 +25,8 @@ function randomState(): string {
  * @param userId - users.id
  * @param req - connect か reconnect と、対象のアカウント
  * @returns Threads の認可URL（state を含む）
- * @throws AppError ACCOUNT_NOT_FOUND（関わっていない Account）・ROLE_FORBIDDEN（オーナーではない）・ACCOUNT_ALREADY_CONNECTED
+ * @throws AppError ACCOUNT_NOT_FOUND（関わっていない Account）・ROLE_FORBIDDEN（オーナーではない）・ACCOUNT_ALREADY_CONNECTED・
+ *   ACCOUNT_NOT_CONNECTED（未接続のアカウントの接続し直し）
  */
 export async function startConnect(
   db: Db,
@@ -37,6 +38,10 @@ export async function startConnect(
   const { account } = await authorizeAccount(db, { id: userId }, req.accountId, "owner");
   if (req.mode === "connect" && account.connectionStatus !== "not_connected") {
     throw new AppError("ACCOUNT_ALREADY_CONNECTED", 409, "account already connected");
+  }
+  // 未接続のアカウントの接続し直しは、許可の画面に進む前に止める（callback でThreadsに問い合わせないように。PR #15 のCodexレビュー）
+  if (req.mode === "reconnect" && account.connectionStatus === "not_connected") {
+    throw new AppError("ACCOUNT_NOT_CONNECTED", 409, "account not connected yet");
   }
   const targetAccountId = account.id;
 

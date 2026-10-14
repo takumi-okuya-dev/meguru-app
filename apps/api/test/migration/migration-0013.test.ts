@@ -41,6 +41,10 @@ beforeAll(async () => {
   await insert("tu2", "shop_c", null, "needs_reconnect");
   await insert("tu3", "blank_d", "   ");
   await insert("tu4", "long_e", LONG);
+  // API の .trim() と同じ空白（タブ・改行・NBSP・全角スペースなど）だけの表示名は、ユーザー名にする（PR #15 のCodexレビュー）
+  await insert("tu5", "tab_f", "\t\n");
+  await insert("tu6", "nbsp_g", "\u00a0\u3000");
+  await insert("tu7", "wide_h", "\u3000カフェ\u3000");
   await client.query(`INSERT INTO memberships (user_id, account_id, role) VALUES ($1, $2, 'owner')`, [owner.id, a1.id]);
   await client.query(`INSERT INTO strategy_designs (account_id, final_action) VALUES ($1, '来店')`, [a1.id]);
   await client.query(
@@ -67,6 +71,9 @@ describe("0013_accounts_before_connect", () => {
       { username: "blank_d", name: "blank_d", connection_status: "connected", connection_method: "app" },
       // 50文字で切ったあとの末尾の空白は落とす（名前の CHECK を満たす）
       { username: "long_e", name: "あ".repeat(49), connection_status: "connected", connection_method: "app" },
+      { username: "tab_f", name: "tab_f", connection_status: "connected", connection_method: "app" },
+      { username: "nbsp_g", name: "nbsp_g", connection_status: "connected", connection_method: "app" },
+      { username: "wide_h", name: "カフェ", connection_status: "connected", connection_method: "app" },
     ]);
   });
 
@@ -94,7 +101,7 @@ describe("0013_accounts_before_connect", () => {
     await expect(client.query(`UPDATE accounts SET threads_user_id = NULL WHERE username = 'cafe_b'`)).rejects.toThrow(
       /accounts_connection_consistency/,
     );
-    for (const name of ["", " カフェ", "あ".repeat(51)]) {
+    for (const name of ["", " カフェ", "あ".repeat(51), "\u3000カフェ", "カフェ\t", "\u00a0"]) {
       await expect(
         client.query(
           `INSERT INTO accounts (name, plan, connection_status, connection_method) VALUES ($1, 'auto-only', 'not_connected', NULL)`,
