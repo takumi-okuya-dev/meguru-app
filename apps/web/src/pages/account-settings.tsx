@@ -46,6 +46,17 @@ import { useAccountAccess } from "@/lib/use-account-access";
  */
 export function AccountSettings() {
   const account = useCurrentAccount();
+  // アカウントが変わったら、画面の状態（削除の確認の入力・開いているダイアログ・つないだ直後の案内など）を作り直す。
+  // 名前の重なったアカウントの間を移ったとき、前のアカウントで入れた削除の確認が使えないように（PR #15 のCodexレビュー）
+  return <AccountSettingsContent key={account.id} />;
+}
+
+/**
+ * 1つのアカウントの設定の中身（AccountSettings がアカウントのIDで作り直す）。
+ * @returns Account の設定画面の中身
+ */
+function AccountSettingsContent() {
+  const account = useCurrentAccount();
   // callback の結果は、はじめてつないだとき・未接続のままのエラーは区分の中に出し、接続し直しはトーストで出す（specs/012）
   const callback = useCallbackResult({ silent: true });
   const notConnected = account.connectionStatus === "not_connected";

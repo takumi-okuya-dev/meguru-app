@@ -1,9 +1,9 @@
 // US2：「このアカウントの設定」の「Threadsとの接続」（specs/012 FR-010〜FR-014、contracts/ui-routes.md「このアカウントの設定」）
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen, within } from "@testing-library/react";
+import { act, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { AccountSummary, MeResponse } from "@threads-grower/shared";
-import { createMemoryRouter, Outlet, RouterProvider } from "react-router";
+import { createMemoryRouter, Outlet, RouterProvider, useParams } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { OWNER_ACCESS } from "./helpers/access";
 
@@ -190,5 +190,45 @@ describe("アカウントの名前（specs/012 FR-040・FR-043、US5-3・US5-4�
     expect(remove).toBeDisabled();
     await userEvent.type(within(dialog).getByLabelText("確認のためのアカウントの名前"), "の公式");
     expect(remove).toBeEnabled();
+  });
+});
+
+describe("アカウントが変わったら、削除の確認を消す（PR #15 のCodexレビュー）", () => {
+  function AccountOutlet() {
+    const { accountId } = useParams();
+    // 名前の重なった2つのアカウント（名前は止めない。spec Edge Cases）
+    const account = accountId === "a1" ? connected : { ...connected, id: "a2", username: "cafe_c" };
+    return <Outlet context={{ account }} />;
+  }
+
+  it("同じ名前の別のアカウントの設定へ移ると、削除のダイアログが閉じ、入力も消える", async () => {
+    const router = createMemoryRouter(
+      [
+        {
+          path: "/accounts/:accountId",
+          element: (
+            <UnsavedChangesProvider>
+              <AccountOutlet />
+            </UnsavedChangesProvider>
+          ),
+          children: [{ path: "settings", element: <AccountSettings /> }],
+        },
+      ],
+      { initialEntries: ["/accounts/a1/settings"] },
+    );
+    render(
+      <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+        <RouterProvider router={router} />
+      </QueryClientProvider>,
+    );
+    await userEvent.click(await screen.findByRole("button", { name: "Accountを削除" }));
+    await userEvent.type(await screen.findByLabelText("確認のためのアカウントの名前"), "カフェの公式");
+    expect(screen.getByRole("button", { name: "削除する" })).toBeEnabled();
+
+    await act(() => router.navigate("/accounts/a2/settings"));
+    expect(screen.queryByRole("button", { name: "削除する" })).not.toBeInTheDocument();
+    await userEvent.click(await screen.findByRole("button", { name: "Accountを削除" }));
+    expect(await screen.findByLabelText("確認のためのアカウントの名前")).toHaveValue("");
+    expect(screen.getByRole("button", { name: "削除する" })).toBeDisabled();
   });
 });
