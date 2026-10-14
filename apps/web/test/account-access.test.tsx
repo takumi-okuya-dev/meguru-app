@@ -1,7 +1,7 @@
-// 役割と権限の読み込み・権限のエラーの扱い（specs/008-team-operations contracts/ui-routes.md「共通の振る舞い」2・3）
+// 関わりと権限の読み込み・権限のエラーの扱い（specs/008-team-operations contracts/ui-routes.md「共通の振る舞い」2・3）
 import { QueryClient } from "@tanstack/react-query";
-import type { AccountAccessResponse } from "@threads-grower/shared";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { EDITOR_ACCESS } from "./helpers/access";
 
 const toastError = vi.fn();
 vi.mock("sonner", () => ({ toast: { error: toastError, success: vi.fn(), dismiss: vi.fn() } }));
@@ -11,14 +11,7 @@ const { queryKeys } = await import("@/lib/query");
 
 const ID = "11111111-1111-4111-8111-111111111111";
 
-const editor: AccountAccessResponse = {
-  role: "editor",
-  permissions: ["view", "content"],
-  owner: { name: "鈴木 花子" },
-  hasTeam: true,
-  team: { name: "A社", partnerName: "田中 健" },
-  delegation: { review: false, settings: false },
-};
+const editor = EDITOR_ACCESS;
 
 beforeEach(() => {
   toastError.mockReset();

@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { AFTER_TRIAL, call, createUserWithAccount, makeApp, resetDb, setAccount, testEnv } from "../helpers/app";
 
 import { approvedDrafts, db, setSchedule } from "../helpers/auto-post";
-import { makeEditor, makePartner } from "../helpers/team";
+import { putInTeam } from "../helpers/team";
 
 const app = makeApp();
 
@@ -607,8 +607,7 @@ describe("005：予定と次に投稿する操作", () => {
 describe("編集者の削除（チーム運用）", () => {
   it("編集者は要確認の案だけを消せ、却下の案は消さずに飛ばす", async () => {
     const { accountId } = await createUserWithAccount("o1");
-    const { teamId } = await makePartner(accountId, "p1");
-    await makeEditor(teamId, "e1", [accountId]);
+    await putInTeam(accountId, "o1", { editor: "e1" });
     const reg = await call(app, "POST", `/api/accounts/${accountId}/draft-batches`, {
       user: "e1",
       body: { clientRequestId: crypto.randomUUID(), text: "残す案\n@@@\n却下する案" },

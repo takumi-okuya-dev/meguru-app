@@ -3,7 +3,8 @@
 // - 他人・存在しないAccountは404画面（規則4）
 // - 画面を開いたら open を呼び、接続状態とプロフィールを最新にする（規則5）
 // - needs_reconnect ならバナーを出す（FR-019）
-// - パートナー・編集者として関わるAccountも開ける（specs/008。/api/me の accounts は全役割）
+// - 担当しているAccountも開ける（specs/011。/api/me の accounts はオーナーと担当）
+// - 見せてもらっているAccountは、読むだけの画面（/teams/:teamId/accounts/:accountId）へ移す（specs/011 contracts/permissions.md）
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   NEEDS_RECONNECT_BANNER,
@@ -20,7 +21,7 @@ import { Button } from "@/components/ui/button";
 import { ApiError, api } from "@/lib/api-client";
 import { queryKeys } from "@/lib/query";
 import { useAccountOpen } from "@/lib/use-account-open";
-import { useAccountAccessErrors } from "@/lib/use-account-access";
+import { useAccountAccess, useAccountAccessErrors } from "@/lib/use-account-access";
 import { NotFound } from "@/pages/not-found";
 import { ApiErrorScreen } from "@/components/ApiErrorScreen";
 import { LoadingSkeleton } from "@/components/guards";
@@ -38,7 +39,7 @@ export function useCurrentAccount() {
 
 /**
  * 要再接続のバナーの文言（001 FR-019、specs/008 FR-044、specs/010 FR-041）。
- * オーナーには再接続を、トークンで接続していれば新しいトークンの貼り付けを案内し、パートナー・編集者にはオーナーを待つ案内を出す。
+ * オーナーには再接続を、トークンで接続していれば新しいトークンの貼り付けを案内し、担当の人にはオーナーを待つ案内を出す。
  * @param account - 要再接続のAccount
  * @returns バナーの文言
  */
@@ -65,7 +66,11 @@ export function AccountLayout() {
   // 権限がなくなった・開けなくなったときの扱い（specs/008 contracts/ui-routes.md「共通の振る舞い」2・3）
   useAccountAccessErrors(accountId);
 
-  useAccountOpen(accountId, (latest) => {
+  // 開く記録（open）は、切り替えメニューに出るAccount（オーナー・担当）だけ。/api/me を読む前は今までどおりすぐ始め、
+  // 読んだ後に一覧にない（見せてもらっている）と分かったら止める
+  const unlisted = Boolean(me.data && !me.data.accounts.some((a) => a.id === accountId));
+  const { access } = useAccountAccess(account.data?.role === "viewer" ? accountId : undefined);
+  useAccountOpen(unlisted ? undefined : accountId, (latest) => {
     queryClient.setQueryData(queryKeys.account(latest.id), latest);
     // 一覧の接続状態・並び順も最新にする
     void queryClient.invalidateQueries({ queryKey: queryKeys.me });
@@ -82,6 +87,10 @@ export function AccountLayout() {
     return <ApiErrorScreen error={account.error} onRetry={() => void account.refetch()} />;
   }
   if (!account.data) return <LoadingSkeleton />;
+  if (account.data.role === "viewer") {
+    if (!access) return <LoadingSkeleton />;
+    if (access.team) return <Navigate to={`/teams/${access.team.id}/accounts/${account.data.id}`} replace />;
+  }
 
   // 再接続のバナーは、各画面の上部バーの下に出す（docs/ui-design.md「2. 画面の骨格」）
   const banner =

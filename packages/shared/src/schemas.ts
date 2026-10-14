@@ -22,6 +22,8 @@ import {
   PERFORMANCE_PAGE_SIZE,
   AUTOPOST_SLOT_LIMIT,
   PUBLISHED_PAGE_SIZE,
+  TEAM_MEMBER_LIMIT,
+  TEAM_NAME_MAX,
 } from "./limits";
 import { REJECT_REASON_CODES } from "./review";
 import { isValidYmd } from "./promotions";
@@ -40,12 +42,16 @@ export const connectionMethodSchema = z.enum(["app", "token"]);
 /** 接続の方法。 */
 export type ConnectionMethod = z.infer<typeof connectionMethodSchema>;
 
-/** Accountに対する役割のスキーマ（specs/008 contracts/permissions.md）。 */
-export const roleSchema = z.enum(["owner", "partner", "editor"]);
-/** 権限のスキーマ（specs/008 contracts/permissions.md）。 */
-export const permissionSchema = z.enum(["view", "content", "review", "settings", "activity", "owner"]);
-/** 任せる範囲のスキーマ（specs/008 FR-030）。 */
-export const delegationSchema = z.object({ review: z.boolean(), settings: z.boolean() });
+/** Accountに対する役割のスキーマ（memberships の owner・editor。specs/011 contracts/permissions.md）。 */
+export const roleSchema = z.enum(["owner", "editor"]);
+/** Accountとの関わりのスキーマ（specs/011 contracts/permissions.md「関わり」）。 */
+export const relationSchema = z.enum(["owner", "assigned", "shared_viewer"]);
+/** チームでのロールのスキーマ（specs/011 data-model.md の team_role）。 */
+export const teamRoleSchema = z.enum(["admin", "member", "editor"]);
+/** 権限のスキーマ（specs/011 contracts/permissions.md「権限」）。 */
+export const permissionSchema = z.enum(["read", "view", "content", "review", "settings", "activity", "owner"]);
+/** 操作の記録の、した人の役割（specs/011 data-model.md。partner は008の記録にだけ残る）。 */
+export const actorRoleSchema = z.enum(["owner", "member", "partner", "editor", "admin"]);
 
 /** 画面に出すAccountの要約のスキーマ（contracts/api.md の AccountSummary）。 */
 export const accountSummarySchema = z.object({
@@ -58,9 +64,9 @@ export const accountSummarySchema = z.object({
   connectionStatus: connectionStatusSchema,
   /** ISO 8601 */
   lastUsedAt: z.string().nullable(),
-  /** ログインした人の、このAccountでの役割（specs/008 research.md R11） */
-  role: roleSchema,
-  /** 手伝っているAccountのオーナーの名前。自分のAccountならNULL */
+  /** ログインした人の、このAccountでの役割（owner＝自分のアカウント、editor＝担当、viewer＝見せてもらっている） */
+  role: z.enum(["owner", "editor", "viewer"]),
+  /** 担当しているAccountのオーナーの名前。自分のAccountならNULL */
   ownerName: z.string().nullable(),
   /** 今の接続の方法（specs/010 contracts/api.md）。APIは必ず返す。省略は app として扱う */
   connectionMethod: connectionMethodSchema.optional(),
@@ -78,6 +84,16 @@ export const accountLimitSchema = z.object({
 /** ユーザーの登録数上限（max）と、ownerとして保有するAccount数（used）。 */
 export type AccountLimit = z.infer<typeof accountLimitSchema>;
 
+/** /api/me の、入っているチーム（サイドバーの「チーム」の見出しの下に並べる）。 */
+export const meTeamSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  memberCount: z.number().int().nonnegative(),
+  role: teamRoleSchema,
+});
+/** 入っているチーム。 */
+export type MeTeam = z.infer<typeof meTeamSchema>;
+
 /** GET /api/me のレスポンスのスキーマ。 */
 export const meResponseSchema = z.object({
   user: z.object({
@@ -90,10 +106,8 @@ export const meResponseSchema = z.object({
   accountLimit: accountLimitSchema,
   /** Threads連携の公開範囲（specs/002 FR-028）。testers の間は、アカウント追加画面に検証期間の案内を出す */
   threadsAccessMode: z.enum(["testers", "public"]),
-  /** チームのパートナーのときだけ（specs/008 research.md R11、FR-047(2)） */
-  partnerTeam: z.object({ name: z.string().nullable(), unassignedEditorCount: z.number().int().nonnegative() }).nullable(),
-  /** 担当がなく、自分のAccountも手伝い先もない編集者のときだけ（FR-026） */
-  editorWaiting: z.object({ partnerName: z.string() }).nullable(),
+  /** 入っているチーム（参加した順。入っていなければ空。specs/011 research.md R5） */
+  teams: z.array(meTeamSchema),
 });
 /** GET /api/me のレスポンス。ログイン中のユーザー、Account一覧、ログイン後の遷移先、登録数上限。 */
 export type MeResponse = z.infer<typeof meResponseSchema>;
@@ -482,7 +496,8 @@ export const postDraftListSchema = z.object({
   publishFailed: z.array(postDraftSchema),
   /** 下書きのIDから、投稿の予定の時刻（ISO 8601）へ。オフ・停止中は {}（005） */
   schedule: z.record(z.string(), z.string()),
-  autoPost: autoPostStateSchema,
+  /** 自動投稿の状態。見せてもらっている人にはNULL（自動投稿の状態は view。specs/011 FR-031、PR #14 のCodexレビュー） */
+  autoPost: autoPostStateSchema.nullable(),
   /** reviewedAt の新しい順に最大500件 */
   rejected: z.array(postDraftSchema),
   counts: draftCountsSchema,
@@ -491,10 +506,10 @@ export const postDraftListSchema = z.object({
   ngWords: z.array(ngWordSchema),
   /** そのAccountで、プロンプトの生成（grower機能）を使えるか */
   canGeneratePrompt: z.boolean(),
-  /** 保存済みの作る件数 */
-  promptPostCount: z.number().int(),
-  /** 作る件数の版（保存のときに送る。specs/008 FR-007） */
-  promptPostCountVersion: z.number().int().default(1),
+  /** 保存済みの作る件数。見せてもらっている人にはNULL（設定は見せない。specs/011 FR-031） */
+  promptPostCount: z.number().int().nullable(),
+  /** 作る件数の版（保存のときに送る。specs/008 FR-007）。見せてもらっている人にはNULL */
+  promptPostCountVersion: z.number().int().nullable().default(1),
   /** createdBy・editedBy の users.id から名前へ（チームがあるAccountだけ。specs/008 FR-053） */
   people: z.record(z.string(), z.string()).default({}),
 });
@@ -1012,116 +1027,170 @@ export const exportPageSchema = z.object({
 /** GET /performance/export のレスポンス（specs/006）。 */
 export type ExportPage = z.infer<typeof exportPageSchema>;
 
-// ---- チーム運用（specs/008-team-operations contracts/api.md）----
+// ---- チーム運用（specs/011-team-revision contracts/api.md）----
 
-/** GET /api/accounts/:id/access の応答のスキーマ（contracts/api.md「権限」）。 */
+/** 見ている人のチーム（入っているチームの id・名前・自分のロール）。 */
+const accessTeamSchema = z.object({ id: z.string(), name: z.string(), myRole: teamRoleSchema });
+
+/** GET /api/accounts/:id/access の応答のスキーマ（contracts/permissions.md「画面での出し分け」）。 */
 export const accountAccessResponseSchema = z.object({
-  role: roleSchema,
+  relation: relationSchema,
   permissions: z.array(permissionSchema),
   owner: z.object({ name: z.string() }),
+  /** このアカウントがチームに入っているか（操作の記録を書くか） */
   hasTeam: z.boolean(),
-  team: z.object({ name: z.string().nullable(), partnerName: z.string() }).nullable(),
-  delegation: delegationSchema.nullable(),
+  /** このアカウントが入っているチームと、見ている人のロール。入っていなければNULL */
+  team: accessTeamSchema.nullable(),
+  /** 担当の知らせ「（アカウント名）の担当になりました」を出すか（担当の人で、まだ閉じていない。research.md R9） */
+  assignedNotice: z.boolean(),
 });
-/** Accountでの役割と権限（画面の出し分けに使う）。 */
+/** Accountとの関わりと権限（画面の出し分けに使う）。 */
 export type AccountAccessResponse = z.infer<typeof accountAccessResponseSchema>;
 
-/** パートナーの招待リンク（contracts/api.md「パートナーの招待」）。 */
-export const partnerInviteResponseSchema = z.object({
-  invite: z.object({ url: z.string(), createdAt: z.string() }).nullable(),
+/** チーム名（前後の空白を除いて1〜50文字。FR-010）。 */
+export const teamNameSchema = z
+  .string()
+  .transform((v) => v.trim())
+  .refine((v) => countChars(v) >= 1 && countChars(v) <= TEAM_NAME_MAX, { message: "1-50 chars" });
+
+/** POST /api/teams のリクエスト（自分がオーナーのアカウントを1つ以上。0件はサービスで TEAM_NEEDS_ACCOUNT）。 */
+export const teamCreateRequestSchema = z.object({
+  name: teamNameSchema,
+  accountIds: z.array(z.string().uuid()).max(TEAM_MEMBER_LIMIT),
 });
-/** パートナーの招待リンク。 */
-export type PartnerInviteResponse = z.infer<typeof partnerInviteResponseSchema>;
+/** POST /api/teams の応答。 */
+export const teamCreateResponseSchema = z.object({ teamId: z.string() });
+
+/** PATCH /api/teams/:teamId のリクエスト。 */
+export const teamRenameRequestSchema = z.object({ name: teamNameSchema });
+
+/** GET /api/teams/:teamId のメンバーの行のアカウント。開けないアカウントは名前だけ。 */
+export const teamMemberAccountSchema = z.object({
+  id: z.string(),
+  username: z.string(),
+  displayName: z.string().nullable(),
+  profilePictureUrl: z.string().nullable(),
+  /** オーナーが「チームに見せる」にしているか */
+  shared: z.boolean(),
+  /** 見ている人がこのアカウントを開けるか（オーナー・担当・見せている） */
+  canOpen: z.boolean(),
+  /** 見ている人の関わり（開けなければNULL）。owner・assigned は Account の画面、shared_viewer は読むだけの画面で開く */
+  relation: relationSchema.nullable(),
+});
+/** GET /api/teams/:teamId のメンバーの行。 */
+export const teamMemberSchema = z.object({
+  userId: z.string(),
+  name: z.string(),
+  role: teamRoleSchema,
+  isMe: z.boolean(),
+  joinedAt: z.string(),
+  /** 見ている人が管理者で、閉じていない参加の知らせのときだけ true */
+  joinedNotice: z.boolean(),
+  accounts: z.array(teamMemberAccountSchema),
+});
+/** チームのメンバーの行。 */
+export type TeamMember = z.infer<typeof teamMemberSchema>;
+
+/** GET /api/teams/:teamId の応答（contracts/api.md「GET /api/teams/:teamId の応答」）。 */
+export const teamDetailSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  myRole: teamRoleSchema,
+  admin: z.object({ userId: z.string(), name: z.string() }),
+  members: z.array(teamMemberSchema),
+  limits: z.object({ members: z.number().int(), editors: z.number().int() }),
+});
+/** チームの詳細。 */
+export type TeamDetail = z.infer<typeof teamDetailSchema>;
+
+/** GET /api/teams/:teamId/invite の応答。 */
+export const teamInviteSchema = z.object({ url: z.string(), rotatedAt: z.string() });
+/** チームの招待リンク。 */
+export type TeamInvite = z.infer<typeof teamInviteSchema>;
+
+/** PATCH /api/teams/:teamId/members/:userId のリクエスト（管理者は切り替えられない）。 */
+export const teamRoleUpdateSchema = z.object({ role: z.enum(["member", "editor"]) });
+
+/** POST /api/teams/:teamId/leave のリクエスト（管理者は引き継ぐ人が必須）。 */
+export const teamLeaveRequestSchema = z.object({ newAdminUserId: z.string().uuid().optional() });
+
+/** POST /api/teams/:teamId/admin のリクエスト（抜けずに引き継ぐ）。 */
+export const teamAdminTransferSchema = z.object({ userId: z.string().uuid() });
+
+/** POST /api/teams/:teamId/accounts のリクエスト（自分のアカウントを足す）。 */
+export const teamAccountAddSchema = z.object({ accountId: z.string().uuid(), shared: z.boolean().optional() });
+
+/** PATCH /api/teams/:teamId/accounts/:accountId のリクエスト（チームに見せる）。 */
+export const teamShareUpdateSchema = z.object({ shared: z.boolean() });
+
+/** GET /api/teams/:teamId/assignments の応答（担当の表）。 */
+export const teamAssignmentsSchema = z.object({
+  /** 列：チームのアカウント */
+  accounts: z.array(
+    z.object({
+      id: z.string(),
+      username: z.string(),
+      displayName: z.string().nullable(),
+      profilePictureUrl: z.string().nullable(),
+      ownerUserId: z.string(),
+      ownerName: z.string(),
+    }),
+  ),
+  /** 行：編集者と管理者 */
+  people: z.array(
+    z.object({ userId: z.string(), name: z.string(), role: teamRoleSchema, isMe: z.boolean(), accountIds: z.array(z.string()) }),
+  ),
+});
+/** 担当の表。 */
+export type TeamAssignments = z.infer<typeof teamAssignmentsSchema>;
 
 /** 招待リンクを開いた人の状態（contracts/api.md「GET /api/invites/:token」）。 */
-export const inviteViewerStatusSchema = z.enum(["anonymous", "can_join", "already_member", "self", "limit_reached"]);
+export const inviteViewerStatusSchema = z.enum(["anonymous", "needs_account", "ready", "already_member"]);
 
 /** GET /api/invites/:token の応答。 */
 export const invitePreviewSchema = z.object({
-  kind: z.enum(["partner", "editor"]),
-  account: z
-    .object({ displayName: z.string().nullable(), username: z.string(), profilePictureUrl: z.string().nullable() })
-    .nullable(),
-  inviterName: z.string(),
-  team: z.object({ name: z.string().nullable(), partnerName: z.string(), editorsRemaining: z.number().int() }).nullable(),
+  team: z.object({ name: z.string(), adminName: z.string(), memberCount: z.number().int() }),
   viewer: z.object({
     status: inviteViewerStatusSchema,
-    /** すでに参加している、またはパートナーとして参加した後に開くAccount */
-    accountId: z.string().nullable(),
-    /** 初めてパートナーになる人（チーム名を入れてもらう） */
-    needsTeamName: z.boolean(),
+    /** already_member のとき、開くチーム */
+    teamId: z.string().nullable(),
+    /** ready のとき、選べる自分のアカウント。ほかのチームに入っていれば、そのチーム名 */
+    accounts: z.array(
+      z.object({
+        id: z.string(),
+        displayName: z.string().nullable(),
+        username: z.string(),
+        profilePictureUrl: z.string().nullable(),
+        inOtherTeam: z.string().nullable(),
+      }),
+    ),
   }),
 });
 /** 招待の確認画面の情報。 */
 export type InvitePreview = z.infer<typeof invitePreviewSchema>;
 
-/** POST /api/invites/:token/accept のリクエスト（チーム名は50文字まで、空ならNULL）。 */
+/** POST /api/invites/:token/accept のリクエスト（0件はサービスで TEAM_NEEDS_ACCOUNT）。 */
 export const inviteAcceptRequestSchema = z.object({
-  teamName: z
-    .string()
-    .optional()
-    .refine((v) => v === undefined || countChars(v.trim()) <= 50, { message: "too long" }),
+  accounts: z.array(z.object({ id: z.string().uuid(), shared: z.boolean() })).max(TEAM_MEMBER_LIMIT),
 });
 /** POST /api/invites/:token/accept の応答。 */
-export const inviteAcceptResponseSchema = z.object({
-  kind: z.enum(["partner", "editor"]),
-  accountId: z.string().nullable(),
-});
+export const inviteAcceptResponseSchema = z.object({ teamId: z.string() });
 
-/** GET /api/accounts/:id/team の応答（contracts/api.md「チーム」）。 */
+/** GET /api/accounts/:id/team の応答（009のカードを改めた。specs/011 FR-055）。 */
 export const accountTeamSchema = z.object({
-  /** Accountのオーナー（カード「このアカウントのチーム」の一番上。FR-042） */
+  /** このアカウントが入っているチーム。入っていなければNULL */
+  team: z
+    .object({ id: z.string(), name: z.string(), admin: z.object({ userId: z.string(), name: z.string() }), shared: z.boolean() })
+    .nullable(),
+  /** Accountのオーナー */
   owner: z.object({ userId: z.string(), name: z.string() }),
   /** 要求したユーザー（カードの「あなた」の印に使う） */
   viewerUserId: z.string(),
-  partner: z
-    .object({ userId: z.string(), name: z.string(), teamName: z.string().nullable(), joinedAt: z.string() })
-    .nullable(),
-  delegation: delegationSchema.nullable(),
-  editors: z.array(z.object({ userId: z.string(), name: z.string() })),
-  joinedNotice: z.object({ show: z.boolean() }),
+  /** このアカウントの担当の人（編集者・自分を担当にした管理者） */
+  assignees: z.array(z.object({ userId: z.string(), name: z.string(), role: teamRoleSchema })),
 });
-/** このアカウントのチーム（オーナー・パートナー・担当の編集者）。 */
+/** このアカウントのチーム（チーム・オーナー・担当の人）。 */
 export type AccountTeam = z.infer<typeof accountTeamSchema>;
-
-/** GET /api/team の応答（contracts/api.md「パートナーのチーム」）。 */
-export const teamSchema = z.object({
-  id: z.string(),
-  name: z.string().nullable(),
-  partnerName: z.string(),
-  editorLimit: z.number().int(),
-  editors: z.array(
-    z.object({ userId: z.string(), name: z.string(), joinedAt: z.string(), accountIds: z.array(z.string()) }),
-  ),
-  accounts: z.array(
-    z.object({
-      id: z.string(),
-      displayName: z.string().nullable(),
-      username: z.string(),
-      profilePictureUrl: z.string().nullable(),
-      ownerName: z.string(),
-      own: z.boolean(),
-    }),
-  ),
-  unassignedEditorCount: z.number().int(),
-});
-/** パートナーのチーム。 */
-export type Team = z.infer<typeof teamSchema>;
-
-/** GET /api/team/invite の応答。 */
-export const teamInviteSchema = z.object({ url: z.string(), rotatedAt: z.string() });
-
-/** PATCH /api/team のリクエスト（チーム名は50文字まで、空ならNULL）。 */
-export const teamNameUpdateSchema = z.object({
-  name: z.string().refine((v) => countChars(v.trim()) <= 50, { message: "too long" }),
-});
-
-/** PATCH /api/accounts/:id/partner のリクエスト（任せる範囲。片方だけでもよい。FR-030）。 */
-export const delegationUpdateSchema = z.object({
-  delegation: z
-    .object({ review: z.boolean().optional(), settings: z.boolean().optional() })
-    .refine((d) => d.review !== undefined || d.settings !== undefined, { message: "empty" }),
-});
 
 /** 操作の記録の種類のスキーマ（specs/008 FR-052）。 */
 export const activityKindSchema = z.enum(["review", "draft", "content", "settings", "member"]);
@@ -1142,7 +1211,7 @@ export const activityQuerySchema = z.object({
 export const activityItemSchema = z.object({
   id: z.string(),
   at: z.string(),
-  actor: z.object({ userId: z.string().nullable(), name: z.string(), role: z.enum(["owner", "member", "partner", "editor"]) }),
+  actor: z.object({ userId: z.string().nullable(), name: z.string(), role: actorRoleSchema }),
   kind: activityKindSchema,
   action: z.string(),
   itemCount: z.number().int(),
@@ -1154,33 +1223,8 @@ export type ActivityItem = z.infer<typeof activityItemSchema>;
 /** GET /api/accounts/:id/activity の応答（contracts/api.md「操作の記録」）。 */
 export const activityListSchema = z.object({
   items: z.array(activityItemSchema),
-  actors: z.array(z.object({ userId: z.string(), name: z.string(), role: z.enum(["owner", "member", "partner", "editor"]) })),
+  actors: z.array(z.object({ userId: z.string(), name: z.string(), role: actorRoleSchema })),
   nextCursor: z.string().nullable(),
 });
 /** 操作の記録の一覧。 */
 export type ActivityList = z.infer<typeof activityListSchema>;
-
-/** GET /api/team/accounts の応答（contracts/api.md、specs/008 FR-061）。 */
-export const partnerSummarySchema = z.object({
-  items: z.array(
-    z.object({
-      account: z.object({
-        id: z.string(),
-        displayName: z.string().nullable(),
-        username: z.string(),
-        profilePictureUrl: z.string().nullable(),
-        connectionStatus: connectionStatusSchema,
-      }),
-      ownerName: z.string(),
-      needsReview: z.number().int(),
-      approved: z.object({ count: z.number().int(), days: z.number().int().nullable() }),
-      nextPost: z.object({ at: z.string().nullable(), state: z.enum(["scheduled", "off", "paused", "none"]) }),
-      judgments7d: z.object({ good: z.number().int(), normal: z.number().int(), poor: z.number().int() }),
-      delegation: delegationSchema,
-      editors: z.array(z.object({ userId: z.string(), name: z.string() })),
-    }),
-  ),
-  truncated: z.boolean(),
-});
-/** 手伝っているアカウントのまとめ。 */
-export type PartnerSummary = z.infer<typeof partnerSummarySchema>;

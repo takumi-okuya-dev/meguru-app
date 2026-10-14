@@ -33,6 +33,7 @@ import {
 import { authorizeAccount } from "./access";
 import { recordActivity } from "./activity-log";
 import type { ConsumedState } from "./threads-oauth";
+import { beforeAccountDeleted } from "./team-service";
 
 // ---- 登録数の上限（FR-015〜FR-017） ----
 
@@ -519,6 +520,8 @@ export async function deleteAccount(
     ) {
       throw new AppError("CONFIRMATION_MISMATCH", 422, "confirmation does not match");
     }
+    // チームの最後のアカウントなら、同じトランザクションでチームを抜けたものとする（specs/011 FR-046、research.md R7）
+    await beforeAccountDeleted(tx, account.id, userId);
     const now = new Date();
     await tx
       .update(users)

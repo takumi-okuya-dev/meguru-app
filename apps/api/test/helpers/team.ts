@@ -1,7 +1,9 @@
-// チーム運用のテスト用の部品（specs/008-team-operations）。DBへ直接、チーム・パートナー・編集者・担当を作る。
+// チームのテスト用の部品（specs/011-team-revision T005）。DBへ直接、チーム・チームの人・アカウント・担当を作る。
+// 招待リンクは本物と同じ形（ハッシュと暗号化した写し）で作るので、作ったチームでも招待のAPIを呼べる。
 import { neon } from "@neondatabase/serverless";
 import { createDb } from "../../src/db/client";
-import { testEnv } from "./app";
+import { newInviteToken, sealInviteToken } from "../../src/services/invite-service";
+import { createUserWithAccount, testEnv } from "./app";
 
 function sql() {
   createDb(testEnv.DATABASE_URL); // ローカルプロキシの設定を有効にする
@@ -24,66 +26,107 @@ export async function ensureUser(user: string, createdAt: Date = new Date()): Pr
 }
 
 /**
- * パートナーのチームを作る（なければ）。
- * @param partner - パートナーの clerkUserId
- * @param name - チーム名
- * @returns teams.id と users.id
+ * チームを作る。admin が管理者になり、accountIds（admin がオーナーのもの）がチームに入る。
+ * @param admin - 管理者の clerkUserId
+ * @param accountIds - 入れるアカウント
+ * @param opts - name：チーム名、shared：入れたアカウントを見せるか
+ * @returns teams.id・管理者の users.id・招待の文字列
  */
-export async function ensureTeam(partner: string, name: string | null = `${partner}社`) {
-  const partnerUserId = await ensureUser(partner);
-  const [t] = (await sql()`
-    INSERT INTO teams (partner_user_id, name) VALUES (${partnerUserId}, ${name})
-    ON CONFLICT (partner_user_id) DO UPDATE SET partner_user_id = EXCLUDED.partner_user_id
-    RETURNING id`) as [{ id: string }];
-  return { teamId: t.id, partnerUserId };
-}
-
-/**
- * Account にパートナーを付ける（account_partners と memberships(partner)）。
- * @param accountId - 手伝う先
- * @param partner - パートナーの clerkUserId
- * @param delegation - 任せる範囲
- * @returns teams.id と パートナーの users.id
- */
-export async function makePartner(
-  accountId: string,
-  partner: string,
-  delegation: { review?: boolean; settings?: boolean } = {},
-) {
-  const { teamId, partnerUserId } = await ensureTeam(partner);
+export async function makeTeam(admin: string, accountIds: string[], opts: { name?: string; shared?: boolean } = {}) {
+  const adminUserId = await ensureUser(admin);
+  const teamId = crypto.randomUUID();
+  const token = newInviteToken();
+  const sealed = await sealInviteToken(testEnv, token, teamId);
   const q = sql();
-  await q`INSERT INTO account_partners (account_id, team_id, delegate_review, delegate_settings)
-    VALUES (${accountId}, ${teamId}, ${delegation.review ?? false}, ${delegation.settings ?? false})`;
-  await q`INSERT INTO memberships (user_id, account_id, role, team_id)
-    VALUES (${partnerUserId}, ${accountId}, 'partner', ${teamId})`;
-  return { teamId, partnerUserId };
-}
-
-/**
- * チームに編集者を入れ、担当を付ける（team_editors と memberships(editor)）。
- * @param teamId - チーム
- * @param editor - 編集者の clerkUserId
- * @param accountIds - 担当にするAccount（空なら担当なし）
- * @returns 編集者の users.id
- */
-export async function makeEditor(teamId: string, editor: string, accountIds: string[] = []) {
-  const userId = await ensureUser(editor);
-  const q = sql();
-  await q`INSERT INTO team_editors (team_id, user_id) VALUES (${teamId}, ${userId}) ON CONFLICT DO NOTHING`;
+  await q`INSERT INTO teams (id, name, admin_user_id, invite_token_hash, invite_token_ciphertext, invite_token_iv, invite_key_version)
+    VALUES (${teamId}, ${opts.name ?? `${admin}のチーム`}, ${adminUserId}, ${sealed.hash},
+      ${`\\x${Buffer.from(sealed.ciphertext).toString("hex")}`}, ${`\\x${Buffer.from(sealed.iv).toString("hex")}`}, ${sealed.keyVersion})`;
+  await q`INSERT INTO team_members (team_id, user_id, role) VALUES (${teamId}, ${adminUserId}, 'admin')`;
   for (const accountId of accountIds) {
-    await q`INSERT INTO memberships (user_id, account_id, role, team_id) VALUES (${userId}, ${accountId}, 'editor', ${teamId})`;
+    await q`INSERT INTO team_accounts (team_id, account_id, added_by_user_id, shared)
+      VALUES (${teamId}, ${accountId}, ${adminUserId}, ${opts.shared ?? false})`;
+  }
+  return { teamId, adminUserId, token };
+}
+
+/**
+ * チームに入る（メンバーとして）。accountIds（その人がオーナーのもの）がチームに入る。
+ * @param teamId - チーム
+ * @param user - 入る人の clerkUserId
+ * @param accountIds - 入れるアカウント
+ * @param opts - shared：入れたアカウントを見せるか
+ * @returns 入った人の users.id
+ */
+export async function joinTeam(teamId: string, user: string, accountIds: string[], opts: { shared?: boolean } = {}) {
+  const userId = await ensureUser(user);
+  const q = sql();
+  await q`INSERT INTO team_members (team_id, user_id, role) VALUES (${teamId}, ${userId}, 'member')`;
+  for (const accountId of accountIds) {
+    await q`INSERT INTO team_accounts (team_id, account_id, added_by_user_id, shared)
+      VALUES (${teamId}, ${accountId}, ${userId}, ${opts.shared ?? false})`;
   }
   return userId;
 }
 
 /**
- * 任せる範囲を変える。
- * @param accountId - Account
- * @param delegation - 任せる範囲
+ * チームでのロールを変える（管理者にはしない。管理者の引き継ぎはAPIで確かめる）。
+ * @param teamId - チーム
+ * @param user - clerkUserId
+ * @param role - member か editor
  */
-export async function setDelegation(accountId: string, delegation: { review: boolean; settings: boolean }) {
-  await sql()`UPDATE account_partners SET delegate_review = ${delegation.review}, delegate_settings = ${delegation.settings}
-    WHERE account_id = ${accountId}`;
+export async function setRole(teamId: string, user: string, role: "member" | "editor") {
+  const userId = await ensureUser(user);
+  await sql()`UPDATE team_members SET role = ${role} WHERE team_id = ${teamId} AND user_id = ${userId}`;
+}
+
+/**
+ * 担当にする（memberships の editor の行）。
+ * @param teamId - チーム
+ * @param user - 担当の人の clerkUserId
+ * @param accountId - アカウント
+ * @returns 担当の人の users.id
+ */
+export async function assign(teamId: string, user: string, accountId: string) {
+  const userId = await ensureUser(user);
+  await sql()`INSERT INTO memberships (user_id, account_id, role, team_id) VALUES (${userId}, ${accountId}, 'editor', ${teamId})`;
+  return userId;
+}
+
+/**
+ * 「チームに見せる」を変える。
+ * @param teamId - チーム
+ * @param accountId - アカウント
+ * @param shared - 見せるか
+ */
+export async function setShared(teamId: string, accountId: string, shared: boolean) {
+  await sql()`UPDATE team_accounts SET shared = ${shared} WHERE team_id = ${teamId} AND account_id = ${accountId}`;
+}
+
+/**
+ * owner のアカウントを、新しいチームに入れる（各featureのテストで「チームに入っているアカウント」を作る）。
+ * 管理者 admin は自分のアカウントを入れて作る。editor を渡すと、その人も自分のアカウントで入り、編集者にして担当にする。
+ * @param accountId - owner のアカウント
+ * @param owner - そのアカウントのオーナーの clerkUserId
+ * @param opts - admin：管理者（既定 "a1"）、editor：担当の編集者、shared：owner のアカウントを見せるか
+ * @returns teams.id と、編集者の users.id
+ */
+export async function putInTeam(
+  accountId: string,
+  owner: string,
+  opts: { admin?: string; editor?: string; editorCreatedAt?: Date; shared?: boolean } = {},
+) {
+  const admin = opts.admin ?? "a1";
+  const { accountId: adminAcc } = await createUserWithAccount(admin);
+  const { teamId } = await makeTeam(admin, [adminAcc]);
+  await joinTeam(teamId, owner, [accountId], { shared: opts.shared });
+  let editorUserId: string | null = null;
+  if (opts.editor) {
+    const { accountId: editorAcc } = await createUserWithAccount(opts.editor, { userCreatedAt: opts.editorCreatedAt });
+    editorUserId = await joinTeam(teamId, opts.editor, [editorAcc]);
+    await setRole(teamId, opts.editor, "editor");
+    await assign(teamId, opts.editor, accountId);
+  }
+  return { teamId, editorUserId };
 }
 
 /** 操作の記録を読む（新しい順）。 */
@@ -97,4 +140,10 @@ export async function activityRows(accountId: string) {
     summary: string | null;
     details: Record<string, unknown> | null;
   }[];
+}
+
+/** チームの人とロール（参加の順）。 */
+export async function teamMemberRows(teamId: string) {
+  return (await sql()`SELECT u.clerk_user_id AS user, m.role FROM team_members m JOIN users u ON u.id = m.user_id
+    WHERE m.team_id = ${teamId} ORDER BY m.joined_at, u.clerk_user_id`) as { user: string; role: string }[];
 }

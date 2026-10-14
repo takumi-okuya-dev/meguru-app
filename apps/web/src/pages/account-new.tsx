@@ -1,8 +1,8 @@
 // アカウント追加画面（FR-008・FR-017、規則8、「常時表示する案内」。specs/010 でトークンでの追加を足した）
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { ChevronDownIcon } from "lucide-react";
-import { useState } from "react";
-import { useNavigate } from "react-router";
+import { useEffect, useState } from "react";
+import { useNavigate, useSearchParams } from "react-router";
 import {
   RECONNECT_FROM_SETTINGS_HINT,
   TESTER_NOTICE,
@@ -17,6 +17,7 @@ import { queryKeys } from "@/lib/query";
 import { ApiErrorScreen } from "@/components/ApiErrorScreen";
 import { LoadingSkeleton } from "@/components/guards";
 import { TokenConnectForm, warnParam } from "@/components/connect/TokenConnectForm";
+import { isInvitePath, rememberInviteReturn, takeInviteReturn } from "@/lib/invite-return";
 import { cn } from "@/lib/utils";
 
 /**
@@ -28,6 +29,11 @@ export function AccountNew() {
   const navigate = useNavigate();
   const [tokenOpen, setTokenOpen] = useState(false);
   useCallbackResult({ max: me.data?.accountLimit.max });
+  // 招待リンクから来たときは、追加の後にリンクへ戻す（specs/011 T019）
+  const next = useSearchParams()[0].get("next");
+  useEffect(() => {
+    if (isInvitePath(next)) rememberInviteReturn(next);
+  }, [next]);
   const connect = useMutation({
     mutationFn: () => api.connect({ mode: "new" }),
     onSuccess: ({ authorizeUrl }) => window.location.assign(authorizeUrl),
@@ -95,7 +101,8 @@ export function AccountNew() {
               mode="new"
               onSuccess={(result) => {
                 const warn = warnParam(result.warnings);
-                void navigate(`/accounts/${result.accountId}?connected=new${warn ? `&warn=${warn}` : ""}`);
+                const back = takeInviteReturn();
+                void navigate(back ?? `/accounts/${result.accountId}?connected=new${warn ? `&warn=${warn}` : ""}`);
               }}
             />
           ))}

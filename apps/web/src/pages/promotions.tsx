@@ -176,7 +176,8 @@ export function PromotionsPage() {
           accountId={account.id}
           value={settings.data?.ratioPercent}
           version={settings.data?.version ?? 1}
-          canEdit={canEdit}
+          // 宣伝投稿の割合は設定（オーナーだけ）。担当の人には読むだけで出す（PR #14 のCodexレビュー）
+          canEdit={canEdit && (settings.data?.canEdit ?? false)}
           onGrowerLost={() => setGrowerDialog(true)}
         />
         {canEdit && atLimit && (

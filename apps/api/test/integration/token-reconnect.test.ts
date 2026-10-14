@@ -3,7 +3,7 @@ import { neon } from "@neondatabase/serverless";
 import { beforeEach, describe, expect, it } from "vitest";
 import { approvedDrafts } from "../helpers/auto-post";
 import { authorizeAndCallback, call, connectNew, fake, makeApp, redirectTarget, resetDb, testEnv } from "../helpers/app";
-import { activityRows, makeEditor, makePartner } from "../helpers/team";
+import { activityRows, putInTeam } from "../helpers/team";
 
 const app = makeApp();
 const q = () => neon(testEnv.DATABASE_URL);
@@ -98,12 +98,11 @@ describe("トークンで接続し直す（US3）", () => {
     expect((await account()).recheck_at).toBeNull();
   });
 
-  it("パートナー・編集者は ROLE_FORBIDDEN（FR-034）", async () => {
+  it("担当の人・見せてもらっている人は ROLE_FORBIDDEN（FR-034）", async () => {
     const id = await tokenAccount("owner1");
-    const { teamId } = await makePartner(id, "p1");
-    await makeEditor(teamId, "e1", [id]);
+    await putInTeam(id, "owner1", { editor: "e1", shared: true });
     const token = await fake.issueToken({ user: "9003" });
-    for (const user of ["p1", "e1"]) {
+    for (const user of ["a1", "e1"]) {
       const res = await reconnectWithToken(id, token, user);
       expect([res.status, await errorOf(res)], user).toEqual([403, "ROLE_FORBIDDEN"]);
     }
@@ -113,7 +112,7 @@ describe("トークンで接続し直す（US3）", () => {
 describe("接続し直しの記録（FR-035、research.md R11a）", () => {
   it("チームがあれば、どちらの方法の接続し直しも threads_reconnected を1行ずつ書く。トークンは書かない", async () => {
     const id = await tokenAccount("owner1");
-    await makePartner(id, "p1");
+    await putInTeam(id, "owner1");
     const token = await fake.issueToken({ user: "9003" });
     await reconnectWithToken(id, token, "owner1");
     await q()`UPDATE accounts SET plan = 'multi-account'`;

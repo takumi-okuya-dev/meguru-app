@@ -22,16 +22,15 @@ export const queryKeys = {
   me: ["me"] as const,
   needsReviewCounts: ["me", "needs-review-counts"] as const,
   account: (id: string) => ["account", id] as const,
-  // チーム運用（specs/008-team-operations）。役割と権限。Account の下に置き、Account の削除で一緒に消す
+  // 関わりと権限（specs/011-team-revision）。Account の下に置き、Account の削除で一緒に消す
   access: (id: string) => ["account", id, "access"] as const,
   accountTeam: (id: string) => ["account", id, "team"] as const,
   activity: (id: string, kind: string, actor: string) => ["account", id, "activity", kind, actor] as const,
-  partnerInvite: (id: string) => ["account", id, "partner-invite"] as const,
   invite: (token: string) => ["invite", token] as const,
-  // パートナーのチーム（specs/008）。Account の下に置かない（チームは Account をまたぐ）
-  team: ["team"] as const,
-  teamInvite: ["team", "invite"] as const,
-  teamAccounts: ["team", "accounts"] as const,
+  // チーム（specs/011）。Account の下に置かない（チームは Account をまたぐ）。取り直しは ["team", id] の範囲で行う
+  team: (id: string) => ["team", id] as const,
+  teamInvite: (id: string) => ["team", id, "invite"] as const,
+  teamAssignments: (id: string) => ["team", id, "assignments"] as const,
   // 戦略プロファイル（specs/002-strategy-profile）。Account 単位で持ち、Account の削除で一緒に消す
   profileStatus: (id: string) => ["account", id, "profile-status"] as const,
   strategy: (id: string) => ["account", id, "strategy"] as const,

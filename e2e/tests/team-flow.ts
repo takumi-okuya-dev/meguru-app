@@ -1,34 +1,60 @@
-// チーム運用の操作の手順（specs/008-team-operations quickstart.md 手順3・4）。
+// チームの操作の手順（specs/011-team-revision quickstart.md 2、SC-007）。
 // E2E（team.spec.ts）と、手で確かめるための3人の画面を開くスクリプト（scripts/team-open.ts）で使う。
 // テストの外でも動くよう、待つのは Playwright の waitFor・waitForURL だけにする（確かめは呼ぶ側で行う）。
 import type { Page } from "@playwright/test";
 
 const ACCOUNT_URL = /\/accounts\/([0-9a-f-]{36})$/;
+const TEAM_URL = /\/teams\/([0-9a-f-]{36})$/;
+
+/** 偽のThreadsのユーザー（tests/helpers.ts の registerFakeUsers）と、アカウントの表示名。 */
+export const FAKE_ACCOUNTS = {
+  admin: { id: "9002", name: "Partner Co" },
+  owner: { id: "9001", name: "E2E User" },
+  editor: { id: "9003", name: "Cafe B" },
+} as const;
 
 /**
- * オーナーが偽のThreadsのアカウントを接続する。
- * @param page - オーナーのページ
- * @param fakeUserId - 偽のThreadsのユーザー（省略すると既定の @e2e_user）
+ * 偽のThreadsのアカウントを接続する（自分のアカウントを1つ作る）。
+ * @param page - 接続する人のページ
+ * @param fakeUserId - 偽のThreadsのユーザー
  * @returns 接続したAccountのID
  */
-export async function connectThreads(page: Page, fakeUserId?: string): Promise<string> {
+export async function connectThreads(page: Page, fakeUserId: string): Promise<string> {
   await page.goto("/accounts/new");
   await page.getByRole("button", { name: "Threadsアカウントを接続" }).click();
-  await page.locator(fakeUserId ? `#allow-${fakeUserId}` : "#allow").click();
+  await page.locator(fakeUserId === FAKE_ACCOUNTS.owner.id ? "#allow" : `#allow-${fakeUserId}`).click();
   await page.waitForURL(ACCOUNT_URL);
   return ACCOUNT_URL.exec(new URL(page.url()).pathname)![1]!;
 }
 
 /**
- * 招待のダイアログからリンクを読み、ダイアログを閉じる。
- * @param page - ページ
- * @param title - ダイアログの見出し
- * @param prefix - リンクの種類（p_ または e_）
+ * このアカウントの設定の「チームを作る」から、チームを作る（作った人が管理者）。
+ * @param page - 管理者のページ
+ * @param accountId - チームに入れる自分のアカウント
+ * @param name - チーム名
+ * @returns 作ったチームのID
+ */
+export async function createTeam(page: Page, accountId: string, name: string): Promise<string> {
+  await page.goto(`/accounts/${accountId}/settings`);
+  await page.getByRole("button", { name: "チームを作る" }).click();
+  const dialog = page.getByRole("dialog", { name: "チームを作る" });
+  await dialog.getByLabel("チーム名").fill(name);
+  await dialog.getByRole("button", { name: "作る" }).click();
+  await page.waitForURL(TEAM_URL);
+  return TEAM_URL.exec(new URL(page.url()).pathname)![1]!;
+}
+
+/**
+ * 管理者が「メンバーを招待」のダイアログからリンクを読み、ダイアログを閉じる。
+ * @param page - 管理者のページ
+ * @param teamId - チーム
  * @returns 招待リンク
  */
-async function readInviteLink(page: Page, title: string, prefix: "p_" | "e_"): Promise<string> {
-  const dialog = page.getByRole("dialog", { name: title });
-  const input = dialog.locator(`input#invite-link[value*="/invite/${prefix}"]`);
+export async function readTeamInvite(page: Page, teamId: string): Promise<string> {
+  await page.goto(`/teams/${teamId}`);
+  await page.getByRole("button", { name: "メンバーを招待" }).click();
+  const dialog = page.getByRole("dialog", { name: /にメンバーを招待$/ });
+  const input = dialog.locator('input#invite-link[value*="/invite/t_"]');
   await input.waitFor();
   const link = await input.inputValue();
   await dialog.getByRole("button", { name: "閉じる" }).last().click();
@@ -36,48 +62,57 @@ async function readInviteLink(page: Page, title: string, prefix: "p_" | "e_"): P
 }
 
 /**
- * オーナーがパートナーの招待リンクを作る。
- * @param page - オーナーのページ
- * @param accountId - Account
- * @returns 招待リンク
- */
-export async function createPartnerInvite(page: Page, accountId: string): Promise<string> {
-  await page.goto(`/accounts/${accountId}/settings`);
-  await page.getByRole("button", { name: "招待リンクを作る" }).click();
-  return readInviteLink(page, "パートナーを招待", "p_");
-}
-
-/**
- * 招待リンクから参加する。
+ * 招待リンクから、自分のアカウントを選んで参加する（入った人はメンバー）。
  * @param page - 参加する人のページ
  * @param link - 招待リンク
- * @param teamName - 初めてのパートナーのチーム名
+ * @param accountName - チームに入れる自分のアカウントの表示名
+ * @param opts - shared：そのアカウントを「チームに見せる」にする
  */
-export async function joinByLink(page: Page, link: string, teamName?: string) {
+export async function joinByLink(page: Page, link: string, accountName: string, opts: { shared?: boolean } = {}) {
   await page.goto(link);
-  if (teamName) await page.getByLabel(/チーム名（会社名）/).fill(teamName);
-  await page.getByRole("button", { name: "参加する" }).click();
-  await page.waitForURL((url) => !url.pathname.startsWith("/invite/"));
+  await page.getByRole("checkbox", { name: `${accountName}をチームに入れる` }).check();
+  if (opts.shared) await page.getByRole("switch", { name: `${accountName}をチームに見せる` }).click();
+  await page.getByRole("button", { name: "1件のアカウントで参加する" }).click();
+  await page.waitForURL(TEAM_URL);
 }
 
 /**
- * パートナーが編集者の招待リンクを出す。
- * @param page - パートナーのページ
- * @returns 招待リンク
+ * 管理者が、アカウントの表示名で見つけた人のロールを編集者にする。
+ * @param page - 管理者のページ
+ * @param teamId - チーム
+ * @param accountName - その人がチームに入れているアカウントの表示名
  */
-export async function createEditorInvite(page: Page): Promise<string> {
-  await page.goto("/partner/editors");
-  await page.getByRole("button", { name: "編集者を招待" }).first().click();
-  return readInviteLink(page, "編集者を招待", "e_");
+export async function makeEditor(page: Page, teamId: string, accountName: string) {
+  await page.goto(`/teams/${teamId}`);
+  const row = page.getByRole("list", { name: "メンバーの一覧" }).getByRole("listitem").filter({ hasText: accountName });
+  await row.getByRole("button", { name: "編集者" }).click();
+  await row.locator('button[aria-pressed="true"]', { hasText: "編集者" }).waitFor();
 }
 
 /**
- * パートナーが、表の最初の「担当にする」のチェックを付ける（編集者1人・Account1件のとき）。
- * @param page - パートナーのページ
+ * 管理者が、担当の表で編集者をアカウントの担当にする。
+ * @param page - 管理者のページ
+ * @param teamId - チーム
+ * @param accountName - 担当にするアカウントの表示名
  */
-export async function assignFirstEditor(page: Page) {
-  await page.goto("/partner/editors");
-  const assign = page.getByRole("checkbox", { name: /の担当にする$/ }).first();
-  await assign.click();
-  await page.locator('[role="checkbox"][aria-checked="true"]').first().waitFor();
+export async function assignEditor(page: Page, teamId: string, accountName: string) {
+  await page.goto(`/teams/${teamId}/assign`);
+  // 行の名前の下に「編集者」（担当がなければ「編集者 · 担当を決めてください」）と出る
+  const row = page.getByRole("row").filter({ hasText: "編集者" });
+  const cell = row.getByRole("checkbox", { name: new RegExp(`を${accountName}の担当にする$`) });
+  await cell.click();
+  await row.locator(`[role="checkbox"][aria-checked="true"]`).first().waitFor();
+}
+
+/**
+ * オーナーが、チームの画面で自分のアカウントを「チームに見せる」にする。
+ * @param page - オーナーのページ
+ * @param teamId - チーム
+ * @param accountName - 見せるアカウントの表示名
+ */
+export async function shareAccount(page: Page, teamId: string, accountName: string) {
+  await page.goto(`/teams/${teamId}`);
+  const sw = page.getByRole("switch", { name: `${accountName}をチームに見せる` });
+  await sw.click();
+  await page.locator(`[role="switch"][aria-checked="true"][aria-label="${accountName}をチームに見せる"]`).waitFor();
 }

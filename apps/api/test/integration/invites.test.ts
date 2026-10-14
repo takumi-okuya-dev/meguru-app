@@ -1,259 +1,154 @@
-// 招待（specs/008-team-operations contracts/api.md「パートナーの招待」「招待の確認と参加」、research.md R4・R7）
+// 招待の確認と参加（specs/011-team-revision contracts/api.md「招待の確認と参加」、FR-011〜FR-016）
 import { neon } from "@neondatabase/serverless";
 import { beforeEach, describe, expect, it } from "vitest";
 import { call, createUserWithAccount, makeApp, resetDb, testEnv } from "../helpers/app";
-import { ensureTeam, ensureUser, makePartner } from "../helpers/team";
+import { activityRows, ensureUser, joinTeam, makeTeam, teamMemberRows } from "../helpers/team";
 
 const app = makeApp();
 const sql = () => neon(testEnv.DATABASE_URL);
-
-type Invite = { invite: { url: string; createdAt: string } | null };
-const tokenOf = (url: string) => url.split("/invite/")[1]!;
 
 async function json<T>(res: Response, status = 200): Promise<T> {
   expect(res.status, await res.clone().text()).toBe(status);
   return (await res.json()) as T;
 }
 
-async function createInvite(accountId: string, user = "o1") {
-  const body = await json<Invite>(await call(app, "POST", `/api/accounts/${accountId}/partner-invite`, { user }));
-  return body.invite!;
-}
+const errorOf = async (res: Response) => ((await res.json()) as { error: { code: string; details?: string[] } }).error;
 
-const codeOf = async (res: Response) => ((await res.json()) as { error: { code: string } }).error.code;
+type Preview = {
+  team: { name: string; adminName: string; memberCount: number };
+  viewer: { status: string; teamId: string | null; accounts: { id: string; username: string; inOtherTeam: string | null }[] };
+};
 
 beforeEach(async () => {
   await resetDb();
 });
 
-describe("パートナーの招待リンク（オーナー）", () => {
-  it("作る（2回呼んでも1本）・表示・作り直し・取り消し。URLは WEB_ORIGIN/invite/p_…", async () => {
-    const { accountId } = await createUserWithAccount("o1");
-    expect((await json<Invite>(await call(app, "GET", `/api/accounts/${accountId}/partner-invite`, { user: "o1" }))).invite).toBeNull();
-    const first = await createInvite(accountId);
-    expect(first.url).toMatch(new RegExp(`^${testEnv.WEB_ORIGIN}/invite/p_[A-Za-z0-9_-]{43}$`));
-    expect((await createInvite(accountId)).url).toBe(first.url);
-    expect((await json<Invite>(await call(app, "GET", `/api/accounts/${accountId}/partner-invite`, { user: "o1" }))).invite!.url).toBe(first.url);
+async function team() {
+  const { accountId } = await createUserWithAccount("a1");
+  return makeTeam("a1", [accountId], { name: "飲食チーム" });
+}
 
-    const rotated = (await json<Invite>(await call(app, "POST", `/api/accounts/${accountId}/partner-invite/rotate`, { user: "o1" }))).invite!;
-    expect(rotated.url).not.toBe(first.url);
-    const old = await call(app, "GET", `/api/invites/${tokenOf(first.url)}`);
-    expect([old.status, await codeOf(old)]).toEqual([404, "INVITE_INVALID"]);
-
-    expect((await call(app, "DELETE", `/api/accounts/${accountId}/partner-invite`, { user: "o1" })).status).toBe(204);
-    const gone = await call(app, "GET", `/api/invites/${tokenOf(rotated.url)}`);
-    expect(gone.status).toBe(404);
+describe("GET /api/invites/:token（招待の確認）", () => {
+  it("ログイン前は anonymous で、チーム名・管理者・人数だけ", async () => {
+    const { token } = await team();
+    const res = await json<Preview>(await call(app, "GET", `/api/invites/${token}`));
+    expect(res).toEqual({
+      team: { name: "飲食チーム", adminName: "a1", memberCount: 1 },
+      viewer: { status: "anonymous", teamId: null, accounts: [] },
+    });
   });
 
-  it("DBに文字列の平文は残さない（照合用のハッシュと暗号文だけ）", async () => {
-    const { accountId } = await createUserWithAccount("o1");
-    const token = tokenOf((await createInvite(accountId)).url);
-    const rows = (await sql()`SELECT token_hash, encode(token_ciphertext, 'escape') AS c FROM account_partner_invites`) as {
-      token_hash: string;
-      c: string;
+  it("自分のアカウントがなければ needs_account。あれば ready で、ほかのチームに入っているものはそのチーム名", async () => {
+    const { token } = await team();
+    await ensureUser("u1");
+    expect((await json<Preview>(await call(app, "GET", `/api/invites/${token}`, { user: "u1" }))).viewer.status).toBe("needs_account");
+    const { accountId: free } = await createUserWithAccount("u1");
+    const { accountId: busy } = await createUserWithAccount("u1");
+    await makeTeam("u1", [busy], { name: "美容チーム" });
+    const ready = await json<Preview>(await call(app, "GET", `/api/invites/${token}`, { user: "u1" }));
+    expect(ready.viewer.status).toBe("ready");
+    expect(ready.viewer.accounts.map((a) => [a.id, a.inOtherTeam])).toEqual([
+      [free, null],
+      [busy, "美容チーム"],
+    ]);
+  });
+
+  it("すでにチームの人なら already_member とチームのID", async () => {
+    const { teamId, token } = await team();
+    const res = await json<Preview>(await call(app, "GET", `/api/invites/${token}`, { user: "a1" }));
+    expect(res.viewer).toEqual({ status: "already_member", teamId, accounts: [] });
+  });
+
+  it("形が違う・見つからない文字列は INVITE_INVALID", async () => {
+    for (const token of ["x", `t_${"A".repeat(43)}`, `p_${"A".repeat(43)}`]) {
+      const res = await call(app, "GET", `/api/invites/${token}`);
+      expect([res.status, (await errorOf(res)).code], token).toEqual([404, "INVITE_INVALID"]);
+    }
+  });
+});
+
+describe("POST /api/invites/:token/accept（参加）", () => {
+  it("選んだアカウントを入れてメンバーとして入る。見せる設定はアカウントごと。記録 team_member_joined", async () => {
+    const { teamId, token } = await team();
+    const { accountId: a } = await createUserWithAccount("u1");
+    const { accountId: b } = await createUserWithAccount("u1");
+    const res = await json<{ teamId: string }>(
+      await call(app, "POST", `/api/invites/${token}/accept`, { user: "u1", body: { accounts: [{ id: a, shared: true }, { id: b, shared: false }] } }),
+    );
+    expect(res.teamId).toBe(teamId);
+    expect(await teamMemberRows(teamId)).toEqual([
+      { user: "a1", role: "admin" },
+      { user: "u1", role: "member" },
+    ]);
+    const rows = (await sql()`SELECT account_id, shared FROM team_accounts WHERE team_id = ${teamId} AND account_id IN (${a}, ${b})`) as {
+      account_id: string;
+      shared: boolean;
     }[];
-    expect(rows).toHaveLength(1);
-    expect(rows[0]!.token_hash).toMatch(/^[0-9a-f]{64}$/);
-    expect(rows[0]!.c).not.toContain(token);
+    expect(Object.fromEntries(rows.map((r) => [r.account_id, r.shared]))).toEqual({ [a]: true, [b]: false });
+    expect((await activityRows(a)).map((r) => [r.action, r.actor_role, r.summary])).toEqual([["team_member_joined", "owner", "u1"]]);
+    // 見せたアカウントは、管理者が読むだけで開ける
+    expect((await call(app, "GET", `/api/accounts/${a}/strategy`, { user: "a1" })).status).toBe(200);
+    expect((await call(app, "GET", `/api/accounts/${b}/strategy`, { user: "a1" })).status).toBe(404);
   });
 
-  it("パートナーがいるAccountでは作れない（PARTNER_ALREADY_EXISTS）", async () => {
-    const { accountId } = await createUserWithAccount("o1");
-    await makePartner(accountId, "p1");
-    const res = await call(app, "POST", `/api/accounts/${accountId}/partner-invite`, { user: "o1" });
-    expect([res.status, await codeOf(res)]).toEqual([409, "PARTNER_ALREADY_EXISTS"]);
-  });
-});
-
-describe("招待の確認と参加（パートナー）", () => {
-  type Preview = {
-    kind: string;
-    account: { displayName: string | null; username: string } | null;
-    inviterName: string;
-    viewer: { status: string; accountId?: string | null; needsTeamName?: boolean };
-  };
-
-  it("ログインなしで確認でき、Account・招いた人だけを返す。ログインしていれば参加できるかを返す", async () => {
-    const { accountId } = await createUserWithAccount("o1");
-    const token = tokenOf((await createInvite(accountId)).url);
-    const anon = await json<Preview>(await call(app, "GET", `/api/invites/${token}`));
-    expect(anon).toMatchObject({ kind: "partner", inviterName: "o1", viewer: { status: "anonymous" } });
-    expect(anon.account?.username).toMatch(/^o1_/);
-    expect((await json<Preview>(await call(app, "GET", `/api/invites/${token}`, { user: "p1" }))).viewer).toMatchObject({
-      status: "can_join",
-      needsTeamName: true,
+  it("0件は TEAM_NEEDS_ACCOUNT、ほかのチームのアカウントは ACCOUNT_IN_OTHER_TEAM、他人のアカウントは ACCOUNT_NOT_FOUND", async () => {
+    const { token } = await team();
+    const { accountId: busy } = await createUserWithAccount("u1");
+    await makeTeam("u1", [busy]);
+    const { accountId: free } = await createUserWithAccount("u2");
+    const { accountId: others } = await createUserWithAccount("u3");
+    const none = await call(app, "POST", `/api/invites/${token}/accept`, { user: "u2", body: { accounts: [] } });
+    expect([none.status, (await errorOf(none)).code]).toEqual([409, "TEAM_NEEDS_ACCOUNT"]);
+    const inOther = await call(app, "POST", `/api/invites/${token}/accept`, { user: "u1", body: { accounts: [{ id: busy, shared: false }] } });
+    const err = await errorOf(inOther);
+    expect([inOther.status, err.code, err.details]).toEqual([409, "ACCOUNT_IN_OTHER_TEAM", [busy]]);
+    const notMine = await call(app, "POST", `/api/invites/${token}/accept`, {
+      user: "u2",
+      body: { accounts: [{ id: free, shared: false }, { id: others, shared: false }] },
     });
-    expect((await json<Preview>(await call(app, "GET", `/api/invites/${token}`, { user: "o1" }))).viewer.status).toBe("self");
+    expect([notMine.status, (await errorOf(notMine)).code]).toEqual([404, "ACCOUNT_NOT_FOUND"]);
+    // 失敗した参加では、何も入らない
+    expect((await sql()`SELECT count(*)::int AS n FROM team_accounts WHERE account_id = ${free}`) as { n: number }[]).toEqual([{ n: 0 }]);
   });
 
-  it("参加でパートナーになり、チーム（名前つき）ができ、リンクは使えなくなる。2つ目のAccountでは同じチーム", async () => {
-    const { accountId } = await createUserWithAccount("o1");
-    const token = tokenOf((await createInvite(accountId)).url);
-    const joined = await json<{ kind: string; accountId: string }>(
-      await call(app, "POST", `/api/invites/${token}/accept`, { user: "p1", body: { teamName: "A社" } }),
-    );
-    expect(joined).toEqual({ kind: "partner", accountId });
-    expect((await call(app, "GET", `/api/accounts/${accountId}/post-drafts`, { user: "p1" })).status).toBe(200);
-    const review = await call(app, "POST", `/api/accounts/${accountId}/post-drafts/review`, { user: "p1", body: {} });
-    expect(review.status).toBe(403);
-    const again = await call(app, "GET", `/api/invites/${token}`, { user: "x1" });
-    expect(again.status).toBe(404);
-
-    const { accountId: second } = await createUserWithAccount("o2");
-    const token2 = tokenOf((await createInvite(second, "o2")).url);
-    expect((await json<Preview>(await call(app, "GET", `/api/invites/${token2}`, { user: "p1" }))).viewer).toMatchObject({
-      status: "can_join",
-      needsTeamName: false,
-    });
-    await json(await call(app, "POST", `/api/invites/${token2}/accept`, { user: "p1", body: { teamName: "無視される" } }));
-    const teams = (await sql()`SELECT name FROM teams`) as { name: string }[];
-    expect(teams).toEqual([{ name: "A社" }]);
-  });
-
-  it("自分のAccount・すでに関わっている人は参加できない", async () => {
-    const { accountId } = await createUserWithAccount("o1");
-    const token = tokenOf((await createInvite(accountId)).url);
-    const self = await call(app, "POST", `/api/invites/${token}/accept`, { user: "o1", body: {} });
-    expect([self.status, await codeOf(self)]).toEqual([409, "INVITE_SELF"]);
-  });
-
-  it("2人がほぼ同時に参加すると、1人だけがパートナーになる", async () => {
-    const { accountId } = await createUserWithAccount("o1");
-    const token = tokenOf((await createInvite(accountId)).url);
-    await ensureUser("p1");
-    await ensureUser("p2");
-    const [a, b] = await Promise.all([
-      call(app, "POST", `/api/invites/${token}/accept`, { user: "p1", body: {} }),
-      call(app, "POST", `/api/invites/${token}/accept`, { user: "p2", body: {} }),
+  it("すでにチームの人は INVITE_ALREADY_MEMBER。同じ人の同時の参加でも1回だけ入る", async () => {
+    const { teamId, token } = await team();
+    const { accountId } = await createUserWithAccount("u1");
+    const body = { accounts: [{ id: accountId, shared: false }] };
+    const results = await Promise.all([
+      call(app, "POST", `/api/invites/${token}/accept`, { user: "u1", body }),
+      call(app, "POST", `/api/invites/${token}/accept`, { user: "u1", body }),
     ]);
-    expect([a.status, b.status].sort()).toEqual([200, 404]);
-    const partners = (await sql()`SELECT count(*)::int AS n FROM account_partners WHERE account_id = ${accountId}`) as { n: number }[];
-    expect(partners[0]!.n).toBe(1);
+    expect(results.map((r) => r.status).sort()).toEqual([200, 409]);
+    const again = await call(app, "POST", `/api/invites/${token}/accept`, { user: "u1", body });
+    expect([again.status, (await errorOf(again)).code]).toEqual([409, "INVITE_ALREADY_MEMBER"]);
+    expect((await teamMemberRows(teamId)).filter((m) => m.user === "u1")).toHaveLength(1);
   });
 
-  it("チーム名は50文字まで", async () => {
-    const { accountId } = await createUserWithAccount("o1");
-    await ensureTeam("other");
-    const token = tokenOf((await createInvite(accountId)).url);
-    const res = await call(app, "POST", `/api/invites/${token}/accept`, { user: "p1", body: { teamName: "あ".repeat(51) } });
-    expect(res.status).toBe(400);
-  });
-});
-
-describe("編集者の招待（チームのリンク）", () => {
-  type TeamInvite = { url: string; rotatedAt: string };
-  const teamInvite = async (user = "p1") =>
-    json<TeamInvite>(await call(app, "GET", "/api/team/invite", { user }));
-
-  async function partnerWithTeam() {
-    const { accountId } = await createUserWithAccount("o1");
-    await makePartner(accountId, "p1");
-    return accountId;
-  }
-
-  it("最初に表示したときに作られ、同じリンクを返す。作り直すと前のリンクは使えない", async () => {
-    await partnerWithTeam();
-    const first = await teamInvite();
-    expect(first.url).toMatch(new RegExp(`^${testEnv.WEB_ORIGIN}/invite/e_[A-Za-z0-9_-]{43}$`));
-    expect((await teamInvite()).url).toBe(first.url);
-    const rotated = await json<TeamInvite>(await call(app, "POST", "/api/team/invite/rotate", { user: "p1" }));
-    expect(rotated.url).not.toBe(first.url);
-    const old = await call(app, "GET", `/api/invites/${tokenOf(first.url)}`);
-    expect([old.status, await codeOf(old)]).toEqual([404, "INVITE_INVALID"]);
-  });
-
-  it("同じリンクで何人でも参加でき、担当はつかない。参加済み・パートナー本人は参加できない", async () => {
-    await partnerWithTeam();
-    const token = tokenOf((await teamInvite()).url);
-    const preview = await json<{ kind: string; team: { name: string; editorsRemaining: number } }>(
-      await call(app, "GET", `/api/invites/${token}`),
-    );
-    expect(preview).toMatchObject({ kind: "editor", team: { name: "p1社", editorsRemaining: 10 } });
-    for (const user of ["e1", "e2"]) {
-      expect(await json(await call(app, "POST", `/api/invites/${token}/accept`, { user, body: {} }))).toEqual({
-        kind: "editor",
-        accountId: null,
-      });
+  it("50人で TEAM_FULL。作り直した前のリンク・削除したチームのリンクは INVITE_INVALID", async () => {
+    const { teamId, token } = await team();
+    for (let i = 0; i < 49; i++) {
+      const { accountId } = await createUserWithAccount(`m${i}`);
+      await joinTeam(teamId, `m${i}`, [accountId]);
     }
-    const helpers = (await sql()`SELECT count(*)::int AS n FROM memberships WHERE role = 'editor'`) as { n: number }[];
-    expect(helpers[0]!.n).toBe(0);
-    const again = await call(app, "POST", `/api/invites/${token}/accept`, { user: "e1", body: {} });
-    expect([again.status, await codeOf(again)]).toEqual([409, "INVITE_ALREADY_MEMBER"]);
-    const self = await call(app, "POST", `/api/invites/${token}/accept`, { user: "p1", body: {} });
-    expect([self.status, await codeOf(self)]).toEqual([409, "INVITE_SELF"]);
+    const { accountId } = await createUserWithAccount("u1");
+    const full = await call(app, "POST", `/api/invites/${token}/accept`, { user: "u1", body: { accounts: [{ id: accountId, shared: false }] } });
+    const err = await errorOf(full);
+    expect([full.status, err.code, err.details]).toEqual([409, "TEAM_FULL", ["members"]]);
+
+    const { teamId: t2, token: old } = await team();
+    await call(app, "POST", `/api/teams/${t2}/invite/rotate`, { user: "a1" });
+    const rotated = await call(app, "POST", `/api/invites/${old}/accept`, { user: "u1", body: { accounts: [{ id: accountId, shared: false }] } });
+    expect([rotated.status, (await errorOf(rotated)).code]).toEqual([404, "INVITE_INVALID"]);
+
+    const { teamId: t3, token: deleted } = await team();
+    expect((await call(app, "DELETE", `/api/teams/${t3}`, { user: "a1" })).status).toBe(204);
+    const gone = await call(app, "POST", `/api/invites/${deleted}/accept`, { user: "u1", body: { accounts: [{ id: accountId, shared: false }] } });
+    expect([gone.status, (await errorOf(gone)).code]).toEqual([404, "INVITE_INVALID"]);
   });
 
-  it("10人を超えて参加できない。上限ちょうどで2人が同時に参加しても超えない", async () => {
-    await partnerWithTeam();
-    const token = tokenOf((await teamInvite()).url);
-    for (let i = 1; i <= 9; i++) {
-      await json(await call(app, "POST", `/api/invites/${token}/accept`, { user: `e${i}`, body: {} }));
-    }
-    await ensureUser("e10");
-    await ensureUser("e11");
-    const [a, b] = await Promise.all([
-      call(app, "POST", `/api/invites/${token}/accept`, { user: "e10", body: {} }),
-      call(app, "POST", `/api/invites/${token}/accept`, { user: "e11", body: {} }),
-    ]);
-    expect([a.status, b.status].sort()).toEqual([200, 409]);
-    const n = (await sql()`SELECT count(*)::int AS n FROM team_editors`) as { n: number }[];
-    expect(n[0]!.n).toBe(10);
-    expect((await json<{ viewer: { status: string } }>(await call(app, "GET", `/api/invites/${token}`, { user: "e12" }))).viewer.status).toBe(
-      "limit_reached",
-    );
-  });
-});
-
-describe("招待の安全性（PR #9 のCodexレビュー）", () => {
-  it("参加とリンクの作り直しが同時でも、500にならない（同じ順番で鍵をかける）", async () => {
-    for (let round = 0; round < 3; round++) {
-      await resetDb();
-      const { accountId } = await createUserWithAccount("o1");
-      const token = tokenOf((await createInvite(accountId)).url);
-      await ensureUser("p1");
-      const [accept, rotate] = await Promise.all([
-        call(app, "POST", `/api/invites/${token}/accept`, { user: "p1", body: {} }),
-        call(app, "POST", `/api/accounts/${accountId}/partner-invite/rotate`, { user: "o1" }),
-      ]);
-      expect([200, 404]).toContain(accept.status);
-      expect([200, 409]).toContain(rotate.status);
-    }
-  });
-
-  it("取り消しと、参加・作り直しが同時でも、500にならない（同じ順番で鍵をかける。PR #9 のCodexレビュー）", async () => {
-    for (let round = 0; round < 3; round++) {
-      await resetDb();
-      const { accountId } = await createUserWithAccount("o1");
-      const token = tokenOf((await createInvite(accountId)).url);
-      await ensureUser("p1");
-      const [cancel, accept, rotate] = await Promise.all([
-        call(app, "DELETE", `/api/accounts/${accountId}/partner-invite`, { user: "o1" }),
-        call(app, "POST", `/api/invites/${token}/accept`, { user: "p1", body: {} }),
-        call(app, "POST", `/api/accounts/${accountId}/partner-invite/rotate`, { user: "o1" }),
-      ]);
-      expect(cancel.status).toBe(204);
-      expect([200, 404]).toContain(accept.status);
-      expect([200, 409]).toContain(rotate.status);
-    }
-  });
-
-  it("WEB_ORIGIN の末尾が「/」でも、招待のURLに二重スラッシュを入れない", async () => {
-    const { accountId } = await createUserWithAccount("o1");
-    const res = await app.request(
-      `/api/accounts/${accountId}/partner-invite`,
-      { method: "POST", headers: { Authorization: "Bearer test:o1" } },
-      { ...testEnv, WEB_ORIGIN: `${testEnv.WEB_ORIGIN}/` },
-    );
-    const { invite } = (await res.json()) as { invite: { url: string } };
-    expect(invite.url).toMatch(new RegExp(`^${testEnv.WEB_ORIGIN}/invite/p_`));
-  });
-
-  it("PATCH をCORSで許す（チーム名・任せる範囲）", async () => {
-    const res = await app.request(
-      "/api/team",
-      { method: "OPTIONS", headers: { Origin: testEnv.WEB_ORIGIN, "Access-Control-Request-Method": "PATCH" } },
-      testEnv,
-    );
-    expect(res.headers.get("Access-Control-Allow-Methods")).toContain("PATCH");
+  it("ログインしていなければ 401", async () => {
+    const { token } = await team();
+    expect((await call(app, "POST", `/api/invites/${token}/accept`, { body: { accounts: [] } })).status).toBe(401);
   });
 });

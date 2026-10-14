@@ -21,8 +21,7 @@ const meResponse: MeResponse = {
   landingAccountId: "a1",
   accountLimit: { max: 5, used: 2 },
   threadsAccessMode: "testers",
-  partnerTeam: null,
-  editorWaiting: null,
+  teams: [],
 };
 const getDraftCounts = vi.fn();
 vi.mock("@/lib/api-client", async (orig) => {

@@ -45,8 +45,8 @@ export function useAccountOpen(
         if (!controller.signal.aborted) onResultRef.current(account);
       } catch (err) {
         if (controller.signal.aborted) return;
-        // 認証切れ・存在しないAccountは再試行しない（画面側で扱う）
-        if (err instanceof ApiError && (err.status === 401 || err.status === 404)) return;
+        // 認証切れ・権限がない・存在しないAccountは再試行しない（画面側で扱う。権限は specs/011 の見せてもらっている人）
+        if (err instanceof ApiError && (err.status === 401 || err.status === 403 || err.status === 404)) return;
         const delay = OPEN_RETRY_DELAYS_MS[attempt];
         attempt += 1;
         if (delay !== undefined) {

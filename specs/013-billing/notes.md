@@ -1,10 +1,10 @@
-# 011 決済：仕様づくりの前のメモ
+# 013 決済：仕様づくりの前のメモ
 
 **作成日**：2026-10-10
 
-**位置づけ**：`/speckit-specify` の前に、決めたこと・検討することを残すメモ。仕様（spec.md）を作るときの入力にする。011の仕様ができたら、このメモの内容をspec.md・plan.mdに移す。
+**位置づけ**：`/speckit-specify` の前に、決めたこと・検討することを残すメモ。仕様（spec.md）を作るときの入力にする。013の仕様ができたら、このメモの内容をspec.md・plan.mdに移す。
 
-**Source**：[PRD §4.6 FR-12「契約・支払い」](../../_bmad-output/initiative-threads-grower-app/prd-threads-grower-app/prd-threads-grower-app.md)、[008 research.md R15「009（決済）への申し送り」](../008-team-operations/research.md)（番号の変更で、決済は011になった）、[008 contracts/permissions.md](../008-team-operations/contracts/permissions.md)、[docs/external-services-setup.md「9. 本番公開時の追加作業」](../../docs/external-services-setup.md)
+**Source**：[PRD §4.6 FR-12「契約・支払い」](../../_bmad-output/initiative-threads-grower-app/prd-threads-grower-app/prd-threads-grower-app.md)、[008 research.md R15「013（決済）への申し送り」](../008-team-operations/research.md)（番号の変更で、決済は013になった）、[008 contracts/permissions.md](../008-team-operations/contracts/permissions.md)、[docs/external-services-setup.md「9. 本番公開時の追加作業」](../../docs/external-services-setup.md)
 
 ## 1. 公開後のブランチと環境（2026-10-10 ユーザーの方針）
 
@@ -43,7 +43,7 @@
 - オーナーが未払いのとき、パートナー・編集者も読むだけにする（`authorizeAccount` と `listTeamAccounts` の1か所に足す。008 FR-080・R15）
 - 旧プランの `PLANS`・`accounts.plan`・`limitForOwnedPlans`・`hasGrowerAccess` を外す
 
-## 3. 番号の変更（2026-10-10）
+## 3. 番号の変更（2026-10-10、2026-10-13）
 
-- 009 = このアカウントのチーム（実装済み）、010 = 自分のMetaアプリのトークンでアカウントを追加、011 = 決済。
-- Constitution（「決済（feature 009）」）、008 spec FR-080、research.md R15、contracts/permissions.md、PRD §6.1 に残っていた「009（決済）」の記述は、010で「011（決済）」に直した（010 FR-060。Constitution 3.0.1）。
+- 009 = このアカウントのチーム、010 = 自分のMetaアプリのトークンでアカウントを追加（どちらも実装済み）。2026-10-13 に、011 = チームの見直し、012 = アカウントを先に作る、013 = 決済に付け直した（`specs/011-billing/`を`specs/013-billing/`に移した）。
+- Constitution（「決済（feature 009）」）、008 spec FR-080、research.md R15、contracts/permissions.md、PRD §6.1 に残っていた「009（決済）」の記述は、010で「011（決済）」に直し（010 FR-060。Constitution 3.0.1）、2026-10-13 に008の文書・PRDを「013（決済）」に直した。Constitution は011（チームの見直し）の改定で、決済を番号でなく「最後の feature」と書く。

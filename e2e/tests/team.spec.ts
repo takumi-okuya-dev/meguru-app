@@ -1,15 +1,26 @@
-// チーム運用（specs/008-team-operations quickstart.md 手順3〜6・8）を、オーナー・パートナー・編集者の3人のブラウザで流す。
+// チーム（specs/011-team-revision quickstart.md 2、SC-007）を、管理者・オーナー（メンバー）・編集者の3人のブラウザで流す。
 // それぞれ別の BrowserContext（Cookieが別）でログインするので、3つのウィンドウを手で用意しなくてよい。
-// 役割の全体像は docs/team-roles.md。
+// 管理者がチームを作る → 2人が自分のアカウントを入れて参加 → 1人を編集者にして担当 → オーナーが見せる → 管理者が読む
+// → 編集者が案を登録・承認できない → 管理者が引き継いで抜ける。ロールの全体像は docs/team-roles.md。
 import { expect, test, type Browser, type BrowserContext, type Page } from "@playwright/test";
 import { resetAll, signInAs, type TeamRole } from "./helpers";
-import { assignFirstEditor, connectThreads, createEditorInvite, createPartnerInvite, joinByLink } from "./team-flow";
+import {
+  FAKE_ACCOUNTS,
+  assignEditor,
+  connectThreads,
+  createTeam,
+  joinByLink,
+  makeEditor,
+  readTeamInvite,
+  shareAccount,
+} from "./team-flow";
 
 test.describe.configure({ mode: "serial" });
 
 const contexts: BrowserContext[] = [];
 const pages = {} as Record<TeamRole, Page>;
-let accountId = "";
+const accounts = {} as Record<TeamRole, string>;
+let teamId = "";
 
 /**
  * 役割ごとに新しいブラウザ（Cookieが別）を開いてログインする。
@@ -27,101 +38,100 @@ async function openAs(browser: Browser, role: TeamRole): Promise<Page> {
 
 test.beforeAll(async ({ browser }) => {
   await resetAll();
-  for (const role of ["owner", "partner", "editor"] as const) pages[role] = await openAs(browser, role);
+  for (const role of ["admin", "owner", "editor"] as const) {
+    pages[role] = await openAs(browser, role);
+    accounts[role] = await connectThreads(pages[role], FAKE_ACCOUNTS[role].id);
+  }
 });
 
 test.afterAll(async () => {
   for (const context of contexts) await context.close();
 });
 
-test("オーナーがパートナーを招き、パートナーがチーム名を入れて参加する（US1）", async () => {
-  const { owner, partner } = pages;
-  accountId = await connectThreads(owner);
-  const link = await createPartnerInvite(owner, accountId);
-  expect(link).toMatch(/\/invite\/p_/);
-  await expect(owner.getByText("パートナーを招待中（参加待ち）")).toBeVisible();
+test("管理者がチームを作り、2人が招待リンクから自分のアカウントを入れて参加する（US1）", async () => {
+  const { admin, owner, editor } = pages;
+  teamId = await createTeam(admin, accounts.admin, "飲食チーム");
+  const link = await readTeamInvite(admin, teamId);
+  expect(link).toMatch(/\/invite\/t_/);
 
-  await joinByLink(partner, link, "A社");
-  await expect(partner).toHaveURL(new RegExp(`/accounts/${accountId}$`));
-  await expect(partner.getByText("パートナーとして手伝っています").first()).toBeVisible();
-});
+  await joinByLink(owner, link, FAKE_ACCOUNTS.owner.name);
+  await joinByLink(editor, link, FAKE_ACCOUNTS.editor.name);
 
-test("パートナーは投稿の案を登録できるが、任されるまで承認できない（FR-041）", async () => {
-  const { partner } = pages;
-  await partner.goto(`/accounts/${accountId}/stock`);
-  await partner.getByPlaceholder("AIの返信をここに貼り付け…").fill("一つ目の案です\n@@@\n二つ目の案です");
-  await partner.getByRole("button", { name: "投稿ストックに登録する" }).click();
-  await expect(partner.getByText("オーナーの確認待ち")).toHaveCount(2);
-  await expect(partner.getByRole("button", { name: /を承認$/ })).toHaveCount(0);
-});
-
-test("パートナーが編集者を招いて担当を決めると、編集者がアカウントを開ける（US2）", async () => {
-  const { partner, editor } = pages;
-  const link = await createEditorInvite(partner);
-  expect(link).toMatch(/\/invite\/e_/);
-
-  await joinByLink(editor, link);
-  await expect(editor.getByRole("heading", { name: /担当を決めるのを待っています/ })).toBeVisible();
-
-  await assignFirstEditor(partner);
-  await expect(partner.getByRole("checkbox", { name: /の担当にする$/ })).toHaveAttribute("aria-checked", "true");
-
-  await editor.getByRole("button", { name: "読み込み直す" }).click();
-  await expect(editor).toHaveURL(new RegExp(`/accounts/${accountId}$`));
-  await expect(editor.getByText("編集者として担当しています").first()).toBeVisible();
-});
-
-test("3人とも「このアカウントのチーム」でオーナー → パートナー → 編集者が見え、自分に「あなた」が付く（FR-042）", async () => {
-  const tiers = { owner: "オーナー", partner: "パートナー", editor: "編集者" } as const;
-  for (const role of ["owner", "partner", "editor"] as const) {
-    const page = pages[role];
-    await page.goto(`/accounts/${accountId}/settings`);
-    const roster = page.getByRole("list", { name: "このアカウントのチーム" });
-    await expect(roster).toBeVisible();
-    for (const [key, name] of Object.entries(tiers)) {
-      const tier = roster.getByRole("listitem", { name, exact: true });
-      await expect(tier).toBeVisible();
-      await expect(tier.getByText("あなた")).toHaveCount(key === role ? 1 : 0);
-    }
-    await expect(roster.getByRole("listitem", { name: "パートナー", exact: true })).toContainText("A社");
+  // 3人とも、サイドバーの「チーム」の見出しの下に「飲食チーム」が出る（US4）
+  for (const page of [admin, owner, editor]) {
+    await page.goto(`/teams/${teamId}`);
+    const nav = page.getByRole("navigation", { name: "このアカウント" });
+    await expect(nav.getByRole("link", { name: /飲食チーム/ })).toHaveAttribute("aria-current", "page");
+    await expect(page.getByRole("list", { name: "メンバーの一覧" }).getByRole("listitem")).toHaveCount(3);
   }
+  // 参加の知らせは管理者だけ
+  await admin.goto(`/teams/${teamId}`);
+  await expect(admin.getByText(/さんが参加しました$/)).toHaveCount(2);
 });
 
-test("オーナーが承認を任せると、パートナーが承認でき、操作の記録に残る（US3・US4）", async () => {
-  const { owner, partner, editor } = pages;
-  await owner.goto(`/accounts/${accountId}/settings`);
-  const review = owner.getByRole("switch", { name: "投稿の承認・却下をパートナーに任せる" });
-  await review.click();
-  await expect(review).toBeChecked();
+test("管理者が1人を編集者にして担当を決める。メンバーには表とロールの切り替えが出ない（US2）", async () => {
+  const { admin, owner } = pages;
+  await makeEditor(admin, teamId, FAKE_ACCOUNTS.editor.name);
+  await assignEditor(admin, teamId, FAKE_ACCOUNTS.owner.name);
 
-  await partner.goto(`/accounts/${accountId}/stock`);
-  await partner.getByRole("button", { name: /を承認$/ }).first().click();
-  await expect(partner.getByRole("button", { name: /を承認$/ })).toHaveCount(1);
+  await owner.goto(`/teams/${teamId}`);
+  await expect(owner.getByText(/あなたのロール：メンバー/)).toBeVisible();
+  await expect(owner.getByRole("link", { name: "担当を決める" })).toHaveCount(0);
+  await expect(owner.getByRole("group", { name: /のロール$/ })).toHaveCount(0);
+});
 
-  // 編集者には承認の操作が出ない
-  await editor.goto(`/accounts/${accountId}/stock`);
-  await expect(editor.getByText("オーナーの確認待ち")).toHaveCount(1);
+test("オーナーが見せると、管理者が投稿ストックと戦略を読むだけで開ける（US3）", async () => {
+  const { admin, owner } = pages;
+  // 見せる前は、管理者には点線の「見せていません」
+  await admin.goto(`/teams/${teamId}`);
+  await expect(admin.getByText(`${FAKE_ACCOUNTS.owner.name} · 見せていません`)).toBeVisible();
+
+  await shareAccount(owner, teamId, FAKE_ACCOUNTS.owner.name);
+
+  await admin.goto(`/teams/${teamId}`);
+  await admin.getByRole("link", { name: new RegExp(`${FAKE_ACCOUNTS.owner.name}を見る$`) }).click();
+  await expect(admin).toHaveURL(new RegExp(`/teams/${teamId}/accounts/${accounts.owner}$`));
+  await expect(admin.getByRole("status").filter({ hasText: "読むだけ" })).toBeVisible();
+  await expect(admin.getByRole("button", { name: /を承認$/ })).toHaveCount(0);
+  await admin.getByRole("button", { name: "戦略" }).click();
+  await expect(admin.getByRole("heading", { name: "課題" })).toBeVisible();
+  // 設定・パフォーマンスはAPIでも拒まれ、Accountの画面には入れない（読むだけの画面へ戻される）
+  await admin.goto(`/accounts/${accounts.owner}/settings`);
+  await expect(admin).toHaveURL(new RegExp(`/teams/${teamId}/accounts/${accounts.owner}$`));
+});
+
+test("編集者は担当のアカウントで案を登録でき、承認のボタンは出ない（オーナーの確認待ち）", async () => {
+  const { editor, owner } = pages;
+  await editor.goto(`/accounts/${accounts.owner}`);
+  await expect(editor.getByText(`${FAKE_ACCOUNTS.owner.name}の担当になりました。投稿の案を作れます。`)).toBeVisible();
+  await expect(editor.getByText("担当しています").first()).toBeVisible();
+  await editor.goto(`/accounts/${accounts.owner}/stock`);
+  await editor.getByPlaceholder("AIの返信をここに貼り付け…").fill("一つ目の案です\n@@@\n二つ目の案です");
+  await editor.getByRole("button", { name: "投稿ストックに登録する" }).click();
+  await expect(editor.getByText("オーナーの確認待ち")).toHaveCount(2);
   await expect(editor.getByRole("button", { name: /を承認$/ })).toHaveCount(0);
 
-  await owner.goto(`/accounts/${accountId}/activity`);
-  for (const text of [/パートナーとして参加しました/, /投稿の案を2件登録しました/, /の担当にしました/, /パートナーに任せる範囲を変えました/, /1件を承認しました/]) {
-    await expect(owner.getByText(text).first()).toBeVisible();
-  }
+  // 承認はオーナーだけ
+  await owner.goto(`/accounts/${accounts.owner}/stock`);
+  await expect(owner.getByRole("button", { name: /を承認$/ })).toHaveCount(2);
 });
 
-test("オーナーがパートナーを外すと、パートナーと編集者は開けなくなり、記録は残る（手順8）", async () => {
-  const { owner, partner, editor } = pages;
-  await owner.goto(`/accounts/${accountId}/settings`);
-  await owner.getByRole("button", { name: "外す" }).click();
-  await owner.getByRole("alertdialog").getByRole("button", { name: "外す" }).click();
-  await expect(owner.getByRole("button", { name: "招待リンクを作る" })).toBeVisible();
+test("管理者は引き継ぎ先を選ぶまで抜けられない。オーナーへ引き継いで抜けると、オーナーが管理者になる（US5）", async () => {
+  const { admin, owner } = pages;
+  await admin.goto(`/teams/${teamId}`);
+  await admin.getByRole("button", { name: "チームを抜ける" }).click();
+  const dialog = admin.getByRole("dialog", { name: "飲食チームを抜けますか？" });
+  const go = dialog.getByRole("button", { name: "引き継いで抜ける" });
+  await expect(go).toBeDisabled();
+  await dialog.locator("label").filter({ hasText: "メンバー" }).getByRole("radio").check();
+  await go.click();
+  await admin.waitForURL((url) => !url.pathname.startsWith(`/teams/${teamId}`));
 
-  for (const page of [partner, editor]) {
-    await page.goto(`/accounts/${accountId}/stock`);
-    await expect(page).not.toHaveURL(new RegExp(`/accounts/${accountId}`));
-  }
+  await owner.goto(`/teams/${teamId}`);
+  await expect(owner.getByRole("button", { name: "メンバーを招待" })).toBeVisible();
+  await expect(owner.getByRole("list", { name: "メンバーの一覧" }).getByRole("listitem")).toHaveCount(2);
 
-  await owner.goto(`/accounts/${accountId}/activity`);
-  await expect(owner.getByText(/パートナーを外しました/).first()).toBeVisible();
-  await expect(owner.getByText(/1件を承認しました/).first()).toBeVisible();
+  // 抜けた管理者には、チームが出なくなる
+  await admin.goto(`/accounts/${accounts.admin}`);
+  await expect(admin.getByRole("navigation", { name: "このアカウント" }).getByRole("link", { name: /飲食チーム/ })).toHaveCount(0);
 });

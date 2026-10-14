@@ -1,8 +1,8 @@
-// 判定の本体（specs/008-team-operations contracts/permissions.md、research.md R2）。
+// 判定の本体（specs/011-team-revision contracts/permissions.md、research.md R3・R4）。
 import { beforeEach, describe, expect, it } from "vitest";
-import { authorizeAccount, authorizeAssignment, authorizeTeam, listTeamAccounts } from "../../src/services/access";
+import { authorizeAccount, authorizeAssignment, authorizeTeamAdmin, authorizeTeamMember } from "../../src/services/access";
 import { createUserWithAccount, db, resetDb } from "../helpers/app";
-import { ensureTeam, ensureUser, makeEditor, makePartner } from "../helpers/team";
+import { assign, ensureUser, joinTeam, makeTeam, setRole, setShared } from "../helpers/team";
 
 async function codeOf(p: Promise<unknown>) {
   try {
@@ -17,87 +17,151 @@ beforeEach(async () => {
   await resetDb();
 });
 
-describe("authorizeAccount", () => {
-  it("オーナーはすべての権限。チームがなければ hasTeam は false", async () => {
+describe("authorizeAccount（4つの関わり）", () => {
+  it("オーナーはすべての権限。チームに入っていなければ hasTeam は false、team は NULL", async () => {
     const { userId, accountId } = await createUserWithAccount("o1");
     const access = await authorizeAccount(db(), { id: userId }, accountId, "owner");
-    expect(access.role).toBe("owner");
+    expect(access.relation).toBe("owner");
     expect(access.hasTeam).toBe(false);
-    expect(access.delegation).toBeNull();
-    expect(access.owner).toMatchObject({ id: userId, name: "o1" });
-  });
-
-  it("パートナーは任せる範囲に従い、足りなければ ROLE_FORBIDDEN。チームの情報も返す", async () => {
-    const { accountId } = await createUserWithAccount("o1");
-    const { partnerUserId } = await makePartner(accountId, "p1", { review: true });
-    const access = await authorizeAccount(db(), { id: partnerUserId }, accountId, "review");
-    expect(access.role).toBe("partner");
-    expect(access.hasTeam).toBe(true);
-    expect(access.delegation).toEqual({ review: true, settings: false });
-    expect(access.team).toMatchObject({ name: "p1社", partnerName: "p1" });
-    expect(await codeOf(authorizeAccount(db(), { id: partnerUserId }, accountId, "settings"))).toBe("ROLE_FORBIDDEN");
-    expect(await codeOf(authorizeAccount(db(), { id: partnerUserId }, accountId, "owner"))).toBe("ROLE_FORBIDDEN");
-  });
-
-  it("担当の編集者は content まで。担当でない・関係のない人・UUIDでないIDは ACCOUNT_NOT_FOUND", async () => {
-    const { accountId } = await createUserWithAccount("o1");
-    const { teamId } = await makePartner(accountId, "p1");
-    const editor = await makeEditor(teamId, "e1", [accountId]);
-    const idle = await makeEditor(teamId, "e2", []);
-    const stranger = await ensureUser("x1");
-    expect((await authorizeAccount(db(), { id: editor }, accountId, "content")).role).toBe("editor");
-    expect(await codeOf(authorizeAccount(db(), { id: editor }, accountId, "review"))).toBe("ROLE_FORBIDDEN");
-    expect(await codeOf(authorizeAccount(db(), { id: editor }, accountId, "activity"))).toBe("ROLE_FORBIDDEN");
-    expect(await codeOf(authorizeAccount(db(), { id: idle }, accountId, "view"))).toBe("ACCOUNT_NOT_FOUND");
-    expect(await codeOf(authorizeAccount(db(), { id: stranger }, accountId, "view"))).toBe("ACCOUNT_NOT_FOUND");
-    expect(await codeOf(authorizeAccount(db(), { id: stranger }, "not-a-uuid", "view"))).toBe("ACCOUNT_NOT_FOUND");
-  });
-
-  it("パートナー自身のAccountに自社の編集者がいれば、パートナーがいなくても hasTeam は true", async () => {
-    const { userId: p, accountId: own } = await createUserWithAccount("p1");
-    const { teamId } = await ensureTeam("p1");
-    await makeEditor(teamId, "e1", [own]);
-    const access = await authorizeAccount(db(), { id: p }, own, "owner");
-    expect(access.role).toBe("owner");
-    expect(access.hasTeam).toBe(true);
     expect(access.team).toBeNull();
+    expect(access.isTeamAdmin).toBe(false);
+    expect(access.owner).toMatchObject({ id: userId, name: "o1" });
+    expect(access.actor).toMatchObject({ id: userId, role: "owner" });
+  });
+
+  it("チームに入っているオーナー：hasTeam は true、team にチームと自分のロール", async () => {
+    const { userId, accountId } = await createUserWithAccount("a1");
+    const { teamId } = await makeTeam("a1", [accountId], { name: "飲食チーム" });
+    const access = await authorizeAccount(db(), { id: userId }, accountId, "owner");
+    expect(access.relation).toBe("owner");
+    expect(access.hasTeam).toBe(true);
+    expect(access.team).toEqual({ id: teamId, name: "飲食チーム", myRole: "admin" });
+    expect(access.isTeamAdmin).toBe(true);
+  });
+
+  it("担当の人（編集者）は content まで。承認・設定・操作の記録は ROLE_FORBIDDEN", async () => {
+    const { accountId: adminAcc } = await createUserWithAccount("a1");
+    const { accountId } = await createUserWithAccount("o1");
+    const { accountId: editorAcc } = await createUserWithAccount("e1");
+    const { teamId } = await makeTeam("a1", [adminAcc]);
+    await joinTeam(teamId, "o1", [accountId]);
+    const editor = await joinTeam(teamId, "e1", [editorAcc]);
+    await setRole(teamId, "e1", "editor");
+    await assign(teamId, "e1", accountId);
+    const access = await authorizeAccount(db(), { id: editor }, accountId, "content");
+    expect(access.relation).toBe("assigned");
+    expect(access.actor.role).toBe("editor");
+    expect(access.team?.myRole).toBe("editor");
+    for (const p of ["review", "settings", "activity", "owner"] as const) {
+      expect(await codeOf(authorizeAccount(db(), { id: editor }, accountId, p)), p).toBe("ROLE_FORBIDDEN");
+    }
+  });
+
+  it("自分を担当にした管理者は、content と操作の記録まで。記録の役割は admin", async () => {
+    const { userId: admin, accountId: adminAcc } = await createUserWithAccount("a1");
+    const { accountId } = await createUserWithAccount("o1");
+    const { teamId } = await makeTeam("a1", [adminAcc]);
+    await joinTeam(teamId, "o1", [accountId]);
+    await assign(teamId, "a1", accountId);
+    const access = await authorizeAccount(db(), { id: admin }, accountId, "activity");
+    expect(access.relation).toBe("assigned");
+    expect(access.isTeamAdmin).toBe(true);
+    expect(access.actor.role).toBe("admin");
+    expect(await codeOf(authorizeAccount(db(), { id: admin }, accountId, "review"))).toBe("ROLE_FORBIDDEN");
+  });
+
+  it("見せているアカウント：同じチームの人（管理者を含む）は read だけ。見せていなければ ACCOUNT_NOT_FOUND", async () => {
+    const { userId: admin, accountId: adminAcc } = await createUserWithAccount("a1");
+    const { accountId } = await createUserWithAccount("o1");
+    const { accountId: memberAcc } = await createUserWithAccount("m1");
+    const { teamId } = await makeTeam("a1", [adminAcc]);
+    await joinTeam(teamId, "o1", [accountId], { shared: true });
+    const member = await joinTeam(teamId, "m1", [memberAcc]);
+    for (const id of [admin, member]) {
+      const access = await authorizeAccount(db(), { id }, accountId, "read");
+      expect(access.relation).toBe("shared_viewer");
+      expect(await codeOf(authorizeAccount(db(), { id }, accountId, "view"))).toBe("ROLE_FORBIDDEN");
+    }
+    await setShared(teamId, accountId, false);
+    for (const id of [admin, member]) {
+      expect(await codeOf(authorizeAccount(db(), { id }, accountId, "read"))).toBe("ACCOUNT_NOT_FOUND");
+    }
+  });
+
+  it("担当は、見せていなくても開ける。別のチームの人・関係のない人・UUIDでないIDは ACCOUNT_NOT_FOUND", async () => {
+    const { accountId: adminAcc } = await createUserWithAccount("a1");
+    const { accountId } = await createUserWithAccount("o1");
+    const { accountId: editorAcc } = await createUserWithAccount("e1");
+    const { accountId: otherAcc } = await createUserWithAccount("x1");
+    const { teamId } = await makeTeam("a1", [adminAcc]);
+    await joinTeam(teamId, "o1", [accountId], { shared: false });
+    const editor = await joinTeam(teamId, "e1", [editorAcc]);
+    await setRole(teamId, "e1", "editor");
+    await assign(teamId, "e1", accountId);
+    expect((await authorizeAccount(db(), { id: editor }, accountId, "read")).relation).toBe("assigned");
+    // 別のチームの人（見せていても見えない）
+    const { teamId: other } = await makeTeam("x1", [otherAcc]);
+    await setShared(teamId, accountId, true);
+    const outsider = await ensureUser("x1");
+    expect(await codeOf(authorizeAccount(db(), { id: outsider }, accountId, "read"))).toBe("ACCOUNT_NOT_FOUND");
+    expect(other).not.toBe(teamId);
+    const stranger = await ensureUser("s1");
+    expect(await codeOf(authorizeAccount(db(), { id: stranger }, accountId, "read"))).toBe("ACCOUNT_NOT_FOUND");
+    expect(await codeOf(authorizeAccount(db(), { id: stranger }, "not-a-uuid", "read"))).toBe("ACCOUNT_NOT_FOUND");
+  });
+
+  it("担当の行が残っていても、そのアカウントがチームから外れていれば開けない", async () => {
+    const { accountId: adminAcc } = await createUserWithAccount("a1");
+    const { accountId } = await createUserWithAccount("o1");
+    const { accountId: editorAcc } = await createUserWithAccount("e1");
+    const { teamId } = await makeTeam("a1", [adminAcc]);
+    const editor = await joinTeam(teamId, "e1", [editorAcc]);
+    await setRole(teamId, "e1", "editor");
+    // o1 のアカウントはチームに入っていない（壊れたデータの想定）
+    await ensureUser("o1");
+    await assign(teamId, "e1", accountId);
+    expect(await codeOf(authorizeAccount(db(), { id: editor }, accountId, "read"))).toBe("ACCOUNT_NOT_FOUND");
   });
 });
 
-describe("チームの判定", () => {
-  it("authorizeTeam：チームのパートナーだけ。ほかは TEAM_NOT_FOUND", async () => {
-    const { teamId, partnerUserId } = await ensureTeam("p1");
-    expect((await authorizeTeam(db(), { id: partnerUserId })).team.id).toBe(teamId);
-    const editor = await makeEditor(teamId, "e1");
-    expect(await codeOf(authorizeTeam(db(), { id: editor }))).toBe("TEAM_NOT_FOUND");
+describe("チームの判定（research.md R4）", () => {
+  it("authorizeTeamMember：チームの人だけ。ほか・形の違うIDは TEAM_NOT_FOUND", async () => {
+    const { accountId } = await createUserWithAccount("a1");
+    const { accountId: memberAcc } = await createUserWithAccount("m1");
+    const { teamId, adminUserId } = await makeTeam("a1", [accountId]);
+    const member = await joinTeam(teamId, "m1", [memberAcc]);
+    expect((await authorizeTeamMember(db(), { id: adminUserId }, teamId)).member.role).toBe("admin");
+    expect((await authorizeTeamMember(db(), { id: member }, teamId)).member).toMatchObject({ id: member, role: "member", name: "m1" });
+    const stranger = await ensureUser("s1");
+    expect(await codeOf(authorizeTeamMember(db(), { id: stranger }, teamId))).toBe("TEAM_NOT_FOUND");
+    expect(await codeOf(authorizeTeamMember(db(), { id: member }, "x"))).toBe("TEAM_NOT_FOUND");
   });
 
-  it("listTeamAccounts：手伝う先と自社。ほかのチームが手伝う先は含めない", async () => {
-    const { accountId: helped } = await createUserWithAccount("o1");
-    const { accountId: other } = await createUserWithAccount("o2");
-    const { partnerUserId } = await makePartner(helped, "p1", { settings: true });
-    await makePartner(other, "p2");
-    const { accountId: own } = await createUserWithAccount("p1");
-    const team = await authorizeTeam(db(), { id: partnerUserId });
-    const list = await listTeamAccounts(db(), team);
-    expect(list.map((a) => [a.account.id, a.own])).toEqual([
-      [own, true],
-      [helped, false],
-    ]);
-    expect(list[1]!.owner.name).toBe("o1");
-    expect(list[1]!.delegation).toEqual({ review: false, settings: true });
-    expect(list[0]!.delegation).toBeNull();
+  it("authorizeTeamAdmin：管理者だけ。チームの人は ROLE_FORBIDDEN、ほかは TEAM_NOT_FOUND", async () => {
+    const { accountId } = await createUserWithAccount("a1");
+    const { accountId: memberAcc } = await createUserWithAccount("m1");
+    const { teamId, adminUserId } = await makeTeam("a1", [accountId]);
+    const member = await joinTeam(teamId, "m1", [memberAcc]);
+    expect((await authorizeTeamAdmin(db(), { id: adminUserId }, teamId)).team.id).toBe(teamId);
+    expect(await codeOf(authorizeTeamAdmin(db(), { id: member }, teamId))).toBe("ROLE_FORBIDDEN");
+    expect(await codeOf(authorizeTeamAdmin(db(), { id: await ensureUser("s1") }, teamId))).toBe("TEAM_NOT_FOUND");
   });
 
-  it("authorizeAssignment：チームの編集者×関われるAccountだけ", async () => {
-    const { accountId: helped } = await createUserWithAccount("o1");
-    const { accountId: other } = await createUserWithAccount("o2");
-    const { teamId, partnerUserId } = await makePartner(helped, "p1");
-    const editor = await makeEditor(teamId, "e1");
-    const outsider = await ensureUser("x1");
-    const team = await authorizeTeam(db(), { id: partnerUserId });
-    expect((await authorizeAssignment(db(), team, editor, helped)).account.id).toBe(helped);
-    expect(await codeOf(authorizeAssignment(db(), team, editor, other))).toBe("ASSIGNMENT_NOT_ALLOWED");
-    expect(await codeOf(authorizeAssignment(db(), team, outsider, helped))).toBe("TEAM_NOT_FOUND");
+  it("authorizeAssignment：チームのアカウント×編集者・管理者だけ。自分のアカウント・メンバーは ASSIGNMENT_NOT_ALLOWED", async () => {
+    const { userId: admin, accountId: adminAcc } = await createUserWithAccount("a1");
+    const { accountId } = await createUserWithAccount("o1");
+    const { accountId: editorAcc } = await createUserWithAccount("e1");
+    const { accountId: outside } = await createUserWithAccount("x1");
+    const { teamId } = await makeTeam("a1", [adminAcc]);
+    const owner = await joinTeam(teamId, "o1", [accountId]);
+    const editor = await joinTeam(teamId, "e1", [editorAcc]);
+    await setRole(teamId, "e1", "editor");
+    const team = await authorizeTeamAdmin(db(), { id: admin }, teamId);
+    expect((await authorizeAssignment(db(), team, editor, accountId)).account.id).toBe(accountId);
+    expect((await authorizeAssignment(db(), team, admin, accountId)).person.role).toBe("admin");
+    expect(await codeOf(authorizeAssignment(db(), team, editor, editorAcc))).toBe("ASSIGNMENT_NOT_ALLOWED");
+    expect(await codeOf(authorizeAssignment(db(), team, owner, adminAcc))).toBe("ASSIGNMENT_NOT_ALLOWED");
+    expect(await codeOf(authorizeAssignment(db(), team, editor, outside))).toBe("TEAM_NOT_FOUND");
+    expect(await codeOf(authorizeAssignment(db(), team, await ensureUser("s1"), accountId))).toBe("TEAM_NOT_FOUND");
   });
 });

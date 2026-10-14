@@ -5,7 +5,7 @@ import userEvent from "@testing-library/user-event";
 import type { AccountAccessResponse, AccountSummary, ActivityList } from "@threads-grower/shared";
 import { createMemoryRouter, Outlet, RouterProvider } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { EDITOR_ACCESS } from "./helpers/access";
+import { ADMIN_ACCESS, EDITOR_ACCESS } from "./helpers/access";
 
 const listActivity = vi.fn();
 let access: AccountAccessResponse;
@@ -15,14 +15,6 @@ vi.mock("@/lib/api-client", async (orig) => {
 });
 const { ActivityPage, actionText } = await import("@/pages/activity");
 
-const PARTNER_ACCESS: AccountAccessResponse = {
-  role: "partner",
-  permissions: ["view", "content", "activity"],
-  owner: { name: "鈴木 花子" },
-  hasTeam: true,
-  team: { name: "A社", partnerName: "田中 健" },
-  delegation: { review: false, settings: false },
-};
 const account: AccountSummary = {
   id: "a1",
   username: "cafe_b",
@@ -31,7 +23,7 @@ const account: AccountSummary = {
   plan: "auto-only",
   connectionStatus: "connected",
   lastUsedAt: null,
-  role: "partner",
+  role: "editor",
   ownerName: "鈴木 花子",
 };
 
@@ -50,7 +42,7 @@ const page1: ActivityList = {
     {
       id: "2",
       at: "2026-10-08T12:12:00.000Z",
-      actor: { userId: "u-p", name: "田中 健", role: "partner" },
+      actor: { userId: "u-p", name: "田中 健", role: "admin" },
       kind: "member",
       action: "assignment_added",
       itemCount: 1,
@@ -60,7 +52,7 @@ const page1: ActivityList = {
   ],
   actors: [
     { userId: "u-o", name: "鈴木 花子", role: "owner" },
-    { userId: "u-p", name: "田中 健", role: "partner" },
+    { userId: "u-p", name: "田中 健", role: "admin" },
   ],
   nextCursor: "c1",
 };
@@ -88,7 +80,7 @@ function renderPage() {
 }
 
 beforeEach(() => {
-  access = PARTNER_ACCESS;
+  access = ADMIN_ACCESS;
   listActivity.mockReset();
 });
 
@@ -102,7 +94,7 @@ describe("操作の記録", () => {
     expect(screen.getByText(/高橋 涼さんをこのアカウントの担当にしました/)).toBeInTheDocument();
     await user.click(row);
     expect(within(row.closest("li")!).getByText("限定のシフォン")).toBeInTheDocument();
-    expect(screen.getByText("記録は、チームで運用しているアカウントだけに、90日分残ります。オーナーとパートナーが見られます。")).toBeInTheDocument();
+    expect(screen.getByText("記録は、チームに入っているアカウントだけに、90日分残ります。オーナーと、このアカウントを担当している管理者が見られます。")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "続きを読む" }));
     expect(listActivity).toHaveBeenLastCalledWith("a1", { kind: "", actor: "", cursor: "c1" });
   });
@@ -150,5 +142,12 @@ describe("操作の記録", () => {
       "承認済みの案を直しました（要確認に戻りました）",
     );
     expect(actionText({ ...page1.items[0]!, action: "partner_removed" })).toBe("パートナーを外しました");
+    // チームの操作（specs/011 data-model.md「activity_logs」）
+    expect(actionText({ ...page1.items[0]!, action: "team_member_joined", summary: "山口 誠" })).toBe("山口 誠さんがチームに参加しました");
+    expect(
+      actionText({ ...page1.items[0]!, action: "team_role_changed", summary: "佐藤 美咲", details: { from: "member", to: "editor" } }),
+    ).toBe("佐藤 美咲さんのロールを編集者にしました");
+    expect(actionText({ ...page1.items[0]!, action: "team_share_changed", details: { shared: true } })).toBe("チームに見せるようにしました");
+    expect(actionText({ ...page1.items[0]!, action: "team_admin_transferred", summary: "鈴木 花子" })).toBe("管理者を鈴木 花子さんに引き継ぎました");
   });
 });

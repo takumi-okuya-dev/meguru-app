@@ -35,7 +35,7 @@ vi.mock("@/lib/api-client", async (importOriginal) => {
   };
 });
 
-const { AccountSwitcher } = await import("@/components/layout/AccountSwitcher");
+const { AccountSwitcher, groupHeading } = await import("@/components/layout/AccountSwitcher");
 const { AccountLayout, useCurrentAccount } = await import("@/pages/account-layout");
 
 const account = (
@@ -60,8 +60,7 @@ const me = (rows: AccountSummary[]): MeResponse => ({
   landingAccountId: rows[0]?.id ?? null,
   accountLimit: { max: 5, used: rows.length },
   threadsAccessMode: "testers",
-  partnerTeam: null,
-  editorWaiting: null,
+  teams: [],
 });
 const counts = (rows: [string, number][]): NeedsReviewCountsResponse => ({
   counts: rows.map(([accountId, needsReview]) => ({ accountId, needsReview })),
@@ -533,5 +532,28 @@ describe("AccountSwitcherの状態と操作", () => {
     await router.navigate("/accounts/a2/settings");
     expect(await screen.findByText("設定: Bの設定")).toBeInTheDocument();
     expect(screen.queryByText("設定: Aの設定")).not.toBeInTheDocument();
+  });
+});
+
+describe("切り替えメニューの見出し（specs/011 T025）", () => {
+  const make = (id: string, role: AccountSummary["role"]): AccountSummary => ({
+    id,
+    username: id,
+    displayName: id,
+    profilePictureUrl: null,
+    plan: "auto-only",
+    connectionStatus: "connected",
+    lastUsedAt: null,
+    role,
+    ownerName: role === "owner" ? null : "鈴木 花子",
+  });
+
+  it("担当しているAccountがあるときだけ「自分のアカウント」「担当しているアカウント」に分ける", () => {
+    const mixed = [make("a1", "owner"), make("a2", "editor"), make("a3", "editor")];
+    expect(mixed.map((_, i) => groupHeading(mixed, i))).toEqual(["自分のアカウント", "担当しているアカウント", null]);
+    const ownOnly = [make("a1", "owner"), make("a2", "owner")];
+    expect(ownOnly.map((_, i) => groupHeading(ownOnly, i))).toEqual([null, null]);
+    const helpOnly = [make("a2", "editor")];
+    expect(groupHeading(helpOnly, 0)).toBe("担当しているアカウント");
   });
 });

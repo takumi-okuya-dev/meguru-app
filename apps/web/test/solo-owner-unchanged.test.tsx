@@ -1,11 +1,12 @@
-// 個人運用のオーナーの画面は、「運用を手伝ってもらう」の区分以外変わらない（specs/008 FR-006・SC-005、/speckit-analyze G1）。
-// あわせて、手伝う人には役割の表示が出ることを確かめる（FR-040）。
+// 個人運用（チームに入っていない）のオーナーの画面は、このアカウントの設定のチームの区分の1行
+// （「チームに入っていません」「チームを作る」）を除いて008の前と同じ（specs/011 FR-006・SC-005、Constitution 4.0.1 原則V、T038）。
+// あわせて、担当の人には立場の表示が出ることを確かめる（T025）。
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen } from "@testing-library/react";
 import type { AccountAccessResponse, MeResponse } from "@threads-grower/shared";
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { EDITOR_ACCESS, OWNER_ACCESS } from "./helpers/access";
+import { ADMIN_ACCESS, EDITOR_ACCESS, OWNER_ACCESS } from "./helpers/access";
 
 vi.mock("@clerk/react", () => ({
   useUser: () => ({ user: { fullName: "Takumi", primaryEmailAddress: { emailAddress: "t@example.com" } } }),
@@ -31,8 +32,7 @@ const meResponse: MeResponse = {
   landingAccountId: "a1",
   accountLimit: { max: 1, used: 1 },
   threadsAccessMode: "testers",
-  partnerTeam: null,
-  editorWaiting: null,
+  teams: [],
 };
 const accountTeam = vi.fn();
 vi.mock("@/lib/api-client", async (orig) => {
@@ -50,7 +50,8 @@ vi.mock("@/lib/api-client", async (orig) => {
 });
 
 const { Sidebar } = await import("@/components/layout/Sidebar");
-const { PartnerJoinedNotice } = await import("@/components/team/PartnerJoinedNotice");
+const { AssignedNotice } = await import("@/components/team/AssignedNotice");
+const { TeamSection } = await import("@/components/team/TeamSection");
 
 function renderAt(element: React.ReactNode) {
   const router = createMemoryRouter([{ path: "/accounts/:accountId", element }], { initialEntries: ["/accounts/a1"] });
@@ -67,42 +68,42 @@ beforeEach(() => {
 });
 
 describe("個人運用のオーナー", () => {
-  it("サイドバーに役割の表示も「チーム」の見出しも出ない", async () => {
+  it("サイドバーに立場の表示も「チーム」の見出しも、チームを作る入口も出ない", async () => {
     renderAt(<Sidebar />);
     expect(await screen.findByRole("link", { name: /投稿ストック/ })).toBeInTheDocument();
-    expect(screen.queryByText("パートナーとして手伝っています")).not.toBeInTheDocument();
-    expect(screen.queryByText("編集者として担当しています")).not.toBeInTheDocument();
+    expect(screen.queryByText("担当しています")).not.toBeInTheDocument();
     expect(screen.queryByText("チーム")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /チームを作る/ })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: /操作の記録/ })).not.toBeInTheDocument();
   });
 
-  it("パートナーがいなければ、ホームに参加の知らせは出ない", async () => {
-    accountTeam.mockResolvedValue({ owner: { userId: "o1", name: "たくみ" }, viewerUserId: "o1", partner: null, delegation: null, editors: [], joinedNotice: { show: false } });
-    renderAt(<PartnerJoinedNotice accountId="a1" />);
+  it("ホームに担当の知らせは出ない", async () => {
+    renderAt(<AssignedNotice account={meResponse.accounts[0]!} />);
     await new Promise((r) => setTimeout(r, 10));
     expect(screen.queryByRole("status")).not.toBeInTheDocument();
   });
+
+  it("このアカウントの設定に増えるのは、チームの区分の1行だけ。チームの問い合わせはしない", async () => {
+    renderAt(<TeamSection accountId="a1" access={OWNER_ACCESS} />);
+    expect(screen.getByText("チームに入っていません")).toBeInTheDocument();
+    expect(screen.getAllByRole("button").map((b) => b.textContent)).toEqual(["チームを作る"]);
+    expect(accountTeam).not.toHaveBeenCalled();
+  });
 });
 
-describe("手伝う人", () => {
-  it("編集者には、切り替えの下に役割とオーナーの名前が出る", async () => {
+describe("担当の人", () => {
+  it("編集者には、切り替えの下に「担当しています」とオーナーの名前が出る。操作の記録は出ない", async () => {
     access = EDITOR_ACCESS;
     renderAt(<Sidebar />);
-    expect(await screen.findByText("編集者として担当しています")).toBeInTheDocument();
+    expect(await screen.findByText("担当しています")).toBeInTheDocument();
     expect(screen.getByText("オーナー：鈴木 花子")).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /操作の記録/ })).not.toBeInTheDocument();
   });
 
-  it("チームがあるAccountのパートナーには「チーム > 操作の記録」が出る", async () => {
-    access = {
-      role: "partner",
-      permissions: ["view", "content", "activity"],
-      owner: { name: "鈴木 花子" },
-      hasTeam: true,
-      team: { name: "A社", partnerName: "田中 健" },
-      delegation: { review: false, settings: false },
-    };
+  it("自分を担当にした管理者には「チーム > 操作の記録」が出る", async () => {
+    access = ADMIN_ACCESS;
     renderAt(<Sidebar />);
     expect(await screen.findByRole("link", { name: /操作の記録/ })).toHaveAttribute("href", "/accounts/a1/activity");
-    expect(screen.getByText("パートナーとして手伝っています")).toBeInTheDocument();
+    expect(screen.getByText("担当しています")).toBeInTheDocument();
   });
 });

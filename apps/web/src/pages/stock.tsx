@@ -4,6 +4,7 @@
 // 承認・却下・要確認に戻すも、トーストの「元に戻す」で取り消せる（004 FR-008）。
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
+  PROMPT_COUNT_DEFAULT,
   SIMILARITY_THRESHOLD,
   checkPublishable,
   type PostDraft,
@@ -152,7 +153,7 @@ function StockPageContent() {
 
   const items = lists[tab];
   // 一覧から消えた下書き（取り消し・他の端末での削除・状態の変更）は、選択からも外す。
-  // 承認の操作ができない人（編集者・任されていないパートナー）は選ばない（まとめての操作は承認・却下のため。specs/008 FR-041）
+  // 承認の操作ができない人（担当の人。承認はオーナーだけ）は選ばない（まとめての操作は承認・却下のため。specs/008 FR-041）
   const selectable = canReview ? items.filter((d) => d.status !== "publishing") : [];
   const selected = selectable.filter((d) => picked.has(d.id));
   const atLimit = data ? lists.needs_review.length >= data.limits.needsReview : false;
@@ -380,8 +381,9 @@ function StockPageContent() {
           <PromptCard
             accountId={account.id}
             canGeneratePrompt={data.canGeneratePrompt}
-            promptPostCount={data.promptPostCount}
-            promptPostCountVersion={data.promptPostCountVersion}
+            promptPostCount={data.promptPostCount ?? PROMPT_COUNT_DEFAULT}
+            promptPostCountVersion={data.promptPostCountVersion ?? 1}
+            canSaveCount={can("settings")}
             startKey={startKey}
             onLocked={() => setPromptLocked(true)}
           />
@@ -462,11 +464,11 @@ function StockPageContent() {
                   renderCard={renderCard}
                   failed={value === "approved" ? data.publishFailed : undefined}
                   approvedNotice={
-                    data.autoPost.stoppedReason === "needs_reconnect" ? (
+                    data.autoPost?.stoppedReason === "needs_reconnect" ? (
                       "Threadsとの接続が切れているため、自動投稿を止めています"
-                    ) : data.autoPost.stoppedReason === "rate_limited" ? (
+                    ) : data.autoPost?.stoppedReason === "rate_limited" ? (
                       "Threadsの投稿数の上限に達したため、今日の投稿を止めました"
-                    ) : data.autoPost.enabled ? (
+                    ) : data.autoPost?.enabled ? (
                       "上から順に、投稿する時刻に1件ずつThreadsへ投稿します"
                     ) : (
                       <>

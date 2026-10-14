@@ -304,6 +304,19 @@ describe("プロンプトのカード（US1）", () => {
     await waitFor(() => expect(getPrompt).toHaveBeenCalledWith("a1", 10));
   });
 
+  it("担当の人は作る件数を変えるとその件数のプロンプトを取り直すが、保存はしない（設定はオーナーだけ。PR #14 のCodexレビュー）", async () => {
+    accountAccess.mockResolvedValue(EDITOR_ACCESS);
+    const user = userEvent.setup();
+    renderPage();
+    const input = await screen.findByRole("spinbutton", { name: "作る件数" });
+    await user.clear(input);
+    await user.type(input, "10");
+    await waitFor(() => expect(getPrompt).toHaveBeenCalledWith("a1", 10), { timeout: 2000 });
+    await new Promise((r) => setTimeout(r, 700));
+    expect(putPromptSettings).not.toHaveBeenCalled();
+    accountAccess.mockResolvedValue(OWNER_ACCESS);
+  });
+
   it("保存中に件数を変えても並行して保存せず、終わってから最新の件数を保存する（Codexレビュー）", async () => {
     const user = userEvent.setup();
     let resolveFirst: (v: { postCount: number; version: number }) => void = () => {};

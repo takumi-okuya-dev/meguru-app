@@ -43,6 +43,7 @@ const isValidCount = (s: string) => /^\d+$/.test(s) && Number(s) >= PROMPT_COUNT
 /**
  * プロンプトのカード。
  * @param props - accountId：Account の ID、canGeneratePrompt：grower機能を使えるか、promptPostCount：保存済みの作る件数、
+ *   canSaveCount：作る件数を保存できるか（設定の権限。担当の人は、件数を変えてもこの画面の間だけ使い、保存しない。PR #14 のCodexレビュー）、
  *   startKey：サイドバーの「投稿をつくる」から来たときの移動のキー（押すたびに変わる）。プロンプトのカードまで移り、
  *   「コピー」にフォーカスを当てる（specs/004 Clarifications 2026-10-05）、
  *   onLocked：画面を開いた後にプロンプトが使えなくなった（無料体験の終了など）。ページは貼り付け欄にフォーカスを移す
@@ -53,6 +54,7 @@ export function PromptCard({
   canGeneratePrompt,
   promptPostCount,
   promptPostCountVersion = 1,
+  canSaveCount = true,
   startKey,
   onLocked,
 }: {
@@ -60,6 +62,7 @@ export function PromptCard({
   canGeneratePrompt: boolean;
   promptPostCount: number;
   promptPostCountVersion?: number;
+  canSaveCount?: boolean;
   startKey?: string;
   onLocked?: () => void;
 }) {
@@ -70,6 +73,7 @@ export function PromptCard({
       accountId={accountId}
       savedCount={promptPostCount}
       savedVersion={promptPostCountVersion}
+      canSaveCount={canSaveCount}
       startKey={startKey}
       onGrowerLost={() => {
         setGrowerLost(true);
@@ -97,12 +101,14 @@ function PromptReadyCard({
   accountId,
   savedCount,
   savedVersion,
+  canSaveCount,
   startKey,
   onGrowerLost,
 }: {
   accountId: string;
   savedCount: number;
   savedVersion: number;
+  canSaveCount: boolean;
   startKey?: string;
   onGrowerLost: () => void;
 }) {
@@ -196,9 +202,9 @@ function PromptReadyCard({
 
   // 件数の保存は1つずつ順に行う。保存中に件数が変わったら、終わってから最新の件数を保存する（古い値で上書きしない）
   useEffect(() => {
-    if (count === saved || saving || failed?.count === count) return;
+    if (!canSaveCount || count === saved || saving || failed?.count === count) return;
     save(count);
-  }, [count, saved, saving, failed, save]);
+  }, [canSaveCount, count, saved, saving, failed, save]);
 
   // コピーに失敗したら、全文の欄を開いた後に全選択する（research.md R13）
   useEffect(() => {

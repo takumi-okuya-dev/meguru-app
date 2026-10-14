@@ -12,6 +12,7 @@ import { accounts, memberships, threadsDeletionRequests, users } from "../db/sch
 import { sha256Hex, threadsUserHmac, toHex } from "../lib/identifier-hash";
 import { logger } from "../lib/logger";
 import { verifySignedRequest } from "../lib/signed-request";
+import { beforeAccountDeleted } from "./team-service";
 
 const LEASE_MS = 15 * 60_000;
 const IDENTIFIER_GRACE_MS = 15 * 60_000;
@@ -123,12 +124,14 @@ export async function attemptDeletion(
 
       // 4. Accountを削除する。所有者の users 行をロックして last_account_deleted_at を記録する（research.md R13）
       const owners = await tx
-        .select({ userId: memberships.userId })
+        .select({ userId: memberships.userId, accountId: accounts.id })
         .from(accounts)
         .innerJoin(memberships, and(eq(memberships.accountId, accounts.id), eq(memberships.role, "owner")))
         .where(eq(accounts.threadsUserId, threadsUserId));
       for (const o of owners) {
         await lockUserRow(tx, o.userId);
+        // チームの最後のアカウントなら、チームを抜けたものとする（specs/011 FR-046。アカウントの削除と同じ）
+        await beforeAccountDeleted(tx, o.accountId, o.userId);
         await tx.update(users).set({ lastAccountDeletedAt: now, updatedAt: now }).where(eq(users.id, o.userId));
       }
       await tx.delete(accounts).where(eq(accounts.threadsUserId, threadsUserId));

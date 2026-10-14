@@ -1,5 +1,6 @@
 // 操作の記録（specs/008-team-operations research.md R9、contracts/api.md「操作の記録」）。
-// チームがあるAccountだけ、その操作と同じトランザクションで書く。90日を過ぎたものは日次の処理で消す。
+// チームに入っているAccountだけ（specs/011 research.md R8）、その操作と同じトランザクションで書く。
+// 90日を過ぎたものは日次の処理で消す。
 import {
   ACTIVITY_DETAILS_EXCERPT_LIMIT,
   ACTIVITY_LOG_RETENTION_DAYS,
@@ -11,8 +12,7 @@ import { and, desc, eq, gte, inArray, lt, or, sql } from "drizzle-orm";
 import { withTransaction, type Db, type TxDb } from "../db/client";
 import { activityLogs, users } from "../db/schema";
 import { AppError } from "../lib/errors";
-import type { Role } from "@threads-grower/shared";
-import { isUuid, personName, type AccountAccess } from "./access";
+import { isUuid, personName, type AccountAccess, type ActorRole } from "./access";
 
 /** 操作の記録の種類（画面の絞り込みの単位）。 */
 export type ActivityKind = "review" | "draft" | "content" | "settings" | "member";
@@ -29,7 +29,7 @@ export type ActivityInput = {
   excerpts?: string[];
   /** そのほかの内容（却下の理由、変更の前後、人の名前など） */
   details?: Record<string, unknown>;
-  /** チームがなくても書く（パートナーを外したときなど） */
+  /** チームに入っていなくても書く */
   force?: boolean;
 };
 
@@ -65,7 +65,7 @@ export async function withActivityTx<T>(
 }
 
 /**
- * 操作を記録する（FR-050・FR-050a）。チームがあるAccountのときだけ書く（force なら必ず書く）。
+ * 操作を記録する（FR-050・FR-050a）。チームに入っているAccountのときだけ書く（force なら必ず書く）。
  * した人の名前・役割は、その時点の値を写して持つ（後で外されても残る。FR-054）。
  * @param db - その操作と同じトランザクション
  * @param access - 操作した人の判定の結果
@@ -75,19 +75,19 @@ export async function recordActivity(db: Db | TxDb, access: AccountAccess, input
   if (!access.hasTeam && !input.force) return;
   await insertActivity(db, {
     accountId: access.account.id,
-    actor: { id: access.actor.id, name: access.actor.name, role: access.role },
+    actor: access.actor,
     ...input,
   });
 }
 
 /**
- * 操作の記録を1行書く（チームの有無は呼び出し側が決める）。チームの操作（参加・担当の付け外し）で使う。
+ * 操作の記録を1行書く（チームの有無は呼び出し側が決める）。チームの操作（参加・ロール・担当・見せる設定など）で使う。
  * @param db - その操作と同じトランザクション
  * @param input - Account・した人（その時点の名前と役割）・記録する内容
  */
 export async function insertActivity(
   db: Db | TxDb,
-  input: ActivityInput & { accountId: string; actor: { id: string; name: string; role: Role } },
+  input: ActivityInput & { accountId: string; actor: { id: string; name: string; role: ActorRole } },
 ) {
   const excerpts = input.excerpts?.slice(0, ACTIVITY_DETAILS_EXCERPT_LIMIT).map(excerptOf);
   const details = { ...(input.details ?? {}), ...(excerpts && excerpts.length > 0 ? { excerpts } : {}) };

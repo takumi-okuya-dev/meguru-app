@@ -15,7 +15,7 @@ export function ReconnectButton({ accountId }: { accountId: string }) {
   // Accountの画面の中ではユーザー名と今の方法が分かる（外で使うときは分からないまま開く）
   const account = useOutletContext<{ account?: AccountSummary } | undefined>()?.account;
   // 接続し直しはオーナーだけ（specs/008 FR-044、specs/010 FR-034）。呼び出し側で隠していなくても、
-  // パートナー・編集者にはトークンの入力欄を出さない（PR #12 のCodexレビュー）
+  // オーナーでない人（担当の人）にはトークンの入力欄を出さない（PR #12 のCodexレビュー）
   if (account?.id === accountId && account.role !== "owner") return null;
   return (
     <div>

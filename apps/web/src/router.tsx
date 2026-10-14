@@ -10,10 +10,11 @@ import { DataDeletion } from "@/pages/data-deletion";
 import { InvitePage } from "@/pages/invite";
 import { Landing } from "@/pages/landing";
 import { NotFound } from "@/pages/not-found";
-import { PartnerAccountsPage } from "@/pages/partner/partner-accounts";
-import { PartnerEditorsPage } from "@/pages/partner/partner-editors";
-import { PartnerLayout } from "@/pages/partner/partner-layout";
 import { PerformancePage } from "@/pages/performance";
+import { TeamPage } from "@/pages/team";
+import { TeamAssignPage } from "@/pages/team-assign";
+import { TeamLayout } from "@/pages/team-layout";
+import { TeamSharedAccountPage } from "@/pages/team-shared-account";
 import { SignInPage } from "@/pages/sign-in";
 import { AccountSettingsPage } from "@/pages/settings/account";
 import { AppearanceSettings } from "@/pages/settings/appearance";
@@ -32,7 +33,7 @@ export const routes = [
   // 利用規約・トークンの作り方はログインなしで読める（specs/010 FR-052・FR-030）
   { path: "/terms", element: <TermsPage /> },
   { path: "/guide/threads-token", element: <GuideThreadsTokenPage /> },
-  // 招待の確認はログインなしで開ける（specs/008 research.md R7）
+  // 招待の確認はログインなしで開ける（specs/008 research.md R7、specs/011 contracts/ui-routes.md）
   { path: "/invite/:token", element: <InvitePage /> },
   {
     element: <RequireAuth />,
@@ -48,15 +49,17 @@ export const routes = [
           { path: "account", element: <AccountSettingsPage /> },
         ],
       },
-      // パートナーの画面（specs/008 FR-060）。チームのパートナーでなければ / へ移す
+      // チーム（specs/011 contracts/ui-routes.md「ルート」）。チームの画面と担当の表はサイドバーの中に出す
       {
-        path: "/partner",
-        element: <PartnerLayout />,
+        path: "/teams/:teamId",
+        element: <TeamLayout />,
         children: [
-          { path: "accounts", element: <PartnerAccountsPage /> },
-          { path: "editors", element: <PartnerEditorsPage /> },
+          { index: true, element: <TeamPage /> },
+          { path: "assign", element: <TeamAssignPage /> },
         ],
       },
+      // 見せてもらっているアカウントは、読むだけの1カラムの画面（Accountのサイドバーには入らない）
+      { path: "/teams/:teamId/accounts/:accountId", element: <TeamSharedAccountPage /> },
       {
         path: "/accounts/:accountId",
         element: <AccountLayout />,
@@ -68,7 +71,7 @@ export const routes = [
           { path: "research", element: <ResearchPage /> },
           { path: "stock", element: <StockPage /> },
           { path: "performance", element: <PerformancePage /> },
-          // 操作の記録（specs/008 FR-052）。オーナー・パートナーだけ
+          // 操作の記録（specs/008 FR-052）。オーナーと、担当の管理者だけ（specs/011 FR-002）
           { path: "activity", element: <ActivityPage /> },
         ],
       },

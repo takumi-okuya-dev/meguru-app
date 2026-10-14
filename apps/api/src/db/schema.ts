@@ -56,7 +56,9 @@ export const accountPlan = pgEnum("account_plan", PLANS);
  * Membershipのロールの列挙型（membership_role。Constitution原則IV）。
  * partner・editor は specs/008-team-operations で足した。member は旧プラン4の名残で使わない（列挙型から値は消せないので残す）。
  */
-export const membershipRole = pgEnum("membership_role", ["owner", "member", "partner", "editor"]);
+export const membershipRole = pgEnum("membership_role", ["owner", "member", "partner", "editor", "admin"]);
+/** チームでのロール（specs/011 data-model.md の team_role）。 */
+export const teamRole = pgEnum("team_role", ["admin", "member", "editor"]);
 /** Threads接続の状態の列挙型（connection_status）。 */
 export const connectionStatus = pgEnum("connection_status", ["connected", "needs_reconnect"]);
 /** 今の接続の方法（specs/010-token-account-add data-model.md）。app は001のOAuth、token は利用者のMetaアプリのトークン。 */
@@ -141,8 +143,10 @@ export const memberships = pgTable(
       .notNull()
       .references(() => accounts.id, { onDelete: "cascade" }),
     role: membershipRole("role").notNull(),
-    // partner・editor の行が経由するチーム（specs/008 data-model.md）。owner はNULL
+    // editor（担当）の行が経由するチーム（specs/011 data-model.md）。owner はNULL
     teamId: uuid("team_id").references((): AnyPgColumn => teams.id, { onDelete: "cascade" }),
+    // 担当の知らせを閉じた日時（specs/011 research.md R9）。editor の行だけで使う
+    assignedNoticeDismissedAt: timestamp("assigned_notice_dismissed_at", { withTimezone: true, precision: 6 }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
@@ -814,36 +818,34 @@ export const followerSnapshots = pgTable(
 /** 操作の記録の種類の列挙型（activity_kind。FR-052の絞り込みの単位）。 */
 export const activityKind = pgEnum("activity_kind", ["review", "draft", "content", "settings", "member"]);
 
-/** パートナーのチーム（data-model.md の teams）。パートナー1人に0か1行。 */
+/** チーム（specs/011 data-model.md の teams）。管理者が作り、招待リンクを1本持つ。 */
 export const teams = pgTable(
   "teams",
   {
     id: uuid("id").primaryKey().defaultRandom(),
-    partnerUserId: uuid("partner_user_id")
+    name: text("name").notNull(),
+    // 管理者。team_members の admin の行と同じ値を同じトランザクションで書く。
+    // 利用者の削除（退会）は011の次のfeatureで作り、users の行を消す前にチームから外す（data-model.md）
+    adminUserId: uuid("admin_user_id")
       .notNull()
-      .unique()
-      .references(() => users.id, { onDelete: "cascade" }),
-    name: text("name"),
-    // 編集者の招待リンク（research.md R4）。照合はハッシュ、表示は暗号化した写し。最初に表示したときに作る
-    editorInviteTokenHash: text("editor_invite_token_hash").unique(),
-    editorInviteTokenCiphertext: bytea("editor_invite_token_ciphertext"),
-    editorInviteTokenIv: bytea("editor_invite_token_iv"),
-    editorInviteKeyVersion: smallint("editor_invite_key_version"),
-    editorInviteRotatedAt: timestamp("editor_invite_rotated_at", { withTimezone: true, precision: 6 }),
+      .references(() => users.id, { onDelete: "restrict" }),
+    // 招待リンク（specs/008 research.md R4 と同じ仕組み）。照合はハッシュ、表示は暗号化した写し
+    inviteTokenHash: text("invite_token_hash").notNull().unique(),
+    inviteTokenCiphertext: bytea("invite_token_ciphertext").notNull(),
+    inviteTokenIv: bytea("invite_token_iv").notNull(),
+    inviteKeyVersion: smallint("invite_key_version").notNull(),
+    inviteRotatedAt: timestamp("invite_rotated_at", { withTimezone: true, precision: 6 }),
     ...timestamps,
   },
   (t) => [
-    check("teams_name_length", sql`char_length(${t.name}) <= 50`),
-    check(
-      "teams_editor_invite_complete",
-      sql`(${t.editorInviteTokenHash} IS NULL) = (${t.editorInviteTokenCiphertext} IS NULL) AND (${t.editorInviteTokenHash} IS NULL) = (${t.editorInviteTokenIv} IS NULL) AND (${t.editorInviteTokenHash} IS NULL) = (${t.editorInviteKeyVersion} IS NULL)`,
-    ),
+    check("teams_name_length", sql`char_length(${t.name}) BETWEEN 1 AND 50`),
+    index("teams_admin_idx").on(t.adminUserId),
   ],
 );
 
-/** チームの編集者（data-model.md の team_editors）。1チーム10人まで（参加のトランザクションで数える）。 */
-export const teamEditors = pgTable(
-  "team_editors",
+/** チームの人（specs/011 data-model.md の team_members）。1チーム50人、編集者10人まで。 */
+export const teamMembers = pgTable(
+  "team_members",
   {
     teamId: uuid("team_id")
       .notNull()
@@ -851,47 +853,40 @@ export const teamEditors = pgTable(
     userId: uuid("user_id")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
+    role: teamRole("role").notNull(),
     joinedAt: timestamp("joined_at", { withTimezone: true, precision: 6 }).notNull().defaultNow(),
-  },
-  (t) => [primaryKey({ columns: [t.teamId, t.userId] }), index("team_editors_user_idx").on(t.userId)],
-);
-
-/** 手伝いの関係（data-model.md の account_partners）。将来の複数パートナーに備えて主キーは Account＋チーム。 */
-export const accountPartners = pgTable(
-  "account_partners",
-  {
-    accountId: uuid("account_id")
-      .notNull()
-      .references(() => accounts.id, { onDelete: "cascade" }),
-    teamId: uuid("team_id")
-      .notNull()
-      .references(() => teams.id, { onDelete: "cascade" }),
-    delegateReview: boolean("delegate_review").notNull().default(false),
-    delegateSettings: boolean("delegate_settings").notNull().default(false),
-    joinedAt: timestamp("joined_at", { withTimezone: true, precision: 6 }).notNull().defaultNow(),
+    // 管理者がこの人の参加の知らせを閉じた日時（research.md R9）
     joinedNoticeDismissedAt: timestamp("joined_notice_dismissed_at", { withTimezone: true, precision: 6 }),
-    updatedAt: timestamp("updated_at", { withTimezone: true, precision: 6 }).notNull().defaultNow(),
   },
   (t) => [
-    primaryKey({ columns: [t.accountId, t.teamId] }),
-    // 本featureでは1つのAccountにパートナーは1チームまで（FR-016。複数にするときはこのインデックスを外す）
-    uniqueIndex("account_partners_one_per_account").on(t.accountId),
-    index("account_partners_team_idx").on(t.teamId),
+    primaryKey({ columns: [t.teamId, t.userId] }),
+    // 1チームに管理者は1人
+    uniqueIndex("team_members_one_admin").on(t.teamId).where(sql`${t.role} = 'admin'`),
+    index("team_members_user_idx").on(t.userId),
   ],
 );
 
-/** パートナーの招待リンク（data-model.md の account_partner_invites）。Accountに0か1行。 */
-export const accountPartnerInvites = pgTable("account_partner_invites", {
-  accountId: uuid("account_id")
-    .primaryKey()
-    .references(() => accounts.id, { onDelete: "cascade" }),
-  tokenHash: text("token_hash").notNull().unique(),
-  tokenCiphertext: bytea("token_ciphertext").notNull(),
-  tokenIv: bytea("token_iv").notNull(),
-  keyVersion: smallint("key_version").notNull(),
-  createdByUserId: uuid("created_by_user_id").references(() => users.id, { onDelete: "set null" }),
-  createdAt: timestamp("created_at", { withTimezone: true, precision: 6 }).notNull().defaultNow(),
-});
+/** チームに入っているアカウント（specs/011 data-model.md の team_accounts）。shared は「チームに見せる」。 */
+export const teamAccounts = pgTable(
+  "team_accounts",
+  {
+    teamId: uuid("team_id")
+      .notNull()
+      .references(() => teams.id, { onDelete: "cascade" }),
+    accountId: uuid("account_id")
+      .notNull()
+      .references(() => accounts.id, { onDelete: "cascade" }),
+    addedByUserId: uuid("added_by_user_id").references(() => users.id, { onDelete: "set null" }),
+    shared: boolean("shared").notNull().default(false),
+    addedAt: timestamp("added_at", { withTimezone: true, precision: 6 }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true, precision: 6 }).notNull().defaultNow(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.teamId, t.accountId] }),
+    // 1つのアカウントは1つのチームにだけ入る（複数に広げるときはこの索引を外す。spec Clarifications）
+    uniqueIndex("team_accounts_one_team_per_account").on(t.accountId),
+  ],
+);
 
 /** 操作の記録（data-model.md の activity_logs）。チームがあるAccountだけ。90日で消す。 */
 export const activityLogs = pgTable(
