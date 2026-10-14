@@ -36,6 +36,8 @@ describe("トークンの作り方", () => {
     ]);
     expect(screen.getAllByText(/^この手順の目的：/)).toHaveLength(6);
     expect(screen.getByText(/この手順は2026年10月10日時点の内容です/)).toBeInTheDocument();
+    // つなぐのは「このアカウントの設定」の「Threadsとの接続」から（specs/012）
+    expect(screen.getByText(/「Threadsとの接続」の「自分のMetaアプリのトークンでつなぐ」を開きます/)).toBeInTheDocument();
     expect(screen.queryByRole("img")).not.toBeInTheDocument();
   });
 });
