@@ -97,3 +97,63 @@ export async function signIn(page: Page, email: string = testUserEmail()) {
 export async function signOut(page: Page) {
   await clerk.signOut({ page });
 }
+
+// ---- アカウントを作ってからつなぐ（specs/012-accounts-before-connect）----
+
+/** アカウントの画面のURL（IDを取り出す）。 */
+export const ACCOUNT_URL = /\/accounts\/([0-9a-f-]{36})(?:\/|\?|#|$)/;
+
+/**
+ * 「アカウントを作る」で名前だけのアカウントを作り、そのホームへ移るのを待つ。
+ * @param page - ページ
+ * @param name - アカウントの名前
+ * @returns 作ったアカウントのID
+ */
+export async function createAccount(page: Page, name: string): Promise<string> {
+  await page.goto("/accounts/new");
+  await page.getByLabel("アカウントの名前").fill(name);
+  await page.getByRole("button", { name: "作る", exact: true }).click();
+  await page.waitForURL(/\/accounts\/[0-9a-f-]{36}$/);
+  return ACCOUNT_URL.exec(page.url())![1]!;
+}
+
+/**
+ * 「このアカウントの設定」の「Threadsで許可する」でつなぎ、偽のThreadsの認可画面で許可する。
+ * @param page - ページ
+ * @param accountId - つなぐアカウント
+ * @param allow - 認可画面のボタン（既定は最初のユーザーの「許可する」。ほかは「#allow-<id>」）
+ */
+export async function connectWithApp(page: Page, accountId: string, allow = "#allow") {
+  await page.goto(`/accounts/${accountId}/settings`);
+  await page.getByRole("button", { name: "Threadsで許可する" }).click();
+  await page.locator(allow).click();
+  await page.waitForURL(new RegExp(`/accounts/${accountId}/settings`));
+}
+
+/**
+ * 偽のThreadsの「ユーザートークン生成ツール」でトークンを作る。
+ * @param page - ページ（同じブラウザで別のタブを開く）
+ * @param user - 偽のThreadsのユーザーID
+ * @param appScope - Metaアプリの見分け（違うとユーザーIDが変わる）
+ * @returns トークン
+ */
+export async function makeToken(page: Page, user: string, appScope = "myapp"): Promise<string> {
+  const tool = await page.context().newPage();
+  await tool.goto(`${FAKE_THREADS}/__control/token-page?user=${user}&appScope=${appScope}&lifetime=long&debug=1`);
+  const token = (await tool.locator("#token").textContent())!.trim();
+  await tool.close();
+  return token;
+}
+
+/**
+ * 「このアカウントの設定」の「自分のMetaアプリのトークンでつなぐ」で、トークンを貼り付けてつなぐ。
+ * @param page - ページ
+ * @param accountId - つなぐアカウント
+ * @param token - トークン
+ */
+export async function connectWithToken(page: Page, accountId: string, token: string) {
+  await page.goto(`/accounts/${accountId}/settings`);
+  await page.getByRole("button", { name: "自分のMetaアプリのトークンでつなぐ" }).click();
+  await page.getByLabel("アクセストークン").fill(token);
+  await page.getByRole("button", { name: "つなぐ", exact: true }).click();
+}

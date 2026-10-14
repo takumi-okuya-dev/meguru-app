@@ -1,6 +1,6 @@
 // specs/002 US1：課題を入力して保存し、再読み込みで復元される。未保存のまま移動すると確認が出る
 import { expect, test } from "@playwright/test";
-import { resetAll, signIn } from "./helpers";
+import { createAccount, resetAll, signIn } from "./helpers";
 
 test.beforeEach(async () => {
   await resetAll();
@@ -8,10 +8,8 @@ test.beforeEach(async () => {
 
 test("課題を保存すると再読み込みで復元され、未保存のまま移動すると確認が出る", async ({ page }) => {
   await signIn(page);
-  await page.goto("/accounts/new");
-  await page.getByRole("button", { name: "Threadsアカウントを接続" }).click();
-  await page.locator("#allow").click();
-  await expect(page).toHaveURL(/\/accounts\/[0-9a-f-]{36}$/);
+  // つながっていなくても課題は使える（specs/012 FR-031）
+  await createAccount(page, "課題のアカウント");
   const accountUrl = page.url();
 
   // ホームの案内から課題の画面へ

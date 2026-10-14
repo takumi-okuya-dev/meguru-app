@@ -14,17 +14,24 @@ export const FAKE_ACCOUNTS = {
 } as const;
 
 /**
- * 偽のThreadsのアカウントを接続する（自分のアカウントを1つ作る）。
- * @param page - 接続する人のページ
+ * 自分のアカウントを1つ作り、偽のThreadsのアカウントにつなぐ（specs/012：名前だけで作ってから、設定でつなぐ）。
+ * アカウントの名前は、偽のThreadsの表示名にする（チームの画面などの見え方を011のときとそろえる）。
+ * @param page - つなぐ人のページ
  * @param fakeUserId - 偽のThreadsのユーザー
- * @returns 接続したAccountのID
+ * @returns つないだAccountのID
  */
 export async function connectThreads(page: Page, fakeUserId: string): Promise<string> {
+  const name = Object.values(FAKE_ACCOUNTS).find((a) => a.id === fakeUserId)?.name ?? `アカウント ${fakeUserId}`;
   await page.goto("/accounts/new");
-  await page.getByRole("button", { name: "Threadsアカウントを接続" }).click();
-  await page.locator(fakeUserId === FAKE_ACCOUNTS.owner.id ? "#allow" : `#allow-${fakeUserId}`).click();
+  await page.getByLabel("アカウントの名前").fill(name);
+  await page.getByRole("button", { name: "作る", exact: true }).click();
   await page.waitForURL(ACCOUNT_URL);
-  return ACCOUNT_URL.exec(new URL(page.url()).pathname)![1]!;
+  const accountId = ACCOUNT_URL.exec(new URL(page.url()).pathname)![1]!;
+  await page.goto(`/accounts/${accountId}/settings`);
+  await page.getByRole("button", { name: "Threadsで許可する" }).click();
+  await page.locator(fakeUserId === FAKE_ACCOUNTS.owner.id ? "#allow" : `#allow-${fakeUserId}`).click();
+  await page.waitForURL(new RegExp(`/accounts/${accountId}/settings`));
+  return accountId;
 }
 
 /**
