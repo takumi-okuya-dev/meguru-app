@@ -196,7 +196,7 @@ description: "Task list for feature 012 accounts before connect"
 - [X] T045 [P] `apps/web/src/pages/guide-threads-token.tsx`の「追加の画面で」などの文言を「『このアカウントの設定』の『Threadsとの接続』で」に直し、`apps/web/test/guide-page.test.tsx`を直す。
 - [X] T046 `apps/web/test/solo-owner-unchanged.test.tsx`を直す：接続中のアカウントだけを持つ人の画面が、「アカウントの名前」の区分と切り替えメニューの「アカウントを作る」を除いて変わらない（SC-007、Constitution原則V）。
 - [X] T047 E2Eを「作ってからつなぐ」に直す：`e2e/tests/onboarding.spec.ts`（名前で作る → 課題 → 案の登録 → 承認 → ホームの「次にやること」→ 設定でトークンでつなぐ → 「自動投稿を始める」）、`e2e/tests/token.spec.ts`・`e2e/tests/reconnect-delete.spec.ts`（削除の確認を名前に）・`e2e/tests/team-flow.ts`・`e2e/tests/helpers.ts`・`e2e/scripts/team-open.ts`。既知の失敗（reconnect-deleteの「再接続」のボタンが2つ）も、この書き直しで直す。
-- [ ] T048 `pnpm lint && pnpm typecheck && pnpm test`、`pnpm e2e -- onboarding`・`token`・`team`を通し、quickstart.md 2の1〜7を手で確かめ、結果を`specs/012-accounts-before-connect/verification.md`に残す。
+- [X] T048 `pnpm lint && pnpm typecheck && pnpm test`、`pnpm e2e -- onboarding`・`token`・`team`を通し、quickstart.md 2の1〜7を手で確かめ、結果を`specs/012-accounts-before-connect/verification.md`に残す。
 
 ---
 
