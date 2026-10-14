@@ -10,7 +10,7 @@ import {
 } from "@threads-grower/shared";
 import { CheckCircle2Icon } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { useNavigate } from "react-router";
+import { useLocation, useNavigate } from "react-router";
 import { toast } from "sonner";
 import { ConnectMethods } from "@/components/connect/ConnectMethods";
 import { AccountNameSection } from "@/components/settings/AccountNameSection";
@@ -66,6 +66,23 @@ function AccountSettingsContent() {
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const [confirm, setConfirm] = useState("");
+
+  // 「#threads」で開いたら（ホーム・招待・チームを作るの入口から）、「Threadsとの接続」の区分まで動かし、見出しにフォーカスを移す。
+  // 区分は投稿のスケジュールなどの下にあり、画面の中の移動ではブラウザがハッシュの位置へ動かさないため（PR #15 のCodexレビュー）。
+  // オーナーの区分は権限を読んでから出るので、読めたときにもう一度動かす
+  const location = useLocation();
+  const threadsHeading = useRef<HTMLHeadingElement>(null);
+  const accessLoaded = access !== undefined;
+  useEffect(() => {
+    if (location.hash !== "#threads") return;
+    const frame = requestAnimationFrame(() => {
+      const section = document.getElementById("threads");
+      if (!section) return;
+      section.scrollIntoView?.({ block: "start" });
+      threadsHeading.current?.focus();
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [location.key, location.hash, accessLoaded]);
 
   // 接続し直しは、このアプリで許可かトークンの貼り付けを選ぶダイアログから（specs/010 FR-031）
   const [reconnectOpen, setReconnectOpen] = useState(false);
@@ -167,7 +184,9 @@ function AccountSettingsContent() {
 
         {notConnected ? (
           <section id="threads" className="space-y-3">
-            <h2 className="font-medium">Threadsとの接続</h2>
+            <h2 ref={threadsHeading} tabIndex={-1} className="font-medium outline-none">
+              Threadsとの接続
+            </h2>
             <ConnectMethods
               account={account}
               canConnect={can("owner")}
@@ -177,7 +196,9 @@ function AccountSettingsContent() {
           </section>
         ) : can("owner") && (
         <section id="threads" className="space-y-3">
-          <h2 className="font-medium">Threadsとの接続</h2>
+          <h2 ref={threadsHeading} tabIndex={-1} className="font-medium outline-none">
+            Threadsとの接続
+          </h2>
           <p className="text-sm text-muted-foreground">
             今の接続：{account.connectionMethod === "token" ? "自分のMetaアプリのトークン" : "このアプリで許可"}。同じThreadsアカウント（@{account.username}）で接続し直すと、接続情報を更新できます。
           </p>

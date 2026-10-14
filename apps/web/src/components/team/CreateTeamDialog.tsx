@@ -32,6 +32,9 @@ export function CreateTeamDialog({
   // 未接続のアカウントはチームに入れられない（specs/012 FR-050・FR-051）
   const connectedIds = new Set(own.filter((a) => a.connectionStatus !== "not_connected").map((a) => a.id));
   const noConnected = me.data !== undefined && connectedIds.size === 0;
+  // つなぐ入口は、開いた画面のアカウントを優先する（名前は重なりうるので、ほかのアカウントへ移らないように。PR #15 のCodexレビュー）
+  const connectTarget =
+    own.find((a) => a.id === initialAccountId && !connectedIds.has(a.id)) ?? own.find((a) => !connectedIds.has(a.id));
   const [name, setName] = useState("");
   const [picked, setPicked] = useState<Set<string>>(() => new Set(initialAccountId ? [initialAccountId] : []));
   const chosen = [...picked].filter((id) => connectedIds.has(id));
@@ -97,9 +100,13 @@ export function CreateTeamDialog({
               <div role="status" className="space-y-1.5 rounded-xl border bg-muted/40 px-3 py-2 text-sm">
                 <p>先にThreadsにつないでください。チームに入れられるのは、Threadsにつないだアカウントだけです。</p>
                 {/* 「Threadsとの接続」へ進む入口（PR #15 のCodexレビュー） */}
-                {own[0] && (
-                  <Link className="font-medium underline underline-offset-4" to={`/accounts/${own[0].id}/settings#threads`} onClick={onClose}>
-                    「{own[0].name}」をThreadsにつなぐ
+                {connectTarget && (
+                  <Link
+                    className="font-medium underline underline-offset-4"
+                    to={`/accounts/${connectTarget.id}/settings#threads`}
+                    onClick={onClose}
+                  >
+                    「{connectTarget.name}」をThreadsにつなぐ
                   </Link>
                 )}
               </div>

@@ -232,3 +232,22 @@ describe("アカウントが変わったら、削除の確認を消す（PR #15 
     expect(screen.getByRole("button", { name: "削除する" })).toBeDisabled();
   });
 });
+
+describe("#threads で開くと「Threadsとの接続」まで動かす（PR #15 のCodexレビュー）", () => {
+  it("区分までスクロールし、見出しにフォーカスを移す。ハッシュがなければ動かさない", async () => {
+    const scroll = vi.fn();
+    Element.prototype.scrollIntoView = scroll;
+    renderSettings(unconnected, "/accounts/a1/settings#threads");
+    await vi.waitFor(() => expect(scroll).toHaveBeenCalled());
+    expect(scroll.mock.instances[0]).toBe(document.getElementById("threads"));
+    expect(await screen.findByRole("heading", { name: "Threadsとの接続" })).toHaveFocus();
+  });
+
+  it("ハッシュがなければ動かさない", async () => {
+    const scroll = vi.fn();
+    Element.prototype.scrollIntoView = scroll;
+    renderSettings(unconnected);
+    await screen.findByRole("heading", { name: "Threadsとの接続" });
+    expect(scroll).not.toHaveBeenCalled();
+  });
+});

@@ -128,6 +128,25 @@ describe("TeamSection（チームに入っていないオーナー）", () => {
     expect(screen.queryByRole("dialog", { name: "チームを作る" })).not.toBeInTheDocument();
   });
 
+  it("未接続のアカウントが2つあるとき、つなぐリンクは開いた画面のアカウントを優先する（PR #15 のCodexレビュー）", async () => {
+    const base = { ...meData.accounts[0]!, username: null, displayName: null, connectionStatus: "not_connected" as const };
+    me.mockResolvedValue({
+      ...meData,
+      accounts: [
+        { ...base, id: "a0", name: "カフェの公式" },
+        { ...base, id: "a1", name: "カフェの公式" },
+      ],
+    });
+    const user = userEvent.setup();
+    renderSection();
+    await user.click(screen.getByRole("button", { name: "チームを作る" }));
+    const dialog = await screen.findByRole("dialog", { name: "チームを作る" });
+    expect(await within(dialog).findByRole("link", { name: "「カフェの公式」をThreadsにつなぐ" })).toHaveAttribute(
+      "href",
+      "/accounts/a1/settings#threads",
+    );
+  });
+
   it("担当の人には（チームに入っていなければ）何も出さない", () => {
     const { container } = render(
       <QueryClientProvider client={new QueryClient()}>
