@@ -119,7 +119,7 @@ export const fake = {
   insightsFail: (key: string, kind: "not_found" | "permission" | "rate_limit" | "transient" | "auth", times: number) =>
     control("insights-failure", { key, kind, times }),
   setFollowers: (userId: string, count: number) => control("followers", { userId, count }),
-  callCounts: async () => (await control("call-counts")) as { insights: number; followers: number },
+  callCounts: async () => (await control("call-counts")) as { insights: number; followers: number; total: number },
   containers: async () =>
     ((await control("containers")) as { containers: { id: string; userId: string; text: string; status: string }[] })
       .containers,
@@ -141,13 +141,58 @@ export async function authorizeAndCallback(
   return app.request(`${cb.pathname}${cb.search}`, { method: "GET" }, testEnv);
 }
 
-/** connect（mode=new）→ 認可 → callback をまとめて行う */
-export async function connectNew(app: TestApp, user: string, fakeUser: string, action: "allow" | "deny" = "allow") {
-  const res = await call(app, "POST", "/api/threads/connect", { user, body: { mode: "new" } });
-  if (res.status !== 200) return { connectRes: res, callbackRes: null as Response | null };
+/**
+ * 名前だけでアカウントを作る（POST /api/accounts。specs/012）。
+ * @returns 作ったアカウントのID。作れなければ（上限など）NULL と応答
+ */
+export async function createAccountVia(app: TestApp, user: string, name = "テストのアカウント") {
+  const res = await call(app, "POST", "/api/accounts", { user, body: { name } });
+  if (res.status !== 201) return { accountId: null as string | null, res };
+  return { accountId: ((await res.clone().json()) as { id: string }).id, res };
+}
+
+/**
+ * 未接続のアカウントに、このアプリの接続ではじめてつなぐ（connect（mode=connect）→ 認可 → callback）。
+ * @returns connect の応答と callback の応答（302）
+ */
+export async function connectExisting(
+  app: TestApp,
+  user: string,
+  accountId: string,
+  fakeUser: string,
+  action: "allow" | "deny" = "allow",
+) {
+  const res = await call(app, "POST", "/api/threads/connect", { user, body: { mode: "connect", accountId } });
+  if (res.status !== 200) return { connectRes: res, callbackRes: null as Response | null, authorizeUrl: undefined };
   const { authorizeUrl } = (await res.json()) as { authorizeUrl: string };
   const callbackRes = await authorizeAndCallback(app, authorizeUrl, { fakeUser, action });
   return { connectRes: res, callbackRes, authorizeUrl };
+}
+
+/**
+ * アカウントを作ってから、このアプリの接続でつなぐ（012 より前の「つないで追加」の代わり）。
+ * 作れなければ（上限など）、作る応答を connectRes に入れ、callbackRes は NULL。
+ * @returns 作ったアカウントのID・connect の応答・callback の応答
+ */
+export async function connectNew(app: TestApp, user: string, fakeUser: string, action: "allow" | "deny" = "allow") {
+  const created = await createAccountVia(app, user, `アカウント ${fakeUser}`);
+  if (!created.accountId) return { accountId: null, connectRes: created.res, callbackRes: null as Response | null, authorizeUrl: undefined };
+  return { accountId: created.accountId, ...(await connectExisting(app, user, created.accountId, fakeUser, action)) };
+}
+
+/**
+ * アカウントを作ってから、トークンでつなぐ（POST /api/threads/token-connect、mode=connect）。
+ * 作れなければ、作る応答を返す。
+ * @returns token-connect の応答（作れなければ作る応答）と、作ったアカウントのID
+ */
+export async function tokenConnectNew(app: TestApp, user: string, token: string, name = "トークンのアカウント") {
+  const created = await createAccountVia(app, user, name);
+  if (!created.accountId) return { accountId: null, res: created.res };
+  const res = await call(app, "POST", "/api/threads/token-connect", {
+    user,
+    body: { mode: "connect", accountId: created.accountId, token },
+  });
+  return { accountId: created.accountId, res };
 }
 
 export function redirectTarget(res: Response) {
@@ -166,7 +211,7 @@ let accountSeq = 0;
  */
 export async function createUserWithAccount(
   user: string,
-  opts: { plan?: "auto-only" | "auto-grower" | "multi-account" | "team"; userCreatedAt?: Date } = {},
+  opts: { plan?: "auto-only" | "auto-grower" | "multi-account" | "team"; userCreatedAt?: Date; name?: string } = {},
 ) {
   const sql = neon(testEnv.DATABASE_URL);
   createDb(testEnv.DATABASE_URL);
@@ -178,9 +223,35 @@ export async function createUserWithAccount(
     RETURNING id`) as [{ id: string }];
   accountSeq += 1;
   const threadsUserId = `tu_${user}_${Date.now()}_${accountSeq}`;
+  const username = `${user}_${accountSeq}`;
   const [a] = (await sql`
-    INSERT INTO accounts (threads_user_id, username, plan)
-    VALUES (${threadsUserId}, ${`${user}_${accountSeq}`}, ${opts.plan ?? "auto-only"})
+    INSERT INTO accounts (name, threads_user_id, username, plan)
+    VALUES (${opts.name ?? username}, ${threadsUserId}, ${username}, ${opts.plan ?? "auto-only"})
+    RETURNING id`) as [{ id: string }];
+  await sql`INSERT INTO memberships (user_id, account_id, role) VALUES (${u.id}, ${a.id}, 'owner')`;
+  return { userId: u.id, accountId: a.id };
+}
+
+/**
+ * ユーザーと、Threadsにつないでいない owner の Account を直接作る（specs/012 data-model.md）。
+ * @param user - Clerk のユーザーID
+ * @param opts - name：アカウントの名前（既定「未接続のアカウント」）、plan、userCreatedAt
+ * @returns users.id と accounts.id
+ */
+export async function createUnconnectedAccount(
+  user: string,
+  opts: { name?: string; plan?: "auto-only" | "auto-grower" | "multi-account" | "team"; userCreatedAt?: Date } = {},
+) {
+  const sql = neon(testEnv.DATABASE_URL);
+  const createdAt = (opts.userCreatedAt ?? new Date()).toISOString();
+  const [u] = (await sql`
+    INSERT INTO users (clerk_user_id, email, display_name, created_at, updated_at)
+    VALUES (${user}, ${`${user}@example.com`}, ${user}, ${createdAt}, ${createdAt})
+    ON CONFLICT (clerk_user_id) DO UPDATE SET updated_at = users.updated_at
+    RETURNING id`) as [{ id: string }];
+  const [a] = (await sql`
+    INSERT INTO accounts (name, plan, connection_status, connection_method)
+    VALUES (${opts.name ?? "未接続のアカウント"}, ${opts.plan ?? "auto-only"}, 'not_connected', NULL)
     RETURNING id`) as [{ id: string }];
   await sql`INSERT INTO memberships (user_id, account_id, role) VALUES (${u.id}, ${a.id}, 'owner')`;
   return { userId: u.id, accountId: a.id };

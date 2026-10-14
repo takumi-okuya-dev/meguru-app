@@ -1,8 +1,9 @@
-// US1：自分のMetaアプリのトークンでの追加（specs/010-token-account-add contracts/api.md、FR-010〜FR-015）
+// US1：自分のMetaアプリのトークンでの追加（specs/010-token-account-add contracts/api.md、FR-010〜FR-015）。
+// specs/012 で「トークンでアカウントを作る」は「名前で作ったアカウントに、トークンではじめてつなぐ」（mode = connect）になった。
 import { neon } from "@neondatabase/serverless";
 import { beforeEach, describe, expect, it } from "vitest";
 import { runDailyJobs } from "../../src/services/daily-jobs";
-import { call, fake, makeApp, resetDb, testEnv } from "../helpers/app";
+import { call, createAccountVia, fake, makeApp, resetDb, testEnv } from "../helpers/app";
 
 const app = makeApp();
 const q = () => neon(testEnv.DATABASE_URL);
@@ -16,17 +17,33 @@ beforeEach(async () => {
   await testEnv.AUTOPOST_KV.delete("autopost:wake");
 });
 
-type Ok = { accountId: string; kind: "new" | "reconnect"; username: string; warnings: string[] };
+type Ok = { accountId: string; kind: "connect" | "reconnect"; username: string; warnings: string[] };
 const codeOf = async (res: Response) => ((await res.json()) as { error: { code: string } }).error.code;
 
 /**
- * トークンで追加する。
+ * その人の未接続のアカウント（なければ作る）。
+ * @param user - Clerk のユーザーID
+ * @returns accounts.id
+ */
+async function targetFor(user: string): Promise<string> {
+  const [row] = (await q()`
+    SELECT a.id FROM accounts a JOIN memberships m ON m.account_id = a.id AND m.role = 'owner' JOIN users u ON u.id = m.user_id
+    WHERE u.clerk_user_id = ${user} AND a.connection_status = 'not_connected' ORDER BY a.created_at LIMIT 1`) as { id: string }[];
+  if (row) return row.id;
+  const { accountId } = await createAccountVia(app, user);
+  if (!accountId) throw new Error(`could not create an account for ${user}`);
+  return accountId;
+}
+
+/**
+ * その人の未接続のアカウントに、トークンではじめてつなぐ（specs/012）。
  * @param token - 貼り付けるトークン
  * @param user - Clerk のユーザーID
  * @returns 応答
  */
-function add(token: string, user = "u1") {
-  return call(app, "POST", "/api/threads/token-connect", { user, body: { mode: "new", token } });
+async function add(token: string, user = "u1") {
+  const accountId = await targetFor(user);
+  return call(app, "POST", "/api/threads/token-connect", { user, body: { mode: "connect", accountId, token } });
 }
 
 async function accountRow(id: string) {
@@ -42,7 +59,7 @@ describe("トークンで追加する（US1）", () => {
     const res = await add(`  "${token}"\n`);
     expect(res.status).toBe(200);
     const body = (await res.json()) as Ok;
-    expect(body).toMatchObject({ kind: "new", username: "cafe_b", warnings: [] });
+    expect(body).toMatchObject({ kind: "connect", username: "cafe_b", warnings: [] });
     const a = await accountRow(body.accountId);
     expect(a).toMatchObject({ connection_method: "token", connection_status: "connected", username: "cafe_b", display_name: "Cafe B" });
     expect(a.threads_user_id).toBe("9003-myapp");
@@ -91,7 +108,8 @@ describe("トークンで追加する（US1）", () => {
     expect(await codeOf(await add(revoked))).toBe("TOKEN_INVALID");
     expect(await codeOf(await add(short))).toBe("TOKEN_SHORT_LIVED");
     expect(await codeOf(await add("https://example.com/not-a-token"))).toBe("TOKEN_INVALID");
-    expect((await q()`SELECT count(*)::int AS n FROM accounts`)[0]).toEqual({ n: 0 });
+    // つながらず、未接続のまま（specs/012）
+    expect((await q()`SELECT count(*)::int AS n FROM accounts WHERE connection_status <> 'not_connected'`)[0]).toEqual({ n: 0 });
   });
 
   it("Threadsの一時的な失敗は THREADS_UNAVAILABLE で、失敗に数えない", async () => {
@@ -102,16 +120,19 @@ describe("トークンで追加する（US1）", () => {
     expect((await q()`SELECT count(*)::int AS n FROM token_check_failures`)[0]).toEqual({ n: 0 });
   });
 
-  it("登録の上限なら ACCOUNT_LIMIT_REACHED（US1-7）", async () => {
-    await add(await fake.issueToken({ user: "9003" }));
-    const res = await add(await fake.issueToken({ user: "9004" }));
-    expect([res.status, await codeOf(res)]).toEqual([409, "ACCOUNT_LIMIT_REACHED"]);
+  it("登録の上限に達していても、未接続のアカウントにはつなげる（アカウントは増えない。specs/012 FR-016）", async () => {
+    await targetFor("u1");
+    expect((await createAccountVia(app, "u1")).res.status).toBe(409);
+    const res = await add(await fake.issueToken({ user: "9003" }));
+    expect(res.status).toBe(200);
   });
 
-  it("同じトークンを同時に2回送っても、Accountは1つ（FR-014）", async () => {
+  it("同じトークンを同時に2回送っても、つながるのは1回で、後の方は ACCOUNT_ALREADY_CONNECTED（FR-014、specs/012 FR-018）", async () => {
     const token = await fake.issueToken({ user: "9003" });
+    await targetFor("u1");
     const results = await Promise.all([add(token), add(token)]);
     expect(results.map((r) => r.status).sort()).toEqual([200, 409]);
+    expect((await Promise.all(results.filter((r) => r.status === 409).map(codeOf)))).toEqual(["ACCOUNT_ALREADY_CONNECTED"]);
     expect((await q()`SELECT count(*)::int AS n FROM accounts`)[0]).toEqual({ n: 1 });
   });
 
@@ -123,7 +144,7 @@ describe("トークンで追加する（US1）", () => {
       body: { mode: "reconnect", accountId: crypto.randomUUID(), token: `  "${"a".repeat(2048)}"\n` },
     });
     expect(await codeOf(reconnect)).not.toBe("VALIDATION_FAILED");
-    const huge = await call(app, "POST", "/api/threads/token-connect", { user: "u1", body: { mode: "new", token: "a".repeat(9000) } });
+    const huge = await call(app, "POST", "/api/threads/token-connect", { user: "u1", body: { mode: "connect", accountId: await targetFor("u1"), token: "a".repeat(9000) } });
     expect(await codeOf(huge)).toBe("VALIDATION_FAILED");
   });
 
@@ -155,16 +176,16 @@ describe("トークンで追加する（US1）", () => {
     await call(app, "GET", "/api/me", { user: "u1" });
     const id = ((await q()`SELECT id FROM users WHERE clerk_user_id = 'u1'`) as { id: string }[])[0]!.id;
     const broken = createThreadsClient(testEnv, () => Promise.reject(new TypeError("fetch failed: getaddrinfo ENOTFOUND")));
-    const err = await connectWithToken(testEnv, broken, { id }, { mode: "new", token: "a".repeat(40) }).catch((e: unknown) => e);
+    const err = await connectWithToken(testEnv, broken, { id }, { mode: "connect", accountId: await targetFor("u1"), token: "a".repeat(40) }).catch((e: unknown) => e);
     expect(err).toBeInstanceOf(AppError);
     expect(err).toMatchObject({ code: "THREADS_UNAVAILABLE", status: 503 });
     expect((await q()`SELECT count(*)::int AS n FROM token_check_failures`)[0]).toEqual({ n: 0 });
   });
 
   it("本文がなければ VALIDATION_FAILED、未ログインは 401", async () => {
-    const bad = await call(app, "POST", "/api/threads/token-connect", { user: "u1", body: { mode: "new" } });
+    const bad = await call(app, "POST", "/api/threads/token-connect", { user: "u1", body: { mode: "connect" } });
     expect(await codeOf(bad)).toBe("VALIDATION_FAILED");
-    const anon = await call(app, "POST", "/api/threads/token-connect", { body: { mode: "new", token: "x".repeat(40) } });
+    const anon = await call(app, "POST", "/api/threads/token-connect", { body: { mode: "connect", accountId: crypto.randomUUID(), token: "x".repeat(40) } });
     expect(anon.status).toBe(401);
   });
 });
@@ -185,6 +206,7 @@ describe("確認の失敗の待ち（FR-015、research.md R9）", () => {
 
   it("並べて送っても、確認中の要求も数えるので、5回を超えて確かめない（PR #12 のCodexレビュー）", async () => {
     const shaped = Array.from({ length: 8 }, (_, i) => `badtoken${i}`.padEnd(40, "x"));
+    await targetFor("u1");
     const results = await Promise.all(shaped.map((t) => add(t)));
     const codes = await Promise.all(results.map(codeOf));
     expect(codes.filter((c) => c === "TOKEN_INVALID")).toHaveLength(5);
@@ -215,7 +237,8 @@ describe("確認の失敗の待ち（FR-015、research.md R9）", () => {
       const ok = await add(await fake.issueToken({ user: "9003" }));
       expect(ok.status).toBe(200);
       expect((await q()`SELECT count(*)::int AS n FROM accounts`)[0]).toEqual({ n: 1 });
-      expect(await codeOf(await add("bad token"))).toBe("TOKEN_INVALID");
+      // 1件目をつないだ u1 には、もう未接続のアカウントがない（上限1件）ので、別の人で確かめる
+      expect(await codeOf(await add("bad token", "u2"))).toBe("TOKEN_INVALID");
     } finally {
       await q()`DROP TRIGGER tcf_fail ON token_check_failures`;
       await q()`DROP FUNCTION tcf_fail()`;

@@ -94,6 +94,7 @@ export async function getPerformanceSummary(db: Db, account: AccountRow): Promis
     lastFetchedAt: r.last_fetched_at ? new Date(r.last_fetched_at).toISOString() : null,
     insightsDenied: account.insightsDeniedAt !== null,
     needsReconnect: account.connectionStatus === "needs_reconnect",
+    notConnected: account.connectionStatus === "not_connected",
     counts: {
       all: Number(r.all),
       good: Number(r.good),

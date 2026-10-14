@@ -226,6 +226,7 @@ export async function getTeamDetail(db: Db | TxDb, teamAccess: TeamAccess) {
         const relation = r.ownerUserId === me ? "owner" : mine.has(r.account.id) ? "assigned" : r.shared ? "shared_viewer" : null;
         return {
           id: r.account.id,
+          name: r.account.name,
           username: r.account.username,
           displayName: r.account.displayName,
           profilePictureUrl: relation ? r.account.profilePictureUrl : null,
@@ -422,6 +423,7 @@ export async function getAssignments(db: Db | TxDb, teamAccess: TeamAccess) {
   return {
     accounts: cols.map((c) => ({
       id: c.account.id,
+      name: c.account.name,
       username: c.account.username,
       displayName: c.account.displayName,
       profilePictureUrl: c.account.profilePictureUrl,

@@ -59,3 +59,28 @@ describe("チームの見直しのエラー文言（specs/011 contracts/api.md�
     expect(errorMessage("INVITE_INVALID").message).toContain("このリンクは使えません");
   });
 });
+
+describe("アカウントを先に作るのエラー文言（specs/012 contracts/api.md）", () => {
+  it("新しいコードはエラーコードとして扱える", () => {
+    for (const code of ["ACCOUNT_NOT_CONNECTED", "ACCOUNT_ALREADY_CONNECTED"]) expect(isErrorCode(code)).toBe(true);
+  });
+
+  it("文言", () => {
+    expect(errorMessage("ACCOUNT_NOT_CONNECTED").message).toBe(
+      "このアカウントは、まだThreadsにつながっていません。「このアカウントの設定」からつないでください。",
+    );
+    expect(errorMessage("ACCOUNT_ALREADY_CONNECTED").message).toBe("このアカウントは、すでにThreadsにつながっています。");
+  });
+
+  it("自分の別のアカウントと重なったら、そのアカウントの名前を出す（details: [id, name, username]）", () => {
+    expect(errorMessage("ACCOUNT_ALREADY_REGISTERED", { details: ["a1", "カフェ", "cafe_b"] }).message).toBe(
+      "@cafe_bは、あなたのアカウント『カフェ』につながっています。",
+    );
+    // 名前がなければ今の文言
+    expect(errorMessage("ACCOUNT_ALREADY_REGISTERED").message).toContain("「接続し直す」");
+  });
+
+  it("未接続で自動投稿をオンにしようとしたとき", () => {
+    expect(errorMessage("THREADS_NOT_READY", { details: ["not_connected"] }).message).toBe("Threadsにつなぐと使えます");
+  });
+});

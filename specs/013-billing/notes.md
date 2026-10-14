@@ -42,6 +42,7 @@
 - 無料体験中のアカウントの上限を1件にする（PRD FR-2・FR-12、2026-10-09）
 - オーナーが未払いのとき、パートナー・編集者も読むだけにする（`authorizeAccount` と `listTeamAccounts` の1か所に足す。008 FR-080・R15）
 - 旧プランの `PLANS`・`accounts.plan`・`limitForOwnedPlans`・`hasGrowerAccess` を外す
+- **012（アカウントを先に作る）からの持ち越し**：Threadsにつないでいないアカウント（`connection_status = not_connected`）を、登録数の上限・無料体験の上限・料金にどう数えるか。012では、001の上限に未接続のアカウントも数えている（数えないと、上限を超えて作れてしまうため。specs/012 spec.md「Assumptions」）。一度もつながないまま置かれたアカウントを、いつまで残すかもここで決める
 
 ## 3. 番号の変更（2026-10-10、2026-10-13）
 

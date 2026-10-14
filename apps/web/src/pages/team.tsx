@@ -46,7 +46,7 @@ type Pending =
  * @returns チップ
  */
 function AccountChip({ teamId, account, owner }: { teamId: string; account: TeamMember["accounts"][number]; owner: string }) {
-  const label = account.displayName ?? account.username;
+  const label = account.name;
   if (!account.canOpen) {
     return (
       <span className="inline-flex h-9 items-center rounded-full border border-dashed border-muted-foreground/50 px-3.5 text-[13px] text-muted-foreground">
@@ -340,7 +340,7 @@ export function TeamPage() {
           </h2>
           <ul className="divide-y overflow-hidden rounded-2xl border">
             {myAccounts.map((a) => {
-              const label = a.displayName ?? a.username;
+              const label = a.name;
               return (
                 <li key={a.id} className="flex flex-wrap items-center gap-3 px-4 py-3">
                   <AccountAvatar account={a} className="size-9" />
@@ -560,16 +560,19 @@ export function TeamPage() {
             <ul className="space-y-2">
               {addable.map((a) => (
                 <li key={a.id}>
+                  {/* 未接続のアカウントは足せない（specs/012 FR-050） */}
                   <button
                     type="button"
-                    disabled={action.isPending}
+                    disabled={action.isPending || a.connectionStatus === "not_connected"}
                     onClick={() => action.mutate(() => api.addTeamAccount(teamId, a.id))}
-                    className="flex min-h-11 w-full items-center gap-3 rounded-xl border px-3 py-2 text-left hover:bg-accent"
+                    className="flex min-h-11 w-full items-center gap-3 rounded-xl border px-3 py-2 text-left hover:bg-accent disabled:opacity-60 disabled:hover:bg-transparent"
                   >
                     <AccountAvatar account={a} className="size-8" />
                     <span className="flex min-w-0 flex-col leading-tight">
-                      <span className="truncate font-medium">{a.displayName ?? a.username}</span>
-                      <span className="truncate text-xs text-muted-foreground">@{a.username}</span>
+                      <span className="truncate font-medium">{a.name}</span>
+                      <span className="truncate text-xs text-muted-foreground">
+                        {a.connectionStatus === "not_connected" ? "Threadsにつなぐと入れられます" : a.username ? `@${a.username}` : ""}
+                      </span>
                     </span>
                   </button>
                 </li>

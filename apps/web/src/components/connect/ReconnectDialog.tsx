@@ -14,7 +14,13 @@ import { TokenConnectForm } from "./TokenConnectForm";
 import { TokenWarnings } from "./TokenWarnings";
 
 /** 接続し直すAccount。 */
-export type ReconnectTarget = { id: string; username: string; connectionMethod?: ConnectionMethod };
+export type ReconnectTarget = {
+  id: string;
+  /** アカウントの名前（specs/012） */
+  name: string;
+  username: string | null;
+  connectionMethod?: ConnectionMethod | null;
+};
 
 /**
  * 接続し直しのダイアログ。
@@ -61,7 +67,8 @@ export function ReconnectDialog({
         </div>
         <div className="flex-1 space-y-4 overflow-y-auto px-4 py-4 md:max-h-[75vh] md:px-6 md:pb-6">
           <DialogDescription id="reconnect-desc" className="text-sm text-foreground/80">
-            @{account.username}の接続を更新します。投稿ストックや設定はそのまま残ります。
+            {account.name}
+            {account.username ? `（@${account.username}）` : ""}の接続を更新します。投稿ストックや設定はそのまま残ります。
           </DialogDescription>
           {doneWarnings ? (
             <div className="space-y-4">
@@ -106,7 +113,7 @@ export function ReconnectDialog({
             <TokenConnectForm
               mode="reconnect"
               accountId={account.id}
-              username={account.username}
+              username={account.username ?? ""}
               onSuccess={(result) => {
                 toast.success("接続し直しました");
                 void queryClient.invalidateQueries({ queryKey: ["me"] });

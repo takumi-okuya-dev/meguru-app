@@ -59,12 +59,15 @@ export const accountPlan = pgEnum("account_plan", PLANS);
 export const membershipRole = pgEnum("membership_role", ["owner", "member", "partner", "editor", "admin"]);
 /** チームでのロール（specs/011 data-model.md の team_role）。 */
 export const teamRole = pgEnum("team_role", ["admin", "member", "editor"]);
-/** Threads接続の状態の列挙型（connection_status）。 */
-export const connectionStatus = pgEnum("connection_status", ["connected", "needs_reconnect"]);
+/** Threads接続の状態の列挙型（connection_status）。not_connected は一度もつないでいない（specs/012 data-model.md）。 */
+export const connectionStatus = pgEnum("connection_status", ["connected", "needs_reconnect", "not_connected"]);
 /** 今の接続の方法（specs/010-token-account-add data-model.md）。app は001のOAuth、token は利用者のMetaアプリのトークン。 */
 export const connectionMethod = pgEnum("connection_method", ["app", "token"]);
-/** 接続フローの種類の列挙型（oauth_mode）。 */
-export const oauthMode = pgEnum("oauth_mode", ["new", "reconnect"]);
+/**
+ * 接続フローの種類の列挙型（oauth_mode）。connect は未接続のアカウントにはじめてつなぐ（specs/012 research.md R4）。
+ * new（つないでアカウントを作る）は使わない（列挙型から値は消せないので残す）。
+ */
+export const oauthMode = pgEnum("oauth_mode", ["new", "reconnect", "connect"]);
 /** Metaのデータ削除要求の進み具合の列挙型（deletion_status）。 */
 export const deletionStatus = pgEnum("deletion_status", ["pending", "completed", "failed"]);
 
@@ -82,11 +85,16 @@ export const users = pgTable("users", {
   ...timestamps,
 });
 
-/** Threadsアカウント1件に対応する運用単位（data-model.md の accounts）。 */
+/**
+ * Threadsアカウント1件に対応する運用単位（data-model.md の accounts）。
+ * 名前だけで作り、Threadsには後でつなぐ。未接続の間は threads_user_id・username・connection_method が NULL（specs/012 data-model.md）。
+ */
 export const accounts = pgTable("accounts", {
   id: uuid("id").primaryKey().defaultRandom(),
-  threadsUserId: text("threads_user_id").notNull().unique(),
-  username: text("username").notNull(),
+  // アカウントの名前（specs/012 research.md R2）。主に出す名前
+  name: text("name").notNull(),
+  threadsUserId: text("threads_user_id").unique(),
+  username: text("username"),
   displayName: text("display_name"),
   profilePictureUrl: text("profile_picture_url"),
   plan: accountPlan("plan").notNull(),
@@ -120,7 +128,7 @@ export const accounts = pgTable("accounts", {
   // 反応数を読む権限がないと分かった日時（006 research.md R11）。再接続で消す
   insightsDeniedAt: timestamp("insights_denied_at", { withTimezone: true, precision: 6 }),
   // 今の接続の方法と、要再接続の理由の補い（specs/010 data-model.md。hint は short_lived_token だけ）
-  connectionMethod: connectionMethod("connection_method").notNull().default("app"),
+  connectionMethod: connectionMethod("connection_method").default("app"),
   reconnectHint: text("reconnect_hint"),
   ...timestamps,
 }, (t) => [
@@ -129,6 +137,18 @@ export const accounts = pgTable("accounts", {
   check("accounts_promotion_ratio_range", sql`${t.promotionRatioPercent} BETWEEN 0 AND 100`),
   check("accounts_prompt_post_count_range", sql`${t.promptPostCount} BETWEEN 1 AND 50`),
   check("accounts_core_rules_length", sql`char_length(${t.coreRules}) <= 2000`),
+  // アカウントの名前は前後の空白を除いて1〜50文字（specs/012 data-model.md）。空白は JavaScript の trim() と同じもの
+  // （タブ・改行・NBSP・全角スペースなど。PR #15 のCodexレビュー）。0013 の名前の埋め方も同じ文字の集まりを使う
+  check(
+    "accounts_name_length",
+    sql`char_length(${t.name}) BETWEEN 1 AND 50 AND ${t.name} !~ '^[\\t\\n\\u000b\\f\\r \\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000\\ufeff]' AND ${t.name} !~ '[\\t\\n\\u000b\\f\\r \\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000\\ufeff]$'`,
+  ),
+  // 未接続 ⇔ Threadsのユーザー・ユーザー名・接続の方法がそろって NULL（同じマイグレーションで足した値を使えないので ::text で比べる）
+  check(
+    "accounts_connection_consistency",
+    sql`(${t.connectionStatus}::text = 'not_connected' AND ${t.threadsUserId} IS NULL AND ${t.username} IS NULL AND ${t.connectionMethod} IS NULL)
+      OR (${t.connectionStatus}::text <> 'not_connected' AND ${t.threadsUserId} IS NOT NULL AND ${t.username} IS NOT NULL AND ${t.connectionMethod} IS NOT NULL)`,
+  ),
 ]);
 
 /** User と Account の関係（data-model.md の memberships）。1つのAccountに owner は1人だけ。 */
@@ -204,15 +224,14 @@ export const oauthStates = pgTable(
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
     mode: oauthMode("mode").notNull(),
-    targetAccountId: uuid("target_account_id").references(() => accounts.id, { onDelete: "cascade" }),
+    // 許可の画面にいる間に対象が消されたら NULL にし、callback で「見つからない」と分かるようにする（specs/012 contracts/api.md）
+    targetAccountId: uuid("target_account_id").references(() => accounts.id, { onDelete: "set null" }),
     expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
     createdAt: timestamp("created_at", { withTimezone: true, precision: 6 }).notNull().defaultNow(),
   },
   (t) => [
-    check(
-      "oauth_states_target_required_for_reconnect",
-      sql`(${t.mode} = 'reconnect') = (${t.targetAccountId} IS NOT NULL)`,
-    ),
+    // new（012 より前の「つないで作る」）は対象を持たない。connect・reconnect の対象は、消されると NULL になる
+    check("oauth_states_no_target_for_new", sql`${t.mode}::text <> 'new' OR ${t.targetAccountId} IS NULL`),
   ],
 );
 

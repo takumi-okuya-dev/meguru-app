@@ -23,7 +23,7 @@ export function AssignedNotice({ account }: { account: AccountSummary }) {
   return (
     <div role="status" className="flex w-full items-center gap-3 rounded-2xl border bg-card px-4 py-3 text-sm">
       <UsersIcon aria-hidden="true" className="size-5 shrink-0 text-muted-foreground" />
-      <span className="flex-1">{account.displayName ?? account.username}の担当になりました。投稿の案を作れます。</span>
+      <span className="flex-1">{account.name}の担当になりました。投稿の案を作れます。</span>
       <button
         type="button"
         aria-label="閉じる"

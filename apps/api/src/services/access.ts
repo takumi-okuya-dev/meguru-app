@@ -275,6 +275,7 @@ export function summaryRoleOf(relation: Relation): SummaryRole {
 export function toAccountSummary(a: AccountRow, role: SummaryRole = "owner", ownerName: string | null = null) {
   return {
     id: a.id,
+    name: a.name,
     username: a.username,
     displayName: a.displayName,
     profilePictureUrl: a.profilePictureUrl,

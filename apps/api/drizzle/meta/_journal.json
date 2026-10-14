@@ -92,6 +92,13 @@
       "when": 1791863239362,
       "tag": "0012_team_revision",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1791940814663,
+      "tag": "0013_accounts_before_connect",
+      "breakpoints": true
     }
   ]
 }

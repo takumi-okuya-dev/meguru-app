@@ -8,7 +8,7 @@ import {
   type PostingSchedule,
   type ThreadsCheck,
 } from "@threads-grower/shared";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -18,6 +18,7 @@ import { queryKeys } from "@/lib/query";
 import { cn } from "@/lib/utils";
 import { PostingScheduleDialog } from "./PostingScheduleDialog";
 import { SettingCard, SettingRow } from "./SettingRow";
+import { NotConnectedNotice } from "@/components/NotConnectedNotice";
 
 /**
  * 保存の後の通知の文言。オンにしたときは次の投稿の予定を添える（contracts/ui-routes.md）。
@@ -42,7 +43,8 @@ async function savedMessage(accountId: string, schedule: PostingSchedule): Promi
 /**
  * 「投稿のスケジュール」の区分。自動投稿・投稿する時刻・時刻を少しずらすの3つの行と、「接続を確かめる」。
  * 設定の権限がない人（担当の人。設定はオーナーだけ。specs/011 FR-060）には、読むだけで出す（specs/008 FR-041）。
- * @param props - account：Account、canEdit：設定の権限、canReconnect：再接続できる（オーナー）、onReconnect：再接続を始める
+ * @param props - account：Account、canEdit：設定の権限、canReconnect：再接続できる（オーナー）、onReconnect：再接続を始める、
+ *   editRequest：増えるたびに設定のダイアログを開く（つないだ直後の「自動投稿を始める」。specs/012 FR-014）
  * @returns 区分
  */
 export function PostingScheduleSection({
@@ -50,11 +52,13 @@ export function PostingScheduleSection({
   canEdit = true,
   canReconnect = true,
   onReconnect,
+  editRequest = 0,
 }: {
   account: AccountSummary;
   canEdit?: boolean;
   canReconnect?: boolean;
   onReconnect: () => void;
+  editRequest?: number;
 }) {
   const accountId = account.id;
   const query = useQuery({
@@ -64,6 +68,12 @@ export function PostingScheduleSection({
   const queryClient = useQueryClient();
   const [editing, setEditing] = useState(false);
   const schedule = query.data?.schedule;
+  const sectionRef = useRef<HTMLElement>(null);
+  useEffect(() => {
+    if (editRequest === 0 || !canEdit) return;
+    sectionRef.current?.scrollIntoView?.({ block: "start", behavior: "smooth" });
+    setEditing(true);
+  }, [editRequest, canEdit]);
 
   const check = useMutation({
     mutationFn: () => api.checkThreads(accountId),
@@ -95,7 +105,7 @@ export function PostingScheduleSection({
   const times = schedule?.slotTimes ?? [];
 
   return (
-    <section aria-labelledby="posting-schedule-heading" className="space-y-3">
+    <section ref={sectionRef} id="posting-schedule" aria-labelledby="posting-schedule-heading" className="space-y-3">
       <div className="flex items-center justify-between gap-3">
         <h2 id="posting-schedule-heading" className="font-medium">
           投稿のスケジュール
@@ -112,6 +122,8 @@ export function PostingScheduleSection({
         )}
       </div>
       {!canEdit && <p className="text-xs text-muted-foreground">変更できるのはオーナーです</p>}
+      {/* 未接続：オンにはできない。時刻は先に決めておける（specs/012 FR-032・FR-033） */}
+      {account.connectionStatus === "not_connected" && <NotConnectedNotice accountId={accountId} />}
       {account.connectionStatus === "needs_reconnect" && (
         <Alert variant="destructive">
           <AlertDescription className="flex flex-wrap items-center gap-3 text-foreground">
@@ -172,7 +184,7 @@ export function PostingScheduleSection({
         </SettingCard>
       )}
 
-      {canEdit && (
+      {canEdit && account.connectionStatus !== "not_connected" && (
       <div className="flex flex-wrap items-center gap-3">
         <Button
           variant="outline"
@@ -218,6 +230,7 @@ export function PostingScheduleSection({
           onSaved={(s, c) => void onSaved(s, c)}
           onReconnect={onReconnect}
           onClose={() => setEditing(false)}
+          notConnected={account.connectionStatus === "not_connected"}
         />
       )}
     </section>

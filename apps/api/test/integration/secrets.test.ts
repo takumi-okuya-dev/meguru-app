@@ -1,7 +1,7 @@
 // US1：秘密情報が漏れない（FR-010、SC-005）
 import { neon } from "@neondatabase/serverless";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { call, connectNew, fake, makeApp, resetDb, testEnv } from "../helpers/app";
+import { call, connectExisting, connectNew, createAccountVia, fake, makeApp, resetDb, testEnv } from "../helpers/app";
 
 const app = makeApp();
 const q = () => neon(testEnv.DATABASE_URL);
@@ -26,13 +26,14 @@ describe("秘密情報", () => {
     }
 
     const bodies: string[] = [];
-    // 失敗系のレスポンスとログも集める（上限1件なので、成功より先に行う）
+    // 失敗系のレスポンスとログも集める
     await fake.fail("getProfile", 1, "auth");
     const failed = await connectNew(app, "u1", "1001");
     const failedState = new URL(failed.authorizeUrl!).searchParams.get("state")!;
     bodies.push(failed.callbackRes!.headers.get("Location") ?? "", await failed.callbackRes!.text());
 
-    const { connectRes, callbackRes, authorizeUrl } = await connectNew(app, "u1", "1001");
+    // 失敗した後も未接続のまま残ったアカウントに、もう一度つなぐ（specs/012）
+    const { connectRes, callbackRes, authorizeUrl } = await connectExisting(app, "u1", failed.accountId!, "1001");
     const state = new URL(authorizeUrl!).searchParams.get("state")!;
     bodies.push(callbackRes!.headers.get("Location") ?? "", await callbackRes!.text());
     expect(connectRes.status).toBe(200);
@@ -61,8 +62,9 @@ describe("秘密情報", () => {
     await fake.revokeToken(revoked);
     const short = await fake.issueToken({ user: "9003", lifetime: "short" });
     const good = await fake.issueToken({ user: "9003", debug: false });
+    const { accountId: target } = await createAccountVia(app, "u1");
     for (const token of [revoked, short, good]) {
-      const res = await call(app, "POST", "/api/threads/token-connect", { user: "u1", body: { mode: "new", token } });
+      const res = await call(app, "POST", "/api/threads/token-connect", { user: "u1", body: { mode: "connect", accountId: target, token } });
       bodies.push(await res.text());
     }
     const { accountId } = JSON.parse(bodies[2]!) as { accountId: string };

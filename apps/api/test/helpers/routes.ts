@@ -6,6 +6,8 @@ import type { Permission } from "@threads-grower/shared";
 export const ACCOUNT_ROUTES: [string, string, Permission][] = [
   ["GET", "/api/accounts/:accountId", "read"],
   ["POST", "/api/accounts/:accountId/open", "view"],
+  // 名前を直す（specs/012 FR-040）
+  ["PATCH", "/api/accounts/:accountId", "owner"],
   ["DELETE", "/api/accounts/:accountId", "owner"],
   ["GET", "/api/accounts/:accountId/auto-post", "view"],
   ["POST", "/api/accounts/:accountId/auto-post/notices/blocked/dismiss", "review"],

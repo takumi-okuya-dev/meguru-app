@@ -150,13 +150,16 @@ async function executeOwned(
     // 公開の結果がわからない途中だけは、確かめる処理（公開しない）を続ける
     return ctx.backToApproved("needs_reconnect");
   }
-  if (!cred?.token) {
+  if (!cred?.token || cred.threadsUserId === null) {
     // 接続がない・鍵の設定ミスで復号できない。結果がわからない途中なら待ち、そうでなければ一時的な失敗として数える
     if (attempt.publishRequestedAt || attempt.containerId) return ctx.release();
     return ctx.transientFailure("unknown");
   }
-  return ctx.run(cred as ThreadsCredentials & { token: string });
+  return ctx.run({ ...cred, token: cred.token });
 }
+
+/** 投稿に使える接続（つないでいて、トークンを復号できた。specs/012 で未接続を足した）。 */
+type UsableCredentials = Extract<ThreadsCredentials, { threadsUserId: string }> & { token: string };
 
 /** 1つの試みを進める間の状態と操作。 */
 class AttemptContext {
@@ -240,7 +243,7 @@ class AttemptContext {
     if (updated.length === 0) throw new LeaseLostError();
   }
 
-  async run(cred: ThreadsCredentials & { token: string }): Promise<ExecuteOutcome> {
+  async run(cred: UsableCredentials): Promise<ExecuteOutcome> {
     try {
       if (this.attempt.publishRequestedAt)
         return await this.confirm(cred, this.attempt.publishRequestedAt);
@@ -317,7 +320,7 @@ class AttemptContext {
    *   下書きを approved に戻す（別のトランザクションに分けると、その間にほかの処理が引き継いで公開しうる）
    */
   private publishFenced(
-    cred: ThreadsCredentials & { token: string },
+    cred: UsableCredentials,
     containerId: string,
   ): Promise<{ kind: "sent"; mediaId: string } | { kind: "stale" }> {
     return withTransaction(this.env.DATABASE_URL, async (tx) => {
@@ -381,7 +384,7 @@ class AttemptContext {
    * @returns 確認の結果
    */
   private async confirm(
-    cred: ThreadsCredentials & { token: string },
+    cred: UsableCredentials,
     requestedAt: Date,
   ): Promise<ExecuteOutcome> {
     const containerId = this.attempt.containerId;
@@ -456,7 +459,7 @@ class AttemptContext {
    * @returns 投稿済みの結果
    */
   private async succeed(
-    cred: ThreadsCredentials & { token: string },
+    cred: UsableCredentials,
     mediaId: string | null,
     publishedAt: Date,
   ): Promise<ExecuteOutcome> {

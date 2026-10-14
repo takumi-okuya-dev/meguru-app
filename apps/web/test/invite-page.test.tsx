@@ -28,9 +28,9 @@ const { isInvitePath } = await import("@/lib/invite-return");
 const TOKEN = "t_" + "a".repeat(43);
 
 const ACCOUNTS = [
-  { id: "acc-1", displayName: "ベーカリー E", username: "bakery_e", profilePictureUrl: null, inOtherTeam: null },
-  { id: "acc-2", displayName: "ベーカリー E 焼き菓子", username: "bakery_e_sweets", profilePictureUrl: null, inOtherTeam: null },
-  { id: "acc-3", displayName: "整体院 D", username: "seitai_d", profilePictureUrl: null, inOtherTeam: "美容チーム" },
+  { id: "acc-1", name: "ベーカリー E", displayName: "ベーカリー E", username: "bakery_e", profilePictureUrl: null, connected: true, inOtherTeam: null },
+  { id: "acc-2", name: "ベーカリー E 焼き菓子", displayName: "ベーカリー E 焼き菓子", username: "bakery_e_sweets", profilePictureUrl: null, connected: true, inOtherTeam: null },
+  { id: "acc-3", name: "整体院 D", displayName: "整体院 D", username: "seitai_d", profilePictureUrl: null, connected: true, inOtherTeam: "美容チーム" },
 ];
 
 function preview(viewer: Partial<InvitePreview["viewer"]> = {}): InvitePreview {
@@ -46,6 +46,7 @@ function renderAt() {
       { path: "/invite/:token", element: <InvitePage /> },
       { path: "/sign-in", element: <p>ログイン画面</p> },
       { path: "/accounts/new", element: <p>アカウント追加</p> },
+      { path: "/accounts/:id/settings", element: <p>設定の画面</p> },
       { path: "/teams/:teamId", element: <p>チームの画面</p> },
       { path: "/", element: <p>最初の画面</p> },
     ],
@@ -60,6 +61,7 @@ function renderAt() {
 }
 
 beforeEach(() => {
+  sessionStorage.clear();
   signedIn = false;
   for (const fn of [previewInvite, acceptInvite, me, signOut]) fn.mockReset();
   me.mockResolvedValue({ user: { id: "u", email: "yamaguchi@example.com", displayName: "山口 誠" }, accounts: [], teams: [] });
@@ -78,15 +80,49 @@ describe("招待の確認", () => {
     expect(new URLSearchParams(router.state.location.search).get("next")).toBe(`/invite/${TOKEN}`);
   });
 
-  it("needs_account：先にThreadsアカウントを追加するよう案内し、追加の画面へ（戻り先つき）", async () => {
+  it("needs_account：先にアカウントを作ってつなぐよう案内し、作る画面へ（戻り先つき。specs/012）", async () => {
     signedIn = true;
     previewInvite.mockResolvedValue(preview({ status: "needs_account" }));
     renderAt();
-    expect(await screen.findByText("先に、自分のThreadsアカウントをつないでください")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Threadsアカウントを追加" })).toHaveAttribute(
+    expect(await screen.findByText("先に、自分のアカウントを作り、Threadsにつないでください")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "アカウントを作る" })).toHaveAttribute(
       "href",
       `/accounts/new?next=${encodeURIComponent(`/invite/${TOKEN}`)}`,
     );
+  });
+
+  it("needs_connection：未接続のアカウントの「Threadsとの接続」へ案内し、押す前に招待を覚える（specs/012 FR-051）", async () => {
+    signedIn = true;
+    previewInvite.mockResolvedValue(
+      preview({
+        status: "needs_connection",
+        accounts: [{ id: "acc-9", name: "カフェの公式", displayName: null, username: null, profilePictureUrl: null, connected: false, inOtherTeam: null }],
+      }),
+    );
+    renderAt();
+    expect(await screen.findByText("先に、自分のアカウントをThreadsにつないでください")).toBeInTheDocument();
+    const link = screen.getByRole("link", { name: "「カフェの公式」をThreadsにつなぐ" });
+    expect(link).toHaveAttribute("href", "/accounts/acc-9/settings#threads");
+    await userEvent.click(link);
+    expect(sessionStorage.getItem("tg.inviteReturn")).toBe(`/invite/${TOKEN}`);
+  });
+
+  it("ready：未接続のアカウントは選べず「Threadsにつなぐと入れられます」と添える（specs/012 FR-050）", async () => {
+    signedIn = true;
+    previewInvite.mockResolvedValue(
+      preview({
+        status: "ready",
+        accounts: [
+          ACCOUNTS[0]!,
+          { id: "acc-9", name: "カフェの公式", displayName: null, username: null, profilePictureUrl: null, connected: false, inOtherTeam: null },
+        ],
+      }),
+    );
+    renderAt();
+    const box = await screen.findByRole("checkbox", { name: "カフェの公式をチームに入れる" });
+    expect(box).toBeDisabled();
+    expect(screen.getByText("Threadsにつなぐと入れられます")).toBeInTheDocument();
+    expect(screen.getByRole("checkbox", { name: "ベーカリー Eをチームに入れる" })).toBeEnabled();
   });
 
   it("ready：アカウントを選ぶまで押せない。選んだアカウントごとに「チームに見せる」（初めはオフ）。ほかのチームのものは選べない", async () => {

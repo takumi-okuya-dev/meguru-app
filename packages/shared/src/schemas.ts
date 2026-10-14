@@ -2,6 +2,7 @@
 import { z } from "zod";
 import { ERROR_CODES } from "./errors";
 import {
+  ACCOUNT_NAME_MAX,
   PRIORITY_MAX,
   PRIORITY_MIN,
   PROMOTION_CONTENT_MAX,
@@ -33,9 +34,9 @@ import { countChars, isBlank, isHttpUrl } from "./text";
 
 /** 契約プランのスキーマ。 */
 export const planSchema = z.enum(PLANS);
-/** Threads接続の状態のスキーマ（FR-018）。 */
-export const connectionStatusSchema = z.enum(["connected", "needs_reconnect"]);
-/** Threads接続の状態。connected（接続中）か needs_reconnect（要再接続）。 */
+/** Threads接続の状態のスキーマ（FR-018。not_connected は specs/012 で足した）。 */
+export const connectionStatusSchema = z.enum(["connected", "needs_reconnect", "not_connected"]);
+/** Threads接続の状態。connected（接続中）・needs_reconnect（要再接続）・not_connected（一度もつないでいない）。 */
 export type ConnectionStatus = z.infer<typeof connectionStatusSchema>;
 /** 接続の方法（specs/010-token-account-add）。app はこのアプリで許可、token は自分のMetaアプリのトークン。 */
 export const connectionMethodSchema = z.enum(["app", "token"]);
@@ -56,8 +57,10 @@ export const actorRoleSchema = z.enum(["owner", "member", "partner", "editor", "
 /** 画面に出すAccountの要約のスキーマ（contracts/api.md の AccountSummary）。 */
 export const accountSummarySchema = z.object({
   id: z.string(),
-  /** Threadsのユーザー名（@なし） */
-  username: z.string(),
+  /** アカウントの名前。主に出す名前（specs/012 research.md R2） */
+  name: z.string(),
+  /** Threadsのユーザー名（@なし）。未接続ならNULL */
+  username: z.string().nullable(),
   displayName: z.string().nullable(),
   profilePictureUrl: z.string().nullable(),
   plan: planSchema,
@@ -68,8 +71,8 @@ export const accountSummarySchema = z.object({
   role: z.enum(["owner", "editor", "viewer"]),
   /** 担当しているAccountのオーナーの名前。自分のAccountならNULL */
   ownerName: z.string().nullable(),
-  /** 今の接続の方法（specs/010 contracts/api.md）。APIは必ず返す。省略は app として扱う */
-  connectionMethod: connectionMethodSchema.optional(),
+  /** 今の接続の方法（specs/010 contracts/api.md）。APIは必ず返す。未接続ならNULL（specs/012）。省略は app として扱う */
+  connectionMethod: connectionMethodSchema.nullable().optional(),
   /** 要再接続の理由の補い（short_lived_token）。省略は NULL として扱う */
   reconnectHint: z.enum(["short_lived_token"]).nullable().optional(),
 });
@@ -124,9 +127,12 @@ export const needsReviewCountsResponseSchema = z.object({
 /** 所有Accountごとの要確認件数。 */
 export type NeedsReviewCountsResponse = z.infer<typeof needsReviewCountsResponseSchema>;
 
-/** POST /api/threads/connect のリクエストのスキーマ。新規（new）か再接続（reconnect）。 */
+/**
+ * POST /api/threads/connect のリクエストのスキーマ。未接続のアカウントにはじめてつなぐ（connect）か、接続し直す（reconnect）。
+ * つないでアカウントを作る（new）は specs/012 でなくした（research.md R4）。
+ */
 export const connectRequestSchema = z.discriminatedUnion("mode", [
-  z.object({ mode: z.literal("new") }),
+  z.object({ mode: z.literal("connect"), accountId: z.string().uuid() }),
   z.object({ mode: z.literal("reconnect"), accountId: z.string().uuid() }),
 ]);
 /** POST /api/threads/connect のリクエスト。 */
@@ -134,7 +140,7 @@ export type ConnectRequest = z.infer<typeof connectRequestSchema>;
 
 /** POST /api/threads/token-connect のリクエスト（specs/010 contracts/api.md）。トークンは前後を取り除く前のもの。 */
 export const tokenConnectRequestSchema = z.discriminatedUnion("mode", [
-  z.object({ mode: z.literal("new"), token: z.string().min(1).max(4096) }),
+  z.object({ mode: z.literal("connect"), accountId: z.string().uuid(), token: z.string().min(1).max(4096) }),
   z.object({ mode: z.literal("reconnect"), accountId: z.string().uuid(), token: z.string().min(1).max(4096) }),
 ]);
 /** POST /api/threads/token-connect のリクエスト。 */
@@ -143,7 +149,7 @@ export type TokenConnectRequestBody = z.infer<typeof tokenConnectRequestSchema>;
 /** POST /api/threads/token-connect のレスポンス。warnings は権限がないもの。 */
 export const tokenConnectResponseSchema = z.object({
   accountId: z.string(),
-  kind: z.enum(["new", "reconnect"]),
+  kind: z.enum(["connect", "reconnect"]),
   username: z.string(),
   warnings: z.array(z.enum(["no_publish_permission", "no_insights_permission"])),
 });
@@ -163,10 +169,26 @@ export const openAccountRequestSchema = z.object({
 /** POST /api/accounts/:id/open のリクエスト。 */
 export type OpenAccountRequest = z.infer<typeof openAccountRequestSchema>;
 
-/** DELETE /api/accounts/:id のリクエストのスキーマ。確認のためのユーザー名を受け取る（FR-022）。 */
+/** DELETE /api/accounts/:id のリクエストのスキーマ。確認のためのアカウントの名前を受け取る（FR-022、specs/012 FR-043）。 */
 export const deleteAccountRequestSchema = z.object({
-  confirmUsername: z.string(),
+  confirmName: z.string().max(200),
 });
+
+/** アカウントの名前（前後の空白を除いて1〜50文字。specs/012 FR-002・FR-040）。 */
+export const accountNameSchema = z
+  .string()
+  .transform((v) => v.trim())
+  .refine((v) => countChars(v) >= 1 && countChars(v) <= ACCOUNT_NAME_MAX, { message: "1-50 chars" });
+
+/** POST /api/accounts のリクエスト（specs/012 contracts/api.md）。 */
+export const createAccountRequestSchema = z.object({ name: accountNameSchema });
+/** POST /api/accounts のリクエスト。 */
+export type CreateAccountRequest = z.input<typeof createAccountRequestSchema>;
+
+/** PATCH /api/accounts/:id のリクエスト（specs/012 contracts/api.md）。 */
+export const renameAccountRequestSchema = z.object({ name: accountNameSchema });
+/** PATCH /api/accounts/:id のリクエスト。 */
+export type RenameAccountRequest = z.input<typeof renameAccountRequestSchema>;
 
 /** GET /api/data-deletion/:code のレスポンスのスキーマ。Metaのデータ削除要求の進み具合。 */
 export const dataDeletionStatusSchema = z.object({
@@ -481,7 +503,7 @@ export const autoPostStateSchema = z.object({
   enabled: z.boolean(),
   slotCount: z.number().int(),
   /** 止まっている理由。止まっていなければ null */
-  stoppedReason: z.enum(["needs_reconnect", "rate_limited"]).nullable(),
+  stoppedReason: z.enum(["needs_reconnect", "rate_limited", "not_connected"]).nullable(),
 });
 /** 自動投稿の状態。 */
 export type AutoPostState = z.infer<typeof autoPostStateSchema>;
@@ -742,6 +764,8 @@ export type PutPostingScheduleRequest = z.infer<typeof putPostingScheduleRequest
 export const threadsCheckSchema = z.discriminatedUnion("status", [
   z.object({ status: z.literal("ok"), quotaUsage: z.number().int(), quotaTotal: z.number().int() }),
   z.object({ status: z.literal("needs_reconnect") }),
+  // 未接続のアカウント（specs/012 research.md R5）。Threadsに問い合わせない
+  z.object({ status: z.literal("not_connected") }),
   z.object({ status: z.literal("no_publish_permission") }),
   z.object({ status: z.literal("unknown") }),
 ]);
@@ -767,6 +791,8 @@ export type PutPostingScheduleResponse = z.infer<typeof putPostingScheduleRespon
 /** 知らせのスキーマ（005 FR-018、research.md R8）。 */
 export const autoPostNoticeSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("needs_reconnect") }),
+  // 未接続（specs/012 contracts/api.md「Threadsが要る機能」）
+  z.object({ kind: z.literal("not_connected") }),
   z.object({ kind: z.literal("rate_limited"), until: z.string() }),
   z.object({
     kind: z.literal("publish_failed"),
@@ -912,6 +938,8 @@ export const performanceSummarySchema = z.object({
   lastFetchedAt: z.string().nullable(),
   insightsDenied: z.boolean(),
   needsReconnect: z.boolean(),
+  /** 未接続（数字は数えない。specs/012 FR-033） */
+  notConnected: z.boolean(),
   counts: z.object({
     all: z.number().int(),
     good: z.number().int(),
@@ -1067,7 +1095,10 @@ export const teamRenameRequestSchema = z.object({ name: teamNameSchema });
 /** GET /api/teams/:teamId のメンバーの行のアカウント。開けないアカウントは名前だけ。 */
 export const teamMemberAccountSchema = z.object({
   id: z.string(),
-  username: z.string(),
+  /** アカウントの名前（specs/012） */
+  name: z.string(),
+  /** チームのアカウントはつないだものだけだが、型は NULL を許す（specs/012 research.md R7） */
+  username: z.string().nullable(),
   displayName: z.string().nullable(),
   profilePictureUrl: z.string().nullable(),
   /** オーナーが「チームに見せる」にしているか */
@@ -1129,7 +1160,8 @@ export const teamAssignmentsSchema = z.object({
   accounts: z.array(
     z.object({
       id: z.string(),
-      username: z.string(),
+      name: z.string(),
+      username: z.string().nullable(),
       displayName: z.string().nullable(),
       profilePictureUrl: z.string().nullable(),
       ownerUserId: z.string(),
@@ -1145,7 +1177,7 @@ export const teamAssignmentsSchema = z.object({
 export type TeamAssignments = z.infer<typeof teamAssignmentsSchema>;
 
 /** 招待リンクを開いた人の状態（contracts/api.md「GET /api/invites/:token」）。 */
-export const inviteViewerStatusSchema = z.enum(["anonymous", "needs_account", "ready", "already_member"]);
+export const inviteViewerStatusSchema = z.enum(["anonymous", "needs_account", "needs_connection", "ready", "already_member"]);
 
 /** GET /api/invites/:token の応答。 */
 export const invitePreviewSchema = z.object({
@@ -1158,9 +1190,12 @@ export const invitePreviewSchema = z.object({
     accounts: z.array(
       z.object({
         id: z.string(),
+        name: z.string(),
         displayName: z.string().nullable(),
-        username: z.string(),
+        username: z.string().nullable(),
         profilePictureUrl: z.string().nullable(),
+        /** Threadsにつないでいるか。未接続は選べない（specs/012 FR-050） */
+        connected: z.boolean(),
         inOtherTeam: z.string().nullable(),
       }),
     ),

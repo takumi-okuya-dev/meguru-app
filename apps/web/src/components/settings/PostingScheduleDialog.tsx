@@ -60,7 +60,7 @@ function validationMessage(form: Form): string | null {
 /**
  * 投稿のスケジュールのダイアログ。
  * @param props - accountId、schedule：保存済みの設定、onSaved：保存できた（設定と、投稿の権限の確認の結果）、
- *   onReconnect：再接続を始める、onClose：閉じる
+ *   onReconnect：再接続を始める、onClose：閉じる、notConnected：未接続（オンにできない。時刻は保存できる。specs/012 FR-032）
  * @returns ダイアログ
  */
 export function PostingScheduleDialog({
@@ -69,16 +69,18 @@ export function PostingScheduleDialog({
   onSaved,
   onReconnect,
   onClose,
+  notConnected = false,
 }: {
   accountId: string;
   schedule: PostingSchedule;
   onSaved: (schedule: PostingSchedule, check: ThreadsCheck | null) => void;
   onReconnect: () => void;
   onClose: () => void;
+  notConnected?: boolean;
 }) {
   const [adding, setAdding] = useState("");
   const [addError, setAddError] = useState<string | null>(null);
-  const [notReady, setNotReady] = useState<"needs_reconnect" | "no_publish_permission" | null>(
+  const [notReady, setNotReady] = useState<"needs_reconnect" | "no_publish_permission" | "not_connected" | null>(
     null,
   );
   // 保存の結果の、投稿の権限の確認（保存できた後に渡す。state だと古い値を渡してしまうので ref にする）
@@ -99,7 +101,7 @@ export function PostingScheduleDialog({
     fieldErrorFor: (err) => {
       if (err.code !== "THREADS_NOT_READY") return null;
       setNotReady(
-        err.details[0] === "needs_reconnect" ? "needs_reconnect" : "no_publish_permission",
+        err.details[0] === "needs_reconnect" || err.details[0] === "not_connected" ? err.details[0] : "no_publish_permission",
       );
       return {};
     },
@@ -161,9 +163,11 @@ export function PostingScheduleDialog({
           <Alert variant="destructive">
             <AlertDescription className="flex flex-wrap items-center gap-3 text-foreground">
               <span className="flex-1">{THREADS_CHECK_MESSAGES[notReady]}</span>
-              <Button size="sm" className="rounded-full" onClick={onReconnect}>
-                再接続
-              </Button>
+              {notReady !== "not_connected" && (
+                <Button size="sm" className="rounded-full" onClick={onReconnect}>
+                  再接続
+                </Button>
+              )}
             </AlertDescription>
           </Alert>
         )}
@@ -181,10 +185,17 @@ export function PostingScheduleDialog({
                 ? "承認済みの下書きを、下の時刻に1件ずつ投稿します"
                 : "オフです。承認済みの下書きは投稿されません"}
             </span>
+            {notConnected && (
+              <span id="auto-post-not-connected" className="block text-xs text-muted-foreground">
+                Threadsにつなぐと使えます。時刻は先に決めておけます
+              </span>
+            )}
           </span>
           <Switch
             aria-label="自動投稿"
             checked={f.form.enabled}
+            disabled={notConnected && !f.form.enabled}
+            aria-describedby={notConnected ? "auto-post-not-connected" : undefined}
             onCheckedChange={(v) => f.setField("enabled", v)}
           />
         </label>

@@ -43,6 +43,7 @@ const account = (
   connectionStatus: AccountSummary["connectionStatus"] = "connected",
 ): AccountSummary => ({
   id,
+  name: `Account ${id}`,
   username: `user_${id}`,
   displayName: `Account ${id}`,
   profilePictureUrl: null,
@@ -183,7 +184,7 @@ describe("AccountSwitcherの横断要確認件数", () => {
     await userEvent.click(within(menu).getByRole("menuitem", { name: /Account a2/ }));
     expect(router.state.location.pathname).toBe("/accounts/a2");
     const secondMenu = await openMenu();
-    await userEvent.click(within(secondMenu).getByRole("menuitem", { name: /アカウントを追加/ }));
+    await userEvent.click(within(secondMenu).getByRole("menuitem", { name: /アカウントを作る/ }));
     expect(router.state.location.pathname).toBe("/accounts/new");
   });
 
@@ -436,7 +437,7 @@ describe("AccountSwitcherの状態と操作", () => {
     renderSwitcher();
     const menu = await openMenu();
     expect(await within(menu).findByRole("menuitem", { name: /Account a20/ })).toBeInTheDocument();
-    expect(within(menu).getByRole("menuitem", { name: /アカウントを追加/ })).toBeInTheDocument();
+    expect(within(menu).getByRole("menuitem", { name: /アカウントを作る/ })).toBeInTheDocument();
     expect(menu.className).toContain("overflow-y-auto");
     expect(menu.className).toContain("max-h-");
   });
@@ -444,7 +445,8 @@ describe("AccountSwitcherの状態と操作", () => {
   it("長い表示名でも件数と状態が残り、キーボードで追加へ進める", async () => {
     const long = {
       ...account("a2", "needs_reconnect"),
-      displayName: "とても長い表示名".repeat(12),
+      // 主に出すのはアカウントの名前（specs/012）
+      name: "とても長い表示名".repeat(12),
     };
     mocks.me.mockResolvedValue(me([account("a1"), long]));
     renderSwitcher();
@@ -453,7 +455,7 @@ describe("AccountSwitcherの状態と操作", () => {
     expect(row).toHaveTextContent("要確認 2件");
     expect(row).toHaveTextContent("要再接続");
     await userEvent.keyboard("{End}");
-    expect(within(menu).getByRole("menuitem", { name: /アカウントを追加/ })).toHaveFocus();
+    expect(within(menu).getByRole("menuitem", { name: /アカウントを作る/ })).toHaveFocus();
     await userEvent.keyboard("{Escape}");
     expect(screen.queryByRole("menu")).not.toBeInTheDocument();
   });
@@ -488,7 +490,7 @@ describe("AccountSwitcherの状態と操作", () => {
     expect(await within(menu).findByText("要確認 2件")).toBeInTheDocument();
     expect(menu).toContainElement(document.activeElement as HTMLElement);
     await userEvent.keyboard("{End}");
-    expect(within(menu).getByRole("menuitem", { name: /アカウントを追加/ })).toHaveFocus();
+    expect(within(menu).getByRole("menuitem", { name: /アカウントを作る/ })).toHaveFocus();
   });
 
   it("ドロワーから行を選ぶとonNavigateを呼ぶ", async () => {
@@ -535,9 +537,25 @@ describe("AccountSwitcherの状態と操作", () => {
   });
 });
 
+describe("未接続のアカウントの画面（specs/012 FR-036）", () => {
+  it("要再接続のバナーと「再接続」を出さない", async () => {
+    vi.clearAllMocks();
+    const unconnected = { ...account("a1", "not_connected"), username: null, connectionMethod: null };
+    mocks.me.mockResolvedValue(me([unconnected]));
+    mocks.needsReviewCounts.mockResolvedValue(counts([["a1", 0]]));
+    mocks.account.mockResolvedValue(unconnected);
+    mocks.openAccount.mockResolvedValue(unconnected);
+    renderAccountRoutes();
+    expect(await screen.findByText("投稿: Aの投稿")).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "再接続" })).not.toBeInTheDocument();
+    expect(screen.queryByText(/接続が切れ/)).not.toBeInTheDocument();
+  });
+});
+
 describe("切り替えメニューの見出し（specs/011 T025）", () => {
   const make = (id: string, role: AccountSummary["role"]): AccountSummary => ({
     id,
+    name: id,
     username: id,
     displayName: id,
     profilePictureUrl: null,

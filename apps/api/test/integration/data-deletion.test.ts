@@ -77,7 +77,7 @@ describe("POST /api/threads/webhooks/data-deletion", () => {
     const first = (await (await postDeletion(sr)).json()) as { confirmation_code: string };
     // 削除の完了後にユーザーが改めて接続する
     const { callbackRes } = await connectNew(app, "u1", "1001");
-    expect(redirectTarget(callbackRes!).searchParams.get("connected")).toBe("new");
+    expect(redirectTarget(callbackRes!).searchParams.get("connected")).toBe("connect");
     const second = (await (await postDeletion(sr)).json()) as { confirmation_code: string };
     expect(second.confirmation_code).toBe(first.confirmation_code);
     expect(await db().select().from(threadsDeletionRequests)).toHaveLength(1);
@@ -137,7 +137,7 @@ describe("削除要求の再試行（Cron）", () => {
     expect((await request(code)).status).toBe("completed");
     // ユーザーが削除の完了後に新しい認可フローで再接続する
     const { callbackRes } = await connectNew(app, "u1", "1001");
-    expect(redirectTarget(callbackRes!).searchParams.get("connected")).toBe("new");
+    expect(redirectTarget(callbackRes!).searchParams.get("connected")).toBe("connect");
     // 遅れて Worker B が、古い読み取り結果のまま処理を続ける
     const outcome = await attemptDeletion(testEnv, code, observed);
     expect(outcome).toBe("skipped");
@@ -159,7 +159,7 @@ describe("削除要求の再試行（Cron）", () => {
     expect(redirectTarget(blocked.callbackRes!).searchParams.get("error")).toBe("THREADS_DATA_DELETION_REQUESTED");
     await retryDeletions(testEnv, new Date(Date.now() + 16 * MIN));
     const after = await connectNew(app, "u1", "1001");
-    expect(redirectTarget(after.callbackRes!).searchParams.get("connected")).toBe("new");
+    expect(redirectTarget(after.callbackRes!).searchParams.get("connected")).toBe("connect");
   });
 });
 

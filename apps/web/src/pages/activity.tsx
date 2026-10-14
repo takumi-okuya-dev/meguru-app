@@ -89,6 +89,14 @@ export function actionText(item: ActivityItem): string {
       return "投稿のスケジュールを変えました";
     case "threads_checked":
       return "Threadsとの接続を確かめました";
+    case "threads_connected":
+      // はじめてつないだ（specs/012 FR-019）。方法を添える
+      return item.details?.method === "token"
+        ? "Threadsにつなぎました（自分のMetaアプリのトークン）"
+        : "Threadsにつなぎました（このアプリで許可）";
+    case "account_renamed":
+      // アカウントの名前を直した（specs/012 FR-040）
+      return `アカウントの名前を「${String(item.details?.to ?? "")}」に変えました`;
     case "threads_reconnected":
       // 接続し直し（specs/010 FR-035）。方法を添える
       return item.details?.method === "token"

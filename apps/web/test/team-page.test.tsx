@@ -34,6 +34,7 @@ const { TeamPage } = await import("@/pages/team");
 
 const acc = (id: string, name: string, extra: Partial<TeamDetail["members"][number]["accounts"][number]> = {}) => ({
   id,
+  name: name,
   username: id,
   displayName: name,
   profilePictureUrl: null,
@@ -76,8 +77,8 @@ function memberView(): TeamDetail {
 const meData: MeResponse = {
   user: { id: "u-s", email: "s@example.com", displayName: "鈴木 花子" },
   accounts: [
-    { id: "a-s", username: "a-s", displayName: "カフェ B店", profilePictureUrl: null, plan: "auto-only", connectionStatus: "connected", lastUsedAt: null, role: "owner", ownerName: null },
-    { id: "a-s2", username: "a-s2", displayName: "カフェ B店 2号店", profilePictureUrl: null, plan: "auto-only", connectionStatus: "connected", lastUsedAt: null, role: "owner", ownerName: null },
+    { id: "a-s", name: "カフェ B店", username: "a-s", displayName: "カフェ B店", profilePictureUrl: null, plan: "auto-only", connectionStatus: "connected", lastUsedAt: null, role: "owner", ownerName: null },
+    { id: "a-s2", name: "カフェ B店 2号店", username: "a-s2", displayName: "カフェ B店 2号店", profilePictureUrl: null, plan: "auto-only", connectionStatus: "connected", lastUsedAt: null, role: "owner", ownerName: null },
   ],
   landingAccountId: "a-s",
   accountLimit: { max: 3, used: 2 },
@@ -267,6 +268,23 @@ describe("チームの画面（メンバー・編集者）", () => {
     const dialog = await screen.findByRole("dialog", { name: "アカウントを足す" });
     await user.click(within(dialog).getByRole("button", { name: /カフェ B店 2号店/ }));
     expect(mocks.addTeamAccount).toHaveBeenCalledWith("t1", "a-s2");
+  });
+
+  it("未接続のアカウントは足せず、「Threadsにつなぐと入れられます」と添える（specs/012 FR-050）", async () => {
+    mocks.getTeam.mockResolvedValue(memberView());
+    mocks.me.mockResolvedValue({
+      ...meData,
+      accounts: meData.accounts.map((a) =>
+        a.id === "a-s2" ? { ...a, username: null, displayName: null, connectionStatus: "not_connected" as const } : a,
+      ),
+    });
+    const user = userEvent.setup();
+    renderPage();
+    await user.click(await screen.findByRole("button", { name: "アカウントを足す" }));
+    const dialog = await screen.findByRole("dialog", { name: "アカウントを足す" });
+    const row = within(dialog).getByRole("button", { name: /カフェ B店 2号店/ });
+    expect(row).toBeDisabled();
+    expect(row).toHaveTextContent("Threadsにつなぐと入れられます");
   });
 
   it("「チームを抜ける」：確認してから抜け、最初の画面へ戻る", async () => {

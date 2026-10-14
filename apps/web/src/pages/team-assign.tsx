@@ -102,7 +102,9 @@ export function TeamAssignPage() {
                   </th>
                   {table.data.accounts.map((a) => (
                     <th key={a.id} scope="col" className="px-2 py-2.5 text-center font-normal leading-tight">
-                      <span className="block text-foreground">{a.displayName ?? a.username}</span>
+                      <span className="block text-foreground">{a.name}</span>
+                      {/* 名前は重なりうるので、@ユーザー名で見分ける（PR #15 のCodexレビュー） */}
+                      {a.username && <span className="block text-[11px]">@{a.username}</span>}
                       <span className="text-[11px]">{a.ownerName}</span>
                     </th>
                   ))}
@@ -132,7 +134,7 @@ export function TeamAssignPage() {
                               type="button"
                               role="checkbox"
                               aria-checked={on}
-                              aria-label={`${p.name}を${a.displayName ?? a.username}の担当にする`}
+                              aria-label={`${p.name}を${a.username ? `${a.name}（@${a.username}）` : a.name}の担当にする`}
                               onClick={() => toggle.mutate({ userId: p.userId, accountId: a.id, on: !on })}
                               className="inline-flex size-11 items-center justify-center"
                             >

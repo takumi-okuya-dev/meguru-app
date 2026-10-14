@@ -29,8 +29,8 @@ async function adminCount(teamId: string) {
 }
 
 async function deleteAccount(accountId: string, user: string) {
-  const [acc] = (await sql()`SELECT username FROM accounts WHERE id = ${accountId}`) as { username: string }[];
-  return call(app, "DELETE", `/api/accounts/${accountId}`, { user, body: { confirmUsername: acc!.username } });
+  const [acc] = (await sql()`SELECT name FROM accounts WHERE id = ${accountId}`) as { name: string }[];
+  return call(app, "DELETE", `/api/accounts/${accountId}`, { user, body: { confirmName: acc!.name } });
 }
 
 beforeEach(async () => {

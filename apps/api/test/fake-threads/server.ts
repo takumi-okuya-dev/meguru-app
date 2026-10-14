@@ -43,7 +43,8 @@ export function createFakeThreads() {
   // キーは mediaId か、Accountの全投稿なら "user:{userId}"、すべてなら "*"
   const insightsFailures = new Map<string, { kind: InsightsFailureKind; times: number }>();
   const followers = new Map<string, number>();
-  const callCounts = { insights: 0, followers: 0 };
+  // total は制御用（/__control）以外のすべての要求の数（specs/012：未接続のアカウントから問い合わせないことを確かめる）
+  const callCounts = { insights: 0, followers: 0, total: 0 };
   let seq = 0;
   // Number の安全な整数の範囲に収める（大きすぎると丸められてIDが重なる）
   const nextId = () => String(17_900_000_000 + ++seq);
@@ -168,6 +169,10 @@ export function createFakeThreads() {
   }
 
   const app = new Hono();
+  app.use("*", async (c, next) => {
+    if (!c.req.path.startsWith("/__control")) callCounts.total += 1;
+    await next();
+  });
 
   app.get("/v1.0/:mediaId/insights", (c) => {
     callCounts.insights += 1;
@@ -419,6 +424,7 @@ export function createFakeThreads() {
     followers.clear();
     callCounts.insights = 0;
     callCounts.followers = 0;
+    callCounts.total = 0;
     return c.json({ ok: true });
   });
   app.post("/__control/users", async (c) => {

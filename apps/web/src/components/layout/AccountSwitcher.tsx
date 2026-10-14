@@ -1,6 +1,6 @@
 // サイドバー左上のAccount切り替え。開くたびに所有Accountと要確認件数を読み直す。
 import { isCancelledError, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { AccountSummary } from "@threads-grower/shared";
+import { accountLabel, type AccountSummary } from "@threads-grower/shared";
 import { CheckIcon, ChevronDownIcon, PlusIcon, TriangleAlertIcon } from "lucide-react";
 import { Fragment, useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router";
@@ -136,10 +136,13 @@ export function AccountSwitcher({ onNavigate }: { onNavigate?: () => void }) {
           <>
             <AccountAvatar account={current} className="size-8" />
             <span className="flex min-w-0 flex-1 flex-col leading-tight">
-              <span className="truncate text-sm font-semibold">
-                {current.displayName ?? current.username}
-              </span>
-              <span className="truncate text-xs text-muted-foreground">@{current.username}</span>
+              <span className="truncate text-sm font-semibold">{accountLabel(current).primary}</span>
+              {/* つないでいれば@ユーザー名、未接続なら「未接続」（specs/012 contracts/ui-routes.md「アカウントの示し方」） */}
+              {accountLabel(current).secondary ? (
+                <span className="truncate text-xs text-muted-foreground">{accountLabel(current).secondary}</span>
+              ) : (
+                <span className="truncate text-xs text-muted-foreground">未接続</span>
+              )}
             </span>
           </>
         ) : (
@@ -182,11 +185,9 @@ export function AccountSwitcher({ onNavigate }: { onNavigate?: () => void }) {
                 <Link to={`/accounts/${account.id}`} onClick={onNavigate}>
                   <AccountAvatar account={account} className="size-7" />
                   <span className="flex min-w-0 flex-1 flex-col leading-tight">
-                    <span className="truncate font-medium">
-                      {account.displayName ?? account.username}
-                    </span>
+                    <span className="truncate font-medium">{accountLabel(account).primary}</span>
                     <span className="truncate text-xs text-muted-foreground">
-                      @{account.username}
+                      {accountLabel(account).secondary ?? "未接続"}
                       {account.ownerName ? ` · オーナー ${account.ownerName}` : ""}
                     </span>
                     <span className="text-xs text-muted-foreground">
@@ -234,7 +235,7 @@ export function AccountSwitcher({ onNavigate }: { onNavigate?: () => void }) {
             <DropdownMenuSeparator />
             <DropdownMenuItem asChild className="min-h-11 rounded-lg py-2">
               <Link to="/accounts/new" onClick={onNavigate}>
-                <PlusIcon className="size-4" aria-hidden="true" /> アカウントを追加
+                <PlusIcon className="size-4" aria-hidden="true" /> アカウントを作る
               </Link>
             </DropdownMenuItem>
           </>

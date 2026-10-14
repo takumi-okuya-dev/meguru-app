@@ -1,28 +1,22 @@
-// 自分のMetaアプリのトークンでの追加と、接続し直しの方法の切り替え（specs/010-token-account-add quickstart.md 2）。
+// 自分のMetaアプリのトークンでつなぐ・接続し直しの方法の切り替え（specs/010-token-account-add quickstart.md 2）。
+// specs/012 で、名前だけで作ったアカウントに「このアカウントの設定」からトークンでつなぐ形になった（US2・US3）。
 // トークンは、偽のThreadsの「ユーザートークン生成ツール」の画面で作る。
 import { expect, test, type Page } from "@playwright/test";
 import pg from "pg";
-import { FAKE_THREADS, resetAll, signInAs } from "./helpers";
+import { connectWithToken, createAccount, makeToken as makeTokenFor, resetAll, signInAs } from "./helpers";
 
 test.describe.configure({ mode: "serial" });
 
 const DIRECT_DB = process.env.E2E_DATABASE_URL_DIRECT ?? "postgres://postgres:postgres@localhost:5432/threads_grower";
-const ACCOUNT_URL = /\/accounts\/([0-9a-f-]{36})(?:\?|$)/;
 let page: Page;
 let accountId = "";
 
 /**
- * 偽のThreadsでトークンを作る。
+ * 偽のThreadsで、@cafe_b（9003）のトークンを作る。
  * @param appScope - Metaアプリの見分け（違うとユーザーIDが変わる）
  * @returns トークン
  */
-async function makeToken(appScope: string): Promise<string> {
-  const tool = await page.context().newPage();
-  await tool.goto(`${FAKE_THREADS}/__control/token-page?user=9003&appScope=${appScope}&lifetime=long&debug=1`);
-  const token = (await tool.locator("#token").textContent())!.trim();
-  await tool.close();
-  return token;
-}
+const makeToken = (appScope: string) => makeTokenFor(page, "9003", appScope);
 
 async function sql(query: string) {
   const client = new pg.Client({ connectionString: DIRECT_DB });
@@ -40,16 +34,10 @@ test.beforeAll(async ({ browser }) => {
   await signInAs(page, "owner");
 });
 
-test("トークンを貼り付けてアカウントを追加する（US1）", async () => {
-  const token = await makeToken("myapp");
-  await page.goto("/accounts/new");
-  await page.getByRole("button", { name: "自分のMetaアプリのトークンで追加する" }).click();
-  await page.getByLabel("アクセストークン").fill(token);
-  await page.getByRole("button", { name: "追加する", exact: true }).click();
-  await page.waitForURL(ACCOUNT_URL);
-  accountId = ACCOUNT_URL.exec(page.url())![1]!;
-
-  await page.goto(`/accounts/${accountId}/settings`);
+test("名前で作ったアカウントに、トークンを貼り付けてつなぐ（010 US1、012 US2）", async () => {
+  accountId = await createAccount(page, "カフェ本店");
+  await connectWithToken(page, accountId, await makeToken("myapp"));
+  await expect(page.getByText("カフェ本店をThreadsにつなぎました（@cafe_b）")).toBeVisible();
   await expect(page.getByText(/今の接続：自分のMetaアプリのトークン/)).toBeVisible();
 
   await page.goto(`/accounts/${accountId}/stock`);
@@ -58,17 +46,17 @@ test("トークンを貼り付けてアカウントを追加する（US1）", as
   await expect(page.getByText("トークンの案1")).toBeVisible();
 });
 
-test("同じアカウントの別のアプリのトークンは「すでに登録されています」（US2）", async () => {
-  // 上限（1件）だと入力欄が出ないので、上限を上げておく
+test("自分の別のアカウントを、同じThreadsアカウントにつなごうとすると止まり、そのアカウントを示す（012 US3-1）", async () => {
+  // 上限（1件）だと2つ目を作れないので、上限を上げておく
   await sql("UPDATE accounts SET plan = 'multi-account'");
-  const token = await makeToken("another");
-  await page.goto("/accounts/new");
-  await page.getByRole("button", { name: "自分のMetaアプリのトークンで追加する" }).click();
-  await page.getByLabel("アクセストークン").fill(token);
-  await page.getByRole("button", { name: "追加する", exact: true }).click();
-  await expect(page.getByText(/このアカウントはすでに登録されています/)).toBeVisible();
-  await page.getByRole("link", { name: "そのアカウントの設定を開く" }).click();
+  const second = await createAccount(page, "カフェ2");
+  await connectWithToken(page, second, await makeToken("another"));
+  await expect(page.getByText("@cafe_bは、あなたのアカウント『カフェ本店』につながっています。")).toBeVisible();
+  await page.getByRole("link", { name: "『カフェ本店』を開く" }).click();
   await expect(page).toHaveURL(new RegExp(`/accounts/${accountId}/settings$`));
+  // 2つ目は未接続のまま残る
+  await page.goto(`/accounts/${second}/settings`);
+  await expect(page.getByRole("button", { name: "Threadsで許可する" })).toBeVisible();
 });
 
 test("接続し直しで「Threadsで許可する」に切り替えても、投稿ストックが残る（US3）", async () => {

@@ -67,6 +67,7 @@ beforeEach(() => {
   mocks.accountAccess.mockImplementation(() => Promise.resolve(access));
   mocks.account.mockResolvedValue({
     id: "acc-1",
+    name: "さくらのパン日記",
     username: "sakura_pan",
     displayName: "さくらのパン日記",
     profilePictureUrl: null,

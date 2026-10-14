@@ -103,6 +103,8 @@ export async function getAutoPostStatus(
   ]);
   const autoPost = toAutoPostState(account, schedule, now);
   const notices: AutoPostNotice[] = [];
+  // 未接続なら、承認した案はつないでオンにすると投稿される、と知らせる（specs/012 FR-033）
+  if (account.connectionStatus === "not_connected") notices.push({ kind: "not_connected" });
   if (autoPost.enabled && account.connectionStatus === "needs_reconnect")
     notices.push({ kind: "needs_reconnect" });
   if (autoPost.enabled && schedule?.pausedUntil && schedule.pausedUntil > now)

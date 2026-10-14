@@ -77,7 +77,7 @@ async function expectProfileGone() {
 describe("Accountの削除と戦略プロファイル", () => {
   it("DELETE /api/accounts/:id で、課題・宣伝内容・参考投稿・キーワード・登録のまとまり・下書きの行がすべて消える", async () => {
     const a = await accountWithProfile();
-    const res = await call(app, "DELETE", `/api/accounts/${a.id}`, { user: "u1", body: { confirmUsername: "takumi" } });
+    const res = await call(app, "DELETE", `/api/accounts/${a.id}`, { user: "u1", body: { confirmName: a.name } });
     expect(res.status).toBe(204);
     await expectProfileGone();
   });

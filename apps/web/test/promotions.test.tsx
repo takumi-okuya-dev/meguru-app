@@ -22,6 +22,7 @@ const { PromotionsPage } = await import("@/pages/promotions");
 
 const account: AccountSummary = {
   id: "a1",
+  name: "たくみ",
   username: "takumi",
   displayName: "たくみ",
   profilePictureUrl: null,

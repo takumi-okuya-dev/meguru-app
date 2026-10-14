@@ -17,6 +17,7 @@ const { ActivityPage, actionText } = await import("@/pages/activity");
 
 const account: AccountSummary = {
   id: "a1",
+  name: "カフェ B店",
   username: "cafe_b",
   displayName: "カフェ B店",
   profilePictureUrl: null,
@@ -142,6 +143,13 @@ describe("操作の記録", () => {
       "承認済みの案を直しました（要確認に戻りました）",
     );
     expect(actionText({ ...page1.items[0]!, action: "partner_removed" })).toBe("パートナーを外しました");
+    // アカウントを先に作る（specs/012 data-model.md「操作の記録」）
+    expect(actionText({ ...page1.items[0]!, action: "account_renamed", details: { from: "カフェ", to: "カフェの公式" } })).toBe(
+      "アカウントの名前を「カフェの公式」に変えました",
+    );
+    expect(actionText({ ...page1.items[0]!, action: "threads_connected", details: { method: "token" } })).toBe(
+      "Threadsにつなぎました（自分のMetaアプリのトークン）",
+    );
     // チームの操作（specs/011 data-model.md「activity_logs」）
     expect(actionText({ ...page1.items[0]!, action: "team_member_joined", summary: "山口 誠" })).toBe("山口 誠さんがチームに参加しました");
     expect(

@@ -58,6 +58,8 @@ import {
   type ResearchKeywordInput,
   type ErrorCode,
   type OpenAccountRequest,
+  type CreateAccountRequest,
+  type RenameAccountRequest,
 } from "@threads-grower/shared";
 import { z } from "zod";
 
@@ -221,10 +223,15 @@ export const api = {
       method: "POST",
       body: JSON.stringify(body),
     }),
-  deleteAccount: (accountId: string, confirmUsername: string) =>
+  // 名前だけでアカウントを作る・名前を直す（specs/012 contracts/api.md「アカウント」）
+  createAccount: (body: CreateAccountRequest) =>
+    request("/api/accounts", accountSummarySchema, { method: "POST", body: JSON.stringify(body) }),
+  renameAccount: (accountId: string, body: RenameAccountRequest) =>
+    request(`/api/accounts/${accountId}`, accountSummarySchema, { method: "PATCH", body: JSON.stringify(body) }),
+  deleteAccount: (accountId: string, confirmName: string) =>
     request(`/api/accounts/${accountId}`, null, {
       method: "DELETE",
-      body: JSON.stringify({ confirmUsername }),
+      body: JSON.stringify({ confirmName }),
     }),
   // ---- 戦略プロファイル（specs/002-strategy-profile contracts/api.md）----
   getProfileStatus: (accountId: string) =>

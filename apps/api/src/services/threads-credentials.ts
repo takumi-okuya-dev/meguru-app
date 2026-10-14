@@ -10,12 +10,14 @@ import { logger } from "../lib/logger";
 /** Threadsへの呼び出しに必要な、Accountの接続。 */
 export type ThreadsCredentials = {
   accountId: string;
-  threadsUserId: string;
   generation: number;
-  connectionStatus: "connected" | "needs_reconnect";
   /** 復号したトークン。接続がない・復号できないときは null */
   token: string | null;
-};
+} & (
+  | { connectionStatus: "connected" | "needs_reconnect"; threadsUserId: string }
+  // 一度もつないでいない（specs/012 data-model.md）。Threadsに問い合わせない
+  | { connectionStatus: "not_connected"; threadsUserId: null }
+);
 
 /**
  * Accountの接続を読み、トークンを復号する。鍵の設定ミスなどで復号できないときは token を null にする（001 R5）。
@@ -36,6 +38,15 @@ export async function loadThreadsCredentials(
     .where(eq(accounts.id, accountId))
     .limit(1);
   if (!row) return null;
+  if (row.account.connectionStatus === "not_connected" || row.account.threadsUserId === null) {
+    return {
+      accountId,
+      generation: row.account.connectionGeneration,
+      token: null,
+      connectionStatus: "not_connected",
+      threadsUserId: null,
+    };
+  }
   let token: string | null = null;
   if (row.conn) {
     try {

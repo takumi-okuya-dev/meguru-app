@@ -8,7 +8,7 @@ import {
 } from "cloudflare:test";
 import worker from "../../src/index";
 import { runAutoPost } from "../../src/services/auto-post-runner";
-import { call, fake, makeApp, resetDb, testEnv } from "../helpers/app";
+import { fake, makeApp, resetDb, testEnv, tokenConnectNew } from "../helpers/app";
 import { addMin, connectedAccount, jst, setSchedule } from "../helpers/auto-post";
 
 const app = makeApp();
@@ -97,10 +97,7 @@ describe("関所（DBに触れずに終える）", () => {
     await runAutoPost(testEnv, NOON);
     const base = (await gate()).nextCheckAt;
     await fake.addUser("9003", "cafe_b");
-    const res = await call(app, "POST", "/api/threads/token-connect", {
-      user: "u1",
-      body: { mode: "new", token: await fake.issueToken({ user: "9003", debug: false }) },
-    });
+    const { res } = await tokenConnectNew(app, "u1", await fake.issueToken({ user: "9003", debug: false }));
     expect(res.status).toBe(200);
     // トークンの追加は autopost:wake を書く
     expect(await KV().get("autopost:wake")).not.toBeNull();

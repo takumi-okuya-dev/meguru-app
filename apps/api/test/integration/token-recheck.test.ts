@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { createThreadsClient } from "../../src/lib/threads-client";
 import { createDb } from "../../src/db/client";
 import { runTokenRecheck } from "../../src/services/token-recheck";
-import { call, fake, makeApp, resetDb, testEnv } from "../helpers/app";
+import { fake, makeApp, resetDb, testEnv, tokenConnectNew } from "../helpers/app";
 
 const app = makeApp();
 const q = () => neon(testEnv.DATABASE_URL);
@@ -18,7 +18,7 @@ beforeEach(async () => {
 
 async function addWithoutDebug(user = "u1") {
   const token = await fake.issueToken({ user: "9003", debug: false });
-  const res = await call(app, "POST", "/api/threads/token-connect", { user, body: { mode: "new", token } });
+  const { res } = await tokenConnectNew(app, user, token);
   return { token, accountId: ((await res.json()) as { accountId: string }).accountId };
 }
 const row = async () =>
@@ -81,10 +81,7 @@ describe("確かめ直し", () => {
 describe("日次の延長（SC-006、FR-040）", () => {
   it("トークンの接続も、期限まで7日を切れば延長され、アプリのユーザーIDのまま", async () => {
     const { refreshExpiringTokens } = await import("../../src/services/token-refresh");
-    await call(app, "POST", "/api/threads/token-connect", {
-      user: "u1",
-      body: { mode: "new", token: await fake.issueToken({ user: "9003" }) },
-    });
+    await tokenConnectNew(app, "u1", await fake.issueToken({ user: "9003" }));
     await q()`UPDATE threads_connections SET expires_at = now() + interval '3 days', issued_at = now() - interval '2 days'`;
     const result = await refreshExpiringTokens(testEnv, createThreadsClient(testEnv), new Date());
     expect(result.refreshed).toBe(1);

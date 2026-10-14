@@ -20,6 +20,7 @@ const { PerformancePage: Page } = await import("@/pages/performance");
 
 const account: AccountSummary = {
   id: "a1",
+  name: "たくみ",
   username: "takumi",
   displayName: "たくみ",
   profilePictureUrl: null,
@@ -38,6 +39,7 @@ const summary = (over: Partial<PerformanceSummary> = {}): PerformanceSummary => 
   lastFetchedAt: "2026-10-07T18:00:00.000Z",
   insightsDenied: false,
   needsReconnect: false,
+  notConnected: false,
   counts: { all: 37, good: 7, normal: 16, poor: 9, pending: 4 },
   ...over,
 });
@@ -348,5 +350,19 @@ describe("US3：CSVで書き出す", () => {
     await userEvent.click(await screen.findByRole("button", { name: /CSVで書き出す/ }));
     await userEvent.click(await screen.findByRole("menuitem", { name: /取り込みごと/ }));
     await waitFor(() => expect(toast.error).toHaveBeenCalledWith("書き出せませんでした。もう一度お試しください"));
+  });
+});
+
+describe("未接続のアカウント（specs/012 FR-033）", () => {
+  it("数字・一覧・書き出しの代わりに「Threadsにつなぐと使えます」だけを出す", async () => {
+    Object.assign(account, { connectionStatus: "not_connected", username: null, connectionMethod: null });
+    try {
+      renderPage();
+      expect(await screen.findByText("Threadsにつなぐと使えます")).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: /CSV/ })).not.toBeInTheDocument();
+      expect(screen.queryByText(/基準値/)).not.toBeInTheDocument();
+    } finally {
+      Object.assign(account, { connectionStatus: "connected", username: "takumi", connectionMethod: undefined });
+    }
   });
 });

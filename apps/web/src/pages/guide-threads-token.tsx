@@ -30,7 +30,7 @@ export function GuideThreadsTokenPage() {
 
       <Step title="はじめに">
         <p>
-          ThreadsGrowerに、自分で作ったMetaアプリのアクセストークンを貼り付けて、Threadsアカウントを追加する手順です。Metaアプリを持っていなくても、この手順どおりに進めれば作れます。かかる時間の目安は30分です。
+          ThreadsGrowerのアカウントに、自分で作ったMetaアプリのアクセストークンを貼り付けて、Threadsアカウントをつなぐ手順です。Metaアプリを持っていなくても、この手順どおりに進めれば作れます。かかる時間の目安は30分です。
         </p>
         <p>すでにMetaアプリとトークンをお持ちなら、「5. 長期トークンを作る」から読んでください。</p>
       </Step>
@@ -70,9 +70,9 @@ export function GuideThreadsTokenPage() {
         <p>トークンはパスワードと同じように扱い、他の人に見せたり、チャットに貼ったりしないでください。</p>
       </Step>
 
-      <Step title="6. 貼り付ける" purpose="ThreadsGrowerにアカウントを追加します。">
+      <Step title="6. 貼り付ける" purpose="ThreadsGrowerのアカウントを、Threadsにつなぎます。">
         <p>
-          ThreadsGrowerの「Threadsアカウントを追加」で「自分のMetaアプリのトークンで追加する」を開き、コピーしたトークンを貼り付けて「追加する」を押します。追加したアカウントの画面に移れば完了です。
+          ThreadsGrowerで、つなぎたいアカウントの「このアカウントの設定」を開き、「Threadsとの接続」の「自分のMetaアプリのトークンでつなぐ」を開きます。コピーしたトークンを貼り付けて「つなぐ」を押し、「つながりました」と出れば完了です。アカウントがまだなければ、先に「アカウントを作る」で名前だけを入れて作ります。
         </p>
         <p>
           トークンは暗号化して保存し、画面に再び表示しません。扱いは<Link className="underline" to="/terms">利用規約</Link>のとおりです。

@@ -15,6 +15,7 @@ vi.mock("@clerk/react", () => ({
 
 const account = {
   id: "a1",
+  name: "カフェ B店",
   username: "cafe_b",
   displayName: "カフェ B店",
   profilePictureUrl: null,

@@ -324,9 +324,9 @@ export function TeamSharedAccountPage() {
       <header className="mx-auto flex w-full max-w-3xl items-center gap-3 px-4 pt-5 md:px-6">
         <AccountAvatar account={a} className="size-10" />
         <span className="flex min-w-0 flex-col leading-tight">
-          <h1 className="truncate text-[17px] font-semibold">{a.displayName ?? a.username}</h1>
+          <h1 className="truncate text-[17px] font-semibold">{a.name}</h1>
           <span className="truncate text-xs text-muted-foreground">
-            @{a.username} · オーナー {owner}
+            {a.username ? `@${a.username}` : "未接続"} · オーナー {owner}
           </span>
         </span>
       </header>

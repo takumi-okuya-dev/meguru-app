@@ -44,6 +44,9 @@ export const ERROR_CODES = [
   "TOKEN_SHORT_LIVED",
   "TOKEN_CHECK_LOCKED",
   "ACCOUNT_ALREADY_REGISTERED",
+  // アカウントを先に作る（specs/012-accounts-before-connect contracts/api.md）
+  "ACCOUNT_NOT_CONNECTED",
+  "ACCOUNT_ALREADY_CONNECTED",
   "THREADS_UNAVAILABLE",
   "CONFIG_ERROR",
   "API_UNREACHABLE",
@@ -182,6 +185,7 @@ export function errorMessage(code: ErrorCode, ctx: ErrorMessageContext = {}): Er
     case "DRAFT_PUBLISHING":
       return { message: "投稿の処理中です。少し待ってからもう一度お試しください。", action: "reload" };
     case "THREADS_NOT_READY":
+      if (ctx.details?.[0] === "not_connected") return { message: THREADS_CHECK_MESSAGES.not_connected, action: "none" };
       return ctx.details?.[0] === "needs_reconnect"
         ? { message: THREADS_CHECK_MESSAGES.needs_reconnect, action: "retry-connect" }
         : { message: THREADS_CHECK_MESSAGES.no_publish_permission, action: "retry-connect" };
@@ -235,11 +239,22 @@ export function errorMessage(code: ErrorCode, ctx: ErrorMessageContext = {}): Er
         action: "retry-later",
       };
     case "ACCOUNT_ALREADY_REGISTERED":
+      // 自分の別のアカウントと重なったときは、その名前を出す（details: [id, name, username]。specs/012 contracts/api.md）
+      if (ctx.details?.[1] && ctx.details[2]) {
+        return { message: `@${ctx.details[2]}は、あなたのアカウント『${ctx.details[1]}』につながっています。`, action: "none" };
+      }
       return {
         message:
           "このアカウントはすでに登録されています。接続を更新するときは、そのアカウントの設定の「接続し直す」を使ってください。",
         action: "none",
       };
+    case "ACCOUNT_NOT_CONNECTED":
+      return {
+        message: "このアカウントは、まだThreadsにつながっていません。「このアカウントの設定」からつないでください。",
+        action: "none",
+      };
+    case "ACCOUNT_ALREADY_CONNECTED":
+      return { message: "このアカウントは、すでにThreadsにつながっています。", action: "reload" };
     case "THREADS_UNAVAILABLE":
       return { message: "Threadsに接続できませんでした。時間をおいて、もう一度お試しください。", action: "retry-later" };
     case "CONFIG_ERROR":
@@ -299,20 +314,13 @@ export const RECONNECT_FROM_SETTINGS_HINT =
   "登録済みのAccountの接続を更新したい場合は、そのAccountの設定画面から認可し直せます。";
 
 /**
- * Threadsの接続に成功したときの文言（contracts/ui-routes.md「callbackの結果表示」）。
- * @param kind - new（新規）、updated（既存を更新）、reconnect（再接続）
- * @param username - Threadsのユーザー名（@なし）
- * @returns 画面に出す文言
+ * callback の connected の文言。名前はアカウントの名前（specs/012 research.md R2）。
+ * @param kind - connect（はじめてつないだ）・reconnect（接続し直した）
+ * @param name - アカウントの名前
+ * @returns 文言
  */
-export function connectedMessage(kind: "new" | "updated" | "reconnect", username: string): string {
-  switch (kind) {
-    case "new":
-      return `@${username} を追加しました`;
-    case "updated":
-      return `@${username} はすでに登録済みのため、接続情報を更新しました`;
-    case "reconnect":
-      return `@${username} を再接続しました`;
-  }
+export function connectedMessage(kind: "connect" | "reconnect", name: string): string {
+  return kind === "connect" ? `${name}をThreadsにつなぎました` : `${name}を再接続しました`;
 }
 
 // ---- 自動投稿（specs/005-auto-post contracts/ui-routes.md）----
@@ -329,6 +337,7 @@ export const PUBLISH_ERROR_LABELS = {
 /** 投稿の権限の確認の結果の文言（FR-002a・FR-002b）。ok は件数を埋め込むので threadsCheckOkMessage を使う。 */
 export const THREADS_CHECK_MESSAGES = {
   needs_reconnect: "Threadsとの接続が切れています。再接続してください",
+  not_connected: "Threadsにつなぐと使えます",
   no_publish_permission: "Threadsへの投稿の権限がありません。再接続して、投稿の許可をオンにしてください",
   unknown: "Threadsとの接続を確認できませんでした。時間をおいてもう一度お試しください",
 } as const;

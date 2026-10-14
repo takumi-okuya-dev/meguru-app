@@ -356,12 +356,20 @@ async function loadCandidates(db: Db, now: Date, catchup: boolean, todayStart: D
     .groupBy(postDrafts.id, accounts.id, users.id, threadsConnections.accountId, postMetrics.draftId)
     .orderBy(priority, asc(postDrafts.publishedAt), asc(postDrafts.id))
     .limit(limit);
-  return rows.map((r) => ({
-    ...r,
-    publishedAt: r.publishedAt!,
-    state: r.state as "updating" | null,
-    taken: (r.taken ?? []).filter((k): k is MetricsMilestone => k === "h24" || k === "d3" || k === "d7"),
-  }));
+  // connected で絞っているので threads_user_id は必ずある（specs/012 の CHECK 制約）。型のために NULL を落とす
+  return rows.flatMap(({ threadsUserId, ...r }) =>
+    threadsUserId
+      ? [
+          {
+            ...r,
+            threadsUserId,
+            publishedAt: r.publishedAt!,
+            state: r.state as "updating" | null,
+            taken: (r.taken ?? []).filter((k): k is MetricsMilestone => k === "h24" || k === "d3" || k === "d7"),
+          },
+        ]
+      : [],
+  );
 }
 
 /**
@@ -373,7 +381,7 @@ async function loadCandidates(db: Db, now: Date, catchup: boolean, todayStart: D
  * @returns 対象
  */
 async function loadFollowerTargets(db: Db, now: Date, today: string, todayStart: Date) {
-  return db
+  const rows = await db
     .select({
       accountId: accounts.id,
       threadsUserId: accounts.threadsUserId,
@@ -398,6 +406,8 @@ async function loadFollowerTargets(db: Db, now: Date, today: string, todayStart:
       ),
     )
     .orderBy(asc(accounts.id));
+  // connected で絞っているので threads_user_id は必ずある（specs/012 の CHECK 制約）
+  return rows.flatMap(({ threadsUserId, ...r }) => (threadsUserId ? [{ ...r, threadsUserId }] : []));
 }
 
 /**
