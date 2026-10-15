@@ -201,7 +201,7 @@ export async function listReviewedRows(
  * @param now - 今の時刻
  * @returns 要確認・承認済み（投稿の順）・却下（新しい500件）・投稿に失敗の下書き、予定、自動投稿の状態、件数
  */
-export async function listAllDrafts(db: Db, account: AccountRow, now: Date = new Date()) {
+export async function listAllDrafts(db: Db, account: AccountRow & { ownerReadOnly?: boolean }, now: Date = new Date()) {
   const [needsReview, approved, rejected, publishFailed, counts, schedule] = await Promise.all([
     listDraftRows(db, account.id),
     listQueueRows(db, account.id),

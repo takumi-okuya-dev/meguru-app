@@ -149,7 +149,7 @@ export function teamsRoutes(authed: MiddlewareHandler<AppEnv>) {
       const { accountId, shared } = await parseBody(teamAccountAddSchema, c.req.json());
       await withTransaction(c.env.DATABASE_URL, async (tx) => {
         const access = await authorizeTeamMember(tx, c.get("user"), c.req.param("teamId"), { lock: true });
-        await addTeamAccount(tx, access, accountId, shared ?? false);
+        await addTeamAccount(tx, access, accountId, shared ?? false, c.get("user").billing);
       });
       return c.body(null, 204);
     })

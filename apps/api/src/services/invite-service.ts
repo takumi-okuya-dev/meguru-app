@@ -5,6 +5,8 @@ import { TEAM_MEMBER_LIMIT } from "@threads-grower/shared";
 import { and, asc, count, eq, inArray } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import type { Env } from "../env";
+import { billingModeOf, type BillingMode } from "../lib/config";
+import { loadEntitlement } from "./billing-service";
 import { createDb, withTransaction, type Db, type TxDb } from "../db/client";
 import { accounts, memberships, teamAccounts, teamMembers, teams, users } from "../db/schema";
 import { createTokenCipher } from "../lib/crypto";
@@ -158,13 +160,18 @@ export async function previewTeamInvite(env: Env, token: string, viewer: Viewer)
  * @param tx - トランザクション
  * @param userId - 利用者
  * @param accountIds - 選んだアカウント
+ * @param mode - 決済のモード（読むだけの人は、チームを作る・参加する・アカウントを足すことができない。specs/013 FR-043）
  * 未接続のアカウントは入れない（チームのアカウントは、どれも一度はThreadsにつないだもの。specs/012 FR-050・FR-052）。
- * @throws AppError TEAM_NEEDS_ACCOUNT（0件）、ACCOUNT_NOT_FOUND（自分のアカウントでない）、ACCOUNT_NOT_CONNECTED（未接続）、
- *   ACCOUNT_IN_OTHER_TEAM（ほかのチームに入っている）
+ * @throws AppError TEAM_NEEDS_ACCOUNT（0件）、BILLING_REQUIRED（読むだけ）、ACCOUNT_NOT_FOUND（自分のアカウントでない）、
+ *   ACCOUNT_NOT_CONNECTED（未接続）、ACCOUNT_IN_OTHER_TEAM（ほかのチームに入っている）
  */
-export async function assertOwnFreeAccounts(tx: TxDb, userId: string, accountIds: string[]) {
+export async function assertOwnFreeAccounts(tx: TxDb, userId: string, accountIds: string[], mode: BillingMode) {
   const ids = [...new Set(accountIds)];
   if (ids.length === 0) throw new AppError("TEAM_NEEDS_ACCOUNT", 409, "no account selected");
+  const entitlement = await loadEntitlement(tx, userId, mode);
+  if (entitlement && !entitlement.fullAccess) {
+    throw new AppError("BILLING_REQUIRED", 403, "billing required", undefined, [entitlement.readOnlyReason ?? "trial_ended"]);
+  }
   const owned = await tx
     .select({ accountId: memberships.accountId })
     .from(memberships)
@@ -226,6 +233,7 @@ export async function acceptTeamInvite(env: Env, user: { id: string }, token: st
       tx,
       user.id,
       selected.map((a) => a.id),
+      billingModeOf(env),
     );
     await tx.insert(teamMembers).values({ teamId: team.id, userId: user.id, role: "member" });
     const shared = new Map(selected.map((a) => [a.id, a.shared]));

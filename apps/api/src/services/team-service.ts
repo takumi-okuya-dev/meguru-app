@@ -5,6 +5,7 @@ import { TEAM_EDITOR_LIMIT, TEAM_MEMBER_LIMIT, TEAMS_PER_ADMIN, type TeamRole } 
 import { and, asc, count, eq, inArray, ne, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import type { Env } from "../env";
+import { billingModeOf, type BillingMode } from "../lib/config";
 import type { Db, TxDb } from "../db/client";
 import { accounts, memberships, teamAccounts, teamMembers, teams, users } from "../db/schema";
 import { lockAdminTeams } from "../db/locks";
@@ -120,7 +121,7 @@ export async function listMyTeams(db: Db | TxDb, userId: string) {
  */
 export async function createTeam(env: Env, tx: TxDb, user: { id: string }, input: { name: string; accountIds: string[] }) {
   await tx.select({ id: users.id }).from(users).where(eq(users.id, user.id)).for("update");
-  await assertOwnFreeAccounts(tx, user.id, input.accountIds);
+  await assertOwnFreeAccounts(tx, user.id, input.accountIds, billingModeOf(env));
   // 管理者のチームの数のロックは、行ロックの後に取る（db/locks.ts の lockAdminTeams）
   await assertCanAdminMore(tx, user.id);
   const teamId = crypto.randomUUID();
@@ -526,10 +527,11 @@ export async function setShared(tx: TxDb, teamAccess: TeamAccess, accountId: str
  * @param teamAccess - authorizeTeamMember の結果（鍵をかけてある）
  * @param accountId - アカウント
  * @param shared - 見せるか（既定は見せない）
- * @throws AppError ACCOUNT_NOT_FOUND（自分のアカウントでない）、ACCOUNT_IN_OTHER_TEAM
+ * @param mode - 決済のモード（読むだけなら足せない。specs/013 FR-043）
+ * @throws AppError ACCOUNT_NOT_FOUND（自分のアカウントでない）、ACCOUNT_IN_OTHER_TEAM、BILLING_REQUIRED
  */
-export async function addTeamAccount(tx: TxDb, teamAccess: TeamAccess, accountId: string, shared = false) {
-  await assertOwnFreeAccounts(tx, teamAccess.member.id, [accountId]);
+export async function addTeamAccount(tx: TxDb, teamAccess: TeamAccess, accountId: string, shared: boolean, mode: BillingMode) {
+  await assertOwnFreeAccounts(tx, teamAccess.member.id, [accountId], mode);
   const now = new Date();
   await tx
     .insert(teamAccounts)

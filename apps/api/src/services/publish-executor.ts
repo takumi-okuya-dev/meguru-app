@@ -21,6 +21,8 @@ import {
   publishAttempts,
 } from "../db/schema";
 import type { Env } from "../env";
+import { billingModeOf } from "../lib/config";
+import { loadOwnerEntitlement } from "./billing-service";
 import { logger } from "../lib/logger";
 import {
   ThreadsApiError,
@@ -53,7 +55,7 @@ export type ExecuteOutcome =
   | { kind: "retry" }
   | { kind: "carried_over" }
   | { kind: "failed" }
-  | { kind: "skipped"; reason: "needs_reconnect" | "rate_limited" };
+  | { kind: "skipped"; reason: "needs_reconnect" | "rate_limited" | "billing_inactive" };
 
 /** 持ち時間を別の処理に取られた（再接続の片付けを含む）。この処理では、それ以上何も書かず、公開もしない。 */
 class LeaseLostError extends Error {
@@ -149,6 +151,11 @@ async function executeOwned(
     // 要再接続：トークンの有無によらず、新しく公開しない（連携の取り消しで接続の行が消えても、ここで止める）。
     // 公開の結果がわからない途中だけは、確かめる処理（公開しない）を続ける
     return ctx.backToApproved("needs_reconnect");
+  }
+  // オーナーが読むだけなら、新しく公開しない（やり直し待ちも含む）。公開の結果がわからない途中だけは確かめる（specs/013 R8）
+  if (!attempt.publishRequestedAt) {
+    const owner = await loadOwnerEntitlement(db, attempt.accountId, billingModeOf(env), now);
+    if (owner && !owner.fullAccess) return ctx.backToApproved("billing_inactive");
   }
   if (!cred?.token || cred.threadsUserId === null) {
     // 接続がない・鍵の設定ミスで復号できない。結果がわからない途中なら待ち、そうでなければ一時的な失敗として数える
@@ -571,7 +578,7 @@ class AttemptContext {
    * @returns 飛ばした結果
    */
   async backToApproved(
-    reason: "needs_reconnect" | "rate_limited",
+    reason: "needs_reconnect" | "rate_limited" | "billing_inactive",
   ): Promise<ExecuteOutcome> {
     await this.commit(
       { state: "skipped", skipReason: reason, draftId: null, leaseUntil: null },

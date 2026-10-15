@@ -15,6 +15,8 @@ import { withTransaction, type TxDb } from "../db/client";
 import { lockAccountDrafts } from "../db/locks";
 import { accounts, postDrafts, postingSchedules, publishAttempts } from "../db/schema";
 import type { Env } from "../env";
+import { billingModeOf, type BillingMode } from "../lib/config";
+import { loadOwnerEntitlement } from "./billing-service";
 import { CLEAR_QUEUE_FIELDS, listQueueRows } from "./draft-service";
 import { listNgWords } from "./posting-rules-service";
 
@@ -22,7 +24,7 @@ type ScheduleRow = typeof postingSchedules.$inferSelect;
 
 /** 飛ばした理由（publish_attempts.skip_reason）。 */
 export type SkipReason =
-  "no_drafts" | "needs_reconnect" | "rate_limited" | "daily_limit" | "auto_post_off";
+  "no_drafts" | "needs_reconnect" | "rate_limited" | "daily_limit" | "auto_post_off" | "billing_inactive";
 
 /** 取り出しの結果。 */
 export type ClaimResult =
@@ -52,6 +54,7 @@ function isCurrentSlot(accountId: string, slot: DueSlot, schedule: ScheduleRow):
 /**
  * 公開してよいかの条件を確かめる（手順3の表）。満たさなければ飛ばす理由を返す。
  * @param tx - トランザクション
+ * @param mode - 決済のモード（オーナーが読むだけなら billing_inactive。specs/013 research.md R8）
  * @param accountId - accounts.id
  * @param schedule - 読み直した設定
  * @param slot - 来ている時刻
@@ -60,6 +63,7 @@ function isCurrentSlot(accountId: string, slot: DueSlot, schedule: ScheduleRow):
  */
 async function skipReasonOf(
   tx: TxDb,
+  mode: BillingMode,
   accountId: string,
   schedule: ScheduleRow | undefined,
   slot: DueSlot,
@@ -71,6 +75,9 @@ async function skipReasonOf(
     .where(eq(accounts.id, accountId));
   if (!schedule?.enabled) return "auto_post_off";
   if (account?.connectionStatus !== "connected") return "needs_reconnect";
+  // 一覧を読んだ後にオーナーが読むだけになった（specs/013 research.md R8）
+  const owner = await loadOwnerEntitlement(tx, accountId, mode, now);
+  if (owner && !owner.fullAccess) return "billing_inactive";
   if (schedule.pausedUntil && schedule.pausedUntil.getTime() > now.getTime()) return "rate_limited";
   const published = (from: Date, to: Date) =>
     tx
@@ -158,7 +165,7 @@ export async function claimSlot(
     };
 
     // 自分の記録で250件に達した場合は paused_until を入れない（直前24時間の件数が減れば、次の時刻から投稿する）
-    const reason = await skipReasonOf(tx, accountId, schedule, slot, now);
+    const reason = await skipReasonOf(tx, billingModeOf(env), accountId, schedule, slot, now);
     if (reason) return skip(reason, 0);
 
     const [queue, ngWordRows] = await Promise.all([

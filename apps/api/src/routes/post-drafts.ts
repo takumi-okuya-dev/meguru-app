@@ -47,7 +47,7 @@ export function postDraftRoutes(authed: MiddlewareHandler<AppEnv>) {
       // 見せてもらっている人には、設定（NGワード・作る件数）と自動投稿の状態を見せない（specs/011 FR-031、Constitution原則V）
       const viewer = access.relation === "shared_viewer";
       const [drafts, ngWordRows] = await Promise.all([
-        listAllDrafts(db, account),
+        listAllDrafts(db, { ...account, ownerReadOnly: access.readOnly !== null }),
         viewer ? Promise.resolve([]) : listNgWords(db, account.id),
       ]);
       return c.json({

@@ -557,7 +557,8 @@ export const autoPostStateSchema = z.object({
   enabled: z.boolean(),
   slotCount: z.number().int(),
   /** 止まっている理由。止まっていなければ null */
-  stoppedReason: z.enum(["needs_reconnect", "rate_limited", "not_connected"]).nullable(),
+  // billing_inactive：オーナーが読むだけ（specs/013 research.md R8）
+  stoppedReason: z.enum(["needs_reconnect", "rate_limited", "not_connected", "billing_inactive"]).nullable(),
 });
 /** 自動投稿の状態。 */
 export type AutoPostState = z.infer<typeof autoPostStateSchema>;

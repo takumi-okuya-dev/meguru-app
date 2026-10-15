@@ -433,3 +433,21 @@ export async function reconcileSubscriptions(env: Env, stripe: StripeClient = cr
   }
   return { synced, failed };
 }
+
+/**
+ * アカウントのオーナーの使える状態を読む（定期処理が使う。specs/013 research.md R8）。
+ * @param db - データベース（トランザクションの中でもよい）
+ * @param accountId - accounts.id
+ * @param mode - 決済のモード
+ * @param now - 今の時刻
+ * @returns 使える状態。オーナーがいなければ null
+ */
+export async function loadOwnerEntitlement(db: Db | TxDb, accountId: string, mode: BillingMode, now: Date = new Date()) {
+  if (!mode.enabled) return entitlementFromFacts(mode, { createdAt: now, billingExempt: false, status: null, cancelAtPeriodEnd: null }, now);
+  const [owner] = await db
+    .select({ userId: memberships.userId })
+    .from(memberships)
+    .where(and(eq(memberships.accountId, accountId), eq(memberships.role, "owner")))
+    .limit(1);
+  return owner ? loadEntitlement(db, owner.userId, mode, now) : null;
+}

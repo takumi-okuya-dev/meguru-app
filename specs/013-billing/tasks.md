@@ -202,23 +202,23 @@ description: "Task list for feature 013 billing and withdrawal"
 
 ### Tests for User Story 3
 
-- [ ] T031 [P] [US3] `apps/api/test/integration/auto-post-billing.test.ts`を作る（決済ON、`apps/api/test/helpers/auto-post.ts`を使う）。確かめること（FR-041、research.md R8）：
+- [X] T031 [P] [US3] `apps/api/test/integration/auto-post-billing.test.ts`を作る（決済ON、`apps/api/test/helpers/auto-post.ts`を使う）。確かめること（FR-041、research.md R8）：
   - 読むだけのオーナーのアカウントで、時刻が来てもThreadsへの問い合わせが0回で、試みの行が作られない。
   - 一覧を読んだ後・確定の前に読むだけになったら、`skip_reason = 'billing_inactive'`で飛ばす。
   - やり直し待ち（`retry_wait`）の試みは、読むだけなら投稿せずに終える。結果の確認中（`in_progress`）のものは確認だけ続ける。
   - 契約して戻った後、次の時刻から投稿し、60分を過ぎた時刻はまとめて投稿しない。
   - 承認済みの案は承認済みのまま残る。
   - 料金なし・決済OFFでは今のまま投稿する。
-- [ ] T032 [P] [US3] `apps/api/test/integration/metrics-runner.test.ts`に足す（決済ON）：読むだけのオーナーのアカウントで、パフォーマンスの取得とフォロワーの記録がThreadsに問い合わせない。契約中・無料体験中・料金なしでは取得する。トークンの更新（日次）は読むだけでも続く。
-- [ ] T033 [P] [US3] `apps/api/test/integration/team-billing.test.ts`を作る（決済ON）。確かめること（FR-043・FR-044）：
+- [X] T032 [P] [US3] `apps/api/test/integration/metrics-runner.test.ts`に足す（決済ON）：読むだけのオーナーのアカウントで、パフォーマンスの取得とフォロワーの記録がThreadsに問い合わせない。契約中・無料体験中・料金なしでは取得する。トークンの更新（日次）は読むだけでも続く。
+- [X] T033 [P] [US3] `apps/api/test/integration/team-billing.test.ts`を作る（決済ON）。確かめること（FR-043・FR-044）：
   - 読むだけの人の`POST /api/teams`・`POST /api/invites/:token/accept`・`POST /api/teams/:id/accounts`が`403 BILLING_REQUIRED`。
   - 読むだけの管理者の招待・ロールの切り替え・担当の割り当て・人を外す・管理者の引き継ぎ・チームの名前と削除・「チームに見せる」は通る。
 
 ### Implementation for User Story 3
 
-- [ ] T034 [US3] `apps/api/src/services/auto-post-runner.ts`の「2.時刻の処理」の一覧に、オーナーの`users`（`memberships.role = 'owner'`）と`subscriptions`を結合し、`entitlementOf`で読むだけのオーナーの設定を外す。`apps/api/src/services/publish-claim.ts`の`skipReasonOf`で同じ確認をし、読むだけなら`billing_inactive`にする。`apps/api/src/services/publish-executor.ts`で、`retry_wait`の試みを投稿し直す前に同じ確認をし、読むだけなら失敗として終える。オーナーの状態を読む関数は`billing-service.ts`の`loadEntitlement`を使う（決済のモードは`billingModeOf(env)`）。
+- [X] T034 [US3] `apps/api/src/services/auto-post-runner.ts`の「2.時刻の処理」の一覧に、オーナーの`users`（`memberships.role = 'owner'`）と`subscriptions`を結合し、`entitlementOf`で読むだけのオーナーの設定を外す。`apps/api/src/services/publish-claim.ts`の`skipReasonOf`で同じ確認をし、読むだけなら`billing_inactive`にする。`apps/api/src/services/publish-executor.ts`で、`retry_wait`の試みを投稿し直す前に同じ確認をし、読むだけなら失敗として終える。オーナーの状態を読む関数は`billing-service.ts`の`loadEntitlement`を使う（決済のモードは`billingModeOf(env)`）。
 - [X] T035 [US3] `apps/api/src/services/metrics-runner.ts`の`hasGrowerAccess`（2か所）とプランでの絞り込み（`inArray(accounts.plan, …)`）を、オーナーの`users`・`subscriptions`の結合と`entitlementOf(...).fullAccess`に置き換える。
-- [ ] T036 [US3] `apps/api/src/services/invite-service.ts`の`assertOwnFreeAccounts`に、その人の`loadEntitlement`が`fullAccess`でなければ`BILLING_REQUIRED`を投げる確認を足す（呼び出し元のチームの作成・参加・アカウントの追加の3か所が守られる）。
+- [X] T036 [US3] `apps/api/src/services/invite-service.ts`の`assertOwnFreeAccounts`に、その人の`loadEntitlement`が`fullAccess`でなければ`BILLING_REQUIRED`を投げる確認を足す（呼び出し元のチームの作成・参加・アカウントの追加の3か所が守られる）。
 - [ ] T037 [P] [US3] `apps/web/test/read-only-banner.test.tsx`を先に書き、`apps/web/src/components/billing/ReadOnlyBanner.tsx`を作る（contracts/ui-routes.md「読むだけの帯」）。
   - `useAccountAccess`の`access.readOnly`があれば出す。理由ごとの文言とボタンは表のとおり。`owner_inactive`はボタンなし。閉じられない。
   - アカウントの画面のレイアウト（`apps/web/src/pages/account-layout.tsx`）の一番上に置く。未接続の帯より上。
