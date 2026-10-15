@@ -50,7 +50,7 @@ export const relationSchema = z.enum(["owner", "assigned", "shared_viewer"]);
 /** チームでのロールのスキーマ（specs/011 data-model.md の team_role）。 */
 export const teamRoleSchema = z.enum(["admin", "member", "editor"]);
 /** 権限のスキーマ（specs/011 contracts/permissions.md「権限」）。 */
-export const permissionSchema = z.enum(["read", "view", "content", "review", "settings", "activity", "owner"]);
+export const permissionSchema = z.enum(["read", "view", "content", "review", "settings", "activity", "owner", "remove"]);
 /** 操作の記録の、した人の役割（specs/011 data-model.md。partner は008の記録にだけ残る）。 */
 export const actorRoleSchema = z.enum(["owner", "member", "partner", "editor", "admin"]);
 

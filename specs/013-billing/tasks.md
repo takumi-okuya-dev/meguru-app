@@ -22,8 +22,8 @@ description: "Task list for feature 013 billing and withdrawal"
 
 **Purpose**: PRDの直し・使える状態の判定・権限・エラーのcode。
 
-- [ ] T001 [P] PRDを実装の前に直す（Constitution「開発ワークフロー」、research.md R14）：`_bmad-output/initiative-threads-grower-app/prd-threads-grower-app/prd-threads-grower-app.md`のFR-12（無料体験の後に契約がなければ読むだけ・自動投稿を止める、支払いが失敗したらすぐに読むだけ、無料体験中の契約は無料体験の終わりから請求、退会はすぐにすべて消す・契約はすぐ止めて返金なし、の`[ASSUMPTION]`を「2026-10-15決定」にする。料金の金額は仮の値のまま）、FR-2の「無料体験中は1件まで」、§3 Glossary「grower機能」（013で旧プランを外し、契約中・無料体験中・料金なしならすべて使える）、§9 Assumptions Indexの§4.6の行。
-- [ ] T002 [P] `packages/shared/test/billing.test.ts`を先に書き、`packages/shared/src/billing.ts`を作る（research.md R1・R3・R4）：
+- [X] T001 [P] PRDを実装の前に直す（Constitution「開発ワークフロー」、research.md R14）：`_bmad-output/initiative-threads-grower-app/prd-threads-grower-app/prd-threads-grower-app.md`のFR-12（無料体験の後に契約がなければ読むだけ・自動投稿を止める、支払いが失敗したらすぐに読むだけ、無料体験中の契約は無料体験の終わりから請求、退会はすぐにすべて消す・契約はすぐ止めて返金なし、の`[ASSUMPTION]`を「2026-10-15決定」にする。料金の金額は仮の値のまま）、FR-2の「無料体験中は1件まで」、§3 Glossary「grower機能」（013で旧プランを外し、契約中・無料体験中・料金なしならすべて使える）、§9 Assumptions Indexの§4.6の行。
+- [X] T002 [P] `packages/shared/test/billing.test.ts`を先に書き、`packages/shared/src/billing.ts`を作る（research.md R1・R3・R4）：
   - 定数：`BILLING_BASE_PRICE_JPY = 1000`、`BILLING_EXTRA_PRICE_JPY = 500`、`TRIAL_ACCOUNT_LIMIT = 1`、`TRIAL_ENDING_NOTICE_DAYS = 7`、`CHECKOUT_TRIAL_MIN_HOURS = 48`。
   - `trialEndsAt`・`isInTrial`を`packages/shared/src/access.ts`から移す（中身は変えない）。
   - `entitlementOf({ billingEnabled, exempt, userCreatedAt, subscription: { status, cancelAtPeriodEnd } | null, now })`：`{ state, fullAccess, readOnlyReason, accountLimit, trialEndsAt }`。R1の表のすべての行をテストにする（`past_due`・`unpaid`・`paused`は無料体験中でも`payment_failed`、`incomplete`・`incomplete_expired`・契約なしは無料体験中なら`trial`で上限1、終わっていれば`trial_ended`、`canceled`は無料体験中なら`trial`で終わっていれば`canceled`、`active`かつ解約の予約は`canceling`、`trialing`は`subscribed_trial`、料金なし・決済OFFは上限`null`）。
@@ -31,8 +31,8 @@ description: "Task list for feature 013 billing and withdrawal"
   - `nextInvoiceAmount(ownedCount)`：`BASE + EXTRA × (max(n,1) − 1)`（0件・1件・3件）。`billingQuantity(n) = max(n,1)`。
   - `trialDaysLeft(trialEndsAt, now)`：日本時間の日付で数え、終わる日を含まない（終わる日の当日は0）。
   - `packages/shared/src/index.ts`から出す。
-- [ ] T003 [P] `packages/shared/test/permissions.test.ts`を先に直し、`packages/shared/src/permissions.ts`に権限`remove`（アカウントの削除。オーナーだけ）を足し、`owner`の説明から削除を外す。`READ_ONLY_PERMISSIONS = ["read", "view", "activity", "remove"]`と`narrowForReadOnly(permissions)`（共通部分）を足す（research.md R2、contracts/api.md「権限」）。
-- [ ] T004 [P] `packages/shared/test/errors.test.ts`を先に直し、`packages/shared/src/errors.ts`にcode `BILLING_REQUIRED`・`ALREADY_SUBSCRIBED`・`NO_SUBSCRIPTION`・`BILLING_UNAVAILABLE`・`WITHDRAWAL_IN_PROGRESS`と文言を足す（contracts/api.md「新しいエラーコード」。`BILLING_REQUIRED`は`details[0]`の`trial_ended`・`payment_failed`・`canceled`・`owner_inactive`で文言を変える）。`ACCOUNT_LIMIT_REACHED`の文言を「無料体験中に作れるアカウントは1件までです。契約すると、2件目から1件につき月500円で足せます」（金額は`BILLING_EXTRA_PRICE_JPY`）、次の操作を「契約する」（`/settings/billing`）にする。`GROWER_FEATURE_REQUIRED`を一覧と文言から消す。
+- [X] T003 [P] `packages/shared/test/permissions.test.ts`を先に直し、`packages/shared/src/permissions.ts`に権限`remove`（アカウントの削除。オーナーだけ）を足し、`owner`の説明から削除を外す。`READ_ONLY_PERMISSIONS = ["read", "view", "activity", "remove"]`と`narrowForReadOnly(permissions)`（共通部分）を足す（research.md R2、contracts/api.md「権限」）。
+- [X] T004 [P] `packages/shared/test/errors.test.ts`を先に直し、`packages/shared/src/errors.ts`にcode `BILLING_REQUIRED`・`ALREADY_SUBSCRIBED`・`NO_SUBSCRIPTION`・`BILLING_UNAVAILABLE`・`WITHDRAWAL_IN_PROGRESS`と文言を足す（contracts/api.md「新しいエラーコード」。`BILLING_REQUIRED`は`details[0]`の`trial_ended`・`payment_failed`・`canceled`・`owner_inactive`で文言を変える）。`ACCOUNT_LIMIT_REACHED`の文言を「無料体験中に作れるアカウントは1件までです。契約すると、2件目から1件につき月500円で足せます」（金額は`BILLING_EXTRA_PRICE_JPY`）、次の操作を「契約する」（`/settings/billing`）にする。`GROWER_FEATURE_REQUIRED`を一覧と文言から消す。
 
 ---
 

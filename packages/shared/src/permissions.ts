@@ -23,12 +23,25 @@ export type TeamRole = "admin" | "member" | "editor";
  * - review：承認の操作（承認・却下・要確認に戻す・投稿の順）、要確認以外の案の削除
  * - settings：自動投稿・接続を確かめる・NGワード・投稿のルール
  * - activity：操作の記録を見る
- * - owner：Threadsとの接続、Accountの削除、チームに見せる
+ * - owner：Threadsとの接続、名前の変更、チームに見せる
+ * - remove：Accountの削除（オーナーだけ。読むだけになっても残る。specs/013 research.md R2）
  */
-export type Permission = "read" | "view" | "content" | "review" | "settings" | "activity" | "owner";
+export type Permission = "read" | "view" | "content" | "review" | "settings" | "activity" | "owner" | "remove";
 
 /** すべての権限（オーナーが持つもの）。 */
-export const ALL_PERMISSIONS: readonly Permission[] = ["read", "view", "content", "review", "settings", "activity", "owner"];
+export const ALL_PERMISSIONS: readonly Permission[] = [
+  "read",
+  "view",
+  "content",
+  "review",
+  "settings",
+  "activity",
+  "owner",
+  "remove",
+];
+
+/** オーナーが読むだけ（無料体験の終わり・支払いの失敗・解約の後）のときに残る権限（specs/013 research.md R2）。 */
+export const READ_ONLY_PERMISSIONS: readonly Permission[] = ["read", "view", "activity", "remove"];
 
 /**
  * 関わりから、許される権限の集合を求める（contracts/permissions.md「権限」）。
@@ -45,6 +58,15 @@ export function permissionsFor(relation: Relation, opts: { isTeamAdmin?: boolean
     return set;
   }
   return new Set<Permission>(["read"]);
+}
+
+/**
+ * オーナーが読むだけのときの権限に絞る（関わりから求めた権限と READ_ONLY_PERMISSIONS の共通部分）。
+ * @param permissions - 関わりから求めた権限
+ * @returns 絞った権限
+ */
+export function narrowForReadOnly(permissions: ReadonlySet<Permission>): ReadonlySet<Permission> {
+  return new Set([...permissions].filter((p) => READ_ONLY_PERMISSIONS.includes(p)));
 }
 
 /**

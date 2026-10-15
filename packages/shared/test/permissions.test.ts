@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ALL_PERMISSIONS, deletePermissionFor, permissionsFor, type Permission } from "../src/permissions";
+import { ALL_PERMISSIONS, deletePermissionFor, narrowForReadOnly, permissionsFor, type Permission } from "../src/permissions";
 
 const sorted = (set: ReadonlySet<Permission>) => [...set].sort();
 
@@ -29,8 +29,16 @@ describe("permissions（specs/011 contracts/permissions.md「権限」）", () =
         expect(set.has("review")).toBe(false);
         expect(set.has("settings")).toBe(false);
         expect(set.has("owner")).toBe(false);
+        expect(set.has("remove")).toBe(false);
       }
     }
+  });
+
+  it("読むだけに絞ると、読む・見る・操作の記録・アカウントの削除だけが残る（specs/013 research.md R2）", () => {
+    expect(sorted(narrowForReadOnly(permissionsFor("owner")))).toEqual(["activity", "read", "remove", "view"]);
+    expect(sorted(narrowForReadOnly(permissionsFor("assigned")))).toEqual(["read", "view"]);
+    expect(sorted(narrowForReadOnly(permissionsFor("assigned", { isTeamAdmin: true })))).toEqual(["activity", "read", "view"]);
+    expect(sorted(narrowForReadOnly(permissionsFor("shared_viewer")))).toEqual(["read"]);
   });
 
   it("削除に要る権限は、要確認なら content、それ以外は review（FR-002a）", () => {

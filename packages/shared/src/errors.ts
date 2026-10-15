@@ -1,5 +1,6 @@
 // エラーコードと、画面に出す日本語の文言（contracts/ui-routes.md「エラー文言」）。
 // APIは code だけを返し、Webがここから文言を引く。
+import { BILLING_EXTRA_PRICE_JPY } from "./billing";
 import { TEAM_EDITOR_LIMIT, TEAM_MEMBER_LIMIT, TEAMS_PER_ADMIN } from "./limits";
 
 /** APIとWebで共有するエラーコードの一覧（contracts/api.md・ui-routes.md）。 */
@@ -22,7 +23,6 @@ export const ERROR_CODES = [
   "ITEM_NOT_FOUND",
   "ITEM_LIMIT_REACHED",
   "KEYWORD_DUPLICATE",
-  "GROWER_FEATURE_REQUIRED",
   "PASTE_TOO_LARGE",
   "DRAFT_PUBLISHING",
   "THREADS_NOT_READY",
@@ -51,6 +51,12 @@ export const ERROR_CODES = [
   "CONFIG_ERROR",
   "API_UNREACHABLE",
   "INTERNAL_ERROR",
+  // 決済＋退会（specs/013-billing contracts/api.md「新しいエラーコード」）
+  "BILLING_REQUIRED",
+  "ALREADY_SUBSCRIBED",
+  "NO_SUBSCRIPTION",
+  "BILLING_UNAVAILABLE",
+  "WITHDRAWAL_IN_PROGRESS",
 ] as const;
 
 /** エラーコード。 */
@@ -85,7 +91,8 @@ export type ErrorMessageContext = {
 export type NextAction =
   | "sign-in"
   | "back-to-accounts"
-  | "plan-guidance"
+  | "subscribe"
+  | "open-portal"
   | "delete-account"
   | "retry-connect"
   | "retry-later"
@@ -113,17 +120,10 @@ export function errorMessage(code: ErrorCode, ctx: ErrorMessageContext = {}): Er
         action: "back-to-accounts",
       };
     case "ACCOUNT_LIMIT_REACHED":
-      // 上限1件ならアップグレード、最上位の上限（5件）なら不要なAccountの削除を案内する（FR-017）
-      if ((ctx.max ?? 1) <= 1) {
-        return {
-          message:
-            "現在のプランで登録できるAccount数（1件）に達しています。プラン3にすると最大5件まで登録できます。",
-          action: "plan-guidance",
-        };
-      }
+      // 無料体験中の上限（1件）だけで使う。契約すると上限はない（specs/013 research.md R9）
       return {
-        message: `登録できるAccount数の上限（${ctx.max}件）に達しています。新しく追加するには、使っていないAccountを削除してください。`,
-        action: "delete-account",
+        message: `無料体験中に作れるアカウントは${ctx.max ?? 1}件までです。契約すると、2件目から1件につき月${BILLING_EXTRA_PRICE_JPY}円で足せます。`,
+        action: "subscribe",
       };
     case "THREADS_AUTH_CANCELLED":
       return { message: "Threadsとの接続がキャンセルされました。", action: "retry-connect" };
@@ -189,11 +189,29 @@ export function errorMessage(code: ErrorCode, ctx: ErrorMessageContext = {}): Er
       return ctx.details?.[0] === "needs_reconnect"
         ? { message: THREADS_CHECK_MESSAGES.needs_reconnect, action: "retry-connect" }
         : { message: THREADS_CHECK_MESSAGES.no_publish_permission, action: "retry-connect" };
-    case "GROWER_FEATURE_REQUIRED":
+    case "BILLING_REQUIRED":
+      // 理由ごとに文言を変える。チームの人（owner_inactive）にはオーナーの支払いの詳細を出さない（specs/013 FR-045）
+      switch (ctx.details?.[0]) {
+        case "payment_failed":
+          return { message: "支払いに失敗しました。カードを更新してください。更新するまで読むだけです。", action: "open-portal" };
+        case "canceled":
+          return { message: "契約が終わりました。今は読むだけです。契約すると、すぐに元どおり使えます。", action: "subscribe" };
+        case "owner_inactive":
+          return { message: "オーナーの契約の状態により、このアカウントは今、読むだけです。", action: "none" };
+        default:
+          return { message: "無料体験が終わりました。今は読むだけです。契約すると、すぐに元どおり使えます。", action: "subscribe" };
+      }
+    case "ALREADY_SUBSCRIBED":
       return {
-        message: "この機能はプラン2以上で使えます。保存済みの内容はそのまま残っています。",
-        action: "plan-guidance",
+        message: "すでに契約しています。契約の確認・カードの変更は「支払いの画面を開く」から行えます。",
+        action: "open-portal",
       };
+    case "NO_SUBSCRIPTION":
+      return { message: "まだ契約していません。", action: "subscribe" };
+    case "BILLING_UNAVAILABLE":
+      return { message: "支払いの手続きにつながりませんでした。少し待ってから、もう一度お試しください。", action: "retry-later" };
+    case "WITHDRAWAL_IN_PROGRESS":
+      return { message: "退会の手続きの途中です。「退会する」をもう一度押して、手続きを終えてください。", action: "none" };
     case "ROLE_FORBIDDEN":
       return { message: ROLE_FORBIDDEN_MESSAGE, action: "reload" };
     case "INVITE_INVALID":
