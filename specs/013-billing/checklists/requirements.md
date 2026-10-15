@@ -33,4 +33,4 @@
 
 - 決済の仕組みにStripe（Checkout・カスタマーポータル）を名指ししているのは、Constitutionの技術スタック制約（決済：Stripe Billing + Checkout）で決まっているためで、Assumptionsにだけ書いた。要件の本文は「決済の側」「支払いの画面」と書いている。
 - 2026-10-15、specifyの前にユーザーに4つを確かめた（支払いの失敗はすぐに読むだけ、無料体験中の契約は体験の終わりから請求、退会はすぐにすべて消す、ステージングはテスト用環境でON＋料金なしの印）。Clarificationsに記録した。
-- 未完了の項目があれば、`/speckit-clarify` か `/speckit-plan` の前に仕様を直す。
+- 未完了の項目があれば、`/speckit-clarify`か`/speckit-plan`の前に仕様を直す。
