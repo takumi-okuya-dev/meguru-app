@@ -47,7 +47,7 @@ Phase 0の調べと決めたこと。各項目は「決定・理由・ほかの�
 
 **決定**：
 - Stripeの料金（Price）は1つ。月ごと・JPY・段階制（`tiers_mode = graduated`：1件目まで1,000円、2件目から1件500円）・`tax_behavior = inclusive`（税込み）。契約の数（quantity）は`max(オーナーのアカウントの数, 1)`。0件でも1にするので、基本料金は下がらない（spec US4-4）。
-- 金額は`packages/shared/src/billing.ts`の`BILLING_BASE_PRICE_JPY = 1000`・`BILLING_EXTRA_PRICE_JPY = 500`に置き、画面の料金の説明・次の請求の見込み・利用規約の文はここから出す。Stripeの料金のIDは環境の`STRIPE_PRICE_ID`で指す。2つの値がそろっているかは、手順書（FR-064）の確認の手順に入れる。
+- 金額は`packages/shared/src/billing.ts`の`BILLING_BASE_PRICE_JPY = 1000`・`BILLING_EXTRA_PRICE_JPY = 500`に置く。APIは`GET /api/billing`の`prices`と次の請求の見込みをここから出し、Webの「契約と支払い」・アカウントを作る画面は`prices`を使う。利用規約・特定商取引法に基づく表記（ログイン不要の画面）だけは、Webで定数を直接使う。Stripeの料金のIDは環境の`STRIPE_PRICE_ID`で指す。2つの値がそろっているかは、手順書（FR-064）の確認の手順に入れる。
 - 次の請求の見込みは、`BASE + EXTRA × (max(n,1) − 1)`で計算する（Stripeの「次の請求書の見込み」を読まない。画面を開くたびの問い合わせを減らす）。
 - 適格請求書の登録番号を載せるときは、Stripeの設定に登録番号と10%（内税）の税率を入れ、環境の`STRIPE_TAX_RATE_ID`（任意）を契約の既定の税率にする。アプリの金額は変わらない（spec Assumptions「適格請求書」）。
 

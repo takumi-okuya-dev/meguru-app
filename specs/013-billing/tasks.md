@@ -86,6 +86,7 @@ description: "Task list for feature 013 billing and withdrawal"
   - `entitlementOf`でオーナーの状態を求め、`fullAccess`でなければ`narrowForReadOnly`で権限を絞る。
   - 絞る前にはあって、絞った後にない権限を要られたら`AppError("BILLING_REQUIRED", 403, …, undefined, [reason])`を投げる。`reason`は、判定した人がオーナーなら`readOnlyReason`、ほかの人なら`owner_inactive`。
   - `AccountAccess`に`readOnly: { reason } | null`を足す。
+  - `apps/api/src/services/billing-service.ts`を作り、`loadEntitlement(db, userId, mode, now)`（`users`と`subscriptions`を読んで`entitlementOf`する）を置く。上限（T018）・定期処理（T034・T035）・チームの入口（T036）・`GET /api/me`（T019）はこれを使う。
   - `apps/api/src/routes/accounts.ts`の`DELETE /api/accounts/:accountId`を`owner`から`remove`に変える。
   - `apps/api/src/routes/account-team.ts`の`GET /api/accounts/:accountId/access`の応答に`readOnly`を足し、`packages/shared/src/schemas.ts`の`accountAccessResponseSchema`に`readOnly: z.object({ reason: z.enum(["trial_ended","payment_failed","canceled","owner_inactive"]) }).nullable()`を足す。
 - [ ] T013 `apps/api/test/integration/read-only-access.test.ts`を作る（決済ON）。T012の前に書いて失敗を確かめる。
@@ -129,7 +130,7 @@ description: "Task list for feature 013 billing and withdrawal"
 
 ### Implementation for User Story 1
 
-- [ ] T018 [US1] `apps/api/src/services/account-service.ts`の`ownedPlans`・`accountLimitFor`・`assertCanAddAccount`を置き換える（research.md R9）。`loadEntitlement(db, userId, mode, now)`は、`users`と`subscriptions`を読んで`entitlementOf`する（`apps/api/src/services/billing-service.ts`に置き、ほかからも使う）。`assertCanAddAccount`は、`read_only`なら`BILLING_REQUIRED`、`accountLimit`があり所有の数が上限以上なら`ACCOUNT_LIMIT_REACHED`（`max`）を投げる。`createAccount`から`plan`を外す。鍵（`lockUserRow`）の中で数えるのは今のまま。
+- [ ] T018 [US1] `apps/api/src/services/account-service.ts`の`ownedPlans`・`accountLimitFor`・`assertCanAddAccount`を置き換える（research.md R9）。利用者の状態はT012の`loadEntitlement`で読む。`assertCanAddAccount`は、`read_only`なら`BILLING_REQUIRED`、`accountLimit`があり所有の数が上限以上なら`ACCOUNT_LIMIT_REACHED`（`max`）を投げる。`createAccount`から`plan`を外す。鍵（`lockUserRow`）の中で数えるのは今のまま。
 - [ ] T019 [US1] `apps/api/src/routes/me.ts`の`GET /api/me`で、`accountLimit`を`{ max: entitlement.accountLimit, used }`にし、`billing`を足す。`withdrawalInProgress`も足す（今は常に`false`。US5で使う）。`packages/shared/src/schemas.ts`の`me`の応答の型を直す。
 - [ ] T020 [P] [US1] `apps/web/test/account-create.test.tsx`を先に直し、`apps/web/src/pages/account-new.tsx`に場合分けを足す（contracts/ui-routes.md「アカウントを作る」）。`state = trial`で`used >= 1`なら、入力欄の代わりに上限の文と「契約する」（`/settings/billing`）を出す。`state = read_only`なら、入力欄の代わりに理由の文と「契約する」か「支払いの画面を開く」を出す。アカウントが0件の人はサイドバーなしの1カラムのまま（spec Edge Cases）。
 - [ ] T021 [P] [US1] `apps/web/test/trial-ending-banner.test.tsx`を先に書き、`apps/web/src/components/billing/TrialEndingBanner.tsx`を作る（contracts/ui-routes.md「無料体験の終わりの帯」）。
@@ -250,7 +251,7 @@ description: "Task list for feature 013 billing and withdrawal"
 
 - [ ] T043 [US4] `apps/api/src/services/billing-service.ts`に`markQuantityDirty(tx, userId)`と`syncQuantity(env, db, userId)`を足す。`apps/api/src/services/account-service.ts`の`createAccount`・`deleteAccount`のトランザクションで`markQuantityDirty`し、トランザクションの後に`syncQuantity`を呼ぶ（失敗はログだけ）。`syncQuantity`は、契約が終わっていなければ`updateSubscriptionQuantity(…, billingQuantity(n))`し、`quantity`を書いて印を消す。契約の項目のIDは`listSubscriptions`の結果から取る。データ削除の求め（001の`data-deletion.ts`）でアカウントが消える所でも、同じ印を付ける。
 - [ ] T044 [US4] `apps/api/src/services/daily-jobs.ts`に「契約の合わせ直し」を足す（決済OFFなら飛ばす）。終わっていない契約と`quantity_sync_needed = true`の行について、`syncCustomer`と`syncQuantity`を呼ぶ。1件の失敗で全体を止めない。
-- [ ] T045 [US4] `apps/api/src/routes/billing.ts`に`POST /api/billing/portal`（`{ url }`）を足す。`apps/web/src/pages/settings/billing.tsx`に「支払いの画面を開く」と`canceling`の表示を足す。表示は「〇月〇日に終わります（解約済み）」と「その日まで、すべての機能を使えます。解約は支払いの画面から取り消せます」。`apps/web/src/lib/api-client.ts`に`openPortal()`を足す。`apps/web/test/billing-page.test.tsx`に場合を足す。
+- [ ] T045 [US4] `apps/api/src/routes/billing.ts`に`POST /api/billing/portal`（`{ url }`）を足す。`apps/web/src/pages/settings/billing.tsx`に「支払いの画面を開く」と`canceling`の表示を足す。表示は「〇月〇日に終わります（解約済み）」と「その日まで、すべての機能を使えます。解約は支払いの画面から取り消せます」。`apps/web/src/lib/api-client.ts`に`openPortal()`を足す。契約（顧客）がある人は、画面を開くたびに`POST /api/billing/sync`を1回呼び、結果で表示を更新する（FR-036。`?checkout=success`のくり返しとは別）。`apps/web/test/billing-page.test.tsx`に場合を足す（開いたときの読み直しを含む）。
 - [ ] T046 [P] [US4] `apps/web/src/pages/account-new.tsx`に、契約中（`subscribed_trial`・`active`・`canceling`）で`used >= 1`なら「2件目からは1件につき月500円です。次の請求から反映されます」を入力の下に出す（FR-031）。`apps/web/test/account-create.test.tsx`に場合を足す。
 
 ---
@@ -274,6 +275,7 @@ description: "Task list for feature 013 billing and withdrawal"
   - `clerk_deleted_at`から25時間で`withdrawn_users`の行が消える。
   - 日次の処理が、`withdrawal_requested_at`から1時間を過ぎた人の退会を終える。
   - 契約のない人・決済OFFでも退会できる。
+  - その人のアカウントについて、Threads側からのデータ削除の求め（001の`threads_deletion_requests`）が処理中（`pending`・`failed`）なら、退会のあとで完了（`completed`）になる（spec Edge Cases）。
 
 ### Implementation for User Story 5
 
@@ -281,6 +283,7 @@ description: "Task list for feature 013 billing and withdrawal"
   - 引き継ぎ先の選び方は`apps/api/src/services/team-service.ts`の`beforeAccountDeleted`と同じにする（プレビュー用に、選ぶ部分を関数に分けて使い回す）。
   - Clerkのユーザーの削除は、`@clerk/backend`の`createClerkClient(...).users.deleteUser`を、差し込める依存（テストでは偽）にする。`apps/api/src/app.ts`の`AppDeps`に`deleteClerkUser`を足す。
   - 3のトランザクションの最後に、管理者のチームが残っていれば同じ引き継ぎをする。
+  - 3のトランザクションの中で、消すアカウントの`threads_user_id`に当たる、処理中（`pending`・`failed`）のデータ削除の求め（`threads_deletion_requests`）を完了にする（`status = 'completed'`、`completed_at`を今に。001の削除の完了と同じ書き方を`apps/api/src/services/data-deletion.ts`から使う）。
 - [ ] T049 [US5] `apps/api/src/routes/me.ts`に`GET /api/me/withdrawal-preview`と`POST /api/me/withdraw`（`{ confirmEmail }`、204）を足す。`GET /api/me`の`withdrawalInProgress`を`users.withdrawal_requested_at IS NOT NULL`にする。`packages/shared/src/schemas.ts`に`withdrawalPreviewSchema`・`withdrawRequestSchema`を足す。
 - [ ] T050 [US5] `apps/api/src/middleware/auth.ts`を直す（contracts/api.md「認証のミドルウェアの変更」）。`withdrawn_users`にあるClerkのユーザーIDは、`users`を探す前・作る前に`401 AUTH_REQUIRED`にする。`withdrawal_requested_at`がある人は、3つのAPIのほかを`409 WITHDRAWAL_IN_PROGRESS`にする。`apps/api/src/services/daily-jobs.ts`に`resumeWithdrawals`を足す。
 - [ ] T051 [P] [US5] `apps/web/test/withdraw-dialog.test.tsx`を先に書き、`apps/web/src/components/billing/WithdrawDialog.tsx`を作る。`apps/web/src/pages/settings/account.tsx`に「退会」のカードを足す（contracts/ui-routes.md「退会」）。
@@ -343,7 +346,7 @@ description: "Task list for feature 013 billing and withdrawal"
   - メールアドレスを入れて退会すると入口に「退会しました」。
   - メンバーの画面でチームの管理者がメンバーになっている。
   - 同じGoogleでログインすると「アカウントを作る」から始まる（Clerkのテスト用の利用者を作り直す準備を`e2e/tests/helpers.ts`に足す）。
-- [ ] T062 `pnpm lint && pnpm typecheck && pnpm test`、`pnpm e2e`（`E2E_CLERK_USER_EMAIL=$E2E_OWNER_EMAIL`）を通す。quickstart.mdの「手で確かめる」の1〜9を、Stripeのテスト用環境で行う。結果と、計画からずれた所を`specs/013-billing/verification.md`に書く（012のverification.mdと同じ形）。
+- [ ] T062 `pnpm lint && pnpm typecheck && pnpm test`、`pnpm e2e`（`E2E_CLERK_USER_EMAIL=$E2E_OWNER_EMAIL`）を通す。quickstart.mdの「手で確かめる」の1〜9を、Stripeのテスト用環境で行う。日次の処理に、読むだけの人のデータを消すものがないことを確かめる（FR-047）。SC-002の「3分以内に契約を終える」は、手で確かめる手順の2で確かめる。結果と、計画からずれた所を`specs/013-billing/verification.md`に書く（012のverification.mdと同じ形）。
 
 ---
 
@@ -355,7 +358,7 @@ description: "Task list for feature 013 billing and withdrawal"
 - **Foundational（Phase 2）**：Setupの後。T005→T006・T007（DB）、T008→T009・T010（環境とStripe）、T011→T012（判定。T013を先に書く）→T014・T015（旧プランを外す）。すべてのStoryの前提。
 - **US1（Phase 3）**：Foundationalの後。
 - **US2（Phase 4）**：US1のT023・T024（「契約と支払い」の画面と`GET /api/billing`）の後。
-- **US3（Phase 5）**：Foundationalの後（判定はT012で入っている）。US2と並行できる。T040だけはT030の後。
+- **US3（Phase 5）**：Foundationalの後（判定と`loadEntitlement`はT012で入っている）。US2と並行できる。T040だけはT030の後。
 - **US4（Phase 6）**：US2の後（契約と`syncCustomer`が要る）。
 - **US5（Phase 7）**：Foundationalの後。Stripeの契約を止める部分はT027の後。
 - **US6（Phase 8）**：T008の後ならいつでも。T053はUS1〜US2の後が確かめやすい。
