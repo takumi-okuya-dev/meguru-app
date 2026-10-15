@@ -11,6 +11,7 @@ import { cleanupRevocations } from "./revocation";
 import { refreshExpiringTokens } from "./token-refresh";
 import { purgeTokenCheckFailures } from "./token-connect";
 import { purgeOldActivity } from "./activity-log";
+import { reconcileSubscriptions } from "./billing-service";
 
 /**
  * 日次の定期処理をまとめて行う（contracts/api.md「定期処理」）。1つの処理の失敗で全体を止めない。
@@ -37,6 +38,8 @@ export async function runDailyJobs(env: Env, now: Date = new Date()) {
     // トークンの確認の失敗は1日で消す（specs/010 data-model.md）
     ["token check failures cleanup", () => purgeTokenCheckFailures(env, now)],
     ["data deletion retry", () => retryDeletions(env, now)],
+    // 契約の状態とアカウントの数を、Stripeと合わせ直す（specs/013 research.md R5・R6）。データ削除の後に行う
+    ["billing reconcile", () => reconcileSubscriptions(env)],
     ["deletion identifiers cleanup", () => cleanupDeletionIdentifiers(env, now)],
     [
       "publish attempts cleanup",

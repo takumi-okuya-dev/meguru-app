@@ -119,14 +119,14 @@ description: "Task list for feature 013 billing and withdrawal"
 
 ### Tests for User Story 1
 
-- [ ] T016 [P] [US1] `apps/api/test/integration/account-limit-billing.test.ts`を作る（決済ON）。確かめること（FR-010〜FR-014、SC-001）：
+- [X] T016 [P] [US1] `apps/api/test/integration/account-limit-billing.test.ts`を作る（決済ON）。確かめること（FR-010〜FR-014、SC-001）：
   - 無料体験中で1件（未接続でも）あれば、`POST /api/accounts`が`409 ACCOUNT_LIMIT_REACHED`（`max: 1`）。2つ並べて送っても作られるのは1件まで。
   - チームで担当のアカウントは数えない。
   - 契約中（`trialing`・`active`・`canceling`）・料金なしなら3件目も作れる。
   - 無料体験が終わって契約がなければ`403 BILLING_REQUIRED`。
   - このfeatureの前に2件ある無料体験中の人は、今の2件をそのまま使え、3件目は作れない。
   - 決済OFFなら上限なし。
-- [ ] T017 [P] [US1] `apps/api/test/integration/me-billing.test.ts`を作る：`GET /api/me`の`billing`（`mode`・`state`・`readOnlyReason`・`trialEndsAt`・`trialDaysLeft`）と`accountLimit`（`{ max: 1 | null, used }`）が、無料体験中・契約中・料金なし・読むだけ・決済OFFで正しい。`GET /api/accounts/:id/profile-status`（ホームの入力状況）の`access`に`trialDaysLeft`。
+- [X] T017 [P] [US1] `apps/api/test/integration/me-billing.test.ts`を作る：`GET /api/me`の`billing`（`mode`・`state`・`readOnlyReason`・`trialEndsAt`・`trialDaysLeft`）と`accountLimit`（`{ max: 1 | null, used }`）が、無料体験中・契約中・料金なし・読むだけ・決済OFFで正しい。`GET /api/accounts/:id/profile-status`（ホームの入力状況）の`access`に`trialDaysLeft`。
 
 ### Implementation for User Story 1
 
@@ -143,7 +143,7 @@ description: "Task list for feature 013 billing and withdrawal"
   - `apps/web/src/pages/settings/sections.ts`に「契約と支払い」を足す（`slug: "billing"`、`CreditCardIcon`、検索語：料金・支払い・契約・解約・領収書・カード）。
   - `apps/web/src/router.tsx`に`/settings/billing`を足す。
   - `apps/web/src/lib/api-client.ts`に`billing()`（`GET /api/billing`）を足す。
-- [ ] T024 [US1] `apps/api/src/routes/billing.ts`を作り、`GET /api/billing`（`BillingSummary`。contracts/api.md）を返す。`apps/api/src/app.ts`につなぐ。`packages/shared/src/schemas.ts`に`billingSummarySchema`を足す。`apps/api/test/integration/billing-summary.test.ts`で、決済OFF・料金なし・無料体験中・契約中の応答を確かめる。
+- [X] T024 [US1] `apps/api/src/routes/billing.ts`を作り、`GET /api/billing`（`BillingSummary`。contracts/api.md）を返す。`apps/api/src/app.ts`につなぐ。`packages/shared/src/schemas.ts`に`billingSummarySchema`を足す。`apps/api/test/integration/billing-summary.test.ts`で、決済OFF・料金なし・無料体験中・契約中の応答を確かめる。
 
 **Checkpoint**：決済ONの手元で、無料体験の利用者が1件まで作れ、2件目で止まり、帯とホーム・「契約と支払い」に終わる日が出る。
 
@@ -157,7 +157,7 @@ description: "Task list for feature 013 billing and withdrawal"
 
 ### Tests for User Story 2
 
-- [ ] T025 [P] [US2] `apps/api/test/integration/billing-checkout.test.ts`を作る（決済ON・偽のStripe）。確かめること（FR-021〜FR-025、research.md R4）：
+- [X] T025 [P] [US2] `apps/api/test/integration/billing-checkout.test.ts`を作る（決済ON・偽のStripe）。確かめること（FR-021〜FR-025、research.md R4）：
   - はじめての「契約する」で顧客が1つ作られ（冪等キー`customer-<userId>`）、`subscriptions`の行ができる。
   - Checkoutの要求の中身：`mode=subscription`、数＝`max(n,1)`、`locale=ja`、`client_reference_id`、`success_url`・`cancel_url`、`proration_behavior=none`。
   - 無料体験の残りが10日なら`trial_end`＝無料体験の終わり。30時間なら`trial_period_days=1`。終わっていれば試用なし。
@@ -165,7 +165,7 @@ description: "Task list for feature 013 billing and withdrawal"
   - 契約中（`trialing`・`active`・`canceling`）・支払いの失敗中は`409 ALREADY_SUBSCRIBED`。
   - 偽のStripeが500なら`503 BILLING_UNAVAILABLE`で、`subscriptions`の状態が変わらない。
   - 決済OFFなら404。
-- [ ] T026 [P] [US2] `apps/api/test/integration/billing-sync-webhook.test.ts`を作る（決済ON・偽のStripe）。確かめること（FR-023・FR-035・FR-056、SC-006、research.md R5）：
+- [X] T026 [P] [US2] `apps/api/test/integration/billing-sync-webhook.test.ts`を作る（決済ON・偽のStripe）。確かめること（FR-023・FR-035・FR-056、SC-006、research.md R5）：
   - `POST /api/billing/sync`でStripeの今の契約が`subscriptions`に入る。
   - Webhook：署名がない・違う・5分より古いは400で、状態が変わらない。
   - 正しい署名の`customer.subscription.updated`で読み直す。同じ知らせを2回送っても結果が同じ。
@@ -176,14 +176,14 @@ description: "Task list for feature 013 billing and withdrawal"
 
 ### Implementation for User Story 2
 
-- [ ] T027 [US2] `apps/api/src/services/billing-service.ts`に足す：
+- [X] T027 [US2] `apps/api/src/services/billing-service.ts`に足す：
   - `ensureCustomer(env, tx, user)`：利用者の行の鍵の中で、なければStripeの顧客を作り`subscriptions`を作る。
   - `startCheckout(env, user)`：R4の確認・前のセッションの期限切れ・`checkoutTrialFor`・セッションを作り`pending_checkout_session_id`に残す。`{ url }`を返す。
   - `syncCustomer(env, db, customerId, now)`：`listSubscriptions`から、終わっていないもののうち作られたのがいちばん古いものを選び、それ以外の終わっていないものを`cancelSubscription`してログに残す。終わっていないものがなければ最新のものを選ぶ。`status`・`current_period_end`・`trial_end`・`cancel_at_period_end`・`quantity`・`stripe_subscription_id`を、`stripe_synced_at`が今回より古いときだけ書く。終わった契約なら`pending_checkout_session_id`を消す。
   - `syncUser(env, db, userId)`：顧客があれば`syncCustomer`。
   - Stripeの失敗は`AppError("BILLING_UNAVAILABLE", 503)`にする。
-- [ ] T028 [US2] `apps/api/src/routes/billing.ts`に`POST /api/billing/checkout`（`{ url }`）と`POST /api/billing/sync`（`BillingSummary`）を足す。決済OFFなら404を返す。
-- [ ] T029 [US2] `apps/api/src/routes/stripe-webhook.ts`を作る：`POST /api/stripe/webhook`。認証のミドルウェアを通さず、本文をテキストで読み、`verifyWebhookSignature`で確かめる。知らせの種類が`checkout.session.completed`・`customer.subscription.created`・`updated`・`deleted`・`paused`・`resumed`・`invoice.paid`・`invoice.payment_failed`なら、`data.object.customer`で`syncCustomer`を呼ぶ。ほかの種類は200で何もしない。`apps/api/src/app.ts`につなぐ。CORSの対象から外す。本文と署名をログに出さない。
+- [X] T028 [US2] `apps/api/src/routes/billing.ts`に`POST /api/billing/checkout`（`{ url }`）と`POST /api/billing/sync`（`BillingSummary`）を足す。決済OFFなら404を返す。
+- [X] T029 [US2] `apps/api/src/routes/stripe-webhook.ts`を作る：`POST /api/stripe/webhook`。認証のミドルウェアを通さず、本文をテキストで読み、`verifyWebhookSignature`で確かめる。知らせの種類が`checkout.session.completed`・`customer.subscription.created`・`updated`・`deleted`・`paused`・`resumed`・`invoice.paid`・`invoice.payment_failed`なら、`data.object.customer`で`syncCustomer`を呼ぶ。ほかの種類は200で何もしない。`apps/api/src/app.ts`につなぐ。CORSの対象から外す。本文と署名をログに出さない。
 - [ ] T030 [US2] `apps/web/src/pages/settings/billing.tsx`に、`subscribed_trial`・`active`・`read_only(trial_ended)`の表示と「契約する」を足す（押すと`POST /api/billing/checkout`の`url`へ移る。押している間は止めて「支払いの画面に移っています…」。`BILLING_UNAVAILABLE`はトースト）。
   - `?checkout=success`で開いたら、`POST /api/billing/sync`を最大10秒くり返す。`subscribed_trial`・`active`になったら「契約しました」のトーストを出してURLから消す。10秒で変わらなければ案内を出す。
   - `?checkout=canceled`はURLから消す。
@@ -238,19 +238,19 @@ description: "Task list for feature 013 billing and withdrawal"
 
 ### Tests for User Story 4
 
-- [ ] T041 [P] [US4] `apps/api/test/integration/billing-quantity.test.ts`を作る（決済ON・偽のStripe）。確かめること（FR-030・FR-036、SC-005、research.md R6）：
+- [X] T041 [P] [US4] `apps/api/test/integration/billing-quantity.test.ts`を作る（決済ON・偽のStripe）。確かめること（FR-030・FR-036、SC-005、research.md R6）：
   - 契約中にアカウントを作る・削除すると、Stripeの数が`max(n,1)`になり、`proration_behavior=none`。
   - 0件でも数は1。
   - 偽のStripeが失敗しても、作成・削除は成功し、`quantity_sync_needed = true`が残る。日次の処理（`runDailyJobs`）で数が合い、印が消える。
   - 契約がない利用者では何も呼ばない。
   - 日次の処理が、終わっていない契約を読み直す（知らせが届かなかったときの状態の変化が反映される）。
   - 決済OFFでは何もしない。
-- [ ] T042 [P] [US4] `apps/api/test/integration/billing-portal.test.ts`を作る：`POST /api/billing/portal`が`return_url = <WEB_ORIGIN>/settings/billing`のセッションの`url`を返す（`STRIPE_PORTAL_CONFIGURATION_ID`があれば渡す）。顧客がなければ`409 NO_SUBSCRIPTION`。解約の予約（`cancel_at_period_end`）が`state = canceling`・すべて使えるになり、期間の終わりの後に`canceled`になると読むだけになる。
+- [X] T042 [P] [US4] `apps/api/test/integration/billing-portal.test.ts`を作る：`POST /api/billing/portal`が`return_url = <WEB_ORIGIN>/settings/billing`のセッションの`url`を返す（`STRIPE_PORTAL_CONFIGURATION_ID`があれば渡す）。顧客がなければ`409 NO_SUBSCRIPTION`。解約の予約（`cancel_at_period_end`）が`state = canceling`・すべて使えるになり、期間の終わりの後に`canceled`になると読むだけになる。
 
 ### Implementation for User Story 4
 
-- [ ] T043 [US4] `apps/api/src/services/billing-service.ts`に`markQuantityDirty(tx, userId)`と`syncQuantity(env, db, userId)`を足す。`apps/api/src/services/account-service.ts`の`createAccount`・`deleteAccount`のトランザクションで`markQuantityDirty`し、トランザクションの後に`syncQuantity`を呼ぶ（失敗はログだけ）。`syncQuantity`は、契約が終わっていなければ`updateSubscriptionQuantity(…, billingQuantity(n))`し、`quantity`を書いて印を消す。契約の項目のIDは`listSubscriptions`の結果から取る。データ削除の求め（001の`data-deletion.ts`）でアカウントが消える所でも、同じ印を付ける。
-- [ ] T044 [US4] `apps/api/src/services/daily-jobs.ts`に「契約の合わせ直し」を足す（決済OFFなら飛ばす）。終わっていない契約と`quantity_sync_needed = true`の行について、`syncCustomer`と`syncQuantity`を呼ぶ。1件の失敗で全体を止めない。
+- [X] T043 [US4] `apps/api/src/services/billing-service.ts`に`markQuantityDirty(tx, userId)`と`syncQuantity(env, db, userId)`を足す。`apps/api/src/services/account-service.ts`の`createAccount`・`deleteAccount`のトランザクションで`markQuantityDirty`し、トランザクションの後に`syncQuantity`を呼ぶ（失敗はログだけ）。`syncQuantity`は、契約が終わっていなければ`updateSubscriptionQuantity(…, billingQuantity(n))`し、`quantity`を書いて印を消す。契約の項目のIDは`listSubscriptions`の結果から取る。データ削除の求め（001の`data-deletion.ts`）でアカウントが消える所でも、同じ印を付ける。
+- [X] T044 [US4] `apps/api/src/services/daily-jobs.ts`に「契約の合わせ直し」を足す（決済OFFなら飛ばす）。終わっていない契約と`quantity_sync_needed = true`の行について、`syncCustomer`と`syncQuantity`を呼ぶ。1件の失敗で全体を止めない。
 - [ ] T045 [US4] `apps/api/src/routes/billing.ts`に`POST /api/billing/portal`（`{ url }`）を足す。`apps/web/src/pages/settings/billing.tsx`に「支払いの画面を開く」と`canceling`の表示を足す。表示は「〇月〇日に終わります（解約済み）」と「その日まで、すべての機能を使えます。解約は支払いの画面から取り消せます」。`apps/web/src/lib/api-client.ts`に`openPortal()`を足す。契約（顧客）がある人は、画面を開くたびに`POST /api/billing/sync`を1回呼び、結果で表示を更新する（FR-036。`?checkout=success`のくり返しとは別）。`apps/web/test/billing-page.test.tsx`に場合を足す（開いたときの読み直しを含む）。
 - [X] T046 [P] [US4] `apps/web/src/pages/account-new.tsx`に、契約中（`subscribed_trial`・`active`・`canceling`）で`used >= 1`なら「2件目からは1件につき月500円です。次の請求から反映されます」を入力の下に出す（FR-031）。`apps/web/test/account-create.test.tsx`に場合を足す。
 

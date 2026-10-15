@@ -1,9 +1,27 @@
 // 契約と支払い（specs/013-billing research.md R1・R4〜R7）。Stripeとのやり取りは、このファイルと lib/stripe-client.ts の外に書かない。
-import { entitlementOf, trialDaysLeft, type Entitlement, type MeBilling, type SubscriptionStatus } from "@threads-grower/shared";
-import { eq } from "drizzle-orm";
-import type { Db, TxDb } from "../db/client";
-import { subscriptions, users } from "../db/schema";
-import type { BillingMode } from "../lib/config";
+import {
+  BILLING_BASE_PRICE_JPY,
+  BILLING_EXTRA_PRICE_JPY,
+  SUBSCRIPTION_STATUSES,
+  billingQuantity,
+  checkoutTrialFor,
+  entitlementOf,
+  nextInvoiceAmount,
+  trialDaysLeft,
+  type BillingSummary,
+  type Entitlement,
+  type MeBilling,
+  type SubscriptionStatus,
+} from "@threads-grower/shared";
+import { and, eq, isNull, lt, notInArray, or, sql } from "drizzle-orm";
+import type { Env } from "../env";
+import { createDb, withTransaction, type Db, type TxDb } from "../db/client";
+import { lockUserRow } from "../db/locks";
+import { memberships, subscriptions, users } from "../db/schema";
+import { billingModeOf, type BillingMode } from "../lib/config";
+import { AppError } from "../lib/errors";
+import { logger } from "../lib/logger";
+import { createStripeClient, periodEndOf, StripeError, type StripeClient } from "../lib/stripe-client";
 
 /** 判定に使う、利用者と契約の値（users・subscriptions の行の一部）。 */
 export type BillingFacts = {
@@ -72,4 +90,346 @@ export function toMeBilling(mode: BillingMode, e: Entitlement, now: Date = new D
     trialEndsAt: e.trialEndsAt.toISOString(),
     trialDaysLeft: e.state === "trial" || e.state === "subscribed_trial" ? trialDaysLeft(e.trialEndsAt, now) : null,
   };
+}
+
+// ---- 「契約と支払い」の内容（GET /api/billing。contracts/api.md「BillingSummary」） ----
+
+/** 契約が終わっている状態（数の合わせ直し・読み直しの対象にしない）。 */
+const ENDED_STATUSES = ["canceled", "incomplete_expired"] as const;
+/** 次の請求がある状態。 */
+const BILLED_STATUSES = ["trialing", "active", "past_due", "unpaid"];
+
+/**
+ * 「契約と支払い」の内容を作る。
+ * @param db - データベース
+ * @param user - 利用者（決済のモードを含む）
+ * @param now - 今の時刻
+ * @returns BillingSummary
+ */
+export async function billingSummary(db: Db, user: { id: string; billing: BillingMode }, now: Date = new Date()): Promise<BillingSummary> {
+  const prices = { base: BILLING_BASE_PRICE_JPY, extra: BILLING_EXTRA_PRICE_JPY };
+  if (!user.billing.enabled) {
+    return {
+      mode: "disabled",
+      state: "billing_disabled",
+      readOnlyReason: null,
+      trialEndsAt: null,
+      trialDaysLeft: null,
+      ownedAccountCount: null,
+      subscription: null,
+      prices,
+    };
+  }
+  const [entitlement, row, owned] = await Promise.all([
+    loadEntitlement(db, user.id, user.billing, now),
+    db.select().from(subscriptions).where(eq(subscriptions.userId, user.id)).limit(1),
+    countOwned(db, user.id),
+  ]);
+  const e = entitlement!;
+  const sub = row[0];
+  const billed = sub?.status ? BILLED_STATUSES.includes(sub.status) && !sub.cancelAtPeriodEnd : false;
+  return {
+    mode: "enabled",
+    state: e.state,
+    readOnlyReason: e.readOnlyReason,
+    trialEndsAt: e.trialEndsAt.toISOString(),
+    trialDaysLeft: e.state === "trial" || e.state === "subscribed_trial" ? trialDaysLeft(e.trialEndsAt, now) : null,
+    ownedAccountCount: owned,
+    subscription: sub?.status
+      ? {
+          status: sub.status,
+          currentPeriodEnd: sub.currentPeriodEnd?.toISOString() ?? null,
+          cancelAtPeriodEnd: sub.cancelAtPeriodEnd,
+          nextInvoiceAt: billed ? (sub.currentPeriodEnd?.toISOString() ?? null) : null,
+          nextInvoiceAmount: billed ? nextInvoiceAmount(owned) : null,
+        }
+      : null,
+    prices,
+  };
+}
+
+/**
+ * オーナーのアカウントの数（未接続のものも数える。FR-013）。
+ * @param db - データベース（トランザクションの中でもよい）
+ * @param userId - users.id
+ * @returns 数
+ */
+async function countOwned(db: Db | TxDb, userId: string): Promise<number> {
+  const [row] = await db
+    .select({ n: sql<number>`count(*)::int` })
+    .from(memberships)
+    .where(and(eq(memberships.userId, userId), eq(memberships.role, "owner")));
+  return Number(row?.n ?? 0);
+}
+
+// ---- 契約する（research.md R4） ----
+
+/**
+ * Stripeの失敗を BILLING_UNAVAILABLE にする（鍵・本文は出さない）。
+ * @param err - 捕まえたエラー
+ * @returns AppError
+ */
+function unavailable(err: unknown): AppError {
+  logger.error("billing: stripe call failed", { err: err instanceof StripeError ? { status: err.status, code: err.code } : String(err) });
+  return new AppError("BILLING_UNAVAILABLE", 503, "billing unavailable");
+}
+
+/**
+ * Stripeの顧客を用意する（利用者に1つ。なければ作って subscriptions の行を作る）。
+ * @param env - Workers のバインディング
+ * @param stripe - Stripeのクライアント
+ * @param user - 利用者
+ * @returns 顧客のID
+ * @throws AppError BILLING_UNAVAILABLE
+ */
+async function ensureCustomer(env: Env, stripe: StripeClient, user: { id: string; email: string }): Promise<string> {
+  const db = createDb(env.DATABASE_URL);
+  const [existing] = await db.select().from(subscriptions).where(eq(subscriptions.userId, user.id)).limit(1);
+  if (existing) return existing.stripeCustomerId;
+  // 冪等キーで、同時に押しても・失敗してやり直しても顧客は1つ
+  const customer = await stripe.createCustomer({ userId: user.id, email: user.email }, `customer-${user.id}`).catch((err: unknown) => {
+    throw unavailable(err);
+  });
+  await db.insert(subscriptions).values({ userId: user.id, stripeCustomerId: customer.id }).onConflictDoNothing();
+  const [row] = await db.select().from(subscriptions).where(eq(subscriptions.userId, user.id)).limit(1);
+  return row!.stripeCustomerId;
+}
+
+/**
+ * Checkoutのセッションを作り、URLを返す（research.md R4）。契約中・支払いの失敗中は作らない。
+ * 開いているセッションが前にあれば期限切れにしてから作り、開いているセッションを1つにする（FR-022）。
+ * @param env - Workers のバインディング
+ * @param user - 利用者（決済のモードを含む）
+ * @param stripe - Stripeのクライアント
+ * @param now - 今の時刻
+ * @returns CheckoutのURL
+ * @throws AppError ALREADY_SUBSCRIBED・BILLING_UNAVAILABLE
+ */
+export async function startCheckout(
+  env: Env,
+  user: { id: string; email: string; billing: BillingMode },
+  stripe: StripeClient = createStripeClient(env),
+  now: Date = new Date(),
+): Promise<string> {
+  const before = await loadEntitlement(createDb(env.DATABASE_URL), user.id, user.billing, now);
+  assertCanSubscribe(before);
+  const customer = await ensureCustomer(env, stripe, user);
+  return withTransaction(env.DATABASE_URL, async (tx) => {
+    await lockUserRow(tx, user.id);
+    const e = await loadEntitlement(tx, user.id, user.billing, now);
+    assertCanSubscribe(e);
+    const [row] = await tx.select().from(subscriptions).where(eq(subscriptions.userId, user.id)).limit(1);
+    if (row?.pendingCheckoutSessionId) {
+      // 終わった・期限切れのセッションは期限切れにできない（400）。それ以外の失敗は止める
+      await stripe.expireCheckoutSession(row.pendingCheckoutSessionId).catch((err: unknown) => {
+        if (!(err instanceof StripeError && (err.status === 400 || err.status === 404))) throw unavailable(err);
+      });
+    }
+    const trial = e?.state === "trial" ? checkoutTrialFor(e.trialEndsAt, now) : null;
+    const session = await stripe
+      .createCheckoutSession({
+        customer,
+        priceId: env.STRIPE_PRICE_ID ?? "",
+        quantity: billingQuantity(await countOwned(tx, user.id)),
+        userId: user.id,
+        successUrl: `${env.WEB_ORIGIN}/settings/billing?checkout=success`,
+        cancelUrl: `${env.WEB_ORIGIN}/settings/billing?checkout=canceled`,
+        trialEnd: trial && "trialEnd" in trial ? trial.trialEnd : undefined,
+        trialPeriodDays: trial && "trialPeriodDays" in trial ? trial.trialPeriodDays : undefined,
+        taxRateId: env.STRIPE_TAX_RATE_ID || undefined,
+      })
+      .catch((err: unknown) => {
+        throw unavailable(err);
+      });
+    await tx
+      .update(subscriptions)
+      .set({ pendingCheckoutSessionId: session.id, updatedAt: now })
+      .where(eq(subscriptions.userId, user.id));
+    return session.url;
+  });
+}
+
+/**
+ * 契約できる状態かを確かめる。契約中（試用・解約の予約を含む）と支払いの失敗中は、新しい契約を作らない。
+ * @param e - 使える状態
+ * @throws AppError ALREADY_SUBSCRIBED
+ */
+function assertCanSubscribe(e: Entitlement | null) {
+  if (!e) throw new AppError("AUTH_REQUIRED", 401, "user not found");
+  if (e.state === "subscribed_trial" || e.state === "active" || e.state === "canceling" || e.readOnlyReason === "payment_failed") {
+    throw new AppError("ALREADY_SUBSCRIBED", 409, "already subscribed");
+  }
+}
+
+// ---- 状態の反映（research.md R5） ----
+
+/**
+ * 顧客の契約をStripeから読み直して subscriptions に書く。知らせの中身は使わない（重複・順番の入れ替わりに強い）。
+ * 終わっていない契約が2つ以上あれば、いちばん古いものを残し、ほかを止めてログに残す（返金は運用が手で行う）。
+ * 読み直した時刻より新しい読み直しが書かれていれば、上書きしない。
+ * @param env - Workers のバインディング
+ * @param customerId - Stripeの顧客のID
+ * @param stripe - Stripeのクライアント
+ * @returns 反映した利用者のID。知らない顧客なら null
+ * @throws StripeError（呼び出し側で扱う）
+ */
+export async function syncCustomer(env: Env, customerId: string, stripe: StripeClient = createStripeClient(env)): Promise<string | null> {
+  const db = createDb(env.DATABASE_URL);
+  const [row] = await db.select().from(subscriptions).where(eq(subscriptions.stripeCustomerId, customerId)).limit(1);
+  if (!row) return null;
+  // 読み直しを始めた時刻（この時刻より後に始めた読み直しの結果を、上書きしない）
+  const readAt = new Date();
+  const list = await stripe.listSubscriptions(customerId);
+  const live = list.filter((s) => !(ENDED_STATUSES as readonly string[]).includes(s.status)).sort((a, b) => a.created - b.created);
+  for (const extra of live.slice(1)) {
+    logger.error("billing: duplicate subscription canceled", { userId: row.userId, subscriptionId: extra.id });
+    await stripe.cancelSubscription(extra.id).catch((err: unknown) => logger.error("billing: cancel duplicate failed", { err: String(err) }));
+  }
+  const chosen = live[0] ?? [...list].sort((a, b) => b.created - a.created)[0] ?? null;
+  const values = chosen
+    ? {
+        stripeSubscriptionId: chosen.id,
+        status: (SUBSCRIPTION_STATUSES as readonly string[]).includes(chosen.status) ? chosen.status : null,
+        currentPeriodEnd: periodEndOf(chosen),
+        trialEnd: chosen.trial_end ? new Date(chosen.trial_end * 1000) : null,
+        cancelAtPeriodEnd: chosen.cancel_at_period_end || chosen.cancel_at !== null,
+        quantity: chosen.items.data[0]?.quantity ?? null,
+      }
+    : {};
+  await db
+    .update(subscriptions)
+    .set({
+      ...values,
+      // 契約ができたら、開いていたセッションは要らない
+      ...(live[0] ? { pendingCheckoutSessionId: null } : {}),
+      stripeSyncedAt: readAt,
+      updatedAt: new Date(),
+    })
+    .where(
+      and(
+        eq(subscriptions.userId, row.userId),
+        or(isNull(subscriptions.stripeSyncedAt), lt(subscriptions.stripeSyncedAt, readAt)),
+      ),
+    );
+  return row.userId;
+}
+
+/**
+ * 利用者の契約を読み直す（顧客がなければ何もしない）。
+ * @param env - Workers のバインディング
+ * @param userId - users.id
+ * @param stripe - Stripeのクライアント
+ * @throws AppError BILLING_UNAVAILABLE
+ */
+export async function syncUser(env: Env, userId: string, stripe: StripeClient = createStripeClient(env)): Promise<void> {
+  const [row] = await createDb(env.DATABASE_URL).select().from(subscriptions).where(eq(subscriptions.userId, userId)).limit(1);
+  if (!row) return;
+  await syncCustomer(env, row.stripeCustomerId, stripe).catch((err: unknown) => {
+    throw unavailable(err);
+  });
+}
+
+// ---- カスタマーポータル（research.md R7） ----
+
+/**
+ * カスタマーポータルのURLを作る。
+ * @param env - Workers のバインディング
+ * @param userId - users.id
+ * @param stripe - Stripeのクライアント
+ * @returns ポータルのURL
+ * @throws AppError NO_SUBSCRIPTION・BILLING_UNAVAILABLE
+ */
+export async function openPortal(env: Env, userId: string, stripe: StripeClient = createStripeClient(env)): Promise<string> {
+  const [row] = await createDb(env.DATABASE_URL).select().from(subscriptions).where(eq(subscriptions.userId, userId)).limit(1);
+  if (!row) throw new AppError("NO_SUBSCRIPTION", 409, "no subscription");
+  const session = await stripe
+    .createPortalSession({
+      customer: row.stripeCustomerId,
+      returnUrl: `${env.WEB_ORIGIN}/settings/billing`,
+      configuration: env.STRIPE_PORTAL_CONFIGURATION_ID,
+    })
+    .catch((err: unknown) => {
+      throw unavailable(err);
+    });
+  return session.url;
+}
+
+// ---- アカウントの数の反映（research.md R6） ----
+
+/**
+ * アカウントを作る・削除するトランザクションの中で、数の合わせ直しの印を付ける（契約がなければ何もしない）。
+ * @param tx - トランザクション
+ * @param userId - オーナーの users.id
+ */
+export async function markQuantityDirty(tx: Db | TxDb, userId: string): Promise<void> {
+  await tx
+    .update(subscriptions)
+    .set({ quantitySyncNeeded: true })
+    .where(and(eq(subscriptions.userId, userId), sql`${subscriptions.stripeSubscriptionId} IS NOT NULL`));
+}
+
+/**
+ * Stripeの契約の数を、今のアカウントの数（max(n,1)）に合わせる。日割りの請求・返金はしない。
+ * 終わった契約・決済OFFでは何もしない。合ったら印を消す。
+ * @param env - Workers のバインディング
+ * @param userId - オーナーの users.id
+ * @param stripe - Stripeのクライアント
+ * @returns 合わせたなら true（何もしなかったときも true）
+ */
+export async function syncQuantity(env: Env, userId: string, stripe: StripeClient = createStripeClient(env)): Promise<boolean> {
+  if (!billingModeOf(env).enabled) return true;
+  const db = createDb(env.DATABASE_URL);
+  const [row] = await db.select().from(subscriptions).where(eq(subscriptions.userId, userId)).limit(1);
+  if (!row?.stripeSubscriptionId || !row.status || (ENDED_STATUSES as readonly string[]).includes(row.status)) {
+    if (row?.quantitySyncNeeded) await db.update(subscriptions).set({ quantitySyncNeeded: false }).where(eq(subscriptions.userId, userId));
+    return true;
+  }
+  try {
+    const quantity = billingQuantity(await countOwned(db, userId));
+    const sub = (await stripe.listSubscriptions(row.stripeCustomerId)).find((s) => s.id === row.stripeSubscriptionId);
+    const item = sub?.items.data[0];
+    if (sub && item && item.quantity !== quantity) await stripe.updateSubscriptionQuantity(sub.id, item.id, quantity);
+    await db
+      .update(subscriptions)
+      .set({ quantity, quantitySyncNeeded: false, updatedAt: new Date() })
+      .where(eq(subscriptions.userId, userId));
+    return true;
+  } catch (err) {
+    // 印は残し、日次の処理でやり直す
+    logger.error("billing: quantity sync failed", { userId, err: err instanceof StripeError ? { status: err.status, code: err.code } : String(err) });
+    return false;
+  }
+}
+
+/**
+ * 日次の契約の合わせ直し（research.md R5・R6）。終わっていない契約と、数の合わせ直しが要る契約を読み直す。
+ * 1件の失敗で全体を止めない。決済OFFなら何もしない。
+ * @param env - Workers のバインディング
+ * @param stripe - Stripeのクライアント
+ * @returns 読み直した数と失敗の数
+ */
+export async function reconcileSubscriptions(env: Env, stripe: StripeClient = createStripeClient(env)) {
+  if (!billingModeOf(env).enabled) return { synced: 0, failed: 0 };
+  const rows = await createDb(env.DATABASE_URL)
+    .select({ userId: subscriptions.userId, customerId: subscriptions.stripeCustomerId })
+    .from(subscriptions)
+    .where(
+      or(
+        eq(subscriptions.quantitySyncNeeded, true),
+        and(sql`${subscriptions.status} IS NOT NULL`, notInArray(subscriptions.status, [...ENDED_STATUSES])),
+      ),
+    );
+  let synced = 0;
+  let failed = 0;
+  for (const r of rows) {
+    try {
+      await syncCustomer(env, r.customerId, stripe);
+      if (!(await syncQuantity(env, r.userId, stripe))) failed += 1;
+      else synced += 1;
+    } catch (err) {
+      failed += 1;
+      logger.error("billing: reconcile failed", { userId: r.userId, err: String(err) });
+    }
+  }
+  return { synced, failed };
 }

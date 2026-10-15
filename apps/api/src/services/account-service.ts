@@ -27,7 +27,7 @@ import {
   type ThreadsProfile,
 } from "../lib/threads-client";
 import { authorizeAccount } from "./access";
-import { loadEntitlement } from "./billing-service";
+import { loadEntitlement, markQuantityDirty, syncQuantity } from "./billing-service";
 import { recordActivity } from "./activity-log";
 import type { ConsumedState } from "./threads-oauth";
 import { beforeAccountDeleted } from "./team-service";
@@ -96,7 +96,7 @@ export async function assertCanAddAccount(db: Db | TxDb, userId: string, mode: B
  * @throws AppError ACCOUNT_LIMIT_REACHED
  */
 export async function createAccount(env: Env, userId: string, name: string) {
-  return withTransaction(env.DATABASE_URL, async (tx) => {
+  const created = await withTransaction(env.DATABASE_URL, async (tx) => {
     await lockUserRow(tx, userId);
     await assertCanAddAccount(tx, userId, billingModeOf(env));
     const [account] = await tx
@@ -108,8 +108,13 @@ export async function createAccount(env: Env, userId: string, name: string) {
       })
       .returning();
     await tx.insert(memberships).values({ userId, accountId: account!.id, role: "owner" });
+    // 契約があれば、数の合わせ直しの印を付ける（specs/013 research.md R6）
+    await markQuantityDirty(tx, userId);
     return account!;
   });
+  // トランザクションの後でStripeの数を合わせる。失敗しても作成は成功のまま（印が残り、日次で合わせる）
+  await syncQuantity(env, userId);
+  return created;
 }
 
 // ---- 接続の確定（research.md R8 の手順。specs/010 research.md R5 でトークンの接続と共通にした） ----
@@ -563,5 +568,8 @@ export async function deleteAccount(
       .set({ lastAccountDeletedAt: now, updatedAt: now })
       .where(eq(users.id, userId));
     await tx.delete(accounts).where(eq(accounts.id, account.id));
+    await markQuantityDirty(tx, userId);
   });
+  // 次の請求から数を減らす（日割りの返金はしない。specs/013 FR-030）
+  await syncQuantity(env, userId);
 }

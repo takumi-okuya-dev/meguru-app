@@ -14,6 +14,8 @@ import {
   type AuthVariables,
 } from "./middleware/auth";
 import { accountRoutes } from "./routes/accounts";
+import { billingRoutes } from "./routes/billing";
+import { stripeWebhookRoutes } from "./routes/stripe-webhook";
 import { accountTeamRoutes } from "./routes/account-team";
 import { inviteRoutes } from "./routes/invites";
 import { teamsRoutes } from "./routes/teams";
@@ -157,6 +159,8 @@ export function createApp(deps: AppDeps = defaultDeps) {
     .route("/", autoPostRoutes(authed))
     .route("/", performanceRoutes(authed))
     .route("/", threadsConnectRoutes(authed))
+    .route("/", billingRoutes(authed))
+    .route("/", stripeWebhookRoutes())
     .route("/", threadsWebhookRoutes())
     .route("/", dataDeletionRoutes());
 
