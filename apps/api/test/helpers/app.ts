@@ -30,7 +30,7 @@ export function call(
   app: TestApp,
   method: string,
   path: string,
-  opts: { user?: string; body?: unknown; headers?: Record<string, string> } = {},
+  opts: { user?: string; body?: unknown; headers?: Record<string, string>; env?: Env } = {},
 ) {
   const headers: Record<string, string> = { ...(opts.headers ?? {}) };
   if (opts.user) headers.Authorization = `Bearer test:${opts.user}`;
@@ -43,13 +43,13 @@ export function call(
       body = JSON.stringify(opts.body);
     }
   }
-  return app.request(path, { method, headers, body }, testEnv);
+  return app.request(path, { method, headers, body }, opts.env ?? testEnv);
 }
 
 export async function resetDb() {
   const sql = neon(testEnv.DATABASE_URL);
   createDb(testEnv.DATABASE_URL); // ローカルプロキシの設定を有効にする
-  await sql`TRUNCATE users, accounts, memberships, threads_connections, oauth_states, threads_deletion_requests, threads_revocations, strategy_designs, promotions, reference_posts, research_keywords, draft_batches, post_drafts, ng_words, posting_schedules, publish_attempts, teams, team_members, team_accounts, activity_logs, token_check_failures CASCADE`;
+  await sql`TRUNCATE users, accounts, memberships, threads_connections, oauth_states, threads_deletion_requests, threads_revocations, strategy_designs, promotions, reference_posts, research_keywords, draft_batches, post_drafts, ng_words, posting_schedules, publish_attempts, teams, team_members, team_accounts, activity_logs, token_check_failures, subscriptions, withdrawn_users CASCADE`;
 }
 
 export function db() {
@@ -211,7 +211,7 @@ let accountSeq = 0;
  */
 export async function createUserWithAccount(
   user: string,
-  opts: { plan?: "auto-only" | "auto-grower" | "multi-account" | "team"; userCreatedAt?: Date; name?: string } = {},
+  opts: { userCreatedAt?: Date; name?: string } = {},
 ) {
   const sql = neon(testEnv.DATABASE_URL);
   createDb(testEnv.DATABASE_URL);
@@ -225,8 +225,8 @@ export async function createUserWithAccount(
   const threadsUserId = `tu_${user}_${Date.now()}_${accountSeq}`;
   const username = `${user}_${accountSeq}`;
   const [a] = (await sql`
-    INSERT INTO accounts (name, threads_user_id, username, plan)
-    VALUES (${opts.name ?? username}, ${threadsUserId}, ${username}, ${opts.plan ?? "auto-only"})
+    INSERT INTO accounts (name, threads_user_id, username)
+    VALUES (${opts.name ?? username}, ${threadsUserId}, ${username})
     RETURNING id`) as [{ id: string }];
   await sql`INSERT INTO memberships (user_id, account_id, role) VALUES (${u.id}, ${a.id}, 'owner')`;
   return { userId: u.id, accountId: a.id };
@@ -235,12 +235,12 @@ export async function createUserWithAccount(
 /**
  * ユーザーと、Threadsにつないでいない owner の Account を直接作る（specs/012 data-model.md）。
  * @param user - Clerk のユーザーID
- * @param opts - name：アカウントの名前（既定「未接続のアカウント」）、plan、userCreatedAt
+ * @param opts - name：アカウントの名前（既定「未接続のアカウント」）、userCreatedAt
  * @returns users.id と accounts.id
  */
 export async function createUnconnectedAccount(
   user: string,
-  opts: { name?: string; plan?: "auto-only" | "auto-grower" | "multi-account" | "team"; userCreatedAt?: Date } = {},
+  opts: { name?: string; userCreatedAt?: Date } = {},
 ) {
   const sql = neon(testEnv.DATABASE_URL);
   const createdAt = (opts.userCreatedAt ?? new Date()).toISOString();
@@ -250,21 +250,17 @@ export async function createUnconnectedAccount(
     ON CONFLICT (clerk_user_id) DO UPDATE SET updated_at = users.updated_at
     RETURNING id`) as [{ id: string }];
   const [a] = (await sql`
-    INSERT INTO accounts (name, plan, connection_status, connection_method)
-    VALUES (${opts.name ?? "未接続のアカウント"}, ${opts.plan ?? "auto-only"}, 'not_connected', NULL)
+    INSERT INTO accounts (name, connection_status, connection_method)
+    VALUES (${opts.name ?? "未接続のアカウント"}, 'not_connected', NULL)
     RETURNING id`) as [{ id: string }];
   await sql`INSERT INTO memberships (user_id, account_id, role) VALUES (${u.id}, ${a.id}, 'owner')`;
   return { userId: u.id, accountId: a.id };
 }
 
-/** Account の plan・接続状態を書き換える */
-export async function setAccount(
-  accountId: string,
-  values: { plan?: "auto-only" | "auto-grower" | "multi-account" | "team"; connectionStatus?: "connected" | "needs_reconnect" },
-) {
+/** Account の接続状態を書き換える */
+export async function setAccount(accountId: string, values: { connectionStatus?: "connected" | "needs_reconnect" }) {
   const sql = neon(testEnv.DATABASE_URL);
   createDb(testEnv.DATABASE_URL);
-  if (values.plan) await sql`UPDATE accounts SET plan = ${values.plan} WHERE id = ${accountId}`;
   if (values.connectionStatus) {
     await sql`UPDATE accounts SET connection_status = ${values.connectionStatus} WHERE id = ${accountId}`;
   }
@@ -272,3 +268,59 @@ export async function setAccount(
 
 /** 無料体験が終わった登録日時（今から40日前） */
 export const AFTER_TRIAL = () => new Date(Date.now() - 40 * 24 * 60 * 60 * 1000);
+
+// ---- 決済のテスト用（specs/013-billing）----
+
+/**
+ * 料金なしの印を付け・外す。
+ * @param userId - users.id
+ * @param on - 付けるなら true
+ */
+export async function setBillingExempt(userId: string, on: boolean) {
+  const sql = neon(testEnv.DATABASE_URL);
+  createDb(testEnv.DATABASE_URL);
+  await sql`UPDATE users SET billing_exempt = ${on} WHERE id = ${userId}`;
+}
+
+/**
+ * 契約の行を直接入れる（Stripeを通さない）。同じ利用者の行があれば置き換える。
+ * @param userId - users.id
+ * @param values - 状態など。顧客・契約のIDは既定で利用者から作る
+ */
+export async function insertSubscription(
+  userId: string,
+  values: {
+    status: string | null;
+    cancelAtPeriodEnd?: boolean;
+    currentPeriodEnd?: Date;
+    stripeCustomerId?: string;
+    stripeSubscriptionId?: string | null;
+    quantity?: number;
+  },
+) {
+  const sql = neon(testEnv.DATABASE_URL);
+  createDb(testEnv.DATABASE_URL);
+  const customer = values.stripeCustomerId ?? `cus_${userId.slice(0, 8)}`;
+  const subscription = values.stripeSubscriptionId === undefined ? `sub_${userId.slice(0, 8)}` : values.stripeSubscriptionId;
+  const periodEnd = (values.currentPeriodEnd ?? new Date(Date.now() + 20 * 86_400_000)).toISOString();
+  await sql`
+    INSERT INTO subscriptions (user_id, stripe_customer_id, stripe_subscription_id, status, cancel_at_period_end, current_period_end, quantity)
+    VALUES (${userId}, ${customer}, ${subscription}, ${values.status}, ${values.cancelAtPeriodEnd ?? false}, ${periodEnd}, ${values.quantity ?? 1})
+    ON CONFLICT (user_id) DO UPDATE SET
+      stripe_customer_id = EXCLUDED.stripe_customer_id,
+      stripe_subscription_id = EXCLUDED.stripe_subscription_id,
+      status = EXCLUDED.status,
+      cancel_at_period_end = EXCLUDED.cancel_at_period_end,
+      current_period_end = EXCLUDED.current_period_end,
+      quantity = EXCLUDED.quantity`;
+}
+
+/**
+ * 無料体験を終わらせる（登録日時を40日前にする）。
+ * @param userId - users.id
+ */
+export async function endTrial(userId: string) {
+  const sql = neon(testEnv.DATABASE_URL);
+  createDb(testEnv.DATABASE_URL);
+  await sql`UPDATE users SET created_at = ${AFTER_TRIAL().toISOString()} WHERE id = ${userId}`;
+}

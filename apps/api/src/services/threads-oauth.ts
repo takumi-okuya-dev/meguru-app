@@ -7,7 +7,7 @@ import { oauthStates } from "../db/schema";
 import { sha256Hex } from "../lib/identifier-hash";
 import type { ThreadsClient } from "../lib/threads-client";
 import { AppError } from "../lib/errors";
-import { authorizeAccount } from "./access";
+import { authorizeAccount, type RequestUser } from "./access";
 
 const STATE_TTL_MS = 10 * 60 * 1000;
 
@@ -22,7 +22,7 @@ function randomState(): string {
  * （アカウントは増えない。specs/012 FR-016）。connect は、対象がもうつながっていれば止める（specs/012 FR-018）。
  * @param db - データベース
  * @param threads - Threads API のクライアント
- * @param userId - users.id
+ * @param user - リクエストしたユーザー（決済のモードを含む）
  * @param req - connect か reconnect と、対象のアカウント
  * @returns Threads の認可URL（state を含む）
  * @throws AppError ACCOUNT_NOT_FOUND（関わっていない Account）・ROLE_FORBIDDEN（オーナーではない）・ACCOUNT_ALREADY_CONNECTED・
@@ -31,11 +31,12 @@ function randomState(): string {
 export async function startConnect(
   db: Db,
   threads: ThreadsClient,
-  userId: string,
+  user: RequestUser,
   req: ConnectRequest,
 ): Promise<string> {
-  // 接続はオーナーだけ（specs/008 FR-044、specs/012 FR-015。担当の人は ROLE_FORBIDDEN）
-  const { account } = await authorizeAccount(db, { id: userId }, req.accountId, "owner");
+  const userId = user.id;
+  // 接続はオーナーだけ（specs/008 FR-044、specs/012 FR-015。担当の人は ROLE_FORBIDDEN。読むだけなら BILLING_REQUIRED）
+  const { account } = await authorizeAccount(db, user, req.accountId, "owner");
   if (req.mode === "connect" && account.connectionStatus !== "not_connected") {
     throw new AppError("ACCOUNT_ALREADY_CONNECTED", 409, "account already connected");
   }

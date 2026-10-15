@@ -1,7 +1,8 @@
 // US4：ホームの入力状況（specs/002-strategy-profile FR-017・FR-024b、research.md R11・R14）
 import { emptyStrategyValues, jstToday } from "@threads-grower/shared";
 import { beforeEach, describe, expect, it } from "vitest";
-import { AFTER_TRIAL, call, createUserWithAccount, makeApp, resetDb, setAccount } from "../helpers/app";
+import { AFTER_TRIAL, call, createUserWithAccount, insertSubscription, makeApp, resetDb, setAccount } from "../helpers/app";
+import { billingEnv } from "../helpers/billing";
 
 const app = makeApp();
 
@@ -13,11 +14,11 @@ type Status = {
   strategy: { filledCount: number; totalCount: number };
   promotions: { targetableCount: number; totalCount: number };
   research: { referencePostCount: number; keywordCount: number };
-  access: { canEdit: boolean; inTrial: boolean; trialEndsAt: string | null };
+  access: { canEdit: boolean; inTrial: boolean; trialEndsAt: string | null; trialDaysLeft: number | null };
 };
 
-async function status(accountId: string, user = "u1") {
-  const res = await call(app, "GET", `/api/accounts/${accountId}/profile-status`, { user });
+async function status(accountId: string, user = "u1", billing = false) {
+  const res = await call(app, "GET", `/api/accounts/${accountId}/profile-status`, { user, env: billing ? billingEnv() : undefined });
   expect(res.status).toBe(200);
   return (await res.json()) as Status;
 }
@@ -59,19 +60,23 @@ describe("GET /api/accounts/:id/profile-status", () => {
     });
   });
 
-  it("access：無料体験中は inTrial と trialEndsAt を返し、無料体験の後のプラン1は canEdit: false", async () => {
+  it("access（決済ON）：無料体験中は inTrial・trialEndsAt・残りの日数、無料体験の後で契約がなければ canEdit: false、契約すれば true（specs/013）", async () => {
     const trial = await createUserWithAccount("u1");
-    const s1 = await status(trial.accountId);
-    expect(s1.access.canEdit).toBe(true);
-    expect(s1.access.inTrial).toBe(true);
+    const s1 = await status(trial.accountId, "u1", true);
+    expect(s1.access).toMatchObject({ canEdit: true, inTrial: true });
     expect(new Date(s1.access.trialEndsAt!).getTime()).toBeGreaterThan(Date.now());
+    expect(s1.access.trialDaysLeft).toBeGreaterThanOrEqual(28);
 
     const after = await createUserWithAccount("u2", { userCreatedAt: AFTER_TRIAL() });
-    const s2 = await status(after.accountId, "u2");
-    expect(s2.access).toMatchObject({ canEdit: false, inTrial: false });
+    expect((await status(after.accountId, "u2", true)).access).toMatchObject({ canEdit: false, inTrial: false, trialDaysLeft: null });
 
-    await setAccount(after.accountId, { plan: "auto-grower" });
-    expect((await status(after.accountId, "u2")).access).toMatchObject({ canEdit: true, inTrial: false });
+    await insertSubscription(after.userId, { status: "active" });
+    expect((await status(after.accountId, "u2", true)).access).toMatchObject({ canEdit: true, inTrial: false });
+  });
+
+  it("access（決済OFF）：無料体験の表示を出さず、だれでも編集できる", async () => {
+    const after = await createUserWithAccount("u1", { userCreatedAt: AFTER_TRIAL() });
+    expect((await status(after.accountId)).access).toMatchObject({ canEdit: true, inTrial: false, trialDaysLeft: null });
   });
 
   it("他人のAccountは 404", async () => {

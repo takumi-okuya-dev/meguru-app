@@ -1,6 +1,6 @@
 // GET /api/me（FR-004・FR-005、research.md R10。specs/008 research.md R11 で役割つきに広げ、
 // specs/011 research.md R5 で入っているチームを足した）
-import { limitForOwnedPlans, type Role } from "@threads-grower/shared";
+import type { Role } from "@threads-grower/shared";
 import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { Hono, type MiddlewareHandler } from "hono";
@@ -9,6 +9,7 @@ import { createDb } from "../db/client";
 import { accounts, memberships, users } from "../db/schema";
 import { personName, toAccountSummary, type AccountRow } from "../services/access";
 import { countOwnedAccountNeedsReview } from "../services/account-review-counts";
+import { loadEntitlement, toMeBilling } from "../services/billing-service";
 import { listMyTeams } from "../services/team-service";
 
 /**
@@ -59,7 +60,8 @@ export function meRoutes(authed: MiddlewareHandler<AppEnv>) {
       );
     const owned = rows.filter((r) => r.role === "owner").map((r) => r.account);
     const helped = rows.filter((r) => r.role !== "owner").map((r) => r.account);
-    const teams = await listMyTeams(db, user.id);
+    const now = new Date();
+    const [teams, entitlement] = await Promise.all([listMyTeams(db, user.id), loadEntitlement(db, user.id, user.billing, now)]);
     // Account切り替えメニューは開くたびに一覧を読み直すため、ブラウザに保存させない。
     c.header("Cache-Control", "no-store");
     return c.json({
@@ -72,10 +74,13 @@ export function meRoutes(authed: MiddlewareHandler<AppEnv>) {
         ),
       ),
       landingAccountId: resolveLandingAccountId(owned, user.lastAccountId, helped),
-      accountLimit: { max: limitForOwnedPlans(owned.map((a) => a.plan)), used: owned.length },
+      // 上限は使える状態から（null は上限なし。specs/013 research.md R9）。未接続のアカウントも数える
+      accountLimit: { max: entitlement!.accountLimit, used: owned.length },
       // Threads連携の公開範囲。Web はアカウント追加画面の案内の有無に使う（specs/002 FR-028）
       threadsAccessMode: c.env.THREADS_ACCESS_MODE ?? "testers",
       teams,
+      billing: toMeBilling(user.billing, entitlement!, now),
+      withdrawalInProgress: user.withdrawalRequestedAt !== null,
     });
   }).get("/me/needs-review-counts", authed, async (c) => {
     const user = c.get("user");

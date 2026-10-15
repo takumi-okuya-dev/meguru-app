@@ -67,7 +67,7 @@ describe("未接続のアカウントはチームに入れない（ACCOUNT_NOT_C
   });
 
   it("あとからアカウントを足す（POST /api/teams/:teamId/accounts）", async () => {
-    const { accountId } = await createUnconnectedAccount("admin", { plan: "multi-account" });
+    const { accountId } = await createUnconnectedAccount("admin");
     const res = await call(app, "POST", `/api/teams/${teamId}/accounts`, { user: "admin", body: { accountId } });
     expect(res.status).toBe(409);
     expect((await errorOf(res)).code).toBe("ACCOUNT_NOT_CONNECTED");

@@ -15,7 +15,6 @@ async function me(user: string) {
 
 async function twoAccounts(user: string) {
   await connectNew(app, user, "1001");
-  await db().update(accounts).set({ plan: "multi-account" });
   await connectNew(app, user, "1002");
   const rows = await db().select().from(accounts);
   const a = rows.find((r) => r.threadsUserId === "1001")!;

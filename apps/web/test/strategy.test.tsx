@@ -24,7 +24,6 @@ const account: AccountSummary = {
   username: "takumi",
   displayName: "たくみ",
   profilePictureUrl: null,
-  plan: "auto-grower",
   connectionStatus: "connected",
   lastUsedAt: null,
   role: "owner" as const,
@@ -170,22 +169,23 @@ describe("課題の画面", () => {
     });
   });
 
-  describe("grower機能を使えないAccount（FR-024a）", () => {
+  describe("編集できないAccount（読むだけ。specs/013）", () => {
     it("canEdit: false では入力欄が読み取り専用で、保存がなく、案内が出る", async () => {
       getStrategy.mockResolvedValue(strategy({ canEdit: false }));
       renderPage();
       expect(await screen.findByLabelText(fieldLabel)).toHaveAttribute("readonly");
       expect(screen.queryByRole("button", { name: "保存" })).not.toBeInTheDocument();
-      expect(screen.getByText(/プラン2以上で使えます/)).toBeInTheDocument();
     });
 
     it("保存で 403 を受けると、入力内容を残したまま案内のダイアログが出る", async () => {
       getStrategy.mockResolvedValue(strategy());
-      putStrategy.mockRejectedValue(new ApiError("GROWER_FEATURE_REQUIRED", 403));
+      putStrategy.mockRejectedValue(new ApiError("BILLING_REQUIRED", 403, ["payment_failed"]));
       renderPage();
       await userEvent.type(await screen.findByLabelText(fieldLabel), "x");
       await userEvent.click(screen.getByRole("button", { name: "保存" }));
       expect(await screen.findByText("編集できなくなりました")).toBeInTheDocument();
+      // 理由ごとの文言（specs/013 FR-045）
+      expect(screen.getByText(/支払いに失敗しました。カードを更新してください/)).toBeInTheDocument();
       expect(screen.getByLabelText(fieldLabel)).toHaveValue("保存済みの行動x");
     });
   });

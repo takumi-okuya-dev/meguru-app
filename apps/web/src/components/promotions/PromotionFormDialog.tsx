@@ -84,7 +84,7 @@ function overLimit(f: Form) {
 
 /**
  * 宣伝内容の追加・編集のダイアログ。768px以上は中央のダイアログ、767px以下は全画面のシート。
- * @param props - accountId、item：編集する宣伝内容（追加のときは undefined）、onSaved・onClose・onGrowerLost・onDeletedElsewhere：結果の通知
+ * @param props - accountId、item：編集する宣伝内容（追加のときは undefined）、onSaved・onClose・onReadOnly・onDeletedElsewhere：結果の通知
  * @returns ダイアログ
  */
 export function PromotionFormDialog({
@@ -92,7 +92,7 @@ export function PromotionFormDialog({
   item,
   onSaved,
   onClose,
-  onGrowerLost,
+  onReadOnly,
   onDeletedElsewhere,
   onLimitReached,
 }: {
@@ -100,7 +100,7 @@ export function PromotionFormDialog({
   item?: Promotion;
   onSaved: (p: Promotion) => void;
   onClose: () => void;
-  onGrowerLost: () => void;
+  onReadOnly: () => void;
   onDeletedElsewhere: () => void;
   onLimitReached: () => void;
 }) {
@@ -112,7 +112,7 @@ export function PromotionFormDialog({
     overLimit,
     onSaved,
     onClose,
-    onGrowerLost,
+    onReadOnly,
     onDeletedElsewhere,
     onLimitReached,
     save: (form, expectedVersion) => {

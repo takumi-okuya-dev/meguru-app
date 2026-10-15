@@ -67,7 +67,6 @@ const account: AccountSummary = {
   username: "takumi",
   displayName: "たくみ",
   profilePictureUrl: null,
-  plan: "auto-grower",
   connectionStatus: "connected",
   lastUsedAt: null,
   role: "owner" as const,
@@ -421,15 +420,11 @@ describe("プロンプトのカード（US1）", () => {
     expect(putPromptSettings).not.toHaveBeenCalled();
   });
 
-  it("プラン1の表示：canGeneratePrompt が false なら案内に変わり、getPrompt を呼ばない（FR-024）", async () => {
+  it("読むだけの表示：canGeneratePrompt が false なら案内に変わり、getPrompt を呼ばない（FR-024、specs/013）", async () => {
     listPostDrafts.mockResolvedValue(listResponse({ canGeneratePrompt: false }));
     renderPage();
-    expect(
-      await screen.findByText("AIプロンプトの生成はプラン2以上で使えます"),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByText(/「@@@」だけの行で区切って下の欄に貼り付ければ、まとめて登録できます/),
-    ).toBeInTheDocument();
+    expect(await screen.findByText("今はAIプロンプトを作れません")).toBeInTheDocument();
+    expect(screen.getByText(/このアカウントは今、読むだけです/)).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "コピー" })).not.toBeInTheDocument();
     expect(getPrompt).not.toHaveBeenCalled();
   });
@@ -1594,11 +1589,9 @@ describe("PR #5 のCodexレビュー（2回目）への対応", () => {
   });
 
   it("画面を開いた後にプロンプトが使えなくなったら、「投稿をつくる」で貼り付け欄にフォーカスする", async () => {
-    getPrompt.mockRejectedValue(new ApiError("GROWER_FEATURE_REQUIRED", 403));
+    getPrompt.mockRejectedValue(new ApiError("BILLING_REQUIRED", 403, ["trial_ended"]));
     renderWithRouter({ startCreate: true });
-    expect(
-      await screen.findByText("AIプロンプトの生成はプラン2以上で使えます"),
-    ).toBeInTheDocument();
+    expect(await screen.findByText("今はAIプロンプトを作れません")).toBeInTheDocument();
     await waitFor(() => expect(composer()).toHaveFocus());
   });
 });
@@ -1824,7 +1817,7 @@ describe("PR #5 のCodexレビュー（3回目）への対応", () => {
     const user = userEvent.setup();
     getPrompt.mockImplementation((id: string) =>
       id === "a1"
-        ? Promise.reject(new ApiError("GROWER_FEATURE_REQUIRED", 403))
+        ? Promise.reject(new ApiError("BILLING_REQUIRED", 403, ["trial_ended"]))
         : Promise.resolve(promptResponse()),
     );
     function Layout() {
@@ -1859,11 +1852,11 @@ describe("PR #5 のCodexレビュー（3回目）への対応", () => {
       </QueryClientProvider>,
     );
     expect(
-      await screen.findByText("AIプロンプトの生成はプラン2以上で使えます"),
+      await screen.findByText("今はAIプロンプトを作れません"),
     ).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "切り替え" }));
     expect(await screen.findByRole("button", { name: "コピー" })).toBeInTheDocument();
-    expect(screen.queryByText("AIプロンプトの生成はプラン2以上で使えます")).not.toBeInTheDocument();
+    expect(screen.queryByText("今はAIプロンプトを作れません")).not.toBeInTheDocument();
   });
 });
 

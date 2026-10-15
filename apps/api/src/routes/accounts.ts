@@ -75,7 +75,8 @@ export function accountRoutes(authed: MiddlewareHandler<AppEnv>) {
     })
     .delete("/accounts/:accountId", authed, async (c) => {
       const user = c.get("user");
-      await authorizeAccount(createDb(c.env.DATABASE_URL), user, c.req.param("accountId"), "owner");
+      // 削除は remove（オーナーだけ。読むだけになっても消せる。specs/013 FR-042）
+      await authorizeAccount(createDb(c.env.DATABASE_URL), user, c.req.param("accountId"), "remove");
       const parsed = deleteAccountRequestSchema.safeParse(await c.req.json().catch(() => null));
       if (!parsed.success) throw new AppError("VALIDATION_FAILED", 400, "invalid delete request");
       await deleteAccount(c.env, user.id, c.req.param("accountId"), parsed.data.confirmName);

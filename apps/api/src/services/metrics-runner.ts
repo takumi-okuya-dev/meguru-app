@@ -16,13 +16,11 @@ import {
   addDays,
   catchUpKind,
   elapsedMinutes,
-  hasGrowerAccess,
   jstDateOf,
   jstMidnight,
   milestoneForElapsed,
   type MetricsKindValue,
   type MetricsMilestone,
-  type Plan,
 } from "@threads-grower/shared";
 import { and, asc, eq, gte, inArray, isNull, lt, or, sql, type SQL } from "drizzle-orm";
 import type { BatchItem } from "drizzle-orm/batch";
@@ -35,9 +33,12 @@ import {
   postMetricSnapshots,
   postMetrics,
   threadsConnections,
+  subscriptions,
   users,
 } from "../db/schema";
 import type { Env } from "../env";
+import { billingModeOf, type BillingMode } from "../lib/config";
+import { entitlementFromFacts } from "./billing-service";
 import { createTokenCipher } from "../lib/crypto";
 import { logger } from "../lib/logger";
 import {
@@ -67,6 +68,23 @@ export type MetricsStageResult = {
   };
 };
 
+/**
+ * 読みすぎを防ぐための、大まかな絞り込み（オーナーがすべて使えそうな行だけ）。正しい判定は entitlementFromFacts で行う
+ * （specs/013 research.md R1。ここは広めに取るだけで、判定の条件を書き写さない）。決済OFFなら絞らない。
+ * @param mode - 決済のモード
+ * @param now - 今
+ * @returns 条件
+ */
+function roughlyFull(mode: BillingMode, now: Date): SQL | undefined {
+  if (!mode.enabled) return undefined;
+  return or(
+    eq(users.billingExempt, true),
+    inArray(subscriptions.status, ["trialing", "active"]),
+    // 無料体験は1か月。余裕をみて40日
+    gte(users.createdAt, new Date(now.getTime() - 40 * 24 * HOUR)),
+  );
+}
+
 /** 6-1 の対象の1件。 */
 type Candidate = {
   id: string;
@@ -76,9 +94,11 @@ type Candidate = {
   state: "updating" | null;
   taken: MetricsMilestone[];
   threadsUserId: string;
-  plan: Plan;
   generation: number;
   ownerCreatedAt: Date;
+  ownerBillingExempt: boolean;
+  subStatus: string | null;
+  subCancelAtPeriodEnd: boolean | null;
   ciphertext: Uint8Array | null;
   iv: Uint8Array | null;
   keyVersion: number | null;
@@ -144,13 +164,21 @@ export async function runMetricsStage(
 
   // 6-1. 対象を読む
   const limit = calls + 40;
-  const candidates = await loadCandidates(db, now, catchup, todayStart, limit);
+  const mode = billingModeOf(env);
+  const candidates = await loadCandidates(db, mode, now, catchup, todayStart, limit);
+  // オーナーが読むだけのアカウントは取らない（specs/013 research.md R8）
+  const ownerFull = (t: { ownerCreatedAt: Date; ownerBillingExempt: boolean; subStatus: string | null; subCancelAtPeriodEnd: boolean | null }) =>
+    entitlementFromFacts(
+      mode,
+      { createdAt: t.ownerCreatedAt, billingExempt: t.ownerBillingExempt, status: t.subStatus, cancelAtPeriodEnd: t.subCancelAtPeriodEnd },
+      now,
+    ).fullAccess;
   let catchupRemaining = catchup && candidates.length >= limit;
 
   // 6-2. 何を取るかを決める
   const works: Work[] = [];
   for (const c of candidates) {
-    if (!hasGrowerAccess(c.plan, c.ownerCreatedAt, now)) continue;
+    if (!ownerFull(c)) continue;
     const elapsed = elapsedMinutes(c.publishedAt, now);
     const taken = new Set(c.taken);
     const milestone = milestoneForElapsed(elapsed);
@@ -238,10 +266,10 @@ export async function runMetricsStage(
   // 6-4. フォロワー数（補いのときだけ）
   const followers: { accountId: string; count: number }[] = [];
   if (catchup && !stopped) {
-    const targets = await loadFollowerTargets(db, now, today, todayStart);
+    const targets = await loadFollowerTargets(db, mode, now, today, todayStart);
     for (const t of targets) {
       if (skipAccounts.has(t.accountId) || denied.has(t.accountId)) continue;
-      if (!hasGrowerAccess(t.plan, t.ownerCreatedAt, now)) continue;
+      if (!ownerFull(t)) continue;
       if (calls <= 0) {
         catchupRemaining = true;
         break;
@@ -299,13 +327,21 @@ function isConfirming(w: Work): boolean {
 /**
  * 6-1 の対象を読む。時点の幅の中を先に、次に投稿IDのない投稿、最後に補いの投稿を古い順に。
  * @param db - データベース
+ * @param mode - 決済のモード（大まかな絞り込みに使う）
  * @param now - 今
  * @param catchup - 補いをするか
  * @param todayStart - 今日の0時（日本時間）。権限のない印がこれより前なら対象にする
  * @param limit - 読む上限
  * @returns 対象
  */
-async function loadCandidates(db: Db, now: Date, catchup: boolean, todayStart: Date, limit: number): Promise<Candidate[]> {
+async function loadCandidates(
+  db: Db,
+  mode: BillingMode,
+  now: Date,
+  catchup: boolean,
+  todayStart: Date,
+  limit: number,
+): Promise<Candidate[]> {
   const windows = (["h24", "d3", "d7"] as const).map((m) => {
     const center = now.getTime() - METRICS_MILESTONE_HOURS[m] * HOUR;
     return and(
@@ -325,9 +361,11 @@ async function loadCandidates(db: Db, now: Date, catchup: boolean, todayStart: D
       state: postMetrics.state,
       taken: sql<string[]>`coalesce(array_agg(${postMetricSnapshots.kind}::text) FILTER (WHERE ${postMetricSnapshots.kind} IS NOT NULL), '{}')`,
       threadsUserId: accounts.threadsUserId,
-      plan: accounts.plan,
       generation: accounts.connectionGeneration,
       ownerCreatedAt: users.createdAt,
+      ownerBillingExempt: users.billingExempt,
+      subStatus: subscriptions.status,
+      subCancelAtPeriodEnd: subscriptions.cancelAtPeriodEnd,
       ciphertext: threadsConnections.accessTokenCiphertext,
       iv: threadsConnections.accessTokenIv,
       keyVersion: threadsConnections.keyVersion,
@@ -336,6 +374,7 @@ async function loadCandidates(db: Db, now: Date, catchup: boolean, todayStart: D
     .innerJoin(accounts, eq(accounts.id, postDrafts.accountId))
     .innerJoin(memberships, and(eq(memberships.accountId, accounts.id), eq(memberships.role, "owner")))
     .innerJoin(users, eq(users.id, memberships.userId))
+    .leftJoin(subscriptions, eq(subscriptions.userId, users.id))
     .leftJoin(threadsConnections, eq(threadsConnections.accountId, accounts.id))
     .leftJoin(postMetrics, eq(postMetrics.draftId, postDrafts.id))
     .leftJoin(postMetricSnapshots, eq(postMetricSnapshots.draftId, postDrafts.id))
@@ -345,15 +384,11 @@ async function loadCandidates(db: Db, now: Date, catchup: boolean, todayStart: D
         eq(accounts.connectionStatus, "connected"),
         or(isNull(accounts.insightsDeniedAt), lt(accounts.insightsDeniedAt, todayStart)),
         or(isNull(postMetrics.state), eq(postMetrics.state, "updating")),
-        // grower機能の判定は下でも行う。読みすぎを防ぐため、ここでも大まかに絞る（無料体験は1か月＋余裕）
-        or(
-          inArray(accounts.plan, ["auto-grower", "multi-account", "team"]),
-          gte(users.createdAt, new Date(now.getTime() - 40 * 24 * HOUR)),
-        ),
+        roughlyFull(mode, now),
         due,
       ),
     )
-    .groupBy(postDrafts.id, accounts.id, users.id, threadsConnections.accountId, postMetrics.draftId)
+    .groupBy(postDrafts.id, accounts.id, users.id, subscriptions.userId, threadsConnections.accountId, postMetrics.draftId)
     .orderBy(priority, asc(postDrafts.publishedAt), asc(postDrafts.id))
     .limit(limit);
   // connected で絞っているので threads_user_id は必ずある（specs/012 の CHECK 制約）。型のために NULL を落とす
@@ -375,19 +410,22 @@ async function loadCandidates(db: Db, now: Date, catchup: boolean, todayStart: D
 /**
  * 6-4 のフォロワー数の対象：今日の記録がなく、直近30日に投稿済みがあるAccount。
  * @param db - データベース
+ * @param mode - 決済のモード（大まかな絞り込みに使う）
  * @param now - 今
  * @param today - 今日（日本時間）
  * @param todayStart - 今日の0時（日本時間）
  * @returns 対象
  */
-async function loadFollowerTargets(db: Db, now: Date, today: string, todayStart: Date) {
+async function loadFollowerTargets(db: Db, mode: BillingMode, now: Date, today: string, todayStart: Date) {
   const rows = await db
     .select({
       accountId: accounts.id,
       threadsUserId: accounts.threadsUserId,
-      plan: accounts.plan,
       generation: accounts.connectionGeneration,
       ownerCreatedAt: users.createdAt,
+      ownerBillingExempt: users.billingExempt,
+      subStatus: subscriptions.status,
+      subCancelAtPeriodEnd: subscriptions.cancelAtPeriodEnd,
       ciphertext: threadsConnections.accessTokenCiphertext,
       iv: threadsConnections.accessTokenIv,
       keyVersion: threadsConnections.keyVersion,
@@ -395,11 +433,13 @@ async function loadFollowerTargets(db: Db, now: Date, today: string, todayStart:
     .from(accounts)
     .innerJoin(memberships, and(eq(memberships.accountId, accounts.id), eq(memberships.role, "owner")))
     .innerJoin(users, eq(users.id, memberships.userId))
+    .leftJoin(subscriptions, eq(subscriptions.userId, users.id))
     .leftJoin(threadsConnections, eq(threadsConnections.accountId, accounts.id))
     .where(
       and(
         eq(accounts.connectionStatus, "connected"),
         or(isNull(accounts.insightsDeniedAt), lt(accounts.insightsDeniedAt, todayStart)),
+        roughlyFull(mode, now),
         sql`EXISTS (SELECT 1 FROM ${postDrafts} d WHERE d.account_id = ${accounts.id} AND d.status = 'published'
           AND d.published_at >= ${new Date(now.getTime() - FOLLOWER_ACTIVE_DAYS * 24 * HOUR).toISOString()})`,
         sql`NOT EXISTS (SELECT 1 FROM ${followerSnapshots} f WHERE f.account_id = ${accounts.id} AND f.snapshot_date = ${today}::date)`,

@@ -40,48 +40,48 @@ description: "Task list for feature 013 billing and withdrawal"
 
 **Purpose**: DB・環境・Stripeのつなぎ方・判定の差し替え・旧プランを外す。ここが終わるまでStoryに入らない。
 
-- [ ] T005 `apps/api/src/db/schema.ts`をdata-model.mdのとおりにする：
+- [X] T005 `apps/api/src/db/schema.ts`をdata-model.mdのとおりにする：
   - `users`に`billingExempt`（`boolean NOT NULL DEFAULT false`）・`withdrawalRequestedAt`（`timestamptz NULL`）。
   - 表`subscriptions`：`user_id uuid PRIMARY KEY → users.id ON DELETE CASCADE`、`stripe_customer_id text NOT NULL UNIQUE`、`stripe_subscription_id text NULL UNIQUE`、`status text NULL`（CHECK：「`status IS NULL OR status IN ('incomplete','incomplete_expired','trialing','active','past_due','unpaid','canceled','paused')`」）、`current_period_end`・`trial_end timestamptz NULL`、`cancel_at_period_end boolean NOT NULL DEFAULT false`、`quantity integer NULL`、`quantity_sync_needed boolean NOT NULL DEFAULT false`、`pending_checkout_session_id text NULL`、`stripe_synced_at timestamptz NULL`、`created_at`・`updated_at`。
   - 表`withdrawn_users`：`clerk_user_id text PRIMARY KEY`、`withdrawn_at timestamptz NOT NULL`、`clerk_deleted_at timestamptz NULL`。
   - `accounts.plan`と列挙型`accountPlan`を消す。
   - `SKIP_REASONS`に`billing_inactive`を足す（CHECK `publish_attempts_skip_reason_valid`が作り直される）。
   - `pnpm --filter api db:generate`で`apps/api/drizzle/0014_billing.sql`を作り、`accounts.plan`の列を消してから型を消す順か確かめる。
-- [ ] T006 `apps/api/test/migration/migration-0014.test.ts`を作る（`apps/api/test/helpers/migrate.ts`で0013までを当て、データを入れて0014を当てる）。確かめること：
+- [X] T006 `apps/api/test/migration/migration-0014.test.ts`を作る（`apps/api/test/helpers/migrate.ts`で0013までを当て、データを入れて0014を当てる）。確かめること：
   - アカウント・`post_drafts`・`memberships`・`team_members`の件数が前後で同じ。
   - `accounts.plan`の列と型`account_plan`がない。
   - 今の利用者の`billing_exempt`が`false`。
   - `subscriptions.status`に表にない値を入れると拒まれる。
   - `publish_attempts.skip_reason = 'billing_inactive'`が入る。
   - `users`を消すと`subscriptions`の行が消える。
-- [ ] T007 `apps/api/test/helpers/app.ts`・`apps/api/test/helpers/team.ts`から`plan`の指定と`setAccount`の`plan`を外し、関数を足す：
+- [X] T007 `apps/api/test/helpers/app.ts`・`apps/api/test/helpers/team.ts`から`plan`の指定と`setAccount`の`plan`を外し、関数を足す：
   - `setBillingExempt(userId, on)`。
   - `insertSubscription(userId, { status, cancelAtPeriodEnd?, currentPeriodEnd?, stripeCustomerId?, stripeSubscriptionId? })`。
   - `endTrial(userId)`（`users.created_at`を1か月と1日前にする）。
   - 既存のテストで`plan: "auto-grower"`などを使っている所（`apps/api/test/integration/*.test.ts`の`prompt`・`post-drafts`・`profile-status`・`analysis-records`・`posting-schedule`・`research`・`promotions`・`strategy`・`metrics-runner`・`auto-post-runner`・`performance`・`review`・`posting-rules`）から`plan`を外す。`GROWER_FEATURE_REQUIRED`を期待しているテストは、T013で`BILLING_REQUIRED`の決済ONのテストに移すので、ここでは消す。
-- [ ] T008 環境と設定（research.md R11、contracts/api.md「環境変数・Secret」）：
+- [X] T008 環境と設定（research.md R11、contracts/api.md「環境変数・Secret」）：
   - `apps/api/src/env.ts`に`BILLING_ENABLED`（`"true" | "false"`）・`STRIPE_SECRET_KEY?`・`STRIPE_WEBHOOK_SECRET?`・`STRIPE_PRICE_ID?`・`STRIPE_API_BASE_URL?`・`STRIPE_PORTAL_CONFIGURATION_ID?`・`STRIPE_TAX_RATE_ID?`を足す。
   - `apps/api/src/lib/config.ts`の`validateConfig`で、`BILLING_ENABLED`が`"true"`・`"false"`以外（未設定を含む）なら問題にする。`"true"`のときだけ、`STRIPE_SECRET_KEY`（`/^sk_(test|live)_[A-Za-z0-9]{10,}$/`）・`STRIPE_WEBHOOK_SECRET`（`/^whsec_/`）・`STRIPE_PRICE_ID`（`/^price_/`）を確かめる。`billingModeOf(env)`（`{ enabled: env.BILLING_ENABLED === "true" }`）を足す。
   - `apps/api/test/unit/config.test.ts`に、未設定・違う値・ONで鍵がない・ONで見本の値のテストを足す（FR-063）。
   - `apps/api/test/env.ts`の`testBindings`に`BILLING_ENABLED: "false"`、`STRIPE_API_BASE_URL`（引数）、テスト用の`STRIPE_SECRET_KEY`・`STRIPE_WEBHOOK_SECRET`・`STRIPE_PRICE_ID`を足す。
   - `apps/api/.dev.vars.example`に`BILLING_ENABLED=false`とStripeの見本を足す。
-- [ ] T009 [P] `apps/api/src/lib/stripe-client.ts`を作り、`apps/api/test/unit/stripe-client.test.ts`を先に書く（research.md R5）：
+- [X] T009 [P] `apps/api/src/lib/stripe-client.ts`を作り、`apps/api/test/unit/stripe-client.test.ts`を先に書く（research.md R5）：
   - `createStripeClient(env)`の7つの呼び出し：`createCustomer({ userId, email }, idempotencyKey)`、`createCheckoutSession(params)`、`expireCheckoutSession(id)`、`createPortalSession({ customer, returnUrl, configuration? })`、`listSubscriptions(customerId)`、`updateSubscriptionQuantity(subscriptionId, itemId, quantity)`（`proration_behavior=none`）、`cancelSubscription(subscriptionId)`。
   - 本文は`application/x-www-form-urlencoded`（入れ子は`a[b][0]`の形）。`Stripe-Version`を固定する。接続先は`STRIPE_API_BASE_URL ?? "https://api.stripe.com"`。
   - 4xx・5xx・通信の失敗は`StripeError`（`status`・`code`）にする。鍵を例外の文やログに出さない。
   - `verifyWebhookSignature(body, header, secret, now)`：`t=`と`v1=`を読み、`HMAC-SHA256(secret, "${t}.${body}")`を一定時間で比べ、時刻の差が300秒を超えたら拒む。合う・合わない・古い・形の誤り・`v1`が複数をテストする。
-- [ ] T010 [P] `apps/api/test/fake-stripe/server.ts`を作る（`apps/api/test/fake-threads/server.ts`と同じ形。メモリの中に顧客・契約・セッションを持つ）。
+- [X] T010 [P] `apps/api/test/fake-stripe/server.ts`を作る（`apps/api/test/fake-threads/server.ts`と同じ形。メモリの中に顧客・契約・セッションを持つ）。
   - T009の7つの呼び出しに答える。
   - Checkoutの`url`は偽のサーバーの`/checkout/:id`にする。開くと契約を作り（`trial_end`があれば`trialing`、なければ`active`）、`success_url`へ302で戻し、設定されていれば宛先にWebhook（`checkout.session.completed`と`customer.subscription.created`）を署名つきで送る。
   - テストから状態を変える口：`setSubscriptionStatus`・`failNext`・`reset`・`requests`。
   - `apps/api/test/fake-stripe/serve.ts`（手元・E2E用に単独で立てる）を作り、`apps/api/package.json`に`fake-stripe`の命令を足す。
   - `apps/api/test/global-setup.ts`で偽のStripeを立て、`apps/api/vitest.config.ts`の`testBindings`に渡す。
-- [ ] T011 判定する人に決済のモードを持たせる（research.md R2）：
+- [X] T011 判定する人に決済のモードを持たせる（research.md R2）：
   - `apps/api/src/middleware/auth.ts`で、`c.set("user", …)`に`billing: billingModeOf(c.env)`を入れる（`AuthVariables`の型を直す）。
   - `apps/api/src/services/access.ts`の`RequestUser`を`{ id: string; billing: BillingMode }`にする。
   - 型の誤りになる所を、モードを受け取る形に直す：`apps/api/src/services/account-service.ts`（`deleteAccount`・`completeConnection`・`createAccount`）、`apps/api/src/services/threads-oauth.ts`、`apps/api/src/services/token-connect.ts`、ほか`{ id: … }`を渡している所。
   - `pnpm --filter api typecheck`が通ることを確かめる。
-- [ ] T012 `apps/api/src/services/access.ts`の`authorizeAccount`に、オーナーの使える状態を足す（research.md R2）：
+- [X] T012 `apps/api/src/services/access.ts`の`authorizeAccount`に、オーナーの使える状態を足す（research.md R2）：
   - 同じ1回の問い合わせに、`ownerU.billingExempt`と`subscriptions`（オーナーの`user_id`で左結合）の`status`・`cancel_at_period_end`を足す。
   - `entitlementOf`でオーナーの状態を求め、`fullAccess`でなければ`narrowForReadOnly`で権限を絞る。
   - 絞る前にはあって、絞った後にない権限を要られたら`AppError("BILLING_REQUIRED", 403, …, undefined, [reason])`を投げる。`reason`は、判定した人がオーナーなら`readOnlyReason`、ほかの人なら`owner_inactive`。
@@ -89,14 +89,14 @@ description: "Task list for feature 013 billing and withdrawal"
   - `apps/api/src/services/billing-service.ts`を作り、`loadEntitlement(db, userId, mode, now)`（`users`と`subscriptions`を読んで`entitlementOf`する）を置く。上限（T018）・定期処理（T034・T035）・チームの入口（T036）・`GET /api/me`（T019）はこれを使う。
   - `apps/api/src/routes/accounts.ts`の`DELETE /api/accounts/:accountId`を`owner`から`remove`に変える。
   - `apps/api/src/routes/account-team.ts`の`GET /api/accounts/:accountId/access`の応答に`readOnly`を足し、`packages/shared/src/schemas.ts`の`accountAccessResponseSchema`に`readOnly: z.object({ reason: z.enum(["trial_ended","payment_failed","canceled","owner_inactive"]) }).nullable()`を足す。
-- [ ] T013 `apps/api/test/integration/read-only-access.test.ts`を作る（決済ON）。T012の前に書いて失敗を確かめる。
+- [X] T013 `apps/api/test/integration/read-only-access.test.ts`を作る（決済ON）。T012の前に書いて失敗を確かめる。
   - オーナーが無料体験の終わった利用者のアカウントで、オーナー・担当の人（編集者・自分を担当にした管理者）・見せてもらっている人のそれぞれについて、`read`・`view`・`activity`のAPI（投稿ストック・戦略・パフォーマンス・CSV・操作の記録）が200になる。
   - 同じ人たちの`content`・`review`・`settings`・`owner`のAPIが`403 BILLING_REQUIRED`になる。対象は、案の登録・承認・却下・戦略の保存・NGワード・投稿のルール・自動投稿の設定・接続の確認・名前の変更・Threadsとの接続の開始・トークンでの接続。
   - `details`は、オーナーには`trial_ended`、ほかの人には`owner_inactive`になる。
   - `DELETE /api/accounts/:id`は通る。
   - 担当の人が読むだけで、オーナーがすべて使えるアカウントでは、担当の人の`content`が通る。
   - 支払いの失敗（`past_due`）・解約後（`canceled`）・料金なし・決済OFF・契約中のそれぞれで結果が表のとおりになる（SC-003、FR-040・FR-042）。
-- [ ] T014 旧プランを外す（research.md R12、FR-004）：
+- [X] T014 旧プランを外す（research.md R12、FR-004）：
   - `packages/shared/src/plans.ts`・`packages/shared/test/plans.test.ts`を消す。
   - `packages/shared/src/access.ts`の`hasGrowerAccess`と`packages/shared/test/access.test.ts`の該当部分を消す（`trialEndsAt`のテストは`billing.test.ts`へ移す）。
   - `apps/api/src/services/grower-access.ts`を消す。
@@ -105,7 +105,7 @@ description: "Task list for feature 013 billing and withdrawal"
   - `apps/api/src/services/profile-status.ts`の`access`を`{ canEdit: access.permissions.has("content"), inTrial: state === "trial" \|\| state === "subscribed_trial", trialEndsAt }`にする（`trialDaysLeft`も足す）。
   - `apps/api/scripts/set-plan.ts`と`apps/api/package.json`の`admin:set-plan`を消す。
   - `pnpm --filter api typecheck`と`pnpm --filter api test`が通ることを確かめる。
-- [ ] T015 [P] Webの旧プランの表示を外す：`apps/web/src/components/GrowerRequiredNotice.tsx`を消し、使っている所（`apps/web/src/pages/strategy.tsx`・`promotions.tsx`・`research.tsx`・`account-settings.tsx`・`account-home.tsx`、`apps/web/src/components/settings/PostingScheduleSection.tsx`・`PostingRulesSection.tsx`、`apps/web/src/lib/save-error.ts`）から外す。読むだけの帯・ダイアログはUS3（T037・T038）で足す。それまでは、書き込みのボタンは`can()`の出し分けだけで消える。`apps/web/test/strategy.test.tsx`・`promotions.test.tsx`・`research.test.tsx`の`GROWER_FEATURE_REQUIRED`の期待を消す。`pnpm --filter web test`が通ることを確かめる。
+- [X] T015 [P] Webの旧プランの表示を外す：`apps/web/src/components/GrowerRequiredNotice.tsx`を消し、使っている所（`apps/web/src/pages/strategy.tsx`・`promotions.tsx`・`research.tsx`・`account-settings.tsx`・`account-home.tsx`、`apps/web/src/components/settings/PostingScheduleSection.tsx`・`PostingRulesSection.tsx`、`apps/web/src/lib/save-error.ts`）から外す。読むだけの帯・ダイアログはUS3（T037・T038）で足す。それまでは、書き込みのボタンは`can()`の出し分けだけで消える。`apps/web/test/strategy.test.tsx`・`promotions.test.tsx`・`research.test.tsx`の`GROWER_FEATURE_REQUIRED`の期待を消す。`pnpm --filter web test`が通ることを確かめる。
 
 **Checkpoint**：`BILLING_ENABLED=false`で、001〜012の自動テストとE2Eが今のまま通る。決済ONで、読むだけの権限の表（T013）が通る。
 
@@ -130,15 +130,15 @@ description: "Task list for feature 013 billing and withdrawal"
 
 ### Implementation for User Story 1
 
-- [ ] T018 [US1] `apps/api/src/services/account-service.ts`の`ownedPlans`・`accountLimitFor`・`assertCanAddAccount`を置き換える（research.md R9）。利用者の状態はT012の`loadEntitlement`で読む。`assertCanAddAccount`は、`read_only`なら`BILLING_REQUIRED`、`accountLimit`があり所有の数が上限以上なら`ACCOUNT_LIMIT_REACHED`（`max`）を投げる。`createAccount`から`plan`を外す。鍵（`lockUserRow`）の中で数えるのは今のまま。
-- [ ] T019 [US1] `apps/api/src/routes/me.ts`の`GET /api/me`で、`accountLimit`を`{ max: entitlement.accountLimit, used }`にし、`billing`を足す。`withdrawalInProgress`も足す（今は常に`false`。US5で使う）。`packages/shared/src/schemas.ts`の`me`の応答の型を直す。
-- [ ] T020 [P] [US1] `apps/web/test/account-create.test.tsx`を先に直し、`apps/web/src/pages/account-new.tsx`に場合分けを足す（contracts/ui-routes.md「アカウントを作る」）。`state = trial`で`used >= 1`なら、入力欄の代わりに上限の文と「契約する」（`/settings/billing`）を出す。`state = read_only`なら、入力欄の代わりに理由の文と「契約する」か「支払いの画面を開く」を出す。アカウントが0件の人はサイドバーなしの1カラムのまま（spec Edge Cases）。
+- [X] T018 [US1] `apps/api/src/services/account-service.ts`の`ownedPlans`・`accountLimitFor`・`assertCanAddAccount`を置き換える（research.md R9）。利用者の状態はT012の`loadEntitlement`で読む。`assertCanAddAccount`は、`read_only`なら`BILLING_REQUIRED`、`accountLimit`があり所有の数が上限以上なら`ACCOUNT_LIMIT_REACHED`（`max`）を投げる。`createAccount`から`plan`を外す。鍵（`lockUserRow`）の中で数えるのは今のまま。
+- [X] T019 [US1] `apps/api/src/routes/me.ts`の`GET /api/me`で、`accountLimit`を`{ max: entitlement.accountLimit, used }`にし、`billing`を足す。`withdrawalInProgress`も足す（今は常に`false`。US5で使う）。`packages/shared/src/schemas.ts`の`me`の応答の型を直す。
+- [X] T020 [P] [US1] `apps/web/test/account-create.test.tsx`を先に直し、`apps/web/src/pages/account-new.tsx`に場合分けを足す（contracts/ui-routes.md「アカウントを作る」）。`state = trial`で`used >= 1`なら、入力欄の代わりに上限の文と「契約する」（`/settings/billing`）を出す。`state = read_only`なら、入力欄の代わりに理由の文と「契約する」か「支払いの画面を開く」を出す。アカウントが0件の人はサイドバーなしの1カラムのまま（spec Edge Cases）。
 - [ ] T021 [P] [US1] `apps/web/test/trial-ending-banner.test.tsx`を先に書き、`apps/web/src/components/billing/TrialEndingBanner.tsx`を作る（contracts/ui-routes.md「無料体験の終わりの帯」）。
   - 出す条件：`state = trial`で`trialDaysLeft <= 7`。
   - 文言：「無料体験はあと〇日で終わります。続けて使うには契約してください」。0日なら「無料体験は今日で終わります」。
   - 「契約する」と閉じるボタンを置く。閉じたら、日本時間のその日は出さない（`localStorage`の`trial-banner-dismissed:<YYYY-MM-DD>`。読み書きの失敗は毎回出す）。
   - サイドバーの右のメインの一番上に置く。置き場所は`apps/web/src/components/layout/`の共通のレイアウト（アカウントの画面・設定・チームの画面）。
-- [ ] T022 [P] [US1] `apps/web/src/pages/account-home.tsx`の「無料体験中：〇月〇日まで」に「（あと〇日）」を足す（`trialDaysLeft`）。`apps/web/test/account-home.test.tsx`を直す。
+- [X] T022 [P] [US1] `apps/web/src/pages/account-home.tsx`の「無料体験中：〇月〇日まで」に「（あと〇日）」を足す（`trialDaysLeft`）。`apps/web/test/account-home.test.tsx`を直す。
 - [ ] T023 [US1] `apps/web/test/billing-page.test.tsx`を先に書き、`apps/web/src/pages/settings/billing.tsx`を作る。表示は、状態のカード・料金の説明のカード・規約へのリンク。`billing_disabled`・`exempt`・`trial`の3つの状態の表示を作る（contracts/ui-routes.md「契約と支払い」。残りの状態はUS2〜US4で足す）。
   - `apps/web/src/pages/settings/sections.ts`に「契約と支払い」を足す（`slug: "billing"`、`CreditCardIcon`、検索語：料金・支払い・契約・解約・領収書・カード）。
   - `apps/web/src/router.tsx`に`/settings/billing`を足す。
@@ -217,12 +217,12 @@ description: "Task list for feature 013 billing and withdrawal"
 ### Implementation for User Story 3
 
 - [ ] T034 [US3] `apps/api/src/services/auto-post-runner.ts`の「2.時刻の処理」の一覧に、オーナーの`users`（`memberships.role = 'owner'`）と`subscriptions`を結合し、`entitlementOf`で読むだけのオーナーの設定を外す。`apps/api/src/services/publish-claim.ts`の`skipReasonOf`で同じ確認をし、読むだけなら`billing_inactive`にする。`apps/api/src/services/publish-executor.ts`で、`retry_wait`の試みを投稿し直す前に同じ確認をし、読むだけなら失敗として終える。オーナーの状態を読む関数は`billing-service.ts`の`loadEntitlement`を使う（決済のモードは`billingModeOf(env)`）。
-- [ ] T035 [US3] `apps/api/src/services/metrics-runner.ts`の`hasGrowerAccess`（2か所）とプランでの絞り込み（`inArray(accounts.plan, …)`）を、オーナーの`users`・`subscriptions`の結合と`entitlementOf(...).fullAccess`に置き換える。
+- [X] T035 [US3] `apps/api/src/services/metrics-runner.ts`の`hasGrowerAccess`（2か所）とプランでの絞り込み（`inArray(accounts.plan, …)`）を、オーナーの`users`・`subscriptions`の結合と`entitlementOf(...).fullAccess`に置き換える。
 - [ ] T036 [US3] `apps/api/src/services/invite-service.ts`の`assertOwnFreeAccounts`に、その人の`loadEntitlement`が`fullAccess`でなければ`BILLING_REQUIRED`を投げる確認を足す（呼び出し元のチームの作成・参加・アカウントの追加の3か所が守られる）。
 - [ ] T037 [P] [US3] `apps/web/test/read-only-banner.test.tsx`を先に書き、`apps/web/src/components/billing/ReadOnlyBanner.tsx`を作る（contracts/ui-routes.md「読むだけの帯」）。
   - `useAccountAccess`の`access.readOnly`があれば出す。理由ごとの文言とボタンは表のとおり。`owner_inactive`はボタンなし。閉じられない。
   - アカウントの画面のレイアウト（`apps/web/src/pages/account-layout.tsx`）の一番上に置く。未接続の帯より上。
-- [ ] T038 [P] [US3] `apps/web/src/components/billing/BillingRequiredDialog.tsx`を作る。保存の途中で`403 BILLING_REQUIRED`を受けたら、「編集できなくなりました」と帯と同じ文言を出し、入力は画面に残す。`apps/web/src/lib/save-error.ts`で`BILLING_REQUIRED`を受けたら、このダイアログを出す。今`GrowerRequiredDialog`を出していた画面（戦略・宣伝内容・リサーチ・投稿のルール）と、投稿ストックの保存で使う。`apps/web/test/strategy.test.tsx`に場合を足す。
+- [X] T038 [P] [US3] `apps/web/src/components/billing/BillingRequiredDialog.tsx`を作る。保存の途中で`403 BILLING_REQUIRED`を受けたら、「編集できなくなりました」と帯と同じ文言を出し、入力は画面に残す。`apps/web/src/lib/save-error.ts`で`BILLING_REQUIRED`を受けたら、このダイアログを出す。今`GrowerRequiredDialog`を出していた画面（戦略・宣伝内容・リサーチ・投稿のルール）と、投稿ストックの保存で使う。`apps/web/test/strategy.test.tsx`に場合を足す。
 - [ ] T039 [P] [US3] `apps/web/src/components/AutoPostNotices.tsx`に、飛ばした理由`billing_inactive`の文「契約が止まっていたため、この時刻は投稿しませんでした」を足す。`apps/web/test/auto-post-notices.test.tsx`を直す。
 - [ ] T040 [US3] `apps/web/src/pages/settings/billing.tsx`に`read_only(payment_failed)`・`read_only(canceled)`の表示を足す。
 
@@ -252,7 +252,7 @@ description: "Task list for feature 013 billing and withdrawal"
 - [ ] T043 [US4] `apps/api/src/services/billing-service.ts`に`markQuantityDirty(tx, userId)`と`syncQuantity(env, db, userId)`を足す。`apps/api/src/services/account-service.ts`の`createAccount`・`deleteAccount`のトランザクションで`markQuantityDirty`し、トランザクションの後に`syncQuantity`を呼ぶ（失敗はログだけ）。`syncQuantity`は、契約が終わっていなければ`updateSubscriptionQuantity(…, billingQuantity(n))`し、`quantity`を書いて印を消す。契約の項目のIDは`listSubscriptions`の結果から取る。データ削除の求め（001の`data-deletion.ts`）でアカウントが消える所でも、同じ印を付ける。
 - [ ] T044 [US4] `apps/api/src/services/daily-jobs.ts`に「契約の合わせ直し」を足す（決済OFFなら飛ばす）。終わっていない契約と`quantity_sync_needed = true`の行について、`syncCustomer`と`syncQuantity`を呼ぶ。1件の失敗で全体を止めない。
 - [ ] T045 [US4] `apps/api/src/routes/billing.ts`に`POST /api/billing/portal`（`{ url }`）を足す。`apps/web/src/pages/settings/billing.tsx`に「支払いの画面を開く」と`canceling`の表示を足す。表示は「〇月〇日に終わります（解約済み）」と「その日まで、すべての機能を使えます。解約は支払いの画面から取り消せます」。`apps/web/src/lib/api-client.ts`に`openPortal()`を足す。契約（顧客）がある人は、画面を開くたびに`POST /api/billing/sync`を1回呼び、結果で表示を更新する（FR-036。`?checkout=success`のくり返しとは別）。`apps/web/test/billing-page.test.tsx`に場合を足す（開いたときの読み直しを含む）。
-- [ ] T046 [P] [US4] `apps/web/src/pages/account-new.tsx`に、契約中（`subscribed_trial`・`active`・`canceling`）で`used >= 1`なら「2件目からは1件につき月500円です。次の請求から反映されます」を入力の下に出す（FR-031）。`apps/web/test/account-create.test.tsx`に場合を足す。
+- [X] T046 [P] [US4] `apps/web/src/pages/account-new.tsx`に、契約中（`subscribed_trial`・`active`・`canceling`）で`used >= 1`なら「2件目からは1件につき月500円です。次の請求から反映されます」を入力の下に出す（FR-031）。`apps/web/test/account-create.test.tsx`に場合を足す。
 
 ---
 

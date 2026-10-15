@@ -1,9 +1,17 @@
 // アカウントを作る画面（specs/012 FR-001〜FR-006、contracts/ui-routes.md「アカウントを作る」）。
-// 名前だけで作り、Threadsには後で「このアカウントの設定」の「Threadsとの接続」からつなぐ。上限の案内は001 FR-017のまま。
+// 名前だけで作り、Threadsには後で「このアカウントの設定」の「Threadsとの接続」からつなぐ。
+// 上限・読むだけ・2件目からの料金の案内は specs/013 contracts/ui-routes.md「アカウントを作る」。
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ACCOUNT_NAME_MAX, RECONNECT_FROM_SETTINGS_HINT, countChars, errorMessage } from "@threads-grower/shared";
+import {
+  ACCOUNT_NAME_MAX,
+  BILLING_EXTRA_PRICE_JPY,
+  RECONNECT_FROM_SETTINGS_HINT,
+  countChars,
+  errorMessage,
+} from "@threads-grower/shared";
 import { useEffect, useState, type FormEvent } from "react";
-import { useNavigate, useSearchParams } from "react-router";
+import { Link, useNavigate, useSearchParams } from "react-router";
+import { readOnlyMessage } from "@/components/billing/BillingRequiredDialog";
 import { ApiErrorScreen } from "@/components/ApiErrorScreen";
 import { FieldWithCounter } from "@/components/FieldWithCounter";
 import { LoadingSkeleton } from "@/components/guards";
@@ -41,8 +49,18 @@ export function AccountNew() {
   if (me.isLoadingError) return <ApiErrorScreen error={me.error} onRetry={() => void me.refetch()} />;
 
   const { max, used } = me.data.accountLimit;
-  const limitReached =
-    used >= max || (create.error instanceof ApiError && create.error.code === "ACCOUNT_LIMIT_REACHED");
+  const billing = me.data.billing;
+  const createCode = create.error instanceof ApiError ? create.error.code : null;
+  // 読むだけ（無料体験の終わり・支払いの失敗・解約の後）なら作れない（specs/013 FR-043）
+  const readOnlyReason =
+    billing.state === "read_only"
+      ? (billing.readOnlyReason ?? "trial_ended")
+      : createCode === "BILLING_REQUIRED"
+        ? ((create.error as ApiError).details[0] ?? "trial_ended")
+        : null;
+  // 上限は無料体験中だけ（null は上限なし。specs/013 research.md R9）
+  const limitReached = (max !== null && used >= max) || createCode === "ACCOUNT_LIMIT_REACHED";
+  const subscribed = billing.state === "subscribed_trial" || billing.state === "active" || billing.state === "canceling";
   const trimmed = name.trim();
   const canSubmit = trimmed !== "" && countChars(trimmed) <= ACCOUNT_NAME_MAX && !create.isPending;
 
@@ -59,15 +77,28 @@ export function AccountNew() {
         {/* はじめての人には数を見せない（contracts/ui-routes.md） */}
         {used > 0 && (
           <p className="text-sm text-muted-foreground">
-            登録済み {used}/{max}件
+            登録済み {used}
+            {max !== null ? `/${max}` : ""}件
           </p>
         )}
       </div>
 
-      {limitReached ? (
+      {readOnlyReason ? (
         <Alert variant="warning">
-          <AlertDescription className="space-y-2 text-foreground">
-            <p>{errorMessage("ACCOUNT_LIMIT_REACHED", { max }).message}</p>
+          <AlertDescription className="space-y-3 text-foreground">
+            <p>{readOnlyMessage(readOnlyReason)}</p>
+            <Button asChild size="sm" className="rounded-full">
+              <Link to="/settings/billing">{readOnlyReason === "payment_failed" ? "支払いの画面を開く" : "契約する"}</Link>
+            </Button>
+          </AlertDescription>
+        </Alert>
+      ) : limitReached ? (
+        <Alert variant="warning">
+          <AlertDescription className="space-y-3 text-foreground">
+            <p>{errorMessage("ACCOUNT_LIMIT_REACHED", { max: max ?? 1 }).message}</p>
+            <Button asChild size="sm" className="rounded-full">
+              <Link to="/settings/billing">契約する</Link>
+            </Button>
             <p className="text-muted-foreground">{RECONNECT_FROM_SETTINGS_HINT}</p>
           </AlertDescription>
         </Alert>
@@ -84,8 +115,14 @@ export function AccountNew() {
           />
           {create.isError && (
             <Alert variant="destructive">
-              <AlertDescription className="text-foreground">{describeError(create.error, { max })}</AlertDescription>
+              <AlertDescription className="text-foreground">{describeError(create.error, { max: max ?? undefined })}</AlertDescription>
             </Alert>
+          )}
+          {/* 契約中の2件目からは料金がかかる（specs/013 FR-031） */}
+          {subscribed && used >= 1 && (
+            <p className="text-sm text-muted-foreground">
+              2件目からは1件につき月{BILLING_EXTRA_PRICE_JPY}円です。次の請求から反映されます。
+            </p>
           )}
           <Button type="submit" className="w-full" disabled={!canSubmit}>
             作る

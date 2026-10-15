@@ -21,7 +21,6 @@ const account: AccountSummary = {
   username: "cafe_b",
   displayName: "カフェ B店",
   profilePictureUrl: null,
-  plan: "auto-only",
   connectionStatus: "connected",
   lastUsedAt: null,
   role: "editor",

@@ -8,7 +8,6 @@ import type { Env } from "../env";
 import { AppError, itemNotFound, notFound, pgErrorCode } from "../lib/errors";
 import type { AccountRow } from "./access";
 import { CLEAR_QUEUE_FIELDS } from "./draft-service";
-import { canEditProfile } from "./grower-access";
 import type { AccountAccess } from "./access";
 import { recordActivity, updatedByOf } from "./activity-log";
 
@@ -37,17 +36,17 @@ export async function listNgWords(db: Db | TxDb, accountId: string): Promise<NgW
  * 「このアカウントの設定」の「投稿のルール」に必要な値（GET /posting-rules）。
  * @param db - データベース
  * @param account - Account の行
- * @param user - Accountのオーナー（無料体験の判定に使う。specs/008 research.md R3）
+ * @param canEditCoreRules - 投稿ルールを編集できるか（権限 settings。読むだけなら false。specs/013）
  * @returns NGワード・上限・投稿ルール・投稿ルールを編集できるか
  */
-export async function getPostingRules(db: Db, account: AccountRow, user: { createdAt: Date }) {
+export async function getPostingRules(db: Db, account: AccountRow, canEditCoreRules: boolean) {
   const rows = await listNgWords(db, account.id);
   return {
     ngWords: rows.map(toNgWord),
     ngWordLimit: NG_WORD_LIMIT,
     coreRules: account.coreRules,
     coreRulesVersion: account.coreRulesVersion,
-    canEditCoreRules: canEditProfile(account, user),
+    canEditCoreRules,
   };
 }
 

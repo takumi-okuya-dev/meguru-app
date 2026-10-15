@@ -6,7 +6,6 @@ import { createDb } from "../db/client";
 import { withActivityTx } from "../services/activity-log";
 import { AppError } from "../lib/errors";
 import { authorizeAccount } from "../services/access";
-import { canEditProfile, requireGrowerAccess } from "../services/grower-access";
 import { getProfileStatus } from "../services/profile-status";
 import { getStrategy, saveStrategy } from "../services/strategy-service";
 
@@ -22,8 +21,7 @@ export function strategyRoutes(authed: MiddlewareHandler<AppEnv>) {
       const db = createDb(c.env.DATABASE_URL);
       const user = c.get("user");
       const access = await authorizeAccount(db, user, c.req.param("accountId"), "view");
-      const account = access.account;
-      return c.json(await getProfileStatus(db, account, access.owner));
+      return c.json(await getProfileStatus(db, access, user.billing));
     })
     .get("/accounts/:accountId/strategy", authed, async (c) => {
       const db = createDb(c.env.DATABASE_URL);
@@ -33,7 +31,7 @@ export function strategyRoutes(authed: MiddlewareHandler<AppEnv>) {
       // 直せるのは content の権限がある人だけ（見せてもらっている人は読むだけ。PR #14 のCodexレビュー）
       return c.json({
         ...(await getStrategy(db, account.id)),
-        canEdit: canEditProfile(account, access.owner) && access.permissions.has("content"),
+        canEdit: access.permissions.has("content"),
       });
     })
     .put("/accounts/:accountId/strategy", authed, async (c) => {
@@ -42,7 +40,6 @@ export function strategyRoutes(authed: MiddlewareHandler<AppEnv>) {
       // 必ず「所有 → grower機能 → 入力の検証」の順で確かめる（FR-023・FR-024）
       const access = await authorizeAccount(db, user, c.req.param("accountId"), "content");
       const account = access.account;
-      requireGrowerAccess(account, access.owner);
       const parsed = putStrategyRequestSchema.safeParse(await c.req.json().catch(() => null));
       if (!parsed.success) {
         throw new AppError("VALIDATION_FAILED", 400, "invalid strategy", undefined, invalidFields(parsed.error));

@@ -6,7 +6,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { ApiErrorScreen } from "@/components/ApiErrorScreen";
 import { ConflictDialog } from "@/components/ConflictDialog";
-import { GrowerRequiredBanner, GrowerRequiredDialog } from "@/components/GrowerRequiredNotice";
+import { BillingRequiredDialog } from "@/components/billing/BillingRequiredDialog";
 import { ConfirmDeleteDialog } from "@/components/items/ConfirmDeleteDialog";
 import { PageBody, PageHeader } from "@/components/layout/PageHeader";
 import { PROMOTION_STATUS_LABELS, PromotionFormDialog } from "@/components/promotions/PromotionFormDialog";
@@ -21,7 +21,7 @@ import {
 import { ApiError, api } from "@/lib/api-client";
 import { formatMonthDay } from "@/lib/format";
 import { queryKeys } from "@/lib/query";
-import { isGrowerRequired, isStale, saveErrorMessage } from "@/lib/save-error";
+import { billingReasonOf, isBillingRequired, isStale, saveErrorMessage } from "@/lib/save-error";
 import { cn } from "@/lib/utils";
 import { useUnsavedChanges } from "@/lib/use-unsaved-changes";
 import { useCurrentAccount } from "@/pages/account-layout";
@@ -64,8 +64,8 @@ export function PromotionsPage() {
   });
   const [dialog, setDialog] = useState<DialogState>(null);
   const [toDelete, setToDelete] = useState<Promotion | null>(null);
-  const [growerLost, setGrowerLost] = useState(false);
-  const [growerDialog, setGrowerDialog] = useState(false);
+  const [readOnlyLost, setReadOnlyLost] = useState(false);
+  const [billingReason, setBillingReason] = useState<string | null>(null);
   // カードのメニューからの状態の変更が、他で先に更新されていた（contracts/ui-routes.md 規則5）
   const [statusConflict, setStatusConflict] = useState<{
     latest: Promotion;
@@ -79,7 +79,7 @@ export function PromotionsPage() {
     void queryClient.invalidateQueries({ queryKey: queryKeys.profileStatus(account.id) });
   };
   const onMutationError = (err: unknown) => {
-    if (isGrowerRequired(err)) return setGrowerDialog(true);
+    if (isBillingRequired(err)) return setBillingReason(billingReasonOf(err) ?? "");
     if (isStale(err) || (err instanceof ApiError && err.code === "ITEM_NOT_FOUND")) {
       toast.error(saveErrorMessage(err));
       return refresh();
@@ -115,7 +115,7 @@ export function PromotionsPage() {
   if (list.isError) return <ApiErrorScreen error={list.error} onRetry={() => void list.refetch()} />;
 
   const items = list.data?.items ?? [];
-  const canEdit = (list.data?.canEdit ?? false) && !growerLost;
+  const canEdit = (list.data?.canEdit ?? false) && !readOnlyLost;
   const limit = list.data?.limit ?? PROMOTION_LIMIT;
   const atLimit = items.length >= limit;
   const targetable = items.filter((p) => p.isTargetable);
@@ -168,7 +168,6 @@ export function PromotionsPage() {
     <>
       <PageHeader title="宣伝内容" actions={addButton} />
       <PageBody className="space-y-7 pb-16">
-        {!canEdit && list.data && <GrowerRequiredBanner />}
         <p className="text-[15px] text-muted-foreground">
           登録した宣伝内容は、投稿づくりの材料になります。宣伝内容がなくても投稿は作れます。
         </p>
@@ -178,7 +177,7 @@ export function PromotionsPage() {
           version={settings.data?.version ?? 1}
           // 宣伝投稿の割合は設定（オーナーだけ）。担当の人には読むだけで出す（PR #14 のCodexレビュー）
           canEdit={canEdit && (settings.data?.canEdit ?? false)}
-          onGrowerLost={() => setGrowerDialog(true)}
+          onReadOnly={() => setBillingReason("")}
         />
         {canEdit && atLimit && (
           <p role="status" className="rounded-xl border border-warning/40 bg-warning-bg px-4 py-3 text-sm">
@@ -241,7 +240,7 @@ export function PromotionsPage() {
           }}
           onClose={() => setDialog(null)}
           // ダイアログは閉じずに、入力内容を読むだけで残す（閉じるのはユーザーの操作で）
-          onGrowerLost={() => setGrowerLost(true)}
+          onReadOnly={() => setReadOnlyLost(true)}
           onDeletedElsewhere={refresh}
           onLimitReached={refresh}
         />
@@ -267,11 +266,11 @@ export function PromotionsPage() {
           setStatusConflict(null);
         }}
       />
-      <GrowerRequiredDialog
-        open={growerDialog}
+      <BillingRequiredDialog
+        reason={billingReason}
         onClose={() => {
-          setGrowerDialog(false);
-          setGrowerLost(true);
+          setBillingReason(null);
+          setReadOnlyLost(true);
         }}
       />
     </>
@@ -333,13 +332,13 @@ function RatioRow({
   value,
   version,
   canEdit,
-  onGrowerLost,
+  onReadOnly,
 }: {
   accountId: string;
   value: number | undefined;
   version: number;
   canEdit: boolean;
-  onGrowerLost: () => void;
+  onReadOnly: () => void;
 }) {
   const queryClient = useQueryClient();
   // 入力中の値と、編集を始めたときの版（裏で読み直して版が上がっても、編集を始めたときの版で保存する。
@@ -364,7 +363,7 @@ function RatioRow({
     },
     onError: (err) => {
       if (isStale(err)) setConflict({ latest: err.latest as PromotionSettings, by: err.updatedBy?.name ?? null });
-      else if (isGrowerRequired(err)) onGrowerLost();
+      else if (isBillingRequired(err)) onReadOnly();
       else toast.error(saveErrorMessage(err));
     },
   });

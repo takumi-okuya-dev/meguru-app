@@ -382,7 +382,6 @@ describe("US3：公開の結果の確認", () => {
 describe("反応数の段階との関係（specs/006 plan.md「Phase 1の設計後の再確認」）", () => {
   it("反応数の段階が失敗しても、公開の結果に影響しない", async () => {
     const { accountId } = await connectedAccount("u1", app);
-    await db()`UPDATE accounts SET plan = 'auto-grower' WHERE id = ${accountId}`;
     await approvedDrafts(accountId, ["A"]);
     await setSchedule(accountId, { slotMinutes: [720] });
     await publishedDrafts(accountId, [{ publishedAt: addMin(NOON, 1 - 24 * 60) }]);

@@ -1,5 +1,5 @@
 // /api/accounts/:accountId/performance（specs/006-performance-feedback contracts/api.md）。
-// grower機能を使えるAccountだけ（FR-031）。必ず「所有 → grower機能 → 入力の検証」の順で確かめる。
+// 書き込みは権限の判定（authorizeAccount）で守る。読むだけのオーナーのアカウントでも、見ることはできる（specs/013 FR-040）。
 import { exportQuerySchema, feedbackRequestSchema, invalidFields, performanceQuerySchema } from "@threads-grower/shared";
 import { Hono, type MiddlewareHandler } from "hono";
 import type { AppEnv } from "../app";
@@ -7,7 +7,6 @@ import { createDb } from "../db/client";
 import { withActivityTx } from "../services/activity-log";
 import { AppError } from "../lib/errors";
 import { authorizeAccount } from "../services/access";
-import { requireGrowerAccess } from "../services/grower-access";
 import { getPerformanceSummary, listExportRows, listPerformancePage, updateFeedback } from "../services/performance-service";
 
 /**
@@ -21,7 +20,6 @@ export function performanceRoutes(authed: MiddlewareHandler<AppEnv>) {
     const user = c.get("user");
     const access = await authorizeAccount(db, user, c.req.param("accountId"), "view");
     const account = access.account;
-    requireGrowerAccess(account, access.owner);
     const parsed = performanceQuerySchema.safeParse(c.req.query());
     if (!parsed.success) {
       throw new AppError("VALIDATION_FAILED", 400, "invalid query", undefined, invalidFields(parsed.error));
@@ -38,7 +36,6 @@ export function performanceRoutes(authed: MiddlewareHandler<AppEnv>) {
       const user = c.get("user");
       const access = await authorizeAccount(db, user, c.req.param("accountId"), "content");
       const account = access.account;
-      requireGrowerAccess(account, access.owner);
       const parsed = feedbackRequestSchema.safeParse(await c.req.json().catch(() => null));
       if (!parsed.success) {
         throw new AppError("VALIDATION_FAILED", 400, "invalid feedback", undefined, invalidFields(parsed.error));
@@ -56,7 +53,6 @@ export function performanceRoutes(authed: MiddlewareHandler<AppEnv>) {
       const user = c.get("user");
       const access = await authorizeAccount(db, user, c.req.param("accountId"), "view");
       const account = access.account;
-      requireGrowerAccess(account, access.owner);
       // 未接続のアカウントには書き出すものがない（specs/012 FR-033）
       if (account.connectionStatus === "not_connected")
         throw new AppError("ACCOUNT_NOT_CONNECTED", 409, "account not connected", undefined, [account.id]);

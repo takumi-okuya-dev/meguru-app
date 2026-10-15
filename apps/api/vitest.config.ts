@@ -19,7 +19,7 @@ export default defineConfig({
           cloudflareTest(({ inject }) => ({
             wrangler: { configPath: "./wrangler.toml" },
             miniflare: {
-              bindings: testBindings(inject("fakeThreadsUrl"), inject("databaseUrl")),
+              bindings: testBindings(inject("fakeThreadsUrl"), inject("databaseUrl"), inject("fakeStripeUrl")),
             },
           })),
         ],

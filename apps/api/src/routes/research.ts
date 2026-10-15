@@ -19,7 +19,6 @@ import { parseBody } from "../lib/validate";
 import { authorizeAccount } from "../services/access";
 import { recordActivity, updatedByOf, withActivityTx } from "../services/activity-log";
 import { touchMaterials } from "../services/materials";
-import { canEditProfile, requireGrowerAccess } from "../services/grower-access";
 import { assertItemId, insertWithLimit, updateWithVersion } from "../services/item-service";
 
 type ReferencePostRow = typeof referencePosts.$inferSelect;
@@ -102,14 +101,13 @@ export function researchRoutes(authed: MiddlewareHandler<AppEnv>) {
           .where(eq(referencePosts.accountId, account.id))
           .orderBy(desc(referencePosts.createdAt), desc(referencePosts.id));
         // 直せるのは content の権限がある人だけ（見せてもらっている人は読むだけ。PR #14 のCodexレビュー）
-        return c.json({ items: rows.map(toReferencePost), limit: REFERENCE_POST_LIMIT, canEdit: canEditProfile(account, access.owner) && access.permissions.has("content") });
+        return c.json({ items: rows.map(toReferencePost), limit: REFERENCE_POST_LIMIT, canEdit: access.permissions.has("content") });
       })
       .post("/accounts/:accountId/reference-posts", authed, async (c) => {
         const db = createDb(c.env.DATABASE_URL);
         const user = c.get("user");
         const access = await authorizeAccount(db, user, c.req.param("accountId"), "content");
         const account = access.account;
-        requireGrowerAccess(account, access.owner);
         const input = await parseBody(referencePostInputSchema, c.req.json());
         const row = await insertWithLimit(
           c.env,
@@ -136,7 +134,6 @@ export function researchRoutes(authed: MiddlewareHandler<AppEnv>) {
         const user = c.get("user");
         const access = await authorizeAccount(db, user, c.req.param("accountId"), "content");
         const account = access.account;
-        requireGrowerAccess(account, access.owner);
         const id = assertItemId(c.req.param("referencePostId"));
         const { expectedVersion, ...input } = await parseBody(updateReferencePostRequestSchema, c.req.json());
         const where = and(eq(referencePosts.id, id), eq(referencePosts.accountId, account.id));
@@ -169,7 +166,6 @@ export function researchRoutes(authed: MiddlewareHandler<AppEnv>) {
         const user = c.get("user");
         const access = await authorizeAccount(db, user, c.req.param("accountId"), "content");
         const account = access.account;
-        requireGrowerAccess(account, access.owner);
         const id = assertItemId(c.req.param("referencePostId"));
         // 削除と操作の記録を同じトランザクションにする（PR #9 のCodexレビュー）
         await withActivityTx(c.env.DATABASE_URL, db, access, async (q) => {
@@ -196,14 +192,13 @@ export function researchRoutes(authed: MiddlewareHandler<AppEnv>) {
           .where(eq(researchKeywords.accountId, account.id))
           .orderBy(desc(researchKeywords.createdAt), desc(researchKeywords.id));
         // 直せるのは content の権限がある人だけ（PR #14 のCodexレビュー）
-        return c.json({ items: rows.map(toKeyword), limit: KEYWORD_LIMIT, canEdit: canEditProfile(account, access.owner) && access.permissions.has("content") });
+        return c.json({ items: rows.map(toKeyword), limit: KEYWORD_LIMIT, canEdit: access.permissions.has("content") });
       })
       .post("/accounts/:accountId/research-keywords", authed, async (c) => {
         const db = createDb(c.env.DATABASE_URL);
         const user = c.get("user");
         const access = await authorizeAccount(db, user, c.req.param("accountId"), "content");
         const account = access.account;
-        requireGrowerAccess(account, access.owner);
         const input = await parseBody(researchKeywordInputSchema, c.req.json());
         const row = await withDuplicateCheck(() =>
           insertWithLimit(
@@ -238,7 +233,6 @@ export function researchRoutes(authed: MiddlewareHandler<AppEnv>) {
         const user = c.get("user");
         const access = await authorizeAccount(db, user, c.req.param("accountId"), "content");
         const account = access.account;
-        requireGrowerAccess(account, access.owner);
         const id = assertItemId(c.req.param("keywordId"));
         const { expectedVersion, ...input } = await parseBody(updateResearchKeywordRequestSchema, c.req.json());
         const where = and(eq(researchKeywords.id, id), eq(researchKeywords.accountId, account.id));
@@ -275,7 +269,6 @@ export function researchRoutes(authed: MiddlewareHandler<AppEnv>) {
         const user = c.get("user");
         const access = await authorizeAccount(db, user, c.req.param("accountId"), "content");
         const account = access.account;
-        requireGrowerAccess(account, access.owner);
         const id = assertItemId(c.req.param("keywordId"));
         // 削除と操作の記録を同じトランザクションにする（PR #9 のCodexレビュー）
         await withActivityTx(c.env.DATABASE_URL, db, access, async (q) => {

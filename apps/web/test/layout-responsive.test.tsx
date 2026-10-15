@@ -6,6 +6,7 @@ import type { MeResponse } from "@threads-grower/shared";
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { resetViewport, setViewport } from "./helpers/viewport";
+import { ME_BILLING_OFF } from "./helpers/billing";
 
 vi.mock("@clerk/react", () => ({
   useUser: () => ({ user: { fullName: "Takumi", primaryEmailAddress: { emailAddress: "t@example.com" } } }),
@@ -20,6 +21,7 @@ const meResponse: MeResponse = {
   accounts: [account("a1", "takumi"), account("a2", "aibu", "needs_reconnect")],
   landingAccountId: "a1",
   accountLimit: { max: 5, used: 2 },
+  ...ME_BILLING_OFF,
   threadsAccessMode: "testers",
   teams: [],
 };

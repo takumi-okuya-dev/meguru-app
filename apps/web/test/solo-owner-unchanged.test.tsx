@@ -10,6 +10,7 @@ import type { AccountAccessResponse, MeResponse } from "@threads-grower/shared";
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ADMIN_ACCESS, EDITOR_ACCESS, OWNER_ACCESS } from "./helpers/access";
+import { ME_BILLING_OFF } from "./helpers/billing";
 
 vi.mock("@clerk/react", () => ({
   useUser: () => ({ user: { fullName: "Takumi", primaryEmailAddress: { emailAddress: "t@example.com" } } }),
@@ -26,7 +27,6 @@ const meResponse: MeResponse = {
       username: "takumi",
       displayName: "たくみ",
       profilePictureUrl: null,
-      plan: "auto-grower",
       connectionStatus: "connected",
       lastUsedAt: null,
       role: "owner",
@@ -35,6 +35,7 @@ const meResponse: MeResponse = {
   ],
   landingAccountId: "a1",
   accountLimit: { max: 1, used: 1 },
+  ...ME_BILLING_OFF,
   threadsAccessMode: "testers",
   teams: [],
 };

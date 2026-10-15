@@ -2,7 +2,6 @@
 // 002の追加・編集のダイアログの枠と振る舞い（未保存の警告・他の場所での更新・grower機能の判定）を使う。
 import { CORE_RULES_MAX, countChars, type CoreRulesResponse } from "@threads-grower/shared";
 import { FieldWithCounter } from "@/components/FieldWithCounter";
-import { PLAN_CHANGE_CONTACT } from "@/components/GrowerRequiredNotice";
 import { FormDialogFrame } from "@/components/items/FormDialogFrame";
 import { useItemForm } from "@/components/items/use-item-form";
 import { ApiError, api } from "@/lib/api-client";
@@ -47,7 +46,7 @@ export function CoreRulesDialog({
     overLimit: (form) => countChars(form.text) > CORE_RULES_MAX,
     onSaved,
     onClose,
-    onGrowerLost: () => {},
+    onReadOnly: () => {},
     onDeletedElsewhere: onClose,
     save: async (form, expectedVersion) => {
       try {
@@ -82,8 +81,7 @@ export function CoreRulesDialog({
         locked={readOnly || f.locked}
         lockedNotice={
           <p role="status" className="rounded-2xl border bg-muted/60 px-4 py-3 text-sm">
-            投稿ルールはAIプロンプトの生成（プラン2以上）で使われます。
-            <span className="text-muted-foreground">{PLAN_CHANGE_CONTACT}</span>
+            このアカウントは今、読むだけです。投稿ルールは保存済みのまま、AIプロンプトの生成で使われます。
           </p>
         }
         onSubmit={f.submit}

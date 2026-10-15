@@ -20,7 +20,7 @@ export function KeywordFormDialog({
   existing,
   onSaved,
   onClose,
-  onGrowerLost,
+  onReadOnly,
   onDeletedElsewhere,
   onLimitReached,
 }: {
@@ -29,7 +29,7 @@ export function KeywordFormDialog({
   existing: ResearchKeyword[];
   onSaved: (k: ResearchKeyword) => void;
   onClose: () => void;
-  onGrowerLost: () => void;
+  onReadOnly: () => void;
   onDeletedElsewhere: () => void;
   onLimitReached: () => void;
 }) {
@@ -47,7 +47,7 @@ export function KeywordFormDialog({
     fieldErrorFor: (err) => (err.code === "KEYWORD_DUPLICATE" ? { keyword: DUPLICATE } : null),
     onSaved,
     onClose,
-    onGrowerLost,
+    onReadOnly,
     onDeletedElsewhere,
     onLimitReached,
     save: (form, expectedVersion) =>

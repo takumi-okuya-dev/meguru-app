@@ -43,7 +43,6 @@ describe("GET /api/me/needs-review-counts", () => {
 
   it("ownerの3件を5・2・0件で返し、他人とowner以外を除き、要再接続も数える", async () => {
     const first = await addAccount("u1", "7001");
-    await db().update(accounts).set({ plan: "multi-account" }).where(eq(accounts.id, first));
     const second = await addAccount("u1", "7002");
     const third = await addAccount("u1", "7003");
     const memberOnly = await addAccount("u1", "7004");

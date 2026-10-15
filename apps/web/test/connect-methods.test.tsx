@@ -6,6 +6,7 @@ import userEvent from "@testing-library/user-event";
 import type { AccountSummary, MeResponse } from "@threads-grower/shared";
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { ME_BILLING_OFF } from "./helpers/billing";
 
 let meResponse: MeResponse;
 const mocks = vi.hoisted(() => ({ tokenConnect: vi.fn(), connect: vi.fn(), assign: vi.fn() }));
@@ -28,7 +29,6 @@ const unconnected: AccountSummary = {
   username: null,
   displayName: null,
   profilePictureUrl: null,
-  plan: "auto-only",
   connectionStatus: "not_connected",
   connectionMethod: null,
   lastUsedAt: null,
@@ -46,6 +46,7 @@ function renderIt(opts: { canConnect?: boolean; initialError?: { code: "ACCOUNT_
     accounts: [unconnected, other],
     landingAccountId: "a1",
     accountLimit: { max: 5, used: 2 },
+    ...ME_BILLING_OFF,
     threadsAccessMode: "testers",
     teams: [],
   };

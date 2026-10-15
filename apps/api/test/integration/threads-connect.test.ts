@@ -8,7 +8,6 @@ import { TEST_WEB_ORIGIN } from "../env";
 import {
   authorizeAndCallback,
   call,
-  connectExisting,
   connectNew,
   createAccountVia,
   createUserWithAccount,
@@ -103,12 +102,6 @@ describe("POST /api/threads/connect（mode = connect）", () => {
     expect((await fake.callCounts()).total).toBe(before.total);
   });
 
-  it("上限に達していてもつなげる（アカウントは増えない。FR-016）", async () => {
-    const { accountId } = await createAccountVia(app, "u1");
-    expect((await createAccountVia(app, "u1")).accountId).toBeNull(); // プラン1は1件
-    const { callbackRes } = await connectExisting(app, "u1", accountId!, "1001");
-    expect(redirectTarget(callbackRes!).searchParams.get("connected")).toBe("connect");
-  });
 });
 
 describe("GET /api/threads/callback（mode = connect）", () => {

@@ -1,6 +1,6 @@
 // 反応数の段階（specs/006-performance-feedback contracts/metrics-job.md、FR-001〜FR-010、SC-002・SC-008・SC-009、research.md R2〜R5・R10・R11）
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { AFTER_TRIAL, fake, makeApp, resetDb, testEnv } from "../helpers/app";
+import { fake, makeApp, resetDb, testEnv } from "../helpers/app";
 import {
   addMin,
   approvedDrafts,
@@ -29,7 +29,6 @@ const hoursAgo = (h: number, from: Date = NOON) => new Date(from.getTime() - h *
  */
 async function growerAccount(user: string) {
   const a = await connectedAccount(user, app);
-  await db()`UPDATE accounts SET plan = 'auto-grower' WHERE id = ${a.accountId}`;
   return a;
 }
 
@@ -297,13 +296,10 @@ describe("失敗の扱い（research.md R11）", () => {
 });
 
 describe("対象のAccount（FR-005）", () => {
-  it("要再接続・grower機能を使えないAccountは取り込まない", async () => {
+  it("要再接続のAccountは取り込まない（読むだけのオーナーは specs/013 で確かめる）", async () => {
     const recon = await growerAccount("u1");
-    const trial = await connectedAccount("u2", app);
     await db()`UPDATE accounts SET connection_status = 'needs_reconnect' WHERE id = ${recon.accountId}`;
-    await db()`UPDATE users SET created_at = ${AFTER_TRIAL().toISOString()} WHERE clerk_user_id = 'u2'`; // 念のため
     await publishedDrafts(recon.accountId, [{ publishedAt: hoursAgo(24) }]);
-    await publishedDrafts(trial.accountId, [{ publishedAt: hoursAgo(24) }]);
     await run(NOON);
     expect(await fake.callCounts()).toMatchObject({ insights: 0, followers: 0 });
   });

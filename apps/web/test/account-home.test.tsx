@@ -31,7 +31,6 @@ const account: AccountSummary = {
   username: "takumi",
   displayName: "たくみ",
   profilePictureUrl: null,
-  plan: "auto-only",
   connectionStatus: "connected",
   lastUsedAt: null,
   role: "owner" as const,
@@ -43,7 +42,7 @@ function status(overrides: Partial<ProfileStatus> = {}): ProfileStatus {
     strategy: { filledCount: 0, totalCount: 16 },
     promotions: { targetableCount: 0, totalCount: 0 },
     research: { referencePostCount: 0, keywordCount: 0 },
-    access: { canEdit: true, inTrial: true, trialEndsAt: "2026-11-03T03:00:00.000Z" },
+    access: { canEdit: true, inTrial: true, trialEndsAt: "2026-11-03T03:00:00.000Z", trialDaysLeft: 12 },
     ...overrides,
   };
 }
@@ -97,14 +96,13 @@ describe("Accountのホーム", () => {
 
   it("無料体験中は「無料体験中：{YYYY年M月D日}まで、すべての機能を使えます」が出る（FR-024b）", async () => {
     renderHome(status());
-    expect(await screen.findByText("無料体験中：2026年11月3日まで、すべての機能を使えます")).toBeInTheDocument();
+    // 残りの日数を添える（specs/013 FR-046、T022）
+    expect(await screen.findByText("無料体験中：2026年11月3日まで（あと12日）、すべての機能を使えます")).toBeInTheDocument();
   });
 
-  it("canEdit: false では、grower機能の案内に変わる", async () => {
-    renderHome(status({ access: { canEdit: false, inTrial: false, trialEndsAt: "2026-09-01T00:00:00.000Z" } }));
-    expect(
-      await screen.findByRole("heading", { name: "課題・宣伝内容・リサーチの編集は、プラン2以上で使えます" }),
-    ).toBeInTheDocument();
+  it("canEdit: false では、読むだけの案内に変わる（specs/013）", async () => {
+    renderHome(status({ access: { canEdit: false, inTrial: false, trialEndsAt: "2026-09-01T00:00:00.000Z", trialDaysLeft: null } }));
+    expect(await screen.findByRole("heading", { name: "このアカウントは今、読むだけです" })).toBeInTheDocument();
     expect(screen.queryByText(/無料体験中/)).not.toBeInTheDocument();
   });
 

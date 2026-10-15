@@ -7,6 +7,7 @@ import { createMemoryRouter, RouterProvider } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ADMIN_ACCESS, OWNER_ACCESS } from "./helpers/access";
 import { resetViewport, setViewport } from "./helpers/viewport";
+import { ME_BILLING_OFF } from "./helpers/billing";
 
 vi.mock("@clerk/react", () => ({
   useUser: () => ({ user: { fullName: "Takumi", primaryEmailAddress: { emailAddress: "t@example.com" } } }),
@@ -49,6 +50,7 @@ function me(teams: MeResponse["teams"]): MeResponse {
     accounts: [account],
     landingAccountId: "a1",
     accountLimit: { max: 5, used: 1 },
+    ...ME_BILLING_OFF,
     threadsAccessMode: "testers",
     teams,
   };

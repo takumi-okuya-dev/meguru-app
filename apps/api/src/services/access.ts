@@ -1,20 +1,36 @@
 // 関わりによる判定（specs/011-team-revision contracts/permissions.md、research.md R3・R4）。
 // 「誰がどのAccount（とチーム）で何をできるか」の判定はこのファイルだけに置き、すべてのAPIがここを通す（Constitution原則V）。
 // Accountに関わっていない人には、存在の有無を漏らさないよう 404 ACCOUNT_NOT_FOUND を返す（001から同じ）。
-import { permissionsFor, type Permission, type Relation, type Role, type TeamRole } from "@threads-grower/shared";
+import {
+  narrowForReadOnly,
+  permissionsFor,
+  type Permission,
+  type ReadOnlyReason,
+  type Relation,
+  type Role,
+  type TeamRole,
+} from "@threads-grower/shared";
 import { and, eq } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import type { Db, TxDb } from "../db/client";
-import { accounts, memberships, teamAccounts, teamMembers, teams, users } from "../db/schema";
+import { accounts, memberships, subscriptions, teamAccounts, teamMembers, teams, users } from "../db/schema";
+import type { BillingMode } from "../lib/config";
 import { AppError, notFound } from "../lib/errors";
+import { entitlementFromFacts } from "./billing-service";
 
 /** accounts の行。 */
 export type AccountRow = typeof accounts.$inferSelect;
 /** teams の行。 */
 export type TeamRow = typeof teams.$inferSelect;
 
-/** 判定に使うユーザー（認証のミドルウェアが入れる users の行の一部）。 */
-type RequestUser = { id: string };
+/**
+ * 判定に使うユーザー（認証のミドルウェアが入れる users の行の一部）と、環境の決済のモード
+ * （オーナーが読むだけかを決めるのに使う。specs/013 research.md R2）。
+ */
+export type RequestUser = { id: string; billing: BillingMode };
+
+/** 読むだけの理由（画面の帯。オーナー以外には支払いの詳細を出さない。specs/013 FR-045）。 */
+export type AccessReadOnlyReason = ReadOnlyReason | "owner_inactive";
 
 /** 操作の記録に写す、した人の役割（data-model.md「activity_logs」）。 */
 export type ActorRole = "owner" | "admin" | "editor" | "member";
@@ -34,6 +50,8 @@ export type AccountAccess = {
   isTeamAdmin: boolean;
   /** このAccountがチームに入っているか（操作の記録を書く。research.md R8） */
   hasTeam: boolean;
+  /** オーナーが読むだけなら、その理由（判定した人がオーナーでなければ owner_inactive）。すべて使えるなら NULL（specs/013） */
+  readOnly: { reason: AccessReadOnlyReason } | null;
 };
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -100,6 +118,9 @@ export async function authorizeAccount(
       ownerDisplayName: ownerU.displayName,
       ownerEmail: ownerU.email,
       ownerCreatedAt: ownerU.createdAt,
+      ownerBillingExempt: ownerU.billingExempt,
+      subStatus: subscriptions.status,
+      subCancelAtPeriodEnd: subscriptions.cancelAtPeriodEnd,
       meDisplayName: meU.displayName,
       meEmail: meU.email,
       teamId: teamAccounts.teamId,
@@ -111,6 +132,8 @@ export async function authorizeAccount(
     .innerJoin(ownerM, and(eq(ownerM.accountId, accounts.id), eq(ownerM.role, "owner")))
     .innerJoin(ownerU, eq(ownerU.id, ownerM.userId))
     .innerJoin(meU, eq(meU.id, user.id))
+    // オーナーの契約（specs/013 research.md R2。決済による制限はこの判定に足す。Constitution原則V）
+    .leftJoin(subscriptions, eq(subscriptions.userId, ownerU.id))
     .leftJoin(own, and(eq(own.accountId, accounts.id), eq(own.userId, user.id)))
     .leftJoin(teamAccounts, eq(teamAccounts.accountId, accounts.id))
     .leftJoin(teams, eq(teams.id, teamAccounts.teamId))
@@ -126,9 +149,24 @@ export async function authorizeAccount(
   else if (inTeam && row.shared) relation = "shared_viewer";
   else throw notFound();
   const isTeamAdmin = row.myTeamRole === "admin";
-  const permissions = permissionsFor(relation, { isTeamAdmin });
-  if (!permissions.has(permission)) {
+  const byRelation = permissionsFor(relation, { isTeamAdmin });
+  if (!byRelation.has(permission)) {
     throw new AppError("ROLE_FORBIDDEN", 403, "role forbidden", undefined, [permission]);
+  }
+  // オーナーが読むだけなら、だれの操作でも読む・見る・記録・削除だけにする（specs/013 FR-040・FR-042）
+  const owner = entitlementFromFacts(user.billing, {
+    createdAt: row.ownerCreatedAt,
+    billingExempt: row.ownerBillingExempt,
+    status: row.subStatus,
+    cancelAtPeriodEnd: row.subCancelAtPeriodEnd,
+  });
+  const readOnly =
+    owner.fullAccess || owner.readOnlyReason === null
+      ? null
+      : { reason: relation === "owner" ? owner.readOnlyReason : ("owner_inactive" as const) };
+  const permissions = readOnly ? narrowForReadOnly(byRelation) : byRelation;
+  if (!permissions.has(permission)) {
+    throw new AppError("BILLING_REQUIRED", 403, "billing required", undefined, [readOnly!.reason]);
   }
   return {
     account: row.account,
@@ -147,6 +185,7 @@ export async function authorizeAccount(
     team: row.teamId !== null && row.teamName !== null ? { id: row.teamId, name: row.teamName, myRole: row.myTeamRole ?? "member" } : null,
     isTeamAdmin,
     hasTeam: row.teamId !== null,
+    readOnly,
   };
 }
 
@@ -164,7 +203,7 @@ export type TeamAccess = { team: TeamRow; member: { id: string; name: string; ro
  */
 export async function authorizeTeamMember(
   db: Db | TxDb,
-  user: RequestUser,
+  user: Pick<RequestUser, "id">,
   teamId: string,
   opts: { lock?: boolean } = {},
 ): Promise<TeamAccess> {
@@ -197,7 +236,7 @@ export async function authorizeTeamMember(
  */
 export async function authorizeTeamAdmin(
   db: Db | TxDb,
-  user: RequestUser,
+  user: Pick<RequestUser, "id">,
   teamId: string,
   opts: { lock?: boolean } = {},
 ): Promise<TeamAccess> {
@@ -279,7 +318,6 @@ export function toAccountSummary(a: AccountRow, role: SummaryRole = "owner", own
     username: a.username,
     displayName: a.displayName,
     profilePictureUrl: a.profilePictureUrl,
-    plan: a.plan,
     connectionStatus: a.connectionStatus,
     lastUsedAt: a.lastUsedAt ? a.lastUsedAt.toISOString() : null,
     role,

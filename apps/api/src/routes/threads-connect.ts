@@ -44,7 +44,7 @@ export function threadsConnectRoutes(authed: MiddlewareHandler<AppEnv>) {
       const authorizeUrl = await startConnect(
         createDb(c.env.DATABASE_URL),
         createThreadsClient(c.env),
-        c.get("user").id,
+        c.get("user"),
         parsed.data,
       );
       return c.json({ authorizeUrl });

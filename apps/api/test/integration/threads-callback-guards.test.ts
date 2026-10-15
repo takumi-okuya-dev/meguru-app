@@ -48,7 +48,6 @@ describe("callback の拒否条件", () => {
 
   it("自分の別のアカウントと同じ Threads アカウントなら、つながず ACCOUNT_ALREADY_REGISTERED（specs/012 FR-022。接続を更新しない）", async () => {
     await connectNew(app, "u1", "1001");
-    await db().update(accounts).set({ plan: "multi-account" });
     const [before] = await db().select().from(accounts);
     const { accountId, callbackRes } = await connectNew(app, "u1", "1001");
     const target = redirectTarget(callbackRes!);

@@ -16,7 +16,7 @@ beforeEach(async () => {
 
 /** 新しい未接続のアカウントを（上限に関係なく）作り、トークンではじめてつなぐ */
 const add = async (token: string, user = "u1", name = "トークンのアカウント") => {
-  const { accountId } = await createUnconnectedAccount(user, { name, plan: "multi-account" });
+  const { accountId } = await createUnconnectedAccount(user, { name });
   return call(app, "POST", "/api/threads/token-connect", { user, body: { mode: "connect", accountId, token } });
 };
 const errorOf = async (res: Response) => ((await res.json()) as { error: { code: string; details?: string[] } }).error;
@@ -37,7 +37,6 @@ describe("二重登録の3通り（SC-003）", () => {
 
   it("(b) トークン → このアプリで接続：自分の別のアカウントなので、つながず ACCOUNT_ALREADY_REGISTERED（specs/012 FR-022）", async () => {
     const created = (await (await add(await fake.issueToken({ user: "9003" }), "u1", "トークンで")).json()) as { accountId: string };
-    await q()`UPDATE accounts SET plan = 'multi-account'`;
     const { accountId, callbackRes } = await connectNew(app, "u1", "9003");
     const target = redirectTarget(callbackRes!);
     expect([target.pathname, target.searchParams.get("error")]).toEqual([`/accounts/${accountId}/settings`, "ACCOUNT_ALREADY_REGISTERED"]);

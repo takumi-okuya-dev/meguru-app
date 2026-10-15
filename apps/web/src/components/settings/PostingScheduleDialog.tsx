@@ -95,7 +95,7 @@ export function PostingScheduleDialog({
     overLimit: (form) => validationMessage(form) !== null,
     onSaved: (item) => onSaved(item, lastCheck.current),
     onClose,
-    onGrowerLost: () => {},
+    onReadOnly: () => {},
     onDeletedElsewhere: onClose,
     // 接続が切れている・投稿の権限がない（FR-002a）：ダイアログを閉じず、理由と「再接続」を出す
     fieldErrorFor: (err) => {

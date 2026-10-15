@@ -161,10 +161,10 @@ describe("GET・PUT /api/accounts/:id/strategy", () => {
     expect(res.status).toBe(200);
   });
 
-  describe("grower機能の判定（FR-024・FR-024a、SC-008）", () => {
-    it("無料体験中のプラン1と、無料体験の後のプラン2は保存できる", async () => {
-      const a = await createUserWithAccount("trial", { plan: "auto-only" });
-      const b = await createUserWithAccount("paid", { plan: "auto-grower", userCreatedAt: AFTER_TRIAL() });
+  describe("無料体験の前後（決済OFF。読むだけは specs/013 read-only-access.test.ts）", () => {
+    it("無料体験中と、無料体験の後（決済OFF）は保存できる", async () => {
+      const a = await createUserWithAccount("trial");
+      const b = await createUserWithAccount("paid", { userCreatedAt: AFTER_TRIAL() });
       for (const [user, { accountId }] of [["trial", a], ["paid", b]] as const) {
         const res = await call(app, "PUT", path(accountId), {
           user,
@@ -174,28 +174,11 @@ describe("GET・PUT /api/accounts/:id/strategy", () => {
       }
     });
 
-    it("無料体験の後のプラン1は PUT が 403 GROWER_FEATURE_REQUIRED で、GET は保存済みの内容と canEdit: false を返す", async () => {
-      const { accountId } = await createUserWithAccount("u1", { plan: "auto-grower", userCreatedAt: AFTER_TRIAL() });
-      await call(app, "PUT", path(accountId), {
-        user: "u1",
-        body: { ...emptyStrategyValues(), finalAction: "保存済み", expectedVersion: 0 },
-      });
-      await setAccount(accountId, { plan: "auto-only" });
-      const put = await call(app, "PUT", path(accountId), {
-        user: "u1",
-        body: { ...emptyStrategyValues(), finalAction: "書き換え", expectedVersion: 1 },
-      });
-      expect(put.status).toBe(403);
-      expect(((await put.json()) as { error: { code: string } }).error.code).toBe("GROWER_FEATURE_REQUIRED");
-      const s = await getStrategy(accountId);
-      expect(s.canEdit).toBe(false);
-      expect(s.finalAction).toBe("保存済み");
-    });
   });
 });
 
 // ---- チーム運用：grower機能はオーナーの登録日時で判定する（specs/008 research.md R3）----
-describe("grower機能の判定（チーム運用）", () => {
+describe("使える状態はオーナーで判定する（チーム運用。specs/008 research.md R3）", () => {
   it("無料体験の終わった編集者でも、無料体験中のオーナーのAccountは編集できる", async () => {
     const { accountId } = await createUserWithAccount("o1");
     await putInTeam(accountId, "o1", { editor: "e1", editorCreatedAt: AFTER_TRIAL() });
@@ -206,15 +189,4 @@ describe("grower機能の判定（チーム運用）", () => {
     expect(res.status).toBe(200);
   });
 
-  it("無料体験中の編集者でも、無料体験の終わったオーナー（プラン1）のAccountは編集できない", async () => {
-    const { accountId } = await createUserWithAccount("o1", { userCreatedAt: AFTER_TRIAL() });
-    await putInTeam(accountId, "o1", { editor: "e1" });
-    const res = await call(app, "PUT", path(accountId), {
-      user: "e1",
-      body: { ...fullValues(), expectedVersion: 0 },
-    });
-    expect(res.status).toBe(403);
-    expect(((await res.json()) as { error: { code: string } }).error.code).toBe("GROWER_FEATURE_REQUIRED");
-    expect((await getStrategy(accountId, "e1")).canEdit).toBe(false);
-  });
 });

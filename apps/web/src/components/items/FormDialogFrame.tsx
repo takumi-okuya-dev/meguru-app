@@ -3,7 +3,6 @@
 // 767px以下は全画面のシート（左上に✕、右上に「保存」）。
 import { XIcon } from "lucide-react";
 import type { ReactNode } from "react";
-import { GrowerRequiredBanner } from "@/components/GrowerRequiredNotice";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 
@@ -75,7 +74,7 @@ export function FormDialogFrame({
           {description}
         </DialogDescription>
         <div className="flex-1 space-y-4 overflow-y-auto px-4 py-4 md:max-h-[65vh] md:px-6 md:py-3">
-          {locked && (lockedNotice ?? <GrowerRequiredBanner />)}
+          {locked && (lockedNotice ?? <ReadOnlyNotice />)}
           {children}
         </div>
         <div className="hidden justify-end gap-2 px-6 pt-3 pb-5 md:flex">
@@ -115,5 +114,17 @@ export function DeletedElsewhereNotice({ what, onClose }: { what: string; onClos
         閉じる
       </Button>
     </div>
+  );
+}
+
+/**
+ * 編集できないとき（読むだけ）の、フォームの上の短い知らせ（specs/013。理由はアカウントの画面の帯に出す）。
+ * @returns 知らせ
+ */
+function ReadOnlyNotice() {
+  return (
+    <p role="status" className="rounded-2xl border bg-muted/60 px-4 py-3 text-sm">
+      このアカウントは今、読むだけです。保存済みの内容はそのまま残っています。
+    </p>
   );
 }

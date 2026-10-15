@@ -7,7 +7,6 @@ import { createDb } from "../db/client";
 import { withActivityTx } from "../services/activity-log";
 import { parseBody } from "../lib/validate";
 import { authorizeAccount } from "../services/access";
-import { requireGrowerAccess } from "../services/grower-access";
 import { assertItemId } from "../services/item-service";
 import { addNgWords, deleteNgWord, getPostingRules, saveCoreRules } from "../services/posting-rules-service";
 
@@ -23,7 +22,7 @@ export function postingRulesRoutes(authed: MiddlewareHandler<AppEnv>) {
       const user = c.get("user");
       const access = await authorizeAccount(db, user, c.req.param("accountId"), "view");
       const account = access.account;
-      return c.json(await getPostingRules(db, account, access.owner));
+      return c.json(await getPostingRules(db, account, access.permissions.has("settings")));
     })
     .post("/accounts/:accountId/ng-words", authed, async (c) => {
       const db = createDb(c.env.DATABASE_URL);
@@ -44,7 +43,6 @@ export function postingRulesRoutes(authed: MiddlewareHandler<AppEnv>) {
       const user = c.get("user");
       const access = await authorizeAccount(db, user, c.req.param("accountId"), "settings");
       const account = access.account;
-      requireGrowerAccess(account, access.owner);
       const req = await parseBody(coreRulesRequestSchema, c.req.json());
       // 保存と操作の記録を同じトランザクションにする（PR #9 のCodexレビュー）
       return c.json(await withActivityTx(c.env.DATABASE_URL, db, access, (q) => saveCoreRules(q, account.id, req, access)));

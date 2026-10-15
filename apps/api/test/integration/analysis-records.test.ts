@@ -60,7 +60,7 @@ describe("登録の後に人が本文を直したか（FR-002e）", () => {
 
 describe("プロンプトの材料の版（FR-002g）", () => {
   it("宣伝内容・リサーチの追加・変更・削除、投稿ルールの保存で、Accountの変更の日時が入る", async () => {
-    const { accountId } = await createUserWithAccount("u1", { plan: "auto-grower" });
+    const { accountId } = await createUserWithAccount("u1");
     expect(await changedAt(accountId)).toEqual({
       promotions_changed_at: null,
       research_changed_at: null,
@@ -91,7 +91,7 @@ describe("プロンプトの材料の版（FR-002g）", () => {
   });
 
   it("バッチの登録で、その時点の4つの日時を写す", async () => {
-    const { accountId } = await createUserWithAccount("u1", { plan: "auto-grower" });
+    const { accountId } = await createUserWithAccount("u1");
     await db()`INSERT INTO strategy_designs (account_id, final_action, updated_at) VALUES (${accountId}, '参加', '2026-09-01T00:00:00Z')`;
     await db()`UPDATE accounts SET promotions_changed_at = '2026-09-02T00:00:00Z', research_changed_at = '2026-09-03T00:00:00Z',
       core_rules_changed_at = '2026-09-04T00:00:00Z' WHERE id = ${accountId}`;

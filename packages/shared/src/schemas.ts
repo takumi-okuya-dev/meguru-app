@@ -28,12 +28,9 @@ import {
 } from "./limits";
 import { REJECT_REASON_CODES } from "./review";
 import { isValidYmd } from "./promotions";
-import { PLANS } from "./plans";
 import { STRATEGY_TEXT_KEYS, TONE_PRESET_VALUES, type StrategyTextKey } from "./strategy";
 import { countChars, isBlank, isHttpUrl } from "./text";
 
-/** 契約プランのスキーマ。 */
-export const planSchema = z.enum(PLANS);
 /** Threads接続の状態のスキーマ（FR-018。not_connected は specs/012 で足した）。 */
 export const connectionStatusSchema = z.enum(["connected", "needs_reconnect", "not_connected"]);
 /** Threads接続の状態。connected（接続中）・needs_reconnect（要再接続）・not_connected（一度もつないでいない）。 */
@@ -63,7 +60,6 @@ export const accountSummarySchema = z.object({
   username: z.string().nullable(),
   displayName: z.string().nullable(),
   profilePictureUrl: z.string().nullable(),
-  plan: planSchema,
   connectionStatus: connectionStatusSchema,
   /** ISO 8601 */
   lastUsedAt: z.string().nullable(),
@@ -81,11 +77,63 @@ export type AccountSummary = z.infer<typeof accountSummarySchema>;
 
 /** ユーザーの登録数上限と使用数のスキーマ。 */
 export const accountLimitSchema = z.object({
-  max: z.number().int(),
+  /** オーナーとして持てるアカウントの数。null は上限なし、0 は作れない（specs/013 research.md R9） */
+  max: z.number().int().nullable(),
   used: z.number().int(),
 });
 /** ユーザーの登録数上限（max）と、ownerとして保有するAccount数（used）。 */
 export type AccountLimit = z.infer<typeof accountLimitSchema>;
+
+/** 利用者の使える状態（specs/013 research.md R1）。 */
+export const billingStateSchema = z.enum([
+  "billing_disabled",
+  "exempt",
+  "trial",
+  "subscribed_trial",
+  "active",
+  "canceling",
+  "read_only",
+]);
+/** 読むだけの理由。 */
+export const readOnlyReasonSchema = z.enum(["trial_ended", "payment_failed", "canceled"]);
+
+/** /api/me の、使える状態。 */
+export const meBillingSchema = z.object({
+  mode: z.enum(["enabled", "disabled"]),
+  state: billingStateSchema,
+  readOnlyReason: readOnlyReasonSchema.nullable(),
+  /** 無料体験の終わる時刻（ISO 8601） */
+  trialEndsAt: z.string(),
+  /** 無料体験の残りの日数（state が trial のときだけ。日本時間の日付で数え、終わる日を含まない） */
+  trialDaysLeft: z.number().int().nullable(),
+});
+/** /api/me の、使える状態。 */
+export type MeBilling = z.infer<typeof meBillingSchema>;
+
+/** 「契約と支払い」の内容（GET /api/billing。specs/013 contracts/api.md「BillingSummary」）。 */
+export const billingSummarySchema = z.object({
+  mode: z.enum(["enabled", "disabled"]),
+  state: billingStateSchema,
+  readOnlyReason: readOnlyReasonSchema.nullable(),
+  trialEndsAt: z.string().nullable(),
+  trialDaysLeft: z.number().int().nullable(),
+  ownedAccountCount: z.number().int().nullable(),
+  subscription: z
+    .object({
+      status: z.string().nullable(),
+      currentPeriodEnd: z.string().nullable(),
+      cancelAtPeriodEnd: z.boolean(),
+      nextInvoiceAt: z.string().nullable(),
+      nextInvoiceAmount: z.number().int().nullable(),
+    })
+    .nullable(),
+  prices: z.object({ base: z.number().int(), extra: z.number().int() }),
+});
+/** 「契約と支払い」の内容。 */
+export type BillingSummary = z.infer<typeof billingSummarySchema>;
+
+/** POST /api/billing/checkout・portal の応答。 */
+export const billingRedirectSchema = z.object({ url: z.string() });
 
 /** /api/me の、入っているチーム（サイドバーの「チーム」の見出しの下に並べる）。 */
 export const meTeamSchema = z.object({
@@ -111,6 +159,10 @@ export const meResponseSchema = z.object({
   threadsAccessMode: z.enum(["testers", "public"]),
   /** 入っているチーム（参加した順。入っていなければ空。specs/011 research.md R5） */
   teams: z.array(meTeamSchema),
+  /** 使える状態（帯とアカウントを作る画面に使う。specs/013 contracts/api.md） */
+  billing: meBillingSchema,
+  /** 退会の途中か（specs/013 research.md R10） */
+  withdrawalInProgress: z.boolean(),
 });
 /** GET /api/me のレスポンス。ログイン中のユーザー、Account一覧、ログイン後の遷移先、登録数上限。 */
 export type MeResponse = z.infer<typeof meResponseSchema>;
@@ -398,6 +450,8 @@ export const profileStatusSchema = z.object({
     inTrial: z.boolean(),
     /** 無料体験の終了時刻（ISO 8601） */
     trialEndsAt: z.string().nullable(),
+    /** 無料体験の残りの日数（日本時間の日付で数え、終わる日を含まない。無料体験中だけ。specs/013） */
+    trialDaysLeft: z.number().int().nullable(),
   }),
 });
 /** ホームの入力状況。 */
@@ -1071,6 +1125,8 @@ export const accountAccessResponseSchema = z.object({
   team: accessTeamSchema.nullable(),
   /** 担当の知らせ「（アカウント名）の担当になりました」を出すか（担当の人で、まだ閉じていない。research.md R9） */
   assignedNotice: z.boolean(),
+  /** オーナーが読むだけなら、その理由（チームの人には owner_inactive だけ。specs/013 FR-045）。すべて使えるなら NULL */
+  readOnly: z.object({ reason: z.enum(["trial_ended", "payment_failed", "canceled", "owner_inactive"]) }).nullable(),
 });
 /** Accountとの関わりと権限（画面の出し分けに使う）。 */
 export type AccountAccessResponse = z.infer<typeof accountAccessResponseSchema>;

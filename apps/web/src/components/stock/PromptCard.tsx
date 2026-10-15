@@ -13,12 +13,11 @@ import { ChevronDownIcon, CopyIcon, LockIcon } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router";
 import { toast } from "sonner";
-import { PLAN_CHANGE_CONTACT } from "@/components/GrowerRequiredNotice";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { api, describeError } from "@/lib/api-client";
 import { queryKeys } from "@/lib/query";
-import { isGrowerRequired, isStale, saveErrorMessage } from "@/lib/save-error";
+import { isBillingRequired, isStale, saveErrorMessage } from "@/lib/save-error";
 import { cn } from "@/lib/utils";
 
 /**
@@ -66,8 +65,8 @@ export function PromptCard({
   startKey?: string;
   onLocked?: () => void;
 }) {
-  const [growerLost, setGrowerLost] = useState(false);
-  if (!canGeneratePrompt || growerLost) return <PromptLockedCard />;
+  const [readOnlyLost, setReadOnlyLost] = useState(false);
+  if (!canGeneratePrompt || readOnlyLost) return <PromptLockedCard />;
   return (
     <PromptReadyCard
       accountId={accountId}
@@ -75,8 +74,8 @@ export function PromptCard({
       savedVersion={promptPostCountVersion}
       canSaveCount={canSaveCount}
       startKey={startKey}
-      onGrowerLost={() => {
-        setGrowerLost(true);
+      onReadOnly={() => {
+        setReadOnlyLost(true);
         onLocked?.();
       }}
     />
@@ -88,9 +87,9 @@ function PromptLockedCard() {
     <section aria-label="プロンプト" className="flex gap-3 rounded-2xl border bg-muted/60 px-4 py-4">
       <LockIcon className="mt-1 size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
       <div className="space-y-1">
-        <h2 className="font-semibold">AIプロンプトの生成はプラン2以上で使えます</h2>
+        <h2 className="font-semibold">今はAIプロンプトを作れません</h2>
         <p className="text-sm text-muted-foreground">
-          自分で用意した投稿も、「@@@」だけの行で区切って下の欄に貼り付ければ、まとめて登録できます。{PLAN_CHANGE_CONTACT}
+          このアカウントは今、読むだけです。保存済みの戦略・投稿の案はそのまま残っています。
         </p>
       </div>
     </section>
@@ -103,14 +102,14 @@ function PromptReadyCard({
   savedVersion,
   canSaveCount,
   startKey,
-  onGrowerLost,
+  onReadOnly,
 }: {
   accountId: string;
   savedCount: number;
   savedVersion: number;
   canSaveCount: boolean;
   startKey?: string;
-  onGrowerLost: () => void;
+  onReadOnly: () => void;
 }) {
   const sectionRef = useRef<HTMLElement>(null);
   // 「投稿をつくる」で移った先のキー。同じ移動で2回フォーカスを当てない
@@ -140,8 +139,8 @@ function PromptReadyCard({
   });
 
   useEffect(() => {
-    if (isGrowerRequired(prompt.error)) onGrowerLost();
-  }, [prompt.error, onGrowerLost]);
+    if (isBillingRequired(prompt.error)) onReadOnly();
+  }, [prompt.error, onReadOnly]);
 
   // 「投稿をつくる」から来たら、プロンプトを読み込んだ後に、カードまで移って「コピー」にフォーカスを当てる。
   // 作る流れの最初の一歩（プロンプトのコピー）から始められるようにする（specs/004 Clarifications 2026-10-05）。
@@ -184,7 +183,7 @@ function PromptReadyCard({
           // 保存中に入力が続いていたら、その入力は捨てない（入力が止まった後に、最新の版で保存し直す。PR #9 のCodexレビュー）
           toast.info(`${staleUpdateTitle(err.updatedBy?.name)}（${latest.postCount}件）。入力した件数で保存し直します`);
         }
-      } else if (isGrowerRequired(err)) onGrowerLost();
+      } else if (isBillingRequired(err)) onReadOnly();
       else setFailed({ count: n, message: saveErrorMessage(err) });
     },
   });
@@ -285,7 +284,7 @@ function PromptReadyCard({
         </div>
       )}
 
-      {prompt.error && !isGrowerRequired(prompt.error) ? (
+      {prompt.error && !isBillingRequired(prompt.error) ? (
         <div role="alert" className="flex flex-wrap items-center gap-3 rounded-xl bg-muted/60 px-3 py-2.5 text-sm">
           <span className="min-w-0 flex-1">プロンプトを読み込めませんでした。{describeError(prompt.error)}</span>
           <Button size="sm" variant="outline" className="rounded-full" onClick={() => void prompt.refetch()}>

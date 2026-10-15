@@ -53,7 +53,7 @@ export function DraftEditDialog({
     onSaved: (d) => onSaved(d, reopened.current),
     onClose,
     // 下書きの操作は全プランで使える（research.md R10）ので、403 は起きない
-    onGrowerLost: () => {},
+    onReadOnly: () => {},
     onDeletedElsewhere,
     save: async (form, expectedVersion) => {
       let res;

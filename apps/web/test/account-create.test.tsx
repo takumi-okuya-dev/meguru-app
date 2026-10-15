@@ -1,10 +1,11 @@
 // US1・US6：アカウントを作る画面（specs/012 FR-001〜FR-006、contracts/ui-routes.md「アカウントを作る」）
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen } from "@testing-library/react";
+import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { AccountSummary, MeResponse } from "@threads-grower/shared";
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { ME_BILLING_OFF, meBilling } from "./helpers/billing";
 
 const mocks = vi.hoisted(() => ({ me: vi.fn(), createAccount: vi.fn() }));
 vi.mock("@/lib/api-client", async (orig) => {
@@ -24,7 +25,6 @@ function account(id: string): AccountSummary {
     username: `user_${id}`,
     displayName: null,
     profilePictureUrl: null,
-    plan: "auto-only",
     connectionStatus: "connected",
     lastUsedAt: null,
     role: "owner",
@@ -32,12 +32,19 @@ function account(id: string): AccountSummary {
   };
 }
 
-function me(max: number, used: number, threadsAccessMode: "testers" | "public" = "testers"): MeResponse {
+function me(
+  max: number | null,
+  used: number,
+  threadsAccessMode: "testers" | "public" = "testers",
+  billing: MeResponse["billing"] = ME_BILLING_OFF.billing,
+): MeResponse {
   return {
     user: { id: "u", email: "u@example.com", displayName: null },
     accounts: Array.from({ length: used }, (_, i) => account(`a${i}`)),
     landingAccountId: used > 0 ? "a0" : null,
     accountLimit: { max, used },
+    ...ME_BILLING_OFF,
+    billing,
     threadsAccessMode,
     teams: [],
   };
@@ -98,21 +105,44 @@ describe("アカウントを作る画面", () => {
     expect(router.state.location.pathname).toBe("/accounts/acc-1");
   });
 
-  it("上限に達していれば、名前の欄の代わりに上限の案内（001 FR-017、US6-3）", async () => {
-    mocks.me.mockResolvedValue(me(1, 1));
+  it("無料体験中で1件あれば、名前の欄の代わりに上限の案内と「契約する」（specs/013 US1-2）", async () => {
+    mocks.me.mockResolvedValue(me(1, 1, "testers", meBilling("trial")));
     renderAt();
-    expect(await screen.findByText(/プラン3にすると最大5件まで登録できます/)).toBeInTheDocument();
+    expect(
+      await screen.findByText("無料体験中に作れるアカウントは1件までです。契約すると、2件目から1件につき月500円で足せます。"),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "契約する" })).toHaveAttribute("href", "/settings/billing");
     expect(screen.queryByLabelText("アカウントの名前")).not.toBeInTheDocument();
   });
 
+  it("読むだけなら、理由と「契約する」か「支払いの画面を開く」を出す（specs/013 FR-043、Edge Cases：0件で体験が終わった人）", async () => {
+    mocks.me.mockResolvedValue(me(0, 0, "testers", meBilling("read_only")));
+    renderAt();
+    expect(await screen.findByText(/無料体験が終わりました。今は読むだけです/)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "契約する" })).toBeInTheDocument();
+    expect(screen.queryByLabelText("アカウントの名前")).not.toBeInTheDocument();
+    cleanup();
+    mocks.me.mockResolvedValue(me(0, 1, "testers", meBilling("read_only", { readOnlyReason: "payment_failed" })));
+    renderAt();
+    expect(await screen.findByRole("link", { name: "支払いの画面を開く" })).toBeInTheDocument();
+  });
+
+  it("契約中の2件目からは、料金の案内を添える（specs/013 FR-031）", async () => {
+    mocks.me.mockResolvedValue(me(null, 1, "testers", meBilling("active")));
+    renderAt();
+    expect(await screen.findByText("2件目からは1件につき月500円です。次の請求から反映されます。")).toBeInTheDocument();
+    expect(screen.getByLabelText("アカウントの名前")).toBeInTheDocument();
+    expect(screen.getByText("登録済み 1件")).toBeInTheDocument();
+  });
+
   it("作る途中で上限になったら、案内に切り替える", async () => {
-    mocks.me.mockResolvedValue(me(5, 4));
+    mocks.me.mockResolvedValue(me(null, 0));
     const { ApiError } = await import("@/lib/api-client");
     mocks.createAccount.mockRejectedValue(new ApiError("ACCOUNT_LIMIT_REACHED", 409));
     renderAt();
-    await userEvent.type(await screen.findByLabelText("アカウントの名前"), "5つ目");
+    await userEvent.type(await screen.findByLabelText("アカウントの名前"), "2つ目");
     await userEvent.click(screen.getByRole("button", { name: "作る" }));
-    expect(await screen.findByText(/使っていないAccountを削除してください/)).toBeInTheDocument();
+    expect(await screen.findByText(/無料体験中に作れるアカウントは1件までです/)).toBeInTheDocument();
   });
 
   it("2つ目以降は「登録済み n/m件」を出す（US6）", async () => {

@@ -26,10 +26,19 @@ export function isStale(err: unknown): err is ApiError {
 }
 
 /**
- * 403 GROWER_FEATURE_REQUIRED かを確かめる。
+ * 403 BILLING_REQUIRED（オーナーが読むだけ）かを確かめる（specs/013）。
  * @param err - 保存の失敗
- * @returns grower機能を使えなくなっていたなら true
+ * @returns 読むだけになっていたなら true
  */
-export function isGrowerRequired(err: unknown): boolean {
-  return err instanceof ApiError && err.code === "GROWER_FEATURE_REQUIRED";
+export function isBillingRequired(err: unknown): err is ApiError {
+  return err instanceof ApiError && err.code === "BILLING_REQUIRED";
+}
+
+/**
+ * 403 BILLING_REQUIRED の読むだけの理由（details の1つ目）。
+ * @param err - 保存の失敗
+ * @returns 理由（BILLING_REQUIRED でなければ null）
+ */
+export function billingReasonOf(err: unknown): string | null {
+  return isBillingRequired(err) ? (err.details[0] ?? "trial_ended") : null;
 }

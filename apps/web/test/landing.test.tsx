@@ -5,6 +5,7 @@ import { render, screen } from "@testing-library/react";
 import type { MeResponse } from "@threads-grower/shared";
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { ME_BILLING_OFF } from "./helpers/billing";
 
 const mocks = vi.hoisted(() => ({ me: vi.fn() }));
 vi.mock("@/lib/api-client", async (orig) => {
@@ -22,6 +23,7 @@ function me(landingAccountId: string | null): MeResponse {
     accounts: [],
     landingAccountId,
     accountLimit: { max: 1, used: landingAccountId ? 1 : 0 },
+    ...ME_BILLING_OFF,
     threadsAccessMode: "public",
     teams: [],
   };

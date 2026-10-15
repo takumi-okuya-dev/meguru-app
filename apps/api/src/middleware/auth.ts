@@ -7,6 +7,7 @@ import { createMiddleware } from "hono/factory";
 import type { Env } from "../env";
 import { createDb } from "../db/client";
 import { users } from "../db/schema";
+import { billingModeOf, type BillingMode } from "../lib/config";
 import { AppError } from "../lib/errors";
 
 /** セッショントークンから確かめた本人。 */
@@ -24,8 +25,11 @@ export type AuthVerifier = {
   fetchProfile(clerkUserId: string): Promise<{ email: string; displayName: string | null }>;
 };
 
-/** リクエストしたユーザー（users の行）。 */
-export type CurrentUser = typeof users.$inferSelect;
+/**
+ * リクエストしたユーザー（users の行）と、環境の決済のモード。
+ * 決済のモードは権限の判定（authorizeAccount）が使う（specs/013 research.md R2）。
+ */
+export type CurrentUser = typeof users.$inferSelect & { billing: BillingMode };
 /** 認証済みのリクエストで Hono のコンテキストに置く値。 */
 export type AuthVariables = { user: CurrentUser };
 
@@ -84,7 +88,7 @@ export function authMiddleware(makeVerifier: (env: Env) => AuthVerifier) {
     const db = createDb(c.env.DATABASE_URL);
     const [existing] = await db.select().from(users).where(eq(users.clerkUserId, identity.clerkUserId)).limit(1);
 
-    let user: CurrentUser;
+    let user: typeof users.$inferSelect;
     if (existing) {
       user = existing;
       // メールアドレス・表示名がトークンに含まれていて、変わっていれば更新する
@@ -95,7 +99,7 @@ export function authMiddleware(makeVerifier: (env: Env) => AuthVerifier) {
           .update(users)
           .set({ email: nextEmail, displayName: nextName, updatedAt: new Date() })
           .where(eq(users.id, existing.id))
-          .returning()) as [CurrentUser];
+          .returning()) as [typeof users.$inferSelect];
       }
     } else {
       const profile =
@@ -108,11 +112,11 @@ export function authMiddleware(makeVerifier: (env: Env) => AuthVerifier) {
         .values({ clerkUserId: identity.clerkUserId, email: profile.email, displayName: profile.displayName })
         .onConflictDoNothing({ target: users.clerkUserId });
       [user] = (await db.select().from(users).where(eq(users.clerkUserId, identity.clerkUserId)).limit(1)) as [
-        CurrentUser,
+        typeof users.$inferSelect,
       ];
     }
 
-    c.set("user", user);
+    c.set("user", { ...user, billing: billingModeOf(c.env) });
     await next();
   });
 }

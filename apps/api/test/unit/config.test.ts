@@ -54,6 +54,21 @@ describe("validateConfig", () => {
     expect(validateConfig(env)).toEqual(["THREADS_APP_ID", "THREADS_APP_SECRET", "THREADS_REDIRECT_URI"]);
   });
 
+  it("BILLING_ENABLED は true か false が必須（specs/013 FR-063）", () => {
+    expect(validateConfig({ ...good, BILLING_ENABLED: undefined } as unknown as Env)).toEqual(["BILLING_ENABLED"]);
+    expect(validateConfig({ ...good, BILLING_ENABLED: "yes" } as Env)).toEqual(["BILLING_ENABLED"]);
+  });
+
+  it("決済ONなら、Stripeの鍵・Webhookの秘密・料金のIDを確かめる。OFFなら見ない", () => {
+    const on = { ...good, BILLING_ENABLED: "true" } as Env;
+    expect(validateConfig(on)).toEqual([]);
+    const missing = { ...on, STRIPE_SECRET_KEY: undefined, STRIPE_WEBHOOK_SECRET: "", STRIPE_PRICE_ID: undefined } as unknown as Env;
+    expect(validateConfig(missing)).toEqual(["STRIPE_SECRET_KEY", "STRIPE_WEBHOOK_SECRET", "STRIPE_PRICE_ID"]);
+    const sample = { ...on, STRIPE_SECRET_KEY: "sk_test_xxx", STRIPE_WEBHOOK_SECRET: "whsec_xxx", STRIPE_PRICE_ID: "price_xxx" } as Env;
+    expect(validateConfig(sample)).toEqual(["STRIPE_SECRET_KEY", "STRIPE_WEBHOOK_SECRET", "STRIPE_PRICE_ID"]);
+    expect(validateConfig({ ...missing, BILLING_ENABLED: "false" } as Env)).toEqual([]);
+  });
+
   it("偽のThreadsで動かすときは、Threadsの3項目は見本の値のままでよい", () => {
     const env = { ...good, THREADS_APP_ID: "000000000000000", THREADS_APP_SECRET: "xxxxxxxx" } as Env;
     expect(validateConfig(env)).toEqual([]);
