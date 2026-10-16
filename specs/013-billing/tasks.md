@@ -264,7 +264,7 @@ description: "Task list for feature 013 billing and withdrawal"
 
 ### Tests for User Story 5
 
-- [ ] T047 [P] [US5] `apps/api/test/integration/withdrawal.test.ts`を作る（決済ON・偽のStripe）。確かめること（FR-050〜FR-056、SC-007、research.md R10）：
+- [X] T047 [P] [US5] `apps/api/test/integration/withdrawal.test.ts`を作る（決済ON・偽のStripe）。確かめること（FR-050〜FR-056、SC-007、research.md R10）：
   - `GET /api/me/withdrawal-preview`の内容：アカウントの名前、チームごとの`transfer`・`delete`・`leave`と引き継ぎ先、`hasActiveSubscription`。
   - `POST /api/me/withdraw`は、メールアドレスが違えば`422 CONFIRMATION_MISMATCH`で何も変わらない。大文字・小文字と前後の空白は区別しない。
   - 成功の順：Stripeの契約が止まる → アカウント・`threads_connections`・投稿ストックなどが0件 → 管理者のチームは、いちばん長くいる人が管理者になる（いなければ消える）→ ほかの人のアカウントの担当が外れる → ほかの人のアカウントの`activity_logs.actor_name`が「退会した人」で`actor_user_id`が`NULL` → `users`・`subscriptions`の行がない → `withdrawn_users`に行がある → Clerkのユーザーを消す呼び出しがある。
@@ -279,13 +279,13 @@ description: "Task list for feature 013 billing and withdrawal"
 
 ### Implementation for User Story 5
 
-- [ ] T048 [US5] `apps/api/src/services/withdrawal-service.ts`を作る。中身は`withdrawalPreview(db, userId)`、`withdraw(env, deps, user, confirmEmail)`（R10の1〜4）、`resumeWithdrawals(env, now)`（日次）。
+- [X] T048 [US5] `apps/api/src/services/withdrawal-service.ts`を作る。中身は`withdrawalPreview(db, userId)`、`withdraw(env, deps, user, confirmEmail)`（R10の1〜4）、`resumeWithdrawals(env, now)`（日次）。
   - 引き継ぎ先の選び方は`apps/api/src/services/team-service.ts`の`beforeAccountDeleted`と同じにする（プレビュー用に、選ぶ部分を関数に分けて使い回す）。
   - Clerkのユーザーの削除は、`@clerk/backend`の`createClerkClient(...).users.deleteUser`を、差し込める依存（テストでは偽）にする。`apps/api/src/app.ts`の`AppDeps`に`deleteClerkUser`を足す。
   - 3のトランザクションの最後に、管理者のチームが残っていれば同じ引き継ぎをする。
   - 3のトランザクションの中で、消すアカウントの`threads_user_id`に当たる、処理中（`pending`・`failed`）のデータ削除の求め（`threads_deletion_requests`）を完了にする（`status = 'completed'`、`completed_at`を今に。001の削除の完了と同じ書き方を`apps/api/src/services/data-deletion.ts`から使う）。
-- [ ] T049 [US5] `apps/api/src/routes/me.ts`に`GET /api/me/withdrawal-preview`と`POST /api/me/withdraw`（`{ confirmEmail }`、204）を足す。`GET /api/me`の`withdrawalInProgress`を`users.withdrawal_requested_at IS NOT NULL`にする。`packages/shared/src/schemas.ts`に`withdrawalPreviewSchema`・`withdrawRequestSchema`を足す。
-- [ ] T050 [US5] `apps/api/src/middleware/auth.ts`を直す（contracts/api.md「認証のミドルウェアの変更」）。`withdrawn_users`にあるClerkのユーザーIDは、`users`を探す前・作る前に`401 AUTH_REQUIRED`にする。`withdrawal_requested_at`がある人は、3つのAPIのほかを`409 WITHDRAWAL_IN_PROGRESS`にする。`apps/api/src/services/daily-jobs.ts`に`resumeWithdrawals`を足す。
+- [X] T049 [US5] `apps/api/src/routes/me.ts`に`GET /api/me/withdrawal-preview`と`POST /api/me/withdraw`（`{ confirmEmail }`、204）を足す。`GET /api/me`の`withdrawalInProgress`を`users.withdrawal_requested_at IS NOT NULL`にする。`packages/shared/src/schemas.ts`に`withdrawalPreviewSchema`・`withdrawRequestSchema`を足す。
+- [X] T050 [US5] `apps/api/src/middleware/auth.ts`を直す（contracts/api.md「認証のミドルウェアの変更」）。`withdrawn_users`にあるClerkのユーザーIDは、`users`を探す前・作る前に`401 AUTH_REQUIRED`にする。`withdrawal_requested_at`がある人は、3つのAPIのほかを`409 WITHDRAWAL_IN_PROGRESS`にする。`apps/api/src/services/daily-jobs.ts`に`resumeWithdrawals`を足す。
 - [ ] T051 [P] [US5] `apps/web/test/withdraw-dialog.test.tsx`を先に書き、`apps/web/src/components/billing/WithdrawDialog.tsx`を作る。`apps/web/src/pages/settings/account.tsx`に「退会」のカードを足す（contracts/ui-routes.md「退会」）。
   - ダイアログの中身：消えるもの・チームの行き先・契約の文・メールアドレスの入力（合うまで押せない）。
   - 押している間は閉じられない。

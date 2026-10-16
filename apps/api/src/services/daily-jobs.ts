@@ -12,6 +12,7 @@ import { refreshExpiringTokens } from "./token-refresh";
 import { purgeTokenCheckFailures } from "./token-connect";
 import { purgeOldActivity } from "./activity-log";
 import { reconcileSubscriptions } from "./billing-service";
+import { clerkUserDeleter, resumeWithdrawals } from "./withdrawal-service";
 
 /**
  * 日次の定期処理をまとめて行う（contracts/api.md「定期処理」）。1つの処理の失敗で全体を止めない。
@@ -40,6 +41,8 @@ export async function runDailyJobs(env: Env, now: Date = new Date()) {
     ["data deletion retry", () => retryDeletions(env, now)],
     // 契約の状態とアカウントの数を、Stripeと合わせ直す（specs/013 research.md R5・R6）。データ削除の後に行う
     ["billing reconcile", () => reconcileSubscriptions(env)],
+    // 退会の続き（契約を止める・データを消す・ログインの情報を消す。specs/013 research.md R10）
+    ["withdrawal resume", () => resumeWithdrawals(env, clerkUserDeleter(env), now)],
     ["deletion identifiers cleanup", () => cleanupDeletionIdentifiers(env, now)],
     [
       "publish attempts cleanup",

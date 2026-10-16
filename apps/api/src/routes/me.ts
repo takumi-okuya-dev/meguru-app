@@ -10,6 +10,10 @@ import { accounts, memberships, users } from "../db/schema";
 import { personName, toAccountSummary, type AccountRow } from "../services/access";
 import { countOwnedAccountNeedsReview } from "../services/account-review-counts";
 import { loadEntitlement, toMeBilling } from "../services/billing-service";
+import { withdraw, withdrawalPreview, type ClerkUserDeleter } from "../services/withdrawal-service";
+import type { Env } from "../env";
+import { withdrawRequestSchema } from "@threads-grower/shared";
+import { AppError } from "../lib/errors";
 import { listMyTeams } from "../services/team-service";
 
 /**
@@ -38,9 +42,10 @@ export function resolveLandingAccountId(
 /**
  * GET /api/me のルート（FR-004・FR-005）。
  * @param authed - 認証のミドルウェア
+ * @param deleteClerkUser - 退会でClerkのユーザーを消す関数を作る（specs/013）
  * @returns Hono のルート
  */
-export function meRoutes(authed: MiddlewareHandler<AppEnv>) {
+export function meRoutes(authed: MiddlewareHandler<AppEnv>, deleteClerkUser: (env: Env) => ClerkUserDeleter) {
   return new Hono<AppEnv>().get("/me", authed, async (c) => {
     const user = c.get("user");
     const db = createDb(c.env.DATABASE_URL);
@@ -87,5 +92,17 @@ export function meRoutes(authed: MiddlewareHandler<AppEnv>) {
     const counts = await countOwnedAccountNeedsReview(createDb(c.env.DATABASE_URL), user.id);
     c.header("Cache-Control", "no-store");
     return c.json({ counts });
-  });
+  })
+    // 退会（specs/013 contracts/api.md「自分」、research.md R10）
+    .get("/me/withdrawal-preview", authed, async (c) => {
+      c.header("Cache-Control", "no-store");
+      return c.json(await withdrawalPreview(createDb(c.env.DATABASE_URL), c.get("user").id));
+    })
+    .post("/me/withdraw", authed, async (c) => {
+      const parsed = withdrawRequestSchema.safeParse(await c.req.json().catch(() => null));
+      if (!parsed.success) throw new AppError("VALIDATION_FAILED", 400, "invalid withdraw request", undefined, ["confirmEmail"]);
+      const user = c.get("user");
+      await withdraw(c.env, deleteClerkUser(c.env), user, parsed.data.confirmEmail);
+      return c.body(null, 204);
+    });
 }

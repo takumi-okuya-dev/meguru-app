@@ -20,8 +20,22 @@ export const fakeVerifier: AuthVerifier = {
   },
 };
 
+/** 偽のClerkのユーザーの削除（退会。specs/013）。消したIDを記録し、fail を立てると失敗する。 */
+export const fakeClerk = {
+  deleted: [] as string[],
+  fail: false,
+  reset() {
+    this.deleted = [];
+    this.fail = false;
+  },
+  async delete(clerkUserId: string) {
+    if (fakeClerk.fail) throw new Error("clerk unavailable");
+    fakeClerk.deleted.push(clerkUserId);
+  },
+};
+
 export function makeApp() {
-  return createApp({ verifyAuth: () => fakeVerifier });
+  return createApp({ verifyAuth: () => fakeVerifier, deleteClerkUser: () => (id) => fakeClerk.delete(id) });
 }
 
 export type TestApp = ReturnType<typeof makeApp>;

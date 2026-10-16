@@ -1320,3 +1320,24 @@ export const activityListSchema = z.object({
 });
 /** 操作の記録の一覧。 */
 export type ActivityList = z.infer<typeof activityListSchema>;
+
+/** POST /api/me/withdraw の要求（specs/013 contracts/api.md「自分」）。 */
+export const withdrawRequestSchema = z.object({ confirmEmail: z.string().max(320) });
+
+/** GET /api/me/withdrawal-preview の応答（退会の確認の内容）。 */
+export const withdrawalPreviewSchema = z.object({
+  email: z.string(),
+  ownedAccounts: z.array(z.object({ id: z.string(), name: z.string() })),
+  teams: z.array(
+    z.object({
+      id: z.string(),
+      name: z.string(),
+      isAdmin: z.boolean(),
+      outcome: z.enum(["transfer", "delete", "leave"]),
+      nextAdminName: z.string().nullable(),
+    }),
+  ),
+  hasActiveSubscription: z.boolean(),
+});
+/** 退会の確認の内容。 */
+export type WithdrawalPreview = z.infer<typeof withdrawalPreviewSchema>;
