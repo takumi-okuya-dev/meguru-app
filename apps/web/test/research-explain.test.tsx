@@ -52,6 +52,18 @@ describe("まとめてAIに解説してもらう", () => {
     expect(panel().getByLabelText("AIの答えを貼り付ける")).toBeInTheDocument();
   });
 
+  it("プロンプトを読み込めなければ、原因を出してもう一度押せる（PR #17 のCodexレビュー）", async () => {
+    const { ApiError } = await import("@/lib/api-client");
+    getExplainPrompt.mockRejectedValueOnce(new ApiError("API_UNREACHABLE", 0));
+    renderResearchPage(ResearchPage);
+    const button = await screen.findByRole("button", { name: /まとめてAIに解説してもらう（/ });
+    await userEvent.click(button);
+    expect(await screen.findByText(/^プロンプトを作れませんでした。/)).toBeInTheDocument();
+    await userEvent.click(button);
+    await waitFor(() => expect(screen.queryByText(/^プロンプトを作れませんでした。/)).not.toBeInTheDocument());
+    expect(screen.getByLabelText("AIの答えを貼り付ける")).toBeInTheDocument();
+  });
+
   it("貼り付けると対応が理由つきで並び、保存すると選んだ分だけ送る（US8-4〜US8-6）", async () => {
     saveExplanations.mockResolvedValue({ saved: [A.id], skipped: [] });
     const user = userEvent.setup();

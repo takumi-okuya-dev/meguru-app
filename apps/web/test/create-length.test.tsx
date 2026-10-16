@@ -91,6 +91,38 @@ describe("文字数と長さの割合", () => {
     await waitFor(() => expect(getPrompt.mock.calls.length).toBeGreaterThanOrEqual(2));
   });
 
+  it("作る件数の保存中は文字数と割合を保存できず、文字数と割合の保存中は件数の保存を待ち、新しい版で送る（PR #17 のCodexレビュー）", async () => {
+    const user = userEvent.setup();
+    let finishCount: (v: unknown) => void = () => {};
+    let finishLength: (v: unknown) => void = () => {};
+    putPromptSettings.mockImplementation((_a: string, n: number, v: number, length?: PostLengthSettings) =>
+      length
+        ? new Promise((r) => (finishLength = () => r({ postCount: n, length, version: v + 1 })))
+        : new Promise((r) => (finishCount = () => r({ postCount: n, length: POST_LENGTH_DEFAULTS, version: v + 1 }))),
+    );
+    renderCreate();
+    const s = await openSettings(user);
+    // 件数の保存中
+    const count = screen.getByRole("spinbutton", { name: "作る件数" });
+    await user.clear(count);
+    await user.type(count, "10");
+    await waitFor(() => expect(putPromptSettings).toHaveBeenCalledWith("a1", 10, 1), { timeout: 2000 });
+    fireEvent.change(s.getByRole("slider", { name: "短文の割合" }), { target: { value: "40" } });
+    fireEvent.change(s.getByRole("slider", { name: "中文の割合" }), { target: { value: "40" } });
+    expect(s.getByRole("button", { name: "保存" })).toBeDisabled();
+    finishCount({});
+    await waitFor(() => expect(s.getByRole("button", { name: "保存" })).toBeEnabled());
+    await user.click(s.getByRole("button", { name: "保存" }));
+    expect(putPromptSettings).toHaveBeenLastCalledWith("a1", 10, 2, expect.objectContaining({ shortRatio: 40 }));
+    // 文字数と割合の保存中に件数を変えても、終わるまで送らない
+    await user.clear(count);
+    await user.type(count, "12");
+    await new Promise((r) => setTimeout(r, 700));
+    expect(putPromptSettings).toHaveBeenCalledTimes(2);
+    finishLength({});
+    await waitFor(() => expect(putPromptSettings).toHaveBeenLastCalledWith("a1", 12, 3));
+  });
+
   it("オーナー以外は、見られるが保存できない（SC-019）", async () => {
     accountAccess.mockResolvedValue(EDITOR_ACCESS);
     const user = userEvent.setup();

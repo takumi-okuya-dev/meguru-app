@@ -63,7 +63,9 @@ export function ReferencePostAddDialog({
   const cap = Math.min(remaining, REFERENCE_BATCH_MAX);
   const hasBody = !isBlank(form.body);
   const total = queue.length + (hasBody ? 1 : 0);
-  const dirty = queue.length > 0 || form.body !== "" || form.whyGood !== "";
+  // どの項目でも入力があれば未保存として扱う（本文が空でもURLなどを入れていれば。PR #17 のCodexレビュー）
+  const dirty =
+    queue.length > 0 || (Object.keys(EMPTY_REF_FORM) as (keyof RefForm)[]).some((k) => form[k] !== EMPTY_REF_FORM[k]);
   useUnsavedChanges(dirty);
 
   const setField = <K extends keyof RefForm>(key: K, value: RefForm[K]) => {

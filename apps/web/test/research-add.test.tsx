@@ -118,6 +118,14 @@ describe("参考投稿を追加（ためて登録）", () => {
     expect(await screen.findByText("登録していない投稿があります。破棄しますか？")).toBeInTheDocument();
   });
 
+  it("本文が空でも、ほかの項目を入れていれば、閉じるときに破棄してよいかを確かめる（PR #17 のCodexレビュー）", async () => {
+    renderResearchPage(ResearchPage);
+    const d = await openAdd();
+    await userEvent.type(d.getByLabelText("投稿のURL"), "https://www.threads.com/@a/post/1");
+    await userEvent.click(d.getByRole("button", { name: "閉じる" }));
+    expect(await screen.findByText("登録していない投稿があります。破棄しますか？")).toBeInTheDocument();
+  });
+
   it("一覧のカードに、媒体・鮮度・解説の有無・閲覧といいねが出る（US7-8）", async () => {
     listReferencePosts.mockResolvedValue({
       items: [

@@ -3,6 +3,7 @@
 import { CopyIcon } from "lucide-react";
 import { useEffect, useId, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { describeError } from "@/lib/api-client";
 import { cn } from "@/lib/utils";
 
 /**
@@ -28,7 +29,10 @@ export function CopyPromptButton({
   className?: string;
   onCopied?: () => void;
 }) {
-  const [state, setState] = useState<{ kind: "idle" } | { kind: "copied" } | { kind: "failed"; text: string }>({ kind: "idle" });
+  const [state, setState] = useState<
+    { kind: "idle" } | { kind: "copied" } | { kind: "failed"; text: string } | { kind: "error"; message: string }
+  >({ kind: "idle" });
+  const [loading, setLoading] = useState(false);
   const areaRef = useRef<HTMLTextAreaElement>(null);
   const areaId = useId();
 
@@ -41,7 +45,17 @@ export function CopyPromptButton({
   }, [state]);
 
   const copy = async () => {
-    const text = await getText();
+    // プロンプトをAPIから作るボタン（解説・キーワードの案）は、読み込みに失敗することがある（PR #17 のCodexレビュー）
+    let text: string;
+    setLoading(true);
+    try {
+      text = await getText();
+    } catch (err) {
+      setState({ kind: "error", message: describeError(err) });
+      return;
+    } finally {
+      setLoading(false);
+    }
     try {
       await navigator.clipboard.writeText(text);
       setState({ kind: "copied" });
@@ -54,7 +68,7 @@ export function CopyPromptButton({
   return (
     <div className={cn("space-y-2", className)}>
       <div className="flex flex-wrap items-center gap-2.5">
-        <Button type="button" variant={variant} className="h-10 rounded-full px-4" disabled={disabled} onClick={() => void copy()}>
+        <Button type="button" variant={variant} className="h-10 rounded-full px-4" disabled={disabled || loading} onClick={() => void copy()}>
           <CopyIcon className="size-4" />
           {label}
         </Button>
@@ -64,6 +78,11 @@ export function CopyPromptButton({
           </span>
         )}
       </div>
+      {state.kind === "error" && (
+        <p role="alert" className="rounded-xl border border-warning/40 bg-warning-bg px-3 py-2 text-sm">
+          プロンプトを作れませんでした。{state.message}もう一度押してください
+        </p>
+      )}
       {state.kind === "failed" && (
         <div className="space-y-1.5">
           <p role="alert" className="rounded-xl border border-warning/40 bg-warning-bg px-3 py-2 text-sm">

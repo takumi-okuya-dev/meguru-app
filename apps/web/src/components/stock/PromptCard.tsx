@@ -237,9 +237,10 @@ function PromptReadyCard({
 
   // 件数の保存は1つずつ順に行う。保存中に件数が変わったら、終わってから最新の件数を保存する（古い値で上書きしない）
   useEffect(() => {
-    if (!canSaveCount || count === saved || saving || failed?.count === count) return;
+    // 文字数と割合の保存中は待つ（同じ版で並べて送ると、後の方が 409 になる。PR #17 のCodexレビュー）
+    if (!canSaveCount || count === saved || saving || savingLength || failed?.count === count) return;
     save(count);
-  }, [canSaveCount, count, saved, saving, failed, save]);
+  }, [canSaveCount, count, saved, saving, savingLength, failed, save]);
 
   // コピーに失敗したら、全文の欄を開いた後に全選択する（research.md R13）
   useEffect(() => {
@@ -250,6 +251,12 @@ function PromptReadyCard({
   }, [copyFailed, open]);
 
   const fullText = edited ?? prompt.data?.prompt ?? "";
+  // 文字数と割合の欄は、件数を変えてプロンプトを読み直している間も出したままにする（入力中の値を失わない）
+  const [lengthSettings, setLengthSettings] = useState<PostLengthSettings | null>(null);
+  const latestLength = prompt.data?.settings.length;
+  useEffect(() => {
+    if (latestLength) setLengthSettings(latestLength);
+  }, [latestLength]);
   // 送り方（1つにまとめて／2つに分けて。specs/014 FR-150〜FR-153）
   const [mode, setMode] = useSendMode(prompt.data?.splitRecommended ?? false);
   const split = mode === "split" && !!prompt.data;
@@ -343,13 +350,14 @@ function PromptReadyCard({
         <PromptMaterials accountId={accountId} materials={prompt.data.materials} />
       )}
       {/* 文字数と長さの割合（specs/014 FR-140）。保存済みの値が変わったら作り直す */}
-      {prompt.data?.settings && (
+      {lengthSettings && (
         <LengthSettings
-          key={JSON.stringify(prompt.data.settings.length)}
-          settings={prompt.data.settings.length}
+          key={JSON.stringify(lengthSettings)}
+          settings={lengthSettings}
           count={count}
           canSave={canSaveCount}
-          saving={savingLength}
+          // 作る件数の保存中も押せない（版を1つずつ進める）
+          saving={savingLength || saving}
           onSave={saveLength}
         />
       )}
