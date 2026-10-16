@@ -30,7 +30,7 @@ description: "Task list for feature 014 strategy guidance"
 
 **Purpose**: Constitutionの文言の明確化と、決定を変える文書の注記。
 
-- [ ] T001 `/speckit-constitution`で`.specify/memory/constitution.md`をPATCH（4.0.1 → 4.0.2）にする（research.md R18）。
+- [X] T001 `/speckit-constitution`で`.specify/memory/constitution.md`をPATCH（4.0.1 → 4.0.2）にする（research.md R18）。
   - 原則Vの「決済をMVPの最後のfeatureとする」を、「決済を、MVPのうちチーム運用と課金まわりの最後のfeatureとする。公開の前の入力の手助けなど、決済の判定に関わらない機能は、決済の後に足してよい」に直す。
   - Rationaleに2026-10-16の理由を1文足す。
   - Sync Impact Reportを残し、`Last Amended`を2026-10-16にする。
@@ -79,6 +79,7 @@ description: "Task list for feature 014 strategy guidance"
   - 保存・読み直し・版の衝突・操作の記録（`strategy_saved`）
   - 6キーを省いたPUTで値が残る
   - 見せてもらっている人のGETに6キーが出る
+  - 読むだけ（013）のオーナーのPUTが`403 BILLING_REQUIRED`（FR-071）
   - `filledCount`が変わらない
 - [ ] T010 `apps/web/src/lib/api-client.ts`の型と`apps/web/src/pages/strategy.tsx`の`pickValues`・`sameValues`を、6キーに合わせる（画面の区分は`STRATEGY_SECTIONS`から並ぶので、目的の区分が先頭に出る）。区分の名前の変更で落ちる今のテスト（`apps/web/test/strategy.test.tsx`）の期待を直す。
 
@@ -221,6 +222,7 @@ description: "Task list for feature 014 strategy guidance"
   - ためる：欄が空になり、キーワードと媒体は残り、投稿日は不明に戻る。本文が空なら押せない。検証に通らなければためない。
   - ためた投稿の一覧と「外す」。登録のボタンの文（登録する／〇件を登録する）。
   - まとめての登録の成功と、上限の文。数字の欄の開閉。
+  - ためた数が、残りの件数（上限200−今の件数）または20件に達したら「ためる」を押せなくなり、「参考投稿はあと〇件まで登録できます」「1回に登録できるのは20件までです」と出る（US7-5、FR-084）。
   - 閉じる・離れるときの確認。
   - 一覧のカードに媒体・鮮度・解説あり／なし・数字が出る。
 - [ ] T038 [P] [US7] `packages/shared/test/prompt.test.ts`：参考投稿が鮮度の順で入る（`buildPrompt`に渡す前の並べ替えは`apps/api/test/integration/prompt-research-order.test.ts`で確かめる）。
@@ -230,7 +232,7 @@ description: "Task list for feature 014 strategy guidance"
 - [ ] T039 [US7] `packages/shared/src/research.ts`を作り、`freshnessOf(post, today)`・`sortForPrompt(posts, today)`を書く（日本時間の日付は今の`packages/shared`の日付の関数を使う）。`index.ts`から出す。T034を通す。
 - [ ] T040 [US7] `apps/api/src/routes/research.ts`：`referenceColumns`・`toReferencePost`に新しい項目を足し、GETに`freshness`・`shortId`を足す。T035を通す。
 - [ ] T041 [US7] `apps/api/src/services/item-service.ts`に`insertManyWithLimit(env, accountId, kind, limit, count, n, insert)`を足す（`insertWithLimit`と同じアドバイザリーロック、`count + n > limit`なら`details.remaining`つきの409）。`apps/api/src/routes/research.ts`に`POST /accounts/:accountId/reference-posts/batch`（`content`、`reference_posts_added`を1件、`touchMaterials`）を足す。T036を通す。
-- [ ] T042 [US7] `apps/api/src/services/prompt-service.ts`：参考投稿を全件（上限200件）読み、`sortForPrompt`で並べてから`PROMPT_REFERENCE_POSTS`件にする。`PromptReferencePost`に媒体・数字・鮮度を渡す（節の書き方はUS10のT053）。T038を通す。
+- [ ] T042 [US7] `apps/api/src/services/prompt-service.ts`：参考投稿を全件（上限200件）読み、`sortForPrompt`で並べてから`PROMPT_REFERENCE_POSTS`件にする。`PromptReferencePost`に媒体・数字・鮮度を渡す（節の書き方はUS10のT055）。T038を通す。
 - [ ] T043 [P] [US7] `apps/web/src/lib/api-client.ts`に`createReferencePostsBatch`と新しい項目の型を足す。
 - [ ] T044 [US7] `apps/web/src/components/research/ReferencePostFormDialog.tsx`を「参考投稿を追加」（ためる・まとめて登録）と「編集」（ためるなし）の2つの使い方にし、新しい項目（媒体・投稿日の選び方と日付・鮮度の表示・開閉の数字の欄・投稿者・メモ・なぜ良いかの案内）を足す。未登録の入力の確認は今の`useUnsavedChanges`を使う。
 - [ ] T045 [US7] `apps/web/src/pages/research.tsx`：参考投稿のカードに媒体・鮮度・解説あり／なし・キーワード・閲覧といいねを出す。T037を通す。
@@ -275,12 +277,12 @@ description: "Task list for feature 014 strategy guidance"
 
 ### Tests for User Story 10
 
-- [ ] T052 [P] [US10] `packages/shared/test/prompt.test.ts`を直し、足す（FR-110〜FR-119b、SC-015・SC-016・SC-018）。
+- [ ] T052 [P] [US10] `packages/shared/test/prompt.test.ts`を直し、足す（FR-110〜FR-118・FR-170〜FR-172、SC-015・SC-016・SC-018）。
   - 件数：`promoCount`・`patternCount`・`profileInviteCount`・`splitLengthMix`。
   - 節：最初に確認すること・優先順位、忠実に反映の指示、話題の配分（4項目のどれかがあるとき）、プロフィールと固定投稿（下書きがあるとき）、宣伝のタイトル・期限と残り日数・ちょうどN件・書き方、リサーチの引用・鮮度・媒体・数字・「分析メモなし」・型の件数、長さの件数と幅、文字数の目標、コードブロックの指示、最終チェック（材料のある行だけ）。
   - 冒頭・各節・最終チェックで件数が同じ。材料が空なら節と行が入らない。
   - 初めの値で今の範囲（150字・40〜70・80〜120・120〜150）。長さの調整で新しい節が残る。今のテストの期待（150字の文など）を新しい文に直す。
-- [ ] T053 [P] [US10] `packages/shared/test/drafts.test.ts`：`splitDrafts`が行の初めの```` ``` ````（言語名つき、前の空白つき）を除いてから分け、行の途中の```` ``` ````は残す（FR-119、SC-021）。
+- [ ] T053 [P] [US10] `packages/shared/test/drafts.test.ts`：`splitDrafts`が行の初めの```` ``` ````（言語名つき、前の空白つき）を除いてから分け、行の途中の```` ``` ````は残す（FR-170、SC-021）。
 - [ ] T054 [P] [US10] `apps/api/test/integration/prompt-materials.test.ts`：宣伝内容のタイトル・期限が入る、下書き・目的が入る、`length`が全文の文字数（FR-113〜FR-115）。
 
 ### Implementation for User Story 10
@@ -294,6 +296,7 @@ description: "Task list for feature 014 strategy guidance"
   - 長さの調整は今の減らす順のまま、新しい節を減らさない。戻り値に`length`を足す。
 - [ ] T056 [US10] `packages/shared/src/drafts.ts`の`splitDrafts`で、行の初めが```` ``` ````の行を除く。T053を通す。
 - [ ] T057 [US10] `apps/api/src/services/prompt-service.ts`：宣伝内容の`title`・`validUntil`、今日の日付（日本時間）、アカウントの文字数と割合（US13の前は既定値の列）を`buildPrompt`に渡す。応答に`length`を足す。T054を通す。
+- [ ] T058 [US10] `apps/web/src/pages/strategy.tsx`の下書きの区分の説明を「Threadsには自動で反映されない下書きです。投稿づくりでは、投稿の方向性の軸として使います」に変え、`apps/web/test/strategy.test.tsx`の期待を直す（FR-021）。
 
 ---
 
@@ -305,20 +308,20 @@ description: "Task list for feature 014 strategy guidance"
 
 ### Tests for User Story 15
 
-- [ ] T058 [P] [US15] `apps/web/test/create.test.tsx`（新規。今の`apps/web/test/stock.test.tsx`のプロンプトのカードと貼り付け欄の部分をここへ移す）（FR-160〜FR-162・FR-165）。
+- [ ] T059 [P] [US15] `apps/web/test/create.test.tsx`（新規。今の`apps/web/test/stock.test.tsx`のプロンプトのカードと貼り付け欄の部分をここへ移す）（FR-160〜FR-162・FR-165）。
   - 画面の並び。
   - 登録の後の「〇件を投稿ストックに登録しました」「投稿ストックで確かめる」（`/stock`）と、貼り付け欄が空になる。
   - プロンプトを作れない状態の案内が今と同じ。未登録の入力の確認。
-- [ ] T059 [P] [US15] `apps/web/test/stock.test.tsx`を直す（FR-163、SC-023）：プロンプトのカードと固定の貼り付け欄がない、上に「投稿をつくる」、空の要確認で「まだ投稿がありません」と「投稿をつくる」、今の承認・却下・修正・まとめての承認・投稿済みのテストは今のまま通る。
-- [ ] T060 [P] [US15] `apps/web/test/sidebar-create.test.tsx`（サイドバーの「投稿をつくる」が`/accounts/:id/create`へ移り、その画面で選ばれた見た目になる。並び・名前は変わらない）と、`apps/web/test/account-home.test.tsx`（「投稿をつくりましょう」のボタンが`/create`へ）（FR-160・FR-164）。
+- [ ] T060 [P] [US15] `apps/web/test/stock.test.tsx`を直す（FR-163、SC-023）：プロンプトのカードと固定の貼り付け欄がない、上に「投稿をつくる」、空の要確認で「まだ投稿がありません」と「投稿をつくる」、今の承認・却下・修正・まとめての承認・投稿済みのテストは今のまま通る。
+- [ ] T061 [P] [US15] `apps/web/test/sidebar-create.test.tsx`（サイドバーの「投稿をつくる」が`/accounts/:id/create`へ移り、その画面で選ばれた見た目になる。並び・名前は変わらない）と、`apps/web/test/account-home.test.tsx`（「投稿をつくりましょう」のボタンが`/create`へ）（FR-160・FR-164）。
 
 ### Implementation for User Story 15
 
-- [ ] T061 [US15] `apps/web/src/router.tsx`に`/accounts/:accountId/create`を足し、`apps/web/src/pages/create.tsx`を作る：上部バー「投稿をつくる」、`PromptCard`、`PasteComposer`の順（US12・US11・US13・US14の部品は後のPhaseで足す）。T058を通す。
-- [ ] T062 [US15] `apps/web/src/components/stock/PasteComposer.tsx`を、画面の下に固定しない置き方（`placement: "inline"`）でも使えるようにし、見出し「AIの答えを貼り付けて、投稿ストックに登録する」と、登録の後の案内（件数・「投稿ストックで確かめる」）を足す。`PromptCard.tsx`の`startKey`（サイドバーから来たときの移動とフォーカス）は、`/create`を開いたときの初めのフォーカスに置き換える。
-- [ ] T063 [US15] `apps/web/src/pages/stock.tsx`から`PromptCard`・`PasteComposer`・`startCreate`の扱いを外し、`PageHeader`の`actions`に「投稿をつくる」（`/create`）、空の要確認の案内を足す。T059を通す。
-- [ ] T064 [US15] `apps/web/src/components/layout/Sidebar.tsx`の「投稿をつくる」を`NavLink`で`${base}/create`へ（`state.startCreate`をやめる。見た目・並び・名前は変えない）。`apps/web/src/pages/account-home.tsx`の「投稿をつくりましょう」のボタンを`/create`へ。T060を通す。
-- [ ] T065 [US15] E2Eを直す：`e2e/tests/onboarding.spec.ts`・`e2e/tests/team.spec.ts`・`e2e/tests/token.spec.ts`・`e2e/tests/helpers.ts`・`e2e/tests/team-flow.ts`で、投稿ストックのプロンプト・貼り付けを使っている所を「投稿をつくる」へ。
+- [ ] T062 [US15] `apps/web/src/router.tsx`に`/accounts/:accountId/create`を足し、`apps/web/src/pages/create.tsx`を作る：上部バー「投稿をつくる」、`PromptCard`、`PasteComposer`の順（US12・US11・US13・US14の部品は後のPhaseで足す）。T059を通す。
+- [ ] T063 [US15] `apps/web/src/components/stock/PasteComposer.tsx`を、画面の下に固定しない置き方（`placement: "inline"`）でも使えるようにし、見出し「AIの答えを貼り付けて、投稿ストックに登録する」と、登録の後の案内（件数・「投稿ストックで確かめる」）を足す。`PromptCard.tsx`の`startKey`（サイドバーから来たときの移動とフォーカス）は、`/create`を開いたときの初めのフォーカスに置き換える。
+- [ ] T064 [US15] `apps/web/src/pages/stock.tsx`から`PromptCard`・`PasteComposer`・`startCreate`の扱いを外し、`PageHeader`の`actions`に「投稿をつくる」（`/create`）、空の要確認の案内を足す。T060を通す。
+- [ ] T065 [US15] `apps/web/src/components/layout/Sidebar.tsx`の「投稿をつくる」を`NavLink`で`${base}/create`へ（`state.startCreate`をやめる。見た目・並び・名前は変えない）。`apps/web/src/pages/account-home.tsx`の「投稿をつくりましょう」のボタンを`/create`へ。T061を通す。
+- [ ] T066 [US15] E2Eを直す：`e2e/tests/onboarding.spec.ts`・`e2e/tests/team.spec.ts`・`e2e/tests/token.spec.ts`・`e2e/tests/helpers.ts`・`e2e/tests/team-flow.ts`で、投稿ストックのプロンプト・貼り付けを使っている所を「投稿をつくる」へ。
 
 ---
 
@@ -328,13 +331,13 @@ description: "Task list for feature 014 strategy guidance"
 
 **Independent Test**：区分ごとの件数・判定が課題・宣伝内容・リサーチの画面とプロンプトに入る内容と一致し、「編集」でその項目へ移ることを確かめる。
 
-- [ ] T066 [P] [US11] `apps/api/test/integration/prompt-materials.test.ts`に`materials`のテストを足す（FR-121・FR-123、SC-017）。
+- [ ] T067 [P] [US11] `apps/api/test/integration/prompt-materials.test.ts`に`materials`のテストを足す（FR-121・FR-123、SC-017）。
   - 課題：`checkStrategy`の結果と文字数。下書き：入力のあり・なし。
   - 宣伝：公開中で期限内の件数と行動喚起が空の件数。
   - リサーチ：全件・入る件数（10件まで）・解説あり・解説がまだ。
-- [ ] T067 [P] [US11] `apps/web/test/create-materials.test.tsx`（FR-120〜FR-122）：閉じた状態の1行のまとめ、開くと一覧、課題の「編集」が`/strategy#field-<key>`、「解説がまだ」がリサーチのまとめての解説へ、プロンプトを作れない人には出ない。
-- [ ] T068 [US11] `apps/api/src/services/prompt-service.ts`で`materials`を作り、`apps/api/src/routes/prompt.ts`の応答に足す。T066を通す。
-- [ ] T069 [US11] `apps/web/src/components/create/PromptMaterials.tsx`を作り、`apps/web/src/components/stock/PromptCard.tsx`に置く。`apps/web/src/pages/strategy.tsx`で`#field-<key>`を開いたときにその項目へ移る。T067を通す。
+- [ ] T068 [P] [US11] `apps/web/test/create-materials.test.tsx`（FR-120〜FR-122）：閉じた状態の1行のまとめ、開くと一覧、課題の「編集」が`/strategy#field-<key>`、「解説がまだ」がリサーチのまとめての解説へ、プロンプトを作れない人には出ない。
+- [ ] T069 [US11] `apps/api/src/services/prompt-service.ts`で`materials`を作り、`apps/api/src/routes/prompt.ts`の応答に足す。T067を通す。
+- [ ] T070 [US11] `apps/web/src/components/create/PromptMaterials.tsx`を作り、`apps/web/src/components/stock/PromptCard.tsx`に置く。`apps/web/src/pages/strategy.tsx`で`#field-<key>`を開いたときにその項目へ移る。T068を通す。
 
 ---
 
@@ -344,9 +347,9 @@ description: "Task list for feature 014 strategy guidance"
 
 **Independent Test**：手順の案内と開閉（端末に覚える）、注意と入口が出ることを確かめる。
 
-- [ ] T070 [P] [US12] `apps/web/test/create-steps.test.tsx`（FR-130〜FR-132）：手順の5行とリンク、閉じたことを`localStorage`に覚える（読めないときは開いた状態）、貼り付け欄のコピーの注意、「自分で1件書く」と「リサーチを見る」、見せてもらっている人には出ない。
-- [ ] T071 [P] [US12] `apps/web/src/lib/preferences.ts`を作る：`readPreference(key, fallback)`・`writePreference(key, value)`（`threads-grower:`で始まるキー。`localStorage`が使えなければ例外を出さずに既定値。research.md R15）。
-- [ ] T072 [US12] `apps/web/src/components/create/CreateSteps.tsx`を作り`apps/web/src/pages/create.tsx`の一番上に置く。`PasteComposer.tsx`の`inline`の置き方に注意と入口を足す。T070を通す。
+- [ ] T071 [P] [US12] `apps/web/test/create-steps.test.tsx`（FR-130〜FR-132）：手順の5行とリンク、閉じたことを`localStorage`に覚える（読めないときは開いた状態）、貼り付け欄のコピーの注意、「自分で1件書く」と「リサーチを見る」、見せてもらっている人には出ない。
+- [ ] T072 [P] [US12] `apps/web/src/lib/preferences.ts`を作る：`readPreference(key, fallback)`・`writePreference(key, value)`（`threads-grower:`で始まるキー。`localStorage`が使えなければ例外を出さずに既定値。research.md R15）。
+- [ ] T073 [US12] `apps/web/src/components/create/CreateSteps.tsx`を作り`apps/web/src/pages/create.tsx`の一番上に置く。`PasteComposer.tsx`の`inline`の置き方に注意と入口を足す。T071を通す。
 
 ---
 
@@ -356,9 +359,9 @@ description: "Task list for feature 014 strategy guidance"
 
 **Independent Test**：リサーチの画面で解説を開いて読め、ホームで読めて閉じられる（端末に覚える）ことを確かめる。
 
-- [ ] T073 [P] [US6] `apps/web/test/research-guide.test.tsx`（FR-060・FR-062）と`apps/web/test/intro-guide.test.tsx`（FR-061：初めは開く、閉じると見出し1行、利用者ごとに覚える、見せてもらっている人のホームでは出ない）。
-- [ ] T074 [P] [US6] `apps/web/src/components/guides/ResearchGuide.tsx`を作る（①3つの指標 ②真似してよい投稿 ③真似しない方がよい投稿と例外 ④5つの手順 ⑤登録する前の5つの確認といちばん大事な考え方。このアプリの言葉で、成果を約束しない）。`apps/web/src/pages/research.tsx`のタブの下に、閉じた状態で置く。
-- [ ] T075 [P] [US6] `apps/web/src/components/guides/IntroGuide.tsx`を作り（文はcontracts/ui-routes.md「ホーム」）、`apps/web/src/pages/account-home.tsx`の一番上に置く（`preferences.ts`の`threads-grower:intro-dismissed:<userId>`）。T073を通す。
+- [ ] T074 [P] [US6] `apps/web/test/research-guide.test.tsx`（FR-060・FR-062）と`apps/web/test/intro-guide.test.tsx`（FR-061：初めは開く、閉じると見出し1行、利用者ごとに覚える、見せてもらっている人のホームでは出ない）。
+- [ ] T075 [P] [US6] `apps/web/src/components/guides/ResearchGuide.tsx`を作る（①3つの指標 ②真似してよい投稿 ③真似しない方がよい投稿と例外 ④5つの手順 ⑤登録する前の5つの確認といちばん大事な考え方。このアプリの言葉で、成果を約束しない）。`apps/web/src/pages/research.tsx`のタブの下に、閉じた状態で置く。
+- [ ] T076 [P] [US6] `apps/web/src/components/guides/IntroGuide.tsx`を作り（文はcontracts/ui-routes.md「ホーム」）、`apps/web/src/pages/account-home.tsx`の一番上に置く（`preferences.ts`の`threads-grower:intro-dismissed:<userId>`）。T074を通す。
 
 ---
 
@@ -368,11 +371,11 @@ description: "Task list for feature 014 strategy guidance"
 
 **Independent Test**：コピーした文に課題が入り、1行1つの答えを貼って選んだものだけ登録され、「Threadsで検索」が検索結果を開くことを確かめる。
 
-- [ ] T076 [P] [US9] `packages/shared/test/research.test.ts`に`buildKeywordIdeaPrompt`・`parseKeywordIdeas`のテストを足す（行頭の`1.`・`1)`・`・`・`-`・`#`・`*`を除く、`｜`と`|`、`｜`なし、空の行、100文字超・登録済み・一覧の中の重なり。FR-090・FR-091）。
-- [ ] T077 [P] [US9] `apps/api/test/integration/keywords-batch.test.ts`：`idea-prompt`の中身、まとめての登録（20件まで・上限100で0件と`remaining`・登録済みと重なれば`409 KEYWORD_DUPLICATE`と`details.keywords`・一覧の中の重なりは400・操作の記録が1件）、権限の表（FR-092・FR-094）。
-- [ ] T078 [P] [US9] `apps/web/test/research-keywords.test.tsx`：案のカード・チェック付きの一覧・登録・「Threadsで検索」のURL（`https://www.threads.com/search?q=`＋エンコード）と`target="_blank"`、見せてもらっている人は「Threadsで検索」だけ（FR-090〜FR-093）。
-- [ ] T079 [US9] `packages/shared/src/research.ts`に`buildKeywordIdeaPrompt`・`parseKeywordIdeas`を足し、`apps/api/src/routes/research.ts`に`GET /research-keywords/idea-prompt`と`POST /research-keywords/batch`（`insertManyWithLimit`、`research_keywords_added`）を足す。T076・T077を通す。
-- [ ] T080 [US9] `apps/web/src/components/research/KeywordIdeasPanel.tsx`を作り、`apps/web/src/pages/research.tsx`のキーワードのタブに置く。キーワードの各行に「Threadsで検索」を足す。`apps/web/src/lib/api-client.ts`に2つのAPIを足す。T078を通す。
+- [ ] T077 [P] [US9] `packages/shared/test/research.test.ts`に`buildKeywordIdeaPrompt`・`parseKeywordIdeas`のテストを足す（行頭の`1.`・`1)`・`・`・`-`・`#`・`*`を除く、`｜`と`|`、`｜`なし、空の行、100文字超・登録済み・一覧の中の重なり。FR-090・FR-091）。
+- [ ] T078 [P] [US9] `apps/api/test/integration/keywords-batch.test.ts`：`idea-prompt`の中身、まとめての登録（20件まで・上限100で0件と`remaining`・登録済みと重なれば`409 KEYWORD_DUPLICATE`と`details.keywords`・一覧の中の重なりは400・操作の記録が1件）、権限の表（FR-092・FR-094）。
+- [ ] T079 [P] [US9] `apps/web/test/research-keywords.test.tsx`：案のカード・チェック付きの一覧・登録・「Threadsで検索」のURL（`https://www.threads.com/search?q=`＋エンコード）と`target="_blank"`、見せてもらっている人は「Threadsで検索」だけ（FR-090〜FR-093）。
+- [ ] T080 [US9] `packages/shared/src/research.ts`に`buildKeywordIdeaPrompt`・`parseKeywordIdeas`を足し、`apps/api/src/routes/research.ts`に`GET /research-keywords/idea-prompt`と`POST /research-keywords/batch`（`insertManyWithLimit`、`research_keywords_added`）を足す。T077・T078を通す。
+- [ ] T081 [US9] `apps/web/src/components/research/KeywordIdeasPanel.tsx`を作り、`apps/web/src/pages/research.tsx`のキーワードのタブに置く。キーワードの各行に「Threadsで検索」を足す。`apps/web/src/lib/api-client.ts`に2つのAPIを足す。T079を通す。
 
 ---
 
@@ -382,13 +385,13 @@ description: "Task list for feature 014 strategy guidance"
 
 **Independent Test**：値を変えて保存・読み直しでき、内訳とプロンプトの数字が変わり、「初期値に戻す」で今と同じになることを確かめる。
 
-- [ ] T081 [P] [US13] `apps/api/test/integration/prompt-settings-length.test.ts`（FR-140〜FR-142）。
+- [ ] T082 [P] [US13] `apps/api/test/integration/prompt-settings-length.test.ts`（FR-140〜FR-142）。
   - `length`の保存・省略。刻み・合計100・目標以下の検証（`details.reason`）。
   - 版の衝突（`latest`に`length`）。オーナーだけ（担当の人は403）。操作の記録`prompt_length_saved`。
   - `GET /prompt`の`settings`と、プロンプトの数字が変わる。
-- [ ] T082 [P] [US13] `apps/web/test/create-length.test.tsx`：1行のまとめ、入力のたびの内訳（合計＝作る件数）、理由の文で保存できない、「初期値に戻す」、保存、オーナー以外は保存できない（SC-019）。
-- [ ] T083 [US13] `apps/api/src/routes/prompt.ts`の`PUT /prompt-settings`で`length`を保存（同じ版、`prompt_length_saved`）、`GET /prompt`に`settings`を足す。`apps/api/src/services/prompt-service.ts`でアカウントの値を`buildPrompt`に渡す。T081を通す。
-- [ ] T084 [US13] `apps/web/src/components/create/LengthSettings.tsx`を作り、`PromptCard.tsx`に置く（目標の文字数・短文中文長文の文字数とスライダー・件数・内訳・理由・「保存」・「初期値に戻す」。`splitLengthMix`を使う）。T082を通す。
+- [ ] T083 [P] [US13] `apps/web/test/create-length.test.tsx`：1行のまとめ、入力のたびの内訳（合計＝作る件数）、理由の文で保存できない、「初期値に戻す」、保存、オーナー以外は保存できない（SC-019）。
+- [ ] T084 [US13] `apps/api/src/routes/prompt.ts`の`PUT /prompt-settings`で`length`を保存（同じ版、`prompt_length_saved`）、`GET /prompt`に`settings`を足す。`apps/api/src/services/prompt-service.ts`でアカウントの値を`buildPrompt`に渡す。T082を通す。
+- [ ] T085 [US13] `apps/web/src/components/create/LengthSettings.tsx`を作り、`PromptCard.tsx`に置く（目標の文字数・短文中文長文の文字数とスライダー・件数・内訳・理由・「保存」・「初期値に戻す」。`splitLengthMix`を使う）。T083を通す。
 
 ---
 
@@ -398,21 +401,21 @@ description: "Task list for feature 014 strategy guidance"
 
 **Independent Test**：長いプロンプトで文字数と注意が出て、1つ目・2つ目をそれぞれコピーでき、合わせると全文と同じ節になることを確かめる。
 
-- [ ] T085 [P] [US14] `packages/shared/test/prompt.test.ts`に`parts`のテストを足す：1つ目と2つ目の冒頭・末尾の文、どちらにも最初に確認すること、合わせた節が全文と同じ（SC-020）。`splitRecommended`の境（12,000字）。
-- [ ] T086 [P] [US14] `apps/web/test/create-parts.test.tsx`：文字数の表示、12,000字超で注意と「2つに分けて送る」が初めの選択、切り替えを`localStorage`に覚える、それぞれのコピー・中身を見る、書き換えのコピーは1つにまとめたときだけ（FR-150〜FR-153）。
-- [ ] T087 [US14] `packages/shared/src/prompt.ts`の`buildPrompt`に`parts`を足し（節2〜6と7〜14で分ける）、`apps/api/src/routes/prompt.ts`の応答に`parts`・`splitRecommended`を足す。T085を通す。
-- [ ] T088 [US14] `apps/web/src/components/create/PromptParts.tsx`を作り、`PromptCard.tsx`のコピーの所を、文字数・送り方の切り替え（`preferences.ts`の`threads-grower:prompt-send-mode`）・1つにまとめて（今のコピーと書き換え）・2つに分けて（各行のコピーと中身を見る）にする。T086を通す。
+- [ ] T086 [P] [US14] `packages/shared/test/prompt.test.ts`に`parts`のテストを足す：1つ目と2つ目の冒頭・末尾の文、どちらにも最初に確認すること、合わせた節が全文と同じ（SC-020）。`splitRecommended`の境（12,000字）。
+- [ ] T087 [P] [US14] `apps/web/test/create-parts.test.tsx`：文字数の表示、12,000字超で注意と「2つに分けて送る」が初めの選択、切り替えを`localStorage`に覚える、それぞれのコピー・中身を見る、書き換えのコピーは1つにまとめたときだけ（FR-150〜FR-153）。
+- [ ] T088 [US14] `packages/shared/src/prompt.ts`の`buildPrompt`に`parts`を足し（節2〜6と7〜14で分ける）、`apps/api/src/routes/prompt.ts`の応答に`parts`・`splitRecommended`を足す。T086を通す。
+- [ ] T089 [US14] `apps/web/src/components/create/PromptParts.tsx`を作り、`PromptCard.tsx`のコピーの所を、文字数・送り方の切り替え（`preferences.ts`の`threads-grower:prompt-send-mode`）・1つにまとめて（今のコピーと書き換え）・2つに分けて（各行のコピーと中身を見る）にする。T087を通す。
 
 ---
 
 ## Phase 18: Polish & Cross-Cutting Concerns
 
-- [ ] T089 [P] E2E：`e2e/tests/strategy.spec.ts`に目的の5問・考えるヒント・自動チェック・深掘りの反映（偽の答え）を足す。`e2e/tests/research.spec.ts`（新規：ためて登録 → まとめての解説（偽の答え））と`e2e/tests/create.spec.ts`（新規：投稿をつくる → コピー → 貼り付け（コードブロックつき）→ 登録 → 投稿ストックで確かめる）を書く。
-- [ ] T090 [P] `docs/ui-design.md`に「投稿をつくる」の画面と、課題の固定のチップ・リサーチの追加の欄を足す。
-- [ ] T091 [P] `apps/web/src/pages/activity.tsx`に新しい操作の記録の名前（`reference_posts_added`・`reference_posts_explained`・`research_keywords_added`・`prompt_length_saved`）の表示を足し、テストを足す。
-- [ ] T092 スマートフォンの幅（375px）で、課題・リサーチ・投稿をつくる・投稿ストック・ホームが横にはみ出さないことを、Webのテスト（幅を狭めた描画）と手で確かめる（SC-009）。
-- [ ] T093 `pnpm lint && pnpm typecheck && pnpm test && pnpm e2e`を通し、`specs/014-strategy-guidance/verification.md`に結果と手で確かめること（quickstart.md 2）の結果、計画からの変更を書く。
-- [ ] T094 [P] contracts/hints.mdの文言を、ユーザーに確かめてもらい、直しがあれば`packages/shared/src/strategy-guidance.ts`に反映する。
+- [ ] T090 [P] E2E：`e2e/tests/strategy.spec.ts`に目的の5問・考えるヒント・自動チェック・深掘りの反映（偽の答え）を足す。`e2e/tests/research.spec.ts`（新規：ためて登録 → まとめての解説（偽の答え））と`e2e/tests/create.spec.ts`（新規：投稿をつくる → コピー → 貼り付け（コードブロックつき）→ 登録 → 投稿ストックで確かめる）を書く。
+- [ ] T091 [P] `docs/ui-design.md`に「投稿をつくる」の画面と、課題の固定のチップ・リサーチの追加の欄を足す。
+- [ ] T092 [P] `apps/web/src/pages/activity.tsx`に新しい操作の記録の名前（`reference_posts_added`・`reference_posts_explained`・`research_keywords_added`・`prompt_length_saved`）の表示を足し、テストを足す。
+- [ ] T093 スマートフォンの幅（375px）で、課題・リサーチ・投稿をつくる・投稿ストック・ホームが横にはみ出さないことを、Webのテスト（幅を狭めた描画）と手で確かめる（SC-009）。
+- [ ] T094 `pnpm lint && pnpm typecheck && pnpm test && pnpm e2e`を通し、`specs/014-strategy-guidance/verification.md`に結果と手で確かめること（quickstart.md 2）の結果、計画からの変更を書く。
+- [ ] T095 [P] contracts/hints.mdの文言を、ユーザーに確かめてもらい、直しがあれば`packages/shared/src/strategy-guidance.ts`に反映する。
 
 ---
 
@@ -457,9 +460,9 @@ Task: T037 research-add.test.tsx
 Task: T043 api-client.ts
 
 # US15の中で
-Task: T058 create.test.tsx
-Task: T059 stock.test.tsx
-Task: T060 sidebar-create.test.tsx・account-home.test.tsx
+Task: T059 create.test.tsx
+Task: T060 stock.test.tsx
+Task: T061 sidebar-create.test.tsx・account-home.test.tsx
 ```
 
 ## Implementation Strategy
