@@ -177,17 +177,25 @@ export function createStripeClient(
       });
     },
     /**
-     * 顧客の契約の一覧（終わったものを含む）。
+     * 顧客の契約の一覧（終わったものを含む。すべてのページ）。
      * @param customerId - 顧客のID
      * @returns 契約の一覧（新しい順）
      */
     async listSubscriptions(customerId: string) {
-      const res = await request<{ data: StripeSubscription[] }>("GET", "/v1/subscriptions", {
-        customer: customerId,
-        status: "all",
-        limit: 10,
-      });
-      return res.data;
+      // 契約の履歴が多くても取りこぼさないよう、すべてのページを読む（PR #16 のCodexレビュー）
+      const all: StripeSubscription[] = [];
+      let startingAfter: string | undefined;
+      for (;;) {
+        const res = await request<{ data: StripeSubscription[]; has_more?: boolean }>("GET", "/v1/subscriptions", {
+          customer: customerId,
+          status: "all",
+          limit: 100,
+          starting_after: startingAfter,
+        });
+        all.push(...res.data);
+        if (!res.has_more || res.data.length === 0) return all;
+        startingAfter = res.data[res.data.length - 1]!.id;
+      }
     },
     /**
      * 契約の数を変える。日割りの請求・返金を作らない（research.md R6）。

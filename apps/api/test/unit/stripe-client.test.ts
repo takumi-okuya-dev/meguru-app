@@ -85,8 +85,23 @@ describe("createStripeClient", () => {
     expect(body.get("items[0][quantity]")).toBe("2");
     expect(body.get("proration_behavior")).toBe("none");
     await stripe.listSubscriptions("cus_1");
-    expect(captured[1]!.url).toBe("http://stripe.test/v1/subscriptions?customer=cus_1&status=all&limit=10");
+    expect(captured[1]!.url).toBe("http://stripe.test/v1/subscriptions?customer=cus_1&status=all&limit=100");
     expect(captured[1]!.init.body).toBeUndefined();
+  });
+
+  it("契約の一覧は has_more の間、starting_after で次のページを読む（PR #16 のCodexレビュー）", async () => {
+    const captured: Captured[] = [];
+    const pages = [
+      { data: [{ id: "sub_3" }, { id: "sub_2" }], has_more: true },
+      { data: [{ id: "sub_1" }], has_more: false },
+    ];
+    const stripe = createStripeClient(env, (async (input: RequestInfo | URL, init?: RequestInit) => {
+      captured.push({ url: String(input), init: init ?? {} });
+      return new Response(JSON.stringify(pages[captured.length - 1]), { status: 200 });
+    }) as typeof fetch);
+    const all = await stripe.listSubscriptions("cus_1");
+    expect(all.map((s) => s.id)).toEqual(["sub_3", "sub_2", "sub_1"]);
+    expect(captured[1]!.url).toContain("starting_after=sub_2");
   });
 
   it("誤りは StripeError にし、鍵を文に含めない", async () => {

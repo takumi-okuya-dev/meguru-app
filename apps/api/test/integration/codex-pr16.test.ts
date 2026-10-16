@@ -208,3 +208,23 @@ describe("P2：同時の読み直し・数の反映", () => {
     expect(await rowOf(userId)).toMatchObject({ quantity: 4, quantitySyncNeeded: false });
   });
 });
+
+describe("P2（2回目）：契約の一覧をすべてのページから読む", () => {
+  it("新しい12件の後ろにある古い有効な契約も、読み直しと退会で扱う", async () => {
+    const { userId } = await createUserWithAccount("u1");
+    await checkout("u1");
+    const customer = (await rowOf(userId)).stripeCustomerId;
+    const oldLive = await fakeStripe.createSubscription(customer, { status: "active" });
+    for (let i = 0; i < 12; i++) await fakeStripe.createSubscription(customer, { status: "canceled" });
+    // 1ページ5件にして、ページ分けを確かめる
+    await fetch(`${testEnv.STRIPE_API_BASE_URL}/__control/page-limit`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ limit: 5 }),
+    });
+    await syncCustomer(billingEnv(), customer);
+    expect(await rowOf(userId)).toMatchObject({ stripeSubscriptionId: oldLive.id, status: "active" });
+    expect((await callBilling(app, "POST", "/api/me/withdraw", { user: "u1", body: { confirmEmail: "u1@example.com" } })).status).toBe(204);
+    expect((await fakeStripe.subscriptions()).find((s) => s.id === oldLive.id)!.status).toBe("canceled");
+  });
+});

@@ -40,6 +40,8 @@ export function createFakeStripe() {
   const failures: { prefix: string; method: string; times: number; status: number }[] = [];
   let webhook: { url: string; secret: string } | null = null;
   let seq = 0;
+  // 1ページの最大の件数（テストでページ分けを確かめるために小さくできる）
+  let pageLimit = 100;
   let clock = 0; // 契約の created を必ず増やす
   const id = (prefix: string) => `${prefix}_fake${++seq}`;
   const now = () => Math.floor(Date.now() / 1000);
@@ -146,10 +148,14 @@ export function createFakeStripe() {
     return c.json({ url: `${new URL(c.req.url).origin}/portal/${q.customer}?return=${encodeURIComponent(q.return_url ?? "")}` });
   });
 
+  // 本物と同じく、limit（既定10）と starting_after でページに分け、has_more を返す
   app.get("/v1/subscriptions", (c) => {
-    const customer = p(c).customer;
-    const data = [...subscriptions.values()].filter((s) => s.customer === customer).sort((a, b) => b.created - a.created);
-    return c.json({ object: "list", data });
+    const q = p(c);
+    const all = [...subscriptions.values()].filter((s) => s.customer === q.customer).sort((a, b) => b.created - a.created);
+    const from = q.starting_after ? all.findIndex((s) => s.id === q.starting_after) + 1 : 0;
+    const limit = Math.min(Number(q.limit ?? 10), pageLimit);
+    const data = all.slice(from, from + limit);
+    return c.json({ object: "list", data, has_more: from + limit < all.length });
   });
 
   app.post("/v1/subscriptions/:id", (c) => {
@@ -191,6 +197,7 @@ export function createFakeStripe() {
     requests.length = 0;
     failures.length = 0;
     webhook = null;
+    pageLimit = 100;
     return c.json({ ok: true });
   });
   app.get("/__control/requests", (c) => c.json({ requests }));
@@ -242,6 +249,10 @@ export function createFakeStripe() {
     if (b.currentPeriodEnd !== undefined) sub.items.data[0]!.current_period_end = b.currentPeriodEnd;
     if (b.webhook) await sendWebhook(b.webhook, sub);
     return c.json(sub);
+  });
+  app.post("/__control/page-limit", async (c) => {
+    pageLimit = (await c.req.json<{ limit: number }>()).limit;
+    return c.json({ ok: true });
   });
   app.post("/__control/webhook", async (c) => {
     webhook = await c.req.json<{ url: string; secret: string }>();
