@@ -4,6 +4,8 @@ import {
   KEYWORD_LIMIT,
   REFERENCE_POST_LIMIT,
   buildExplainPrompt,
+  buildKeywordIdeaPrompt,
+  keywordBatchRequestSchema,
   explanationsRequestSchema,
   freshnessOf,
   isBlank,
@@ -19,7 +21,7 @@ import {
   type ReferencePost,
   type ReferencePostInput,
 } from "@threads-grower/shared";
-import { and, count, desc, eq, sql } from "drizzle-orm";
+import { and, count, desc, eq, inArray, sql } from "drizzle-orm";
 import { Hono, type MiddlewareHandler } from "hono";
 import type { AppEnv } from "../app";
 import { createDb } from "../db/client";
@@ -391,6 +393,75 @@ export function researchRoutes(authed: MiddlewareHandler<AppEnv>) {
         );
         await touchMaterials(db, account.id, "research");
         return c.json(toKeyword(row), 201);
+      })
+      // キーワードの案のプロンプト（specs/014 FR-090、research.md R16）
+      .get("/accounts/:accountId/research-keywords/idea-prompt", authed, async (c) => {
+        const db = createDb(c.env.DATABASE_URL);
+        const access = await authorizeAccount(db, c.get("user"), c.req.param("accountId"), "content");
+        return c.json({ prompt: buildKeywordIdeaPrompt(await getStrategy(db, access.account.id)) });
+      })
+      // キーワードの案のまとめての登録（specs/014 FR-092・FR-094）。1件でも通らなければ1件も入れない
+      .post("/accounts/:accountId/research-keywords/batch", authed, async (c) => {
+        const db = createDb(c.env.DATABASE_URL);
+        const user = c.get("user");
+        const access = await authorizeAccount(db, user, c.req.param("accountId"), "content");
+        const account = access.account;
+        const parsed = keywordBatchRequestSchema.safeParse(await c.req.json().catch(() => null));
+        if (!parsed.success) {
+          const fields = [...new Set(parsed.error.issues.map((i) => i.path.join(".")).filter(Boolean))];
+          throw new AppError("VALIDATION_FAILED", 400, "invalid request", undefined, fields);
+        }
+        const { items } = parsed.data;
+        // 登録済みと重なる言葉を先に返す（どれが重なったかを画面で示すため）
+        const normalized = items.map((i) => normalizeKeyword(i.keyword));
+        const taken = new Set(
+          (
+            await db
+              .select({ n: researchKeywords.keywordNormalized })
+              .from(researchKeywords)
+              .where(and(eq(researchKeywords.accountId, account.id), inArray(researchKeywords.keywordNormalized, normalized)))
+          ).map((r) => r.n),
+        );
+        const overlaps = items.filter((_, i) => taken.has(normalized[i]!)).map((i) => i.keyword);
+        if (overlaps.length > 0) throw new AppError("KEYWORD_DUPLICATE", 409, "duplicate keyword", undefined, overlaps);
+        const rows = await withDuplicateCheck(() =>
+          insertManyWithLimit(
+            c.env,
+            account.id,
+            "research_keywords",
+            KEYWORD_LIMIT,
+            async (tx) =>
+              (await tx.select({ n: count() }).from(researchKeywords).where(eq(researchKeywords.accountId, account.id)))[0]!.n,
+            items.length,
+            async (tx) => {
+              // 送った順を保つため、登録日時を1ミリ秒ずつずらす
+              const now = Date.now();
+              const inserted = await tx
+                .insert(researchKeywords)
+                .values(
+                  items.map((input, i) => ({
+                    accountId: account.id,
+                    keyword: input.keyword,
+                    keywordNormalized: normalized[i]!,
+                    purpose: orNull(input.purpose),
+                    updatedByUserId: access.actor.id,
+                    createdAt: new Date(now + i),
+                    updatedAt: new Date(now + i),
+                  })),
+                )
+                .returning();
+              await recordActivity(tx, access, {
+                kind: "content",
+                action: "research_keywords_added",
+                summary: `${items.length}件`,
+                excerpts: [items[0]!.keyword],
+              });
+              return inserted;
+            },
+          ),
+        );
+        await touchMaterials(db, account.id, "research");
+        return c.json({ items: rows.map(toKeyword) }, 201);
       })
       .put("/accounts/:accountId/research-keywords/:keywordId", authed, async (c) => {
         const db = createDb(c.env.DATABASE_URL);

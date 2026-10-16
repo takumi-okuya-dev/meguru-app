@@ -1,10 +1,10 @@
 // リサーチの参考投稿・キーワードの手助け（specs/014-strategy-guidance research.md R6〜R8・R16）。
 // 鮮度・プロンプトの並び・解説のプロンプトと取り出し・キーワードの案の取り出しを、APIとWebで共有する。
 import { splitDrafts } from "./drafts";
-import { FRESHNESS_ACTIVE_DAYS, FRESHNESS_LATEST_DAYS, REFERENCE_WHY_GOOD_MAX } from "./limits";
+import { FRESHNESS_ACTIVE_DAYS, FRESHNESS_LATEST_DAYS, REFERENCE_WHY_GOOD_MAX, SHORT_TEXT_MAX } from "./limits";
 import { addDays, jstDateOf } from "./schedule";
 import type { StrategyValues } from "./strategy";
-import { countChars, isBlank } from "./text";
+import { countChars, isBlank, normalizeKeyword } from "./text";
 
 /** 参考投稿の媒体（data-model.md の reference_posts.platform）。 */
 export const REFERENCE_PLATFORMS = [
@@ -270,4 +270,70 @@ export function parseExplanations(
     if (post && problem === null) seen.add(post.id);
     return { id: post?.id ?? null, shortId: post?.shortId ?? shortId, text: body, problem };
   });
+}
+
+/** キーワードの案のプロンプトに入れる課題の項目（specs/014 FR-090）。 */
+const KEYWORD_CONTEXT: [keyof StrategyValues, string][] = [
+  ["targetPersona", "届けたい人"],
+  ["realWorries", "本音の悩み"],
+  ["desiredSelfImage", "なりたい姿"],
+  ["contentThemeMix", "発信テーマの掛け合わせ"],
+  ["postGenres", "投稿ジャンル"],
+];
+
+/**
+ * 検索するキーワードの案を、外部のAIに出してもらうプロンプト（specs/014 FR-090、contracts/prompt-template.md 6）。
+ * @param strategy - 課題の値
+ * @returns プロンプト
+ */
+export function buildKeywordIdeaPrompt(strategy: StrategyValues): string {
+  const account = contextLines(strategy, KEYWORD_CONTEXT);
+  return [
+    "あなたは、Threadsのリサーチを手伝う相談相手です。下の私のアカウントの設計をもとに、Threadsの検索欄に入れると「集めたい人に届いて伸びている投稿」が見つかりそうな言葉の案を出してください。",
+    "",
+    "■私のアカウント",
+    ...(account.length > 0 ? account : ["(まだ書いていません。Threadsでよく検索される、暮らし・仕事・人間関係の言葉から出してください)"]),
+    "",
+    "■お願い",
+    "・短い言葉(1〜3語)を15〜20個。集めたい人が使いそうな言葉・その人の気持ちに近い言葉を中心にする。",
+    "・1行に1つ、「キーワード｜狙い」の形で書く(例: 20代後半 友達｜社会人になって友達が増えない人の本音を探す)。",
+    "・前置き・番号・見出しは書かない。",
+  ].join("\n");
+}
+
+/** キーワードの案を登録できない理由（長すぎる・登録済み・一覧の中で重なる）。 */
+export type KeywordIdeaProblem = "too_long" | "registered" | "duplicate";
+
+/** 貼り付けた答えから取り出したキーワードの案。 */
+export type KeywordIdea = { keyword: string; purpose: string; problem: KeywordIdeaProblem | null };
+
+/** 行頭の番号・記号（1.・1)・①・・・-・#・*・>）と空白（\s は全角の空白も含む）。 */
+const IDEA_PREFIX = /^\s*(?:(?:\d+|[①-⑳])[.)．）、]?|[・\-#*>•])?\s*/;
+
+/**
+ * 貼り付けた答えを1行ずつキーワードの案にする（specs/014 FR-091）。
+ * 「｜」「|」の前をキーワード、後を狙い（なければ空）にし、行頭の番号・記号・空白を除く。空の行とコードブロックの区切りの行は捨てる。
+ * @param text - 貼り付けた答え
+ * @param registered - 登録済みのキーワード
+ * @returns 案の一覧（答えの順）。登録できないものは problem に理由
+ */
+export function parseKeywordIdeas(text: string, registered: readonly string[]): KeywordIdea[] {
+  const known = new Set(registered.map(normalizeKeyword));
+  const seen = new Set<string>();
+  const ideas: KeywordIdea[] = [];
+  for (const raw of text.replace(/\r\n?/g, "\n").split("\n")) {
+    if (/^\s*```/.test(raw)) continue;
+    const line = raw.replace(IDEA_PREFIX, "").trim();
+    if (line === "") continue;
+    const at = line.search(/[｜|]/);
+    const keyword = (at < 0 ? line : line.slice(0, at)).trim();
+    if (keyword === "") continue;
+    const purpose = [...(at < 0 ? "" : line.slice(at + 1).trim())].slice(0, SHORT_TEXT_MAX).join("");
+    const key = normalizeKeyword(keyword);
+    const problem: KeywordIdeaProblem | null =
+      countChars(keyword) > SHORT_TEXT_MAX ? "too_long" : known.has(key) ? "registered" : seen.has(key) ? "duplicate" : null;
+    seen.add(key);
+    ideas.push({ keyword, purpose, problem });
+  }
+  return ideas;
 }

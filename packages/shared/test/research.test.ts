@@ -1,6 +1,14 @@
 // リサーチの手助け（specs/014-strategy-guidance FR-096・FR-098・FR-099、research.md R6）。
 import { describe, expect, it } from "vitest";
-import { buildExplainPrompt, freshnessOf, parseExplanations, shortIdsOf, sortForPrompt } from "../src/research";
+import {
+  buildExplainPrompt,
+  buildKeywordIdeaPrompt,
+  freshnessOf,
+  parseExplanations,
+  parseKeywordIdeas,
+  shortIdsOf,
+  sortForPrompt,
+} from "../src/research";
 import { emptyStrategyValues } from "../src/strategy";
 
 // 登録日時：2026-10-16 10:00 JST
@@ -154,3 +162,62 @@ describe("parseExplanations（FR-103）", () => {
     expect(long[0]!.problem).toBe("too_long");
   });
 });
+
+describe("buildKeywordIdeaPrompt（specs/014 FR-090、contracts/prompt-template.md 6）", () => {
+  it("課題の5項目のうち入力のあるものと、出す形を入れる", () => {
+    const prompt = buildKeywordIdeaPrompt({
+      ...emptyStrategyValues(),
+      targetPersona: "上京したばかりの20代",
+      contentThemeMix: "東京の暮らし×友だちづくり",
+      finalAction: "公式LINEに登録",
+    });
+    expect(prompt).toContain("あなたは、Threadsのリサーチを手伝う相談相手です。");
+    expect(prompt).toContain("■私のアカウント\n- 届けたい人: 上京したばかりの20代\n- 発信テーマの掛け合わせ: 東京の暮らし×友だちづくり\n");
+    expect(prompt).not.toContain("公式LINEに登録");
+    expect(prompt).toContain("・短い言葉(1〜3語)を15〜20個。");
+    expect(prompt).toContain("・1行に1つ、「キーワード｜狙い」の形で書く(例: 20代後半 友達｜社会人になって友達が増えない人の本音を探す)。");
+    expect(prompt).toContain("・前置き・番号・見出しは書かない。");
+  });
+
+  it("課題が空でも、一般的な案を頼む一言を入れる", () => {
+    expect(buildKeywordIdeaPrompt(emptyStrategyValues())).toContain("(まだ書いていません。");
+  });
+});
+
+describe("parseKeywordIdeas（specs/014 FR-091）", () => {
+  it("1行ずつ「｜」「|」で分け、行頭の番号・記号・空白を除く。「｜」がなければ全体をキーワードにし、空の行は捨てる", () => {
+    const text = [
+      "1. 20代後半 友達｜社会人の本音",
+      "2) 上京 さみしい | 孤独の声を探す",
+      "",
+      "・ 東京 一人暮らし",
+      "- 友達 作り方｜方法を探す",
+      "# 社会人 サークル",
+      "* 休日 ひとり",
+      "```",
+      "  　週末 予定なし  ",
+    ].join("\n");
+    expect(parseKeywordIdeas(text, []).map(({ keyword, purpose }) => [keyword, purpose])).toEqual([
+      ["20代後半 友達", "社会人の本音"],
+      ["上京 さみしい", "孤独の声を探す"],
+      ["東京 一人暮らし", ""],
+      ["友達 作り方", "方法を探す"],
+      ["社会人 サークル", ""],
+      ["休日 ひとり", ""],
+      ["週末 予定なし", ""],
+    ]);
+  });
+
+  it("100文字を超える・登録済み（正規化して同じ）・一覧の中で重なる行は、理由を付ける", () => {
+    const long = "あ".repeat(101);
+    const ideas = parseKeywordIdeas(["上京 さみしい", long, "ＴＯＫＹＯ 友達", "上京 さみしい", "新しい言葉"].join("\n"), ["tokyo 友達"]);
+    expect(ideas.map((i) => i.problem)).toEqual([null, "too_long", "registered", "duplicate", null]);
+  });
+
+  it("狙いは100文字までに切る", () => {
+    const [idea] = parseKeywordIdeas(`言葉｜${"い".repeat(150)}`, []);
+    expect([...idea!.purpose]).toHaveLength(100);
+    expect(idea!.problem).toBeNull();
+  });
+});
+

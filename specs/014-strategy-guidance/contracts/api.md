@@ -143,7 +143,7 @@
 ```
 
 - `items`は1〜20件（`KEYWORD_BATCH_MAX`）。各要素は`POST /research-keywords`と同じ検証。一覧の中で重なる（`normalizeKeyword`で同じ）なら`400 VALIDATION_FAILED`。
-- 上限（100件）を超えるなら`409 ITEM_LIMIT_REACHED`（`error.remaining`）。登録済みと重なるなら`409 KEYWORD_DUPLICATE`（`details.keywords`に重なった言葉）。どちらも1件も入れない。
+- 上限（100件）を超えるなら`409 ITEM_LIMIT_REACHED`（`error.remaining`）。登録済みと重なるなら`409 KEYWORD_DUPLICATE`（`details`に重なった言葉）。どちらも1件も入れない。
 - 応答`201`：`{ "items": [ResearchKeyword, …] }`。
 - 操作の記録：1件（`research_keywords_added`、要約「〇件」）。
 - 権限：`content`。

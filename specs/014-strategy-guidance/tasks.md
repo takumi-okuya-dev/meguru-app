@@ -371,11 +371,11 @@ description: "Task list for feature 014 strategy guidance"
 
 **Independent Test**：コピーした文に課題が入り、1行1つの答えを貼って選んだものだけ登録され、「Threadsで検索」が検索結果を開くことを確かめる。
 
-- [ ] T077 [P] [US9] `packages/shared/test/research.test.ts`に`buildKeywordIdeaPrompt`・`parseKeywordIdeas`のテストを足す（行頭の`1.`・`1)`・`・`・`-`・`#`・`*`を除く、`｜`と`|`、`｜`なし、空の行、100文字超・登録済み・一覧の中の重なり。FR-090・FR-091）。
-- [ ] T078 [P] [US9] `apps/api/test/integration/keywords-batch.test.ts`：`idea-prompt`の中身、まとめての登録（20件まで・上限100で0件と`remaining`・登録済みと重なれば`409 KEYWORD_DUPLICATE`と`details.keywords`・一覧の中の重なりは400・操作の記録が1件）、権限の表（FR-092・FR-094）。
-- [ ] T079 [P] [US9] `apps/web/test/research-keywords.test.tsx`：案のカード・チェック付きの一覧・登録・「Threadsで検索」のURL（`https://www.threads.com/search?q=`＋エンコード）と`target="_blank"`、見せてもらっている人は「Threadsで検索」だけ（FR-090〜FR-093）。
-- [ ] T080 [US9] `packages/shared/src/research.ts`に`buildKeywordIdeaPrompt`・`parseKeywordIdeas`を足し、`apps/api/src/routes/research.ts`に`GET /research-keywords/idea-prompt`と`POST /research-keywords/batch`（`insertManyWithLimit`、`research_keywords_added`）を足す。T077・T078を通す。
-- [ ] T081 [US9] `apps/web/src/components/research/KeywordIdeasPanel.tsx`を作り、`apps/web/src/pages/research.tsx`のキーワードのタブに置く。キーワードの各行に「Threadsで検索」を足す。`apps/web/src/lib/api-client.ts`に2つのAPIを足す。T079を通す。
+- [X] T077 [P] [US9] `packages/shared/test/research.test.ts`に`buildKeywordIdeaPrompt`・`parseKeywordIdeas`のテストを足す（行頭の`1.`・`1)`・`・`・`-`・`#`・`*`を除く、`｜`と`|`、`｜`なし、空の行、100文字超・登録済み・一覧の中の重なり。FR-090・FR-091）。
+- [X] T078 [P] [US9] `apps/api/test/integration/keywords-batch.test.ts`：`idea-prompt`の中身、まとめての登録（20件まで・上限100で0件と`remaining`・登録済みと重なれば`409 KEYWORD_DUPLICATE`と`details`（重なった言葉）・一覧の中の重なりは400・操作の記録が1件）、権限の表（FR-092・FR-094）。
+- [X] T079 [P] [US9] `apps/web/test/research-keywords.test.tsx`：案のカード・チェック付きの一覧・登録・「Threadsで検索」のURL（`https://www.threads.com/search?q=`＋エンコード）と`target="_blank"`、見せてもらっている人は「Threadsで検索」だけ（FR-090〜FR-093）。
+- [X] T080 [US9] `packages/shared/src/research.ts`に`buildKeywordIdeaPrompt`・`parseKeywordIdeas`を足し、`apps/api/src/routes/research.ts`に`GET /research-keywords/idea-prompt`と`POST /research-keywords/batch`（`insertManyWithLimit`、`research_keywords_added`）を足す。T077・T078を通す。
+- [X] T081 [US9] `apps/web/src/components/research/KeywordIdeasPanel.tsx`を作り、`apps/web/src/pages/research.tsx`のキーワードのタブに置く。キーワードの各行に「Threadsで検索」を足す。`apps/web/src/lib/api-client.ts`に2つのAPIを足す。T079を通す。
 
 ---
 

@@ -13,6 +13,7 @@ import { PageBody, PageHeader } from "@/components/layout/PageHeader";
 import { KeywordFormDialog } from "@/components/research/KeywordFormDialog";
 import { ResearchGuide } from "@/components/guides/ResearchGuide";
 import { ExplainBatchPanel } from "@/components/research/ExplainBatchPanel";
+import { KeywordIdeasPanel } from "@/components/research/KeywordIdeasPanel";
 import { ExplainOne } from "@/components/research/ExplainOne";
 import { ReferenceBadges } from "@/components/research/ReferenceBadges";
 import { ReferencePostAddDialog } from "@/components/research/ReferencePostAddDialog";
@@ -211,6 +212,15 @@ export function ResearchPage() {
           </TabsContent>
           <TabsContent value="keywords">
             {limitNotice}
+            {canEdit && keywords.data && (
+              <KeywordIdeasPanel
+                accountId={account.id}
+                registered={keywords.data.items.map((k) => k.keyword)}
+                remaining={Math.max(0, keywords.data.limit - keywords.data.items.length)}
+                onSaved={refresh}
+                onBillingRequired={(reason) => setBillingReason(reason)}
+              />
+            )}
             {!keywords.data ? (
               <Skeleton />
             ) : keywords.data.items.length === 0 ? (
@@ -223,6 +233,17 @@ export function ResearchPage() {
                       <span className="font-medium break-words">{k.keyword}</span>
                       {k.purpose && <span className="text-[13px] text-muted-foreground">{k.purpose}</span>}
                     </span>
+                    {/* だれでも使える（見せてもらっている人・読むだけの人も。specs/014 FR-093） */}
+                    <a
+                      href={`https://www.threads.com/search?q=${encodeURIComponent(k.keyword)}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      aria-label={`「${k.keyword}」をThreadsで検索`}
+                      className="flex shrink-0 items-center gap-1 text-[13px] text-ring underline"
+                    >
+                      <ExternalLinkIcon className="size-3.5" aria-hidden="true" />
+                      <span className="hidden md:inline">Threadsで検索</span>
+                    </a>
                     {menu(
                       k.keyword,
                       () => setDialog({ kind: "keyword", item: k }),

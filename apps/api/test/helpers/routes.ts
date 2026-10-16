@@ -40,6 +40,9 @@ export const ACCOUNT_ROUTES: [string, string, Permission][] = [
   ["DELETE", "/api/accounts/:accountId/reference-posts/:referencePostId", "content"],
   ["GET", "/api/accounts/:accountId/research-keywords", "read"],
   ["POST", "/api/accounts/:accountId/research-keywords", "content"],
+  // specs/014 US9（キーワードの案のプロンプト、まとめての登録）
+  ["GET", "/api/accounts/:accountId/research-keywords/idea-prompt", "content"],
+  ["POST", "/api/accounts/:accountId/research-keywords/batch", "content"],
   ["PUT", "/api/accounts/:accountId/research-keywords/:keywordId", "content"],
   ["DELETE", "/api/accounts/:accountId/research-keywords/:keywordId", "content"],
   ["GET", "/api/accounts/:accountId/prompt", "view"],

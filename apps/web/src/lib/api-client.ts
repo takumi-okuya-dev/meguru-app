@@ -42,6 +42,8 @@ import {
   promotionSettingsSchema,
   referencePostListSchema,
   explainPromptSchema,
+  keywordBatchResultSchema,
+  keywordIdeaPromptSchema,
   explanationsResultSchema,
   referencePostBatchResultSchema,
   referencePostSchema,
@@ -329,6 +331,13 @@ export const api = {
     ),
   saveExplanations: (accountId: string, body: { items: { id: string; whyGood: string }[] }) =>
     request(`/api/accounts/${accountId}/reference-posts/explanations`, explanationsResultSchema, {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+  getKeywordIdeaPrompt: (accountId: string) =>
+    request(`/api/accounts/${accountId}/research-keywords/idea-prompt`, keywordIdeaPromptSchema),
+  createKeywordsBatch: (accountId: string, body: { items: { keyword: string; purpose: string }[] }) =>
+    request(`/api/accounts/${accountId}/research-keywords/batch`, keywordBatchResultSchema, {
       method: "POST",
       body: JSON.stringify(body),
     }),

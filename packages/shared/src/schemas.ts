@@ -43,7 +43,7 @@ import { REJECT_REASON_CODES } from "./review";
 import { isValidYmd, jstToday } from "./promotions";
 import { FRESHNESS_VALUES, POSTED_DATE_MODE_VALUES, REFERENCE_PLATFORM_VALUES } from "./research";
 import { PURPOSE_KEYS, STRATEGY_TEXT_KEYS, TONE_PRESET_VALUES, type PurposeKey, type StrategyTextKey } from "./strategy";
-import { countChars, isBlank, isHttpUrl } from "./text";
+import { countChars, isBlank, isHttpUrl, normalizeKeyword } from "./text";
 
 /** Threads接続の状態のスキーマ（FR-018。not_connected は specs/012 で足した）。 */
 export const connectionStatusSchema = z.enum(["connected", "needs_reconnect", "not_connected"]);
@@ -534,7 +534,19 @@ export type ResearchKeywordInput = z.infer<typeof researchKeywordInputSchema>;
 
 /** POST /research-keywords/batch のリクエストのスキーマ（specs/014 FR-092）。 */
 export const keywordBatchRequestSchema = z.object({
-  items: z.array(researchKeywordInputSchema).min(1).max(KEYWORD_BATCH_MAX),
+  items: z
+    .array(researchKeywordInputSchema)
+    .min(1)
+    .max(KEYWORD_BATCH_MAX)
+    .superRefine((items, ctx) => {
+      // 一覧の中で重なる（正規化して同じ）キーワードは受け付けない
+      const seen = new Set<string>();
+      items.forEach((item, i) => {
+        const key = normalizeKeyword(item.keyword);
+        if (seen.has(key)) ctx.addIssue({ code: "custom", message: "duplicate", path: [i, "keyword"] });
+        seen.add(key);
+      });
+    }),
 });
 
 /** GET /research-keywords/idea-prompt のレスポンスのスキーマ（specs/014 FR-090）。 */
@@ -549,6 +561,9 @@ export const updateResearchKeywordRequestSchema = researchKeywordInputSchema.ext
 export const researchKeywordSchema = researchKeywordInputSchema.extend(itemMeta);
 /** キーワード（レスポンス）。 */
 export type ResearchKeyword = z.infer<typeof researchKeywordSchema>;
+
+/** POST /research-keywords/batch のレスポンスのスキーマ（specs/014 FR-092）。 */
+export const keywordBatchResultSchema = z.object({ items: z.array(researchKeywordSchema) });
 
 /** GET /research-keywords のレスポンスのスキーマ。 */
 export const researchKeywordListSchema = z.object({ items: z.array(researchKeywordSchema), ...listMeta });
