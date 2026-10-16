@@ -1,6 +1,7 @@
 // 課題の入力の手助け：考えるヒントと自動チェック（specs/014-strategy-guidance research.md R1・R2）。
 // 文言は contracts/hints.md のとおり。課題の画面・深掘りのプロンプト・「投稿をつくる」の情報の一覧が同じ定数を使う（FR-005）。
-import type { StrategyField } from "./strategy";
+import { STRATEGY_FIELDS, STRATEGY_SECTIONS, type StrategyField, type StrategySectionId, type StrategyValues } from "./strategy";
+import { countChars, isBlank } from "./text";
 
 /** ヒントを持つ項目のキー（表示の順。目的の5問と、数える16項目）。活動の軸と下書きは持たない。 */
 export const HINTED_KEYS = [
@@ -260,4 +261,64 @@ export const STRATEGY_HINTS: Record<HintedKey, StrategyHint> = {
  */
 export function hintOf(key: StrategyField["key"]): StrategyHint | null {
   return (STRATEGY_HINTS as Partial<Record<StrategyField["key"], StrategyHint>>)[key] ?? null;
+}
+
+/** 自動チェックの判定（FR-010）。 */
+export type CheckStatus = "empty" | "short" | "ok";
+
+/** 自動チェックの結果（research.md R2）。 */
+export type StrategyCheck = {
+  /** 項目ごとの判定と文字数（前後の空白を除く） */
+  items: Record<HintedKey, { status: CheckStatus; chars: number }>;
+  /** 数える16項目のうち「十分」の数 */
+  done: number;
+  /** 数える16項目と目的の5問のうち「短め」の数 */
+  review: number;
+  /** 目的の5問のうち「十分」の数 */
+  purposeDone: number;
+  /** 次におすすめの項目。すべて十分なら null */
+  next: HintedKey | null;
+  /** 区分ごとの「十分」の数と項目数。下書きは null */
+  sections: Record<StrategySectionId, { done: number; total: number } | null>;
+};
+
+const PURPOSE_HINTED = new Set<HintedKey>(["purposeOrigin", "purposeSelf", "purposeOthers", "purposeFuture", "purposeStance"]);
+
+/**
+ * 課題の自動チェック（FR-010〜FR-016）。入力の量だけを見て、内容の良し悪しは判定しない。
+ * 下書きの4項目と活動の軸は判定しない。
+ * @param values - 課題の値（未保存を含む）
+ * @returns 項目ごとの判定・数・次におすすめ・区分ごとの数
+ */
+export function checkStrategy(values: StrategyValues): StrategyCheck {
+  const items = {} as StrategyCheck["items"];
+  for (const key of HINTED_KEYS) {
+    if (key === "tonePreset") {
+      items[key] = { status: values.tonePreset === null ? "empty" : "ok", chars: 0 };
+      continue;
+    }
+    const text = values[key];
+    const chars = isBlank(text) ? 0 : countChars(text.trim());
+    const min = STRATEGY_HINTS[key].minChars ?? 1;
+    items[key] = { status: chars === 0 ? "empty" : chars < min ? "short" : "ok", chars };
+  }
+  let done = 0;
+  let review = 0;
+  let purposeDone = 0;
+  for (const key of HINTED_KEYS) {
+    const { status } = items[key];
+    if (status === "short") review += 1;
+    if (status === "ok") {
+      if (PURPOSE_HINTED.has(key)) purposeDone += 1;
+      else done += 1;
+    }
+  }
+  const next = HINTED_KEYS.find((k) => items[k].status === "empty") ?? HINTED_KEYS.find((k) => items[k].status === "short") ?? null;
+  const sections = {} as StrategyCheck["sections"];
+  for (const section of STRATEGY_SECTIONS) {
+    const keys = STRATEGY_FIELDS.filter((f) => f.section === section.id && f.key in items).map((f) => f.key as HintedKey);
+    sections[section.id] =
+      keys.length === 0 ? null : { done: keys.filter((k) => items[k].status === "ok").length, total: keys.length };
+  }
+  return { items, done, review, purposeDone, next, sections };
 }

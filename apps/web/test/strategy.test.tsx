@@ -87,7 +87,8 @@ describe("課題の画面", () => {
     expect(screen.getByRole("heading", { name: "活動の目的・在り方" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "営業導線設計" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "プロフィール・固定投稿（下書き）" })).toBeInTheDocument();
-    expect(screen.getAllByText("1/16 入力済み").length).toBeGreaterThan(0);
+    // 「保存済みの行動」は目安（20字）より短いので、完了0・要確認1（specs/014 FR-014）
+    expect(screen.getAllByText(/完了 0\/16 ・ 要確認 1/).length).toBeGreaterThan(0);
     expect(screen.getByLabelText("近い人間性")).toBeInTheDocument();
   });
 

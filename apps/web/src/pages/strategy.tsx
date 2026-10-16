@@ -8,8 +8,9 @@ import {
   STRATEGY_TEXT_MAX,
   STRATEGY_TOTAL,
   TONE_PRESETS,
+  SHORT_TIP,
+  checkStrategy,
   countChars,
-  countFilled,
   hintOf,
   type Strategy,
   type StrategyValues,
@@ -21,7 +22,10 @@ import { toast } from "sonner";
 import { ApiErrorScreen } from "@/components/ApiErrorScreen";
 import { ConflictDialog } from "@/components/ConflictDialog";
 import { FieldWithCounter } from "@/components/FieldWithCounter";
+import { FieldCheckBadge } from "@/components/strategy/FieldCheckBadge";
 import { HintPanel } from "@/components/strategy/HintPanel";
+import { ProgressCard } from "@/components/strategy/ProgressCard";
+import { SectionChips, sectionElementId } from "@/components/strategy/SectionChips";
 import { BillingRequiredDialog } from "@/components/billing/BillingRequiredDialog";
 import { PageBody, PageHeader } from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/button";
@@ -49,10 +53,14 @@ function sameValues(a: StrategyValues, b: StrategyValues): boolean {
   return a.tonePreset === b.tonePreset && STRATEGY_TEXT_KEYS.every((k) => a[k] === b[k]);
 }
 
-const sectionId = (id: string) => `strategy-${id}`;
-
-function scrollToSection(id: string) {
-  document.getElementById(sectionId(id))?.scrollIntoView({ behavior: "smooth", block: "start" });
+/**
+ * 項目へ移り、直せる人なら入力欄にカーソルを入れる（次におすすめ。FR-015、SC-003）。
+ * @param key - 項目のキー
+ * @param focus - 入力欄にカーソルを入れるか
+ */
+function goToField(key: string, focus: boolean) {
+  document.getElementById(`field-${key}`)?.scrollIntoView?.({ behavior: "smooth", block: "center" });
+  if (focus) document.getElementById(`strategy-${key}`)?.focus({ preventScroll: true });
 }
 
 /**
@@ -92,7 +100,9 @@ function StrategyEditor({ accountId, initial }: { accountId: string; initial: St
   const dirty = canEdit && !sameValues(values, baseline);
   useUnsavedChanges(dirty);
   const overLimit = STRATEGY_TEXT_KEYS.some((k) => countChars(values[k]) > STRATEGY_TEXT_MAX);
-  const filled = countFilled(values);
+  // 自動チェック（入力のたびに、保存を待たずに求める。FR-012）
+  const check = checkStrategy(values);
+  const nextField = check.next ? STRATEGY_FIELDS.find((f) => f.key === check.next) : undefined;
 
   const applySaved = (s: Strategy, keepInput = false) => {
     setSaved(s);
@@ -134,7 +144,7 @@ function StrategyEditor({ accountId, initial }: { accountId: string; initial: St
   const actions = canEdit ? (
     <>
       <span className="hidden text-[13px] text-muted-foreground md:inline">
-        {filled}/{STRATEGY_TOTAL} 入力済み
+        完了 {check.done}/{STRATEGY_TOTAL} ・ 要確認 {check.review} ・ 目的 {check.purposeDone}/5問
       </span>
       {saved.updatedAt && (
         <span className="hidden text-[13px] text-muted-foreground lg:inline">
@@ -163,47 +173,21 @@ function StrategyEditor({ accountId, initial }: { accountId: string; initial: St
     </>
   ) : null;
 
-  // 767px以下：上部バーの下に、入力済み項目数と区分のチップを横スクロールで固定する
-  const mobileChips = (
-    <nav aria-label="区分へ移動（スマートフォン）" className="flex items-center gap-2 overflow-x-auto border-b px-4 py-2 md:hidden">
-      <span className="shrink-0 text-[13px] text-muted-foreground">
-        {filled}/{STRATEGY_TOTAL}
-      </span>
-      {STRATEGY_SECTIONS.map((s) => (
-        <button
-          key={s.id}
-          type="button"
-          onClick={() => scrollToSection(s.id)}
-          className="h-9 shrink-0 rounded-full bg-muted px-3.5 text-sm whitespace-nowrap"
-        >
-          {s.chip}
-        </button>
-      ))}
-    </nav>
-  );
-
   return (
     <>
-      <PageHeader title="課題" actions={actions} toolbar={mobileChips} />
+      <PageHeader title="課題" actions={actions} toolbar={<SectionChips check={check} />} />
       <PageBody className="pb-24">
         <p className={cn("text-[15px] text-muted-foreground", !canEdit && "mt-4")}>
           ここに書いた内容が、投稿づくりの材料になります。空欄があっても保存できます。
         </p>
-        <nav aria-label="区分へ移動" className="mt-3 mb-9 hidden flex-wrap gap-2 md:flex">
-          {STRATEGY_SECTIONS.map((s) => (
-            <button
-              key={s.id}
-              type="button"
-              onClick={() => scrollToSection(s.id)}
-              className="rounded-full bg-muted px-3 py-1 text-[13px] hover:bg-accent"
-            >
-              {s.chip}
-            </button>
-          ))}
-        </nav>
-        <div className="mt-6 space-y-11 md:mt-0">
+        <ProgressCard
+          check={check}
+          nextLabel={nextField?.label ?? null}
+          onNext={() => check.next && goToField(check.next, canEdit)}
+        />
+        <div className="mt-9 space-y-11">
           {STRATEGY_SECTIONS.map((section) => (
-            <section key={section.id} id={sectionId(section.id)} className="scroll-mt-32 space-y-5">
+            <section key={section.id} id={sectionElementId(section.id)} className="scroll-mt-36 space-y-5">
               <h2 className="text-[17px] font-semibold">{section.title}</h2>
               {section.id === "drafts" && (
                 <p className="-mt-3 text-[13px] text-muted-foreground">
@@ -212,6 +196,7 @@ function StrategyEditor({ accountId, initial }: { accountId: string; initial: St
               )}
               {STRATEGY_FIELDS.filter((f) => f.section === section.id).map((f) => {
                 const hint = hintOf(f.key);
+                const item = (check.items as Partial<typeof check.items>)[f.key as keyof typeof check.items];
                 return (
                   <div key={f.key} id={`field-${f.key}`} className="scroll-mt-36">
                     {f.key === "tonePreset" ? (
@@ -221,6 +206,7 @@ function StrategyEditor({ accountId, initial }: { accountId: string; initial: St
                         value={values.tonePreset}
                         disabled={!canEdit}
                         onChange={(v) => set("tonePreset", v)}
+                        badge={item && <FieldCheckBadge status={item.status} />}
                       >
                         {hint && <HintPanel hint={hint} className="pt-1" />}
                       </ToneSelect>
@@ -234,14 +220,20 @@ function StrategyEditor({ accountId, initial }: { accountId: string; initial: St
                         max={STRATEGY_TEXT_MAX}
                         value={values[f.key as keyof typeof values] as string}
                         readOnly={!canEdit}
-                        showEmptyBadge={f.counted}
                         onChange={(v) => set(f.key as (typeof STRATEGY_TEXT_KEYS)[number], v)}
+                        hint={item?.status === "short" ? (hint?.shortTip ?? SHORT_TIP) : undefined}
                         labelExtra={
-                          hint?.star && (
-                            <span className="rounded-full bg-foreground px-2 py-px text-[11px] font-medium text-background">
-                              ★ 特に大事
-                            </span>
-                          )
+                          <>
+                            {hint?.star && (
+                              <span className="rounded-full bg-foreground px-2 py-px text-[11px] font-medium text-background">
+                                ★ 特に大事
+                              </span>
+                            )}
+                            {f.key === "activityAxis" && (
+                              <span className="rounded-full bg-muted px-2 py-px text-[11px] text-muted-foreground">任意</span>
+                            )}
+                            {item && <FieldCheckBadge status={item.status} />}
+                          </>
                         }
                         aside={
                           hint?.starNote && (
@@ -295,6 +287,7 @@ function ToneSelect({
   value,
   disabled,
   onChange,
+  badge,
   children,
 }: {
   label: string;
@@ -302,6 +295,7 @@ function ToneSelect({
   value: TonePreset | null;
   disabled: boolean;
   onChange: (v: TonePreset | null) => void;
+  badge?: ReactNode;
   children?: ReactNode;
 }) {
   return (
@@ -310,9 +304,7 @@ function ToneSelect({
         <label htmlFor="strategy-tonePreset" className="font-medium">
           {label}
         </label>
-        {value === null && (
-          <span className="rounded-full bg-muted px-2 py-px text-[11px] text-muted-foreground">未入力</span>
-        )}
+        {badge}
       </div>
       <p className="text-[13px] text-muted-foreground">{description}</p>
       <div className="pt-1">

@@ -116,12 +116,12 @@ description: "Task list for feature 014 strategy guidance"
 
 ### Tests for User Story 2
 
-- [ ] T016 [P] [US2] `packages/shared/test/strategy-guidance.test.ts`に`checkStrategy`のテストを足す（FR-010〜FR-016、research.md R2）。
+- [X] T016 [P] [US2] `packages/shared/test/strategy-guidance.test.ts`に`checkStrategy`のテストを足す（FR-010〜FR-016、research.md R2）。
   - 空白・改行だけは`empty`、目安ちょうどは`ok`、目安未満は`short`。近い人間性は選んでいれば`ok`。
   - 下書きと活動の軸は判定しない。
   - 完了（16項目の`ok`）・要確認（16項目と5問の`short`）・目的（5問の`ok`）の数。
   - 次におすすめ：表示の順で最初の`empty`、なければ最初の`short`、なければ`null`。
-- [ ] T017 [P] [US2] `apps/web/test/strategy-progress.test.tsx`（FR-012〜FR-018）。
+- [X] T017 [P] [US2] `apps/web/test/strategy-progress.test.tsx`（FR-012〜FR-018）。
   - 入力のたびに印・数・短めの一言が変わる（保存しない）。
   - 次におすすめを押すと項目へ移り、直せる人なら入力欄にフォーカスする。
   - すべて十分のとき「すべての項目が十分に書けています」。
@@ -130,13 +130,13 @@ description: "Task list for feature 014 strategy guidance"
 
 ### Implementation for User Story 2
 
-- [ ] T018 [US2] `packages/shared/src/strategy-guidance.ts`に`checkStrategy(values)`を足す（`countChars`と`isBlank`を使う）。T016を通す。
-- [ ] T019 [P] [US2] `apps/web/src/components/strategy/FieldCheckBadge.tsx`（十分・短め・未入力の印）と`ProgressCard.tsx`（完了n/16項目・要確認n件・活動の目的n/5問・バー・次におすすめのリンク・「全体をAIと整理する」の置き場所）を作る。
-- [ ] T020 [P] [US2] `apps/web/src/components/strategy/SectionChips.tsx`を作る（research.md R5）。
+- [X] T018 [US2] `packages/shared/src/strategy-guidance.ts`に`checkStrategy(values)`を足す（`countChars`と`isBlank`を使う）。T016を通す。
+- [X] T019 [P] [US2] `apps/web/src/components/strategy/FieldCheckBadge.tsx`（十分・短め・未入力の印）と`ProgressCard.tsx`（完了n/16項目・要確認n件・活動の目的n/5問・バー・次におすすめのリンク・「全体をAIと整理する」の置き場所）を作る。
+- [X] T020 [P] [US2] `apps/web/src/components/strategy/SectionChips.tsx`を作る（research.md R5）。
   - 区分ごとの`ok`の数/項目数（すべて十分なら✓、下書きは数なし）を出す。
   - 今の区分を`IntersectionObserver`で決め、`aria-current`と塗りつぶしで目立たせる。
   - 押すと見出しへ移る。
-- [ ] T021 [US2] `apps/web/src/pages/strategy.tsx`を直す。T017を通す。
+- [X] T021 [US2] `apps/web/src/pages/strategy.tsx`を直す。T017を通す。
   - `PageHeader`の`toolbar`を、PCでもスマートフォンでも固定の`SectionChips`にする（今のPCの区分のボタンの並びは消す）。
   - 上部バーに完了・要確認・目的の数を出す。
   - `ProgressCard`を案内の文の下に置く。
