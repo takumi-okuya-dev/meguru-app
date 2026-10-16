@@ -368,6 +368,18 @@ describe("splitLengthMix（specs/014 FR-141、research.md R11）", () => {
     expect(mix).toEqual(expected);
     expect(mix.reduce((a, b) => a + b, 0)).toBe(count);
   });
+
+  it("1〜50件と、5%刻みで合計100のどの割合でも、合計は作る件数（SC-019）", () => {
+    for (let count = 1; count <= 50; count++) {
+      for (let a = 0; a <= 100; a += 5) {
+        for (let b = 0; a + b <= 100; b += 5) {
+          const mix = splitLengthMix(count, [a, b, 100 - a - b]);
+          expect(mix.reduce((x, y) => x + y, 0)).toBe(count);
+          expect(mix.every((n) => n >= 0)).toBe(true);
+        }
+      }
+    }
+  });
 });
 
 describe("投稿のプロンプトの直し（specs/014 US10、FR-110〜FR-118・FR-170〜FR-172、contracts/prompt-template.md 1）", () => {
