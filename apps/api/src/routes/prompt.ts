@@ -9,7 +9,6 @@ import { AppError, notFound } from "../lib/errors";
 import { parseBody } from "../lib/validate";
 import { authorizeAccount } from "../services/access";
 import { recordActivity, updatedByOf, withActivityTx } from "../services/activity-log";
-import { requireGrowerAccess } from "../services/grower-access";
 import { getPrompt } from "../services/prompt-service";
 
 /**
@@ -28,7 +27,7 @@ function parseCount(raw: string | undefined): number | undefined {
 }
 
 /**
- * プロンプトと作る件数のルート。どちらも grower機能（research.md R10）で、「所有 → grower機能 → 入力の検証」の順で確かめる。
+ * プロンプトと作る件数のルート。「権限の判定 → 入力の検証」の順で確かめる（読むだけのときの制限は authorizeAccount。specs/013）。
  * @param authed - 認証のミドルウェア
  * @returns Hono のルート
  */
@@ -39,7 +38,6 @@ export function promptRoutes(authed: MiddlewareHandler<AppEnv>) {
       const user = c.get("user");
       const access = await authorizeAccount(db, user, c.req.param("accountId"), "view");
       const account = access.account;
-      requireGrowerAccess(account, access.owner);
       const count = parseCount(c.req.query("count")) ?? account.promptPostCount;
       return c.json(await getPrompt(db, account, count));
     })
@@ -49,7 +47,6 @@ export function promptRoutes(authed: MiddlewareHandler<AppEnv>) {
       // 作る件数は設定（オーナーだけ。specs/011 contracts/permissions.md、PR #14 のCodexレビュー）
       const access = await authorizeAccount(db, user, c.req.param("accountId"), "settings");
       const account = access.account;
-      requireGrowerAccess(account, access.owner);
       const { postCount, expectedVersion } = await parseBody(putPromptSettingsRequestSchema, c.req.json());
       // 読み込んだときの版が一致するときだけ保存する（黙って上書きしない。specs/008 FR-007、PR #9 のCodexレビュー）。
       // 保存と操作の記録は同じトランザクションにする

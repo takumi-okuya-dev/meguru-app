@@ -16,8 +16,8 @@ export function autoPostRoutes(authed: MiddlewareHandler<AppEnv>) {
     .get("/accounts/:accountId/auto-post", authed, async (c) => {
       const db = createDb(c.env.DATABASE_URL);
       const access = await authorizeAccount(db, c.get("user"), c.req.param("accountId"), "view");
-      const account = access.account;
-      return c.json(await getAutoPostStatus(db, account));
+      // オーナーが読むだけなら、自動投稿は止まっている（specs/013 research.md R8）
+      return c.json(await getAutoPostStatus(db, { ...access.account, ownerReadOnly: access.readOnly !== null }));
     })
     .post("/accounts/:accountId/auto-post/notices/blocked/dismiss", authed, async (c) => {
       const db = createDb(c.env.DATABASE_URL);

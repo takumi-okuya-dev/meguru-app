@@ -22,10 +22,10 @@ import {
   type AnyPgColumn,
 } from "drizzle-orm/pg-core";
 import {
-  PLANS,
   PROMOTION_RATIO_DEFAULT,
   PROMPT_COUNT_DEFAULT,
   REJECT_REASON_CODES,
+  SUBSCRIPTION_STATUSES,
 } from "@threads-grower/shared";
 
 const bytea = customType<{ data: Uint8Array; driverData: Uint8Array | string }>({
@@ -50,8 +50,6 @@ const timestamps = {
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 };
 
-/** Accountの契約プランの列挙型（account_plan）。 */
-export const accountPlan = pgEnum("account_plan", PLANS);
 /**
  * Membershipのロールの列挙型（membership_role。Constitution原則IV）。
  * partner・editor は specs/008-team-operations で足した。member は旧プラン4の名残で使わない（列挙型から値は消せないので残す）。
@@ -82,6 +80,10 @@ export const users = pgTable("users", {
   lastAccountClientId: text("last_account_client_id"),
   lastAccountOpenSeq: bigint("last_account_open_seq", { mode: "number" }),
   lastAccountOpenReceivedAt: timestamp("last_account_open_received_at", { withTimezone: true, precision: 6 }),
+  // 料金なしの印（specs/013 data-model.md）。運用のスクリプトだけが変える
+  billingExempt: boolean("billing_exempt").notNull().default(false),
+  // 退会を受け付けた時刻。退会が終わると行ごと消えるので、残っていれば「途中」（specs/013 research.md R10）
+  withdrawalRequestedAt: timestamp("withdrawal_requested_at", { withTimezone: true }),
   ...timestamps,
 });
 
@@ -97,7 +99,6 @@ export const accounts = pgTable("accounts", {
   username: text("username"),
   displayName: text("display_name"),
   profilePictureUrl: text("profile_picture_url"),
-  plan: accountPlan("plan").notNull(),
   connectionStatus: connectionStatus("connection_status").notNull().default("connected"),
   lastUsedAt: timestamp("last_used_at", { withTimezone: true, precision: 6 }),
   connectionGeneration: bigint("connection_generation", { mode: "number" }).notNull().default(0),
@@ -463,7 +464,8 @@ export const publishAttemptState = pgEnum("publish_attempt_state", [
 
 /** 失敗の理由・飛ばした理由・直前のチェックの理由の値（text に保存し、CHECK制約で絞る）。 */
 const PUBLISH_ERRORS = ["network", "threads_server", "invalid_request", "container_error", "unknown"] as const;
-const SKIP_REASONS = ["no_drafts", "needs_reconnect", "rate_limited", "daily_limit", "auto_post_off"] as const;
+// billing_inactive：オーナーが読むだけ（無料体験の終わり・支払いの失敗・解約の後。specs/013 research.md R8）
+const SKIP_REASONS = ["no_drafts", "needs_reconnect", "rate_limited", "daily_limit", "auto_post_off", "billing_inactive"] as const;
 const BLOCKED_REASONS = ["ng_word", "over_threads_limit"] as const;
 const inList = (values: readonly string[]) => sql.raw(values.map((v) => `'${v}'`).join(", "));
 
@@ -931,3 +933,42 @@ export const activityLogs = pgTable(
     index("activity_logs_created_idx").on(t.createdAt),
   ],
 );
+
+/** 契約（specs/013-billing data-model.md の subscriptions）。利用者に1行まで。はじめて「契約する」を押したときに作る。 */
+export const subscriptions = pgTable(
+  "subscriptions",
+  {
+    userId: uuid("user_id")
+      .primaryKey()
+      .references(() => users.id, { onDelete: "cascade" }),
+    stripeCustomerId: text("stripe_customer_id").notNull().unique(),
+    stripeSubscriptionId: text("stripe_subscription_id").unique(),
+    // Stripeの契約の状態。まだ契約がなければ NULL
+    status: text("status"),
+    currentPeriodEnd: timestamp("current_period_end", { withTimezone: true }),
+    trialEnd: timestamp("trial_end", { withTimezone: true }),
+    cancelAtPeriodEnd: boolean("cancel_at_period_end").notNull().default(false),
+    // Stripeに伝えてある数（max(n,1)）
+    quantity: integer("quantity"),
+    // アカウントの数を合わせ直す要がある（research.md R6）
+    quantitySyncNeeded: boolean("quantity_sync_needed").notNull().default(false),
+    // 開いているCheckoutのセッション（作り直す前に期限切れにする。research.md R4）
+    pendingCheckoutSessionId: text("pending_checkout_session_id"),
+    // Stripeから最後に読み直した時刻。これより古い読み直しでは更新しない（research.md R5）
+    stripeSyncedAt: timestamp("stripe_synced_at", { withTimezone: true, precision: 6 }),
+    ...timestamps,
+  },
+  (t) => [
+    check("subscriptions_status_valid", sql`${t.status} IS NULL OR ${t.status} IN (${inList(SUBSCRIPTION_STATUSES)})`),
+  ],
+);
+
+/**
+ * 退会した人（specs/013-billing data-model.md の withdrawn_users）。ログインの情報の削除をやり直し、
+ * 消した後に残ったセッションのトークンで users の行が作り直されないようにする。メールアドレス・名前は持たない。
+ */
+export const withdrawnUsers = pgTable("withdrawn_users", {
+  clerkUserId: text("clerk_user_id").primaryKey(),
+  withdrawnAt: timestamp("withdrawn_at", { withTimezone: true }).notNull(),
+  clerkDeletedAt: timestamp("clerk_deleted_at", { withTimezone: true }),
+});

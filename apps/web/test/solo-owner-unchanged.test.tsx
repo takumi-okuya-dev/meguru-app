@@ -10,6 +10,7 @@ import type { AccountAccessResponse, MeResponse } from "@threads-grower/shared";
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ADMIN_ACCESS, EDITOR_ACCESS, OWNER_ACCESS } from "./helpers/access";
+import { ME_BILLING_OFF } from "./helpers/billing";
 
 vi.mock("@clerk/react", () => ({
   useUser: () => ({ user: { fullName: "Takumi", primaryEmailAddress: { emailAddress: "t@example.com" } } }),
@@ -26,7 +27,6 @@ const meResponse: MeResponse = {
       username: "takumi",
       displayName: "たくみ",
       profilePictureUrl: null,
-      plan: "auto-grower",
       connectionStatus: "connected",
       lastUsedAt: null,
       role: "owner",
@@ -35,6 +35,7 @@ const meResponse: MeResponse = {
   ],
   landingAccountId: "a1",
   accountLimit: { max: 1, used: 1 },
+  ...ME_BILLING_OFF,
   threadsAccessMode: "testers",
   teams: [],
 };
@@ -124,5 +125,40 @@ describe("Threadsにつないだアカウントだけの人（specs/012 SC-007�
     const menu = await screen.findByRole("menu");
     expect(within(menu).queryByText("未接続")).not.toBeInTheDocument();
     expect(within(menu).getByRole("menuitem", { name: /アカウントを作る/ })).toHaveAttribute("href", "/accounts/new");
+  });
+});
+
+// ---- 決済（specs/013 FR-072、T059） ----
+describe("個人運用のオーナーと決済", () => {
+  it("決済OFFでは、帯を出さない（無料体験の終わり・読むだけ）", async () => {
+    const { TrialEndingBanner } = await import("@/components/billing/TrialEndingBanner");
+    renderAt(<TrialEndingBanner billing={meResponse.billing} />);
+    expect(screen.queryByText(/無料体験/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/読むだけ/)).not.toBeInTheDocument();
+  });
+
+  it("「契約と支払い」に、チームの説明を出さない", async () => {
+    const { BillingSettingsPage } = await import("@/pages/settings/billing");
+    const actual = await import("@/lib/api-client");
+    vi.spyOn(actual.api, "billing").mockResolvedValue({
+      mode: "enabled",
+      state: "active",
+      readOnlyReason: null,
+      trialEndsAt: "2026-11-15T03:00:00.000Z",
+      trialDaysLeft: null,
+      ownedAccountCount: 1,
+      subscription: {
+        status: "active",
+        currentPeriodEnd: "2026-12-01T03:00:00.000Z",
+        cancelAtPeriodEnd: false,
+        nextInvoiceAt: "2026-12-01T03:00:00.000Z",
+        nextInvoiceAmount: 1000,
+      },
+      prices: { base: 1000, extra: 500 },
+    });
+    vi.spyOn(actual.api, "syncBilling").mockImplementation(() => new Promise(() => {}));
+    renderAt(<BillingSettingsPage />);
+    expect(await screen.findByText("契約中")).toBeInTheDocument();
+    expect(screen.queryByText(/チーム/)).not.toBeInTheDocument();
   });
 });

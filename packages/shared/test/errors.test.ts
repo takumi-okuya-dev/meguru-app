@@ -84,3 +84,47 @@ describe("アカウントを先に作るのエラー文言（specs/012 contracts
     expect(errorMessage("THREADS_NOT_READY", { details: ["not_connected"] }).message).toBe("Threadsにつなぐと使えます");
   });
 });
+
+describe("決済＋退会のエラー文言（specs/013 contracts/api.md）", () => {
+  it("新しいコードはエラーコードとして扱え、GROWER_FEATURE_REQUIRED は消えている", () => {
+    for (const code of ["BILLING_REQUIRED", "ALREADY_SUBSCRIBED", "NO_SUBSCRIPTION", "BILLING_UNAVAILABLE", "WITHDRAWAL_IN_PROGRESS"]) {
+      expect(isErrorCode(code)).toBe(true);
+    }
+    expect(isErrorCode("GROWER_FEATURE_REQUIRED")).toBe(false);
+  });
+
+  it("BILLING_REQUIRED は理由ごとに文言を変え、チームの人には支払いの詳細を出さない", () => {
+    expect(errorMessage("BILLING_REQUIRED", { details: ["trial_ended"] })).toEqual({
+      message: "無料体験が終わりました。今は読むだけです。契約すると、すぐに元どおり使えます。",
+      action: "subscribe",
+    });
+    expect(errorMessage("BILLING_REQUIRED", { details: ["canceled"] })).toEqual({
+      message: "契約が終わりました。今は読むだけです。契約すると、すぐに元どおり使えます。",
+      action: "subscribe",
+    });
+    expect(errorMessage("BILLING_REQUIRED", { details: ["payment_failed"] })).toEqual({
+      message: "支払いに失敗しました。カードを更新してください。更新するまで読むだけです。",
+      action: "open-portal",
+    });
+    const team = errorMessage("BILLING_REQUIRED", { details: ["owner_inactive"] });
+    expect(team).toEqual({ message: "オーナーの契約の状態により、このアカウントは今、読むだけです。", action: "none" });
+    expect(team.message).not.toContain("支払い");
+  });
+
+  it("無料体験中の上限は1件で、2件目からの料金と契約を案内する", () => {
+    expect(errorMessage("ACCOUNT_LIMIT_REACHED", { max: 1 })).toEqual({
+      message: "無料体験中に作れるアカウントは1件までです。契約すると、2件目から1件につき月500円で足せます。",
+      action: "subscribe",
+    });
+  });
+
+  it("そのほかの文言", () => {
+    expect(errorMessage("ALREADY_SUBSCRIBED").message).toContain("すでに契約しています");
+    expect(errorMessage("NO_SUBSCRIPTION").message).toBe("まだ契約していません。");
+    expect(errorMessage("BILLING_UNAVAILABLE")).toEqual({
+      message: "支払いの手続きにつながりませんでした。少し待ってから、もう一度お試しください。",
+      action: "retry-later",
+    });
+    expect(errorMessage("WITHDRAWAL_IN_PROGRESS").message).toContain("退会の手続きの途中です");
+  });
+});

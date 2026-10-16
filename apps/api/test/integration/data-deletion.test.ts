@@ -146,7 +146,6 @@ describe("削除要求の再試行（Cron）", () => {
 
   it("未完了の要求がある間に始めた認可フローは拒否され、完了の後で始めた認可フローは成功する", async () => {
     await connectNew(app, "u1", "1001");
-    await db().update(accounts).set({ plan: "multi-account" });
     const sr = await makeSignedRequest(TEST_APP_SECRET, { user_id: "1001", issued_at: 1 });
     const { code } = await receiveDeletion(testEnv, sr, new Date());
     await attemptDeletion(testEnv, code, (await request(code)).lastAttemptedAt, {

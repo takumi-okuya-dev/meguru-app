@@ -1,6 +1,6 @@
 # 次の機能のメモ（仕様づくりの前）
 
-**最終更新**：2026-10-14
+**最終更新**：2026-10-15
 
 **位置づけ**：ユーザーと話して決めたこと・まだ決めていないことを、`/speckit-specify`の前に残すメモ。各機能の仕様（`specs/NNN-…/spec.md`）を作るときの入力にし、移したらこのメモからは消す。決済のメモは[specs/013-billing/notes.md](../specs/013-billing/notes.md)。
 
@@ -8,8 +8,8 @@
 
 1. 010 自分のMetaアプリのトークンでアカウントを追加（[PR #12](https://github.com/MarronTaku/threads-grower-app/pull/12)、2026-10-13 にマージ）
 2. 011 チームの見直し（[PR #14](https://github.com/MarronTaku/threads-grower-app/pull/14)、2026-10-14 にマージ。仕様は[specs/011-team-revision](../specs/011-team-revision/spec.md)）
-3. **012 アカウントを先に作る**（実装中。仕様は[specs/012-accounts-before-connect](../specs/012-accounts-before-connect/spec.md)）
-4. **013 決済**
+3. 012 アカウントを先に作る（[PR #15](https://github.com/MarronTaku/threads-grower-app/pull/15)、2026-10-14 にマージ。仕様は[specs/012-accounts-before-connect](../specs/012-accounts-before-connect/spec.md)）
+4. **013 決済＋退会**（2026-10-15、退会を決済といっしょに作ると決めた。メモは[specs/013-billing/notes.md](../specs/013-billing/notes.md)）
 
 - チームの見直しを先にするのは、権限の判定の中心（`authorizeAccount`）を変えるため。アカウントを先に作る機能は、チームに入れるアカウントの扱いにも関わるので、その後に作る。
 - どちらも決済の前に入れる。決済の無料体験・登録数の上限は、アカウントの数え方とチームの形が決まってから決める。
@@ -23,15 +23,6 @@
 
 決済の後に、`main`（本番）・`develop`（ステージング）・`feature/*`の3段構成に切り替える。詳しくは[specs/013-billing/notes.md](../specs/013-billing/notes.md)の「1. 公開後のブランチと環境」と、Constitution「開発ワークフロー」。
 
-## D. 退会（012の次）
+## D. 退会
 
-### 2026-10-13 にユーザーと決めたこと
-
-- 利用者の退会（利用者の削除）は、今のアプリにない。012の次のfeatureで作る（2026-10-14 に、Bを先にすると決めた）。
-- 退会した人は、入っているチームから自動で外れる。管理者なら、011 FR-046と同じく、いちばん長くいる人へ管理者を引き継ぎ、誰もいなければチームを消す。そのあとで`users`の行を消す（011の`teams.admin_user_id`はON DELETE RESTRICTのまま。011 data-model.md）。
-
-### 仕様づくりのときに決めること
-
-- 番号：決済（013）の前に入れるなら、決済の番号を付け直すか。
-- 退会した人のアカウントのデータ（投稿の案・戦略・操作の記録）の消し方と、Threadsのトークンの扱い。
-- 決済（013）との関係：退会の前に契約を止めるか。
+2026-10-15 に、決済（013）といっしょに作ると決めた。メモは[specs/013-billing/notes.md](../specs/013-billing/notes.md)の「4. 退会」に移した。

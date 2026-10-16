@@ -1,6 +1,7 @@
 // 反応数の段階（specs/006-performance-feedback contracts/metrics-job.md、FR-001〜FR-010、SC-002・SC-008・SC-009、research.md R2〜R5・R10・R11）
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { AFTER_TRIAL, fake, makeApp, resetDb, testEnv } from "../helpers/app";
+import { fake, insertSubscription, makeApp, resetDb, setBillingExempt, testEnv } from "../helpers/app";
+import { billingEnv } from "../helpers/billing";
 import {
   addMin,
   approvedDrafts,
@@ -23,13 +24,12 @@ const TODAY = "2030-01-10";
 const hoursAgo = (h: number, from: Date = NOON) => new Date(from.getTime() - h * 3600_000);
 
 /**
- * grower機能を使えるAccount（テストの「今」は2030年で、無料体験の外になるため、プラン2にする）。
+ * 反応数を取れるAccount（テストの既定は決済OFFなので、テストの「今」の2030年でもすべて使える。specs/013）。
  * @param user - Clerk のユーザーID
  * @returns accountId と、ThreadsのユーザーID
  */
 async function growerAccount(user: string) {
   const a = await connectedAccount(user, app);
-  await db()`UPDATE accounts SET plan = 'auto-grower' WHERE id = ${a.accountId}`;
   return a;
 }
 
@@ -297,13 +297,10 @@ describe("失敗の扱い（research.md R11）", () => {
 });
 
 describe("対象のAccount（FR-005）", () => {
-  it("要再接続・grower機能を使えないAccountは取り込まない", async () => {
+  it("要再接続のAccountは取り込まない（読むだけのオーナーは specs/013 で確かめる）", async () => {
     const recon = await growerAccount("u1");
-    const trial = await connectedAccount("u2", app);
     await db()`UPDATE accounts SET connection_status = 'needs_reconnect' WHERE id = ${recon.accountId}`;
-    await db()`UPDATE users SET created_at = ${AFTER_TRIAL().toISOString()} WHERE clerk_user_id = 'u2'`; // 念のため
     await publishedDrafts(recon.accountId, [{ publishedAt: hoursAgo(24) }]);
-    await publishedDrafts(trial.accountId, [{ publishedAt: hoursAgo(24) }]);
     await run(NOON);
     expect(await fake.callCounts()).toMatchObject({ insights: 0, followers: 0 });
   });
@@ -333,5 +330,37 @@ describe("1回の処理の呼び出しの数（research.md R3）", () => {
     expect((await fake.callCounts()).insights).toBe(0);
     const gate = JSON.parse((await testEnv.AUTOPOST_KV.get("autopost:gate"))!) as { nextCheckAt: string };
     expect(gate.nextCheckAt).toBe(addMin(NOON, 1).toISOString());
+  });
+});
+
+// ---- 読むだけのオーナー（specs/013-billing FR-041、research.md R8、T032） ----
+describe("オーナーが読むだけ（決済ON）", () => {
+  async function runOn(now: Date) {
+    const env = billingEnv();
+    await env.AUTOPOST_KV.delete("autopost:gate");
+    const { runAutoPost } = await import("../../src/services/auto-post-runner");
+    return runAutoPost(env, now, undefined, () => now);
+  }
+  async function ownerOf(accountId: string) {
+    const [r] = (await db()`SELECT user_id FROM memberships WHERE account_id = ${accountId} AND role = 'owner'`) as [{ user_id: string }];
+    return r.user_id;
+  }
+
+  it("無料体験の後で契約がなければ、反応数とフォロワー数をThreadsに問い合わせない", async () => {
+    const { accountId } = await growerAccount("u1");
+    await publishedDrafts(accountId, [{ publishedAt: hoursAgo(24) }]);
+    await runOn(NOON);
+    expect(await fake.callCounts()).toMatchObject({ insights: 0, followers: 0 });
+  });
+
+  it("契約中・料金なしなら取る", async () => {
+    const a = await growerAccount("u1");
+    const b = await growerAccount("u2");
+    await insertSubscription(await ownerOf(a.accountId), { status: "active" });
+    await setBillingExempt(await ownerOf(b.accountId), true);
+    await publishedDrafts(a.accountId, [{ publishedAt: hoursAgo(24) }]);
+    await publishedDrafts(b.accountId, [{ publishedAt: hoursAgo(24) }]);
+    await runOn(NOON);
+    expect((await fake.callCounts()).insights).toBe(2);
   });
 });

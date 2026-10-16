@@ -5,6 +5,7 @@ import userEvent from "@testing-library/user-event";
 import type { MeResponse, TeamDetail } from "@threads-grower/shared";
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { ME_BILLING_OFF } from "./helpers/billing";
 
 const mocks = vi.hoisted(() => ({
   getTeam: vi.fn(),
@@ -77,11 +78,12 @@ function memberView(): TeamDetail {
 const meData: MeResponse = {
   user: { id: "u-s", email: "s@example.com", displayName: "鈴木 花子" },
   accounts: [
-    { id: "a-s", name: "カフェ B店", username: "a-s", displayName: "カフェ B店", profilePictureUrl: null, plan: "auto-only", connectionStatus: "connected", lastUsedAt: null, role: "owner", ownerName: null },
-    { id: "a-s2", name: "カフェ B店 2号店", username: "a-s2", displayName: "カフェ B店 2号店", profilePictureUrl: null, plan: "auto-only", connectionStatus: "connected", lastUsedAt: null, role: "owner", ownerName: null },
+    { id: "a-s", name: "カフェ B店", username: "a-s", displayName: "カフェ B店", profilePictureUrl: null, connectionStatus: "connected", lastUsedAt: null, role: "owner", ownerName: null },
+    { id: "a-s2", name: "カフェ B店 2号店", username: "a-s2", displayName: "カフェ B店 2号店", profilePictureUrl: null, connectionStatus: "connected", lastUsedAt: null, role: "owner", ownerName: null },
   ],
   landingAccountId: "a-s",
   accountLimit: { max: 3, used: 2 },
+  ...ME_BILLING_OFF,
   threadsAccessMode: "testers",
   teams: [{ id: "t1", name: "飲食チーム", memberCount: 4, role: "member" }],
 };

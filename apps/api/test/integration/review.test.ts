@@ -374,7 +374,7 @@ describe("アクセス範囲・プラン（FR-033〜FR-035）", () => {
     expect(await res.json()).toMatchObject({ error: { code: "ACCOUNT_NOT_FOUND" } });
   });
 
-  it("要再接続のAccount・無料体験の後のプラン1でも使える", async () => {
+  it("要再接続のAccount・無料体験の後（決済OFF）でも使える", async () => {
     const { accountId } = await createUserWithAccount("u1", { userCreatedAt: AFTER_TRIAL() });
     await setAccount(accountId, { connectionStatus: "needs_reconnect" });
     const [a] = await register(accountId, ["A"]);

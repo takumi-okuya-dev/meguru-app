@@ -7,6 +7,7 @@ import { createMemoryRouter, RouterProvider } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ADMIN_ACCESS, OWNER_ACCESS } from "./helpers/access";
 import { resetViewport, setViewport } from "./helpers/viewport";
+import { ME_BILLING_OFF } from "./helpers/billing";
 
 vi.mock("@clerk/react", () => ({
   useUser: () => ({ user: { fullName: "Takumi", primaryEmailAddress: { emailAddress: "t@example.com" } } }),
@@ -19,7 +20,6 @@ const account = {
   username: "cafe_b",
   displayName: "カフェ B店",
   profilePictureUrl: null,
-  plan: "auto-grower" as const,
   connectionStatus: "connected" as const,
   lastUsedAt: null,
   role: "owner" as const,
@@ -49,6 +49,7 @@ function me(teams: MeResponse["teams"]): MeResponse {
     accounts: [account],
     landingAccountId: "a1",
     accountLimit: { max: 5, used: 1 },
+    ...ME_BILLING_OFF,
     threadsAccessMode: "testers",
     teams,
   };

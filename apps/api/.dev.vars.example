@@ -28,6 +28,17 @@ DATABASE_URL=postgres://postgres:postgres@db.localtest.me:5432/threads_grower
 # CORSの許可とリダイレクト先
 WEB_ORIGIN=http://localhost:5173
 
+# 決済（specs/013-billing）。必須で、true か false。手元はふだん false
+# 決済を試すときは true にし、Stripeのテスト用環境のキー（sk_test_）・Webhookの秘密（stripe listen が出す whsec_）・料金のIDを入れる
+# 偽のStripe（pnpm --filter api fake-stripe）で試すときは STRIPE_API_BASE_URL=http://localhost:8791
+BILLING_ENABLED=false
+# STRIPE_SECRET_KEY=sk_test_xxx
+# STRIPE_WEBHOOK_SECRET=whsec_xxx
+# STRIPE_PRICE_ID=price_xxx
+# STRIPE_API_BASE_URL=https://api.stripe.com
+# STRIPE_PORTAL_CONFIGURATION_ID=
+# STRIPE_TAX_RATE_ID=
+
 # Threads連携の公開範囲：testers（既定。Meta App Reviewの前で、招待したテスターだけが接続できる）か public
 # Meta App Reviewに通り、Metaのアプリを公開したら public にする（specs/002-strategy-profile research.md R15）
 THREADS_ACCESS_MODE=testers

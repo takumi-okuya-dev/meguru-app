@@ -12,6 +12,7 @@ import { accounts, memberships, threadsDeletionRequests, users } from "../db/sch
 import { sha256Hex, threadsUserHmac, toHex } from "../lib/identifier-hash";
 import { logger } from "../lib/logger";
 import { verifySignedRequest } from "../lib/signed-request";
+import { markQuantityDirty } from "./billing-service";
 import { beforeAccountDeleted } from "./team-service";
 
 const LEASE_MS = 15 * 60_000;
@@ -133,6 +134,8 @@ export async function attemptDeletion(
         // チームの最後のアカウントなら、チームを抜けたものとする（specs/011 FR-046。アカウントの削除と同じ）
         await beforeAccountDeleted(tx, o.accountId, o.userId);
         await tx.update(users).set({ lastAccountDeletedAt: now, updatedAt: now }).where(eq(users.id, o.userId));
+        // 契約があれば、数の合わせ直しの印（日次の処理で合わせる。specs/013 research.md R6）
+        await markQuantityDirty(tx, o.userId);
       }
       await tx.delete(accounts).where(eq(accounts.threadsUserId, threadsUserId));
 

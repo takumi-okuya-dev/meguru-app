@@ -10,7 +10,6 @@ const sample: AccountSummary = {
   username: "takumi",
   displayName: null,
   profilePictureUrl: null,
-  plan: "auto-only",
   connectionStatus: "connected",
   lastUsedAt: null,
   role: "owner" as const,

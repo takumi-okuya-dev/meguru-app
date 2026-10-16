@@ -53,7 +53,6 @@ const account: AccountSummary = {
   username: "takumi",
   displayName: "たくみ",
   profilePictureUrl: null,
-  plan: "auto-grower",
   connectionStatus: "connected",
   lastUsedAt: null,
   role: "owner" as const,
@@ -274,7 +273,7 @@ describe("投稿ルール（CORE RULES）のダイアログ（FR-019〜FR-021）
     expect(await screen.findByText("他の場所で更新されています")).toBeInTheDocument();
   });
 
-  it("grower機能を使えないAccountでは「見る」になり、読み取り専用で案内が出る（FR-020）", async () => {
+  it("編集できないAccount（読むだけ）では「見る」になり、読み取り専用で案内が出る（FR-020、specs/013）", async () => {
     getPostingRules.mockResolvedValue(
       rules({ coreRules: "断定口調は使わない", canEditCoreRules: false }),
     );
@@ -282,7 +281,7 @@ describe("投稿ルール（CORE RULES）のダイアログ（FR-019〜FR-021）
     expect(within(section).getAllByRole("button", { name: "見る", hidden: true })).toHaveLength(2);
     expect(within(dialog).getByRole("textbox", { name: /投稿ルール/ })).toHaveAttribute("readonly");
     expect(
-      within(dialog).getByText(/投稿ルールはAIプロンプトの生成（プラン2以上）で使われます/),
+      within(dialog).getByText(/このアカウントは今、読むだけです/),
     ).toBeInTheDocument();
     expect(within(dialog).queryByRole("button", { name: "保存" })).not.toBeInTheDocument();
   });

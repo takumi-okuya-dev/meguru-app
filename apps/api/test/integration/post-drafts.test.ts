@@ -73,7 +73,7 @@ describe("POST /draft-batches（一括登録）", () => {
     expect(r).toMatchObject({ draftCount: 4, overLimitCount: 3 });
   });
 
-  it("一括登録は全プラン：無料体験の後のプラン1でも 201（FR-024a）", async () => {
+  it("一括登録は無料体験の後（決済OFF）でも 201（FR-024a）", async () => {
     const { accountId } = await createUserWithAccount("u1", { userCreatedAt: AFTER_TRIAL() });
     await register(accountId, "A\n@@@\nB");
   });

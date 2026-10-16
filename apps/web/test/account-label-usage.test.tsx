@@ -7,6 +7,7 @@ import userEvent from "@testing-library/user-event";
 import type { AccountSummary, MeResponse } from "@threads-grower/shared";
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { ME_BILLING_OFF } from "./helpers/billing";
 
 const mocks = vi.hoisted(() => ({ me: vi.fn(), needsReviewCounts: vi.fn() }));
 vi.mock("@clerk/react", () => ({
@@ -27,7 +28,6 @@ const unconnected: AccountSummary = {
   username: null,
   displayName: null,
   profilePictureUrl: null,
-  plan: "auto-only",
   connectionStatus: "not_connected",
   connectionMethod: null,
   lastUsedAt: null,
@@ -48,6 +48,7 @@ const me: MeResponse = {
   accounts: [unconnected, connected],
   landingAccountId: "a1",
   accountLimit: { max: 5, used: 2 },
+  ...ME_BILLING_OFF,
   threadsAccessMode: "testers",
   teams: [],
 };

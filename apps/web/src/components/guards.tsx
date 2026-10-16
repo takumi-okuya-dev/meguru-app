@@ -1,9 +1,11 @@
 // ルートのガード（contracts/ui-routes.md「遷移の規則」）
 import { useAuth } from "@clerk/react";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import { Navigate, Outlet } from "react-router";
 import { ClerkLoadFailedScreen } from "@/components/ErrorScreen";
 import { CLERK_LOAD_TIMEOUT_MS } from "@/lib/config-check";
+import { WithdrawalInProgress } from "@/components/billing/WithdrawalInProgress";
+import { getWithdrawalInProgress, subscribeWithdrawalInProgress } from "@/lib/api-client";
 
 /**
  * 読み込み中の骨組み。データは出さない（規則1）。
@@ -40,9 +42,12 @@ export function useLoadTimeout(isLoaded: boolean, ms: number = CLERK_LOAD_TIMEOU
  */
 export function RequireAuth() {
   const { isLoaded, isSignedIn } = useAuth();
+  const withdrawing = useSyncExternalStore(subscribeWithdrawalInProgress, getWithdrawalInProgress);
   const timedOut = useLoadTimeout(Boolean(isLoaded));
   if (timedOut) return <ClerkLoadFailedScreen />;
   if (!isLoaded) return <LoadingSkeleton />;
   if (!isSignedIn) return <Navigate to="/sign-in" replace />;
+  // 退会の途中なら、退会を終える画面だけを出す（specs/013 research.md R10）
+  if (withdrawing) return <WithdrawalInProgress />;
   return <Outlet />;
 }

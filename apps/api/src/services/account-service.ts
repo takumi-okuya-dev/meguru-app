@@ -1,11 +1,6 @@
 // Accountの作成・更新・上限（FR-008〜FR-017、research.md R8・R9）
 import { and, eq, gte, inArray, isNull, lt, ne, or, sql } from "drizzle-orm";
-import {
-  initialPlanFor,
-  limitForOwnedPlans,
-  normalizeUsername,
-  type Plan,
-} from "@threads-grower/shared";
+import { normalizeUsername } from "@threads-grower/shared";
 import type { Env } from "../env";
 import { createDb, withTransaction, type Db, type TxDb } from "../db/client";
 import { lockThreadsUser, lockThreadsUsername, lockUserRow } from "../db/locks";
@@ -20,6 +15,7 @@ import {
   threadsRevocations,
   users,
 } from "../db/schema";
+import { billingModeOf, type BillingMode } from "../lib/config";
 import { createTokenCipher } from "../lib/crypto";
 import { AppError } from "../lib/errors";
 import { threadsUserHmac } from "../lib/identifier-hash";
@@ -31,49 +27,59 @@ import {
   type ThreadsProfile,
 } from "../lib/threads-client";
 import { authorizeAccount } from "./access";
+import { loadEntitlement, markQuantityDirty, syncQuantity } from "./billing-service";
 import { recordActivity } from "./activity-log";
 import type { ConsumedState } from "./threads-oauth";
 import { beforeAccountDeleted } from "./team-service";
 
-// ---- 登録数の上限（FR-015〜FR-017） ----
+// ---- 登録数の上限（specs/013 research.md R9。001 FR-015〜FR-017 を置き換えた） ----
 
 /**
- * ユーザーが owner として持つ Account のプランを取得する。
+ * ユーザーが owner として持つ Account の数（Threadsにつないでいないものも数える。specs/013 FR-013）。
  * @param db - データベース（トランザクションの中でもよい）
  * @param userId - users.id
- * @returns プランの一覧
+ * @returns 数
  */
-export async function ownedPlans(db: Db | TxDb, userId: string): Promise<Plan[]> {
-  const rows = await db
-    .select({ plan: accounts.plan })
-    .from(accounts)
-    .innerJoin(memberships, eq(memberships.accountId, accounts.id))
+export async function countOwnedAccounts(db: Db | TxDb, userId: string): Promise<number> {
+  const [row] = await db
+    .select({ n: sql<number>`count(*)::int` })
+    .from(memberships)
     .where(and(eq(memberships.userId, userId), eq(memberships.role, "owner")));
-  return rows.map((r) => r.plan);
+  return Number(row?.n ?? 0);
 }
 
 /**
- * ユーザーの登録数上限と使用数を求める（FR-015・FR-016）。
+ * ユーザーの登録数の上限と使用数を求める。
  * @param db - データベース（トランザクションの中でもよい）
  * @param userId - users.id
- * @returns 上限（max）、使用数（used）、保有Accountのプラン（plans）
+ * @param mode - 決済のモード
+ * @param now - 今の時刻
+ * @returns 上限（max。null は上限なし、0 は作れない）、使用数（used）、使える状態
  */
-export async function accountLimitFor(db: Db | TxDb, userId: string) {
-  const plans = await ownedPlans(db, userId);
-  return { max: limitForOwnedPlans(plans), used: plans.length, plans };
+export async function accountLimitFor(db: Db | TxDb, userId: string, mode: BillingMode, now: Date = new Date()) {
+  const [entitlement, used] = await Promise.all([loadEntitlement(db, userId, mode, now), countOwnedAccounts(db, userId)]);
+  return { max: entitlement ? entitlement.accountLimit : 0, used, entitlement };
 }
 
 /**
- * 新しい Account を追加できるかを確かめる（FR-017）。
+ * 新しい Account を追加できるかを確かめる（specs/013 FR-010・FR-011・FR-043）。
+ * 読むだけなら BILLING_REQUIRED、無料体験中で上限に達していれば ACCOUNT_LIMIT_REACHED。
+ * 上限を超えて持っている（このfeatureの前に作った）アカウントは消さない（FR-014）。
  * @param db - データベース（トランザクションの中でもよい）
  * @param userId - users.id
- * @returns 上限・使用数・保有Accountのプラン
- * @throws AppError ACCOUNT_LIMIT_REACHED（上限に達しているとき）
+ * @param mode - 決済のモード
+ * @returns 上限・使用数
+ * @throws AppError BILLING_REQUIRED・ACCOUNT_LIMIT_REACHED
  */
-export async function assertCanAddAccount(db: Db | TxDb, userId: string) {
-  const limit = await accountLimitFor(db, userId);
-  if (limit.used >= limit.max)
-    throw new AppError("ACCOUNT_LIMIT_REACHED", 409, "account limit reached");
+export async function assertCanAddAccount(db: Db | TxDb, userId: string, mode: BillingMode) {
+  const limit = await accountLimitFor(db, userId, mode);
+  const e = limit.entitlement;
+  if (e && !e.fullAccess) {
+    throw new AppError("BILLING_REQUIRED", 403, "billing required", undefined, [e.readOnlyReason ?? "trial_ended"]);
+  }
+  if (limit.max !== null && limit.used >= limit.max) {
+    throw new AppError("ACCOUNT_LIMIT_REACHED", 409, "account limit reached", undefined, undefined, { max: limit.max });
+  }
   return limit;
 }
 
@@ -90,21 +96,25 @@ export async function assertCanAddAccount(db: Db | TxDb, userId: string) {
  * @throws AppError ACCOUNT_LIMIT_REACHED
  */
 export async function createAccount(env: Env, userId: string, name: string) {
-  return withTransaction(env.DATABASE_URL, async (tx) => {
+  const created = await withTransaction(env.DATABASE_URL, async (tx) => {
     await lockUserRow(tx, userId);
-    const limit = await assertCanAddAccount(tx, userId);
+    await assertCanAddAccount(tx, userId, billingModeOf(env));
     const [account] = await tx
       .insert(accounts)
       .values({
         name,
-        plan: initialPlanFor(limit.plans),
         connectionStatus: "not_connected",
         connectionMethod: null,
       })
       .returning();
     await tx.insert(memberships).values({ userId, accountId: account!.id, role: "owner" });
+    // 契約があれば、数の合わせ直しの印を付ける（specs/013 research.md R6）
+    await markQuantityDirty(tx, userId);
     return account!;
   });
+  // トランザクションの後でStripeの数を合わせる。失敗しても作成は成功のまま（印が残り、日次で合わせる）
+  await syncQuantity(env, userId);
+  return created;
 }
 
 // ---- 接続の確定（research.md R8 の手順。specs/010 research.md R5 でトークンの接続と共通にした） ----
@@ -227,7 +237,7 @@ export async function completeConnection(
     //    接続はオーナーだけ（specs/008 FR-044、specs/012 FR-015）。トランザクションの中でも確かめ、記録に使う
     const [target] = await tx.select().from(accounts).where(eq(accounts.id, state.targetAccountId)).for("update").limit(1);
     if (!target) throw new AppError("ACCOUNT_NOT_FOUND", 404, "target account no longer exists");
-    const access = await authorizeAccount(tx, { id: state.userId }, target.id, "owner");
+    const access = await authorizeAccount(tx, { id: state.userId, billing: billingModeOf(env) }, target.id, "owner");
     const norm = normalizeUsername(input.profile.username);
     if (state.mode === "connect") {
       // 同じアカウントへの同時のつなぐ操作は、後の方を止める（黙って接続し直しにしない。specs/012 FR-018）
@@ -513,7 +523,7 @@ export async function verifyConnection(
  */
 export async function renameAccount(env: Env, userId: string, accountId: string, name: string) {
   return withTransaction(env.DATABASE_URL, async (tx) => {
-    const access = await authorizeAccount(tx, { id: userId }, accountId, "owner");
+    const access = await authorizeAccount(tx, { id: userId, billing: billingModeOf(env) }, accountId, "owner");
     const from = access.account.name;
     const [row] = await tx
       .update(accounts)
@@ -546,7 +556,7 @@ export async function deleteAccount(
 ) {
   await withTransaction(env.DATABASE_URL, async (tx) => {
     await lockUserRow(tx, userId);
-    const { account } = await authorizeAccount(tx, { id: userId }, accountId, "owner");
+    const { account } = await authorizeAccount(tx, { id: userId, billing: billingModeOf(env) }, accountId, "remove");
     if (!confirmName.trim() || confirmName.trim() !== account.name) {
       throw new AppError("CONFIRMATION_MISMATCH", 422, "confirmation does not match");
     }
@@ -558,5 +568,8 @@ export async function deleteAccount(
       .set({ lastAccountDeletedAt: now, updatedAt: now })
       .where(eq(users.id, userId));
     await tx.delete(accounts).where(eq(accounts.id, account.id));
+    await markQuantityDirty(tx, userId);
   });
+  // 次の請求から数を減らす（日割りの返金はしない。specs/013 FR-030）
+  await syncQuantity(env, userId);
 }

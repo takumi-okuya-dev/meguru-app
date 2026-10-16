@@ -4,11 +4,12 @@ import type { AccountAccessResponse } from "@threads-grower/shared";
 /** 個人運用のオーナー（すべての権限、チームなし）。 */
 export const OWNER_ACCESS: AccountAccessResponse = {
   relation: "owner",
-  permissions: ["read", "view", "content", "review", "settings", "activity", "owner"],
+  permissions: ["read", "view", "content", "review", "settings", "activity", "owner", "remove"],
   owner: { name: "たくみ" },
   hasTeam: false,
   team: null,
   assignedNotice: false,
+  readOnly: null,
 };
 
 /** 担当の編集者（読む・見る・作る・直すだけ）。 */
@@ -19,6 +20,7 @@ export const EDITOR_ACCESS: AccountAccessResponse = {
   hasTeam: true,
   team: { id: "team-1", name: "飲食チーム", myRole: "editor" },
   assignedNotice: false,
+  readOnly: null,
 };
 
 /** 自分を担当にした管理者（操作の記録も見られる）。 */
@@ -29,6 +31,7 @@ export const ADMIN_ACCESS: AccountAccessResponse = {
   hasTeam: true,
   team: { id: "team-1", name: "飲食チーム", myRole: "admin" },
   assignedNotice: false,
+  readOnly: null,
 };
 
 /** 見せてもらっている人（読むだけ）。 */
@@ -39,4 +42,5 @@ export const VIEWER_ACCESS: AccountAccessResponse = {
   hasTeam: true,
   team: { id: "team-1", name: "飲食チーム", myRole: "member" },
   assignedNotice: false,
+  readOnly: null,
 };

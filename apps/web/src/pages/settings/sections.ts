@@ -1,5 +1,5 @@
 // 設定画面の項目の一覧。項目を足すときは、ここに1行足して画面を作るだけにする
-import { PaletteIcon, UserCircleIcon, type LucideIcon } from "lucide-react";
+import { CreditCardIcon, PaletteIcon, UserCircleIcon, type LucideIcon } from "lucide-react";
 
 /** 設定画面の項目。 */
 export type SettingsSection = {
@@ -20,7 +20,9 @@ export const SETTINGS_GROUPS: SettingsGroup[] = [
     label: "個人設定",
     sections: [
       { slug: "appearance", label: "外観", Icon: PaletteIcon, keywords: ["配色", "テーマ", "ダーク", "ライト", "ダークモード"] },
-      { slug: "account", label: "アカウント", Icon: UserCircleIcon, keywords: ["Google", "メールアドレス", "名前", "ログアウト"] },
+      { slug: "account", label: "アカウント", Icon: UserCircleIcon, keywords: ["Google", "メールアドレス", "名前", "ログアウト", "退会"] },
+      // 契約と支払い（specs/013 contracts/ui-routes.md）
+      { slug: "billing", label: "契約と支払い", Icon: CreditCardIcon, keywords: ["料金", "支払い", "契約", "解約", "領収書", "カード"] },
     ],
   },
 ];

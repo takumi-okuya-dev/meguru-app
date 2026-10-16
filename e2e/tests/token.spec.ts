@@ -2,12 +2,10 @@
 // specs/012 で、名前だけで作ったアカウントに「このアカウントの設定」からトークンでつなぐ形になった（US2・US3）。
 // トークンは、偽のThreadsの「ユーザートークン生成ツール」の画面で作る。
 import { expect, test, type Page } from "@playwright/test";
-import pg from "pg";
 import { connectWithToken, createAccount, makeToken as makeTokenFor, resetAll, signInAs } from "./helpers";
 
 test.describe.configure({ mode: "serial" });
 
-const DIRECT_DB = process.env.E2E_DATABASE_URL_DIRECT ?? "postgres://postgres:postgres@localhost:5432/threads_grower";
 let page: Page;
 let accountId = "";
 
@@ -17,16 +15,6 @@ let accountId = "";
  * @returns トークン
  */
 const makeToken = (appScope: string) => makeTokenFor(page, "9003", appScope);
-
-async function sql(query: string) {
-  const client = new pg.Client({ connectionString: DIRECT_DB });
-  await client.connect();
-  try {
-    await client.query(query);
-  } finally {
-    await client.end();
-  }
-}
 
 test.beforeAll(async ({ browser }) => {
   await resetAll();
@@ -47,8 +35,7 @@ test("名前で作ったアカウントに、トークンを貼り付けてつ�
 });
 
 test("自分の別のアカウントを、同じThreadsアカウントにつなごうとすると止まり、そのアカウントを示す（012 US3-1）", async () => {
-  // 上限（1件）だと2つ目を作れないので、上限を上げておく
-  await sql("UPDATE accounts SET plan = 'multi-account'");
+  // E2E は決済OFFで流すので、上限はない（specs/013 research.md R9）
   const second = await createAccount(page, "カフェ2");
   await connectWithToken(page, second, await makeToken("another"));
   await expect(page.getByText("@cafe_bは、あなたのアカウント『カフェ本店』につながっています。")).toBeVisible();

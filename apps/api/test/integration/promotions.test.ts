@@ -2,7 +2,7 @@
 import { jstToday } from "@threads-grower/shared";
 import { neon } from "@neondatabase/serverless";
 import { beforeEach, describe, expect, it } from "vitest";
-import { AFTER_TRIAL, call, createUserWithAccount, makeApp, resetDb, setAccount, testEnv } from "../helpers/app";
+import { call, createUserWithAccount, makeApp, resetDb, setAccount, testEnv } from "../helpers/app";
 
 const app = makeApp();
 
@@ -142,8 +142,8 @@ describe("宣伝内容", () => {
   });
 
   it("別のAccountの行：自分の別のAccountの宣伝内容のIDでは 404 ITEM_NOT_FOUND", async () => {
-    const a = await createUserWithAccount("u1", { plan: "multi-account" });
-    const b = await createUserWithAccount("u1", { plan: "multi-account" });
+    const a = await createUserWithAccount("u1");
+    const b = await createUserWithAccount("u1");
     const p = await create(a.accountId);
     const res = await call(app, "PUT", `${base(b.accountId)}/promotions/${p.id}`, {
       user: "u1",
@@ -178,24 +178,6 @@ describe("宣伝内容", () => {
     expect((await call(app, "PUT", `${base(accountId)}/promotion-settings`, { user: "u1", body: { ratioPercent: 30, expectedVersion: 1 } })).status).toBe(200);
   });
 
-  it("grower機能の判定：無料体験の後のプラン1は書き込みが 403、読み取りは canEdit: false（FR-024、SC-008）", async () => {
-    const { accountId } = await createUserWithAccount("u1", { plan: "auto-grower", userCreatedAt: AFTER_TRIAL() });
-    const p = await create(accountId);
-    await setAccount(accountId, { plan: "auto-only" });
-    const writes = [
-      call(app, "POST", `${base(accountId)}/promotions`, { user: "u1", body: input() }),
-      call(app, "PUT", `${base(accountId)}/promotions/${p.id}`, { user: "u1", body: { ...input(), expectedVersion: 1 } }),
-      call(app, "DELETE", `${base(accountId)}/promotions/${p.id}`, { user: "u1" }),
-      call(app, "PUT", `${base(accountId)}/promotion-settings`, { user: "u1", body: { ratioPercent: 30, expectedVersion: 1 } }),
-    ];
-    for (const res of await Promise.all(writes)) {
-      expect(res.status).toBe(403);
-      expect(((await res.json()) as { error: { code: string } }).error.code).toBe("GROWER_FEATURE_REQUIRED");
-    }
-    const l = await list(accountId);
-    expect(l.canEdit).toBe(false);
-    expect(l.items).toHaveLength(1);
-  });
 });
 
 describe("宣伝投稿の割合", () => {

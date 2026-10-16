@@ -123,7 +123,7 @@ describe("トークンでの接続し直しの表（specs/010 FR-034）", () => 
   });
 
   it("mode = connect も、オーナーでなければ判定で止まる（specs/012 FR-015）。自分の未接続のアカウントなら確認に進む", async () => {
-    const { accountId: unconnected } = await createUnconnectedAccount("owner1", { name: "未接続", plan: "multi-account" });
+    const { accountId: unconnected } = await createUnconnectedAccount("owner1", { name: "未接続" });
     const denied = await call(app, "POST", "/api/threads/token-connect", {
       user: "editor1",
       body: { mode: "connect", accountId: unconnected, token: "x".repeat(40) },

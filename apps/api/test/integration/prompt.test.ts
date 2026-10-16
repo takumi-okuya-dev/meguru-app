@@ -116,20 +116,8 @@ describe("PUT /prompt-settings", () => {
 });
 
 describe("プランと権限", () => {
-  it("無料体験の後のプラン1は GET /prompt・PUT /prompt-settings が 403、GET /post-drafts は canGeneratePrompt: false で 200", async () => {
+  it("無料体験の後でも決済OFFなら使える", async () => {
     const { accountId } = await createUserWithAccount("u1", { userCreatedAt: AFTER_TRIAL() });
-    const get = await call(app, "GET", `${base(accountId)}/prompt`, { user: "u1" });
-    expect(get.status).toBe(403);
-    expect(await get.json()).toMatchObject({ error: { code: "GROWER_FEATURE_REQUIRED" } });
-    const put = await call(app, "PUT", `${base(accountId)}/prompt-settings`, { user: "u1", body: { postCount: 10, expectedVersion: 1 } });
-    expect(put.status).toBe(403);
-    const drafts = await call(app, "GET", `${base(accountId)}/post-drafts`, { user: "u1" });
-    expect(drafts.status).toBe(200);
-    expect(await drafts.json()).toMatchObject({ needsReview: [], limits: { needsReview: 500 }, canGeneratePrompt: false, promptPostCount: 30 });
-  });
-
-  it("無料体験の後でもプラン2なら使える", async () => {
-    const { accountId } = await createUserWithAccount("u1", { plan: "auto-grower", userCreatedAt: AFTER_TRIAL() });
     expect((await getPrompt(accountId)).count).toBe(30);
   });
 
@@ -205,7 +193,7 @@ describe("反応が低かった投稿の反映（specs/006 FR-025〜FR-027、SC-
   const HEADING = "■反応が低かった投稿(このアカウントで閲覧数が基準の半分以下だった投稿。同じ書き方・切り口は避けること)";
 
   it("外していない低調の新しい5件がメモ付きで入り、外した投稿・好調・普通・確定待ちは入らない", async () => {
-    const { accountId } = await createUserWithAccount("u1", { plan: "auto-grower" });
+    const { accountId } = await createUserWithAccount("u1");
     const poor = await publishedDrafts(
       accountId,
       [200, 201, 202, 203, 204, 205, 206].map((h, i) => ({ body: `低調${i + 1}`, publishedAt: ago(h) })),
@@ -236,7 +224,7 @@ describe("反応が低かった投稿の反映（specs/006 FR-025〜FR-027、SC-
   });
 
   it("低調の投稿がなければ節ごと省く", async () => {
-    const { accountId } = await createUserWithAccount("u1", { plan: "auto-grower" });
+    const { accountId } = await createUserWithAccount("u1");
     const { prompt } = await getPrompt(accountId);
     expect(prompt).not.toContain("■反応が低かった投稿");
   });

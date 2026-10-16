@@ -240,6 +240,7 @@ cp apps/api/.dev.vars.example apps/api/.dev.vars
 | `IDENTIFIER_HASH_KEY` | `…` | 4 |
 | `DATABASE_URL` | `postgres://postgres:postgres@db.localtest.me:5432/threads_grower` | ローカルのDB（`local-neon-http-proxy`経由） |
 | `WEB_ORIGIN` | `http://localhost:5173` | Webの開発サーバー |
+| `BILLING_ENABLED` | `false`（決済を試すときは`true`） | 必須。10 |
 
 `THREADS_AUTH_BASE_URL`と`THREADS_GRAPH_BASE_URL`は、本物のThreadsにつなぐ場合は書きません（`wrangler.toml`の既定値が使われます）。
 
@@ -326,6 +327,98 @@ pnpm e2e
   - 自動投稿（005）の関所のKVを作る：`pnpm --filter api exec wrangler kv namespace create AUTOPOST_KV`。表示された`id`を、`apps/api/wrangler.toml`の`[[kv_namespaces]]`の`id`に入れる（ローカルとテストは、入れなくても動く）。
 - **Neon**：本番のDBを作り、`DATABASE_URL`を本番の接続文字列にする。
 - 本番用のURLで、3-3の3つのURLと`THREADS_REDIRECT_URI`・`WEB_ORIGIN`を設定し直す。
+- **事業者としての手続き（決済。specs/013-billing）**：アプリの外で、公開の前に決めて済ませておく。
+  - **適格請求書（インボイス）**：適格請求書発行事業者に登録するかを決める。登録したら、Stripeの本番の領収書・請求書の設定に登録番号（T＋13桁）を入れ、税率ごとの消費税の額が出ることを、テスト用環境の領収書で確かめる。登録しないなら、登録番号は載せない。どちらでも、アプリのコードと料金（税込み）は変わらない。
+  - **特定商取引法に基づく表記**：販売者の名前・住所・連絡先などを決め、表記のページに入れる（013 FR-071）。値は`apps/web/src/lib/seller-info.ts`に入れる。住所・電話番号は「請求があれば遅滞なく開示します」と書く形も選べる。
+- **Stripe**：「10. Stripe」の手順を本番（`sk_live_`）で行い、`BILLING_ENABLED=true`にする。公開の前に、今の利用者（開発者・テストユーザー）に料金なしの印を付ける（10-7）。
+
+---
+
+## 10. Stripe（決済。specs/013-billing）
+
+決済のON/OFFは、コードではなく環境の設定で切り替えます（research.md R11）。手元はふだん`BILLING_ENABLED=false`で、決済を試すときだけ`true`にします。
+
+| 環境 | `BILLING_ENABLED` | Stripeのキー | Webhookの秘密 |
+|---|---|---|---|
+| 本番（`main`） | `true` | `sk_live_…` | 本番の宛先の`whsec_…` |
+| ステージング（`develop`） | `true` | `sk_test_…`（テスト用環境） | ステージングの宛先の`whsec_…` |
+| 手元・PRの確認 | `false`（試すときは`true`） | `sk_test_…` | `stripe listen`が出す`whsec_…` |
+
+テストユーザーには、決済を止めるのではなく、料金なしの印を付けて払わずに使ってもらいます（10-7）。
+
+### 10-1. テスト用環境と本番を分ける
+
+Stripeのダッシュボードの左上で「テスト環境」（sandbox）と本番を切り替えます。10-2〜10-6は、テスト用環境と本番のそれぞれで行います。
+
+### 10-2. 料金を作る
+
+「商品カタログ」→「商品を追加」で、商品「ThreadsGrower」を作り、料金を次のとおりにします（research.md R3）。
+
+- 料金体系：**段階制（graduated）**、毎月、JPY
+- 1段目：1〜1件 **1,000円**
+- 2段目：2件〜 **1件につき500円**
+- 税：**内税（税込み）**
+
+できた料金のID（`price_…`）を`STRIPE_PRICE_ID`に入れます。金額は`packages/shared/src/billing.ts`の`BILLING_BASE_PRICE_JPY`・`BILLING_EXTRA_PRICE_JPY`と同じ値にします。金額を変えるときは、両方と利用規約を直し、利用者に告知します。
+
+### 10-3. Webhookの宛先を登録する
+
+「開発者」→「Webhook」→「エンドポイントを追加」で、宛先を`<APIのURL>/api/stripe/webhook`にし、次の8つの知らせを選びます（research.md R5）。
+
+`checkout.session.completed`・`customer.subscription.created`・`customer.subscription.updated`・`customer.subscription.deleted`・`customer.subscription.paused`・`customer.subscription.resumed`・`invoice.paid`・`invoice.payment_failed`
+
+表示された署名の秘密（`whsec_…`）を`STRIPE_WEBHOOK_SECRET`に入れます。
+
+手元では、Stripe CLIで転送します（表示された`whsec_…`を`.dev.vars`に入れる）。
+
+```bash
+stripe listen --forward-to localhost:8787/api/stripe/webhook
+```
+
+### 10-4. カスタマーポータルを設定する
+
+「設定」→「Billing」→「カスタマーポータル」で、次のとおりにします（research.md R7）。
+
+- 許す：支払い方法の変更、請求書・領収書の履歴、解約（**請求期間の終わりに**）、解約の取り消し
+- 許さない：数量の変更、料金（プラン）の変更（数はアプリが決める）
+
+別の設定を作ったときは、そのID（`bpc_…`）を`STRIPE_PORTAL_CONFIGURATION_ID`に入れます（なければ既定の設定が使われます）。
+
+### 10-5. 支払いの失敗とメール
+
+- 「設定」→「Billing」→「サブスクリプションとメール」→「支払いの再試行（Smart Retries）」をオンにし、**すべての再試行が失敗したらサブスクリプションをキャンセルする**にします。失敗した時点でアプリは読むだけになり、払えればすぐに戻ります（Clarifications 2026-10-15）。
+- 同じ画面で、顧客へのメール（領収書・支払いの失敗・カードの期限切れ）をオンにします。アプリからはメールを送りません。
+
+### 10-6. 環境変数を入れる
+
+`apps/api/.dev.vars`（本番・ステージングは`wrangler secret put`）に入れます。
+
+| 名前 | 値 | 必須 |
+|---|---|---|
+| `BILLING_ENABLED` | `true` | いつも（`true`か`false`） |
+| `STRIPE_SECRET_KEY` | `sk_test_…`／`sk_live_…` | 決済ONのとき |
+| `STRIPE_WEBHOOK_SECRET` | `whsec_…` | 決済ONのとき |
+| `STRIPE_PRICE_ID` | `price_…` | 決済ONのとき |
+| `STRIPE_PORTAL_CONFIGURATION_ID` | `bpc_…` | いいえ |
+| `STRIPE_TAX_RATE_ID` | `txr_…`（10%・内税。適格請求書の登録をしたとき） | いいえ |
+
+決済ONで鍵が欠けていると、APIは`CONFIG_ERROR`を返して止まります（黙って全員を無料にしません）。
+
+偽のStripeで試すときは、`pnpm --filter api fake-stripe`で起動し（ポート8791）、`STRIPE_API_BASE_URL=http://localhost:8791`と、見本の形の値（`sk_test_`で始まる10文字以上など）を入れます。
+
+### 10-7. 料金なしの印
+
+開発者・テストユーザー・公開の前からの利用者には、料金なしの印を付けます（登録から1か月を過ぎた人は、印がないと読むだけになります）。
+
+```bash
+DATABASE_URL=… pnpm --filter api admin:set-billing-exempt <email> on   # 外すときは off
+```
+
+終わっていない契約がある人には、重ねて請求しないよう止まります。支払いの画面で解約してもらってから付けるか、`--force`を付けます。
+
+### 10-8. 確かめる
+
+[specs/013-billing/quickstart.md](../specs/013-billing/quickstart.md)の「手で確かめる」を、テスト用環境で行います（テスト用のカード`4242 4242 4242 4242`、支払いの失敗は`4000 0000 0000 0341`）。
 
 ---
 
@@ -336,4 +429,6 @@ pnpm e2e
 - [Clerk：Add Google as a social connection](https://clerk.com/docs/guides/configure/auth-strategies/social-connections/google)
 - [Clerk：Customize your session token](https://clerk.com/docs/guides/sessions/customize-session-tokens)
 - [Clerk：Playwright test helpers](https://clerk.com/docs/guides/development/testing/playwright/test-helpers)
+- [Stripe：Create a Checkout Session](https://docs.stripe.com/api/checkout/sessions/create)
+- [Stripe：Customer portal](https://docs.stripe.com/customer-management)
 - [Cloudflare：Create a locally-managed tunnel](https://developers.cloudflare.com/cloudflare-one/networks/connectors/cloudflare-tunnel/do-more-with-tunnels/local-management/create-local-tunnel/)

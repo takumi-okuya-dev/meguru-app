@@ -4,6 +4,7 @@
 import { ArrowLeftIcon, ChevronLeftIcon, ChevronRightIcon, SearchIcon } from "lucide-react";
 import { useState } from "react";
 import { Link, Navigate, NavLink, Outlet, useLocation, useMatch } from "react-router";
+import { TrialEndingBannerFromMe } from "@/components/billing/TrialEndingBanner";
 import { Input } from "@/components/ui/input";
 import { MD_QUERY, useMediaQuery } from "@/lib/use-media-query";
 import { cn } from "@/lib/utils";
@@ -96,6 +97,9 @@ export function SettingsLayout() {
           }
         />
         <main className="px-4 pt-2 pb-8">
+          <div className="mb-4 overflow-hidden rounded-2xl empty:hidden">
+            <TrialEndingBannerFromMe />
+          </div>
           <Outlet />
         </main>
       </div>
@@ -138,6 +142,9 @@ export function SettingsLayout() {
         </nav>
       </aside>
       <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-6 md:px-8 md:py-10">
+        <div className="mb-6 overflow-hidden rounded-2xl empty:hidden">
+          <TrialEndingBannerFromMe />
+        </div>
         <Outlet />
       </main>
     </div>

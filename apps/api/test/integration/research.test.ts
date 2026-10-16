@@ -1,7 +1,7 @@
 // US3：参考投稿とキーワード（specs/002-strategy-profile FR-012〜FR-014・FR-020〜FR-025、research.md R3〜R5）
 import { neon } from "@neondatabase/serverless";
 import { beforeEach, describe, expect, it } from "vitest";
-import { AFTER_TRIAL, call, createUserWithAccount, makeApp, resetDb, setAccount, testEnv } from "../helpers/app";
+import { call, createUserWithAccount, makeApp, resetDb, setAccount, testEnv } from "../helpers/app";
 
 const app = makeApp();
 
@@ -140,22 +140,4 @@ describe("リサーチ共通", () => {
     expect((await post(accountId, "research-keywords", { keyword: "AI" })).status).toBe(201);
   });
 
-  it("grower機能の判定：無料体験の後のプラン1は書き込みが 403、読み取りは canEdit: false（FR-024、SC-008）", async () => {
-    const { accountId } = await createUserWithAccount("u1", { plan: "auto-grower", userCreatedAt: AFTER_TRIAL() });
-    const rp = (await (await post(accountId, "reference-posts", { body: "本文" })).json()) as Item;
-    const kw = (await (await post(accountId, "research-keywords", { keyword: "AI" })).json()) as Item;
-    await setAccount(accountId, { plan: "auto-only" });
-    const writes = await Promise.all([
-      post(accountId, "reference-posts", { body: "x" }),
-      post(accountId, "research-keywords", { keyword: "y" }),
-      call(app, "PUT", `${base(accountId)}/reference-posts/${rp.id}`, { user: "u1", body: { body: "x", expectedVersion: 1 } }),
-      call(app, "DELETE", `${base(accountId)}/research-keywords/${kw.id}`, { user: "u1" }),
-    ]);
-    for (const res of writes) expect(res.status).toBe(403);
-    for (const kind of ["reference-posts", "research-keywords"] as const) {
-      const l = await list(accountId, kind);
-      expect(l.canEdit).toBe(false);
-      expect(l.items).toHaveLength(1);
-    }
-  });
 });

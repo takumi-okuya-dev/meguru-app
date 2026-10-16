@@ -6,6 +6,7 @@ import type { AccountSummary, MeResponse } from "@threads-grower/shared";
 import { createMemoryRouter, Outlet, RouterProvider, useParams } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { OWNER_ACCESS } from "./helpers/access";
+import { ME_BILLING_OFF } from "./helpers/billing";
 
 const mocks = vi.hoisted(() => ({ me: vi.fn(), tokenConnect: vi.fn(), getPostingSchedule: vi.fn(), renameAccount: vi.fn() }));
 vi.mock("@/lib/api-client", async (orig) => {
@@ -40,7 +41,6 @@ const unconnected: AccountSummary = {
   username: null,
   displayName: null,
   profilePictureUrl: null,
-  plan: "auto-only",
   connectionStatus: "not_connected",
   connectionMethod: null,
   lastUsedAt: null,
@@ -83,6 +83,7 @@ beforeEach(() => {
     accounts: [unconnected],
     landingAccountId: "a1",
     accountLimit: { max: 1, used: 1 },
+    ...ME_BILLING_OFF,
     threadsAccessMode: "public",
     teams: [],
   };

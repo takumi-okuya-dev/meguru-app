@@ -45,7 +45,7 @@ export function ReferencePostFormDialog({
   item,
   onSaved,
   onClose,
-  onGrowerLost,
+  onReadOnly,
   onDeletedElsewhere,
   onLimitReached,
 }: {
@@ -53,7 +53,7 @@ export function ReferencePostFormDialog({
   item?: ReferencePost;
   onSaved: (p: ReferencePost) => void;
   onClose: () => void;
-  onGrowerLost: () => void;
+  onReadOnly: () => void;
   onDeletedElsewhere: () => void;
   onLimitReached: () => void;
 }) {
@@ -65,7 +65,7 @@ export function ReferencePostFormDialog({
     overLimit,
     onSaved,
     onClose,
-    onGrowerLost,
+    onReadOnly,
     onDeletedElsewhere,
     onLimitReached,
     save: (form, expectedVersion) =>

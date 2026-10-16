@@ -6,6 +6,7 @@ import { createMemoryRouter, RouterProvider } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { queryKeys } from "@/lib/query";
+import { ME_BILLING_OFF } from "./helpers/billing";
 
 const mocks = vi.hoisted(() => ({
   me: vi.fn(),
@@ -47,7 +48,6 @@ const account = (
   username: `user_${id}`,
   displayName: `Account ${id}`,
   profilePictureUrl: null,
-  plan: "multi-account",
   connectionStatus,
   lastUsedAt: null,
   role: "owner" as const,
@@ -60,6 +60,7 @@ const me = (rows: AccountSummary[]): MeResponse => ({
   accounts: rows,
   landingAccountId: rows[0]?.id ?? null,
   accountLimit: { max: 5, used: rows.length },
+  ...ME_BILLING_OFF,
   threadsAccessMode: "testers",
   teams: [],
 });
@@ -559,7 +560,6 @@ describe("切り替えメニューの見出し（specs/011 T025）", () => {
     username: id,
     displayName: id,
     profilePictureUrl: null,
-    plan: "auto-only",
     connectionStatus: "connected",
     lastUsedAt: null,
     role,

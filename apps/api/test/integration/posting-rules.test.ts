@@ -151,7 +151,7 @@ describe("POST /ng-words（FR-014・FR-016a）", () => {
     expect(await counts.json()).toMatchObject({ needsReview: 501, approved: 0 });
   });
 
-  it("無料体験の後のプラン1でも追加・削除できる（FR-017）", async () => {
+  it("無料体験の後でも（決済OFF）追加・削除できる（FR-017）", async () => {
     const { accountId } = await createUserWithAccount("u1", { userCreatedAt: AFTER_TRIAL() });
     const res = await addWords(accountId, ["絶対"]);
     expect(res.status).toBe(200);
@@ -200,11 +200,4 @@ describe("PUT /core-rules（FR-019〜FR-021）", () => {
     expect((await put(accountId, "あ".repeat(2001), 2)).status).toBe(400);
   });
 
-  it("無料体験の後のプラン1は 403 GROWER_FEATURE_REQUIRED で、GET は canEditCoreRules: false（FR-020）", async () => {
-    const { accountId } = await createUserWithAccount("u1", { userCreatedAt: AFTER_TRIAL() });
-    const res = await put(accountId, "A", 1);
-    expect(res.status).toBe(403);
-    expect(await res.json()).toMatchObject({ error: { code: "GROWER_FEATURE_REQUIRED" } });
-    expect((await rules(accountId)).canEditCoreRules).toBe(false);
-  });
 });

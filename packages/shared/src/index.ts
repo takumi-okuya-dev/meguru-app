@@ -1,5 +1,5 @@
 export * from "./account-label";
-export * from "./access";
+export * from "./billing";
 export * from "./csv";
 export * from "./drafts";
 export * from "./errors";
@@ -8,7 +8,6 @@ export * from "./ng-words";
 export * from "./performance";
 export * from "./permissions";
 export * from "./normalize";
-export * from "./plans";
 export * from "./policy";
 export * from "./promotions";
 export * from "./prompt";

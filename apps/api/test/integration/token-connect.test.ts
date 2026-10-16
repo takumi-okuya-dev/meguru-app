@@ -120,13 +120,6 @@ describe("トークンで追加する（US1）", () => {
     expect((await q()`SELECT count(*)::int AS n FROM token_check_failures`)[0]).toEqual({ n: 0 });
   });
 
-  it("登録の上限に達していても、未接続のアカウントにはつなげる（アカウントは増えない。specs/012 FR-016）", async () => {
-    await targetFor("u1");
-    expect((await createAccountVia(app, "u1")).res.status).toBe(409);
-    const res = await add(await fake.issueToken({ user: "9003" }));
-    expect(res.status).toBe(200);
-  });
-
   it("同じトークンを同時に2回送っても、つながるのは1回で、後の方は ACCOUNT_ALREADY_CONNECTED（FR-014、specs/012 FR-018）", async () => {
     const token = await fake.issueToken({ user: "9003" });
     await targetFor("u1");
@@ -176,7 +169,7 @@ describe("トークンで追加する（US1）", () => {
     await call(app, "GET", "/api/me", { user: "u1" });
     const id = ((await q()`SELECT id FROM users WHERE clerk_user_id = 'u1'`) as { id: string }[])[0]!.id;
     const broken = createThreadsClient(testEnv, () => Promise.reject(new TypeError("fetch failed: getaddrinfo ENOTFOUND")));
-    const err = await connectWithToken(testEnv, broken, { id }, { mode: "connect", accountId: await targetFor("u1"), token: "a".repeat(40) }).catch((e: unknown) => e);
+    const err = await connectWithToken(testEnv, broken, { id, billing: { enabled: false } }, { mode: "connect", accountId: await targetFor("u1"), token: "a".repeat(40) }).catch((e: unknown) => e);
     expect(err).toBeInstanceOf(AppError);
     expect(err).toMatchObject({ code: "THREADS_UNAVAILABLE", status: 503 });
     expect((await q()`SELECT count(*)::int AS n FROM token_check_failures`)[0]).toEqual({ n: 0 });

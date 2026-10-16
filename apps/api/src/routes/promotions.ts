@@ -19,7 +19,6 @@ import { parseBody } from "../lib/validate";
 import { authorizeAccount } from "../services/access";
 import { recordActivity, updatedByOf, withActivityTx } from "../services/activity-log";
 import { touchMaterials } from "../services/materials";
-import { canEditProfile, requireGrowerAccess } from "../services/grower-access";
 import { assertItemId, insertWithLimit, updateWithVersion } from "../services/item-service";
 
 type PromotionRow = typeof promotions.$inferSelect;
@@ -97,7 +96,7 @@ export function promotionRoutes(authed: MiddlewareHandler<AppEnv>) {
         ratioPercent: account.promotionRatioPercent,
         version: account.promotionRatioVersion,
         // 宣伝投稿の割合は設定（オーナーだけ。specs/011 contracts/permissions.md、PR #14 のCodexレビュー）
-        canEdit: canEditProfile(account, access.owner) && access.permissions.has("settings"),
+        canEdit: access.permissions.has("settings"),
       });
     })
     .put("/accounts/:accountId/promotion-settings", authed, async (c) => {
@@ -105,7 +104,6 @@ export function promotionRoutes(authed: MiddlewareHandler<AppEnv>) {
       const user = c.get("user");
       const access = await authorizeAccount(db, user, c.req.param("accountId"), "settings");
       const account = access.account;
-      requireGrowerAccess(account, access.owner);
       const { ratioPercent, expectedVersion } = await parseBody(putPromotionSettingsRequestSchema, c.req.json());
       // 読み込んだときの版が一致するときだけ保存する（黙って上書きしない。specs/008 FR-007、PR #9 のCodexレビュー）。
       // 保存と操作の記録は同じトランザクションにする
@@ -148,7 +146,7 @@ export function promotionRoutes(authed: MiddlewareHandler<AppEnv>) {
         items: sortPromotions(rows.map((r) => toPromotion(r, now)), now),
         limit: PROMOTION_LIMIT,
         // 直せるのは content の権限がある人だけ（見せてもらっている人は読むだけ。PR #14 のCodexレビュー）
-        canEdit: canEditProfile(account, access.owner, now) && access.permissions.has("content"),
+        canEdit: access.permissions.has("content"),
       });
     })
     .post("/accounts/:accountId/promotions", authed, async (c) => {
@@ -156,7 +154,6 @@ export function promotionRoutes(authed: MiddlewareHandler<AppEnv>) {
       const user = c.get("user");
       const access = await authorizeAccount(db, user, c.req.param("accountId"), "content");
       const account = access.account;
-      requireGrowerAccess(account, access.owner);
       const input = await parseBody(promotionInputSchema, c.req.json());
       const row = await insertWithLimit(
         c.env,
@@ -181,7 +178,6 @@ export function promotionRoutes(authed: MiddlewareHandler<AppEnv>) {
       const user = c.get("user");
       const access = await authorizeAccount(db, user, c.req.param("accountId"), "content");
       const account = access.account;
-      requireGrowerAccess(account, access.owner);
       const id = assertItemId(c.req.param("promotionId"));
       const { expectedVersion, ...input } = await parseBody(updatePromotionRequestSchema, c.req.json());
       const now = new Date();
@@ -209,7 +205,6 @@ export function promotionRoutes(authed: MiddlewareHandler<AppEnv>) {
       const user = c.get("user");
       const access = await authorizeAccount(db, user, c.req.param("accountId"), "content");
       const account = access.account;
-      requireGrowerAccess(account, access.owner);
       const id = assertItemId(c.req.param("promotionId"));
       // すでに消えていても成功とする（contracts/api.md）
       // 削除と操作の記録を同じトランザクションにする（PR #9 のCodexレビュー）

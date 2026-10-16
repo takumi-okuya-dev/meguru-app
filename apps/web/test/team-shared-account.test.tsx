@@ -71,7 +71,6 @@ beforeEach(() => {
     username: "sakura_pan",
     displayName: "さくらのパン日記",
     profilePictureUrl: null,
-    plan: "auto-grower",
     connectionStatus: "connected",
     lastUsedAt: null,
     role: "viewer",

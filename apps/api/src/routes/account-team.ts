@@ -24,6 +24,8 @@ export function accountTeamRoutes(authed: MiddlewareHandler<AppEnv>) {
         hasTeam: access.hasTeam,
         team: access.team,
         assignedNotice: await assignedNoticeVisible(db, access),
+        // オーナーが読むだけなら、その理由（オーナー以外には owner_inactive。specs/013 FR-045）
+        readOnly: access.readOnly,
       });
     })
     .get("/accounts/:accountId/team", authed, async (c) => {

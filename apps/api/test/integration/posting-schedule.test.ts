@@ -214,7 +214,7 @@ describe("PUT /posting-schedule", () => {
     expect(await fake.posts()).toHaveLength(0);
   });
 
-  it("全プラン：無料体験の後のプラン1でも保存できる（FR-004）", async () => {
+  it("無料体験の後でも（決済OFF）保存できる（FR-004）", async () => {
     const { accountId } = await createUserWithAccount("u1", { userCreatedAt: AFTER_TRIAL() });
     const res = await putSchedule(app, accountId, {
       enabled: false,

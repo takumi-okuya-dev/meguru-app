@@ -1,7 +1,11 @@
 // 利用規約（specs/010-token-account-add FR-052、contracts/ui-routes.md「利用規約」）。ログインなしで読める。
 // 本featureでは最小限の下書き。運営者が公開の前に文面を確かめ、運営者の名前・連絡先を書き足す。
-// 料金・解約・特定商取引法に基づく表示は 011（決済）で足す。
+// 料金・無料体験・解約・未払い・退会の節は specs/013-billing（FR-070）で足した。金額は共通の定数から出す。
+import { BILLING_BASE_PRICE_JPY, BILLING_EXTRA_PRICE_JPY } from "@threads-grower/shared";
 import type { ReactNode } from "react";
+import { Link } from "react-router";
+
+const yen = (n: number) => `${n.toLocaleString("ja-JP")}円`;
 
 /**
  * 見出しと本文の節。
@@ -65,11 +69,49 @@ export function TermsPage() {
         </p>
       </Section>
 
-      <Section title="6. 規約の変更">
-        <p>本サービスは、必要に応じてこの規約を変えることがあります。大切な変更は、本サービスの画面でお知らせします。</p>
+      <Section title="6. 料金と支払い">
+        <p>
+          料金は、基本料金 月{yen(BILLING_BASE_PRICE_JPY)}（アカウント1件目を含む）と、2件目以降のアカウント1件につき月
+          {yen(BILLING_EXTRA_PRICE_JPY)}です（どちらも税込み）。Threadsにつないでいないアカウントも数えます。
+        </p>
+        <p>
+          支払いはクレジットカードで、毎月請求します。アカウントを足す・削除すると、次の請求からアカウントの数が反映されます。今の期間の分の日割りの請求・返金はしません。カードの情報は決済代行会社（Stripe）が扱い、本サービスは持ちません。
+        </p>
       </Section>
 
-      <p className="text-sm text-muted-foreground">最終更新日：2026年10月10日</p>
+      <Section title="7. 無料体験">
+        <p>
+          登録から1か月間は、すべての機能を無料で使えます（無料体験）。無料体験中に作れるアカウントは1件までです。無料体験は1人1回です。
+        </p>
+        <p>無料体験中に契約した場合、無料体験が終わる日から請求を始めます（残りが2日を切っているときは、契約から1日後になることがあります）。</p>
+      </Section>
+
+      <Section title="8. 解約">
+        <p>契約は、「契約と支払い」の支払いの画面からいつでも解約できます。払った期間の終わりまでは、すべての機能を使えます。残りの期間の返金はしません。</p>
+      </Section>
+
+      <Section title="9. 未払いのとき">
+        <p>
+          無料体験が終わって契約がないとき、支払いに失敗したとき、解約して期間が終わったときは、データを残したまま読むだけになり、自動投稿とパフォーマンスの取得を止めます。チームで手伝っている人・見せてもらっている人も、そのアカウントでは読むだけになります。契約する（支払いが済む）と、すぐに元どおり使えます。
+        </p>
+      </Section>
+
+      <Section title="10. 退会">
+        <p>
+          「設定」の「アカウント」からいつでも退会できます。退会すると、あなたのアカウントとそのデータ（Threadsとのつながりを含む）はすぐにすべて消え、元に戻せません。契約はすぐに止まり、残りの期間の返金はしません。入っているチームからは外れます（管理者なら、いちばん長くいる人に管理者を引き継ぎます）。
+        </p>
+      </Section>
+
+      <Section title="11. 規約の変更">
+        <p>本サービスは、必要に応じてこの規約を変えることがあります。大切な変更（料金の変更を含む）は、本サービスの画面でお知らせします。</p>
+      </Section>
+
+      <p className="text-sm text-muted-foreground">
+        <Link to="/legal/commerce" className="underline underline-offset-4">
+          特定商取引法に基づく表記
+        </Link>
+      </p>
+      <p className="text-sm text-muted-foreground">最終更新日：2026年10月16日</p>
     </main>
   );
 }

@@ -1,6 +1,6 @@
 // GET /api/me（FR-004・FR-005、research.md R10。specs/008 research.md R11 で役割つきに広げ、
 // specs/011 research.md R5 で入っているチームを足した）
-import { limitForOwnedPlans, type Role } from "@threads-grower/shared";
+import type { Role } from "@threads-grower/shared";
 import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { Hono, type MiddlewareHandler } from "hono";
@@ -9,6 +9,11 @@ import { createDb } from "../db/client";
 import { accounts, memberships, users } from "../db/schema";
 import { personName, toAccountSummary, type AccountRow } from "../services/access";
 import { countOwnedAccountNeedsReview } from "../services/account-review-counts";
+import { loadEntitlement, toMeBilling } from "../services/billing-service";
+import { withdraw, withdrawalPreview, type ClerkUserDeleter } from "../services/withdrawal-service";
+import type { Env } from "../env";
+import { withdrawRequestSchema } from "@threads-grower/shared";
+import { AppError } from "../lib/errors";
 import { listMyTeams } from "../services/team-service";
 
 /**
@@ -37,9 +42,10 @@ export function resolveLandingAccountId(
 /**
  * GET /api/me のルート（FR-004・FR-005）。
  * @param authed - 認証のミドルウェア
+ * @param deleteClerkUser - 退会でClerkのユーザーを消す関数を作る（specs/013）
  * @returns Hono のルート
  */
-export function meRoutes(authed: MiddlewareHandler<AppEnv>) {
+export function meRoutes(authed: MiddlewareHandler<AppEnv>, deleteClerkUser: (env: Env) => ClerkUserDeleter) {
   return new Hono<AppEnv>().get("/me", authed, async (c) => {
     const user = c.get("user");
     const db = createDb(c.env.DATABASE_URL);
@@ -59,7 +65,8 @@ export function meRoutes(authed: MiddlewareHandler<AppEnv>) {
       );
     const owned = rows.filter((r) => r.role === "owner").map((r) => r.account);
     const helped = rows.filter((r) => r.role !== "owner").map((r) => r.account);
-    const teams = await listMyTeams(db, user.id);
+    const now = new Date();
+    const [teams, entitlement] = await Promise.all([listMyTeams(db, user.id), loadEntitlement(db, user.id, user.billing, now)]);
     // Account切り替えメニューは開くたびに一覧を読み直すため、ブラウザに保存させない。
     c.header("Cache-Control", "no-store");
     return c.json({
@@ -72,15 +79,30 @@ export function meRoutes(authed: MiddlewareHandler<AppEnv>) {
         ),
       ),
       landingAccountId: resolveLandingAccountId(owned, user.lastAccountId, helped),
-      accountLimit: { max: limitForOwnedPlans(owned.map((a) => a.plan)), used: owned.length },
+      // 上限は使える状態から（null は上限なし。specs/013 research.md R9）。未接続のアカウントも数える
+      accountLimit: { max: entitlement!.accountLimit, used: owned.length },
       // Threads連携の公開範囲。Web はアカウント追加画面の案内の有無に使う（specs/002 FR-028）
       threadsAccessMode: c.env.THREADS_ACCESS_MODE ?? "testers",
       teams,
+      billing: toMeBilling(user.billing, entitlement!, now),
+      withdrawalInProgress: user.withdrawalRequestedAt !== null,
     });
   }).get("/me/needs-review-counts", authed, async (c) => {
     const user = c.get("user");
     const counts = await countOwnedAccountNeedsReview(createDb(c.env.DATABASE_URL), user.id);
     c.header("Cache-Control", "no-store");
     return c.json({ counts });
-  });
+  })
+    // 退会（specs/013 contracts/api.md「自分」、research.md R10）
+    .get("/me/withdrawal-preview", authed, async (c) => {
+      c.header("Cache-Control", "no-store");
+      return c.json(await withdrawalPreview(createDb(c.env.DATABASE_URL), c.get("user").id));
+    })
+    .post("/me/withdraw", authed, async (c) => {
+      const parsed = withdrawRequestSchema.safeParse(await c.req.json().catch(() => null));
+      if (!parsed.success) throw new AppError("VALIDATION_FAILED", 400, "invalid withdraw request", undefined, ["confirmEmail"]);
+      const user = c.get("user");
+      await withdraw(c.env, deleteClerkUser(c.env), user, parsed.data.confirmEmail);
+      return c.body(null, 204);
+    });
 }

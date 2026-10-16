@@ -5,6 +5,7 @@ import { TEAM_EDITOR_LIMIT, TEAM_MEMBER_LIMIT, TEAMS_PER_ADMIN, type TeamRole } 
 import { and, asc, count, eq, inArray, ne, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import type { Env } from "../env";
+import { billingModeOf, type BillingMode } from "../lib/config";
 import type { Db, TxDb } from "../db/client";
 import { accounts, memberships, teamAccounts, teamMembers, teams, users } from "../db/schema";
 import { lockAdminTeams } from "../db/locks";
@@ -120,7 +121,7 @@ export async function listMyTeams(db: Db | TxDb, userId: string) {
  */
 export async function createTeam(env: Env, tx: TxDb, user: { id: string }, input: { name: string; accountIds: string[] }) {
   await tx.select({ id: users.id }).from(users).where(eq(users.id, user.id)).for("update");
-  await assertOwnFreeAccounts(tx, user.id, input.accountIds);
+  await assertOwnFreeAccounts(tx, user.id, input.accountIds, billingModeOf(env));
   // 管理者のチームの数のロックは、行ロックの後に取る（db/locks.ts の lockAdminTeams）
   await assertCanAdminMore(tx, user.id);
   const teamId = crypto.randomUUID();
@@ -526,10 +527,11 @@ export async function setShared(tx: TxDb, teamAccess: TeamAccess, accountId: str
  * @param teamAccess - authorizeTeamMember の結果（鍵をかけてある）
  * @param accountId - アカウント
  * @param shared - 見せるか（既定は見せない）
- * @throws AppError ACCOUNT_NOT_FOUND（自分のアカウントでない）、ACCOUNT_IN_OTHER_TEAM
+ * @param mode - 決済のモード（読むだけなら足せない。specs/013 FR-043）
+ * @throws AppError ACCOUNT_NOT_FOUND（自分のアカウントでない）、ACCOUNT_IN_OTHER_TEAM、BILLING_REQUIRED
  */
-export async function addTeamAccount(tx: TxDb, teamAccess: TeamAccess, accountId: string, shared = false) {
-  await assertOwnFreeAccounts(tx, teamAccess.member.id, [accountId]);
+export async function addTeamAccount(tx: TxDb, teamAccess: TeamAccess, accountId: string, shared: boolean, mode: BillingMode) {
+  await assertOwnFreeAccounts(tx, teamAccess.member.id, [accountId], mode);
   const now = new Date();
   await tx
     .insert(teamAccounts)
@@ -672,6 +674,43 @@ export async function removeMember(tx: TxDb, teamAccess: TeamAccess, userId: str
 }
 
 /**
+ * 管理者が抜けるときの引き継ぎ先を選ぶ（FR-046）。いちばん長くいる人。ただし、すでに20チームの管理者の人は飛ばす
+ * （PR #14 のCodexレビュー）。退会の確認の画面（specs/013）も同じ選び方を使う。
+ * @param db - データベース（lock のときはトランザクション）
+ * @param teamId - teams.id
+ * @param leavingUserId - 抜ける管理者
+ * @param opts - lock：候補の管理者のチームの数に鍵をかけて数える（実際に引き継ぐとき）
+ * @returns 引き継ぎ先の users.id。いなければ null
+ */
+export async function chooseSuccessor(
+  db: Db | TxDb,
+  teamId: string,
+  leavingUserId: string,
+  opts: { lock?: boolean } = {},
+): Promise<{ userId: string } | null> {
+  const others = await db
+    .select({ userId: teamMembers.userId })
+    .from(teamMembers)
+    .where(and(eq(teamMembers.teamId, teamId), ne(teamMembers.userId, leavingUserId)))
+    .orderBy(asc(teamMembers.joinedAt), asc(teamMembers.userId));
+  // 候補のロックは、いつもユーザーIDの順に先にまとめて取る（別のチームの削除と、逆の順で待ち合わないように。
+  // PR #14 のCodexレビュー）。取った後に、管理者のチームの数をまとめて数え、在籍の順で選ぶ
+  if (opts.lock) for (const id of others.map((o) => o.userId).sort()) await lockAdminTeams(db as TxDb, id);
+  const counts = new Map(
+    others.length === 0
+      ? []
+      : (
+          await db
+            .select({ userId: teams.adminUserId, n: count() })
+            .from(teams)
+            .where(inArray(teams.adminUserId, others.map((o) => o.userId)))
+            .groupBy(teams.adminUserId)
+        ).map((r) => [r.userId, Number(r.n)]),
+  );
+  return others.find((o) => (counts.get(o.userId) ?? 0) < TEAMS_PER_ADMIN) ?? null;
+}
+
+/**
  * アカウントを削除する前に呼ぶ（FR-046、research.md R7）。オーナーのチームのアカウントがこれで0件になるなら、
  * オーナーはチームを抜けたものとする。管理者なら、いちばん長くいる人へ引き継ぎ、誰もいなければチームを消す。
  * @param tx - アカウントの削除と同じトランザクション
@@ -697,27 +736,7 @@ export async function beforeAccountDeleted(tx: TxDb, accountId: string, ownerUse
   }
   const me = await memberOf(tx, teamId, ownerUserId);
   if (me.role === "admin") {
-    // いちばん長くいる人へ引き継ぐ。ただし、すでに20チームの管理者の人は飛ばす（PR #14 のCodexレビュー）
-    const others = await tx
-      .select({ userId: teamMembers.userId })
-      .from(teamMembers)
-      .where(and(eq(teamMembers.teamId, teamId), ne(teamMembers.userId, ownerUserId)))
-      .orderBy(asc(teamMembers.joinedAt), asc(teamMembers.userId));
-    // 候補のロックは、いつもユーザーIDの順に先にまとめて取る（別のチームの削除と、逆の順で待ち合わないように。
-    // PR #14 のCodexレビュー）。取った後に、管理者のチームの数をまとめて数え、在籍の順で選ぶ
-    for (const id of others.map((o) => o.userId).sort()) await lockAdminTeams(tx, id);
-    const counts = new Map(
-      others.length === 0
-        ? []
-        : (
-            await tx
-              .select({ userId: teams.adminUserId, n: count() })
-              .from(teams)
-              .where(inArray(teams.adminUserId, others.map((o) => o.userId)))
-              .groupBy(teams.adminUserId)
-          ).map((r) => [r.userId, Number(r.n)]),
-    );
-    const next = others.find((o) => (counts.get(o.userId) ?? 0) < TEAMS_PER_ADMIN);
+    const next = await chooseSuccessor(tx, teamId, ownerUserId, { lock: true });
     // 引き継げる人がいなければ、チームを消す（管理者のいないチームを残さない）
     if (!next) {
       await tx.delete(teams).where(eq(teams.id, teamId));

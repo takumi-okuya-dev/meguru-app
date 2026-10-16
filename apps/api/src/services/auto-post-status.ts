@@ -65,7 +65,7 @@ export async function readScheduleUsage(db: Db, accountId: string, now: Date) {
  */
 export async function upcomingSlots(
   db: Db,
-  account: AccountRow,
+  account: AccountRow & { ownerReadOnly?: boolean },
   schedule: PostingScheduleRow | null,
   now: Date,
   n: number,
@@ -94,7 +94,7 @@ export async function upcomingSlots(
  */
 export async function getAutoPostStatus(
   db: Db,
-  account: AccountRow,
+  account: AccountRow & { ownerReadOnly?: boolean },
   now: Date = new Date(),
 ): Promise<AutoPostStatus> {
   const [schedule, counts] = await Promise.all([

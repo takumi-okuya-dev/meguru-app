@@ -7,6 +7,7 @@ import type { AccountTeam, MeResponse } from "@threads-grower/shared";
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { EDITOR_ACCESS, OWNER_ACCESS } from "./helpers/access";
+import { ME_BILLING_OFF } from "./helpers/billing";
 
 const accountTeam = vi.fn();
 const setTeamShared = vi.fn();
@@ -40,7 +41,6 @@ const meData: MeResponse = {
       username: "cafe_b",
       displayName: "カフェ B店",
       profilePictureUrl: null,
-      plan: "auto-only",
       connectionStatus: "connected",
       lastUsedAt: null,
       role: "owner",
@@ -49,6 +49,7 @@ const meData: MeResponse = {
   ],
   landingAccountId: "a1",
   accountLimit: { max: 1, used: 1 },
+  ...ME_BILLING_OFF,
   threadsAccessMode: "testers",
   teams: [],
 };

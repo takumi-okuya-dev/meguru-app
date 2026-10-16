@@ -1,6 +1,6 @@
 // パフォーマンスのAPI（specs/006-performance-feedback contracts/api.md、FR-003・FR-007〜FR-019・FR-031・FR-032、SC-007）
 import { beforeEach, describe, expect, it } from "vitest";
-import { AFTER_TRIAL, call, createUserWithAccount, makeApp, resetDb } from "../helpers/app";
+import { call, createUserWithAccount, makeApp, resetDb } from "../helpers/app";
 import { confirmedMetrics, db, publishedDrafts } from "../helpers/auto-post";
 
 const app = makeApp();
@@ -35,7 +35,7 @@ function getPerformance(accountId: string, query = "", user = "u1") {
 
 describe("GET /performance", () => {
   it("集計・並び・状態ごとの項目（FR-003・FR-012・FR-016〜FR-018）", async () => {
-    const { accountId } = await createUserWithAccount("u1", { plan: "auto-grower" });
+    const { accountId } = await createUserWithAccount("u1");
     const confirmed = await publishedDrafts(
       accountId,
       [200, 201, 202, 203, 204].map((h) => ({ publishedAt: ago(h) })),
@@ -106,7 +106,7 @@ describe("GET /performance", () => {
   });
 
   it("タブで絞り込み、カーソルで続きを読む（FR-015・FR-019）", async () => {
-    const { accountId } = await createUserWithAccount("u1", { plan: "auto-grower" });
+    const { accountId } = await createUserWithAccount("u1");
     const posts = await publishedDrafts(accountId, [1, 30, 200, 201, 202].map((h) => ({ publishedAt: ago(h) })));
     await db()`INSERT INTO post_metrics (draft_id, account_id, state, views, last_fetched_at, last_elapsed_minutes, last_kind)
       VALUES (${posts[1]!.id}, ${accountId}, 'updating', 5, now(), 1500, 'h24')`;
@@ -133,7 +133,7 @@ describe("GET /performance", () => {
   });
 
   it("確定が5件未満なら基準値は null、基準値0なら baselineIsZero（FR-009）", async () => {
-    const { accountId } = await createUserWithAccount("u1", { plan: "auto-grower" });
+    const { accountId } = await createUserWithAccount("u1");
     const posts = await publishedDrafts(accountId, [200, 201, 202].map((h) => ({ publishedAt: ago(h) })));
     for (const d of posts) await confirmedMetrics(accountId, d.id, 0);
     let summary = ((await (await getPerformance(accountId)).json()) as { summary: Record<string, unknown> }).summary;
@@ -145,23 +145,22 @@ describe("GET /performance", () => {
   });
 
   it("権限がない印・要再接続を返す", async () => {
-    const { accountId } = await createUserWithAccount("u1", { plan: "auto-grower" });
+    const { accountId } = await createUserWithAccount("u1");
     await db()`UPDATE accounts SET insights_denied_at = now(), connection_status = 'needs_reconnect' WHERE id = ${accountId}`;
     const summary = ((await (await getPerformance(accountId)).json()) as { summary: Record<string, unknown> }).summary;
     expect(summary).toMatchObject({ insightsDenied: true, needsReconnect: true });
   });
 
-  it("grower機能を使えなければ403、他人のAccountは404、不正なクエリは400（FR-031・FR-032）", async () => {
-    const after = await createUserWithAccount("u1", { plan: "auto-only", userCreatedAt: AFTER_TRIAL() });
-    expect((await getPerformance(after.accountId)).status).toBe(403);
-    const mine = await createUserWithAccount("u2", { plan: "auto-grower" });
+  it("他人のAccountは404、不正なクエリは400（FR-031・FR-032。読むだけのときは specs/013 read-only-access.test.ts）", async () => {
+    await createUserWithAccount("u1");
+    const mine = await createUserWithAccount("u2");
     expect((await getPerformance(mine.accountId, "", "u1")).status).toBe(404);
     expect((await getPerformance(mine.accountId, "?tab=bad", "u2")).status).toBe(400);
     expect((await getPerformance(mine.accountId, "?before=xxx", "u2")).status).toBe(400);
   });
 
   it("投稿済み500件でも速く返り、件数に比例してクエリが増えない（SC-007）", async () => {
-    const { accountId } = await createUserWithAccount("u1", { plan: "auto-grower" });
+    const { accountId } = await createUserWithAccount("u1");
     for (let k = 0; k < 10; k++) {
       const [b] = (await db()`INSERT INTO draft_batches (account_id, client_request_id, draft_count, delimiter_found)
         VALUES (${accountId}, gen_random_uuid(), 50, true) RETURNING id`) as [{ id: string }];
@@ -202,7 +201,7 @@ describe("PATCH /performance/:draftId/feedback（FR-021〜FR-024、SC-003）", (
     call(app, "PATCH", `/api/accounts/${accountId}/performance/${draftId}/feedback`, { user, body });
 
   it("メモを保存し（前後の空白を除く・空なら null）、切り替えると次の投稿が繰り上がる", async () => {
-    const { accountId } = await createUserWithAccount("u1", { plan: "auto-grower" });
+    const { accountId } = await createUserWithAccount("u1");
     const posts = await poorPosts(accountId, [200, 201, 202, 203, 204, 205]);
 
     const memo = await patch(accountId, posts[0]!.id, { memo: "  前置きが長い  " });
@@ -227,7 +226,7 @@ describe("PATCH /performance/:draftId/feedback（FR-021〜FR-024、SC-003）", (
   });
 
   it("後から保存した内容で上書きする", async () => {
-    const { accountId } = await createUserWithAccount("u1", { plan: "auto-grower" });
+    const { accountId } = await createUserWithAccount("u1");
     const [p] = await poorPosts(accountId, [200]);
     await patch(accountId, p!.id, { memo: "1つ目" });
     await patch(accountId, p!.id, { memo: "2つ目" });
@@ -235,8 +234,8 @@ describe("PATCH /performance/:draftId/feedback（FR-021〜FR-024、SC-003）", (
     expect(row.feedback_memo).toBe("2つ目");
   });
 
-  it("200文字を超えるメモ・項目なしは400、低調でない・他人の投稿は404、grower機能なしは403", async () => {
-    const { accountId } = await createUserWithAccount("u1", { plan: "auto-grower" });
+  it("200文字を超えるメモ・項目なしは400、低調でない・他人の投稿は404", async () => {
+    const { accountId } = await createUserWithAccount("u1");
     const [p] = await poorPosts(accountId, [200]);
     expect((await patch(accountId, p!.id, { memo: "あ".repeat(201) })).status).toBe(400);
     expect((await patch(accountId, p!.id, { memo: "あ".repeat(200) })).status).toBe(200);
@@ -249,12 +248,9 @@ describe("PATCH /performance/:draftId/feedback（FR-021〜FR-024、SC-003）", (
     expect((await patch(accountId, "00000000-0000-0000-0000-000000000000", { memo: "x" })).status).toBe(404);
     expect((await patch(accountId, "not-a-uuid", { memo: "x" })).status).toBe(404);
 
-    const other = await createUserWithAccount("u2", { plan: "auto-grower" });
+    const other = await createUserWithAccount("u2");
     expect((await patch(accountId, p!.id, { memo: "x" }, "u2")).status).toBe(404);
     void other;
-
-    const after = await createUserWithAccount("u3", { plan: "auto-only", userCreatedAt: AFTER_TRIAL() });
-    expect((await patch(after.accountId, p!.id, { memo: "x" }, "u3")).status).toBe(403);
   });
 });
 
@@ -263,7 +259,7 @@ describe("GET /performance/export（FR-028〜FR-030、SC-005）", () => {
     call(app, "GET", `/api/accounts/${accountId}/performance/export${query}`, { user });
 
   it("投稿ごと：全件・200件ずつ・各列の材料", async () => {
-    const { accountId } = await createUserWithAccount("u1", { plan: "auto-grower" });
+    const { accountId } = await createUserWithAccount("u1");
     const [p, pending, gone] = await publishedDrafts(accountId, [
       { publishedAt: ago(200), body: "確定した投稿" },
       { publishedAt: ago(2) },
@@ -312,7 +308,7 @@ describe("GET /performance/export（FR-028〜FR-030、SC-005）", () => {
   });
 
   it("投稿ごと：200件を超えるとカーソルで続きを読み、行数は投稿済みの件数と一致する", async () => {
-    const { accountId } = await createUserWithAccount("u1", { plan: "auto-grower" });
+    const { accountId } = await createUserWithAccount("u1");
     for (let k = 0; k < 5; k++) {
       const [b] = (await db()`INSERT INTO draft_batches (account_id, client_request_id, draft_count, delimiter_found)
         VALUES (${accountId}, gen_random_uuid(), 50, true) RETURNING id`) as [{ id: string }];
@@ -330,7 +326,7 @@ describe("GET /performance/export（FR-028〜FR-030、SC-005）", () => {
   });
 
   it("取り込みごと：履歴を1回1行、その日のフォロワー数つき", async () => {
-    const { accountId } = await createUserWithAccount("u1", { plan: "auto-grower" });
+    const { accountId } = await createUserWithAccount("u1");
     const [p] = await publishedDrafts(accountId, [{ publishedAt: new Date("2026-09-25T10:00:00Z") }]);
     await db()`INSERT INTO post_metric_snapshots (draft_id, account_id, kind, method, fetched_at, elapsed_minutes, views) VALUES
       (${p!.id}, ${accountId}, 'h24', 'slot', '2026-09-26T10:05:00Z', 1445, 120),
@@ -348,10 +344,9 @@ describe("GET /performance/export（FR-028〜FR-030、SC-005）", () => {
     ]);
   });
 
-  it("grower機能なしは403、他人のAccountは404、kind がなければ400", async () => {
-    const after = await createUserWithAccount("u1", { plan: "auto-only", userCreatedAt: AFTER_TRIAL() });
-    expect((await exportPage(after.accountId, "?kind=posts")).status).toBe(403);
-    const mine = await createUserWithAccount("u2", { plan: "auto-grower" });
+  it("他人のAccountは404、kind がなければ400", async () => {
+    await createUserWithAccount("u1");
+    const mine = await createUserWithAccount("u2");
     expect((await exportPage(mine.accountId, "?kind=posts", "u1")).status).toBe(404);
     expect((await exportPage(mine.accountId, "", "u2")).status).toBe(400);
   });

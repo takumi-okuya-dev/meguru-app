@@ -43,7 +43,6 @@ function makeAccount(overrides: Partial<AccountSummary> = {}): AccountSummary {
     username: "cafe_b",
     displayName: "Cafe B",
     profilePictureUrl: null,
-    plan: "auto-grower",
     connectionStatus: "connected",
     lastUsedAt: null,
     role: "owner",

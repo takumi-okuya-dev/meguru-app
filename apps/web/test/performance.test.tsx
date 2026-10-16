@@ -24,7 +24,6 @@ const account: AccountSummary = {
   username: "takumi",
   displayName: "たくみ",
   profilePictureUrl: null,
-  plan: "auto-grower",
   connectionStatus: "connected",
   lastUsedAt: null,
   role: "owner" as const,
@@ -181,14 +180,6 @@ describe("US1：反応数と判定を見る", () => {
     await userEvent.click(await screen.findByRole("button", { name: "さらに表示する" }));
     expect(await screen.findByTestId("card-2")).toBeInTheDocument();
     expect(getPerformance).toHaveBeenLastCalledWith("a1", "all", "c1");
-  });
-
-  it("grower機能を使えなければ案内だけを出し、CSVのボタンを出さない（FR-031）", async () => {
-    getPerformance.mockRejectedValue(new ApiError("GROWER_FEATURE_REQUIRED", 403));
-    renderPage();
-    expect(await screen.findByText("パフォーマンス分析は有料の契約で使えます")).toBeInTheDocument();
-    expect(screen.getByText(/プランの変更は運営者にお問い合わせください/)).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /CSVで書き出す/ })).toBeNull();
   });
 
   it("反応数を読む許可がなければ、案内と再接続を出す", async () => {

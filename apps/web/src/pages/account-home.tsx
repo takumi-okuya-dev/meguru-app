@@ -19,7 +19,6 @@ import { useAccountAccess } from "@/lib/use-account-access";
 import { AccountAvatar } from "@/components/AccountAvatar";
 import { ApiErrorScreen } from "@/components/ApiErrorScreen";
 import { ConnectionBadge } from "@/components/ConnectionBadge";
-import { PLAN_CHANGE_CONTACT } from "@/components/GrowerRequiredNotice";
 import { PageBody, PageHeader } from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/button";
 import { api } from "@/lib/api-client";
@@ -131,7 +130,8 @@ export function AccountHome() {
           </div>
           {s?.access.inTrial && s.access.trialEndsAt && (
             <p className="mt-1 rounded-full bg-muted px-3 py-1 text-xs">
-              無料体験中：{formatDate(s.access.trialEndsAt)}まで、すべての機能を使えます
+              無料体験中：{formatDate(s.access.trialEndsAt)}まで
+              {s.access.trialDaysLeft !== null ? `（あと${s.access.trialDaysLeft}日）` : ""}、すべての機能を使えます
             </p>
           )}
         </section>
@@ -168,11 +168,9 @@ export function AccountHome() {
               ) : (
                 <>
                   <h2 className="text-[22px] leading-snug font-semibold md:text-[26px]">
-                    課題・宣伝内容・リサーチの編集は、プラン2以上で使えます
+                    このアカウントは今、読むだけです
                   </h2>
-                  <p className="text-[15px] text-muted-foreground">
-                    保存済みの内容はそのまま残っています。{PLAN_CHANGE_CONTACT}
-                  </p>
+                  <p className="text-[15px] text-muted-foreground">保存済みの内容はそのまま残っています。</p>
                 </>
               )}
             </section>

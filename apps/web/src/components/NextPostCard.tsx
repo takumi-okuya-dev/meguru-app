@@ -35,6 +35,9 @@ export function NextPostCard({ accountId }: { accountId: string }) {
             <Link to={`/accounts/${accountId}/settings`}>投稿のスケジュールを設定する</Link>
           </Button>
         </>
+      ) : data.autoPost.stoppedReason === "billing_inactive" ? (
+        // オーナーが読むだけ（specs/013 research.md R8）。理由は画面の上の帯に出す
+        <p className="text-sm text-warning">このアカウントは今、読むだけのため、自動投稿を止めています</p>
       ) : data.autoPost.stoppedReason === "needs_reconnect" ? (
         <>
           <p className="text-sm text-destructive">

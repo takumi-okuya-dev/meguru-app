@@ -4,7 +4,7 @@
 import type { Env } from "../env";
 import { createTokenCipher } from "./crypto";
 
-const PLACEHOLDERS = ["sk_test_xxx", "pk_test_xxx", "xxxxxxxx", "000000000000000"];
+const PLACEHOLDERS = ["sk_test_xxx", "pk_test_xxx", "xxxxxxxx", "000000000000000", "whsec_xxx", "price_xxx"];
 
 function isPlaceholder(v: string | undefined): boolean {
   if (!v) return true;
@@ -73,6 +73,21 @@ export function validateConfig(env: Env): string[] {
     problems.push("THREADS_ACCESS_MODE");
   }
 
+  // 決済のON/OFFは必須。未設定で黙ってOFFにしない（specs/013 FR-063）
+  if (env.BILLING_ENABLED !== "true" && env.BILLING_ENABLED !== "false") problems.push("BILLING_ENABLED");
+  if (env.BILLING_ENABLED === "true") {
+    if (isPlaceholder(env.STRIPE_SECRET_KEY) || !/^sk_(test|live)_[A-Za-z0-9]{10,}$/.test(env.STRIPE_SECRET_KEY ?? "")) {
+      problems.push("STRIPE_SECRET_KEY");
+    }
+    if (isPlaceholder(env.STRIPE_WEBHOOK_SECRET) || !/^whsec_[A-Za-z0-9]{10,}$/.test(env.STRIPE_WEBHOOK_SECRET ?? "")) {
+      problems.push("STRIPE_WEBHOOK_SECRET");
+    }
+    if (isPlaceholder(env.STRIPE_PRICE_ID) || !/^price_[A-Za-z0-9]{6,}$/.test(env.STRIPE_PRICE_ID ?? "")) {
+      problems.push("STRIPE_PRICE_ID");
+    }
+    if (env.STRIPE_API_BASE_URL !== undefined && !isHttpUrl(env.STRIPE_API_BASE_URL)) problems.push("STRIPE_API_BASE_URL");
+  }
+
   if (usesRealThreads(env)) {
     if (isPlaceholder(env.THREADS_APP_ID) || !/^\d+$/.test(env.THREADS_APP_ID)) problems.push("THREADS_APP_ID");
     if (isPlaceholder(env.THREADS_APP_SECRET)) problems.push("THREADS_APP_SECRET");
@@ -81,4 +96,16 @@ export function validateConfig(env: Env): string[] {
     }
   }
   return problems;
+}
+
+/** 決済のモード（specs/013 research.md R2・R11）。環境ごとに1つで、判定する人の値に持たせる。 */
+export type BillingMode = { enabled: boolean };
+
+/**
+ * 環境の設定から決済のモードを作る。
+ * @param env - Workers のバインディング
+ * @returns 決済のモード
+ */
+export function billingModeOf(env: Pick<Env, "BILLING_ENABLED">): BillingMode {
+  return { enabled: env.BILLING_ENABLED === "true" };
 }

@@ -1,16 +1,14 @@
 // パフォーマンスの画面（specs/006-performance-feedback contracts/ui-routes.md、FR-011〜FR-031）。
 // 上から：上部バー（最終更新・CSV）→ 案内 → 説明 → 基準値 → タブ → 低調のタブの説明 → 投稿のカード。
 import {
-  PERFORMANCE_MESSAGES,
   type FeedbackResponse,
   type PerformanceItem,
   type PerformancePage as PerformancePageData,
   type PerformanceTab,
 } from "@threads-grower/shared";
 import { useQueryClient, type InfiniteData } from "@tanstack/react-query";
-import { ChartColumnIcon, CheckIcon, InfoIcon } from "lucide-react";
+import { CheckIcon, InfoIcon } from "lucide-react";
 import { ApiErrorScreen } from "@/components/ApiErrorScreen";
-import { PLAN_CHANGE_CONTACT } from "@/components/GrowerRequiredNotice";
 import { PageBody, PageHeader } from "@/components/layout/PageHeader";
 import { BaselineCard } from "@/components/performance/BaselineCard";
 import { CsvExportMenu } from "@/components/performance/CsvExportMenu";
@@ -23,7 +21,6 @@ import { Button } from "@/components/ui/button";
 import { Tabs } from "@/components/ui/tabs";
 import { formatJstShort } from "@/lib/format";
 import { queryKeys } from "@/lib/query";
-import { isGrowerRequired } from "@/lib/save-error";
 import { NotConnectedNotice } from "@/components/NotConnectedNotice";
 import { useCurrentAccount } from "@/pages/account-layout";
 
@@ -76,24 +73,6 @@ function ConnectedPerformance() {
     );
     void queryClient.invalidateQueries({ queryKey: queryKeys.promptAll(account.id) });
   };
-
-  if (query.isError && isGrowerRequired(query.error)) {
-    return (
-      <>
-        <PageHeader title="パフォーマンス" />
-        <PageBody>
-          <div className="mx-auto flex max-w-xl flex-col items-center gap-4 py-16 text-center">
-            <span className="flex size-14 items-center justify-center rounded-full bg-muted text-muted-foreground">
-              <ChartColumnIcon className="size-6" aria-hidden="true" />
-            </span>
-            <h2 className="text-xl font-semibold">{PERFORMANCE_MESSAGES.growerRequiredTitle}</h2>
-            <p className="text-muted-foreground">{PERFORMANCE_MESSAGES.growerRequiredBody}</p>
-            <p className="text-sm text-muted-foreground">{PLAN_CHANGE_CONTACT}</p>
-          </div>
-        </PageBody>
-      </>
-    );
-  }
 
   const pages = query.data?.pages ?? [];
   const summary = pages.at(-1)?.summary;

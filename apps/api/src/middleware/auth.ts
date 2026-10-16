@@ -6,8 +6,12 @@ import { eq } from "drizzle-orm";
 import { createMiddleware } from "hono/factory";
 import type { Env } from "../env";
 import { createDb } from "../db/client";
-import { users } from "../db/schema";
+import { users, withdrawnUsers } from "../db/schema";
+import { billingModeOf, type BillingMode } from "../lib/config";
 import { AppError } from "../lib/errors";
+
+/** 退会の途中でも呼べるAPI（specs/013 contracts/api.md「認証のミドルウェアの変更」）。 */
+const WITHDRAWAL_ALLOWED = new Set(["GET /api/me", "GET /api/me/withdrawal-preview", "POST /api/me/withdraw"]);
 
 /** セッショントークンから確かめた本人。 */
 export type VerifiedIdentity = {
@@ -24,8 +28,11 @@ export type AuthVerifier = {
   fetchProfile(clerkUserId: string): Promise<{ email: string; displayName: string | null }>;
 };
 
-/** リクエストしたユーザー（users の行）。 */
-export type CurrentUser = typeof users.$inferSelect;
+/**
+ * リクエストしたユーザー（users の行）と、環境の決済のモード。
+ * 決済のモードは権限の判定（authorizeAccount）が使う（specs/013 research.md R2）。
+ */
+export type CurrentUser = typeof users.$inferSelect & { billing: BillingMode };
 /** 認証済みのリクエストで Hono のコンテキストに置く値。 */
 export type AuthVariables = { user: CurrentUser };
 
@@ -84,7 +91,7 @@ export function authMiddleware(makeVerifier: (env: Env) => AuthVerifier) {
     const db = createDb(c.env.DATABASE_URL);
     const [existing] = await db.select().from(users).where(eq(users.clerkUserId, identity.clerkUserId)).limit(1);
 
-    let user: CurrentUser;
+    let user: typeof users.$inferSelect;
     if (existing) {
       user = existing;
       // メールアドレス・表示名がトークンに含まれていて、変わっていれば更新する
@@ -95,9 +102,16 @@ export function authMiddleware(makeVerifier: (env: Env) => AuthVerifier) {
           .update(users)
           .set({ email: nextEmail, displayName: nextName, updatedAt: new Date() })
           .where(eq(users.id, existing.id))
-          .returning()) as [CurrentUser];
+          .returning()) as [typeof users.$inferSelect];
       }
     } else {
+      // 退会した人のセッションが残っていても、users の行を作り直さない（specs/013 research.md R10）
+      const [withdrawn] = await db
+        .select({ id: withdrawnUsers.clerkUserId })
+        .from(withdrawnUsers)
+        .where(eq(withdrawnUsers.clerkUserId, identity.clerkUserId))
+        .limit(1);
+      if (withdrawn) throw new AppError("AUTH_REQUIRED", 401, "withdrawn user");
       const profile =
         identity.email !== undefined
           ? { email: identity.email, displayName: identity.displayName ?? null }
@@ -108,11 +122,15 @@ export function authMiddleware(makeVerifier: (env: Env) => AuthVerifier) {
         .values({ clerkUserId: identity.clerkUserId, email: profile.email, displayName: profile.displayName })
         .onConflictDoNothing({ target: users.clerkUserId });
       [user] = (await db.select().from(users).where(eq(users.clerkUserId, identity.clerkUserId)).limit(1)) as [
-        CurrentUser,
+        typeof users.$inferSelect,
       ];
     }
 
-    c.set("user", user);
+    // 退会の途中の人は、退会のAPIと GET /api/me のほかを止める（途中でデータを足させない。specs/013 research.md R10）
+    if (user.withdrawalRequestedAt && !WITHDRAWAL_ALLOWED.has(`${c.req.method} ${c.req.path}`)) {
+      throw new AppError("WITHDRAWAL_IN_PROGRESS", 409, "withdrawal in progress");
+    }
+    c.set("user", { ...user, billing: billingModeOf(c.env) });
     await next();
   });
 }

@@ -17,6 +17,8 @@ import { TeamLayout } from "@/pages/team-layout";
 import { TeamSharedAccountPage } from "@/pages/team-shared-account";
 import { SignInPage } from "@/pages/sign-in";
 import { AccountSettingsPage } from "@/pages/settings/account";
+import { BillingSettingsPage } from "@/pages/settings/billing";
+import { LegalCommercePage } from "@/pages/legal-commerce";
 import { AppearanceSettings } from "@/pages/settings/appearance";
 import { SettingsIndex, SettingsLayout } from "@/pages/settings/settings-layout";
 import { PromotionsPage } from "@/pages/promotions";
@@ -32,6 +34,7 @@ export const routes = [
   { path: "/data-deletion/:code", element: <DataDeletion /> },
   // 利用規約・トークンの作り方はログインなしで読める（specs/010 FR-052・FR-030）
   { path: "/terms", element: <TermsPage /> },
+  { path: "/legal/commerce", element: <LegalCommercePage /> },
   { path: "/guide/threads-token", element: <GuideThreadsTokenPage /> },
   // 招待の確認はログインなしで開ける（specs/008 research.md R7、specs/011 contracts/ui-routes.md）
   { path: "/invite/:token", element: <InvitePage /> },
@@ -47,6 +50,7 @@ export const routes = [
           { index: true, element: <SettingsIndex /> },
           { path: "appearance", element: <AppearanceSettings /> },
           { path: "account", element: <AccountSettingsPage /> },
+          { path: "billing", element: <BillingSettingsPage /> },
         ],
       },
       // チーム（specs/011 contracts/ui-routes.md「ルート」）。チームの画面と担当の表はサイドバーの中に出す

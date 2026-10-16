@@ -20,7 +20,7 @@ import { toast } from "sonner";
 import { ApiErrorScreen } from "@/components/ApiErrorScreen";
 import { ConflictDialog } from "@/components/ConflictDialog";
 import { FieldWithCounter } from "@/components/FieldWithCounter";
-import { GrowerRequiredBanner, GrowerRequiredDialog } from "@/components/GrowerRequiredNotice";
+import { BillingRequiredDialog } from "@/components/billing/BillingRequiredDialog";
 import { PageBody, PageHeader } from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/button";
 import {
@@ -32,7 +32,7 @@ import {
 import { api } from "@/lib/api-client";
 import { formatDateTime } from "@/lib/format";
 import { queryKeys } from "@/lib/query";
-import { isGrowerRequired, isStale, saveErrorMessage } from "@/lib/save-error";
+import { billingReasonOf, isBillingRequired, isStale, saveErrorMessage } from "@/lib/save-error";
 import { useUnsavedChanges } from "@/lib/use-unsaved-changes";
 import { cn } from "@/lib/utils";
 import { useCurrentAccount } from "@/pages/account-layout";
@@ -84,7 +84,7 @@ function StrategyEditor({ accountId, initial }: { accountId: string; initial: St
   const [conflict, setConflict] = useState<Strategy | null>(null);
   // 先に保存した人（specs/008 FR-007）
   const [conflictBy, setConflictBy] = useState<string | null>(null);
-  const [growerDialog, setGrowerDialog] = useState(false);
+  const [billingReason, setBillingReason] = useState<string | null>(null);
 
   const baseline = pickValues(saved);
   const dirty = canEdit && !sameValues(values, baseline);
@@ -116,8 +116,8 @@ function StrategyEditor({ accountId, initial }: { accountId: string; initial: St
         setConflictBy(err.updatedBy?.name ?? null);
         // サーバーの latest には canEdit がないことがあるので、いまの値で補う（保存できた＝編集できる）
         setConflict({ ...(err.latest as Strategy), canEdit: true });
-      } else if (isGrowerRequired(err)) {
-        setGrowerDialog(true);
+      } else if (isBillingRequired(err)) {
+        setBillingReason(billingReasonOf(err) ?? "");
       } else {
         toast.error(saveErrorMessage(err), { action: { label: "もう一度保存", onClick: () => submit(saved.version) } });
       }
@@ -184,7 +184,6 @@ function StrategyEditor({ accountId, initial }: { accountId: string; initial: St
     <>
       <PageHeader title="課題" actions={actions} toolbar={mobileChips} />
       <PageBody className="pb-24">
-        {!canEdit && <GrowerRequiredBanner />}
         <p className={cn("text-[15px] text-muted-foreground", !canEdit && "mt-4")}>
           ここに書いた内容が、投稿づくりの材料になります。空欄があっても保存できます。
         </p>
@@ -258,10 +257,10 @@ function StrategyEditor({ accountId, initial }: { accountId: string; initial: St
           setConflict(null);
         }}
       />
-      <GrowerRequiredDialog
-        open={growerDialog}
+      <BillingRequiredDialog
+        reason={billingReason}
         onClose={() => {
-          setGrowerDialog(false);
+          setBillingReason(null);
           setCanEdit(false);
         }}
       />

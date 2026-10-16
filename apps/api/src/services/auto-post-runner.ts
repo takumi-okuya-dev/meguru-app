@@ -30,8 +30,10 @@ import {
   sql,
 } from "drizzle-orm";
 import { createDb, type Db } from "../db/client";
-import { accounts, postDrafts, postingSchedules, publishAttempts } from "../db/schema";
+import { accounts, memberships, postDrafts, postingSchedules, publishAttempts, subscriptions, users } from "../db/schema";
 import type { Env } from "../env";
+import { billingModeOf } from "../lib/config";
+import { entitlementFromFacts } from "./billing-service";
 import { logger } from "../lib/logger";
 import { createThreadsClient, type ThreadsClient } from "../lib/threads-client";
 import { computeNextCheckAt, readGate, shouldRun, writeCatchupDate, writeGate } from "./auto-post-gate";
@@ -173,12 +175,31 @@ export async function runAutoPost(
   }
 
   // 2. 時刻の処理（来ている時刻の試みを作り、公開する）
-  const schedules = await db
-    .select({ schedule: postingSchedules })
+  const mode = billingModeOf(env);
+  const scheduleRows = await db
+    .select({
+      schedule: postingSchedules,
+      ownerCreatedAt: users.createdAt,
+      ownerBillingExempt: users.billingExempt,
+      subStatus: subscriptions.status,
+      subCancelAtPeriodEnd: subscriptions.cancelAtPeriodEnd,
+    })
     .from(postingSchedules)
     .innerJoin(accounts, eq(accounts.id, postingSchedules.accountId))
+    .innerJoin(memberships, and(eq(memberships.accountId, accounts.id), eq(memberships.role, "owner")))
+    .innerJoin(users, eq(users.id, memberships.userId))
+    .leftJoin(subscriptions, eq(subscriptions.userId, users.id))
     // 未接続のアカウントは見ない（オンにはできないが、試み（飛ばした記録）も作らない。specs/012 FR-035）
     .where(and(eq(postingSchedules.enabled, true), ne(accounts.connectionStatus, "not_connected")));
+  // オーナーが読むだけのアカウントも見ない（試みも作らない。specs/013 research.md R8）
+  const schedules = scheduleRows.filter(
+    (r) =>
+      entitlementFromFacts(
+        mode,
+        { createdAt: r.ownerCreatedAt, billingExempt: r.ownerBillingExempt, status: r.subStatus, cancelAtPeriodEnd: r.subCancelAtPeriodEnd },
+        now,
+      ).fullAccess,
+  );
   const accountIds = schedules.map((s) => s.schedule.accountId);
   const recent = accountIds.length
     ? await db
@@ -313,7 +334,9 @@ export async function runAutoPost(
   // トークンの確かめ直しの時刻も候補にする（specs/010 research.md R8）
   const recheck = await nextRecheckAt(db);
   if (recheck) candidates.push(recheck);
-  for (const { schedule: s } of schedules) {
+  // 読むだけのオーナーの予定も、次に見る時刻には入れる（契約が戻ったとき、どの経路で戻っても次の時刻に動けるように。
+  // PR #16 のCodexレビュー）。その回の処理は、上の「時刻の処理」で読むだけの予定を外している
+  for (const { schedule: s } of scheduleRows) {
     const [next] = projectSchedule({
       accountId: s.accountId,
       enabled: true,

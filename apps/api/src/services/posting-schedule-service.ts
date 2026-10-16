@@ -58,19 +58,20 @@ export function toPostingSchedule(row: PostingScheduleRow | null): PostingSchedu
 
 /**
  * 自動投稿の状態（オン・オフ、時刻の数、止まっている理由）。
- * @param account - Account の行（接続の状態）
+ * @param account - Account の行（接続の状態）と、オーナーが読むだけか（specs/013。読むだけなら投稿しない）
  * @param row - posting_schedules の行
  * @param now - 今の時刻
  * @returns AutoPostState
  */
 export function toAutoPostState(
-  account: Pick<AccountRow, "connectionStatus">,
+  account: Pick<AccountRow, "connectionStatus"> & { ownerReadOnly?: boolean },
   row: PostingScheduleRow | null,
   now: Date,
 ): AutoPostState {
   const enabled = row?.enabled ?? false;
   let stoppedReason: AutoPostState["stoppedReason"] = null;
-  if (enabled && account.connectionStatus === "needs_reconnect") stoppedReason = "needs_reconnect";
+  if (enabled && account.ownerReadOnly) stoppedReason = "billing_inactive";
+  else if (enabled && account.connectionStatus === "needs_reconnect") stoppedReason = "needs_reconnect";
   else if (enabled && account.connectionStatus === "not_connected") stoppedReason = "not_connected";
   else if (enabled && row?.pausedUntil && row.pausedUntil.getTime() > now.getTime())
     stoppedReason = "rate_limited";

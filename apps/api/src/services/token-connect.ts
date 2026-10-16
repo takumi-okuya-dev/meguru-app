@@ -28,7 +28,7 @@ import {
   type ThreadsProfile,
   type TokenDebugInfo,
 } from "../lib/threads-client";
-import { authorizeAccount } from "./access";
+import { authorizeAccount, type RequestUser } from "./access";
 import { completeConnection } from "./account-service";
 import { notifyWake } from "./posting-schedule-service";
 import { refreshUsernameOnlyMatch } from "./username-match";
@@ -187,7 +187,7 @@ async function inspectToken(threads: ThreadsClient, token: string): Promise<Insp
 export async function connectWithToken(
   env: Env,
   threads: ThreadsClient,
-  user: { id: string },
+  user: RequestUser,
   req: TokenConnectRequest,
   now: Date = new Date(),
 ): Promise<TokenConnectResult> {

@@ -28,7 +28,6 @@ const account: AccountSummary = {
   username: "takumi",
   displayName: "たくみ",
   profilePictureUrl: null,
-  plan: "auto-grower",
   connectionStatus: "connected",
   lastUsedAt: null,
   role: "owner" as const,
@@ -94,7 +93,7 @@ describe("リサーチの画面", () => {
   });
 
   it("保存で 403 を受けると、入力内容を残したまま案内のダイアログが出る", async () => {
-    createReferencePost.mockRejectedValue(new ApiError("GROWER_FEATURE_REQUIRED", 403));
+    createReferencePost.mockRejectedValue(new ApiError("BILLING_REQUIRED", 403, ["trial_ended"]));
     renderPage();
     await userEvent.click(await screen.findByRole("button", { name: /参考投稿を追加/ }));
     const body = await screen.findByLabelText("本文");

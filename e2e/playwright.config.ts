@@ -16,6 +16,12 @@ export default defineConfig({
     baseURL: "http://localhost:5173",
     trace: "on-first-retry",
   },
+  // 決済のE2E（specs/013-billing T060）は、決済ONのAPI（8788、偽のStripe 8791）と、それに向けたWeb（5174）で流す。
+  // ほかのE2Eは今までどおり決済OFF（apps/api/.dev.vars の BILLING_ENABLED=false）で流す
+  projects: [
+    { name: "default", testIgnore: /billing\.spec\.ts/ },
+    { name: "billing", testMatch: /billing\.spec\.ts/, use: { baseURL: "http://localhost:5174" } },
+  ],
   globalSetup: "./global-setup.ts",
   webServer: [
     {
@@ -37,6 +43,34 @@ export default defineConfig({
       command: "pnpm --filter web dev",
       port: 5173,
       reuseExistingServer: true,
+    },
+    // ---- 決済のE2E（specs/013-billing T060）----
+    {
+      command: "pnpm --filter api exec tsx test/fake-stripe/serve.ts",
+      port: 8791,
+      reuseExistingServer: true,
+    },
+    {
+      // 決済ON。Stripeは偽のStripeに向ける（鍵・料金のIDは形だけの値）。状態は別の場所に置き、8787 と混ぜない
+      command:
+        "pnpm --filter api exec wrangler dev --port 8788 --inspector-port 9230 --persist-to .wrangler/state-billing" +
+        " --var THREADS_AUTH_BASE_URL:http://localhost:8790" +
+        " --var THREADS_GRAPH_BASE_URL:http://localhost:8790" +
+        " --var THREADS_REDIRECT_URI:http://localhost:8788/api/threads/callback" +
+        " --var WEB_ORIGIN:http://localhost:5174" +
+        " --var BILLING_ENABLED:true" +
+        " --var STRIPE_SECRET_KEY:sk_test_E2eFakeStripeKey00" +
+        " --var STRIPE_WEBHOOK_SECRET:whsec_E2eFakeWebhookSecret" +
+        " --var STRIPE_PRICE_ID:price_E2eTiered" +
+        " --var STRIPE_API_BASE_URL:http://localhost:8791",
+      port: 8788,
+      reuseExistingServer: true,
+    },
+    {
+      command: "pnpm --filter web exec vite --port 5174 --strictPort",
+      port: 5174,
+      reuseExistingServer: true,
+      env: { VITE_API_BASE_URL: "http://localhost:8788" },
     },
   ],
 });

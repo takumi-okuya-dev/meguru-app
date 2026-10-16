@@ -3,7 +3,8 @@ import { and, eq } from "drizzle-orm";
 import { PROMOTION_RATIO_DEFAULT, PROMPT_COUNT_DEFAULT } from "@threads-grower/shared";
 import { beforeEach, describe, expect, it } from "vitest";
 import { accounts, memberships, threadsConnections, users } from "../../src/db/schema";
-import { call, createUserWithAccount, db, makeApp, resetDb } from "../helpers/app";
+import { call, db, makeApp, resetDb } from "../helpers/app";
+import { callBilling } from "../helpers/billing";
 
 const app = makeApp();
 
@@ -12,6 +13,8 @@ beforeEach(async () => {
 });
 
 const create = (user: string, name: unknown) => call(app, "POST", "/api/accounts", { user, body: { name } });
+// 決済ONの環境（無料体験中は1件まで。specs/013 research.md R9）
+const createOn = (user: string, name: unknown) => callBilling(app, "POST", "/api/accounts", { user, body: { name } });
 
 async function errorCode(res: Response) {
   return ((await res.json()) as { error: { code: string; details?: string[] } }).error;
@@ -39,7 +42,6 @@ describe("POST /api/accounts", () => {
       username: null,
       connectionMethod: null,
       connectionStatus: "not_connected",
-      plan: "auto-only",
       promotionRatioPercent: PROMOTION_RATIO_DEFAULT,
       promptPostCount: PROMPT_COUNT_DEFAULT,
     });
@@ -71,25 +73,16 @@ describe("POST /api/accounts", () => {
     expect(res.status).toBe(201);
   });
 
-  it("未接続のアカウントも上限に数える。上限なら ACCOUNT_LIMIT_REACHED（プラン1は1件）", async () => {
-    expect((await create("u1", "1つ目")).status).toBe(201);
-    const res = await create("u1", "2つ目");
+  it("未接続のアカウントも上限に数える。上限なら ACCOUNT_LIMIT_REACHED（決済ONの無料体験中は1件。specs/013 FR-010）", async () => {
+    expect((await createOn("u1", "1つ目")).status).toBe(201);
+    const res = await createOn("u1", "2つ目");
     expect(res.status).toBe(409);
     expect((await errorCode(res)).code).toBe("ACCOUNT_LIMIT_REACHED");
     expect(await db().select().from(accounts)).toHaveLength(1);
   });
 
-  it("接続中のアカウントと合わせて数え、プランは最上位を引き継ぐ（001 FR-015・FR-016）", async () => {
-    const { accountId } = await createUserWithAccount("u1", { plan: "multi-account" });
-    for (const n of ["2", "3", "4", "5"]) expect((await create("u1", `アカウント${n}`)).status).toBe(201);
-    expect((await create("u1", "6")).status).toBe(409);
-    const all = await db().select().from(accounts);
-    expect(all).toHaveLength(5);
-    expect(all.filter((a) => a.id !== accountId).every((a) => a.plan === "multi-account")).toBe(true);
-  });
-
   it("同じ人が並べて送っても、上限を超えない（FR-004）", async () => {
-    const results = await Promise.all([create("u1", "A"), create("u1", "B"), create("u1", "C")]);
+    const results = await Promise.all([createOn("u1", "A"), createOn("u1", "B"), createOn("u1", "C")]);
     expect(results.map((r) => r.status).sort()).toEqual([201, 409, 409]);
     expect(await db().select().from(accounts)).toHaveLength(1);
   });

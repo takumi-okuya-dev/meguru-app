@@ -6,6 +6,7 @@ import type { MeResponse } from "@threads-grower/shared";
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { resetViewport, setViewport } from "./helpers/viewport";
+import { ME_BILLING_OFF } from "./helpers/billing";
 
 vi.mock("@clerk/react", () => ({
   useUser: () => ({ user: { fullName: "Takumi", primaryEmailAddress: { emailAddress: "t@example.com" } } }),
@@ -13,13 +14,14 @@ vi.mock("@clerk/react", () => ({
 }));
 
 function account(id: string, username: string, connectionStatus: "connected" | "needs_reconnect" = "connected") {
-  return { id, name: username, username, displayName: username, profilePictureUrl: null, plan: "auto-grower" as const, connectionStatus, lastUsedAt: null, role: "owner" as const, ownerName: null };
+  return { id, name: username, username, displayName: username, profilePictureUrl: null, connectionStatus, lastUsedAt: null, role: "owner" as const, ownerName: null };
 }
 const meResponse: MeResponse = {
   user: { id: "u", email: "t@example.com", displayName: "Takumi" },
   accounts: [account("a1", "takumi"), account("a2", "aibu", "needs_reconnect")],
   landingAccountId: "a1",
   accountLimit: { max: 5, used: 2 },
+  ...ME_BILLING_OFF,
   threadsAccessMode: "testers",
   teams: [],
 };
@@ -73,7 +75,11 @@ function renderSettings(path: string) {
     ],
     { initialEntries: [path] },
   );
-  render(<RouterProvider router={router} />);
+  render(
+    <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+      <RouterProvider router={router} />
+    </QueryClientProvider>,
+  );
   return router;
 }
 

@@ -14,6 +14,8 @@ import {
   type AuthVariables,
 } from "./middleware/auth";
 import { accountRoutes } from "./routes/accounts";
+import { billingRoutes } from "./routes/billing";
+import { stripeWebhookRoutes } from "./routes/stripe-webhook";
 import { accountTeamRoutes } from "./routes/account-team";
 import { inviteRoutes } from "./routes/invites";
 import { teamsRoutes } from "./routes/teams";
@@ -32,15 +34,19 @@ import { promptRoutes } from "./routes/prompt";
 import { researchRoutes } from "./routes/research";
 import { strategyRoutes } from "./routes/strategy";
 import { threadsConnectRoutes } from "./routes/threads-connect";
+import { clerkUserDeleter, type ClerkUserDeleter } from "./services/withdrawal-service";
 
 /** アプリに差し込む依存。テストでは偽の認証を渡す。 */
 export type AppDeps = {
   verifyAuth: (env: Env) => AuthVerifier;
+  /** 退会でClerkのユーザーを消す（specs/013 research.md R10）。テストでは偽を渡す */
+  deleteClerkUser?: (env: Env) => ClerkUserDeleter;
 };
 
 /** 本番の依存。認証は Clerk で検証する。 */
 export const defaultDeps: AppDeps = {
   verifyAuth: (env) => clerkVerifier(env),
+  deleteClerkUser: (env) => clerkUserDeleter(env),
 };
 
 /** Hono のアプリの型引数。バインディングと、認証済みのユーザー。 */
@@ -140,7 +146,7 @@ export function createApp(deps: AppDeps = defaultDeps) {
       const configErrors = validateConfig(c.env);
       return c.json(configErrors.length === 0 ? { ok: true } : { ok: false, configErrors });
     })
-    .route("/", meRoutes(authed))
+    .route("/", meRoutes(authed, deps.deleteClerkUser ?? ((env) => clerkUserDeleter(env))))
     .route("/", accountRoutes(authed))
     .route("/", accountTeamRoutes(authed))
     .route("/", inviteRoutes(authed, maybeAuthed))
@@ -157,6 +163,8 @@ export function createApp(deps: AppDeps = defaultDeps) {
     .route("/", autoPostRoutes(authed))
     .route("/", performanceRoutes(authed))
     .route("/", threadsConnectRoutes(authed))
+    .route("/", billingRoutes(authed))
+    .route("/", stripeWebhookRoutes())
     .route("/", threadsWebhookRoutes())
     .route("/", dataDeletionRoutes());
 

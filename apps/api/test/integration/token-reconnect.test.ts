@@ -112,7 +112,6 @@ describe("接続し直しの記録（FR-035、research.md R11a）", () => {
     await putInTeam(id, "owner1");
     const token = await fake.issueToken({ user: "9003" });
     await reconnectWithToken(id, token, "owner1");
-    await q()`UPDATE accounts SET plan = 'multi-account'`;
     const { authorizeUrl } = (await (
       await call(app, "POST", "/api/threads/connect", { user: "owner1", body: { mode: "reconnect", accountId: id } })
     ).json()) as { authorizeUrl: string };

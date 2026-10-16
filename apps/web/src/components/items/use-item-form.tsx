@@ -4,10 +4,10 @@ import { useMutation } from "@tanstack/react-query";
 import { useState, type ReactNode } from "react";
 import { toast } from "sonner";
 import { ConflictDialog } from "@/components/ConflictDialog";
-import { GrowerRequiredDialog } from "@/components/GrowerRequiredNotice";
+import { BillingRequiredDialog } from "@/components/billing/BillingRequiredDialog";
 import { UnsavedChangesDialog } from "@/components/UnsavedChangesDialog";
 import { ApiError } from "@/lib/api-client";
-import { isGrowerRequired, isStale, saveErrorMessage } from "@/lib/save-error";
+import { billingReasonOf, isBillingRequired, isStale, saveErrorMessage } from "@/lib/save-error";
 import { useUnsavedChanges } from "@/lib/use-unsaved-changes";
 
 /** 入力値の検証の結果。項目名 → 入力欄の下に出す案内。 */
@@ -32,7 +32,7 @@ export type ItemFormOptions<F, T extends { version: number; updatedAt: string }>
   /** 閉じる */
   onClose: () => void;
   /** grower機能が使えなくなった（画面を読むだけにする）。ダイアログは閉じずに、入力内容を読むだけで残す */
-  onGrowerLost: () => void;
+  onReadOnly: () => void;
   /** 件数の上限に達していた（一覧を読み込み直して、上限の案内を出す） */
   onLimitReached?: () => void;
   /** 削除済みの案内を閉じた（一覧を読み込み直す） */
@@ -60,7 +60,7 @@ export function useItemForm<F, T extends { version: number; updatedAt: string }>
   const [conflict, setConflict] = useState<T | null>(null);
   // 先に保存した人（specs/008 FR-007）
   const [conflictBy, setConflictBy] = useState<string | null>(null);
-  const [growerLost, setGrowerLost] = useState(false);
+  const [readOnlyReason, setReadOnlyReason] = useState<string | null>(null);
   const [deleted, setDeleted] = useState(false);
   const [confirmClose, setConfirmClose] = useState(false);
   // grower機能が使えなくなった後は、入力内容を読むだけで残す（閉じるまで消さない）
@@ -81,7 +81,7 @@ export function useItemForm<F, T extends { version: number; updatedAt: string }>
         setConflictBy(err.updatedBy?.name ?? null);
         return setConflict(err.latest as T);
       }
-      if (isGrowerRequired(err)) return setGrowerLost(true);
+      if (isBillingRequired(err)) return setReadOnlyReason(billingReasonOf(err));
       if (err instanceof ApiError && err.code === "ITEM_NOT_FOUND") return setDeleted(true);
       if (err instanceof ApiError && err.code === "ITEM_LIMIT_REACHED") {
         toast.error(saveErrorMessage(err));
@@ -136,12 +136,12 @@ export function useItemForm<F, T extends { version: number; updatedAt: string }>
           setConflict(null);
         }}
       />
-      <GrowerRequiredDialog
-        open={growerLost}
+      <BillingRequiredDialog
+        reason={readOnlyReason}
         onClose={() => {
-          setGrowerLost(false);
+          setReadOnlyReason(null);
           setLocked(true);
-          opts.onGrowerLost();
+          opts.onReadOnly();
         }}
       />
     </>

@@ -7,7 +7,7 @@ import { useState, type ReactNode } from "react";
 import { useSearchParams } from "react-router";
 import { toast } from "sonner";
 import { ApiErrorScreen } from "@/components/ApiErrorScreen";
-import { GrowerRequiredBanner, GrowerRequiredDialog } from "@/components/GrowerRequiredNotice";
+import { BillingRequiredDialog } from "@/components/billing/BillingRequiredDialog";
 import { ConfirmDeleteDialog } from "@/components/items/ConfirmDeleteDialog";
 import { PageBody, PageHeader } from "@/components/layout/PageHeader";
 import { KeywordFormDialog } from "@/components/research/KeywordFormDialog";
@@ -23,7 +23,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { api } from "@/lib/api-client";
 import { formatDateTime } from "@/lib/format";
 import { queryKeys } from "@/lib/query";
-import { isGrowerRequired, saveErrorMessage } from "@/lib/save-error";
+import { billingReasonOf, isBillingRequired, saveErrorMessage } from "@/lib/save-error";
 import { cn } from "@/lib/utils";
 import { useCurrentAccount } from "@/pages/account-layout";
 
@@ -53,8 +53,8 @@ export function ResearchPage() {
   });
   const [dialog, setDialog] = useState<Dialog>(null);
   const [toDelete, setToDelete] = useState<ToDelete>(null);
-  const [growerLost, setGrowerLost] = useState(false);
-  const [growerDialog, setGrowerDialog] = useState(false);
+  const [readOnlyLost, setReadOnlyLost] = useState(false);
+  const [billingReason, setBillingReason] = useState<string | null>(null);
 
   const refresh = () => {
     void queryClient.invalidateQueries({ queryKey: queryKeys.referencePosts(account.id) });
@@ -74,7 +74,7 @@ export function ResearchPage() {
     },
     onError: (err) => {
       setToDelete(null);
-      if (isGrowerRequired(err)) setGrowerDialog(true);
+      if (isBillingRequired(err)) setBillingReason(billingReasonOf(err) ?? "");
       else toast.error(saveErrorMessage(err));
     },
   });
@@ -92,7 +92,7 @@ export function ResearchPage() {
     );
   }
 
-  const canEdit = (posts.data?.canEdit ?? false) && !growerLost;
+  const canEdit = (posts.data?.canEdit ?? false) && !readOnlyLost;
   const current = tab === "posts" ? posts.data : keywords.data;
   const atLimit = current ? current.items.length >= current.limit : false;
   const addLabel = tab === "posts" ? "参考投稿を追加" : "キーワードを追加";
@@ -141,7 +141,7 @@ export function ResearchPage() {
     onSaved,
     onClose: () => setDialog(null),
     // ダイアログは閉じずに、入力内容を読むだけで残す（閉じるのはユーザーの操作で）
-    onGrowerLost: () => setGrowerLost(true),
+    onReadOnly: () => setReadOnlyLost(true),
     onDeletedElsewhere: refresh,
     onLimitReached: refresh,
   };
@@ -150,7 +150,6 @@ export function ResearchPage() {
     <>
       <PageHeader title="リサーチ" actions={addButton} />
       <PageBody className="space-y-5 pb-16">
-        {!canEdit && posts.data && <GrowerRequiredBanner />}
         <div className="space-y-2">
           <p className="text-[15px] text-muted-foreground">
             Threadsで検索して、反応の良い投稿を見つけたら保存しましょう。「なぜ良いか」を書いておくと、投稿の材料になります。
@@ -235,11 +234,11 @@ export function ResearchPage() {
         onCancel={() => setToDelete(null)}
         onConfirm={() => toDelete && remove.mutate(toDelete)}
       />
-      <GrowerRequiredDialog
-        open={growerDialog}
+      <BillingRequiredDialog
+        reason={billingReason}
         onClose={() => {
-          setGrowerDialog(false);
-          setGrowerLost(true);
+          setBillingReason(null);
+          setReadOnlyLost(true);
         }}
       />
     </>
