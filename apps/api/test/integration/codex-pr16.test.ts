@@ -239,3 +239,20 @@ describe("P1（3回目）：退会を受け付けた後は、Checkoutを作ら�
     expect(await fakeStripe.sessions()).toHaveLength(0);
   });
 });
+
+describe("P1（4回目）：知らせが届かなかった完了済みのCheckoutがあれば、2つ目を作らない", () => {
+  it("「契約する」の前にStripeを読み直し、契約中なら 409 ALREADY_SUBSCRIBED で、新しいセッションを作らない", async () => {
+    const { userId } = await createUserWithAccount("u1");
+    const sessionId = await checkout("u1");
+    await fetch(`${testEnv.STRIPE_API_BASE_URL}/__control/complete-session`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: sessionId }),
+    });
+    const res = await callBilling(app, "POST", "/api/billing/checkout", { user: "u1" });
+    expect(res.status).toBe(409);
+    expect(((await res.json()) as { error: { code: string } }).error.code).toBe("ALREADY_SUBSCRIBED");
+    expect(await fakeStripe.sessions()).toHaveLength(1);
+    expect((await rowOf(userId)).status).toBe("trialing");
+  });
+});

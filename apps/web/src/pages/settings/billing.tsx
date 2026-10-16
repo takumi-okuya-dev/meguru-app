@@ -90,6 +90,9 @@ export function BillingSettingsPage() {
   const [waiting, setWaiting] = useState(checkout === "success");
   const [slow, setSlow] = useState(false);
   const syncedOnce = useRef(false);
+  // 開いたときの読み直しが終わるまで「契約する」を押せなくする（未同期の完了済みのCheckoutで2つ目を作らない。
+  // PR #16 のCodexレビュー）
+  const [initialSyncDone, setInitialSyncDone] = useState(false);
 
   const apply = (s: BillingSummary) => {
     queryClient.setQueryData(queryKeys.billing, s);
@@ -139,7 +142,10 @@ export function BillingSettingsPage() {
   useEffect(() => {
     if (checkout === "success" || syncedOnce.current || summary.data?.mode !== "enabled") return;
     syncedOnce.current = true;
-    api.syncBilling().then(apply, () => undefined);
+    api
+      .syncBilling()
+      .then(apply, () => undefined)
+      .finally(() => setInitialSyncDone(true));
   }, [summary.data, checkout]);
 
   const go = useMutation({
@@ -170,7 +176,12 @@ export function BillingSettingsPage() {
       <SettingCard>
         <SettingRow label={title} description={body ?? undefined}>
           {action && (
-            <Button size="sm" className="rounded-full" disabled={go.isPending} onClick={() => go.mutate(action)}>
+            <Button
+              size="sm"
+              className="rounded-full"
+              disabled={go.isPending || (action === "checkout" && s.mode === "enabled" && !initialSyncDone && checkout !== "success")}
+              onClick={() => go.mutate(action)}
+            >
               {go.isPending ? "支払いの画面に移っています…" : action === "checkout" ? "契約する" : "支払いの画面を開く"}
             </Button>
           )}

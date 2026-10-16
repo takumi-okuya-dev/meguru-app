@@ -138,12 +138,24 @@ describe("状態ごとの表示", () => {
 });
 
 describe("ボタン", () => {
+  it("開いたときの読み直しが終わるまで「契約する」は押せない（PR #16 のCodexレビュー）", async () => {
+    billing.mockResolvedValue(summary());
+    let resolve: (v: BillingSummary) => void = () => {};
+    syncBilling.mockImplementation(() => new Promise((r) => (resolve = r)));
+    renderPage();
+    expect(await screen.findByRole("button", { name: "契約する" })).toBeDisabled();
+    resolve(summary());
+    await waitFor(() => expect(screen.getByRole("button", { name: "契約する" })).toBeEnabled());
+  });
+
   it("「契約する」でCheckoutのURLへ移る。押している間は止める", async () => {
     billing.mockResolvedValue(summary());
+    syncBilling.mockResolvedValue(summary());
     let resolve: (v: { url: string }) => void = () => {};
     startCheckout.mockImplementation(() => new Promise((r) => (resolve = r)));
     renderPage();
-    await userEvent.click(await screen.findByRole("button", { name: "契約する" }));
+    await waitFor(() => expect(screen.getByRole("button", { name: "契約する" })).toBeEnabled());
+    await userEvent.click(screen.getByRole("button", { name: "契約する" }));
     expect(screen.getByRole("button", { name: "支払いの画面に移っています…" })).toBeDisabled();
     resolve({ url: "https://checkout.stripe.com/x" });
     await waitFor(() => expect(assign).toHaveBeenCalledWith("https://checkout.stripe.com/x"));

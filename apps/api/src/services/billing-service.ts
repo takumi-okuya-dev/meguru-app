@@ -236,6 +236,11 @@ export async function startCheckout(
   const before = await loadEntitlement(createDb(env.DATABASE_URL), user.id, user.billing, now);
   assertCanSubscribe(before);
   const customer = await ensureCustomer(env, stripe, user);
+  // 作る前にStripeの今の状態を読み直す（知らせが届かなかった完了済みのCheckoutがあれば、契約中と分かって止まる。
+  // PR #16 のCodexレビュー）
+  await syncCustomer(env, customer, stripe).catch((err: unknown) => {
+    throw unavailable(err);
+  });
   return withTransaction(env.DATABASE_URL, async (tx) => {
     await lockUserRow(tx, user.id);
     // 退会を受け付けた後には作らない（退会の契約を止める処理より後にセッションが残らないように。退会の受け付けも
@@ -246,10 +251,18 @@ export async function startCheckout(
     assertCanSubscribe(e);
     const [row] = await tx.select().from(subscriptions).where(eq(subscriptions.userId, user.id)).limit(1);
     if (row?.pendingCheckoutSessionId) {
-      // 終わった・期限切れのセッションは期限切れにできない（400）。それ以外の失敗は止める
-      await stripe.expireCheckoutSession(row.pendingCheckoutSessionId).catch((err: unknown) => {
-        if (!(err instanceof StripeError && (err.status === 400 || err.status === 404))) throw unavailable(err);
+      // 前のセッションが読み直しの後に完了していたら、2つ目の契約を作らない（画面を読み直してもらう）
+      const prev = await stripe.retrieveCheckoutSession(row.pendingCheckoutSessionId).catch((err: unknown) => {
+        if (err instanceof StripeError && err.status === 404) return null;
+        throw unavailable(err);
       });
+      if (prev?.status === "complete") throw new AppError("ALREADY_SUBSCRIBED", 409, "previous checkout completed");
+      // 期限切れのセッションは期限切れにできない（400）。それ以外の失敗は止める
+      if (prev?.status === "open") {
+        await stripe.expireCheckoutSession(row.pendingCheckoutSessionId).catch((err: unknown) => {
+          if (!(err instanceof StripeError && (err.status === 400 || err.status === 404))) throw unavailable(err);
+        });
+      }
     }
     const trial = e?.state === "trial" ? checkoutTrialFor(e.trialEndsAt, now) : null;
     const session = await stripe
