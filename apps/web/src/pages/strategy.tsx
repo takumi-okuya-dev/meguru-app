@@ -9,19 +9,22 @@ import {
   STRATEGY_TOTAL,
   TONE_PRESETS,
   SHORT_TIP,
+  buildDeepenPrompt,
   checkStrategy,
   countChars,
   hintOf,
   type Strategy,
+  type HintedKey,
   type StrategyValues,
   type TonePreset,
 } from "@threads-grower/shared";
-import { EllipsisIcon } from "lucide-react";
+import { EllipsisIcon, SparklesIcon } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import { toast } from "sonner";
 import { ApiErrorScreen } from "@/components/ApiErrorScreen";
 import { ConflictDialog } from "@/components/ConflictDialog";
 import { FieldWithCounter } from "@/components/FieldWithCounter";
+import { DeepenPanel } from "@/components/strategy/DeepenPanel";
 import { FieldCheckBadge } from "@/components/strategy/FieldCheckBadge";
 import { HintPanel } from "@/components/strategy/HintPanel";
 import { ProgressCard } from "@/components/strategy/ProgressCard";
@@ -95,6 +98,8 @@ function StrategyEditor({ accountId, initial }: { accountId: string; initial: St
   // 先に保存した人（specs/008 FR-007）
   const [conflictBy, setConflictBy] = useState<string | null>(null);
   const [billingReason, setBillingReason] = useState<string | null>(null);
+  // AIと深掘りする欄を開いている項目（同時に1つだけ。FR-031）
+  const [deepenKey, setDeepenKey] = useState<string | null>(null);
 
   const baseline = pickValues(saved);
   const dirty = canEdit && !sameValues(values, baseline);
@@ -241,7 +246,40 @@ function StrategyEditor({ accountId, initial }: { accountId: string; initial: St
                           )
                         }
                       >
-                        {hint && <HintPanel hint={hint} className="pt-1" />}
+                        {(hint || canEdit) && (
+                          <HintPanel
+                            hint={hint}
+                            className="pt-1"
+                            actions={
+                              canEdit &&
+                              hint && (
+                                <button
+                                  type="button"
+                                  aria-expanded={deepenKey === f.key}
+                                  onClick={() => setDeepenKey(deepenKey === f.key ? null : f.key)}
+                                  className="inline-flex h-9 items-center gap-1.5 rounded-full border px-3 text-[13px] hover:bg-accent"
+                                >
+                                  <SparklesIcon className="size-4" aria-hidden="true" />
+                                  この項目をAIと深掘りする
+                                </button>
+                              )
+                            }
+                            below={
+                              canEdit &&
+                              deepenKey === f.key &&
+                              hint && (
+                                <DeepenPanel
+                                  getPrompt={() => buildDeepenPrompt(f.key as HintedKey, values)}
+                                  onApply={(text) => {
+                                    set(f.key as (typeof STRATEGY_TEXT_KEYS)[number], text);
+                                    setDeepenKey(null);
+                                  }}
+                                  onClose={() => setDeepenKey(null)}
+                                />
+                              )
+                            }
+                          />
+                        )}
                       </FieldWithCounter>
                     )}
                   </div>

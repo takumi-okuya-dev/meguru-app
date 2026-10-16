@@ -155,10 +155,10 @@ description: "Task list for feature 014 strategy guidance"
 
 ### Tests for User Story 3
 
-- [ ] T022 [P] [US3] `packages/shared/test/strategy-prompts.test.ts`（FR-032・FR-033・FR-037、contracts/prompt-template.md 2）。
+- [X] T022 [P] [US3] `packages/shared/test/strategy-prompts.test.ts`（FR-032・FR-033・FR-037、contracts/prompt-template.md 2）。
   - `buildDeepenPrompt`：項目名・説明・ヒント・今の入力（空なら「未入力」）・ほかの入力のある項目（下書きを除く）・頼み方・目印の2行が入る。掛け合わせでは候補を3つ以上出す頼み方。
   - `extractFinal`：組の内側、組なしは全体、2組は最初、始まりだけは全体、前後の空白を除く。
-- [ ] T023 [P] [US3] `apps/web/test/strategy-deepen.test.tsx`（FR-030〜FR-035、FR-070）。
+- [X] T023 [P] [US3] `apps/web/test/strategy-deepen.test.tsx`（FR-030〜FR-035、FR-070）。
   - 同時に1項目だけ開く。
   - コピー（クリップボードに書けないときは選べる形で出す）。
   - 反映する内容の出し分け（目印あり・なし）。
@@ -168,9 +168,9 @@ description: "Task list for feature 014 strategy guidance"
 
 ### Implementation for User Story 3
 
-- [ ] T024 [US3] `packages/shared/src/strategy-prompts.ts`を作り、`buildDeepenPrompt(key, values)`と`extractFinal(text)`を書く（目印は`【完成版ここから】`・`【完成版ここまで】`、research.md R4）。`packages/shared/src/index.ts`から出す。T022を通す。
-- [ ] T025 [P] [US3] `apps/web/src/components/strategy/DeepenPanel.tsx`を作る：3つの手順・「プロンプトをコピーする」（今の`PromptCard`と同じコピーの扱い）・貼り付け欄・反映する内容・「この内容を反映する」・「閉じる」・「反映しても、まだ保存されません」・上限超えの文。
-- [ ] T026 [US3] `apps/web/src/pages/strategy.tsx`：直せる人だけ、テキストの15項目と目的の5問に「この項目をAIと深掘りする」を置き、開いている項目を1つだけ持つ。反映は`set(key, value)`で行う。T023を通す。
+- [X] T024 [US3] `packages/shared/src/strategy-prompts.ts`を作り、`buildDeepenPrompt(key, values)`と`extractFinal(text)`を書く（目印は`【完成版ここから】`・`【完成版ここまで】`、research.md R4）。`packages/shared/src/index.ts`から出す。T022を通す。
+- [X] T025 [P] [US3] `apps/web/src/components/strategy/DeepenPanel.tsx`を作る：3つの手順・「プロンプトをコピーする」（今の`PromptCard`と同じコピーの扱い）・貼り付け欄・反映する内容・「この内容を反映する」・「閉じる」・「反映しても、まだ保存されません」・上限超えの文。
+- [X] T026 [US3] `apps/web/src/pages/strategy.tsx`：直せる人だけ、テキストの15項目と目的の5問に「この項目をAIと深掘りする」を置き、開いている項目を1つだけ持つ。反映は`set(key, value)`で行う。T023を通す。
 
 ---
 

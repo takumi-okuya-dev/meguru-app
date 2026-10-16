@@ -19,6 +19,7 @@ export * from "./schemas";
 export * from "./strategy";
 export * from "./research";
 export * from "./strategy-guidance";
+export * from "./strategy-prompts";
 export * from "./text";
 export * from "./threads-text";
 export * from "./token";
