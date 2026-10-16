@@ -10,16 +10,18 @@ import {
   TONE_PRESETS,
   countChars,
   countFilled,
+  hintOf,
   type Strategy,
   type StrategyValues,
   type TonePreset,
 } from "@threads-grower/shared";
 import { EllipsisIcon } from "lucide-react";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { toast } from "sonner";
 import { ApiErrorScreen } from "@/components/ApiErrorScreen";
 import { ConflictDialog } from "@/components/ConflictDialog";
 import { FieldWithCounter } from "@/components/FieldWithCounter";
+import { HintPanel } from "@/components/strategy/HintPanel";
 import { BillingRequiredDialog } from "@/components/billing/BillingRequiredDialog";
 import { PageBody, PageHeader } from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/button";
@@ -208,32 +210,51 @@ function StrategyEditor({ accountId, initial }: { accountId: string; initial: St
                   Threadsには自動で反映されない下書きです。投稿づくりの材料には使いません。
                 </p>
               )}
-              {STRATEGY_FIELDS.filter((f) => f.section === section.id).map((f) =>
-                f.key === "tonePreset" ? (
-                  <ToneSelect
-                    key={f.key}
-                    label={f.label}
-                    description={f.description}
-                    value={values.tonePreset}
-                    disabled={!canEdit}
-                    onChange={(v) => set("tonePreset", v)}
-                  />
-                ) : (
-                  <FieldWithCounter
-                    key={f.key}
-                    id={`strategy-${f.key}`}
-                    label={f.label}
-                    description={f.description}
-                    placeholder={f.placeholder}
-                    rows={f.rows}
-                    max={STRATEGY_TEXT_MAX}
-                    value={values[f.key as keyof typeof values] as string}
-                    readOnly={!canEdit}
-                    showEmptyBadge={f.counted}
-                    onChange={(v) => set(f.key as (typeof STRATEGY_TEXT_KEYS)[number], v)}
-                  />
-                ),
-              )}
+              {STRATEGY_FIELDS.filter((f) => f.section === section.id).map((f) => {
+                const hint = hintOf(f.key);
+                return (
+                  <div key={f.key} id={`field-${f.key}`} className="scroll-mt-36">
+                    {f.key === "tonePreset" ? (
+                      <ToneSelect
+                        label={f.label}
+                        description={f.description}
+                        value={values.tonePreset}
+                        disabled={!canEdit}
+                        onChange={(v) => set("tonePreset", v)}
+                      >
+                        {hint && <HintPanel hint={hint} className="pt-1" />}
+                      </ToneSelect>
+                    ) : (
+                      <FieldWithCounter
+                        id={`strategy-${f.key}`}
+                        label={f.label}
+                        description={f.description}
+                        placeholder={f.placeholder}
+                        rows={f.rows}
+                        max={STRATEGY_TEXT_MAX}
+                        value={values[f.key as keyof typeof values] as string}
+                        readOnly={!canEdit}
+                        showEmptyBadge={f.counted}
+                        onChange={(v) => set(f.key as (typeof STRATEGY_TEXT_KEYS)[number], v)}
+                        labelExtra={
+                          hint?.star && (
+                            <span className="rounded-full bg-foreground px-2 py-px text-[11px] font-medium text-background">
+                              ★ 特に大事
+                            </span>
+                          )
+                        }
+                        aside={
+                          hint?.starNote && (
+                            <p className="rounded-xl bg-muted/60 px-3 py-2 text-[13px] leading-relaxed">{hint.starNote}</p>
+                          )
+                        }
+                      >
+                        {hint && <HintPanel hint={hint} className="pt-1" />}
+                      </FieldWithCounter>
+                    )}
+                  </div>
+                );
+              })}
             </section>
           ))}
         </div>
@@ -274,12 +295,14 @@ function ToneSelect({
   value,
   disabled,
   onChange,
+  children,
 }: {
   label: string;
   description: string;
   value: TonePreset | null;
   disabled: boolean;
   onChange: (v: TonePreset | null) => void;
+  children?: ReactNode;
 }) {
   return (
     <div className="space-y-1">
@@ -308,6 +331,7 @@ function ToneSelect({
           ))}
         </select>
       </div>
+      {children}
     </div>
   );
 }

@@ -95,14 +95,14 @@ description: "Task list for feature 014 strategy guidance"
 
 ### Tests for User Story 1
 
-- [ ] T011 [P] [US1] `packages/shared/test/strategy-guidance.test.ts`：`STRATEGY_HINTS`が21項目（目的の5問・テキストの15項目・近い人間性）をそろえ、各項目にコツ・悪い例・良い例・足してみたら2〜3個・こんな場合は・もっと良くするなら・目安の文字数（近い人間性はなし）がある。発信テーマの掛け合わせに★と考え方がある（SC-001、FR-001・FR-003）。
-- [ ] T012 [P] [US1] `apps/web/test/strategy-hints.test.tsx`：考えるヒントが初めは閉じている、押すと開いて内容が出る、もう一度で閉じる、★特に大事と考え方の文が出る、見せてもらっている人（`canEdit: false`）でもヒントが出る（FR-002〜FR-004）。
+- [X] T011 [P] [US1] `packages/shared/test/strategy-guidance.test.ts`：`STRATEGY_HINTS`が21項目（目的の5問・テキストの15項目・近い人間性）をそろえ、各項目にコツ・悪い例・良い例・足してみたら2〜3個・こんな場合は・もっと良くするなら・目安の文字数（近い人間性はなし）がある。発信テーマの掛け合わせに★と考え方がある（SC-001、FR-001・FR-003）。
+- [X] T012 [P] [US1] `apps/web/test/strategy-hints.test.tsx`：考えるヒントが初めは閉じている、押すと開いて内容が出る、もう一度で閉じる、★特に大事と考え方の文が出る、見せてもらっている人（`canEdit: false`）でもヒントが出る（FR-002〜FR-004）。
 
 ### Implementation for User Story 1
 
-- [ ] T013 [US1] `packages/shared/src/strategy-guidance.ts`を作り、`STRATEGY_HINTS`をcontracts/hints.mdの文言のとおりに書く（キー・コツ・悪い例・良い例・`more`・`whatIf`・`better`・`shortTip`（任意）・`minChars`・`star`と`starNote`）。`packages/shared/src/index.ts`から出す。T011を通す。
-- [ ] T014 [P] [US1] `apps/web/src/components/strategy/HintPanel.tsx`を作る：「考えるヒント」のボタン（`aria-expanded`）と、開いたときのコツ・悪い例と良い例（`grid`で横2つ、狭い幅では縦）・足してみたら・こんな場合は・もっと良くするなら（contracts/ui-routes.md「課題」）。
-- [ ] T015 [US1] `apps/web/src/pages/strategy.tsx`と`apps/web/src/components/FieldWithCounter.tsx`：各項目の下に`HintPanel`を置き、★特に大事の印と考え方の文を出す（近い人間性の`ToneSelect`にも置く）。T012を通す。
+- [X] T013 [US1] `packages/shared/src/strategy-guidance.ts`を作り、`STRATEGY_HINTS`をcontracts/hints.mdの文言のとおりに書く（キー・コツ・悪い例・良い例・`more`・`whatIf`・`better`・`shortTip`（任意）・`minChars`・`star`と`starNote`）。`packages/shared/src/index.ts`から出す。T011を通す。
+- [X] T014 [P] [US1] `apps/web/src/components/strategy/HintPanel.tsx`を作る：「考えるヒント」のボタン（`aria-expanded`）と、開いたときのコツ・悪い例と良い例（`grid`で横2つ、狭い幅では縦）・足してみたら・こんな場合は・もっと良くするなら（contracts/ui-routes.md「課題」）。
+- [X] T015 [US1] `apps/web/src/pages/strategy.tsx`と`apps/web/src/components/FieldWithCounter.tsx`：各項目の下に`HintPanel`を置き、★特に大事の印と考え方の文を出す（近い人間性の`ToneSelect`にも置く）。T012を通す。
 
 **Checkpoint**：US1だけで、21項目のヒントを読める。
 

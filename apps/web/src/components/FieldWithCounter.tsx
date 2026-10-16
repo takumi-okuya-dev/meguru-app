@@ -1,6 +1,7 @@
 // ラベル・説明・未入力・文字数つきの入力欄（docs/ui-design.md 型A、specs/002 contracts/ui-routes.md 規則9）。
 // 各項目に出すのは、ラベル・1行の説明・入力欄（記入例は空の欄の中）・文字数だけにする。
 import { countChars, isBlank } from "@threads-grower/shared";
+import type { ReactNode } from "react";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
@@ -31,6 +32,12 @@ export type FieldWithCounterProps = {
   hint?: string;
   type?: "text" | "url";
   className?: string;
+  /** ラベルの横に足す印（課題の自動チェック・★特に大事など。specs/014） */
+  labelExtra?: ReactNode;
+  /** 説明の下、入力欄の上に足す中身（★の考え方など） */
+  aside?: ReactNode;
+  /** 入力欄の下に足す中身（考えるヒント・AIと深掘りするなど） */
+  children?: ReactNode;
 };
 
 /**
@@ -55,6 +62,9 @@ export function FieldWithCounter({
   hint,
   type = "text",
   className,
+  labelExtra,
+  aside,
+  children,
 }: FieldWithCounterProps) {
   const count = countChars(value);
   const over = count > max;
@@ -64,7 +74,7 @@ export function FieldWithCounter({
 
   return (
     <div className={cn("space-y-1", className)}>
-      <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         <label htmlFor={id} className="font-medium">
           {label}
         </label>
@@ -72,12 +82,14 @@ export function FieldWithCounter({
         {showEmptyBadge && isBlank(value) && (
           <span className="rounded-full bg-muted px-2 py-px text-[11px] text-muted-foreground">未入力</span>
         )}
+        {labelExtra}
       </div>
       {description && (
         <p id={`${id}-desc`} className="text-[13px] text-muted-foreground">
           {description}
         </p>
       )}
+      {aside}
       <div className="relative pt-1">
         {multiline ? (
           <Textarea
@@ -120,6 +132,7 @@ export function FieldWithCounter({
         </p>
       )}
       {!message && hint && <p className="text-[13px] text-muted-foreground">{hint}</p>}
+      {children}
     </div>
   );
 }
