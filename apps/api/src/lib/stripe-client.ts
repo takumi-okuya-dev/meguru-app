@@ -157,6 +157,14 @@ export function createStripeClient(
       return request<{ id: string; status: string }>("POST", `/v1/checkout/sessions/${encodeURIComponent(id)}/expire`);
     },
     /**
+     * Checkoutのセッションを読む（開いているか。PR #16 のCodexレビュー）。
+     * @param id - セッションのID
+     * @returns セッション（status は open・complete・expired）
+     */
+    retrieveCheckoutSession(id: string) {
+      return request<{ id: string; status: string }>("GET", `/v1/checkout/sessions/${encodeURIComponent(id)}`);
+    },
+    /**
      * カスタマーポータルのセッションを作る（research.md R7）。
      * @param input - 顧客・戻り先・設定
      * @returns ポータルのURL

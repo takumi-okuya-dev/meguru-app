@@ -13,7 +13,7 @@ import {
   type MeBilling,
   type SubscriptionStatus,
 } from "@threads-grower/shared";
-import { and, eq, isNull, lt, notInArray, or, sql } from "drizzle-orm";
+import { and, eq, inArray, isNull, lt, notInArray, or, sql, type SQL } from "drizzle-orm";
 import type { Env } from "../env";
 import { createDb, withTransaction, type Db, type TxDb } from "../db/client";
 import { lockUserRow } from "../db/locks";
@@ -49,6 +49,28 @@ export function entitlementFromFacts(mode: BillingMode, facts: BillingFacts, now
         : { status: (facts.status as SubscriptionStatus | null) ?? null, cancelAtPeriodEnd: facts.cancelAtPeriodEnd ?? false },
     now,
   });
+}
+
+/**
+ * 「オーナーがすべて使える」のSQLの条件（users・subscriptions を結合した問い合わせで使う）。entitlementOf と同じ条件で、
+ * 定期処理が件数の上限の前に読むだけの行を外すために使う（上限を読むだけの行が埋めて、ほかが進まないことを防ぐ。
+ * PR #16 のCodexレビュー）。entitlementOf と同じ結果になることは billing-sql-parity.test.ts で確かめる。決済OFFなら条件なし。
+ * 無料体験の終わりは、日本時間の暦で1か月後（月末は丸める。Postgres の interval '1 month' も同じ丸め）。
+ * @param mode - 決済のモード
+ * @param now - 今の時刻
+ * @returns 条件
+ */
+export function fullAccessSql(mode: BillingMode, now: Date): SQL | undefined {
+  if (!mode.enabled) return undefined;
+  const trialEnd = sql`((${users.createdAt} AT TIME ZONE 'Asia/Tokyo') + interval '1 month') AT TIME ZONE 'Asia/Tokyo'`;
+  return or(
+    eq(users.billingExempt, true),
+    inArray(subscriptions.status, ["trialing", "active"]),
+    and(
+      or(isNull(subscriptions.status), notInArray(subscriptions.status, ["past_due", "unpaid", "paused"])),
+      sql`${trialEnd} > ${now.toISOString()}::timestamptz`,
+    ),
+  );
 }
 
 /**
@@ -263,10 +285,15 @@ function assertCanSubscribe(e: Entitlement | null) {
 
 // ---- 状態の反映（research.md R5） ----
 
+/** 重複した契約のうち、どれを残すかの順（小さいほど残す。PR #16 のCodexレビュー）。 */
+const KEEP_RANK: Record<string, number> = { active: 0, trialing: 0, past_due: 1, unpaid: 1, paused: 1, incomplete: 2 };
+
 /**
  * 顧客の契約をStripeから読み直して subscriptions に書く。知らせの中身は使わない（重複・順番の入れ替わりに強い）。
- * 終わっていない契約が2つ以上あれば、いちばん古いものを残し、ほかを止めてログに残す（返金は運用が手で行う）。
- * 読み直した時刻より新しい読み直しが書かれていれば、上書きしない。
+ * 同じ顧客の読み直しは、顧客ごとの鍵で1つずつ行う（先に始めた読み直しが、後の読み直しの新しい結果を上書きしない。
+ * PR #16 のCodexレビュー）。終わっていない契約が2つ以上あれば、使える契約（active・trialing）を優先し、
+ * 同じなら古いものを残して、ほかを止めてログに残す（返金は運用が手で行う）。
+ * 契約がなく、開いていたCheckoutのセッションがもう開いていなければ、その記録を消す（日次の合わせ直しの対象から外す）。
  * @param env - Workers のバインディング
  * @param customerId - Stripeの顧客のID
  * @param stripe - Stripeのクライアント
@@ -274,44 +301,55 @@ function assertCanSubscribe(e: Entitlement | null) {
  * @throws StripeError（呼び出し側で扱う）
  */
 export async function syncCustomer(env: Env, customerId: string, stripe: StripeClient = createStripeClient(env)): Promise<string | null> {
-  const db = createDb(env.DATABASE_URL);
-  const [row] = await db.select().from(subscriptions).where(eq(subscriptions.stripeCustomerId, customerId)).limit(1);
-  if (!row) return null;
-  // 読み直しを始めた時刻（この時刻より後に始めた読み直しの結果を、上書きしない）
-  const readAt = new Date();
-  const list = await stripe.listSubscriptions(customerId);
-  const live = list.filter((s) => !(ENDED_STATUSES as readonly string[]).includes(s.status)).sort((a, b) => a.created - b.created);
-  for (const extra of live.slice(1)) {
-    logger.error("billing: duplicate subscription canceled", { userId: row.userId, subscriptionId: extra.id });
-    await stripe.cancelSubscription(extra.id).catch((err: unknown) => logger.error("billing: cancel duplicate failed", { err: String(err) }));
-  }
-  const chosen = live[0] ?? [...list].sort((a, b) => b.created - a.created)[0] ?? null;
-  const values = chosen
-    ? {
-        stripeSubscriptionId: chosen.id,
-        status: (SUBSCRIPTION_STATUSES as readonly string[]).includes(chosen.status) ? chosen.status : null,
-        currentPeriodEnd: periodEndOf(chosen),
-        trialEnd: chosen.trial_end ? new Date(chosen.trial_end * 1000) : null,
-        cancelAtPeriodEnd: chosen.cancel_at_period_end || chosen.cancel_at !== null,
-        quantity: chosen.items.data[0]?.quantity ?? null,
-      }
-    : {};
-  await db
-    .update(subscriptions)
-    .set({
-      ...values,
-      // 契約ができたら、開いていたセッションは要らない
-      ...(live[0] ? { pendingCheckoutSessionId: null } : {}),
-      stripeSyncedAt: readAt,
-      updatedAt: new Date(),
-    })
-    .where(
-      and(
-        eq(subscriptions.userId, row.userId),
-        or(isNull(subscriptions.stripeSyncedAt), lt(subscriptions.stripeSyncedAt, readAt)),
-      ),
-    );
-  return row.userId;
+  return withTransaction(env.DATABASE_URL, async (tx) => {
+    await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${"billing_customer:" + customerId}, 0))`);
+    const [row] = await tx.select().from(subscriptions).where(eq(subscriptions.stripeCustomerId, customerId)).limit(1);
+    if (!row) return null;
+    const readAt = new Date();
+    const list = await stripe.listSubscriptions(customerId);
+    const live = list
+      .filter((s) => !(ENDED_STATUSES as readonly string[]).includes(s.status))
+      .sort((a, b) => (KEEP_RANK[a.status] ?? 3) - (KEEP_RANK[b.status] ?? 3) || a.created - b.created);
+    for (const extra of live.slice(1)) {
+      logger.error("billing: duplicate subscription canceled", { userId: row.userId, subscriptionId: extra.id, status: extra.status });
+      await stripe.cancelSubscription(extra.id).catch((err: unknown) => logger.error("billing: cancel duplicate failed", { err: String(err) }));
+    }
+    const chosen = live[0] ?? [...list].sort((a, b) => b.created - a.created)[0] ?? null;
+    const values = chosen
+      ? {
+          stripeSubscriptionId: chosen.id,
+          status: (SUBSCRIPTION_STATUSES as readonly string[]).includes(chosen.status) ? chosen.status : null,
+          currentPeriodEnd: periodEndOf(chosen),
+          trialEnd: chosen.trial_end ? new Date(chosen.trial_end * 1000) : null,
+          cancelAtPeriodEnd: chosen.cancel_at_period_end || chosen.cancel_at !== null,
+          quantity: chosen.items.data[0]?.quantity ?? null,
+        }
+      : {};
+    // 契約ができたら、開いていたセッションは要らない。契約がなければ、セッションがまだ開いているかを確かめる
+    let clearPending = Boolean(live[0]);
+    if (!live[0] && row.pendingCheckoutSessionId) {
+      const session = await stripe.retrieveCheckoutSession(row.pendingCheckoutSessionId).catch((err: unknown) => {
+        if (err instanceof StripeError && err.status === 404) return null;
+        throw err;
+      });
+      clearPending = session === null || session.status !== "open";
+    }
+    await tx
+      .update(subscriptions)
+      .set({
+        ...values,
+        ...(clearPending ? { pendingCheckoutSessionId: null } : {}),
+        stripeSyncedAt: readAt,
+        updatedAt: new Date(),
+      })
+      .where(
+        and(
+          eq(subscriptions.userId, row.userId),
+          or(isNull(subscriptions.stripeSyncedAt), lt(subscriptions.stripeSyncedAt, readAt)),
+        ),
+      );
+    return row.userId;
+  });
 }
 
 /**
@@ -378,22 +416,25 @@ export async function markQuantityDirty(tx: Db | TxDb, userId: string): Promise<
  */
 export async function syncQuantity(env: Env, userId: string, stripe: StripeClient = createStripeClient(env)): Promise<boolean> {
   if (!billingModeOf(env).enabled) return true;
-  const db = createDb(env.DATABASE_URL);
-  const [row] = await db.select().from(subscriptions).where(eq(subscriptions.userId, userId)).limit(1);
-  if (!row?.stripeSubscriptionId || !row.status || (ENDED_STATUSES as readonly string[]).includes(row.status)) {
-    if (row?.quantitySyncNeeded) await db.update(subscriptions).set({ quantitySyncNeeded: false }).where(eq(subscriptions.userId, userId));
-    return true;
-  }
   try {
-    const quantity = billingQuantity(await countOwned(db, userId));
-    const sub = (await stripe.listSubscriptions(row.stripeCustomerId)).find((s) => s.id === row.stripeSubscriptionId);
-    const item = sub?.items.data[0];
-    if (sub && item && item.quantity !== quantity) await stripe.updateSubscriptionQuantity(sub.id, item.id, quantity);
-    await db
-      .update(subscriptions)
-      .set({ quantity, quantitySyncNeeded: false, updatedAt: new Date() })
-      .where(eq(subscriptions.userId, userId));
-    return true;
+    // 同じ利用者の数の反映は1つずつ行い、鍵の中で数え直す（古い数で新しい数を上書きしない。PR #16 のCodexレビュー）
+    return await withTransaction(env.DATABASE_URL, async (tx) => {
+      await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${"billing_quantity:" + userId}, 0))`);
+      const [row] = await tx.select().from(subscriptions).where(eq(subscriptions.userId, userId)).limit(1);
+      if (!row?.stripeSubscriptionId || !row.status || (ENDED_STATUSES as readonly string[]).includes(row.status)) {
+        if (row?.quantitySyncNeeded) await tx.update(subscriptions).set({ quantitySyncNeeded: false }).where(eq(subscriptions.userId, userId));
+        return true;
+      }
+      const quantity = billingQuantity(await countOwned(tx, userId));
+      const sub = (await stripe.listSubscriptions(row.stripeCustomerId)).find((x) => x.id === row.stripeSubscriptionId);
+      const item = sub?.items.data[0];
+      if (sub && item && item.quantity !== quantity) await stripe.updateSubscriptionQuantity(sub.id, item.id, quantity);
+      await tx
+        .update(subscriptions)
+        .set({ quantity, quantitySyncNeeded: false, updatedAt: new Date() })
+        .where(eq(subscriptions.userId, userId));
+      return true;
+    });
   } catch (err) {
     // 印は残し、日次の処理でやり直す
     logger.error("billing: quantity sync failed", { userId, err: err instanceof StripeError ? { status: err.status, code: err.code } : String(err) });
@@ -402,7 +443,7 @@ export async function syncQuantity(env: Env, userId: string, stripe: StripeClien
 }
 
 /**
- * 日次の契約の合わせ直し（research.md R5・R6）。終わっていない契約と、数の合わせ直しが要る契約を読み直す。
+ * 日次の契約の合わせ直し（research.md R5・R6）。終わっていない契約、数の合わせ直しが要る契約、開いたCheckoutのある行を読み直す。
  * 1件の失敗で全体を止めない。決済OFFなら何もしない。
  * @param env - Workers のバインディング
  * @param stripe - Stripeのクライアント
@@ -416,6 +457,8 @@ export async function reconcileSubscriptions(env: Env, stripe: StripeClient = cr
     .where(
       or(
         eq(subscriptions.quantitySyncNeeded, true),
+        // Checkoutを終えたのに、知らせも画面からの読み直しも届かなかった行も拾う（PR #16 のCodexレビュー）
+        sql`${subscriptions.pendingCheckoutSessionId} IS NOT NULL`,
         and(sql`${subscriptions.status} IS NOT NULL`, notInArray(subscriptions.status, [...ENDED_STATUSES])),
       ),
     );

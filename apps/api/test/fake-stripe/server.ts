@@ -126,6 +126,12 @@ export function createFakeStripe() {
     return c.json({ id: s.id, url: `${new URL(c.req.url).origin}/checkout/${s.id}` });
   });
 
+  app.get("/v1/checkout/sessions/:id", (c) => {
+    const s = sessions.get(c.req.param("id"));
+    if (!s) return stripeError(c, 404, "resource_missing");
+    return c.json({ id: s.id, status: s.status });
+  });
+
   app.post("/v1/checkout/sessions/:id/expire", (c) => {
     const s = sessions.get(c.req.param("id"));
     if (!s) return stripeError(c, 404, "resource_missing");
@@ -189,6 +195,22 @@ export function createFakeStripe() {
   });
   app.get("/__control/requests", (c) => c.json({ requests }));
   app.get("/__control/sessions", (c) => c.json({ sessions: [...sessions.values()] }));
+  // Checkoutのセッションを、画面を開かずに完了にする（Webhook も読み直しも届かなかった場合の再現。契約はできる）
+  app.post("/__control/complete-session", async (c) => {
+    const { id } = await c.req.json<{ id: string }>();
+    const s = sessions.get(id);
+    if (!s || s.status !== "open") return c.json({ error: "not open" }, 409);
+    const trialEnd = s.trialEnd ?? (s.trialPeriodDays ? now() + s.trialPeriodDays * DAY : null);
+    const sub = createSubscription(s.customer, s.quantity, { trialEnd });
+    s.status = "complete";
+    return c.json(sub);
+  });
+  app.post("/__control/expire-session", async (c) => {
+    const { id } = await c.req.json<{ id: string }>();
+    const s = sessions.get(id);
+    if (s) s.status = "expired";
+    return c.json({ ok: true });
+  });
   app.get("/__control/subscriptions", (c) => c.json({ subscriptions: [...subscriptions.values()] }));
   app.post("/__control/fail", async (c) => {
     const b = await c.req.json<{ prefix: string; method?: string; times?: number; status?: number }>();

@@ -152,7 +152,9 @@ async function finishWithdrawal(
 
 /**
  * 契約を今すぐ止め、開いているCheckoutのセッションも期限切れにする（退会の後に契約ができないように）。
- * 止まっている・見つからない・決済OFFは成功とみなす。
+ * 止まっている・見つからないは成功とみなす。決済OFFの環境でも、契約の記録があれば止める（ONからOFFに切り替えた
+ * 環境で、退会の後も請求が続かないように。PR #16 のCodexレビュー）。止められない（鍵がない・Stripeにつながらない）
+ * ときは失敗にして、データと契約の記録を残す（もう一度の操作か日次の処理でやり直す）。
  * @param env - Workers のバインディング
  * @param userId - users.id
  * @param stripe - Stripeのクライアント
@@ -160,7 +162,14 @@ async function finishWithdrawal(
  */
 async function stopBilling(env: Env, userId: string, stripe: StripeClient) {
   const [row] = await createDb(env.DATABASE_URL).select().from(subscriptions).where(eq(subscriptions.userId, userId));
-  if (!row || !billingModeOf(env).enabled) return;
+  if (!row) return;
+  // 決済OFFで、記録の上で止める契約も開いたセッションもなければ、Stripeを呼ばない（鍵のない環境でも退会できる）
+  const live = row.status !== null && !["canceled", "incomplete_expired"].includes(row.status);
+  if (!billingModeOf(env).enabled && !live && !row.pendingCheckoutSessionId) return;
+  if (!env.STRIPE_SECRET_KEY) {
+    logger.error("withdrawal: cannot stop billing without stripe key", { userId });
+    throw new AppError("BILLING_UNAVAILABLE", 503, "billing unavailable");
+  }
   const ignorable = (err: unknown) => err instanceof StripeError && (err.status === 400 || err.status === 404);
   try {
     if (row.pendingCheckoutSessionId) {
@@ -169,9 +178,9 @@ async function stopBilling(env: Env, userId: string, stripe: StripeClient) {
       });
     }
     // 終わっていない契約は、記録の有無にかかわらずStripeから読んで止める（記録が古くても取りこぼさない）
-    for (const s of await stripe.listSubscriptions(row.stripeCustomerId)) {
-      if (s.status === "canceled" || s.status === "incomplete_expired") continue;
-      await stripe.cancelSubscription(s.id).catch((err: unknown) => {
+    for (const sub of await stripe.listSubscriptions(row.stripeCustomerId)) {
+      if (sub.status === "canceled" || sub.status === "incomplete_expired") continue;
+      await stripe.cancelSubscription(sub.id).catch((err: unknown) => {
         if (!ignorable(err)) throw err;
       });
     }

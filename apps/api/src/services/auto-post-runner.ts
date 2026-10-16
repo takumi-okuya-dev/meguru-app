@@ -334,7 +334,9 @@ export async function runAutoPost(
   // トークンの確かめ直しの時刻も候補にする（specs/010 research.md R8）
   const recheck = await nextRecheckAt(db);
   if (recheck) candidates.push(recheck);
-  for (const { schedule: s } of schedules) {
+  // 読むだけのオーナーの予定も、次に見る時刻には入れる（契約が戻ったとき、どの経路で戻っても次の時刻に動けるように。
+  // PR #16 のCodexレビュー）。その回の処理は、上の「時刻の処理」で読むだけの予定を外している
+  for (const { schedule: s } of scheduleRows) {
     const [next] = projectSchedule({
       accountId: s.accountId,
       enabled: true,
