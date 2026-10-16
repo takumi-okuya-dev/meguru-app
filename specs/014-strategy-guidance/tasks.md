@@ -347,9 +347,9 @@ description: "Task list for feature 014 strategy guidance"
 
 **Independent Test**：手順の案内と開閉（端末に覚える）、注意と入口が出ることを確かめる。
 
-- [ ] T071 [P] [US12] `apps/web/test/create-steps.test.tsx`（FR-130〜FR-132）：手順の5行とリンク、閉じたことを`localStorage`に覚える（読めないときは開いた状態）、貼り付け欄のコピーの注意、「自分で1件書く」と「リサーチを見る」、見せてもらっている人には出ない。
-- [ ] T072 [P] [US12] `apps/web/src/lib/preferences.ts`を作る：`readPreference(key, fallback)`・`writePreference(key, value)`（`threads-grower:`で始まるキー。`localStorage`が使えなければ例外を出さずに既定値。research.md R15）。
-- [ ] T073 [US12] `apps/web/src/components/create/CreateSteps.tsx`を作り`apps/web/src/pages/create.tsx`の一番上に置く。`PasteComposer.tsx`の`inline`の置き方に注意と入口を足す。T071を通す。
+- [X] T071 [P] [US12] `apps/web/test/create-steps.test.tsx`（FR-130〜FR-132）：手順の5行とリンク、閉じたことを`localStorage`に覚える（読めないときは開いた状態）、貼り付け欄のコピーの注意、「自分で1件書く」と「リサーチを見る」、見せてもらっている人には出ない。
+- [X] T072 [P] [US12] `apps/web/src/lib/preferences.ts`を作る：`readPreference(key, fallback)`・`writePreference(key, value)`（`threads-grower:`で始まるキー。`localStorage`が使えなければ例外を出さずに既定値。research.md R15）。
+- [X] T073 [US12] `apps/web/src/components/create/CreateSteps.tsx`を作り`apps/web/src/pages/create.tsx`の一番上に置く。`PasteComposer.tsx`の`inline`の置き方に注意と入口を足す。T071を通す。
 
 ---
 

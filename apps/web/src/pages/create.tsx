@@ -1,10 +1,11 @@
 // 「投稿をつくる」の画面（specs/014-strategy-guidance US15、FR-160〜FR-162・FR-165、contracts/ui-routes.md「投稿をつくる」）。
-// 上から：プロンプトのカード → 貼り付け欄。投稿ストック（/stock）は一覧だけにし、作る流れはこの画面にまとめる。
+// 上から：5つの手順 → プロンプトのカード → 貼り付け欄。投稿ストック（/stock）は一覧だけにし、作る流れはこの画面にまとめる。
 import { useQuery } from "@tanstack/react-query";
 import { PROMPT_COUNT_DEFAULT } from "@threads-grower/shared";
 import { useState } from "react";
 import { useLocation } from "react-router";
 import { ApiErrorScreen } from "@/components/ApiErrorScreen";
+import { CreateSteps } from "@/components/create/CreateSteps";
 import { PageBody, PageHeader } from "@/components/layout/PageHeader";
 import { PasteComposer } from "@/components/stock/PasteComposer";
 import { PromptCard } from "@/components/stock/PromptCard";
@@ -45,11 +46,14 @@ function CreatePageContent() {
   if (drafts.error) return <ApiErrorScreen error={drafts.error} onRetry={() => void drafts.refetch()} />;
 
   const atLimit = data ? data.needsReview.length >= data.limits.needsReview : false;
+  // 手順の案内と自分で1件書く入口は、直せる人だけ（読むだけのときは出さない。specs/014 FR-130・FR-132）
+  const canCreate = !!data && data.canGeneratePrompt && !promptLocked && can("content");
 
   return (
     <>
       <PageHeader title="投稿をつくる" />
       <PageBody className="space-y-6 pb-16">
+        {canCreate && <CreateSteps accountId={account.id} />}
         {data ? (
           <PromptCard
             accountId={account.id}
@@ -72,6 +76,7 @@ function CreatePageContent() {
           accountId={account.id}
           atLimit={atLimit}
           focusKey={data && (!data.canGeneratePrompt || promptLocked) ? openKey : undefined}
+          showSelfWrite={canCreate}
         />
       </PageBody>
     </>
