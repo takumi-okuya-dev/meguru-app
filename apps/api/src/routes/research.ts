@@ -29,6 +29,7 @@ import { parseBody } from "../lib/validate";
 import { authorizeAccount } from "../services/access";
 import { recordActivity, updatedByOf, withActivityTx } from "../services/activity-log";
 import { touchMaterials } from "../services/materials";
+import { referenceMetricsOf } from "../services/prompt-service";
 import { getStrategy } from "../services/strategy-service";
 import { assertItemId, insertManyWithLimit, insertWithLimit, updateWithVersion } from "../services/item-service";
 
@@ -59,14 +60,7 @@ function toReferencePost(row: ReferencePostRow, shortId?: string) {
     platform: row.platform as ReferencePost["platform"],
     postedDateMode,
     postedDate: row.postedDate,
-    metrics: {
-      likes: row.metricLikes,
-      replies: row.metricReplies,
-      views: row.metricViews,
-      saves: row.metricSaves,
-      reposts: row.metricReposts,
-      followers: row.metricFollowers,
-    },
+    metrics: referenceMetricsOf(row),
     author: row.author ?? "",
     memo: row.memo ?? "",
     freshness: freshnessOf({ postedDateMode, postedDate: row.postedDate, createdAt: row.createdAt }, jstToday(new Date())),

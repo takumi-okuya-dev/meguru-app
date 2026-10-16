@@ -5,12 +5,16 @@ import {
   PROMPT_REFERENCE_POSTS,
   PROMPT_REJECTED_DRAFTS,
   buildPrompt,
+  freshnessOf,
   isTargetable,
   jstToday,
   rejectReasonLabel,
   sortForPrompt,
+  type PostLengthSettings,
   type PostedDateMode,
   type PromptPromotion,
+  type ReferenceMetrics,
+  type ReferencePlatform,
   type RejectReasonCode,
 } from "@threads-grower/shared";
 import { and, asc, desc, eq, inArray } from "drizzle-orm";
@@ -24,6 +28,40 @@ import { readPostingSchedule } from "./posting-schedule-service";
 import { getStrategy } from "./strategy-service";
 
 type PromotionRow = typeof promotions.$inferSelect;
+
+/**
+ * アカウントの1投稿の文字数の目標と、短文・中文・長文の文字数と割合（specs/014 research.md R11）。
+ * @param a - Account の行
+ * @returns 文字数と割合
+ */
+export function lengthSettingsOf(a: AccountRow): PostLengthSettings {
+  return {
+    target: a.postLengthTarget,
+    shortLength: a.shortLength,
+    mediumLength: a.mediumLength,
+    longLength: a.longLength,
+    shortRatio: a.shortRatio,
+    mediumRatio: a.mediumRatio,
+    longRatio: a.longRatio,
+  };
+}
+
+/**
+ * 参考投稿の行の数字（specs/014 FR-095）。
+ * @param row - reference_posts の行
+ * @returns 数字（わからないものは null）
+ */
+export function referenceMetricsOf(row: typeof referencePosts.$inferSelect): ReferenceMetrics {
+  return {
+    likes: row.metricLikes,
+    replies: row.metricReplies,
+    views: row.metricViews,
+    saves: row.metricSaves,
+    reposts: row.metricReposts,
+    followers: row.metricFollowers,
+  };
+}
+
 
 /**
  * 宣伝の対象を、掲載期限の近い順（期限なしは最後）、同じなら優先度の高い順に並べる。
@@ -47,6 +85,8 @@ function targetPromotions(rows: PromotionRow[], now: Date): PromotionRow[] {
 
 function toPromptPromotion(r: PromotionRow): PromptPromotion {
   return {
+    title: r.title,
+    validUntil: r.validUntil,
     content: r.content,
     targetLocation: r.targetLocation ?? "",
     targetPersona: r.targetPersona ?? "",
@@ -122,8 +162,12 @@ export async function getPrompt(db: Db, account: AccountRow, count: number) {
         .orderBy(desc(postDrafts.publishedAt), asc(postDrafts.id))
         .limit(PROMPT_POOR_POSTS),
     ]);
-  const { prompt, summary } = buildPrompt({
+  const today = jstToday(now);
+  const { prompt, summary, length } = buildPrompt({
     count,
+    today,
+    // 文字数と長さの割合はアカウントの設定（specs/014 FR-140・FR-171）
+    lengthSettings: lengthSettingsOf(account),
     dailyPostCount: schedule?.slotMinutes.length ?? 0,
     // 話者はアカウントの名前（つなぐ前後でプロンプトを変えない。specs/012 FR-037）
     displayName: account.name,
@@ -132,14 +176,17 @@ export async function getPrompt(db: Db, account: AccountRow, count: number) {
     promotionRatioPercent: account.promotionRatioPercent,
     referencePosts: sortForPrompt(
       postRows.map((p) => ({ ...p, postedDateMode: p.postedDateMode as PostedDateMode })),
-      jstToday(now),
+      today,
     )
       .slice(0, PROMPT_REFERENCE_POSTS)
       .map((p) => ({
-      body: p.body,
-      keyword: p.keyword ?? "",
-      whyGood: p.whyGood ?? "",
-    })),
+        body: p.body,
+        keyword: p.keyword ?? "",
+        whyGood: p.whyGood ?? "",
+        platform: p.platform as ReferencePlatform,
+        metrics: referenceMetricsOf(p),
+        freshness: freshnessOf(p, today),
+      })),
     recentDrafts: draftBodies,
     coreRules: coreRuleLines(account.coreRules),
     ngWords: ngWordRows.map((w) => w.word),
@@ -150,5 +197,5 @@ export async function getPrompt(db: Db, account: AccountRow, count: number) {
     })),
     poorPosts: poorRows,
   });
-  return { prompt, count, summary };
+  return { prompt, count, summary, length };
 }

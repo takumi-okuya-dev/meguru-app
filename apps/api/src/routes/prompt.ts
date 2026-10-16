@@ -3,7 +3,6 @@ import {
   PROMPT_COUNT_MAX,
   PROMPT_COUNT_MIN,
   putPromptSettingsRequestSchema,
-  type PostLengthSettings,
 } from "@threads-grower/shared";
 import { and, eq, sql } from "drizzle-orm";
 import { Hono, type MiddlewareHandler } from "hono";
@@ -14,7 +13,7 @@ import { AppError, notFound } from "../lib/errors";
 import { parseBody } from "../lib/validate";
 import { authorizeAccount } from "../services/access";
 import { recordActivity, updatedByOf, withActivityTx } from "../services/activity-log";
-import { getPrompt } from "../services/prompt-service";
+import { getPrompt, lengthSettingsOf } from "../services/prompt-service";
 
 /**
  * クエリの count を確かめる。省略なら undefined、1〜50の整数でなければ 400。
@@ -29,23 +28,6 @@ function parseCount(raw: string | undefined): number | undefined {
     throw new AppError("VALIDATION_FAILED", 400, "invalid request", undefined, ["count"]);
   }
   return n;
-}
-
-/**
- * アカウントの1投稿の文字数の目標と、短文・中文・長文の文字数と割合（specs/014 research.md R11）。
- * @param a - Account の行
- * @returns 文字数と割合
- */
-export function lengthSettingsOf(a: typeof accounts.$inferSelect): PostLengthSettings {
-  return {
-    target: a.postLengthTarget,
-    shortLength: a.shortLength,
-    mediumLength: a.mediumLength,
-    longLength: a.longLength,
-    shortRatio: a.shortRatio,
-    mediumRatio: a.mediumRatio,
-    longRatio: a.longRatio,
-  };
 }
 
 /**

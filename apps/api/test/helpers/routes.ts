@@ -32,6 +32,10 @@ export const ACCOUNT_ROUTES: [string, string, Permission][] = [
   ["PUT", "/api/accounts/:accountId/strategy", "content"],
   ["GET", "/api/accounts/:accountId/reference-posts", "read"],
   ["POST", "/api/accounts/:accountId/reference-posts", "content"],
+  // specs/014 US7・US8（まとめての登録、解説のプロンプト、まとめての解説の保存）
+  ["POST", "/api/accounts/:accountId/reference-posts/batch", "content"],
+  ["GET", "/api/accounts/:accountId/reference-posts/explain-prompt", "content"],
+  ["POST", "/api/accounts/:accountId/reference-posts/explanations", "content"],
   ["PUT", "/api/accounts/:accountId/reference-posts/:referencePostId", "content"],
   ["DELETE", "/api/accounts/:accountId/reference-posts/:referencePostId", "content"],
   ["GET", "/api/accounts/:accountId/research-keywords", "read"],

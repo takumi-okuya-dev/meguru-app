@@ -217,7 +217,7 @@ function StrategyEditor({ accountId, initial }: { accountId: string; initial: St
               )}
               {section.id === "drafts" && (
                 <p className="-mt-3 text-[13px] text-muted-foreground">
-                  Threadsには自動で反映されない下書きです。投稿づくりの材料には使いません。
+                  Threadsには自動で反映されない下書きです。投稿づくりでは、投稿の方向性の軸として使います。
                 </p>
               )}
               {STRATEGY_FIELDS.filter((f) => f.section === section.id).map((f) => {

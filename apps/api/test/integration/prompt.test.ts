@@ -70,10 +70,11 @@ describe("GET /prompt", () => {
     expect(prompt).toContain("Threadsに投稿する文章を30件作ってください。");
     expect(prompt).toContain("ターゲット: 28歳の会社員");
     expect(prompt).toContain("人柄(近い人間性): 丁寧・温かい");
-    expect(prompt).not.toContain("プロフィール案");
-    expect(prompt).toContain("1. 有効の宣伝 / 行動喚起: DMで申し込み");
+    // 下書きは014から、投稿の方向性の軸として入る（specs/014 FR-113）
+    expect(prompt).toContain("- プロフィール文:\nプロフィール案");
+    expect(prompt).toContain("1. 【有効】(期限なし) 有効の宣伝 / 行動喚起: DMで申し込み");
     expect(prompt).not.toContain("停止の宣伝");
-    expect(prompt).toContain("[検索語:転職] 元の投稿(参考: 内容はコピーしない): 参考投稿の本文");
+    expect(prompt).toContain("元の投稿(参考: 内容はコピーしない) [検索語:転職・投稿日不明]\n   > 参考投稿の本文");
     expect(prompt).toContain("1. 新しい下書きA\n2. 新しい下書きB\n3. 古い下書き");
     expect(summary).toMatchObject({ strategyFilledCount: 2, promotionCount: 1, referencePostCount: 1, recentDraftCount: 3 });
   });

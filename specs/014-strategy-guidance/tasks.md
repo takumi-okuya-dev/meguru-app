@@ -277,26 +277,26 @@ description: "Task list for feature 014 strategy guidance"
 
 ### Tests for User Story 10
 
-- [ ] T052 [P] [US10] `packages/shared/test/prompt.test.ts`を直し、足す（FR-110〜FR-118・FR-170〜FR-172、SC-015・SC-016・SC-018）。
+- [X] T052 [P] [US10] `packages/shared/test/prompt.test.ts`を直し、足す（FR-110〜FR-118・FR-170〜FR-172、SC-015・SC-016・SC-018）。
   - 件数：`promoCount`・`patternCount`・`profileInviteCount`・`splitLengthMix`。
   - 節：最初に確認すること・優先順位、忠実に反映の指示、話題の配分（4項目のどれかがあるとき）、プロフィールと固定投稿（下書きがあるとき）、宣伝のタイトル・期限と残り日数・ちょうどN件・書き方、リサーチの引用・鮮度・媒体・数字・「分析メモなし」・型の件数、長さの件数と幅、文字数の目標、コードブロックの指示、最終チェック（材料のある行だけ）。
   - 冒頭・各節・最終チェックで件数が同じ。材料が空なら節と行が入らない。
   - 初めの値で今の範囲（150字・40〜70・80〜120・120〜150）。長さの調整で新しい節が残る。今のテストの期待（150字の文など）を新しい文に直す。
-- [ ] T053 [P] [US10] `packages/shared/test/drafts.test.ts`：`splitDrafts`が行の初めの```` ``` ````（言語名つき、前の空白つき）を除いてから分け、行の途中の```` ``` ````は残す（FR-170、SC-021）。
-- [ ] T054 [P] [US10] `apps/api/test/integration/prompt-materials.test.ts`：宣伝内容のタイトル・期限が入る、下書き・目的が入る、`length`が全文の文字数（FR-113〜FR-115）。
+- [X] T053 [P] [US10] `packages/shared/test/drafts.test.ts`：`splitDrafts`が行の初めの```` ``` ````（言語名つき、前の空白つき）を除いてから分け、行の途中の```` ``` ````は残す（FR-170、SC-021）。
+- [X] T054 [P] [US10] `apps/api/test/integration/prompt-materials.test.ts`：宣伝内容のタイトル・期限が入る、下書き・目的が入る、`length`が全文の文字数（FR-113〜FR-115）。
 
 ### Implementation for User Story 10
 
-- [ ] T055 [US10] `packages/shared/src/prompt.ts`を直す（research.md R10、contracts/prompt-template.md 1）。T052を通す。
+- [X] T055 [US10] `packages/shared/src/prompt.ts`を直す（research.md R10、contracts/prompt-template.md 1）。T052を通す。
   - `PromptInput`に`today`・`lengthSettings`（既定は`POST_LENGTH_DEFAULTS`）を足す。`PromptPromotion`に`title`・`validUntil`、`PromptReferencePost`に`platform`・`metrics`・`freshness`を足す。
   - 件数を求める関数（`promptCounts`）と`splitLengthMix`を足し、各節に渡す。
   - 節を足す：`firstCheckSection`・`profileSection`・`finalCheckSection`。
   - 節を直す：`strategySection`（忠実に反映・話題の配分）・`promotionSection`・`researchSection`・`lengthMixSection`・`charCountSection`・`outputSection`。
   - `assemble`の順をR10にする。
   - 長さの調整は今の減らす順のまま、新しい節を減らさない。戻り値に`length`を足す。
-- [ ] T056 [US10] `packages/shared/src/drafts.ts`の`splitDrafts`で、行の初めが```` ``` ````の行を除く。T053を通す。
-- [ ] T057 [US10] `apps/api/src/services/prompt-service.ts`：宣伝内容の`title`・`validUntil`、今日の日付（日本時間）、アカウントの文字数と割合（US13の前は既定値の列）を`buildPrompt`に渡す。応答に`length`を足す。T054を通す。
-- [ ] T058 [US10] `apps/web/src/pages/strategy.tsx`の下書きの区分の説明を「Threadsには自動で反映されない下書きです。投稿づくりでは、投稿の方向性の軸として使います」に変え、`apps/web/test/strategy.test.tsx`の期待を直す（FR-021）。
+- [X] T056 [US10] `packages/shared/src/drafts.ts`の`splitDrafts`で、行の初めが```` ``` ````の行を除く。T053を通す。
+- [X] T057 [US10] `apps/api/src/services/prompt-service.ts`：宣伝内容の`title`・`validUntil`、今日の日付（日本時間）、アカウントの文字数と割合（US13の前は既定値の列）を`buildPrompt`に渡す。応答に`length`を足す。T054を通す。
+- [X] T058 [US10] `apps/web/src/pages/strategy.tsx`の下書きの区分の説明を「Threadsには自動で反映されない下書きです。投稿づくりでは、投稿の方向性の軸として使います」に変え、`apps/web/test/strategy.test.tsx`の期待を直す（FR-021）。
 
 ---
 
