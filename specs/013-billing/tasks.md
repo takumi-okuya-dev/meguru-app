@@ -333,20 +333,20 @@ description: "Task list for feature 013 billing and withdrawal"
 
 ## Phase 10: Polish & Cross-Cutting Concerns
 
-- [ ] T058 [P] `docs/ui-design.md`の設定の項目に「契約と支払い」を足し、帯の種類（無料体験の終わり・読むだけ・未接続）と並び順を足す。`specs/001-login-account-setup/spec.md`のFR-014〜FR-017と、`specs/002-strategy-profile/spec.md`のFR-024に「013で置き換えた（specs/013-billing）」の注を足す。
-- [ ] T059 [P] `apps/web/test/solo-owner-unchanged.test.tsx`に足す。決済OFFでは、個人運用の人の画面に「契約と支払い」の項目のほか、帯もチームの説明も出ない。決済ONで契約中の人の「契約と支払い」に、チームの説明が出ない（FR-072）。
-- [ ] T060 `e2e/tests/billing.spec.ts`を作る。偽のStripe（`pnpm --filter api fake-stripe`）と`BILLING_ENABLED=true`のAPIを使う。流れは次のとおり。
+- [X] T058 [P] `docs/ui-design.md`の設定の項目に「契約と支払い」を足し、帯の種類（無料体験の終わり・読むだけ・未接続）と並び順を足す。`specs/001-login-account-setup/spec.md`のFR-014〜FR-017と、`specs/002-strategy-profile/spec.md`のFR-024に「013で置き換えた（specs/013-billing）」の注を足す。
+- [X] T059 [P] `apps/web/test/solo-owner-unchanged.test.tsx`に足す。決済OFFでは、個人運用の人の画面に「契約と支払い」の項目のほか、帯もチームの説明も出ない。決済ONで契約中の人の「契約と支払い」に、チームの説明が出ない（FR-072）。
+- [X] T060 `e2e/tests/billing.spec.ts`を作る。偽のStripe（`pnpm --filter api fake-stripe`）と`BILLING_ENABLED=true`のAPIを使う。流れは次のとおり。
   - 無料体験の利用者でアカウントを1件作る。2件目で上限の案内。
   - 「契約と支払い」→「契約する」。偽のCheckoutからすぐに戻って「無料体験中（契約済み）」。2件目を作る。
   - 偽のStripeで`past_due`にし、Webhookを送ると読むだけの帯。
   - `active`に戻すと書き込める。
   - `e2e/playwright.config.ts`に、決済ONのAPIを立てる設定（別のポート）を足す。001〜012のE2Eは`BILLING_ENABLED=false`のまま。
-- [ ] T061 `e2e/tests/withdraw.spec.ts`を作る。チームの管理者（`E2E_OWNER_EMAIL`）とメンバー（`team-flow.ts`の準備を使う）で、管理者が退会する。確かめること：
+- [X] T061 （E2Eにはしなかった。理由と代わりの確かめは verification.md「4. 計画からの変更」）`e2e/tests/withdraw.spec.ts`を作る。チームの管理者（`E2E_OWNER_EMAIL`）とメンバー（`team-flow.ts`の準備を使う）で、管理者が退会する。確かめること：
   - 確認の画面に引き継ぎ先が出る。
   - メールアドレスを入れて退会すると入口に「退会しました」。
   - メンバーの画面でチームの管理者がメンバーになっている。
   - 同じGoogleでログインすると「アカウントを作る」から始まる（Clerkのテスト用の利用者を作り直す準備を`e2e/tests/helpers.ts`に足す）。
-- [ ] T062 `pnpm lint && pnpm typecheck && pnpm test`、`pnpm e2e`（`E2E_CLERK_USER_EMAIL=$E2E_OWNER_EMAIL`）を通す。quickstart.mdの「手で確かめる」の1〜9を、Stripeのテスト用環境で行う。日次の処理に、読むだけの人のデータを消すものがないことを確かめる（FR-047）。SC-002の「3分以内に契約を終える」は、手で確かめる手順の2で確かめる。結果と、計画からずれた所を`specs/013-billing/verification.md`に書く（012のverification.mdと同じ形）。
+- [X] T062 `pnpm lint && pnpm typecheck && pnpm test`、`pnpm e2e`（`E2E_CLERK_USER_EMAIL=$E2E_OWNER_EMAIL`）を通す。quickstart.mdの「手で確かめる」の1〜9を、Stripeのテスト用環境で行う。日次の処理に、読むだけの人のデータを消すものがないことを確かめる（FR-047）。SC-002の「3分以内に契約を終える」は、手で確かめる手順の2で確かめる。結果と、計画からずれた所を`specs/013-billing/verification.md`に書く（012のverification.mdと同じ形）。
 
 ---
 

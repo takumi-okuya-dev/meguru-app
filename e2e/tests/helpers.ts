@@ -157,3 +157,34 @@ export async function connectWithToken(page: Page, accountId: string, token: str
   await page.getByLabel("アクセストークン").fill(token);
   await page.getByRole("button", { name: "つなぐ", exact: true }).click();
 }
+
+// ---- 決済（specs/013-billing T060）----
+
+export const FAKE_STRIPE = process.env.FAKE_STRIPE_URL ?? "http://localhost:8791";
+
+/**
+ * 偽のStripeを操作する。
+ * @param path - 制御のパス（/__control/ の後）
+ * @param body - 本文（なければ GET）
+ * @returns 応答の本文
+ */
+export async function stripeControl(path: string, body?: unknown): Promise<unknown> {
+  const res = await fetch(`${FAKE_STRIPE}/__control/${path}`, {
+    method: body === undefined ? "GET" : "POST",
+    headers: { "Content-Type": "application/json" },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error(`fake stripe control ${path} failed: ${res.status}`);
+  return res.json();
+}
+
+/**
+ * 偽のStripeの最新の契約の状態を変える。
+ * @param status - 新しい状態（past_due・active など）
+ */
+export async function setStripeStatus(status: string) {
+  const { subscriptions } = (await stripeControl("subscriptions")) as { subscriptions: { id: string; created: number }[] };
+  const latest = [...subscriptions].sort((a, b) => b.created - a.created)[0];
+  if (!latest) throw new Error("fake stripe has no subscription");
+  await stripeControl("subscription-status", { id: latest.id, status });
+}
