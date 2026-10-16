@@ -18,6 +18,8 @@ vi.mock("@/lib/api-client", async (orig) => {
       getAutoPost: async () => auto,
       getDraftCounts: async () => ({ needsReview: 0, approved, rejected: 0, published: 0, publishFailed: 0 }),
       accountAccess: async () => OWNER_ACCESS,
+      // 「はじめに読んでほしいこと」は利用者が分かってから出す（specs/014 FR-061）。ここでは出さない
+      me: () => new Promise(() => {}),
       getProfileStatus: () => (current instanceof Error ? Promise.reject(current) : Promise.resolve(current)),
     },
   };

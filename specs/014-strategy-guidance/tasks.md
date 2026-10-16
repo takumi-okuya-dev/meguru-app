@@ -359,9 +359,9 @@ description: "Task list for feature 014 strategy guidance"
 
 **Independent Test**：リサーチの画面で解説を開いて読め、ホームで読めて閉じられる（端末に覚える）ことを確かめる。
 
-- [ ] T074 [P] [US6] `apps/web/test/research-guide.test.tsx`（FR-060・FR-062）と`apps/web/test/intro-guide.test.tsx`（FR-061：初めは開く、閉じると見出し1行、利用者ごとに覚える、見せてもらっている人のホームでは出ない）。
-- [ ] T075 [P] [US6] `apps/web/src/components/guides/ResearchGuide.tsx`を作る（①3つの指標 ②真似してよい投稿 ③真似しない方がよい投稿と例外 ④5つの手順 ⑤登録する前の5つの確認といちばん大事な考え方。このアプリの言葉で、成果を約束しない）。`apps/web/src/pages/research.tsx`のタブの下に、閉じた状態で置く。
-- [ ] T076 [P] [US6] `apps/web/src/components/guides/IntroGuide.tsx`を作り（文はcontracts/ui-routes.md「ホーム」）、`apps/web/src/pages/account-home.tsx`の一番上に置く（`preferences.ts`の`threads-grower:intro-dismissed:<userId>`）。T074を通す。
+- [X] T074 [P] [US6] `apps/web/test/research-guide.test.tsx`（FR-060・FR-062）と`apps/web/test/intro-guide.test.tsx`（FR-061：初めは開く、閉じると見出し1行、利用者ごとに覚える、見せてもらっている人のホームでは出ない）。
+- [X] T075 [P] [US6] `apps/web/src/components/guides/ResearchGuide.tsx`を作る（①3つの指標 ②真似してよい投稿 ③真似しない方がよい投稿と例外 ④5つの手順 ⑤登録する前の5つの確認といちばん大事な考え方。このアプリの言葉で、成果を約束しない）。`apps/web/src/pages/research.tsx`のタブの下に、閉じた状態で置く。
+- [X] T076 [P] [US6] `apps/web/src/components/guides/IntroGuide.tsx`を作り（文はcontracts/ui-routes.md「ホーム」）、`apps/web/src/pages/account-home.tsx`の一番上に置く（`preferences.ts`の`threads-grower:intro-dismissed:<userId>`）。T074を通す。
 
 ---
 

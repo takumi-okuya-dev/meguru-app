@@ -11,6 +11,7 @@ import { BillingRequiredDialog } from "@/components/billing/BillingRequiredDialo
 import { ConfirmDeleteDialog } from "@/components/items/ConfirmDeleteDialog";
 import { PageBody, PageHeader } from "@/components/layout/PageHeader";
 import { KeywordFormDialog } from "@/components/research/KeywordFormDialog";
+import { ResearchGuide } from "@/components/guides/ResearchGuide";
 import { ExplainBatchPanel } from "@/components/research/ExplainBatchPanel";
 import { ExplainOne } from "@/components/research/ExplainOne";
 import { ReferenceBadges } from "@/components/research/ReferenceBadges";
@@ -162,24 +163,18 @@ export function ResearchPage() {
     <>
       <PageHeader title="リサーチ" actions={addButton} />
       <PageBody className="space-y-5 pb-16">
-        <div className="space-y-2">
-          <p className="text-[15px] text-muted-foreground">
-            Threadsで検索して、反応の良い投稿を見つけたら保存しましょう。「なぜ良いか」を書いておくと、投稿の材料になります。
-          </p>
-          <details className="rounded-xl border px-4 py-2.5 text-sm">
-            <summary className="cursor-pointer py-1 font-medium">リサーチの手順</summary>
-            <ol className="list-decimal space-y-1 py-2 pl-5 text-muted-foreground">
-              <li>キーワードでThreadsを検索する</li>
-              <li>反応の良い投稿の本文をコピーして保存する</li>
-              <li>なぜ良いかを書き残す（ChatGPTやClaudeに分析してもらった結果を貼り付けてもよい）</li>
-            </ol>
-          </details>
-        </div>
+        <p className="text-[15px] text-muted-foreground">
+          Threadsで検索して、反応の良い投稿を見つけたら保存しましょう。「なぜ良いか」を書いておくと、投稿の材料になります。
+        </p>
         <Tabs value={tab} onValueChange={(v) => setParams(v === "keywords" ? { tab: "keywords" } : {}, { replace: true })}>
           <TabsList>
             <TabsTrigger value="posts">参考投稿</TabsTrigger>
             <TabsTrigger value="keywords">キーワード</TabsTrigger>
           </TabsList>
+          {/* リサーチのやり方（初めは閉じる。specs/014 FR-060） */}
+          <div className="mt-3 mb-3">
+            <ResearchGuide />
+          </div>
           <TabsContent value="posts">
             {limitNotice}
             {canEdit && posts.data && (

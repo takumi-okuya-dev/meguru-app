@@ -17,6 +17,7 @@ import { AutoPostNotices } from "@/components/AutoPostNotices";
 import { NotConnectedBanner, connectPath } from "@/components/NotConnectedNotice";
 import { useAccountAccess } from "@/lib/use-account-access";
 import { AccountAvatar } from "@/components/AccountAvatar";
+import { IntroGuide } from "@/components/guides/IntroGuide";
 import { ApiErrorScreen } from "@/components/ApiErrorScreen";
 import { ConnectionBadge } from "@/components/ConnectionBadge";
 import { PageBody, PageHeader } from "@/components/layout/PageHeader";
@@ -118,6 +119,7 @@ export function AccountHome() {
     <>
       <PageHeader title="ホーム" />
       <PageBody className="flex flex-col items-center gap-7 pt-10 md:pt-16">
+        <IntroGuide />
         {notConnected && <NotConnectedBanner accountId={account.id} />}
         <AssignedNotice account={account} />
         <TokenWarnings />
