@@ -3,6 +3,7 @@
 import {
   accountAccessResponseSchema,
   billingRedirectSchema,
+  withdrawalPreviewSchema,
   billingSummarySchema,
   accountTeamSchema,
   inviteAcceptResponseSchema,
@@ -93,6 +94,38 @@ type TokenGetter = () => Promise<string | null>;
 let getToken: TokenGetter = async () => null;
 let onSessionExpired: () => void = () => {};
 
+// ---- 退会の途中（specs/013 research.md R10）。どのAPIの応答で分かっても、画面を「退会の手続きの途中です」に替える ----
+let withdrawalInProgress = false;
+const withdrawalListeners = new Set<() => void>();
+
+/**
+ * 退会の途中になったことを知らせる。
+ * @param value - 途中なら true（退会が終わったら false に戻す）
+ */
+export function setWithdrawalInProgress(value: boolean) {
+  if (withdrawalInProgress === value) return;
+  withdrawalInProgress = value;
+  for (const l of withdrawalListeners) l();
+}
+
+/**
+ * 退会の途中かを読む（useSyncExternalStore 用）。
+ * @returns 途中なら true
+ */
+export function getWithdrawalInProgress(): boolean {
+  return withdrawalInProgress;
+}
+
+/**
+ * 退会の途中の変化を受け取る（useSyncExternalStore 用）。
+ * @param listener - 変わったときに呼ぶ
+ * @returns 受け取りをやめる関数
+ */
+export function subscribeWithdrawalInProgress(listener: () => void): () => void {
+  withdrawalListeners.add(listener);
+  return () => withdrawalListeners.delete(listener);
+}
+
 /** Accountの API が権限・存在のエラーを返したときの受け取り口（specs/008 contracts/ui-routes.md「共通の振る舞い」2・3）。 */
 export type AccountAccessErrorListener = (code: "ROLE_FORBIDDEN" | "ACCOUNT_NOT_FOUND", accountId: string) => void;
 let onAccountAccessError: AccountAccessErrorListener | null = null;
@@ -139,6 +172,7 @@ async function request<T>(
     const parsed = errorResponseSchema.safeParse(await res.json().catch(() => null));
     const code: ErrorCode = parsed.success ? parsed.data.error.code : "INTERNAL_ERROR";
     if (res.status === 401) onSessionExpired();
+    if (code === "WITHDRAWAL_IN_PROGRESS") setWithdrawalInProgress(true);
     const accountId = ACCOUNT_PATH.exec(path)?.[1];
     if (accountId && (code === "ROLE_FORBIDDEN" || code === "ACCOUNT_NOT_FOUND")) onAccountAccessError?.(code, accountId);
     throw new ApiError(
@@ -158,7 +192,15 @@ type FeedbackRequestInput = { memo?: string | null; includeInPrompt?: boolean; e
 
 /** API の呼び出し。レスポンスは共通のスキーマで検証する。 */
 export const api = {
-  me: () => request("/api/me", meResponseSchema),
+  me: async () => {
+    const me = await request("/api/me", meResponseSchema);
+    if (me.withdrawalInProgress) setWithdrawalInProgress(true);
+    return me;
+  },
+  // ---- 退会（specs/013 contracts/api.md「自分」）----
+  withdrawalPreview: () => request("/api/me/withdrawal-preview", withdrawalPreviewSchema),
+  withdraw: (confirmEmail: string) =>
+    request("/api/me/withdraw", null, { method: "POST", body: JSON.stringify({ confirmEmail }) }),
   // ---- 契約と支払い（specs/013-billing contracts/api.md）----
   billing: () => request("/api/billing", billingSummarySchema),
   syncBilling: () => request("/api/billing/sync", billingSummarySchema, { method: "POST" }),

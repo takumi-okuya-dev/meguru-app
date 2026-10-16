@@ -13,6 +13,7 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:psql": "docker compose exec -T postgres psql -U postgres -d threads_grower",
+    "admin:set-billing-exempt": "tsx scripts/set-billing-exempt.ts",
     "admin:rotate-token-key": "tsx scripts/rotate-token-key.ts",
     "seed:performance": "tsx scripts/seed-performance.ts"
   },

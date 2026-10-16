@@ -286,13 +286,13 @@ description: "Task list for feature 013 billing and withdrawal"
   - 3のトランザクションの中で、消すアカウントの`threads_user_id`に当たる、処理中（`pending`・`failed`）のデータ削除の求め（`threads_deletion_requests`）を完了にする（`status = 'completed'`、`completed_at`を今に。001の削除の完了と同じ書き方を`apps/api/src/services/data-deletion.ts`から使う）。
 - [X] T049 [US5] `apps/api/src/routes/me.ts`に`GET /api/me/withdrawal-preview`と`POST /api/me/withdraw`（`{ confirmEmail }`、204）を足す。`GET /api/me`の`withdrawalInProgress`を`users.withdrawal_requested_at IS NOT NULL`にする。`packages/shared/src/schemas.ts`に`withdrawalPreviewSchema`・`withdrawRequestSchema`を足す。
 - [X] T050 [US5] `apps/api/src/middleware/auth.ts`を直す（contracts/api.md「認証のミドルウェアの変更」）。`withdrawn_users`にあるClerkのユーザーIDは、`users`を探す前・作る前に`401 AUTH_REQUIRED`にする。`withdrawal_requested_at`がある人は、3つのAPIのほかを`409 WITHDRAWAL_IN_PROGRESS`にする。`apps/api/src/services/daily-jobs.ts`に`resumeWithdrawals`を足す。
-- [ ] T051 [P] [US5] `apps/web/test/withdraw-dialog.test.tsx`を先に書き、`apps/web/src/components/billing/WithdrawDialog.tsx`を作る。`apps/web/src/pages/settings/account.tsx`に「退会」のカードを足す（contracts/ui-routes.md「退会」）。
+- [X] T051 [P] [US5] `apps/web/test/withdraw-dialog.test.tsx`を先に書き、`apps/web/src/components/billing/WithdrawDialog.tsx`を作る。`apps/web/src/pages/settings/account.tsx`に「退会」のカードを足す（contracts/ui-routes.md「退会」）。
   - ダイアログの中身：消えるもの・チームの行き先・契約の文・メールアドレスの入力（合うまで押せない）。
   - 押している間は閉じられない。
   - 成功したらClerkの`signOut`で`/?withdrawn=1`へ移る。
   - 失敗の文：`BILLING_UNAVAILABLE`はダイアログの中に出す。`CONFIRMATION_MISMATCH`は入力欄の下に出す。
   - `apps/web/src/lib/api-client.ts`に`withdrawalPreview()`・`withdraw()`を足す。
-- [ ] T052 [P] [US5] `apps/web/src/lib/api-client.ts`の共通のエラーの扱いで、`WITHDRAWAL_IN_PROGRESS`を受けたら「退会の手続きの途中です」の画面（`apps/web/src/components/billing/WithdrawalInProgress.tsx`。「退会する」だけを出す）に替える。`apps/web/src/pages/landing.tsx`で`?withdrawn=1`なら「退会しました」のトーストを出す。`apps/web/test/landing.test.tsx`を直す。
+- [X] T052 [P] [US5] `apps/web/src/lib/api-client.ts`の共通のエラーの扱いで、`WITHDRAWAL_IN_PROGRESS`を受けたら「退会の手続きの途中です」の画面（`apps/web/src/components/billing/WithdrawalInProgress.tsx`。「退会する」だけを出す）に替える。`apps/web/src/pages/landing.tsx`で`?withdrawn=1`なら「退会しました」のトーストを出す。`apps/web/test/landing.test.tsx`を直す。
 
 ---
 
@@ -302,11 +302,11 @@ description: "Task list for feature 013 billing and withdrawal"
 
 **Independent Test**：決済OFFで全員が上限なくすべて使え、ONで料金なしの印の付いた利用者が契約なしで2件以上作れる。
 
-- [ ] T053 [P] [US6] `apps/api/test/integration/billing-modes.test.ts`を作る。確かめること（FR-060〜FR-062、SC-008）：
+- [X] T053 [P] [US6] `apps/api/test/integration/billing-modes.test.ts`を作る。確かめること（FR-060〜FR-062、SC-008）：
   - 決済OFFでは、`GET /api/billing`が`mode: "disabled"`。`checkout`・`sync`・`portal`・Webhookが404。無料体験の終わった人も上限なくすべて使える。契約の行は消えない。
   - ONで料金なしの印の付いた人は、契約なしで3件作れ、無料体験の後もすべて使える。印を外すと読むだけになる。
-- [ ] T054 [US6] `apps/api/scripts/set-billing-exempt.ts`を作る（`pnpm --filter api admin:set-billing-exempt <email> on|off [--force]`。`apps/api/package.json`に足す）。メールアドレスで`users`を探す。`on`のとき、終わっていない契約があれば警告を出して止める（`--force`で付ける）。結果（前の値→新しい値）を出す。`apps/api/test/integration/set-billing-exempt.test.ts`で確かめる。
-- [ ] T055 [P] [US6] `docs/external-services-setup.md`に「Stripe」の節を足す（FR-064、research.md R3・R7・R11）。内容は次のとおり。
+- [X] T054 [US6] `apps/api/scripts/set-billing-exempt.ts`を作る（`pnpm --filter api admin:set-billing-exempt <email> on|off [--force]`。`apps/api/package.json`に足す）。メールアドレスで`users`を探す。`on`のとき、終わっていない契約があれば警告を出して止める（`--force`で付ける）。結果（前の値→新しい値）を出す。`apps/api/test/integration/set-billing-exempt.test.ts`で確かめる。
+- [X] T055 [P] [US6] `docs/external-services-setup.md`に「Stripe」の節を足す（FR-064、research.md R3・R7・R11）。内容は次のとおり。
   - テスト用環境と本番の切り替え。
   - 段階制の料金の作り方（JPY・月ごと・graduated・1件目1,000円・2件目から500円・内税）と、`BILLING_*_PRICE_JPY`の定数と同じ値か確かめる手順。
   - Webhookの宛先（`<API>/api/stripe/webhook`）と知らせの種類（research.md R5の8つ）。
@@ -326,8 +326,8 @@ description: "Task list for feature 013 billing and withdrawal"
 
 **Independent Test**：利用規約に料金などの節があり、特定商取引法に基づく表記のページがあり、どちらもログインせずに開け、「契約する」の前にリンクがある。
 
-- [ ] T056 [P] [US7] `apps/web/test/terms-page.test.tsx`を先に直し、`apps/web/src/pages/terms.tsx`に「料金と支払い」「無料体験」「解約」「未払いのとき」「退会」の5つの節を足す（spec US7-2の内容。金額は`BILLING_BASE_PRICE_JPY`・`BILLING_EXTRA_PRICE_JPY`から出す）。「料金・解約・特定商取引法に基づく表示は 011（決済）で足す」のコメントを消す。
-- [ ] T057 [P] [US7] `apps/web/test/legal-commerce.test.tsx`を先に書き、`apps/web/src/pages/legal-commerce.tsx`を作る（contracts/ui-routes.md「特定商取引法に基づく表記」の表。販売者の情報は`apps/web/src/lib/seller-info.ts`の定数で、空なら「（公開の前に記入）」）。`apps/web/src/router.tsx`に`/legal/commerce`（ログイン不要）を足す。`apps/web/src/pages/landing.tsx`の下と`apps/web/src/pages/settings/billing.tsx`の「契約する」の上に、「利用規約」「特定商取引法に基づく表記」のリンクを足す（SC-009）。
+- [X] T056 [P] [US7] `apps/web/test/terms-page.test.tsx`を先に直し、`apps/web/src/pages/terms.tsx`に「料金と支払い」「無料体験」「解約」「未払いのとき」「退会」の5つの節を足す（spec US7-2の内容。金額は`BILLING_BASE_PRICE_JPY`・`BILLING_EXTRA_PRICE_JPY`から出す）。「料金・解約・特定商取引法に基づく表示は 011（決済）で足す」のコメントを消す。
+- [X] T057 [P] [US7] `apps/web/test/legal-commerce.test.tsx`を先に書き、`apps/web/src/pages/legal-commerce.tsx`を作る（contracts/ui-routes.md「特定商取引法に基づく表記」の表。販売者の情報は`apps/web/src/lib/seller-info.ts`の定数で、空なら「（公開の前に記入）」）。`apps/web/src/router.tsx`に`/legal/commerce`（ログイン不要）を足す。`apps/web/src/pages/landing.tsx`の下と`apps/web/src/pages/settings/billing.tsx`の「契約する」の上に、「利用規約」「特定商取引法に基づく表記」のリンクを足す（SC-009）。
 
 ---
 

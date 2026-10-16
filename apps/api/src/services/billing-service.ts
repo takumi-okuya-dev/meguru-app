@@ -451,3 +451,33 @@ export async function loadOwnerEntitlement(db: Db | TxDb, accountId: string, mod
     .limit(1);
   return owner ? loadEntitlement(db, owner.userId, mode, now) : null;
 }
+
+/** 料金なしの印を付け・外した結果。 */
+export type ExemptResult =
+  | { kind: "updated"; email: string; before: boolean; after: boolean }
+  | { kind: "not_found" }
+  | { kind: "has_subscription"; status: string };
+
+/**
+ * 料金なしの印を付け・外す（運用のスクリプト。specs/013 FR-062、research.md R11）。
+ * 付けるときに終わっていない契約があれば、重ねて請求しないよう止める（force で付ける）。
+ * @param db - データベース
+ * @param email - 利用者のメールアドレス（大文字・小文字を区別しない）
+ * @param on - 付けるなら true
+ * @param force - 契約があっても付ける
+ * @returns 結果
+ */
+export async function setBillingExemptByEmail(db: Db, email: string, on: boolean, force = false): Promise<ExemptResult> {
+  const [user] = await db
+    .select({ id: users.id, email: users.email, exempt: users.billingExempt })
+    .from(users)
+    .where(sql`lower(${users.email}) = ${email.trim().toLowerCase()}`)
+    .limit(1);
+  if (!user) return { kind: "not_found" };
+  if (on && !force) {
+    const [sub] = await db.select({ status: subscriptions.status }).from(subscriptions).where(eq(subscriptions.userId, user.id));
+    if (sub?.status && !(ENDED_STATUSES as readonly string[]).includes(sub.status)) return { kind: "has_subscription", status: sub.status };
+  }
+  await db.update(users).set({ billingExempt: on, updatedAt: new Date() }).where(eq(users.id, user.id));
+  return { kind: "updated", email: user.email, before: user.exempt, after: on };
+}
