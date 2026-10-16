@@ -7,12 +7,14 @@ import {
   STRATEGY_TOTAL,
   staleUpdateTitle,
   type PostDraftList,
+  type PostLengthSettings,
   type PromptSummary,
 } from "@threads-grower/shared";
 import { ChevronDownIcon, CopyIcon, LockIcon } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router";
 import { toast } from "sonner";
+import { LengthSettings } from "@/components/create/LengthSettings";
 import { PromptMaterials } from "@/components/create/PromptMaterials";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -189,6 +191,29 @@ function PromptReadyCard({
     },
   });
 
+  // 文字数と割合の保存（specs/014 FR-140）。作る件数と同じ版で衝突を見る
+  const { mutate: saveLength, isPending: savingLength } = useMutation({
+    mutationFn: (length: PostLengthSettings) => api.putPromptSettings(accountId, saved, version.current, length),
+    onSuccess: ({ version: v }) => {
+      version.current = v;
+      queryClient.setQueryData<PostDraftList>(queryKeys.postDrafts(accountId), (old) =>
+        old ? { ...old, promptPostCountVersion: v } : old,
+      );
+      toast.success("文字数と割合を保存しました");
+      // プロンプトの数字が変わるので作り直す
+      void queryClient.invalidateQueries({ queryKey: queryKeys.promptAll(accountId) });
+    },
+    onError: (err) => {
+      if (isStale(err)) {
+        const latest = err.latest as { version: number };
+        version.current = latest.version;
+        toast.info(`${staleUpdateTitle(err.updatedBy?.name)}。最新の文字数と割合を読み込みました`);
+        void queryClient.invalidateQueries({ queryKey: queryKeys.promptAll(accountId) });
+      } else if (isBillingRequired(err)) onReadOnly();
+      else toast.error(saveErrorMessage(err));
+    },
+  });
+
   // 入力が止まってから0.5秒後に、その件数でプロンプトを取り直す（contracts/ui-routes.md）
   useEffect(() => {
     if (!isValidCount(countInput) || Number(countInput) === count) return;
@@ -287,6 +312,17 @@ function PromptReadyCard({
 
       {/* プロンプトに入っている情報（specs/014 FR-120）。プロンプトを作れる人だけ */}
       {prompt.data?.materials && <PromptMaterials accountId={accountId} materials={prompt.data.materials} />}
+      {/* 文字数と長さの割合（specs/014 FR-140）。保存済みの値が変わったら作り直す */}
+      {prompt.data?.settings && (
+        <LengthSettings
+          key={JSON.stringify(prompt.data.settings.length)}
+          settings={prompt.data.settings.length}
+          count={count}
+          canSave={canSaveCount}
+          saving={savingLength}
+          onSave={saveLength}
+        />
+      )}
 
       {prompt.error && !isBillingRequired(prompt.error) ? (
         <div role="alert" className="flex flex-wrap items-center gap-3 rounded-xl bg-muted/60 px-3 py-2.5 text-sm">

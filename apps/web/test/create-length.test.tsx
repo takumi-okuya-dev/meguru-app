@@ -1,0 +1,103 @@
+// US13：1投稿の文字数と、短文・中文・長文の割合（specs/014-strategy-guidance FR-140〜FR-142、SC-019）
+import { screen, waitFor, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { POST_LENGTH_DEFAULTS, type PostLengthSettings } from "@threads-grower/shared";
+import { fireEvent } from "@testing-library/react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { EDITOR_ACCESS, OWNER_ACCESS } from "./helpers/access";
+import { listResponse, promptResponse, renderAccountRoutes } from "./helpers/stock";
+
+const listPostDrafts = vi.fn();
+const getPrompt = vi.fn();
+const putPromptSettings = vi.fn();
+const accountAccess = vi.fn(async () => OWNER_ACCESS);
+const toastSuccess = vi.fn();
+vi.mock("@/lib/api-client", async (orig) => {
+  const actual = await orig<typeof import("@/lib/api-client")>();
+  return { ...actual, api: { ...actual.api, accountAccess, listPostDrafts, getPrompt, putPromptSettings } };
+});
+vi.mock("sonner", () => ({ toast: { success: toastSuccess, error: vi.fn(), info: vi.fn() } }));
+
+const { CreatePage } = await import("@/pages/create");
+
+const CUSTOM: PostLengthSettings = { target: 200, shortLength: 70, mediumLength: 135, longLength: 180, shortRatio: 35, mediumRatio: 45, longRatio: 20 };
+
+function withSettings(length: PostLengthSettings, version = 1) {
+  return { ...promptResponse(), settings: { postCount: 30, length, version } };
+}
+
+function renderCreate() {
+  return renderAccountRoutes([{ path: "create", element: <CreatePage /> }], "/accounts/a1/create");
+}
+
+async function openSettings(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(await screen.findByRole("button", { name: /文字数と長さの割合/ }));
+  return within(screen.getByRole("region", { name: "文字数と長さの割合" }));
+}
+
+beforeEach(() => {
+  accountAccess.mockResolvedValue(OWNER_ACCESS);
+  listPostDrafts.mockReset().mockResolvedValue(listResponse());
+  getPrompt.mockReset().mockResolvedValue(withSettings({ ...POST_LENGTH_DEFAULTS }));
+  putPromptSettings.mockReset();
+  toastSuccess.mockReset();
+});
+
+describe("文字数と長さの割合", () => {
+  it("初めは閉じていて、1行のまとめを出す", async () => {
+    renderCreate();
+    const toggle = await screen.findByRole("button", { name: /文字数と長さの割合/ });
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+    expect(toggle).toHaveTextContent("目標 150字・短文 55字 35%・中文 100字 45%・長文 135字 20%");
+  });
+
+  it("入力のたびに、作る件数の内訳（合計は作る件数）が変わる（FR-141）", async () => {
+    const user = userEvent.setup();
+    renderCreate();
+    const s = await openSettings(user);
+    expect(s.getByText("30件の内訳：短文11件・中文13件・長文6件")).toBeInTheDocument();
+    fireEvent.change(s.getByRole("slider", { name: "短文の割合" }), { target: { value: "50" } });
+    fireEvent.change(s.getByRole("slider", { name: "中文の割合" }), { target: { value: "30" } });
+    expect(s.getByText("30件の内訳：短文15件・中文9件・長文6件")).toBeInTheDocument();
+  });
+
+  it("割合の合計が100%でない・長さが目標を超えるときは、理由を出して保存できない（FR-142）", async () => {
+    const user = userEvent.setup();
+    renderCreate();
+    const s = await openSettings(user);
+    fireEvent.change(s.getByRole("slider", { name: "長文の割合" }), { target: { value: "30" } });
+    expect(s.getByText("割合の合計を100%にしてください（今は110%）")).toBeInTheDocument();
+    expect(s.getByRole("button", { name: "保存" })).toBeDisabled();
+    fireEvent.change(s.getByRole("slider", { name: "長文の割合" }), { target: { value: "20" } });
+    await user.clear(s.getByRole("spinbutton", { name: "長文の文字数" }));
+    await user.type(s.getByRole("spinbutton", { name: "長文の文字数" }), "160");
+    expect(s.getByText("長文の文字数は、目標の150字以下にしてください")).toBeInTheDocument();
+    expect(s.getByRole("button", { name: "保存" })).toBeDisabled();
+  });
+
+  it("「保存」で作る件数と一緒に送り、プロンプトを作り直す。「初期値に戻す」で初めの値に戻す（保存はしない）", async () => {
+    const user = userEvent.setup();
+    getPrompt.mockResolvedValue(withSettings(CUSTOM));
+    putPromptSettings.mockResolvedValue({ postCount: 30, length: POST_LENGTH_DEFAULTS, version: 2 });
+    renderCreate();
+    const s = await openSettings(user);
+    expect(s.getByRole("spinbutton", { name: "1投稿の文字数の目標" })).toHaveValue(200);
+    await user.click(s.getByRole("button", { name: "初期値に戻す" }));
+    expect(s.getByRole("spinbutton", { name: "1投稿の文字数の目標" })).toHaveValue(150);
+    expect(putPromptSettings).not.toHaveBeenCalled();
+    await user.click(s.getByRole("button", { name: "保存" }));
+    expect(putPromptSettings).toHaveBeenCalledWith("a1", 30, 1, POST_LENGTH_DEFAULTS);
+    await waitFor(() => expect(toastSuccess).toHaveBeenCalledWith("文字数と割合を保存しました"));
+    await waitFor(() => expect(getPrompt.mock.calls.length).toBeGreaterThanOrEqual(2));
+  });
+
+  it("オーナー以外は、見られるが保存できない（SC-019）", async () => {
+    accountAccess.mockResolvedValue(EDITOR_ACCESS);
+    const user = userEvent.setup();
+    renderCreate();
+    const s = await openSettings(user);
+    expect(s.getByText("文字数と割合を保存できるのは、オーナーだけです")).toBeInTheDocument();
+    expect(s.queryByRole("button", { name: "保存" })).not.toBeInTheDocument();
+    expect(s.getByRole("spinbutton", { name: "1投稿の文字数の目標" })).toBeDisabled();
+  });
+});

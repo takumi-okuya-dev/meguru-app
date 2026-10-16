@@ -246,6 +246,8 @@ export async function getPrompt(db: Db, account: AccountRow, count: number) {
     count,
     summary,
     length,
+    // 作る件数と文字数・割合（specs/014 research.md R11）
+    settings: { postCount: account.promptPostCount, length: lengthSettingsOf(account), version: account.promptPostCountVersion },
     materials: promptMaterials(strategy, includedPromotions, postRows, summary.referencePostCount),
   };
 }

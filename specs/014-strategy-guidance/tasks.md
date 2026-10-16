@@ -385,13 +385,13 @@ description: "Task list for feature 014 strategy guidance"
 
 **Independent Test**：値を変えて保存・読み直しでき、内訳とプロンプトの数字が変わり、「初期値に戻す」で今と同じになることを確かめる。
 
-- [ ] T082 [P] [US13] `apps/api/test/integration/prompt-settings-length.test.ts`（FR-140〜FR-142）。
+- [X] T082 [P] [US13] `apps/api/test/integration/prompt-settings-length.test.ts`（FR-140〜FR-142）。
   - `length`の保存・省略。刻み・合計100・目標以下の検証（`details.reason`）。
   - 版の衝突（`latest`に`length`）。オーナーだけ（担当の人は403）。操作の記録`prompt_length_saved`。
   - `GET /prompt`の`settings`と、プロンプトの数字が変わる。
-- [ ] T083 [P] [US13] `apps/web/test/create-length.test.tsx`：1行のまとめ、入力のたびの内訳（合計＝作る件数）、理由の文で保存できない、「初期値に戻す」、保存、オーナー以外は保存できない（SC-019）。
-- [ ] T084 [US13] `apps/api/src/routes/prompt.ts`の`PUT /prompt-settings`で`length`を保存（同じ版、`prompt_length_saved`）、`GET /prompt`に`settings`を足す。`apps/api/src/services/prompt-service.ts`でアカウントの値を`buildPrompt`に渡す。T082を通す。
-- [ ] T085 [US13] `apps/web/src/components/create/LengthSettings.tsx`を作り、`PromptCard.tsx`に置く（目標の文字数・短文中文長文の文字数とスライダー・件数・内訳・理由・「保存」・「初期値に戻す」。`splitLengthMix`を使う）。T083を通す。
+- [X] T083 [P] [US13] `apps/web/test/create-length.test.tsx`：1行のまとめ、入力のたびの内訳（合計＝作る件数）、理由の文で保存できない、「初期値に戻す」、保存、オーナー以外は保存できない（SC-019）。
+- [X] T084 [US13] `apps/api/src/routes/prompt.ts`の`PUT /prompt-settings`で`length`を保存（同じ版、`prompt_length_saved`）、`GET /prompt`に`settings`を足す。`apps/api/src/services/prompt-service.ts`でアカウントの値を`buildPrompt`に渡す。T082を通す。
+- [X] T085 [US13] `apps/web/src/components/create/LengthSettings.tsx`を作り、`PromptCard.tsx`に置く（目標の文字数・短文中文長文の文字数とスライダー・件数・内訳・理由・「保存」・「初期値に戻す」。`splitLengthMix`を使う）。T083を通す。
 
 ---
 

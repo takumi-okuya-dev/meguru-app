@@ -62,6 +62,7 @@ import {
   type ReviewRequest,
   type PromotionInput,
   type PutStrategyRequest,
+  type PostLengthSettings,
   type ReferencePostInputBody,
   type ResearchKeywordInput,
   type ErrorCode,
@@ -386,10 +387,11 @@ export const api = {
       `/api/accounts/${accountId}/prompt${count === undefined ? "" : `?count=${count}`}`,
       promptResponseSchema,
     ),
-  putPromptSettings: (accountId: string, postCount: number, expectedVersion: number) =>
+  putPromptSettings: (accountId: string, postCount: number, expectedVersion: number, length?: PostLengthSettings) =>
     request(`/api/accounts/${accountId}/prompt-settings`, promptSettingsSchema, {
       method: "PUT",
-      body: JSON.stringify({ postCount, expectedVersion }),
+      // 文字数と割合は省略できる（省略なら変えない。specs/014 FR-140）
+      body: JSON.stringify(length ? { postCount, length, expectedVersion } : { postCount, expectedVersion }),
     }),
   listPostDrafts: (accountId: string) =>
     request(`/api/accounts/${accountId}/post-drafts`, postDraftListSchema),

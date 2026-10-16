@@ -73,7 +73,7 @@
 ```
 
 - `length`は省略できる（省略なら文字数・割合は変えない。今のクライアントを壊さない）。
-- 検証：`target`は50〜500で10刻み、各長さは10〜500で5刻みかつ`target`以下、各割合は0〜100で5刻み、割合の合計が100。通らなければ`400 VALIDATION_FAILED`（`fields`に`length.longLength`などの項目名、`details.reason`に`ratio_sum`・`length_over_target`）。
+- 検証：`target`は50〜500で10刻み、各長さは10〜500で5刻みかつ`target`以下、各割合は0〜100で5刻み、割合の合計が100。通らなければ`400 VALIDATION_FAILED`（`details`に`length.longLength`などの項目名、`error.reason`に`ratio_sum`・`length_over_target`）。
 - 版：今の`prompt_post_count_version`で衝突を見る（`409 STALE_UPDATE`。`latest`に`postCount`・`length`・`version`）。
 - 応答：`{ "postCount": 10, "length": {…}, "version": 4 }`。
 - 操作の記録：件数が変われば今の`prompt_count_saved`、文字数・割合が変われば`prompt_length_saved`（要約「200字・35/45/20%」）。
