@@ -13,6 +13,7 @@ import { ChevronDownIcon, CopyIcon, LockIcon } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router";
 import { toast } from "sonner";
+import { PromptMaterials } from "@/components/create/PromptMaterials";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { api, describeError } from "@/lib/api-client";
@@ -283,6 +284,9 @@ function PromptReadyCard({
           </Button>
         </div>
       )}
+
+      {/* プロンプトに入っている情報（specs/014 FR-120）。プロンプトを作れる人だけ */}
+      {prompt.data?.materials && <PromptMaterials accountId={accountId} materials={prompt.data.materials} />}
 
       {prompt.error && !isBillingRequired(prompt.error) ? (
         <div role="alert" className="flex flex-wrap items-center gap-3 rounded-xl bg-muted/60 px-3 py-2.5 text-sm">

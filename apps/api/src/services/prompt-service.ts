@@ -4,18 +4,24 @@ import {
   PROMPT_RECENT_DRAFTS,
   PROMPT_REFERENCE_POSTS,
   PROMPT_REJECTED_DRAFTS,
+  HINTED_KEYS,
   buildPrompt,
+  checkStrategy,
+  countChars,
   freshnessOf,
+  isBlank,
   isTargetable,
   jstToday,
   rejectReasonLabel,
   sortForPrompt,
   type PostLengthSettings,
   type PostedDateMode,
+  type PromptMaterials,
   type PromptPromotion,
   type ReferenceMetrics,
   type ReferencePlatform,
   type RejectReasonCode,
+  type StrategyValues,
 } from "@threads-grower/shared";
 import { and, asc, desc, eq, inArray } from "drizzle-orm";
 import type { Db } from "../db/client";
@@ -131,6 +137,41 @@ function coreRuleLines(text: string): string[] {
 }
 
 /**
+ * 「プロンプトに入っている情報」（specs/014 FR-121・FR-123、research.md R9）。プロンプトを作るときの数え方のまま数える。
+ * @param strategy - 課題の値
+ * @param included - プロンプトに入る宣伝内容（宣伝の節がなければ空）
+ * @param posts - 参考投稿の全件
+ * @param includedPosts - プロンプトに入る参考投稿の件数
+ * @returns 情報の一覧
+ */
+function promptMaterials(
+  strategy: StrategyValues,
+  included: PromptPromotion[],
+  posts: { whyGood: string | null }[],
+  includedPosts: number,
+): PromptMaterials {
+  const check = checkStrategy(strategy);
+  const item = (key: (typeof HINTED_KEYS)[number]) => ({ key, ...check.items[key] });
+  // 目的の5問 → 活動の軸（判定しない）→ 16項目の順（contracts/api.md）
+  const axisChars = isBlank(strategy.activityAxis) ? 0 : countChars(strategy.activityAxis.trim());
+  const items = [
+    ...HINTED_KEYS.slice(0, 5).map(item),
+    { key: "activityAxis", status: null, chars: axisChars },
+    ...HINTED_KEYS.slice(5).map(item),
+  ];
+  const explained = posts.filter((p) => !isBlank(p.whyGood ?? "")).length;
+  return {
+    strategy: { items, done: check.done, review: check.review, purposeDone: check.purposeDone },
+    drafts: {
+      profileBio: !isBlank(strategy.profileBioDraft),
+      pinned: [strategy.pinnedPostDraft1, strategy.pinnedPostDraft2, strategy.pinnedPostDraft3].map((d) => !isBlank(d)),
+    },
+    promotions: { included: included.length, missingCta: included.filter((p) => isBlank(p.cta)).length },
+    research: { total: posts.length, included: includedPosts, explained, pending: posts.length - explained },
+  };
+}
+
+/**
  * 最新の材料からプロンプトを組み立てる（FR-002・FR-007）。材料の取得は並べて行う。
  * @param db - データベース
  * @param account - Account の行
@@ -163,6 +204,7 @@ export async function getPrompt(db: Db, account: AccountRow, count: number) {
         .limit(PROMPT_POOR_POSTS),
     ]);
   const today = jstToday(now);
+  const targetable = targetPromotions(promotionRows, now).map(toPromptPromotion);
   const { prompt, summary, length } = buildPrompt({
     count,
     today,
@@ -172,7 +214,7 @@ export async function getPrompt(db: Db, account: AccountRow, count: number) {
     // 話者はアカウントの名前（つなぐ前後でプロンプトを変えない。specs/012 FR-037）
     displayName: account.name,
     strategy,
-    promotions: targetPromotions(promotionRows, now).map(toPromptPromotion),
+    promotions: targetable,
     promotionRatioPercent: account.promotionRatioPercent,
     referencePosts: sortForPrompt(
       postRows.map((p) => ({ ...p, postedDateMode: p.postedDateMode as PostedDateMode })),
@@ -197,5 +239,13 @@ export async function getPrompt(db: Db, account: AccountRow, count: number) {
     })),
     poorPosts: poorRows,
   });
-  return { prompt, count, summary, length };
+  // 宣伝の節が入らない（割合0%）なら、宣伝内容は入らない
+  const includedPromotions = summary.promotionCount > 0 ? targetable : [];
+  return {
+    prompt,
+    count,
+    summary,
+    length,
+    materials: promptMaterials(strategy, includedPromotions, postRows, summary.referencePostCount),
+  };
 }

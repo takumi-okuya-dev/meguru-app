@@ -22,7 +22,8 @@ import {
   type TonePreset,
 } from "@threads-grower/shared";
 import { EllipsisIcon, SparklesIcon } from "lucide-react";
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
+import { useLocation } from "react-router";
 import { toast } from "sonner";
 import { ApiErrorScreen } from "@/components/ApiErrorScreen";
 import { ConflictDialog } from "@/components/ConflictDialog";
@@ -104,6 +105,14 @@ function StrategyEditor({ accountId, initial }: { accountId: string; initial: St
   const [billingReason, setBillingReason] = useState<string | null>(null);
   // AIと深掘りする欄を開いている項目（同時に1つだけ。FR-031）
   const [deepenKey, setDeepenKey] = useState<string | null>(null);
+
+  // ほかの画面の「編集」（#field-<key>）から来たら、その項目へ移る（specs/014 FR-122）
+  const { hash } = useLocation();
+  const editable = initial.canEdit;
+  useEffect(() => {
+    const key = /^#field-(\w+)$/.exec(hash)?.[1];
+    if (key) goToField(key, editable);
+  }, [hash, editable]);
 
   const baseline = pickValues(saved);
   const dirty = canEdit && !sameValues(values, baseline);

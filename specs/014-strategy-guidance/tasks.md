@@ -331,13 +331,13 @@ description: "Task list for feature 014 strategy guidance"
 
 **Independent Test**：区分ごとの件数・判定が課題・宣伝内容・リサーチの画面とプロンプトに入る内容と一致し、「編集」でその項目へ移ることを確かめる。
 
-- [ ] T067 [P] [US11] `apps/api/test/integration/prompt-materials.test.ts`に`materials`のテストを足す（FR-121・FR-123、SC-017）。
+- [X] T067 [P] [US11] `apps/api/test/integration/prompt-materials.test.ts`に`materials`のテストを足す（FR-121・FR-123、SC-017）。
   - 課題：`checkStrategy`の結果と文字数。下書き：入力のあり・なし。
   - 宣伝：公開中で期限内の件数と行動喚起が空の件数。
   - リサーチ：全件・入る件数（10件まで）・解説あり・解説がまだ。
-- [ ] T068 [P] [US11] `apps/web/test/create-materials.test.tsx`（FR-120〜FR-122）：閉じた状態の1行のまとめ、開くと一覧、課題の「編集」が`/strategy#field-<key>`、「解説がまだ」がリサーチのまとめての解説へ、プロンプトを作れない人には出ない。
-- [ ] T069 [US11] `apps/api/src/services/prompt-service.ts`で`materials`を作り、`apps/api/src/routes/prompt.ts`の応答に足す。T067を通す。
-- [ ] T070 [US11] `apps/web/src/components/create/PromptMaterials.tsx`を作り、`apps/web/src/components/stock/PromptCard.tsx`に置く。`apps/web/src/pages/strategy.tsx`で`#field-<key>`を開いたときにその項目へ移る。T068を通す。
+- [X] T068 [P] [US11] `apps/web/test/create-materials.test.tsx`（FR-120〜FR-122）：閉じた状態の1行のまとめ、開くと一覧、課題の「編集」が`/strategy#field-<key>`、「解説がまだ」がリサーチのまとめての解説へ、プロンプトを作れない人には出ない。
+- [X] T069 [US11] `apps/api/src/services/prompt-service.ts`で`materials`を作り、`apps/api/src/routes/prompt.ts`の応答に足す。T067を通す。
+- [X] T070 [US11] `apps/web/src/components/create/PromptMaterials.tsx`を作り、`apps/web/src/components/stock/PromptCard.tsx`に置く。`apps/web/src/pages/strategy.tsx`で`#field-<key>`を開いたときにその項目へ移る。T068を通す。
 
 ---
 

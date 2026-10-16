@@ -69,3 +69,66 @@ describe("投稿のプロンプトの014の材料", () => {
     expect(body.summary.length).toBe(body.length);
   });
 });
+
+type Materials = {
+  strategy: { items: { key: string; status: string | null; chars: number }[]; done: number; review: number; purposeDone: number };
+  drafts: { profileBio: boolean; pinned: boolean[] };
+  promotions: { included: number; missingCta: number };
+  research: { total: number; included: number; explained: number; pending: number };
+};
+
+describe("GET /prompt の materials（FR-121・FR-123、SC-017）", () => {
+  it("材料が空なら、すべて0・なし。課題は目的の5問・活動の軸・16項目の順", async () => {
+    const { accountId } = await createUserWithAccount("u1");
+    const { materials } = (await getPrompt(accountId)) as PromptBody & { materials: Materials };
+    expect(materials.strategy.items.map((i) => i.key).slice(0, 7)).toEqual([
+      "purposeOrigin",
+      "purposeSelf",
+      "purposeOthers",
+      "purposeFuture",
+      "purposeStance",
+      "activityAxis",
+      "finalAction",
+    ]);
+    expect(materials.strategy.items).toHaveLength(22);
+    expect(materials.strategy.items[5]).toEqual({ key: "activityAxis", status: null, chars: 0 });
+    expect(materials).toMatchObject({
+      strategy: { done: 0, review: 0, purposeDone: 0 },
+      drafts: { profileBio: false, pinned: [false, false, false] },
+      promotions: { included: 0, missingCta: 0 },
+      research: { total: 0, included: 0, explained: 0, pending: 0 },
+    });
+  });
+
+  it("課題の判定と文字数、下書きのあり・なし、宣伝（公開中で期限内・行動喚起が空）、リサーチの件数", async () => {
+    const { accountId } = await createUserWithAccount("u1");
+    const q = neon(testEnv.DATABASE_URL);
+    await q`INSERT INTO strategy_designs (account_id, target_persona, purpose_origin, activity_axis, pinned_post_draft_2)
+      VALUES (${accountId}, '20代', ${"上京して寂しかった。".repeat(10)}, 'ひとりにしない', '固定投稿の案')`;
+    await q`INSERT INTO promotions (account_id, title, content, cta) VALUES (${accountId}, 'A', 'A', 'DMで')`;
+    await q`INSERT INTO promotions (account_id, title, content) VALUES (${accountId}, 'B', 'B')`;
+    await q`INSERT INTO promotions (account_id, title, content, status) VALUES (${accountId}, 'C', 'C', 'paused')`;
+    await q`INSERT INTO promotions (account_id, title, content, valid_until) VALUES (${accountId}, 'D', 'D', '2020-01-01')`;
+    for (let i = 0; i < 12; i++) {
+      await q`INSERT INTO reference_posts (account_id, body, why_good) VALUES (${accountId}, ${`参考${i}`}, ${i < 4 ? "解説" : null})`;
+    }
+    const { materials } = (await getPrompt(accountId)) as PromptBody & { materials: Materials };
+    const item = (key: string) => materials.strategy.items.find((i) => i.key === key);
+    expect(item("targetPersona")).toEqual({ key: "targetPersona", status: "short", chars: 3 });
+    expect(item("purposeOrigin")).toMatchObject({ status: "ok", chars: 100 });
+    expect(item("activityAxis")).toEqual({ key: "activityAxis", status: null, chars: 7 });
+    expect(materials.strategy).toMatchObject({ done: 0, review: 1, purposeDone: 1 });
+    expect(materials.drafts).toEqual({ profileBio: false, pinned: [false, true, false] });
+    expect(materials.promotions).toEqual({ included: 2, missingCta: 1 });
+    expect(materials.research).toEqual({ total: 12, included: 10, explained: 4, pending: 8 });
+  });
+
+  it("宣伝の割合が0%なら、宣伝はプロンプトに入らないので0件", async () => {
+    const { accountId } = await createUserWithAccount("u1");
+    const q = neon(testEnv.DATABASE_URL);
+    await q`UPDATE accounts SET promotion_ratio_percent = 0 WHERE id = ${accountId}`;
+    await q`INSERT INTO promotions (account_id, title, content) VALUES (${accountId}, 'A', 'A')`;
+    const { materials } = (await getPrompt(accountId)) as PromptBody & { materials: Materials };
+    expect(materials.promotions).toEqual({ included: 0, missingCta: 0 });
+  });
+});

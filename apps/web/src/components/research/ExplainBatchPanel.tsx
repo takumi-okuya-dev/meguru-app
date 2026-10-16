@@ -67,7 +67,12 @@ export function ExplainBatchPanel({
   if (pending === 0 && skippedCount === 0) return null;
 
   return (
-    <section aria-label="まとめてAIに解説してもらう" className="space-y-3 rounded-2xl border bg-muted/30 px-4 py-3.5 text-sm">
+    // 「投稿をつくる」の「解説がまだ」から #explain で移ってくる（specs/014 FR-122）
+    <section
+      id="explain"
+      aria-label="まとめてAIに解説してもらう"
+      className="scroll-mt-28 space-y-3 rounded-2xl border bg-muted/30 px-4 py-3.5 text-sm"
+    >
       <div className="flex flex-wrap items-center gap-3">
         <div className="min-w-0 flex-1">
           <p className="font-medium">解説がまだの参考投稿：{pending}件</p>

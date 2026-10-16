@@ -3,8 +3,8 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { ReferencePost, ResearchKeyword } from "@threads-grower/shared";
 import { EllipsisIcon, ExternalLinkIcon, PlusIcon } from "lucide-react";
-import { useState, type ReactNode } from "react";
-import { useSearchParams } from "react-router";
+import { useEffect, useState, type ReactNode } from "react";
+import { useLocation, useSearchParams } from "react-router";
 import { toast } from "sonner";
 import { ApiErrorScreen } from "@/components/ApiErrorScreen";
 import { BillingRequiredDialog } from "@/components/billing/BillingRequiredDialog";
@@ -59,6 +59,14 @@ export function ResearchPage() {
   const [toDelete, setToDelete] = useState<ToDelete>(null);
   const [readOnlyLost, setReadOnlyLost] = useState(false);
   const [billingReason, setBillingReason] = useState<string | null>(null);
+
+  // 「投稿をつくる」の「解説がまだ」から来たら、まとめての解説へ移る（specs/014 FR-122）
+  const { hash } = useLocation();
+  const postsLoaded = posts.isSuccess;
+  useEffect(() => {
+    if (postsLoaded && hash === "#explain")
+      document.getElementById("explain")?.scrollIntoView?.({ block: "start", behavior: "smooth" });
+  }, [postsLoaded, hash]);
 
   const refresh = () => {
     void queryClient.invalidateQueries({ queryKey: queryKeys.referencePosts(account.id) });
