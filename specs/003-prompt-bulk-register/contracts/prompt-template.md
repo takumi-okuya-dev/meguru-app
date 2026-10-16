@@ -4,6 +4,8 @@
 
 `packages/shared`の`buildPrompt(input)`が組み立てる文面の正。参考プロダクトの言い回しを土台にし、R2の修正を入れている。
 
+> **2026-10-16の注記**：014で、冒頭の確認・戦略設計の忠実な反映・話題の配分・活動の目的・プロフィールと固定投稿・宣伝の件数と書き方・リサーチの鮮度と型の件数・長さの設定・コードブロック・最終チェック・2つに分けて送る、を足した。今の文面は[specs/014 contracts/prompt-template.md](../../014-strategy-guidance/contracts/prompt-template.md)を正とする。
+
 ## 入力
 
 | 名前 | 内容 |

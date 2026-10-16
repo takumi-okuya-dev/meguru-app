@@ -34,8 +34,8 @@ description: "Task list for feature 014 strategy guidance"
   - 原則Vの「決済をMVPの最後のfeatureとする」を、「決済を、MVPのうちチーム運用と課金まわりの最後のfeatureとする。公開の前の入力の手助けなど、決済の判定に関わらない機能は、決済の後に足してよい」に直す。
   - Rationaleに2026-10-16の理由を1文足す。
   - Sync Impact Reportを残し、`Last Amended`を2026-10-16にする。
-- [ ] T002 [P] `specs/002-strategy-profile/spec.md`に注記を足す：プロフィール・固定投稿の下書きは、014（FR-113）から投稿のプロンプトに方向性の軸として入る。区分の名前の「課題①〜③」は014（FR-019）で外した。
-- [ ] T003 [P] `specs/003-prompt-bulk-register/contracts/prompt-template.md`の冒頭に、014のcontracts/prompt-template.mdで直したことへのリンクを1行足す。
+- [X] T002 [P] `specs/002-strategy-profile/spec.md`に注記を足す：プロフィール・固定投稿の下書きは、014（FR-113）から投稿のプロンプトに方向性の軸として入る。区分の名前の「課題①〜③」は014（FR-019）で外した。
+- [X] T003 [P] `specs/003-prompt-bulk-register/contracts/prompt-template.md`の冒頭に、014のcontracts/prompt-template.mdで直したことへのリンクを1行足す。
 
 ---
 

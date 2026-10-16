@@ -11,6 +11,8 @@
 **Source**: [PRD §4.2](../../_bmad-output/initiative-threads-grower-app/prd-threads-grower-app/prd-threads-grower-app.md)（FR-3）、UJ-1の「戦略設計画面で課題①②③・宣伝内容・リサーチメモを入力」の部分。項目の構成は参考プロダクト（Threads Growth OS）の「課題」「宣伝内容」「リサーチ」画面を簡略化して取り込んだ。
 
 > **2026-10-08の料金の見直しによる注記**：料金を「無料体験（1か月）の後、基本料金1,000円（Threadsアカウント1件目を含む）＋2件目以降1件500円。有料ならすべての機能」に改めた。このspecの「grower機能＝プラン2以上か無料体験中」は「有料の契約中か無料体験中」に、「プラン1は読むだけ」は「無料体験が終わり、契約していない場合は読むだけ」に変わる。当時の記録としてこのspecの本文は変えない。コード（プランの値・grower機能の判定・アカウント数の上限など）は、課金のfeature（PRD FR-12）で置き換える。詳しくは[PRD FR-12](../../_bmad-output/initiative-threads-grower-app/prd-threads-grower-app/prd-threads-grower-app.md)・Product Brief addendum「料金」・Constitution 2.0.0。
+>
+> **2026-10-16の014による注記**：区分の名前から「課題①〜③」を外した（「営業導線設計」「アカウント設計」「集客導線設計」。[specs/014](../014-strategy-guidance/spec.md) FR-019）。プロフィールと固定投稿（下書き）は、FR-003bの「投稿づくりの材料には使わない」を変え、投稿のプロンプトに方向性の軸として入れる（014 FR-021・FR-113）。課題の先頭に「活動の目的・在り方」（5問と活動の軸）を足したが、入力済み項目数（n/16）は変えない（014 FR-020）。当時の記録としてこのspecの本文は変えない。
 
 ## Clarifications
 
