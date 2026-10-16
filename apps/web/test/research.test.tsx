@@ -9,17 +9,19 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const listReferencePosts = vi.fn();
 const listResearchKeywords = vi.fn();
 const createReferencePost = vi.fn();
+const createReferencePostsBatch = vi.fn();
 const createResearchKeyword = vi.fn();
 vi.mock("@/lib/api-client", async (orig) => {
   const actual = await orig<typeof import("@/lib/api-client")>();
   return {
     ...actual,
-    api: { ...actual.api, listReferencePosts, listResearchKeywords, createReferencePost, createResearchKeyword },
+    api: { ...actual.api, listReferencePosts, listResearchKeywords, createReferencePost, createReferencePostsBatch, createResearchKeyword },
   };
 });
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
 const { ApiError } = await import("@/lib/api-client");
+const { refPost } = await import("./helpers/research");
 const { ResearchPage } = await import("@/pages/research");
 
 const account: AccountSummary = {
@@ -58,7 +60,7 @@ function renderPage(path = "/accounts/a1/research") {
 describe("リサーチの画面", () => {
   beforeEach(() => {
     listReferencePosts.mockResolvedValue({
-      items: [{ id: "r1", body: "伸びていた投稿の本文", keyword: "AI", postUrl: "", whyGood: "", ...meta }],
+      items: [refPost({ id: "r1", body: "伸びていた投稿の本文", keyword: "AI" })],
       limit: 200,
       canEdit: true,
     });
@@ -93,39 +95,39 @@ describe("リサーチの画面", () => {
   });
 
   it("保存で 403 を受けると、入力内容を残したまま案内のダイアログが出る", async () => {
-    createReferencePost.mockRejectedValue(new ApiError("BILLING_REQUIRED", 403, ["trial_ended"]));
+    createReferencePostsBatch.mockRejectedValue(new ApiError("BILLING_REQUIRED", 403, ["trial_ended"]));
     renderPage();
     await userEvent.click(await screen.findByRole("button", { name: /参考投稿を追加/ }));
-    const body = await screen.findByLabelText("本文");
+    const body = await screen.findByLabelText(/^本文/);
     await userEvent.type(body, "新しい投稿");
-    await userEvent.click(screen.getAllByRole("button", { name: "保存" })[0]!);
+    await userEvent.click(screen.getAllByRole("button", { name: "登録する" })[0]!);
     expect(await screen.findByText("編集できなくなりました")).toBeInTheDocument();
-    expect(screen.getByLabelText("本文")).toHaveValue("新しい投稿");
+    expect(screen.getByLabelText(/^本文/)).toHaveValue("新しい投稿");
     // 案内を閉じても、ダイアログは閉じずに入力内容を読むだけで残す（Codexレビュー P1）
     const notice = screen.getByRole("dialog", { name: "編集できなくなりました" });
     await userEvent.click(within(notice).getAllByRole("button", { name: "閉じる" })[0]!);
     await waitFor(() => expect(screen.queryByText("編集できなくなりました")).not.toBeInTheDocument());
-    expect(screen.getByLabelText("本文")).toHaveValue("新しい投稿");
-    expect(screen.getByLabelText("本文")).toHaveAttribute("readonly");
-    expect(screen.queryByRole("button", { name: "保存" })).not.toBeInTheDocument();
+    expect(screen.getByLabelText(/^本文/)).toHaveValue("新しい投稿");
+    expect(screen.getByLabelText(/^本文/)).toHaveAttribute("readonly");
+    expect(screen.queryByRole("button", { name: "登録する" })).not.toBeInTheDocument();
   });
 
   it("保存の途中は入力欄を読み取り専用にする（送った内容と食い違わないように。Codexレビュー P1）", async () => {
-    createReferencePost.mockReturnValue(new Promise(() => {}));
+    createReferencePostsBatch.mockReturnValue(new Promise(() => {}));
     renderPage();
     await userEvent.click(await screen.findByRole("button", { name: /参考投稿を追加/ }));
-    await userEvent.type(await screen.findByLabelText("本文"), "新しい投稿");
-    await userEvent.click(screen.getAllByRole("button", { name: "保存" })[0]!);
-    await waitFor(() => expect(screen.getByLabelText("本文")).toHaveAttribute("readonly"));
+    await userEvent.type(await screen.findByLabelText(/^本文/), "新しい投稿");
+    await userEvent.click(screen.getAllByRole("button", { name: "登録する" })[0]!);
+    await waitFor(() => expect(screen.getByLabelText(/^本文/)).toHaveAttribute("readonly"));
   });
 
   it("追加で件数の上限（409 ITEM_LIMIT_REACHED）を受けたら、一覧を読み込み直す（Codexレビュー P2）", async () => {
-    createReferencePost.mockRejectedValue(new ApiError("ITEM_LIMIT_REACHED", 409));
+    createReferencePostsBatch.mockRejectedValue(new ApiError("ITEM_LIMIT_REACHED", 409));
     renderPage();
     await userEvent.click(await screen.findByRole("button", { name: /参考投稿を追加/ }));
-    await userEvent.type(await screen.findByLabelText("本文"), "新しい投稿");
+    await userEvent.type(await screen.findByLabelText(/^本文/), "新しい投稿");
     const before = listReferencePosts.mock.calls.length;
-    await userEvent.click(screen.getAllByRole("button", { name: "保存" })[0]!);
+    await userEvent.click(screen.getAllByRole("button", { name: "登録する" })[0]!);
     await waitFor(() => expect(listReferencePosts.mock.calls.length).toBeGreaterThan(before));
   });
 });

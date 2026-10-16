@@ -207,35 +207,35 @@ description: "Task list for feature 014 strategy guidance"
 
 ### Tests for User Story 7
 
-- [ ] T034 [P] [US7] `packages/shared/test/research.test.ts`（FR-096・FR-098・FR-099）。
+- [X] T034 [P] [US7] `packages/shared/test/research.test.ts`（FR-096・FR-098・FR-099）。
   - `freshnessOf`：0・30・31・90・91日の境（日本時間の日付）。`week`・`month`・`3months`は登録日から7・30・90日前。`unknown`。
   - `sortForPrompt`：最新 → 現役 → 投稿日不明 → アーカイブ、同じ区分は登録の新しい順。
-- [ ] T035 [P] [US7] `apps/api/test/integration/reference-posts-fields.test.ts`（FR-095〜FR-097、SC-013）。
+- [X] T035 [P] [US7] `apps/api/test/integration/reference-posts-fields.test.ts`（FR-095〜FR-097、SC-013）。
   - 新しい項目の追加・編集・読み直し。省略は既定値。
   - 検証：`exact`で日付なし・未来の日付、`exact`以外で日付あり、負の数字、101文字の投稿者。
   - GETの`freshness`・`shortId`。今ある行が`threads`・`unknown`。
-- [ ] T036 [P] [US7] `apps/api/test/integration/reference-posts-batch.test.ts`（FR-083・FR-084・FR-094、contracts/api.md）。
+- [X] T036 [P] [US7] `apps/api/test/integration/reference-posts-batch.test.ts`（FR-083・FR-084・FR-094、contracts/api.md）。
   - 20件まで、21件は400。1件でも検証に通らなければ0件（`fields`に位置）。
-  - 上限200を超えるなら0件で`409 ITEM_LIMIT_REACHED`と`details.remaining`。同時の2つの要求でも上限を超えない。
+  - 上限200を超えるなら0件で`409 ITEM_LIMIT_REACHED`と`error.remaining`。同時の2つの要求でも上限を超えない。
   - 操作の記録が1件。権限：見せてもらっている人403、読むだけ`BILLING_REQUIRED`。
-- [ ] T037 [P] [US7] `apps/web/test/research-add.test.tsx`（FR-080〜FR-085、FR-097）。
+- [X] T037 [P] [US7] `apps/web/test/research-add.test.tsx`（FR-080〜FR-085、FR-097）。
   - ためる：欄が空になり、キーワードと媒体は残り、投稿日は不明に戻る。本文が空なら押せない。検証に通らなければためない。
   - ためた投稿の一覧と「外す」。登録のボタンの文（登録する／〇件を登録する）。
   - まとめての登録の成功と、上限の文。数字の欄の開閉。
   - ためた数が、残りの件数（上限200−今の件数）または20件に達したら「ためる」を押せなくなり、「参考投稿はあと〇件まで登録できます」「1回に登録できるのは20件までです」と出る（US7-5、FR-084）。
   - 閉じる・離れるときの確認。
   - 一覧のカードに媒体・鮮度・解説あり／なし・数字が出る。
-- [ ] T038 [P] [US7] `packages/shared/test/prompt.test.ts`：参考投稿が鮮度の順で入る（`buildPrompt`に渡す前の並べ替えは`apps/api/test/integration/prompt-research-order.test.ts`で確かめる）。
+- [X] T038 [P] [US7] `packages/shared/test/prompt.test.ts`：参考投稿が鮮度の順で入る（`buildPrompt`に渡す前の並べ替えは`apps/api/test/integration/prompt-research-order.test.ts`で確かめる）。
 
 ### Implementation for User Story 7
 
-- [ ] T039 [US7] `packages/shared/src/research.ts`を作り、`freshnessOf(post, today)`・`sortForPrompt(posts, today)`を書く（日本時間の日付は今の`packages/shared`の日付の関数を使う）。`index.ts`から出す。T034を通す。
-- [ ] T040 [US7] `apps/api/src/routes/research.ts`：`referenceColumns`・`toReferencePost`に新しい項目を足し、GETに`freshness`・`shortId`を足す。T035を通す。
-- [ ] T041 [US7] `apps/api/src/services/item-service.ts`に`insertManyWithLimit(env, accountId, kind, limit, count, n, insert)`を足す（`insertWithLimit`と同じアドバイザリーロック、`count + n > limit`なら`details.remaining`つきの409）。`apps/api/src/routes/research.ts`に`POST /accounts/:accountId/reference-posts/batch`（`content`、`reference_posts_added`を1件、`touchMaterials`）を足す。T036を通す。
-- [ ] T042 [US7] `apps/api/src/services/prompt-service.ts`：参考投稿を全件（上限200件）読み、`sortForPrompt`で並べてから`PROMPT_REFERENCE_POSTS`件にする。`PromptReferencePost`に媒体・数字・鮮度を渡す（節の書き方はUS10のT055）。T038を通す。
-- [ ] T043 [P] [US7] `apps/web/src/lib/api-client.ts`に`createReferencePostsBatch`と新しい項目の型を足す。
-- [ ] T044 [US7] `apps/web/src/components/research/ReferencePostFormDialog.tsx`を「参考投稿を追加」（ためる・まとめて登録）と「編集」（ためるなし）の2つの使い方にし、新しい項目（媒体・投稿日の選び方と日付・鮮度の表示・開閉の数字の欄・投稿者・メモ・なぜ良いかの案内）を足す。未登録の入力の確認は今の`useUnsavedChanges`を使う。
-- [ ] T045 [US7] `apps/web/src/pages/research.tsx`：参考投稿のカードに媒体・鮮度・解説あり／なし・キーワード・閲覧といいねを出す。T037を通す。
+- [X] T039 [US7] `packages/shared/src/research.ts`を作り、`freshnessOf(post, today)`・`sortForPrompt(posts, today)`を書く（日本時間の日付は今の`packages/shared`の日付の関数を使う）。`index.ts`から出す。T034を通す。
+- [X] T040 [US7] `apps/api/src/routes/research.ts`：`referenceColumns`・`toReferencePost`に新しい項目を足し、GETに`freshness`・`shortId`を足す。T035を通す。
+- [X] T041 [US7] `apps/api/src/services/item-service.ts`に`insertManyWithLimit(env, accountId, kind, limit, count, n, insert)`を足す（`insertWithLimit`と同じアドバイザリーロック、`count + n > limit`なら`error.remaining`つきの409）。`apps/api/src/routes/research.ts`に`POST /accounts/:accountId/reference-posts/batch`（`content`、`reference_posts_added`を1件、`touchMaterials`）を足す。T036を通す。
+- [X] T042 [US7] `apps/api/src/services/prompt-service.ts`：参考投稿を全件（上限200件）読み、`sortForPrompt`で並べてから`PROMPT_REFERENCE_POSTS`件にする。`PromptReferencePost`に媒体・数字・鮮度を渡す（節の書き方はUS10のT055）。T038を通す。
+- [X] T043 [P] [US7] `apps/web/src/lib/api-client.ts`に`createReferencePostsBatch`と新しい項目の型を足す。
+- [X] T044 [US7] `apps/web/src/components/research/ReferencePostFormDialog.tsx`を「参考投稿を追加」（ためる・まとめて登録）と「編集」（ためるなし）の2つの使い方にし、新しい項目（媒体・投稿日の選び方と日付・鮮度の表示・開閉の数字の欄・投稿者・メモ・なぜ良いかの案内）を足す。未登録の入力の確認は今の`useUnsavedChanges`を使う。
+- [X] T045 [US7] `apps/web/src/pages/research.tsx`：参考投稿のカードに媒体・鮮度・解説あり／なし・キーワード・閲覧といいねを出す。T037を通す。
 
 ---
 

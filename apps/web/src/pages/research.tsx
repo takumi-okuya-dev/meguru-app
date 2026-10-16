@@ -11,6 +11,8 @@ import { BillingRequiredDialog } from "@/components/billing/BillingRequiredDialo
 import { ConfirmDeleteDialog } from "@/components/items/ConfirmDeleteDialog";
 import { PageBody, PageHeader } from "@/components/layout/PageHeader";
 import { KeywordFormDialog } from "@/components/research/KeywordFormDialog";
+import { ReferenceBadges } from "@/components/research/ReferenceBadges";
+import { ReferencePostAddDialog } from "@/components/research/ReferencePostAddDialog";
 import { ReferencePostFormDialog } from "@/components/research/ReferencePostFormDialog";
 import { Button } from "@/components/ui/button";
 import {
@@ -219,7 +221,22 @@ export function ResearchPage() {
         </Tabs>
       </PageBody>
 
-      {dialog?.kind === "post" && <ReferencePostFormDialog accountId={account.id} item={dialog.item} {...dialogCallbacks} />}
+      {dialog?.kind === "post" && !dialog.item && posts.data && (
+        <ReferencePostAddDialog
+          accountId={account.id}
+          remaining={Math.max(0, posts.data.limit - posts.data.items.length)}
+          onSaved={() => {
+            setDialog(null);
+            refresh();
+          }}
+          onClose={() => setDialog(null)}
+          onReadOnly={() => setReadOnlyLost(true)}
+          onLimitReached={refresh}
+        />
+      )}
+      {dialog?.kind === "post" && dialog.item && (
+        <ReferencePostFormDialog accountId={account.id} item={dialog.item} {...dialogCallbacks} />
+      )}
       {dialog?.kind === "keyword" && (
         <KeywordFormDialog
           accountId={account.id}
@@ -255,6 +272,18 @@ function Empty({ children }: { children: ReactNode }) {
   );
 }
 
+/**
+ * 参考投稿の分かっている閲覧数といいねの1行（specs/014 US7-8）。
+ * @param item - 参考投稿
+ * @returns 「閲覧 32,000 ・ いいね 820」、どちらもなければ ""
+ */
+function metricsLine(item: ReferencePost): string {
+  const parts: string[] = [];
+  if (item.metrics.views !== null) parts.push(`閲覧 ${item.metrics.views.toLocaleString("ja-JP")}`);
+  if (item.metrics.likes !== null) parts.push(`いいね ${item.metrics.likes.toLocaleString("ja-JP")}`);
+  return parts.join(" ・ ");
+}
+
 function ReferencePostCard({
   item,
   canEdit,
@@ -280,7 +309,9 @@ function ReferencePostCard({
         </button>
       )}
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+        <ReferenceBadges platform={item.platform} freshness={item.freshness} explained={item.whyGood.trim() !== ""} />
         {item.keyword && <span className="rounded-full bg-muted px-2.5 py-0.5 text-foreground">{item.keyword}</span>}
+        {metricsLine(item) && <span>{metricsLine(item)}</span>}
         <span>{formatDateTime(item.createdAt)}</span>
         {item.postUrl && (
           <a

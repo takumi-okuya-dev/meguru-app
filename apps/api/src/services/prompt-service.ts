@@ -6,7 +6,10 @@ import {
   PROMPT_REJECTED_DRAFTS,
   buildPrompt,
   isTargetable,
+  jstToday,
   rejectReasonLabel,
+  sortForPrompt,
+  type PostedDateMode,
   type PromptPromotion,
   type RejectReasonCode,
 } from "@threads-grower/shared";
@@ -100,12 +103,12 @@ export async function getPrompt(db: Db, account: AccountRow, count: number) {
     await Promise.all([
       getStrategy(db, account.id),
       db.select().from(promotions).where(eq(promotions.accountId, account.id)),
+      // 鮮度の順に並べるため、全件（上限200件）を読んでから選ぶ（specs/014 FR-099、research.md R6）
       db
         .select()
         .from(referencePosts)
         .where(eq(referencePosts.accountId, account.id))
-        .orderBy(desc(referencePosts.createdAt), desc(referencePosts.id))
-        .limit(PROMPT_REFERENCE_POSTS),
+        .orderBy(desc(referencePosts.createdAt), desc(referencePosts.id)),
       recentDraftBodies(db, account.id),
       listNgWords(db, account.id),
       listReviewedRows(db, account.id, "rejected", PROMPT_REJECTED_DRAFTS),
@@ -127,7 +130,12 @@ export async function getPrompt(db: Db, account: AccountRow, count: number) {
     strategy,
     promotions: targetPromotions(promotionRows, now).map(toPromptPromotion),
     promotionRatioPercent: account.promotionRatioPercent,
-    referencePosts: postRows.map((p) => ({
+    referencePosts: sortForPrompt(
+      postRows.map((p) => ({ ...p, postedDateMode: p.postedDateMode as PostedDateMode })),
+      jstToday(now),
+    )
+      .slice(0, PROMPT_REFERENCE_POSTS)
+      .map((p) => ({
       body: p.body,
       keyword: p.keyword ?? "",
       whyGood: p.whyGood ?? "",

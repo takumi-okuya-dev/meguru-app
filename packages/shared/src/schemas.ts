@@ -518,6 +518,9 @@ export const referencePostSchema = referencePostFieldsSchema.extend({
 /** 参考投稿（レスポンス）。 */
 export type ReferencePost = z.infer<typeof referencePostSchema>;
 
+/** POST /reference-posts/batch のレスポンスのスキーマ。 */
+export const referencePostBatchResultSchema = z.object({ items: z.array(referencePostSchema) });
+
 /** GET /reference-posts のレスポンスのスキーマ。 */
 export const referencePostListSchema = z.object({ items: z.array(referencePostSchema), ...listMeta });
 

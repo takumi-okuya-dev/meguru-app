@@ -2,11 +2,16 @@
 import {
   KEYWORD_LIMIT,
   REFERENCE_POST_LIMIT,
+  freshnessOf,
+  jstToday,
   normalizeKeyword,
+  referencePostBatchRequestSchema,
   referencePostInputSchema,
+  shortIdsOf,
   researchKeywordInputSchema,
   updateReferencePostRequestSchema,
   updateResearchKeywordRequestSchema,
+  type ReferencePost,
   type ReferencePostInput,
 } from "@threads-grower/shared";
 import { and, count, desc, eq, sql } from "drizzle-orm";
@@ -19,7 +24,7 @@ import { parseBody } from "../lib/validate";
 import { authorizeAccount } from "../services/access";
 import { recordActivity, updatedByOf, withActivityTx } from "../services/activity-log";
 import { touchMaterials } from "../services/materials";
-import { assertItemId, insertWithLimit, updateWithVersion } from "../services/item-service";
+import { assertItemId, insertManyWithLimit, insertWithLimit, updateWithVersion } from "../services/item-service";
 
 type ReferencePostRow = typeof referencePosts.$inferSelect;
 type KeywordRow = typeof researchKeywords.$inferSelect;
@@ -31,13 +36,35 @@ const orNull = (s: string) => (s.trim() === "" ? null : s);
  * @param row - reference_posts の行
  * @returns レスポンスの参考投稿
  */
-function toReferencePost(row: ReferencePostRow) {
+/**
+ * 参考投稿の行を応答の形にする。鮮度は今日（日本時間）で求める（specs/014 R6）。
+ * @param row - 参考投稿の行
+ * @param shortId - まとめての解説で使う短いID（一覧では重なりを見て延ばしたもの。省略は先頭8文字）
+ * @returns 応答の参考投稿
+ */
+function toReferencePost(row: ReferencePostRow, shortId?: string) {
+  const postedDateMode = row.postedDateMode as ReferencePost["postedDateMode"];
   return {
     id: row.id,
     body: row.body,
     keyword: row.keyword ?? "",
     postUrl: row.postUrl ?? "",
     whyGood: row.whyGood ?? "",
+    platform: row.platform as ReferencePost["platform"],
+    postedDateMode,
+    postedDate: row.postedDate,
+    metrics: {
+      likes: row.metricLikes,
+      replies: row.metricReplies,
+      views: row.metricViews,
+      saves: row.metricSaves,
+      reposts: row.metricReposts,
+      followers: row.metricFollowers,
+    },
+    author: row.author ?? "",
+    memo: row.memo ?? "",
+    freshness: freshnessOf({ postedDateMode, postedDate: row.postedDate, createdAt: row.createdAt }, jstToday(new Date())),
+    shortId: shortId ?? row.id.replace(/-/g, "").slice(0, 8),
     version: row.version,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
@@ -65,6 +92,17 @@ const referenceColumns = (input: ReferencePostInput) => ({
   keyword: orNull(input.keyword),
   postUrl: orNull(input.postUrl),
   whyGood: orNull(input.whyGood),
+  platform: input.platform,
+  postedDateMode: input.postedDateMode,
+  postedDate: input.postedDateMode === "exact" ? input.postedDate : null,
+  metricLikes: input.metrics.likes,
+  metricReplies: input.metrics.replies,
+  metricViews: input.metrics.views,
+  metricSaves: input.metrics.saves,
+  metricReposts: input.metrics.reposts,
+  metricFollowers: input.metrics.followers,
+  author: orNull(input.author),
+  memo: orNull(input.memo),
 });
 
 /**
@@ -100,8 +138,14 @@ export function researchRoutes(authed: MiddlewareHandler<AppEnv>) {
           .from(referencePosts)
           .where(eq(referencePosts.accountId, account.id))
           .orderBy(desc(referencePosts.createdAt), desc(referencePosts.id));
+        // 短いIDは、アカウントの中で重ならない長さにする（specs/014 FR-102）
+        const shortIds = shortIdsOf(rows.map((r) => r.id));
         // 直せるのは content の権限がある人だけ（見せてもらっている人は読むだけ。PR #14 のCodexレビュー）
-        return c.json({ items: rows.map(toReferencePost), limit: REFERENCE_POST_LIMIT, canEdit: access.permissions.has("content") });
+        return c.json({
+          items: rows.map((r) => toReferencePost(r, shortIds.get(r.id))),
+          limit: REFERENCE_POST_LIMIT,
+          canEdit: access.permissions.has("content"),
+        });
       })
       .post("/accounts/:accountId/reference-posts", authed, async (c) => {
         const db = createDb(c.env.DATABASE_URL);
@@ -128,6 +172,54 @@ export function researchRoutes(authed: MiddlewareHandler<AppEnv>) {
         );
         await touchMaterials(db, account.id, "research");
         return c.json(toReferencePost(row), 201);
+      })
+      // ためた参考投稿をまとめて登録する（specs/014 FR-083・FR-084、research.md R7）。全部か無しか
+      .post("/accounts/:accountId/reference-posts/batch", authed, async (c) => {
+        const db = createDb(c.env.DATABASE_URL);
+        const user = c.get("user");
+        const access = await authorizeAccount(db, user, c.req.param("accountId"), "content");
+        const account = access.account;
+        const parsed = referencePostBatchRequestSchema.safeParse(await c.req.json().catch(() => null));
+        if (!parsed.success) {
+          // どの投稿のどの項目かがわかるように、位置つきの項目名を返す（items.2.body など）
+          const fields = [...new Set(parsed.error.issues.map((i) => i.path.join(".")).filter(Boolean))];
+          throw new AppError("VALIDATION_FAILED", 400, "invalid request", undefined, fields);
+        }
+        const { items } = parsed.data;
+        const rows = await insertManyWithLimit(
+          c.env,
+          account.id,
+          "reference_posts",
+          REFERENCE_POST_LIMIT,
+          async (tx) =>
+            (await tx.select({ n: count() }).from(referencePosts).where(eq(referencePosts.accountId, account.id)))[0]!.n,
+          items.length,
+          async (tx) => {
+            // 送った順を保つため、登録日時を1ミリ秒ずつずらす（一覧は新しい順なので、後に送ったものが上）
+            const base = Date.now();
+            const inserted = await tx
+              .insert(referencePosts)
+              .values(
+                items.map((input, i) => ({
+                  accountId: account.id,
+                  ...referenceColumns(input),
+                  updatedByUserId: access.actor.id,
+                  createdAt: new Date(base + i),
+                  updatedAt: new Date(base + i),
+                })),
+              )
+              .returning();
+            await recordActivity(tx, access, {
+              kind: "content",
+              action: "reference_posts_added",
+              summary: `${items.length}件`,
+              excerpts: [items[0]!.body],
+            });
+            return inserted;
+          },
+        );
+        await touchMaterials(db, account.id, "research");
+        return c.json({ items: rows.map((r) => toReferencePost(r)) }, 201);
       })
       .put("/accounts/:accountId/reference-posts/:referencePostId", authed, async (c) => {
         const db = createDb(c.env.DATABASE_URL);

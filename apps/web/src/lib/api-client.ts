@@ -41,6 +41,7 @@ import {
   promotionSchema,
   promotionSettingsSchema,
   referencePostListSchema,
+  referencePostBatchResultSchema,
   referencePostSchema,
   researchKeywordListSchema,
   researchKeywordSchema,
@@ -319,6 +320,11 @@ export const api = {
     }),
   listReferencePosts: (accountId: string) =>
     request(`/api/accounts/${accountId}/reference-posts`, referencePostListSchema),
+  createReferencePostsBatch: (accountId: string, body: { items: ReferencePostInputBody[] }) =>
+    request(`/api/accounts/${accountId}/reference-posts/batch`, referencePostBatchResultSchema, {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
   createReferencePost: (accountId: string, body: ReferencePostInputBody) =>
     request(`/api/accounts/${accountId}/reference-posts`, referencePostSchema, {
       method: "POST",

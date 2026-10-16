@@ -94,7 +94,7 @@
 ```
 
 - `items`は1〜20件（`REFERENCE_BATCH_MAX`）。各要素は`POST /reference-posts`と同じ検証。1件でも通らなければ、1件も入れずに`400 VALIDATION_FAILED`（`fields`に`items.2.body`のような位置）。
-- 上限：アドバイザリーロックのうえで「今の件数＋件数 ≤ 200」を確かめる。超えるなら`409 ITEM_LIMIT_REACHED`（`details.remaining`にあと何件）。
+- 上限：アドバイザリーロックのうえで「今の件数＋件数 ≤ 200」を確かめる。超えるなら`409 ITEM_LIMIT_REACHED`（`error.remaining`にあと何件）。
 - 応答`201`：`{ "items": [ReferencePost, …] }`（送った順）。
 - 操作の記録：1件（`reference_posts_added`、要約「〇件」、先頭の書き出し）。`touchMaterials(research)`。
 - 権限：`content`。
@@ -143,7 +143,7 @@
 ```
 
 - `items`は1〜20件（`KEYWORD_BATCH_MAX`）。各要素は`POST /research-keywords`と同じ検証。一覧の中で重なる（`normalizeKeyword`で同じ）なら`400 VALIDATION_FAILED`。
-- 上限（100件）を超えるなら`409 ITEM_LIMIT_REACHED`（`details.remaining`）。登録済みと重なるなら`409 KEYWORD_DUPLICATE`（`details.keywords`に重なった言葉）。どちらも1件も入れない。
+- 上限（100件）を超えるなら`409 ITEM_LIMIT_REACHED`（`error.remaining`）。登録済みと重なるなら`409 KEYWORD_DUPLICATE`（`details.keywords`に重なった言葉）。どちらも1件も入れない。
 - 応答`201`：`{ "items": [ResearchKeyword, …] }`。
 - 操作の記録：1件（`research_keywords_added`、要約「〇件」）。
 - 権限：`content`。

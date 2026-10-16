@@ -81,7 +81,7 @@ Phase 0の調べと決めたこと。各項目は「決定・理由・ほかの�
 
 - 「ためる」は画面の中だけ（FR-082）。ためるときに、今の1件の検証（`referencePostInputSchema`）を画面で通す（FR-081）。
 - 今の`POST /reference-posts`（1件）は、編集の画面以外では使わなくなるが、残す（互換）。
-- 上限を超えるときは`409 ITEM_LIMIT_REACHED`に`details.remaining`（あと何件）を足す。
+- 上限を超えるときは`409 ITEM_LIMIT_REACHED`に`error.remaining`（あと何件）を足す。
 
 **理由**：何件かを1回で登録する（SC-010）。1件ずつAPIを呼ぶと、途中で上限に当たったときに一部だけ入る。
 
