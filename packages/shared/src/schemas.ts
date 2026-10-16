@@ -25,10 +25,24 @@ import {
   PUBLISHED_PAGE_SIZE,
   TEAM_MEMBER_LIMIT,
   TEAM_NAME_MAX,
+  REFERENCE_BATCH_MAX,
+  EXPLAIN_BATCH_MAX,
+  KEYWORD_BATCH_MAX,
+  REFERENCE_AUTHOR_MAX,
+  REFERENCE_MEMO_MAX,
+  REFERENCE_METRIC_MAX,
+  POST_LENGTH_TARGET_MIN,
+  POST_LENGTH_TARGET_MAX,
+  POST_LENGTH_TARGET_STEP,
+  POST_KIND_LENGTH_MIN,
+  POST_KIND_LENGTH_MAX,
+  POST_KIND_LENGTH_STEP,
+  POST_KIND_RATIO_STEP,
 } from "./limits";
 import { REJECT_REASON_CODES } from "./review";
-import { isValidYmd } from "./promotions";
-import { STRATEGY_TEXT_KEYS, TONE_PRESET_VALUES, type StrategyTextKey } from "./strategy";
+import { isValidYmd, jstToday } from "./promotions";
+import { FRESHNESS_VALUES, POSTED_DATE_MODE_VALUES, REFERENCE_PLATFORM_VALUES } from "./research";
+import { PURPOSE_KEYS, STRATEGY_TEXT_KEYS, TONE_PRESET_VALUES, type PurposeKey, type StrategyTextKey } from "./strategy";
 import { countChars, isBlank, isHttpUrl } from "./text";
 
 /** Threads接続の状態のスキーマ（FR-018。not_connected は specs/012 で足した）。 */
@@ -285,8 +299,15 @@ export const strategyValuesSchema = z.object({
   tonePreset: z.enum(TONE_PRESET_VALUES).nullable(),
 });
 
-/** PUT /api/accounts/:id/strategy のリクエストのスキーマ。 */
+/**
+ * PUT /api/accounts/:id/strategy のリクエストのスキーマ。
+ * 目的の6キー（specs/014）は省略でき、省略したキーは保存で今の値を残す（FR-054。014の前の画面からの保存）。
+ */
 export const putStrategyRequestSchema = strategyValuesSchema.extend({
+  ...(Object.fromEntries(PURPOSE_KEYS.map((k) => [k, textMax(STRATEGY_TEXT_MAX).optional()])) as Record<
+    PurposeKey,
+    z.ZodOptional<ReturnType<typeof textMax>>
+  >),
   expectedVersion: z.number().int().nonnegative(),
 });
 /** PUT /api/accounts/:id/strategy のリクエスト。 */
@@ -396,23 +417,99 @@ export const promotionSettingsSchema = promotionSettingsInputSchema.extend({
 /** 宣伝投稿の割合（レスポンス）。 */
 export type PromotionSettings = z.infer<typeof promotionSettingsSchema>;
 
-/** 参考投稿の入力のスキーマ（contracts/api.md の ReferencePostInput）。 */
-export const referencePostInputSchema = z.object({
-  body: requiredText(REFERENCE_BODY_MAX),
-  keyword: textMax(SHORT_TEXT_MAX).default(""),
-  postUrl: optionalUrl(URL_MAX),
-  whyGood: textMax(REFERENCE_WHY_GOOD_MAX).default(""),
+/** 参考投稿の反応の数字1つ（0以上の整数。わからなければ null）。 */
+const metricValue = z.number().int().min(0).max(REFERENCE_METRIC_MAX).nullable().default(null);
+
+/** 参考投稿の反応の数字（specs/014 FR-097）。省略した数字は null。 */
+export const referenceMetricsSchema = z
+  .object({
+    likes: metricValue,
+    replies: metricValue,
+    views: metricValue,
+    saves: metricValue,
+    reposts: metricValue,
+    followers: metricValue,
+  })
+  .default({ likes: null, replies: null, views: null, saves: null, reposts: null, followers: null });
+
+/**
+ * 参考投稿の入力のスキーマ（contracts/api.md の ReferencePostInput。014で媒体・投稿日・数字・投稿者・メモを足した）。
+ * 新しい項目はどれも省略でき、省略は既定値（今のクライアントからの追加・編集を壊さない）。
+ */
+const referencePostFieldsSchema = z.object({
+    body: requiredText(REFERENCE_BODY_MAX),
+    keyword: textMax(SHORT_TEXT_MAX).default(""),
+    postUrl: optionalUrl(URL_MAX),
+    whyGood: textMax(REFERENCE_WHY_GOOD_MAX).default(""),
+    platform: z.enum(REFERENCE_PLATFORM_VALUES).default("threads"),
+    postedDateMode: z.enum(POSTED_DATE_MODE_VALUES).default("unknown"),
+    /** YYYY-MM-DD。postedDateMode が exact のときだけ */
+    postedDate: z.string().nullable().default(null),
+    metrics: referenceMetricsSchema,
+    author: textMax(REFERENCE_AUTHOR_MAX).default(""),
+    memo: textMax(REFERENCE_MEMO_MAX).default(""),
 });
+
+/**
+ * 投稿日の選び方と投稿日の組を確かめる（FR-096）。exact なら実在する日付で、今日（日本時間）より後でない。
+ * それ以外なら投稿日は null。
+ */
+function checkPostedDate(v: { postedDateMode: string; postedDate: string | null }, ctx: z.RefinementCtx) {
+  if (v.postedDateMode !== "exact") {
+    if (v.postedDate !== null) ctx.addIssue({ code: "custom", path: ["postedDate"], message: "only for exact" });
+    return;
+  }
+  if (v.postedDate === null || !isValidYmd(v.postedDate) || v.postedDate > jstToday(new Date())) {
+    ctx.addIssue({ code: "custom", path: ["postedDate"], message: "valid past date required" });
+  }
+}
+
+export const referencePostInputSchema = referencePostFieldsSchema.superRefine(checkPostedDate);
 /** 参考投稿の入力。 */
 export type ReferencePostInput = z.infer<typeof referencePostInputSchema>;
 
 /** PUT /reference-posts/:id のリクエストのスキーマ。 */
-export const updateReferencePostRequestSchema = referencePostInputSchema.extend({
-  expectedVersion: z.number().int().positive(),
+export const updateReferencePostRequestSchema = referencePostFieldsSchema
+  .extend({ expectedVersion: z.number().int().positive() })
+  .superRefine(checkPostedDate);
+
+/** POST /reference-posts/batch のリクエストのスキーマ（specs/014 FR-083）。 */
+export const referencePostBatchRequestSchema = z.object({
+  items: z.array(referencePostInputSchema).min(1).max(REFERENCE_BATCH_MAX),
 });
 
-/** 参考投稿（レスポンス）のスキーマ。 */
-export const referencePostSchema = referencePostInputSchema.extend(itemMeta);
+/** POST /reference-posts/explanations のリクエストのスキーマ（specs/014 FR-104）。同じIDの重なりは拒む。 */
+export const explanationsRequestSchema = z.object({
+  items: z
+    .array(z.object({ id: z.string().uuid(), whyGood: requiredText(REFERENCE_WHY_GOOD_MAX) }))
+    .min(1)
+    .max(EXPLAIN_BATCH_MAX)
+    .refine((items) => new Set(items.map((i) => i.id)).size === items.length, { message: "duplicate id" }),
+});
+
+/** POST /reference-posts/explanations のレスポンスのスキーマ。 */
+export const explanationsResultSchema = z.object({
+  saved: z.array(z.string()),
+  skipped: z.array(z.object({ id: z.string(), reason: z.enum(["already_explained", "not_found"]) })),
+});
+/** まとめての解説の保存の結果。 */
+export type ExplanationsResult = z.infer<typeof explanationsResultSchema>;
+
+/** GET /reference-posts/explain-prompt のレスポンスのスキーマ（specs/014 FR-101）。 */
+export const explainPromptSchema = z.object({
+  prompt: z.string(),
+  items: z.array(z.object({ id: z.string(), shortId: z.string() })),
+  pendingCount: z.number().int(),
+});
+/** 解説のプロンプト。 */
+export type ExplainPrompt = z.infer<typeof explainPromptSchema>;
+
+/** 参考投稿（レスポンス）のスキーマ。鮮度と、まとめての解説で使う短いID（specs/014 R6・R8）を足す。 */
+export const referencePostSchema = referencePostFieldsSchema.extend({
+  ...itemMeta,
+  freshness: z.enum(FRESHNESS_VALUES),
+  shortId: z.string(),
+});
 /** 参考投稿（レスポンス）。 */
 export type ReferencePost = z.infer<typeof referencePostSchema>;
 
@@ -426,6 +523,14 @@ export const researchKeywordInputSchema = z.object({
 });
 /** キーワードの入力。 */
 export type ResearchKeywordInput = z.infer<typeof researchKeywordInputSchema>;
+
+/** POST /research-keywords/batch のリクエストのスキーマ（specs/014 FR-092）。 */
+export const keywordBatchRequestSchema = z.object({
+  items: z.array(researchKeywordInputSchema).min(1).max(KEYWORD_BATCH_MAX),
+});
+
+/** GET /research-keywords/idea-prompt のレスポンスのスキーマ（specs/014 FR-090）。 */
+export const keywordIdeaPromptSchema = z.object({ prompt: z.string() });
 
 /** PUT /research-keywords/:id のリクエストのスキーマ。 */
 export const updateResearchKeywordRequestSchema = researchKeywordInputSchema.extend({
@@ -724,11 +829,67 @@ export const promptSummarySchema = z.object({
 /** プロンプトに実際に含めた内容の要約。 */
 export type PromptSummary = z.infer<typeof promptSummarySchema>;
 
-/** GET /prompt のレスポンスのスキーマ。 */
+/** 1投稿の文字数の目標と、短文・中文・長文の文字数と割合（specs/014 FR-140）。 */
+export const postLengthSettingsSchema = z
+  .object({
+    target: z.number().int().min(POST_LENGTH_TARGET_MIN).max(POST_LENGTH_TARGET_MAX).multipleOf(POST_LENGTH_TARGET_STEP),
+    shortLength: z.number().int().min(POST_KIND_LENGTH_MIN).max(POST_KIND_LENGTH_MAX).multipleOf(POST_KIND_LENGTH_STEP),
+    mediumLength: z.number().int().min(POST_KIND_LENGTH_MIN).max(POST_KIND_LENGTH_MAX).multipleOf(POST_KIND_LENGTH_STEP),
+    longLength: z.number().int().min(POST_KIND_LENGTH_MIN).max(POST_KIND_LENGTH_MAX).multipleOf(POST_KIND_LENGTH_STEP),
+    shortRatio: z.number().int().min(0).max(100).multipleOf(POST_KIND_RATIO_STEP),
+    mediumRatio: z.number().int().min(0).max(100).multipleOf(POST_KIND_RATIO_STEP),
+    longRatio: z.number().int().min(0).max(100).multipleOf(POST_KIND_RATIO_STEP),
+  })
+  .superRefine((v, ctx) => {
+    if (v.shortRatio + v.mediumRatio + v.longRatio !== 100) {
+      ctx.addIssue({ code: "custom", path: ["longRatio"], message: "ratio_sum" });
+    }
+    for (const k of ["shortLength", "mediumLength", "longLength"] as const) {
+      if (v[k] > v.target) ctx.addIssue({ code: "custom", path: [k], message: "length_over_target" });
+    }
+  });
+/** 1投稿の文字数の目標と、短文・中文・長文の文字数と割合。 */
+export type PostLengthSettings = z.infer<typeof postLengthSettingsSchema>;
+
+/** 「投稿をつくる」の情報の一覧（specs/014 FR-121、research.md R9）。プロンプトを作るときの数え方のまま。 */
+export const promptMaterialsSchema = z.object({
+  strategy: z.object({
+    items: z.array(
+      z.object({ key: z.string(), status: z.enum(["empty", "short", "ok"]).nullable(), chars: z.number().int() }),
+    ),
+    done: z.number().int(),
+    review: z.number().int(),
+    purposeDone: z.number().int(),
+  }),
+  drafts: z.object({ profileBio: z.boolean(), pinned: z.array(z.boolean()) }),
+  promotions: z.object({ included: z.number().int(), missingCta: z.number().int() }),
+  research: z.object({
+    total: z.number().int(),
+    included: z.number().int(),
+    explained: z.number().int(),
+    pending: z.number().int(),
+  }),
+});
+/** 「投稿をつくる」の情報の一覧。 */
+export type PromptMaterials = z.infer<typeof promptMaterialsSchema>;
+
+/** GET /prompt のレスポンスのスキーマ（014で parts・length・splitRecommended・settings・materials を足した）。 */
 export const promptResponseSchema = z.object({
   prompt: z.string(),
+  /** 2つに分けて送るときの1つ目と2つ目（FR-152） */
+  parts: z.tuple([z.string(), z.string()]),
   count: z.number().int(),
+  /** 1つにまとめた全文の文字数（コードポイント） */
+  length: z.number().int(),
+  /** 2つに分けて送るのをすすめるか（PROMPT_SPLIT_THRESHOLD を超える） */
+  splitRecommended: z.boolean(),
+  settings: z.object({
+    postCount: z.number().int(),
+    length: postLengthSettingsSchema,
+    version: z.number().int(),
+  }),
   summary: promptSummarySchema,
+  materials: promptMaterialsSchema,
 });
 /** GET /prompt のレスポンス。 */
 export type PromptResponse = z.infer<typeof promptResponseSchema>;
@@ -736,12 +897,15 @@ export type PromptResponse = z.infer<typeof promptResponseSchema>;
 /** 作る件数の保存（PUT /prompt-settings のリクエスト）のスキーマ。読み込んだときの版を送る（specs/008 FR-007、PR #9 のCodexレビュー）。 */
 export const putPromptSettingsRequestSchema = z.object({
   postCount: z.number().int().min(PROMPT_COUNT_MIN).max(PROMPT_COUNT_MAX),
+  /** 文字数と割合（specs/014 FR-140）。省略なら変えない */
+  length: postLengthSettingsSchema.optional(),
   expectedVersion: z.number().int().min(1),
 });
 
-/** 作る件数のスキーマ（PUT /prompt-settings のレスポンス）。 */
+/** 作る件数と文字数・割合のスキーマ（PUT /prompt-settings のレスポンス）。 */
 export const promptSettingsSchema = z.object({
   postCount: z.number().int().min(PROMPT_COUNT_MIN).max(PROMPT_COUNT_MAX),
+  length: postLengthSettingsSchema,
   version: z.number().int(),
 });
 

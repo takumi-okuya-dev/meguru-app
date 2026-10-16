@@ -43,8 +43,8 @@ description: "Task list for feature 014 strategy guidance"
 
 **Purpose**: マイグレーション・共通の定義（課題の6キーと区分、参考投稿の項目、文字数と割合、新しい定数）。どのStoryもここに依存する。
 
-- [ ] T004 `apps/api/test/migration/migration-0015.test.ts`を先に書く（data-model.md「マイグレーションの確かめ」）：前後で課題・参考投稿・アカウントの件数と今の列の値が変わらない。今ある参考投稿が`platform = 'threads'`・`posted_date_mode = 'unknown'`、今あるアカウントが150・55・100・135・35・45・20になる。次のCHECKがそれぞれ拒まれる：割合の合計が100でない、長さが目標を超える、`exact`で投稿日がない、`exact`以外で投稿日がある、数字が負、投稿者が101文字、メモが501文字。
-- [ ] T005 `apps/api/drizzle/0015_strategy_guidance.sql`と`apps/api/src/db/schema.ts`を直す（data-model.md）。T004を通す。
+- [X] T004 `apps/api/test/migration/migration-0015.test.ts`を先に書く（data-model.md「マイグレーションの確かめ」）：前後で課題・参考投稿・アカウントの件数と今の列の値が変わらない。今ある参考投稿が`platform = 'threads'`・`posted_date_mode = 'unknown'`、今あるアカウントが150・55・100・135・35・45・20になる。次のCHECKがそれぞれ拒まれる：割合の合計が100でない、長さが目標を超える、`exact`で投稿日がない、`exact`以外で投稿日がある、数字が負、投稿者が101文字、メモが501文字。
+- [X] T005 `apps/api/drizzle/0015_strategy_guidance.sql`と`apps/api/src/db/schema.ts`を直す（data-model.md）。T004を通す。
   - `strategy_designs`：`purpose_origin`・`purpose_self`・`purpose_others`・`purpose_future`・`purpose_stance`・`activity_axis`（`text NULL`）
   - `reference_posts`
     - `platform text NOT NULL DEFAULT 'threads'`（CHECKで`threads`・`instagram`・`tiktok`・`x`・`other`）
@@ -57,13 +57,13 @@ description: "Task list for feature 014 strategy guidance"
     - `short_length` 55・`medium_length` 100・`long_length` 135（各10〜500かつ`≤ post_length_target`）
     - `short_ratio` 35・`medium_ratio` 45・`long_ratio` 20（各0〜100、合計100）
   - `apps/api/drizzle/meta`の記録も合わせる。
-- [ ] T006 [P] `packages/shared/src/limits.ts`に定数を足す：`PROMPT_SPLIT_THRESHOLD = 12000`、`REFERENCE_BATCH_MAX = 20`、`EXPLAIN_BATCH_MAX = 10`、`KEYWORD_BATCH_MAX = 20`、`REFERENCE_AUTHOR_MAX = 100`、`REFERENCE_MEMO_MAX = 500`、`FRESHNESS_LATEST_DAYS = 30`、`FRESHNESS_ACTIVE_DAYS = 90`、`POST_LENGTH_DEFAULTS = { target: 150, shortLength: 55, mediumLength: 100, longLength: 135, shortRatio: 35, mediumRatio: 45, longRatio: 20 }`。
-- [ ] T007 `packages/shared/test/strategy.test.ts`を先に直し、`packages/shared/src/strategy.ts`を直す（data-model.md、research.md R3）。
+- [X] T006 [P] `packages/shared/src/limits.ts`に定数を足す：`PROMPT_SPLIT_THRESHOLD = 12000`、`REFERENCE_BATCH_MAX = 20`、`EXPLAIN_BATCH_MAX = 10`、`KEYWORD_BATCH_MAX = 20`、`REFERENCE_AUTHOR_MAX = 100`、`REFERENCE_MEMO_MAX = 500`、`FRESHNESS_LATEST_DAYS = 30`、`FRESHNESS_ACTIVE_DAYS = 90`、`POST_LENGTH_DEFAULTS = { target: 150, shortLength: 55, mediumLength: 100, longLength: 135, shortRatio: 35, mediumRatio: 45, longRatio: 20 }`。
+- [X] T007 `packages/shared/test/strategy.test.ts`を先に直し、`packages/shared/src/strategy.ts`を直す（data-model.md、research.md R3）。
   - `STRATEGY_TEXT_KEYS`の先頭に`purposeOrigin`・`purposeSelf`・`purposeOthers`・`purposeFuture`・`purposeStance`・`activityAxis`を足す。
   - `STRATEGY_SECTIONS`：先頭に`{ id: "purpose", title: "活動の目的・在り方", chip: "目的" }`を足す。`sales`は「営業導線設計」／「営業導線」、`account`は「アカウント設計」／「アカウント」、`funnel`は「集客導線設計」／「集客導線」にする（「課題①〜③」を外す。FR-019）。`chipShort`をやめ、`drafts`のチップを「下書き」にする。
   - `STRATEGY_FIELDS`に6項目を`section: "purpose"`・`counted: false`で足す。項目名はQ1：〜Q5：の問いと「活動の軸」、記入例はcontracts/hints.mdの例に合わせる。
   - テスト：`countFilled`と`STRATEGY_TOTAL = 16`が変わらない（SC-007）、区分の順・名前。
-- [ ] T008 `packages/shared/test/schemas.test.ts`（新規）を先に書き、`packages/shared/src/schemas.ts`を直す（contracts/api.md）。
+- [X] T008 `packages/shared/test/schemas.test.ts`（新規）を先に書き、`packages/shared/src/schemas.ts`を直す（contracts/api.md）。
   - `putStrategyRequestSchema`：目的の6キーは`.optional()`、今の19キーと`tonePreset`は必須のまま。
   - `strategySchema`：6キーを足す。
   - `referencePostInputSchema`

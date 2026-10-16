@@ -51,6 +51,47 @@ export const PROMPT_RECENT_DRAFTS = 20;
 /** プロンプトの長さの目安（これを超えたら、下書き → 参考投稿の順に古いものから減らす）。 */
 export const PROMPT_LENGTH_TARGET = 30000;
 
+// ---- 課題の入力の手助け・リサーチ・投稿をつくる（specs/014-strategy-guidance research.md R6〜R12）----
+
+/** プロンプトがこの文字数を超えたら、2つに分けて送るのをすすめる。 */
+export const PROMPT_SPLIT_THRESHOLD = 12000;
+/** 参考投稿をまとめて登録できる件数。 */
+export const REFERENCE_BATCH_MAX = 20;
+/** まとめて解説を頼める参考投稿の件数。 */
+export const EXPLAIN_BATCH_MAX = 10;
+/** キーワードをまとめて登録できる件数。 */
+export const KEYWORD_BATCH_MAX = 20;
+/** 参考投稿の投稿者（アカウント名）の文字数の上限。 */
+export const REFERENCE_AUTHOR_MAX = 100;
+/** 参考投稿のメモの文字数の上限。 */
+export const REFERENCE_MEMO_MAX = 500;
+/** 参考投稿の数字（いいね・閲覧数など）の上限（Postgres の integer の最大）。 */
+export const REFERENCE_METRIC_MAX = 2147483647;
+/** 鮮度「最新」の日数（投稿日から0〜この日数）。 */
+export const FRESHNESS_LATEST_DAYS = 30;
+/** 鮮度「現役」の日数（「最新」の次の日から、この日数まで）。 */
+export const FRESHNESS_ACTIVE_DAYS = 90;
+/** 1投稿の文字数の目標と、短文・中文・長文の文字数と割合の初めの値（今のプロンプトの範囲に合わせる）。 */
+export const POST_LENGTH_DEFAULTS = {
+  target: 150,
+  shortLength: 55,
+  mediumLength: 100,
+  longLength: 135,
+  shortRatio: 35,
+  mediumRatio: 45,
+  longRatio: 20,
+} as const;
+/** 1投稿の文字数の目標の範囲と刻み。 */
+export const POST_LENGTH_TARGET_MIN = 50;
+export const POST_LENGTH_TARGET_MAX = 500;
+export const POST_LENGTH_TARGET_STEP = 10;
+/** 短文・中文・長文の文字数の範囲と刻み。 */
+export const POST_KIND_LENGTH_MIN = 10;
+export const POST_KIND_LENGTH_MAX = 500;
+export const POST_KIND_LENGTH_STEP = 5;
+/** 短文・中文・長文の割合の刻み。 */
+export const POST_KIND_RATIO_STEP = 5;
+
 // ---- 承認・却下・NGワード（specs/004-review-approval research.md R6・R8・R9・R11・R12）----
 
 /** 1つのAccountの承認済みの下書きの件数の上限。 */

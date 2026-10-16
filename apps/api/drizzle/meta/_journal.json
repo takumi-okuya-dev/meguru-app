@@ -106,6 +106,13 @@
       "when": 1792026246027,
       "tag": "0014_billing",
       "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "7",
+      "when": 1792162606462,
+      "tag": "0015_strategy_guidance",
+      "breakpoints": true
     }
   ]
 }

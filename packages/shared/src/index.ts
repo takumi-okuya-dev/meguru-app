@@ -17,6 +17,7 @@ export * from "./similarity";
 export * from "./schedule";
 export * from "./schemas";
 export * from "./strategy";
+export * from "./research";
 export * from "./text";
 export * from "./threads-text";
 export * from "./token";
