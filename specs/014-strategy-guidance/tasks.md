@@ -308,20 +308,20 @@ description: "Task list for feature 014 strategy guidance"
 
 ### Tests for User Story 15
 
-- [ ] T059 [P] [US15] `apps/web/test/create.test.tsx`（新規。今の`apps/web/test/stock.test.tsx`のプロンプトのカードと貼り付け欄の部分をここへ移す）（FR-160〜FR-162・FR-165）。
+- [X] T059 [P] [US15] `apps/web/test/create.test.tsx`（新規。今の`apps/web/test/stock.test.tsx`のプロンプトのカードと貼り付け欄の部分をここへ移す）（FR-160〜FR-162・FR-165）。
   - 画面の並び。
   - 登録の後の「〇件を投稿ストックに登録しました」「投稿ストックで確かめる」（`/stock`）と、貼り付け欄が空になる。
   - プロンプトを作れない状態の案内が今と同じ。未登録の入力の確認。
-- [ ] T060 [P] [US15] `apps/web/test/stock.test.tsx`を直す（FR-163、SC-023）：プロンプトのカードと固定の貼り付け欄がない、上に「投稿をつくる」、空の要確認で「まだ投稿がありません」と「投稿をつくる」、今の承認・却下・修正・まとめての承認・投稿済みのテストは今のまま通る。
-- [ ] T061 [P] [US15] `apps/web/test/sidebar-create.test.tsx`（サイドバーの「投稿をつくる」が`/accounts/:id/create`へ移り、その画面で選ばれた見た目になる。並び・名前は変わらない）と、`apps/web/test/account-home.test.tsx`（「投稿をつくりましょう」のボタンが`/create`へ）（FR-160・FR-164）。
+- [X] T060 [P] [US15] `apps/web/test/stock.test.tsx`を直す（FR-163、SC-023）：プロンプトのカードと固定の貼り付け欄がない、上に「投稿をつくる」、空の要確認で「まだ投稿がありません」と「投稿をつくる」、今の承認・却下・修正・まとめての承認・投稿済みのテストは今のまま通る。
+- [X] T061 [P] [US15] `apps/web/test/sidebar-create.test.tsx`（サイドバーの「投稿をつくる」が`/accounts/:id/create`へ移り、その画面で選ばれた見た目になる。並び・名前は変わらない）と、`apps/web/test/account-home.test.tsx`（「投稿をつくりましょう」のボタンが`/create`へ）（FR-160・FR-164）。
 
 ### Implementation for User Story 15
 
-- [ ] T062 [US15] `apps/web/src/router.tsx`に`/accounts/:accountId/create`を足し、`apps/web/src/pages/create.tsx`を作る：上部バー「投稿をつくる」、`PromptCard`、`PasteComposer`の順（US12・US11・US13・US14の部品は後のPhaseで足す）。T059を通す。
-- [ ] T063 [US15] `apps/web/src/components/stock/PasteComposer.tsx`を、画面の下に固定しない置き方（`placement: "inline"`）でも使えるようにし、見出し「AIの答えを貼り付けて、投稿ストックに登録する」と、登録の後の案内（件数・「投稿ストックで確かめる」）を足す。`PromptCard.tsx`の`startKey`（サイドバーから来たときの移動とフォーカス）は、`/create`を開いたときの初めのフォーカスに置き換える。
-- [ ] T064 [US15] `apps/web/src/pages/stock.tsx`から`PromptCard`・`PasteComposer`・`startCreate`の扱いを外し、`PageHeader`の`actions`に「投稿をつくる」（`/create`）、空の要確認の案内を足す。T060を通す。
-- [ ] T065 [US15] `apps/web/src/components/layout/Sidebar.tsx`の「投稿をつくる」を`NavLink`で`${base}/create`へ（`state.startCreate`をやめる。見た目・並び・名前は変えない）。`apps/web/src/pages/account-home.tsx`の「投稿をつくりましょう」のボタンを`/create`へ。T061を通す。
-- [ ] T066 [US15] E2Eを直す：`e2e/tests/onboarding.spec.ts`・`e2e/tests/team.spec.ts`・`e2e/tests/token.spec.ts`・`e2e/tests/helpers.ts`・`e2e/tests/team-flow.ts`で、投稿ストックのプロンプト・貼り付けを使っている所を「投稿をつくる」へ。
+- [X] T062 [US15] `apps/web/src/router.tsx`に`/accounts/:accountId/create`を足し、`apps/web/src/pages/create.tsx`を作る：上部バー「投稿をつくる」、`PromptCard`、`PasteComposer`の順（US12・US11・US13・US14の部品は後のPhaseで足す）。T059を通す。
+- [X] T063 [US15] `apps/web/src/components/stock/PasteComposer.tsx`を、画面の下に固定しない置き方（`placement: "inline"`）でも使えるようにし、見出し「AIの答えを貼り付けて、投稿ストックに登録する」と、登録の後の案内（件数・「投稿ストックで確かめる」）を足す。`PromptCard.tsx`の`startKey`（サイドバーから来たときの移動とフォーカス）は、`/create`を開いたときの初めのフォーカスに置き換える。
+- [X] T064 [US15] `apps/web/src/pages/stock.tsx`から`PromptCard`・`PasteComposer`・`startCreate`の扱いを外し、`PageHeader`の`actions`に「投稿をつくる」（`/create`）、空の要確認の案内を足す。T060を通す。
+- [X] T065 [US15] `apps/web/src/components/layout/Sidebar.tsx`の「投稿をつくる」を`NavLink`で`${base}/create`へ（`state.startCreate`をやめる。見た目・並び・名前は変えない）。`apps/web/src/pages/account-home.tsx`の「投稿をつくりましょう」のボタンを`/create`へ。T061を通す。
+- [X] T066 [US15] E2Eを直す：`e2e/tests/onboarding.spec.ts`・`e2e/tests/team.spec.ts`・`e2e/tests/token.spec.ts`・`e2e/tests/helpers.ts`・`e2e/tests/team-flow.ts`で、投稿ストックのプロンプト・貼り付けを使っている所を「投稿をつくる」へ。
 
 ---
 

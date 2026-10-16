@@ -56,7 +56,7 @@ function nextStep(s: ProfileStatus): { area: Area | null; title: string; body: s
       body: "Threadsで伸びている投稿を保存しておくと、投稿の精度が上がります。",
     };
   }
-  // 材料がそろったら、投稿ストックへ案内する（specs/003 contracts/ui-routes.md「ホーム」）
+  // 材料がそろったら、「投稿をつくる」の画面へ案内する（specs/003 contracts/ui-routes.md「ホーム」、specs/014 FR-164）
   return {
     area: null,
     title: "投稿をつくりましょう",
@@ -161,7 +161,7 @@ export function AccountHome() {
                   <p className="text-[15px] text-muted-foreground">{step!.body}</p>
                   {step!.area === null && (
                     <Button asChild className="mt-3 h-11 rounded-full px-5 md:h-9">
-                      <Link to={`/accounts/${account.id}/stock`}>投稿ストックへ</Link>
+                      <Link to={`/accounts/${account.id}/create`}>投稿をつくる</Link>
                     </Button>
                   )}
                 </>

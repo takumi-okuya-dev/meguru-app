@@ -43,8 +43,8 @@ const isValidCount = (s: string) => /^\d+$/.test(s) && Number(s) >= PROMPT_COUNT
  * プロンプトのカード。
  * @param props - accountId：Account の ID、canGeneratePrompt：grower機能を使えるか、promptPostCount：保存済みの作る件数、
  *   canSaveCount：作る件数を保存できるか（設定の権限。担当の人は、件数を変えてもこの画面の間だけ使い、保存しない。PR #14 のCodexレビュー）、
- *   startKey：サイドバーの「投稿をつくる」から来たときの移動のキー（押すたびに変わる）。プロンプトのカードまで移り、
- *   「コピー」にフォーカスを当てる（specs/004 Clarifications 2026-10-05）、
+ *   startKey：「投稿をつくる」の画面を開いたときの移動のキー（開くたびに変わる）。プロンプトのカードまで移り、
+ *   「コピー」にフォーカスを当てる（specs/004 Clarifications 2026-10-05、specs/014 T063）、
  *   onLocked：画面を開いた後にプロンプトが使えなくなった（無料体験の終了など）。ページは貼り付け欄にフォーカスを移す
  * @returns プロンプトのカード（使えないときは案内）
  */
@@ -112,7 +112,7 @@ function PromptReadyCard({
   onReadOnly: () => void;
 }) {
   const sectionRef = useRef<HTMLElement>(null);
-  // 「投稿をつくる」で移った先のキー。同じ移動で2回フォーカスを当てない
+  // 「投稿をつくる」を開いたときのキー。同じ移動で2回フォーカスを当てない
   const focusedFor = useRef<string | null>(null);
   const queryClient = useQueryClient();
   // count：プロンプトの取得に使う件数。countInput：入力欄の文字（保存の前の値も持つ）。
@@ -142,7 +142,7 @@ function PromptReadyCard({
     if (isBillingRequired(prompt.error)) onReadOnly();
   }, [prompt.error, onReadOnly]);
 
-  // 「投稿をつくる」から来たら、プロンプトを読み込んだ後に、カードまで移って「コピー」にフォーカスを当てる。
+  // 「投稿をつくる」を開いたら、プロンプトを読み込んだ後に、カードまで移って「コピー」にフォーカスを当てる。
   // 作る流れの最初の一歩（プロンプトのコピー）から始められるようにする（specs/004 Clarifications 2026-10-05）。
   // 読み込みに失敗して「コピー」が出ていない間は待ち、「再読み込み」で出た時点で当てる。
   // 実際に当てられたときだけ済ませた扱いにする（PR #5 のCodexレビュー）

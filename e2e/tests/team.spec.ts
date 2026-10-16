@@ -105,9 +105,11 @@ test("編集者は担当のアカウントで案を登録でき、承認のボ�
   await editor.goto(`/accounts/${accounts.owner}`);
   await expect(editor.getByText(`${FAKE_ACCOUNTS.owner.name}の担当になりました。投稿の案を作れます。`)).toBeVisible();
   await expect(editor.getByText("担当しています").first()).toBeVisible();
-  await editor.goto(`/accounts/${accounts.owner}/stock`);
+  // 案は「投稿をつくる」で登録し、投稿ストックで確かめる（specs/014 US15）
+  await editor.goto(`/accounts/${accounts.owner}/create`);
   await editor.getByPlaceholder("AIの返信をここに貼り付け…").fill("一つ目の案です\n@@@\n二つ目の案です");
   await editor.getByRole("button", { name: "投稿ストックに登録する" }).click();
+  await editor.getByRole("link", { name: "投稿ストックで確かめる" }).click();
   await expect(editor.getByText("オーナーの確認待ち")).toHaveCount(2);
   await expect(editor.getByRole("button", { name: /を承認$/ })).toHaveCount(0);
 

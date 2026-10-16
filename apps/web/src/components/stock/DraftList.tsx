@@ -3,6 +3,8 @@
 // 承認済み・却下：承認・却下した日時の新しい順（API の順のまま）。
 import { REJECTED_LIST_MAX, type PostDraft } from "@threads-grower/shared";
 import type { ReactNode } from "react";
+import { Link } from "react-router";
+import { Button } from "@/components/ui/button";
 import { formatDateTime } from "@/lib/format";
 import { APPROVED_TAB_NOTICE, STOCK_LIMIT_MESSAGE } from "./messages";
 import type { StockTab } from "./StatusTabs";
@@ -29,7 +31,7 @@ function Empty({ children }: { children: ReactNode }) {
 
 /**
  * タブごとの下書きの一覧。
- * @param props - tab：表示するタブ、items：下書き（API の順）、limit：要確認の上限、canGeneratePrompt：空の状態の文言の切り替え、
+ * @param props - tab：表示するタブ、items：下書き（API の順）、limit：要確認の上限、createPath：「投稿をつくる」の画面（空の要確認の案内。specs/014 FR-163）、
  *   total：そのタブの全件数（却下は500件までしか返らないため）、renderCard：1件のカード、
  *   onSelectBatch：登録のまとまりの下書きを選択に足す（要確認。FR-004a）
  * @returns 一覧
@@ -38,7 +40,7 @@ export function DraftList({
   tab,
   items,
   limit,
-  canGeneratePrompt,
+  createPath,
   total,
   renderCard,
   onSelectBatch,
@@ -48,7 +50,7 @@ export function DraftList({
   tab: StockTab;
   items: PostDraft[];
   limit: number;
-  canGeneratePrompt: boolean;
+  createPath: string;
   total: number;
   renderCard: (draft: PostDraft) => ReactNode;
   failed?: PostDraft[];
@@ -93,9 +95,11 @@ export function DraftList({
   if (items.length === 0) {
     return (
       <Empty>
-        {canGeneratePrompt
-          ? "まだ下書きがありません。上のプロンプトをChatGPTやClaudeに送り、返ってきた回答を下の欄に貼り付けてください。"
-          : "まだ下書きがありません。投稿を「@@@」だけの行で区切って、下の欄に貼り付けてください。"}
+        <p className="font-medium text-foreground">まだ投稿がありません</p>
+        <p className="mt-1">「投稿をつくる」で、AIに作ってもらった投稿や、自分で書いた投稿を登録できます</p>
+        <Button asChild className="mt-4 h-11 rounded-full px-5 md:h-9">
+          <Link to={createPath}>投稿をつくる</Link>
+        </Button>
       </Empty>
     );
   }
