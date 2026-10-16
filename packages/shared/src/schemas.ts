@@ -432,10 +432,7 @@ export const referenceMetricsSchema = z
   })
   .default({ likes: null, replies: null, views: null, saves: null, reposts: null, followers: null });
 
-/**
- * 参考投稿の入力のスキーマ（contracts/api.md の ReferencePostInput。014で媒体・投稿日・数字・投稿者・メモを足した）。
- * 新しい項目はどれも省略でき、省略は既定値（今のクライアントからの追加・編集を壊さない）。
- */
+/** 参考投稿の入力の項目（絞り込みの前。応答・更新のスキーマに広げるため分けておく）。 */
 const referencePostFieldsSchema = z.object({
     body: requiredText(REFERENCE_BODY_MAX),
     keyword: textMax(SHORT_TEXT_MAX).default(""),
@@ -453,6 +450,8 @@ const referencePostFieldsSchema = z.object({
 /**
  * 投稿日の選び方と投稿日の組を確かめる（FR-096）。exact なら実在する日付で、今日（日本時間）より後でない。
  * それ以外なら投稿日は null。
+ * @param v - 投稿日の選び方と投稿日
+ * @param ctx - zod の絞り込みの文脈
  */
 function checkPostedDate(v: { postedDateMode: string; postedDate: string | null }, ctx: z.RefinementCtx) {
   if (v.postedDateMode !== "exact") {
@@ -464,6 +463,10 @@ function checkPostedDate(v: { postedDateMode: string; postedDate: string | null 
   }
 }
 
+/**
+ * 参考投稿の入力のスキーマ（contracts/api.md の ReferencePostInput。014で媒体・投稿日・数字・投稿者・メモを足した）。
+ * 新しい項目はどれも省略でき、省略は既定値（今のクライアントからの追加・編集を壊さない）。
+ */
 export const referencePostInputSchema = referencePostFieldsSchema.superRefine(checkPostedDate);
 /** 参考投稿の入力。 */
 export type ReferencePostInput = z.infer<typeof referencePostInputSchema>;

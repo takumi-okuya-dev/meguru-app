@@ -81,13 +81,17 @@ export const POST_LENGTH_DEFAULTS = {
   mediumRatio: 45,
   longRatio: 20,
 } as const;
-/** 1投稿の文字数の目標の範囲と刻み。 */
+/** 1投稿の文字数の目標の下限。 */
 export const POST_LENGTH_TARGET_MIN = 50;
+/** 1投稿の文字数の目標の上限。 */
 export const POST_LENGTH_TARGET_MAX = 500;
+/** 1投稿の文字数の目標の刻み。 */
 export const POST_LENGTH_TARGET_STEP = 10;
-/** 短文・中文・長文の文字数の範囲と刻み。 */
+/** 短文・中文・長文の文字数の下限。 */
 export const POST_KIND_LENGTH_MIN = 10;
+/** 短文・中文・長文の文字数の上限。 */
 export const POST_KIND_LENGTH_MAX = 500;
+/** 短文・中文・長文の文字数の刻み。 */
 export const POST_KIND_LENGTH_STEP = 5;
 /** 短文・中文・長文の割合の刻み。 */
 export const POST_KIND_RATIO_STEP = 5;
