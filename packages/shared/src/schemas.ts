@@ -896,28 +896,23 @@ export const promptMaterialsSchema = z.object({
 /** 「投稿をつくる」の情報の一覧。 */
 export type PromptMaterials = z.infer<typeof promptMaterialsSchema>;
 
-/**
- * GET /prompt のレスポンスのスキーマ（014で parts・length・splitRecommended・settings・materials を足した）。
- * 014の実装の途中は、APIが返すようになるまで新しい項目を省略できる（US10・US11・US13・US14で必須に戻す）。
- */
+/** GET /prompt のレスポンスのスキーマ（014で parts・length・splitRecommended・settings・materials を足した）。 */
 export const promptResponseSchema = z.object({
   prompt: z.string(),
   /** 2つに分けて送るときの1つ目と2つ目（FR-152） */
-  parts: z.tuple([z.string(), z.string()]).optional(),
+  parts: z.tuple([z.string(), z.string()]),
   count: z.number().int(),
   /** 1つにまとめた全文の文字数（コードポイント） */
-  length: z.number().int().optional(),
+  length: z.number().int(),
   /** 2つに分けて送るのをすすめるか（PROMPT_SPLIT_THRESHOLD を超える） */
-  splitRecommended: z.boolean().optional(),
-  settings: z
-    .object({
-      postCount: z.number().int(),
-      length: postLengthSettingsSchema,
-      version: z.number().int(),
-    })
-    .optional(),
+  splitRecommended: z.boolean(),
+  settings: z.object({
+    postCount: z.number().int(),
+    length: postLengthSettingsSchema,
+    version: z.number().int(),
+  }),
   summary: promptSummarySchema,
-  materials: promptMaterialsSchema.optional(),
+  materials: promptMaterialsSchema,
 });
 /** GET /prompt のレスポンス。 */
 export type PromptResponse = z.infer<typeof promptResponseSchema>;

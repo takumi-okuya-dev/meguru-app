@@ -1,6 +1,7 @@
 // 投稿ストックと「投稿をつくる」の画面のテストの見本と組み立て（api-client の差し替えは各テストのファイルで行う）。
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render } from "@testing-library/react";
+import { POST_LENGTH_DEFAULTS } from "@threads-grower/shared";
 import type {
   AccountSummary,
   DraftBatchResult,
@@ -30,9 +31,20 @@ export function promptResponse(
   overrides: Partial<PromptResponse["summary"]> = {},
   count = 30,
 ): PromptResponse {
+  const prompt = count === 30 ? PROMPT : `${count}件のプロンプト`;
   return {
-    prompt: count === 30 ? PROMPT : `${count}件のプロンプト`,
+    prompt,
+    parts: [`1つ目：${prompt}`, `2つ目：${prompt}`],
     count,
+    length: [...prompt].length,
+    splitRecommended: false,
+    settings: { postCount: count, length: { ...POST_LENGTH_DEFAULTS }, version: 1 },
+    materials: {
+      strategy: { items: [], done: 11, review: 0, purposeDone: 0 },
+      drafts: { profileBio: false, pinned: [false, false, false] },
+      promotions: { included: 1, missingCta: 0 },
+      research: { total: 3, included: 3, explained: 3, pending: 0 },
+    },
     summary: {
       strategyFilledCount: 11,
       promotionCount: 1,

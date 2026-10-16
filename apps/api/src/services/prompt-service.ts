@@ -4,6 +4,7 @@ import {
   PROMPT_RECENT_DRAFTS,
   PROMPT_REFERENCE_POSTS,
   PROMPT_REJECTED_DRAFTS,
+  PROMPT_SPLIT_THRESHOLD,
   HINTED_KEYS,
   buildPrompt,
   checkStrategy,
@@ -205,7 +206,7 @@ export async function getPrompt(db: Db, account: AccountRow, count: number) {
     ]);
   const today = jstToday(now);
   const targetable = targetPromotions(promotionRows, now).map(toPromptPromotion);
-  const { prompt, summary, length } = buildPrompt({
+  const { prompt, parts, summary, length } = buildPrompt({
     count,
     today,
     // 文字数と長さの割合はアカウントの設定（specs/014 FR-140・FR-171）
@@ -243,9 +244,12 @@ export async function getPrompt(db: Db, account: AccountRow, count: number) {
   const includedPromotions = summary.promotionCount > 0 ? targetable : [];
   return {
     prompt,
+    // 2つに分けて送るときの1つ目と2つ目（specs/014 FR-152）。長いときは分けるのをすすめる（FR-150、research.md R12）
+    parts,
     count,
     summary,
     length,
+    splitRecommended: length > PROMPT_SPLIT_THRESHOLD,
     // 作る件数と文字数・割合（specs/014 research.md R11）
     settings: { postCount: account.promptPostCount, length: lengthSettingsOf(account), version: account.promptPostCountVersion },
     materials: promptMaterials(strategy, includedPromotions, postRows, summary.referencePostCount),

@@ -132,3 +132,21 @@ describe("GET /prompt の materials（FR-121・FR-123、SC-017）", () => {
     expect(materials.promotions).toEqual({ included: 0, missingCta: 0 });
   });
 });
+
+describe("GET /prompt の parts と splitRecommended（specs/014 FR-150・FR-152）", () => {
+  it("短いときは分けるのをすすめず、長い（12,000字超）ときはすすめる。parts は2つ", async () => {
+    const { accountId } = await createUserWithAccount("u1");
+    const short = (await getPrompt(accountId)) as PromptBody & { parts: string[]; splitRecommended: boolean };
+    expect(short.splitRecommended).toBe(false);
+    expect(short.parts).toHaveLength(2);
+    expect(short.parts[0]).toContain("【1/2つ目】");
+    expect(short.parts[1]).toContain("【2/2つ目(最後)】");
+    const q = neon(testEnv.DATABASE_URL);
+    for (let i = 0; i < 10; i++) {
+      await q`INSERT INTO reference_posts (account_id, body) VALUES (${accountId}, ${`長い参考投稿${i}`.padEnd(1500, "あ")})`;
+    }
+    const long = (await getPrompt(accountId)) as PromptBody & { splitRecommended: boolean };
+    expect(long.length).toBeGreaterThan(12000);
+    expect(long.splitRecommended).toBe(true);
+  });
+});

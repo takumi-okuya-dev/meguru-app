@@ -401,10 +401,10 @@ description: "Task list for feature 014 strategy guidance"
 
 **Independent Test**：長いプロンプトで文字数と注意が出て、1つ目・2つ目をそれぞれコピーでき、合わせると全文と同じ節になることを確かめる。
 
-- [ ] T086 [P] [US14] `packages/shared/test/prompt.test.ts`に`parts`のテストを足す：1つ目と2つ目の冒頭・末尾の文、どちらにも最初に確認すること、合わせた節が全文と同じ（SC-020）。`splitRecommended`の境（12,000字）。
-- [ ] T087 [P] [US14] `apps/web/test/create-parts.test.tsx`：文字数の表示、12,000字超で注意と「2つに分けて送る」が初めの選択、切り替えを`localStorage`に覚える、それぞれのコピー・中身を見る、書き換えのコピーは1つにまとめたときだけ（FR-150〜FR-153）。
-- [ ] T088 [US14] `packages/shared/src/prompt.ts`の`buildPrompt`に`parts`を足し（節2〜6と7〜14で分ける）、`apps/api/src/routes/prompt.ts`の応答に`parts`・`splitRecommended`を足す。T086を通す。
-- [ ] T089 [US14] `apps/web/src/components/create/PromptParts.tsx`を作り、`PromptCard.tsx`のコピーの所を、文字数・送り方の切り替え（`preferences.ts`の`threads-grower:prompt-send-mode`）・1つにまとめて（今のコピーと書き換え）・2つに分けて（各行のコピーと中身を見る）にする。T087を通す。
+- [X] T086 [P] [US14] `packages/shared/test/prompt.test.ts`に`parts`のテストを足す：1つ目と2つ目の冒頭・末尾の文、どちらにも最初に確認すること、合わせた節が全文と同じ（SC-020）。`splitRecommended`の境（12,000字）。
+- [X] T087 [P] [US14] `apps/web/test/create-parts.test.tsx`：文字数の表示、12,000字超で注意と「2つに分けて送る」が初めの選択、切り替えを`localStorage`に覚える、それぞれのコピー・中身を見る、書き換えのコピーは1つにまとめたときだけ（FR-150〜FR-153）。
+- [X] T088 [US14] `packages/shared/src/prompt.ts`の`buildPrompt`に`parts`を足し（節2〜6と7〜14で分ける）、`apps/api/src/routes/prompt.ts`の応答に`parts`・`splitRecommended`を足す。T086を通す。
+- [X] T089 [US14] `apps/web/src/components/create/PromptParts.tsx`を作り、`PromptCard.tsx`のコピーの所を、文字数・送り方の切り替え（`preferences.ts`の`threads-grower:prompt-send-mode`）・1つにまとめて（今のコピーと書き換え）・2つに分けて（各行のコピーと中身を見る）にする。T087を通す。
 
 ---
 

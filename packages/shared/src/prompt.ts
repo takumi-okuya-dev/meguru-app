@@ -529,22 +529,27 @@ function promptCounts(input: PromptInput, posts: PromptReferencePost[], withProm
   };
 }
 
+/** 組み立てた節。材料（1つ目）と、作り方（2つ目）に分けて持つ（014 FR-152）。 */
+type Assembled = { count: number; first: string; materials: string[]; instructions: string[] };
+
+const joinSections = (sections: (string | null)[]) => sections.filter((s): s is string => s !== null).join("\n\n");
+
 function assemble(
   input: PromptInput,
   { posts, drafts, rejected }: Parts,
   withPromotions: boolean,
-): string {
+): Assembled {
   const c = promptCounts(input, posts, withPromotions);
   const strategy = strategySection(input.strategy, c.count);
   const purpose = purposeSection(input.strategy);
-  const sections = [
-    `以下の情報をもとに、Threadsに投稿する文章を${c.count}件作ってください。`,
-    firstCheckSection(c),
+  const materials = [
     `■話者\n表示名: ${input.displayName}`,
     coreRulesSection(input.coreRules, input.ngWords),
     strategy,
     purpose,
     profileSection(input.strategy, c),
+  ];
+  const instructions = [
     withPromotions ? promotionSection(input, c) : null,
     rejected.length > 0 ? rejectedSection(rejected) : null,
     // 長さの調整で減らさない（006 contracts/prompt-template.md、Constitution原則VI）
@@ -560,7 +565,44 @@ function assemble(
       topics: strategy !== null && hasTopics(input.strategy),
     }),
   ];
-  return sections.filter((s): s is string => s !== null).join("\n\n");
+  return {
+    count: c.count,
+    first: firstCheckSection(c),
+    materials: materials.filter((s): s is string => s !== null),
+    instructions: instructions.filter((s): s is string => s !== null),
+  };
+}
+
+/**
+ * 1つにまとめた全文。
+ * @param a - 組み立てた節
+ * @returns 全文
+ */
+function wholePrompt(a: Assembled): string {
+  return joinSections([`以下の情報をもとに、Threadsに投稿する文章を${a.count}件作ってください。`, a.first, ...a.materials, ...a.instructions]);
+}
+
+/**
+ * 2つに分けて送るときの1つ目と2つ目（014 FR-152、contracts/prompt-template.md「2つに分けるとき」）。
+ * どちらにも「最初に確認すること」を入れ、2つを合わせた節は全文と同じにする。
+ * @param a - 組み立てた節
+ * @returns 1つ目と2つ目
+ */
+function splitPrompt(a: Assembled): [string, string] {
+  return [
+    joinSections([
+      `これから、Threadsに投稿する文章を${a.count}件作ってもらうための情報を、2つのメッセージに分けて送ります(長いため)。`,
+      "【1/2つ目】このメッセージは、全部で2つのうちの1つ目です。まだ投稿は作らないでください。内容を読んで覚えたら、「1つ目、受け取りました。続きをどうぞ」とだけ返信して、次のメッセージを待ってください。",
+      a.first,
+      ...a.materials,
+      "(ここまでが1つ目です。続きを送るまで、投稿は作らず待っていてください)",
+    ]),
+    joinSections([
+      `【2/2つ目(最後)】これで全部です。1つ目に送った内容と、この内容を、すべて合わせて読んで、Threadsに投稿する文章を${a.count}件作ってください。`,
+      a.first,
+      ...a.instructions,
+    ]),
+  ];
 }
 
 /**
@@ -568,16 +610,22 @@ function assemble(
  * 全文が PROMPT_LENGTH_TARGET 文字を超えるときは、直近の下書き → 却下の下書き → 参考投稿の順に、古いものから減らして収める
  * （003 R12、004 R12）。CORE RULESの節と、014で足した節は減らさない（014 FR-117）。
  * @param input - 材料
- * @returns 全文、実際に含めた材料の数、全文の文字数（コードポイント）
+ * @returns 全文、2つに分けたときの1つ目と2つ目、実際に含めた材料の数、全文の文字数（コードポイント）
  */
-export function buildPrompt(input: PromptInput): { prompt: string; summary: PromptSummary; length: number } {
+export function buildPrompt(input: PromptInput): {
+  prompt: string;
+  parts: [string, string];
+  summary: PromptSummary;
+  length: number;
+} {
   const withPromotions = input.promotions.length > 0 && input.promotionRatioPercent >= 1;
   const parts: Parts = {
     posts: input.referencePosts.slice(0, PROMPT_REFERENCE_POSTS),
     drafts: input.recentDrafts.slice(0, PROMPT_RECENT_DRAFTS),
     rejected: input.rejectedDrafts.slice(0, PROMPT_REJECTED_DRAFTS),
   };
-  let prompt = assemble(input, parts, withPromotions);
+  let assembled = assemble(input, parts, withPromotions);
+  let prompt = wholePrompt(assembled);
   let length = [...prompt].length;
   while (
     length > PROMPT_LENGTH_TARGET &&
@@ -586,12 +634,14 @@ export function buildPrompt(input: PromptInput): { prompt: string; summary: Prom
     if (parts.drafts.length > 0) parts.drafts = parts.drafts.slice(0, -1);
     else if (parts.rejected.length > 0) parts.rejected = parts.rejected.slice(0, -1);
     else parts.posts = parts.posts.slice(0, -1);
-    prompt = assemble(input, parts, withPromotions);
+    assembled = assemble(input, parts, withPromotions);
+    prompt = wholePrompt(assembled);
     length = [...prompt].length;
   }
   const { posts, drafts, rejected } = parts;
   return {
     prompt,
+    parts: splitPrompt(assembled),
     length,
     summary: {
       strategyFilledCount: countFilled(input.strategy),

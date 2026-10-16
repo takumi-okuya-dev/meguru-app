@@ -584,3 +584,47 @@ describe("投稿のプロンプトの直し（specs/014 US10、FR-110〜FR-118�
     expect(result.prompt).toContain(`少なくとも${Math.min(30, Math.max(3, Math.ceil(n * 1.2)))}件ある`);
   });
 });
+
+describe("2つに分けて送る（specs/014 US14、FR-152、SC-020）", () => {
+  const full = {
+    ...emptyStrategyValues(),
+    targetPersona: "上京したばかりの20代",
+    purposeOrigin: "上京して寂しかった",
+    profileBioDraft: "東京で友だちをつくる会",
+  };
+  const FIRST =
+    "【1/2つ目】このメッセージは、全部で2つのうちの1つ目です。まだ投稿は作らないでください。内容を読んで覚えたら、「1つ目、受け取りました。続きをどうぞ」とだけ返信して、次のメッセージを待ってください。";
+  const SECOND =
+    "【2/2つ目(最後)】これで全部です。1つ目に送った内容と、この内容を、すべて合わせて読んで、Threadsに投稿する文章を10件作ってください。";
+
+  it("1つ目は材料（話者〜プロフィール）、2つ目は宣伝内容から最終チェックまで。どちらにも最初に確認すること", () => {
+    const { parts } = buildPrompt(
+      input({ count: 10, strategy: full, promotions: [promo("交流会")], referencePosts: [{ body: "参考", keyword: "", whyGood: "" }] }),
+    );
+    const [one, two] = parts;
+    expect(one.startsWith(`これから、Threadsに投稿する文章を10件作ってもらうための情報を、2つのメッセージに分けて送ります(長いため)。\n\n${FIRST}\n\n【最初に確認すること(最重要)】`)).toBe(true);
+    expect(one.endsWith("(ここまでが1つ目です。続きを送るまで、投稿は作らず待っていてください)")).toBe(true);
+    for (const h of ["■話者", "■絶対に守るルール(CORE RULES)", "■アカウントの戦略設計", "■活動の目的・在り方", "■現在のプロフィールと固定投稿"]) {
+      expect(one).toContain(h);
+      expect(two).not.toContain(h);
+    }
+    expect(two.startsWith(`${SECOND}\n\n【最初に確認すること(最重要)】`)).toBe(true);
+    for (const h of ["■今回組み込む宣伝内容", "■リサーチで見つけた", "■重複防止", "■短文・中文・長文", "■文字数について", "■出力形式", "■出力する前の最終チェック"]) {
+      expect(two).toContain(h);
+      expect(one).not.toContain(h);
+    }
+  });
+
+  it("2つを合わせた節は、1つにまとめたものと同じ（重なるのは冒頭の指示と最初に確認することだけ）", () => {
+    const { prompt, parts } = buildPrompt(input({ count: 10, strategy: full, promotions: [promo("交流会")] }));
+    const sections = (s: string) => s.split("\n\n");
+    const whole = sections(prompt);
+    const first = whole[1]!;
+    expect(first.startsWith("【最初に確認すること(最重要)】")).toBe(true);
+    const one = sections(parts[0]);
+    const two = sections(parts[1]);
+    expect(one[2]).toBe(first);
+    expect(two[1]).toBe(first);
+    expect([...one.slice(3, -1), ...two.slice(2)]).toEqual(whole.slice(2));
+  });
+});
