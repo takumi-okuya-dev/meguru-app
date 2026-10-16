@@ -84,7 +84,8 @@ describe("課題の画面", () => {
     getStrategy.mockResolvedValue(strategy());
     renderPage();
     expect(await screen.findByLabelText(fieldLabel)).toHaveValue("保存済みの行動");
-    expect(screen.getByRole("heading", { name: "課題① 営業導線設計" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "活動の目的・在り方" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "営業導線設計" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "プロフィール・固定投稿（下書き）" })).toBeInTheDocument();
     expect(screen.getAllByText("1/16 入力済み").length).toBeGreaterThan(0);
     expect(screen.getByLabelText("近い人間性")).toBeInTheDocument();

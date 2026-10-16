@@ -1,5 +1,10 @@
 // /api/accounts/:accountId/prompt と /prompt-settings（specs/003-prompt-bulk-register contracts/api.md）
-import { PROMPT_COUNT_MAX, PROMPT_COUNT_MIN, putPromptSettingsRequestSchema } from "@threads-grower/shared";
+import {
+  PROMPT_COUNT_MAX,
+  PROMPT_COUNT_MIN,
+  putPromptSettingsRequestSchema,
+  type PostLengthSettings,
+} from "@threads-grower/shared";
 import { and, eq, sql } from "drizzle-orm";
 import { Hono, type MiddlewareHandler } from "hono";
 import type { AppEnv } from "../app";
@@ -24,6 +29,23 @@ function parseCount(raw: string | undefined): number | undefined {
     throw new AppError("VALIDATION_FAILED", 400, "invalid request", undefined, ["count"]);
   }
   return n;
+}
+
+/**
+ * アカウントの1投稿の文字数の目標と、短文・中文・長文の文字数と割合（specs/014 research.md R11）。
+ * @param a - Account の行
+ * @returns 文字数と割合
+ */
+export function lengthSettingsOf(a: typeof accounts.$inferSelect): PostLengthSettings {
+  return {
+    target: a.postLengthTarget,
+    shortLength: a.shortLength,
+    mediumLength: a.mediumLength,
+    longLength: a.longLength,
+    shortRatio: a.shortRatio,
+    mediumRatio: a.mediumRatio,
+    longRatio: a.longRatio,
+  };
 }
 
 /**
@@ -76,6 +98,6 @@ export function promptRoutes(authed: MiddlewareHandler<AppEnv>) {
           { updatedBy: await updatedByOf(db, current.promptPostCountUpdatedByUserId) },
         );
       }
-      return c.json({ postCount: saved.promptPostCount, version: saved.promptPostCountVersion });
+      return c.json({ postCount: saved.promptPostCount, length: lengthSettingsOf(saved), version: saved.promptPostCountVersion });
     });
 }

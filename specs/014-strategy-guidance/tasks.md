@@ -75,13 +75,13 @@ description: "Task list for feature 014 strategy guidance"
   - まとめての要求：`referencePostBatchRequestSchema`（1〜20件）、`explanationsRequestSchema`（1〜10件、`whyGood`は1〜2,000文字、同じ`id`の重なりを拒む）、`keywordBatchRequestSchema`（1〜20件）。
   - `putPromptSettingsRequestSchema`に`length`（任意）を足す：`target`は50〜500で10刻み、各長さは10〜500で5刻みかつ`target`以下、各割合は0〜100で5刻み、合計100。
   - `promptResponseSchema`に`parts`・`length`・`splitRecommended`・`settings`・`materials`を足す。
-- [ ] T009 `apps/api/src/services/strategy-service.ts`と`apps/api/src/routes/strategy.ts`：目的の6キーを読み書きし、PUTで省略されたキーは`set`に入れない（今の値を残す）。先に`apps/api/test/integration/strategy-purpose.test.ts`を書く（FR-050・FR-054・FR-055、SC-006）。
+- [X] T009 `apps/api/src/services/strategy-service.ts`と`apps/api/src/routes/strategy.ts`：目的の6キーを読み書きし、PUTで省略されたキーは`set`に入れない（今の値を残す）。先に`apps/api/test/integration/strategy-purpose.test.ts`を書く（FR-050・FR-054・FR-055、SC-006）。
   - 保存・読み直し・版の衝突・操作の記録（`strategy_saved`）
   - 6キーを省いたPUTで値が残る
   - 見せてもらっている人のGETに6キーが出る
   - 読むだけ（013）のオーナーのPUTが`403 BILLING_REQUIRED`（FR-071）
   - `filledCount`が変わらない
-- [ ] T010 `apps/web/src/lib/api-client.ts`の型と`apps/web/src/pages/strategy.tsx`の`pickValues`・`sameValues`を、6キーに合わせる（画面の区分は`STRATEGY_SECTIONS`から並ぶので、目的の区分が先頭に出る）。区分の名前の変更で落ちる今のテスト（`apps/web/test/strategy.test.tsx`）の期待を直す。
+- [X] T010 `apps/web/src/lib/api-client.ts`の型と`apps/web/src/pages/strategy.tsx`の`pickValues`・`sameValues`を、6キーに合わせる（画面の区分は`STRATEGY_SECTIONS`から並ぶので、目的の区分が先頭に出る）。区分の名前の変更で落ちる今のテスト（`apps/web/test/strategy.test.tsx`）の期待を直す。
 
 **Checkpoint**：マイグレーションが当たり、課題の画面に目的の区分が出て保存でき、今のテストが通る。
 

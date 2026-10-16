@@ -174,7 +174,7 @@ function StrategyEditor({ accountId, initial }: { accountId: string; initial: St
           onClick={() => scrollToSection(s.id)}
           className="h-9 shrink-0 rounded-full bg-muted px-3.5 text-sm whitespace-nowrap"
         >
-          {s.chipShort}
+          {s.chip}
         </button>
       ))}
     </nav>

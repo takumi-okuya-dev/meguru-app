@@ -467,6 +467,8 @@ function checkPostedDate(v: { postedDateMode: string; postedDate: string | null 
 export const referencePostInputSchema = referencePostFieldsSchema.superRefine(checkPostedDate);
 /** 参考投稿の入力。 */
 export type ReferencePostInput = z.infer<typeof referencePostInputSchema>;
+/** 参考投稿の入力の送る形（新しい項目は省略でき、省略は既定値。specs/014）。 */
+export type ReferencePostInputBody = z.input<typeof referencePostInputSchema>;
 
 /** PUT /reference-posts/:id のリクエストのスキーマ。 */
 export const updateReferencePostRequestSchema = referencePostFieldsSchema
@@ -873,23 +875,28 @@ export const promptMaterialsSchema = z.object({
 /** 「投稿をつくる」の情報の一覧。 */
 export type PromptMaterials = z.infer<typeof promptMaterialsSchema>;
 
-/** GET /prompt のレスポンスのスキーマ（014で parts・length・splitRecommended・settings・materials を足した）。 */
+/**
+ * GET /prompt のレスポンスのスキーマ（014で parts・length・splitRecommended・settings・materials を足した）。
+ * 014の実装の途中は、APIが返すようになるまで新しい項目を省略できる（US10・US11・US13・US14で必須に戻す）。
+ */
 export const promptResponseSchema = z.object({
   prompt: z.string(),
   /** 2つに分けて送るときの1つ目と2つ目（FR-152） */
-  parts: z.tuple([z.string(), z.string()]),
+  parts: z.tuple([z.string(), z.string()]).optional(),
   count: z.number().int(),
   /** 1つにまとめた全文の文字数（コードポイント） */
-  length: z.number().int(),
+  length: z.number().int().optional(),
   /** 2つに分けて送るのをすすめるか（PROMPT_SPLIT_THRESHOLD を超える） */
-  splitRecommended: z.boolean(),
-  settings: z.object({
-    postCount: z.number().int(),
-    length: postLengthSettingsSchema,
-    version: z.number().int(),
-  }),
+  splitRecommended: z.boolean().optional(),
+  settings: z
+    .object({
+      postCount: z.number().int(),
+      length: postLengthSettingsSchema,
+      version: z.number().int(),
+    })
+    .optional(),
   summary: promptSummarySchema,
-  materials: promptMaterialsSchema,
+  materials: promptMaterialsSchema.optional(),
 });
 /** GET /prompt のレスポンス。 */
 export type PromptResponse = z.infer<typeof promptResponseSchema>;

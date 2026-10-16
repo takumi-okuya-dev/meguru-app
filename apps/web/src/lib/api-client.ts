@@ -57,7 +57,7 @@ import {
   type ReviewRequest,
   type PromotionInput,
   type PutStrategyRequest,
-  type ReferencePostInput,
+  type ReferencePostInputBody,
   type ResearchKeywordInput,
   type ErrorCode,
   type OpenAccountRequest,
@@ -319,7 +319,7 @@ export const api = {
     }),
   listReferencePosts: (accountId: string) =>
     request(`/api/accounts/${accountId}/reference-posts`, referencePostListSchema),
-  createReferencePost: (accountId: string, body: ReferencePostInput) =>
+  createReferencePost: (accountId: string, body: ReferencePostInputBody) =>
     request(`/api/accounts/${accountId}/reference-posts`, referencePostSchema, {
       method: "POST",
       body: JSON.stringify(body),
@@ -327,7 +327,7 @@ export const api = {
   updateReferencePost: (
     accountId: string,
     id: string,
-    body: ReferencePostInput & { expectedVersion: number },
+    body: ReferencePostInputBody & { expectedVersion: number },
   ) =>
     request(`/api/accounts/${accountId}/reference-posts/${id}`, referencePostSchema, {
       method: "PUT",

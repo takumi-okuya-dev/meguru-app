@@ -100,7 +100,7 @@ describe("PUT /prompt-settings", () => {
     const { accountId } = await createUserWithAccount("u1");
     const res = await call(app, "PUT", `${base(accountId)}/prompt-settings`, { user: "u1", body: { postCount: 10, expectedVersion: 1 } });
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ postCount: 10, version: 2 });
+    expect(await res.json()).toMatchObject({ postCount: 10, version: 2 });
     expect((await getPrompt(accountId)).count).toBe(10);
     const drafts = await call(app, "GET", `${base(accountId)}/post-drafts`, { user: "u1" });
     expect(await drafts.json()).toMatchObject({ promptPostCount: 10, canGeneratePrompt: true });
