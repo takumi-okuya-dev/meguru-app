@@ -41,6 +41,8 @@ import {
   promotionSchema,
   promotionSettingsSchema,
   referencePostListSchema,
+  explainPromptSchema,
+  explanationsResultSchema,
   referencePostBatchResultSchema,
   referencePostSchema,
   researchKeywordListSchema,
@@ -320,6 +322,16 @@ export const api = {
     }),
   listReferencePosts: (accountId: string) =>
     request(`/api/accounts/${accountId}/reference-posts`, referencePostListSchema),
+  getExplainPrompt: (accountId: string, id?: string) =>
+    request(
+      `/api/accounts/${accountId}/reference-posts/explain-prompt${id ? `?id=${encodeURIComponent(id)}` : ""}`,
+      explainPromptSchema,
+    ),
+  saveExplanations: (accountId: string, body: { items: { id: string; whyGood: string }[] }) =>
+    request(`/api/accounts/${accountId}/reference-posts/explanations`, explanationsResultSchema, {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
   createReferencePostsBatch: (accountId: string, body: { items: ReferencePostInputBody[] }) =>
     request(`/api/accounts/${accountId}/reference-posts/batch`, referencePostBatchResultSchema, {
       method: "POST",

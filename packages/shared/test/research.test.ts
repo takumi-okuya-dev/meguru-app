@@ -1,6 +1,7 @@
 // リサーチの手助け（specs/014-strategy-guidance FR-096・FR-098・FR-099、research.md R6）。
 import { describe, expect, it } from "vitest";
-import { freshnessOf, sortForPrompt } from "../src/research";
+import { buildExplainPrompt, freshnessOf, parseExplanations, shortIdsOf, sortForPrompt } from "../src/research";
+import { emptyStrategyValues } from "../src/strategy";
 
 // 登録日時：2026-10-16 10:00 JST
 const created = new Date("2026-10-16T01:00:00Z");
@@ -64,5 +65,92 @@ describe("sortForPrompt（FR-099）", () => {
       "unknown-old",
       "archive",
     ]);
+  });
+});
+
+describe("shortIdsOf（FR-102）", () => {
+  it("「-」を除いた先頭8文字。重なるIDだけ、重ならない長さまで延ばす", () => {
+    const ids = [
+      "8f363364-c8e3-490e-93cc-deb8b67e3f4a",
+      "8f363364-c9aa-490e-93cc-deb8b67e3f4a",
+      "12345678-0000-4000-8000-000000000000",
+    ];
+    const m = shortIdsOf(ids);
+    expect(m.get(ids[0]!)).toBe("8f363364c8");
+    expect(m.get(ids[1]!)).toBe("8f363364c9");
+    expect(m.get(ids[2]!)).toBe("12345678");
+  });
+});
+
+describe("buildExplainPrompt（FR-086・FR-101、contracts/prompt-template.md 5）", () => {
+  const post = {
+    id: "8f363364-c8e3-490e-93cc-deb8b67e3f4a",
+    shortId: "8f363364",
+    body: "大人の友達って、\nどこで作ってる？",
+    keyword: "社会人 友達",
+    postUrl: "",
+    platform: "threads" as const,
+    postedDateMode: "week" as const,
+    postedDate: null,
+    metrics: { likes: 820, replies: null, views: 32000, saves: null, reposts: null, followers: null },
+    author: "",
+    memo: "冒頭が気になった",
+  };
+  const strategy = { ...emptyStrategyValues(), targetPersona: "28歳前後の会社員", purposeOrigin: "上京して寂しかった" };
+
+  it("1件：本文・分かっている数字（ほかは不明）・課題・解説の形が入り、【ID】と区切りはない", () => {
+    const p = buildExplainPrompt([post], strategy, { batch: false });
+    expect(p).toContain("本文:\n大人の友達って、\nどこで作ってる？");
+    expect(p).toContain("閲覧数: 32000");
+    expect(p).toContain("コメント: 不明");
+    expect(p).toContain("元の投稿の投稿日: 1週間以内");
+    expect(p).toContain("登録者のメモ: 冒頭が気になった");
+    expect(p).toContain("- 届けたい人: 28歳前後の会社員");
+    expect(p).toContain("- 活動を始めたきっかけ: 上京して寂しかった");
+    expect(p).toContain("【型の名前】");
+    expect(p).toContain("800字程度");
+    expect(p).not.toContain("【ID:");
+    expect(p).not.toContain("@@@");
+  });
+
+  it("まとめて：投稿ごとに【ID】と @@@ の区切り、1件400〜600字", () => {
+    const p = buildExplainPrompt([post, { ...post, id: "x", shortId: "12345678", body: "2件目" }], strategy, { batch: true });
+    expect(p).toContain("【ID:8f363364】");
+    expect(p).toContain("【ID:12345678】");
+    expect(p).toContain("2件分析し");
+    expect(p).toContain("400〜600字");
+    expect(p).toContain("「@@@」だけの行で区切る");
+  });
+});
+
+describe("parseExplanations（FR-103）", () => {
+  const posts = [
+    { id: "id-a", shortId: "aaaaaaaa", whyGood: "" },
+    { id: "id-b", shortId: "bbbbbbbb", whyGood: "  " },
+    { id: "id-c", shortId: "cccccccc", whyGood: "解説あり" },
+  ];
+
+  it("@@@ で分け、【ID】で結び付け、【ID】の行を除いた残りを解説にする（全角の：も可）", () => {
+    const text = "【ID:aaaaaaaa】\n【型の名前】あるある型\n@@@\n【ID：bbbbbbbb】\n【型の名前】告白型";
+    const r = parseExplanations(text, posts);
+    expect(r).toEqual([
+      { id: "id-a", shortId: "aaaaaaaa", text: "【型の名前】あるある型", problem: null },
+      { id: "id-b", shortId: "bbbbbbbb", text: "【型の名前】告白型", problem: null },
+    ]);
+  });
+
+  it("見つからない・すでに解説がある・2回目・空・長すぎるブロックに理由を付ける", () => {
+    const text = [
+      "前置きの説明です",
+      "【ID:zzzzzzzz】\n解説",
+      "【ID:cccccccc】\n解説",
+      "【ID:aaaaaaaa】\n1回目",
+      "【ID:aaaaaaaa】\n2回目",
+      "【ID:bbbbbbbb】\n  ",
+    ].join("\n@@@\n");
+    const r = parseExplanations(text, posts);
+    expect(r.map((x) => x.problem)).toEqual(["not_found", "not_found", "already_explained", null, "duplicate", "empty"]);
+    const long = parseExplanations(`【ID:aaaaaaaa】\n${"あ".repeat(2001)}`, posts);
+    expect(long[0]!.problem).toBe("too_long");
   });
 });

@@ -247,15 +247,15 @@ description: "Task list for feature 014 strategy guidance"
 
 ### Tests for User Story 8
 
-- [ ] T046 [P] [US8] `packages/shared/test/research.test.ts`に足す（FR-101〜FR-103、SC-014、contracts/prompt-template.md 5）。
+- [X] T046 [P] [US8] `packages/shared/test/research.test.ts`に足す（FR-101〜FR-103、SC-014、contracts/prompt-template.md 5）。
   - `shortIdsOf`：先頭8文字、重なるときに延びる。
   - `buildExplainPrompt`：まとめては【ID】と`@@@`、1件はなし。数字の不明、課題の材料。
   - `parseExplanations`：`@@@`での分け方、`【ID:〜】`と`【ID：〜】`。理由（見つからない・すでに解説あり・2回目・空・2,000文字超）。前後の説明のブロック。
-- [ ] T047 [P] [US8] `apps/api/test/integration/reference-posts-explain.test.ts`（FR-100〜FR-105、SC-014）。
+- [X] T047 [P] [US8] `apps/api/test/integration/reference-posts-explain.test.ts`（FR-100〜FR-105、SC-014）。
   - `explain-prompt`：空の行を`sortForPrompt`の順で10件まで、`pendingCount`、`?id=`の1件、0件のとき。
   - `explanations`：空の行だけ更新し版を上げる。解説ありの行は`skipped`（`already_explained`）、ほかのアカウントのIDは`not_found`。同じIDの重なりは400。操作の記録が1件。
   - 権限の表。
-- [ ] T048 [P] [US8] `apps/web/test/research-explain.test.tsx`（US8-1〜US8-8）。
+- [X] T048 [P] [US8] `apps/web/test/research-explain.test.tsx`（US8-1〜US8-8）。
   - 解説がまだの件数と、押すとコピーして貼り付け欄が出る。
   - 一覧の対応と理由の印。保存の文（飛ばした分を含む）。
   - 0件なら出さない。見せてもらっている人には出さない。
@@ -263,9 +263,9 @@ description: "Task list for feature 014 strategy guidance"
 
 ### Implementation for User Story 8
 
-- [ ] T049 [US8] `packages/shared/src/research.ts`に`shortIdsOf`・`buildExplainPrompt`・`parseExplanations`を足す（区切りの判定は`drafts.ts`の`splitDrafts`と同じ行の判定を使う）。T046を通す。
-- [ ] T050 [US8] `apps/api/src/routes/research.ts`に`GET /accounts/:accountId/reference-posts/explain-prompt`と`POST /accounts/:accountId/reference-posts/explanations`を足す（`content`。保存は1つのトランザクションで`UPDATE … WHERE account_id = ? AND id = ? AND (why_good IS NULL OR btrim(why_good) = '')`、版＋1・最終更新者、`reference_posts_explained`を1件、`touchMaterials`）。T047を通す。
-- [ ] T051 [P] [US8] `apps/web/src/components/research/ExplainBatchPanel.tsx`を作り、`apps/web/src/pages/research.tsx`の一覧の上に置く。`apps/web/src/components/research/ReferencePostFormDialog.tsx`の編集に「AIに解説してもらう」（`?id=`のプロンプト・貼り付け欄・「なぜ良いかに入れる」）を足す。`apps/web/src/lib/api-client.ts`に2つのAPIを足す。T048を通す。
+- [X] T049 [US8] `packages/shared/src/research.ts`に`shortIdsOf`・`buildExplainPrompt`・`parseExplanations`を足す（区切りの判定は`drafts.ts`の`splitDrafts`と同じ行の判定を使う）。T046を通す。
+- [X] T050 [US8] `apps/api/src/routes/research.ts`に`GET /accounts/:accountId/reference-posts/explain-prompt`と`POST /accounts/:accountId/reference-posts/explanations`を足す（`content`。保存は1つのトランザクションで`UPDATE … WHERE account_id = ? AND id = ? AND (why_good IS NULL OR btrim(why_good) = '')`、版＋1・最終更新者、`reference_posts_explained`を1件、`touchMaterials`）。T047を通す。
+- [X] T051 [P] [US8] `apps/web/src/components/research/ExplainBatchPanel.tsx`を作り、`apps/web/src/pages/research.tsx`の一覧の上に置く。`apps/web/src/components/research/ReferencePostFormDialog.tsx`の編集に「AIに解説してもらう」（`?id=`のプロンプト・貼り付け欄・「なぜ良いかに入れる」）を足す。`apps/web/src/lib/api-client.ts`に2つのAPIを足す。T048を通す。
 
 ---
 

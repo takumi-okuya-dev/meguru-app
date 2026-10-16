@@ -1,7 +1,10 @@
 // リサーチの参考投稿・キーワードの手助け（specs/014-strategy-guidance research.md R6〜R8・R16）。
 // 鮮度・プロンプトの並び・解説のプロンプトと取り出し・キーワードの案の取り出しを、APIとWebで共有する。
-import { FRESHNESS_ACTIVE_DAYS, FRESHNESS_LATEST_DAYS } from "./limits";
+import { splitDrafts } from "./drafts";
+import { FRESHNESS_ACTIVE_DAYS, FRESHNESS_LATEST_DAYS, REFERENCE_WHY_GOOD_MAX } from "./limits";
 import { addDays, jstDateOf } from "./schedule";
+import type { StrategyValues } from "./strategy";
+import { countChars, isBlank } from "./text";
 
 /** 参考投稿の媒体（data-model.md の reference_posts.platform）。 */
 export const REFERENCE_PLATFORMS = [
@@ -130,4 +133,141 @@ export function shortIdsOf(ids: readonly string[]): Map<string, string> {
     out.set(id, hex.slice(0, len));
   }
   return out;
+}
+
+/** 解説・キーワードの案のプロンプトに入れる課題の項目（FR-086・FR-101。入力のあるものだけ）。 */
+const ACCOUNT_CONTEXT: [keyof StrategyValues, string][] = [
+  ["purposeOrigin", "活動を始めたきっかけ"],
+  ["purposeSelf", "活動を通して自分がなりたい姿"],
+  ["purposeOthers", "関わった人にどうなってほしいか"],
+  ["purposeFuture", "活動の先に作りたい未来"],
+  ["purposeStance", "大切にしたい在り方・判断基準"],
+  ["activityAxis", "活動の軸"],
+  ["finalAction", "最終的に取ってほしい行動"],
+  ["targetPersona", "届けたい人"],
+  ["realWorries", "ターゲットの本音の悩み"],
+  ["contentThemeMix", "発信テーマの掛け合わせ"],
+  ["antiPersona", "来てほしくない人"],
+];
+
+/**
+ * 課題のうち、指定の項目の入力のあるものを「- 見出し: 値」の行にする。
+ * @param strategy - 課題の値
+ * @param keys - 項目と見出し
+ * @returns 行（入力がなければ空）
+ */
+function contextLines(strategy: StrategyValues, keys: [keyof StrategyValues, string][]): string[] {
+  return keys.flatMap(([key, label]) => {
+    const v = strategy[key];
+    return typeof v === "string" && !isBlank(v) ? [`- ${label}: ${v.trim()}`] : [];
+  });
+}
+
+/** 解説のプロンプトに入れる参考投稿の値。 */
+export type ExplainSource = {
+  shortId: string;
+  body: string;
+  keyword: string;
+  postUrl: string;
+  platform: ReferencePlatform;
+  postedDateMode: PostedDateMode;
+  postedDate: string | null;
+  metrics: ReferenceMetrics;
+  author: string;
+  memo: string;
+};
+
+const unknown = (v: string | number | null | undefined) => (v === null || v === undefined || v === "" ? "不明" : String(v));
+
+function postedDateText(p: ExplainSource): string {
+  if (p.postedDateMode === "exact") return unknown(p.postedDate);
+  if (p.postedDateMode === "unknown") return "不明";
+  return POSTED_DATE_MODES.find((m) => m.value === p.postedDateMode)?.label ?? "不明";
+}
+
+/**
+ * 参考投稿の解説のプロンプト（FR-086・FR-101、contracts/prompt-template.md 5）。
+ * まとめてのときは、投稿ごとに【ID】を付け、「@@@」の行で区切って答えてもらう。
+ * @param posts - 解説してもらう参考投稿（まとめてなら最大10件）
+ * @param strategy - 課題の値
+ * @param opts - batch：まとめての解説か
+ * @returns プロンプト
+ */
+export function buildExplainPrompt(posts: readonly ExplainSource[], strategy: StrategyValues, opts: { batch: boolean }): string {
+  const { batch } = opts;
+  const blocks = posts.map((p) => {
+    const lines = [
+      ...(batch ? [`【ID:${p.shortId}】`] : []),
+      "本文:",
+      p.body,
+      `媒体: ${REFERENCE_PLATFORMS.find((x) => x.value === p.platform)?.label ?? "不明"} ／ 元の投稿の投稿日: ${postedDateText(p)} ／ 投稿者: ${unknown(p.author)} ／ 投稿者のフォロワー数: ${unknown(p.metrics.followers)}`,
+      `閲覧数: ${unknown(p.metrics.views)} ／ いいね: ${unknown(p.metrics.likes)} ／ コメント: ${unknown(p.metrics.replies)} ／ リポスト: ${unknown(p.metrics.reposts)} ／ 保存: ${unknown(p.metrics.saves)}`,
+      `検索したキーワード: ${unknown(p.keyword)} ／ 投稿のURL: ${unknown(p.postUrl)} ／ 登録者のメモ: ${unknown(p.memo)}`,
+    ];
+    return lines.join("\n");
+  });
+  const account = contextLines(strategy, ACCOUNT_CONTEXT);
+  return [
+    "あなたは、Threads運用・コピーライティング・消費者心理に詳しい、SNSマーケティングの専門家です。",
+    `ほかのアカウントで反応が良かったThreadsの投稿を${batch ? `${posts.length}件` : ""}分析し、「なぜ伸びたのか」を、読んだ人がすぐ理解できる形で説明してください。最終目的は、投稿者だから伸びた要素を取り除いて、別のテーマ・別のアカウントでも使える「再現できる型」にすることです。`,
+    "",
+    "■分析する投稿",
+    blocks.join(batch ? "\n@@@\n" : "\n\n"),
+    "",
+    "■私たちのアカウント(このアカウントで使えるかを判断する材料)",
+    ...(account.length > 0 ? account : ["(まだ書いていません。一般的な観点で判断してください)"]),
+    "",
+    "■判断の軸",
+    "・一番バズった投稿が、一番参考になる投稿とは考えない。集めたい人に届くか × 再現できるか × 反応の質で判断する。",
+    "・愚痴・批判・炎上・あおりなど、ネガティブな気持ちだけで伸びた投稿は、数字が大きくても型の対象にしない(最後に前向きに変わる投稿は参考にしてよい)。",
+    "",
+    `■出力の形(前置きなしで、この見出しのまま書く。1件${batch ? "400〜600字" : "800字程度"})`,
+    ...(batch ? ["【ID:〇〇〇〇〇〇〇〇】(上の投稿のIDを、そのまま書き写す)"] : []),
+    "【型の名前】「○○ × ○○型」の1行",
+    "【なぜ伸びたか】重要な順に3つ。「何が(フック・言葉・構成) → 誰に → どう作用して → どんな反応になったか」を1〜2文で。",
+    "【誰が反応したか】年代・状況・そのとき感じていたことを2文以内(根拠がなければ「不明」)。",
+    "【このアカウントでの使い方】この型を、私たちのアカウントでどう使うかを1〜2文。",
+    "【判定】○ 真似してOK ／ △ 条件付きでOK ／ × 真似しない のどれか1つと、理由を1文。",
+    ...(batch ? ["投稿と投稿のあいだは、「@@@」だけの行で区切る。"] : []),
+    "",
+    "■ルール",
+    "・数字・実績・事実を作らない。分からないことは「不明」と書く。",
+    "・投稿の文章の言い換えで終わらせず、反応が生まれた構造を書く。",
+  ].join("\n");
+}
+
+/** まとめての解説の答えを取り出せなかった理由（FR-103）。 */
+export type ExplanationProblem = "not_found" | "already_explained" | "duplicate" | "empty" | "too_long";
+
+/** まとめての解説の答えの1ブロック。 */
+export type ParsedExplanation = { id: string | null; shortId: string | null; text: string; problem: ExplanationProblem | null };
+
+const ID_LINE = /【\s*ID\s*[:：]\s*([0-9a-zA-Z]+)\s*】/;
+
+/**
+ * まとめての解説の答えを、参考投稿ごとの解説に分ける（FR-103）。
+ * 「@@@」の行で分け、各ブロックの【ID:〜】で参考投稿を探し、【ID】を除いた残りを解説にする。
+ * @param text - 貼り付けたAIの答え
+ * @param posts - そのアカウントの参考投稿（ID・短いID・今のなぜ良いか）
+ * @returns ブロックごとの結果（貼った順）
+ */
+export function parseExplanations(
+  text: string,
+  posts: readonly { id: string; shortId: string; whyGood: string }[],
+): ParsedExplanation[] {
+  const seen = new Set<string>();
+  return splitDrafts(text).parts.map((block) => {
+    const m = block.match(ID_LINE);
+    const shortId = m ? m[1]!.toLowerCase() : null;
+    const post = shortId ? posts.find((p) => p.shortId === shortId) : undefined;
+    const body = (m ? block.replace(m[0], "") : block).trim();
+    let problem: ExplanationProblem | null = null;
+    if (!post) problem = "not_found";
+    else if (!isBlank(post.whyGood)) problem = "already_explained";
+    else if (seen.has(post.id)) problem = "duplicate";
+    else if (body === "") problem = "empty";
+    else if (countChars(body) > REFERENCE_WHY_GOOD_MAX) problem = "too_long";
+    if (post && problem === null) seen.add(post.id);
+    return { id: post?.id ?? null, shortId: post?.shortId ?? shortId, text: body, problem };
+  });
 }

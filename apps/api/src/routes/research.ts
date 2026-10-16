@@ -1,8 +1,13 @@
 // /api/accounts/:accountId/reference-posts と /research-keywords（specs/002-strategy-profile contracts/api.md）
 import {
+  EXPLAIN_BATCH_MAX,
   KEYWORD_LIMIT,
   REFERENCE_POST_LIMIT,
+  buildExplainPrompt,
+  explanationsRequestSchema,
   freshnessOf,
+  isBlank,
+  sortForPrompt,
   jstToday,
   normalizeKeyword,
   referencePostBatchRequestSchema,
@@ -24,6 +29,7 @@ import { parseBody } from "../lib/validate";
 import { authorizeAccount } from "../services/access";
 import { recordActivity, updatedByOf, withActivityTx } from "../services/activity-log";
 import { touchMaterials } from "../services/materials";
+import { getStrategy } from "../services/strategy-service";
 import { assertItemId, insertManyWithLimit, insertWithLimit, updateWithVersion } from "../services/item-service";
 
 type ReferencePostRow = typeof referencePosts.$inferSelect;
@@ -220,6 +226,78 @@ export function researchRoutes(authed: MiddlewareHandler<AppEnv>) {
         );
         await touchMaterials(db, account.id, "research");
         return c.json({ items: rows.map((r) => toReferencePost(r)) }, 201);
+      })
+      // 解説のプロンプト（specs/014 FR-086・FR-100・FR-101、research.md R8）。?id= で1件、なしで解説がまだのものをまとめて
+      .get("/accounts/:accountId/reference-posts/explain-prompt", authed, async (c) => {
+        const db = createDb(c.env.DATABASE_URL);
+        const access = await authorizeAccount(db, c.get("user"), c.req.param("accountId"), "content");
+        const account = access.account;
+        const [rows, strategy] = await Promise.all([
+          db.select().from(referencePosts).where(eq(referencePosts.accountId, account.id)),
+          getStrategy(db, account.id),
+        ]);
+        const shortIds = shortIdsOf(rows.map((r) => r.id));
+        const toSource = (r: ReferencePostRow) => toReferencePost(r, shortIds.get(r.id));
+        const pending = rows.filter((r) => isBlank(r.whyGood ?? ""));
+        const id = c.req.query("id");
+        let chosen: ReturnType<typeof toSource>[];
+        if (id !== undefined) {
+          const row = rows.find((r) => r.id === assertItemId(id));
+          if (!row) throw new AppError("ITEM_NOT_FOUND", 404, "item not found");
+          chosen = [toSource(row)];
+        } else {
+          chosen = sortForPrompt(pending.map(toSource), jstToday(new Date())).slice(0, EXPLAIN_BATCH_MAX);
+        }
+        return c.json({
+          prompt: chosen.length === 0 ? "" : buildExplainPrompt(chosen, strategy, { batch: id === undefined }),
+          items: chosen.map((p) => ({ id: p.id, shortId: p.shortId })),
+          pendingCount: pending.length,
+        });
+      })
+      // まとめての解説の保存（specs/014 FR-104、research.md R8）。解説が空の行だけを更新し、ほかは飛ばす
+      .post("/accounts/:accountId/reference-posts/explanations", authed, async (c) => {
+        const db = createDb(c.env.DATABASE_URL);
+        const access = await authorizeAccount(db, c.get("user"), c.req.param("accountId"), "content");
+        const account = access.account;
+        const { items } = await parseBody(explanationsRequestSchema, c.req.json());
+        const result = await withActivityTx(c.env.DATABASE_URL, db, access, async (q) => {
+          const saved: string[] = [];
+          const skipped: { id: string; reason: "already_explained" | "not_found" }[] = [];
+          for (const item of items) {
+            const updated = await q
+              .update(referencePosts)
+              .set({
+                whyGood: item.whyGood.trim(),
+                updatedByUserId: access.actor.id,
+                version: sql`${referencePosts.version} + 1`,
+                updatedAt: new Date(),
+              })
+              .where(
+                and(
+                  eq(referencePosts.id, item.id),
+                  eq(referencePosts.accountId, account.id),
+                  sql`(${referencePosts.whyGood} IS NULL OR btrim(${referencePosts.whyGood}) = '')`,
+                ),
+              )
+              .returning();
+            if (updated.length > 0) {
+              saved.push(item.id);
+              continue;
+            }
+            const exists = await q
+              .select({ id: referencePosts.id })
+              .from(referencePosts)
+              .where(and(eq(referencePosts.id, item.id), eq(referencePosts.accountId, account.id)))
+              .limit(1);
+            skipped.push({ id: item.id, reason: exists.length > 0 ? "already_explained" : "not_found" });
+          }
+          if (saved.length > 0) {
+            await recordActivity(q, access, { kind: "content", action: "reference_posts_explained", summary: `${saved.length}件` });
+          }
+          return { saved, skipped };
+        });
+        if (result.saved.length > 0) await touchMaterials(db, account.id, "research");
+        return c.json(result);
       })
       .put("/accounts/:accountId/reference-posts/:referencePostId", authed, async (c) => {
         const db = createDb(c.env.DATABASE_URL);

@@ -11,6 +11,8 @@ import { BillingRequiredDialog } from "@/components/billing/BillingRequiredDialo
 import { ConfirmDeleteDialog } from "@/components/items/ConfirmDeleteDialog";
 import { PageBody, PageHeader } from "@/components/layout/PageHeader";
 import { KeywordFormDialog } from "@/components/research/KeywordFormDialog";
+import { ExplainBatchPanel } from "@/components/research/ExplainBatchPanel";
+import { ExplainOne } from "@/components/research/ExplainOne";
 import { ReferenceBadges } from "@/components/research/ReferenceBadges";
 import { ReferencePostAddDialog } from "@/components/research/ReferencePostAddDialog";
 import { ReferencePostFormDialog } from "@/components/research/ReferencePostFormDialog";
@@ -172,6 +174,16 @@ export function ResearchPage() {
           </TabsList>
           <TabsContent value="posts">
             {limitNotice}
+            {canEdit && posts.data && (
+              <div className="mb-3">
+                <ExplainBatchPanel
+                  accountId={account.id}
+                  posts={posts.data.items}
+                  onSaved={refresh}
+                  onBillingRequired={(reason) => setBillingReason(reason)}
+                />
+              </div>
+            )}
             {!posts.data ? (
               <Skeleton />
             ) : posts.data.items.length === 0 ? (
@@ -235,7 +247,12 @@ export function ResearchPage() {
         />
       )}
       {dialog?.kind === "post" && dialog.item && (
-        <ReferencePostFormDialog accountId={account.id} item={dialog.item} {...dialogCallbacks} />
+        <ReferencePostFormDialog
+          accountId={account.id}
+          item={dialog.item}
+          {...dialogCallbacks}
+          whyGoodExtra={(setWhyGood) => <ExplainOne accountId={account.id} postId={dialog.item!.id} onUse={setWhyGood} />}
+        />
       )}
       {dialog?.kind === "keyword" && (
         <KeywordFormDialog
