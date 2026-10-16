@@ -125,4 +125,23 @@ describe("自動チェックと進み具合", () => {
     expect(chips.getByRole("button", { name: /^営業導線/ })).toHaveAttribute("aria-current", "true");
     expect(chips.getByRole("button", { name: /^目的/ })).not.toHaveAttribute("aria-current", "true");
   });
+
+  it("「全体をAIと整理する」で、画面の今の値から全体のプロンプトをコピーする（FR-040〜FR-042）", async () => {
+    getStrategy.mockResolvedValue(strategyOf());
+    const user = userEvent.setup();
+    const writeText = vi.spyOn(navigator.clipboard, "writeText");
+    renderStrategyPage(StrategyPage, UnsavedChangesProvider);
+    const f = await field("finalAction");
+    await user.type(f.getByRole("textbox"), "公式LINEに登録");
+    await user.click(progress().getByRole("button", { name: "全体をAIと整理する" }));
+    expect(writeText.mock.calls.at(-1)![0]).toContain("- 最終的に読者に取ってほしい行動: 公式LINEに登録");
+    expect(progress().getByText(/項目どうしの重複・矛盾・抜けを質問の形で返してくれます/)).toBeInTheDocument();
+  });
+
+  it("見せてもらっている人には「全体をAIと整理する」を出さない（FR-040）", async () => {
+    getStrategy.mockResolvedValue(strategyOf({ canEdit: false }));
+    renderStrategyPage(StrategyPage, UnsavedChangesProvider);
+    await field("finalAction");
+    expect(progress().queryByRole("button", { name: "全体をAIと整理する" })).not.toBeInTheDocument();
+  });
 });

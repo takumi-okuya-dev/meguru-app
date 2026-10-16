@@ -119,6 +119,33 @@ function strategySection(strategy: StrategyValues): string | null {
   );
 }
 
+/** 活動の目的・在り方の見出し（specs/014 FR-053）。 */
+const PURPOSE_PROMPT_LABELS = [
+  ["purposeOrigin", "活動を始めたきっかけ"],
+  ["purposeSelf", "活動を通して自分がなりたい姿"],
+  ["purposeOthers", "関わった人にどうなってほしいか"],
+  ["purposeFuture", "活動の先に作りたい未来"],
+  ["purposeStance", "大切にしたい在り方・判断基準"],
+  ["activityAxis", "活動の軸"],
+] as const;
+
+/**
+ * 「■活動の目的・在り方」の節（specs/014 FR-053）。入力のある答えだけを並べ、どれも空なら節ごと入れない。
+ * 長さの調整では削らない（FR-117）。
+ * @param strategy - 課題の値
+ * @returns 節の文面、どれも空なら null
+ */
+function purposeSection(strategy: StrategyValues): string | null {
+  const lines = PURPOSE_PROMPT_LABELS.filter(([key]) => !isBlank(strategy[key])).map(
+    ([key, label]) => `- ${label}: ${strategy[key].trim()}`,
+  );
+  if (lines.length === 0) return null;
+  return [
+    "■活動の目的・在り方(本人の言葉。投稿の方向性・判断基準として踏まえ、これと矛盾する内容は書かないこと)",
+    ...lines,
+  ].join("\n");
+}
+
 function promotionLine(p: PromptPromotion, i: number): string {
   const target = [
     ["場所", p.targetLocation],
@@ -273,6 +300,7 @@ function assemble(
     `■話者\n表示名: ${input.displayName}`,
     coreRulesSection(input.coreRules, input.ngWords),
     strategySection(input.strategy),
+    purposeSection(input.strategy),
     withPromotions
       ? promotionSection(
           count,

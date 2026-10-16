@@ -1,6 +1,6 @@
 // 課題のAIのプロンプト（specs/014-strategy-guidance research.md R4、contracts/prompt-template.md 2〜4）。
 // 画面の今の入力（未保存を含む）から作る。アプリはAIを呼ばない（Constitution原則III）。
-import { STRATEGY_FIELDS, TONE_PRESETS, type StrategyField, type StrategyValues } from "./strategy";
+import { PURPOSE_KEYS, STRATEGY_FIELDS, STRATEGY_SECTIONS, TONE_PRESETS, type StrategyField, type StrategyValues } from "./strategy";
 import { HINTED_KEYS, hintOf, type HintedKey } from "./strategy-guidance";
 import { isBlank } from "./text";
 
@@ -95,4 +95,57 @@ export function extractFinal(text: string): { text: string; marked: boolean } {
     if (end >= 0) return { text: text.slice(begin + FINAL_BEGIN.length, end).trim(), marked: true };
   }
   return { text: text.trim(), marked: false };
+}
+
+/**
+ * 「全体をAIと整理する」のプロンプト（FR-041）。区分ごとに全項目（下書きを除く）を並べ、
+ * 重複・矛盾・抜けを質問の形で出してもらう。答えはアプリに取り込まない（FR-042）。
+ * @param values - 課題の今の値（未保存を含む）
+ * @returns プロンプト
+ */
+export function buildOverallPrompt(values: StrategyValues): string {
+  const lines = [
+    "あなたは、SNS発信の設計を見直す相談相手です。下は、私のThreadsアカウントの設計です。項目どうしの重複・矛盾・抜けを見つけて、直すための質問をしてください。",
+  ];
+  for (const section of STRATEGY_SECTIONS) {
+    if (section.id === "drafts") continue;
+    lines.push("", `■${section.title}`);
+    for (const f of STRATEGY_FIELDS.filter((x) => x.section === section.id)) {
+      lines.push(`- ${f.label}: ${valueText(values, f.key) ?? "未入力"}`);
+    }
+  }
+  lines.push(
+    "",
+    "■お願い",
+    "1. 重複している・食い違っている・足りないと思う所を、項目の名前を挙げて、項目ごとに質問の形で出してください(例: 「ターゲット」と「来てほしくない人」が重なっていませんか？)。",
+    "2. 項目を勝手に書き直さないでください。私が答えを考えるための質問だけにしてください。",
+    "3. 大事な順に、多くても10問にしてください。",
+  );
+  return lines.join("\n");
+}
+
+/**
+ * 「5問からAIと整理する」（活動の軸）のプロンプト（FR-036）。
+ * @param values - 課題の今の値（未保存を含む）
+ * @returns プロンプト
+ */
+export function buildAxisPrompt(values: StrategyValues): string {
+  const questions = PURPOSE_KEYS.filter((k) => k !== "activityAxis").map((k) => {
+    const question = fieldOf(k).label.replace(/^Q\d：/, "");
+    return `- ${question}: ${valueText(values, k) ?? "未入力"}`;
+  });
+  return [
+    "あなたは、活動の軸を言葉にする手伝いをする聞き役です。下は、私の活動の目的・在り方の5つの問いへの答えです。",
+    "",
+    ...questions,
+    "",
+    "■お願い",
+    "5つの答えに共通する思いを、短い一言(20文字前後)にまとめた「活動の軸」の案を3つ出してください。それぞれに、どの答えのどこから考えたかを1行添えてください。私が書いていない事実は足さないでください。",
+    "3つの案は、次の2行のあいだに書いてください。目印の行は、そのまま書き写してください。",
+    FINAL_BEGIN,
+    "1. (案)",
+    "2. (案)",
+    "3. (案)",
+    FINAL_END,
+  ].join("\n");
 }

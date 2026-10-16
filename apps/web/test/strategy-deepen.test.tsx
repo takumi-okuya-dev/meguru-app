@@ -133,4 +133,35 @@ describe("AIと深掘りする", () => {
       expect((await field(key)).queryByRole("button", { name: /AIと/ }), key).not.toBeInTheDocument();
     }
   });
+
+  it("目的の区分に案内の文、活動の軸に任意の印が出る（US5-1）", async () => {
+    getStrategy.mockResolvedValue(strategyOf());
+    renderStrategyPage(StrategyPage, UnsavedChangesProvider);
+    await field("purposeOrigin");
+    expect(screen.getByText(/何のために発信するかを先に決めると、ほかの項目が書きやすくなります/)).toBeInTheDocument();
+    expect((await field("activityAxis")).getByText("任意")).toBeInTheDocument();
+  });
+
+  it("活動の軸：5問がすべて空なら「5問からAIと整理する」は押せず、案内が出る（US5-4）", async () => {
+    getStrategy.mockResolvedValue(strategyOf());
+    renderStrategyPage(StrategyPage, UnsavedChangesProvider);
+    const f = await field("activityAxis");
+    expect(f.getByRole("button", { name: "5問からAIと整理する" })).toBeDisabled();
+    expect(f.getByText("先にQ1〜Q5のどれかに答えてください")).toBeInTheDocument();
+  });
+
+  it("活動の軸：5問の答えから活動の軸のプロンプトをコピーし、貼り付けて反映できる（US5-3）", async () => {
+    getStrategy.mockResolvedValue(strategyOf({ purposeOrigin: "上京して寂しかった" }));
+    const user = userEvent.setup();
+    const writeText = vi.spyOn(navigator.clipboard, "writeText");
+    renderStrategyPage(StrategyPage, UnsavedChangesProvider);
+    const f = await field("activityAxis");
+    await user.click(f.getByRole("button", { name: "5問からAIと整理する" }));
+    await user.click(f.getByRole("button", { name: "プロンプトをコピーする" }));
+    expect(writeText.mock.calls.at(-1)![0]).toContain("「活動の軸」の案を3つ");
+    await user.click(f.getByLabelText("AIの答えを貼り付ける"));
+    await user.paste(`${FINAL_BEGIN}\nひとりにしない\n${FINAL_END}`);
+    await user.click(f.getByRole("button", { name: "この内容を反映する" }));
+    expect(f.getByLabelText("活動の軸")).toHaveValue("ひとりにしない");
+  });
 });

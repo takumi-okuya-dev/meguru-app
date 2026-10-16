@@ -301,3 +301,44 @@ describe("反応が低かった投稿の節（specs/006 contracts/prompt-templat
     for (let i = 0; i < 5; i++) expect(prompt).toContain(`${i + 1}. 低調${i}`);
   });
 });
+
+describe("活動の目的・在り方の節（specs/014 FR-053、contracts/prompt-template.md 1-5）", () => {
+  it("戦略設計の節のすぐ後に、入力のある答えと活動の軸だけを決まった見出しで入れる", () => {
+    const strategy = {
+      ...emptyStrategyValues(),
+      finalAction: "公式LINEに登録",
+      purposeOrigin: "上京して寂しかった",
+      purposeStance: "無理に誘わない",
+      activityAxis: "ひとりにしない",
+    };
+    const { prompt } = buildPrompt(input({ strategy }));
+    const section =
+      "■活動の目的・在り方(本人の言葉。投稿の方向性・判断基準として踏まえ、これと矛盾する内容は書かないこと)\n" +
+      "- 活動を始めたきっかけ: 上京して寂しかった\n" +
+      "- 大切にしたい在り方・判断基準: 無理に誘わない\n" +
+      "- 活動の軸: ひとりにしない";
+    expect(prompt).toContain(section);
+    expect(prompt.indexOf("■アカウントの戦略設計")).toBeLessThan(prompt.indexOf("■活動の目的・在り方"));
+    expect(prompt.indexOf("■活動の目的・在り方")).toBeLessThan(prompt.indexOf("■重複防止"));
+    expect(prompt).not.toContain("- 活動を通して自分がなりたい姿:");
+  });
+
+  it("課題がほかに空でも、目的があれば節が入る。目的がすべて空なら節ごと入れない", () => {
+    const only = buildPrompt(input({ strategy: { ...emptyStrategyValues(), purposeFuture: "孤立しない街" } })).prompt;
+    expect(only).toContain("- 活動の先に作りたい未来: 孤立しない街");
+    expect(buildPrompt(input()).prompt).not.toContain("■活動の目的・在り方");
+  });
+
+  it("長さの調整で、参考投稿などを減らしても目的の節は削らない（FR-117）", () => {
+    const long = "あ".repeat(1900);
+    const { prompt, summary } = buildPrompt(
+      input({
+        strategy: { ...emptyStrategyValues(), purposeOrigin: "上京して寂しかった" },
+        referencePosts: Array.from({ length: 10 }, () => ({ body: long, keyword: "", whyGood: long })),
+        recentDrafts: Array.from({ length: 20 }, () => long),
+      }),
+    );
+    expect(summary.length).toBeLessThanOrEqual(30000);
+    expect(prompt).toContain("- 活動を始めたきっかけ: 上京して寂しかった");
+  });
+});

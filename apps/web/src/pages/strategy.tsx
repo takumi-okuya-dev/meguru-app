@@ -9,7 +9,10 @@ import {
   STRATEGY_TOTAL,
   TONE_PRESETS,
   SHORT_TIP,
+  PURPOSE_KEYS,
+  buildAxisPrompt,
   buildDeepenPrompt,
+  buildOverallPrompt,
   checkStrategy,
   countChars,
   hintOf,
@@ -23,6 +26,7 @@ import { useState, type ReactNode } from "react";
 import { toast } from "sonner";
 import { ApiErrorScreen } from "@/components/ApiErrorScreen";
 import { ConflictDialog } from "@/components/ConflictDialog";
+import { CopyPromptButton } from "@/components/CopyPromptButton";
 import { FieldWithCounter } from "@/components/FieldWithCounter";
 import { DeepenPanel } from "@/components/strategy/DeepenPanel";
 import { FieldCheckBadge } from "@/components/strategy/FieldCheckBadge";
@@ -108,6 +112,8 @@ function StrategyEditor({ accountId, initial }: { accountId: string; initial: St
   // 自動チェック（入力のたびに、保存を待たずに求める。FR-012）
   const check = checkStrategy(values);
   const nextField = check.next ? STRATEGY_FIELDS.find((f) => f.key === check.next) : undefined;
+  // 活動の軸の「5問からAIと整理する」は、5問のどれかに答えがあるときだけ押せる（FR-036）
+  const purposeAnswered = PURPOSE_KEYS.some((k) => k !== "activityAxis" && values[k].trim() !== "");
 
   const applySaved = (s: Strategy, keepInput = false) => {
     setSaved(s);
@@ -189,11 +195,26 @@ function StrategyEditor({ accountId, initial }: { accountId: string; initial: St
           check={check}
           nextLabel={nextField?.label ?? null}
           onNext={() => check.next && goToField(check.next, canEdit)}
+          actions={
+            canEdit && (
+              <CopyPromptButton
+                variant="outline"
+                label="全体をAIと整理する"
+                getText={() => buildOverallPrompt(values)}
+                copiedMessage="コピーしました。ChatGPTやClaudeに貼り付けて送ると、項目どうしの重複・矛盾・抜けを質問の形で返してくれます"
+              />
+            )
+          }
         />
         <div className="mt-9 space-y-11">
           {STRATEGY_SECTIONS.map((section) => (
             <section key={section.id} id={sectionElementId(section.id)} className="scroll-mt-36 space-y-5">
               <h2 className="text-[17px] font-semibold">{section.title}</h2>
+              {section.id === "purpose" && (
+                <p className="-mt-3 text-[13px] text-muted-foreground">
+                  何のために発信するかを先に決めると、ほかの項目が書きやすくなります。ここに書いた内容も、投稿づくりの材料になります。
+                </p>
+              )}
               {section.id === "drafts" && (
                 <p className="-mt-3 text-[13px] text-muted-foreground">
                   Threadsには自動で反映されない下書きです。投稿づくりの材料には使いません。
@@ -251,8 +272,27 @@ function StrategyEditor({ accountId, initial }: { accountId: string; initial: St
                             hint={hint}
                             className="pt-1"
                             actions={
-                              canEdit &&
-                              hint && (
+                              canEdit && f.key === "activityAxis" ? (
+                                <>
+                                  <button
+                                    type="button"
+                                    disabled={!purposeAnswered}
+                                    aria-expanded={deepenKey === f.key}
+                                    onClick={() => setDeepenKey(deepenKey === f.key ? null : f.key)}
+                                    className="inline-flex h-9 items-center gap-1.5 rounded-full border px-3 text-[13px] hover:bg-accent disabled:opacity-50"
+                                  >
+                                    <SparklesIcon className="size-4" aria-hidden="true" />
+                                    5問からAIと整理する
+                                  </button>
+                                  {!purposeAnswered && (
+                                    <span className="self-center text-[13px] text-muted-foreground">
+                                      先にQ1〜Q5のどれかに答えてください
+                                    </span>
+                                  )}
+                                </>
+                              ) : (
+                                canEdit &&
+                                hint && (
                                 <button
                                   type="button"
                                   aria-expanded={deepenKey === f.key}
@@ -262,14 +302,26 @@ function StrategyEditor({ accountId, initial }: { accountId: string; initial: St
                                   <SparklesIcon className="size-4" aria-hidden="true" />
                                   この項目をAIと深掘りする
                                 </button>
+                                )
                               )
                             }
                             below={
                               canEdit &&
                               deepenKey === f.key &&
-                              hint && (
+                              (hint || f.key === "activityAxis") && (
                                 <DeepenPanel
-                                  getPrompt={() => buildDeepenPrompt(f.key as HintedKey, values)}
+                                  getPrompt={() =>
+                                    f.key === "activityAxis" ? buildAxisPrompt(values) : buildDeepenPrompt(f.key as HintedKey, values)
+                                  }
+                                  steps={
+                                    f.key === "activityAxis"
+                                      ? [
+                                          "「プロンプトをコピーする」を押す",
+                                          "ChatGPTやClaudeに貼り付けて送り、3つの案から選ぶ（直してもらってもよい）",
+                                          "決めた一言を、答えごと下に貼り付けて「この内容を反映する」",
+                                        ]
+                                      : undefined
+                                  }
                                   onApply={(text) => {
                                     set(f.key as (typeof STRATEGY_TEXT_KEYS)[number], text);
                                     setDeepenKey(null);

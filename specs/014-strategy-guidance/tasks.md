@@ -180,9 +180,9 @@ description: "Task list for feature 014 strategy guidance"
 
 **Independent Test**：コピーした文に区分ごとの全項目（下書きを除く。未保存を含む）と頼み方が入ることを確かめる。
 
-- [ ] T027 [P] [US4] `packages/shared/test/strategy-prompts.test.ts`に`buildOverallPrompt`のテストを足す：区分の順、空は「未入力」、下書きなし、頼み方（質問だけ・書き直さない・10問まで）（FR-041）。
-- [ ] T028 [US4] `packages/shared/src/strategy-prompts.ts`に`buildOverallPrompt(values)`を足す。T027を通す。
-- [ ] T029 [US4] `apps/web/src/components/strategy/ProgressCard.tsx`の「全体をAIと整理する」（直せる人だけ）で、画面の今の値からコピーし、「コピーしました。ChatGPTやClaudeに貼り付けて送ると…」を出す。テストは`apps/web/test/strategy-progress.test.tsx`に足す（FR-040・FR-042）。
+- [X] T027 [P] [US4] `packages/shared/test/strategy-prompts.test.ts`に`buildOverallPrompt`のテストを足す：区分の順、空は「未入力」、下書きなし、頼み方（質問だけ・書き直さない・10問まで）（FR-041）。
+- [X] T028 [US4] `packages/shared/src/strategy-prompts.ts`に`buildOverallPrompt(values)`を足す。T027を通す。
+- [X] T029 [US4] `apps/web/src/components/strategy/ProgressCard.tsx`の「全体をAIと整理する」（直せる人だけ）で、画面の今の値からコピーし、「コピーしました。ChatGPTやClaudeに貼り付けて送ると…」を出す。テストは`apps/web/test/strategy-progress.test.tsx`に足す（FR-040・FR-042）。
 
 ---
 
@@ -192,10 +192,10 @@ description: "Task list for feature 014 strategy guidance"
 
 **Independent Test**：5問を書いて保存し、「5問からAIと整理する」の文に答えが入り、投稿のプロンプトに目的の節が入ることを確かめる。
 
-- [ ] T030 [P] [US5] `packages/shared/test/strategy-prompts.test.ts`に`buildAxisPrompt`のテストを足す（5問の問いと答え・未入力・3案・目印。FR-036）。
-- [ ] T031 [P] [US5] `packages/shared/test/prompt.test.ts`に目的の節のテストを足す：戦略設計の節のすぐ後、入力のある見出しだけ、すべて空なら節ごとなし、長さの調整で削られない（FR-053、FR-117）。
-- [ ] T032 [US5] `packages/shared/src/strategy-prompts.ts`に`buildAxisPrompt(values)`を、`packages/shared/src/prompt.ts`に`purposeSection(strategy)`（contracts/prompt-template.md 1-5）を足し、`assemble`で戦略設計の後に置く。T030・T031を通す。
-- [ ] T033 [US5] `apps/web/src/pages/strategy.tsx`：目的の区分に案内の文（「何のために発信するかを先に決めると、ほかの項目が書きやすくなります。ここに書いた内容も、投稿づくりの材料になります」）を出す。活動の軸に「任意」の印と「5問からAIと整理する」（`DeepenPanel`を`buildAxisPrompt`で使う。5問がすべて空なら押せず「先にQ1〜Q5のどれかに答えてください」）を置く。テストは`apps/web/test/strategy-deepen.test.tsx`に足す（US5-1・US5-3・US5-4）。
+- [X] T030 [P] [US5] `packages/shared/test/strategy-prompts.test.ts`に`buildAxisPrompt`のテストを足す（5問の問いと答え・未入力・3案・目印。FR-036）。
+- [X] T031 [P] [US5] `packages/shared/test/prompt.test.ts`に目的の節のテストを足す：戦略設計の節のすぐ後、入力のある見出しだけ、すべて空なら節ごとなし、長さの調整で削られない（FR-053、FR-117）。
+- [X] T032 [US5] `packages/shared/src/strategy-prompts.ts`に`buildAxisPrompt(values)`を、`packages/shared/src/prompt.ts`に`purposeSection(strategy)`（contracts/prompt-template.md 1-5）を足し、`assemble`で戦略設計の後に置く。T030・T031を通す。
+- [X] T033 [US5] `apps/web/src/pages/strategy.tsx`：目的の区分に案内の文（「何のために発信するかを先に決めると、ほかの項目が書きやすくなります。ここに書いた内容も、投稿づくりの材料になります」）を出す。活動の軸に「任意」の印と「5問からAIと整理する」（`DeepenPanel`を`buildAxisPrompt`で使う。5問がすべて空なら押せず「先にQ1〜Q5のどれかに答えてください」）を置く。テストは`apps/web/test/strategy-deepen.test.tsx`に足す（US5-1・US5-3・US5-4）。
 
 ---
 
