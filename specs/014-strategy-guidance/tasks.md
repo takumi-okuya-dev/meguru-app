@@ -411,8 +411,8 @@ description: "Task list for feature 014 strategy guidance"
 ## Phase 18: Polish & Cross-Cutting Concerns
 
 - [ ] T090 [P] E2E：`e2e/tests/strategy.spec.ts`に目的の5問・考えるヒント・自動チェック・深掘りの反映（偽の答え）を足す。`e2e/tests/research.spec.ts`（新規：ためて登録 → まとめての解説（偽の答え））と`e2e/tests/create.spec.ts`（新規：投稿をつくる → コピー → 貼り付け（コードブロックつき）→ 登録 → 投稿ストックで確かめる）を書く。
-- [ ] T091 [P] `docs/ui-design.md`に「投稿をつくる」の画面と、課題の固定のチップ・リサーチの追加の欄を足す。
-- [ ] T092 [P] `apps/web/src/pages/activity.tsx`に新しい操作の記録の名前（`reference_posts_added`・`reference_posts_explained`・`research_keywords_added`・`prompt_length_saved`）の表示を足し、テストを足す。
+- [X] T091 [P] `docs/ui-design.md`に「投稿をつくる」の画面と、課題の固定のチップ・リサーチの追加の欄を足す。
+- [X] T092 [P] `apps/web/src/pages/activity.tsx`に新しい操作の記録の名前（`reference_posts_added`・`reference_posts_explained`・`research_keywords_added`・`prompt_length_saved`）の表示を足し、テストを足す。
 - [ ] T093 スマートフォンの幅（375px）で、課題・リサーチ・投稿をつくる・投稿ストック・ホームが横にはみ出さないことを、Webのテスト（幅を狭めた描画）と手で確かめる（SC-009）。
 - [ ] T094 `pnpm lint && pnpm typecheck && pnpm test && pnpm e2e`を通し、`specs/014-strategy-guidance/verification.md`に結果と手で確かめること（quickstart.md 2）の結果、計画からの変更を書く。
 - [ ] T095 [P] contracts/hints.mdの文言を、ユーザーに確かめてもらい、直しがあれば`packages/shared/src/strategy-guidance.ts`に反映する。

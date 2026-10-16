@@ -157,4 +157,14 @@ describe("操作の記録", () => {
     expect(actionText({ ...page1.items[0]!, action: "team_share_changed", details: { shared: true } })).toBe("チームに見せるようにしました");
     expect(actionText({ ...page1.items[0]!, action: "team_admin_transferred", summary: "鈴木 花子" })).toBe("管理者を鈴木 花子さんに引き継ぎました");
   });
+
+  it("014で足した操作の文言（specs/014 T092）", () => {
+    const item = page1.items[0]!;
+    expect(actionText({ ...item, action: "reference_posts_added", summary: "3件" })).toBe("参考投稿を3件まとめて登録しました");
+    expect(actionText({ ...item, action: "reference_posts_explained", summary: "2件" })).toBe("2件の参考投稿にAIの解説を入れました");
+    expect(actionText({ ...item, action: "research_keywords_added", summary: "5件" })).toBe("キーワードを5件まとめて登録しました");
+    expect(actionText({ ...item, action: "prompt_length_saved", summary: "200字・35/45/20%" })).toBe(
+      "投稿の文字数と割合を変えました（200字・35/45/20%）",
+    );
+  });
 });
