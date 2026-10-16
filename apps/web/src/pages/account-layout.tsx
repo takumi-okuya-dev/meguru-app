@@ -14,6 +14,8 @@ import {
   type AccountSummary,
 } from "@threads-grower/shared";
 import { Link, Navigate, Outlet, useOutletContext, useParams } from "react-router";
+import { ReadOnlyBanner } from "@/components/billing/ReadOnlyBanner";
+import { TrialEndingBanner } from "@/components/billing/TrialEndingBanner";
 import { AppShell } from "@/components/layout/AppShell";
 import { UnsavedChangesProvider } from "@/components/UnsavedChangesProvider";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -69,7 +71,8 @@ export function AccountLayout() {
   // 開く記録（open）は、切り替えメニューに出るAccount（オーナー・担当）だけ。/api/me を読む前は今までどおりすぐ始め、
   // 読んだ後に一覧にない（見せてもらっている）と分かったら止める
   const unlisted = Boolean(me.data && !me.data.accounts.some((a) => a.id === accountId));
-  const { access } = useAccountAccess(account.data?.role === "viewer" ? accountId : undefined);
+  // 関わりと権限。見せてもらっているAccountの移動と、読むだけの帯（specs/013 FR-045）に使う
+  const { access } = useAccountAccess(account.data ? accountId : undefined);
   useAccountOpen(unlisted ? undefined : accountId, (latest) => {
     queryClient.setQueryData(queryKeys.account(latest.id), latest);
     // 一覧の接続状態・並び順も最新にする
@@ -93,7 +96,7 @@ export function AccountLayout() {
   }
 
   // 再接続のバナーは、各画面の上部バーの下に出す（docs/ui-design.md「2. 画面の骨格」）
-  const banner =
+  const reconnectBanner =
     account.data.connectionStatus === "needs_reconnect" ? (
       <Alert
         variant="warning"
@@ -112,6 +115,14 @@ export function AccountLayout() {
         )}
       </Alert>
     ) : null;
+  // 帯の並び：無料体験の終わり → 読むだけ → 要再接続（specs/013 contracts/ui-routes.md「帯」）
+  const banner = (
+    <>
+      <TrialEndingBanner billing={me.data.billing} />
+      {access?.readOnly && <ReadOnlyBanner reason={access.readOnly.reason} />}
+      {reconnectBanner}
+    </>
+  );
 
   return (
     <AppShell banner={banner}>

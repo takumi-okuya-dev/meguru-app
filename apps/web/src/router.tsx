@@ -17,6 +17,7 @@ import { TeamLayout } from "@/pages/team-layout";
 import { TeamSharedAccountPage } from "@/pages/team-shared-account";
 import { SignInPage } from "@/pages/sign-in";
 import { AccountSettingsPage } from "@/pages/settings/account";
+import { BillingSettingsPage } from "@/pages/settings/billing";
 import { AppearanceSettings } from "@/pages/settings/appearance";
 import { SettingsIndex, SettingsLayout } from "@/pages/settings/settings-layout";
 import { PromotionsPage } from "@/pages/promotions";
@@ -47,6 +48,7 @@ export const routes = [
           { index: true, element: <SettingsIndex /> },
           { path: "appearance", element: <AppearanceSettings /> },
           { path: "account", element: <AccountSettingsPage /> },
+          { path: "billing", element: <BillingSettingsPage /> },
         ],
       },
       // チーム（specs/011 contracts/ui-routes.md「ルート」）。チームの画面と担当の表はサイドバーの中に出す

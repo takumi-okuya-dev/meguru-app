@@ -20,7 +20,6 @@ const account = {
   username: "cafe_b",
   displayName: "カフェ B店",
   profilePictureUrl: null,
-  plan: "auto-grower" as const,
   connectionStatus: "connected" as const,
   lastUsedAt: null,
   role: "owner" as const,

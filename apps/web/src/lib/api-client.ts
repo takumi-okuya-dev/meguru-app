@@ -2,6 +2,8 @@
 // 401 を受けたら、セッション切れとして案内してから /sign-in へ遷移する（contracts/ui-routes.md の規則7）。
 import {
   accountAccessResponseSchema,
+  billingRedirectSchema,
+  billingSummarySchema,
   accountTeamSchema,
   inviteAcceptResponseSchema,
   invitePreviewSchema,
@@ -157,6 +159,11 @@ type FeedbackRequestInput = { memo?: string | null; includeInPrompt?: boolean; e
 /** API の呼び出し。レスポンスは共通のスキーマで検証する。 */
 export const api = {
   me: () => request("/api/me", meResponseSchema),
+  // ---- 契約と支払い（specs/013-billing contracts/api.md）----
+  billing: () => request("/api/billing", billingSummarySchema),
+  syncBilling: () => request("/api/billing/sync", billingSummarySchema, { method: "POST" }),
+  startCheckout: () => request("/api/billing/checkout", billingRedirectSchema, { method: "POST" }),
+  openPortal: () => request("/api/billing/portal", billingRedirectSchema, { method: "POST" }),
   needsReviewCounts: () => request("/api/me/needs-review-counts", needsReviewCountsResponseSchema),
   account: (accountId: string) => request(`/api/accounts/${accountId}`, accountSummarySchema),
   // ---- チーム（specs/011-team-revision contracts/api.md）----

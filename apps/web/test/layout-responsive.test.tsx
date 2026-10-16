@@ -14,7 +14,7 @@ vi.mock("@clerk/react", () => ({
 }));
 
 function account(id: string, username: string, connectionStatus: "connected" | "needs_reconnect" = "connected") {
-  return { id, name: username, username, displayName: username, profilePictureUrl: null, plan: "auto-grower" as const, connectionStatus, lastUsedAt: null, role: "owner" as const, ownerName: null };
+  return { id, name: username, username, displayName: username, profilePictureUrl: null, connectionStatus, lastUsedAt: null, role: "owner" as const, ownerName: null };
 }
 const meResponse: MeResponse = {
   user: { id: "u", email: "t@example.com", displayName: "Takumi" },
@@ -75,7 +75,11 @@ function renderSettings(path: string) {
     ],
     { initialEntries: [path] },
   );
-  render(<RouterProvider router={router} />);
+  render(
+    <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+      <RouterProvider router={router} />
+    </QueryClientProvider>,
+  );
   return router;
 }
 

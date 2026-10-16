@@ -20,6 +20,8 @@ export const queryClient = new QueryClient({
 /** TanStack Query のキー。 */
 export const queryKeys = {
   me: ["me"] as const,
+  // 契約と支払い（specs/013）
+  billing: ["billing"] as const,
   needsReviewCounts: ["me", "needs-review-counts"] as const,
   account: (id: string) => ["account", id] as const,
   // 関わりと権限（specs/011-team-revision）。Account の下に置き、Account の削除で一緒に消す
