@@ -228,3 +228,14 @@ describe("P2（2回目）：契約の一覧をすべてのページから読む"
     expect((await fakeStripe.subscriptions()).find((s) => s.id === oldLive.id)!.status).toBe("canceled");
   });
 });
+
+describe("P1（3回目）：退会を受け付けた後は、Checkoutを作らない", () => {
+  it("退会の途中の利用者の「契約する」は 409 WITHDRAWAL_IN_PROGRESS で、セッションを作らない", async () => {
+    const { userId } = await createUserWithAccount("u1");
+    await db().update(users).set({ withdrawalRequestedAt: new Date() }).where(eq(users.id, userId));
+    const { startCheckout } = await import("../../src/services/billing-service");
+    const err = await startCheckout(billingEnv(), { id: userId, email: "u1@example.com", billing: { enabled: true } }).catch((e: unknown) => e);
+    expect(err).toMatchObject({ code: "WITHDRAWAL_IN_PROGRESS", status: 409 });
+    expect(await fakeStripe.sessions()).toHaveLength(0);
+  });
+});

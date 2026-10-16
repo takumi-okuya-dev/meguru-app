@@ -57,6 +57,8 @@ function renderPage(path = "/settings/billing") {
 const assign = vi.fn();
 beforeEach(() => {
   for (const f of [billing, syncBilling, startCheckout, openPortal, toastSuccess, toastError, assign]) f.mockReset();
+  // 開いたときの読み直しは、既定では返らない（表示は billing の値のまま）
+  syncBilling.mockImplementation(() => new Promise(() => {}));
   vi.stubGlobal("location", { ...window.location, assign });
 });
 afterEach(() => {
@@ -88,6 +90,20 @@ describe("状態ごとの表示", () => {
     expect(screen.getByRole("link", { name: "利用規約" })).toHaveAttribute("href", "/terms");
     expect(screen.getByRole("link", { name: "特定商取引法に基づく表記" })).toHaveAttribute("href", "/legal/commerce");
     expect(screen.getByRole("button", { name: "契約する" })).toBeInTheDocument();
+  });
+
+  it("契約の記録がなくても、開いたら1回読み直し、Checkoutを終えていれば契約済みを出す（PR #16 のCodexレビュー）", async () => {
+    billing.mockResolvedValue(summary());
+    syncBilling.mockResolvedValue(summary({ state: "subscribed_trial", subscription: sub({ status: "trialing" }) }));
+    renderPage();
+    expect(await screen.findByText("無料体験中（契約済み）")).toBeInTheDocument();
+    expect(syncBilling).toHaveBeenCalledTimes(1);
+  });
+
+  it("決済OFFでは読み直さない", async () => {
+    billing.mockResolvedValue(summary({ mode: "disabled", state: "billing_disabled" }));
+    renderPage();
+    await screen.findByText("この環境では決済を使いません");
     expect(syncBilling).not.toHaveBeenCalled();
   });
 
@@ -154,11 +170,12 @@ describe("Checkoutから戻ったとき（FR-023）", () => {
     expect(await screen.findByText("無料体験中（契約済み）")).toBeInTheDocument();
   });
 
-  it("?checkout=canceled：何も出さず、URLから消す", async () => {
+  it("?checkout=canceled：何も出さず、URLから消す（読み直しは、開いたときの1回だけ）", async () => {
     billing.mockResolvedValue(summary());
     const router = renderPage("/settings/billing?checkout=canceled");
     await screen.findByRole("button", { name: "契約する" });
     await waitFor(() => expect(router.state.location.search).toBe(""));
-    expect(syncBilling).not.toHaveBeenCalled();
+    expect(toastSuccess).not.toHaveBeenCalled();
+    expect(syncBilling.mock.calls.length).toBeLessThanOrEqual(1);
   });
 });

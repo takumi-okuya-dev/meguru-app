@@ -134,9 +134,10 @@ export function BillingSettingsPage() {
     // checkout の値が変わったときだけ動かす
   }, [checkout]);
 
-  // 契約がある人は、画面を開くたびに1回読み直す（知らせが届かなかったとき。FR-036）
+  // 決済ONなら、画面を開くたびに1回読み直す（知らせが届かず、Checkoutから戻る前に閉じた場合も拾う。FR-036、
+  // PR #16 のCodexレビュー）。顧客がなければ、APIはStripeを呼ばずに返す
   useEffect(() => {
-    if (checkout === "success" || syncedOnce.current || !summary.data?.subscription) return;
+    if (checkout === "success" || syncedOnce.current || summary.data?.mode !== "enabled") return;
     syncedOnce.current = true;
     api.syncBilling().then(apply, () => undefined);
   }, [summary.data, checkout]);

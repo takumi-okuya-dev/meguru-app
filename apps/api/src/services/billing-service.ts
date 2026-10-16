@@ -225,7 +225,7 @@ async function ensureCustomer(env: Env, stripe: StripeClient, user: { id: string
  * @param stripe - Stripeのクライアント
  * @param now - 今の時刻
  * @returns CheckoutのURL
- * @throws AppError ALREADY_SUBSCRIBED・BILLING_UNAVAILABLE
+ * @throws AppError ALREADY_SUBSCRIBED・BILLING_UNAVAILABLE・WITHDRAWAL_IN_PROGRESS
  */
 export async function startCheckout(
   env: Env,
@@ -238,6 +238,10 @@ export async function startCheckout(
   const customer = await ensureCustomer(env, stripe, user);
   return withTransaction(env.DATABASE_URL, async (tx) => {
     await lockUserRow(tx, user.id);
+    // 退会を受け付けた後には作らない（退会の契約を止める処理より後にセッションが残らないように。退会の受け付けも
+    // 同じ利用者の行の鍵を取るので、鍵の中で読み直せば順番が決まる。PR #16 のCodexレビュー）
+    const [fresh] = await tx.select({ withdrawalRequestedAt: users.withdrawalRequestedAt }).from(users).where(eq(users.id, user.id));
+    if (fresh?.withdrawalRequestedAt) throw new AppError("WITHDRAWAL_IN_PROGRESS", 409, "withdrawal in progress");
     const e = await loadEntitlement(tx, user.id, user.billing, now);
     assertCanSubscribe(e);
     const [row] = await tx.select().from(subscriptions).where(eq(subscriptions.userId, user.id)).limit(1);
