@@ -307,8 +307,11 @@ export type KeywordIdeaProblem = "too_long" | "registered" | "duplicate";
 /** 貼り付けた答えから取り出したキーワードの案。 */
 export type KeywordIdea = { keyword: string; purpose: string; problem: KeywordIdeaProblem | null };
 
-/** 行頭の番号・記号（1.・1)・①・・・-・#・*・>）と空白（\s は全角の空白も含む）。 */
-const IDEA_PREFIX = /^\s*(?:(?:\d+|[①-⑳])[.)．）、]?|[・\-#*>•])?\s*/;
+/**
+ * 行頭の番号・記号（1.・1)・①・・・-・#・*・>）と空白（\s は全角の空白も含む）。
+ * 算用数字は番号の記号が続くときだけ番号とみなす（「20代後半 友達」の「20」を削らない。PR #17 のCodexレビュー）。
+ */
+const IDEA_PREFIX = /^\s*(?:\d+[.)．）、]|[①-⑳][.)．）、]?|[・\-#*>•])?\s*/;
 
 /**
  * 貼り付けた答えを1行ずつキーワードの案にする（specs/014 FR-091）。

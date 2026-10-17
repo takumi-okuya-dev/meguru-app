@@ -5,7 +5,8 @@ import { POST_LENGTH_DEFAULTS, type PostLengthSettings } from "@threads-grower/s
 import { fireEvent } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { EDITOR_ACCESS, OWNER_ACCESS } from "./helpers/access";
-import { listResponse, promptResponse, renderAccountRoutes } from "./helpers/stock";
+import { Link, Outlet } from "react-router";
+import { account, listResponse, promptResponse, renderAccountRoutes } from "./helpers/stock";
 
 const listPostDrafts = vi.fn();
 const getPrompt = vi.fn();
@@ -19,6 +20,7 @@ vi.mock("@/lib/api-client", async (orig) => {
 vi.mock("sonner", () => ({ toast: { success: toastSuccess, error: vi.fn(), info: vi.fn() } }));
 
 const { CreatePage } = await import("@/pages/create");
+const { UnsavedChangesProvider } = await import("@/components/UnsavedChangesProvider");
 
 const CUSTOM: PostLengthSettings = { target: 200, shortLength: 70, mediumLength: 135, longLength: 180, shortRatio: 35, mediumRatio: 45, longRatio: 20 };
 
@@ -155,6 +157,73 @@ describe("文字数と長さの割合", () => {
     await user.click(again.getByRole("button", { name: "保存" }));
     await waitFor(() => expect(putPromptSettings).toHaveBeenLastCalledWith("a1", 12, 5, expect.objectContaining({ target: 200 })));
     expect(putPromptSettings).not.toHaveBeenCalledWith("a1", 12, expect.anything());
+  });
+
+  it("作る件数の保存が 409 なら、最新の文字数と割合もすぐ欄に入れる（PR #17 のCodexレビュー）", async () => {
+    const { ApiError } = await import("@/lib/api-client");
+    const user = userEvent.setup();
+    putPromptSettings.mockRejectedValueOnce(new ApiError("STALE_UPDATE", 409, [], { postCount: 30, length: CUSTOM, version: 5 }, null));
+    getPrompt.mockResolvedValueOnce(withSettings({ ...POST_LENGTH_DEFAULTS })).mockImplementation(() => new Promise(() => {}));
+    renderCreate();
+    const count = await screen.findByRole("spinbutton", { name: "作る件数" });
+    await user.clear(count);
+    await user.type(count, "10");
+    await waitFor(() => expect(screen.getByRole("button", { name: /文字数と長さの割合/ })).toHaveTextContent("目標 200字"), {
+      timeout: 2000,
+    });
+  });
+
+  it("文字数と割合の保存が 409 なら、読み直しを待たずに最新の文字数と割合を欄に入れる（PR #17 のCodexレビュー）", async () => {
+    const { ApiError } = await import("@/lib/api-client");
+    const user = userEvent.setup();
+    putPromptSettings.mockRejectedValueOnce(new ApiError("STALE_UPDATE", 409, [], { postCount: 30, length: CUSTOM, version: 5 }, null));
+    getPrompt.mockResolvedValueOnce(withSettings({ ...POST_LENGTH_DEFAULTS })).mockImplementation(() => new Promise(() => {}));
+    renderCreate();
+    const s = await openSettings(user);
+    fireEvent.change(s.getByRole("slider", { name: "短文の割合" }), { target: { value: "40" } });
+    fireEvent.change(s.getByRole("slider", { name: "中文の割合" }), { target: { value: "40" } });
+    await user.click(s.getByRole("button", { name: "保存" }));
+    await waitFor(() => expect(screen.getByRole("button", { name: /文字数と長さの割合/ })).toHaveTextContent("目標 200字"));
+  });
+
+  it("文字数と割合の保存中に作る件数を変えていたら、409 でもその件数を残し、最新の版で保存し直す（PR #17 のCodexレビュー）", async () => {
+    const { ApiError } = await import("@/lib/api-client");
+    const user = userEvent.setup();
+    let fail: (e: unknown) => void = () => {};
+    putPromptSettings
+      .mockImplementationOnce(() => new Promise((_, r) => (fail = r)))
+      .mockImplementation(async (_a: string, n: number, v: number) => ({ postCount: n, length: POST_LENGTH_DEFAULTS, version: v + 1 }));
+    renderCreate();
+    const s = await openSettings(user);
+    fireEvent.change(s.getByRole("slider", { name: "短文の割合" }), { target: { value: "40" } });
+    fireEvent.change(s.getByRole("slider", { name: "中文の割合" }), { target: { value: "40" } });
+    await user.click(s.getByRole("button", { name: "保存" }));
+    const count = screen.getByRole("spinbutton", { name: "作る件数" });
+    await user.clear(count);
+    await user.type(count, "15");
+    fail(new ApiError("STALE_UPDATE", 409, [], { postCount: 12, length: POST_LENGTH_DEFAULTS, version: 5 }, null));
+    await waitFor(() => expect(putPromptSettings).toHaveBeenLastCalledWith("a1", 15, 5), { timeout: 2000 });
+    expect(count).toHaveValue(15);
+  });
+
+  it("文字数と割合を保存せずに移動しようとすると、未保存の確認が出る（PR #17 のCodexレビュー）", async () => {
+    const user = userEvent.setup();
+    renderAccountRoutes(
+      [
+        { index: true, element: <p>ホームの中身</p> },
+        { path: "create", element: <CreatePage /> },
+      ],
+      "/accounts/a1/create",
+      <UnsavedChangesProvider>
+        <Link to="/accounts/a1">ホームへ</Link>
+        <Outlet context={{ account }} />
+      </UnsavedChangesProvider>,
+    );
+    const s = await openSettings(user);
+    await user.clear(s.getByRole("spinbutton", { name: "1投稿の文字数の目標" }));
+    await user.type(s.getByRole("spinbutton", { name: "1投稿の文字数の目標" }), "200");
+    await user.click(screen.getByRole("link", { name: "ホームへ" }));
+    expect(await screen.findByText("保存していない変更があります")).toBeInTheDocument();
   });
 
   it("オーナー以外は、見られるが保存できない（SC-019）", async () => {

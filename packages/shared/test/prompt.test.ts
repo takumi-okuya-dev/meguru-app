@@ -640,3 +640,32 @@ describe("2つに分けて送る（specs/014 US14、FR-152、SC-020）", () => {
     expect([...one.slice(3, -1), ...two.slice(2)]).toEqual(whole.slice(2));
   });
 });
+
+describe("件数が少ないときに矛盾した指示を出さない（PR #17 のCodexレビュー）", () => {
+  const drafts = { ...emptyStrategyValues(), profileBioDraft: "プロフィール", contentThemeMix: "東京×友だち" };
+
+  it("宣伝投稿で全件を使うなら、プロフィールへ誘う件数は0件にし、その指示と最終チェックの行を入れない", () => {
+    const { prompt } = buildPrompt(input({ count: 1, promotionRatioPercent: 100, promotions: [promo("交流会")], strategy: drafts }));
+    expect(prompt).toContain("■現在のプロフィールと固定投稿");
+    expect(prompt).not.toContain("自然に誘う一言を添える");
+    expect(prompt).not.toContain("□ プロフィールや固定投稿へ誘う投稿");
+  });
+
+  it("誘う件数は、宣伝投稿を除いた通常投稿の件数まで", () => {
+    const { prompt } = buildPrompt(input({ count: 20, promotionRatioPercent: 95, promotions: [promo("交流会")], strategy: drafts }));
+    // 宣伝19件・通常1件、誘う件数は round(20/10)=2 → 1件まで
+    expect(prompt).toContain("・20件のうち1件は、文末で");
+    expect(prompt).toContain("□ プロフィールや固定投稿へ誘う投稿が1件ある");
+  });
+
+  it("3件未満なら、話題の4割の指示と「すべて最低1件ずつ」を求めない", () => {
+    const two = buildPrompt(input({ count: 2, strategy: drafts })).prompt;
+    expect(two).toContain("【話題の配分(必ず守る)】");
+    expect(two).not.toContain("4割");
+    expect(two).not.toContain("すべて最低1件ずつ");
+    expect(two).toContain("2件しか作らないので、すべての話題を入れなくてよい");
+    const three = buildPrompt(input({ count: 3, strategy: drafts })).prompt;
+    expect(three).toContain("全体の4割を超えないようにすること");
+  });
+});
+

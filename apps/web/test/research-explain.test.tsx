@@ -77,6 +77,15 @@ describe("まとめてAIに解説してもらう", () => {
     expect(panel().getAllByRole("checkbox")[0]).toBeDisabled();
   });
 
+  it("自動でコピーできず手でコピーする欄を出したときも、答えの貼り付け欄を開く（PR #17 のCodexレビュー）", async () => {
+    const user = userEvent.setup();
+    vi.spyOn(navigator.clipboard, "writeText").mockRejectedValueOnce(new Error("denied"));
+    renderResearchPage(ResearchPage);
+    await user.click(await screen.findByRole("button", { name: /まとめてAIに解説してもらう（/ }));
+    expect(await panel().findByText("コピーできませんでした。全体を選んでコピーしてください")).toBeInTheDocument();
+    expect(panel().getByLabelText("AIの答えを貼り付ける")).toBeInTheDocument();
+  });
+
   it("貼り付けると対応が理由つきで並び、保存すると選んだ分だけ送る（US8-4〜US8-6）", async () => {
     saveExplanations.mockResolvedValue({ saved: [A.id], skipped: [] });
     const user = userEvent.setup();

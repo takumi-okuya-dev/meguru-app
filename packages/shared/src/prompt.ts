@@ -123,6 +123,9 @@ const PROFILE_PROMPT_LABELS = [
 /** 話題の配分の指示を出す項目（014 FR-112）。 */
 const TOPIC_KEYS = ["contentThemeMix", "postGenres", "realWorries", "desiredSelfImage"] as const;
 
+/** 話題を「すべて最低1件ずつ・1つは4割まで」と求める、作る件数の下限。 */
+const TOPIC_SPREAD_MIN = 3;
+
 const hasTopics = (strategy: StrategyValues) => TOPIC_KEYS.some((k) => !isBlank(strategy[k]));
 const hasProfile = (strategy: StrategyValues) => PROFILE_PROMPT_LABELS.some(([k]) => !isBlank(strategy[k]));
 
@@ -188,10 +191,13 @@ function strategySection(strategy: StrategyValues, count: number): string | null
     }
   }
   if (lines.length === 0) return null;
+  // 3件未満では「すべて最低1件ずつ」「4割まで」を両立できないので、緩めた指示にする（PR #17 のCodexレビュー）
   const topics = hasTopics(strategy)
     ? [
         "【話題の配分(必ず守る)】",
-        `上の「発信テーマの掛け合わせ」「投稿ジャンル」「ターゲットの本音の悩み」「ターゲットのなりたい姿」に出てくる主な話題を、${count}件の中に、すべて最低1件ずつ入れること。1つの話題が、全体の4割を超えないようにすること。投稿ジャンルに割合や件数が書かれている場合は、その配分どおりにすること。`,
+        count >= TOPIC_SPREAD_MIN
+          ? `上の「発信テーマの掛け合わせ」「投稿ジャンル」「ターゲットの本音の悩み」「ターゲットのなりたい姿」に出てくる主な話題を、${count}件の中に、すべて最低1件ずつ入れること。1つの話題が、全体の4割を超えないようにすること。投稿ジャンルに割合や件数が書かれている場合は、その配分どおりにすること。`
+          : `上の「発信テーマの掛け合わせ」「投稿ジャンル」「ターゲットの本音の悩み」「ターゲットのなりたい姿」に出てくる主な話題から選んで書くこと。${count}件しか作らないので、すべての話題を入れなくてよい。`,
       ]
     : [];
   return [
@@ -245,7 +251,11 @@ function profileSection(strategy: StrategyValues, c: Counts): string | null {
     ...drafts,
     "【使い方】",
     "・プロフィールが示す「誰に・何を・どんな価値を届けるか」を軸にして、各投稿を書く。プロフィールの約束と関係ない話題、トーンが食い違う話題は作らない。文章そのものはコピーしない。",
-    `・${c.count}件のうち${c.invite}件は、文末で、プロフィールや固定投稿へ自然に誘う一言を添える(毎回違う言い方にする。URLは書かない。宣伝投稿とは別の投稿にする)。`,
+    ...(c.invite > 0
+      ? [
+          `・${c.count}件のうち${c.invite}件は、文末で、プロフィールや固定投稿へ自然に誘う一言を添える(毎回違う言い方にする。URLは書かない。宣伝投稿とは別の投稿にする)。`,
+        ]
+      : []),
   ].join("\n");
 }
 
@@ -499,7 +509,12 @@ function finalCheckSection(c: Counts, has: { strategy: boolean; purpose: boolean
     `□ 1件ずつ、${c.length.target}文字以内(500文字は絶対に超えない)。`,
   ];
   if (material.length > 0) lines.push(`□ 上の${material.join("と")}の内容が、投稿に表れている。`);
-  if (has.topics) lines.push("□ 「発信テーマ」「投稿ジャンル」などに書かれた話題が、すべて最低1件ずつ入っている。");
+  if (has.topics)
+    lines.push(
+      c.count >= TOPIC_SPREAD_MIN
+        ? "□ 「発信テーマ」「投稿ジャンル」などに書かれた話題が、すべて最低1件ずつ入っている。"
+        : "□ 「発信テーマ」「投稿ジャンル」などに書かれた話題から選んで書いている。",
+    );
   if (c.promo > 0) lines.push(`□ 宣伝投稿がちょうど${c.promo}件あり、そのすべてに、投稿ごとに違う言い回しの誘導の一言がある。`);
   if (c.pattern > 0) lines.push(`□ リサーチの「型」を使った投稿が、少なくとも${c.pattern}件ある。`);
   if (c.invite > 0) lines.push(`□ プロフィールや固定投稿へ誘う投稿が${c.invite}件ある(宣伝投稿とは別)。`);
@@ -519,11 +534,13 @@ type Parts = { posts: PromptReferencePost[]; drafts: string[]; rejected: PromptR
 function promptCounts(input: PromptInput, posts: PromptReferencePost[], withPromotions: boolean): Counts {
   const { count } = input;
   const length = input.lengthSettings ?? POST_LENGTH_DEFAULTS;
+  const promo = withPromotions ? Math.max(1, Math.round((count * input.promotionRatioPercent) / 100)) : 0;
   return {
     count,
-    promo: withPromotions ? Math.max(1, Math.round((count * input.promotionRatioPercent) / 100)) : 0,
+    promo,
     pattern: posts.length > 0 ? Math.min(count, Math.max(3, Math.ceil(posts.length * 1.2))) : 0,
-    invite: hasProfile(input.strategy) ? Math.max(1, Math.round(count / 10)) : 0,
+    // 誘う投稿は宣伝投稿とは別にするので、通常投稿の件数まで（PR #17 のCodexレビュー）
+    invite: hasProfile(input.strategy) ? Math.min(count - promo, Math.max(1, Math.round(count / 10))) : 0,
     mix: splitLengthMix(count, [length.shortRatio, length.mediumRatio, length.longRatio]),
     length,
   };

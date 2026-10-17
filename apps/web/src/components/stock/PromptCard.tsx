@@ -139,6 +139,9 @@ function PromptReadyCard({
   const [copyFailed, setCopyFailed] = useState(false);
   const areaRef = useRef<HTMLTextAreaElement>(null);
 
+  // 文字数と割合の欄に出す保存済みの値。件数を変えてプロンプトを読み直している間も出したままにし（入力中の値を失わない）、
+  // 保存の競合（409）では読み直しを待たずに最新の値にする（PR #17 のCodexレビュー）
+  const [lengthSettings, setLengthSettings] = useState<PostLengthSettings | null>(null);
   const prompt = useQuery({
     queryKey: queryKeys.prompt(accountId, count),
     queryFn: () => api.getPrompt(accountId, count),
@@ -179,11 +182,13 @@ function PromptReadyCard({
     onError: (err, n, context) => {
       if (isStale(err)) {
         // 自動で保存する欄なので、黙って上書きせず、最新の件数に合わせて知らせる
-        const latest = err.latest as { postCount: number; version: number };
+        const latest = err.latest as { postCount: number; length?: PostLengthSettings; version: number };
         version.current = latest.version;
         setSaved(latest.postCount);
         setCount(latest.postCount);
         setFailed(null);
+        // 文字数と割合もほかの人が変えていることがあるので、最新の値にする（PR #17 のCodexレビュー）
+        if (latest.length) setLengthSettings(latest.length);
         if (context?.generation === editGeneration.current) {
           setCountInput(String(latest.postCount));
           toast.info(
@@ -204,6 +209,7 @@ function PromptReadyCard({
   const { mutate: saveLength, isPending: savingLength } = useMutation({
     mutationFn: (length: PostLengthSettings) =>
       api.putPromptSettings(accountId, saved, version.current, length),
+    onMutate: () => ({ generation: editGeneration.current }),
     onSuccess: ({ version: v }) => {
       version.current = v;
       queryClient.setQueryData<PostDraftList>(queryKeys.postDrafts(accountId), (old) =>
@@ -213,15 +219,19 @@ function PromptReadyCard({
       // プロンプトの数字が変わるので作り直す
       void queryClient.invalidateQueries({ queryKey: queryKeys.promptAll(accountId) });
     },
-    onError: (err) => {
+    onError: (err, _length, context) => {
       if (isStale(err)) {
-        // 作る件数もほかの人が変えていることがあるので、最新の件数にそろえる（古い件数を新しい版で送り戻さない。PR #17 のCodexレビュー）
-        const latest = err.latest as { postCount: number; version: number };
+        // 作る件数もほかの人が変えていることがあるので、最新の件数にそろえる（古い件数を新しい版で送り戻さない）。
+        // 文字数と割合は読み直しを待たずに最新の値にする。保存中に件数を入力していたら、その件数は残して最新の版で保存し直す
+        // （PR #17 のCodexレビュー）
+        const latest = err.latest as { postCount: number; length: PostLengthSettings; version: number };
         version.current = latest.version;
+        setLengthSettings(latest.length);
         setSaved(latest.postCount);
         setCount(latest.postCount);
-        setCountInput(String(latest.postCount));
         setFailed(null);
+        // 入力中の件数は入力欄に残す（入力が止まった後に、その件数を最新の版で保存する）
+        if (context?.generation === editGeneration.current) setCountInput(String(latest.postCount));
         queryClient.setQueryData<PostDraftList>(queryKeys.postDrafts(accountId), (old) =>
           old ? { ...old, promptPostCount: latest.postCount, promptPostCountVersion: latest.version } : old,
         );
@@ -259,8 +269,6 @@ function PromptReadyCard({
   }, [copyFailed, open]);
 
   const fullText = edited ?? prompt.data?.prompt ?? "";
-  // 文字数と割合の欄は、件数を変えてプロンプトを読み直している間も出したままにする（入力中の値を失わない）
-  const [lengthSettings, setLengthSettings] = useState<PostLengthSettings | null>(null);
   const latestLength = prompt.data?.settings.length;
   useEffect(() => {
     if (latestLength) setLengthSettings(latestLength);

@@ -15,6 +15,7 @@ import {
 import { ChevronDownIcon } from "lucide-react";
 import { useId, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { useUnsavedChanges } from "@/lib/use-unsaved-changes";
 import { cn } from "@/lib/utils";
 
 const KINDS = [
@@ -81,6 +82,10 @@ export function LengthSettings({
   const ratios = [Number(draft.shortRatio) || 0, Number(draft.mediumRatio) || 0, Number(draft.longRatio) || 0] as [number, number, number];
   const mix = ratios[0] + ratios[1] + ratios[2] === 100 ? splitLengthMix(count, ratios) : null;
   const changed = value !== null && (Object.keys(settings) as (keyof PostLengthSettings)[]).some((k) => settings[k] !== value[k]);
+  // 保存していない入力があれば、移動の前に確かめる（PR #17 のCodexレビュー）
+  useUnsavedChanges(
+    canSave && (Object.keys(settings) as (keyof PostLengthSettings)[]).some((k) => draft[k] !== String(settings[k])),
+  );
   const summary = `目標 ${settings.target}字・${KINDS.map((k) => `${k.name} ${settings[k.length]}字 ${settings[k.ratio]}%`).join("・")}`;
   const set = (k: keyof PostLengthSettings, v: string) => setDraft((d) => ({ ...d, [k]: v }));
   const numberClass = "h-10 w-20 rounded-xl border border-input bg-card px-3 text-right text-base disabled:opacity-60 md:h-9 md:text-[15px]";

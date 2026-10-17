@@ -9,7 +9,8 @@ import { cn } from "@/lib/utils";
 /**
  * プロンプトをコピーするボタン。
  * @param props - getText：押したときのプロンプト（画面の今の入力から作る）、label：ボタンの文言、
- *   copiedMessage：コピーできたときの文、disabled：押せないか、variant：見た目、onCopied：コピーできたとき
+ *   copiedMessage：コピーできたときの文、disabled：押せないか、variant：見た目、
+ *   onCopied：コピーできたとき、または手でコピーする欄を出したとき
  * @returns ボタンと結果の表示
  */
 export function CopyPromptButton({
@@ -62,6 +63,8 @@ export function CopyPromptButton({
       onCopied?.();
     } catch {
       setState({ kind: "failed", text });
+      // 手でコピーする欄を出したときも、次の手順（答えの貼り付け欄）へ進めるようにする（PR #17 のCodexレビュー）
+      onCopied?.();
     }
   };
 

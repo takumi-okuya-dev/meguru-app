@@ -208,6 +208,15 @@ describe("parseKeywordIdeas（specs/014 FR-091）", () => {
     ]);
   });
 
+  it("数字で始まるキーワードは、番号の記号（. や )）が続かなければ削らない（PR #17 のCodexレビュー）", () => {
+    expect(parseKeywordIdeas("20代後半 友達｜社会人の本音\n3. 30代 転職\n2) 40代 趣味\n1、50代", []).map((i) => i.keyword)).toEqual([
+      "20代後半 友達",
+      "30代 転職",
+      "40代 趣味",
+      "50代",
+    ]);
+  });
+
   it("100文字を超える・登録済み（正規化して同じ）・一覧の中で重なる行は、理由を付ける", () => {
     const long = "あ".repeat(101);
     const ideas = parseKeywordIdeas(["上京 さみしい", long, "ＴＯＫＹＯ 友達", "上京 さみしい", "新しい言葉"].join("\n"), ["tokyo 友達"]);
