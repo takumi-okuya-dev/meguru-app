@@ -127,7 +127,12 @@ export function ReferencePostAddDialog({
         locked={locked}
         submitDisabled={total === 0 || total > cap}
         onSubmit={submit}
-        onRequestClose={() => (dirty ? setConfirmClose(true) : onClose())}
+        // 登録の途中は閉じない（送った登録は取り消せないので、破棄したつもりで登録されないように。PR #17 のCodexレビュー）
+        onRequestClose={() => {
+          if (register.isPending) return;
+          if (dirty) setConfirmClose(true);
+          else onClose();
+        }}
       >
         <p className="text-[13px] text-muted-foreground">
           何件かまとめて登録するときは、1件入れるたびに「この投稿をためて、次の投稿を入力する」を押してください。最後に「〇件を登録する」で、ためた分も一緒に登録します。

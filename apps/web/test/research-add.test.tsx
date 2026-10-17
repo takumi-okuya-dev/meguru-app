@@ -155,6 +155,18 @@ describe("参考投稿を追加（ためて登録）", () => {
     await waitFor(() => expect(d.getByRole("button", { name: "外す" })).toBeDisabled());
   });
 
+  it("登録の途中は閉じられない（破棄したつもりで登録されるのを防ぐ。PR #17 のCodexレビュー）", async () => {
+    createReferencePostsBatch.mockImplementation(() => new Promise(() => {}));
+    renderResearchPage(ResearchPage);
+    const d = await openAdd();
+    await userEvent.type(d.getByLabelText(/^本文/), "1件目");
+    await userEvent.click(d.getAllByRole("button", { name: "登録する" })[0]!);
+    await waitFor(() => expect(createReferencePostsBatch).toHaveBeenCalled());
+    await userEvent.click(d.getByRole("button", { name: "閉じる" }));
+    expect(screen.queryByText("登録していない投稿があります。破棄しますか？")).not.toBeInTheDocument();
+    expect(screen.getByRole("dialog", { name: "参考投稿を追加" })).toBeInTheDocument();
+  });
+
   it("アカウントを切り替えると、追加の欄とためた投稿を捨てる（ほかのアカウントに登録しない。PR #17 のCodexレビュー）", async () => {
     function Layout() {
       const [current, setCurrent] = useState(testAccount);
