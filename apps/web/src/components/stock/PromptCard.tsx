@@ -142,6 +142,7 @@ function PromptReadyCard({
   // 文字数と割合の欄に出す保存済みの値。件数を変えてプロンプトを読み直している間も出したままにし（入力中の値を失わない）、
   // 保存の競合（409）では読み直しを待たずに最新の値にする（PR #17 のCodexレビュー）
   const [lengthSettings, setLengthSettings] = useState<PostLengthSettings | null>(null);
+  const [lengthResetKey, setLengthResetKey] = useState(0);
   const prompt = useQuery({
     queryKey: queryKeys.prompt(accountId, count),
     queryFn: () => api.getPrompt(accountId, count),
@@ -210,8 +211,10 @@ function PromptReadyCard({
     mutationFn: (length: PostLengthSettings) =>
       api.putPromptSettings(accountId, saved, version.current, length),
     onMutate: () => ({ generation: editGeneration.current }),
-    onSuccess: ({ version: v }) => {
+    onSuccess: ({ version: v, length }) => {
       version.current = v;
+      // 保存した値をすぐ保存済みの値にする（読み直しを待たずに、未保存の扱いを外す）
+      setLengthSettings(length);
       queryClient.setQueryData<PostDraftList>(queryKeys.postDrafts(accountId), (old) =>
         old ? { ...old, promptPostCountVersion: v } : old,
       );
@@ -227,6 +230,7 @@ function PromptReadyCard({
         const latest = err.latest as { postCount: number; length: PostLengthSettings; version: number };
         version.current = latest.version;
         setLengthSettings(latest.length);
+        setLengthResetKey((k) => k + 1);
         setSaved(latest.postCount);
         setCount(latest.postCount);
         setFailed(null);
@@ -368,7 +372,8 @@ function PromptReadyCard({
       {/* 文字数と長さの割合（specs/014 FR-140）。保存済みの値が変わったら作り直す */}
       {lengthSettings && (
         <LengthSettings
-          key={JSON.stringify(lengthSettings)}
+          // 文字数と割合の保存の競合（409）のときだけ入力を捨てて最新の値にする。ほかで保存済みの値が変わっても、入力中の値は残す
+          resetKey={lengthResetKey}
           settings={lengthSettings}
           count={count}
           canSave={canSaveCount}

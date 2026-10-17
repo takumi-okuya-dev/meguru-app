@@ -1,8 +1,13 @@
 // US7：参考投稿を、ためてまとめて登録する（specs/014-strategy-guidance FR-080〜FR-085・FR-095〜FR-098）
-import { screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { render } from "@testing-library/react";
+import { useState } from "react";
+import { createMemoryRouter, Outlet, RouterProvider } from "react-router";
 import { refPost, renderResearchPage } from "./helpers/research";
+import { testAccount } from "./helpers/strategy-page";
 
 const listReferencePosts = vi.fn();
 const listResearchKeywords = vi.fn();
@@ -137,6 +142,46 @@ describe("参考投稿を追加（ためて登録）", () => {
     await userEvent.type(d.getByLabelText("投稿のURL"), "https://www.threads.com/@a/post/2");
     await userEvent.click(d.getAllByRole("button", { name: "1件を登録する" })[0]!);
     expect(await d.findByText("入力してください")).toBeInTheDocument();
+    expect(createReferencePostsBatch).not.toHaveBeenCalled();
+  });
+
+  it("登録の途中は、ためた投稿を外せない（PR #17 のCodexレビュー）", async () => {
+    createReferencePostsBatch.mockImplementation(() => new Promise(() => {}));
+    renderResearchPage(ResearchPage);
+    const d = await openAdd();
+    await userEvent.type(d.getByLabelText(/^本文/), "1件目");
+    await userEvent.click(d.getByRole("button", { name: "＋この投稿をためて、次の投稿を入力する" }));
+    await userEvent.click(d.getAllByRole("button", { name: "1件を登録する" })[0]!);
+    await waitFor(() => expect(d.getByRole("button", { name: "外す" })).toBeDisabled());
+  });
+
+  it("アカウントを切り替えると、追加の欄とためた投稿を捨てる（ほかのアカウントに登録しない。PR #17 のCodexレビュー）", async () => {
+    function Layout() {
+      const [current, setCurrent] = useState(testAccount);
+      return (
+        <>
+          <button type="button" onClick={() => setCurrent({ ...testAccount, id: "a2", name: "別のアカウント" })}>
+            切り替え
+          </button>
+          <Outlet context={{ account: current }} />
+        </>
+      );
+    }
+    const router = createMemoryRouter(
+      [{ path: "/accounts/:accountId", element: <Layout />, children: [{ path: "research", element: <ResearchPage /> }] }],
+      { initialEntries: ["/accounts/a1/research"] },
+    );
+    render(
+      <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+        <RouterProvider router={router} />
+      </QueryClientProvider>,
+    );
+    const d = await openAdd();
+    await userEvent.type(d.getByLabelText(/^本文/), "Aの投稿");
+    await userEvent.click(d.getByRole("button", { name: "＋この投稿をためて、次の投稿を入力する" }));
+    // ダイアログの外のボタン（アカウントの切り替え）を押した扱いにする
+    fireEvent.click(screen.getByRole("button", { name: "切り替え", hidden: true }));
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: "参考投稿を追加" })).not.toBeInTheDocument());
     expect(createReferencePostsBatch).not.toHaveBeenCalled();
   });
 

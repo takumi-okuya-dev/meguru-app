@@ -46,6 +46,16 @@ type ToDelete = { kind: "post"; item: ReferencePost } | { kind: "keyword"; item:
  */
 export function ResearchPage() {
   const account = useCurrentAccount();
+  // アカウントを切り替えたら作り直す（追加の欄・ためた投稿をほかのアカウントへ持ち越さない。PR #17 のCodexレビュー）
+  return <ResearchPageContent key={account.id} />;
+}
+
+/**
+ * リサーチの画面の中身（1つのAccount分）。
+ * @returns リサーチの画面
+ */
+function ResearchPageContent() {
+  const account = useCurrentAccount();
   const queryClient = useQueryClient();
   const [params, setParams] = useSearchParams();
   const tab: Tab = params.get("tab") === "keywords" ? "keywords" : "posts";

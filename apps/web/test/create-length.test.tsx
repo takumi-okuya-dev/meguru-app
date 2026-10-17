@@ -173,6 +173,25 @@ describe("文字数と長さの割合", () => {
     });
   });
 
+  it("作る件数の保存が 409 でも、文字数と割合の未保存の入力は残す。入力していなければ最新の値にする（PR #17 のCodexレビュー）", async () => {
+    const { ApiError } = await import("@/lib/api-client");
+    const user = userEvent.setup();
+    putPromptSettings.mockRejectedValueOnce(new ApiError("STALE_UPDATE", 409, [], { postCount: 30, length: CUSTOM, version: 5 }, null));
+    getPrompt.mockResolvedValueOnce(withSettings({ ...POST_LENGTH_DEFAULTS })).mockImplementation(() => new Promise(() => {}));
+    renderCreate();
+    const s = await openSettings(user);
+    await user.clear(s.getByRole("spinbutton", { name: "短文の文字数" }));
+    await user.type(s.getByRole("spinbutton", { name: "短文の文字数" }), "60");
+    const count = screen.getByRole("spinbutton", { name: "作る件数" });
+    await user.clear(count);
+    await user.type(count, "10");
+    await waitFor(() => expect(screen.getByRole("button", { name: /文字数と長さの割合/ })).toHaveTextContent("目標 200字"), {
+      timeout: 2000,
+    });
+    // 入力していた短文の文字数は残り、入力していない目標は最新の値になる
+    expect(s.getByRole("spinbutton", { name: "短文の文字数" })).toHaveValue(60);
+  });
+
   it("文字数と割合の保存が 409 なら、読み直しを待たずに最新の文字数と割合を欄に入れる（PR #17 のCodexレビュー）", async () => {
     const { ApiError } = await import("@/lib/api-client");
     const user = userEvent.setup();

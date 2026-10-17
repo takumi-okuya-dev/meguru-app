@@ -13,7 +13,7 @@ import {
   type PostLengthSettings,
 } from "@threads-grower/shared";
 import { ChevronDownIcon } from "lucide-react";
-import { useId, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { useUnsavedChanges } from "@/lib/use-unsaved-changes";
 import { cn } from "@/lib/utils";
@@ -57,7 +57,8 @@ function validate(d: Draft): { value: PostLengthSettings | null; reasons: string
  * 文字数と長さの割合の欄。
  * @param props - settings：保存済みの値、count：作る件数（内訳に使う）、canSave：保存できるか（オーナーだけ）、
  *   saving：保存中か（欄も変えられない。保存の後の読み直しで、後から入れた値を失わないように）、
- *   blocked：ほかの保存（作る件数）の途中か（「保存」だけ押せない）、onSave：保存する
+ *   blocked：ほかの保存（作る件数）の途中か（「保存」だけ押せない）、resetKey：変わったら入力を捨てて保存済みの値に戻す、
+ *   onSave：保存する
  * @returns 欄
  */
 export function LengthSettings({
@@ -66,6 +67,7 @@ export function LengthSettings({
   canSave,
   saving,
   blocked = false,
+  resetKey = 0,
   onSave,
 }: {
   settings: PostLengthSettings;
@@ -73,10 +75,28 @@ export function LengthSettings({
   canSave: boolean;
   saving: boolean;
   blocked?: boolean;
+  resetKey?: number;
   onSave: (length: PostLengthSettings) => void;
 }) {
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState<Draft>(() => toDraft(settings));
+  // 保存済みの値が変わったら（読み直し・ほかの人の保存）、入力していない項目だけ新しい値にし、入力中の項目は残す（PR #17 のCodexレビュー）
+  const base = useRef(settings);
+  useEffect(() => {
+    const prev = toDraft(base.current);
+    const next = toDraft(settings);
+    base.current = settings;
+    setDraft((d) =>
+      Object.fromEntries((Object.keys(d) as (keyof Draft)[]).map((k) => [k, d[k] === prev[k] ? next[k] : d[k]])) as Draft,
+    );
+  }, [settings]);
+  // 親が入力を捨てるよう求めたら（保存の競合）、保存済みの値に戻す。開いた状態はそのまま
+  const resetSeen = useRef(resetKey);
+  useEffect(() => {
+    if (resetSeen.current === resetKey) return;
+    resetSeen.current = resetKey;
+    setDraft(toDraft(base.current));
+  }, [resetKey]);
   const id = useId();
   const { value, reasons } = validate(draft);
   const ratios = [Number(draft.shortRatio) || 0, Number(draft.mediumRatio) || 0, Number(draft.longRatio) || 0] as [number, number, number];

@@ -147,6 +147,8 @@ export function ReferencePostAddDialog({
                     variant="outline"
                     size="sm"
                     className="shrink-0 rounded-full"
+                    // 登録の途中は外せない（送った内容と画面が食い違わないように。PR #17 のCodexレビュー）
+                    disabled={locked || register.isPending}
                     onClick={() => setQueue((list) => list.filter((_, j) => j !== i))}
                   >
                     外す
