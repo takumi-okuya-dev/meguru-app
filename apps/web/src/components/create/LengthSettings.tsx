@@ -55,7 +55,8 @@ function validate(d: Draft): { value: PostLengthSettings | null; reasons: string
 /**
  * 文字数と長さの割合の欄。
  * @param props - settings：保存済みの値、count：作る件数（内訳に使う）、canSave：保存できるか（オーナーだけ）、
- *   saving：保存中か、onSave：保存する
+ *   saving：保存中か（欄も変えられない。保存の後の読み直しで、後から入れた値を失わないように）、
+ *   blocked：ほかの保存（作る件数）の途中か（「保存」だけ押せない）、onSave：保存する
  * @returns 欄
  */
 export function LengthSettings({
@@ -63,12 +64,14 @@ export function LengthSettings({
   count,
   canSave,
   saving,
+  blocked = false,
   onSave,
 }: {
   settings: PostLengthSettings;
   count: number;
   canSave: boolean;
   saving: boolean;
+  blocked?: boolean;
   onSave: (length: PostLengthSettings) => void;
 }) {
   const [open, setOpen] = useState(false);
@@ -108,7 +111,7 @@ export function LengthSettings({
               max={POST_LENGTH_TARGET_MAX}
               step={POST_LENGTH_TARGET_STEP}
               value={draft.target}
-              disabled={!canSave}
+              disabled={!canSave || saving}
               onChange={(e) => set("target", e.target.value)}
               className={numberClass}
             />
@@ -130,7 +133,7 @@ export function LengthSettings({
                     max={POST_KIND_LENGTH_MAX}
                     step={POST_KIND_LENGTH_STEP}
                     value={draft[k.length]}
-                    disabled={!canSave}
+                    disabled={!canSave || saving}
                     onChange={(e) => set(k.length, e.target.value)}
                     className={numberClass}
                   />
@@ -145,7 +148,7 @@ export function LengthSettings({
                     max={100}
                     step={POST_KIND_RATIO_STEP}
                     value={draft[k.ratio]}
-                    disabled={!canSave}
+                    disabled={!canSave || saving}
                     onChange={(e) => set(k.ratio, e.target.value)}
                     className="min-w-0 flex-1 accent-foreground"
                   />
@@ -171,7 +174,7 @@ export function LengthSettings({
               <Button
                 type="button"
                 className="h-10 rounded-full px-5 md:h-9"
-                disabled={!value || !changed || saving}
+                disabled={!value || !changed || saving || blocked}
                 onClick={() => value && onSave(value)}
               >
                 保存
@@ -180,6 +183,7 @@ export function LengthSettings({
                 type="button"
                 variant="outline"
                 className="h-10 rounded-full px-4 md:h-9"
+                disabled={saving}
                 onClick={() => setDraft(toDraft(POST_LENGTH_DEFAULTS))}
               >
                 初期値に戻す

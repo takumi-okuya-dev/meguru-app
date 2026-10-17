@@ -123,6 +123,40 @@ describe("文字数と長さの割合", () => {
     await waitFor(() => expect(putPromptSettings).toHaveBeenLastCalledWith("a1", 12, 3));
   });
 
+  it("文字数と割合の保存中は、欄を変えられない（PR #17 のCodexレビュー）", async () => {
+    const user = userEvent.setup();
+    putPromptSettings.mockImplementation(() => new Promise(() => {}));
+    renderCreate();
+    const s = await openSettings(user);
+    fireEvent.change(s.getByRole("slider", { name: "短文の割合" }), { target: { value: "40" } });
+    fireEvent.change(s.getByRole("slider", { name: "中文の割合" }), { target: { value: "40" } });
+    await user.click(s.getByRole("button", { name: "保存" }));
+    await waitFor(() => expect(s.getByRole("spinbutton", { name: "1投稿の文字数の目標" })).toBeDisabled());
+    expect(s.getByRole("slider", { name: "長文の割合" })).toBeDisabled();
+  });
+
+  it("文字数と割合の保存が 409 なら、作る件数も最新の値にして、次の保存では最新の件数を送る（PR #17 のCodexレビュー）", async () => {
+    const { ApiError } = await import("@/lib/api-client");
+    const user = userEvent.setup();
+    putPromptSettings
+      .mockRejectedValueOnce(
+        new ApiError("STALE_UPDATE", 409, [], { postCount: 12, length: POST_LENGTH_DEFAULTS, version: 5 }, { name: "田中 健" }),
+      )
+      .mockResolvedValue({ postCount: 12, length: CUSTOM, version: 6 });
+    renderCreate();
+    const s = await openSettings(user);
+    await user.clear(s.getByRole("spinbutton", { name: "1投稿の文字数の目標" }));
+    await user.type(s.getByRole("spinbutton", { name: "1投稿の文字数の目標" }), "200");
+    await user.click(s.getByRole("button", { name: "保存" }));
+    await waitFor(() => expect(screen.getByRole("spinbutton", { name: "作る件数" })).toHaveValue(12));
+    const again = within(screen.getByRole("region", { name: "文字数と長さの割合" }));
+    await user.clear(again.getByRole("spinbutton", { name: "1投稿の文字数の目標" }));
+    await user.type(again.getByRole("spinbutton", { name: "1投稿の文字数の目標" }), "200");
+    await user.click(again.getByRole("button", { name: "保存" }));
+    await waitFor(() => expect(putPromptSettings).toHaveBeenLastCalledWith("a1", 12, 5, expect.objectContaining({ target: 200 })));
+    expect(putPromptSettings).not.toHaveBeenCalledWith("a1", 12, expect.anything());
+  });
+
   it("オーナー以外は、見られるが保存できない（SC-019）", async () => {
     accountAccess.mockResolvedValue(EDITOR_ACCESS);
     const user = userEvent.setup();

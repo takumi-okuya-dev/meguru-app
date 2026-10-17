@@ -215,8 +215,16 @@ function PromptReadyCard({
     },
     onError: (err) => {
       if (isStale(err)) {
-        const latest = err.latest as { version: number };
+        // 作る件数もほかの人が変えていることがあるので、最新の件数にそろえる（古い件数を新しい版で送り戻さない。PR #17 のCodexレビュー）
+        const latest = err.latest as { postCount: number; version: number };
         version.current = latest.version;
+        setSaved(latest.postCount);
+        setCount(latest.postCount);
+        setCountInput(String(latest.postCount));
+        setFailed(null);
+        queryClient.setQueryData<PostDraftList>(queryKeys.postDrafts(accountId), (old) =>
+          old ? { ...old, promptPostCount: latest.postCount, promptPostCountVersion: latest.version } : old,
+        );
         toast.info(`${staleUpdateTitle(err.updatedBy?.name)}。最新の文字数と割合を読み込みました`);
         void queryClient.invalidateQueries({ queryKey: queryKeys.promptAll(accountId) });
       } else if (isBillingRequired(err)) onReadOnly();
@@ -356,8 +364,9 @@ function PromptReadyCard({
           settings={lengthSettings}
           count={count}
           canSave={canSaveCount}
-          // 作る件数の保存中も押せない（版を1つずつ進める）
-          saving={savingLength || saving}
+          saving={savingLength}
+          // 作る件数の保存中も「保存」は押せない（版を1つずつ進める）
+          blocked={saving}
           onSave={saveLength}
         />
       )}

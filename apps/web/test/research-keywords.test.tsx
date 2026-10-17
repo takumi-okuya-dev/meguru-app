@@ -70,6 +70,18 @@ describe("キーワードの案", () => {
     await waitFor(() => expect(listResearchKeywords).toHaveBeenCalledTimes(2));
   });
 
+  it("登録の途中は、貼り付け欄と選択を変えられない（後から貼った案を失わない。PR #17 のCodexレビュー）", async () => {
+    const user = userEvent.setup();
+    createKeywordsBatch.mockImplementation(() => new Promise(() => {}));
+    renderKeywords();
+    await user.click(await screen.findByRole("button", { name: "AIにキーワードの案を出してもらう" }));
+    await user.click(panel().getByRole("textbox", { name: "AIの答えを貼り付ける" }));
+    await user.paste("新しい言葉");
+    await user.click(panel().getByRole("button", { name: "1件を登録する" }));
+    await waitFor(() => expect(panel().getByRole("textbox", { name: "AIの答えを貼り付ける" })).toBeDisabled());
+    expect(panel().getAllByRole("checkbox")[0]).toBeDisabled();
+  });
+
   it("残りの件数を超えて選んでいると登録できず、残りの件数を示す（FR-092）", async () => {
     const user = userEvent.setup();
     listResearchKeywords.mockResolvedValue({ items: Array.from({ length: 99 }, (_, i) => kw(`k${i}`, `言葉${i}`)), limit: 100, canEdit: true });

@@ -106,6 +106,8 @@ export function ExplainBatchPanel({
             id={pasteId}
             rows={6}
             value={paste}
+            // 保存の途中は変えられない（保存の後に欄を空にするので、後から貼った答えを失わないように）
+            disabled={save.isPending}
             onChange={(e) => {
               setPaste(e.target.value);
               setUnchecked(new Set());
@@ -124,7 +126,7 @@ export function ExplainBatchPanel({
                       <input
                         type="checkbox"
                         className="mt-1 size-4"
-                        disabled={!ok}
+                        disabled={!ok || save.isPending}
                         checked={ok && !unchecked.has(i)}
                         onChange={() =>
                           setUnchecked((set) => {

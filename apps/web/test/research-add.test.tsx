@@ -126,6 +126,20 @@ describe("参考投稿を追加（ためて登録）", () => {
     expect(await screen.findByText("登録していない投稿があります。破棄しますか？")).toBeInTheDocument();
   });
 
+  it("ためた後に本文なしでほかの項目だけ入れていると、登録せずに本文を求める（入力を黙って捨てない。PR #17 のCodexレビュー）", async () => {
+    renderResearchPage(ResearchPage);
+    const d = await openAdd();
+    await userEvent.type(d.getByLabelText(/^本文/), "1件目");
+    await userEvent.type(d.getByLabelText("検索したキーワード"), "転職");
+    await userEvent.click(d.getByRole("button", { name: "＋この投稿をためて、次の投稿を入力する" }));
+    // 引き継いだキーワード・媒体だけなら、ためた分を登録できる
+    expect(d.getAllByRole("button", { name: "1件を登録する" })[0]).toBeEnabled();
+    await userEvent.type(d.getByLabelText("投稿のURL"), "https://www.threads.com/@a/post/2");
+    await userEvent.click(d.getAllByRole("button", { name: "1件を登録する" })[0]!);
+    expect(await d.findByText("入力してください")).toBeInTheDocument();
+    expect(createReferencePostsBatch).not.toHaveBeenCalled();
+  });
+
   it("一覧のカードに、媒体・鮮度・解説の有無・閲覧といいねが出る（US7-8）", async () => {
     listReferencePosts.mockResolvedValue({
       items: [

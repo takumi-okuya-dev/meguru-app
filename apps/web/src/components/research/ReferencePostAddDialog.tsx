@@ -102,9 +102,16 @@ export function ReferencePostAddDialog({
     },
   });
 
+  // 本文はまだだが、引き継いだキーワード・媒体のほかに入力がある（登録すると黙って捨てることになる。PR #17 のCodexレビュー）
+  const partial =
+    !hasBody &&
+    (Object.keys(EMPTY_REF_FORM) as (keyof RefForm)[]).some(
+      (k) => k !== "keyword" && k !== "platform" && form[k] !== EMPTY_REF_FORM[k],
+    );
+
   const submit = () => {
     if (locked || register.isPending || total === 0 || total > cap) return;
-    if (hasBody && !check(form)) return;
+    if ((hasBody || partial) && !check(form)) return;
     register.mutate(hasBody ? [...queue, form] : queue);
   };
 

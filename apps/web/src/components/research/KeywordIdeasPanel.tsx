@@ -97,6 +97,8 @@ export function KeywordIdeasPanel({
             id={pasteId}
             rows={5}
             value={paste}
+            // 登録の途中は変えられない（登録の後に欄を空にするので、後から貼った案を失わないように）
+            disabled={save.isPending}
             onChange={(e) => {
               setPaste(e.target.value);
               setUnchecked(new Set());
@@ -115,7 +117,7 @@ export function KeywordIdeasPanel({
                       <input
                         type="checkbox"
                         className="mt-1 size-4"
-                        disabled={!ok}
+                        disabled={!ok || save.isPending}
                         checked={ok && !unchecked.has(i)}
                         onChange={() => toggle(i)}
                       />

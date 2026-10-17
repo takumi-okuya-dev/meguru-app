@@ -64,6 +64,19 @@ describe("まとめてAIに解説してもらう", () => {
     expect(screen.getByLabelText("AIの答えを貼り付ける")).toBeInTheDocument();
   });
 
+  it("保存の途中は、貼り付け欄と選択を変えられない（後から貼った答えを失わない。PR #17 のCodexレビュー）", async () => {
+    saveExplanations.mockImplementation(() => new Promise(() => {}));
+    const user = userEvent.setup();
+    renderResearchPage(ResearchPage);
+    await screen.findByText("解説がまだの参考投稿：2件");
+    await user.click(panel().getByRole("button", { name: /まとめてAIに解説してもらう/ }));
+    await user.click(panel().getByLabelText("AIの答えを貼り付ける"));
+    await user.paste("【ID:aaaaaaaa】\n【型の名前】あるある型");
+    await user.click(panel().getByRole("button", { name: "1件の解説を保存する" }));
+    await waitFor(() => expect(panel().getByLabelText("AIの答えを貼り付ける")).toBeDisabled());
+    expect(panel().getAllByRole("checkbox")[0]).toBeDisabled();
+  });
+
   it("貼り付けると対応が理由つきで並び、保存すると選んだ分だけ送る（US8-4〜US8-6）", async () => {
     saveExplanations.mockResolvedValue({ saved: [A.id], skipped: [] });
     const user = userEvent.setup();
