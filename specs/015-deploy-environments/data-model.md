@@ -31,20 +31,27 @@
 
 ### 3-1. APIが動くときに使う値（Cloudflare）
 
+一覧は`apps/api/src/env.ts`の`Env`と同じにする（足し引きしたら、こちらも直す）。
+
 | 名前 | 本番 | ステージング | 置き場所 |
 |---|---|---|---|
 | `DATABASE_URL` | 本番のNeonのプロジェクト | ステージングのNeonのプロジェクト | 秘：`wrangler secret`（環境ごと） |
 | `CLERK_SECRET_KEY` | 本番インスタンス | 開発用インスタンス | 秘：`wrangler secret` |
 | `CLERK_PUBLISHABLE_KEY` | 本番インスタンス | 開発用インスタンス | `[env.*].vars` |
+| `THREADS_APP_ID` | 同じMetaのアプリ | 同左 | `[env.*].vars` |
 | `THREADS_APP_SECRET` | 同じMetaのアプリ | 同左 | 秘：`wrangler secret` |
+| `THREADS_ACCESS_MODE` | App Reviewが通れば`public`、それまで`testers` | `testers` | `[env.*].vars`（省略すると`testers`） |
 | `THREADS_REDIRECT_URI` | `https://api.<ドメイン>/api/threads/callback` | ステージングのAPIのURL＋同じ道 | `[env.*].vars` |
 | `THREADS_AUTH_BASE_URL`・`THREADS_GRAPH_BASE_URL` | 本物のThreads | 本物のThreads | `[env.*].vars` |
 | `WEB_ORIGIN` | `https://app.<ドメイン>` | `https://staging.<ドメイン>` | `[env.*].vars` |
-| `TOKEN_ENCRYPTION_KEY`・`TOKEN_ENCRYPTION_KEY_VERSION` | 本番の鍵 | ステージングの鍵（別の値） | 秘：`wrangler secret`／版は`vars` |
+| `TOKEN_ENCRYPTION_KEYS` | 本番の鍵 | ステージングの鍵（別の値） | 秘：`wrangler secret` |
+| `TOKEN_ENCRYPTION_KEY_VERSION` | `1` | `1` | `[env.*].vars` |
+| `IDENTIFIER_HASH_KEY` | 本番の鍵 | ステージングの鍵（別の値） | 秘：`wrangler secret` |
 | `BILLING_ENABLED` | `true` | `true` | `[env.*].vars` |
 | `STRIPE_SECRET_KEY` | `sk_live_…` | `sk_test_…` | 秘：`wrangler secret` |
 | `STRIPE_WEBHOOK_SECRET` | 本番のWebhookの値 | テスト用環境のWebhookの値 | 秘：`wrangler secret` |
 | `STRIPE_PRICE_ID`・`STRIPE_PORTAL_CONFIGURATION_ID`・`STRIPE_TAX_RATE_ID` | 本番のID | テスト用環境のID | `[env.*].vars` |
+| `STRIPE_API_BASE_URL` | 省略（既定の`https://api.stripe.com`） | 省略 | `[env.*].vars`（偽のStripeに向けるときだけ入れる） |
 | `APP_ENV` | `production` | `staging` | `[env.*].vars`（記録に入れる。R8） |
 | `AUTOPOST_KV` | 本番のnamespace | ステージングのnamespace | `[env.*].kv_namespaces` |
 | Cron（`triggers`） | `0 18 * * *`・`*/5 * * * *` | 同じ | `[env.*].triggers` |

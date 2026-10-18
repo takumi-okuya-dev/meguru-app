@@ -86,7 +86,9 @@ specs/015-deploy-environments/
 
 apps/api/
 ├── wrangler.toml               # 直す：[env.staging]・[env.production]
-├── src/config.ts（相当）        # 直す：APP_ENV の確認を足す
+├── src/env.ts                  # 直す：Env に APP_ENV を足す
+├── src/app.ts                  # 直す：設定の確認に APP_ENV を足す
+├── src/lib/logger.ts           # 直す：記録に APP_ENV を入れる
 ├── .dev.vars.example           # 直す：APP_ENV を足す
 └── test/
     ├── unit/wrangler-config.test.ts    # 新規：環境の項目がそろっているか

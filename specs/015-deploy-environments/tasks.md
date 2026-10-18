@@ -17,7 +17,7 @@ description: "作業の一覧：公開のためのブランチと環境"
 
 - **[P]**：並べて進められる（別のファイル・依存なし）
 - **[Story]**：どの筋書きの作業か（US1〜US6）
-- **【人】**：ユーザーが外部サービスの画面で行う作業（Claudeはできない）。手順は[quickstart.md](./quickstart.md) 1と、T041で書き直す手順書にある
+- **【人】**：ユーザーが外部サービスの画面で行う作業（Claudeはできない。全19件）。手順は[quickstart.md](./quickstart.md) 1と、T043で書き直す手順書にある
 - ファイルの場所を必ず書く
 
 ---
@@ -39,14 +39,15 @@ description: "作業の一覧：公開のためのブランチと環境"
 **⚠️ ここが終わるまで、US1以降のデプロイは試せない**
 
 - [ ] T004 [P] `apps/api/test/unit/wrangler-config.test.ts`（新規）：`wrangler.toml`を読み、`[env.staging]`と`[env.production]`のそれぞれに`vars`・`kv_namespaces`（binding`AUTOPOST_KV`）・`triggers`（`0 18 * * *`と`*/5 * * * *`）があり、`name`が重複しないことを確かめる。**先に書いて落ちることを確かめる**（research.md R3）
-- [ ] T005 `apps/api/wrangler.toml`に`[env.staging]`・`[env.production]`を足す（[contracts/environments.md](./contracts/environments.md) 1の形。名前付きの環境は一番上の設定を受け継がないので、`vars`・`kv_namespaces`・`triggers`を両方に書き切る。KVの`id`は仮の値を置き、T015・T024で本物に差し替える）。T004を通す
+- [ ] T005 `apps/api/wrangler.toml`に`[env.staging]`・`[env.production]`を足す（[contracts/environments.md](./contracts/environments.md) 1の形。名前付きの環境は一番上の設定を受け継がないので、`vars`・`kv_namespaces`・`triggers`を両方に書き切る。KVの`id`は仮の値を置き、T020（ステージング）・T029（本番）で本物に差し替える）。T004を通す
 - [ ] T006 [P] `apps/api/test/integration/config.test.ts`（既存）に、`APP_ENV`が無い・`production`/`staging`/`development`以外のときに`CONFIG_ERROR`で止まることのテストを足す。**先に書いて落ちることを確かめる**
-- [ ] T007 `apps/api/src`の設定の確認に`APP_ENV`を足す（既定は`development`。[contracts/environments.md](./contracts/environments.md) 2）。T006を通す
-- [ ] T008 `apps/api/src`の記録（ログ）を出すところに`APP_ENV`を入れる（どの環境の記録か分かるようにする。FR-026）
+- [ ] T007 `apps/api/src/env.ts`の`Env`に`APP_ENV`を足し、`apps/api/src/app.ts`の設定の確認で値を確かめる（`production`・`staging`・`development`のどれか。手元の既定は`development`。[contracts/environments.md](./contracts/environments.md) 2）。T006を通す
+- [ ] T008 `apps/api/src/lib/logger.ts`の記録に`APP_ENV`を入れる（どの環境の記録か分かるようにする。FR-026）
 - [ ] T009 `.github/workflows/ci.yml`の`on: push: branches`に`develop`を足す（PRは今までどおり全部）
-- [ ] T010 【人】GitHubのEnvironmentを2つ作る（`staging`・`production`）。[data-model.md](./data-model.md) 3-3の値（`CLOUDFLARE_API_TOKEN`・`CLOUDFLARE_ACCOUNT_ID`・`DATABASE_URL`・`VITE_…`）を入れる
-- [ ] T011 【人】GitHubのrulesetで`main`と`develop`を守る（直接のpushを禁止・PR必須・`ci.yml`の成功を必須）。既定のブランチを`develop`にする（[contracts/deploy.md](./contracts/deploy.md) 3）
-- [ ] T012 【人】`develop`ブランチを`main`から作って push する
+- [ ] T010 【人】Cloudflareで、デプロイ用のAPIトークンを作る（Workersの編集・Pagesの編集・KVの編集の権限）。アカウントIDも控える（[data-model.md](./data-model.md) 3-3）
+- [ ] T011 【人】GitHubのEnvironmentを2つ作る（`staging`・`production`）。[data-model.md](./data-model.md) 3-3の値（`CLOUDFLARE_API_TOKEN`・`CLOUDFLARE_ACCOUNT_ID`・`DATABASE_URL`・`VITE_…`）を入れる
+- [ ] T012 【人】GitHubのrulesetで`main`と`develop`を守る（直接のpushを禁止・PR必須・`ci.yml`の成功を必須）。既定のブランチを`develop`にする（[contracts/deploy.md](./contracts/deploy.md) 3）
+- [ ] T013 【人】`develop`ブランチを`main`から作って push する
 
 **区切り**：ここまでで、環境ごとの設定の置き場所と、ブランチの守りができる
 
@@ -60,21 +61,22 @@ description: "作業の一覧：公開のためのブランチと環境"
 
 ### テスト（先に書く）
 
-- [ ] T013 [P] [US1] `apps/web/test/env-banner.test.tsx`（新規）：`VITE_APP_ENV`が`staging`・`development`なら帯が出て`production`なら出ないこと、帯がほかの帯（無料体験・読むだけ・要再接続）より**上**に出ることを確かめる。**先に書いて落ちることを確かめる**（[contracts/ui-routes.md](./contracts/ui-routes.md) 1）
+- [ ] T014 [P] [US1] `apps/web/test/env-banner.test.tsx`（新規）：`VITE_APP_ENV`が`staging`・`development`なら帯が出て`production`なら出ないこと、帯がほかの帯（無料体験・読むだけ・要再接続）より**上**に出ることを確かめる。**先に書いて落ちることを確かめる**（[contracts/ui-routes.md](./contracts/ui-routes.md) 1）
 
 ### 実装
 
-- [ ] T014 [US1] `apps/web/src/components/layout/EnvBanner.tsx`（新規）：`VITE_APP_ENV`を見て帯を出す（文言は[contracts/ui-routes.md](./contracts/ui-routes.md) 1の表のとおり。注意の色・閉じられない・375pxで折り返す）
-- [ ] T015 [US1] `apps/web/src/components/layout/AppShell.tsx`の`banner`の**先頭**に`EnvBanner`を置く。あわせて`AppShell`の外の画面（ログイン・招待の確認・利用規約・特定商取引法の表記・トークンの作り方）の一番上にも置く。T013を通す
-- [ ] T016 [P] [US1] `apps/web/vite.config.ts`と`apps/web/index.html`：`VITE_APP_ENV`が`staging`のときだけ`<meta name="robots" content="noindex, nofollow">`を差し込む（FR-042）
-- [ ] T017 [US1] `.github/workflows/deploy.yml`（新規）を書く（[contracts/deploy.md](./contracts/deploy.md) 2の手順。`on: push: branches: [develop, main]`、`environment`の出し分け、`concurrency`、マイグレーション → API（`wrangler deploy --env`）→ Web（`wrangler pages deploy --branch`）、`workflow_dispatch`も付ける）
-- [ ] T018 [US1] 【人】Neonでステージングのプロジェクトを作り、接続文字列をGitHubの`staging`のSecretsとCloudflareのシークレットに入れる。マイグレーションをすべて当てる
-- [ ] T019 [US1] 【人】ステージングのKVを作る（`wrangler kv namespace create AUTOPOST_KV --env staging`）。出た`id`を`wrangler.toml`の`[env.staging]`に入れる（T005の仮の値を差し替える）
-- [ ] T020 [US1] 【人】ステージングのCloudflareのシークレットを入れる（[data-model.md](./data-model.md) 3-1の「秘」。`wrangler secret put … --env staging`）
-- [ ] T021 [US1] 【人】Cloudflare PagesのGit連携を切り、`staging.<ドメイン>`を`develop`のブランチの別名に向ける（DNSはproxy。ドメインが未定の間は`develop.<プロジェクト>.pages.dev`で進める）
-- [ ] T022 [US1] 【人】Clerkの開発用インスタンスで、許可したメールアドレスだけ登録できる設定にし、テストユーザーを登録する（FR-021b）
-- [ ] T023 [US1] 【人】Metaのアプリに、ステージングのコールバックのURLを足す
-- [ ] T024 [US1] `develop`に小さな変更をマージして、[quickstart.md](./quickstart.md) 3-2の1〜6を通す（帯・許可していない人が入れない・ログインから自動投稿まで・本番のDBに入らない）
+- [ ] T015 [US1] `apps/web/src/components/layout/EnvBanner.tsx`（新規）：`VITE_APP_ENV`を見て帯を出す（文言は[contracts/ui-routes.md](./contracts/ui-routes.md) 1の表のとおり。注意の色・閉じられない・375pxで折り返す）
+- [ ] T016 [US1] `apps/web/src/components/layout/AppShell.tsx`の`banner`の**先頭**に`EnvBanner`を置く。あわせて`AppShell`の外の画面（ログイン・招待の確認・利用規約・特定商取引法の表記・トークンの作り方）の一番上にも置く。T014を通す
+- [ ] T017 [P] [US1] `apps/web/vite.config.ts`と`apps/web/index.html`：`VITE_APP_ENV`が`staging`のときだけ`<meta name="robots" content="noindex, nofollow">`を差し込む（FR-042）
+- [ ] T018 [US1] `.github/workflows/deploy.yml`（新規）を書く（[contracts/deploy.md](./contracts/deploy.md) 2の手順。`on: push: branches: [develop, main]`、`environment`の出し分け、`concurrency`、マイグレーション → API（`wrangler deploy --env`）→ Web（`wrangler pages deploy --branch`）、`workflow_dispatch`も付ける）
+- [ ] T019 [US1] 【人】Neonでステージングのプロジェクトを作り、接続文字列をGitHubの`staging`のSecretsとCloudflareのシークレットに入れる。マイグレーションをすべて当てる
+- [ ] T020 [US1] 【人】ステージングのKVを作る（`wrangler kv namespace create AUTOPOST_KV --env staging`）。出た`id`を`wrangler.toml`の`[env.staging]`に入れる（T005の仮の値を差し替える）
+- [ ] T021 [US1] 【人】ステージングのCloudflareのシークレットを入れる（[data-model.md](./data-model.md) 3-1の「秘」。`wrangler secret put … --env staging`）
+- [ ] T022 [US1] 【人】Cloudflareに置き場所を作る：Pagesのプロジェクトを作り（`pnpm --filter web exec wrangler pages project create threads-grower-web`。本番のブランチを`main`にする）、ステージングのWorkerを最初のデプロイで作る（`pnpm --filter api exec wrangler deploy --env staging`）。このリポジトリはまだ一度もデプロイしていないので、ここで初めて実体ができる
+- [ ] T023 [US1] 【人】Cloudflare PagesのGit連携を切り（Git連携で作っていなければ何もしない）、`staging.<ドメイン>`を`develop`のブランチの別名に向ける（DNSはproxy。ドメインが未定の間は`develop.<プロジェクト>.pages.dev`で進める）
+- [ ] T024 [US1] 【人】Clerkの開発用インスタンスで、許可したメールアドレスだけ登録できる設定にし、テストユーザーを登録する（FR-021b）
+- [ ] T025 [US1] 【人】Metaのアプリに、ステージングのコールバックのURLを足す
+- [ ] T026 [US1] `develop`に小さな変更をマージして、[quickstart.md](./quickstart.md) 3-2の1〜6を通す（帯・許可していない人が入れない・ログインから自動投稿まで・本番のDBに入らない）。**マージからステージングで見えるまでの時間を測り、10分以内であることを記録する**（SC-001）
 
 **区切り**：ステージングが動く。ここまでで、この機能の価値の中心は出ている
 
@@ -86,14 +88,14 @@ description: "作業の一覧：公開のためのブランチと環境"
 
 **単体での確かめ**：`develop`→`main`のPRをマージし、本番のWebとAPIが新しくなり、マイグレーションが当たっている（[quickstart.md](./quickstart.md) 3-3）
 
-- [ ] T025 [US2] 【人】ドメインを買い、CloudflareのDNSに載せる（ネームサーバーを向ける）。`app.<ドメイン>`・`staging.<ドメイン>`・APIのURLを決める
-- [ ] T026 [US2] 【人】Neonで本番のプロジェクトを作り、接続文字列をGitHubの`production`のSecretsとCloudflareのシークレットに入れる
-- [ ] T027 [US2] 【人】本番のKVを作り、`wrangler.toml`の`[env.production]`に`id`を入れる
-- [ ] T028 [US2] 【人】本番のCloudflareのシークレットを入れる（[data-model.md](./data-model.md) 3-1の「秘」。`--env production`）
-- [ ] T029 [US2] 【人】Clerkの本番インスタンスを作り、`clerk.`・`accounts.`のCNAMEをDNSに足す。GoogleのOAuthを自分の認証情報に差し替える（research.md R6）
-- [ ] T030 [US2] 【人】Metaのアプリに本番のコールバックのURLを足す。Cloudflare Pagesに`app.<ドメイン>`を当てる
-- [ ] T031 [US2] `develop`→`main`のPRをマージして、[quickstart.md](./quickstart.md) 3-3の1〜4を通す（本番が新しくなる・帯が出ない・マイグレーションが当たる）
-- [ ] T032 [US2] わざと失敗するマイグレーションで、APIとWebが入れ替わらないことを確かめる（[quickstart.md](./quickstart.md) 3-4。確かめたら戻す。SC-005）
+- [ ] T027 [US2] 【人】ドメインを買い、CloudflareのDNSに載せる（ネームサーバーを向ける）。`app.<ドメイン>`・`staging.<ドメイン>`・APIのURLを決める
+- [ ] T028 [US2] 【人】Neonで本番のプロジェクトを作り、接続文字列をGitHubの`production`のSecretsとCloudflareのシークレットに入れる
+- [ ] T029 [US2] 【人】本番のKVを作り、`wrangler.toml`の`[env.production]`に`id`を入れる
+- [ ] T030 [US2] 【人】本番のCloudflareのシークレットを入れる（[data-model.md](./data-model.md) 3-1の「秘」。`--env production`）
+- [ ] T031 [US2] 【人】Clerkの本番インスタンスを作り、`clerk.`・`accounts.`のCNAMEをDNSに足す。GoogleのOAuthを自分の認証情報に差し替える（research.md R6）
+- [ ] T032 [US2] 【人】Metaのアプリに本番のコールバックのURLを足す。Cloudflare Pagesに`app.<ドメイン>`を当てる
+- [ ] T033 [US2] `develop`→`main`のPRをマージして、[quickstart.md](./quickstart.md) 3-3の1〜4を通す（本番が新しくなる・帯が出ない・マイグレーションが当たる。本番のWorkerは、この最初のデプロイで作られる）。**マージから本番で見えるまでの時間を測り、10分以内であることを記録する**（SC-002）
+- [ ] T034 [US2] わざと失敗するマイグレーションで、APIとWebが入れ替わらないことを確かめる（[quickstart.md](./quickstart.md) 3-4。確かめたら戻す。SC-005）
 
 **区切り**：本番に出せる。公開の判断ができる状態になる
 
@@ -101,14 +103,14 @@ description: "作業の一覧：公開のためのブランチと環境"
 
 ## Phase 5: User Story 3 -環境ごとに、設定と秘密情報が分かれている（Priority: P1）
 
-**目的**：混ざっていないこと・秘密がリポジトリにないことを、確かめられる形にする
+**目的**：US1・US2で作った分離が本当に効いていることを、**確かめる**（新しく作るものはない）
 
 **単体での確かめ**：両方の環境の設定の出どころを確かめ、リポジトリに秘密がなく、片方を変えても他方が変わらない
 
-- [ ] T033 [P] [US3] リポジトリに秘密が入っていないことを確かめる（`git log -p`と今のファイルを、鍵の形（`sk_live_`・`sk_test_`・`postgres://`・`whsec_`）で検索する）。見つかれば、その値を無効にして入れ直す（SC-004）
-- [ ] T034 [P] [US3] `.gitignore`に`.dev.vars`・`.env.local`が入っていることを確かめ、抜けていれば足す
-- [ ] T035 [US3] ステージングで作ったデータが本番のDBに入っていないことを確かめる（両方のDBの件数を見る。SC-003）
-- [ ] T036 [US3] `pnpm --filter api exec wrangler deploy --env staging --dry-run`と`--env production --dry-run`が通ることを確かめる（[quickstart.md](./quickstart.md) 3-1）
+- [ ] T035 [P] [US3] リポジトリに秘密が入っていないことを確かめる（`git log -p`と今のファイルを、鍵の形（`sk_live_`・`sk_test_`・`postgres://`・`whsec_`）で検索する）。見つかれば、その値を無効にして入れ直す（SC-004）
+- [ ] T036 [P] [US3] `.gitignore`に`.dev.vars`・`.env.local`が入っていることを確かめ、抜けていれば足す
+- [ ] T037 [US3] ステージングで作ったデータが本番のDBに入っていないことを確かめる（両方のDBの件数を見る。SC-003）
+- [ ] T038 [US3] `pnpm --filter api exec wrangler deploy --env staging --dry-run`と`--env production --dry-run`が通ることを確かめる（[quickstart.md](./quickstart.md) 3-1）
 
 **区切り**：環境が混ざらないことを、実際に確かめた
 
@@ -120,9 +122,9 @@ description: "作業の一覧：公開のためのブランチと環境"
 
 **単体での確かめ**：テスト用のカードで契約でき、本番のStripeに何も起きず、料金なしの印を付けた人は契約なしで使える
 
-- [ ] T037 [US4] 【人】Stripeのテスト用環境のWebhookを、ステージングのAPIのURLに向ける。本番のWebhookは本番のAPIのURLに向ける
-- [ ] T038 [US4] 【人】`[env.staging].vars`と`[env.production].vars`の`STRIPE_PRICE_ID`などを、それぞれの環境のIDにする（[data-model.md](./data-model.md) 3-1）
-- [ ] T039 [US4] ステージングで[quickstart.md](./quickstart.md) 3-5の1〜3を通す（テスト用のカードで契約・本番に影響なし・料金なしの印）
+- [ ] T039 [US4] 【人】Stripeのテスト用環境のWebhookを、ステージングのAPIのURLに向ける。本番のWebhookは本番のAPIのURLに向ける
+- [ ] T040 [US4] 【人】`[env.staging].vars`と`[env.production].vars`の`STRIPE_PRICE_ID`などを、それぞれの環境のIDにする（[data-model.md](./data-model.md) 3-1）
+- [ ] T041 [US4] ステージングで[quickstart.md](./quickstart.md) 3-5の1〜3を通す（テスト用のカードで契約・本番に影響なし・料金なしの印）
 
 **区切り**：決済の変更を、本番より先にステージングで試せる
 
@@ -134,7 +136,7 @@ description: "作業の一覧：公開のためのブランチと環境"
 
 **単体での確かめ**：`main`から修正を出して本番に反映し、`develop`との差が残らない
 
-- [ ] T040 [US5] 小さな修正（文言など）で[quickstart.md](./quickstart.md) 3-6の1〜2を通し、`git log --oneline main ^develop`が空になることを確かめる
+- [ ] T042 [US5] 小さな修正（文言など）で[quickstart.md](./quickstart.md) 3-6の1〜2を通し、`git log --oneline main ^develop`が空になることを確かめる
 
 **区切り**：公開後に必ず要る流れを、一度通してある
 
@@ -146,19 +148,19 @@ description: "作業の一覧：公開のためのブランチと環境"
 
 **単体での確かめ**：Constitutionと手順書を読み、PRの行き先・リリース・公開前の作業が分かる（[quickstart.md](./quickstart.md) 3-7）
 
-- [ ] T041 [US6] `docs/external-services-setup.md`の「9. 本番公開時の追加作業」を、上から進めれば済む形に書き直す（[quickstart.md](./quickstart.md) 1の1〜8を、画面の操作の手順まで入れて移す。値の置き場所は[data-model.md](./data-model.md) 3の表を引く）
-- [ ] T042 [P] [US6] `.specify/memory/constitution.md`の「開発ワークフロー」のブランチ運用を、3段構成の今の形に直す（PRの行き先・リリース・急ぎの修正）。MINOR改定として版を上げ、Sync Impact Reportを残す
-- [ ] T043 [P] [US6] `README.md`に、ブランチの運用（`develop`が既定・リリースのPR・急ぎの修正）とデプロイ（`deploy.yml`）の説明を足す
-- [ ] T044 [P] [US6] `docs/next-features.md`の「C. 公開後のブランチと環境」を、このfeatureに移したと書き換える（メモからは消す）
+- [ ] T043 [US6] `docs/external-services-setup.md`の「9. 本番公開時の追加作業」を、上から進めれば済む形に書き直す（[quickstart.md](./quickstart.md) 1の1〜8を、画面の操作の手順まで入れて移す。値の置き場所は[data-model.md](./data-model.md) 3の表を引く）
+- [ ] T044 [P] [US6] `.specify/memory/constitution.md`の「開発ワークフロー」のブランチ運用を、3段構成の今の形に直す（PRの行き先・リリース・急ぎの修正）。MINOR改定として版を上げ、Sync Impact Reportを残す
+- [ ] T045 [P] [US6] `README.md`に、ブランチの運用（`develop`が既定・リリースのPR・急ぎの修正）とデプロイ（`deploy.yml`）の説明を足す
+- [ ] T046 [P] [US6] `docs/next-features.md`の「C. 公開後のブランチと環境」を、このfeatureに移したと書き換える（メモからは消す）
 
 ---
 
 ## Phase 9: 仕上げ（Polish）
 
-- [ ] T045 [P] `docs/ui-design.md`に、環境の帯（いちばん上・閉じられない・ステージングと開発で出す）を足す
-- [ ] T046 スマートフォンの幅（375px）で、帯が横にはみ出さず、上部バーの操作に重ならないことを確かめる
-- [ ] T047 `pnpm lint && pnpm typecheck && pnpm test && pnpm e2e`を通す（E2Eは手元で今までどおり）
-- [ ] T048 `specs/015-deploy-environments/verification.md`に、自動の確認の結果・手で確かめたこと（quickstart 3）・計画からの変更を書く
+- [ ] T047 [P] `docs/ui-design.md`に、環境の帯（いちばん上・閉じられない・ステージングと開発で出す）を足す
+- [ ] T048 スマートフォンの幅（375px）で、帯が横にはみ出さず、上部バーの操作に重ならないことを確かめる
+- [ ] T049 `pnpm lint && pnpm typecheck && pnpm test && pnpm e2e`を通す（E2Eは手元で今までどおり）
+- [ ] T050 `specs/015-deploy-environments/verification.md`に、自動の確認の結果・手で確かめたこと（quickstart 3）・計画からの変更を書く
 
 ---
 
@@ -187,10 +189,10 @@ description: "作業の一覧：公開のためのブランチと環境"
 
 - T001・T002・T003（Setup）
 - T004とT006（別のテストのファイル）
-- T013とT016（別のファイル）
-- T033とT034（別の確認）
-- T042・T043・T044（別の文書）
-- 【人】の作業のうち、T018〜T023（ステージングの準備）は、T017（`deploy.yml`）と並べて進められる
+- T014とT017（別のファイル）
+- T035とT036（別の確認）
+- T044・T045・T046（別の文書）
+- 【人】の作業のうち、T019〜T025（ステージングの準備）は、T018（`deploy.yml`）と並べて進められる
 
 ---
 
@@ -215,12 +217,12 @@ description: "作業の一覧：公開のためのブランチと環境"
 
 ### 【人】の作業について
 
-外部サービスの画面での作業（T010・T011・T012・T018〜T023・T025〜T030・T037・T038）は、ユーザーが行う。Claudeは、
+外部サービスの画面での作業（T010〜T013・T019〜T025・T027〜T032・T039・T040。全19件）は、ユーザーが行う。Claudeは、
 
-- その前に、必要な値と手順を`docs/external-services-setup.md`（T041）と[quickstart.md](./quickstart.md) 1にそろえる
+- その前に、必要な値と手順を`docs/external-services-setup.md`（T043）と[quickstart.md](./quickstart.md) 1にそろえる
 - 作業の後に、`--dry-run`やデプロイの実行で、入った値が正しいかを確かめる
 
-を担当する。ドメイン（T025）が決まるまでは、Cloudflareの既定のURL（`*.pages.dev`・`*.workers.dev`）でステージングまで進められる（Clerkの本番インスタンスだけがドメインを待つ）。
+を担当する。ドメイン（T027）が決まるまでは、Cloudflareの既定のURL（`*.pages.dev`・`*.workers.dev`）でステージングまで進められる（Clerkの本番インスタンスだけがドメインを待つ）。
 
 ---
 
@@ -228,6 +230,6 @@ description: "作業の一覧：公開のためのブランチと環境"
 
 - `[P]`＝別のファイルで依存なし
 - `[Story]`＝どの筋書きの作業か（追えるようにするため）
-- テスト（T004・T006・T013）は、**先に書いて落ちることを確かめてから**実装する
+- テスト（T004・T006・T014）は、**先に書いて落ちることを確かめてから**実装する
 - 作業のたび、またはまとまりごとにコミットする
 - 区切りで止めて、その筋書きだけで確かめられる

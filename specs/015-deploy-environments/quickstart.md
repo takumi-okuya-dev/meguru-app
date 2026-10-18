@@ -11,10 +11,11 @@
 1. **ドメイン**：ドメインを1つ買い、CloudflareのDNSに載せる（ネームサーバーをCloudflareに向ける）。
 2. **Neon**：プロジェクトを2つ作る（本番・ステージング）。それぞれの接続文字列を控える。ステージングにマイグレーションをすべて当てる。
 3. **Cloudflare**：
+   - **置き場所を作る**（このリポジトリはまだ一度もデプロイしていないので、実体がない）：Pagesのプロジェクトを作る（`pnpm --filter web exec wrangler pages project create threads-grower-web`。本番のブランチは`main`）。Workerは、最初の`wrangler deploy --env staging`／`--env production`で作られる。
+   - デプロイ用のAPIトークンを作る（Workersの編集・Pagesの編集・KVの編集）。アカウントIDも控える。
    - Workersの環境ごとのKVを作る（`wrangler kv namespace create AUTOPOST_KV --env staging` / `--env production`）。出た`id`を`wrangler.toml`に入れる。
    - Pagesのプロジェクトに独自ドメインを当てる（本番＝`app.<ドメイン>`、ステージング＝`staging.<ドメイン>`をブランチの別名`develop`へ。DNSはproxy＝オレンジの雲）。
-   - PagesのGit連携は**切る**（Actionsからだけ出す）。
-   - デプロイ用のAPIトークンを作る（Workers・Pagesの編集の権限）。
+   - PagesのGit連携は使わない（Actionsからだけ出す）。Git連携で作っていたら切る。
 4. **Clerk**：本番インスタンスを作り、`clerk.`・`accounts.`のCNAMEをDNSに足す。GoogleのOAuthを自分の認証情報に差し替える。ステージング（開発用インスタンス）は、許可したメールアドレスだけ登録できる設定にする。
 5. **Meta**：今のアプリに、本番とステージングのコールバックのURLを両方登録する。
 6. **Stripe**：本番の設定を「10. Stripe」の手順で作る（料金・Webhook・ポータル）。テスト用環境はそのまま使う。両方のWebhookのURLを、それぞれの環境のAPIに向ける。
@@ -32,6 +33,8 @@
 | 帯が、ほかの帯（無料体験・読むだけ・要再接続）より上に出る | 同上 |
 | `APP_ENV`が無い・知らない値なら、APIが`CONFIG_ERROR`で止まる | `apps/api/test/integration/config.test.ts`（既存に足す） |
 | `wrangler.toml`の`[env.staging]`・`[env.production]`に、`vars`・`kv_namespaces`・`triggers`がそろっている | `apps/api/test/unit/wrangler-config.test.ts`（新規） |
+
+**SC-001・SC-002（10分以内）**は自動では測らない。3-2・3-3でマージからの時間を測り、[verification.md](./verification.md)（T050で作る）に記録する。
 
 ## 3. 手で確かめること
 
