@@ -8,10 +8,11 @@ const listReferencePosts = vi.fn();
 const listResearchKeywords = vi.fn();
 const getExplainPrompt = vi.fn();
 const saveExplanations = vi.fn();
+const updateReferencePost = vi.fn();
 const toastSuccess = vi.fn();
 vi.mock("@/lib/api-client", async (orig) => {
   const actual = await orig<typeof import("@/lib/api-client")>();
-  return { ...actual, api: { ...actual.api, listReferencePosts, listResearchKeywords, getExplainPrompt, saveExplanations } };
+  return { ...actual, api: { ...actual.api, listReferencePosts, listResearchKeywords, getExplainPrompt, saveExplanations, updateReferencePost } };
 });
 vi.mock("sonner", () => ({ toast: { success: toastSuccess, error: vi.fn() } }));
 
@@ -32,6 +33,7 @@ beforeEach(() => {
     ],
     pendingCount: 2,
   });
+  updateReferencePost.mockReset().mockResolvedValue({ ...A, version: 2 });
   saveExplanations.mockReset();
   toastSuccess.mockReset();
 });
@@ -180,5 +182,21 @@ describe("1件の解説の未保存（PR #17 のCodexレビュー6回目）", ()
     await user.paste("AIの解説");
     await user.click(dialog.getByRole("button", { name: "閉じる" }));
     expect(await screen.findByText("保存していない変更があります")).toBeInTheDocument();
+  });
+
+  it("解説を貼ったまま「保存」を押すと、破棄してよいかを確かめる（PR #17 のCodexレビュー7回目）", async () => {
+    const user = userEvent.setup();
+    renderResearchPage(ResearchPage);
+    await screen.findByText("空の投稿A");
+    await user.click(screen.getAllByRole("button", { name: "参考投稿の操作" })[0]!);
+    await user.click(await screen.findByRole("menuitem", { name: "編集" }));
+    const dialog = within(await screen.findByRole("dialog", { name: "参考投稿を編集" }));
+    await user.click(dialog.getByLabelText("解説を貼り付ける"));
+    await user.paste("AIの解説");
+    await user.click(dialog.getAllByRole("button", { name: "保存" })[0]!);
+    expect(await screen.findByText("貼り付けた解説が、まだ「なぜ良いか」に入っていません")).toBeInTheDocument();
+    expect(updateReferencePost).not.toHaveBeenCalled();
+    await user.click(screen.getByRole("button", { name: "破棄して保存" }));
+    await waitFor(() => expect(updateReferencePost).toHaveBeenCalled());
   });
 });

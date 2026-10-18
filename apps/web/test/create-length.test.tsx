@@ -231,6 +231,25 @@ describe("文字数と長さの割合", () => {
     await waitFor(() => expect(screen.getByRole("button", { name: /文字数と長さの割合/ })).toHaveTextContent("目標 200字"));
   });
 
+  it("409 で入れた最新の文字数と割合を、古いプロンプトの設定で上書きしない（PR #17 のCodexレビュー7回目）", async () => {
+    const { ApiError } = await import("@/lib/api-client");
+    const user = userEvent.setup();
+    putPromptSettings.mockRejectedValueOnce(new ApiError("STALE_UPDATE", 409, [], { postCount: 12, length: CUSTOM, version: 5 }, null));
+    // プロンプトは古い版（version 1）の設定を返し続ける
+    getPrompt.mockResolvedValue(withSettings({ ...POST_LENGTH_DEFAULTS }, 1));
+    renderCreate();
+    const count = await screen.findByRole("spinbutton", { name: "作る件数" });
+    await user.clear(count);
+    await user.type(count, "12");
+    await waitFor(() => expect(screen.getByRole("button", { name: /文字数と長さの割合/ })).toHaveTextContent("目標 200字"), {
+      timeout: 2000,
+    });
+    await waitFor(() => expect(getPrompt).toHaveBeenCalledWith("a1", 12));
+    // 古い版の設定で上書きしない
+    await new Promise((r) => setTimeout(r, 100));
+    expect(screen.getByRole("button", { name: /文字数と長さの割合/ })).toHaveTextContent("目標 200字");
+  });
+
   it("文字数と割合の保存中に作る件数を変えていたら、409 でもその件数を残し、最新の版で保存し直す（PR #17 のCodexレビュー）", async () => {
     const { ApiError } = await import("@/lib/api-client");
     const user = userEvent.setup();

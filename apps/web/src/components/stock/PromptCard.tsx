@@ -277,10 +277,13 @@ function PromptReadyCard({
   }, [copyFailed, open]);
 
   const fullText = edited ?? prompt.data?.prompt ?? "";
-  const latestLength = prompt.data?.settings.length;
+  // プロンプトの応答の設定。古い版（ほかの件数のキャッシュ・取り直しの前）では、今より新しいときだけ使う
+  // （保存の競合で入れた最新の値を、古い設定で上書きしないように。PR #17 のCodexレビュー）
+  const fetchedSettings = prompt.data?.settings;
   useEffect(() => {
-    if (latestLength) setLengthSettings(latestLength);
-  }, [latestLength]);
+    if (!fetchedSettings) return;
+    setLengthSettings((prev) => (prev === null || fetchedSettings.version >= version.current ? fetchedSettings.length : prev));
+  }, [fetchedSettings]);
   // 送り方（1つにまとめて／2つに分けて。specs/014 FR-150〜FR-153）
   const [mode, setMode] = useSendMode(prompt.data?.splitRecommended ?? false);
   const split = mode === "split" && !!prompt.data;

@@ -3,6 +3,7 @@ import { useState, type ReactNode } from "react";
 import type { ReferencePost } from "@threads-grower/shared";
 import { DeletedElsewhereNotice, FormDialogFrame } from "@/components/items/FormDialogFrame";
 import { useItemForm } from "@/components/items/use-item-form";
+import { UnsavedChangesDialog } from "@/components/UnsavedChangesDialog";
 import { api } from "@/lib/api-client";
 import { ReferencePostFields } from "./ReferencePostFields";
 import { EMPTY_REF_FORM, overLimitRef, toRefForm, toRefInput, validateRef, type RefForm } from "./reference-post-form";
@@ -33,6 +34,8 @@ export function ReferencePostFormDialog({
 }) {
   // 1件の解説に貼り付けた内容も、未保存として扱う（PR #17 のCodexレビュー）
   const [explainDirty, setExplainDirty] = useState(false);
+  // 貼り付けた解説を「なぜ良いか」に入れずに保存しようとしたとき（保存すると貼り付けた内容は残らない）
+  const [confirmSave, setConfirmSave] = useState(false);
   const f = useItemForm<RefForm, ReferencePost>({
     extraDirty: explainDirty,
     item,
@@ -60,7 +63,7 @@ export function ReferencePostFormDialog({
         submitLabel="保存"
         submitting={f.submitting}
         locked={f.locked}
-        onSubmit={f.submit}
+        onSubmit={() => (explainDirty ? setConfirmSave(true) : f.submit())}
         onRequestClose={f.requestClose}
       >
         {f.deleted && <DeletedElsewhereNotice what="参考投稿" onClose={f.closeDeleted} />}
@@ -73,6 +76,17 @@ export function ReferencePostFormDialog({
         />
       </FormDialogFrame>
       {f.overlays}
+      <UnsavedChangesDialog
+        open={confirmSave}
+        title="貼り付けた解説が、まだ「なぜ良いか」に入っていません"
+        description="このまま保存すると、貼り付けた解説は失われます。"
+        discardLabel="破棄して保存"
+        onStay={() => setConfirmSave(false)}
+        onDiscard={() => {
+          setConfirmSave(false);
+          f.submit();
+        }}
+      />
     </>
   );
 }

@@ -153,6 +153,33 @@ describe("待っている削除は、画面を移っても確定してから登�
     await waitFor(() => expect(screen.queryByText(/要確認の下書きが上限（500件）に達しています/)).not.toBeInTheDocument());
   });
 
+  it("続けて削除したときは、どの削除も確定してから登録する（PR #17 のCodexレビュー7回目）", async () => {
+    const user = userEvent.setup();
+    const three = [...twoDrafts, draft({ id: "d3", position: 2, body: "3件目" })];
+    listPostDrafts.mockResolvedValue(listResponse({ items: three }));
+    let finishFirst: (v: { deletedCount: number }) => void = () => {};
+    deletePostDrafts
+      .mockImplementationOnce(() => new Promise((r) => (finishFirst = r)))
+      .mockResolvedValue({ deletedCount: 1 });
+    createDraftBatch.mockResolvedValue(batchResult([draft({ id: "d4", body: "新しい" })]));
+    const router = renderBoth();
+    await deleteFirst(user);
+    // 1件目の削除が終わらないうちに、2件目を削除する（1件目の確定が始まる）
+    await user.click(await screen.findByRole("button", { name: "「2件目」の操作" }));
+    await user.click(await screen.findByRole("menuitem", { name: "削除" }));
+    await waitFor(() => expect(deletePostDrafts).toHaveBeenCalledWith("a1", ["d1"]));
+    await act(() => router.navigate("/accounts/a1/create"));
+    const box = await screen.findByRole("textbox", { name: "AIの返信を貼り付ける欄" });
+    await user.click(box);
+    await user.paste("新しい");
+    await user.click(screen.getByRole("button", { name: "投稿ストックに登録する" }));
+    await waitFor(() => expect(deletePostDrafts).toHaveBeenCalledWith("a1", ["d2"]));
+    // 先に始まった削除が終わるまで登録しない
+    expect(createDraftBatch).not.toHaveBeenCalled();
+    await act(async () => finishFirst({ deletedCount: 1 }));
+    await screen.findByText("1件を投稿ストックに登録しました");
+  });
+
   it("削除の確定が終わる前に登録しようとしても、先に削除を確定してから登録する", async () => {
     const user = userEvent.setup();
     listPostDrafts.mockResolvedValue(listResponse({ items: twoDrafts }));

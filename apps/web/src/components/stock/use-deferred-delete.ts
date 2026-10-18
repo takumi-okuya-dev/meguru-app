@@ -15,15 +15,17 @@ type Pending = { ids: string[]; timer: ReturnType<typeof setTimeout>; toastId: s
 // 画面をまたいでも、待っている削除の確定を待てるようにする（投稿ストックで削除してすぐ「投稿をつくる」で登録する流れ。
 // PR #17 のCodexレビュー）。待っている削除を始める関数と、始まった確定の約束を、この場所に置く
 const starters = new Set<() => Promise<void>>();
-let inFlight: Promise<void> | null = null;
+// 続けて削除すると確定が重なるので、始まった確定をすべて覚える（PR #17 のCodexレビュー）
+const inFlight = new Set<Promise<void>>();
 
 /**
  * 待っている削除をすぐ確定し、終わるまで待つ（画面を離れた後に始まった確定も待つ）。
  * @returns 確定が終わる約束
  */
 export function flushPendingDeletes(): Promise<void> {
+  // starters は呼ぶとその場で確定を始め、inFlight に入る
   const started = [...starters].map((start) => start());
-  return Promise.all([...started, inFlight ?? Promise.resolve()]).then(() => undefined);
+  return Promise.all([...started, ...inFlight]).then(() => undefined);
 }
 
 /**
@@ -61,10 +63,8 @@ export function useDeferredDelete(accountId: string) {
         unhide(p.ids);
       },
     );
-    inFlight = done;
-    void done.finally(() => {
-      if (inFlight === done) inFlight = null;
-    });
+    inFlight.add(done);
+    void done.finally(() => inFlight.delete(done));
     return done;
   }, [accountId, queryClient, unhide]);
 
