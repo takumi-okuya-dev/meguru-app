@@ -202,6 +202,26 @@ describe("1件の解説の未保存（PR #17 のCodexレビュー6回目）", ()
   });
 });
 
+describe("読むだけになった後の欄（PR #17 のCodexレビュー9回目）", () => {
+  it("保存が BILLING_REQUIRED でも、貼り付けた答えは残し、保存はできなくする", async () => {
+    const { ApiError } = await import("@/lib/api-client");
+    const user = userEvent.setup();
+    saveExplanations.mockRejectedValue(new ApiError("BILLING_REQUIRED", 403, ["trial_ended"]));
+    renderResearchPage(ResearchPage);
+    await screen.findByText("解説がまだの参考投稿：2件");
+    await user.click(panel().getByRole("button", { name: /まとめてAIに解説してもらう/ }));
+    await user.click(panel().getByLabelText("AIの答えを貼り付ける"));
+    await user.paste("【ID:aaaaaaaa】\n【型の名前】あるある型");
+    await user.click(panel().getByRole("button", { name: "1件の解説を保存する" }));
+    // 読むだけの案内を閉じても、貼り付けた答えは残る
+    const notice = within(await screen.findByRole("dialog", { name: "編集できなくなりました" }));
+    // ダイアログの✕と足元のボタンがあるので、足元のボタンを押す
+    await user.click(notice.getAllByRole("button", { name: "閉じる" }).at(-1)!);
+    expect(panel().getByLabelText("AIの答えを貼り付ける")).toHaveValue("【ID:aaaaaaaa】\n【型の名前】あるある型");
+    expect(panel().queryByRole("button", { name: /件の解説を保存する/ })).not.toBeInTheDocument();
+  });
+});
+
 describe("まとめての解説の欄の出し入れ（PR #17 のCodexレビュー8回目）", () => {
   it("貼り付けた答えがある間は、解説がまだの参考投稿が0件になっても欄を消さない", async () => {
     const { ExplainBatchPanel } = await import("@/components/research/ExplainBatchPanel");

@@ -305,6 +305,66 @@ describe("文字数と長さの割合", () => {
     expect(await screen.findByText("保存していない変更があります")).toBeInTheDocument();
   });
 
+  it("プロンプトが古い版の設定を返している間は、欄を出さない。新しい版が届いたら出す（PR #17 のCodexレビュー9回目）", async () => {
+    const user = userEvent.setup();
+    // 投稿ストックの一覧は版5。プロンプトのキャッシュには版1が残っている
+    listPostDrafts.mockResolvedValue({ ...listResponse(), promptPostCountVersion: 5 });
+    getPrompt
+      .mockResolvedValueOnce(withSettings({ ...POST_LENGTH_DEFAULTS }, 1))
+      .mockResolvedValue(withSettings(CUSTOM, 9, 30));
+    putPromptSettings.mockResolvedValue({ postCount: 10, length: CUSTOM, version: 6 });
+    renderCreate();
+    await screen.findByRole("button", { name: "コピー" });
+    expect(screen.queryByRole("button", { name: /文字数と長さの割合/ })).not.toBeInTheDocument();
+    // 件数を変えると新しい版（9）の設定が届き、欄が出る
+    const count = screen.getByRole("spinbutton", { name: "作る件数" });
+    await user.clear(count);
+    await user.type(count, "10");
+    expect(await screen.findByRole("button", { name: /文字数と長さの割合/ }, { timeout: 2000 })).toHaveTextContent("目標 200字");
+  });
+
+  it("件数の入力の途中に新しい版が届いても、古い件数を新しい版で保存しない（PR #17 のCodexレビュー9回目）", async () => {
+    const user = userEvent.setup();
+    let resolvePrompt: (v: unknown) => void = () => {};
+    getPrompt.mockImplementationOnce(() => new Promise((r) => (resolvePrompt = r))).mockResolvedValue(withSettings(CUSTOM, 5, 12));
+    putPromptSettings.mockImplementation(async (_a: string, n: number, v: number) => ({
+      postCount: n,
+      length: CUSTOM,
+      version: v + 1,
+    }));
+    renderCreate();
+    const count = await screen.findByRole("spinbutton", { name: "作る件数" });
+    await user.clear(count);
+    await user.type(count, "15");
+    // 入力の途中（0.5秒の反映の前）に、ほかの人の保存を含む新しい版（12件・版5）が届く
+    await act(async () => resolvePrompt(withSettings(CUSTOM, 5, 12)));
+    await waitFor(() => expect(putPromptSettings).toHaveBeenCalledWith("a1", 15, 5), { timeout: 2000 });
+    expect(putPromptSettings).not.toHaveBeenCalledWith("a1", 30, 5);
+  });
+
+  it("遅れて届いた保存の応答で、新しい版を巻き戻さない（PR #17 のCodexレビュー9回目）", async () => {
+    const user = userEvent.setup();
+    let finishFirst: (v: unknown) => void = () => {};
+    putPromptSettings
+      .mockImplementationOnce(() => new Promise((r) => (finishFirst = r)))
+      .mockImplementation(async (_a: string, n: number, v: number) => ({ postCount: n, length: CUSTOM, version: v + 1 }));
+    // 件数を変えると、ほかの人の保存を含む版3の設定が届く
+    getPrompt
+      .mockResolvedValueOnce(withSettings({ ...POST_LENGTH_DEFAULTS }, 1))
+      .mockResolvedValue(withSettings(CUSTOM, 3, 30));
+    renderCreate();
+    const count = await screen.findByRole("spinbutton", { name: "作る件数" });
+    await user.clear(count);
+    await user.type(count, "10");
+    await waitFor(() => expect(putPromptSettings).toHaveBeenCalledWith("a1", 10, 1), { timeout: 2000 });
+    await waitFor(() => expect(screen.getByRole("button", { name: /文字数と長さの割合/ })).toHaveTextContent("目標 200字"));
+    // 遅れて届いた版2の応答は使わない（版3を巻き戻さない）
+    await act(async () => finishFirst({ postCount: 10, length: { ...POST_LENGTH_DEFAULTS }, version: 2 }));
+    await user.clear(count);
+    await user.type(count, "20");
+    await waitFor(() => expect(putPromptSettings).toHaveBeenLastCalledWith("a1", 20, 3), { timeout: 2000 });
+  });
+
   it("オーナー以外は、見られるが保存できない（SC-019）", async () => {
     accountAccess.mockResolvedValue(EDITOR_ACCESS);
     const user = userEvent.setup();

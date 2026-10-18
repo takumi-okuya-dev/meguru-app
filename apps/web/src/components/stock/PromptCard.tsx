@@ -174,6 +174,8 @@ function PromptReadyCard({
     mutationFn: (n: number) => api.putPromptSettings(accountId, n, version.current),
     onMutate: () => ({ generation: editGeneration.current }),
     onSuccess: ({ postCount, version: v }) => {
+      // 遅れて届いた応答で、すでに知っている新しい版を巻き戻さない（PR #17 のCodexレビュー）
+      if (v < version.current) return;
       version.current = v;
       setSaved(postCount);
       setFailed(null);
@@ -220,6 +222,8 @@ function PromptReadyCard({
       api.putPromptSettings(accountId, saved, version.current, length),
     onMutate: () => ({ generation: editGeneration.current }),
     onSuccess: ({ version: v, length }) => {
+      // 遅れて届いた応答で、すでに知っている新しい版・設定を巻き戻さない（PR #17 のCodexレビュー）
+      if (v < version.current) return toast.success("文字数と割合を保存しました");
       version.current = v;
       // 保存した値をすぐ保存済みの値にする（読み直しを待たずに、未保存の扱いを外す）
       lengthRef.current = length;
@@ -293,19 +297,17 @@ function PromptReadyCard({
   const fetchedSettings = prompt.data?.settings;
   useEffect(() => {
     if (!fetchedSettings) return;
-    const first = lengthRef.current === null;
-    if (!first && fetchedSettings.version < version.current) return;
+    // 古い版の応答（ほかの件数のキャッシュ・取り直しの前）は、初めの読み込みでも使わない（欄は読み込み中のまま）
+    if (fetchedSettings.version < version.current) return;
     lengthRef.current = fetchedSettings.length;
     setLengthSettings(fetchedSettings.length);
-    if (fetchedSettings.version <= version.current) return;
+    if (fetchedSettings.version === version.current) return;
     version.current = fetchedSettings.version;
     setSaved(fetchedSettings.postCount);
-    // 入力の途中（保存を待っている件数）でなければ、件数も最新にする。途中なら入力を残し、新しい版で保存し直す
+    // 件数も最新の保存値に合わせる。入力の途中なら、入力欄だけ利用者の値を残す（入力が止まった後に新しい版で保存する）
     const { count: now, countInput: input, saved: savedNow } = countState.current;
-    if (now === savedNow && input === String(now)) {
-      setCount(fetchedSettings.postCount);
-      setCountInput(String(fetchedSettings.postCount));
-    }
+    setCount(fetchedSettings.postCount);
+    if (now === savedNow && input === String(now)) setCountInput(String(fetchedSettings.postCount));
   }, [fetchedSettings]);
   // 送り方（1つにまとめて／2つに分けて。specs/014 FR-150〜FR-153）
   const [mode, setMode] = useSendMode(prompt.data?.splitRecommended ?? false);

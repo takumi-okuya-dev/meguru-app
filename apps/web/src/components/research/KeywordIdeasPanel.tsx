@@ -1,7 +1,11 @@
 // 検索するキーワードの案をAIに出してもらう（specs/014-strategy-guidance US9、FR-090〜FR-092）。
 // プロンプトをコピーし、AIの答えを貼ると1行ずつチェック付きの一覧にし、選んだものをまとめて登録する。
 import { useMutation } from "@tanstack/react-query";
-import { KEYWORD_BATCH_MAX, parseKeywordIdeas, type KeywordIdeaProblem } from "@threads-grower/shared";
+import {
+  KEYWORD_BATCH_MAX,
+  parseKeywordIdeas,
+  type KeywordIdeaProblem,
+} from "@threads-grower/shared";
 import { useId, useState } from "react";
 import { toast } from "sonner";
 import { CopyPromptButton } from "@/components/CopyPromptButton";
@@ -19,7 +23,8 @@ const PROBLEM_LABELS: Record<KeywordIdeaProblem, string> = {
 /**
  * キーワードの案の欄。直せる人だけに置く。
  * @param props - accountId、registered：登録済みのキーワード、remaining：あと何件登録できるか、
- *   onSaved：登録した後（重なり・上限で登録できなかったときも一覧を読み直す）、onBillingRequired：読むだけになった
+ *   onSaved：登録した後（重なり・上限で登録できなかったときも一覧を読み直す）、onBillingRequired：読むだけになった、
+ *   readOnly：読むだけになった後（貼り付けた内容は残し、コピーと登録はできない。PR #17 のCodexレビュー）
  * @returns 欄
  */
 export function KeywordIdeasPanel({
@@ -28,12 +33,14 @@ export function KeywordIdeasPanel({
   remaining,
   onSaved,
   onBillingRequired,
+  readOnly = false,
 }: {
   accountId: string;
   registered: string[];
   remaining: number;
   onSaved: () => void;
   onBillingRequired: (reason: string) => void;
+  readOnly?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [paste, setPaste] = useState("");
@@ -48,7 +55,9 @@ export function KeywordIdeasPanel({
 
   const save = useMutation({
     mutationFn: () =>
-      api.createKeywordsBatch(accountId, { items: picked.map(({ keyword, purpose }) => ({ keyword, purpose })) }),
+      api.createKeywordsBatch(accountId, {
+        items: picked.map(({ keyword, purpose }) => ({ keyword, purpose })),
+      }),
     onSuccess: () => {
       toast.success(`${picked.length}件のキーワードを登録しました`);
       setPaste("");
@@ -78,18 +87,25 @@ export function KeywordIdeasPanel({
     });
 
   return (
-    <section aria-label="何を検索すればいいか迷ったら" className="mb-3 space-y-3 rounded-2xl border bg-muted/30 px-4 py-3.5 text-sm">
+    <section
+      aria-label="何を検索すればいいか迷ったら"
+      className="mb-3 space-y-3 rounded-2xl border bg-muted/30 px-4 py-3.5 text-sm"
+    >
       <div className="flex flex-wrap items-center gap-3">
         <div className="min-w-0 flex-1">
           <p className="font-medium">何を検索すればいいか迷ったら</p>
-          <p className="text-xs text-muted-foreground">課題をもとに、検索する言葉の案をAIに出してもらえます</p>
+          <p className="text-xs text-muted-foreground">
+            課題をもとに、検索する言葉の案をAIに出してもらえます
+          </p>
         </div>
-        <CopyPromptButton
-          label="AIにキーワードの案を出してもらう"
-          copiedMessage="プロンプトをコピーしました。ChatGPTやClaudeに貼り付けて送り、返ってきた答えをまるごと下に貼り付けてください"
-          getText={async () => (await api.getKeywordIdeaPrompt(accountId)).prompt}
-          onCopied={() => setOpen(true)}
-        />
+        {!readOnly && (
+          <CopyPromptButton
+            label="AIにキーワードの案を出してもらう"
+            copiedMessage="プロンプトをコピーしました。ChatGPTやClaudeに貼り付けて送り、返ってきた答えをまるごと下に貼り付けてください"
+            getText={async () => (await api.getKeywordIdeaPrompt(accountId)).prompt}
+            onCopied={() => setOpen(true)}
+          />
+        )}
       </div>
       {open && (
         <div className="space-y-2.5">
@@ -101,7 +117,7 @@ export function KeywordIdeasPanel({
             rows={5}
             value={paste}
             // 登録の途中は変えられない（登録の後に欄を空にするので、後から貼った案を失わないように）
-            disabled={save.isPending}
+            disabled={save.isPending || readOnly}
             onChange={(e) => {
               setPaste(e.target.value);
               setUnchecked(new Set());
@@ -120,13 +136,15 @@ export function KeywordIdeasPanel({
                       <input
                         type="checkbox"
                         className="mt-1 size-4"
-                        disabled={!ok || save.isPending}
+                        disabled={!ok || save.isPending || readOnly}
                         checked={ok && !unchecked.has(i)}
                         onChange={() => toggle(i)}
                       />
                       <span className="flex min-w-0 flex-col gap-0.5">
                         <span className="font-medium break-words">{idea.keyword}</span>
-                        {idea.purpose && <span className="text-[13px] text-muted-foreground">{idea.purpose}</span>}
+                        {idea.purpose && (
+                          <span className="text-[13px] text-muted-foreground">{idea.purpose}</span>
+                        )}
                         {idea.problem && (
                           <span className="self-start rounded-full bg-warning-bg px-2 text-[11px] font-medium text-warning">
                             {PROBLEM_LABELS[idea.problem]}
@@ -144,7 +162,7 @@ export function KeywordIdeasPanel({
               {failure}
             </p>
           )}
-          {ideas.length > 0 && (
+          {ideas.length > 0 && !readOnly && (
             <div className="flex flex-wrap items-center gap-3">
               <Button
                 type="button"

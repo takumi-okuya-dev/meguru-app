@@ -35,10 +35,9 @@ import { useCurrentAccount } from "@/pages/account-layout";
 
 type Tab = "posts" | "keywords";
 type Dialog =
-  | { kind: "post"; item?: ReferencePost }
-  | { kind: "keyword"; item?: ResearchKeyword }
-  | null;
-type ToDelete = { kind: "post"; item: ReferencePost } | { kind: "keyword"; item: ResearchKeyword } | null;
+  { kind: "post"; item?: ReferencePost } | { kind: "keyword"; item?: ResearchKeyword } | null;
+type ToDelete =
+  { kind: "post"; item: ReferencePost } | { kind: "keyword"; item: ResearchKeyword } | null;
 
 /**
  * リサーチの画面。参考投稿とキーワードの一覧・追加・編集・削除。
@@ -117,6 +116,9 @@ function ResearchPageContent() {
   }
 
   const canEdit = (posts.data?.canEdit ?? false) && !readOnlyLost;
+  // 画面を開いたときに直せた人には、読むだけになった後もAIの欄を残す（貼り付けた内容を失わないように。PR #17 のCodexレビュー）。
+  // 初めから読むだけ・見せてもらっている人には出さない（FR-008、SC-008）
+  const keepAiPanels = posts.data?.canEdit ?? false;
   const current = tab === "posts" ? posts.data : keywords.data;
   const atLimit = current ? current.items.length >= current.limit : false;
   const addLabel = tab === "posts" ? "参考投稿を追加" : "キーワードを追加";
@@ -137,7 +139,12 @@ function ResearchPageContent() {
     canEdit ? (
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button variant="ghost" size="icon" className="-my-2 -mr-2 size-11 shrink-0 text-muted-foreground md:size-8" aria-label={`${label}の操作`}>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="-my-2 -mr-2 size-11 shrink-0 text-muted-foreground md:size-8"
+            aria-label={`${label}の操作`}
+          >
             <EllipsisIcon className="size-5" />
           </Button>
         </DropdownMenuTrigger>
@@ -151,7 +158,10 @@ function ResearchPageContent() {
     ) : null;
 
   const limitNotice = canEdit && atLimit && current && (
-    <p role="status" className="mb-3 rounded-xl border border-warning/40 bg-warning-bg px-4 py-3 text-sm">
+    <p
+      role="status"
+      className="mb-3 rounded-xl border border-warning/40 bg-warning-bg px-4 py-3 text-sm"
+    >
       登録できる上限（{current.limit}件）に達しています。不要なものを削除してから追加してください。
     </p>
   );
@@ -177,7 +187,12 @@ function ResearchPageContent() {
         <p className="text-[15px] text-muted-foreground">
           Threadsで検索して、反応の良い投稿を見つけたら保存しましょう。「なぜ良いか」を書いておくと、投稿の材料になります。
         </p>
-        <Tabs value={tab} onValueChange={(v) => setParams(v === "keywords" ? { tab: "keywords" } : {}, { replace: true })}>
+        <Tabs
+          value={tab}
+          onValueChange={(v) =>
+            setParams(v === "keywords" ? { tab: "keywords" } : {}, { replace: true })
+          }
+        >
           <TabsList>
             <TabsTrigger value="posts">参考投稿</TabsTrigger>
             <TabsTrigger value="keywords">キーワード</TabsTrigger>
@@ -188,9 +203,10 @@ function ResearchPageContent() {
           </div>
           <TabsContent value="posts">
             {limitNotice}
-            {canEdit && posts.data && (
+            {keepAiPanels && posts.data && (
               <div className="mb-3">
                 <ExplainBatchPanel
+                  readOnly={!canEdit}
                   accountId={account.id}
                   posts={posts.data.items}
                   onSaved={refresh}
@@ -201,7 +217,9 @@ function ResearchPageContent() {
             {!posts.data ? (
               <Skeleton />
             ) : posts.data.items.length === 0 ? (
-              <Empty>まだ参考投稿がありません。Threadsで見つけた反応の良い投稿を保存しましょう。</Empty>
+              <Empty>
+                まだ参考投稿がありません。Threadsで見つけた反応の良い投稿を保存しましょう。
+              </Empty>
             ) : (
               <div className="space-y-2.5">
                 {posts.data.items.map((p) => (
@@ -222,8 +240,9 @@ function ResearchPageContent() {
           </TabsContent>
           <TabsContent value="keywords">
             {limitNotice}
-            {canEdit && keywords.data && (
+            {keepAiPanels && keywords.data && (
               <KeywordIdeasPanel
+                readOnly={!canEdit}
                 accountId={account.id}
                 registered={keywords.data.items.map((k) => k.keyword)}
                 remaining={Math.max(0, keywords.data.limit - keywords.data.items.length)}
@@ -234,14 +253,18 @@ function ResearchPageContent() {
             {!keywords.data ? (
               <Skeleton />
             ) : keywords.data.items.length === 0 ? (
-              <Empty>まだキーワードがありません。リサーチで検索する言葉を登録しておきましょう。</Empty>
+              <Empty>
+                まだキーワードがありません。リサーチで検索する言葉を登録しておきましょう。
+              </Empty>
             ) : (
               <ul className="divide-y rounded-2xl border">
                 {keywords.data.items.map((k) => (
                   <li key={k.id} className="flex items-center gap-3 px-4 py-3">
                     <span className="flex min-w-0 flex-1 flex-col gap-x-3 md:flex-row md:items-baseline">
                       <span className="font-medium break-words">{k.keyword}</span>
-                      {k.purpose && <span className="text-[13px] text-muted-foreground">{k.purpose}</span>}
+                      {k.purpose && (
+                        <span className="text-[13px] text-muted-foreground">{k.purpose}</span>
+                      )}
                     </span>
                     {/* だれでも使える（見せてもらっている人・読むだけの人も。specs/014 FR-093） */}
                     <a
@@ -286,7 +309,12 @@ function ResearchPageContent() {
           item={dialog.item}
           {...dialogCallbacks}
           whyGoodExtra={(setWhyGood, onDirtyChange) => (
-            <ExplainOne accountId={account.id} postId={dialog.item!.id} onUse={setWhyGood} onDirtyChange={onDirtyChange} />
+            <ExplainOne
+              accountId={account.id}
+              postId={dialog.item!.id}
+              onUse={setWhyGood}
+              onDirtyChange={onDirtyChange}
+            />
           )}
         />
       )}
@@ -299,7 +327,13 @@ function ResearchPageContent() {
         />
       )}
       <ConfirmDeleteDialog
-        name={toDelete ? (toDelete.kind === "post" ? "この参考投稿" : `「${toDelete.item.keyword}」`) : null}
+        name={
+          toDelete
+            ? toDelete.kind === "post"
+              ? "この参考投稿"
+              : `「${toDelete.item.keyword}」`
+            : null
+        }
         deleting={remove.isPending}
         onCancel={() => setToDelete(null)}
         onConfirm={() => toDelete && remove.mutate(toDelete)}
@@ -321,7 +355,9 @@ function Skeleton() {
 
 function Empty({ children }: { children: ReactNode }) {
   return (
-    <div className="rounded-2xl border border-dashed px-6 py-10 text-center text-[15px] text-muted-foreground">{children}</div>
+    <div className="rounded-2xl border border-dashed px-6 py-10 text-center text-[15px] text-muted-foreground">
+      {children}
+    </div>
   );
 }
 
@@ -333,7 +369,8 @@ function Empty({ children }: { children: ReactNode }) {
 function metricsLine(item: ReferencePost): string {
   const parts: string[] = [];
   if (item.metrics.views !== null) parts.push(`閲覧 ${item.metrics.views.toLocaleString("ja-JP")}`);
-  if (item.metrics.likes !== null) parts.push(`いいね ${item.metrics.likes.toLocaleString("ja-JP")}`);
+  if (item.metrics.likes !== null)
+    parts.push(`いいね ${item.metrics.likes.toLocaleString("ja-JP")}`);
   return parts.join(" ・ ");
 }
 
@@ -353,17 +390,36 @@ function ReferencePostCard({
   return (
     <article className="space-y-2 rounded-2xl border bg-card px-4 py-3.5">
       <div className="flex items-start gap-2">
-        <p className={cn("flex-1 text-[15px] whitespace-pre-wrap break-words", !expanded && "line-clamp-6")}>{item.body}</p>
+        <p
+          className={cn(
+            "flex-1 text-[15px] whitespace-pre-wrap break-words",
+            !expanded && "line-clamp-6",
+          )}
+        >
+          {item.body}
+        </p>
         {menu}
       </div>
       {long && (
-        <button type="button" className="text-[13px] underline" onClick={() => setExpanded((v) => !v)}>
+        <button
+          type="button"
+          className="text-[13px] underline"
+          onClick={() => setExpanded((v) => !v)}
+        >
           {expanded ? "閉じる" : "もっと見る"}
         </button>
       )}
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
-        <ReferenceBadges platform={item.platform} freshness={item.freshness} explained={item.whyGood.trim() !== ""} />
-        {item.keyword && <span className="rounded-full bg-muted px-2.5 py-0.5 text-foreground">{item.keyword}</span>}
+        <ReferenceBadges
+          platform={item.platform}
+          freshness={item.freshness}
+          explained={item.whyGood.trim() !== ""}
+        />
+        {item.keyword && (
+          <span className="rounded-full bg-muted px-2.5 py-0.5 text-foreground">
+            {item.keyword}
+          </span>
+        )}
         {metricsLine(item) && <span>{metricsLine(item)}</span>}
         <span>{formatDateTime(item.createdAt)}</span>
         {item.postUrl && (
@@ -384,7 +440,11 @@ function ReferencePostCard({
           {item.whyGood}
         </p>
       ) : canEdit ? (
-        <button type="button" onClick={onEdit} className="text-left text-sm text-muted-foreground underline">
+        <button
+          type="button"
+          onClick={onEdit}
+          className="text-left text-sm text-muted-foreground underline"
+        >
           なぜ良いか：未入力
         </button>
       ) : (

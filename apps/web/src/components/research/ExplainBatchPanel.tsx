@@ -25,7 +25,8 @@ const excerpt = (s: string, n: number) => {
 
 /**
  * まとめての解説の欄。直せる人で、解説がまだの参考投稿があるときだけ置く。
- * @param props - accountId、posts：そのアカウントの参考投稿、onSaved：保存した後、onBillingRequired：読むだけになった
+ * @param props - accountId、posts：そのアカウントの参考投稿、onSaved：保存した後、onBillingRequired：読むだけになった、
+ *   readOnly：読むだけになった後（貼り付けた内容は残し、コピーと保存はできない。PR #17 のCodexレビュー）
  * @returns 欄
  */
 export function ExplainBatchPanel({
@@ -33,11 +34,13 @@ export function ExplainBatchPanel({
   posts,
   onSaved,
   onBillingRequired,
+  readOnly = false,
 }: {
   accountId: string;
   posts: ReferencePost[];
   onSaved: () => void;
   onBillingRequired: (reason: string) => void;
+  readOnly?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [paste, setPaste] = useState("");
@@ -84,7 +87,7 @@ export function ExplainBatchPanel({
             「なぜ伸びたか」をAIにまとめて解説してもらうと、投稿づくりに活かせます（1回に{EXPLAIN_BATCH_MAX}件まで）
           </p>
         </div>
-        {pending > 0 && (
+        {pending > 0 && !readOnly && (
           <CopyPromptButton
             label={`まとめてAIに解説してもらう（${batchCount}件）`}
             copiedMessage={`${batchCount}件分のプロンプトをコピーしました。ChatGPTやClaudeに貼り付けて送り、返ってきた答えをまるごと下に貼り付けてください`}
@@ -111,7 +114,7 @@ export function ExplainBatchPanel({
             rows={6}
             value={paste}
             // 保存の途中は変えられない（保存の後に欄を空にするので、後から貼った答えを失わないように）
-            disabled={save.isPending}
+            disabled={save.isPending || readOnly}
             onChange={(e) => {
               setPaste(e.target.value);
               setUnchecked(new Set());
@@ -130,7 +133,7 @@ export function ExplainBatchPanel({
                       <input
                         type="checkbox"
                         className="mt-1 size-4"
-                        disabled={!ok || save.isPending}
+                        disabled={!ok || save.isPending || readOnly}
                         checked={ok && !unchecked.has(i)}
                         onChange={() =>
                           setUnchecked((set) => {
@@ -156,7 +159,7 @@ export function ExplainBatchPanel({
               })}
             </ul>
           )}
-          {parsed.length > 0 && (
+          {parsed.length > 0 && !readOnly && (
             <Button
               type="button"
               className="h-10 rounded-full px-4"
