@@ -55,6 +55,45 @@ export async function insertWithLimit<T>(
 }
 
 /**
+ * 件数の上限を守ってまとめて追加する（specs/014 research.md R7・R16）。全部か無しかで、上限を超えるなら1件も入れない。
+ * insertWithLimit と同じアドバイザリーロックを使うので、1件の追加とまとめての追加が同時でも上限を超えない。
+ * @param env - Workers のバインディング（DATABASE_URL を使う）
+ * @param accountId - accounts.id
+ * @param kind - 種類（ロックのキー）
+ * @param limit - 件数の上限
+ * @param count - 今の件数を数える処理
+ * @param n - 追加する件数
+ * @param insert - まとめて追加して、追加した行を返す処理
+ * @returns 追加した行
+ * @throws AppError ITEM_LIMIT_REACHED（error.remaining にあと何件）、ACCOUNT_NOT_FOUND
+ */
+export async function insertManyWithLimit<T>(
+  env: Env,
+  accountId: string,
+  kind: ItemKind,
+  limit: number,
+  count: (tx: TxDb) => Promise<number>,
+  n: number,
+  insert: (tx: TxDb) => Promise<T>,
+): Promise<T> {
+  try {
+    return await withTransaction(env.DATABASE_URL, async (tx) => {
+      await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${`account_items:${accountId}:${kind}`}, 0))`);
+      const current = await count(tx);
+      if (current + n > limit) {
+        throw new AppError("ITEM_LIMIT_REACHED", 409, "item limit reached", undefined, undefined, {
+          remaining: Math.max(0, limit - current),
+        });
+      }
+      return insert(tx);
+    });
+  } catch (err) {
+    if (pgErrorCode(err) === "23503") throw notFound();
+    throw err;
+  }
+}
+
+/**
  * version が一致する場合だけ更新する（research.md R3）。
  * @param update - `version = expectedVersion` を条件に更新し、更新した行を返す処理（0行なら空配列）
  * @param findCurrent - 今の行を取得する処理（なければ undefined）

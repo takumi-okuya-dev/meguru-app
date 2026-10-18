@@ -84,9 +84,15 @@ describe("課題の画面", () => {
     getStrategy.mockResolvedValue(strategy());
     renderPage();
     expect(await screen.findByLabelText(fieldLabel)).toHaveValue("保存済みの行動");
-    expect(screen.getByRole("heading", { name: "課題① 営業導線設計" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "活動の目的・在り方" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "営業導線設計" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "プロフィール・固定投稿（下書き）" })).toBeInTheDocument();
-    expect(screen.getAllByText("1/16 入力済み").length).toBeGreaterThan(0);
+    // 下書きは投稿づくりで方向性の軸として使う（specs/014 FR-021）
+    expect(
+      screen.getByText("Threadsには自動で反映されない下書きです。投稿づくりでは、投稿の方向性の軸として使います。"),
+    ).toBeInTheDocument();
+    // 「保存済みの行動」は目安（20字）より短いので、完了0・要確認1（specs/014 FR-014）
+    expect(screen.getAllByText(/完了 0\/16 ・ 要確認 1/).length).toBeGreaterThan(0);
     expect(screen.getByLabelText("近い人間性")).toBeInTheDocument();
   });
 

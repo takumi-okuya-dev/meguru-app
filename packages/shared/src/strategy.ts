@@ -19,8 +19,22 @@ export type TonePreset = (typeof TONE_PRESETS)[number]["value"];
 /** 近い人間性の値の一覧（zod の enum 用）。 */
 export const TONE_PRESET_VALUES = TONE_PRESETS.map((t) => t.value) as unknown as readonly [TonePreset, ...TonePreset[]];
 
+/** 活動の目的・在り方の5問と活動の軸のキー（specs/014 research.md R3）。PUT では省略でき、省略は今の値を残す。 */
+export const PURPOSE_KEYS = [
+  "purposeOrigin",
+  "purposeSelf",
+  "purposeOthers",
+  "purposeFuture",
+  "purposeStance",
+  "activityAxis",
+] as const;
+
+/** 活動の目的・在り方の5問と活動の軸のキー。 */
+export type PurposeKey = (typeof PURPOSE_KEYS)[number];
+
 /** 課題のテキストの項目のキー（DB の列名を camelCase にしたもの）。 */
 export const STRATEGY_TEXT_KEYS = [
+  ...PURPOSE_KEYS,
   "finalAction",
   "targetPersona",
   "realWorries",
@@ -48,14 +62,15 @@ export type StrategyTextKey = (typeof STRATEGY_TEXT_KEYS)[number];
 /** 課題の全項目の値。テキストの未入力は ""、近い人間性の未選択は null。 */
 export type StrategyValues = Record<StrategyTextKey, string> & { tonePreset: TonePreset | null };
 
-/** 課題の区分。 */
+/** 課題の区分（specs/014 FR-019 で「課題①〜③」の番号を外し、活動の目的・在り方を先頭に足した）。 */
 export const STRATEGY_SECTIONS = [
-  { id: "sales", title: "課題① 営業導線設計", chip: "課題① 営業導線", chipShort: "課題①" },
-  { id: "account", title: "課題② アカウント設計", chip: "課題② アカウント", chipShort: "課題②" },
-  { id: "funnel", title: "課題③ 集客導線設計", chip: "課題③ 集客導線", chipShort: "課題③" },
-  { id: "tone", title: "人柄（トンマナ）", chip: "人柄", chipShort: "人柄" },
-  { id: "other", title: "その他", chip: "その他", chipShort: "その他" },
-  { id: "drafts", title: "プロフィール・固定投稿（下書き）", chip: "プロフィール・固定投稿", chipShort: "下書き" },
+  { id: "purpose", title: "活動の目的・在り方", chip: "目的" },
+  { id: "sales", title: "営業導線設計", chip: "営業導線" },
+  { id: "account", title: "アカウント設計", chip: "アカウント" },
+  { id: "funnel", title: "集客導線設計", chip: "集客導線" },
+  { id: "tone", title: "人柄（トンマナ）", chip: "人柄" },
+  { id: "other", title: "その他", chip: "その他" },
+  { id: "drafts", title: "プロフィール・固定投稿（下書き）", chip: "下書き" },
 ] as const;
 
 /** 課題の区分の ID。 */
@@ -72,13 +87,84 @@ export type StrategyField = {
   description: string;
   /** 記入例（空の欄の中に出す。保存しない） */
   placeholder: string;
-  /** 入力済み項目数（16項目）に数えるか。下書き4項目は数えない（FR-005） */
+  /** 入力済み項目数（16項目）に数えるか。目的の6項目と下書き4項目は数えない（FR-005、specs/014 FR-020） */
   counted: boolean;
   rows: number;
 };
 
-/** 課題の20項目（表示順）。 */
+/** 活動の目的・在り方の5問と活動の軸（specs/014 FR-050・FR-051。記入例は contracts/hints.md の例）。 */
+const PURPOSE_FIELDS: readonly StrategyField[] = [
+  {
+    key: "purposeOrigin",
+    column: "purpose_origin",
+    kind: "text",
+    section: "purpose",
+    label: "Q1：なぜ、この活動を始めようと思いましたか？",
+    description: "きっかけになった出来事や、そのときの気持ち",
+    placeholder: "例: 上京して、仕事以外で話せる人がいなかった",
+    counted: false,
+    rows: 3,
+  },
+  {
+    key: "purposeSelf",
+    column: "purpose_self",
+    kind: "text",
+    section: "purpose",
+    label: "Q2：この活動を通して、自分自身はどうなりたいですか？",
+    description: "活動を続けた先の、自分の姿",
+    placeholder: "例: 人と人をつなぐ役として頼られる",
+    counted: false,
+    rows: 3,
+  },
+  {
+    key: "purposeOthers",
+    column: "purpose_others",
+    kind: "text",
+    section: "purpose",
+    label: "Q3：関わってくれた人に、どうなってほしいですか？",
+    description: "あなたと関わった人の、その後の変化",
+    placeholder: "例: 会社以外にも、気軽に話せる友達ができる",
+    counted: false,
+    rows: 3,
+  },
+  {
+    key: "purposeFuture",
+    column: "purpose_future",
+    kind: "text",
+    section: "purpose",
+    label: "Q4：この活動を続けた先に、どんな未来を作りたいですか？",
+    description: "自分と周りを超えた、少し大きな景色",
+    placeholder: "例: 地方から上京した人が、孤立しない街",
+    counted: false,
+    rows: 3,
+  },
+  {
+    key: "purposeStance",
+    column: "purpose_stance",
+    kind: "text",
+    section: "purpose",
+    label: "Q5：活動するうえで、どんな在り方を大切にしたいですか？",
+    description: "発信や人との関わりで、守りたい姿勢",
+    placeholder: "例: 無理に売り込まない。本音で話す",
+    counted: false,
+    rows: 3,
+  },
+  {
+    key: "activityAxis",
+    column: "activity_axis",
+    kind: "text",
+    section: "purpose",
+    label: "活動の軸",
+    description: "Q1〜Q5の答えを、短い言葉にまとめたもの。投稿やプロフィールの言葉を選ぶときの芯になります",
+    placeholder: "例: ひとりで頑張る人を、ひとりにしない",
+    counted: false,
+    rows: 2,
+  },
+];
+
+/** 課題の26項目（表示順）。目的の6項目・数える16項目・下書き4項目。 */
 export const STRATEGY_FIELDS: readonly StrategyField[] = [
+  ...PURPOSE_FIELDS,
   {
     key: "finalAction",
     column: "final_action",

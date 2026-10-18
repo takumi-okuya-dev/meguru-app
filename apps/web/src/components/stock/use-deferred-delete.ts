@@ -12,6 +12,22 @@ export const UNDO_WINDOW_MS = 5000;
 
 type Pending = { ids: string[]; timer: ReturnType<typeof setTimeout>; toastId: string | number };
 
+// 画面をまたいでも、待っている削除の確定を待てるようにする（投稿ストックで削除してすぐ「投稿をつくる」で登録する流れ。
+// PR #17 のCodexレビュー）。待っている削除を始める関数と、始まった確定の約束を、この場所に置く
+const starters = new Set<() => Promise<void>>();
+// 続けて削除すると確定が重なるので、始まった確定をすべて覚える（PR #17 のCodexレビュー）
+const inFlight = new Set<Promise<void>>();
+
+/**
+ * 待っている削除をすぐ確定し、終わるまで待つ（画面を離れた後に始まった確定も待つ）。
+ * @returns 確定が終わる約束
+ */
+export function flushPendingDeletes(): Promise<void> {
+  // starters は呼ぶとその場で確定を始め、inFlight に入る
+  const started = [...starters].map((start) => start());
+  return Promise.all([...started, ...inFlight]).then(() => undefined);
+}
+
 /**
  * 下書きの削除を遅らせて確定する。削除した下書きはすぐ一覧から隠し、UNDO_WINDOW_MS 後に API を呼ぶ。
  * 次の削除・画面を離れたときは、前の削除をその時点で確定する。
@@ -34,7 +50,7 @@ export function useDeferredDelete(accountId: string) {
     clearTimeout(p.timer);
     // 次の削除で前の削除を確定するときは、前のトーストの「元に戻す」も消す
     toast.dismiss(p.toastId);
-    return api.deletePostDrafts(accountId, p.ids).then(
+    const done = api.deletePostDrafts(accountId, p.ids).then(
       async () => {
         // 直近の下書きはプロンプトの材料なので、プロンプトも取り直す
         void queryClient.invalidateQueries({ queryKey: queryKeys.promptAll(accountId) });
@@ -47,6 +63,9 @@ export function useDeferredDelete(accountId: string) {
         unhide(p.ids);
       },
     );
+    inFlight.add(done);
+    void done.finally(() => inFlight.delete(done));
+    return done;
   }, [accountId, queryClient, unhide]);
 
   // 画面を離れたら、待っている削除をその時点で確定する
@@ -60,6 +79,14 @@ export function useDeferredDelete(accountId: string) {
     },
     [],
   );
+  // ほかの画面からも、待っている削除を確定できるようにする
+  useEffect(() => {
+    const start = () => commitRef.current();
+    starters.add(start);
+    return () => {
+      starters.delete(start);
+    };
+  }, []);
 
   const remove = useCallback(
     (ids: string[]) => {

@@ -32,10 +32,17 @@ export const ACCOUNT_ROUTES: [string, string, Permission][] = [
   ["PUT", "/api/accounts/:accountId/strategy", "content"],
   ["GET", "/api/accounts/:accountId/reference-posts", "read"],
   ["POST", "/api/accounts/:accountId/reference-posts", "content"],
+  // specs/014 US7・US8（まとめての登録、解説のプロンプト、まとめての解説の保存）
+  ["POST", "/api/accounts/:accountId/reference-posts/batch", "content"],
+  ["GET", "/api/accounts/:accountId/reference-posts/explain-prompt", "content"],
+  ["POST", "/api/accounts/:accountId/reference-posts/explanations", "content"],
   ["PUT", "/api/accounts/:accountId/reference-posts/:referencePostId", "content"],
   ["DELETE", "/api/accounts/:accountId/reference-posts/:referencePostId", "content"],
   ["GET", "/api/accounts/:accountId/research-keywords", "read"],
   ["POST", "/api/accounts/:accountId/research-keywords", "content"],
+  // specs/014 US9（キーワードの案のプロンプト、まとめての登録）
+  ["GET", "/api/accounts/:accountId/research-keywords/idea-prompt", "content"],
+  ["POST", "/api/accounts/:accountId/research-keywords/batch", "content"],
   ["PUT", "/api/accounts/:accountId/research-keywords/:keywordId", "content"],
   ["DELETE", "/api/accounts/:accountId/research-keywords/:keywordId", "content"],
   ["GET", "/api/accounts/:accountId/prompt", "view"],

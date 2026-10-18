@@ -1,43 +1,16 @@
-// 参考投稿の追加・編集のダイアログ（specs/002 contracts/ui-routes.md「リサーチの画面」、US3）
-import {
-  REFERENCE_BODY_MAX,
-  REFERENCE_WHY_GOOD_MAX,
-  SHORT_TEXT_MAX,
-  URL_MAX,
-  countChars,
-  isBlank,
-  isHttpUrl,
-  type ReferencePost,
-} from "@threads-grower/shared";
-import { FieldWithCounter } from "@/components/FieldWithCounter";
+// 参考投稿の編集のダイアログ（specs/002 US3、specs/014 FR-088）。追加は ReferencePostAddDialog（ためて登録）で行う。
+import { useState, type ReactNode } from "react";
+import type { ReferencePost } from "@threads-grower/shared";
 import { DeletedElsewhereNotice, FormDialogFrame } from "@/components/items/FormDialogFrame";
-import { useItemForm, type FormErrors } from "@/components/items/use-item-form";
+import { useItemForm } from "@/components/items/use-item-form";
+import { UnsavedChangesDialog } from "@/components/UnsavedChangesDialog";
 import { api } from "@/lib/api-client";
-
-type Form = { body: string; keyword: string; postUrl: string; whyGood: string };
-const EMPTY: Form = { body: "", keyword: "", postUrl: "", whyGood: "" };
-
-const toForm = (p: ReferencePost): Form => ({ body: p.body, keyword: p.keyword, postUrl: p.postUrl, whyGood: p.whyGood });
-
-function validate(f: Form): FormErrors<Form> {
-  return {
-    body: isBlank(f.body) ? "入力してください" : undefined,
-    postUrl: f.postUrl !== "" && !isHttpUrl(f.postUrl) ? "https:// から始まるURLを入力してください" : undefined,
-  };
-}
-
-function overLimit(f: Form) {
-  return (
-    countChars(f.body) > REFERENCE_BODY_MAX ||
-    countChars(f.keyword) > SHORT_TEXT_MAX ||
-    countChars(f.postUrl) > URL_MAX ||
-    countChars(f.whyGood) > REFERENCE_WHY_GOOD_MAX
-  );
-}
+import { ReferencePostFields } from "./ReferencePostFields";
+import { EMPTY_REF_FORM, overLimitRef, toRefForm, toRefInput, validateRef, type RefForm } from "./reference-post-form";
 
 /**
- * 参考投稿の追加・編集のダイアログ。
- * @param props - accountId、item：編集する参考投稿（追加のときは undefined）、結果の通知
+ * 参考投稿の編集のダイアログ。
+ * @param props - accountId、item：編集する参考投稿、whyGoodExtra：なぜ良いかの下に足す中身（1件の解説）、結果の通知
  * @returns ダイアログ
  */
 export function ReferencePostFormDialog({
@@ -48,21 +21,28 @@ export function ReferencePostFormDialog({
   onReadOnly,
   onDeletedElsewhere,
   onLimitReached,
+  whyGoodExtra,
 }: {
   accountId: string;
   item?: ReferencePost;
+  whyGoodExtra?: (setWhyGood: (text: string) => void, onDirtyChange: (dirty: boolean) => void) => ReactNode;
   onSaved: (p: ReferencePost) => void;
   onClose: () => void;
   onReadOnly: () => void;
   onDeletedElsewhere: () => void;
   onLimitReached: () => void;
 }) {
-  const f = useItemForm<Form, ReferencePost>({
+  // 1件の解説に貼り付けた内容も、未保存として扱う（PR #17 のCodexレビュー）
+  const [explainDirty, setExplainDirty] = useState(false);
+  // 貼り付けた解説を「なぜ良いか」に入れずに保存しようとしたとき（保存すると貼り付けた内容は残らない）
+  const [confirmSave, setConfirmSave] = useState(false);
+  const f = useItemForm<RefForm, ReferencePost>({
+    extraDirty: explainDirty,
     item,
-    emptyForm: EMPTY,
-    toForm,
-    validate,
-    overLimit,
+    emptyForm: EMPTY_REF_FORM,
+    toForm: toRefForm,
+    validate: (form) => validateRef(form),
+    overLimit: overLimitRef,
     onSaved,
     onClose,
     onReadOnly,
@@ -70,8 +50,8 @@ export function ReferencePostFormDialog({
     onLimitReached,
     save: (form, expectedVersion) =>
       expectedVersion === undefined
-        ? api.createReferencePost(accountId, form)
-        : api.updateReferencePost(accountId, item!.id, { ...form, expectedVersion }),
+        ? api.createReferencePost(accountId, toRefInput(form))
+        : api.updateReferencePost(accountId, item!.id, { ...toRefInput(form), expectedVersion }),
   });
   const { form, setField, errors } = f;
 
@@ -79,61 +59,34 @@ export function ReferencePostFormDialog({
     <>
       <FormDialogFrame
         title={item ? "参考投稿を編集" : "参考投稿を追加"}
-        description="Threadsで見つけた反応の良い投稿を保存します。"
+        description="Threadsで見つけた反応の良い投稿を直します。"
         submitLabel="保存"
         submitting={f.submitting}
         locked={f.locked}
-        onSubmit={f.submit}
+        onSubmit={() => (explainDirty ? setConfirmSave(true) : f.submit())}
         onRequestClose={f.requestClose}
       >
         {f.deleted && <DeletedElsewhereNotice what="参考投稿" onClose={f.closeDeleted} />}
-        <FieldWithCounter
+        <ReferencePostFields
+          form={form}
+          setField={setField}
+          errors={errors}
           readOnly={f.readOnly}
-          id="reference-body"
-          label="本文"
-          requiredNote="必須"
-          placeholder="Threadsで見つけた投稿の本文をそのまま貼り付け"
-          rows={6}
-          max={REFERENCE_BODY_MAX}
-          value={form.body}
-          error={errors.body}
-          onChange={(v) => setField("body", v)}
-        />
-        <FieldWithCounter
-          readOnly={f.readOnly}
-          id="reference-keyword"
-          label="検索したキーワード"
-          placeholder="例: AI 初心者"
-          multiline={false}
-          max={SHORT_TEXT_MAX}
-          value={form.keyword}
-          onChange={(v) => setField("keyword", v)}
-        />
-        <FieldWithCounter
-          readOnly={f.readOnly}
-          id="reference-url"
-          label="投稿のURL"
-          placeholder="https://www.threads.net/…"
-          type="url"
-          multiline={false}
-          max={URL_MAX}
-          value={form.postUrl}
-          error={errors.postUrl}
-          onChange={(v) => setField("postUrl", v)}
-        />
-        <FieldWithCounter
-          readOnly={f.readOnly}
-          id="reference-why"
-          label="なぜ良いか"
-          description="自分で書くか、ChatGPTやClaudeに分析してもらった結果を貼り付けます"
-          placeholder="例: 冒頭の1文で共感を取り、最後に問いかけでコメントを促している"
-          rows={4}
-          max={REFERENCE_WHY_GOOD_MAX}
-          value={form.whyGood}
-          onChange={(v) => setField("whyGood", v)}
+          whyGoodExtra={!f.readOnly && whyGoodExtra?.((text) => setField("whyGood", text), setExplainDirty)}
         />
       </FormDialogFrame>
       {f.overlays}
+      <UnsavedChangesDialog
+        open={confirmSave}
+        title="貼り付けた解説が、まだ「なぜ良いか」に入っていません"
+        description="このまま保存すると、貼り付けた解説は失われます。"
+        discardLabel="破棄して保存"
+        onStay={() => setConfirmSave(false)}
+        onDiscard={() => {
+          setConfirmSave(false);
+          f.submit();
+        }}
+      />
     </>
   );
 }

@@ -41,6 +41,11 @@ import {
   promotionSchema,
   promotionSettingsSchema,
   referencePostListSchema,
+  explainPromptSchema,
+  keywordBatchResultSchema,
+  keywordIdeaPromptSchema,
+  explanationsResultSchema,
+  referencePostBatchResultSchema,
   referencePostSchema,
   researchKeywordListSchema,
   researchKeywordSchema,
@@ -57,7 +62,8 @@ import {
   type ReviewRequest,
   type PromotionInput,
   type PutStrategyRequest,
-  type ReferencePostInput,
+  type PostLengthSettings,
+  type ReferencePostInputBody,
   type ResearchKeywordInput,
   type ErrorCode,
   type OpenAccountRequest,
@@ -319,7 +325,29 @@ export const api = {
     }),
   listReferencePosts: (accountId: string) =>
     request(`/api/accounts/${accountId}/reference-posts`, referencePostListSchema),
-  createReferencePost: (accountId: string, body: ReferencePostInput) =>
+  getExplainPrompt: (accountId: string, id?: string) =>
+    request(
+      `/api/accounts/${accountId}/reference-posts/explain-prompt${id ? `?id=${encodeURIComponent(id)}` : ""}`,
+      explainPromptSchema,
+    ),
+  saveExplanations: (accountId: string, body: { items: { id: string; whyGood: string }[] }) =>
+    request(`/api/accounts/${accountId}/reference-posts/explanations`, explanationsResultSchema, {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+  getKeywordIdeaPrompt: (accountId: string) =>
+    request(`/api/accounts/${accountId}/research-keywords/idea-prompt`, keywordIdeaPromptSchema),
+  createKeywordsBatch: (accountId: string, body: { items: { keyword: string; purpose: string }[] }) =>
+    request(`/api/accounts/${accountId}/research-keywords/batch`, keywordBatchResultSchema, {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+  createReferencePostsBatch: (accountId: string, body: { items: ReferencePostInputBody[] }) =>
+    request(`/api/accounts/${accountId}/reference-posts/batch`, referencePostBatchResultSchema, {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+  createReferencePost: (accountId: string, body: ReferencePostInputBody) =>
     request(`/api/accounts/${accountId}/reference-posts`, referencePostSchema, {
       method: "POST",
       body: JSON.stringify(body),
@@ -327,7 +355,7 @@ export const api = {
   updateReferencePost: (
     accountId: string,
     id: string,
-    body: ReferencePostInput & { expectedVersion: number },
+    body: ReferencePostInputBody & { expectedVersion: number },
   ) =>
     request(`/api/accounts/${accountId}/reference-posts/${id}`, referencePostSchema, {
       method: "PUT",
@@ -359,10 +387,11 @@ export const api = {
       `/api/accounts/${accountId}/prompt${count === undefined ? "" : `?count=${count}`}`,
       promptResponseSchema,
     ),
-  putPromptSettings: (accountId: string, postCount: number, expectedVersion: number) =>
+  putPromptSettings: (accountId: string, postCount: number, expectedVersion: number, length?: PostLengthSettings) =>
     request(`/api/accounts/${accountId}/prompt-settings`, promptSettingsSchema, {
       method: "PUT",
-      body: JSON.stringify({ postCount, expectedVersion }),
+      // 文字数と割合は省略できる（省略なら変えない。specs/014 FR-140）
+      body: JSON.stringify(length ? { postCount, length, expectedVersion } : { postCount, expectedVersion }),
     }),
   listPostDrafts: (accountId: string) =>
     request(`/api/accounts/${accountId}/post-drafts`, postDraftListSchema),

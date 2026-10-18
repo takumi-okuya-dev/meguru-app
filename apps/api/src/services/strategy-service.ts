@@ -44,14 +44,17 @@ function toBody(row: StrategyRow | undefined): StrategyBody {
 
 /**
  * 空白だけの値は NULL にし、それ以外は入力されたまま保存する（research.md R2）。
- * @param req - 課題の値
+ * 目的の6キー（specs/014）は省略でき、省略されたキーは列に含めない（今の値を残す。FR-054）。
+ * @param req - 課題の値（目的のキーは省略できる）
  * @returns 列の値
  */
-function toColumns(req: StrategyValues) {
-  const cols = Object.fromEntries(STRATEGY_TEXT_KEYS.map((k) => [k, isBlank(req[k]) ? null : req[k]])) as Record<
-    (typeof STRATEGY_TEXT_KEYS)[number],
-    string | null
-  >;
+function toColumns(req: PutStrategyRequest) {
+  const entries = STRATEGY_TEXT_KEYS.flatMap((k) => {
+    const v = req[k];
+    if (v === undefined) return [];
+    return [[k, isBlank(v) ? null : v] as const];
+  });
+  const cols = Object.fromEntries(entries) as Partial<Record<(typeof STRATEGY_TEXT_KEYS)[number], string | null>>;
   return { ...cols, tonePreset: req.tonePreset };
 }
 

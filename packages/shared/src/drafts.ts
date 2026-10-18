@@ -5,6 +5,9 @@ import { DRAFT_BODY_MAX, PASTE_MAX_CHARS, PASTE_MAX_DRAFTS } from "./limits";
 /** 区切りの行の判定に使う形。前後の空白・`*`・`_`・`` ` ``を除くと「@」が3つ以上だけ並ぶ行。 */
 const DELIMITER_LINE = /^[\s*_`]*@{3,}[\s*_`]*$/;
 
+/** 行の初め（前の空白は許す）が ``` の行。 */
+const CODE_FENCE_LINE = /^\s*```/;
+
 /** splitDrafts の結果。 */
 export type SplitResult = {
   /** 下書きの本文（貼り付けたテキストの順。前後の空白・改行は除いてある） */
@@ -21,7 +24,11 @@ export type SplitResult = {
  * @returns 下書きの本文の一覧と、区切りが見つかったか
  */
 export function splitDrafts(text: string): SplitResult {
-  const lines = text.replace(/\r\n?/g, "\n").split("\n");
+  // コードブロックの始まりと終わりの行（言語名つきも）は除く（specs/014 FR-170、research.md R13）
+  const lines = text
+    .replace(/\r\n?/g, "\n")
+    .split("\n")
+    .filter((line) => !CODE_FENCE_LINE.test(line));
   const chunks: string[][] = [[]];
   let delimiterFound = false;
   for (const line of lines) {

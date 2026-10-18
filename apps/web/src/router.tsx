@@ -24,6 +24,7 @@ import { SettingsIndex, SettingsLayout } from "@/pages/settings/settings-layout"
 import { PromotionsPage } from "@/pages/promotions";
 import { ResearchPage } from "@/pages/research";
 import { StockPage } from "@/pages/stock";
+import { CreatePage } from "@/pages/create";
 import { StrategyPage } from "@/pages/strategy";
 import { TermsPage } from "@/pages/terms";
 import { GuideThreadsTokenPage } from "@/pages/guide-threads-token";
@@ -73,6 +74,8 @@ export const routes = [
           { path: "strategy", element: <StrategyPage /> },
           { path: "promotions", element: <PromotionsPage /> },
           { path: "research", element: <ResearchPage /> },
+          // 投稿をつくる（specs/014 US15）。投稿ストックは一覧だけにした
+          { path: "create", element: <CreatePage /> },
           { path: "stock", element: <StockPage /> },
           { path: "performance", element: <PerformancePage /> },
           // 操作の記録（specs/008 FR-052）。オーナーと、担当の管理者だけ（specs/011 FR-002）

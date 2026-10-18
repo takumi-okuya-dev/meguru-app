@@ -83,6 +83,15 @@ export function actionText(item: ActivityItem): string {
       return "キーワードを削除しました";
     case "prompt_count_saved":
       return "プロンプトで作る件数を変えました";
+    // 014で足した操作（specs/014 FR-094・FR-140）。summary は件数や設定の値
+    case "reference_posts_added":
+      return `参考投稿を${s}まとめて登録しました`;
+    case "reference_posts_explained":
+      return `${s}の参考投稿にAIの解説を入れました`;
+    case "research_keywords_added":
+      return `キーワードを${s}まとめて登録しました`;
+    case "prompt_length_saved":
+      return `投稿の文字数と割合を変えました（${s}）`;
     case "feedback_saved":
       return "改善メモを保存しました";
     case "schedule_saved":

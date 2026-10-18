@@ -22,6 +22,7 @@ import {
   type AnyPgColumn,
 } from "drizzle-orm/pg-core";
 import {
+  POST_LENGTH_DEFAULTS,
   PROMOTION_RATIO_DEFAULT,
   PROMPT_COUNT_DEFAULT,
   REJECT_REASON_CODES,
@@ -126,6 +127,15 @@ export const accounts = pgTable("accounts", {
   promptPostCountUpdatedByUserId: uuid("prompt_post_count_updated_by_user_id").references((): AnyPgColumn => users.id, {
     onDelete: "set null",
   }),
+  // 1投稿の文字数の目標と、短文・中文・長文の文字数と割合（specs/014 data-model.md、research.md R11）。
+  // 版と最後に保存した人は、作る件数のもの（prompt_post_count_version）を共有する
+  postLengthTarget: smallint("post_length_target").notNull().default(POST_LENGTH_DEFAULTS.target),
+  shortLength: smallint("short_length").notNull().default(POST_LENGTH_DEFAULTS.shortLength),
+  mediumLength: smallint("medium_length").notNull().default(POST_LENGTH_DEFAULTS.mediumLength),
+  longLength: smallint("long_length").notNull().default(POST_LENGTH_DEFAULTS.longLength),
+  shortRatio: smallint("short_ratio").notNull().default(POST_LENGTH_DEFAULTS.shortRatio),
+  mediumRatio: smallint("medium_ratio").notNull().default(POST_LENGTH_DEFAULTS.mediumRatio),
+  longRatio: smallint("long_ratio").notNull().default(POST_LENGTH_DEFAULTS.longRatio),
   // 反応数を読む権限がないと分かった日時（006 research.md R11）。再接続で消す
   insightsDeniedAt: timestamp("insights_denied_at", { withTimezone: true, precision: 6 }),
   // 今の接続の方法と、要再接続の理由の補い（specs/010 data-model.md。hint は short_lived_token だけ）
@@ -138,6 +148,15 @@ export const accounts = pgTable("accounts", {
   check("accounts_promotion_ratio_range", sql`${t.promotionRatioPercent} BETWEEN 0 AND 100`),
   check("accounts_prompt_post_count_range", sql`${t.promptPostCount} BETWEEN 1 AND 50`),
   check("accounts_core_rules_length", sql`char_length(${t.coreRules}) <= 2000`),
+  check("accounts_post_length_target_range", sql`${t.postLengthTarget} BETWEEN 50 AND 500`),
+  check(
+    "accounts_post_kind_length_range",
+    sql`${t.shortLength} BETWEEN 10 AND ${t.postLengthTarget} AND ${t.mediumLength} BETWEEN 10 AND ${t.postLengthTarget} AND ${t.longLength} BETWEEN 10 AND ${t.postLengthTarget}`,
+  ),
+  check(
+    "accounts_post_kind_ratio_range",
+    sql`${t.shortRatio} BETWEEN 0 AND 100 AND ${t.mediumRatio} BETWEEN 0 AND 100 AND ${t.longRatio} BETWEEN 0 AND 100 AND ${t.shortRatio} + ${t.mediumRatio} + ${t.longRatio} = 100`,
+  ),
   // アカウントの名前は前後の空白を除いて1〜50文字（specs/012 data-model.md）。空白は JavaScript の trim() と同じもの
   // （タブ・改行・NBSP・全角スペースなど。PR #15 のCodexレビュー）。0013 の名前の埋め方も同じ文字の集まりを使う
   check(
@@ -320,6 +339,13 @@ export const strategyDesigns = pgTable(
     pinnedPostDraft1: text("pinned_post_draft_1"),
     pinnedPostDraft2: text("pinned_post_draft_2"),
     pinnedPostDraft3: text("pinned_post_draft_3"),
+    // 活動の目的・在り方の5問と活動の軸（specs/014 data-model.md、research.md R3）
+    purposeOrigin: text("purpose_origin"),
+    purposeSelf: text("purpose_self"),
+    purposeOthers: text("purpose_others"),
+    purposeFuture: text("purpose_future"),
+    purposeStance: text("purpose_stance"),
+    activityAxis: text("activity_axis"),
     version: versionColumn(),
     // 最後に保存した人（specs/008 research.md R8。保存の衝突で名前を出す）
     updatedByUserId: uuid("updated_by_user_id").references((): AnyPgColumn => users.id, { onDelete: "set null" }),
@@ -399,6 +425,18 @@ export const referencePosts = pgTable(
     keyword: text("keyword"),
     postUrl: text("post_url"),
     whyGood: text("why_good"),
+    // 媒体・元の投稿の投稿日・反応の数字・投稿者・メモ（specs/014 data-model.md、research.md R6）
+    platform: text("platform").notNull().default("threads"),
+    postedDateMode: text("posted_date_mode").notNull().default("unknown"),
+    postedDate: date("posted_date"),
+    metricLikes: integer("metric_likes"),
+    metricReplies: integer("metric_replies"),
+    metricViews: integer("metric_views"),
+    metricSaves: integer("metric_saves"),
+    metricReposts: integer("metric_reposts"),
+    metricFollowers: integer("metric_followers"),
+    author: text("author"),
+    memo: text("memo"),
     version: versionColumn(),
     // 最後に保存した人（specs/008 research.md R8。保存の衝突で名前を出す）
     updatedByUserId: uuid("updated_by_user_id").references((): AnyPgColumn => users.id, { onDelete: "set null" }),
@@ -410,6 +448,21 @@ export const referencePosts = pgTable(
     check("reference_posts_keyword_length", sql`char_length(${t.keyword}) <= 100`),
     check("reference_posts_post_url_length", sql`char_length(${t.postUrl}) <= 2000`),
     check("reference_posts_why_good_length", sql`char_length(${t.whyGood}) <= 2000`),
+    check("reference_posts_platform_valid", sql`${t.platform} IN ('threads', 'instagram', 'tiktok', 'x', 'other')`),
+    check(
+      "reference_posts_posted_date_mode_valid",
+      sql`${t.postedDateMode} IN ('exact', 'week', 'month', '3months', 'unknown')`,
+    ),
+    check(
+      "reference_posts_posted_date_matches_mode",
+      sql`(${t.postedDateMode} = 'exact') = (${t.postedDate} IS NOT NULL)`,
+    ),
+    check(
+      "reference_posts_metrics_nonnegative",
+      sql`coalesce(${t.metricLikes}, 0) >= 0 AND coalesce(${t.metricReplies}, 0) >= 0 AND coalesce(${t.metricViews}, 0) >= 0 AND coalesce(${t.metricSaves}, 0) >= 0 AND coalesce(${t.metricReposts}, 0) >= 0 AND coalesce(${t.metricFollowers}, 0) >= 0`,
+    ),
+    check("reference_posts_author_length", sql`char_length(${t.author}) <= 100`),
+    check("reference_posts_memo_length", sql`char_length(${t.memo}) <= 500`),
   ],
 );
 

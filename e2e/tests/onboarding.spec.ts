@@ -30,9 +30,11 @@ test("名前だけで作り、つながずに課題・案の登録・承認ま�
   await expect(page.getByText("保存しました")).toBeVisible();
 
   // 案の登録と承認
-  await page.goto(`/accounts/${accountId}/stock`);
+  // 案は「投稿をつくる」で登録し、投稿ストックで確かめる（specs/014 US15）
+  await page.goto(`/accounts/${accountId}/create`);
   await page.getByPlaceholder("AIの返信をここに貼り付け…").fill("つなぐ前の案1\n@@@\nつなぐ前の案2");
   await page.getByRole("button", { name: "投稿ストックに登録する" }).click();
+  await page.getByRole("link", { name: "投稿ストックで確かめる" }).click();
   await expect(page.getByText("つなぐ前の案1")).toBeVisible();
   await page.getByRole("button", { name: "「つなぐ前の案1」を承認" }).click();
   await expect(page.getByText("承認しました")).toBeVisible();

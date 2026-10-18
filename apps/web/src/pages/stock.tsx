@@ -1,17 +1,17 @@
 // 投稿ストックの画面（specs/003 US1〜US3・specs/004 US1〜US5、contracts/ui-routes.md「投稿ストックの画面」、docs/ui-design.md 型C）。
-// 上から：プロンプトのカード → 状態のタブ（要確認／承認済み／却下）と下書きの一覧 → 画面下部に固定の貼り付け欄（選択中は選択のバー）。
+// 上から：状態のタブ（要確認／承認済み／却下）と下書きの一覧 → 選んでいる間は画面下部に固定の選択のバー。
+// プロンプトのカードと貼り付け欄は「投稿をつくる」の画面に移した（specs/014 US15、FR-163）。
 // 下書きの削除は確認を求めず、トーストの「元に戻す」で取り消せる（003 Clarifications 2026-10-04）。
 // 承認・却下・要確認に戻すも、トーストの「元に戻す」で取り消せる（004 FR-008）。
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
-  PROMPT_COUNT_DEFAULT,
   SIMILARITY_THRESHOLD,
   checkPublishable,
   type PostDraft,
   type PublishCheck,
 } from "@threads-grower/shared";
-import { useEffect, useMemo, useState } from "react";
-import { Link, useLocation } from "react-router";
+import { useMemo, useState } from "react";
+import { Link } from "react-router";
 import { toast } from "sonner";
 import { AutoPostNotices } from "@/components/AutoPostNotices";
 import { PublishedList } from "@/components/stock/PublishedList";
@@ -28,8 +28,7 @@ import {
   highlightsOf,
 } from "@/components/stock/DraftLabels";
 import { DraftList } from "@/components/stock/DraftList";
-import { PasteComposer } from "@/components/stock/PasteComposer";
-import { PromptCard } from "@/components/stock/PromptCard";
+import { SelectionBar } from "@/components/stock/SelectionBar";
 import { useAccountAccess } from "@/lib/use-account-access";
 import { RejectDialog } from "@/components/stock/RejectDialog";
 import { REOPENED_BY_EDIT } from "@/components/stock/messages";
@@ -47,7 +46,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { ChevronDownIcon } from "lucide-react";
+import { ChevronDownIcon, SquarePenIcon } from "lucide-react";
 import { api, describeError } from "@/lib/api-client";
 import { formatRelativeJst } from "@/lib/format";
 import { queryKeys } from "@/lib/query";
@@ -65,7 +64,7 @@ function tabOf(d: PostDraft): StockTab {
 }
 
 /**
- * 投稿ストックの画面。プロンプトのコピー、貼り付けによる一括登録、下書きの確認・修正・削除・承認・却下。
+ * 投稿ストックの画面。下書きの確認・修正・削除・承認・却下と、投稿済みの一覧。
  * 同じURLのままAccountを切り替えたときに、選択やプロンプトのカードの状態（使えない表示など）を持ち越さないよう、
  * Accountごとに作り直す（PR #5 のCodexレビュー）。
  * @returns 投稿ストックの画面
@@ -87,11 +86,6 @@ function StockPageContent() {
     queryFn: () => api.listPostDrafts(account.id),
   });
   const { tab, setTab } = useStatusTab();
-  const location = useLocation();
-  // サイドバーの「投稿をつくる」から来たか。押すたびに location.key が変わるので、それをキーにする
-  const startKey = (location.state as { startCreate?: boolean } | null)?.startCreate
-    ? location.key
-    : undefined;
   const [picked, setPicked] = useState<ReadonlySet<string>>(new Set());
   const [editing, setEditing] = useState<PostDraft | null>(null);
   const [rejecting, setRejecting] = useState<PostDraft[] | null>(null);
@@ -102,9 +96,7 @@ function StockPageContent() {
   // まとめて承認の確認（FR-004b）で待っている、選んだ下書き
   const [bulkApproving, setBulkApproving] = useState<PostDraft[] | null>(null);
   const [busy, setBusy] = useState(false);
-  // 画面を開いた後にプロンプトが使えなくなった（無料体験の終了など）。「投稿をつくる」は貼り付け欄から始める
-  const [promptLocked, setPromptLocked] = useState(false);
-  const { hidden, remove, flush } = useDeferredDelete(account.id);
+  const { hidden, remove } = useDeferredDelete(account.id);
   const { review } = useReview(account.id);
   // 承認の操作ができるか（specs/008 FR-041）。読み込み中は出さない
   const { access, can } = useAccountAccess(account.id);
@@ -156,7 +148,6 @@ function StockPageContent() {
   // 承認の操作ができない人（担当の人。承認はオーナーだけ）は選ばない（まとめての操作は承認・却下のため。specs/008 FR-041）
   const selectable = canReview ? items.filter((d) => d.status !== "publishing") : [];
   const selected = selectable.filter((d) => picked.has(d.id));
-  const atLimit = data ? lists.needs_review.length >= data.limits.needsReview : false;
 
   const refresh = () => {
     void queryClient.invalidateQueries({ queryKey: queryKeys.postDrafts(account.id) });
@@ -208,11 +199,6 @@ function StockPageContent() {
   const cleanDrafts = lists.needs_review.filter(isClean);
   const addToSelection = (ds: PostDraft[]) =>
     setPicked((prev) => new Set([...prev, ...ds.map((d) => d.id)]));
-
-  // 「投稿をつくる」を押したら選択を解除する（選択のバーで貼り付け欄が隠れたままにしない。PR #5 のCodexレビュー）
-  useEffect(() => {
-    if (startKey) setPicked(new Set());
-  }, [startKey]);
 
   const changeTab = (value: string) => {
     if (!TAB_VALUES.includes(value as StockTab)) return;
@@ -374,22 +360,22 @@ function StockPageContent() {
 
   return (
     <>
-      <PageHeader title="投稿ストック" />
+      <PageHeader
+        title="投稿ストック"
+        actions={
+          <Button
+            asChild
+            className="h-9 rounded-full max-md:size-11 max-md:bg-transparent max-md:p-0 max-md:text-foreground md:pr-4 md:pl-3"
+          >
+            <Link to={`/accounts/${account.id}/create`} aria-label="投稿をつくる">
+              <SquarePenIcon className="size-5 md:size-4" />
+              <span className="hidden md:inline">投稿をつくる</span>
+            </Link>
+          </Button>
+        }
+      />
       <PageBody className="flex-1 space-y-5">
         <AutoPostNotices accountId={account.id} />
-        {data ? (
-          <PromptCard
-            accountId={account.id}
-            canGeneratePrompt={data.canGeneratePrompt}
-            promptPostCount={data.promptPostCount ?? PROMPT_COUNT_DEFAULT}
-            promptPostCountVersion={data.promptPostCountVersion ?? 1}
-            canSaveCount={can("settings")}
-            startKey={startKey}
-            onLocked={() => setPromptLocked(true)}
-          />
-        ) : (
-          <div className="h-32 animate-pulse rounded-2xl bg-muted" aria-busy="true" />
-        )}
         {access && !canReview && (
           <p className="rounded-xl bg-muted/60 px-4 py-2.5 text-sm text-foreground/80">
             承認と却下は、オーナー（{access.owner.name}）さんが行います。あなたは投稿の案を登録したり、直したりできます。
@@ -459,7 +445,7 @@ function StockPageContent() {
                   tab={value}
                   items={lists[value]}
                   limit={data.limits.needsReview}
-                  canGeneratePrompt={data.canGeneratePrompt}
+                  createPath={`/accounts/${account.id}/create`}
                   total={value === "rejected" ? (counts?.rejected ?? 0) : lists[value].length}
                   renderCard={renderCard}
                   failed={value === "approved" ? data.publishFailed : undefined}
@@ -491,24 +477,16 @@ function StockPageContent() {
           ))}
         </Tabs>
       </PageBody>
-      {/* 貼り付け欄。スクロール領域の下端に固定し、767px以下は画面下端の操作バーの領域を避ける */}
-      <div className="sticky bottom-0 z-10 bg-background pb-[env(safe-area-inset-bottom)]">
-        <div className="mx-auto w-full max-w-3xl px-4 pb-3 md:px-8">
-          <PasteComposer
-            accountId={account.id}
-            atLimit={atLimit}
-            // 削除して確定を待っている下書きは、まだサーバーで数えられているので、登録の前に確定する
-            beforeSubmit={flush}
-            // プロンプトを作れないとき（プラン1）は、「投稿をつくる」で貼り付け欄から始める
-            focusKey={data && (!data.canGeneratePrompt || promptLocked) ? startKey : undefined}
-            selection={{
-              count: selected.length,
-              onClear: () => setPicked(new Set()),
-              actions: selectionActions,
-            }}
-          />
+      {/* 選択のバー。スクロール領域の下端に固定し、767px以下は画面下端の操作バーの領域を避ける */}
+      {selected.length > 0 && (
+        <div className="sticky bottom-0 z-10 bg-background pb-[env(safe-area-inset-bottom)]">
+          <div className="mx-auto w-full max-w-3xl px-4 md:px-8">
+            <SelectionBar
+              selection={{ count: selected.length, onClear: () => setPicked(new Set()), actions: selectionActions }}
+            />
+          </div>
         </div>
-      </div>
+      )}
 
       {editing && (
         <DraftEditDialog

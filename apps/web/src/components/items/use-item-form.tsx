@@ -39,6 +39,8 @@ export type ItemFormOptions<F, T extends { version: number; updatedAt: string }>
   onDeletedElsewhere: () => void;
   /** 409 KEYWORD_DUPLICATE などを、入力欄の案内にする */
   fieldErrorFor?: (err: ApiError) => FormErrors<F> | null;
+  /** 入力欄のほかに、未保存の内容があるか（参考投稿の1件の解説の貼り付けなど。specs/014、PR #17 のCodexレビュー） */
+  extraDirty?: boolean;
 };
 
 function sameForm<F>(a: F, b: F) {
@@ -66,7 +68,7 @@ export function useItemForm<F, T extends { version: number; updatedAt: string }>
   // grower機能が使えなくなった後は、入力内容を読むだけで残す（閉じるまで消さない）
   const [locked, setLocked] = useState(false);
 
-  const dirty = !sameForm(form, base.form) && !deleted;
+  const dirty = (!sameForm(form, base.form) || !!opts.extraDirty) && !deleted;
   useUnsavedChanges(dirty);
   const errors = { ...(showErrors ? opts.validate(form) : {}), ...serverErrors } as FormErrors<F>;
 

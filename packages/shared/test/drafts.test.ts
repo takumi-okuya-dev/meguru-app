@@ -47,6 +47,16 @@ describe("splitDrafts（research.md R3）", () => {
   it("本文は元の文字のまま（全角英数字を NFKC で変えない）", () => {
     expect(splitDrafts("ＡＩの話\n@@@\n次").parts[0]).toBe("ＡＩの話");
   });
+
+  it("コードブロックの ``` の行（言語名つき・前の空白つき）を除いてから分け、行の途中の ``` は残す（specs/014 FR-170、SC-021）", () => {
+    const plain = "一件目\n@@@\n二件目";
+    expect(splitDrafts(["```", "一件目", "@@@", "二件目", "```"].join("\n"))).toEqual(splitDrafts(plain));
+    expect(splitDrafts(["```text", "一件目", "@@@", "  ```", "二件目", "```"].join("\n")).parts).toEqual(["一件目", "二件目"]);
+    // 投稿ごとに囲まれていても同じ件数
+    expect(splitDrafts(["```", "一件目", "```", "@@@", "```plaintext", "二件目", "```"].join("\n")).parts).toEqual(["一件目", "二件目"]);
+    expect(splitDrafts("コードは```で囲む\n@@@\n次").parts).toEqual(["コードは```で囲む", "次"]);
+    expect(splitDrafts("```\n```").parts).toEqual([]);
+  });
 });
 
 describe("findPasteProblem（FR-014）", () => {

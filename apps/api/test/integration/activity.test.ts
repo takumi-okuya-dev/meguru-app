@@ -260,7 +260,7 @@ describe("宣伝投稿の割合・作る件数の同時の保存（specs/008 FR-
     const stale = await call(app, "PUT", `/api/accounts/${accountId}/prompt-settings`, { user: "o1", body: { postCount: 5, expectedVersion: 1 } });
     expect(stale.status).toBe(409);
     const body = (await stale.json()) as { error: { code: string }; latest: unknown; updatedBy: { name: string } | null };
-    expect(body.latest).toEqual({ postCount: 12, version: 2 });
+    expect(body.latest).toMatchObject({ postCount: 12, version: 2 });
     expect(body.updatedBy?.name).toBeTruthy();
     const drafts = await json<{ promptPostCount: number; promptPostCountVersion: number }>(
       await call(app, "GET", `/api/accounts/${accountId}/post-drafts`, { user: "o1" }),

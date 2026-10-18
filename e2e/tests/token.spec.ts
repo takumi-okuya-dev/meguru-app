@@ -28,9 +28,11 @@ test("名前で作ったアカウントに、トークンを貼り付けてつ�
   await expect(page.getByText("カフェ本店をThreadsにつなぎました（@cafe_b）")).toBeVisible();
   await expect(page.getByText(/今の接続：自分のMetaアプリのトークン/)).toBeVisible();
 
-  await page.goto(`/accounts/${accountId}/stock`);
+  // 案は「投稿をつくる」で登録し、投稿ストックで確かめる（specs/014 US15）
+  await page.goto(`/accounts/${accountId}/create`);
   await page.getByPlaceholder("AIの返信をここに貼り付け…").fill("トークンの案1\n@@@\nトークンの案2");
   await page.getByRole("button", { name: "投稿ストックに登録する" }).click();
+  await page.getByRole("link", { name: "投稿ストックで確かめる" }).click();
   await expect(page.getByText("トークンの案1")).toBeVisible();
 });
 

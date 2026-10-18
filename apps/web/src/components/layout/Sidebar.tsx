@@ -107,16 +107,10 @@ export function Sidebar({ onCollapse, onNavigate }: { onCollapse?: () => void; o
       )}
       <nav aria-label="このアカウント" className="flex-1 space-y-0.5 overflow-y-auto px-2 py-1">
         {accountId && (
-          // 投稿ストックの画面へ移動し、プロンプトのカード（作る流れの最初の一歩）から始める。
-          // プロンプトを作れないプラン1では、貼り付け欄にフォーカスを当てる（specs/003 FR-021、specs/004 Clarifications 2026-10-05）
-          <Link
-            to={`${base}/stock`}
-            state={{ startCreate: true }}
-            className={itemClass({ isActive: false })}
-            onClick={onNavigate}
-          >
+          // 「投稿をつくる」の画面へ移る。開いている間は選ばれた見た目にする（specs/014 FR-160。見た目・並び・名前は今のまま）
+          <NavLink to={`${base}/create`} className={itemClass} onClick={onNavigate}>
             <SquarePenIcon className="size-5 lg:size-[18px]" /> 投稿をつくる
-          </Link>
+          </NavLink>
         )}
         {NAV_GROUPS.map((group, i) => (
           <div key={group.label ?? i} className="space-y-0.5">

@@ -18,6 +18,8 @@ vi.mock("@/lib/api-client", async (orig) => {
       getAutoPost: async () => auto,
       getDraftCounts: async () => ({ needsReview: 0, approved, rejected: 0, published: 0, publishFailed: 0 }),
       accountAccess: async () => OWNER_ACCESS,
+      // 「はじめに読んでほしいこと」は利用者が分かってから出す（specs/014 FR-061）。ここでは出さない
+      me: () => new Promise(() => {}),
       getProfileStatus: () => (current instanceof Error ? Promise.reject(current) : Promise.resolve(current)),
     },
   };
@@ -79,7 +81,7 @@ describe("Accountのホーム", () => {
     expect(await screen.findByRole("heading", { name: "次は「リサーチ」がおすすめです" })).toBeInTheDocument();
   });
 
-  it("全部あれば「投稿をつくりましょう」と、投稿ストックへのボタン（specs/003）", async () => {
+  it("全部あれば「投稿をつくりましょう」と、「投稿をつくる」の画面へのボタン（specs/003、specs/014 FR-164）", async () => {
     renderHome(
       status({
         strategy: { filledCount: 16, totalCount: 16 },
@@ -91,7 +93,7 @@ describe("Accountのホーム", () => {
     expect(
       screen.getByText("プロンプトをChatGPTやClaudeに送り、返ってきた投稿案を投稿ストックに登録します。"),
     ).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "投稿ストックへ" })).toHaveAttribute("href", "/accounts/a1/stock");
+    expect(screen.getByRole("link", { name: "投稿をつくる" })).toHaveAttribute("href", "/accounts/a1/create");
   });
 
   it("無料体験中は「無料体験中：{YYYY年M月D日}まで、すべての機能を使えます」が出る（FR-024b）", async () => {
