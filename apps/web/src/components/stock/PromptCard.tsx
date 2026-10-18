@@ -142,6 +142,7 @@ function PromptReadyCard({
   // 文字数と割合の欄に出す保存済みの値。件数を変えてプロンプトを読み直している間も出したままにし（入力中の値を失わない）、
   // 保存の競合（409）では読み直しを待たずに最新の値にする（PR #17 のCodexレビュー）
   const [lengthSettings, setLengthSettings] = useState<PostLengthSettings | null>(null);
+  const lengthRef = useRef<PostLengthSettings | null>(null);
   const [lengthResetKey, setLengthResetKey] = useState(0);
   const prompt = useQuery({
     queryKey: queryKeys.prompt(accountId, count),
@@ -189,7 +190,10 @@ function PromptReadyCard({
         setCount(latest.postCount);
         setFailed(null);
         // 文字数と割合もほかの人が変えていることがあるので、最新の値にする（PR #17 のCodexレビュー）
-        if (latest.length) setLengthSettings(latest.length);
+        if (latest.length) {
+          lengthRef.current = latest.length;
+          setLengthSettings(latest.length);
+        }
         // 投稿ストックのキャッシュも最新にする（画面を離れて戻ったときに、古い版で送らないように）
         queryClient.setQueryData<PostDraftList>(queryKeys.postDrafts(accountId), (old) =>
           old ? { ...old, promptPostCount: latest.postCount, promptPostCountVersion: latest.version } : old,
@@ -218,6 +222,7 @@ function PromptReadyCard({
     onSuccess: ({ version: v, length }) => {
       version.current = v;
       // 保存した値をすぐ保存済みの値にする（読み直しを待たずに、未保存の扱いを外す）
+      lengthRef.current = length;
       setLengthSettings(length);
       queryClient.setQueryData<PostDraftList>(queryKeys.postDrafts(accountId), (old) =>
         old ? { ...old, promptPostCountVersion: v } : old,
@@ -233,6 +238,7 @@ function PromptReadyCard({
         // （PR #17 のCodexレビュー）
         const latest = err.latest as { postCount: number; length: PostLengthSettings; version: number };
         version.current = latest.version;
+        lengthRef.current = latest.length;
         setLengthSettings(latest.length);
         setLengthResetKey((k) => k + 1);
         setSaved(latest.postCount);
@@ -277,12 +283,29 @@ function PromptReadyCard({
   }, [copyFailed, open]);
 
   const fullText = edited ?? prompt.data?.prompt ?? "";
+  // 作る件数の今の状態（下のeffectから、依存を増やさずに読む）
+  const countState = useRef({ count, countInput, saved });
+  countState.current = { count, countInput, saved };
+
   // プロンプトの応答の設定。古い版（ほかの件数のキャッシュ・取り直しの前）では、今より新しいときだけ使う
-  // （保存の競合で入れた最新の値を、古い設定で上書きしないように。PR #17 のCodexレビュー）
+  // （保存の競合で入れた最新の値を、古い設定で上書きしないように。PR #17 のCodexレビュー）。
+  // 新しい版を使うときは、版と保存済みの件数もそろえる（次の保存が古い版・件数で 409 にならないように）
   const fetchedSettings = prompt.data?.settings;
   useEffect(() => {
     if (!fetchedSettings) return;
-    setLengthSettings((prev) => (prev === null || fetchedSettings.version >= version.current ? fetchedSettings.length : prev));
+    const first = lengthRef.current === null;
+    if (!first && fetchedSettings.version < version.current) return;
+    lengthRef.current = fetchedSettings.length;
+    setLengthSettings(fetchedSettings.length);
+    if (fetchedSettings.version <= version.current) return;
+    version.current = fetchedSettings.version;
+    setSaved(fetchedSettings.postCount);
+    // 入力の途中（保存を待っている件数）でなければ、件数も最新にする。途中なら入力を残し、新しい版で保存し直す
+    const { count: now, countInput: input, saved: savedNow } = countState.current;
+    if (now === savedNow && input === String(now)) {
+      setCount(fetchedSettings.postCount);
+      setCountInput(String(fetchedSettings.postCount));
+    }
   }, [fetchedSettings]);
   // 送り方（1つにまとめて／2つに分けて。specs/014 FR-150〜FR-153）
   const [mode, setMode] = useSendMode(prompt.data?.splitRecommended ?? false);

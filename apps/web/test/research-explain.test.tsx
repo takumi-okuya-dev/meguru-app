@@ -1,5 +1,6 @@
 // US8：解説がまだの参考投稿を、まとめてAIに解説してもらう（specs/014-strategy-guidance FR-086・FR-100〜FR-105）
-import { screen, waitFor, within } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { refPost, renderResearchPage } from "./helpers/research";
@@ -198,5 +199,29 @@ describe("1件の解説の未保存（PR #17 のCodexレビュー6回目）", ()
     expect(updateReferencePost).not.toHaveBeenCalled();
     await user.click(screen.getByRole("button", { name: "破棄して保存" }));
     await waitFor(() => expect(updateReferencePost).toHaveBeenCalled());
+  });
+});
+
+describe("まとめての解説の欄の出し入れ（PR #17 のCodexレビュー8回目）", () => {
+  it("貼り付けた答えがある間は、解説がまだの参考投稿が0件になっても欄を消さない", async () => {
+    const { ExplainBatchPanel } = await import("@/components/research/ExplainBatchPanel");
+    const user = userEvent.setup();
+    const props = { accountId: "a1", onSaved: vi.fn(), onBillingRequired: vi.fn() };
+    const { rerender } = render(
+      <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+        <ExplainBatchPanel {...props} posts={[A, B, C]} />
+      </QueryClientProvider>,
+    );
+    await user.click(screen.getByRole("button", { name: /まとめてAIに解説してもらう/ }));
+    await user.click(screen.getByLabelText("AIの答えを貼り付ける"));
+    await user.paste("【ID:aaaaaaaa】\n【型の名前】あるある型");
+    // ほかの人が解説を入れて、解説がまだの参考投稿が0件になった
+    rerender(
+      <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+        <ExplainBatchPanel {...props} posts={[{ ...A, whyGood: "ほかの人の解説" }, { ...B, whyGood: "ほかの人の解説" }, C]} />
+      </QueryClientProvider>,
+    );
+    expect(screen.getByRole("region", { name: "まとめてAIに解説してもらう" })).toBeInTheDocument();
+    expect(screen.getByLabelText("AIの答えを貼り付ける")).toHaveValue("【ID:aaaaaaaa】\n【型の名前】あるある型");
   });
 });

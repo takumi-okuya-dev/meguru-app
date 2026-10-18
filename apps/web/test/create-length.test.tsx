@@ -24,8 +24,8 @@ const { UnsavedChangesProvider } = await import("@/components/UnsavedChangesProv
 
 const CUSTOM: PostLengthSettings = { target: 200, shortLength: 70, mediumLength: 135, longLength: 180, shortRatio: 35, mediumRatio: 45, longRatio: 20 };
 
-function withSettings(length: PostLengthSettings, version = 1) {
-  return { ...promptResponse(), settings: { postCount: 30, length, version } };
+function withSettings(length: PostLengthSettings, version = 1, postCount = 30) {
+  return { ...promptResponse(), settings: { postCount, length, version } };
 }
 
 function renderCreate() {
@@ -248,6 +248,21 @@ describe("文字数と長さの割合", () => {
     // 古い版の設定で上書きしない
     await new Promise((r) => setTimeout(r, 100));
     expect(screen.getByRole("button", { name: /文字数と長さの割合/ })).toHaveTextContent("目標 200字");
+  });
+
+  it("プロンプトが新しい版の設定を返したら、版と保存済みの件数もそろえる（PR #17 のCodexレビュー8回目）", async () => {
+    const user = userEvent.setup();
+    // 投稿ストックの一覧は古い（30件・版1）が、プロンプトはほかの人の保存後（12件・版5）を返す
+    getPrompt.mockResolvedValue(withSettings(CUSTOM, 5, 12));
+    putPromptSettings.mockResolvedValue({ postCount: 12, length: CUSTOM, version: 6 });
+    renderCreate();
+    await waitFor(() => expect(screen.getByRole("spinbutton", { name: "作る件数" })).toHaveValue(12));
+    const s = await openSettings(user);
+    await user.clear(s.getByRole("spinbutton", { name: "短文の文字数" }));
+    await user.type(s.getByRole("spinbutton", { name: "短文の文字数" }), "75");
+    await user.click(s.getByRole("button", { name: "保存" }));
+    // 古い版・件数ではなく、新しい版・件数で送るので 409 にならない
+    expect(putPromptSettings).toHaveBeenCalledWith("a1", 12, 5, expect.objectContaining({ shortLength: 75 }));
   });
 
   it("文字数と割合の保存中に作る件数を変えていたら、409 でもその件数を残し、最新の版で保存し直す（PR #17 のCodexレビュー）", async () => {

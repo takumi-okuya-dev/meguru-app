@@ -67,7 +67,8 @@ export function ExplainBatchPanel({
     },
   });
 
-  if (pending === 0 && skippedCount === 0) return null;
+  // 貼り付けた答えが残っている間は、ほかの人が解説を入れて0件になっても欄を消さない（PR #17 のCodexレビュー）
+  if (pending === 0 && skippedCount === 0 && paste.trim() === "") return null;
 
   return (
     // 「投稿をつくる」の「解説がまだ」から #explain で移ってくる（specs/014 FR-122）
