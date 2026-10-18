@@ -8,6 +8,7 @@ import { CopyPromptButton } from "@/components/CopyPromptButton";
 import { Button } from "@/components/ui/button";
 import { ApiError, api } from "@/lib/api-client";
 import { billingReasonOf, isBillingRequired, saveErrorMessage } from "@/lib/save-error";
+import { useUnsavedChanges } from "@/lib/use-unsaved-changes";
 
 const PROBLEM_LABELS: Record<KeywordIdeaProblem, string> = {
   too_long: "長すぎます（100文字まで）",
@@ -40,6 +41,8 @@ export function KeywordIdeasPanel({
   const [failure, setFailure] = useState<string | null>(null);
   const pasteId = useId();
   const ideas = paste.trim() === "" ? [] : parseKeywordIdeas(paste, registered);
+  // 貼り付けた案を選んでいる途中で画面を移ろうとしたら、確かめる（PR #17 のCodexレビュー）
+  useUnsavedChanges(paste.trim() !== "");
   const picked = ideas.filter((idea, i) => idea.problem === null && !unchecked.has(i));
   const cap = Math.min(remaining, KEYWORD_BATCH_MAX);
 

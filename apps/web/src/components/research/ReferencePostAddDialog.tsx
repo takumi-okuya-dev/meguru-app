@@ -51,6 +51,8 @@ export function ReferencePostAddDialog({
 }) {
   const [queue, setQueue] = useState<RefForm[]>([]);
   const [form, setForm] = useState<RefForm>(EMPTY_REF_FORM);
+  // 入力の「初めの値」。ためた後は、引き継いだ検索したキーワード・媒体が初めの値になる（PR #17 のCodexレビュー）
+  const [baseline, setBaseline] = useState<RefForm>(EMPTY_REF_FORM);
   const [errors, setErrors] = useState<FormErrors<RefForm>>({});
   const [confirmClose, setConfirmClose] = useState(false);
   // 欄を空にしたときに、数字の欄の開閉などを初めに戻すためのキー
@@ -63,9 +65,9 @@ export function ReferencePostAddDialog({
   const cap = Math.min(remaining, REFERENCE_BATCH_MAX);
   const hasBody = !isBlank(form.body);
   const total = queue.length + (hasBody ? 1 : 0);
-  // どの項目でも入力があれば未保存として扱う（本文が空でもURLなどを入れていれば。PR #17 のCodexレビュー）
-  const dirty =
-    queue.length > 0 || (Object.keys(EMPTY_REF_FORM) as (keyof RefForm)[]).some((k) => form[k] !== EMPTY_REF_FORM[k]);
+  // 初めの値から変わった項目があれば、未保存として扱う（本文が空でもURLなどを入れていれば。PR #17 のCodexレビュー）
+  const edited = (Object.keys(EMPTY_REF_FORM) as (keyof RefForm)[]).some((k) => form[k] !== baseline[k]);
+  const dirty = queue.length > 0 || edited;
   useUnsavedChanges(dirty);
 
   const setField = <K extends keyof RefForm>(key: K, value: RefForm[K]) => {
@@ -83,7 +85,9 @@ export function ReferencePostAddDialog({
     if (!hasBody || queue.length + 1 > cap || !check(form)) return;
     setQueue((q) => [...q, form]);
     // 検索したキーワードと媒体は、次の投稿のために残す（FR-081）
-    setForm({ ...EMPTY_REF_FORM, keyword: form.keyword, platform: form.platform });
+    const next = { ...EMPTY_REF_FORM, keyword: form.keyword, platform: form.platform };
+    setForm(next);
+    setBaseline(next);
     setFormKey((k) => k + 1);
   };
 
@@ -102,12 +106,8 @@ export function ReferencePostAddDialog({
     },
   });
 
-  // 本文はまだだが、引き継いだキーワード・媒体のほかに入力がある（登録すると黙って捨てることになる。PR #17 のCodexレビュー）
-  const partial =
-    !hasBody &&
-    (Object.keys(EMPTY_REF_FORM) as (keyof RefForm)[]).some(
-      (k) => k !== "keyword" && k !== "platform" && form[k] !== EMPTY_REF_FORM[k],
-    );
+  // 本文はまだだが、初めの値から変えた入力がある（登録すると黙って捨てることになる。PR #17 のCodexレビュー）
+  const partial = !hasBody && edited;
 
   const submit = () => {
     if (locked || register.isPending || total === 0 || total > cap) return;

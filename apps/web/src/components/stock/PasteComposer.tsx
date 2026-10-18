@@ -19,6 +19,7 @@ import { queryKeys } from "@/lib/query";
 import { saveErrorMessage } from "@/lib/save-error";
 import { useUnsavedChanges } from "@/lib/use-unsaved-changes";
 import { STOCK_LIMIT_MESSAGE } from "./messages";
+import { flushPendingDeletes } from "./use-deferred-delete";
 
 type Notice = { message: string; retry: boolean };
 // self：自分で1件書いて登録した（区切りがないのは当たり前なので、その注意は出さない）
@@ -57,6 +58,8 @@ export function PasteComposer({
   const [text, setText] = useState("");
   const [notice, setNotice] = useState<Notice | null>(null);
   const [registered, setRegistered] = useState<Registered | null>(null);
+  // 送る前に、待っている削除（投稿ストックの「元に戻す」の間）を確定している間（PR #17 のCodexレビュー）
+  const [preparing, setPreparing] = useState(false);
   // 「自分で1件書く」を押した（欄の案内を変え、区切りがない注意を出さない）
   const [selfWrite, setSelfWrite] = useState(false);
   // 失敗した送信のIDと内容。同じ内容を送り直すときは同じIDを使う（二重登録を防ぐ。research.md R5）
@@ -112,7 +115,7 @@ export function PasteComposer({
     onError: (err) => toast.error(saveErrorMessage(err)),
   });
 
-  const submit = () => {
+  const submit = async () => {
     const { parts } = splitDrafts(text);
     const problem = findPasteProblem(text, parts);
     if (problem) {
@@ -123,10 +126,17 @@ export function PasteComposer({
     pending.current = { id, text };
     // 前回の登録の案内（「取り消す」）は、次の登録が成功するまで残す
     setNotice(null);
+    // 削除して確定を待っている下書きは、まだサーバーで数えられているので、登録の前に確定する（別の画面で削除した分も待つ）
+    setPreparing(true);
+    try {
+      await flushPendingDeletes();
+    } finally {
+      setPreparing(false);
+    }
     send.mutate({ clientRequestId: id, text, self: selfWrite });
   };
 
-  const busy = send.isPending;
+  const busy = preparing || send.isPending;
   const blank = text.trim() === "";
   const canSend = !blank && !busy && !atLimit;
 
@@ -162,7 +172,7 @@ export function PasteComposer({
         <div role="alert" className="flex flex-wrap items-center gap-2 rounded-xl border border-warning/40 bg-warning-bg px-3 py-2 text-sm">
           <span className="min-w-0 flex-1">{notice.message}</span>
           {notice.retry && (
-            <Button size="sm" variant="outline" className="rounded-full" disabled={busy} onClick={submit}>
+            <Button size="sm" variant="outline" className="rounded-full" disabled={busy} onClick={() => void submit()}>
               もう一度送る
             </Button>
           )}
@@ -184,7 +194,7 @@ export function PasteComposer({
           className="size-10 shrink-0 rounded-full"
           aria-label="投稿ストックに登録する"
           disabled={!canSend}
-          onClick={submit}
+          onClick={() => void submit()}
         >
           <ArrowUpIcon className="size-5" />
         </Button>

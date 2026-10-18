@@ -2,12 +2,13 @@
 // 上から：5つの手順 → プロンプトのカード → 貼り付け欄。投稿ストック（/stock）は一覧だけにし、作る流れはこの画面にまとめる。
 import { useQuery } from "@tanstack/react-query";
 import { PROMPT_COUNT_DEFAULT } from "@threads-grower/shared";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useLocation } from "react-router";
 import { ApiErrorScreen } from "@/components/ApiErrorScreen";
 import { CreateSteps } from "@/components/create/CreateSteps";
 import { PageBody, PageHeader } from "@/components/layout/PageHeader";
 import { PasteComposer } from "@/components/stock/PasteComposer";
+import { flushPendingDeletes } from "@/components/stock/use-deferred-delete";
 import { PromptCard } from "@/components/stock/PromptCard";
 import { STOCK_LIMIT_MESSAGE } from "@/components/stock/messages";
 import { api } from "@/lib/api-client";
@@ -37,6 +38,11 @@ function CreatePageContent() {
     queryFn: () => api.listPostDrafts(account.id),
   });
   const { can } = useAccountAccess(account.id);
+  // 投稿ストックで削除して「元に戻す」を待っている下書きは、この画面を開いたときに確定する
+  // （件数・上限の表示が古くならないように。PR #17 のCodexレビュー）
+  useEffect(() => {
+    void flushPendingDeletes();
+  }, []);
   // 開くたびに変わるキー。初めのフォーカス（プロンプトの「コピー」、作れないときは貼り付け欄）に使う
   const { key: openKey } = useLocation();
   // 画面を開いた後にプロンプトが使えなくなった（無料体験の終了など）。そのときは貼り付け欄から始める

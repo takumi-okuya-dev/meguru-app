@@ -1,20 +1,23 @@
 // 「この項目をAIと深掘りする」の欄（specs/014-strategy-guidance FR-031〜FR-035、contracts/ui-routes.md「課題」）。
 // プロンプトをコピーし、AIの答えを貼り付けて、反映する内容（目印の内側か全体）を入力欄に入れる。保存はしない。
 import { STRATEGY_TEXT_MAX, countChars, extractFinal, FINAL_BEGIN } from "@threads-grower/shared";
-import { useId, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import { CopyPromptButton } from "@/components/CopyPromptButton";
 import { Button } from "@/components/ui/button";
+import { useUnsavedChanges } from "@/lib/use-unsaved-changes";
 
 /**
  * AIと深掘りする欄。
  * @param props - getPrompt：プロンプトを作る（画面の今の入力から）、onApply：反映する内容を入力欄に入れる、
- *   onClose：閉じる、steps：手順の文（省略は深掘りの3つの手順）
+ *   onClose：閉じる（まだ反映していない答えがあれば、親が破棄してよいか確かめる）、
+ *   onDirtyChange：まだ反映していない答えがあるか（PR #17 のCodexレビュー）、steps：手順の文（省略は深掘りの3つの手順）
  * @returns 欄
  */
 export function DeepenPanel({
   getPrompt,
   onApply,
   onClose,
+  onDirtyChange,
   steps = [
     "「プロンプトをコピーする」を押す",
     "ChatGPTやClaudeに貼り付けて送り、AIの質問に答える",
@@ -24,10 +27,18 @@ export function DeepenPanel({
   getPrompt: () => string;
   onApply: (text: string) => void;
   onClose: () => void;
+  onDirtyChange?: (dirty: boolean) => void;
   steps?: string[];
 }) {
   const [paste, setPaste] = useState("");
   const pasteId = useId();
+  // まだ反映していない答えは、閉じる・切り替え・画面の移動の前に確かめる（PR #17 のCodexレビュー）
+  const dirty = paste.trim() !== "";
+  useUnsavedChanges(dirty);
+  useEffect(() => {
+    onDirtyChange?.(dirty);
+    return () => onDirtyChange?.(false);
+  }, [dirty, onDirtyChange]);
   const extracted = extractFinal(paste);
   const over = countChars(extracted.text) > STRATEGY_TEXT_MAX;
 

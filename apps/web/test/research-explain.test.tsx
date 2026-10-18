@@ -112,6 +112,17 @@ describe("まとめてAIに解説してもらう", () => {
     await waitFor(() => expect(toastSuccess).toHaveBeenCalledWith("1件の解説を保存しました"));
   });
 
+  it("貼り付けたまま画面を移ろうとすると、未保存の確認が出る（PR #17 のCodexレビュー6回目）", async () => {
+    const user = userEvent.setup();
+    renderResearchPage(ResearchPage);
+    await screen.findByText("解説がまだの参考投稿：2件");
+    await user.click(panel().getByRole("button", { name: /まとめてAIに解説してもらう/ }));
+    await user.click(panel().getByLabelText("AIの答えを貼り付ける"));
+    await user.paste("【ID:aaaaaaaa】\n【型の名前】あるある型");
+    await user.click(screen.getByRole("link", { name: "ホームへ" }));
+    expect(await screen.findByText("保存していない変更があります")).toBeInTheDocument();
+  });
+
   it("ほかで解説が入っていた分は、飛ばした件数を知らせる（FR-104）", async () => {
     saveExplanations.mockResolvedValue({ saved: [], skipped: [{ id: A.id, reason: "already_explained" }] });
     const user = userEvent.setup();
@@ -154,5 +165,20 @@ describe("まとめてAIに解説してもらう", () => {
     await user.paste("  【型の名前】告白型  ");
     await user.click(dialog.getByRole("button", { name: "なぜ良いかに入れる" }));
     expect(dialog.getByLabelText(/^なぜ良いか/)).toHaveValue("【型の名前】告白型");
+  });
+});
+
+describe("1件の解説の未保存（PR #17 のCodexレビュー6回目）", () => {
+  it("解説を貼ったまま編集の画面を閉じようとすると、破棄してよいかを確かめる", async () => {
+    const user = userEvent.setup();
+    renderResearchPage(ResearchPage);
+    await screen.findByText("空の投稿A");
+    await user.click(screen.getAllByRole("button", { name: "参考投稿の操作" })[0]!);
+    await user.click(await screen.findByRole("menuitem", { name: "編集" }));
+    const dialog = within(await screen.findByRole("dialog", { name: "参考投稿を編集" }));
+    await user.click(dialog.getByLabelText("解説を貼り付ける"));
+    await user.paste("AIの解説");
+    await user.click(dialog.getByRole("button", { name: "閉じる" }));
+    expect(await screen.findByText("保存していない変更があります")).toBeInTheDocument();
   });
 });

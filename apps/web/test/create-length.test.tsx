@@ -1,5 +1,5 @@
 // US13：1投稿の文字数と、短文・中文・長文の割合（specs/014-strategy-guidance FR-140〜FR-142、SC-019）
-import { screen, waitFor, within } from "@testing-library/react";
+import { act, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { POST_LENGTH_DEFAULTS, type PostLengthSettings } from "@threads-grower/shared";
 import { fireEvent } from "@testing-library/react";
@@ -29,7 +29,13 @@ function withSettings(length: PostLengthSettings, version = 1) {
 }
 
 function renderCreate() {
-  return renderAccountRoutes([{ path: "create", element: <CreatePage /> }], "/accounts/a1/create");
+  return renderAccountRoutes(
+    [
+      { index: true, element: <p>ホームの中身</p> },
+      { path: "create", element: <CreatePage /> },
+    ],
+    "/accounts/a1/create",
+  );
 }
 
 async function openSettings(user: ReturnType<typeof userEvent.setup>) {
@@ -190,6 +196,26 @@ describe("文字数と長さの割合", () => {
     });
     // 入力していた短文の文字数は残り、入力していない目標は最新の値になる
     expect(s.getByRole("spinbutton", { name: "短文の文字数" })).toHaveValue(60);
+  });
+
+  it("作る件数の保存が 409 なら、投稿ストックのキャッシュも最新にして、開き直しても新しい版で送る（PR #17 のCodexレビュー6回目）", async () => {
+    const { ApiError } = await import("@/lib/api-client");
+    const user = userEvent.setup();
+    putPromptSettings.mockRejectedValueOnce(new ApiError("STALE_UPDATE", 409, [], { postCount: 12, length: CUSTOM, version: 5 }, null));
+    // 2回目以降の一覧の取得は返さない（キャッシュの値で作り直されることを確かめる）
+    listPostDrafts.mockResolvedValueOnce(listResponse()).mockImplementation(() => new Promise(() => {}));
+    const router = renderCreate();
+    const count = await screen.findByRole("spinbutton", { name: "作る件数" });
+    await user.clear(count);
+    await user.type(count, "10");
+    await waitFor(() => expect(count).toHaveValue(12), { timeout: 2000 });
+    await act(() => router.navigate("/accounts/a1"));
+    await act(() => router.navigate("/accounts/a1/create"));
+    const again = await screen.findByRole("spinbutton", { name: "作る件数" });
+    expect(again).toHaveValue(12);
+    await user.clear(again);
+    await user.type(again, "20");
+    await waitFor(() => expect(putPromptSettings).toHaveBeenLastCalledWith("a1", 20, 5), { timeout: 2000 });
   });
 
   it("文字数と割合の保存が 409 なら、読み直しを待たずに最新の文字数と割合を欄に入れる（PR #17 のCodexレビュー）", async () => {

@@ -27,6 +27,7 @@ import { useLocation } from "react-router";
 import { toast } from "sonner";
 import { ApiErrorScreen } from "@/components/ApiErrorScreen";
 import { ConflictDialog } from "@/components/ConflictDialog";
+import { UnsavedChangesDialog } from "@/components/UnsavedChangesDialog";
 import { CopyPromptButton } from "@/components/CopyPromptButton";
 import { FieldWithCounter } from "@/components/FieldWithCounter";
 import { DeepenPanel } from "@/components/strategy/DeepenPanel";
@@ -105,6 +106,15 @@ function StrategyEditor({ accountId, initial }: { accountId: string; initial: St
   const [billingReason, setBillingReason] = useState<string | null>(null);
   // AIと深掘りする欄を開いている項目（同時に1つだけ。FR-031）
   const [deepenKey, setDeepenKey] = useState<string | null>(null);
+  // 深掘りの欄に、まだ反映していない答えがあるか。あれば閉じる・切り替えの前に確かめる（PR #17 のCodexレビュー）
+  const [deepenDirty, setDeepenDirty] = useState(false);
+  const [confirmDeepen, setConfirmDeepen] = useState<{ next: string | null } | null>(null);
+
+  // 深掘りの欄を開く・閉じる・切り替える
+  const requestDeepen = (next: string | null) => {
+    if (deepenDirty && next !== deepenKey) return setConfirmDeepen({ next });
+    setDeepenKey(next);
+  };
 
   // ほかの画面の「編集」（#field-<key>）から来たら、その項目へ移る（specs/014 FR-122）
   const { hash } = useLocation();
@@ -287,7 +297,7 @@ function StrategyEditor({ accountId, initial }: { accountId: string; initial: St
                                     type="button"
                                     disabled={!purposeAnswered}
                                     aria-expanded={deepenKey === f.key}
-                                    onClick={() => setDeepenKey(deepenKey === f.key ? null : f.key)}
+                                    onClick={() => requestDeepen(deepenKey === f.key ? null : f.key)}
                                     className="inline-flex h-9 items-center gap-1.5 rounded-full border px-3 text-[13px] hover:bg-accent disabled:opacity-50"
                                   >
                                     <SparklesIcon className="size-4" aria-hidden="true" />
@@ -305,7 +315,7 @@ function StrategyEditor({ accountId, initial }: { accountId: string; initial: St
                                 <button
                                   type="button"
                                   aria-expanded={deepenKey === f.key}
-                                  onClick={() => setDeepenKey(deepenKey === f.key ? null : f.key)}
+                                  onClick={() => requestDeepen(deepenKey === f.key ? null : f.key)}
                                   className="inline-flex h-9 items-center gap-1.5 rounded-full border px-3 text-[13px] hover:bg-accent"
                                 >
                                   <SparklesIcon className="size-4" aria-hidden="true" />
@@ -333,9 +343,11 @@ function StrategyEditor({ accountId, initial }: { accountId: string; initial: St
                                   }
                                   onApply={(text) => {
                                     set(f.key as (typeof STRATEGY_TEXT_KEYS)[number], text);
+                                    setDeepenDirty(false);
                                     setDeepenKey(null);
                                   }}
-                                  onClose={() => setDeepenKey(null)}
+                                  onClose={() => requestDeepen(null)}
+                                  onDirtyChange={setDeepenDirty}
                                 />
                               )
                             }
@@ -351,6 +363,19 @@ function StrategyEditor({ accountId, initial }: { accountId: string; initial: St
         </div>
       </PageBody>
 
+      <UnsavedChangesDialog
+        open={confirmDeepen !== null}
+        title="貼り付けたAIの答えがあります。破棄しますか？"
+        description="まだ入力欄に反映していません。破棄すると失われます。"
+        discardLabel="破棄して閉じる"
+        onStay={() => setConfirmDeepen(null)}
+        onDiscard={() => {
+          const next = confirmDeepen?.next ?? null;
+          setConfirmDeepen(null);
+          setDeepenDirty(false);
+          setDeepenKey(next);
+        }}
+      />
       <ConflictDialog
         open={conflict !== null}
         updatedAt={conflict?.updatedAt ?? null}

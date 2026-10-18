@@ -3,7 +3,8 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render } from "@testing-library/react";
 import type { ReferencePost } from "@threads-grower/shared";
 import type { ComponentType } from "react";
-import { createMemoryRouter, Outlet, RouterProvider } from "react-router";
+import { createMemoryRouter, Link, Outlet, RouterProvider } from "react-router";
+import { UnsavedChangesProvider } from "@/components/UnsavedChangesProvider";
 import { testAccount } from "./strategy-page";
 
 const meta = { version: 1, createdAt: "2026-10-03T00:00:00.000Z", updatedAt: "2026-10-03T00:00:00.000Z" };
@@ -44,8 +45,17 @@ export function renderResearchPage(Page: ComponentType, path = "/accounts/a1/res
     [
       {
         path: "/accounts/:accountId",
-        element: <Outlet context={{ account: testAccount }} />,
-        children: [{ path: "research", element: <Page /> }],
+        // 未保存の変更の確認を確かめられるように、ホームへのリンクと登録先を置く（specs/014 PR #17 のCodexレビュー）
+        element: (
+          <UnsavedChangesProvider>
+            <Link to="/accounts/a1">ホームへ</Link>
+            <Outlet context={{ account: testAccount }} />
+          </UnsavedChangesProvider>
+        ),
+        children: [
+          { index: true, element: <p>ホームの中身</p> },
+          { path: "research", element: <Page /> },
+        ],
       },
     ],
     { initialEntries: [path] },

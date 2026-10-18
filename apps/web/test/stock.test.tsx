@@ -6,7 +6,7 @@ import type { PostDraft } from "@threads-grower/shared";
 import { createMemoryRouter, Link, Outlet, RouterProvider } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { EDITOR_ACCESS, OWNER_ACCESS } from "./helpers/access";
-import { account, draft, listResponse, promptResponse } from "./helpers/stock";
+import { account, draft, batchResult, listResponse, promptResponse, renderAccountRoutes } from "./helpers/stock";
 
 const listPostDrafts = vi.fn();
 const getPrompt = vi.fn();
@@ -54,6 +54,7 @@ vi.mock("sonner", () => ({
 const { ApiError } = await import("@/lib/api-client");
 const { UnsavedChangesProvider } = await import("@/components/UnsavedChangesProvider");
 const { StockPage } = await import("@/pages/stock");
+const { CreatePage } = await import("@/pages/create");
 
 function renderPage(path = "/accounts/a1/stock") {
   const router = createMemoryRouter(
@@ -114,6 +115,65 @@ beforeEach(() => {
     Promise.resolve(promptResponse({}, count ?? 30)),
   );
 });
+describe("待っている削除は、画面を移っても確定してから登録する（PR #17 のCodexレビュー6回目）", () => {
+  const twoDrafts = [draft({ id: "d1", body: "1件目" }), draft({ id: "d2", position: 1, body: "2件目" })];
+
+  function renderBoth() {
+    return renderAccountRoutes(
+      [
+        { path: "stock", element: <StockPage /> },
+        { path: "create", element: <CreatePage /> },
+      ],
+      "/accounts/a1/stock",
+    );
+  }
+
+  async function deleteFirst(user: ReturnType<typeof userEvent.setup>) {
+    await user.click(await screen.findByRole("button", { name: "「1件目」の操作" }));
+    await user.click(await screen.findByRole("menuitem", { name: "削除" }));
+  }
+
+  it("削除してすぐ「投稿をつくる」へ移ると、その場で削除を確定して一覧を取り直す（上限の表示が古くならない）", async () => {
+    const user = userEvent.setup();
+    listPostDrafts.mockResolvedValue({ ...listResponse({ items: twoDrafts }), limits: { needsReview: 2, approved: 500 } });
+    deletePostDrafts.mockImplementation(async () => {
+      listPostDrafts.mockResolvedValue({
+        ...listResponse({ items: [twoDrafts[1]!] }),
+        limits: { needsReview: 2, approved: 500 },
+      });
+      return { deletedCount: 1 };
+    });
+    const router = renderBoth();
+    expect(await screen.findByText(/要確認の下書きが上限（500件）に達しています/)).toBeInTheDocument();
+    await deleteFirst(user);
+    await act(() => router.navigate("/accounts/a1/create"));
+    await waitFor(() => expect(deletePostDrafts).toHaveBeenCalledWith("a1", ["d1"]));
+    // 取り直した一覧では上限に達していないので、登録できる
+    await waitFor(() => expect(screen.getByRole("button", { name: "投稿ストックに登録する" })).toBeInTheDocument());
+    await waitFor(() => expect(screen.queryByText(/要確認の下書きが上限（500件）に達しています/)).not.toBeInTheDocument());
+  });
+
+  it("削除の確定が終わる前に登録しようとしても、先に削除を確定してから登録する", async () => {
+    const user = userEvent.setup();
+    listPostDrafts.mockResolvedValue(listResponse({ items: twoDrafts }));
+    let finishDelete: (v: { deletedCount: number }) => void = () => {};
+    deletePostDrafts.mockImplementation(() => new Promise((r) => (finishDelete = r)));
+    createDraftBatch.mockResolvedValue(batchResult([draft({ id: "d3", body: "新しい" })]));
+    const router = renderBoth();
+    await deleteFirst(user);
+    await act(() => router.navigate("/accounts/a1/create"));
+    const box = await screen.findByRole("textbox", { name: "AIの返信を貼り付ける欄" });
+    await user.click(box);
+    await user.paste("新しい");
+    await user.click(screen.getByRole("button", { name: "投稿ストックに登録する" }));
+    // 削除が終わるまで登録しない
+    expect(createDraftBatch).not.toHaveBeenCalled();
+    await act(async () => finishDelete({ deletedCount: 1 }));
+    await screen.findByText("1件を投稿ストックに登録しました");
+    expect(deletePostDrafts.mock.invocationCallOrder[0]!).toBeLessThan(createDraftBatch.mock.invocationCallOrder[0]!);
+  });
+});
+
 describe("投稿ストックは一覧だけ（specs/014 US15、FR-163、SC-023）", () => {
   it("プロンプトのカードと貼り付け欄を置かず、上部バーに「投稿をつくる」（/create）", async () => {
     listPostDrafts.mockResolvedValue(listResponse({ items: [draft()] }));

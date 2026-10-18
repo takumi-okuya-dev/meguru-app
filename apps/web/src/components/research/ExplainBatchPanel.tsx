@@ -8,6 +8,7 @@ import { CopyPromptButton } from "@/components/CopyPromptButton";
 import { Button } from "@/components/ui/button";
 import { api } from "@/lib/api-client";
 import { billingReasonOf, isBillingRequired, saveErrorMessage } from "@/lib/save-error";
+import { useUnsavedChanges } from "@/lib/use-unsaved-changes";
 
 const PROBLEM_LABELS: Record<ExplanationProblem, string> = {
   not_found: "対応する参考投稿が見つかりません",
@@ -46,6 +47,8 @@ export function ExplainBatchPanel({
   const pending = posts.filter((p) => isBlank(p.whyGood)).length;
   const batchCount = Math.min(pending, EXPLAIN_BATCH_MAX);
   const parsed = paste.trim() === "" ? [] : parseExplanations(paste, posts);
+  // 貼り付けた答えを選んでいる途中で画面を移ろうとしたら、確かめる（PR #17 のCodexレビュー）
+  useUnsavedChanges(paste.trim() !== "");
   const picked = parsed.filter((r, i) => r.problem === null && !unchecked.has(i));
 
   const save = useMutation({

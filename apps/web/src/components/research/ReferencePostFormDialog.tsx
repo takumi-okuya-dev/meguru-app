@@ -1,5 +1,5 @@
 // 参考投稿の編集のダイアログ（specs/002 US3、specs/014 FR-088）。追加は ReferencePostAddDialog（ためて登録）で行う。
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import type { ReferencePost } from "@threads-grower/shared";
 import { DeletedElsewhereNotice, FormDialogFrame } from "@/components/items/FormDialogFrame";
 import { useItemForm } from "@/components/items/use-item-form";
@@ -24,14 +24,17 @@ export function ReferencePostFormDialog({
 }: {
   accountId: string;
   item?: ReferencePost;
-  whyGoodExtra?: (setWhyGood: (text: string) => void) => ReactNode;
+  whyGoodExtra?: (setWhyGood: (text: string) => void, onDirtyChange: (dirty: boolean) => void) => ReactNode;
   onSaved: (p: ReferencePost) => void;
   onClose: () => void;
   onReadOnly: () => void;
   onDeletedElsewhere: () => void;
   onLimitReached: () => void;
 }) {
+  // 1件の解説に貼り付けた内容も、未保存として扱う（PR #17 のCodexレビュー）
+  const [explainDirty, setExplainDirty] = useState(false);
   const f = useItemForm<RefForm, ReferencePost>({
+    extraDirty: explainDirty,
     item,
     emptyForm: EMPTY_REF_FORM,
     toForm: toRefForm,
@@ -66,7 +69,7 @@ export function ReferencePostFormDialog({
           setField={setField}
           errors={errors}
           readOnly={f.readOnly}
-          whyGoodExtra={!f.readOnly && whyGoodExtra?.((text) => setField("whyGood", text))}
+          whyGoodExtra={!f.readOnly && whyGoodExtra?.((text) => setField("whyGood", text), setExplainDirty)}
         />
       </FormDialogFrame>
       {f.overlays}

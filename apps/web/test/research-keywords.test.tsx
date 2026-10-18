@@ -82,6 +82,16 @@ describe("キーワードの案", () => {
     expect(panel().getAllByRole("checkbox")[0]).toBeDisabled();
   });
 
+  it("貼り付けたまま画面を移ろうとすると、未保存の確認が出る（PR #17 のCodexレビュー6回目）", async () => {
+    const user = userEvent.setup();
+    renderKeywords();
+    await user.click(await screen.findByRole("button", { name: "AIにキーワードの案を出してもらう" }));
+    await user.click(panel().getByRole("textbox", { name: "AIの答えを貼り付ける" }));
+    await user.paste("新しい言葉");
+    await user.click(screen.getByRole("link", { name: "ホームへ" }));
+    expect(await screen.findByText("保存していない変更があります")).toBeInTheDocument();
+  });
+
   it("残りの件数を超えて選んでいると登録できず、残りの件数を示す（FR-092）", async () => {
     const user = userEvent.setup();
     listResearchKeywords.mockResolvedValue({ items: Array.from({ length: 99 }, (_, i) => kw(`k${i}`, `言葉${i}`)), limit: 100, canEdit: true });

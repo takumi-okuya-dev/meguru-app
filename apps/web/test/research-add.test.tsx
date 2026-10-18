@@ -145,6 +145,18 @@ describe("参考投稿を追加（ためて登録）", () => {
     expect(createReferencePostsBatch).not.toHaveBeenCalled();
   });
 
+  it("ためた後に引き継いだキーワードを変えていれば、登録せずに本文を求める（PR #17 のCodexレビュー6回目）", async () => {
+    renderResearchPage(ResearchPage);
+    const d = await openAdd();
+    await userEvent.type(d.getByLabelText(/^本文/), "1件目");
+    await userEvent.type(d.getByLabelText("検索したキーワード"), "転職");
+    await userEvent.click(d.getByRole("button", { name: "＋この投稿をためて、次の投稿を入力する" }));
+    await userEvent.type(d.getByLabelText("検索したキーワード"), " 20代");
+    await userEvent.click(d.getAllByRole("button", { name: "1件を登録する" })[0]!);
+    expect(await d.findByText("入力してください")).toBeInTheDocument();
+    expect(createReferencePostsBatch).not.toHaveBeenCalled();
+  });
+
   it("登録の途中は、ためた投稿を外せない（PR #17 のCodexレビュー）", async () => {
     createReferencePostsBatch.mockImplementation(() => new Promise(() => {}));
     renderResearchPage(ResearchPage);

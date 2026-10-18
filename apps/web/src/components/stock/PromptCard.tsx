@@ -190,6 +190,10 @@ function PromptReadyCard({
         setFailed(null);
         // 文字数と割合もほかの人が変えていることがあるので、最新の値にする（PR #17 のCodexレビュー）
         if (latest.length) setLengthSettings(latest.length);
+        // 投稿ストックのキャッシュも最新にする（画面を離れて戻ったときに、古い版で送らないように）
+        queryClient.setQueryData<PostDraftList>(queryKeys.postDrafts(accountId), (old) =>
+          old ? { ...old, promptPostCount: latest.postCount, promptPostCountVersion: latest.version } : old,
+        );
         if (context?.generation === editGeneration.current) {
           setCountInput(String(latest.postCount));
           toast.info(

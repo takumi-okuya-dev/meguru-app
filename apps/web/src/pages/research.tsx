@@ -285,7 +285,9 @@ function ResearchPageContent() {
           accountId={account.id}
           item={dialog.item}
           {...dialogCallbacks}
-          whyGoodExtra={(setWhyGood) => <ExplainOne accountId={account.id} postId={dialog.item!.id} onUse={setWhyGood} />}
+          whyGoodExtra={(setWhyGood, onDirtyChange) => (
+            <ExplainOne accountId={account.id} postId={dialog.item!.id} onUse={setWhyGood} onDirtyChange={onDirtyChange} />
+          )}
         />
       )}
       {dialog?.kind === "keyword" && (

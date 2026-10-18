@@ -165,3 +165,49 @@ describe("AIと深掘りする", () => {
     expect(f.getByLabelText("活動の軸")).toHaveValue("ひとりにしない");
   });
 });
+
+describe("深掘りの貼り付けを捨てる前の確認（PR #17 のCodexレビュー6回目）", () => {
+  const paste = async (area: HTMLElement, text: string) => {
+    await userEvent.click(area);
+    await userEvent.paste(text);
+  };
+
+  it("貼り付けたまま「閉じる」を押すと、破棄してよいかを確かめる。破棄すると閉じる", async () => {
+    getStrategy.mockResolvedValue(strategyOf());
+    renderStrategyPage(StrategyPage, UnsavedChangesProvider);
+    const f = await field("realWorries");
+    await userEvent.click(f.getByRole("button", { name: "この項目をAIと深掘りする" }));
+    await paste(f.getByLabelText("AIの答えを貼り付ける"), "AIの答え");
+    await userEvent.click(f.getByRole("button", { name: "閉じる" }));
+    expect(await screen.findByText("貼り付けたAIの答えがあります。破棄しますか？")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "編集に戻る" }));
+    expect(f.getByLabelText("AIの答えを貼り付ける")).toHaveValue("AIの答え");
+    await userEvent.click(f.getByRole("button", { name: "閉じる" }));
+    await userEvent.click(await screen.findByRole("button", { name: "破棄して閉じる" }));
+    expect(f.queryByLabelText("AIの答えを貼り付ける")).not.toBeInTheDocument();
+  });
+
+  it("貼り付けたまま別の項目の深掘りを開こうとすると、破棄してよいかを確かめる", async () => {
+    getStrategy.mockResolvedValue(strategyOf());
+    renderStrategyPage(StrategyPage, UnsavedChangesProvider);
+    const f = await field("realWorries");
+    await userEvent.click(f.getByRole("button", { name: "この項目をAIと深掘りする" }));
+    await paste(f.getByLabelText("AIの答えを貼り付ける"), "AIの答え");
+    const other = await field("targetPersona");
+    await userEvent.click(other.getByRole("button", { name: "この項目をAIと深掘りする" }));
+    expect(await screen.findByText("貼り付けたAIの答えがあります。破棄しますか？")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "破棄して閉じる" }));
+    expect(other.getByLabelText("AIの答えを貼り付ける")).toHaveValue("");
+    expect(f.queryByLabelText("AIの答えを貼り付ける")).not.toBeInTheDocument();
+  });
+
+  it("貼り付けたまま画面を移ろうとすると、未保存の確認が出る", async () => {
+    getStrategy.mockResolvedValue(strategyOf());
+    renderStrategyPage(StrategyPage, UnsavedChangesProvider);
+    const f = await field("realWorries");
+    await userEvent.click(f.getByRole("button", { name: "この項目をAIと深掘りする" }));
+    await paste(f.getByLabelText("AIの答えを貼り付ける"), "AIの答え");
+    await userEvent.click(screen.getByRole("link", { name: "ホームへ" }));
+    expect(await screen.findByText("保存していない変更があります")).toBeInTheDocument();
+  });
+});

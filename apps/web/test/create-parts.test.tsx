@@ -67,6 +67,19 @@ describe("プロンプトの長さと送り方", () => {
     expect(area).toHaveAttribute("readonly");
   });
 
+  it("コピーできなければ、中身を開いて全文を選び、手でコピーする案内を出す（PR #17 のCodexレビュー6回目）", async () => {
+    const user = userEvent.setup();
+    getPrompt.mockResolvedValue(LONG);
+    vi.spyOn(navigator.clipboard, "writeText").mockRejectedValue(new Error("denied"));
+    renderCreate();
+    const first = within(await screen.findByRole("group", { name: "① 1つ目" }));
+    await user.click(first.getByRole("button", { name: "1つ目をコピー" }));
+    expect(await first.findByText("自動でコピーできませんでした。選択された文字を手でコピーしてください")).toBeInTheDocument();
+    const area = first.getByRole<HTMLTextAreaElement>("textbox", { name: "1つ目の全文" });
+    await waitFor(() => expect(area).toHaveFocus());
+    expect([area.selectionStart, area.selectionEnd]).toEqual([0, "1つ目の全文".length]);
+  });
+
   it("切り替えを端末に覚え、次に開いたときもその送り方にする", async () => {
     const user = userEvent.setup();
     renderCreate();

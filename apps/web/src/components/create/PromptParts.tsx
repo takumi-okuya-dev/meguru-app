@@ -1,7 +1,7 @@
 // プロンプトの長さと送り方（specs/014-strategy-guidance US14、FR-150〜FR-153、research.md R12・R15）。
 // 長いプロンプトは2つに分けて送れる。選んだ送り方は端末に覚える。
 import { CopyIcon } from "lucide-react";
-import { useId, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -70,19 +70,29 @@ export function SendModeSelect({
 
 function PartRow({ index, note, text }: { index: 0 | 1; note: string; text: string }) {
   const [open, setOpen] = useState(false);
+  const [copyFailed, setCopyFailed] = useState(false);
+  const areaRef = useRef<HTMLTextAreaElement>(null);
+  // コピーできなかったら、中身を開いた後に全文を選ぶ（003 research.md R13 と同じ扱い。PR #17 のCodexレビュー）
+  useEffect(() => {
+    if (copyFailed && open) {
+      areaRef.current?.focus();
+      areaRef.current?.select();
+    }
+  }, [copyFailed, open]);
   const name = index === 0 ? "1つ目" : "2つ目";
   const title = index === 0 ? "① 1つ目" : "② 2つ目（最後）";
   const copy = async () => {
     try {
       await navigator.clipboard.writeText(text);
+      setCopyFailed(false);
       toast.success(
         index === 0
           ? "1つ目をコピーしました。AIに送って「受け取りました」と返ってきたら、2つ目を送ってください"
           : "2つ目をコピーしました。AIに送ると投稿が作られます",
       );
     } catch {
-      // コピーできなければ中身を開いて全文を選ぶ（003 research.md R13 と同じ扱い）
       setOpen(true);
+      setCopyFailed(true);
     }
   };
   return (
@@ -103,8 +113,14 @@ function PartRow({ index, note, text }: { index: 0 | 1; note: string; text: stri
           中身を見る
         </Button>
       </div>
+      {copyFailed && (
+        <p role="alert" className="rounded-xl border border-warning/40 bg-warning-bg px-3 py-2 text-[13px]">
+          自動でコピーできませんでした。選択された文字を手でコピーしてください
+        </p>
+      )}
       {open && (
         <Textarea
+          ref={areaRef}
           aria-label={`${name}の全文`}
           readOnly
           value={text}
