@@ -59,6 +59,7 @@ pnpm --filter api exec wrangler deploy --env production --dry-run  成功（同�
 | Webのテストの既定を`VITE_APP_ENV=production`にした（`apps/web/vitest.config.ts`） | 既存の515件のテストに帯が割り込まないようにするため。帯そのものは`env-banner.test.tsx`で`vi.stubEnv`を使って確かめる |
 | 帯の`role`を`status`にした（`alert`ではなく） | ずっと出ている知らせなので。読むだけの帯（013）と同じ |
 | `docs/external-services-setup.md`「9」の題を「本番公開時の追加作業（今は不要）」から**「公開のための準備（ステージングと本番）」**に変えた | 「今は不要」ではなくなったため。参照していた`specs/013-billing/notes.md`・`plan.md`・`quickstart.md`も直した |
+| `deploy.yml`に「設定がそろっているか見る」の安全弁を入れた | 【人】の設定（9-11）が済むまでは、`main`・`develop`へのマージのたびにデプロイが失敗して赤くなる。設定が入るまでは警告を出して何もしない。9-11が済んだら、このステップと各ステップの`if`は消してよい |
 | Constitutionを**4.1.0（MINOR）**にした | ブランチ運用を「公開時に3段構成に切り替える」から「3段構成とする」に変えたのは、原則の実質的な変更のため |
 
 ## 4. まだ確かめていないこと（【人】の作業の後）
