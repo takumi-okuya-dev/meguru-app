@@ -1,3 +1,9 @@
+# 手元（wrangler dev）と本番の設定。環境ごとの分け方は specs/015-deploy-environments/contracts/environments.md。
+#
+# ⚠️ wrangler の名前付きの環境（[env.staging]・[env.production]）は、この一番上の設定を**受け継がない**。
+# vars・kv_namespaces・triggers は、どちらの環境にも書き切ること（書き忘れは test/unit/wrangler-config.test.ts で止まる）。
+# ⚠️ `wrangler deploy` を --env なしで実行すると**本番**に出る。必ず `--env staging` か `--env production` を付ける
+# （ふだんのデプロイは .github/workflows/deploy.yml から行う）。
 name = "threads-grower-api"
 main = "src/index.ts"
 compatibility_date = "2026-08-22"
@@ -21,3 +27,66 @@ id = "00000000000000000000000000000000"
 THREADS_AUTH_BASE_URL = "https://threads.com"
 THREADS_GRAPH_BASE_URL = "https://graph.threads.com"
 TOKEN_ENCRYPTION_KEY_VERSION = "1"
+
+# ──────────────────────────────────────────────────────────────────────────
+# ステージング（develop ブランチ）
+# 秘密情報は `wrangler secret put <名前> --env staging`（data-model.md 3-1 の「秘」）。
+# ──────────────────────────────────────────────────────────────────────────
+[env.staging]
+name = "threads-grower-api-staging"
+
+[env.staging.triggers]
+crons = ["0 18 * * *", "*/5 * * * *"]
+
+# T020 で `wrangler kv namespace create AUTOPOST_KV --env staging` を実行し、出た id に差し替える
+[[env.staging.kv_namespaces]]
+binding = "AUTOPOST_KV"
+id = "00000000000000000000000000000000"
+
+[env.staging.vars]
+APP_ENV = "staging"
+# ↓ 見本の値のまま。T019〜T025 で本物に差し替える。差し替えるまでAPIは CONFIG_ERROR で止まる（src/lib/config.ts）
+CLERK_PUBLISHABLE_KEY = "pk_test_xxx"
+THREADS_APP_ID = "000000000000000"
+THREADS_REDIRECT_URI = "https://api.example.com/api/threads/callback"
+WEB_ORIGIN = "https://staging.example.com"
+STRIPE_PRICE_ID = "price_xxx"
+# ↓ ここから下は、このままでよい値
+THREADS_ACCESS_MODE = "testers"
+THREADS_AUTH_BASE_URL = "https://threads.com"
+THREADS_GRAPH_BASE_URL = "https://graph.threads.com"
+TOKEN_ENCRYPTION_KEY_VERSION = "1"
+BILLING_ENABLED = "true"
+# 任意（入れなければStripeの既定）：STRIPE_PORTAL_CONFIGURATION_ID・STRIPE_TAX_RATE_ID
+
+# ──────────────────────────────────────────────────────────────────────────
+# 本番（main ブランチ）
+# 秘密情報は `wrangler secret put <名前> --env production`。
+# ──────────────────────────────────────────────────────────────────────────
+[env.production]
+name = "threads-grower-api"
+
+[env.production.triggers]
+crons = ["0 18 * * *", "*/5 * * * *"]
+
+# T029 で `wrangler kv namespace create AUTOPOST_KV --env production` を実行し、出た id に差し替える
+[[env.production.kv_namespaces]]
+binding = "AUTOPOST_KV"
+id = "00000000000000000000000000000000"
+
+[env.production.vars]
+APP_ENV = "production"
+# ↓ 見本の値のまま。T027〜T032 で本物に差し替える。差し替えるまでAPIは CONFIG_ERROR で止まる
+CLERK_PUBLISHABLE_KEY = "pk_test_xxx"
+THREADS_APP_ID = "000000000000000"
+THREADS_REDIRECT_URI = "https://api.example.com/api/threads/callback"
+WEB_ORIGIN = "https://app.example.com"
+STRIPE_PRICE_ID = "price_xxx"
+# ↓ ここから下は、このままでよい値
+# Meta App Review に通ってアプリを公開したら "public" にする（specs/002 research.md R15）
+THREADS_ACCESS_MODE = "testers"
+THREADS_AUTH_BASE_URL = "https://threads.com"
+THREADS_GRAPH_BASE_URL = "https://graph.threads.com"
+TOKEN_ENCRYPTION_KEY_VERSION = "1"
+BILLING_ENABLED = "true"
+# 任意（入れなければStripeの既定）：STRIPE_PORTAL_CONFIGURATION_ID・STRIPE_TAX_RATE_ID

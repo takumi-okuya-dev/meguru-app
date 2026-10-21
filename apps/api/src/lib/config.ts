@@ -4,6 +4,9 @@
 import type { Env } from "../env";
 import { createTokenCipher } from "./crypto";
 
+/** APP_ENV に入れてよい値（specs/015-deploy-environments contracts/environments.md 2）。 */
+const APP_ENVS: readonly string[] = ["production", "staging", "development"];
+
 const PLACEHOLDERS = ["sk_test_xxx", "pk_test_xxx", "xxxxxxxx", "000000000000000", "whsec_xxx", "price_xxx"];
 
 function isPlaceholder(v: string | undefined): boolean {
@@ -51,6 +54,9 @@ function usesRealThreads(env: Env): boolean {
  */
 export function validateConfig(env: Env): string[] {
   const problems: string[] = [];
+
+  // どの環境かは必ず明示する（未設定のまま本番の値で動かさない。specs/015 FR-026）
+  if (!APP_ENVS.includes(env.APP_ENV)) problems.push("APP_ENV");
 
   if (isPlaceholder(env.CLERK_SECRET_KEY) || !/^sk_(test|live)_[A-Za-z0-9]{20,}$/.test(env.CLERK_SECRET_KEY)) {
     problems.push("CLERK_SECRET_KEY");

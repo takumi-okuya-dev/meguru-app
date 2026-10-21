@@ -31,3 +31,29 @@ describe("ロガーのマスク（research.md R5、FR-010）", () => {
     expect(lines.join("\n")).not.toMatch(/SECRET2|abc|def/);
   });
 });
+
+describe("どの環境の記録か（specs/015 FR-026）", () => {
+  it("環境を渡すと、すべての行に app_env が入る", () => {
+    const lines: string[] = [];
+    const logger = createLogger((line) => lines.push(line), { app_env: "staging" });
+    logger.info("hello");
+    logger.error("bad", { variables: ["APP_ENV"] });
+    expect(lines.map((l) => JSON.parse(l))).toEqual([
+      { level: "info", message: "hello", app_env: "staging" },
+      { level: "error", message: "bad", app_env: "staging", variables: ["APP_ENV"] },
+    ]);
+  });
+
+  it("渡さなければ、今までどおり app_env は入らない", () => {
+    const lines: string[] = [];
+    createLogger((line) => lines.push(line)).info("hello");
+    expect(JSON.parse(lines[0] ?? "")).toEqual({ level: "info", message: "hello" });
+  });
+
+  it("呼び出しごとの値が、環境の値より優先されない（取り違えを防ぐ）", () => {
+    const lines: string[] = [];
+    const logger = createLogger((line) => lines.push(line), { app_env: "production" });
+    logger.warn("x", { app_env: "staging" });
+    expect(JSON.parse(lines[0] ?? "").app_env).toBe("production");
+  });
+});

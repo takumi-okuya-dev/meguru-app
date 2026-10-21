@@ -42,3 +42,7 @@ BILLING_ENABLED=false
 # Threads連携の公開範囲：testers（既定。Meta App Reviewの前で、招待したテスターだけが接続できる）か public
 # Meta App Reviewに通り、Metaのアプリを公開したら public にする（specs/002-strategy-profile research.md R15）
 THREADS_ACCESS_MODE=testers
+
+# どの環境で動いているか（specs/015-deploy-environments）。production / staging / development の3つだけ
+# 本番とステージングは wrangler.toml の [env.*].vars で入る。手元は development
+APP_ENV=development

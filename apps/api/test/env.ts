@@ -8,6 +8,7 @@ export const TEST_STRIPE_WEBHOOK_SECRET = "whsec_TestOnlyWebhookSecret000";
 
 export function testBindings(fakeThreadsUrl: string, databaseUrl: string, fakeStripeUrl = "http://127.0.0.1:1") {
   return {
+    APP_ENV: "development" as const,
     CLERK_SECRET_KEY: "sk_test_TestOnlyDummySecretKey00000",
     CLERK_PUBLISHABLE_KEY: "pk_test_dGVzdC5jbGVyay5hY2NvdW50cy5kZXYk",
     THREADS_APP_ID: "123456",

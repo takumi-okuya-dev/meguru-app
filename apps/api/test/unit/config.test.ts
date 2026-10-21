@@ -69,6 +69,15 @@ describe("validateConfig", () => {
     expect(validateConfig({ ...missing, BILLING_ENABLED: "false" } as Env)).toEqual([]);
   });
 
+  it("APP_ENV は production・staging・development のどれかが必須（specs/015 FR-026）", () => {
+    for (const v of ["production", "staging", "development"]) {
+      expect(validateConfig({ ...good, APP_ENV: v } as Env)).toEqual([]);
+    }
+    expect(validateConfig({ ...good, APP_ENV: undefined } as unknown as Env)).toEqual(["APP_ENV"]);
+    expect(validateConfig({ ...good, APP_ENV: "" } as unknown as Env)).toEqual(["APP_ENV"]);
+    expect(validateConfig({ ...good, APP_ENV: "prod" } as unknown as Env)).toEqual(["APP_ENV"]);
+  });
+
   it("偽のThreadsで動かすときは、Threadsの3項目は見本の値のままでよい", () => {
     const env = { ...good, THREADS_APP_ID: "000000000000000", THREADS_APP_SECRET: "xxxxxxxx" } as Env;
     expect(validateConfig(env)).toEqual([]);

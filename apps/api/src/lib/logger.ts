@@ -60,15 +60,20 @@ export type Logger = {
 /**
  * 構造化ロガーを作る。1行に1つの JSON を出力する。
  * @param write - 1行を書き出す処理（既定は console.log）
+ * @param base - すべての行に入れる値（どの環境の記録かなど。呼び出しごとの値より優先する）
  * @returns ロガー
  */
-export function createLogger(write: (line: string) => void = (line) => console.log(line)): Logger {
+export function createLogger(
+  write: (line: string) => void = (line) => console.log(line),
+  base: Record<string, unknown> = {},
+): Logger {
   function log(level: string, message: string, fields?: Record<string, unknown>) {
     write(
       JSON.stringify({
         level,
         message: redactString(message),
         ...(redact(fields ?? {}) as object),
+        ...base,
       }),
     );
   }
@@ -80,5 +85,23 @@ export function createLogger(write: (line: string) => void = (line) => console.l
   };
 }
 
-/** アプリ全体で使うロガー。 */
-export const logger = createLogger();
+/**
+ * 記録に入れる環境の名前（specs/015 FR-026）。Workers では環境変数が要求・定期処理ごとに渡るので、
+ * 入り口で setLogAppEnv を呼んで覚える。
+ */
+let appEnv: string | undefined;
+
+/**
+ * 記録に入れる環境の名前を覚える（要求・定期処理の入り口で呼ぶ）。
+ * @param value - APP_ENV の値
+ */
+export function setLogAppEnv(value: string | undefined): void {
+  appEnv = value || undefined;
+}
+
+/** アプリ全体で使うロガー。すべての行に、どの環境の記録かが入る。 */
+export const logger = createLogger(undefined, {
+  get app_env() {
+    return appEnv;
+  },
+});

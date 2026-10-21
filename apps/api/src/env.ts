@@ -1,5 +1,7 @@
 /** Workers のバインディング（環境変数・Secret）。一覧と意味は contracts/api.md「環境変数・Secret」。 */
 export interface Env {
+  /** どの環境で動いているか（specs/015-deploy-environments contracts/environments.md 2）。手元は development */
+  APP_ENV: "production" | "staging" | "development";
   CLERK_SECRET_KEY: string;
   CLERK_PUBLISHABLE_KEY: string;
   THREADS_APP_ID: string;
