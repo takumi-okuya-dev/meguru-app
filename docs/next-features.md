@@ -1,6 +1,6 @@
 # 次の機能のメモ（仕様づくりの前）
 
-**最終更新**：2026-10-15
+**最終更新**：2026-10-22
 
 **位置づけ**：ユーザーと話して決めたこと・まだ決めていないことを、`/speckit-specify`の前に残すメモ。各機能の仕様（`specs/NNN-…/spec.md`）を作るときの入力にし、移したらこのメモからは消す。決済のメモは[specs/013-billing/notes.md](../specs/013-billing/notes.md)。
 
@@ -21,7 +21,7 @@
 
 ## C. 公開後のブランチと環境
 
-決済の後に、`main`（本番）・`develop`（ステージング）・`feature/*`の3段構成に切り替える。詳しくは[specs/013-billing/notes.md](../specs/013-billing/notes.md)の「1. 公開後のブランチと環境」と、Constitution「開発ワークフロー」。
+2026-10-22に、feature 015「公開のためのブランチと環境」に移した（[specs/015-deploy-environments](../specs/015-deploy-environments/spec.md)）。このメモでは扱わない。
 
 ## D. 退会
 

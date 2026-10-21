@@ -19,8 +19,28 @@ Claude CodeとCodexで開発スキルを共用する手順と、利用制限時�
 - [x] feature 002「戦略プロファイル（課題・宣伝内容・リサーチ）」：仕様・計画・タスク・実装（[specs/002-strategy-profile/](specs/002-strategy-profile/)）
 - [x] feature 003〜009：プロンプト生成と一括登録・承認とNGワード・自動投稿・パフォーマンスと改善・複数アカウント・チーム運用・このアカウントのチーム（[specs/](specs/)）
 - [x] feature 010「自分のMetaアプリのトークンでアカウントを追加」（[specs/010-token-account-add/](specs/010-token-account-add/)）
-- [ ] feature 011「チームの見直し」（[specs/011-team-revision/](specs/011-team-revision/)、レビュー中）
-- [ ] 次：アカウントを先に作る・退会 → 決済（仕様の前のメモは[docs/next-features.md](docs/next-features.md)）
+- [x] feature 011「チームの見直し」（[specs/011-team-revision/](specs/011-team-revision/)）
+- [x] feature 012〜014：アカウントを先に作る・退会 → 決済 → 課題の入力の手助け（[specs/](specs/)）
+- [ ] feature 015「公開のためのブランチと環境」（[specs/015-deploy-environments/](specs/015-deploy-environments/)。
+  コードと文書は実装済み。外部サービスの設定は[docs/external-services-setup.md](docs/external-services-setup.md)「9. 公開のための準備」）
+- [ ] 次：公開の判断（MetaのApp Review・事業者としての手続き。メモは[docs/next-features.md](docs/next-features.md)）
+
+## ブランチとデプロイ
+
+`main`（本番）／`develop`（ステージング）／`feature/*`（追加実装）の3段構成（[Constitution](.specify/memory/constitution.md)「開発ワークフロー」、[contracts/deploy.md](specs/015-deploy-environments/contracts/deploy.md)）。
+
+| ブランチ | 何の場所か | マージすると |
+|---|---|---|
+| `main` | 本番（一般のお客さま） | 本番に出る |
+| `develop` | ステージング（テストユーザー。**既定のブランチ**） | ステージングに出る |
+| `feature/*`・`fix/*` | 開発（手元） | — |
+
+- ふだんのPRは`feature/*`→`develop`に向ける。
+- リリースは`develop`→`main`のPR（タイトルは「リリース：…」）。
+- 本番の急ぎの修正は`main`から`fix/*`を分け、`main`へマージしたあと、同じ変更を`develop`にも戻す（`git log --oneline main ^develop`が空になること）。
+- `main`・`develop`への直接のpushは禁止（PR必須・CIの成功が必須）。
+- デプロイは[.github/workflows/deploy.yml](.github/workflows/deploy.yml)が自動で行う（**マイグレーション → API → Web**の順。1つでも失敗したらそこで止まる）。やり直しはActionsの画面から手で動かせる。
+- 環境の違いは**コードの分岐にせず、設定だけに置く**（`APP_ENV`・`VITE_APP_ENV`）。本番以外の画面には、いちばん上に環境の帯が出る。
 
 ## 構成
 

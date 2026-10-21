@@ -56,3 +56,28 @@ test("375pxで、014で変えた画面が横にはみ出さない", async ({ pag
   await expect(page.getByText("まだ投稿がありません")).toBeVisible();
   await expectNoOverflow(page, "投稿ストック");
 });
+
+// specs/015 T048：環境の帯が、375pxで横にはみ出さず、上部バーの操作に重ならない
+test("375pxで、環境の帯が上部バーの操作に重ならない", async ({ page }) => {
+  await signIn(page);
+  const accountId = await createAccount(page, "帯のアカウント");
+  await page.goto(`/accounts/${accountId}`);
+
+  // 手元で動かすので VITE_APP_ENV は development（apps/web/.env.local）
+  const banner = page.getByText("開発環境です（手元）");
+  await expect(banner).toBeVisible();
+  await expectNoOverflow(page, "環境の帯");
+
+  // 帯は上部バーの下にある（メニューのボタンに重ならない）
+  const menu = page.getByRole("button", { name: "メニューを開く" });
+  const menuBox = await menu.boundingBox();
+  const bannerBox = await banner.boundingBox();
+  expect(bannerBox, "帯の位置").not.toBeNull();
+  expect(menuBox, "メニューのボタンの位置").not.toBeNull();
+  expect(bannerBox!.y).toBeGreaterThanOrEqual(menuBox!.y + menuBox!.height);
+
+  // ログインの画面（骨格の外）でも、一番上に出る
+  await page.goto("/terms");
+  await expect(page.getByText("開発環境です（手元）")).toBeVisible();
+  await expectNoOverflow(page, "利用規約");
+});

@@ -104,7 +104,7 @@ apps/web/
 └── test/env-banner.test.tsx    # 新規
 
 docs/
-├── external-services-setup.md  # 直す：「9. 本番公開時の追加作業」を実際に使える形に
+├── external-services-setup.md  # 直す：「9. 公開のための準備」を実際に使える形に
 ├── cost-estimate.md            # 直す：ドメイン代と2環境の見込み
 └── next-features.md            # 直す：「C」をこのfeatureに移したと記す
 

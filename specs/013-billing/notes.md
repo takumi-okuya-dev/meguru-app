@@ -4,7 +4,7 @@
 
 **位置づけ**：`/speckit-specify` の前に、決めたこと・検討することを残すメモ。仕様（spec.md）を作るときの入力にする。013の仕様ができたら、このメモの内容をspec.md・plan.mdに移す。
 
-**Source**：[PRD §4.6 FR-12「契約・支払い」](../../_bmad-output/initiative-threads-grower-app/prd-threads-grower-app/prd-threads-grower-app.md)、[008 research.md R15「013（決済）への申し送り」](../008-team-operations/research.md)（番号の変更で、決済は013になった）、[008 contracts/permissions.md](../008-team-operations/contracts/permissions.md)、[docs/external-services-setup.md「9. 本番公開時の追加作業」](../../docs/external-services-setup.md)
+**Source**：[PRD §4.6 FR-12「契約・支払い」](../../_bmad-output/initiative-threads-grower-app/prd-threads-grower-app/prd-threads-grower-app.md)、[008 research.md R15「013（決済）への申し送り」](../008-team-operations/research.md)（番号の変更で、決済は013になった）、[008 contracts/permissions.md](../008-team-operations/contracts/permissions.md)、[docs/external-services-setup.md「9. 公開のための準備」](../../docs/external-services-setup.md)
 
 ## 1. 公開後のブランチと環境（2026-10-10 ユーザーの方針）
 
