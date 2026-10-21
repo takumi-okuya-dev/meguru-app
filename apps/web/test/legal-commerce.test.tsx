@@ -11,12 +11,11 @@ vi.mock("@clerk/react", () => ({
 const { LegalCommercePage } = await import("@/pages/legal-commerce");
 const { SignInPage } = await import("@/pages/sign-in");
 const { routes } = await import("@/router");
+const { isPublicPath } = await import("./helpers/routes");
 
 describe("特定商取引法に基づく表記", () => {
   it("ログインなしで開けるルートにある", () => {
-    const page = routes.find((r) => r.path === "/legal/commerce");
-    expect(page).toBeDefined();
-    expect("children" in page!).toBe(false);
+    expect(isPublicPath(routes, "/legal/commerce")).toBe(true);
   });
 
   it("項目と価格を出し、販売者の情報が空なら「（公開の前に記入）」", () => {

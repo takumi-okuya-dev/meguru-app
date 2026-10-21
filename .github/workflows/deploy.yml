@@ -1,0 +1,76 @@
+# デプロイ：develop への push でステージング、main への push で本番に出す
+# （specs/015-deploy-environments contracts/deploy.md 2）。
+# 順番は マイグレーション → API → Web。1つでも失敗したら、そこで止める（FR-012）。
+# 途中で止まったときに何が起きるかは、contracts/deploy.md 2 の表を見る。
+name: Deploy
+
+on:
+  push:
+    branches: [develop, main]
+  # やり直し用。Actionsの画面から手で動かせる
+  workflow_dispatch:
+
+# 同じ環境へのデプロイは1つずつ。走っているものを打ち切らない（FR-013）
+concurrency:
+  group: deploy-${{ github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    # GitHubのEnvironmentのSecretsと変数を使う（data-model.md 3-2・3-3）
+    environment: ${{ github.ref_name == 'main' && 'production' || 'staging' }}
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: 依存を入れる
+        run: pnpm install --frozen-lockfile
+
+      - name: 環境の名前を決める
+        id: env
+        run: |
+          if [ "${{ github.ref_name }}" = "main" ]; then
+            echo "wrangler=production" >> "$GITHUB_OUTPUT"
+          else
+            echo "wrangler=staging" >> "$GITHUB_OUTPUT"
+          fi
+
+      # Webのビルド。VITE_… はビルドに焼き込まれるので、公開してよい値だけを入れる（data-model.md 3-2）
+      - name: Web をビルドする
+        run: pnpm --filter web build
+        env:
+          VITE_API_BASE_URL: ${{ vars.VITE_API_BASE_URL }}
+          VITE_CLERK_PUBLISHABLE_KEY: ${{ vars.VITE_CLERK_PUBLISHABLE_KEY }}
+          VITE_APP_ENV: ${{ vars.VITE_APP_ENV }}
+
+      # 1. マイグレーション。ここで失敗したら、DBだけが新しくAPIとWebは前の版のまま（research.md R4）
+      - name: マイグレーションを当てる
+        run: pnpm --filter api db:migrate
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
+      # 2. API（Cloudflare Workers）
+      - name: API を出す
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: apps/api
+          command: deploy --env ${{ steps.env.outputs.wrangler }}
+
+      # 3. Web（Cloudflare Pages）。main は本番、develop はブランチの別名として出る
+      - name: Web を出す
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages deploy apps/web/dist --project-name threads-grower-web --branch ${{ github.ref_name }}

@@ -2,6 +2,7 @@
 // 1024px以上はサイドバーを常に出して畳める（状態は localStorage）。未満はドロワーで画面の上に重ねて開く。
 import { useCallback, useMemo, useState, type ReactNode } from "react";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
+import { EnvBanner } from "./EnvBanner";
 import { LG_QUERY, useMediaQuery } from "@/lib/use-media-query";
 import { ShellContext, type ShellState } from "./shell-context";
 import { Sidebar } from "./Sidebar";
@@ -40,12 +41,18 @@ export function AppShell({ children, banner = null }: { children: ReactNode; ban
     writeCollapsed(value);
   }, []);
 
+  // 環境の帯は、ほかのどの帯よりも上に出す（specs/015 contracts/ui-routes.md 1）
   const shell = useMemo<ShellState>(
     () => ({
       sidebarVisible,
       isWide,
       openSidebar: () => (isWide ? setCollapsedAndSave(false) : setDrawerOpen(true)),
-      banner,
+      banner: (
+        <>
+          <EnvBanner />
+          {banner}
+        </>
+      ),
     }),
     [sidebarVisible, isWide, banner, setCollapsedAndSave],
   );
@@ -77,5 +84,10 @@ export function AppShell({ children, banner = null }: { children: ReactNode; ban
  * @returns 中央寄せの骨格
  */
 export function CenteredLayout({ children }: { children: ReactNode }) {
-  return <div className="flex min-h-svh items-center justify-center px-4 py-10">{children}</div>;
+  return (
+    <div className="flex min-h-svh flex-col">
+      <EnvBanner />
+      <div className="flex flex-1 items-center justify-center px-4 py-10">{children}</div>
+    </div>
+  );
 }

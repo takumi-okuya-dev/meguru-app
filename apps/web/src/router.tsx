@@ -1,5 +1,5 @@
 // ルートとガード（contracts/ui-routes.md「ルート」「遷移の規則」）
-import { createBrowserRouter } from "react-router";
+import { createBrowserRouter, Outlet } from "react-router";
 import { RequireAuth } from "@/components/guards";
 import { AccountLayout } from "@/pages/account-layout";
 import { AccountHome } from "@/pages/account-home";
@@ -28,15 +28,34 @@ import { CreatePage } from "@/pages/create";
 import { StrategyPage } from "@/pages/strategy";
 import { TermsPage } from "@/pages/terms";
 import { GuideThreadsTokenPage } from "@/pages/guide-threads-token";
+import { EnvBanner } from "@/components/layout/EnvBanner";
+
+/**
+ * 骨格を使わない読みもののページの入れ物。環境の帯を画面の一番上に出す（specs/015 contracts/ui-routes.md 1）。
+ * @returns 帯と、中の画面
+ */
+function PlainPage() {
+  return (
+    <>
+      <EnvBanner />
+      <Outlet />
+    </>
+  );
+}
 
 /** 画面のルート（contracts/ui-routes.md「ルート」）。認証が必要な画面は RequireAuth で包む。 */
 export const routes = [
   { path: "/sign-in/*", element: <SignInPage /> },
   { path: "/data-deletion/:code", element: <DataDeletion /> },
   // 利用規約・トークンの作り方はログインなしで読める（specs/010 FR-052・FR-030）
-  { path: "/terms", element: <TermsPage /> },
-  { path: "/legal/commerce", element: <LegalCommercePage /> },
-  { path: "/guide/threads-token", element: <GuideThreadsTokenPage /> },
+  {
+    element: <PlainPage />,
+    children: [
+      { path: "/terms", element: <TermsPage /> },
+      { path: "/legal/commerce", element: <LegalCommercePage /> },
+      { path: "/guide/threads-token", element: <GuideThreadsTokenPage /> },
+    ],
+  },
   // 招待の確認はログインなしで開ける（specs/008 research.md R7、specs/011 contracts/ui-routes.md）
   { path: "/invite/:token", element: <InvitePage /> },
   {
