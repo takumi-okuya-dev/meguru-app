@@ -80,7 +80,7 @@ pnpm --filter api exec wrangler deploy --env production --dry-run  成功（同�
 
 `apps/api/test/integration/auto-post-status.test.ts`が、全部のテストを流したときにときどき落ちていた（2回連続）。原因は005の実装側で、`POST /api/accounts/:id/auto-post/notices/blocked/dismiss`が`blockedNoticeSeenAt`に`new Date()`（Workersの時計）を入れ、下書きの`blocked_at`はDBの`now()`で入っていたこと。Workersの`Date`は最後の入出力の時点で止まるので、直前に止められた下書きより**前**の時刻になり、「閉じた」はずの知らせが消えないことがあった。
 
-`sql\`now()\``（DBの時計）に直した（`apps/api/src/routes/auto-post.ts`）。テストの不安定さだけでなく、利用者が「閉じる」を押しても知らせが残る不具合でもあった。このPRのCIを塞ぐため、ここで直した。
+DBの時計（`now()`）に直した（`apps/api/src/routes/auto-post.ts`）。テストの不安定さだけでなく、利用者が「閉じる」を押しても知らせが残る不具合でもあった。このPRのCIを塞ぐため、ここで直した。
 
 ## 3. 計画からの変更
 
