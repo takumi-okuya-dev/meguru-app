@@ -8,6 +8,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Link, Navigate, useNavigate, useParams, useSearchParams } from "react-router";
 import { toast } from "sonner";
 import { ApiErrorScreen } from "@/components/ApiErrorScreen";
+import { EnvBanner } from "@/components/layout/EnvBanner";
 import { AccountAvatar } from "@/components/AccountAvatar";
 import { LoadingSkeleton } from "@/components/guards";
 import { Button } from "@/components/ui/button";
@@ -309,6 +310,7 @@ export function TeamSharedAccountPage() {
 
   return (
     <div className="flex min-h-svh flex-col">
+      <EnvBanner />
       <div
         role="status"
         className="flex flex-wrap items-center gap-3 border-b bg-muted px-4 py-2.5 text-sm md:px-6"

@@ -69,5 +69,5 @@ APP_ENV = "production"
 |---|---|---|
 | Clerk | 本番インスタンス（`app.<ドメイン>`。CNAMEは`clerk.`・`accounts.`） | 開発用インスタンス（許可したメールアドレスだけ） |
 | Meta（Threads） | `https://api.<ドメイン>/api/threads/callback` | ステージングのAPIのURL＋同じ道（同じMetaのアプリに両方登録） |
-| Stripe Webhook | 本番：`https://api.<ドメイン>/api/billing/webhook` | テスト用環境：ステージングのAPIのURL＋同じ道 |
+| Stripe Webhook | 本番：`https://api.<ドメイン>/api/stripe/webhook` | テスト用環境：ステージングのAPIのURL＋同じ道 |
 | Cloudflare Pages | `app.<ドメイン>`（`main`） | `staging.<ドメイン>`（`develop`のブランチの別名。DNSはproxy（オレンジの雲）） |

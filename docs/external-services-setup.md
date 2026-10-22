@@ -396,7 +396,8 @@ pnpm --filter api exec wrangler kv namespace create AUTOPOST_KV --env production
 3. ステージングにマイグレーションを当てます。
 
 ```bash
-DATABASE_URL='<ステージングの接続文字列>' pnpm --filter api db:migrate
+# drizzle-kit が読むのは DATABASE_URL_DIRECT（apps/api/drizzle.config.ts）
+DATABASE_URL_DIRECT='<ステージングの接続文字列>' pnpm --filter api db:migrate
 ```
 
 > 本番のマイグレーションは、`main`へのマージで`deploy.yml`が当てます（手で当てなくてよい）。
@@ -460,8 +461,8 @@ Pagesのプロジェクト → Custom domains。
 
 | Stripeの環境 | Webhookの送り先 |
 |---|---|
-| テスト用環境 | `https://<ステージングのAPIのURL>/api/billing/webhook` |
-| 本番 | `https://api.<ドメイン>/api/billing/webhook` |
+| テスト用環境 | `https://<ステージングのAPIのURL>/api/stripe/webhook` |
+| 本番 | `https://api.<ドメイン>/api/stripe/webhook` |
 
 3. `wrangler.toml`の`[env.staging].vars`・`[env.production].vars`の`STRIPE_PRICE_ID`（必要なら`STRIPE_PORTAL_CONFIGURATION_ID`・`STRIPE_TAX_RATE_ID`）を、それぞれの環境のIDにします。
 4. 公開の前に、今の利用者（開発者・テストユーザー）に料金なしの印を付けます（10-7）。

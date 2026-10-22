@@ -24,7 +24,7 @@
 ```text
 pnpm lint       成功
 pnpm typecheck  成功
-pnpm test       packages/shared 307 / apps/web 515 / apps/api 807　すべて成功（計1,629）
+pnpm test       packages/shared 307 / apps/web 519 / apps/api 807　すべて成功（計1,633）
 pnpm e2e        18 成功
 ```
 
@@ -35,7 +35,8 @@ pnpm e2e        18 成功
 | `wrangler.toml`の`[env.staging]`・`[env.production]`に`vars`・`kv_namespaces`・`triggers`がそろっている。ステージングと本番でWorkerの名前が違う。秘密情報が書かれていない | `apps/api/test/unit/wrangler-config.test.ts`（新規13件） | 成功 |
 | `APP_ENV`が無い・知らない値なら`CONFIG_ERROR`で止まる | `apps/api/test/unit/config.test.ts`（1件追加） | 成功 |
 | 記録（ログ）に`app_env`が入る。呼び出しごとの値で上書きされない | `apps/api/test/unit/logger.test.ts`（3件追加） | 成功 |
-| 帯が`production`以外で出る・知らない値でも本番の見た目にしない・閉じるボタンがない・ほかの帯より上 | `apps/web/test/env-banner.test.tsx`（新規6件） | 成功 |
+| 帯が`production`以外で出る・知らない値でも本番の見た目にしない・閉じるボタンがない・ほかの帯より上 | `apps/web/test/env-banner.test.tsx`（新規9件） | 成功 |
+| どの骨格（`AppShell`・`CenteredLayout`・`SettingsLayout`の3通り・`TeamSharedAccountPage`）でも帯が出る | 同上＋`apps/web/test/team-shared-account.test.tsx`（1件追加） | 成功 |
 | 375pxで帯がはみ出さず、上部バーの操作に重ならない。骨格の外の画面（利用規約）にも出る | `e2e/tests/phone-width.spec.ts`（1件追加） | 成功 |
 
 **T038（設定の抜けがないか）**
@@ -48,6 +49,18 @@ pnpm --filter api exec wrangler deploy --env production --dry-run  成功（同�
 **T035（リポジトリに秘密がないか）**：今のファイルと**全履歴**を、鍵の形（`sk_live_`・`pk_live_`・`whsec_`＋28文字以上・利用者名とパスワード付きの`postgres://`）で検索した。見つかったのは手元のDockerのDB（`postgres://postgres:postgres@…`）だけで、秘密情報ではない。
 
 **T036**：`.gitignore`に`.dev.vars`・`.env`・`.env.local`・`.env*`（`!.env.example`）が入っていることを確認。
+
+## 2-1. PR #19 のCodexレビュー（1回目、2026-10-22）
+
+5件（P1が2件・P2が3件）。すべて直した。
+
+| # | 深刻度 | 指摘 | 直し方 |
+|---|---|---|---|
+| 1 | P1 | `deploy.yml`が`DATABASE_URL`を渡していたが、drizzle-kitが読むのは`DATABASE_URL_DIRECT`（`apps/api/drizzle.config.ts`）。マイグレーションが手元のlocalhostに向かい、必ず失敗する | ワークフローと手順書9-5の両方で`DATABASE_URL_DIRECT`として渡す。`data-model.md` 3-3にも書いた |
+| 2 | P1 | 手順書9-10のStripeのWebhookの宛先が`/api/billing/webhook`になっていたが、実装は`POST /api/stripe/webhook`（`src/routes/stripe-webhook.ts`）。404になり、契約の状態が更新されない | `/api/stripe/webhook`に直した。`contracts/environments.md` 4も同じ誤りだったので直した |
+| 3 | P2 | 帯を`AppShell`・`CenteredLayout`・`PlainPage`にしか置いていなかった。`/settings/*`（`SettingsLayout`）と`/teams/:teamId/accounts/:accountId`（`TeamSharedAccountPage`）は自分で外枠を描くので、ステージングでも帯が出ない | 両方に置いた（`SettingsLayout`は2列・スマートフォンの一覧・スマートフォンの中身の3通り）。骨格ごとに帯が出ることをテストで固定し、`contracts/ui-routes.md`に「外枠になるものすべてに置く」「読み込み中と失敗の画面には置かない（入れ子で二重になる）」と書いた |
+| 4 | P2 | `workflow_dispatch`はどのブランチでも選べるので、`main`以外はすべてステージング扱いになり、未レビューのブランチをステージングに出せた | `main`・`develop`以外は、ワークフローの最初で止める |
+| 5 | P2 | 安全弁が秘密2つだけを見ていたので、Environmentの変数が欠けていてもデプロイしてしまう（空のClerkの鍵、`localhost`向きのWeb） | 必須6つ（秘密2・変数4）を見る。**1つも入っていなければ何もしない／一部だけなら止める**に変えた。あわせて`VITE_APP_ENV`が出す先と合っているかも見る |
 
 ## 3. 計画からの変更
 

@@ -72,7 +72,7 @@
 |---|---|---|
 | `CLOUDFLARE_API_TOKEN` | WorkersとPagesへのデプロイ | 秘：GitHubのEnvironment Secrets |
 | `CLOUDFLARE_ACCOUNT_ID` | 同上 | GitHubのEnvironmentの変数 |
-| `DATABASE_URL` | マイグレーションを当てる | 秘：GitHubのEnvironment Secrets |
+| `DATABASE_URL` | マイグレーションを当てる（ワークフローは`DATABASE_URL_DIRECT`として渡す。drizzle-kitがその名前を読むため） | 秘：GitHubのEnvironment Secrets |
 
 ## 4. 置き場所のきまり
 
