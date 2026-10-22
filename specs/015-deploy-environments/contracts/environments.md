@@ -5,7 +5,7 @@
 ## 1. `apps/api/wrangler.toml`の形
 
 ```toml
-name = "threads-grower-api"          # 手元（wrangler dev）で使う
+name = "threads-grower-api-dev"      # 手元（wrangler dev）とテストだけで使う。本番と名前を分ける
 main = "src/index.ts"
 compatibility_date = "…"
 compatibility_flags = ["nodejs_compat"]
@@ -44,7 +44,9 @@ APP_ENV = "production"
 …
 ```
 
-**きまり**：名前付きの環境は一番上の設定を受け継がない（R3）。`triggers`・`kv_namespaces`・`vars`は、**両方の環境に書き切る**。書き忘れを見つけるため、検査のスクリプトを置く（[quickstart.md](../quickstart.md) 3-1）。
+**きまり**：一番上の`name`は、本番・ステージングと**必ず違う名前**にする。同じにすると、`--env`を付けない`wrangler deploy`が、足りない設定のまま本番を上書きしてしまう（PR #19のCodexレビュー）。`apps/api`のスクリプトも`deploy:staging`・`deploy:production`だけにして、`--env`なしのデプロイを無くした。
+
+名前付きの環境は一番上の設定を受け継がない（R3）。`triggers`・`kv_namespaces`・`vars`は、**両方の環境に書き切る**。書き忘れを見つけるため、検査のスクリプトを置く（[quickstart.md](../quickstart.md) 3-1）。
 
 ## 2. 設定の確認（APIの起動時）
 

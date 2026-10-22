@@ -11,10 +11,10 @@
 1. **ドメイン**：ドメインを1つ買い、CloudflareのDNSに載せる（ネームサーバーをCloudflareに向ける）。
 2. **Neon**：プロジェクトを2つ作る（本番・ステージング）。それぞれの接続文字列を控える。ステージングにマイグレーションをすべて当てる。
 3. **Cloudflare**：
-   - **置き場所を作る**（このリポジトリはまだ一度もデプロイしていないので、実体がない）：Pagesのプロジェクトを作る（`pnpm --filter web exec wrangler pages project create threads-grower-web`。本番のブランチは`main`）。Workerは、最初の`wrangler deploy --env staging`／`--env production`で作られる。
    - デプロイ用のAPIトークンを作る（Workersの編集・Pagesの編集・KVの編集）。アカウントIDも控える。
-   - Workersの環境ごとのKVを作る（`wrangler kv namespace create AUTOPOST_KV --env staging` / `--env production`）。出た`id`を`wrangler.toml`に入れる。
-   - Pagesのプロジェクトに独自ドメインを当てる（本番＝`app.<ドメイン>`、ステージング＝`staging.<ドメイン>`をブランチの別名`develop`へ。DNSはproxy＝オレンジの雲）。
+   - 環境ごとのKVを作る（`pnpm --filter api exec wrangler kv namespace create AUTOPOST_KV --env staging` / `--env production`）。出た`id`を`wrangler.toml`に入れる。**Workerを出す前に行う**（`id`のnamespaceが無いとデプロイが拒まれる）。
+   - **置き場所を作る**（このリポジトリはまだ一度もデプロイしていないので、実体がない）：Pagesのプロジェクトを作る（`pnpm --filter api exec wrangler pages project create threads-grower-web --production-branch main`。wranglerは`apps/api`の依存なので`--filter api`から呼ぶ）。Workerは、最初の`pnpm --filter api deploy:staging`／`deploy:production`で作られる。
+   - Pagesのプロジェクトに独自ドメインを当てる（本番＝`app.<ドメイン>`、ステージング＝`staging.<ドメイン>`）。**ステージングは、足した後にCNAMEの向き先を`develop.threads-grower-web.pages.dev`に書き換える**（名前を足すだけでは本番の版が出る）。DNSはproxy＝オレンジの雲。
    - PagesのGit連携は使わない（Actionsからだけ出す）。Git連携で作っていたら切る。
 4. **Clerk**：本番インスタンスを作り、`clerk.`・`accounts.`のCNAMEをDNSに足す。GoogleのOAuthを自分の認証情報に差し替える。ステージング（開発用インスタンス）は、許可したメールアドレスだけ登録できる設定にする。
 5. **Meta**：今のアプリに、本番とステージングのコールバックのURLを両方登録する。

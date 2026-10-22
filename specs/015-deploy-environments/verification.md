@@ -24,8 +24,8 @@
 ```text
 pnpm lint       成功
 pnpm typecheck  成功
-pnpm test       packages/shared 307 / apps/web 519 / apps/api 807　すべて成功（計1,633）
-pnpm e2e        18 成功
+pnpm test       packages/shared 307 / apps/web 520 / apps/api 807　すべて成功（計1,634）
+pnpm e2e        19 成功
 ```
 
 この機能で足したテスト。
@@ -35,7 +35,7 @@ pnpm e2e        18 成功
 | `wrangler.toml`の`[env.staging]`・`[env.production]`に`vars`・`kv_namespaces`・`triggers`がそろっている。ステージングと本番でWorkerの名前が違う。秘密情報が書かれていない | `apps/api/test/unit/wrangler-config.test.ts`（新規13件） | 成功 |
 | `APP_ENV`が無い・知らない値なら`CONFIG_ERROR`で止まる | `apps/api/test/unit/config.test.ts`（1件追加） | 成功 |
 | 記録（ログ）に`app_env`が入る。呼び出しごとの値で上書きされない | `apps/api/test/unit/logger.test.ts`（3件追加） | 成功 |
-| 帯が`production`以外で出る・知らない値でも本番の見た目にしない・閉じるボタンがない・ほかの帯より上 | `apps/web/test/env-banner.test.tsx`（新規9件） | 成功 |
+| 帯が`production`以外で出る・知らない値でも本番の見た目にしない・閉じるボタンがない・ほかの帯より上 | `apps/web/test/env-banner.test.tsx`（新規10件） | 成功 |
 | どの骨格（`AppShell`・`CenteredLayout`・`SettingsLayout`の3通り・`TeamSharedAccountPage`）でも帯が出る | 同上＋`apps/web/test/team-shared-account.test.tsx`（1件追加） | 成功 |
 | 375pxで帯がはみ出さず、上部バーの操作に重ならない。骨格の外の画面（利用規約）にも出る | `e2e/tests/phone-width.spec.ts`（1件追加） | 成功 |
 
@@ -62,12 +62,32 @@ pnpm --filter api exec wrangler deploy --env production --dry-run  成功（同�
 | 4 | P2 | `workflow_dispatch`はどのブランチでも選べるので、`main`以外はすべてステージング扱いになり、未レビューのブランチをステージングに出せた | `main`・`develop`以外は、ワークフローの最初で止める |
 | 5 | P2 | 安全弁が秘密2つだけを見ていたので、Environmentの変数が欠けていてもデプロイしてしまう（空のClerkの鍵、`localhost`向きのWeb） | 必須6つ（秘密2・変数4）を見る。**1つも入っていなければ何もしない／一部だけなら止める**に変えた。あわせて`VITE_APP_ENV`が出す先と合っているかも見る |
 
+## 2-2. PR #19 のCodexレビュー（2回目・3回目、2026-10-22）
+
+7件（P1が6件・P2が1件）。すべて直した。
+
+| # | 深刻度 | 指摘 | 直し方 |
+|---|---|---|---|
+| 6 | P1 | 一番上の`name`が`[env.production].name`と同じなので、`--env`なしの`wrangler deploy`（`pnpm --filter api deploy`）が、`APP_ENV`もClerkもKVも足りない一番上の設定で**本番を上書き**する | 一番上を`threads-grower-api-dev`にして分けた。`package.json`の`deploy`を`deploy:staging`・`deploy:production`に置き換え、`--env`なしのデプロイを無くした。テストも「3つの名前がすべて違う」に直した |
+| 7 | P1 | 手順書の`pnpm --filter web exec wrangler …`は動かない（wranglerは`apps/api`の開発用の依存で、`--filter web`からは呼べない。`ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL`になる） | `pnpm --filter api exec wrangler …`に直した（quickstart・tasksも） |
+| 8 | P1 | 手順書の順番では、KVの`id`が`00000…`のままWorkerを出すので、最初のデプロイが拒まれる | 9-3（KV）と9-4（置き場所）を入れ替えた。T020・T022にも前後関係を書いた |
+| 9 | P1 | `BILLING_ENABLED=true`のとき、Stripeの鍵が`sk_test_`でも`sk_live_`でも通る。取り違えると、本番がテストの決済で動く／ステージングが本当のお客さまに課金する | `validateConfig`で、`APP_ENV`に合う種類の鍵かを見る（本番＝`live`、ステージングと手元＝`test`）。Clerkの秘密の鍵・公開鍵も同じ |
+| 10 | P2 | `AppShell`が帯を`banner`の仕組みにだけ載せていたので、上部バーを出さない画面（`/accounts/new`で既にアカウントがある人）には帯が出ない | `AppShell`が帯を**直接**出すようにした（サイドバーより上、画面のいちばん上）。`banner`からは外した。上部バーなしでも出ることをテストで固定 |
+| 11 | P1 | 安全弁がClerkの鍵の種類を見ないので、本番に`pk_test_`のままデプロイできる | 本番は`pk_live_`、ステージングは`pk_test_`を必須にした（4通りを手元のbashで確認） |
+| 12 | P1 | 9-9のとおりPagesに`staging.<ドメイン>`を足すだけでは、**本番の版**が出る。CNAMEの向き先を`develop.<プロジェクト>.pages.dev`に書き換える手順が抜けていた | 9-9に書き換えの手順とCloudflareの文書への参照を足した（quickstart・T023も） |
+
+## 2-3. ついでに直した、このfeatureの外の不具合
+
+`apps/api/test/integration/auto-post-status.test.ts`が、全部のテストを流したときにときどき落ちていた（2回連続）。原因は005の実装側で、`POST /api/accounts/:id/auto-post/notices/blocked/dismiss`が`blockedNoticeSeenAt`に`new Date()`（Workersの時計）を入れ、下書きの`blocked_at`はDBの`now()`で入っていたこと。Workersの`Date`は最後の入出力の時点で止まるので、直前に止められた下書きより**前**の時刻になり、「閉じた」はずの知らせが消えないことがあった。
+
+`sql\`now()\``（DBの時計）に直した（`apps/api/src/routes/auto-post.ts`）。テストの不安定さだけでなく、利用者が「閉じる」を押しても知らせが残る不具合でもあった。このPRのCIを塞ぐため、ここで直した。
+
 ## 3. 計画からの変更
 
 | 変えたこと | なぜ |
 |---|---|
 | `wrangler.toml`の`[env.*].vars`に、**見本の値**（`pk_test_xxx`・`https://api.example.com`など）を入れた | ドメインとClerkの本番インスタンスが決まるまで本物を書けない。見本の値のままだと今ある設定の確認（`src/lib/config.ts`）が`CONFIG_ERROR`で止めるので、入れ忘れに必ず気づく |
-| 一番上の`name`と`[env.production].name`を同じ（`threads-grower-api`）にした | [contracts/environments.md](./contracts/environments.md) 1のとおり。`--env`を付けない`wrangler deploy`は本番に出るので、`wrangler.toml`の先頭とREADMEに注意を書いた |
+| 一番上の`name`を`threads-grower-api-dev`にして、本番（`threads-grower-api`）と分けた | 当初は契約どおり本番と同じ名前にしたが、`--env`を付けない`wrangler deploy`が、足りない一番上の設定のまま**本番を上書き**してしまう（Codexレビュー2回目 P1）。あわせて`apps/api`のスクリプトを`deploy:staging`・`deploy:production`だけにした |
 | 読みもののページ（利用規約・特定商取引法の表記・トークンの作り方）を、ルーターの入れ物（`PlainPage`）で包んだ | 3つのファイルを作り変えずに、帯を画面の一番上に出すため。ルートの確認は`apps/web/test/helpers/routes.ts`の`isPublicPath`に寄せた |
 | Webのテストの既定を`VITE_APP_ENV=production`にした（`apps/web/vitest.config.ts`） | 既存の515件のテストに帯が割り込まないようにするため。帯そのものは`env-banner.test.tsx`で`vi.stubEnv`を使って確かめる |
 | 帯の`role`を`status`にした（`alert`ではなく） | ずっと出ている知らせなので。読むだけの帯（013）と同じ |

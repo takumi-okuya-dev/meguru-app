@@ -90,6 +90,21 @@ describe("どの骨格でも帯が出る", () => {
 
   afterEach(() => resetViewport());
 
+  it("AppShell（上部バーを出さない画面でも出る。PR #19 のCodexレビュー）", () => {
+    vi.stubEnv("VITE_APP_ENV", "staging");
+    setViewport(375);
+    render(
+      <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+        <MemoryRouter>
+          <AppShell>
+            <p>上部バーのない中身（アカウントを作る画面など）</p>
+          </AppShell>
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+    expect(screen.getByText(STAGING_TEXT)).toBeInTheDocument();
+  });
+
   it("AppShell（上部バーの下）", () => {
     vi.stubEnv("VITE_APP_ENV", "staging");
     // サイドバーを出さない幅にする（サイドバーは /api/me を読むので、この確認には要らない）

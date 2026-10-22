@@ -362,32 +362,33 @@ pnpm e2e
 3. 「Account Resources」は自分のアカウントだけに絞ります。作った**トークンの文字列は一度しか表示されません**。控えてください。
 4. ダッシュボードの右側（またはWorkersの画面）にある**Account ID**も控えます。
 
-### 9-3. Cloudflareに置き場所を作る（T022）
+### 9-3. KVを作る（T020・T029）
 
-ここで初めて、Cloudflare上に実体ができます。
-
-```bash
-# 1) Pagesのプロジェクト（Webの置き場所）。本番のブランチは main
-pnpm --filter web exec wrangler pages project create threads-grower-web --production-branch main
-
-# 2) ステージングのWorker（APIの置き場所）。最初のデプロイで作られる
-pnpm --filter api exec wrangler deploy --env staging
-```
-
-- どちらも、最初に`wrangler login`（ブラウザが開きます）が要ります。
-- 2)の時点では、環境変数が見本の値のままなので、APIを開いても`CONFIG_ERROR`になります。9-4以降で直します。
-- **PagesのGit連携は使いません**（GitHub Actionsからだけ出します）。画面から作ってGit連携を付けてしまった場合は、Pagesの Settings → Builds & deployments で切ってください。
-
-### 9-4. KVを作る（T020・T029）
-
-自動投稿の関所（specs/005）のKVを、環境ごとに作ります。
+自動投稿の関所（specs/005）のKVを、環境ごとに作ります。**Workerを出す前に作ります**（`wrangler.toml`に書いた`id`のnamespaceが無いと、デプロイが拒まれます）。
 
 ```bash
+# 最初に一度 `pnpm --filter api exec wrangler login`（ブラウザが開きます）
 pnpm --filter api exec wrangler kv namespace create AUTOPOST_KV --env staging
 pnpm --filter api exec wrangler kv namespace create AUTOPOST_KV --env production
 ```
 
 表示された`id`を、`apps/api/wrangler.toml`の`[[env.staging.kv_namespaces]]`・`[[env.production.kv_namespaces]]`の`id`に入れます（`00000000000000000000000000000000`を差し替える）。変更はPRでマージします。
+
+### 9-4. Cloudflareに置き場所を作る（T022）
+
+ここで初めて、Cloudflare上に実体ができます。**9-3のKVの`id`を入れ終えてから**行います。
+
+```bash
+# 1) Pagesのプロジェクト（Webの置き場所）。本番のブランチは main
+#    wrangler は apps/api の開発用の依存なので、--filter api から呼びます
+pnpm --filter api exec wrangler pages project create threads-grower-web --production-branch main
+
+# 2) ステージングのWorker（APIの置き場所）。最初のデプロイで作られる
+pnpm --filter api deploy:staging
+```
+
+- 2)の時点では、環境変数が見本の値のままなので、APIを開いても`CONFIG_ERROR`になります。9-5以降で直します。
+- **PagesのGit連携は使いません**（GitHub Actionsからだけ出します）。画面から作ってGit連携を付けてしまった場合は、Pagesの Settings → Builds & deployments で切ってください。
 
 ### 9-5. Neonのプロジェクトを2つ作る（T019・T028）
 
@@ -450,6 +451,7 @@ Pagesのプロジェクト → Custom domains。
 | 本番 | `app.<ドメイン>` | 本番（`main`） |
 | ステージング | `staging.<ドメイン>` | ブランチの別名`develop` |
 
+- **ステージングは、Pagesに名前を足すだけでは本番の版が出ます**。足した後に、CloudflareのDNSでその`staging`のCNAMEの**向き先を`develop.threads-grower-web.pages.dev`に書き換えます**（[Cloudflareの手順](https://developers.cloudflare.com/pages/how-to/custom-branch-aliases/)）。書き換えないと、ステージングのURLで本番のWeb（本番のAPIにつながる版）が出てしまいます。
 - DNSは**proxy（オレンジの雲）**にします。
 - APIのWorkerにも、Workers → 対象のWorker → Settings → Domains & Routes で`api.<ドメイン>`・`api-staging.<ドメイン>`を当てます。
 - 当てたURLに合わせて、`wrangler.toml`の`WEB_ORIGIN`と、GitHubの変数`VITE_API_BASE_URL`を直します。

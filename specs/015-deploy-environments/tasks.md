@@ -70,10 +70,10 @@ description: "作業の一覧：公開のためのブランチと環境"
 - [X] T017 [P] [US1] `apps/web/vite.config.ts`と`apps/web/index.html`：`VITE_APP_ENV`が`staging`のときだけ`<meta name="robots" content="noindex, nofollow">`を差し込む（FR-042）
 - [X] T018 [US1] `.github/workflows/deploy.yml`（新規）を書く（[contracts/deploy.md](./contracts/deploy.md) 2の手順。`on: push: branches: [develop, main]`、`environment`の出し分け、`concurrency`、マイグレーション → API（`wrangler deploy --env`）→ Web（`wrangler pages deploy --branch`）、`workflow_dispatch`も付ける）
 - [ ] T019 [US1] 【人】Neonでステージングのプロジェクトを作り、接続文字列をGitHubの`staging`のSecretsとCloudflareのシークレットに入れる。マイグレーションをすべて当てる
-- [ ] T020 [US1] 【人】ステージングのKVを作る（`wrangler kv namespace create AUTOPOST_KV --env staging`）。出た`id`を`wrangler.toml`の`[env.staging]`に入れる（T005の仮の値を差し替える）
+- [ ] T020 [US1] 【人】ステージングのKVを作る（`pnpm --filter api exec wrangler kv namespace create AUTOPOST_KV --env staging`）。出た`id`を`wrangler.toml`の`[env.staging]`に入れる（T005の仮の値を差し替える）。**T022より先に行う**（`id`のnamespaceが無いとデプロイが拒まれる）
 - [ ] T021 [US1] 【人】ステージングのCloudflareのシークレットを入れる（[data-model.md](./data-model.md) 3-1の「秘」。`wrangler secret put … --env staging`）
-- [ ] T022 [US1] 【人】Cloudflareに置き場所を作る：Pagesのプロジェクトを作り（`pnpm --filter web exec wrangler pages project create threads-grower-web`。本番のブランチを`main`にする）、ステージングのWorkerを最初のデプロイで作る（`pnpm --filter api exec wrangler deploy --env staging`）。このリポジトリはまだ一度もデプロイしていないので、ここで初めて実体ができる
-- [ ] T023 [US1] 【人】Cloudflare PagesのGit連携を切り（Git連携で作っていなければ何もしない）、`staging.<ドメイン>`を`develop`のブランチの別名に向ける（DNSはproxy。ドメインが未定の間は`develop.<プロジェクト>.pages.dev`で進める）
+- [ ] T022 [US1] 【人】Cloudflareに置き場所を作る（**T020の後**）：Pagesのプロジェクトを作り（`pnpm --filter api exec wrangler pages project create threads-grower-web --production-branch main`。wranglerは`apps/api`の依存）、ステージングのWorkerを最初のデプロイで作る（`pnpm --filter api deploy:staging`）。このリポジトリはまだ一度もデプロイしていないので、ここで初めて実体ができる
+- [ ] T023 [US1] 【人】Cloudflare PagesのGit連携を切り（Git連携で作っていなければ何もしない）、`staging.<ドメイン>`を`develop`のブランチの別名に向ける（Pagesに名前を足したあと、CNAMEの向き先を`develop.threads-grower-web.pages.dev`に書き換える。DNSはproxy。ドメインが未定の間は`develop.<プロジェクト>.pages.dev`で進める）
 - [ ] T024 [US1] 【人】Clerkの開発用インスタンスで、許可したメールアドレスだけ登録できる設定にし、テストユーザーを登録する（FR-021b）
 - [ ] T025 [US1] 【人】Metaのアプリに、ステージングのコールバックのURLを足す
 - [ ] T026 [US1] `develop`に小さな変更をマージして、[quickstart.md](./quickstart.md) 3-2の1〜6を通す（帯・許可していない人が入れない・ログインから自動投稿まで・本番のDBに入らない）。**マージからステージングで見えるまでの時間を測り、10分以内であることを記録する**（SC-001）

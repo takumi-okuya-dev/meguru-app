@@ -71,16 +71,12 @@ describe("wrangler.toml の環境ごとの設定", () => {
     expect(one(`env.${env}`)?.name).toBeDefined();
   });
 
-  it("ステージングと本番で、Workerの名前が違う（取り違えてデプロイしない）", () => {
-    const staging = one("env.staging")?.name;
-    const production = one("env.production")?.name;
-    expect(staging).toBeDefined();
-    expect(production).toBeDefined();
-    expect(staging).not.toBe(production);
-  });
-
-  it("一番上の name は本番と同じ（--env を付けない deploy は本番に出る。contracts/environments.md 1）", () => {
-    expect(one("")?.name).toBe(one("env.production")?.name);
+  it("手元・ステージング・本番で、Workerの名前がすべて違う（取り違えてデプロイしない）", () => {
+    // 一番上の name を本番と同じにすると、--env を付けない deploy が本番を
+    // 一番上の（足りない）設定で上書きしてしまう（PR #19 のCodexレビュー）
+    const names = [one("")?.name, one("env.staging")?.name, one("env.production")?.name];
+    expect(names.every(Boolean)).toBe(true);
+    expect(new Set(names).size).toBe(names.length);
   });
 
   it.each(ENVS)("[env.%s.triggers] に両方のCronがある", (env) => {

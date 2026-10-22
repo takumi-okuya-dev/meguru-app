@@ -41,37 +41,36 @@ export function AppShell({ children, banner = null }: { children: ReactNode; ban
     writeCollapsed(value);
   }, []);
 
-  // 環境の帯は、ほかのどの帯よりも上に出す（specs/015 contracts/ui-routes.md 1）
   const shell = useMemo<ShellState>(
     () => ({
       sidebarVisible,
       isWide,
       openSidebar: () => (isWide ? setCollapsedAndSave(false) : setDrawerOpen(true)),
-      banner: (
-        <>
-          <EnvBanner />
-          {banner}
-        </>
-      ),
+      banner,
     }),
     [sidebarVisible, isWide, banner, setCollapsedAndSave],
   );
 
+  // 環境の帯は骨格が直接出す（上部バーを出さない画面＝アカウントを作る、でも出すため。
+  // PR #19 のCodexレビュー）。ほかのどの帯よりも上になる
   return (
     <ShellContext.Provider value={shell}>
-      <div className="flex h-svh">
-        {sidebarVisible && (
-          <aside className="flex w-64 shrink-0 flex-col border-r bg-sidebar">
-            <Sidebar onCollapse={() => setCollapsedAndSave(true)} />
-          </aside>
-        )}
-        <Sheet open={drawerOpen && !sidebarVisible} onOpenChange={setDrawerOpen}>
-          <SheetContent className="w-[19rem] max-w-[85vw]">
-            <Sidebar onNavigate={() => setDrawerOpen(false)} />
-          </SheetContent>
-        </Sheet>
-        <div className="flex min-w-0 flex-1 flex-col overflow-y-auto" data-main-scroll>
-          {children}
+      <div className="flex h-svh flex-col">
+        <EnvBanner />
+        <div className="flex min-h-0 flex-1">
+          {sidebarVisible && (
+            <aside className="flex w-64 shrink-0 flex-col border-r bg-sidebar">
+              <Sidebar onCollapse={() => setCollapsedAndSave(true)} />
+            </aside>
+          )}
+          <Sheet open={drawerOpen && !sidebarVisible} onOpenChange={setDrawerOpen}>
+            <SheetContent className="w-[19rem] max-w-[85vw]">
+              <Sidebar onNavigate={() => setDrawerOpen(false)} />
+            </SheetContent>
+          </Sheet>
+          <div className="flex min-w-0 flex-1 flex-col overflow-y-auto" data-main-scroll>
+            {children}
+          </div>
         </div>
       </div>
     </ShellContext.Provider>

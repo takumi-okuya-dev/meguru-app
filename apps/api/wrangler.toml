@@ -2,9 +2,10 @@
 #
 # ⚠️ wrangler の名前付きの環境（[env.staging]・[env.production]）は、この一番上の設定を**受け継がない**。
 # vars・kv_namespaces・triggers は、どちらの環境にも書き切ること（書き忘れは test/unit/wrangler-config.test.ts で止まる）。
-# ⚠️ `wrangler deploy` を --env なしで実行すると**本番**に出る。必ず `--env staging` か `--env production` を付ける
-# （ふだんのデプロイは .github/workflows/deploy.yml から行う）。
-name = "threads-grower-api"
+# ⚠️ 一番上の設定は**手元（wrangler dev）とテストのためだけ**。名前も本番と分けてあるので、
+# `--env` を付けない `wrangler deploy` が本番を上書きすることはない。デプロイは必ず
+# `--env staging` か `--env production` を付ける（ふだんは .github/workflows/deploy.yml から）。
+name = "threads-grower-api-dev"
 main = "src/index.ts"
 compatibility_date = "2026-08-22"
 compatibility_flags = ["nodejs_compat"]

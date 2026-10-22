@@ -77,10 +77,17 @@ jobs:
             exit 1
           else
             # VITE_APP_ENV が、出す先の環境と合っているか（取り違えると帯が出ない・出たままになる）
-            case "${{ steps.env.outputs.wrangler }}:$VITE_APP_ENV" in
-              production:production|staging:staging) echo "ready=true" >> "$GITHUB_OUTPUT" ;;
+            if [ "$VITE_APP_ENV" != "${{ steps.env.outputs.wrangler }}" ]; then
+              echo "::error::VITE_APP_ENV（$VITE_APP_ENV）が、出す先（${{ steps.env.outputs.wrangler }}）と合っていません。"
+              exit 1
+            fi
+            # Clerkの公開鍵が、その環境のものか（本番は本番インスタンスの pk_live_、
+            # ステージングは開発用インスタンスの pk_test_）。APIの秘密の鍵のほうは src/lib/config.ts が見る
+            if [ "${{ steps.env.outputs.wrangler }}" = "production" ]; then want=pk_live_; else want=pk_test_; fi
+            case "$VITE_CLERK_PUBLISHABLE_KEY" in
+              "$want"*) echo "ready=true" >> "$GITHUB_OUTPUT" ;;
               *)
-                echo "::error::VITE_APP_ENV（$VITE_APP_ENV）が、出す先（${{ steps.env.outputs.wrangler }}）と合っていません。"
+                echo "::error::VITE_CLERK_PUBLISHABLE_KEY が ${want}… ではありません（${{ steps.env.outputs.wrangler }} なので ${want} が要ります）。"
                 exit 1
                 ;;
             esac

@@ -68,13 +68,13 @@ test("375pxで、環境の帯が上部バーの操作に重ならない", async 
   await expect(banner).toBeVisible();
   await expectNoOverflow(page, "環境の帯");
 
-  // 帯は上部バーの下にある（メニューのボタンに重ならない）
+  // 帯は画面のいちばん上（上部バーより上）にあり、メニューのボタンに重ならない
   const menu = page.getByRole("button", { name: "メニューを開く" });
   const menuBox = await menu.boundingBox();
   const bannerBox = await banner.boundingBox();
   expect(bannerBox, "帯の位置").not.toBeNull();
   expect(menuBox, "メニューのボタンの位置").not.toBeNull();
-  expect(bannerBox!.y).toBeGreaterThanOrEqual(menuBox!.y + menuBox!.height);
+  expect(bannerBox!.y + bannerBox!.height, "帯の下端はメニューのボタンより上").toBeLessThanOrEqual(menuBox!.y);
 
   // ログインの画面（骨格の外）でも、一番上に出る
   await page.goto("/terms");
