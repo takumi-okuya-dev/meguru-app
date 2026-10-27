@@ -119,13 +119,37 @@ Threads接続フローを始め、認可URLを返す（FR-008、FR-017、FR-020�
 
 ### GET /api/threads/callback
 
-Threadsの認可画面から戻ってくる先。ブラウザのトップレベル遷移で呼ばれるため、Clerkの認証は伴わない。本人の確認は`state`で行う（research.md R4）。
+Threadsの認可画面から戻ってくる先。ブラウザのトップレベル遷移で呼ばれるため、Clerkの認証は伴わない。
 
-- **認証**：不要（`state`で検証）
+**この経路は接続を済ませない**（2026-10-28に変更。セキュリティ監査run-1）。`state`と`code`を`{WEB_ORIGIN}/threads/complete`へ渡すだけで、DBにもThreadsにも触らない。接続の完了は、ログイン済みの`POST /api/threads/complete`で行う。
+
+変更の理由：`state`は32バイトの乱数・単回・10分・SHA-256保存なので「第三者が他人の`state`を推測・再生する」向きは防げるが、**`state`を作った人が自分からそれを第三者に踏ませる**向きは防げない。以前はこの経路が`state`の行の`user_id`をそのまま主体に持ち上げて接続まで書き込んでいたため、踏んだ人の認可で発行されたトークンが、作った人のアカウントに保存されてしまった。research.md R4は「第三者に悪用されない」ことを単回・短命・推測困難から論じていて、この逆向きを検討していない。
+
+- **認証**：不要（Metaからのトップレベル遷移で呼ばれる）
 - **クエリ**：
   - 許可されたとき：`code`、`state`
   - 拒否されたとき：`error`、`error_reason`、`state`
-- **処理**：research.md R3・R8の手順で処理し、成功・失敗のどちらでもWebへ`302`でリダイレクトする。
+- **処理**：クエリを`{WEB_ORIGIN}/threads/complete`へ`302`で渡すだけ。
+
+| 受け取ったもの | リダイレクト先 |
+|---|---|
+| `state`と`code` | `{WEB_ORIGIN}/threads/complete?state=…&code=…` |
+| `error`と`state` | `{WEB_ORIGIN}/threads/complete?state=…&error=THREADS_AUTH_CANCELLED` |
+| `error`のみ | `{WEB_ORIGIN}/threads/complete?error=THREADS_AUTH_CANCELLED` |
+| `state`か`code`が無い | `{WEB_ORIGIN}/threads/complete?error=THREADS_AUTH_FAILED` |
+
+### POST /api/threads/complete
+
+接続の完了（2026-10-28に追加）。**ログイン済みでしか呼べない**。
+
+- **認証**：必要
+- **本文**：`{ "state": "…", "code": "…" }`、または許可されなかったとき`{ "state": "…", "error": "THREADS_AUTH_CANCELLED" }`
+- **処理**：`state`を使い切り、その行の`user_id`がClerkで確かめた呼び出し元と**一致することを要求する**。一致しなければ`400 OAUTH_STATE_INVALID`。`state`が無い場合と他人の`state`の場合で、応答のコードも文面も**区別しない**（区別すると`state`の存在を確かめる手がかりになる）。ログには分けて残す。
+- **応答**：`200 { "redirectTo": "/…" }`。行き先はサーバーが決める（下の表はその値）。必ず`/`で始まるこのアプリの中の相対パス。Web側は`//`で始まるものを使わない。
+
+既知の性質：Metaの画面にいる間にClerkのセッションが切れていると、`/threads/complete`が`/sign-in`へ送られ、`state`と`code`を失う（接続をやり直す）。Metaへの往復は数秒で、`state`自体10分で切れるため、受容する。
+
+以前この経路が`GET /api/threads/callback`にあったときのリダイレクト先の表は、そのまま`redirectTo`の値として引き継いでいる。
 
 | 結果 | リダイレクト先 |
 |---|---|

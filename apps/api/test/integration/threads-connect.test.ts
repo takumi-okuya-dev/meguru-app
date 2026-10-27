@@ -142,7 +142,9 @@ describe("GET /api/threads/callback（mode = connect）", () => {
     expect(await db().select().from(threadsConnections)).toHaveLength(0);
   });
 
-  it("同じ state で2回目の callback は OAUTH_STATE_INVALID で、振り分け（/）へ", async () => {
+  // 接続の完了は、ログイン済みの POST /api/threads/complete に移した（セキュリティ監査 run-1）。
+  // callback は state と code を Web へ渡すだけなので、state の良し悪しはそちらで判断する
+  it("同じ state で2回目の完了は OAUTH_STATE_INVALID で、振り分け（/）へ", async () => {
     const { accountId } = await createAccountVia(app, "u1");
     const res = await call(app, "POST", "/api/threads/connect", { user: "u1", body: { mode: "connect", accountId } });
     const { authorizeUrl } = (await res.json()) as { authorizeUrl: string };
@@ -150,18 +152,23 @@ describe("GET /api/threads/callback（mode = connect）", () => {
     url.searchParams.set("fake_action", "allow");
     const authRes = await fetch(url, { redirect: "manual" });
     const cb = new URL(authRes.headers.get("Location")!);
-    const first = await app.request(`${cb.pathname}${cb.search}`, {}, testEnv);
-    expect(redirectTarget(first).searchParams.get("connected")).toBe("connect");
-    const second = await app.request(`${cb.pathname}${cb.search}`, {}, testEnv);
-    expect(redirectTarget(second).pathname).toBe("/");
-    expect(redirectTarget(second).searchParams.get("error")).toBe("OAUTH_STATE_INVALID");
+    const hop = await app.request(`${cb.pathname}${cb.search}`, {}, testEnv);
+    const next = new URL(hop.headers.get("Location")!);
+    const body = { state: next.searchParams.get("state"), code: next.searchParams.get("code") };
+
+    const first = await call(app, "POST", "/api/threads/complete", { user: "u1", body });
+    expect(((await first.json()) as { redirectTo: string }).redirectTo).toContain("connected=connect");
+    const second = await call(app, "POST", "/api/threads/complete", { user: "u1", body });
+    expect(second.status).toBe(400);
+    expect(((await second.json()) as { error: { code: string } }).error.code).toBe("OAUTH_STATE_INVALID");
   });
 
-  it("state がなければ OAUTH_STATE_INVALID で / へ", async () => {
+  it("state がなければ、callback は理由だけを付けて完了の画面へ送る", async () => {
     const res = await call(app, "GET", "/api/threads/callback?code=abc");
     const target = redirectTarget(res);
-    expect(target.pathname).toBe("/");
-    expect(target.searchParams.get("error")).toBe("OAUTH_STATE_INVALID");
+    expect(target.pathname).toBe("/threads/complete");
+    expect(target.searchParams.get("error")).toBe("THREADS_AUTH_FAILED");
+    expect(target.searchParams.get("code")).toBeNull();
   });
 
   it("012 より前の mode = new の state は OAUTH_STATE_INVALID（公開の時点で10分以内に始めたもの）", async () => {
@@ -174,10 +181,9 @@ describe("GET /api/threads/callback（mode = connect）", () => {
     await db()
       .insert(oauthStates)
       .values({ stateHash: await sha256Hex(state), userId: u!.id, mode: "new", targetAccountId: null, expiresAt: new Date(now + 600_000), createdAt: new Date(now) });
-    const res = await call(app, "GET", `/api/threads/callback?state=${state}&code=abc`);
-    const target = redirectTarget(res);
-    expect(target.pathname).toBe("/");
-    expect(target.searchParams.get("error")).toBe("OAUTH_STATE_INVALID");
+    const res = await call(app, "POST", "/api/threads/complete", { user: "u1", body: { state, code: "abc" } });
+    const { redirectTo } = (await res.json()) as { redirectTo: string };
+    expect(redirectTo).toBe("/?error=OAUTH_STATE_INVALID");
     expect(await db().select().from(accounts)).toHaveLength(0);
   });
 

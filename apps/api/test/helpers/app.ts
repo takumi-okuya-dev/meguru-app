@@ -139,11 +139,23 @@ export const fake = {
       .containers,
 };
 
-/** connect で得た authorizeUrl から、偽の認可画面で許可/拒否し、APIのcallbackを呼んだ結果（302）を返す */
+/**
+ * connect で得た authorizeUrl から、偽の認可画面で許可/拒否し、接続を完了させる。
+ *
+ * 完了は無認証の callback ではなく、ログイン済みの `POST /api/threads/complete` で行う
+ * （セキュリティ監査 run-1）。呼び出し側を変えずに済むよう、ここで state の作成者を
+ * DBから引いて、その人として完了させる。本来の流れ（自分で始めて自分で終える）と同じ。
+ * 「他人の state を踏ませる」側は、complete を直接呼ぶ試験で確かめる。
+ *
+ * @param app - テストのアプリ
+ * @param authorizeUrl - connect が返した認可URL
+ * @param opts - 偽の認可画面の挙動と、完了を行う利用者（既定は state の作成者）
+ * @returns 302 の応答（Location は以前の callback と同じ行き先）
+ */
 export async function authorizeAndCallback(
   app: TestApp,
   authorizeUrl: string,
-  opts: { fakeUser?: string; action?: "allow" | "deny" } = {},
+  opts: { fakeUser?: string; action?: "allow" | "deny"; user?: string } = {},
 ) {
   const url = new URL(authorizeUrl);
   url.searchParams.set("fake_action", opts.action ?? "allow");
@@ -152,8 +164,46 @@ export async function authorizeAndCallback(
   const location = res.headers.get("Location");
   if (!location) throw new Error(`fake authorize did not redirect: ${res.status}`);
   const cb = new URL(location);
-  return app.request(`${cb.pathname}${cb.search}`, { method: "GET" }, testEnv);
+  // callback は転送するだけ（DBにも Threads にも触らない）
+  const hop = await app.request(`${cb.pathname}${cb.search}`, { method: "GET" }, testEnv);
+  const next = new URL(hop.headers.get("Location")!);
+  const state = next.searchParams.get("state");
+  const code = next.searchParams.get("code");
+  const error = next.searchParams.get("error");
+  // state を持たずに戻ってくる場合（code も error も無い）はそのまま返す
+  if (!state) return redirectResponse(`${next.pathname}${next.search}`);
+
+  const user = opts.user ?? (await stateOwner(state));
+  // 許可しなかったときも state を渡して、元のアカウントの画面へ戻してもらう
+  const body = error ? { state, error } : { state, code };
+  const done = await call(app, "POST", "/api/threads/complete", { user, body });
+  if (!done.ok) return done;
+  const { redirectTo } = (await done.json()) as { redirectTo: string };
+  return redirectResponse(redirectTo);
 }
+
+/**
+ * state を作った利用者の clerk_user_id を引く（テストの便宜。本番にこの経路は無い）。
+ * @param state - 認可URLに入っていた state の平文
+ * @returns clerk_user_id
+ */
+async function stateOwner(state: string): Promise<string> {
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(state));
+  const hash = [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, "0")).join("");
+  const rows = (await neon(testEnv.DATABASE_URL)`
+    SELECT u.clerk_user_id FROM oauth_states s JOIN users u ON u.id = s.user_id
+    WHERE s.state_hash = ${hash}`) as { clerk_user_id: string }[];
+  if (!rows[0]) throw new Error("state が見つかりません（作成者を引けません）");
+  return rows[0].clerk_user_id;
+}
+
+/**
+ * 以前の callback と同じ形（302 と Location）の応答を作る。呼び出し側の assert を変えずに済む。
+ * @param to - 行き先（アプリの中の相対パス）
+ * @returns 302 の応答
+ */
+const redirectResponse = (to: string) =>
+  new Response(null, { status: 302, headers: { Location: `${testEnv.WEB_ORIGIN.replace(/\/$/, "")}${to}` } });
 
 /**
  * 名前だけでアカウントを作る（POST /api/accounts。specs/012）。
