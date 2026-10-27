@@ -68,3 +68,17 @@ describe("規約に注意（specs/004-review-approval FR-038、contracts/policy-
     expect(r.approvable).toBe(true);
   });
 });
+
+// 規約に注意の側も同じ正準形を使うので、同時に直る（セキュリティ監査 run-1）。
+// 検証で分かった制約：NEAR が群と群の間の1文字を吸収するので、回避には
+// リテラルのトークンの内部に挟む必要があった
+describe("見えない文字を挟んだ規約に注意", () => {
+  it.each(["\u200b", "\ufe0f"])("リテラルの中に %j を挟んでも当たる", (invisible) => {
+    expect(findPolicyCautions(`誰でも必${invisible}ず稼げる方法`)).not.toEqual([]);
+    expect(findPolicyCautions(`元本${invisible}保証で安心`)).not.toEqual([]);
+  });
+
+  it("群と群の間に挟まれた場合は、元から当たっていた（NEAR が吸収する）", () => {
+    expect(findPolicyCautions("誰でも必ず\u200b稼げる方法")).not.toEqual([]);
+  });
+});

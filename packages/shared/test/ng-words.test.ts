@@ -53,3 +53,27 @@ describe("濁点の付いた半角カナ（PR #5 のCodexレビュー）", () =>
     expect(findNgWords("今日もガンバル", ng("ｶﾞﾝﾊﾞﾙ"))).toHaveLength(1);
   });
 });
+
+// 1文字の見えない文字で照合をすり抜けさせない（セキュリティ監査 run-1）。
+// 本文を書くのに要る権限は content だけで、NGワードの登録は settings、承認は review。
+// つまりオーナーが禁止した語を、編集者が「きれいに見える下書き」として通せていた
+describe("見えない文字を挟んだNGワード", () => {
+  it.each(["\u200b", "\u200c", "\u200d", "\u00ad", "\u2060", "\ufeff", "\ufe0f", "\u034f"])(
+    "%j を語の中に挟んでも検知する",
+    (invisible) => {
+      const hits = findNgWords(`絶${invisible}対に稼げる`, ng("絶対"));
+      expect(hits).toHaveLength(1);
+      expect(hits[0]?.word).toBe("絶対");
+      // 強調する範囲は、挟まれた見えない文字も含む
+      expect(hits[0]?.ranges[0]).toEqual([0, 2 + invisible.length]);
+    },
+  );
+
+  it("登録した語の側に挟まっていても検知する", () => {
+    expect(findNgWords("絶対に稼げる", ng("絶\u200b対"))).toHaveLength(1);
+  });
+
+  it("まとめる単位を割る挟み込みも検知する", () => {
+    expect(findNgWords("今日もｶ\u200bﾞﾝﾊﾞﾙ", ng("ガンバル"))).toHaveLength(1);
+  });
+});
