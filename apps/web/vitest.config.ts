@@ -9,6 +9,8 @@ export default defineConfig({
   },
   test: {
     environment: "jsdom",
+    // テストの既定は本番（環境の帯を出さない）。帯そのものは test/env-banner.test.tsx で確かめる
+    env: { VITE_APP_ENV: "production" },
     setupFiles: ["./test/setup.ts"],
     include: ["test/**/*.test.{ts,tsx}"],
   },

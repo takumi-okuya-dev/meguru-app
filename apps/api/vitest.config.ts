@@ -36,6 +36,10 @@ export default defineConfig({
         // マイグレーションのテスト（specs/011 T004）。使い捨てのDBに pg で直接つなぐので、Workers の外（Node）で動かす
         test: { name: "migration", include: ["test/migration/**/*.test.ts"], environment: "node", testTimeout: 60_000 },
       },
+      {
+        // リポジトリの設定ファイルの検査（.github/workflows など）。ファイルを直に読むので Node で動かす
+        test: { name: "repo", include: ["test/repo/**/*.test.ts"], environment: "node" },
+      },
     ],
   },
 });

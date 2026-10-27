@@ -2,6 +2,7 @@
 // 1024px以上はサイドバーを常に出して畳める（状態は localStorage）。未満はドロワーで画面の上に重ねて開く。
 import { useCallback, useMemo, useState, type ReactNode } from "react";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
+import { EnvBanner } from "./EnvBanner";
 import { LG_QUERY, useMediaQuery } from "@/lib/use-media-query";
 import { ShellContext, type ShellState } from "./shell-context";
 import { Sidebar } from "./Sidebar";
@@ -50,21 +51,26 @@ export function AppShell({ children, banner = null }: { children: ReactNode; ban
     [sidebarVisible, isWide, banner, setCollapsedAndSave],
   );
 
+  // 環境の帯は骨格が直接出す（上部バーを出さない画面＝アカウントを作る、でも出すため。
+  // PR #19 のCodexレビュー）。ほかのどの帯よりも上になる
   return (
     <ShellContext.Provider value={shell}>
-      <div className="flex h-svh">
-        {sidebarVisible && (
-          <aside className="flex w-64 shrink-0 flex-col border-r bg-sidebar">
-            <Sidebar onCollapse={() => setCollapsedAndSave(true)} />
-          </aside>
-        )}
-        <Sheet open={drawerOpen && !sidebarVisible} onOpenChange={setDrawerOpen}>
-          <SheetContent className="w-[19rem] max-w-[85vw]">
-            <Sidebar onNavigate={() => setDrawerOpen(false)} />
-          </SheetContent>
-        </Sheet>
-        <div className="flex min-w-0 flex-1 flex-col overflow-y-auto" data-main-scroll>
-          {children}
+      <div className="flex h-svh flex-col">
+        <EnvBanner />
+        <div className="flex min-h-0 flex-1">
+          {sidebarVisible && (
+            <aside className="flex w-64 shrink-0 flex-col border-r bg-sidebar">
+              <Sidebar onCollapse={() => setCollapsedAndSave(true)} />
+            </aside>
+          )}
+          <Sheet open={drawerOpen && !sidebarVisible} onOpenChange={setDrawerOpen}>
+            <SheetContent className="w-[19rem] max-w-[85vw]">
+              <Sidebar onNavigate={() => setDrawerOpen(false)} />
+            </SheetContent>
+          </Sheet>
+          <div className="flex min-w-0 flex-1 flex-col overflow-y-auto" data-main-scroll>
+            {children}
+          </div>
         </div>
       </div>
     </ShellContext.Provider>
@@ -77,5 +83,10 @@ export function AppShell({ children, banner = null }: { children: ReactNode; ban
  * @returns 中央寄せの骨格
  */
 export function CenteredLayout({ children }: { children: ReactNode }) {
-  return <div className="flex min-h-svh items-center justify-center px-4 py-10">{children}</div>;
+  return (
+    <div className="flex min-h-svh flex-col">
+      <EnvBanner />
+      <div className="flex flex-1 items-center justify-center px-4 py-10">{children}</div>
+    </div>
+  );
 }

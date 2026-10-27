@@ -11,12 +11,11 @@ vi.mock("@clerk/react", () => ({
 const { TermsPage } = await import("@/pages/terms");
 const { SignInPage } = await import("@/pages/sign-in");
 const { routes } = await import("@/router");
+const { isPublicPath } = await import("./helpers/routes");
 
 describe("利用規約", () => {
   it("ログインなしで開けるルートにある", () => {
-    const terms = routes.find((r) => r.path === "/terms");
-    expect(terms).toBeDefined();
-    expect("children" in terms!).toBe(false);
+    expect(isPublicPath(routes, "/terms")).toBe(true);
   });
 
   it("トークンでの接続の扱い・禁止事項・データの削除・最終更新日を書く", () => {

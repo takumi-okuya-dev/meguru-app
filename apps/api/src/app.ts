@@ -5,7 +5,7 @@ import { cors } from "hono/cors";
 import type { Env } from "./env";
 import { validateConfig } from "./lib/config";
 import { AppError } from "./lib/errors";
-import { logger } from "./lib/logger";
+import { logger, setLogAppEnv } from "./lib/logger";
 import {
   authMiddleware,
   optionalAuthMiddleware,
@@ -69,6 +69,12 @@ export function createApp(deps: AppDeps = defaultDeps) {
       credentials: false,
     });
     return corsMiddleware(c, next);
+  });
+
+  // どの環境の記録かが分かるようにする（specs/015 FR-026）
+  app.use("*", async (c, next) => {
+    setLogAppEnv(c.env.APP_ENV);
+    return next();
   });
 
   // 設定の確認。誤りがあれば、どの項目が悪いか（項目名だけ）をログに1回出し、CONFIG_ERROR を返す。

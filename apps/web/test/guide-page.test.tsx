@@ -7,12 +7,11 @@ vi.mock("@clerk/react", () => ({ SignIn: () => null, useAuth: () => ({ isLoaded:
 
 const { GuideThreadsTokenPage } = await import("@/pages/guide-threads-token");
 const { routes } = await import("@/router");
+const { isPublicPath } = await import("./helpers/routes");
 
 describe("トークンの作り方", () => {
   it("ログインなしで開けるルートにある", () => {
-    const guide = routes.find((r) => r.path === "/guide/threads-token");
-    expect(guide).toBeDefined();
-    expect("children" in guide!).toBe(false);
+    expect(isPublicPath(routes, "/guide/threads-token")).toBe(true);
   });
 
   it("はじめに・6つの手順・取り消し・うまくいかないとき、各手順の目的、確かめた日が出る", () => {

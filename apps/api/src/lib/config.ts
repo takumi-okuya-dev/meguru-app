@@ -4,6 +4,33 @@
 import type { Env } from "../env";
 import { createTokenCipher } from "./crypto";
 
+/** APP_ENV に入れてよい値（specs/015-deploy-environments contracts/environments.md 2）。 */
+const APP_ENVS: readonly string[] = ["production", "staging", "development"];
+
+/**
+ * その環境で使うべき鍵の種類を返す（specs/015。PR #19 のCodexレビュー）。
+ * 本番は本番の鍵（live）、ステージングと手元はテスト用の鍵（test）。取り違えると、
+ * 本番がテストの利用者名簿で動く・ステージングが本当のお客さまに課金する、といった事故になる。
+ * @param appEnv - APP_ENV の値
+ * @returns "live" か "test"。APP_ENV が不正なら null（その場合は APP_ENV の指摘だけを出す）
+ */
+function keyModeOf(appEnv: string): "live" | "test" | null {
+  if (appEnv === "production") return "live";
+  if (appEnv === "staging" || appEnv === "development") return "test";
+  return null;
+}
+
+/**
+ * 鍵が、その環境の種類（live／test）と合っているかを見る。
+ * @param value - 鍵の値
+ * @param mode - その環境で使うべき種類
+ * @returns 合っていれば true
+ */
+function matchesKeyMode(value: string | undefined, mode: "live" | "test" | null): boolean {
+  if (mode === null || !value) return true;
+  return value.startsWith(`sk_${mode}_`) || value.startsWith(`pk_${mode}_`);
+}
+
 const PLACEHOLDERS = ["sk_test_xxx", "pk_test_xxx", "xxxxxxxx", "000000000000000", "whsec_xxx", "price_xxx"];
 
 function isPlaceholder(v: string | undefined): boolean {
@@ -52,10 +79,22 @@ function usesRealThreads(env: Env): boolean {
 export function validateConfig(env: Env): string[] {
   const problems: string[] = [];
 
-  if (isPlaceholder(env.CLERK_SECRET_KEY) || !/^sk_(test|live)_[A-Za-z0-9]{20,}$/.test(env.CLERK_SECRET_KEY)) {
+  // どの環境かは必ず明示する（未設定のまま本番の値で動かさない。specs/015 FR-026）
+  if (!APP_ENVS.includes(env.APP_ENV)) problems.push("APP_ENV");
+  const keyMode = keyModeOf(env.APP_ENV);
+
+  if (
+    isPlaceholder(env.CLERK_SECRET_KEY) ||
+    !/^sk_(test|live)_[A-Za-z0-9]{20,}$/.test(env.CLERK_SECRET_KEY) ||
+    !matchesKeyMode(env.CLERK_SECRET_KEY, keyMode)
+  ) {
     problems.push("CLERK_SECRET_KEY");
   }
-  if (isPlaceholder(env.CLERK_PUBLISHABLE_KEY) || !/^pk_(test|live)_[A-Za-z0-9+/=$_-]{10,}$/.test(env.CLERK_PUBLISHABLE_KEY)) {
+  if (
+    isPlaceholder(env.CLERK_PUBLISHABLE_KEY) ||
+    !/^pk_(test|live)_[A-Za-z0-9+/=$_-]{10,}$/.test(env.CLERK_PUBLISHABLE_KEY) ||
+    !matchesKeyMode(env.CLERK_PUBLISHABLE_KEY, keyMode)
+  ) {
     problems.push("CLERK_PUBLISHABLE_KEY");
   }
   try {
@@ -76,7 +115,11 @@ export function validateConfig(env: Env): string[] {
   // 決済のON/OFFは必須。未設定で黙ってOFFにしない（specs/013 FR-063）
   if (env.BILLING_ENABLED !== "true" && env.BILLING_ENABLED !== "false") problems.push("BILLING_ENABLED");
   if (env.BILLING_ENABLED === "true") {
-    if (isPlaceholder(env.STRIPE_SECRET_KEY) || !/^sk_(test|live)_[A-Za-z0-9]{10,}$/.test(env.STRIPE_SECRET_KEY ?? "")) {
+    if (
+      isPlaceholder(env.STRIPE_SECRET_KEY) ||
+      !/^sk_(test|live)_[A-Za-z0-9]{10,}$/.test(env.STRIPE_SECRET_KEY ?? "") ||
+      !matchesKeyMode(env.STRIPE_SECRET_KEY, keyMode)
+    ) {
       problems.push("STRIPE_SECRET_KEY");
     }
     if (isPlaceholder(env.STRIPE_WEBHOOK_SECRET) || !/^whsec_[A-Za-z0-9]{10,}$/.test(env.STRIPE_WEBHOOK_SECRET ?? "")) {

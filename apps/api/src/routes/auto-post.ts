@@ -1,4 +1,5 @@
 // /api/accounts/:accountId/auto-post（自動投稿の状態と知らせ。specs/005-auto-post FR-018・FR-022、contracts/api.md）。
+import { sql } from "drizzle-orm";
 import { Hono, type MiddlewareHandler } from "hono";
 import type { AppEnv } from "../app";
 import { createDb } from "../db/client";
@@ -23,7 +24,9 @@ export function autoPostRoutes(authed: MiddlewareHandler<AppEnv>) {
       const db = createDb(c.env.DATABASE_URL);
       const access = await authorizeAccount(db, c.get("user"), c.req.param("accountId"), "review");
       const account = access.account;
-      const now = new Date();
+      // 時刻はDBの時計で入れる。Workers の Date は最後の入出力の時点で止まるので、
+      // 直前に `blocked_at = now()` で止められた下書きより前の時刻になり、知らせが消えないことがある
+      const now = sql`now()`;
       await db
         .insert(postingSchedules)
         .values({ accountId: account.id, blockedNoticeSeenAt: now })

@@ -317,20 +317,212 @@ pnpm e2e
 
 ---
 
-## 9. 本番公開時の追加作業（今は不要）
+## 9. 公開のための準備（ステージングと本番）
 
-検証段階では不要です。Constitutionの`TODO(COMMERCIAL_LAUNCH_GATE)`の時点で行います。
+**これは[specs/015-deploy-environments](../specs/015-deploy-environments/)の【人】の作業（全19件）の手順です。上から順に進めれば、ステージングと本番がそろいます。**
 
-- **Clerk**：本番インスタンスを作り、Google Cloud ConsoleでOAuthクライアント（種類は「ウェブアプリケーション」）を作成して、ClerkのGoogle接続で「Use custom credentials」をオンにする。Clerkの画面に出る「Authorized Redirect URI」を、Google側の「承認済みのリダイレクトURI」に登録する。
-- **Meta**：App Review（各権限の用途の説明）と、必要に応じてビジネス認証。データ削除の状況確認ページの中身も、この時点で見直す（[research.md R7](../specs/001-login-account-setup/research.md)）。
-- **Cloudflare**：APIをWorkersにデプロイし、秘密情報は`wrangler secret put`で設定する。WebはCloudflare Pagesにデプロイする。
-  - 自動投稿（005）の関所のKVを作る：`pnpm --filter api exec wrangler kv namespace create AUTOPOST_KV`。表示された`id`を、`apps/api/wrangler.toml`の`[[kv_namespaces]]`の`id`に入れる（ローカルとテストは、入れなくても動く）。
-- **Neon**：本番のDBを作り、`DATABASE_URL`を本番の接続文字列にする。
-- 本番用のURLで、3-3の3つのURLと`THREADS_REDIRECT_URI`・`WEB_ORIGIN`を設定し直す。
-- **事業者としての手続き（決済。specs/013-billing）**：アプリの外で、公開の前に決めて済ませておく。
-  - **適格請求書（インボイス）**：適格請求書発行事業者に登録するかを決める。登録したら、Stripeの本番の領収書・請求書の設定に登録番号（T＋13桁）を入れ、税率ごとの消費税の額が出ることを、テスト用環境の領収書で確かめる。登録しないなら、登録番号は載せない。どちらでも、アプリのコードと料金（税込み）は変わらない。
-  - **特定商取引法に基づく表記**：販売者の名前・住所・連絡先などを決め、表記のページに入れる（013 FR-071）。値は`apps/web/src/lib/seller-info.ts`に入れる。住所・電話番号は「請求があれば遅滞なく開示します」と書く形も選べる。
-- **Stripe**：「10. Stripe」の手順を本番（`sk_live_`）で行い、`BILLING_ENABLED=true`にする。公開の前に、今の利用者（開発者・テストユーザー）に料金なしの印を付ける（10-7）。
+- 入れる値の一覧と置き場所は[data-model.md](../specs/015-deploy-environments/data-model.md) 3の表。
+- 確かめ方は[quickstart.md](../specs/015-deploy-environments/quickstart.md) 3。
+- 作業のIDは`specs/015-deploy-environments/tasks.md`のもの。終わったらそこに印を付けます。
+
+### 9-0. 先に知っておくこと
+
+- **このリポジトリは、まだ一度もデプロイしていません**。Cloudflare上にWorkerもPagesのプロジェクトも「ありません」。9-3で作ります。
+- `apps/api/wrangler.toml`の`[env.staging]`・`[env.production]`には、**見本の値**（`pk_test_xxx`・`https://api.example.com`など）が入っています。本物に差し替えるまで、デプロイできてもAPIは`CONFIG_ERROR`で止まります（入れ忘れに気づくための仕掛けです）。
+- **ドメインが決まるまで**は、Cloudflareの既定のURL（`*.pages.dev`・`*.workers.dev`）でステージングまで進められます。独自ドメインが要るのは、Clerkの本番インスタンス（9-7）だけです。
+- 増える固定費は**ドメイン代（年に数千円）だけ**です（[docs/cost-estimate.md](./cost-estimate.md)）。
+
+### 9-1. ドメインを買い、Cloudflareに載せる（T027）
+
+1. ドメインを1つ買います（お名前.com・Cloudflare Registrarなど）。
+2. CloudflareにサイトとしてSite（ゾーン）を追加し、**ネームサーバーをCloudflareに向けます**（買った先の管理画面で変更。反映に数時間かかることがあります）。
+3. 名前を決めます。以降の`<ドメイン>`はこれです。
+
+| 使い道 | 名前の例 |
+|---|---|
+| 本番のWeb | `app.<ドメイン>` |
+| 本番のAPI | `api.<ドメイン>` |
+| ステージングのWeb | `staging.<ドメイン>` |
+| ステージングのAPI | `api-staging.<ドメイン>` |
+| Clerkの本番インスタンス | `clerk.<ドメイン>`・`accounts.<ドメイン>`（CNAMEはClerkが指示） |
+
+> ドメインを後回しにする場合は、9-1と9-7を飛ばし、ステージングまでを既定のURLで進めてください。
+
+### 9-2. CloudflareのAPIトークンとアカウントID（T010）
+
+1. Cloudflareのダッシュボード → 右上のアカウント → **API Tokens** → Create Token → Create Custom Token。
+2. 権限（Permissions）を3つ付けます。
+
+| 種類 | 対象 | 権限 |
+|---|---|---|
+| Account | Workers Scripts | Edit |
+| Account | Cloudflare Pages | Edit |
+| Account | Workers KV Storage | Edit |
+
+3. 「Account Resources」は自分のアカウントだけに絞ります。作った**トークンの文字列は一度しか表示されません**。控えてください。
+4. ダッシュボードの右側（またはWorkersの画面）にある**Account ID**も控えます。
+
+### 9-3. KVを作る（T020・T029）
+
+自動投稿の関所（specs/005）のKVを、環境ごとに作ります。**Workerを出す前に作ります**（`wrangler.toml`に書いた`id`のnamespaceが無いと、デプロイが拒まれます）。
+
+```bash
+# 最初に一度 `pnpm --filter api exec wrangler login`（ブラウザが開きます）
+pnpm --filter api exec wrangler kv namespace create AUTOPOST_KV --env staging
+pnpm --filter api exec wrangler kv namespace create AUTOPOST_KV --env production
+```
+
+表示された`id`を、`apps/api/wrangler.toml`の`[[env.staging.kv_namespaces]]`・`[[env.production.kv_namespaces]]`の`id`に入れます（`00000000000000000000000000000000`を差し替える）。変更はPRでマージします。
+
+### 9-4. Cloudflareに置き場所を作る（T022）
+
+ここで初めて、Cloudflare上に実体ができます。**9-3のKVの`id`を入れ終えてから**行います。
+
+```bash
+# 1) Pagesのプロジェクト（Webの置き場所）。本番のブランチは main
+#    wrangler は apps/api の開発用の依存なので、--filter api から呼びます
+pnpm --filter api exec wrangler pages project create threads-grower-web --production-branch main
+
+# 2) ステージングのWorker（APIの置き場所）。最初のデプロイで作られる
+pnpm --filter api deploy:staging
+```
+
+- 2)の時点では、環境変数が見本の値のままなので、APIを開いても`CONFIG_ERROR`になります。9-5以降で直します。
+- **PagesのGit連携は使いません**（GitHub Actionsからだけ出します）。画面から作ってGit連携を付けてしまった場合は、Pagesの Settings → Builds & deployments で切ってください。
+
+### 9-5. Neonのプロジェクトを2つ作る（T019・T028）
+
+1. Neonで**プロジェクトを2つ**作ります（例：`threads-grower-staging`・`threads-grower-production`）。1つのプロジェクトのブランチで分けず、プロジェクトを分けます（枠と安全を分けるため。[research.md R5](../specs/015-deploy-environments/research.md)）。
+2. それぞれの接続文字列（`DATABASE_URL`）を控えます。
+3. ステージングにマイグレーションを当てます。
+
+```bash
+# drizzle-kit が読むのは DATABASE_URL_DIRECT（apps/api/drizzle.config.ts）
+DATABASE_URL_DIRECT='<ステージングの接続文字列>' pnpm --filter api db:migrate
+```
+
+> 本番のマイグレーションは、`main`へのマージで`deploy.yml`が当てます（手で当てなくてよい）。
+
+### 9-6. Cloudflareのシークレットを入れる（T021・T030）
+
+[data-model.md](../specs/015-deploy-environments/data-model.md) 3-1の「秘」の値を、環境ごとに入れます。
+
+```bash
+cd apps/api
+for name in DATABASE_URL CLERK_SECRET_KEY THREADS_APP_SECRET TOKEN_ENCRYPTION_KEYS IDENTIFIER_HASH_KEY STRIPE_SECRET_KEY STRIPE_WEBHOOK_SECRET; do
+  pnpm exec wrangler secret put "$name" --env staging      # 本番は --env production
+done
+```
+
+- `TOKEN_ENCRYPTION_KEYS`・`IDENTIFIER_HASH_KEY`は、**環境ごとに別の値**を作ります（作り方は「4. 鍵を作る」）。
+- 秘密でない値（`WEB_ORIGIN`・`THREADS_REDIRECT_URI`・`CLERK_PUBLISHABLE_KEY`・`THREADS_APP_ID`・`STRIPE_PRICE_ID`など）は、`wrangler.toml`の`[env.*].vars`を直してPRでマージします。
+
+### 9-7. Clerk（T024・T031）
+
+**ステージング（開発用インスタンス。T024）**
+
+1. 今使っている開発用インスタンスの **Restrictions** で「Allowlist」を有効にし、テストユーザーのメールアドレスだけを許可します（許可していない人は登録できません）。
+2. テストユーザーを登録（招待）します。
+
+**本番（本番インスタンス。T031）**
+
+1. Clerkで Production インスタンスを作ります。
+2. Clerkが示す CNAME（`clerk.`・`accounts.`など）を、CloudflareのDNSに足します。
+3. **GoogleのOAuthを自分の認証情報にします**：Google Cloud ConsoleでOAuthクライアント（種類は「ウェブアプリケーション」）を作り、ClerkのGoogle接続で「Use custom credentials」をオンにします。Clerkの画面に出る「Authorized Redirect URI」を、Google側の「承認済みのリダイレクトURI」に登録します。
+4. 本番の`CLERK_SECRET_KEY`（9-6）と`CLERK_PUBLISHABLE_KEY`（`wrangler.toml`とGitHubの変数）を、本番インスタンスのものにします。
+
+### 9-8. Meta（Threads）のコールバックURL（T025・T032）
+
+**Metaのアプリは1つのまま**で、戻り先URLを両方登録します（アプリの設定 → Threads API → Redirect Callback URLs）。
+
+| 環境 | 登録するURL |
+|---|---|
+| ステージング | `https://<ステージングのAPIのURL>/api/threads/callback` |
+| 本番 | `https://api.<ドメイン>/api/threads/callback` |
+
+同じ値を、`wrangler.toml`の各環境の`THREADS_REDIRECT_URI`にも入れます（**完全一致**でないとMetaが拒否します）。
+
+### 9-9. Pagesに独自ドメインを当てる（T023・T032）
+
+Pagesのプロジェクト → Custom domains。
+
+| 環境 | 当てる名前 | 向き先 |
+|---|---|---|
+| 本番 | `app.<ドメイン>` | 本番（`main`） |
+| ステージング | `staging.<ドメイン>` | ブランチの別名`develop` |
+
+- **ステージングは、Pagesに名前を足すだけでは本番の版が出ます**。足した後に、CloudflareのDNSでその`staging`のCNAMEの**向き先を`develop.threads-grower-web.pages.dev`に書き換えます**（[Cloudflareの手順](https://developers.cloudflare.com/pages/how-to/custom-branch-aliases/)）。書き換えないと、ステージングのURLで本番のWeb（本番のAPIにつながる版）が出てしまいます。
+- DNSは**proxy（オレンジの雲）**にします。
+- APIのWorkerにも、Workers → 対象のWorker → Settings → Domains & Routes で`api.<ドメイン>`・`api-staging.<ドメイン>`を当てます。
+- 当てたURLに合わせて、`wrangler.toml`の`WEB_ORIGIN`と、GitHubの変数`VITE_API_BASE_URL`を直します。
+
+### 9-10. Stripe（T039・T040）
+
+1. 本番の設定を「10. Stripe」の手順で作ります（料金・Webhook・ポータル）。テスト用環境はそのまま使います。
+2. Webhookの送り先を、環境ごとに向けます。
+
+| Stripeの環境 | Webhookの送り先 |
+|---|---|
+| テスト用環境 | `https://<ステージングのAPIのURL>/api/stripe/webhook` |
+| 本番 | `https://api.<ドメイン>/api/stripe/webhook` |
+
+3. `wrangler.toml`の`[env.staging].vars`・`[env.production].vars`の`STRIPE_PRICE_ID`（必要なら`STRIPE_PORTAL_CONFIGURATION_ID`・`STRIPE_TAX_RATE_ID`）を、それぞれの環境のIDにします。
+4. 公開の前に、今の利用者（開発者・テストユーザー）に料金なしの印を付けます（10-7）。
+
+### 9-11. GitHubのEnvironmentと変数（T011）
+
+Settings → Environments で`staging`と`production`を作り、それぞれに入れます（[data-model.md](../specs/015-deploy-environments/data-model.md) 3-2・3-3）。
+
+| 名前 | 種類 | staging | production |
+|---|---|---|---|
+| `CLOUDFLARE_API_TOKEN` | Secret | 9-2のトークン | 同じ |
+| `DATABASE_URL` | Secret | ステージングのNeon | 本番のNeon |
+| `CLOUDFLARE_ACCOUNT_ID` | 変数 | 9-2のアカウントID | 同じ |
+| `VITE_API_BASE_URL` | 変数 | ステージングのAPIのURL | `https://api.<ドメイン>` |
+| `VITE_CLERK_PUBLISHABLE_KEY` | 変数 | 開発用インスタンスの公開鍵 | 本番インスタンスの公開鍵 |
+| `VITE_APP_ENV` | 変数 | `staging` | `production` |
+
+`VITE_…`はビルドに焼き込まれるので、**秘密を入れない**（公開鍵だけ）。
+
+さらに、**それぞれのEnvironmentに保護規則を付けます**（Settings → Environments → その環境）。
+
+| 設定 | staging | production |
+|---|---|---|
+| Deployment branches and tags | **Selected** → `develop`（ブランチのみ） | **Selected** → `main`（ブランチのみ） |
+| Required reviewers | なし（任意） | 自分を入れておくと、本番は毎回自分の承認が要る |
+
+**この2つを飛ばさないでください。** `deploy.yml`の中にも出す先を決める関所（`guard`ジョブ）がありますが、Actionsの画面から手で動かすとき（`workflow_dispatch`）は**選んだブランチにあるワークフローの定義が動く**ので、ファイルの中の判定は書き換えられます。「`main`以外から本番の秘密を渡さない」を本当に守れるのは、**リポジトリの外側にあるこの設定だけ**です。
+
+### 9-12. ブランチを守る（T012・T013）
+
+1. `develop`ブランチを`main`から作ってpushします。
+
+```bash
+git checkout main && git pull && git checkout -b develop && git push -u origin develop
+```
+
+2. Settings → General → Default branch を**`develop`**にします（新しいPRの行き先が既定で`develop`になります）。
+3. Settings → Rules → Rulesets で、`main`と`develop`に同じ規則を付けます。
+
+- Restrict deletions
+- Require a pull request before merging（直接のpushを禁止）
+- Require status checks to pass → `check`（`ci.yml`のジョブ）
+
+4. **タグにも規則を付けます。** Ruleset の Target を **Tags** にして、`main`と`develop`という名前のタグを作れないようにします（Restrict creations、または `main`・`develop` を名指しで保護）。
+
+ブランチの規則だけではタグを止められません。`deploy.yml`は出す先を`refs/heads/main`という完全な値で見るようになっているので、`main`という名前のタグでは本番側に入れません。この手順はさらに**そういうタグをそもそも作れなくする**ためのもので、9-11のEnvironmentの保護規則と合わせて二重にします。
+
+### 9-13. 確かめる
+
+[quickstart.md](../specs/015-deploy-environments/quickstart.md) 3の手順を、上から行います（デプロイの通し・帯・許可していない人が入れないこと・決済・急ぎの修正）。**マージからその環境で見えるまでの時間**も測り、10分以内であることを記録します（SC-001・SC-002）。
+
+### 9-14. 公開の判断（この機能の外）
+
+ここまでで「公開できる状態」になります。実際に公開する（本番のURLを配る）前に、次が要ります。
+
+- **Meta**：App Review（各権限の用途の説明）と、必要に応じてビジネス認証。データ削除の状況確認ページの中身も見直す（[001 research.md R7](../specs/001-login-account-setup/research.md)）。通ったら、`wrangler.toml`の本番の`THREADS_ACCESS_MODE`を`public`にします。
+- **適格請求書（インボイス）**：適格請求書発行事業者に登録するかを決めます。登録したら、Stripeの本番の領収書・請求書の設定に登録番号（T＋13桁）を入れ、税率ごとの消費税の額が出ることを、テスト用環境の領収書で確かめます。登録しないなら、登録番号は載せません。どちらでも、アプリのコードと料金（税込み）は変わりません。
+- **特定商取引法に基づく表記**：販売者の名前・住所・連絡先などを決め、`apps/web/src/lib/seller-info.ts`に入れます（013 FR-071）。住所・電話番号は「請求があれば遅滞なく開示します」と書く形も選べます。
 
 ---
 

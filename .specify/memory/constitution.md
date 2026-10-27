@@ -123,9 +123,16 @@ MVPのうちチーム運用と課金まわりの最後のfeatureとする。公�
   から実装に進む。
 - BMAD-METHODは計画フェーズ（Product Brief・PRD）で使用済み。実装フェーズではspec-kitのみを
   用い、両者を並行稼働させない。
-- **ブランチ運用**：検証段階（TODO(COMMERCIAL_LAUNCH_GATE)発火前）は`main`＋`feature/*`のみで
-  運用する。SaaSとして外部公開・課金を開始するタイミングで`develop`ブランチを導入し、`main`
-  （公開用）／`develop`（テスト運用）／`feature/*`（追加実装）の3段構成に切り替える。
+- **ブランチ運用**：`main`（本番）／`develop`（ステージング）／`feature/*`（追加実装）の3段構成
+  とする（2026-10-22、015で切り替え済み。それ以前は`main`＋`feature/*`の2段だった）。
+  - 既定のブランチは`develop`。ふだんのPRは`feature/*`→`develop`に向ける。
+  - リリースは`develop`→`main`のPR（タイトルは「リリース：…」）。
+  - 本番の急ぎの修正は`main`から`fix/*`を分け、`main`へのPRでマージしたあと、同じ変更を
+    `develop`にも戻す（`git log --oneline main ^develop`が空になること）。
+  - `main`・`develop`への直接のpushは禁止（PR必須・CIの成功を必須）。
+  - マージすると自動で出る（`develop`→ステージング、`main`→本番。
+    `.github/workflows/deploy.yml`）。環境ごとの違いはコードの分岐にせず、設定だけに置く。
+  - 詳しくは[specs/015-deploy-environments/contracts/deploy.md](../../specs/015-deploy-environments/contracts/deploy.md)。
 
 ## Governance
 
@@ -135,4 +142,4 @@ MVPのうちチーム運用と課金まわりの最後のfeatureとする。公�
   実質的な拡張＝MINOR、文言修正・明確化＝PATCH。
 - 改定時は`/speckit-constitution`を再実行し、Sync Impact Reportを都度残す。
 
-**Version**: 4.0.2 | **Ratified**: 2026-10-01 | **Last Amended**: 2026-10-16
+**Version**: 4.1.0 | **Ratified**: 2026-10-01 | **Last Amended**: 2026-10-22

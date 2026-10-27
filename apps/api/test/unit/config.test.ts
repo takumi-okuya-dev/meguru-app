@@ -69,6 +69,50 @@ describe("validateConfig", () => {
     expect(validateConfig({ ...missing, BILLING_ENABLED: "false" } as Env)).toEqual([]);
   });
 
+  it("APP_ENV は production・staging・development のどれかが必須（specs/015 FR-026）", () => {
+    // production は本番の鍵（live）が要るので、下の「鍵の種類」のテストで確かめる
+    for (const v of ["staging", "development"]) {
+      expect(validateConfig({ ...good, APP_ENV: v } as Env)).toEqual([]);
+    }
+    expect(validateConfig({ ...good, APP_ENV: undefined } as unknown as Env)).toEqual(["APP_ENV"]);
+    expect(validateConfig({ ...good, APP_ENV: "" } as unknown as Env)).toEqual(["APP_ENV"]);
+    expect(validateConfig({ ...good, APP_ENV: "prod" } as unknown as Env)).toEqual(["APP_ENV"]);
+  });
+
+  it("本番は live の鍵、ステージングと手元は test の鍵でなければ指摘する（PR #19 のCodexレビュー）", () => {
+    const live = {
+      ...good,
+      APP_ENV: "production",
+      BILLING_ENABLED: "true",
+      CLERK_SECRET_KEY: "sk_live_TestOnlyDummySecretKey00000",
+      CLERK_PUBLISHABLE_KEY: "pk_live_dGVzdC5jbGVyay5hY2NvdW50cy5kZXYk",
+      STRIPE_SECRET_KEY: "sk_live_TestOnlyStripeKey000000",
+    } as Env;
+    expect(validateConfig(live)).toEqual([]);
+
+    // 本番にテスト用の鍵が入っている
+    expect(validateConfig({ ...live, CLERK_SECRET_KEY: good.CLERK_SECRET_KEY } as Env)).toEqual(["CLERK_SECRET_KEY"]);
+    expect(validateConfig({ ...live, CLERK_PUBLISHABLE_KEY: good.CLERK_PUBLISHABLE_KEY } as Env)).toEqual([
+      "CLERK_PUBLISHABLE_KEY",
+    ]);
+    expect(validateConfig({ ...live, STRIPE_SECRET_KEY: good.STRIPE_SECRET_KEY } as Env)).toEqual(["STRIPE_SECRET_KEY"]);
+
+    // ステージングに本番の鍵が入っている（本当のお客さまに課金してしまう）
+    const staging = { ...good, APP_ENV: "staging", BILLING_ENABLED: "true" } as Env;
+    expect(validateConfig(staging)).toEqual([]);
+    expect(validateConfig({ ...staging, STRIPE_SECRET_KEY: "sk_live_TestOnlyStripeKey000000" } as Env)).toEqual([
+      "STRIPE_SECRET_KEY",
+    ]);
+    expect(
+      validateConfig({ ...staging, CLERK_SECRET_KEY: "sk_live_TestOnlyDummySecretKey00000" } as Env),
+    ).toEqual(["CLERK_SECRET_KEY"]);
+
+    // 決済OFFなら、Stripeの鍵は見ない（今までどおり）
+    expect(
+      validateConfig({ ...good, APP_ENV: "staging", STRIPE_SECRET_KEY: "sk_live_x000000000" } as Env),
+    ).toEqual([]);
+  });
+
   it("偽のThreadsで動かすときは、Threadsの3項目は見本の値のままでよい", () => {
     const env = { ...good, THREADS_APP_ID: "000000000000000", THREADS_APP_SECRET: "xxxxxxxx" } as Env;
     expect(validateConfig(env)).toEqual([]);

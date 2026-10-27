@@ -1,0 +1,167 @@
+# デプロイ：develop への push でステージング、main への push で本番に出す
+# （specs/015-deploy-environments contracts/deploy.md 2）。
+# 順番は マイグレーション → API → Web。1つでも失敗したら、そこで止める（FR-012）。
+# 途中で止まったときに何が起きるかは、contracts/deploy.md 2 の表を見る。
+name: Deploy
+
+on:
+  push:
+    branches: [develop, main]
+  # やり直し用。Actionsの画面から手で動かせる
+  workflow_dispatch:
+
+# GITHUB_TOKEN は既定では何も渡さない。要るジョブでだけ足す
+permissions: {}
+
+# 同じ ref へのデプロイは1つずつ。走っているものを打ち切らない（FR-013）。
+# ref の完全な値で分けるので、許可した2つの ref は 1対1 で環境に対応する
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  # 出す先を決める関所。Environmentを結び付けず、リポジトリのコードも動かさない。
+  # この順番が肝心で、`environment:` を書いた時点でその環境の秘密がジョブに渡り、
+  # `pnpm install` はワークスペースの lifecycle スクリプトを動かす。どちらも
+  # 「どの ref か」を確かめた後でなければならない（セキュリティ監査 run-1）。
+  #
+  # 手で動かすとき（workflow_dispatch）は、選んだ ref にあるこのファイル自体が
+  # 動くので、ファイルの中の判定だけでは守りきれない。リポジトリの外側の関所
+  # （GitHubのEnvironmentの Deployment branches and tags と、タグの ruleset）が
+  # 必要で、その手順は docs/external-services-setup.md「9-11」「9-12」にある。
+  guard:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      wrangler: ${{ steps.pick.outputs.wrangler }}
+      env_name: ${{ steps.pick.outputs.env_name }}
+      pages_branch: ${{ steps.pick.outputs.pages_branch }}
+    steps:
+      # ref は完全な値（refs/heads/…）で見る。`github.ref_name` は短い名前で、
+      # ブランチとタグを区別しない（`refs/tags/main` の ref_name は `main` になる）
+      - name: 出す先を決める
+        id: pick
+        env:
+          REF: ${{ github.ref }}
+        run: |
+          case "$REF" in
+            refs/heads/main)
+              echo "wrangler=production" >> "$GITHUB_OUTPUT"
+              echo "env_name=production" >> "$GITHUB_OUTPUT"
+              echo "pages_branch=main" >> "$GITHUB_OUTPUT"
+              ;;
+            refs/heads/develop)
+              echo "wrangler=staging" >> "$GITHUB_OUTPUT"
+              echo "env_name=staging" >> "$GITHUB_OUTPUT"
+              echo "pages_branch=develop" >> "$GITHUB_OUTPUT"
+              ;;
+            *)
+              echo "::error::デプロイできるのは refs/heads/main（本番）と refs/heads/develop（ステージング）だけです（選ばれたのは $REF）。"
+              exit 1
+              ;;
+          esac
+
+  deploy:
+    needs: guard
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    # GitHubのEnvironmentのSecretsと変数を使う（data-model.md 3-2・3-3）。
+    # guard を通った ref だけがここに来る
+    environment: ${{ needs.guard.outputs.env_name }}
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: 依存を入れる
+        run: pnpm install --frozen-lockfile
+
+      # 外部サービスの設定（docs/external-services-setup.md「9-11」）の確認。
+      # - 1つも入っていない → 何もせずに終わる（移行の間だけの安全弁。9-11が済んだら、このステップと下の if を消してよい）
+      # - 一部だけ入っている → 止める（空のClerkの鍵や localhost 向きのWebを本番に出さないため）
+      - name: 設定がそろっているか見る
+        id: ready
+        # 値は env 経由で渡す（run の文に埋め込まない）。秘密は中身を見ず、空かどうかだけを見る
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+          VITE_API_BASE_URL: ${{ vars.VITE_API_BASE_URL }}
+          VITE_CLERK_PUBLISHABLE_KEY: ${{ vars.VITE_CLERK_PUBLISHABLE_KEY }}
+          VITE_APP_ENV: ${{ vars.VITE_APP_ENV }}
+          TARGET: ${{ needs.guard.outputs.wrangler }}
+        run: |
+          required="CLOUDFLARE_API_TOKEN DATABASE_URL CLOUDFLARE_ACCOUNT_ID VITE_API_BASE_URL VITE_CLERK_PUBLISHABLE_KEY VITE_APP_ENV"
+          missing=""
+          filled=""
+          for name in $required; do
+            if [ -z "${!name}" ]; then missing="$missing $name"; else filled="$filled $name"; fi
+          done
+          if [ -z "$filled" ]; then
+            echo "::warning::GitHubのEnvironmentの設定がまだなので、デプロイしません。docs/external-services-setup.md の「9. 公開のための準備」を済ませてください。"
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          elif [ -n "$missing" ]; then
+            echo "::error::GitHubのEnvironmentの設定が足りません（$missing）。docs/external-services-setup.md の「9-11」を見て入れてください。"
+            exit 1
+          else
+            # VITE_APP_ENV が、出す先の環境と合っているか（取り違えると帯が出ない・出たままになる）
+            if [ "$VITE_APP_ENV" != "$TARGET" ]; then
+              echo "::error::VITE_APP_ENV（$VITE_APP_ENV）が、出す先（$TARGET）と合っていません。"
+              exit 1
+            fi
+            # Clerkの公開鍵が、その環境のものか（本番は本番インスタンスの pk_live_、
+            # ステージングは開発用インスタンスの pk_test_）。APIの秘密の鍵のほうは src/lib/config.ts が見る
+            if [ "$TARGET" = "production" ]; then want=pk_live_; else want=pk_test_; fi
+            case "$VITE_CLERK_PUBLISHABLE_KEY" in
+              "$want"*) echo "ready=true" >> "$GITHUB_OUTPUT" ;;
+              *)
+                echo "::error::VITE_CLERK_PUBLISHABLE_KEY が ${want}… ではありません（$TARGET なので ${want} が要ります）。"
+                exit 1
+                ;;
+            esac
+          fi
+
+      # Webのビルド。VITE_… はビルドに焼き込まれるので、公開してよい値だけを入れる（data-model.md 3-2）
+      - name: Web をビルドする
+        if: steps.ready.outputs.ready == 'true'
+        run: pnpm --filter web build
+        env:
+          VITE_API_BASE_URL: ${{ vars.VITE_API_BASE_URL }}
+          VITE_CLERK_PUBLISHABLE_KEY: ${{ vars.VITE_CLERK_PUBLISHABLE_KEY }}
+          VITE_APP_ENV: ${{ vars.VITE_APP_ENV }}
+
+      # 1. マイグレーション。ここで失敗したら、DBだけが新しくAPIとWebは前の版のまま（research.md R4）
+      # drizzle-kit が読むのは DATABASE_URL_DIRECT（apps/api/drizzle.config.ts）。同じ接続文字列を渡す
+      - name: マイグレーションを当てる
+        if: steps.ready.outputs.ready == 'true'
+        run: pnpm --filter api db:migrate
+        env:
+          DATABASE_URL_DIRECT: ${{ secrets.DATABASE_URL }}
+
+      # 2. API（Cloudflare Workers）
+      - name: API を出す
+        if: steps.ready.outputs.ready == 'true'
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: apps/api
+          command: deploy --env ${{ needs.guard.outputs.wrangler }}
+
+      # 3. Web（Cloudflare Pages）。main は本番、develop はブランチの別名として出る。
+      # 行き先は guard が決めた固定の名前を渡す（ref の名前をそのまま渡さない）
+      - name: Web を出す
+        if: steps.ready.outputs.ready == 'true'
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages deploy apps/web/dist --project-name threads-grower-web --branch ${{ needs.guard.outputs.pages_branch }}

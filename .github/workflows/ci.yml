@@ -1,4 +1,4 @@
-# CI：PRのたび（と main への push）に、lint・型チェック・テストを実行する。
+# CI：PRのたび（と main・develop への push）に、lint・型チェック・テストを実行する。
 # API の結合テストに使う Postgres 17 と local-neon-http-proxy は、サービスコンテナとして起動する（research.md R12）。
 # E2E は Clerk の開発用キーが必要なので、ここでは実行しない（README の E2E の項を参照）。
 name: CI
@@ -6,16 +6,21 @@ name: CI
 on:
   pull_request:
   push:
-    branches: [main]
+    branches: [main, develop]
 
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
+# GITHUB_TOKEN は既定では何も渡さない。要るジョブでだけ足す
+permissions: {}
+
 jobs:
   check:
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    permissions:
+      contents: read
 
     services:
       postgres:
