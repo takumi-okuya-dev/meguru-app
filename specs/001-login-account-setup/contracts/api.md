@@ -52,7 +52,11 @@ type AccountLimit = {
 
 ### GET /api/health
 
-動作確認用。認証不要。設定に誤りがなければ`{ "ok": true }`、誤りがあれば`{ "ok": false, "configErrors": ["…"] }`（項目名だけ）を返す。
+動作確認用。認証不要。設定に誤りがなければ`{ "ok": true }`を返す。
+
+誤りがあるときに返すものは`APP_ENV`で分かれる。手元の開発（`development`）では`{ "ok": false, "configErrors": ["…"] }`（項目名だけ。値は返さない）、それ以外の環境では`{ "ok": false }`のみ。この経路は無認証で、設定が壊れている間も答え続けるので、公開された環境では「どの秘密が未設定か」を資格情報のない相手に渡さない（セキュリティ監査run-1）。項目名は運用者向けにサーバーのログへ出る。
+
+`CONFIG_ERROR`の応答本文も同じ分かれ方で、`error.details`は`development`のときだけ入る。
 
 ### GET /api/me
 

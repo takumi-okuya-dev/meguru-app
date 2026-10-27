@@ -60,6 +60,16 @@ describe("API の呼び出しに失敗したとき", () => {
     expect(screen.getByRole("button", { name: "再読み込み" })).toBeInTheDocument();
   });
 
+  // 公開された環境では API が項目名を返さない（セキュリティ監査 run-1）。
+  // そのとき、開発者向けの .dev.vars の案内まで利用者に見せない
+  it("項目名が無ければ、.dev.vars の案内を出さない", async () => {
+    meImpl = () => Promise.reject(new ApiError("CONFIG_ERROR", 500));
+    renderWithQuery(<Landing />);
+    expect(await screen.findByRole("heading", { name: "サーバーの設定に誤りがあります" })).toBeInTheDocument();
+    expect(screen.queryByText(/\.dev\.vars/)).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "再読み込み" })).toBeInTheDocument();
+  });
+
   it("APIに接続できなければ、接続先のURLを含む案内を出し、再読み込みで呼び直す", async () => {
     let calls = 0;
     meImpl = () => {

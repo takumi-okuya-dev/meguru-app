@@ -93,6 +93,11 @@ export function createApp(deps: AppDeps = defaultDeps) {
       }
     }
     if (problems.length === 0) return next();
+    // 誤っている項目名は、設定という制御の内部状態。手元の開発のときだけ返す。
+    // 公開された環境では、資格情報を持たない相手が /api/* のどのパスからでも
+    // 「どの秘密が未設定か」を数えられてしまう（セキュリティ監査 run-1）。
+    // 運用者向けには、上の logger.error が env ごとに1回出している
+    const inDevelopment = c.env.APP_ENV === "development";
     if (c.req.path === "/api/threads/callback") {
       try {
         const web = new URL(c.env.WEB_ORIGIN).origin;
@@ -102,7 +107,9 @@ export function createApp(deps: AppDeps = defaultDeps) {
         );
       } catch {
         return c.text(
-          `サーバーの設定に誤りがあります（${problems.join("、")}）。apps/api/.dev.vars を確認し、APIを起動し直してください。`,
+          inDevelopment
+            ? `サーバーの設定に誤りがあります（${problems.join("、")}）。apps/api/.dev.vars を確認し、APIを起動し直してください。`
+            : "サーバーの設定に誤りがあります。運用者にお問い合わせください。",
           500,
         );
       }
@@ -112,7 +119,7 @@ export function createApp(deps: AppDeps = defaultDeps) {
         error: {
           code: "CONFIG_ERROR" as const,
           message: "server configuration error",
-          details: problems,
+          ...(inDevelopment ? { details: problems } : {}),
         },
       },
       500,
@@ -148,9 +155,12 @@ export function createApp(deps: AppDeps = defaultDeps) {
   const routes = app
     .basePath("/api")
     .get("/health", (c) => {
-      // 誤っている設定の項目名を返す（値は返さない）。開発時の確認用
+      // この経路は無認証で、設定が壊れている間も答え続ける（関所が免除している）。
+      // 誤っている項目名は手元の開発のときだけ返す。公開された環境では、
+      // 資格情報を持たない相手に「どの秘密が未設定か」を渡さない（セキュリティ監査 run-1）
       const configErrors = validateConfig(c.env);
-      return c.json(configErrors.length === 0 ? { ok: true } : { ok: false, configErrors });
+      if (configErrors.length === 0) return c.json({ ok: true });
+      return c.json(c.env.APP_ENV === "development" ? { ok: false, configErrors } : { ok: false });
     })
     .route("/", meRoutes(authed, deps.deleteClerkUser ?? ((env) => clerkUserDeleter(env))))
     .route("/", accountRoutes(authed))
