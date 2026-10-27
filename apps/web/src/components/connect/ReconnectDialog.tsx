@@ -1,6 +1,6 @@
 // 「接続し直す」のダイアログ（specs/010-token-account-add contracts/ui-routes.md、US3・FR-031）。
 // このアプリで許可（001のOAuth）と、トークンの貼り付けの2つから選ぶ。オーナーだけが開ける（呼び出し側で出し分ける）。
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { ConnectionMethod, TokenConnectResponse } from "@threads-grower/shared";
 import { ChevronRightIcon, XIcon } from "lucide-react";
 import { useState } from "react";
@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { api, describeError } from "@/lib/api-client";
+import { queryKeys } from "@/lib/query";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { TokenConnectForm } from "./TokenConnectForm";
@@ -46,10 +47,16 @@ export function ReconnectDialog({
     onSuccess: ({ authorizeUrl }) => window.location.assign(authorizeUrl),
   });
 
-  const options = [
-    { key: "app" as const, label: "Threadsで許可する", note: "このアプリのMetaアプリで許可します" },
-    { key: "token" as const, label: "トークンを貼り付ける", note: "自分のMetaアプリで作ったトークンを使います" },
-  ];
+  // 出していない方法はAPIが404で断るので、ここでも出さない（押せるのに必ず失敗する選択肢を見せない。
+  // PR #20 のCodexレビュー）。me が返るまでは既定（両方）
+  const me = useQuery({ queryKey: queryKeys.me, queryFn: api.me });
+  const offered = me.data?.threadsConnectMethods ?? ["app", "token"];
+  const options = (
+    [
+      { key: "app" as const, label: "Threadsで許可する", note: "このアプリのMetaアプリで許可します" },
+      { key: "token" as const, label: "トークンを貼り付ける", note: "自分のMetaアプリで作ったトークンを使います" },
+    ] as const
+  ).filter((o) => offered.includes(o.key));
 
   return (
     <Dialog open onOpenChange={(v) => !v && onClose()}>

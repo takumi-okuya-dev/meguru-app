@@ -77,3 +77,28 @@ describe("見えない文字を挟んだNGワード", () => {
     expect(findNgWords("今日もｶ\u200bﾞﾝﾊﾞﾙ", ng("ガンバル"))).toHaveLength(1);
   });
 });
+
+// 照合の正規化を変えると、登録済みの ng_words.normalized が古くなる。
+// 保存値をそのまま使うと、同じ文字どうしでも当たらなくなる（PR #20 のCodexレビュー）
+describe("登録済みの normalized が古いとき", () => {
+  it("word から正規化し直して当てる（異体字セレクタを含む語）", () => {
+    // 以前の正規化では、異体字セレクタ U+FE0F が normalized に残っていた
+    const stale = { word: "☀\ufe0f", normalized: "☀\ufe0f" };
+    expect(findNgWords("今日は☀\ufe0fです", [stale])).toHaveLength(1);
+    expect(findNgWords("今日は☀です", [stale])).toHaveLength(1);
+  });
+
+  it("word から正規化し直して当てる（書式文字を含む語）", () => {
+    const stale = { word: "絶\u200b対", normalized: "絶\u200b対" };
+    expect(findNgWords("絶対に稼げる", [stale])).toHaveLength(1);
+  });
+
+  it("古い normalized が空でも、word が空でなければ当てる", () => {
+    const stale = { word: "絶対", normalized: "" };
+    expect(findNgWords("絶対に稼げる", [stale])).toHaveLength(1);
+  });
+
+  it("word が空白だけなら、何にも当てない（全文一致にしない）", () => {
+    expect(findNgWords("絶対に稼げる", [{ word: "  ", normalized: "" }])).toEqual([]);
+  });
+});

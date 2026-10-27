@@ -1,6 +1,6 @@
 // US3：接続し直すときに方法を選ぶ（specs/010-token-account-add contracts/ui-routes.md「接続し直すのダイアログ」、FR-031・FR-041・FR-050）
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { cleanup, render, screen, within } from "@testing-library/react";
+import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { AccountSummary } from "@threads-grower/shared";
 import { createMemoryRouter, Outlet, RouterProvider } from "react-router";
@@ -8,6 +8,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { EDITOR_ACCESS, OWNER_ACCESS } from "./helpers/access";
 
 const tokenConnect = vi.fn();
+const me = vi.fn();
 const connect = vi.fn();
 const accountAccess = vi.fn();
 vi.mock("@/lib/api-client", async (orig) => {
@@ -17,6 +18,7 @@ vi.mock("@/lib/api-client", async (orig) => {
     api: {
       ...actual.api,
       accountAccess,
+      me,
       tokenConnect,
       connect,
       getPostingRules: vi.fn(() => new Promise(() => {})),
@@ -76,8 +78,9 @@ function renderSettings(account: AccountSummary) {
 }
 
 beforeEach(() => {
-  for (const fn of [tokenConnect, connect, accountAccess, toastSuccess]) fn.mockReset();
+  for (const fn of [tokenConnect, connect, accountAccess, toastSuccess, me]) fn.mockReset();
   accountAccess.mockResolvedValue(OWNER_ACCESS);
+  me.mockResolvedValue({ threadsConnectMethods: ["app", "token"] });
 });
 
 describe("接続し直しのダイアログ（US3）", () => {
@@ -201,5 +204,33 @@ describe("ReconnectButton（PR #12 のCodexレビュー）", () => {
       expect(screen.queryByRole("button", { name: "再接続" })).not.toBeInTheDocument();
       cleanup();
     }
+  });
+});
+
+// つなぐ方法の切り替え（THREADS_CONNECT_METHODS）は、接続し直しのダイアログにも効かせる。
+// APIが404で断る方法を、押せる選択肢として見せない（PR #20 のCodexレビュー）
+describe("接続し直しで、出していない方法を見せない", () => {
+  it("token だけのとき、「Threadsで許可する」を出さない", async () => {
+    me.mockResolvedValue({ threadsConnectMethods: ["token"] });
+    const user = userEvent.setup();
+    renderSettings(makeAccount());
+    await user.click(await screen.findByRole("button", { name: "接続し直す" }));
+    const dialog = await screen.findByRole("dialog", { name: "Threadsとの接続し直し" });
+    await waitFor(() =>
+      expect(within(dialog).queryByRole("button", { name: /Threadsで許可する/ })).not.toBeInTheDocument(),
+    );
+    expect(within(dialog).getByRole("button", { name: /トークンを貼り付ける/ })).toBeInTheDocument();
+  });
+
+  it("app だけのとき、「トークンを貼り付ける」を出さない", async () => {
+    me.mockResolvedValue({ threadsConnectMethods: ["app"] });
+    const user = userEvent.setup();
+    renderSettings(makeAccount());
+    await user.click(await screen.findByRole("button", { name: "接続し直す" }));
+    const dialog = await screen.findByRole("dialog", { name: "Threadsとの接続し直し" });
+    await waitFor(() =>
+      expect(within(dialog).queryByRole("button", { name: /トークンを貼り付ける/ })).not.toBeInTheDocument(),
+    );
+    expect(within(dialog).getByRole("button", { name: /Threadsで許可する/ })).toBeInTheDocument();
   });
 });
