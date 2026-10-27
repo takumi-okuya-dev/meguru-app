@@ -1,6 +1,6 @@
 // 設定の確認（誤りがあれば項目名だけを返す。値は返さない）
 import { describe, expect, it } from "vitest";
-import { validateConfig } from "../../src/lib/config";
+import { billingModeOf, validateConfig } from "../../src/lib/config";
 import type { Env } from "../../src/env";
 import { testBindings } from "../env";
 
@@ -116,5 +116,22 @@ describe("validateConfig", () => {
   it("偽のThreadsで動かすときは、Threadsの3項目は見本の値のままでよい", () => {
     const env = { ...good, THREADS_APP_ID: "000000000000000", THREADS_APP_SECRET: "xxxxxxxx" } as Env;
     expect(validateConfig(env)).toEqual([]);
+  });
+});
+
+// 1つの変数を2つの規則で読まない（セキュリティ監査 run-1）。
+// `validateConfig` が "true"／"false" 以外を拒むのに `billingModeOf` が
+// `=== "true"` 以外を黙って「課金オフ」に写すと、Cron 側だけが全オーナーを
+// 全権として扱う（契約の状態を読まずに）。
+describe("billingModeOf", () => {
+  it.each([
+    ["true", true],
+    ["false", false],
+  ])("%j は、そのまま読む", (value, expected) => {
+    expect(billingModeOf({ BILLING_ENABLED: value } as Env).enabled).toBe(expected);
+  });
+
+  it.each(["TRUE", "True", "1", "yes", "", undefined])("%j は、黙って課金オフにせず落ちる", (value) => {
+    expect(() => billingModeOf({ BILLING_ENABLED: value } as Env)).toThrow(/BILLING_ENABLED/);
   });
 });

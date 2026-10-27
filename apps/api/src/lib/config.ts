@@ -146,9 +146,19 @@ export type BillingMode = { enabled: boolean };
 
 /**
  * 環境の設定から決済のモードを作る。
+ *
+ * `validateConfig` は `"true"`／`"false"` 以外を拒む（FR-063：未設定で黙ってOFFにしない）。
+ * ここで `=== "true"` だけを見て残りを「課金オフ」に写すと、同じ変数を2つの規則で読むことになり、
+ * `"TRUE"` のような値で **APIは全リクエストを拒むのに Cron は全オーナーを全権として扱う**
+ * （`entitlementOf` が契約の状態を読まずに全権を返す）。だから列挙外の値では落とす。
+ * 両方の入口が先に `validateConfig` を通るので、正しい設定では到達しない
+ * （セキュリティ監査 run-1）。
  * @param env - Workers のバインディング
  * @returns 決済のモード
+ * @throws Error 列挙外の値のとき
  */
 export function billingModeOf(env: Pick<Env, "BILLING_ENABLED">): BillingMode {
-  return { enabled: env.BILLING_ENABLED === "true" };
+  if (env.BILLING_ENABLED === "true") return { enabled: true };
+  if (env.BILLING_ENABLED === "false") return { enabled: false };
+  throw new Error(`BILLING_ENABLED must be "true" or "false"`);
 }
