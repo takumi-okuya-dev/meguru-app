@@ -11,14 +11,36 @@ const WEEKDAYS = ["日", "月", "火", "水", "木", "金", "土"];
 const pad = (n: number) => String(n).padStart(2, "0");
 
 /**
+ * 表計算ソフトが数式として読み始める先頭文字（`=`・`+`・`-`・`@`、タブ、CR）。
+ *
+ * 引用符で囲むのは「セルの区切り」を伝える制御で、「評価するな」を伝える制御ではない。
+ * ソフトは囲みを外した後の先頭文字で数式かどうかを決めるので、`"=HYPERLINK(…)"` は
+ * 数式になりうる。このファイルは先頭にBOMを付けている＝読み手が表計算ソフトである前提なので、
+ * ここで無害化する（セキュリティ監査 run-1）。
+ */
+const FORMULA_LEAD = /^[=+\-@\t\r]/;
+
+/**
+ * CSVの1つの値を、引用した文字列にする。
+ * @param c - 値（null・undefined は空欄）
+ * @returns 引用済みの文字列
+ */
+function cell(c: CsvCell): string {
+  const raw = c === null || c === undefined ? "" : String(c);
+  // 先頭にシングルクォートを足すと、表計算ソフトは「文字列」として読む（セルの表示には出ない）
+  const safe = FORMULA_LEAD.test(raw) ? `'${raw}` : raw;
+  return `"${safe.replace(/"/g, '""')}"`;
+}
+
+/**
  * CSVの文字列にする（RFC 4180）。先頭にBOM（Excelで文字化けしないため）、改行はCRLF、すべての値を引用する。
+ * 先頭が数式の記号になる値は、文字列として読まれる形にする。
  * @param header - 列名
  * @param rows - 行
  * @returns CSVの全文
  */
 export function toCsv(header: readonly string[], rows: readonly (readonly CsvCell[])[]): string {
-  const line = (cells: readonly CsvCell[]) =>
-    cells.map((c) => `"${c === null || c === undefined ? "" : String(c).replace(/"/g, '""')}"`).join(",");
+  const line = (cells: readonly CsvCell[]) => cells.map(cell).join(",");
   return `\uFEFF${[header, ...rows].map(line).join("\r\n")}\r\n`;
 }
 
