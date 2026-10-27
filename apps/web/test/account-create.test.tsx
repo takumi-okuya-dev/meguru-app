@@ -46,6 +46,7 @@ function me(
     ...ME_BILLING_OFF,
     billing,
     threadsAccessMode,
+    threadsConnectMethods: ["app", "token"],
     teams: [],
   };
 }

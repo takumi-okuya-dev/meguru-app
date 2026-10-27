@@ -144,6 +144,26 @@ export function validateConfig(env: Env): string[] {
 /** 決済のモード（specs/013 research.md R2・R11）。環境ごとに1つで、判定する人の値に持たせる。 */
 export type BillingMode = { enabled: boolean };
 
+/** つなぐ方法（`accounts.connection_method` と同じ語）。 */
+export const CONNECT_METHODS = ["app", "token"] as const;
+
+/**
+ * 画面に出すつなぐ方法を決める。
+ *
+ * 未設定なら両方（今までの挙動）。`THREADS_CONNECT_METHODS` はカンマ区切りで、
+ * 知らない語は無視する。1つも残らなければ両方に戻す（設定の打ち間違いで
+ * 「つなげない製品」にしないため）。
+ * @param env - Workers のバインディング
+ * @returns 出す方法の並び（`app` が先）
+ */
+export function connectMethodsOf(env: Pick<Env, "THREADS_CONNECT_METHODS">): ("app" | "token")[] {
+  const raw = env.THREADS_CONNECT_METHODS;
+  if (!raw) return [...CONNECT_METHODS];
+  const asked = new Set(raw.split(",").map((m) => m.trim().toLowerCase()));
+  const picked = CONNECT_METHODS.filter((m) => asked.has(m));
+  return picked.length > 0 ? picked : [...CONNECT_METHODS];
+}
+
 /**
  * 環境の設定から決済のモードを作る。
  *

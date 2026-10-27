@@ -171,6 +171,11 @@ export const meResponseSchema = z.object({
   accountLimit: accountLimitSchema,
   /** Threads連携の公開範囲（specs/002 FR-028）。testers の間は、アカウント追加画面に検証期間の案内を出す */
   threadsAccessMode: z.enum(["testers", "public"]),
+  /**
+   * つなぐ方法のうち、画面に出すもの（既定は両方）。
+   * App Review を通すまで、または通らなかったときは `token` だけにできる。
+   */
+  threadsConnectMethods: z.array(connectionMethodSchema).min(1),
   /** 入っているチーム（参加した順。入っていなければ空。specs/011 research.md R5） */
   teams: z.array(meTeamSchema),
   /** 使える状態（帯とアカウントを作る画面に使う。specs/013 contracts/api.md） */

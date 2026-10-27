@@ -9,6 +9,7 @@ import { Hono, type MiddlewareHandler } from "hono";
 import { bodyLimit } from "hono/body-limit";
 import type { AppEnv } from "../app";
 import { createDb } from "../db/client";
+import { connectMethodsOf } from "../lib/config";
 import { AppError } from "../lib/errors";
 import { logger } from "../lib/logger";
 import { createThreadsClient, ThreadsApiError, ThreadsAuthError } from "../lib/threads-client";
@@ -56,6 +57,9 @@ function parseJson(raw: string): unknown {
 export function threadsConnectRoutes(authed: MiddlewareHandler<AppEnv>) {
   return new Hono<AppEnv>()
     .post("/threads/connect", authed, async (c) => {
+      // 出していない方法は、サーバー側でも断る（画面から消すだけにしない）。
+      // 決済OFFのときの Stripe の知らせと同じ作法で 404 にする
+      if (!connectMethodsOf(c.env).includes("app")) return c.notFound();
       const parsed = connectRequestSchema.safeParse(await c.req.json().catch(() => null));
       if (!parsed.success) throw new AppError("VALIDATION_FAILED", 400, "invalid connect request");
       const authorizeUrl = await startConnect(
@@ -79,6 +83,7 @@ export function threadsConnectRoutes(authed: MiddlewareHandler<AppEnv>) {
       async (c) => {
         // 自分のMetaアプリのトークンでの追加・接続し直し（specs/010 contracts/api.md）。本文はログに出さない
         const raw = await c.req.text();
+        if (!connectMethodsOf(c.env).includes("token")) return c.notFound();
         const parsed = tokenConnectRequestSchema.safeParse(parseJson(raw));
         if (!parsed.success) throw new AppError("VALIDATION_FAILED", 400, "invalid token connect request");
         const result = await connectWithToken(c.env, createThreadsClient(c.env), c.get("user"), parsed.data);

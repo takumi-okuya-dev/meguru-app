@@ -5,6 +5,7 @@ import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { Hono, type MiddlewareHandler } from "hono";
 import type { AppEnv } from "../app";
+import { connectMethodsOf } from "../lib/config";
 import { createDb } from "../db/client";
 import { accounts, memberships, users } from "../db/schema";
 import { personName, toAccountSummary, type AccountRow } from "../services/access";
@@ -83,6 +84,7 @@ export function meRoutes(authed: MiddlewareHandler<AppEnv>, deleteClerkUser: (en
       accountLimit: { max: entitlement!.accountLimit, used: owned.length },
       // Threads連携の公開範囲。Web はアカウント追加画面の案内の有無に使う（specs/002 FR-028）
       threadsAccessMode: c.env.THREADS_ACCESS_MODE ?? "testers",
+      threadsConnectMethods: connectMethodsOf(c.env),
       teams,
       billing: toMeBilling(user.billing, entitlement!, now),
       withdrawalInProgress: user.withdrawalRequestedAt !== null,

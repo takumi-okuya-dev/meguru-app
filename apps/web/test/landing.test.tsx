@@ -25,6 +25,7 @@ function me(landingAccountId: string | null): MeResponse {
     accountLimit: { max: 1, used: landingAccountId ? 1 : 0 },
     ...ME_BILLING_OFF,
     threadsAccessMode: "public",
+    threadsConnectMethods: ["app", "token"] as const,
     teams: [],
   };
 }

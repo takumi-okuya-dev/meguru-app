@@ -85,6 +85,7 @@ beforeEach(() => {
     accountLimit: { max: 1, used: 1 },
     ...ME_BILLING_OFF,
     threadsAccessMode: "public",
+    threadsConnectMethods: ["app", "token"] as const,
     teams: [],
   };
   mocks.me.mockResolvedValue(me);

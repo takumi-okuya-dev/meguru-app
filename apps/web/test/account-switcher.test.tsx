@@ -62,6 +62,7 @@ const me = (rows: AccountSummary[]): MeResponse => ({
   accountLimit: { max: 5, used: rows.length },
   ...ME_BILLING_OFF,
   threadsAccessMode: "testers",
+  threadsConnectMethods: ["app", "token"] as const,
   teams: [],
 });
 const counts = (rows: [string, number][]): NeedsReviewCountsResponse => ({

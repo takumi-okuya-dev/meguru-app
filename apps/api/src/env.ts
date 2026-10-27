@@ -18,6 +18,13 @@ export interface Env {
   AUTOPOST_KV: KVNamespace;
   /** Threads連携の公開範囲。未設定は testers（specs/002-strategy-profile research.md R15） */
   THREADS_ACCESS_MODE?: "testers" | "public";
+  /**
+   * つなぐ方法のうち、どれを出すか（既定は両方）。
+   * `app` はこのアプリのMetaアプリで許可する方法（OAuth）、`token` は利用者が自分の
+   * Metaアプリで作ったトークンを貼る方法。App Review を通すまでは `token` だけにして、
+   * 通らなかった場合も `token` で運用を続けられるようにするための切り替え。
+   */
+  THREADS_CONNECT_METHODS?: string;
   /** 決済のON/OFF（"true" か "false"。必須。specs/013-billing research.md R11） */
   BILLING_ENABLED: string;
   /** Stripeの秘密の鍵（決済ONのとき必須。本番 sk_live_、ステージング・手元 sk_test_） */
