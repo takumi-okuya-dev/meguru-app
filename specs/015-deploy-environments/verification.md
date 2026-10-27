@@ -95,6 +95,28 @@ DBの時計（`now()`）に直した（`apps/api/src/routes/auto-post.ts`）。�
 | `deploy.yml`に「設定がそろっているか見る」の安全弁を入れた | 【人】の設定（9-11）が済むまでは、`main`・`develop`へのマージのたびにデプロイが失敗して赤くなる。設定が入るまでは警告を出して何もしない。9-11が済んだら、このステップと各ステップの`if`は消してよい |
 | Constitutionを**4.1.0（MINOR）**にした | ブランチ運用を「公開時に3段構成に切り替える」から「3段構成とする」に変えたのは、原則の実質的な変更のため |
 
+## 3-2. セキュリティ監査（run-1、2026-10-27）の反映
+
+公開の前に、Cloudflare の security-audit スキルで監査した（成果物は `~/security-audit-skill/threads-grower-app/run-1/`）。
+狩り手・候補の検証・記録の検証をそれぞれ別のエージェントが行い、`deploy.yml` について確定した指摘を直した。
+
+| # | 指摘 | 直し方 |
+|---|---|---|
+| 13 | 出す先の判定が`github.ref_name`（refの短い名前）なので、ブランチとタグを区別しない。`refs/tags/main`というタグは`ref_name`が`main`になり、`environment:`も許可リストも`VITE_APP_ENV`とClerk鍵の照合もすべて本番側で通る | `github.ref`の完全な値（`refs/heads/main`・`refs/heads/develop`）で照合する。`ci.yml`は元から`github.ref`を使っていたので、不統一も解消した。`github.ref_name`は`deploy.yml`から無くなった（Pagesの行き先も`guard`が決めた固定の名前を渡す） |
+| 14 | 2-1の#4で「ワークフローの最初で止める」と書いたが、実際の許可リストは`actions/checkout`と`pnpm install --frozen-lockfile`の**後**にあった。`pnpm install`はワークスペースのlifecycleスクリプトを動かすので、refの内容を決められる主体のコードは許可リストに届く前に動く。しかも`environment:`はジョブの開始時に評価されるため、その時点でEnvironmentの秘密がジョブに渡っている | 許可の判定を`guard`という別のジョブに出した。`guard`は**Environmentを結び付けず、チェックアウトもしない**。`deploy`は`needs: guard`で、`environment:`は`needs.guard.outputs.env_name`から決まる。これで「refを確かめる」が「秘密が渡る」と「refのコードが動く」の両方より前になる |
+| 15 | `run:`の本文に`${{ }}`を埋め込んでいた。式はスクリプトを組み立てる時点で文字列として入るので、同じ`run:`の中に書いた検査では守れない | 値は`env:`経由で渡す。`run:`の中に式が無いことをテストで固定した |
+| 16 | `deploy.yml`・`ci.yml`のどちらにも`permissions:`が無く、`GITHUB_TOKEN`の範囲がリポジトリ／Organizationの既定に委ねられていた | 両方に`permissions: {}`を置き、要るジョブにだけ`contents: read`を足した |
+| 17 | `wrangler-config.test.ts`が`[env.*].vars`のキー名しか見ていなかった。`validateConfig`は`BILLING_ENABLED`が`"true"`／`"false"`以外を拒むのに、`billingModeOf`は`=== "true"`以外を黙って「課金オフ」に写すので、`"TRUE"`が入ると**fetch側は全部止まるのにCron側は全員を全権として扱う**（FR-063違反） | `BILLING_ENABLED`と`THREADS_ACCESS_MODE`の**値**を検査するようにした。`"TRUE"`を入れると落ちることを確かめた |
+
+**リポジトリの外側にしか置けない関所**（手順書に追記した）：
+
+- 9-11 に、Environmentの **Deployment branches and tags**（`production`は`main`のみ、`staging`は`develop`のみ）と Required reviewers。
+- 9-12 に、**タグのruleset**（`main`・`develop`という名前のタグを作れないようにする）。
+
+`workflow_dispatch`は選んだrefにあるワークフローの定義を動かすので、ファイルの中の判定は書き換えられる。「`main`以外から本番の秘密を渡さない」を本当に守れるのは、この2つだけである。**9-11・9-12が未着手の間は、`deploy.yml`の安全弁（必須6件が1つも入っていなければ何もしない）が全デプロイを飛ばすので実害はない。**
+
+監査で確定したその他の欠陥（NGワードの照合・`/api/health`の設定漏洩・`blockedWords`の漏れ・退会ロックアウト）と、観測待ちの8件は、015の範囲外なので別のPRで扱う。
+
 ## 4. まだ確かめていないこと（【人】の作業の後）
 
 [quickstart.md](./quickstart.md) 3の、実際にデプロイしないと確かめられないもの。

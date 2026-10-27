@@ -98,6 +98,17 @@ describe("wrangler.toml の環境ごとの設定", () => {
     expect(one(`env.${env}.vars`)?.APP_ENV).toBe(`"${env}"`);
   });
 
+  // キーがあるかだけでは足りない。`validateConfig` は "true"／"false" 以外を拒むのに
+  // `billingModeOf` は `=== "true"` 以外を黙って「課金オフ」に写すので、"TRUE" や "1" が
+  // 入ると fetch 側は全部止まるのに Cron 側は全員を全権として扱う（セキュリティ監査 run-1）
+  it.each(ENVS)("[env.%s.vars] の BILLING_ENABLED が true か false のどちらかである", (env) => {
+    expect(one(`env.${env}.vars`)?.BILLING_ENABLED).toMatch(/^"(true|false)"$/);
+  });
+
+  it.each(ENVS)("[env.%s.vars] の THREADS_ACCESS_MODE が testers か public のどちらかである", (env) => {
+    expect(one(`env.${env}.vars`)?.THREADS_ACCESS_MODE).toMatch(/^"(testers|public)"$/);
+  });
+
   it("秘密情報は wrangler.toml に書かれていない", () => {
     expect(toml).not.toMatch(/sk_(live|test)_[A-Za-z0-9]{10,}/);
     expect(toml).not.toMatch(/whsec_[A-Za-z0-9]{10,}/);

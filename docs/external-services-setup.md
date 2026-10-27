@@ -484,6 +484,15 @@ Settings → Environments で`staging`と`production`を作り、それぞれに
 
 `VITE_…`はビルドに焼き込まれるので、**秘密を入れない**（公開鍵だけ）。
 
+さらに、**それぞれのEnvironmentに保護規則を付けます**（Settings → Environments → その環境）。
+
+| 設定 | staging | production |
+|---|---|---|
+| Deployment branches and tags | **Selected** → `develop`（ブランチのみ） | **Selected** → `main`（ブランチのみ） |
+| Required reviewers | なし（任意） | 自分を入れておくと、本番は毎回自分の承認が要る |
+
+**この2つを飛ばさないでください。** `deploy.yml`の中にも出す先を決める関所（`guard`ジョブ）がありますが、Actionsの画面から手で動かすとき（`workflow_dispatch`）は**選んだブランチにあるワークフローの定義が動く**ので、ファイルの中の判定は書き換えられます。「`main`以外から本番の秘密を渡さない」を本当に守れるのは、**リポジトリの外側にあるこの設定だけ**です。
+
 ### 9-12. ブランチを守る（T012・T013）
 
 1. `develop`ブランチを`main`から作ってpushします。
@@ -498,6 +507,10 @@ git checkout main && git pull && git checkout -b develop && git push -u origin d
 - Restrict deletions
 - Require a pull request before merging（直接のpushを禁止）
 - Require status checks to pass → `check`（`ci.yml`のジョブ）
+
+4. **タグにも規則を付けます。** Ruleset の Target を **Tags** にして、`main`と`develop`という名前のタグを作れないようにします（Restrict creations、または `main`・`develop` を名指しで保護）。
+
+ブランチの規則だけではタグを止められません。`deploy.yml`は出す先を`refs/heads/main`という完全な値で見るようになっているので、`main`という名前のタグでは本番側に入れません。この手順はさらに**そういうタグをそもそも作れなくする**ためのもので、9-11のEnvironmentの保護規則と合わせて二重にします。
 
 ### 9-13. 確かめる
 

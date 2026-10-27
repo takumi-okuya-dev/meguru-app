@@ -10,17 +10,66 @@ on:
   # やり直し用。Actionsの画面から手で動かせる
   workflow_dispatch:
 
-# 同じ環境へのデプロイは1つずつ。走っているものを打ち切らない（FR-013）
+# GITHUB_TOKEN は既定では何も渡さない。要るジョブでだけ足す
+permissions: {}
+
+# 同じ ref へのデプロイは1つずつ。走っているものを打ち切らない（FR-013）。
+# ref の完全な値で分けるので、許可した2つの ref は 1対1 で環境に対応する
 concurrency:
-  group: deploy-${{ github.ref_name }}
+  group: deploy-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
+  # 出す先を決める関所。Environmentを結び付けず、リポジトリのコードも動かさない。
+  # この順番が肝心で、`environment:` を書いた時点でその環境の秘密がジョブに渡り、
+  # `pnpm install` はワークスペースの lifecycle スクリプトを動かす。どちらも
+  # 「どの ref か」を確かめた後でなければならない（セキュリティ監査 run-1）。
+  #
+  # 手で動かすとき（workflow_dispatch）は、選んだ ref にあるこのファイル自体が
+  # 動くので、ファイルの中の判定だけでは守りきれない。リポジトリの外側の関所
+  # （GitHubのEnvironmentの Deployment branches and tags と、タグの ruleset）が
+  # 必要で、その手順は docs/external-services-setup.md「9-11」「9-12」にある。
+  guard:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      wrangler: ${{ steps.pick.outputs.wrangler }}
+      env_name: ${{ steps.pick.outputs.env_name }}
+      pages_branch: ${{ steps.pick.outputs.pages_branch }}
+    steps:
+      # ref は完全な値（refs/heads/…）で見る。`github.ref_name` は短い名前で、
+      # ブランチとタグを区別しない（`refs/tags/main` の ref_name は `main` になる）
+      - name: 出す先を決める
+        id: pick
+        env:
+          REF: ${{ github.ref }}
+        run: |
+          case "$REF" in
+            refs/heads/main)
+              echo "wrangler=production" >> "$GITHUB_OUTPUT"
+              echo "env_name=production" >> "$GITHUB_OUTPUT"
+              echo "pages_branch=main" >> "$GITHUB_OUTPUT"
+              ;;
+            refs/heads/develop)
+              echo "wrangler=staging" >> "$GITHUB_OUTPUT"
+              echo "env_name=staging" >> "$GITHUB_OUTPUT"
+              echo "pages_branch=develop" >> "$GITHUB_OUTPUT"
+              ;;
+            *)
+              echo "::error::デプロイできるのは refs/heads/main（本番）と refs/heads/develop（ステージング）だけです（選ばれたのは $REF）。"
+              exit 1
+              ;;
+          esac
+
   deploy:
+    needs: guard
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    # GitHubのEnvironmentのSecretsと変数を使う（data-model.md 3-2・3-3）
-    environment: ${{ github.ref_name == 'main' && 'production' || 'staging' }}
+    permissions:
+      contents: read
+    # GitHubのEnvironmentのSecretsと変数を使う（data-model.md 3-2・3-3）。
+    # guard を通った ref だけがここに来る
+    environment: ${{ needs.guard.outputs.env_name }}
 
     steps:
       - uses: actions/checkout@v7
@@ -35,26 +84,12 @@ jobs:
       - name: 依存を入れる
         run: pnpm install --frozen-lockfile
 
-      # 手で動かすとき（workflow_dispatch）は、どのブランチも選べてしまう。
-      # main と develop 以外は、ここで止める（ほかのブランチをステージングに出さないため）
-      - name: 環境の名前を決める
-        id: env
-        run: |
-          case "${{ github.ref_name }}" in
-            main) echo "wrangler=production" >> "$GITHUB_OUTPUT" ;;
-            develop) echo "wrangler=staging" >> "$GITHUB_OUTPUT" ;;
-            *)
-              echo "::error::デプロイできるのは main（本番）と develop（ステージング）だけです（選ばれたのは ${{ github.ref_name }}）。"
-              exit 1
-              ;;
-          esac
-
       # 外部サービスの設定（docs/external-services-setup.md「9-11」）の確認。
       # - 1つも入っていない → 何もせずに終わる（移行の間だけの安全弁。9-11が済んだら、このステップと下の if を消してよい）
       # - 一部だけ入っている → 止める（空のClerkの鍵や localhost 向きのWebを本番に出さないため）
       - name: 設定がそろっているか見る
         id: ready
-        # 秘密の値は env 経由で渡す（run の文に埋め込まない）。中身は見ず、空かどうかだけを見る
+        # 値は env 経由で渡す（run の文に埋め込まない）。秘密は中身を見ず、空かどうかだけを見る
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
@@ -62,6 +97,7 @@ jobs:
           VITE_API_BASE_URL: ${{ vars.VITE_API_BASE_URL }}
           VITE_CLERK_PUBLISHABLE_KEY: ${{ vars.VITE_CLERK_PUBLISHABLE_KEY }}
           VITE_APP_ENV: ${{ vars.VITE_APP_ENV }}
+          TARGET: ${{ needs.guard.outputs.wrangler }}
         run: |
           required="CLOUDFLARE_API_TOKEN DATABASE_URL CLOUDFLARE_ACCOUNT_ID VITE_API_BASE_URL VITE_CLERK_PUBLISHABLE_KEY VITE_APP_ENV"
           missing=""
@@ -77,17 +113,17 @@ jobs:
             exit 1
           else
             # VITE_APP_ENV が、出す先の環境と合っているか（取り違えると帯が出ない・出たままになる）
-            if [ "$VITE_APP_ENV" != "${{ steps.env.outputs.wrangler }}" ]; then
-              echo "::error::VITE_APP_ENV（$VITE_APP_ENV）が、出す先（${{ steps.env.outputs.wrangler }}）と合っていません。"
+            if [ "$VITE_APP_ENV" != "$TARGET" ]; then
+              echo "::error::VITE_APP_ENV（$VITE_APP_ENV）が、出す先（$TARGET）と合っていません。"
               exit 1
             fi
             # Clerkの公開鍵が、その環境のものか（本番は本番インスタンスの pk_live_、
             # ステージングは開発用インスタンスの pk_test_）。APIの秘密の鍵のほうは src/lib/config.ts が見る
-            if [ "${{ steps.env.outputs.wrangler }}" = "production" ]; then want=pk_live_; else want=pk_test_; fi
+            if [ "$TARGET" = "production" ]; then want=pk_live_; else want=pk_test_; fi
             case "$VITE_CLERK_PUBLISHABLE_KEY" in
               "$want"*) echo "ready=true" >> "$GITHUB_OUTPUT" ;;
               *)
-                echo "::error::VITE_CLERK_PUBLISHABLE_KEY が ${want}… ではありません（${{ steps.env.outputs.wrangler }} なので ${want} が要ります）。"
+                echo "::error::VITE_CLERK_PUBLISHABLE_KEY が ${want}… ではありません（$TARGET なので ${want} が要ります）。"
                 exit 1
                 ;;
             esac
@@ -118,13 +154,14 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
           workingDirectory: apps/api
-          command: deploy --env ${{ steps.env.outputs.wrangler }}
+          command: deploy --env ${{ needs.guard.outputs.wrangler }}
 
-      # 3. Web（Cloudflare Pages）。main は本番、develop はブランチの別名として出る
+      # 3. Web（Cloudflare Pages）。main は本番、develop はブランチの別名として出る。
+      # 行き先は guard が決めた固定の名前を渡す（ref の名前をそのまま渡さない）
       - name: Web を出す
         if: steps.ready.outputs.ready == 'true'
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
-          command: pages deploy apps/web/dist --project-name threads-grower-web --branch ${{ github.ref_name }}
+          command: pages deploy apps/web/dist --project-name threads-grower-web --branch ${{ needs.guard.outputs.pages_branch }}
