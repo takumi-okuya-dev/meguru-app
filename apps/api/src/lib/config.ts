@@ -144,11 +144,41 @@ export function validateConfig(env: Env): string[] {
 /** 決済のモード（specs/013 research.md R2・R11）。環境ごとに1つで、判定する人の値に持たせる。 */
 export type BillingMode = { enabled: boolean };
 
+/** つなぐ方法（`accounts.connection_method` と同じ語）。 */
+export const CONNECT_METHODS = ["app", "token"] as const;
+
+/**
+ * 画面に出すつなぐ方法を決める。
+ *
+ * 未設定なら両方（今までの挙動）。`THREADS_CONNECT_METHODS` はカンマ区切りで、
+ * 知らない語は無視する。1つも残らなければ両方に戻す（設定の打ち間違いで
+ * 「つなげない製品」にしないため）。
+ * @param env - Workers のバインディング
+ * @returns 出す方法の並び（`app` が先）
+ */
+export function connectMethodsOf(env: Pick<Env, "THREADS_CONNECT_METHODS">): ("app" | "token")[] {
+  const raw = env.THREADS_CONNECT_METHODS;
+  if (!raw) return [...CONNECT_METHODS];
+  const asked = new Set(raw.split(",").map((m) => m.trim().toLowerCase()));
+  const picked = CONNECT_METHODS.filter((m) => asked.has(m));
+  return picked.length > 0 ? picked : [...CONNECT_METHODS];
+}
+
 /**
  * 環境の設定から決済のモードを作る。
+ *
+ * `validateConfig` は `"true"`／`"false"` 以外を拒む（FR-063：未設定で黙ってOFFにしない）。
+ * ここで `=== "true"` だけを見て残りを「課金オフ」に写すと、同じ変数を2つの規則で読むことになり、
+ * `"TRUE"` のような値で **APIは全リクエストを拒むのに Cron は全オーナーを全権として扱う**
+ * （`entitlementOf` が契約の状態を読まずに全権を返す）。だから列挙外の値では落とす。
+ * 両方の入口が先に `validateConfig` を通るので、正しい設定では到達しない
+ * （セキュリティ監査 run-1）。
  * @param env - Workers のバインディング
  * @returns 決済のモード
+ * @throws Error 列挙外の値のとき
  */
 export function billingModeOf(env: Pick<Env, "BILLING_ENABLED">): BillingMode {
-  return { enabled: env.BILLING_ENABLED === "true" };
+  if (env.BILLING_ENABLED === "true") return { enabled: true };
+  if (env.BILLING_ENABLED === "false") return { enabled: false };
+  throw new Error(`BILLING_ENABLED must be "true" or "false"`);
 }

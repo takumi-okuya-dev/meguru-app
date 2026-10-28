@@ -18,6 +18,7 @@ import {
   feedbackResponseSchema,
   performancePageSchema,
   type PerformanceTab,
+  completeConnectResponseSchema,
   connectResponseSchema,
   tokenConnectResponseSchema,
   deleteCountSchema,
@@ -57,6 +58,7 @@ import {
   putPostingScheduleResponseSchema,
   threadsCheckSchema,
   type PutPostingScheduleRequest,
+  type CompleteConnectRequest,
   type ConnectRequest,
   TokenConnectRequestBody,
   type ReviewRequest,
@@ -275,6 +277,13 @@ export const api = {
     }),
   connect: (body: ConnectRequest) =>
     request("/api/threads/connect", connectResponseSchema, {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+  // Threads から戻ってきた state と code で、接続を完了する（セキュリティ監査 run-1）。
+  // 完了をログイン済みにして、state を作った人と呼び出し元の一致を要求する
+  completeConnect: (body: CompleteConnectRequest) =>
+    request("/api/threads/complete", completeConnectResponseSchema, {
       method: "POST",
       body: JSON.stringify(body),
     }),

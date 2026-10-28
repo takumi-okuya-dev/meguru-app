@@ -50,6 +50,7 @@ const me: MeResponse = {
   accountLimit: { max: 5, used: 2 },
   ...ME_BILLING_OFF,
   threadsAccessMode: "testers",
+  threadsConnectMethods: ["app", "token"] as const,
   teams: [],
 };
 

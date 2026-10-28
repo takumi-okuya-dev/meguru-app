@@ -51,6 +51,7 @@ function me(teams: MeResponse["teams"]): MeResponse {
     accountLimit: { max: 5, used: 1 },
     ...ME_BILLING_OFF,
     threadsAccessMode: "testers",
+    threadsConnectMethods: ["app", "token"] as const,
     teams,
   };
 }

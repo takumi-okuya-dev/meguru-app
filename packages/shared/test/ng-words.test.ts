@@ -53,3 +53,52 @@ describe("濁点の付いた半角カナ（PR #5 のCodexレビュー）", () =>
     expect(findNgWords("今日もガンバル", ng("ｶﾞﾝﾊﾞﾙ"))).toHaveLength(1);
   });
 });
+
+// 1文字の見えない文字で照合をすり抜けさせない（セキュリティ監査 run-1）。
+// 本文を書くのに要る権限は content だけで、NGワードの登録は settings、承認は review。
+// つまりオーナーが禁止した語を、編集者が「きれいに見える下書き」として通せていた
+describe("見えない文字を挟んだNGワード", () => {
+  it.each(["\u200b", "\u200c", "\u200d", "\u00ad", "\u2060", "\ufeff", "\ufe0f", "\u034f"])(
+    "%j を語の中に挟んでも検知する",
+    (invisible) => {
+      const hits = findNgWords(`絶${invisible}対に稼げる`, ng("絶対"));
+      expect(hits).toHaveLength(1);
+      expect(hits[0]?.word).toBe("絶対");
+      // 強調する範囲は、挟まれた見えない文字も含む
+      expect(hits[0]?.ranges[0]).toEqual([0, 2 + invisible.length]);
+    },
+  );
+
+  it("登録した語の側に挟まっていても検知する", () => {
+    expect(findNgWords("絶対に稼げる", ng("絶\u200b対"))).toHaveLength(1);
+  });
+
+  it("まとめる単位を割る挟み込みも検知する", () => {
+    expect(findNgWords("今日もｶ\u200bﾞﾝﾊﾞﾙ", ng("ガンバル"))).toHaveLength(1);
+  });
+});
+
+// 照合の正規化を変えると、登録済みの ng_words.normalized が古くなる。
+// 保存値をそのまま使うと、同じ文字どうしでも当たらなくなる（PR #20 のCodexレビュー）
+describe("登録済みの normalized が古いとき", () => {
+  it("word から正規化し直して当てる（異体字セレクタを含む語）", () => {
+    // 以前の正規化では、異体字セレクタ U+FE0F が normalized に残っていた
+    const stale = { word: "☀\ufe0f", normalized: "☀\ufe0f" };
+    expect(findNgWords("今日は☀\ufe0fです", [stale])).toHaveLength(1);
+    expect(findNgWords("今日は☀です", [stale])).toHaveLength(1);
+  });
+
+  it("word から正規化し直して当てる（書式文字を含む語）", () => {
+    const stale = { word: "絶\u200b対", normalized: "絶\u200b対" };
+    expect(findNgWords("絶対に稼げる", [stale])).toHaveLength(1);
+  });
+
+  it("古い normalized が空でも、word が空でなければ当てる", () => {
+    const stale = { word: "絶対", normalized: "" };
+    expect(findNgWords("絶対に稼げる", [stale])).toHaveLength(1);
+  });
+
+  it("word が空白だけなら、何にも当てない（全文一致にしない）", () => {
+    expect(findNgWords("絶対に稼げる", [{ word: "  ", normalized: "" }])).toEqual([]);
+  });
+});

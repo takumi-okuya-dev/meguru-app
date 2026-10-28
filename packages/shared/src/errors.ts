@@ -276,8 +276,12 @@ export function errorMessage(code: ErrorCode, ctx: ErrorMessageContext = {}): Er
     case "THREADS_UNAVAILABLE":
       return { message: "Threadsに接続できませんでした。時間をおいて、もう一度お試しください。", action: "retry-later" };
     case "CONFIG_ERROR":
+      // 項目名はAPIが手元の開発のときだけ返す（セキュリティ監査 run-1）。
+      // 返ってこない＝公開された環境なので、開発者向けの案内も出さない
       return {
-        message: `サーバーの設定に誤りがあります${ctx.details?.length ? `（${ctx.details.join("、")}）` : ""}。開発環境では apps/api/.dev.vars を確認し、APIを起動し直してください。`,
+        message: ctx.details?.length
+          ? `サーバーの設定に誤りがあります（${ctx.details.join("、")}）。apps/api/.dev.vars を確認し、APIを起動し直してください。`
+          : "サーバーの設定に誤りがあります。運用者にお問い合わせください。",
         action: "reload",
       };
     case "API_UNREACHABLE":

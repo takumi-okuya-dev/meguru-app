@@ -27,11 +27,19 @@ import { readPostingSchedule, toAutoPostState } from "./posting-schedule-service
 type PostDraftRow = typeof postDrafts.$inferSelect;
 
 /**
+ * 下書きを返すときの見せ方。
+ * `redactSettings` は、設定（`settings` の権限）由来の値を伏せる。
+ * 見せてもらっている人（`shared_viewer`）は `read` だけなので、オーナーの設定を見る権限が無い。
+ */
+export type PostDraftView = { redactSettings?: boolean };
+
+/**
  * 下書きの行を、レスポンスの PostDraft にする。
  * @param row - post_drafts の行
+ * @param view - 見せ方（既定は何も伏せない）
  * @returns PostDraft
  */
-export function toPostDraft(row: PostDraftRow) {
+export function toPostDraft(row: PostDraftRow, view: PostDraftView = {}) {
   return {
     id: row.id,
     batchId: row.batchId,
@@ -52,7 +60,9 @@ export function toPostDraft(row: PostDraftRow) {
     publishError: row.publishError as PublishError | null,
     blockedAt: row.blockedAt?.toISOString() ?? null,
     blockedReason: row.blockedReason as BlockedReason | null,
-    blockedWords: row.blockedWords ?? [],
+    // blockedWords はオーナーが登録したNGワードそのもの。`settings` の権限が無い人には返さない
+    // （specs/011 FR-031、Constitution原則V、セキュリティ監査 run-1）
+    blockedWords: view.redactSettings ? [] : (row.blockedWords ?? []),
     // 作った人・直した人（specs/008 FR-053）
     createdBy: row.createdByUserId,
     editedBy: row.editedByUserId,
@@ -201,7 +211,11 @@ export async function listReviewedRows(
  * @param now - 今の時刻
  * @returns 要確認・承認済み（投稿の順）・却下（新しい500件）・投稿に失敗の下書き、予定、自動投稿の状態、件数
  */
-export async function listAllDrafts(db: Db, account: AccountRow & { ownerReadOnly?: boolean }, now: Date = new Date()) {
+export async function listAllDrafts(
+  db: Db,
+  account: AccountRow & { ownerReadOnly?: boolean } & PostDraftView,
+  now: Date = new Date(),
+) {
   const [needsReview, approved, rejected, publishFailed, counts, schedule] = await Promise.all([
     listDraftRows(db, account.id),
     listQueueRows(db, account.id),
@@ -212,11 +226,14 @@ export async function listAllDrafts(db: Db, account: AccountRow & { ownerReadOnl
   ]);
   const queue = approved.filter((d) => d.status !== "publishing");
   const slots = await upcomingSlots(db, account, schedule, now, queue.length);
+  // 設定由来の値の伏せ方は、整形する側に渡す。呼び出し側がフィールドごとに
+  // 覚えておく形にすると、設定由来の値が増えたときに漏れる（セキュリティ監査 run-1）
+  const view: PostDraftView = { redactSettings: account.redactSettings === true };
   return {
-    needsReview: needsReview.map(toPostDraft),
-    approved: approved.map(toPostDraft),
-    rejected: rejected.map(toPostDraft),
-    publishFailed: publishFailed.map(toPostDraft),
+    needsReview: needsReview.map((r) => toPostDraft(r, view)),
+    approved: approved.map((r) => toPostDraft(r, view)),
+    rejected: rejected.map((r) => toPostDraft(r, view)),
+    publishFailed: publishFailed.map((r) => toPostDraft(r, view)),
     schedule: Object.fromEntries(
       queue.flatMap((d, i) => (slots[i] ? [[d.id, slots[i]!.toISOString()]] : [])),
     ),
@@ -233,7 +250,7 @@ function toBatchResult(batch: BatchRow, drafts: PostDraftRow[]) {
     draftCount: batch.draftCount,
     delimiterFound: batch.delimiterFound,
     overLimitCount: drafts.filter((d) => isOverThreadsLimit(d.body)).length,
-    drafts: drafts.map(toPostDraft),
+    drafts: drafts.map((r) => toPostDraft(r)),
   };
 }
 

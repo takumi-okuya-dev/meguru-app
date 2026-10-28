@@ -79,6 +79,15 @@ describe("PATCH /api/teams/:teamId/accounts/:accountId（チームに見せる�
   it("見せてもらっている人には、投稿の一覧にNGワード・作る件数を返さない（設定は見せない。FR-031）", async () => {
     const { teamId, ownerAcc } = await setup();
     await call(app, "POST", `/api/accounts/${ownerAcc}/ng-words`, { user: "o1", body: { words: ["秘密の言葉"] } });
+    // ブロックされた下書きを1件作る。1件も無いとこの不変条件を検査できず、
+    // 下書きに付く blockedWords（＝オーナーのNGワードそのもの）の漏れを見逃す（セキュリティ監査 run-1）
+    const db = sql();
+    const [batch] = (await db`
+      INSERT INTO draft_batches (account_id, client_request_id, draft_count, delimiter_found)
+      VALUES (${ownerAcc}, gen_random_uuid(), 1, true) RETURNING id`) as [{ id: string }];
+    await db`
+      INSERT INTO post_drafts (account_id, batch_id, position, body, status, blocked_at, blocked_reason, blocked_words)
+      VALUES (${ownerAcc}, ${batch.id}, 0, '案', 'needs_review', now(), 'ng_word', ARRAY['秘密の言葉'])`;
     expect((await share(teamId, ownerAcc, "o1", true)).status).toBe(204);
     const res = await call(app, "GET", `/api/accounts/${ownerAcc}/post-drafts`, { user: "m1" });
     const body = (await res.json()) as {
@@ -97,6 +106,27 @@ describe("PATCH /api/teams/:teamId/accounts/:accountId（チームに見せる�
     expect(raw.autoPost).toBeNull();
     expect(raw.schedule).toEqual({});
     expect(JSON.stringify(body)).not.toContain("秘密の言葉");
+    // ブロックされた下書きは見えるが、どの語でブロックされたかは伏せる
+    const lists = body as unknown as { needsReview: { blockedReason: string | null; blockedWords: string[] }[] };
+    expect(lists.needsReview).toHaveLength(1);
+    expect(lists.needsReview[0]?.blockedReason).toBe("ng_word");
+    expect(lists.needsReview[0]?.blockedWords).toEqual([]);
+  });
+
+  it("オーナー自身には blockedWords を返す（伏せるのは見せてもらっている人だけ）", async () => {
+    const { teamId, ownerAcc } = await setup();
+    await call(app, "POST", `/api/accounts/${ownerAcc}/ng-words`, { user: "o1", body: { words: ["秘密の言葉"] } });
+    const db = sql();
+    const [batch] = (await db`
+      INSERT INTO draft_batches (account_id, client_request_id, draft_count, delimiter_found)
+      VALUES (${ownerAcc}, gen_random_uuid(), 1, true) RETURNING id`) as [{ id: string }];
+    await db`
+      INSERT INTO post_drafts (account_id, batch_id, position, body, status, blocked_at, blocked_reason, blocked_words)
+      VALUES (${ownerAcc}, ${batch.id}, 0, '案', 'needs_review', now(), 'ng_word', ARRAY['秘密の言葉'])`;
+    expect((await share(teamId, ownerAcc, "o1", true)).status).toBe(204);
+    const res = await call(app, "GET", `/api/accounts/${ownerAcc}/post-drafts`, { user: "o1" });
+    const body = (await res.json()) as { needsReview: { blockedWords: string[] }[] };
+    expect(body.needsReview[0]?.blockedWords).toEqual(["秘密の言葉"]);
   });
 
   it("見せてもらっている人の GET /accounts/:id は、名前とアイコンだけが本当の値で、接続・最後に使った日時は伏せる（PR #14 のCodexレビュー）", async () => {

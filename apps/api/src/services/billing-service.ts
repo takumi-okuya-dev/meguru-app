@@ -514,8 +514,11 @@ export async function loadOwnerEntitlement(db: Db | TxDb, accountId: string, mod
 
 /** 料金なしの印を付け・外した結果。 */
 export type ExemptResult =
-  | { kind: "updated"; email: string; before: boolean; after: boolean }
+  // どの行を変えたかを出せるよう、id と clerk_user_id も返す（セキュリティ監査 run-1）
+  | { kind: "updated"; id: string; clerkUserId: string; email: string; before: boolean; after: boolean }
   | { kind: "not_found" }
+  // 同じアドレスの行が2つ以上。何も書かずに止める
+  | { kind: "ambiguous"; count: number; users: { id: string; clerkUserId: string }[] }
   | { kind: "has_subscription"; status: string };
 
 /**
@@ -528,16 +531,32 @@ export type ExemptResult =
  * @returns 結果
  */
 export async function setBillingExemptByEmail(db: Db, email: string, on: boolean, force = false): Promise<ExemptResult> {
-  const [user] = await db
-    .select({ id: users.id, email: users.email, exempt: users.billingExempt })
+  const needle = email.trim().toLowerCase();
+  // 空白だけの引数で、空文字列の行（Clerk にメールアドレスが無い利用者）に当たらないようにする
+  if (needle === "") return { kind: "not_found" };
+  // users.email には一意制約もインデックスも無い（schema.ts の users）。Clerk の user.updated の
+  // Webhook も無いので、本人が手放したアドレスが行に残り、後からそのアドレスを取った別人の行と
+  // 重なりうる。1行に決め打たず、2行目があるかどうかを見て止める（セキュリティ監査 run-1）。
+  // 同じ形の lower(accounts.username) は、このプロジェクト自身が一致を集合として扱っている
+  const found = await db
+    .select({ id: users.id, clerkUserId: users.clerkUserId, email: users.email, exempt: users.billingExempt })
     .from(users)
-    .where(sql`lower(${users.email}) = ${email.trim().toLowerCase()}`)
-    .limit(1);
-  if (!user) return { kind: "not_found" };
+    .where(sql`lower(${users.email}) = ${needle}`)
+    .limit(2);
+  if (found.length === 0) return { kind: "not_found" };
+  if (found.length > 1) {
+    logger.error("billing: refusing to set billing_exempt for an ambiguous address", {
+      users: found.map((u) => u.id),
+    });
+    return { kind: "ambiguous", count: found.length, users: found.map((u) => ({ id: u.id, clerkUserId: u.clerkUserId })) };
+  }
+  const user = found[0]!;
   if (on && !force) {
     const [sub] = await db.select({ status: subscriptions.status }).from(subscriptions).where(eq(subscriptions.userId, user.id));
     if (sub?.status && !(ENDED_STATUSES as readonly string[]).includes(sub.status)) return { kind: "has_subscription", status: sub.status };
   }
   await db.update(users).set({ billingExempt: on, updatedAt: new Date() }).where(eq(users.id, user.id));
-  return { kind: "updated", email: user.email, before: user.exempt, after: on };
+  // この経路は活動の記録を残さないので、せめてどの行を変えたかをログに残す
+  logger.info("billing: billing_exempt changed", { userId: user.id, before: user.exempt, after: on });
+  return { kind: "updated", id: user.id, clerkUserId: user.clerkUserId, email: user.email, before: user.exempt, after: on };
 }

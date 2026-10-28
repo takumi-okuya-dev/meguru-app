@@ -1,6 +1,6 @@
 // 設定の確認（誤りがあれば項目名だけを返す。値は返さない）
 import { describe, expect, it } from "vitest";
-import { validateConfig } from "../../src/lib/config";
+import { billingModeOf, connectMethodsOf, validateConfig } from "../../src/lib/config";
 import type { Env } from "../../src/env";
 import { testBindings } from "../env";
 
@@ -116,5 +116,44 @@ describe("validateConfig", () => {
   it("偽のThreadsで動かすときは、Threadsの3項目は見本の値のままでよい", () => {
     const env = { ...good, THREADS_APP_ID: "000000000000000", THREADS_APP_SECRET: "xxxxxxxx" } as Env;
     expect(validateConfig(env)).toEqual([]);
+  });
+});
+
+// 1つの変数を2つの規則で読まない（セキュリティ監査 run-1）。
+// `validateConfig` が "true"／"false" 以外を拒むのに `billingModeOf` が
+// `=== "true"` 以外を黙って「課金オフ」に写すと、Cron 側だけが全オーナーを
+// 全権として扱う（契約の状態を読まずに）。
+describe("billingModeOf", () => {
+  it.each([
+    ["true", true],
+    ["false", false],
+  ])("%j は、そのまま読む", (value, expected) => {
+    expect(billingModeOf({ BILLING_ENABLED: value } as Env).enabled).toBe(expected);
+  });
+
+  it.each(["TRUE", "True", "1", "yes", "", undefined])("%j は、黙って課金オフにせず落ちる", (value) => {
+    expect(() => billingModeOf({ BILLING_ENABLED: value } as Env)).toThrow(/BILLING_ENABLED/);
+  });
+});
+
+// つなぐ方法の切り替え（App Review を通すまで／通らなかったときに token だけで運用する）。
+// 既定は両方（今までの挙動を変えない）
+describe("connectMethodsOf", () => {
+  it("未設定なら両方", () => {
+    expect(connectMethodsOf({} as Env)).toEqual(["app", "token"]);
+    expect(connectMethodsOf({ THREADS_CONNECT_METHODS: "" } as Env)).toEqual(["app", "token"]);
+  });
+
+  it.each([
+    ["token", ["token"]],
+    ["app", ["app"]],
+    ["app,token", ["app", "token"]],
+    [" TOKEN , app ", ["app", "token"]],
+  ])("%j は %j", (raw, expected) => {
+    expect(connectMethodsOf({ THREADS_CONNECT_METHODS: raw } as Env)).toEqual(expected);
+  });
+
+  it("知らない語だけなら、両方に戻す（打ち間違いで「つなげない製品」にしない）", () => {
+    expect(connectMethodsOf({ THREADS_CONNECT_METHODS: "oauth,paste" } as Env)).toEqual(["app", "token"]);
   });
 });

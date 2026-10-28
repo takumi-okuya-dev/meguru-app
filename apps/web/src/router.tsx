@@ -24,6 +24,7 @@ import { SettingsIndex, SettingsLayout } from "@/pages/settings/settings-layout"
 import { PromotionsPage } from "@/pages/promotions";
 import { ResearchPage } from "@/pages/research";
 import { StockPage } from "@/pages/stock";
+import { ThreadsComplete } from "@/pages/threads-complete";
 import { CreatePage } from "@/pages/create";
 import { StrategyPage } from "@/pages/strategy";
 import { TermsPage } from "@/pages/terms";
@@ -63,6 +64,9 @@ export const routes = [
     children: [
       { path: "/", element: <Landing /> },
       { path: "/accounts/new", element: <AccountNew /> },
+      // Threads から戻ってきた人の受け口。接続の完了はログイン済みでしか行えない
+      // （state を作った人と呼び出し元の一致を要求する。セキュリティ監査 run-1）
+      { path: "/threads/complete", element: <ThreadsComplete /> },
       {
         path: "/settings",
         element: <SettingsLayout />,

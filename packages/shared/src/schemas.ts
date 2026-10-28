@@ -171,6 +171,11 @@ export const meResponseSchema = z.object({
   accountLimit: accountLimitSchema,
   /** Threads連携の公開範囲（specs/002 FR-028）。testers の間は、アカウント追加画面に検証期間の案内を出す */
   threadsAccessMode: z.enum(["testers", "public"]),
+  /**
+   * つなぐ方法のうち、画面に出すもの（既定は両方）。
+   * App Review を通すまで、または通らなかったときは `token` だけにできる。
+   */
+  threadsConnectMethods: z.array(connectionMethodSchema).min(1),
   /** 入っているチーム（参加した順。入っていなければ空。specs/011 research.md R5） */
   teams: z.array(meTeamSchema),
   /** 使える状態（帯とアカウントを作る画面に使う。specs/013 contracts/api.md） */
@@ -224,6 +229,37 @@ export type TokenConnectResponse = z.infer<typeof tokenConnectResponseSchema>;
 
 /** POST /api/threads/connect のレスポンスのスキーマ。Threadsの認可URLを返す。 */
 export const connectResponseSchema = z.object({ authorizeUrl: z.string().url() });
+
+/**
+ * POST /api/threads/complete のリクエスト（セキュリティ監査 run-1）。
+ *
+ * Threads から戻ってきた `state` と `code` を、**ログイン済みの呼び出し**で渡す。
+ * 以前は無認証の `GET /api/threads/callback` が `state` の持ち主をそのまま主体に
+ * 持ち上げて接続まで済ませていたので、`state` を作った人が第三者にそれを踏ませると、
+ * 踏んだ人の認可が作った人のテナントに記録された。完了をログイン済みにすることで、
+ * `state` の `user_id` と Clerk で確かめた呼び出し元が一致することを要求できる。
+ */
+export const completeConnectRequestSchema = z.object({
+  state: z.string().min(1).max(200),
+  /** 認可が成功したときの code。利用者が許可しなかったときは入れない。 */
+  code: z.string().min(1).max(4096).optional(),
+  /**
+   * 利用者が許可しなかったときの理由。`state` を渡すのは、元のアカウントの画面へ
+   * 戻すため（どのアカウントの接続だったかは `state` の行にしか無い）。
+   */
+  error: z.literal("THREADS_AUTH_CANCELLED").optional(),
+});
+/** POST /api/threads/complete のリクエスト。 */
+export type CompleteConnectRequest = z.infer<typeof completeConnectRequestSchema>;
+
+/**
+ * POST /api/threads/complete の応答。行き先はサーバーが決める
+ * （以前 callback が組み立てていたリダイレクト先と同じ判断をそのまま持ってくる）。
+ * 必ず `/` で始まる、このアプリの中の相対パス。
+ */
+export const completeConnectResponseSchema = z.object({ redirectTo: z.string().startsWith("/") });
+/** POST /api/threads/complete の応答。 */
+export type CompleteConnectResponse = z.infer<typeof completeConnectResponseSchema>;
 
 /** POST /api/accounts/:id/open のリクエストのスキーマ（research.md R10）。 */
 export const openAccountRequestSchema = z.object({

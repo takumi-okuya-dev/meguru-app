@@ -96,6 +96,14 @@ export function ConnectMethods({
       );
   }
 
+  // 出す方法は環境の設定で決まる（既定は両方）。App Review を通すまで、または
+  // 通らなかったときは token だけにできる
+  const methods = me.data?.threadsConnectMethods ?? ["app", "token"];
+  const showApp = methods.includes("app");
+  const showToken = methods.includes("token");
+  // OAuth を出さないときは、トークンの手順を最初から開いておく（唯一の方法なので畳まない）
+  const tokenExpanded = tokenOpen || !showApp;
+
   return (
     <div className="space-y-4">
       <ConnectionBadge status="not_connected" />
@@ -103,23 +111,30 @@ export function ConnectMethods({
         Threadsにつなぐと、承認した案を自動で投稿し、反応を分析できます。戦略・投稿ストック・設定は、つないでもそのまま残ります。
       </p>
       {returned}
-      <Button disabled={oauth.isPending} onClick={() => oauth.mutate()}>
-        Threadsで許可する
-      </Button>
-      {oauth.isError && (
-        <Alert variant="destructive">
-          <AlertDescription className="text-foreground">{describeError(oauth.error)}</AlertDescription>
-        </Alert>
-      )}
-      {/* Meta App Review の前（テスターだけが接続できる間）だけ出す（specs/002 FR-028） */}
-      {me.data?.threadsAccessMode === "testers" && (
-        <Alert>
-          <AlertDescription>{TESTER_NOTICE}</AlertDescription>
-        </Alert>
+      {showApp && (
+        <>
+          <Button disabled={oauth.isPending} onClick={() => oauth.mutate()}>
+            Threadsで許可する
+          </Button>
+          {oauth.isError && (
+            <Alert variant="destructive">
+              <AlertDescription className="text-foreground">{describeError(oauth.error)}</AlertDescription>
+            </Alert>
+          )}
+          {/* Meta App Review の前（テスターだけが接続できる間）だけ出す（specs/002 FR-028） */}
+          {me.data?.threadsAccessMode === "testers" && (
+            <Alert>
+              <AlertDescription>{TESTER_NOTICE}</AlertDescription>
+            </Alert>
+          )}
+        </>
       )}
 
-      {/* 2つ目の方法（specs/010 FR-001）。開くまで手順と入力欄を出さない */}
-      <div className="space-y-4 border-t pt-4">
+      {/* 2つ目の方法（specs/010 FR-001）。開くまで手順と入力欄を出さない。
+          OAuth を出さないときは、これが唯一の方法なので畳まない */}
+      {showToken && (
+      <div className={cn("space-y-4", showApp && "border-t pt-4")}>
+        {showApp && (
         <button
           type="button"
           aria-expanded={tokenOpen}
@@ -129,7 +144,8 @@ export function ConnectMethods({
           自分のMetaアプリのトークンでつなぐ
           <ChevronDownIcon aria-hidden="true" className={cn("size-4 transition-transform", tokenOpen && "rotate-180")} />
         </button>
-        {tokenOpen && (
+        )}
+        {tokenExpanded && (
           <TokenConnectForm
             mode="connect"
             accountId={account.id}
@@ -142,6 +158,7 @@ export function ConnectMethods({
           />
         )}
       </div>
+      )}
     </div>
   );
 }

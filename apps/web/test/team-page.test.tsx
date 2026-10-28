@@ -85,6 +85,7 @@ const meData: MeResponse = {
   accountLimit: { max: 3, used: 2 },
   ...ME_BILLING_OFF,
   threadsAccessMode: "testers",
+  threadsConnectMethods: ["app", "token"] as const,
   teams: [{ id: "t1", name: "飲食チーム", memberCount: 4, role: "member" }],
 };
 

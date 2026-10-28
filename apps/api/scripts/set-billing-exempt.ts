@@ -18,9 +18,17 @@ const result = await setBillingExemptByEmail(createDb(process.env.DATABASE_URL),
 if (result.kind === "not_found") {
   console.error(`${email} の利用者は見つかりません`);
   process.exitCode = 1;
+} else if (result.kind === "ambiguous") {
+  // 同じアドレスの行が2つ以上あると、どちらに書いたか後から区別できない。
+  // 何も書かずに止めて、id を出す（セキュリティ監査 run-1）
+  console.error(`${email} の利用者が${result.count}人います。何も変えていません。`);
+  for (const u of result.users) console.error(`  - ${u.id}（Clerk: ${u.clerkUserId}）`);
+  console.error("どの利用者かをClerkの画面で確かめ、DBで id を指定して直してください。");
+  process.exitCode = 1;
 } else if (result.kind === "has_subscription") {
   console.error(`契約（${result.status}）があります。重ねて請求しないよう、支払いの画面で解約してもらってから付けるか、--force を付けてください`);
   process.exitCode = 1;
 } else {
-  console.log(`${result.email}：料金なし ${result.before ? "あり" : "なし"} → ${result.after ? "あり" : "なし"}`);
+  // どの行を変えたかを出す（同じアドレスが将来重なったときに、記録として残るように）
+  console.log(`${result.email}（${result.id}）：料金なし ${result.before ? "あり" : "なし"} → ${result.after ? "あり" : "なし"}`);
 }

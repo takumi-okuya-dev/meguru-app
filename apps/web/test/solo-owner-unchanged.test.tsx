@@ -37,6 +37,7 @@ const meResponse: MeResponse = {
   accountLimit: { max: 1, used: 1 },
   ...ME_BILLING_OFF,
   threadsAccessMode: "testers",
+  threadsConnectMethods: ["app", "token"] as const,
   teams: [],
 };
 const accountTeam = vi.fn();

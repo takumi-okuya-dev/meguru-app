@@ -50,6 +50,23 @@ describe("CSVの整形（specs/006 contracts/csv.md、FR-029・FR-030）", () =>
     expect(csv).toBe('﻿"本文"\r\n"1行目, ""引用""\n2行目🙌"\r\n');
   });
 
+  // 表計算ソフトは、囲みの引用符を外した後の先頭文字で数式かどうかを決める。
+  // 引用は「セルの区切り」を伝える制御で、「評価するな」を伝える制御ではない（セキュリティ監査 run-1）。
+  // 本文は content の権限だけで書けるので、オーナーが開くファイルの中身を他人が決められる
+  it.each(["=", "+", "-", "@", "\t", "\r"])("先頭が %j のセルは、数式として評価されない形にする", (lead) => {
+    const csv = toCsv(["本文"], [[`${lead}HYPERLINK("https://example.invalid")`]]);
+    // 先頭にシングルクォートを足す。引用符の二重化はそのまま
+    expect(csv).toContain(`"'${lead}HYPERLINK(""https://example.invalid"")"`);
+  });
+
+  it("先頭が数式の記号でなければ、何も足さない", () => {
+    expect(toCsv(["本文"], [["ふつうの本文"]])).toBe('\uFEFF"本文"\r\n"ふつうの本文"\r\n');
+    // 途中の = は数式にならないので触らない
+    expect(toCsv(["本文"], [["a=b"]])).toContain('"a=b"');
+    // 数値も触らない（-3 は数式ではなく負の数として読まれる…が、先頭が - なので安全側に倒す）
+    expect(toCsv(["n"], [[3]])).toContain('"3"');
+  });
+
   it("日時は日本時間でタイムゾーン付き、曜日と時も日本時間", () => {
     expect(formatJstIso("2026-09-25T10:01:00.000Z")).toBe("2026-09-25T19:01:00+09:00");
     expect(formatJstIso(null)).toBe("");

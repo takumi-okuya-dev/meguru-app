@@ -65,7 +65,10 @@ export async function addNgWords(env: Env, accountId: string, words: string[], a
     return await withTransaction(env.DATABASE_URL, async (tx) => {
       await lockAccountDrafts(tx, accountId);
       const existing = await listNgWords(tx, accountId);
-      const seen = new Set(existing.map((w) => w.normalized));
+      // 重複の判定も word から正規化し直す。保存された normalized は登録した時点の値で、
+      // 照合の正規化を変えると古くなる（古いままだと同じ語を二重に登録できてしまう。
+      // PR #20 のCodexレビュー）
+      const seen = new Set(existing.map((w) => normalizeNgWord(w.word)));
       const toAdd: { word: string; normalized: string }[] = [];
       const duplicates: string[] = [];
       for (const raw of words) {

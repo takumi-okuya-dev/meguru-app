@@ -1,7 +1,7 @@
 // 「Threadsとの接続」の未接続のときの2つの方法（specs/012 US2・US3、contracts/ui-routes.md「Threadsとの接続」）。
 // トークンの方法は specs/010 の追加の画面から移した（入力欄の隠し方・待ち・mutation cache の確認は010のまま）。
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { AccountSummary, MeResponse } from "@threads-grower/shared";
 import { createMemoryRouter, RouterProvider } from "react-router";
@@ -40,7 +40,14 @@ const other: AccountSummary = { ...unconnected, id: "a9", name: "カフェ本店
 let client: QueryClient;
 const onConnected = vi.fn();
 
-function renderIt(opts: { canConnect?: boolean; initialError?: { code: "ACCOUNT_ALREADY_REGISTERED" | "THREADS_AUTH_CANCELLED"; account: string | null } } = {}) {
+function renderIt(
+  opts: {
+    canConnect?: boolean;
+    initialError?: { code: "ACCOUNT_ALREADY_REGISTERED" | "THREADS_AUTH_CANCELLED"; account: string | null };
+    /** 出すつなぐ方法（既定は両方） */
+    methods?: ("app" | "token")[];
+  } = {},
+) {
   meResponse = {
     user: { id: "u", email: "u@example.com", displayName: null },
     accounts: [unconnected, other],
@@ -48,6 +55,7 @@ function renderIt(opts: { canConnect?: boolean; initialError?: { code: "ACCOUNT_
     accountLimit: { max: 5, used: 2 },
     ...ME_BILLING_OFF,
     threadsAccessMode: "testers",
+    threadsConnectMethods: opts.methods ?? ["app", "token"],
     teams: [],
   };
   const router = createMemoryRouter(
@@ -206,5 +214,35 @@ describe("自分の別のアカウントと重なったとき（US3-1）", () =>
     renderIt({ initialError: { code: "ACCOUNT_ALREADY_REGISTERED", account: "a9" } });
     expect(await screen.findByText("@cafe_bは、あなたのアカウント『カフェ本店』につながっています。")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "『カフェ本店』を開く" })).toHaveAttribute("href", "/accounts/a9/settings");
+  });
+});
+
+// つなぐ方法の切り替え（THREADS_CONNECT_METHODS）。App Review を通すまで、または
+// 通らなかったときに、トークンの方法だけで運用できるようにする。既定は両方
+describe("出す方法を環境の設定で絞る", () => {
+  it("token だけのとき、「Threadsで許可する」を出さず、トークンの手順を最初から開く", async () => {
+    renderIt({ methods: ["token"] });
+    // トークンの入力欄が最初から出ている（唯一の方法なので畳まない）
+    expect(await screen.findByLabelText("アクセストークン")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Threadsで許可する" })).not.toBeInTheDocument();
+    // 畳むためのボタンも出さない
+    expect(screen.queryByRole("button", { name: /自分のMetaアプリのトークンでつなぐ/ })).not.toBeInTheDocument();
+  });
+
+  it("app だけのとき、トークンの方法を出さない", async () => {
+    renderIt({ methods: ["app"] });
+    expect(await screen.findByRole("button", { name: "Threadsで許可する" })).toBeInTheDocument();
+    // me の取得が終わるまでは既定（両方）なので、消えるのを待つ
+    await waitFor(() =>
+      expect(screen.queryByRole("button", { name: /自分のMetaアプリのトークンでつなぐ/ })).not.toBeInTheDocument(),
+    );
+  });
+
+  it("既定（両方）のときは、これまでどおり", async () => {
+    renderIt();
+    expect(await screen.findByRole("button", { name: "Threadsで許可する" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /自分のMetaアプリのトークンでつなぐ/ })).toBeInTheDocument();
+    // トークンの欄は、開くまで出さない
+    expect(screen.queryByLabelText("アクセストークン")).not.toBeInTheDocument();
   });
 });

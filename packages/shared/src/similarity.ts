@@ -19,8 +19,11 @@ const EDIT_DISTANCE_MIN_DICE = 0.3;
 /** 各下書きで編集距離を求める候補の数。 */
 const EDIT_DISTANCE_CANDIDATES = 5;
 
-// 空白・改行、句読点・記号、絵文字（結合子・異体字セレクタを含む）を除く
-const IGNORED = /[\s\p{P}\p{S}\p{Extended_Pictographic}]|\u200d|\ufe0f|\u20e3/gu;
+// 空白・改行、句読点・記号、絵文字を除く。
+// 見えない文字（ZWJ U+200D・異体字セレクタ U+FE0F など）は normalizeForMatch が落とすので、
+// ここでは扱わない（正規化を1か所に寄せる。セキュリティ監査 run-1）。
+// U+20E3（キーキャップの囲み）は `\p{Me}` で、まとめた単位の一部として残るのでここで除く
+const IGNORED = /[\s\p{P}\p{S}\p{Extended_Pictographic}]|\u20e3/gu;
 
 /**
  * 比べるために正規化する：NFKC → 小文字 → 空白・句読点・記号・絵文字を除く。

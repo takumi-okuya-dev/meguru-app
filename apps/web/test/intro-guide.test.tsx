@@ -23,6 +23,7 @@ vi.mock("@/lib/api-client", async (orig) => {
         accountLimit: { max: 5, used: 1 },
         ...ME_BILLING_OFF,
         threadsAccessMode: "testers",
+        threadsConnectMethods: ["app", "token"] as const,
         teams: [],
       }),
       getAutoPost: async () => ({ autoPost: { enabled: false, slotCount: 0, stoppedReason: null }, next: null, approvedCount: 0, daysLeft: null, notices: [] }),
