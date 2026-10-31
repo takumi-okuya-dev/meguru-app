@@ -48,9 +48,10 @@ APP_ENV = "staging"
 # ↓ 見本の値のまま。T019〜T025 で本物に差し替える。差し替えるまでAPIは CONFIG_ERROR で止まる（src/lib/config.ts）
 CLERK_PUBLISHABLE_KEY = "pk_test_xxx"
 THREADS_APP_ID = "000000000000000"
-THREADS_REDIRECT_URI = "https://api.example.com/api/threads/callback"
-WEB_ORIGIN = "https://staging.example.com"
 STRIPE_PRICE_ID = "price_xxx"
+# ↓ ステージングのURL（ドメインを買うまではCloudflareの既定のURL。9-0-1）
+THREADS_REDIRECT_URI = "https://threads-grower-api-staging.marron-taku.workers.dev/api/threads/callback"
+WEB_ORIGIN = "https://develop.threads-grower-web.pages.dev"
 # ↓ ここから下は、このままでよい値
 THREADS_ACCESS_MODE = "testers"
 THREADS_AUTH_BASE_URL = "https://threads.com"
