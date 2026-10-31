@@ -6,9 +6,9 @@
 
 ## 順番（2026-10-12 決定）
 
-1. 010 自分のMetaアプリのトークンでアカウントを追加（[PR #12](https://github.com/MarronTaku/threads-grower-app/pull/12)、2026-10-13 にマージ）
-2. 011 チームの見直し（[PR #14](https://github.com/MarronTaku/threads-grower-app/pull/14)、2026-10-14 にマージ。仕様は[specs/011-team-revision](../specs/011-team-revision/spec.md)）
-3. 012 アカウントを先に作る（[PR #15](https://github.com/MarronTaku/threads-grower-app/pull/15)、2026-10-14 にマージ。仕様は[specs/012-accounts-before-connect](../specs/012-accounts-before-connect/spec.md)）
+1. 010 自分のMetaアプリのトークンでアカウントを追加（[PR #12](https://github.com/takumi-okuya-dev/threads-grower-app/pull/12)、2026-10-13 にマージ）
+2. 011 チームの見直し（[PR #14](https://github.com/takumi-okuya-dev/threads-grower-app/pull/14)、2026-10-14 にマージ。仕様は[specs/011-team-revision](../specs/011-team-revision/spec.md)）
+3. 012 アカウントを先に作る（[PR #15](https://github.com/takumi-okuya-dev/threads-grower-app/pull/15)、2026-10-14 にマージ。仕様は[specs/012-accounts-before-connect](../specs/012-accounts-before-connect/spec.md)）
 4. **013 決済＋退会**（2026-10-15、退会を決済といっしょに作ると決めた。メモは[specs/013-billing/notes.md](../specs/013-billing/notes.md)）
 
 - チームの見直しを先にするのは、権限の判定の中心（`authorizeAccount`）を変えるため。アカウントを先に作る機能は、チームに入れるアカウントの扱いにも関わるので、その後に作る。
