@@ -427,13 +427,18 @@ pnpm --filter api exec wrangler kv namespace create AUTOPOST_KV --env production
 
 ```bash
 # 1) Pagesのプロジェクト（Webの置き場所）。本番のブランチは main
-#    wrangler は apps/api の開発用の依存なので、--filter api から呼びます
-pnpm --filter api exec wrangler pages project create threads-grower-web --production-branch main
+#    wrangler は apps/api の開発用の依存。設定ファイルのない空のフォルダーで動かす
+REPO=$(pwd)   # リポジトリの一番上で実行する
+mkdir -p /tmp/empty && cd /tmp/empty
+"$REPO/apps/api/node_modules/.bin/wrangler" pages project create threads-grower-web --production-branch main --force
+cd "$REPO"
 
 # 2) ステージングのWorker（APIの置き場所）。最初のデプロイで作られる
 pnpm --filter api deploy:staging
 ```
 
+- **1)は`--force`を付け、空のフォルダーで動かします。** wrangler 4.146（2026-10）から、新しいPagesのプロジェクトを作ろうとすると、Workers側へ処理が回されます（Cloudflareが「新しいプロジェクトはWorkersで」と勧めているため）。そのとき今いるフォルダーの`wrangler.toml`を読むので、`apps/api`で動かすと、**APIのコードを`threads-grower-web`という名前のWorkerとして出そうとします**（2026-10-31に実際に起き、KVが見つからずに止まった）。`--force`を付けると、これまでのPagesのプロジェクトとして作られます。一度できれば、以後の`pages deploy`（`deploy.yml`）はふつうのPagesに向かうので、`--force`はこの1回だけです。
+- PagesとWorkers（静的アセット）は、どちらも画面のファイルの配信は無料・無制限です。このアプリのWebはファイルを配るだけなので、費用は変わりません。今の設計（`deploy.yml`・URL）に合わせてPagesにしています。
 - 2)の時点では、環境変数が見本の値のままなので、APIを開いても`CONFIG_ERROR`になります。9-5以降で直します。
 - **PagesのGit連携は使いません**（GitHub Actionsからだけ出します）。画面から作ってGit連携を付けてしまった場合は、Pagesの Settings → Builds & deployments で切ってください。
 
