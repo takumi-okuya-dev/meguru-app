@@ -95,6 +95,22 @@ describe("「運営」の区分", () => {
     renderAt("/settings/test-groups");
     expect(await screen.findByText("この画面は運営者だけが使えます。")).toBeInTheDocument();
   });
+
+  it("運営者でも、読み込めなかったときはエラーの中身を出す（「運営者だけ」と言わない）", async () => {
+    me.mockResolvedValue({ ...ME, testGroups: { enabled: true, admitted: true, operator: true } });
+    testGroups.mockRejectedValue(new ApiError("API_UNREACHABLE", 0));
+    renderAt("/settings/test-groups");
+    expect(await screen.findByRole("alert")).toBeInTheDocument();
+    expect(screen.queryByText("この画面は運営者だけが使えます。")).not.toBeInTheDocument();
+  });
+
+  it("グループが見つからないときは、その旨を出す", async () => {
+    me.mockResolvedValue({ ...ME, testGroups: { enabled: true, admitted: true, operator: true } });
+    testGroup.mockRejectedValue(new ApiError("ITEM_NOT_FOUND", 404));
+    renderAt("/settings/test-groups/g1");
+    expect(await screen.findByRole("alert")).toBeInTheDocument();
+    expect(screen.queryByText("この画面は運営者だけが使えます。")).not.toBeInTheDocument();
+  });
 });
 
 describe("一覧", () => {

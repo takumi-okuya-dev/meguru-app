@@ -15,7 +15,7 @@ import { ConfirmDialog } from "@/components/team/ConfirmDialog";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { api, describeError } from "@/lib/api-client";
+import { ApiError, api, describeError } from "@/lib/api-client";
 import { queryKeys } from "@/lib/query";
 
 /**
@@ -29,11 +29,20 @@ function ymd(iso: string): string {
 }
 
 /**
- * 運営者でないときの表示。運営者のAPIが OPERATOR_ONLY か 404 を返したら出す。
+ * 読み込めなかったときの表示。運営者でない（OPERATOR_ONLY）・仕組みがOFF（404）なら「運営者だけ」、
+ * それ以外（通信の失敗・グループが見つからない など）はエラーの中身を出す。運営者本人に「運営者だけ」と見せない。
+ * @param props - error：読み込みのエラー
  * @returns 表示
  */
-function OperatorOnly() {
-  return <p className="text-sm text-muted-foreground">この画面は運営者だけが使えます。</p>;
+function LoadError({ error }: { error: Error }) {
+  const operatorOnly =
+    error instanceof ApiError &&
+    (error.code === "OPERATOR_ONLY" || (error.status === 404 && error.code !== "ITEM_NOT_FOUND"));
+  return (
+    <p role={operatorOnly ? undefined : "alert"} className="text-sm text-muted-foreground">
+      {operatorOnly ? "この画面は運営者だけが使えます。" : describeError(error)}
+    </p>
+  );
 }
 
 /**
@@ -137,7 +146,7 @@ export function TestGroupsPage() {
   const [creating, setCreating] = useState(false);
 
   if (list.isPending) return <p className="text-sm text-muted-foreground">読み込み中…</p>;
-  if (list.isError) return <OperatorOnly />;
+  if (list.isError) return <LoadError error={list.error} />;
 
   return (
     <div className="space-y-6">
@@ -240,7 +249,7 @@ export function TestGroupDetailPage() {
   });
 
   if (detail.isPending) return <p className="text-sm text-muted-foreground">読み込み中…</p>;
-  if (detail.isError) return <OperatorOnly />;
+  if (detail.isError) return <LoadError error={detail.error} />;
   const g = detail.data;
   const closed = g.closedAt !== null;
 
