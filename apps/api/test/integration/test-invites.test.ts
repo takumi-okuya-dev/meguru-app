@@ -126,6 +126,20 @@ describe("参加する", () => {
     expect(n.n).toBe(3);
   });
 
+  it("同じ人が2つのグループの「参加する」を同時に押しても、入るのは1つだけ。料金なしの印はグループで付けたものとして残る", async () => {
+    const a = await createGroup(app, "A会");
+    const b = await createGroup(app, "B会");
+    await signIn("u1");
+    const results = await Promise.all([join(app, "u1", a.token), join(app, "u1", b.token)]);
+    expect(results.map((r) => r.status).sort()).toEqual([200, 409]);
+    const rows = (await neon(testEnv.DATABASE_URL)`
+      SELECT granted_billing_exempt FROM test_group_members WHERE user_id = ${(await userRow("u1"))!.id}`) as {
+      granted_billing_exempt: boolean;
+    }[];
+    expect(rows).toEqual([{ granted_billing_exempt: true }]);
+    expect((await userRow("u1"))!.billing_exempt).toBe(true);
+  });
+
   it("ログインしていなければ 401", async () => {
     const { token } = await createGroup(app);
     expect((await callOn(app, "POST", `/api/test-invites/${token}/join`)).status).toBe(401);

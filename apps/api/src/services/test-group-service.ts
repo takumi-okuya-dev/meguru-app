@@ -214,14 +214,15 @@ export async function joinTestGroup(env: Env, user: { id: string }, token: strin
       .where(and(eq(testGroups.inviteTokenHash, hash), isNull(testGroups.closedAt)))
       .for("update");
     if (!g) throw testInviteInvalid();
+    // 利用者の行にも鍵をかけてから「どこかに入っているか」を見る。同じ人が2つのグループの「参加する」を
+    // 同時に押しても、後の方は先の参加が終わってから確かめるので、1人1グループのまま
+    // （鍵の順は、閉じる・外すと同じく「グループ → 利用者」）
+    const [u] = await tx.select({ exempt: users.billingExempt }).from(users).where(eq(users.id, user.id)).for("update");
     const current = await currentGroupOf(tx, user.id);
     if (current) throw new AppError("TEST_GROUP_ALREADY_MEMBER", 409, "already in a test group", undefined, [current.name]);
     if ((await memberCountOf(tx, g.id)) >= g.capacity) throw new AppError("TEST_GROUP_FULL", 409, "test group full");
-    // 料金なしの印（research.md R7）。利用者の行にも鍵をかけ、手で付け外す処理と重ならないようにする
-    const [u] = await tx.select({ exempt: users.billingExempt }).from(users).where(eq(users.id, user.id)).for("update");
+    // 料金なしの印（research.md R7）。もともと付いていれば、グループで付けたことにしない
     const granted = u ? !u.exempt : false;
-    // 閉じたグループの行が残っていれば消す（閉じるときに消すが、念のため1人1行を守る）
-    await tx.delete(testGroupMembers).where(eq(testGroupMembers.userId, user.id));
     await tx.insert(testGroupMembers).values({ userId: user.id, groupId: g.id, grantedBillingExempt: granted });
     if (granted) await tx.update(users).set({ billingExempt: true, updatedAt: new Date() }).where(eq(users.id, user.id));
     await recordEvent(tx, { groupId: g.id, action: "member_joined", actorUserId: user.id, subjectName: await nameOf(tx, user.id) });
