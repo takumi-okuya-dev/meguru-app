@@ -45,10 +45,12 @@ id = "8721878c58494198ae62714a771f8829"
 
 [env.staging.vars]
 APP_ENV = "staging"
-# ↓ 見本の値のまま。T019〜T025 で本物に差し替える。差し替えるまでAPIは CONFIG_ERROR で止まる（src/lib/config.ts）
-CLERK_PUBLISHABLE_KEY = "pk_test_xxx"
+# ↓ Clerkの開発用インスタンス（手元の開発と同じ。9-7）
+CLERK_PUBLISHABLE_KEY = "pk_test_cGF0aWVudC1seW54LTg5NzIuY2xlcmsuYWNjb3VudHMuZGV2JA"
+# ↓ 見本の値のまま。T025 で本物に差し替える。差し替えるまでAPIは CONFIG_ERROR で止まる（src/lib/config.ts）
 THREADS_APP_ID = "000000000000000"
-STRIPE_PRICE_ID = "price_xxx"
+# ↓ Stripeのテスト環境（サンドボックス）の料金。段階制・毎月・JPY・税込み（10-2）
+STRIPE_PRICE_ID = "price_1UWWzr450ulOJK91LcANS5Ae"
 # ↓ ステージングのURL（ドメインを買うまではCloudflareの既定のURL。9-0-1）
 THREADS_REDIRECT_URI = "https://threads-grower-api-staging.marron-taku.workers.dev/api/threads/callback"
 WEB_ORIGIN = "https://develop.threads-grower-web.pages.dev"
