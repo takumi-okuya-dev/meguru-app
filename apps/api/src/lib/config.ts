@@ -33,7 +33,12 @@ function matchesKeyMode(value: string | undefined, mode: "live" | "test" | null)
 
 const PLACEHOLDERS = ["sk_test_xxx", "pk_test_xxx", "xxxxxxxx", "000000000000000", "whsec_xxx", "price_xxx"];
 
-function isPlaceholder(v: string | undefined): boolean {
+/**
+ * 未設定か、見本の値のままかを判定する。
+ * @param v - 設定の値
+ * @returns 空・見本の値なら true
+ */
+export function isPlaceholder(v: string | undefined): boolean {
   if (!v) return true;
   return PLACEHOLDERS.includes(v) || v.includes("REPLACE_WITH");
 }
@@ -72,7 +77,8 @@ function usesRealThreads(env: Env): boolean {
 
 /**
  * 設定（環境変数・Secret）を確かめる。未設定・見本の値・形の誤りを見つける。
- * ThreadsのアプリID・シークレット・戻り先URLは、接続先が本物のThreadsのときだけ確かめる。
+ * ThreadsのアプリID・シークレット・戻り先URLは、接続先が本物のThreadsで、
+ * 「Threadsで許可する」（`THREADS_CONNECT_METHODS` の `app`）を出すときだけ確かめる。
  * @param env - Workers のバインディング
  * @returns 誤っている設定の項目名の一覧（値は含めない）。問題がなければ空
  */
@@ -131,7 +137,9 @@ export function validateConfig(env: Env): string[] {
     if (env.STRIPE_API_BASE_URL !== undefined && !isHttpUrl(env.STRIPE_API_BASE_URL)) problems.push("STRIPE_API_BASE_URL");
   }
 
-  if (usesRealThreads(env)) {
+  // このアプリのMetaアプリを使うのは「Threadsで許可する」だけ。審査前はトークンを貼る方法だけで
+  // 運用するので、使わない値は求めない。外したときの通知の窓口は verifySignedRequest が断る
+  if (usesRealThreads(env) && connectMethodsOf(env).includes("app")) {
     if (isPlaceholder(env.THREADS_APP_ID) || !/^\d+$/.test(env.THREADS_APP_ID)) problems.push("THREADS_APP_ID");
     if (isPlaceholder(env.THREADS_APP_SECRET)) problems.push("THREADS_APP_SECRET");
     if (!isHttpUrl(env.THREADS_REDIRECT_URI, { httpsOnly: true }) || env.THREADS_REDIRECT_URI.includes("example.com")) {

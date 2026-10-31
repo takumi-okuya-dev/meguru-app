@@ -54,6 +54,24 @@ describe("validateConfig", () => {
     expect(validateConfig(env)).toEqual(["THREADS_APP_ID", "THREADS_APP_SECRET", "THREADS_REDIRECT_URI"]);
   });
 
+  it("本物のThreadsでも、トークンを貼る方法だけなら、Threadsの3項目は求めない（審査前の運用）", () => {
+    const real = {
+      ...good,
+      THREADS_AUTH_BASE_URL: "https://threads.com",
+      THREADS_GRAPH_BASE_URL: "https://graph.threads.com",
+      THREADS_APP_ID: "000000000000000",
+      THREADS_APP_SECRET: undefined,
+      THREADS_REDIRECT_URI: "https://api-dev.example.com/api/threads/callback",
+    } as unknown as Env;
+    expect(validateConfig({ ...real, THREADS_CONNECT_METHODS: "token" } as Env)).toEqual([]);
+    // 「Threadsで許可する」も出すなら（審査後）、また求める
+    expect(validateConfig({ ...real, THREADS_CONNECT_METHODS: "app,token" } as Env)).toEqual([
+      "THREADS_APP_ID",
+      "THREADS_APP_SECRET",
+      "THREADS_REDIRECT_URI",
+    ]);
+  });
+
   it("BILLING_ENABLED は true か false が必須（specs/013 FR-063）", () => {
     expect(validateConfig({ ...good, BILLING_ENABLED: undefined } as unknown as Env)).toEqual(["BILLING_ENABLED"]);
     expect(validateConfig({ ...good, BILLING_ENABLED: "yes" } as Env)).toEqual(["BILLING_ENABLED"]);

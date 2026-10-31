@@ -1,5 +1,6 @@
 // Metaの signed_request の検証（research.md R7）。
 // 形式は "<base64urlの署名>.<base64urlのJSONペイロード>"。署名は App Secret による HMAC-SHA256。
+import { isPlaceholder } from "./config";
 
 /** Meta の signed_request が不正（形式・署名・内容の誤り）であることを表す。 */
 export class SignedRequestError extends Error {
@@ -27,9 +28,15 @@ function b64urlToBytes(value: string): Uint8Array {
  * @param signedRequest - Meta から受け取った signed_request
  * @param appSecret - Threadsのアプリシークレット
  * @returns ThreadsのユーザーIDと、通知の発行時刻
- * @throws SignedRequestError 形式・署名・内容が不正なとき
+ * @throws SignedRequestError 形式・署名・内容が不正なとき。シークレットが未設定・見本の値のときも
  */
-export async function verifySignedRequest(signedRequest: string, appSecret: string): Promise<SignedRequestPayload> {
+export async function verifySignedRequest(
+  signedRequest: string,
+  appSecret: string | undefined,
+): Promise<SignedRequestPayload> {
+  // トークンを貼る方法だけで運用するとシークレットを入れない。空の鍵のHMACは誰でも作れるので、
+  // 署名を見る前に断る（偽のアンインストール・データ削除の通知を通さない）
+  if (isPlaceholder(appSecret)) throw new SignedRequestError("app secret not configured");
   const parts = signedRequest.split(".");
   if (parts.length !== 2 || !parts[0] || !parts[1]) throw new SignedRequestError("malformed signed_request");
   const [sigPart, payloadPart] = parts as [string, string];

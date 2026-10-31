@@ -89,6 +89,21 @@ describe("POST /api/threads/webhooks/data-deletion", () => {
     expect(res.status).toBe(400);
   });
 
+  it("トークンを貼る方法だけでシークレットがなければ、見本の鍵の署名でも 400 で、何も消さない", async () => {
+    await connectNew(app, "u1", "1001");
+    const sr = await makeSignedRequest("xxxxxxxx", { user_id: "1001" });
+    for (const secret of [undefined, "xxxxxxxx"]) {
+      const res = await call(app, "POST", "/api/threads/webhooks/data-deletion", {
+        body: new URLSearchParams({ signed_request: sr }),
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        env: { ...testEnv, THREADS_CONNECT_METHODS: "token", THREADS_APP_SECRET: secret } as typeof testEnv,
+      });
+      expect(res.status).toBe(400);
+    }
+    expect(await db().select().from(accounts)).toHaveLength(1);
+    expect(await db().select().from(threadsDeletionRequests)).toHaveLength(0);
+  });
+
   it("存在しない確認コードは 404", async () => {
     expect((await call(app, "GET", "/api/data-deletion/nope")).status).toBe(404);
   });
