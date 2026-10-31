@@ -42,6 +42,7 @@ Claude CodeとCodexで開発スキルを共用する手順と、利用制限時�
 - デプロイは[.github/workflows/deploy.yml](.github/workflows/deploy.yml)が自動で行う（**マイグレーション → API → Web**の順。1つでも失敗したらそこで止まる）。やり直しはActionsの画面から手で動かせる。
 - 環境の違いは**コードの分岐にせず、設定だけに置く**（`APP_ENV`・`VITE_APP_ENV`）。本番以外の画面には、いちばん上に環境の帯が出る。
 - 機能を足すときの決まり（マイグレーションの書き方・リリースの前に確かめること・困ったときの戻し方）は[リリースの手順書](docs/release-runbook.md)。
+- ステージング（<https://develop.threads-grower-web.pages.dev>）で実際に作ったもの・秘密の値の置き場所・確かめ方は[ステージングの構築記録](docs/staging-setup-record.md)。
 - 非公開のリポジトリなので、Environmentの秘密の値とブランチの保護を使うには、GitHubの有料のプランが要る。Organization`takumi-okuya-dev`の**Team**のプランで使っている（[外部サービスの準備手順](docs/external-services-setup.md) 9-0）。
 
 ## 構成
