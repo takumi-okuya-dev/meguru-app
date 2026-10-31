@@ -137,6 +137,13 @@ describe("サイドバーの「チーム」", () => {
     expect(await screen.findByRole("link", { name: /操作の記録/ })).toHaveAttribute("href", "/accounts/a1/activity");
   });
 
+  it("チームの画面を開いていても、最後に使ったAccountの「操作の記録」は消さない（2026-10-31 スマートフォンで見つかった不具合）", async () => {
+    meResponse = me([{ id: "t1", name: "飲食チーム", memberCount: 5, role: "admin" }]);
+    access = ADMIN_ACCESS;
+    renderAt("/teams/t1");
+    expect(await screen.findByRole("link", { name: /操作の記録/ })).toHaveAttribute("href", "/accounts/a1/activity");
+  });
+
   it("チームに入っていない人には、チームのものを何も出さない（原則V）", async () => {
     renderAt("/accounts/a1");
     const nav = await screen.findByRole("navigation", { name: "このアカウント" });
