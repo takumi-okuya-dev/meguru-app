@@ -39,6 +39,12 @@ BILLING_ENABLED=false
 # STRIPE_PORTAL_CONFIGURATION_ID=
 # STRIPE_TAX_RATE_ID=
 
+# テスト用のグループ（specs/016-test-groups）。必須で、true か false。手元はふだん false
+# true にすると、招待されたグループの人と、OFFの間に登録した人・前からいた人だけが使える
+TEST_GROUPS_ENABLED=false
+# 運営者（グループを作る・管理する人）のClerkのユーザーID（user_…）。カンマ区切りで複数
+# OPERATOR_CLERK_USER_IDS=
+
 # Threads連携の公開範囲：testers（既定。Meta App Reviewの前で、招待したテスターだけが接続できる）か public
 # Meta App Reviewに通り、Metaのアプリを公開したら public にする（specs/002-strategy-profile research.md R15）
 THREADS_ACCESS_MODE=testers

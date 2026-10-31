@@ -18,6 +18,8 @@ import { billingRoutes } from "./routes/billing";
 import { stripeWebhookRoutes } from "./routes/stripe-webhook";
 import { accountTeamRoutes } from "./routes/account-team";
 import { inviteRoutes } from "./routes/invites";
+import { operatorTestGroupRoutes } from "./routes/operator-test-groups";
+import { testInviteRoutes } from "./routes/test-invites";
 import { teamsRoutes } from "./routes/teams";
 import { activityRoutes } from "./routes/activity";
 import { dataDeletionRoutes } from "./routes/data-deletion";
@@ -166,6 +168,9 @@ export function createApp(deps: AppDeps = defaultDeps) {
     .route("/", accountRoutes(authed))
     .route("/", accountTeamRoutes(authed))
     .route("/", inviteRoutes(authed, maybeAuthed))
+    // テスト用のグループ（specs/016 contracts/api.md）
+    .route("/", testInviteRoutes(authed, maybeAuthed))
+    .route("/", operatorTestGroupRoutes(authed))
     .route("/", teamsRoutes(authed))
     .route("/", activityRoutes(authed))
     .route("/", strategyRoutes(authed))

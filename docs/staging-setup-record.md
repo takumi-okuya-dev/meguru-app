@@ -52,6 +52,7 @@
 | `STRIPE_WEBHOOK_SECRET` | Cloudflareのシークレット | Webhookを作ったときの応答から、表示せずに入れた |
 | `CLOUDFLARE_API_TOKEN` | GitHubの`staging`のSecret | Cloudflareのトークン`threads-grower-deploy`（Workers Scripts・Cloudflare Pages・Workers KV Storageの編集）。運営者が「パスワード」アプリにも控えた |
 | `THREADS_APP_SECRET` | **入れていない** | トークンを貼る方法だけなら要らない（PR #29） |
+| `OPERATOR_CLERK_USER_IDS` | Cloudflareのシークレット（**016をマージするときに入れる**） | 運営者のClerkのユーザーID（`user_…`）。テスト用のグループを作る・管理する人（specs/016） |
 
 GitHubの`staging`の変数は、`CLOUDFLARE_ACCOUNT_ID`・`VITE_API_BASE_URL`（APIのURL、`/api`なし）・`VITE_CLERK_PUBLISHABLE_KEY`・`VITE_APP_ENV`（`staging`）の4つです。
 
@@ -167,4 +168,5 @@ cd apps/api && pnpm exec wrangler pages deploy ../web/dist --project-name thread
 - **Stripe**：本番に切り替え、事業者の情報を入れる。料金・Webhook・ポータル・支払いの失敗の設定・**領収書のメール**を、本番側で作り直す。
 - **GitHub**：Environment`production`に同じ6つの値を入れる（`CLOUDFLARE_API_TOKEN`は同じものを使える）。
 - **`main`へ出す前に**、`develop`→`main`のリリースのPRで、ここまでの設定を`main`に追いつかせる（`main`の`wrangler.toml`は見本の値のまま）。
+- **テスト用のグループ**：本番は`TEST_GROUPS_ENABLED = "false"`（誰でも登録できる。specs/016）。`OPERATOR_CLERK_USER_IDS`は入れなくてよい。
 - **Threads**：審査前は`THREADS_CONNECT_METHODS = "token"`。審査が通ったら`app,token`にし、MetaアプリのID・シークレット・戻り先URLを入れ、Metaにコールバックの3つのURLを登録する（3-3・9-8）。

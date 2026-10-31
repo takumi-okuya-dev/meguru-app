@@ -40,8 +40,8 @@ export type BillingState =
   | "canceling"
   | "read_only";
 
-/** 読むだけの理由。 */
-export type ReadOnlyReason = "trial_ended" | "payment_failed" | "canceled";
+/** 読むだけの理由。test_access はテスト用のグループがONの環境で、テスト版に入れない人（specs/016 research.md R4）。 */
+export type ReadOnlyReason = "trial_ended" | "payment_failed" | "canceled" | "test_access";
 
 /** entitlementOf の入力。 */
 export type EntitlementInput = {

@@ -27,6 +27,10 @@ export interface Env {
   THREADS_CONNECT_METHODS?: string;
   /** 決済のON/OFF（"true" か "false"。必須。specs/013-billing research.md R11） */
   BILLING_ENABLED: string;
+  /** テスト用のグループのON/OFF（"true" か "false"。必須。specs/016-test-groups research.md R1） */
+  TEST_GROUPS_ENABLED: string;
+  /** 運営者のClerkのユーザーID（カンマ区切り。Secretで入れる。specs/016 research.md R1） */
+  OPERATOR_CLERK_USER_IDS?: string;
   /** Stripeの秘密の鍵（決済ONのとき必須。本番 sk_live_、ステージング・手元 sk_test_） */
   STRIPE_SECRET_KEY?: string;
   /** Webhookの署名の秘密（決済ONのとき必須。whsec_） */

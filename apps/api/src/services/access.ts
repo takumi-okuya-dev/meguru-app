@@ -10,13 +10,14 @@ import {
   type Role,
   type TeamRole,
 } from "@threads-grower/shared";
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import type { Db, TxDb } from "../db/client";
 import { accounts, memberships, subscriptions, teamAccounts, teamMembers, teams, users } from "../db/schema";
 import type { BillingMode } from "../lib/config";
 import { AppError, notFound } from "../lib/errors";
 import { entitlementFromFacts } from "./billing-service";
+import { testAccessSql } from "./test-group-service";
 
 /** accounts の行。 */
 export type AccountRow = typeof accounts.$inferSelect;
@@ -119,6 +120,8 @@ export async function authorizeAccount(
       ownerEmail: ownerU.email,
       ownerCreatedAt: ownerU.createdAt,
       ownerBillingExempt: ownerU.billingExempt,
+      // オーナーがテスト版に入れるか（specs/016 research.md R4）。OFFの環境では読まない
+      ownerTestAccess: user.billing.testGroups ? testAccessSql(ownerU) : sql<boolean>`true`,
       subStatus: subscriptions.status,
       subCancelAtPeriodEnd: subscriptions.cancelAtPeriodEnd,
       meDisplayName: meU.displayName,
@@ -159,6 +162,7 @@ export async function authorizeAccount(
     billingExempt: row.ownerBillingExempt,
     status: row.subStatus,
     cancelAtPeriodEnd: row.subCancelAtPeriodEnd,
+    testAccess: row.ownerTestAccess,
   });
   const readOnly =
     owner.fullAccess || owner.readOnlyReason === null

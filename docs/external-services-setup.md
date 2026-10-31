@@ -241,6 +241,8 @@ cp apps/api/.dev.vars.example apps/api/.dev.vars
 | `DATABASE_URL` | `postgres://postgres:postgres@db.localtest.me:5432/threads_grower` | ローカルのDB（`local-neon-http-proxy`経由） |
 | `WEB_ORIGIN` | `http://localhost:5173` | Webの開発サーバー |
 | `BILLING_ENABLED` | `false`（決済を試すときは`true`） | 必須。10 |
+| `TEST_GROUPS_ENABLED` | `false`（テスト用のグループを試すときは`true`） | 必須（specs/016） |
+| `OPERATOR_CLERK_USER_IDS` | 自分のClerkのユーザーID（`user_…`。カンマ区切りで複数） | テスト用のグループを試すとき |
 
 `THREADS_AUTH_BASE_URL`と`THREADS_GRAPH_BASE_URL`は、本物のThreadsにつなぐ場合は書きません（`wrangler.toml`の既定値が使われます）。
 
@@ -378,6 +380,7 @@ pnpm e2e
 - **11を飛ばさない**。`CLOUDFLARE_API_TOKEN`などが無いと、13の自動デプロイはその場で落ちます。
 - **5の時点でAPIは`CONFIG_ERROR`です**。シークレット（8）がまだなので、これで正しい動きです。消えるのは8が済んでからです。
 - ステージングは`BILLING_ENABLED = "true"`です。Stripeのテスト用環境の鍵（8）と`STRIPE_PRICE_ID`（7）まで入れないと、`CONFIG_ERROR`は消えません。テストユーザーには料金なしの印を付けます（10-7）。
+- ステージングは`TEST_GROUPS_ENABLED = "true"`です（specs/016）。テスト版は、運営者が作ったグループの招待リンクから入った人と、この機能の前からいた人だけが使えます。グループで入った人には料金なしの印が自動で付きます。運営者（グループを作る人）は、Clerkのダッシュボードの「Users」で自分のIDを見て、`printf '%s' 'user_…' | npx wrangler secret put OPERATOR_CLERK_USER_IDS --env staging`で入れます。本番は`"false"`（誰でも登録できる）。
 - **12（ブランチの保護）は、1より後でよい**。保護がない間は`develop`・`main`とも直接pushできてしまうが、これは`develop`を作る前から`main`にあった状態と同じで、新たに増えるリスクではない。設定の値（2〜10）が出そろってから、まとめて付ける。
 - Threadsにつなぐ方法（トークンを貼る／Metaの審査後）は、環境の設定で切り替えられます。審査前のステージングでの決め方は「つなぐ方法の切り替え（`THREADS_CONNECT_METHODS`）」を見てください。
 

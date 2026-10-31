@@ -1,6 +1,6 @@
 // 設定の確認（誤りがあれば項目名だけを返す。値は返さない）
 import { describe, expect, it } from "vitest";
-import { billingModeOf, connectMethodsOf, validateConfig } from "../../src/lib/config";
+import { billingModeOf, connectMethodsOf, operatorIdsOf, validateConfig } from "../../src/lib/config";
 import type { Env } from "../../src/env";
 import { testBindings } from "../env";
 
@@ -70,6 +70,12 @@ describe("validateConfig", () => {
       "THREADS_APP_SECRET",
       "THREADS_REDIRECT_URI",
     ]);
+  });
+
+  it("TEST_GROUPS_ENABLED は true か false が必須（specs/016 research.md R1）", () => {
+    expect(validateConfig({ ...good, TEST_GROUPS_ENABLED: undefined } as unknown as Env)).toEqual(["TEST_GROUPS_ENABLED"]);
+    expect(validateConfig({ ...good, TEST_GROUPS_ENABLED: "on" } as Env)).toEqual(["TEST_GROUPS_ENABLED"]);
+    expect(validateConfig({ ...good, TEST_GROUPS_ENABLED: "true" } as Env)).toEqual([]);
   });
 
   it("BILLING_ENABLED は true か false が必須（specs/013 FR-063）", () => {
@@ -146,11 +152,33 @@ describe("billingModeOf", () => {
     ["true", true],
     ["false", false],
   ])("%j は、そのまま読む", (value, expected) => {
-    expect(billingModeOf({ BILLING_ENABLED: value } as Env).enabled).toBe(expected);
+    expect(billingModeOf({ BILLING_ENABLED: value, TEST_GROUPS_ENABLED: "false" } as Env).enabled).toBe(expected);
   });
 
   it.each(["TRUE", "True", "1", "yes", "", undefined])("%j は、黙って課金オフにせず落ちる", (value) => {
-    expect(() => billingModeOf({ BILLING_ENABLED: value } as Env)).toThrow(/BILLING_ENABLED/);
+    expect(() => billingModeOf({ BILLING_ENABLED: value, TEST_GROUPS_ENABLED: "false" } as Env)).toThrow(/BILLING_ENABLED/);
+  });
+
+  it.each([
+    ["true", true],
+    ["false", false],
+  ])("TEST_GROUPS_ENABLED の %j は、そのまま testGroups に読む（specs/016）", (value, expected) => {
+    expect(billingModeOf({ BILLING_ENABLED: "false", TEST_GROUPS_ENABLED: value } as Env).testGroups).toBe(expected);
+  });
+
+  it.each(["TRUE", "1", "", undefined])("TEST_GROUPS_ENABLED の %j は、黙ってOFFにせず落ちる（specs/016）", (value) => {
+    expect(() => billingModeOf({ BILLING_ENABLED: "false", TEST_GROUPS_ENABLED: value } as Env)).toThrow(/TEST_GROUPS_ENABLED/);
+  });
+});
+
+describe("operatorIdsOf（specs/016 research.md R1）", () => {
+  it("カンマ区切りを読み、前後の空白と空の項目を捨てる", () => {
+    expect(operatorIdsOf({ OPERATOR_CLERK_USER_IDS: " user_a , ,user_b," } as Env)).toEqual(["user_a", "user_b"]);
+  });
+
+  it("未設定・空なら運営者はいない", () => {
+    expect(operatorIdsOf({} as Env)).toEqual([]);
+    expect(operatorIdsOf({ OPERATOR_CLERK_USER_IDS: "" } as Env)).toEqual([]);
   });
 });
 

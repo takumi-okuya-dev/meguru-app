@@ -17,7 +17,8 @@ import { and, eq, inArray, isNull, lt, notInArray, or, sql, type SQL } from "dri
 import type { Env } from "../env";
 import { createDb, withTransaction, type Db, type TxDb } from "../db/client";
 import { lockUserRow } from "../db/locks";
-import { memberships, subscriptions, users } from "../db/schema";
+import { testAccessSql } from "./test-group-service";
+import { memberships, subscriptions, testGroupMembers, users } from "../db/schema";
 import { billingModeOf, type BillingMode } from "../lib/config";
 import { AppError } from "../lib/errors";
 import { logger } from "../lib/logger";
@@ -29,6 +30,8 @@ export type BillingFacts = {
   billingExempt: boolean;
   status: string | null;
   cancelAtPeriodEnd: boolean | null;
+  /** テスト版に入れるか（specs/016 research.md R4。testAccessSql の値）。読んでいなければ undefined */
+  testAccess?: boolean;
 };
 
 /**
@@ -39,7 +42,7 @@ export type BillingFacts = {
  * @returns 使える状態
  */
 export function entitlementFromFacts(mode: BillingMode, facts: BillingFacts, now: Date = new Date()): Entitlement {
-  return entitlementOf({
+  const e = entitlementOf({
     billingEnabled: mode.enabled,
     exempt: facts.billingExempt,
     userCreatedAt: facts.createdAt,
@@ -49,6 +52,12 @@ export function entitlementFromFacts(mode: BillingMode, facts: BillingFacts, now
         : { status: (facts.status as SubscriptionStatus | null) ?? null, cancelAtPeriodEnd: facts.cancelAtPeriodEnd ?? false },
     now,
   });
+  // テスト用のグループがONで、テスト版に入れない人は読むだけ（specs/016 research.md R4）。
+  // 決済のどの状態よりも先に効かせ、自動投稿・反応の取り込みも013の仕組みのまま止まる
+  if (mode.testGroups && facts.testAccess === false) {
+    return { ...e, state: "read_only", fullAccess: false, readOnlyReason: "test_access", accountLimit: 0 };
+  }
+  return e;
 }
 
 /**
@@ -61,9 +70,11 @@ export function entitlementFromFacts(mode: BillingMode, facts: BillingFacts, now
  * @returns 条件
  */
 export function fullAccessSql(mode: BillingMode, now: Date): SQL | undefined {
-  if (!mode.enabled) return undefined;
+  // テスト用のグループがONなら、テスト版に入れることも条件に足す（specs/016 research.md R4。entitlementFromFacts と同じ）
+  const access = mode.testGroups ? testAccessSql(users) : undefined;
+  if (!mode.enabled) return access;
   const trialEnd = sql`((${users.createdAt} AT TIME ZONE 'Asia/Tokyo') + interval '1 month') AT TIME ZONE 'Asia/Tokyo'`;
-  return or(
+  const billing = or(
     eq(users.billingExempt, true),
     inArray(subscriptions.status, ["trialing", "active"]),
     and(
@@ -71,6 +82,7 @@ export function fullAccessSql(mode: BillingMode, now: Date): SQL | undefined {
       sql`${trialEnd} > ${now.toISOString()}::timestamptz`,
     ),
   );
+  return access ? and(access, billing) : billing;
 }
 
 /**
@@ -88,6 +100,8 @@ export async function loadEntitlement(db: Db | TxDb, userId: string, mode: Billi
       billingExempt: users.billingExempt,
       status: subscriptions.status,
       cancelAtPeriodEnd: subscriptions.cancelAtPeriodEnd,
+      // OFFの環境では読まない（問い合わせを今と同じにする。specs/016 plan.md「性能の目標」）
+      testAccess: mode.testGroups ? testAccessSql(users) : sql<boolean>`true`,
     })
     .from(users)
     .leftJoin(subscriptions, eq(subscriptions.userId, users.id))
@@ -503,7 +517,10 @@ export async function reconcileSubscriptions(env: Env, stripe: StripeClient = cr
  * @returns 使える状態。オーナーがいなければ null
  */
 export async function loadOwnerEntitlement(db: Db | TxDb, accountId: string, mode: BillingMode, now: Date = new Date()) {
-  if (!mode.enabled) return entitlementFromFacts(mode, { createdAt: now, billingExempt: false, status: null, cancelAtPeriodEnd: null }, now);
+  // 決済もテスト用のグループもOFFなら、オーナーを読むまでもなく全権（specs/016 research.md R4）
+  if (!mode.enabled && !mode.testGroups) {
+    return entitlementFromFacts(mode, { createdAt: now, billingExempt: false, status: null, cancelAtPeriodEnd: null }, now);
+  }
   const [owner] = await db
     .select({ userId: memberships.userId })
     .from(memberships)
@@ -556,6 +573,8 @@ export async function setBillingExemptByEmail(db: Db, email: string, on: boolean
     if (sub?.status && !(ENDED_STATUSES as readonly string[]).includes(sub.status)) return { kind: "has_subscription", status: sub.status };
   }
   await db.update(users).set({ billingExempt: on, updatedAt: new Date() }).where(eq(users.id, user.id));
+  // 手で付けた印は、グループを出ても残す（グループで付けた印の扱いから外す。specs/016 research.md R7）
+  if (on) await db.update(testGroupMembers).set({ grantedBillingExempt: false }).where(eq(testGroupMembers.userId, user.id));
   // この経路は活動の記録を残さないので、せめてどの行を変えたかをログに残す
   logger.info("billing: billing_exempt changed", { userId: user.id, before: user.exempt, after: on });
   return { kind: "updated", id: user.id, clerkUserId: user.clerkUserId, email: user.email, before: user.exempt, after: on };

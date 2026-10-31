@@ -137,6 +137,9 @@ export function validateConfig(env: Env): string[] {
     if (env.STRIPE_API_BASE_URL !== undefined && !isHttpUrl(env.STRIPE_API_BASE_URL)) problems.push("STRIPE_API_BASE_URL");
   }
 
+  // テスト用のグループのON/OFFも必須。未設定で黙ってOFFにしない（specs/016 research.md R1）
+  if (env.TEST_GROUPS_ENABLED !== "true" && env.TEST_GROUPS_ENABLED !== "false") problems.push("TEST_GROUPS_ENABLED");
+
   // このアプリのMetaアプリを使うのは「Threadsで許可する」だけ。審査前はトークンを貼る方法だけで
   // 運用するので、使わない値は求めない。外したときの通知の窓口は verifySignedRequest が断る
   if (usesRealThreads(env) && connectMethodsOf(env).includes("app")) {
@@ -149,8 +152,12 @@ export function validateConfig(env: Env): string[] {
   return problems;
 }
 
-/** 決済のモード（specs/013 research.md R2・R11）。環境ごとに1つで、判定する人の値に持たせる。 */
-export type BillingMode = { enabled: boolean };
+/**
+ * 決済のモード（specs/013 research.md R2・R11）。環境ごとに1つで、判定する人の値に持たせる。
+ * testGroups はテスト用のグループの仕組みがONか（specs/016 research.md R4）。ONなら、テスト環境に入れない
+ * オーナーは読むだけになる（定期処理・権限の判定に同じモードで届けるため、ここに載せる）。
+ */
+export type BillingMode = { enabled: boolean; testGroups?: boolean };
 
 /** つなぐ方法（`accounts.connection_method` と同じ語）。 */
 export const CONNECT_METHODS = ["app", "token"] as const;
@@ -185,8 +192,25 @@ export function connectMethodsOf(env: Pick<Env, "THREADS_CONNECT_METHODS">): ("a
  * @returns 決済のモード
  * @throws Error 列挙外の値のとき
  */
-export function billingModeOf(env: Pick<Env, "BILLING_ENABLED">): BillingMode {
-  if (env.BILLING_ENABLED === "true") return { enabled: true };
-  if (env.BILLING_ENABLED === "false") return { enabled: false };
-  throw new Error(`BILLING_ENABLED must be "true" or "false"`);
+export function billingModeOf(env: Pick<Env, "BILLING_ENABLED" | "TEST_GROUPS_ENABLED">): BillingMode {
+  let enabled: boolean;
+  if (env.BILLING_ENABLED === "true") enabled = true;
+  else if (env.BILLING_ENABLED === "false") enabled = false;
+  else throw new Error(`BILLING_ENABLED must be "true" or "false"`);
+  // テスト用のグループも同じ理由で、列挙外の値では落とす（specs/016 research.md R1）
+  if (env.TEST_GROUPS_ENABLED === "true") return { enabled, testGroups: true };
+  if (env.TEST_GROUPS_ENABLED === "false") return { enabled, testGroups: false };
+  throw new Error(`TEST_GROUPS_ENABLED must be "true" or "false"`);
+}
+
+/**
+ * 運営者のClerkのユーザーIDの一覧（specs/016 research.md R1）。カンマ区切りで、前後の空白と空の項目は捨てる。
+ * @param env - Workers のバインディング
+ * @returns ClerkのユーザーIDの一覧（いなければ空）
+ */
+export function operatorIdsOf(env: Pick<Env, "OPERATOR_CLERK_USER_IDS">): string[] {
+  return (env.OPERATOR_CLERK_USER_IDS ?? "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0);
 }

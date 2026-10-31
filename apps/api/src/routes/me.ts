@@ -88,6 +88,8 @@ export function meRoutes(authed: MiddlewareHandler<AppEnv>, deleteClerkUser: (en
       teams,
       billing: toMeBilling(user.billing, entitlement!, now),
       withdrawalInProgress: user.withdrawalRequestedAt !== null,
+      // テスト用のグループ（specs/016 contracts/api.md「GET /api/me」）
+      testGroups: { enabled: Boolean(user.billing.testGroups), ...user.testAccess },
     });
   }).get("/me/needs-review-counts", authed, async (c) => {
     const user = c.get("user");

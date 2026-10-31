@@ -24,6 +24,9 @@ import {
   AUTOPOST_SLOT_LIMIT,
   PUBLISHED_PAGE_SIZE,
   TEAM_MEMBER_LIMIT,
+  TEST_GROUP_CAPACITY_MAX,
+  TEST_GROUP_CAPACITY_MIN,
+  TEST_GROUP_NAME_MAX,
   TEAM_NAME_MAX,
   REFERENCE_BATCH_MAX,
   EXPLAIN_BATCH_MAX,
@@ -109,7 +112,7 @@ export const billingStateSchema = z.enum([
   "read_only",
 ]);
 /** 読むだけの理由。 */
-export const readOnlyReasonSchema = z.enum(["trial_ended", "payment_failed", "canceled"]);
+export const readOnlyReasonSchema = z.enum(["trial_ended", "payment_failed", "canceled", "test_access"]);
 
 /** /api/me の、使える状態。 */
 export const meBillingSchema = z.object({
@@ -182,6 +185,11 @@ export const meResponseSchema = z.object({
   billing: meBillingSchema,
   /** 退会の途中か（specs/013 research.md R10） */
   withdrawalInProgress: z.boolean(),
+  /**
+   * テスト用のグループ（specs/016 contracts/api.md「GET /api/me」）。enabled は仕組みがONか、admitted はテスト版に
+   * 入れるか（OFFなら常に true）、operator は運営者か（OFFなら常に false）
+   */
+  testGroups: z.object({ enabled: z.boolean(), admitted: z.boolean(), operator: z.boolean() }),
 });
 /** GET /api/me のレスポンス。ログイン中のユーザー、Account一覧、ログイン後の遷移先、登録数上限。 */
 export type MeResponse = z.infer<typeof meResponseSchema>;
@@ -1350,7 +1358,7 @@ export const accountAccessResponseSchema = z.object({
   /** 担当の知らせ「（アカウント名）の担当になりました」を出すか（担当の人で、まだ閉じていない。research.md R9） */
   assignedNotice: z.boolean(),
   /** オーナーが読むだけなら、その理由（チームの人には owner_inactive だけ。specs/013 FR-045）。すべて使えるなら NULL */
-  readOnly: z.object({ reason: z.enum(["trial_ended", "payment_failed", "canceled", "owner_inactive"]) }).nullable(),
+  readOnly: z.object({ reason: z.enum(["trial_ended", "payment_failed", "canceled", "test_access", "owner_inactive"]) }).nullable(),
 });
 /** Accountとの関わりと権限（画面の出し分けに使う）。 */
 export type AccountAccessResponse = z.infer<typeof accountAccessResponseSchema>;
@@ -1564,3 +1572,83 @@ export const withdrawalPreviewSchema = z.object({
 });
 /** 退会の確認の内容。 */
 export type WithdrawalPreview = z.infer<typeof withdrawalPreviewSchema>;
+
+// ---- テスト用のグループ（specs/016-test-groups contracts/api.md）----
+
+/** GET /api/test-invites/:token の応答。viewer はログインしていなければ null。 */
+export const testInvitePreviewSchema = z.object({
+  group: z.object({ name: z.string() }),
+  /** 定員に達しているか */
+  full: z.boolean(),
+  viewer: z
+    .discriminatedUnion("state", [
+      z.object({ state: z.literal("can_join") }),
+      z.object({ state: z.literal("full") }),
+      z.object({ state: z.literal("already_member"), groupName: z.string() }),
+    ])
+    .nullable(),
+});
+/** グループの招待の確認。 */
+export type TestInvitePreview = z.infer<typeof testInvitePreviewSchema>;
+
+/** POST /api/test-invites/:token/join の応答。 */
+export const testInviteJoinResponseSchema = z.object({ groupId: z.string() });
+
+/** グループの記録の種類（data-model.md の test_group_events.action）。 */
+export const TEST_GROUP_EVENT_ACTIONS = [
+  "created",
+  "renamed",
+  "capacity_changed",
+  "invite_rotated",
+  "closed",
+  "member_joined",
+  "member_removed",
+] as const;
+/** グループの記録の種類。 */
+export type TestGroupEventAction = (typeof TEST_GROUP_EVENT_ACTIONS)[number];
+
+/** 運営者の画面のグループの行。 */
+export const testGroupSummarySchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  capacity: z.number().int(),
+  memberCount: z.number().int(),
+  /** 閉じていれば null */
+  inviteUrl: z.string().nullable(),
+  closedAt: z.string().nullable(),
+  createdAt: z.string(),
+});
+/** 運営者の画面のグループの行。 */
+export type TestGroupSummary = z.infer<typeof testGroupSummarySchema>;
+
+/** GET /api/operator/test-groups の応答。 */
+export const testGroupListSchema = z.object({ groups: z.array(testGroupSummarySchema) });
+
+/** 運営者の画面のグループの詳しい内容。 */
+export const testGroupDetailSchema = testGroupSummarySchema.extend({
+  /** 入っている人（入った順） */
+  members: z.array(z.object({ userId: z.string(), name: z.string(), email: z.string(), joinedAt: z.string() })),
+  /** 記録（新しい順に TEST_GROUP_EVENTS_LIMIT 件） */
+  events: z.array(
+    z.object({
+      action: z.enum(TEST_GROUP_EVENT_ACTIONS),
+      actorName: z.string(),
+      subjectName: z.string().nullable(),
+      details: z.unknown(),
+      createdAt: z.string(),
+    }),
+  ),
+});
+/** 運営者の画面のグループの詳しい内容。 */
+export type TestGroupDetail = z.infer<typeof testGroupDetailSchema>;
+
+const testGroupName = z.string().trim().min(1).max(TEST_GROUP_NAME_MAX);
+const testGroupCapacity = z.number().int().min(TEST_GROUP_CAPACITY_MIN).max(TEST_GROUP_CAPACITY_MAX);
+
+/** POST /api/operator/test-groups のリクエスト。 */
+export const testGroupCreateRequestSchema = z.object({ name: testGroupName, capacity: testGroupCapacity });
+
+/** PATCH /api/operator/test-groups/:groupId のリクエスト（少なくとも1つ）。 */
+export const testGroupUpdateRequestSchema = z
+  .object({ name: testGroupName.optional(), capacity: testGroupCapacity.optional() })
+  .refine((v) => v.name !== undefined || v.capacity !== undefined, { message: "nothing to update" });
