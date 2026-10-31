@@ -565,7 +565,7 @@ git checkout main && git pull && git checkout -b develop && git push -u origin d
 
 最後の例外は、**コードを変えないPR（文書・設定だけ）を、CIを待たずにマージするため**です（2026-10-31に決めた運用）。管理者がPRから`gh pr merge --admin`（画面なら「Merge without waiting for requirements」）でマージできます。PRを通さない直接のpushは、管理者でもできません。コードを変えるPRは、これまでどおりCIの成功を待ってからマージします。
 
-2026-10-31に、この設定（ルールセット「main と develop を守る」）と4のタグの規則を、APIで作りました。
+2026-10-31に、この設定（ルールセット`main と develop を守る`）と4のタグの規則を、APIで作りました。
 
 4. **タグにも規則を付けます。** Ruleset の Target を **Tags** にして、`main`と`develop`という名前のタグを作れないようにします（Restrict creations、または `main`・`develop` を名指しで保護）。
 
