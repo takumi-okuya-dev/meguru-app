@@ -177,7 +177,7 @@ pnpm e2e
 - 外部に公開している関数・クラス・型・定数には、JSDoc形式のドキュメントコメント（`/** … */`）を付ける。説明に加えて、引数は`@param`、戻り値は`@returns`、投げる例外は`@throws`で書く。
 - TypeScriptなので、JSDocには型（`{string}`など）を書かない（[TypeScriptのハンドブック](https://www.typescriptlang.org/ja/docs/handbook/jsdoc-supported-types.html)）。
 - `pnpm lint`（`eslint-plugin-jsdoc`）が付け忘れや`@param`の名前のずれを検出し、CIでも止まる。shadcn/uiから取り込んだ部品（`apps/web/src/components/ui/`）とテストは対象外。
-- マイグレーションは、前の版のアプリでも壊れない形（表や列を足す・既定値つき）だけにする。消す・名前を変える・型を変えるときは2回のリリースに分ける。一度`develop`に入ったマイグレーションのファイルは書き換えない（[リリースの手順書](docs/release-runbook.md) 3）。
+- マイグレーションは、前の版のアプリでも壊れない形（表や列を足す・既定値つき）だけにする。消す・名前を変える・型を変えるときは、何回かのリリースに分ける（列を消すなら、先に使うのをやめる版を出してから消す）。一度`develop`に入ったマイグレーションのファイルは書き換えない（[リリースの手順書](docs/release-runbook.md) 3）。
 
 ## 運営者用のスクリプト
 
