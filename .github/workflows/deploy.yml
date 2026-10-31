@@ -157,11 +157,15 @@ jobs:
           command: deploy --env ${{ needs.guard.outputs.wrangler }}
 
       # 3. Web（Cloudflare Pages）。main は本番、develop はブランチの別名として出る。
-      # 行き先は guard が決めた固定の名前を渡す（ref の名前をそのまま渡さない）
+      # 行き先は guard が決めた固定の名前を渡す（ref の名前をそのまま渡さない）。
+      # wrangler は apps/api の依存にしかないので、API と同じく apps/api で動かす。リポジトリの一番上で
+      # 動かすと wrangler-action が一番上に wrangler を足そうとして pnpm に断られる（2026-10-31）。
+      # apps/api の wrangler.toml は Pages 用の項目がないので、pages deploy は読まずに進む
       - name: Web を出す
         if: steps.ready.outputs.ready == 'true'
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
-          command: pages deploy apps/web/dist --project-name threads-grower-web --branch ${{ needs.guard.outputs.pages_branch }}
+          workingDirectory: apps/api
+          command: pages deploy ../web/dist --project-name threads-grower-web --branch ${{ needs.guard.outputs.pages_branch }}
