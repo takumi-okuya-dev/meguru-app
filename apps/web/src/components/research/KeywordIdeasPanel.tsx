@@ -91,8 +91,9 @@ export function KeywordIdeasPanel({
       aria-label="何を検索すればいいか迷ったら"
       className="mb-3 space-y-3 rounded-2xl border bg-muted/30 px-4 py-3.5 text-sm"
     >
+      {/* 狭い画面では、説明が細い縦の列にならないよう、ボタンを下の行へ回す */}
       <div className="flex flex-wrap items-center gap-3">
-        <div className="min-w-0 flex-1">
+        <div className="min-w-48 flex-1">
           <p className="font-medium">何を検索すればいいか迷ったら</p>
           <p className="text-xs text-muted-foreground">
             課題をもとに、検索する言葉の案をAIに出してもらえます
