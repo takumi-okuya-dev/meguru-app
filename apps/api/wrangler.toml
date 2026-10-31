@@ -61,6 +61,9 @@ THREADS_GRAPH_BASE_URL = "https://graph.threads.com"
 TOKEN_ENCRYPTION_KEY_VERSION = "1"
 BILLING_ENABLED = "true"
 # 任意（入れなければStripeの既定）：STRIPE_PORTAL_CONFIGURATION_ID・STRIPE_TAX_RATE_ID
+# Metaの審査が通るまでは、利用者が自分（またはチームのオーナー）のMetaアプリで作ったトークンを貼る方法だけ。
+# このときThreadsのアプリID・シークレットは要らない（審査後に "app,token" にしたら入れる）
+THREADS_CONNECT_METHODS = "token"
 
 # ──────────────────────────────────────────────────────────────────────────
 # 本番（main ブランチ）
