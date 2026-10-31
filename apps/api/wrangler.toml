@@ -39,10 +39,9 @@ name = "threads-grower-api-staging"
 [env.staging.triggers]
 crons = ["0 18 * * *", "*/5 * * * *"]
 
-# T020 で `wrangler kv namespace create AUTOPOST_KV --env staging` を実行し、出た id に差し替える
 [[env.staging.kv_namespaces]]
 binding = "AUTOPOST_KV"
-id = "00000000000000000000000000000000"
+id = "8721878c58494198ae62714a771f8829"
 
 [env.staging.vars]
 APP_ENV = "staging"
@@ -70,10 +69,9 @@ name = "threads-grower-api"
 [env.production.triggers]
 crons = ["0 18 * * *", "*/5 * * * *"]
 
-# T029 で `wrangler kv namespace create AUTOPOST_KV --env production` を実行し、出た id に差し替える
 [[env.production.kv_namespaces]]
 binding = "AUTOPOST_KV"
-id = "00000000000000000000000000000000"
+id = "e5fd38abb2a847b9a02588d9f2842d0b"
 
 [env.production.vars]
 APP_ENV = "production"
