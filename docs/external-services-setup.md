@@ -330,7 +330,11 @@ pnpm e2e
 - **このリポジトリは、まだ一度もデプロイしていません**。Cloudflare上にWorkerもPagesのプロジェクトも「ありません」。9-4で作ります。
 - `apps/api/wrangler.toml`の`[env.staging]`・`[env.production]`には、**見本の値**（`pk_test_xxx`・`https://api.example.com`など）が入っています。本物に差し替えるまで、デプロイできてもAPIは`CONFIG_ERROR`で止まります（入れ忘れに気づくための仕掛けです）。
 - **ドメインが決まるまで**は、Cloudflareの既定のURL（`*.pages.dev`・`*.workers.dev`）でステージングまで進められます。独自ドメインが要るのは、Clerkの本番インスタンス（9-7）だけです。
-- 増える固定費は**ドメイン代（年に数千円）だけ**です（[docs/cost-estimate.md](./cost-estimate.md)）。
+- **GitHubはProのプランが要ります**（このリポジトリは非公開のため）。無料のプランでは、非公開のリポジトリで次が使えません。9-11・9-12の前に、GitHubのSettings → Billing and plansでProにしてください。
+  - Environmentの秘密の値と変数（9-11）。使えないと`deploy.yml`の「設定がそろっているか見る」が全部を空と見て、**警告だけ出して何もデプロイせずに成功で終わります**。
+  - EnvironmentのDeployment branches and tags（9-11）
+  - ブランチの保護とルールセット（9-12）
+- 増える固定費は**ドメイン代（年に数千円）とGitHub Proの料金**です（[docs/cost-estimate.md](./cost-estimate.md)）。
 - **まずステージングだけ立てる場合は、9章を上から通さず、次の9-0-1の順で進めてください。**
 
 ### 9-0-1. ステージングだけ先に立てる場合の順番
@@ -528,9 +532,10 @@ Settings → Environments で`staging`と`production`を作り、それぞれに
 | 設定 | staging | production |
 |---|---|---|
 | Deployment branches and tags | **Selected** → `develop`（ブランチのみ） | **Selected** → `main`（ブランチのみ） |
-| Required reviewers | なし（任意） | 自分を入れておくと、本番は毎回自分の承認が要る |
 
-**この2つを飛ばさないでください。** `deploy.yml`の中にも出す先を決める関所（`guard`ジョブ）がありますが、Actionsの画面から手で動かすとき（`workflow_dispatch`）は**選んだブランチにあるワークフローの定義が動く**ので、ファイルの中の判定は書き換えられます。「`main`以外から本番の秘密を渡さない」を本当に守れるのは、**リポジトリの外側にあるこの設定だけ**です。
+> Required reviewers（本番に出すたびに自分の承認を挟む設定）は、**Proでも非公開のリポジトリでは使えません**（公開のリポジトリか、Enterpriseのプランだけ）。そのため本番の前の確認は、リリースのPRの中で[リリースの手順書](./release-runbook.md) 4のチェックを通すことで行います。
+
+**この設定を飛ばさないでください。** `deploy.yml`の中にも出す先を決める関所（`guard`ジョブ）がありますが、Actionsの画面から手で動かすとき（`workflow_dispatch`）は**選んだブランチにあるワークフローの定義が動く**ので、ファイルの中の判定は書き換えられます。「`main`以外から本番の秘密を渡さない」を本当に守れるのは、**リポジトリの外側にあるこの設定だけ**です。
 
 ### 9-12. ブランチを守る（T012・T013）
 
@@ -541,7 +546,7 @@ git checkout main && git pull && git checkout -b develop && git push -u origin d
 ```
 
 2. Settings → General → Default branch を**`develop`**にします（新しいPRの行き先が既定で`develop`になります）。
-3. Settings → Rules → Rulesets で、`main`と`develop`に同じ規則を付けます。
+3. Settings → Rules → Rulesets で、`main`と`develop`に同じ規則を付けます（非公開のリポジトリでは**GitHub Proが要ります**。9-0）。
 
 - Restrict deletions
 - Require a pull request before merging（直接のpushを禁止）

@@ -41,6 +41,8 @@ Claude CodeとCodexで開発スキルを共用する手順と、利用制限時�
 - `main`・`develop`への直接のpushは禁止（PR必須・CIの成功が必須）。
 - デプロイは[.github/workflows/deploy.yml](.github/workflows/deploy.yml)が自動で行う（**マイグレーション → API → Web**の順。1つでも失敗したらそこで止まる）。やり直しはActionsの画面から手で動かせる。
 - 環境の違いは**コードの分岐にせず、設定だけに置く**（`APP_ENV`・`VITE_APP_ENV`）。本番以外の画面には、いちばん上に環境の帯が出る。
+- 機能を足すときの決まり（マイグレーションの書き方・リリースの前に確かめること・困ったときの戻し方）は[リリースの手順書](docs/release-runbook.md)。
+- 非公開のリポジトリなので、Environmentの秘密の値とブランチの保護を使うには**GitHub Pro**が要る（[外部サービスの準備手順](docs/external-services-setup.md) 9-0）。
 
 ## 構成
 
@@ -175,6 +177,7 @@ pnpm e2e
 - 外部に公開している関数・クラス・型・定数には、JSDoc形式のドキュメントコメント（`/** … */`）を付ける。説明に加えて、引数は`@param`、戻り値は`@returns`、投げる例外は`@throws`で書く。
 - TypeScriptなので、JSDocには型（`{string}`など）を書かない（[TypeScriptのハンドブック](https://www.typescriptlang.org/ja/docs/handbook/jsdoc-supported-types.html)）。
 - `pnpm lint`（`eslint-plugin-jsdoc`）が付け忘れや`@param`の名前のずれを検出し、CIでも止まる。shadcn/uiから取り込んだ部品（`apps/web/src/components/ui/`）とテストは対象外。
+- マイグレーションは、前の版のアプリでも壊れない形（表や列を足す・既定値つき）だけにする。消す・名前を変える・型を変えるときは2回のリリースに分ける。一度`develop`に入ったマイグレーションのファイルは書き換えない（[リリースの手順書](docs/release-runbook.md) 3）。
 
 ## 運営者用のスクリプト
 
