@@ -81,7 +81,8 @@ export function Sidebar({ onCollapse, onNavigate }: { onCollapse?: () => void; o
     queryFn: () => api.getDraftCounts(accountId!),
     enabled: !!accountId,
   });
-  const { access } = useAccountAccess(params.accountId);
+  // 機能の移動と同じく、チームの画面では最後に使ったAccountで読む（でないと「操作の記録」が消える）
+  const { access } = useAccountAccess(accountId);
   return (
     <div className="flex h-full flex-col">
       <div className="flex items-center gap-1 p-2">
