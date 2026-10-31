@@ -51,12 +51,10 @@ export function AppShell({ children, banner = null }: { children: ReactNode; ban
     [sidebarVisible, isWide, banner, setCollapsedAndSave],
   );
 
-  // 環境の帯は骨格が直接出す（上部バーを出さない画面＝アカウントを作る、でも出すため。
-  // PR #19 のCodexレビュー）。ほかのどの帯よりも上になる
+  // 環境は帯ではなく、サイドバーのユーザー名の横の印で示す（UserMenu。帯がずっと出ていると見にくいため）
   return (
     <ShellContext.Provider value={shell}>
       <div className="flex h-svh flex-col">
-        <EnvBanner />
         <div className="flex min-h-0 flex-1">
           {sidebarVisible && (
             <aside className="flex w-64 shrink-0 flex-col border-r bg-sidebar">

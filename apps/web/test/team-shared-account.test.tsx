@@ -104,12 +104,11 @@ describe("見せてもらっているアカウント", () => {
     for (const name of [/パフォーマンス/, /設定/, /操作の記録/]) expect(screen.queryByRole("link", { name })).not.toBeInTheDocument();
   });
 
-  it("本番以外では、環境の帯が画面のいちばん上に出る（specs/015。PR #19 のCodexレビュー）", async () => {
+  it("アプリの画面なので、本番以外でも環境の帯は出さない（specs/015 contracts/ui-routes.md 1。2026-10-31）", async () => {
     vi.stubEnv("VITE_APP_ENV", "staging");
     renderPage();
-    const env = await screen.findByText(/テスト環境です/);
-    const shared = await screen.findByText(/さんのアカウントを見ています/);
-    expect(env.compareDocumentPosition(shared) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    await screen.findByText(/さんのアカウントを見ています/);
+    expect(screen.queryByText(/テスト環境です/)).not.toBeInTheDocument();
     vi.unstubAllEnvs();
   });
 

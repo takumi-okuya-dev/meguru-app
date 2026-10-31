@@ -5,7 +5,6 @@ import { ArrowLeftIcon, ChevronLeftIcon, ChevronRightIcon, SearchIcon } from "lu
 import { useState } from "react";
 import { Link, Navigate, NavLink, Outlet, useLocation, useMatch } from "react-router";
 import { TrialEndingBannerFromMe } from "@/components/billing/TrialEndingBanner";
-import { EnvBanner } from "@/components/layout/EnvBanner";
 import { Input } from "@/components/ui/input";
 import { MD_QUERY, useMediaQuery } from "@/lib/use-media-query";
 import { cn } from "@/lib/utils";
@@ -60,7 +59,6 @@ function MobileList({
 }) {
   return (
     <div className="min-h-svh bg-sidebar">
-      <EnvBanner />
       <MobileHeader
         title="設定"
         back={
@@ -119,7 +117,6 @@ export function SettingsLayout() {
     const current = SETTINGS_GROUPS.flatMap((g) => g.sections).find((s) => s.slug === slug);
     return (
       <div className="min-h-svh">
-        <EnvBanner />
         <MobileHeader
           title={current?.label ?? "設定"}
           back={
@@ -144,7 +141,6 @@ export function SettingsLayout() {
 
   return (
     <div className="flex min-h-svh flex-col">
-      <EnvBanner />
       <div className="flex flex-1">
         <aside className="w-64 shrink-0 border-r bg-sidebar">
           <div className="space-y-3 p-3">
