@@ -81,7 +81,7 @@
 
 ## 2つの環境（本番・ステージング）にしたときの費用
 
-2026-10-18に、`main`＝本番・`develop`＝ステージングの2環境に分けた（[015 research.md](../specs/015-deploy-environments/research.md) R12）。**増える固定費はドメイン代とGitHub Proの料金**で、ほかは無料の枠に収まる。
+2026-10-18に、`main`＝本番・`develop`＝ステージングの2環境に分けた（[015 research.md](../specs/015-deploy-environments/research.md) R12）。**増える固定費はドメイン代とGitHub Teamの料金**で、ほかは無料の枠に収まる。
 
 | サービス | 本番 | ステージング | 枠 | 増える費用 |
 |---|---|---|---|---|
@@ -92,9 +92,9 @@
 | Clerk | 本番インスタンス | 開発用インスタンス（**利用者100人まで**） | 無料 | $0 |
 | Stripe | 本番 | テスト用環境 | テスト用環境は無料 | $0 |
 | **独自ドメイン** | `app.<ドメイン>`・`api.<ドメイン>` | `staging.<ドメイン>` | — | **年に数千円** |
-| **GitHub Pro** | リポジトリ1つ（両方の環境で共通） | 同左 | 非公開のリポジトリでは、無料のプランだとEnvironmentの秘密の値・変数とブランチの保護が使えない | **月に数ドル**（今の値段はGitHubのBillingの画面で確かめる） |
+| **GitHub Team** | Organization`takumi-okuya-dev`のリポジトリ1つ（両方の環境で共通） | 同左 | 非公開のリポジトリでは、無料のプランだとEnvironmentの秘密の値・変数とブランチの保護が使えない | **1人あたり月に数ドル**（今は1人。今の値段はGitHubのBillingの画面で確かめる） |
 
-- GitHub Proは2026-10-31に使うと決めた。`deploy.yml`が使うEnvironmentの秘密の値・変数とDeployment branches、`main`・`develop`のルールセットは、非公開のリポジトリではProからでないと使えない（[外部サービスの準備手順](./external-services-setup.md) 9-0）。今後も個人開発を続けるので、リポジトリを公開する案や、守りを弱めて無料のまま作り直す案より、Proを選んだ。
+- 有料のプランは2026-10-31に使うと決めた。`deploy.yml`が使うEnvironmentの秘密の値・変数とDeployment branches、`main`・`develop`のルールセットは、非公開のリポジトリでは有料のプラン（個人ならPro、OrganizationならTeam）でないと使えない（[外部サービスの準備手順](./external-services-setup.md) 9-0）。今後も個人開発を続けるので、リポジトリを公開する案や、守りを弱めて無料のまま作り直す案より、有料のプランを選んだ。そのうえで、後から人に手伝ってもらうときに権限を分けやすいOrganization`takumi-okuya-dev`のTeamにし、リポジトリを移した。
 - ドメインが要るのは、Clerkの**本番インスタンスに独自ドメインが必須**だから（015 research.md R6）。`*.accounts.dev`のままでは商用公開できない。
 - ステージングのNeonは別プロジェクトにして、本番のCU-hoursの枠と分けている（015 research.md R5）。テストの実験で本番の枠を食い潰さない。
 - 上の「利用者の数ごとの試算」は**本番の数字**。ステージングは数人のテストユーザーだけなので、無料の枠に対して無視できる。

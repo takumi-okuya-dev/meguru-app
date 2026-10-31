@@ -3,7 +3,7 @@
 Threadsアカウントを「投稿ストック→承認→自動投稿→分析→改善」のループで育てるためのアプリ。
 
 - 由来: Obsidian vault `Wiki/仕事/システム開発/アイデア/Threads自動投稿アプリ.md`
-- 既存の[threads-grower](https://github.com/MarronTaku/threads-grower)リポジトリ（spec-kit導入済み・実装進行中）とは**別プロジェクト**として並走する（2026-10-01、ユーザー確認済み）。
+- 既存の[threads-grower](https://github.com/takumi-okuya/threads-grower)リポジトリ（spec-kit導入済み・実装進行中）とは**別プロジェクト**として並走する（2026-10-01、ユーザー確認済み）。
 - 開発方法論: [BMAD-METHOD](https://github.com/bmad-code-org/BMAD-METHOD)でPRD/設計の叩き台を作成し、[spec-kit](https://github.com/github/spec-kit)で仕様→計画→タスク→実装を進める。
 
 Claude CodeとCodexで開発スキルを共用する手順と、利用制限時の引き継ぎ方法は[AIスキルの共用](docs/ai-skills.md)を参照。
@@ -42,7 +42,7 @@ Claude CodeとCodexで開発スキルを共用する手順と、利用制限時�
 - デプロイは[.github/workflows/deploy.yml](.github/workflows/deploy.yml)が自動で行う（**マイグレーション → API → Web**の順。1つでも失敗したらそこで止まる）。やり直しはActionsの画面から手で動かせる。
 - 環境の違いは**コードの分岐にせず、設定だけに置く**（`APP_ENV`・`VITE_APP_ENV`）。本番以外の画面には、いちばん上に環境の帯が出る。
 - 機能を足すときの決まり（マイグレーションの書き方・リリースの前に確かめること・困ったときの戻し方）は[リリースの手順書](docs/release-runbook.md)。
-- 非公開のリポジトリなので、Environmentの秘密の値とブランチの保護を使うには**GitHub Pro**が要る（[外部サービスの準備手順](docs/external-services-setup.md) 9-0）。
+- 非公開のリポジトリなので、Environmentの秘密の値とブランチの保護を使うには、GitHubの有料のプランが要る。Organization`takumi-okuya-dev`の**Team**のプランで使っている（[外部サービスの準備手順](docs/external-services-setup.md) 9-0）。
 
 ## 構成
 
