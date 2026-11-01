@@ -18,7 +18,8 @@ permissions: {}
 jobs:
   check:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    # テストが増えて20分に届いたため、30分にする（2026-11-01。PR #40 で時間切れになった）
+    timeout-minutes: 30
     permissions:
       contents: read
 
