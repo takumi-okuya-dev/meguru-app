@@ -121,7 +121,7 @@ export async function authorizeAccount(
       ownerCreatedAt: ownerU.createdAt,
       ownerBillingExempt: ownerU.billingExempt,
       // オーナーがテスト版に入れるか（specs/016 research.md R4）。OFFの環境では読まない
-      ownerTestAccess: user.billing.testGroups ? testAccessSql(ownerU) : sql<boolean>`true`,
+      ownerTestAccess: user.billing.testGroups ? testAccessSql(ownerU, user.billing.operators) : sql<boolean>`true`,
       subStatus: subscriptions.status,
       subCancelAtPeriodEnd: subscriptions.cancelAtPeriodEnd,
       meDisplayName: meU.displayName,

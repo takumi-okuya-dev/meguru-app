@@ -8,9 +8,9 @@
 
 | 列 | 型 | 制約・既定 | 意味 |
 |---|---|---|---|
-| `signed_up_open` | boolean | NOT NULL、既定 false | グループの仕組みがOFFの間に登録した（または、この機能の前からいた）。trueなら、グループに入っていなくても入れる人（research.md R2） |
+| `signed_up_open` | boolean | NOT NULL、既定 true | グループの仕組みがOFFの間に登録した（または、この機能の前からいた）。trueなら、グループに入っていなくても入れる人（research.md R2） |
 
-- マイグレーションで、今ある行をすべて true にする（`UPDATE users SET signed_up_open = true`）。
+- 列を足すと、今ある行はすべて true になる（既定が true）。列を足してから新しいAPIに替わるまでの間に古いAPIが作った行も true になり、締め出さない。新しいAPIは行を作るときに必ず値を渡す（ONなら false）。
 - 新しい行は、認証のミドルウェアのJITの作成で、仕組みがOFFなら true、ONなら false で作る。
 
 ## test_groups（新規）
@@ -63,10 +63,11 @@
 
 ## 判定（SQLの条件 `testAccessSql(u)`）
 
-入れる人＝次のどれか（research.md R2）。運営者は認証のミドルウェアでだけ足す（定期処理では、運営者も上の2つのどちらかで決まる。運営者は開発者で、`signed_up_open`が true）。
+入れる人＝次のどれか（research.md R2）。運営者（`OPERATOR_CLERK_USER_IDS`）は、認証と定期処理の両方で同じ条件に入れる（運営者が読むだけにならないように）。
 
 ```sql
 u.signed_up_open
+OR u.clerk_user_id IN (運営者のID)  -- 運営者がいるときだけ
 OR EXISTS (
   SELECT 1 FROM test_group_members m
   JOIN test_groups g ON g.id = m.group_id

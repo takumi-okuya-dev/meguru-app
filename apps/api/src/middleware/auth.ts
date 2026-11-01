@@ -7,18 +7,16 @@ import { createMiddleware } from "hono/factory";
 import type { Env } from "../env";
 import { createDb } from "../db/client";
 import { users, withdrawnUsers } from "../db/schema";
-import { billingModeOf, operatorIdsOf, type BillingMode } from "../lib/config";
+import { billingModeOf, type BillingMode } from "../lib/config";
 import { AppError } from "../lib/errors";
 import { testAccessSql } from "../services/test-group-service";
 
-/** 退会の途中でも呼べるAPI（specs/013 contracts/api.md「認証のミドルウェアの変更」）。 */
-const WITHDRAWAL_ALLOWED = new Set(["GET /api/me", "GET /api/me/withdrawal-preview", "POST /api/me/withdraw"]);
-
 /**
- * テスト版に入れない人でも呼べるAPI（specs/016 contracts/api.md「入れない人に許す経路」、research.md R5）。
- * 自分の状態を知る・自分で退会する・招待から参加する、だけ。ほかに `/api/test-invites/` で始まるパスも許す。
+ * 退会の途中でも、テスト版に入れない人でも呼べるAPI（自分の状態を知る・自分で退会する）。
+ * specs/013 contracts/api.md「認証のミドルウェアの変更」、specs/016 contracts/api.md「入れない人に許す経路」・research.md R5。
  */
-const TEST_ACCESS_ALLOWED = new Set(["GET /api/me", "GET /api/me/withdrawal-preview", "POST /api/me/withdraw"]);
+const SELF_SERVICE_ALLOWED = new Set(["GET /api/me", "GET /api/me/withdrawal-preview", "POST /api/me/withdraw"]);
+/** テスト版に入れない人には、ほかに招待から参加する経路も許す（specs/016 research.md R5）。 */
 const TEST_INVITE_PATH = /^\/api\/test-invites\//;
 
 /** セッショントークンから確かめた本人。 */
@@ -108,7 +106,7 @@ export function authMiddleware(makeVerifier: (env: Env) => AuthVerifier) {
     // テスト用のグループがONなら、テスト版に入れるかも同じ問い合わせで読む（specs/016 plan.md「性能の目標」）
     const selectUser = () =>
       db
-        .select({ row: users, admitted: mode.testGroups ? testAccessSql(users) : sql<boolean>`true` })
+        .select({ row: users, admitted: mode.testGroups ? testAccessSql(users, mode.operators) : sql<boolean>`true` })
         .from(users)
         .where(eq(users.clerkUserId, identity.clerkUserId))
         .limit(1);
@@ -158,13 +156,13 @@ export function authMiddleware(makeVerifier: (env: Env) => AuthVerifier) {
     }
 
     // 退会の途中の人は、退会のAPIと GET /api/me のほかを止める（途中でデータを足させない。specs/013 research.md R10）
-    if (user.withdrawalRequestedAt && !WITHDRAWAL_ALLOWED.has(`${c.req.method} ${c.req.path}`)) {
+    if (user.withdrawalRequestedAt && !SELF_SERVICE_ALLOWED.has(`${c.req.method} ${c.req.path}`)) {
       throw new AppError("WITHDRAWAL_IN_PROGRESS", 409, "withdrawal in progress");
     }
-    // テスト版に入れない人は、許す経路のほかを止める（specs/016 FR-006、research.md R5）。運営者はいつも入れる
-    const operator = Boolean(mode.testGroups) && operatorIdsOf(c.env).includes(user.clerkUserId);
-    const testAccess = mode.testGroups ? { admitted: Boolean(admitted) || operator, operator } : { admitted: true, operator: false };
-    if (!testAccess.admitted && !TEST_ACCESS_ALLOWED.has(`${c.req.method} ${c.req.path}`) && !TEST_INVITE_PATH.test(c.req.path)) {
+    // テスト版に入れない人は、許す経路のほかを止める（specs/016 FR-006、research.md R5）。運営者は testAccessSql で入れる
+    const operator = Boolean(mode.testGroups) && (mode.operators ?? []).includes(user.clerkUserId);
+    const testAccess = mode.testGroups ? { admitted: Boolean(admitted), operator } : { admitted: true, operator: false };
+    if (!testAccess.admitted && !SELF_SERVICE_ALLOWED.has(`${c.req.method} ${c.req.path}`) && !TEST_INVITE_PATH.test(c.req.path)) {
       throw new AppError("TEST_ACCESS_REQUIRED", 403, "test access required");
     }
     c.set("user", { ...user, billing: mode, testAccess });

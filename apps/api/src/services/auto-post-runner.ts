@@ -183,7 +183,7 @@ export async function runAutoPost(
       ownerCreatedAt: users.createdAt,
       ownerBillingExempt: users.billingExempt,
       // オーナーがテスト版に入れるか（specs/016 research.md R4）。OFFの環境では読まない
-      ownerTestAccess: mode.testGroups ? testAccessSql(users) : sql<boolean>`true`,
+      ownerTestAccess: mode.testGroups ? testAccessSql(users, mode.operators) : sql<boolean>`true`,
       subStatus: subscriptions.status,
       subCancelAtPeriodEnd: subscriptions.cancelAtPeriodEnd,
     })

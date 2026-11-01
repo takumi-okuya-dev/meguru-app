@@ -6,7 +6,7 @@ import { runAutoPost } from "../../src/services/auto-post-runner";
 import { entitlementFromFacts, fullAccessSql, loadOwnerEntitlement } from "../../src/services/billing-service";
 import { createUserWithAccount, db, fake, insertSubscription, makeApp, resetDb } from "../helpers/app";
 import { addMin, approvedDrafts, attempts, connectedAccount, db as sqlDb, draftRow, jst, setSchedule } from "../helpers/auto-post";
-import { createGroup, groupsEnv, join } from "../helpers/test-groups";
+import { OPERATOR, createGroup, groupsEnv, join } from "../helpers/test-groups";
 
 const app = makeApp();
 const NOON = jst("2030-01-10 12:00");
@@ -55,6 +55,15 @@ describe("自動投稿", () => {
     const { accountId } = await connectedAccount("u1", app);
     await approvedDrafts(accountId, ["A"]);
     await setSchedule(accountId, { slotMinutes: [720] });
+    await runOn(addMin(NOON, 1));
+    expect((await fake.posts()).map((p) => p.text)).toEqual(["A"]);
+  });
+
+  it("運営者は、グループに入っていなくても投稿する", async () => {
+    const { accountId } = await connectedAccount(OPERATOR, app);
+    await approvedDrafts(accountId, ["A"]);
+    await setSchedule(accountId, { slotMinutes: [720] });
+    await sqlDb()`UPDATE users SET signed_up_open = false WHERE id = ${await ownerIdOf(accountId)}`;
     await runOn(addMin(NOON, 1));
     expect((await fake.posts()).map((p) => p.text)).toEqual(["A"]);
   });

@@ -4,6 +4,7 @@
 
 const KEY = "tg.inviteReturn";
 const INVITE_PATH = /^\/invite\/t_[A-Za-z0-9_-]{43}$/;
+const TEST_INVITE_PATH = /^\/test-invite\/g_[A-Za-z0-9_-]{43}$/;
 
 /**
  * 戻り先が招待リンクの形かを確かめる。
@@ -12,6 +13,15 @@ const INVITE_PATH = /^\/invite\/t_[A-Za-z0-9_-]{43}$/;
  */
 export function isInvitePath(path: string | null | undefined): path is string {
   return Boolean(path && INVITE_PATH.test(path));
+}
+
+/**
+ * 戻り先がテスト用のグループの招待リンクの形かを確かめる（specs/016 research.md R8）。
+ * @param path - 戻り先
+ * @returns グループの招待リンクなら true
+ */
+export function isTestInvitePath(path: string | null | undefined): path is string {
+  return Boolean(path && TEST_INVITE_PATH.test(path));
 }
 
 /**

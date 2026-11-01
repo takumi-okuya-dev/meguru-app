@@ -1,6 +1,7 @@
 // 0016_test_groups のテスト（specs/016-test-groups data-model.md「users」）。
 // 前からいる利用者を入れてから0016を当て、signed_up_open が true になる（締め出さない。FR-007・SC-005）こと、
-// 新しく作る行の既定が false であること、グループのCHECKが効くことを確かめる。
+// 新しく作る行の既定も true であること（列を足してから新しいAPIに替わるまでの間に、古いAPIが作った人を締め出さない）、
+// グループのCHECKが効くことを確かめる。
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type pg from "pg";
 import { applyMigrations, createScratchDb, migrationIndex } from "../helpers/migrate";
@@ -25,11 +26,11 @@ describe("0016_test_groups", () => {
     expect(rows.map((r) => r.open)).toEqual([true, true]);
   });
 
-  it("新しく作る行の既定は false", async () => {
+  it("値を渡さずに作った行（古いAPIが作った人）も true", async () => {
     const { rows } = await client.query<{ open: boolean }>(
       `INSERT INTO users (clerk_user_id, email) VALUES ('user_after', 'c@example.com') RETURNING signed_up_open AS open`,
     );
-    expect(rows[0]!.open).toBe(false);
+    expect(rows[0]!.open).toBe(true);
   });
 
   it("グループの名前の長さと上限の範囲を、DBでも守る", async () => {

@@ -35,13 +35,11 @@ CREATE TABLE "test_groups" (
 	CONSTRAINT "test_groups_capacity_range" CHECK ("test_groups"."capacity" BETWEEN 1 AND 1000)
 );
 --> statement-breakpoint
-ALTER TABLE "users" ADD COLUMN "signed_up_open" boolean DEFAULT false NOT NULL;--> statement-breakpoint
+ALTER TABLE "users" ADD COLUMN "signed_up_open" boolean DEFAULT true NOT NULL;--> statement-breakpoint
 ALTER TABLE "test_group_events" ADD CONSTRAINT "test_group_events_group_id_test_groups_id_fk" FOREIGN KEY ("group_id") REFERENCES "public"."test_groups"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "test_group_events" ADD CONSTRAINT "test_group_events_actor_user_id_users_id_fk" FOREIGN KEY ("actor_user_id") REFERENCES "public"."users"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "test_group_members" ADD CONSTRAINT "test_group_members_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "test_group_members" ADD CONSTRAINT "test_group_members_group_id_test_groups_id_fk" FOREIGN KEY ("group_id") REFERENCES "public"."test_groups"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "test_groups" ADD CONSTRAINT "test_groups_created_by_user_id_users_id_fk" FOREIGN KEY ("created_by_user_id") REFERENCES "public"."users"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 CREATE INDEX "test_group_events_group_created_idx" ON "test_group_events" USING btree ("group_id","created_at" DESC NULLS LAST);--> statement-breakpoint
-CREATE INDEX "test_group_members_group_idx" ON "test_group_members" USING btree ("group_id");--> statement-breakpoint
--- この機能の前からいる利用者は、グループに入っていなくてもテスト版に入れる（specs/016 FR-007、research.md R2）
-UPDATE "users" SET "signed_up_open" = true;
+CREATE INDEX "test_group_members_group_idx" ON "test_group_members" USING btree ("group_id");

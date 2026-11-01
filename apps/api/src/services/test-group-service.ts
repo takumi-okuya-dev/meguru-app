@@ -12,70 +12,54 @@ import { and, asc, count, desc, eq, getTableName, inArray, isNull, sql, type Any
 import type { Env } from "../env";
 import { createDb, withTransaction, type Db, type TxDb } from "../db/client";
 import { testGroupEvents, testGroupMembers, testGroups, users } from "../db/schema";
-import { createTokenCipher } from "../lib/crypto";
 import { AppError } from "../lib/errors";
 import { sha256Hex } from "../lib/identifier-hash";
 import { personName } from "./access";
+import { inviteUrl, newInviteToken, openInviteToken, sealInviteToken } from "./invite-service";
 
 /** users の表か、その別名（alias(users, …)）。 */
-type UsersLike = Table & { id: AnyColumn; signedUpOpen: AnyColumn };
+type UsersLike = Table & { id: AnyColumn; signedUpOpen: AnyColumn; clerkUserId: AnyColumn };
 
 /**
  * 「テスト版に入れる人」のSQLの条件（data-model.md「判定」、research.md R2）。
- * OFFの間に登録した人・前からいた人（signed_up_open）か、閉じていないグループに入っている人。
- * 運営者は認証のミドルウェアでだけ足す。判定はここだけに書き、ほかに写さない（Constitution原則V）。
+ * OFFの間に登録した人・前からいた人（signed_up_open）か、閉じていないグループに入っている人か、運営者。
+ * 判定はここだけに書き、ほかに写さない（Constitution原則V）。
  * 列は表の名前（別名なら別名）を付けて書く。1つの表だけの SELECT では drizzle が列を表の名前なしで書くため、
  * 副問い合わせの中で test_groups.id と取り違えないようにする。
  * @param u - users の表か別名
+ * @param operators - 運営者のClerkのユーザーID（BillingMode.operators）
  * @returns 真偽のSQL
  */
-export function testAccessSql(u: UsersLike = users): SQL<boolean> {
+export function testAccessSql(u: UsersLike = users, operators: readonly string[] = []): SQL<boolean> {
   const t = sql.identifier(getTableName(u));
-  return sql<boolean>`(${t}."signed_up_open" OR EXISTS (
+  const operator =
+    operators.length > 0
+      ? sql` OR ${t}."clerk_user_id" IN (${sql.join(
+          operators.map((id) => sql`${id}`),
+          sql`, `,
+        )})`
+      : sql``;
+  return sql<boolean>`(${t}."signed_up_open"${operator} OR EXISTS (
     SELECT 1 FROM test_group_members tgm
     JOIN test_groups tg ON tg.id = tgm.group_id
     WHERE tgm.user_id = ${t}."id" AND tg.closed_at IS NULL
   ))`;
 }
 
-// ---- 招待の文字列（research.md R8。チームの招待と同じ作り。チームは「t_」、グループは「g_」） ----
+// ---- 招待の文字列（research.md R8。チームの招待と同じ作りを使う。チームは「t_」、グループは「g_」） ----
 
-const PREFIX = "g_";
 const TOKEN_FORM = /^g_[A-Za-z0-9_-]{43}$/;
 
 /**
- * グループの招待の文字列を作る。32バイトの暗号学的乱数の base64url（43文字）に「g_」を付ける。
- * @returns 招待の文字列
- */
-export function newTestInviteToken(): string {
-  const bytes = crypto.getRandomValues(new Uint8Array(32));
-  let bin = "";
-  for (const b of bytes) bin += String.fromCharCode(b);
-  return PREFIX + btoa(bin).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
-}
-
-/**
- * グループの招待のURL（WEB_ORIGIN/test-invite/{token}）。
+ * 新しい招待の文字列を作り、保存する形（照合用のハッシュと暗号化した写し）にする。暗号の AAD にはグループのIDを使う。
  * @param env - Workers のバインディング
- * @param token - 招待の文字列
- * @returns URL
- */
-export function testInviteUrl(env: Env, token: string): string {
-  return `${env.WEB_ORIGIN.replace(/\/+$/, "")}/test-invite/${token}`;
-}
-
-/**
- * 招待の文字列を、保存する形（照合用のハッシュと暗号化した写し）にする。暗号の AAD にはグループのIDを使う。
- * @param env - Workers のバインディング
- * @param token - 招待の文字列
  * @param groupId - test_groups.id
  * @returns 保存する値
  */
-async function sealToken(env: Env, token: string, groupId: string) {
-  const cipher = createTokenCipher(env.TOKEN_ENCRYPTION_KEYS, env.TOKEN_ENCRYPTION_KEY_VERSION);
-  const sealed = await cipher.encrypt(token, groupId);
+async function sealNewToken(env: Env, groupId: string) {
+  const sealed = await sealInviteToken(env, newInviteToken("g_"), groupId);
   return {
-    inviteTokenHash: await sha256Hex(token),
+    inviteTokenHash: sealed.hash,
     inviteTokenCiphertext: sealed.ciphertext,
     inviteTokenIv: sealed.iv,
     inviteKeyVersion: sealed.keyVersion,
@@ -83,14 +67,18 @@ async function sealToken(env: Env, token: string, groupId: string) {
 }
 
 /**
- * 暗号化した写しから招待の文字列を戻す。
+ * グループの招待のURL（WEB_ORIGIN/test-invite/{token}）を、暗号化した写しから作る。
  * @param env - Workers のバインディング
  * @param g - グループの行
- * @returns 招待の文字列
+ * @returns URL
  */
-async function openToken(env: Env, g: typeof testGroups.$inferSelect): Promise<string> {
-  const cipher = createTokenCipher(env.TOKEN_ENCRYPTION_KEYS, env.TOKEN_ENCRYPTION_KEY_VERSION);
-  return cipher.decrypt({ ciphertext: g.inviteTokenCiphertext, iv: g.inviteTokenIv, keyVersion: g.inviteKeyVersion }, g.id);
+async function testInviteUrlOf(env: Env, g: typeof testGroups.$inferSelect): Promise<string> {
+  const token = await openInviteToken(
+    env,
+    { ciphertext: g.inviteTokenCiphertext, iv: g.inviteTokenIv, keyVersion: g.inviteKeyVersion },
+    g.id,
+  );
+  return inviteUrl(env, token, "test-invite");
 }
 
 /**
@@ -162,13 +150,21 @@ async function nameOf(db: Db | TxDb, userId: string): Promise<string> {
  */
 async function recordEvent(
   tx: TxDb,
-  e: { groupId: string; action: TestGroupEventAction; actorUserId: string; subjectName?: string | null; details?: unknown },
+  e: {
+    groupId: string;
+    action: TestGroupEventAction;
+    actorUserId: string;
+    /** した人の名前（読んであれば渡す。なければここで読む） */
+    actorName?: string;
+    subjectName?: string | null;
+    details?: unknown;
+  },
 ) {
   await tx.insert(testGroupEvents).values({
     groupId: e.groupId,
     action: e.action,
     actorUserId: e.actorUserId,
-    actorName: await nameOf(tx, e.actorUserId),
+    actorName: e.actorName ?? (await nameOf(tx, e.actorUserId)),
     subjectName: e.subjectName ?? null,
     details: e.details ?? null,
   });
@@ -225,7 +221,8 @@ export async function joinTestGroup(env: Env, user: { id: string }, token: strin
     const granted = u ? !u.exempt : false;
     await tx.insert(testGroupMembers).values({ userId: user.id, groupId: g.id, grantedBillingExempt: granted });
     if (granted) await tx.update(users).set({ billingExempt: true, updatedAt: new Date() }).where(eq(users.id, user.id));
-    await recordEvent(tx, { groupId: g.id, action: "member_joined", actorUserId: user.id, subjectName: await nameOf(tx, user.id) });
+    const name = await nameOf(tx, user.id);
+    await recordEvent(tx, { groupId: g.id, action: "member_joined", actorUserId: user.id, actorName: name, subjectName: name });
     return { groupId: g.id };
   });
 }
@@ -257,7 +254,7 @@ async function toSummary(env: Env, g: typeof testGroups.$inferSelect, memberCoun
     name: g.name,
     capacity: g.capacity,
     memberCount,
-    inviteUrl: g.closedAt ? null : testInviteUrl(env, await openToken(env, g)),
+    inviteUrl: g.closedAt ? null : await testInviteUrlOf(env, g),
     closedAt: g.closedAt?.toISOString() ?? null,
     createdAt: g.createdAt.toISOString(),
   };
@@ -271,7 +268,8 @@ async function toSummary(env: Env, g: typeof testGroups.$inferSelect, memberCoun
 export async function listTestGroups(env: Env): Promise<TestGroupSummary[]> {
   const db = createDb(env.DATABASE_URL);
   const rows = await db
-    .select({ g: testGroups, n: sql<number>`(SELECT count(*) FROM test_group_members m WHERE m.group_id = ${testGroups.id})::int` })
+    // 1つの表だけの SELECT では drizzle が列を表の名前なしで書くので、外の表の名前を付けて書く（testAccessSql と同じ）
+    .select({ g: testGroups, n: sql<number>`(SELECT count(*) FROM test_group_members m WHERE m.group_id = "test_groups"."id")::int` })
     .from(testGroups)
     .orderBy(sql`${testGroups.closedAt} IS NOT NULL`, desc(testGroups.createdAt));
   return Promise.all(rows.map((r) => toSummary(env, r.g, Number(r.n))));
@@ -353,7 +351,7 @@ const groupClosed = () => new AppError("TEST_GROUP_CLOSED", 409, "test group clo
  */
 export async function createTestGroup(env: Env, operator: { id: string }, input: { name: string; capacity: number }) {
   const id = crypto.randomUUID();
-  const sealed = await sealToken(env, newTestInviteToken(), id);
+  const sealed = await sealNewToken(env, id);
   const g = await withTransaction(env.DATABASE_URL, async (tx) => {
     const [row] = await tx
       .insert(testGroups)
@@ -400,7 +398,7 @@ export async function updateTestGroup(env: Env, operator: { id: string }, groupI
  * @throws AppError ITEM_NOT_FOUND・TEST_GROUP_CLOSED
  */
 export async function rotateTestGroupInvite(env: Env, operator: { id: string }, groupId: string) {
-  const sealed = await sealToken(env, newTestInviteToken(), groupId);
+  const sealed = await sealNewToken(env, groupId);
   await withTransaction(env.DATABASE_URL, async (tx) => {
     const g = await findGroup(tx, groupId, true);
     if (g.closedAt) throw groupClosed();

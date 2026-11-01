@@ -156,8 +156,9 @@ export function validateConfig(env: Env): string[] {
  * 決済のモード（specs/013 research.md R2・R11）。環境ごとに1つで、判定する人の値に持たせる。
  * testGroups はテスト用のグループの仕組みがONか（specs/016 research.md R4）。ONなら、テスト環境に入れない
  * オーナーは読むだけになる（定期処理・権限の判定に同じモードで届けるため、ここに載せる）。
+ * operators は運営者のClerkのユーザーID（ONのときだけ。運営者はいつもテスト版に入れる）。
  */
-export type BillingMode = { enabled: boolean; testGroups?: boolean };
+export type BillingMode = { enabled: boolean; testGroups?: boolean; operators?: readonly string[] };
 
 /** つなぐ方法（`accounts.connection_method` と同じ語）。 */
 export const CONNECT_METHODS = ["app", "token"] as const;
@@ -192,13 +193,13 @@ export function connectMethodsOf(env: Pick<Env, "THREADS_CONNECT_METHODS">): ("a
  * @returns 決済のモード
  * @throws Error 列挙外の値のとき
  */
-export function billingModeOf(env: Pick<Env, "BILLING_ENABLED" | "TEST_GROUPS_ENABLED">): BillingMode {
+export function billingModeOf(env: Pick<Env, "BILLING_ENABLED" | "TEST_GROUPS_ENABLED" | "OPERATOR_CLERK_USER_IDS">): BillingMode {
   let enabled: boolean;
   if (env.BILLING_ENABLED === "true") enabled = true;
   else if (env.BILLING_ENABLED === "false") enabled = false;
   else throw new Error(`BILLING_ENABLED must be "true" or "false"`);
   // テスト用のグループも同じ理由で、列挙外の値では落とす（specs/016 research.md R1）
-  if (env.TEST_GROUPS_ENABLED === "true") return { enabled, testGroups: true };
+  if (env.TEST_GROUPS_ENABLED === "true") return { enabled, testGroups: true, operators: operatorIdsOf(env) };
   if (env.TEST_GROUPS_ENABLED === "false") return { enabled, testGroups: false };
   throw new Error(`TEST_GROUPS_ENABLED must be "true" or "false"`);
 }

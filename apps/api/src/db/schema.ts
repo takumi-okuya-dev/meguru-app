@@ -90,8 +90,9 @@ export const users = pgTable("users", {
   // 退会を受け付けた時刻。退会が終わると行ごと消えるので、残っていれば「途中」（specs/013 research.md R10）
   withdrawalRequestedAt: timestamp("withdrawal_requested_at", { withTimezone: true }),
   // テスト用のグループの仕組みがOFFの間に登録した（またはこの機能の前からいた）。true ならグループに
-  // 入っていなくてもテスト版に入れる（specs/016 data-model.md、research.md R2）
-  signedUpOpen: boolean("signed_up_open").notNull().default(false),
+  // 入っていなくてもテスト版に入れる（specs/016 data-model.md、research.md R2）。既定は true にして、列を足してから
+  // 新しいAPIに替わるまでの間に古いAPIが作った人も締め出さない。新しいAPIは作るときに必ず値を渡す
+  signedUpOpen: boolean("signed_up_open").notNull().default(true),
   ...timestamps,
 });
 

@@ -4,7 +4,7 @@ import { Link, Navigate, useSearchParams } from "react-router";
 import { CenteredLayout } from "@/components/layout/AppShell";
 import { ClerkLoadFailedScreen } from "@/components/ErrorScreen";
 import { LoadingSkeleton, useLoadTimeout } from "@/components/guards";
-import { isInvitePath } from "@/lib/invite-return";
+import { isInvitePath, isTestInvitePath } from "@/lib/invite-return";
 
 /**
  * ログイン画面（FR-001）。Clerk 側で Google だけを有効にしているので、「Googleで続ける」だけが出る。
@@ -12,7 +12,7 @@ import { isInvitePath } from "@/lib/invite-return";
  */
 export function SignInPage() {
   const { isLoaded, isSignedIn } = useAuth();
-  // 招待の確認画面から来たときは、ログインの後にそこへ戻す（specs/008 research.md R7）。招待のURLだけを許す
+  // 招待の確認画面から来たときは、ログインの後にそこへ戻す（specs/008 research.md R7、specs/016 R8）。招待のURLだけを許す
   const [params] = useSearchParams();
   const next = safeNext(params.get("next"));
   // 退会の後に戻ってきた（specs/013 contracts/ui-routes.md「退会」）
@@ -46,10 +46,10 @@ export function SignInPage() {
 }
 
 /**
- * ログインの後に戻る先。招待の確認画面（/invite/…）だけを許し、それ以外は `/`。
+ * ログインの後に戻る先。チームの招待（/invite/t_…）とテスト用のグループの招待（/test-invite/g_…）だけを許し、それ以外は `/`。
  * @param next - クエリの next
  * @returns 戻る先のパス
  */
 export function safeNext(next: string | null): string {
-  return isInvitePath(next) ? next : "/";
+  return isInvitePath(next) || isTestInvitePath(next) ? next : "/";
 }

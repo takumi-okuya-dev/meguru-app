@@ -84,8 +84,13 @@ describe("入れる人", () => {
   it("運営者は、ONの間に登録しても通る", async () => {
     await callOn(app, "GET", "/api/me", { user: OPERATOR });
     expect((await userRow(OPERATOR))!.signed_up_open).toBe(false);
-    const me = (await (await callOn(app, "GET", "/api/me", { user: OPERATOR })).json()) as { testGroups: unknown };
+    const me = (await (await callOn(app, "GET", "/api/me", { user: OPERATOR })).json()) as {
+      testGroups: unknown;
+      billing: { readOnlyReason: unknown };
+    };
     expect(me.testGroups).toEqual({ enabled: true, admitted: true, operator: true });
+    // 通るだけでなく、読むだけにもならない（料金の判定でも運営者を入れる人として扱う）
+    expect(me.billing.readOnlyReason).toBeNull();
   });
 
   it("閉じたグループの人は、通らなくなる", async () => {

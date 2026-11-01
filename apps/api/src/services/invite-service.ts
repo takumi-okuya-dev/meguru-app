@@ -19,32 +19,34 @@ const PREFIX = "t_";
 const TOKEN_FORM = /^t_[A-Za-z0-9_-]{43}$/;
 
 /**
- * チームの招待の文字列を作る。32バイトの暗号学的乱数の base64url（43文字）に「t_」を付ける。
+ * 招待の文字列を作る。32バイトの暗号学的乱数の base64url（43文字）に接頭辞を付ける。
+ * @param prefix - 接頭辞（チームは「t_」、テスト用のグループは「g_」。specs/016 research.md R8）
  * @returns 招待の文字列
  */
-export function newInviteToken(): string {
+export function newInviteToken(prefix: string = PREFIX): string {
   const bytes = crypto.getRandomValues(new Uint8Array(32));
   let bin = "";
   for (const b of bytes) bin += String.fromCharCode(b);
-  return PREFIX + btoa(bin).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  return prefix + btoa(bin).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 }
 
 /**
- * 招待のURL（WEB_ORIGIN/invite/{token}）。
+ * 招待のURL（WEB_ORIGIN/{route}/{token}）。
  * @param env - Workers のバインディング
  * @param token - 招待の文字列
+ * @param route - 画面のパス（チームは「invite」、テスト用のグループは「test-invite」）
  * @returns URL
  */
-export function inviteUrl(env: Env, token: string): string {
+export function inviteUrl(env: Env, token: string, route = "invite"): string {
   // 末尾の「/」を除いてからつなぐ（二重スラッシュにしない。PR #9 のCodexレビュー）
-  return `${env.WEB_ORIGIN.replace(/\/+$/, "")}/invite/${token}`;
+  return `${env.WEB_ORIGIN.replace(/\/+$/, "")}/${route}/${token}`;
 }
 
 /**
- * 招待の文字列を、保存する形（照合用のハッシュと暗号化した写し）にする。暗号の AAD にはチームのIDを使う。
+ * 招待の文字列を、保存する形（照合用のハッシュと暗号化した写し）にする。暗号の AAD にはチーム（グループ）のIDを使う。
  * @param env - Workers のバインディング
  * @param token - 招待の文字列
- * @param teamId - teams.id
+ * @param teamId - teams.id（テスト用のグループなら test_groups.id）
  * @returns 保存する値
  */
 export async function sealInviteToken(env: Env, token: string, teamId: string) {
@@ -57,7 +59,7 @@ export async function sealInviteToken(env: Env, token: string, teamId: string) {
  * 暗号化した写しから招待の文字列を戻す。
  * @param env - Workers のバインディング
  * @param sealed - 暗号文・IV・鍵の版
- * @param teamId - teams.id
+ * @param teamId - teams.id（テスト用のグループなら test_groups.id）
  * @returns 招待の文字列
  */
 export async function openInviteToken(

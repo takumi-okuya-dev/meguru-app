@@ -71,7 +71,7 @@ export function entitlementFromFacts(mode: BillingMode, facts: BillingFacts, now
  */
 export function fullAccessSql(mode: BillingMode, now: Date): SQL | undefined {
   // テスト用のグループがONなら、テスト版に入れることも条件に足す（specs/016 research.md R4。entitlementFromFacts と同じ）
-  const access = mode.testGroups ? testAccessSql(users) : undefined;
+  const access = mode.testGroups ? testAccessSql(users, mode.operators) : undefined;
   if (!mode.enabled) return access;
   const trialEnd = sql`((${users.createdAt} AT TIME ZONE 'Asia/Tokyo') + interval '1 month') AT TIME ZONE 'Asia/Tokyo'`;
   const billing = or(
@@ -101,7 +101,7 @@ export async function loadEntitlement(db: Db | TxDb, userId: string, mode: Billi
       status: subscriptions.status,
       cancelAtPeriodEnd: subscriptions.cancelAtPeriodEnd,
       // OFFの環境では読まない（問い合わせを今と同じにする。specs/016 plan.md「性能の目標」）
-      testAccess: mode.testGroups ? testAccessSql(users) : sql<boolean>`true`,
+      testAccess: mode.testGroups ? testAccessSql(users, mode.operators) : sql<boolean>`true`,
     })
     .from(users)
     .leftJoin(subscriptions, eq(subscriptions.userId, users.id))
