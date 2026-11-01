@@ -1,6 +1,11 @@
 # CI：PRのたび（と main・develop への push）に、lint・型チェック・テストを実行する。
 # API の結合テストに使う Postgres 17 と local-neon-http-proxy は、サービスコンテナとして起動する（research.md R12）。
 # E2E は Clerk の開発用キーが必要なので、ここでは実行しない（README の E2E の項を参照）。
+#
+# 速さのために、次を同時に動かす（2026-11-01。1台で順番に流すと20分に届いたため）。
+# - web：lint・型チェック・共通と Web のテスト・Web のビルド（DB は要らない）
+# - api：API のテストを API_SHARDS 個に分け、それぞれ自分の DB で流す（結合テストは1つの DB を順番に使うので、台を分けて並べる）
+# - check：全部の結果をまとめる。main・develop を守る決まりは、この名前（check）が通ることを求めている
 name: CI
 
 on:
@@ -16,12 +21,51 @@ concurrency:
 permissions: {}
 
 jobs:
-  check:
+  web:
+    name: lint・型チェック・共通とWeb
     runs-on: ubuntu-latest
-    # テストが増えて20分に届いたため、30分にする（2026-11-01。PR #40 で時間切れになった）
-    timeout-minutes: 30
+    timeout-minutes: 15
     permissions:
       contents: read
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: 依存を入れる
+        run: pnpm install --frozen-lockfile
+
+      - name: lint
+        run: pnpm lint
+
+      - name: 型チェック
+        run: pnpm typecheck
+
+      - name: テスト（共通）
+        run: pnpm --filter ./packages/shared test
+
+      - name: テスト（Web）
+        run: pnpm --filter ./apps/web test
+
+      - name: Web のビルド
+        run: pnpm --filter web build
+
+  api:
+    name: API のテスト（${{ matrix.shard }}/4）
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    strategy:
+      # 1つが落ちても、ほかの分の結果は最後まで見る
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
 
     services:
       postgres:
@@ -57,19 +101,32 @@ jobs:
       - name: 依存を入れる
         run: pnpm install --frozen-lockfile
 
-      - name: lint
-        run: pnpm lint
-
-      - name: 型チェック
-        run: pnpm typecheck
-
-      # local-neon-http-proxy は1クエリごとに SCRAM の認証で接続し直す。既定の4096回では結合テストが20分を超えるので、
+      # local-neon-http-proxy は1クエリごとに SCRAM の認証で接続し直す。既定の4096回では結合テストが遅くなりすぎるので、
       # この使い捨てのDBだけ、同じパスワードを反復1回で保存し直す（docker/postgres-init/01-cheap-scram.sql と同じ）
       - name: テスト用DBの認証を軽くする
         run: docker exec -i ${{ job.services.postgres.id }} psql -v ON_ERROR_STOP=1 -U postgres -d threads_grower < docker/postgres-init/01-cheap-scram.sql
 
-      - name: テスト（共通・Web・API の単体と結合）
-        run: pnpm test
+      # 単体・結合・マイグレーション・リポジトリの設定のテストを、ファイルの単位で4つに分ける
+      - name: テスト（API）
+        env:
+          SHARD: ${{ matrix.shard }}
+        run: pnpm --filter ./apps/api exec vitest run --shard="$SHARD/4"
 
-      - name: Web のビルド
-        run: pnpm --filter web build
+  check:
+    name: check
+    if: always()
+    needs: [web, api]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions: {}
+    steps:
+      - name: 全部が通ったか
+        env:
+          WEB: ${{ needs.web.result }}
+          API: ${{ needs.api.result }}
+        run: |
+          echo "web=$WEB api=$API"
+          if [ "$WEB" != "success" ] || [ "$API" != "success" ]; then
+            echo "::error::通っていないジョブがあります（web=$WEB api=$API）"
+            exit 1
+          fi
