@@ -1652,3 +1652,20 @@ export const testGroupCreateRequestSchema = z.object({ name: testGroupName, capa
 export const testGroupUpdateRequestSchema = z
   .object({ name: testGroupName.optional(), capacity: testGroupCapacity.optional() })
   .refine((v) => v.name !== undefined || v.capacity !== undefined, { message: "nothing to update" });
+
+// ---- 紹介リンク（specs/017-referral-links contracts/api.md） ----
+
+/** GET /api/me/referral の応答。紹介された人が誰かわかるものは入れない（FR-007）。 */
+export const referralResponseSchema = z.object({
+  /** 本人の紹介リンク（WEB_ORIGIN/r/{code}） */
+  url: z.string(),
+  /** 本人の紹介で登録した人の数（退会した人は数えない） */
+  referredCount: z.number().int().nonnegative(),
+});
+/** 本人の紹介リンクと人数。 */
+export type ReferralResponse = z.infer<typeof referralResponseSchema>;
+
+/** GET /api/referral-page の応答（認証なし）。testGroups はテスト用のグループの仕組みがONか。 */
+export const referralPageSchema = z.object({ testGroups: z.boolean() });
+/** 紹介リンクの画面に出す注意のための情報。 */
+export type ReferralPage = z.infer<typeof referralPageSchema>;
