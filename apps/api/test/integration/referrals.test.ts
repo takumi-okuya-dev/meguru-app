@@ -140,6 +140,26 @@ describe("退会（US2）", () => {
   });
 });
 
+describe("退会の途中（US2）", () => {
+  const startWithdrawal = (clerk: string) => sql()`UPDATE users SET withdrawal_requested_at = now() WHERE clerk_user_id = ${clerk}`;
+
+  it("持ち主が退会の途中なら、そのリンクで登録しても記録しない", async () => {
+    const code = await codeOf("a");
+    await startWithdrawal("a");
+    await withCode("GET", "/api/me", "b", code);
+    expect((await referralRow("b"))?.referred_by).toBeNull();
+  });
+
+  it("紹介された人が退会の途中なら、人数に数えない", async () => {
+    const code = await codeOf("a");
+    await withCode("GET", "/api/me", "b", code);
+    await withCode("GET", "/api/me", "c", code);
+    await startWithdrawal("b");
+    const body = (await (await call(app, "GET", "/api/me/referral", { user: "a" })).json()) as Referral;
+    expect(body.referredCount).toBe(1);
+  });
+});
+
 describe("テスト用のグループがONの環境（US3）", () => {
   it("紹介の記録は残るが、紹介リンクだけではテスト版に入れない。グループの招待から入っても記録は変わらない", async () => {
     await call(app, "GET", "/api/me", { user: "a" });

@@ -8,7 +8,7 @@ import type { Env } from "../env";
 import { createDb } from "../db/client";
 import { users, withdrawnUsers } from "../db/schema";
 import { billingModeOf, type BillingMode } from "../lib/config";
-import { AppError } from "../lib/errors";
+import { AppError, pgErrorCode } from "../lib/errors";
 import { referrerIdByCode } from "../services/referral-service";
 import { testAccessSql } from "../services/test-group-service";
 
@@ -144,16 +144,24 @@ export function authMiddleware(makeVerifier: (env: Env) => AuthVerifier) {
       // テスト用のグループがOFFの間に登録した人は、あとでONにしても締め出さない（specs/016 research.md R2・FR-016）
       // 紹介リンクを開いてから登録した人は、紹介した人を記録する。行を作るときだけ読み、あとから付け替えない（specs/017 research.md R4）
       const referredBy = await referrerIdByCode(db, c.req.header("X-Referral-Code"));
-      await db
-        .insert(users)
-        .values({
-          clerkUserId: identity.clerkUserId,
-          email: profile.email,
-          displayName: profile.displayName,
-          signedUpOpen: !mode.testGroups,
-          ...(referredBy ? { referredByUserId: referredBy, referredAt: new Date() } : {}),
-        })
-        .onConflictDoNothing({ target: users.clerkUserId });
+      const insertUser = (withReferral: boolean) =>
+        db
+          .insert(users)
+          .values({
+            clerkUserId: identity.clerkUserId,
+            email: profile.email,
+            displayName: profile.displayName,
+            signedUpOpen: !mode.testGroups,
+            ...(withReferral && referredBy ? { referredByUserId: referredBy, referredAt: new Date() } : {}),
+          })
+          .onConflictDoNothing({ target: users.clerkUserId });
+      try {
+        await insertUser(true);
+      } catch (err) {
+        // 引いた直後に紹介した人の退会が終わり、行が消えた（外部キーの違反）。紹介なしで作る
+        if (!referredBy || pgErrorCode(err) !== "23503") throw err;
+        await insertUser(false);
+      }
       const [created] = await selectUser();
       user = created!.row;
       admitted = created!.admitted;

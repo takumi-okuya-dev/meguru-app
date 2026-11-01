@@ -29,7 +29,9 @@ export function currentReferral(): string | null {
     if (raw === null) return null;
     const v = JSON.parse(raw) as { code?: unknown; at?: unknown };
     const at = typeof v.at === "string" ? Date.parse(v.at) : NaN;
-    if (typeof v.code === "string" && REFERRAL_CODE_PATTERN.test(v.code) && Date.now() - at <= REMEMBER_MS) return v.code;
+    // 未来の時刻（端末の時計が進んでいたとき）は、いつまでも残らないよう捨てる
+    const age = Date.now() - at;
+    if (typeof v.code === "string" && REFERRAL_CODE_PATTERN.test(v.code) && age >= 0 && age <= REMEMBER_MS) return v.code;
     localStorage.removeItem(KEY);
     return null;
   } catch {

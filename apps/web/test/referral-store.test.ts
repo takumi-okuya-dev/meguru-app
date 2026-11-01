@@ -36,6 +36,12 @@ describe("紹介の文字列を覚える", () => {
     expect(localStorage.getItem("tg.referral")).toBeNull();
   });
 
+  it("未来の時刻で覚えたもの（端末の時計が進んでいた）は捨てる", () => {
+    localStorage.setItem("tg.referral", JSON.stringify({ code: CODE_A, at: new Date(Date.now() + DAY).toISOString() }));
+    expect(currentReferral()).toBeNull();
+    expect(localStorage.getItem("tg.referral")).toBeNull();
+  });
+
   it("消せる。壊れた値は読まない", () => {
     rememberReferral(CODE_A);
     clearReferral();

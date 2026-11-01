@@ -19,12 +19,13 @@ const PREFIX = "t_";
 const TOKEN_FORM = /^t_[A-Za-z0-9_-]{43}$/;
 
 /**
- * 招待の文字列を作る。32バイトの暗号学的乱数の base64url（43文字）に接頭辞を付ける。
- * @param prefix - 接頭辞（チームは「t_」、テスト用のグループは「g_」。specs/016 research.md R8）
+ * 招待の文字列を作る。暗号学的乱数の base64url に接頭辞を付ける（32バイトなら43文字）。
+ * @param prefix - 接頭辞（チームは「t_」、テスト用のグループは「g_」、紹介は「r_」。specs/016 research.md R8、specs/017 R2）
+ * @param byteLength - 乱数のバイト数
  * @returns 招待の文字列
  */
-export function newInviteToken(prefix: string = PREFIX): string {
-  const bytes = crypto.getRandomValues(new Uint8Array(32));
+export function newInviteToken(prefix: string = PREFIX, byteLength = 32): string {
+  const bytes = crypto.getRandomValues(new Uint8Array(byteLength));
   let bin = "";
   for (const b of bytes) bin += String.fromCharCode(b);
   return prefix + btoa(bin).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");

@@ -28,6 +28,7 @@ export function ReferralSettingsPage() {
       setCopied(true);
     } catch {
       // コピーできない環境では、入力欄を選択して手でコピーしてもらう
+      setCopied(false);
       urlRef.current?.select();
     }
   };
