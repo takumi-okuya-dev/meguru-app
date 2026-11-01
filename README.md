@@ -24,6 +24,8 @@ Claude CodeとCodexで開発スキルを共用する手順と、利用制限時�
 
 勉強用にまとめた文書は [docs/study/](docs/study/README.md) に置く（使っている技術の仕組みなど）。
 
+テスト版と本番で切り替えるスイッチ（環境の設定）の一覧は [docs/environment-switches.md](docs/environment-switches.md)。スイッチを足す・値を変えるときは、同じPRでこの表も直す。
+
 ## 現在のフェーズ
 
 - [x] リポジトリ作成・ローカルクローン

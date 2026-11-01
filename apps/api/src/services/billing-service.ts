@@ -17,7 +17,7 @@ import { and, eq, inArray, isNull, lt, notInArray, or, sql, type SQL } from "dri
 import type { Env } from "../env";
 import { createDb, withTransaction, type Db, type TxDb } from "../db/client";
 import { lockUserRow } from "../db/locks";
-import { testAccessSql } from "./test-group-service";
+import { billingExemptSql, testAccessSql } from "./test-group-service";
 import { memberships, subscriptions, testGroupMembers, users } from "../db/schema";
 import { billingModeOf, type BillingMode } from "../lib/config";
 import { AppError } from "../lib/errors";
@@ -75,7 +75,7 @@ export function fullAccessSql(mode: BillingMode, now: Date): SQL | undefined {
   if (!mode.enabled) return access;
   const trialEnd = sql`((${users.createdAt} AT TIME ZONE 'Asia/Tokyo') + interval '1 month') AT TIME ZONE 'Asia/Tokyo'`;
   const billing = or(
-    eq(users.billingExempt, true),
+    billingExemptSql(users, mode),
     inArray(subscriptions.status, ["trialing", "active"]),
     and(
       or(isNull(subscriptions.status), notInArray(subscriptions.status, ["past_due", "unpaid", "paused"])),
@@ -97,7 +97,7 @@ export async function loadEntitlement(db: Db | TxDb, userId: string, mode: Billi
   const [row] = await db
     .select({
       createdAt: users.createdAt,
-      billingExempt: users.billingExempt,
+      billingExempt: billingExemptSql(users, mode),
       status: subscriptions.status,
       cancelAtPeriodEnd: subscriptions.cancelAtPeriodEnd,
       // OFFの環境では読まない（問い合わせを今と同じにする。specs/016 plan.md「性能の目標」）

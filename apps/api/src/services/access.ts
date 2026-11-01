@@ -17,7 +17,7 @@ import { accounts, memberships, subscriptions, teamAccounts, teamMembers, teams,
 import type { BillingMode } from "../lib/config";
 import { AppError, notFound } from "../lib/errors";
 import { entitlementFromFacts } from "./billing-service";
-import { testAccessSql } from "./test-group-service";
+import { billingExemptSql, testAccessSql } from "./test-group-service";
 
 /** accounts の行。 */
 export type AccountRow = typeof accounts.$inferSelect;
@@ -119,7 +119,7 @@ export async function authorizeAccount(
       ownerDisplayName: ownerU.displayName,
       ownerEmail: ownerU.email,
       ownerCreatedAt: ownerU.createdAt,
-      ownerBillingExempt: ownerU.billingExempt,
+      ownerBillingExempt: billingExemptSql(ownerU, user.billing),
       // オーナーがテスト版に入れるか（specs/016 research.md R4）。OFFの環境では読まない
       ownerTestAccess: user.billing.testGroups ? testAccessSql(ownerU, user.billing.operators) : sql<boolean>`true`,
       subStatus: subscriptions.status,
