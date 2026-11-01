@@ -72,7 +72,9 @@ function describe(s: BillingSummary): { title: string; body: string | null } {
  * @returns ボタン
  */
 function actionOf(s: BillingSummary): "checkout" | "portal" | null {
-  if (s.state === "billing_disabled" || s.state === "exempt") return null;
+  if (s.state === "billing_disabled") return null;
+  // 料金なしでも、前からの契約が残っていれば、解約できるよう支払いの画面を開ける（テスト版の運営者など）
+  if (s.state === "exempt") return s.subscription ? "portal" : null;
   if (s.state === "trial") return "checkout";
   if (s.state === "read_only") return s.readOnlyReason === "payment_failed" ? "portal" : "checkout";
   return "portal";
