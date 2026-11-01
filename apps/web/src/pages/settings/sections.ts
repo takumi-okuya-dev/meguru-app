@@ -1,5 +1,5 @@
 // 設定画面の項目の一覧。項目を足すときは、ここに1行足して画面を作るだけにする
-import { CreditCardIcon, PaletteIcon, UserCircleIcon, UsersRoundIcon, type LucideIcon } from "lucide-react";
+import { CreditCardIcon, PaletteIcon, Share2Icon, UserCircleIcon, UsersRoundIcon, type LucideIcon } from "lucide-react";
 
 /** 設定画面の項目。 */
 export type SettingsSection = {
@@ -23,6 +23,8 @@ export const SETTINGS_GROUPS: SettingsGroup[] = [
       { slug: "account", label: "アカウント", Icon: UserCircleIcon, keywords: ["Google", "メールアドレス", "名前", "ログアウト", "退会"] },
       // 契約と支払い（specs/013 contracts/ui-routes.md）
       { slug: "billing", label: "契約と支払い", Icon: CreditCardIcon, keywords: ["料金", "支払い", "契約", "解約", "領収書", "カード"] },
+      // 紹介リンク（specs/017 contracts/ui-routes.md 2）。特典はないので、プレゼントの絵は使わない
+      { slug: "referral", label: "紹介", Icon: Share2Icon, keywords: ["紹介", "招待", "友だち", "共有", "リンク"] },
     ],
   },
 ];

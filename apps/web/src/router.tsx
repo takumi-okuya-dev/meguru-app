@@ -9,6 +9,8 @@ import { ActivityPage } from "@/pages/activity";
 import { DataDeletion } from "@/pages/data-deletion";
 import { InvitePage } from "@/pages/invite";
 import { TestInvitePage } from "@/pages/test-invite";
+import { ReferralLandingPage } from "@/pages/referral-landing";
+import { ReferralSettingsPage } from "@/pages/settings/referral";
 import { Landing } from "@/pages/landing";
 import { NotFound } from "@/pages/not-found";
 import { PerformancePage } from "@/pages/performance";
@@ -63,6 +65,8 @@ export const routes = [
   { path: "/invite/:token", element: <InvitePage /> },
   // テスト用のグループの招待もログインなしで開ける。テスト版に入れない人も開ける（specs/016 contracts/ui-routes.md 1）
   { path: "/test-invite/:token", element: <TestInvitePage /> },
+  // 紹介リンクもログインなしで開ける（specs/017 contracts/ui-routes.md 1）
+  { path: "/r/:code", element: <ReferralLandingPage /> },
   {
     element: <RequireAuth />,
     children: [
@@ -79,6 +83,7 @@ export const routes = [
           { path: "appearance", element: <AppearanceSettings /> },
           { path: "account", element: <AccountSettingsPage /> },
           { path: "billing", element: <BillingSettingsPage /> },
+          { path: "referral", element: <ReferralSettingsPage /> },
           // 運営者だけ（specs/016 contracts/ui-routes.md 3）。運営者でなければ画面の中で断る
           { path: "test-groups", element: <TestGroupsPage /> },
           { path: "test-groups/:groupId", element: <TestGroupDetailPage /> },

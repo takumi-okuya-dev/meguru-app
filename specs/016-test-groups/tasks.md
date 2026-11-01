@@ -82,7 +82,7 @@ description: "Task list for feature 016 test groups"
 
 - [X] T026 [P] `docs/staging-setup-record.md`と`docs/external-services-setup.md`に、`TEST_GROUPS_ENABLED`（staging`"true"`・production`"false"`）と`OPERATOR_CLERK_USER_IDS`（`wrangler secret put … --env staging`）の入れ方を足す。`docs/user-guide.md`の「テスト版について」に、招待されたグループのリンクから入ることを足す。
 - [X] T027 `pnpm test`・`pnpm typecheck`・`pnpm lint`・`pnpm --filter web build`を通す。OFFの既存のテストが変わらないこと（SC-006）。
-- [ ] T028 quickstart.mdの「2. 手元で試す」を、手元で`TEST_GROUPS_ENABLED="true"`にして画面で通す（できる範囲。Googleのログインが要る所は、テストで代える）。※2026-11-01時点で未実施。Googleのログインが要るため、自動テスト（API・Web）で代えた。ユーザーが起きてから手で確かめる
+- [X] T028 quickstart.mdの「2. 手元で試す」を、手元で`TEST_GROUPS_ENABLED="true"`にして画面で通す（できる範囲。Googleのログインが要る所は、テストで代える）。※手元ではGoogleのログインが要るため自動テスト（API・Web）で代え、2026-11-01にユーザーがテスト版で、グループを作る・招待リンクから入る・リンクなしでは入れない、を確かめた
 
 ## Dependencies & Execution Order
 
