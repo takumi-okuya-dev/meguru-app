@@ -8,6 +8,11 @@ import {
   accountTeamSchema,
   inviteAcceptResponseSchema,
   invitePreviewSchema,
+  testGroupDetailSchema,
+  testGroupListSchema,
+  testGroupSummarySchema,
+  testInviteJoinResponseSchema,
+  testInvitePreviewSchema,
   activityListSchema,
   teamAssignmentsSchema,
   teamCreateResponseSchema,
@@ -134,6 +139,38 @@ export function subscribeWithdrawalInProgress(listener: () => void): () => void 
   return () => withdrawalListeners.delete(listener);
 }
 
+// ---- テスト版に入れない（specs/016 research.md R5）。/api/me か、どのAPIの応答で分かっても、画面を「招待された方だけ」に替える ----
+let testAccessRequired = false;
+const testAccessListeners = new Set<() => void>();
+
+/**
+ * テスト版に入れないことを知らせる。
+ * @param value - 入れないなら true（グループに入ったら false に戻す）
+ */
+export function setTestAccessRequired(value: boolean) {
+  if (testAccessRequired === value) return;
+  testAccessRequired = value;
+  for (const l of testAccessListeners) l();
+}
+
+/**
+ * テスト版に入れないかを読む（useSyncExternalStore 用）。
+ * @returns 入れないなら true
+ */
+export function getTestAccessRequired(): boolean {
+  return testAccessRequired;
+}
+
+/**
+ * テスト版に入れないかの変化を受け取る（useSyncExternalStore 用）。
+ * @param listener - 変わったときに呼ぶ
+ * @returns 受け取りをやめる関数
+ */
+export function subscribeTestAccessRequired(listener: () => void): () => void {
+  testAccessListeners.add(listener);
+  return () => testAccessListeners.delete(listener);
+}
+
 /** Accountの API が権限・存在のエラーを返したときの受け取り口（specs/008 contracts/ui-routes.md「共通の振る舞い」2・3）。 */
 export type AccountAccessErrorListener = (code: "ROLE_FORBIDDEN" | "ACCOUNT_NOT_FOUND", accountId: string) => void;
 let onAccountAccessError: AccountAccessErrorListener | null = null;
@@ -181,6 +218,7 @@ async function request<T>(
     const code: ErrorCode = parsed.success ? parsed.data.error.code : "INTERNAL_ERROR";
     if (res.status === 401) onSessionExpired();
     if (code === "WITHDRAWAL_IN_PROGRESS") setWithdrawalInProgress(true);
+    if (code === "TEST_ACCESS_REQUIRED") setTestAccessRequired(true);
     const accountId = ACCOUNT_PATH.exec(path)?.[1];
     if (accountId && (code === "ROLE_FORBIDDEN" || code === "ACCOUNT_NOT_FOUND")) onAccountAccessError?.(code, accountId);
     throw new ApiError(
@@ -203,6 +241,7 @@ export const api = {
   me: async () => {
     const me = await request("/api/me", meResponseSchema);
     if (me.withdrawalInProgress) setWithdrawalInProgress(true);
+    setTestAccessRequired(me.testGroups.enabled && !me.testGroups.admitted);
     return me;
   },
   // ---- 退会（specs/013 contracts/api.md「自分」）----
@@ -258,6 +297,29 @@ export const api = {
   unassign: (teamId: string, userId: string, accountId: string) =>
     request(`/api/teams/${teamId}/assignments/${userId}/accounts/${accountId}`, null, { method: "DELETE" }),
   previewInvite: (token: string) => request(`/api/invites/${encodeURIComponent(token)}`, invitePreviewSchema),
+  // ---- テスト用のグループ（specs/016 contracts/api.md）----
+  previewTestInvite: (token: string) => request(`/api/test-invites/${encodeURIComponent(token)}`, testInvitePreviewSchema),
+  joinTestGroup: (token: string) =>
+    request(`/api/test-invites/${encodeURIComponent(token)}/join`, testInviteJoinResponseSchema, { method: "POST" }),
+  testGroups: () => request("/api/operator/test-groups", testGroupListSchema),
+  createTestGroup: (input: { name: string; capacity: number }) =>
+    request("/api/operator/test-groups", testGroupSummarySchema, { method: "POST", body: JSON.stringify(input) }),
+  testGroup: (id: string) => request(`/api/operator/test-groups/${encodeURIComponent(id)}`, testGroupDetailSchema),
+  updateTestGroup: (id: string, input: { name?: string; capacity?: number }) =>
+    request(`/api/operator/test-groups/${encodeURIComponent(id)}`, testGroupDetailSchema, {
+      method: "PATCH",
+      body: JSON.stringify(input),
+    }),
+  rotateTestGroupInvite: (id: string) =>
+    request(`/api/operator/test-groups/${encodeURIComponent(id)}/rotate-invite`, testGroupDetailSchema, { method: "POST" }),
+  closeTestGroup: (id: string) =>
+    request(`/api/operator/test-groups/${encodeURIComponent(id)}/close`, testGroupDetailSchema, { method: "POST" }),
+  removeTestGroupMember: (id: string, userId: string) =>
+    request(
+      `/api/operator/test-groups/${encodeURIComponent(id)}/members/${encodeURIComponent(userId)}`,
+      testGroupDetailSchema,
+      { method: "DELETE" },
+    ),
   acceptInvite: (token: string, accounts: { id: string; shared: boolean }[]) =>
     request(`/api/invites/${encodeURIComponent(token)}/accept`, inviteAcceptResponseSchema, {
       method: "POST",

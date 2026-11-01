@@ -1,7 +1,7 @@
 // エラーコードと、画面に出す日本語の文言（contracts/ui-routes.md「エラー文言」）。
 // APIは code だけを返し、Webがここから文言を引く。
 import { BILLING_EXTRA_PRICE_JPY } from "./billing";
-import { TEAM_EDITOR_LIMIT, TEAM_MEMBER_LIMIT, TEAMS_PER_ADMIN } from "./limits";
+import { TEAM_EDITOR_LIMIT, TEAM_MEMBER_LIMIT, TEAMS_PER_ADMIN, TEST_GROUP_CAPACITY_MAX, TEST_GROUP_CAPACITY_MIN } from "./limits";
 
 /** APIとWebで共有するエラーコードの一覧（contracts/api.md・ui-routes.md）。 */
 export const ERROR_CODES = [
@@ -57,6 +57,14 @@ export const ERROR_CODES = [
   "NO_SUBSCRIPTION",
   "BILLING_UNAVAILABLE",
   "WITHDRAWAL_IN_PROGRESS",
+  // テスト用のグループ（specs/016-test-groups contracts/api.md「新しいエラーコード」）
+  "TEST_ACCESS_REQUIRED",
+  "TEST_INVITE_INVALID",
+  "TEST_GROUP_FULL",
+  "TEST_GROUP_ALREADY_MEMBER",
+  "TEST_GROUP_CLOSED",
+  "TEST_GROUP_CAPACITY_INVALID",
+  "OPERATOR_ONLY",
 ] as const;
 
 /** エラーコード。 */
@@ -198,6 +206,8 @@ export function errorMessage(code: ErrorCode, ctx: ErrorMessageContext = {}): Er
           return { message: "契約が終わりました。今は読むだけです。契約すると、すぐに元どおり使えます。", action: "subscribe" };
         case "owner_inactive":
           return { message: "オーナーの契約の状態により、このアカウントは今、読むだけです。", action: "none" };
+        case "test_access":
+          return { message: "テスト版を使えなくなったため、今は読むだけです。", action: "none" };
         default:
           return { message: "無料体験が終わりました。今は読むだけです。契約すると、すぐに元どおり使えます。", action: "subscribe" };
       }
@@ -214,6 +224,20 @@ export function errorMessage(code: ErrorCode, ctx: ErrorMessageContext = {}): Er
       return { message: "退会の手続きの途中です。「退会する」をもう一度押して、手続きを終えてください。", action: "none" };
     case "ROLE_FORBIDDEN":
       return { message: ROLE_FORBIDDEN_MESSAGE, action: "reload" };
+    case "TEST_ACCESS_REQUIRED":
+      return { message: "テスト版は招待された方だけが使えます。", action: "none" };
+    case "TEST_INVITE_INVALID":
+      return { message: "このリンクは使えません。招待してくれた方に、新しいリンクをもらってください。", action: "none" };
+    case "TEST_GROUP_FULL":
+      return { message: "このグループは定員に達しています。招待してくれた方に連絡してください。", action: "none" };
+    case "TEST_GROUP_ALREADY_MEMBER":
+      return { message: `すでに${ctx.details?.[0] ?? "ほかのグループ"}に入っています。`, action: "none" };
+    case "TEST_GROUP_CLOSED":
+      return { message: "このグループは閉じています。", action: "reload" };
+    case "TEST_GROUP_CAPACITY_INVALID":
+      return { message: `上限は${TEST_GROUP_CAPACITY_MIN}〜${TEST_GROUP_CAPACITY_MAX}人で決めてください。`, action: "none" };
+    case "OPERATOR_ONLY":
+      return { message: "この操作は運営者だけができます。", action: "none" };
     case "INVITE_INVALID":
       return {
         message: "このリンクは使えません。作り直されたか、チームが削除されました。管理者に、新しいリンクを頼んでください。",

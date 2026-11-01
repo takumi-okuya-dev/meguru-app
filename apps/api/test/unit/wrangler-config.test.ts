@@ -63,6 +63,7 @@ const REQUIRED_VARS = [
   "WEB_ORIGIN",
   "TOKEN_ENCRYPTION_KEY_VERSION",
   "BILLING_ENABLED",
+  "TEST_GROUPS_ENABLED",
   "STRIPE_PRICE_ID",
 ];
 
@@ -103,6 +104,12 @@ describe("wrangler.toml の環境ごとの設定", () => {
   // 入ると fetch 側は全部止まるのに Cron 側は全員を全権として扱う（セキュリティ監査 run-1）
   it.each(ENVS)("[env.%s.vars] の BILLING_ENABLED が true か false のどちらかである", (env) => {
     expect(one(`env.${env}.vars`)?.BILLING_ENABLED).toMatch(/^"(true|false)"$/);
+  });
+
+  // テスト用のグループは、テスト環境だけON。本番で誤ってONにすると、招待のない人が使えなくなる（specs/016 FR-012）
+  it("[env.*.vars] の TEST_GROUPS_ENABLED は、ステージングが true、本番が false", () => {
+    expect(one("env.staging.vars")?.TEST_GROUPS_ENABLED).toBe('"true"');
+    expect(one("env.production.vars")?.TEST_GROUPS_ENABLED).toBe('"false"');
   });
 
   it.each(ENVS)("[env.%s.vars] の THREADS_ACCESS_MODE が testers か public のどちらかである", (env) => {

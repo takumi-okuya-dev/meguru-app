@@ -185,9 +185,20 @@ describe("招待の確認", () => {
 });
 
 describe("ログインの戻り先（safeNext）", () => {
-  it("チームの招待リンク（t_）だけを許し、ほかは / にする", () => {
+  it("チームの招待リンク（t_）とグループの招待リンク（g_）だけを許し、ほかは / にする", () => {
     expect(safeNext(`/invite/${TOKEN}`)).toBe(`/invite/${TOKEN}`);
-    for (const bad of [null, "/accounts/x", "https://evil.example.com", `/invite/p_${"a".repeat(43)}`, `/invite/${TOKEN}/x`]) {
+    const group = `/test-invite/g_${"a".repeat(43)}`;
+    expect(safeNext(group)).toBe(group);
+    for (const bad of [
+      null,
+      "/accounts/x",
+      "https://evil.example.com",
+      `/invite/p_${"a".repeat(43)}`,
+      `/invite/${TOKEN}/x`,
+      `/test-invite/t_${"a".repeat(43)}`,
+      `${group}/x`,
+      `//evil.example.com${group}`,
+    ]) {
       expect(safeNext(bad)).toBe("/");
     }
     expect(isInvitePath(`/invite/${TOKEN}`)).toBe(true);

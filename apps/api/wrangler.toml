@@ -60,6 +60,9 @@ THREADS_AUTH_BASE_URL = "https://threads.com"
 THREADS_GRAPH_BASE_URL = "https://graph.threads.com"
 TOKEN_ENCRYPTION_KEY_VERSION = "1"
 BILLING_ENABLED = "true"
+# テスト用のグループ（specs/016）。テスト版は招待されたグループの人だけが使える。運営者は
+# `wrangler secret put OPERATOR_CLERK_USER_IDS --env staging`（ClerkのユーザーIDのカンマ区切り）
+TEST_GROUPS_ENABLED = "true"
 # 任意（入れなければStripeの既定）：STRIPE_PORTAL_CONFIGURATION_ID・STRIPE_TAX_RATE_ID
 # Metaの審査が通るまでは、利用者が自分（またはチームのオーナー）のMetaアプリで作ったトークンを貼る方法だけ。
 # このときThreadsのアプリID・シークレットは要らない（審査後に "app,token" にしたら入れる）
@@ -94,4 +97,6 @@ THREADS_AUTH_BASE_URL = "https://threads.com"
 THREADS_GRAPH_BASE_URL = "https://graph.threads.com"
 TOKEN_ENCRYPTION_KEY_VERSION = "1"
 BILLING_ENABLED = "true"
+# テスト用のグループ（specs/016）。本番は使わない（誰でも登録できる）
+TEST_GROUPS_ENABLED = "false"
 # 任意（入れなければStripeの既定）：STRIPE_PORTAL_CONFIGURATION_ID・STRIPE_TAX_RATE_ID

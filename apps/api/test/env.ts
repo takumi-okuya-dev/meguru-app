@@ -23,6 +23,8 @@ export function testBindings(fakeThreadsUrl: string, databaseUrl: string, fakeSt
     WEB_ORIGIN: TEST_WEB_ORIGIN,
     // 既定は決済OFF。決済のテストは withBilling() で ON にする（specs/013 tasks.md）
     BILLING_ENABLED: "false",
+    // 既定はテスト用のグループOFF。016のテストは withTestGroups() で ON にする
+    TEST_GROUPS_ENABLED: "false",
     STRIPE_SECRET_KEY: "sk_test_TestOnlyStripeKey000000",
     STRIPE_WEBHOOK_SECRET: TEST_STRIPE_WEBHOOK_SECRET,
     STRIPE_PRICE_ID: "price_TestOnlyTiered",

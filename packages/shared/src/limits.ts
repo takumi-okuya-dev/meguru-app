@@ -245,3 +245,13 @@ export const TOKEN_MAX_LENGTH = 2048;
 // ---- アカウントを先に作る（specs/012-accounts-before-connect data-model.md「定数」）----
 /** アカウントの名前の上限（文字。FR-002・FR-040）。 */
 export const ACCOUNT_NAME_MAX = 50;
+
+// テスト用のグループ（specs/016-test-groups data-model.md）
+/** グループ名の上限（文字）。 */
+export const TEST_GROUP_NAME_MAX = 50;
+/** グループの人数の上限の下限。 */
+export const TEST_GROUP_CAPACITY_MIN = 1;
+/** グループの人数の上限の上限。 */
+export const TEST_GROUP_CAPACITY_MAX = 1000;
+/** 運営者の画面に出す、グループの記録の件数（research.md R6）。 */
+export const TEST_GROUP_EVENTS_LIMIT = 50;

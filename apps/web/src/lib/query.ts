@@ -30,6 +30,10 @@ export const queryKeys = {
   accountTeam: (id: string) => ["account", id, "team"] as const,
   activity: (id: string, kind: string, actor: string) => ["account", id, "activity", kind, actor] as const,
   invite: (token: string) => ["invite", token] as const,
+  // テスト用のグループ（specs/016）
+  testInvite: (token: string) => ["test-invite", token] as const,
+  testGroups: ["test-groups"] as const,
+  testGroup: (id: string) => ["test-groups", id] as const,
   // チーム（specs/011）。Account の下に置かない（チームは Account をまたぐ）。取り直しは ["team", id] の範囲で行う
   team: (id: string) => ["team", id] as const,
   teamInvite: (id: string) => ["team", id, "invite"] as const,

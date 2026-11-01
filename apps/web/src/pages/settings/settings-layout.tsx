@@ -1,19 +1,17 @@
 // 設定画面の骨格（docs/ui-design.md 型D）。
 // 768px以上：左に「アプリに戻る」・検索・項目の一覧、右に項目の中身（ChatGPTの設定画面と同じ2列）。
 // 767px以下：「項目の一覧の画面」→「項目の中身の画面（左上に「← 設定」）」の2段。
+import { useQuery } from "@tanstack/react-query";
 import { ArrowLeftIcon, ChevronLeftIcon, ChevronRightIcon, SearchIcon } from "lucide-react";
 import { useState } from "react";
 import { Link, Navigate, NavLink, Outlet, useLocation, useMatch } from "react-router";
 import { TrialEndingBannerFromMe } from "@/components/billing/TrialEndingBanner";
 import { Input } from "@/components/ui/input";
+import { api } from "@/lib/api-client";
+import { queryKeys } from "@/lib/query";
 import { MD_QUERY, useMediaQuery } from "@/lib/use-media-query";
 import { cn } from "@/lib/utils";
-import {
-  DEFAULT_SETTINGS_SLUG,
-  SETTINGS_GROUPS,
-  filterSettingsGroups,
-  type SettingsGroup,
-} from "./sections";
+import { DEFAULT_SETTINGS_SLUG, filterSettingsGroups, settingsGroupsFor, type SettingsGroup } from "./sections";
 
 function SearchBox({
   query,
@@ -109,12 +107,15 @@ export function SettingsLayout() {
   const atIndex = useMatch("/settings") !== null;
   const location = useLocation();
   const [query, setQuery] = useState("");
-  const groups = filterSettingsGroups(SETTINGS_GROUPS, query);
+  // 運営者には「運営」の区分を出す（specs/016 contracts/ui-routes.md 3）
+  const me = useQuery({ queryKey: queryKeys.me, queryFn: api.me });
+  const allGroups = settingsGroupsFor(Boolean(me.data?.testGroups.enabled && me.data.testGroups.operator));
+  const groups = filterSettingsGroups(allGroups, query);
 
   if (!isWide) {
     if (atIndex) return <MobileList groups={groups} query={query} onQuery={setQuery} />;
     const slug = location.pathname.split("/")[2];
-    const current = SETTINGS_GROUPS.flatMap((g) => g.sections).find((s) => s.slug === slug);
+    const current = allGroups.flatMap((g) => g.sections).find((s) => s.slug === slug);
     return (
       <div className="min-h-svh">
         <MobileHeader

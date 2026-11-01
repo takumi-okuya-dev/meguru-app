@@ -27,6 +27,10 @@ import {
   PROMPT_COUNT_DEFAULT,
   REJECT_REASON_CODES,
   SUBSCRIPTION_STATUSES,
+  TEST_GROUP_CAPACITY_MAX,
+  TEST_GROUP_CAPACITY_MIN,
+  TEST_GROUP_EVENT_ACTIONS,
+  TEST_GROUP_NAME_MAX,
 } from "@threads-grower/shared";
 
 const bytea = customType<{ data: Uint8Array; driverData: Uint8Array | string }>({
@@ -85,6 +89,10 @@ export const users = pgTable("users", {
   billingExempt: boolean("billing_exempt").notNull().default(false),
   // 退会を受け付けた時刻。退会が終わると行ごと消えるので、残っていれば「途中」（specs/013 research.md R10）
   withdrawalRequestedAt: timestamp("withdrawal_requested_at", { withTimezone: true }),
+  // テスト用のグループの仕組みがOFFの間に登録した（またはこの機能の前からいた）。true ならグループに
+  // 入っていなくてもテスト版に入れる（specs/016 data-model.md、research.md R2）。既定は true にして、列を足してから
+  // 新しいAPIに替わるまでの間に古いAPIが作った人も締め出さない。新しいAPIは作るときに必ず値を渡す
+  signedUpOpen: boolean("signed_up_open").notNull().default(true),
   ...timestamps,
 });
 
@@ -1025,3 +1033,70 @@ export const withdrawnUsers = pgTable("withdrawn_users", {
   withdrawnAt: timestamp("withdrawn_at", { withTimezone: true }).notNull(),
   clerkDeletedAt: timestamp("clerk_deleted_at", { withTimezone: true }),
 });
+
+// ---- テスト用のグループ（specs/016-test-groups data-model.md）----
+
+/** テスト用のグループ。テスト版を渡す組織やコミュニティの単位。招待リンクを1本持つ（チームの招待と同じ仕組み）。 */
+export const testGroups = pgTable(
+  "test_groups",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    name: text("name").notNull(),
+    capacity: integer("capacity").notNull(),
+    // 招待リンク（research.md R8）。照合はハッシュ、運営者の画面に出すのは暗号化した写し（AADはid）
+    inviteTokenHash: text("invite_token_hash").notNull().unique(),
+    inviteTokenCiphertext: bytea("invite_token_ciphertext").notNull(),
+    inviteTokenIv: bytea("invite_token_iv").notNull(),
+    inviteKeyVersion: smallint("invite_key_version").notNull(),
+    inviteRotatedAt: timestamp("invite_rotated_at", { withTimezone: true, precision: 6 }),
+    // 閉じた時刻。閉じたグループは開き直さない
+    closedAt: timestamp("closed_at", { withTimezone: true, precision: 6 }),
+    createdByUserId: uuid("created_by_user_id").references(() => users.id, { onDelete: "set null" }),
+    ...timestamps,
+  },
+  (t) => [
+    check("test_groups_name_length", sql`char_length(${t.name}) BETWEEN 1 AND ${sql.raw(String(TEST_GROUP_NAME_MAX))}`),
+    check(
+      "test_groups_capacity_range",
+      sql`${t.capacity} BETWEEN ${sql.raw(String(TEST_GROUP_CAPACITY_MIN))} AND ${sql.raw(String(TEST_GROUP_CAPACITY_MAX))}`,
+    ),
+  ],
+);
+
+/** 今グループに入っている人（1人1グループ）。外す・閉じるときは行を消す（research.md R3）。 */
+export const testGroupMembers = pgTable(
+  "test_group_members",
+  {
+    userId: uuid("user_id")
+      .primaryKey()
+      .references(() => users.id, { onDelete: "cascade" }),
+    groupId: uuid("group_id")
+      .notNull()
+      .references(() => testGroups.id, { onDelete: "cascade" }),
+    joinedAt: timestamp("joined_at", { withTimezone: true, precision: 6 }).notNull().defaultNow(),
+    // 入ったときに料金なしの印を付けた。出るときはこの人だけ印を戻す（research.md R7）
+    grantedBillingExempt: boolean("granted_billing_exempt").notNull().default(false),
+  },
+  (t) => [index("test_group_members_group_idx").on(t.groupId)],
+);
+
+/** グループの出来事の記録（FR-013、research.md R6）。 */
+export const testGroupEvents = pgTable(
+  "test_group_events",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    groupId: uuid("group_id")
+      .notNull()
+      .references(() => testGroups.id, { onDelete: "cascade" }),
+    action: text("action").notNull(),
+    actorUserId: uuid("actor_user_id").references(() => users.id, { onDelete: "set null" }),
+    actorName: text("actor_name").notNull(),
+    subjectName: text("subject_name"),
+    details: jsonb("details"),
+    createdAt: timestamp("created_at", { withTimezone: true, precision: 6 }).notNull().defaultNow(),
+  },
+  (t) => [
+    check("test_group_events_action_valid", sql`${t.action} IN (${inList(TEST_GROUP_EVENT_ACTIONS)})`),
+    index("test_group_events_group_created_idx").on(t.groupId, t.createdAt.desc()),
+  ],
+);

@@ -2,6 +2,7 @@
 import { useClerk } from "@clerk/react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router";
+import { setTestAccessRequired } from "./api-client";
 
 /**
  * ログアウトの処理を返す（FR-006、規則6）。
@@ -15,6 +16,8 @@ export function useLogout() {
   return async () => {
     await signOut();
     queryClient.clear();
+    // 次にログインする人の画面に、前の人の「テスト版に入れない」を残さない（specs/016）
+    setTestAccessRequired(false);
     void navigate("/sign-in", { replace: true });
   };
 }

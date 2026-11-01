@@ -8,6 +8,7 @@ import { AccountSettings } from "@/pages/account-settings";
 import { ActivityPage } from "@/pages/activity";
 import { DataDeletion } from "@/pages/data-deletion";
 import { InvitePage } from "@/pages/invite";
+import { TestInvitePage } from "@/pages/test-invite";
 import { Landing } from "@/pages/landing";
 import { NotFound } from "@/pages/not-found";
 import { PerformancePage } from "@/pages/performance";
@@ -18,6 +19,7 @@ import { TeamSharedAccountPage } from "@/pages/team-shared-account";
 import { SignInPage } from "@/pages/sign-in";
 import { AccountSettingsPage } from "@/pages/settings/account";
 import { BillingSettingsPage } from "@/pages/settings/billing";
+import { TestGroupDetailPage, TestGroupsPage } from "@/pages/settings/test-groups";
 import { LegalCommercePage } from "@/pages/legal-commerce";
 import { AppearanceSettings } from "@/pages/settings/appearance";
 import { SettingsIndex, SettingsLayout } from "@/pages/settings/settings-layout";
@@ -59,6 +61,8 @@ export const routes = [
   },
   // 招待の確認はログインなしで開ける（specs/008 research.md R7、specs/011 contracts/ui-routes.md）
   { path: "/invite/:token", element: <InvitePage /> },
+  // テスト用のグループの招待もログインなしで開ける。テスト版に入れない人も開ける（specs/016 contracts/ui-routes.md 1）
+  { path: "/test-invite/:token", element: <TestInvitePage /> },
   {
     element: <RequireAuth />,
     children: [
@@ -75,6 +79,9 @@ export const routes = [
           { path: "appearance", element: <AppearanceSettings /> },
           { path: "account", element: <AccountSettingsPage /> },
           { path: "billing", element: <BillingSettingsPage /> },
+          // 運営者だけ（specs/016 contracts/ui-routes.md 3）。運営者でなければ画面の中で断る
+          { path: "test-groups", element: <TestGroupsPage /> },
+          { path: "test-groups/:groupId", element: <TestGroupDetailPage /> },
         ],
       },
       // チーム（specs/011 contracts/ui-routes.md「ルート」）。チームの画面と担当の表はサイドバーの中に出す

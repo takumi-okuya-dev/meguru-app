@@ -149,7 +149,8 @@ export async function runMetricsStage(
   const limit = calls + 40;
   const mode = billingModeOf(env);
   const candidates = await loadCandidates(db, mode, now, catchup, todayStart, limit);
-  // オーナーが読むだけのアカウントは取らない（specs/013 research.md R8）
+  // オーナーが読むだけのアカウントは取らない（specs/013 research.md R8）。テスト版に入れないオーナー（specs/016）は、
+  // 候補を読むSQL（fullAccessSql）で外れているので、ここでは決済の状態だけを見直す
   const ownerFull = (t: { ownerCreatedAt: Date; ownerBillingExempt: boolean; subStatus: string | null; subCancelAtPeriodEnd: boolean | null }) =>
     entitlementFromFacts(
       mode,
