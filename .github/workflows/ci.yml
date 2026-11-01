@@ -1,4 +1,5 @@
-# CI：PRのたび（と main・develop への push）に、lint・型チェック・テストを実行する。
+# CI：PRのたび（と main への push）に、lint・型チェック・テストを実行する。
+# develop への push（PR のマージ）では流さない。同じ中身を PR で確かめ済みで、Actions の持ち時間（月3,000分）を倍使うため（2026-11-01）。
 # API の結合テストに使う Postgres 17 と local-neon-http-proxy は、サービスコンテナとして起動する（research.md R12）。
 # E2E は Clerk の開発用キーが必要なので、ここでは実行しない（README の E2E の項を参照）。
 #
@@ -11,7 +12,7 @@ name: CI
 on:
   pull_request:
   push:
-    branches: [main, develop]
+    branches: [main]
 
 concurrency:
   group: ci-${{ github.ref }}
