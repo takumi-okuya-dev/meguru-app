@@ -34,7 +34,7 @@ import { accounts, memberships, postDrafts, postingSchedules, publishAttempts, s
 import type { Env } from "../env";
 import { billingModeOf } from "../lib/config";
 import { entitlementFromFacts } from "./billing-service";
-import { testAccessSql } from "./test-group-service";
+import { billingExemptSql, testAccessSql } from "./test-group-service";
 import { logger } from "../lib/logger";
 import { createThreadsClient, type ThreadsClient } from "../lib/threads-client";
 import { computeNextCheckAt, readGate, shouldRun, writeCatchupDate, writeGate } from "./auto-post-gate";
@@ -181,7 +181,7 @@ export async function runAutoPost(
     .select({
       schedule: postingSchedules,
       ownerCreatedAt: users.createdAt,
-      ownerBillingExempt: users.billingExempt,
+      ownerBillingExempt: billingExemptSql(users, mode),
       // オーナーがテスト版に入れるか（specs/016 research.md R4）。OFFの環境では読まない
       ownerTestAccess: mode.testGroups ? testAccessSql(users, mode.operators) : sql<boolean>`true`,
       subStatus: subscriptions.status,
