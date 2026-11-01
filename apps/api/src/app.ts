@@ -20,6 +20,7 @@ import { accountTeamRoutes } from "./routes/account-team";
 import { inviteRoutes } from "./routes/invites";
 import { operatorTestGroupRoutes } from "./routes/operator-test-groups";
 import { testInviteRoutes } from "./routes/test-invites";
+import { referralRoutes } from "./routes/referrals";
 import { teamsRoutes } from "./routes/teams";
 import { activityRoutes } from "./routes/activity";
 import { dataDeletionRoutes } from "./routes/data-deletion";
@@ -65,7 +66,8 @@ export function createApp(deps: AppDeps = defaultDeps) {
   app.use("/api/*", async (c, next) => {
     const corsMiddleware = cors({
       origin: c.env.WEB_ORIGIN,
-      allowHeaders: ["Authorization", "Content-Type"],
+      // X-Referral-Code：紹介リンクを開いた人の登録で、紹介した人を記録する（specs/017 research.md R4）
+      allowHeaders: ["Authorization", "Content-Type", "X-Referral-Code"],
       // PATCH：チーム名・任せる範囲・改善メモ（specs/006・008。PR #9 のCodexレビュー）
       allowMethods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
       credentials: false,
@@ -170,6 +172,7 @@ export function createApp(deps: AppDeps = defaultDeps) {
     .route("/", inviteRoutes(authed, maybeAuthed))
     // テスト用のグループ（specs/016 contracts/api.md）
     .route("/", testInviteRoutes(authed, maybeAuthed))
+    .route("/", referralRoutes(authed))
     .route("/", operatorTestGroupRoutes(authed))
     .route("/", teamsRoutes(authed))
     .route("/", activityRoutes(authed))

@@ -93,8 +93,16 @@ export const users = pgTable("users", {
   // 入っていなくてもテスト版に入れる（specs/016 data-model.md、research.md R2）。既定は true にして、列を足してから
   // 新しいAPIに替わるまでの間に古いAPIが作った人も締め出さない。新しいAPIは作るときに必ず値を渡す
   signedUpOpen: boolean("signed_up_open").notNull().default(true),
+  // 紹介リンク（specs/017 data-model.md）。本人の紹介の文字列は、設定の「紹介」を初めて開いたときに入れ、変えない
+  referralCode: text("referral_code").unique(),
+  // この人を紹介した人。行を作るとき（JIT作成）だけ入れ、あとから変えない。紹介した人が退会したら NULL
+  referredByUserId: uuid("referred_by_user_id").references((): AnyPgColumn => users.id, { onDelete: "set null" }),
+  referredAt: timestamp("referred_at", { withTimezone: true }),
   ...timestamps,
-});
+}, (t) => [
+  index("users_referred_by_idx").on(t.referredByUserId),
+  check("users_not_self_referred", sql`${t.referredByUserId} <> ${t.id}`),
+]);
 
 /**
  * Threadsアカウント1件に対応する運用単位（data-model.md の accounts）。

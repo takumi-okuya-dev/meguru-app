@@ -255,3 +255,9 @@ export const TEST_GROUP_CAPACITY_MIN = 1;
 export const TEST_GROUP_CAPACITY_MAX = 1000;
 /** 運営者の画面に出す、グループの記録の件数（research.md R6）。 */
 export const TEST_GROUP_EVENTS_LIMIT = 50;
+
+// 紹介リンク（specs/017-referral-links research.md R2・R3）
+/** 紹介リンクを開いたことを、ブラウザに覚えておく日数。 */
+export const REFERRAL_REMEMBER_DAYS = 30;
+/** 紹介の文字列の形（「r_」＋16バイトの base64url 22文字）。画面とAPIで同じ形を使う。 */
+export const REFERRAL_CODE_PATTERN = /^r_[A-Za-z0-9_-]{22}$/;

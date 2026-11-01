@@ -13,6 +13,8 @@ import {
   testGroupSummarySchema,
   testInviteJoinResponseSchema,
   testInvitePreviewSchema,
+  referralPageSchema,
+  referralResponseSchema,
   activityListSchema,
   teamAssignmentsSchema,
   teamCreateResponseSchema,
@@ -78,6 +80,7 @@ import {
   type RenameAccountRequest,
 } from "@threads-grower/shared";
 import { z } from "zod";
+import { clearReferral, currentReferral } from "./referral-store";
 
 /** POST /post-drafts/:id/prioritize のレスポンス。 */
 const postDraftResponseSchema = z.object({ draft: postDraftSchema });
@@ -204,6 +207,9 @@ async function request<T>(
   if (init.auth !== false) {
     const token = await getToken();
     if (token) headers.set("Authorization", `Bearer ${token}`);
+    // 紹介リンクを開いてから登録する人の紹介した人（APIは、利用者の行を新しく作るときだけ読む。specs/017 research.md R4）
+    const referral = currentReferral();
+    if (referral) headers.set("X-Referral-Code", referral);
   }
   let res: Response;
   try {
@@ -240,6 +246,8 @@ type FeedbackRequestInput = { memo?: string | null; includeInPrompt?: boolean; e
 export const api = {
   me: async () => {
     const me = await request("/api/me", meResponseSchema);
+    // 利用者の行がある（＝登録が終わった）ので、紹介の文字列はもう要らない（specs/017 contracts/ui-routes.md 3）
+    clearReferral();
     if (me.withdrawalInProgress) setWithdrawalInProgress(true);
     setTestAccessRequired(me.testGroups.enabled && !me.testGroups.admitted);
     return me;
@@ -297,6 +305,9 @@ export const api = {
   unassign: (teamId: string, userId: string, accountId: string) =>
     request(`/api/teams/${teamId}/assignments/${userId}/accounts/${accountId}`, null, { method: "DELETE" }),
   previewInvite: (token: string) => request(`/api/invites/${encodeURIComponent(token)}`, invitePreviewSchema),
+  // ---- 紹介リンク（specs/017 contracts/api.md）----
+  referral: () => request("/api/me/referral", referralResponseSchema),
+  referralPage: () => request("/api/referral-page", referralPageSchema, { auth: false }),
   // ---- テスト用のグループ（specs/016 contracts/api.md）----
   previewTestInvite: (token: string) => request(`/api/test-invites/${encodeURIComponent(token)}`, testInvitePreviewSchema),
   joinTestGroup: (token: string) =>

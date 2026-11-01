@@ -9,6 +9,7 @@ import { createDb } from "../db/client";
 import { users, withdrawnUsers } from "../db/schema";
 import { billingModeOf, type BillingMode } from "../lib/config";
 import { AppError } from "../lib/errors";
+import { referrerIdByCode } from "../services/referral-service";
 import { testAccessSql } from "../services/test-group-service";
 
 /**
@@ -141,6 +142,8 @@ export function authMiddleware(makeVerifier: (env: Env) => AuthVerifier) {
           : await verifier.fetchProfile(identity.clerkUserId);
       // 同時に初回アクセスが来ても1行だけになるよう、一意制約で衝突したら既存の行を使う
       // テスト用のグループがOFFの間に登録した人は、あとでONにしても締め出さない（specs/016 research.md R2・FR-016）
+      // 紹介リンクを開いてから登録した人は、紹介した人を記録する。行を作るときだけ読み、あとから付け替えない（specs/017 research.md R4）
+      const referredBy = await referrerIdByCode(db, c.req.header("X-Referral-Code"));
       await db
         .insert(users)
         .values({
@@ -148,6 +151,7 @@ export function authMiddleware(makeVerifier: (env: Env) => AuthVerifier) {
           email: profile.email,
           displayName: profile.displayName,
           signedUpOpen: !mode.testGroups,
+          ...(referredBy ? { referredByUserId: referredBy, referredAt: new Date() } : {}),
         })
         .onConflictDoNothing({ target: users.clerkUserId });
       const [created] = await selectUser();
