@@ -82,6 +82,14 @@ describe("状態ごとの表示", () => {
     expect(screen.queryByRole("button")).not.toBeInTheDocument();
   });
 
+  it("料金なしでも、前からの契約が残っていれば、解約できるよう支払いの画面を開ける", async () => {
+    billing.mockResolvedValue(summary({ state: "exempt", subscription: sub() }));
+    renderPage();
+    expect(await screen.findByText("料金なし")).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: /支払い/ })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "契約する" })).not.toBeInTheDocument();
+  });
+
   it("無料体験中：終わる日と残りの日数、料金、規約へのリンク、「契約する」", async () => {
     billing.mockResolvedValue(summary());
     renderPage();

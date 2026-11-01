@@ -50,6 +50,7 @@ import {
   type ThreadsMediaInsights,
 } from "../lib/threads-client";
 import { markNeedsReconnect } from "./threads-credentials";
+import { billingExemptSql } from "./test-group-service";
 
 /** 反応数の段階の結果。 */
 export type MetricsStageResult = {
@@ -347,7 +348,7 @@ async function loadCandidates(
       threadsUserId: accounts.threadsUserId,
       generation: accounts.connectionGeneration,
       ownerCreatedAt: users.createdAt,
-      ownerBillingExempt: users.billingExempt,
+      ownerBillingExempt: billingExemptSql(users, mode),
       subStatus: subscriptions.status,
       subCancelAtPeriodEnd: subscriptions.cancelAtPeriodEnd,
       ciphertext: threadsConnections.accessTokenCiphertext,
@@ -408,7 +409,7 @@ async function loadFollowerTargets(db: Db, mode: BillingMode, now: Date, today: 
       threadsUserId: accounts.threadsUserId,
       generation: accounts.connectionGeneration,
       ownerCreatedAt: users.createdAt,
-      ownerBillingExempt: users.billingExempt,
+      ownerBillingExempt: billingExemptSql(users, mode),
       subStatus: subscriptions.status,
       subCancelAtPeriodEnd: subscriptions.cancelAtPeriodEnd,
       ciphertext: threadsConnections.accessTokenCiphertext,

@@ -10,6 +10,7 @@ import {
 } from "@threads-grower/shared";
 import { and, asc, count, desc, eq, getTableName, inArray, isNull, sql, type AnyColumn, type SQL, type Table } from "drizzle-orm";
 import type { Env } from "../env";
+import type { BillingMode } from "../lib/config";
 import { createDb, withTransaction, type Db, type TxDb } from "../db/client";
 import { testGroupEvents, testGroupMembers, testGroups, users } from "../db/schema";
 import { AppError } from "../lib/errors";
@@ -32,18 +33,38 @@ type UsersLike = Table & { id: AnyColumn; signedUpOpen: AnyColumn; clerkUserId: 
  */
 export function testAccessSql(u: UsersLike = users, operators: readonly string[] = []): SQL<boolean> {
   const t = sql.identifier(getTableName(u));
-  const operator =
-    operators.length > 0
-      ? sql` OR ${t}."clerk_user_id" IN (${sql.join(
-          operators.map((id) => sql`${id}`),
-          sql`, `,
-        )})`
-      : sql``;
-  return sql<boolean>`(${t}."signed_up_open"${operator} OR EXISTS (
+  return sql<boolean>`(${t}."signed_up_open"${operatorOrSql(t, operators)} OR EXISTS (
     SELECT 1 FROM test_group_members tgm
     JOIN test_groups tg ON tg.id = tgm.group_id
     WHERE tgm.user_id = ${t}."id" AND tg.closed_at IS NULL
   ))`;
+}
+
+/**
+ * 「料金なし」のSQLの条件（料金なしの印か、テスト用のグループがONの環境の運営者）。
+ * 運営者は、テスト版でテストユーザーと同じく料金なしで使う（無料体験の表示を出さない）。本番（OFF）では印だけ。
+ * 使える状態の判定（entitlementFromFacts の billingExempt・fullAccessSql）に渡す値は、すべてここから読む。
+ * @param u - users の表か別名
+ * @param mode - 決済のモード（testGroups と operators を見る）
+ * @returns 真偽のSQL
+ */
+export function billingExemptSql(u: UsersLike, mode: BillingMode): SQL<boolean> {
+  const t = sql.identifier(getTableName(u));
+  return sql<boolean>`(${t}."billing_exempt"${mode.testGroups ? operatorOrSql(t, mode.operators ?? []) : sql``})`;
+}
+
+/**
+ * 「または運営者」のSQLの断片（運営者がいなければ空）。
+ * @param t - 表の名前（sql.identifier）
+ * @param operators - 運営者のClerkのユーザーID
+ * @returns SQLの断片
+ */
+function operatorOrSql(t: ReturnType<typeof sql.identifier>, operators: readonly string[]): SQL {
+  if (operators.length === 0) return sql``;
+  return sql` OR ${t}."clerk_user_id" IN (${sql.join(
+    operators.map((id) => sql`${id}`),
+    sql`, `,
+  )})`;
 }
 
 // ---- 招待の文字列（research.md R8。チームの招待と同じ作りを使う。チームは「t_」、グループは「g_」） ----

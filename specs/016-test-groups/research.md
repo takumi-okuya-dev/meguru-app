@@ -77,6 +77,7 @@ Phase 0の調べと決めたこと。各項目は「決定・理由・ほかの�
 - 外す・閉じる・退会でグループを出るときは、`granted_billing_exempt`が trueの人だけ`billing_exempt`を falseに戻す。
 - 運営者が`admin:set-billing-exempt <email> on`で手で付けたときは、その人の`granted_billing_exempt`を falseにする（グループを出ても、手で付けた印は残る。spec Edge Cases）。
 - 入るときに契約（Stripe）が続いていても止めない。テスト環境のStripeはテスト用で、実際の請求は起きないため（013の`--force`の確認は本番のための守り）。
+- （2026-11-01追記）運営者は、テスト用のグループがONの環境では、印がなくても料金なしとして扱う（`billingExemptSql`。印の列は書き換えない）。運営者はグループを通らずに入るので、印が付かず「無料体験中」と出ていたため。本番（OFF）では印だけで決める。スイッチの一覧は[docs/environment-switches.md](../../docs/environment-switches.md)。
 
 **理由**：spec Assumptions「グループから外れたときに外すのは、グループで付いた印だけ」。
 
