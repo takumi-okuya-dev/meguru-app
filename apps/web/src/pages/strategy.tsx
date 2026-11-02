@@ -319,7 +319,7 @@ function StrategyEditor({ accountId, initial }: { accountId: string; initial: St
                                   className="inline-flex h-9 items-center gap-1.5 rounded-full border px-3 text-[13px] hover:bg-accent"
                                 >
                                   <SparklesIcon className="size-4" aria-hidden="true" />
-                                  この項目をAIと深掘りする
+                                  AIと深掘り
                                 </button>
                                 )
                               )
