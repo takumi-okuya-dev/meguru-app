@@ -11,6 +11,7 @@ import {
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { SwapLabel } from "@/components/SwapLabel";
 import { Button } from "@/components/ui/button";
 import { api } from "@/lib/api-client";
 import { formatRelativeJst, formatSlotTime } from "@/lib/format";
@@ -192,7 +193,7 @@ export function PostingScheduleSection({
           disabled={check.isPending}
           onClick={() => check.mutate()}
         >
-          {check.isPending ? "確かめています…" : "接続を確かめる"}
+          <SwapLabel labels={{ idle: "接続を確かめる", busy: "確かめています…" }} show={check.isPending ? "busy" : "idle"} />
         </Button>
         {check.isError && (
           <span className="text-sm text-destructive">{THREADS_CHECK_MESSAGES.unknown}</span>

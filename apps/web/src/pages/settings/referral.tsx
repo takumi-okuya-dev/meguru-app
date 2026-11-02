@@ -5,6 +5,7 @@ import { useRef, useState } from "react";
 import { ApiErrorScreen } from "@/components/ApiErrorScreen";
 import { LoadingSkeleton } from "@/components/guards";
 import { SettingCard } from "@/components/settings/SettingRow";
+import { SwapLabel } from "@/components/SwapLabel";
 import { Button } from "@/components/ui/button";
 import { api } from "@/lib/api-client";
 import { queryKeys } from "@/lib/query";
@@ -51,7 +52,7 @@ export function ReferralSettingsPage() {
               className="h-9 min-w-0 flex-1 rounded-md border border-input bg-transparent px-3 text-sm"
             />
             <Button variant="outline" onClick={() => void copy()}>
-              {copied ? "コピーしました" : "コピー"}
+              <SwapLabel labels={{ idle: "コピー", done: "コピーしました" }} show={copied ? "done" : "idle"} />
             </Button>
           </div>
         </div>

@@ -8,7 +8,7 @@ import {
 } from "@threads-grower/shared";
 import { useId, useState } from "react";
 import { toast } from "sonner";
-import { CopyPromptButton } from "@/components/CopyPromptButton";
+import { CopyPromptStatus, CopyPromptTrigger, useCopyPrompt } from "@/components/CopyPromptButton";
 import { Button } from "@/components/ui/button";
 import { ApiError, api } from "@/lib/api-client";
 import { billingReasonOf, isBillingRequired, saveErrorMessage } from "@/lib/save-error";
@@ -86,6 +86,11 @@ export function KeywordIdeasPanel({
       return next;
     });
 
+  // 結果の文は、説明とボタンの行の下に出す（行の中に出すと、ボタンが下の行へ押し出される）
+  const prompt = useCopyPrompt({
+    getText: async () => (await api.getKeywordIdeaPrompt(accountId)).prompt,
+    onCopied: () => setOpen(true),
+  });
   return (
     <section
       aria-label="何を検索すればいいか迷ったら"
@@ -100,14 +105,17 @@ export function KeywordIdeasPanel({
           </p>
         </div>
         {!readOnly && (
-          <CopyPromptButton
+          <CopyPromptTrigger
             label="AIにキーワードの案を出してもらう"
-            copiedMessage="プロンプトをコピーしました。ChatGPTやClaudeに貼り付けて送り、返ってきた答えをまるごと下に貼り付けてください"
-            getText={async () => (await api.getKeywordIdeaPrompt(accountId)).prompt}
-            onCopied={() => setOpen(true)}
+            disabled={prompt.loading}
+            onClick={() => void prompt.copy()}
           />
         )}
       </div>
+      <CopyPromptStatus
+        state={prompt.state}
+        copiedMessage="プロンプトをコピーしました。ChatGPTやClaudeに貼り付けて送り、返ってきた答えをまるごと下に貼り付けてください"
+      />
       {open && (
         <div className="space-y-2.5">
           <label htmlFor={pasteId} className="font-medium">

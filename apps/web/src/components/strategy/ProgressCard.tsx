@@ -1,12 +1,12 @@
 // 課題の進み具合のカード（specs/014-strategy-guidance FR-014・FR-015、contracts/ui-routes.md「課題」）。
-// 完了n/16項目・要確認n件・活動の目的n/5問・バー・次におすすめ。「全体をAIと整理する」は actions に入れる。
+// 完了n/16項目・要確認n件・活動の目的n/5問・バー・次におすすめ。「全体をAIと整理する」は actions に、その結果の文は below に入れる（行の下に全幅で出し、ボタンを動かさない）。
 import { STRATEGY_TOTAL, type StrategyCheck } from "@threads-grower/shared";
 import { ChevronRightIcon } from "lucide-react";
 import type { ReactNode } from "react";
 
 /**
  * 進み具合のカード。
- * @param props - check：自動チェックの結果、nextLabel：次におすすめの項目名、onNext：次におすすめを押したとき、actions：右の操作
+ * @param props - check：自動チェックの結果、nextLabel：次におすすめの項目名、onNext：次におすすめを押したとき、actions：右の操作、below：カードの下に出す中身
  * @returns カード
  */
 export function ProgressCard({
@@ -14,11 +14,13 @@ export function ProgressCard({
   nextLabel,
   onNext,
   actions,
+  below,
 }: {
   check: StrategyCheck;
   nextLabel: string | null;
   onNext: () => void;
   actions?: ReactNode;
+  below?: ReactNode;
 }) {
   const percent = Math.round((check.done / STRATEGY_TOTAL) * 100);
   return (
@@ -47,6 +49,7 @@ export function ProgressCard({
         )}
         {actions && <div className="ml-auto">{actions}</div>}
       </div>
+      {below}
     </section>
   );
 }
