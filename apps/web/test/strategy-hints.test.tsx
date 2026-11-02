@@ -39,6 +39,8 @@ describe("考えるヒント", () => {
 
     await userEvent.click(button);
     expect(button).toHaveAttribute("aria-expanded", "true");
+    // 開いても文言は変えない（ボタンの幅が変わって、横のボタンが動かないように）
+    expect(button).toHaveTextContent(/^考えるヒント$/);
     expect(f.getByText(/年齢・職業で終わらせず/)).toBeInTheDocument();
     expect(f.getByText("20代会社員")).toBeInTheDocument();
     expect(f.getByText(/28歳前後の会社員。仕事は嫌いではないけれど/)).toBeInTheDocument();
