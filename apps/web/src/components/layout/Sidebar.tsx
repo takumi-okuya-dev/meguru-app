@@ -1,5 +1,5 @@
 // サイドバーの中身（docs/ui-design.md「2. 画面の骨格」）。
-// 上から：Accountの切り替えと畳むボタン → 「投稿をつくる」 → 機能の移動 → チーム → 区切り線 → このアカウントの設定・ユーザーメニュー。
+// 上から：Accountの切り替えと畳むボタン → 機能の移動（ホーム・投稿をつくる・投稿ストック…） → チーム → 区切り線 → このアカウントの設定・ユーザーメニュー。
 // まだ作っていない機能は出さない（各featureで画面を作ったときに NAV_GROUPS に足す）。
 // 「チーム」の見出しの下に、入っているチームの名前を並べる（specs/011 contracts/ui-routes.md「サイドバー」）。
 // チームに入っていない人には、チームのものを何も出さない（Constitution原則V）。
@@ -30,7 +30,7 @@ import { cn } from "@/lib/utils";
 import { AccountSwitcher } from "./AccountSwitcher";
 import { UserMenu } from "./UserMenu";
 
-type NavItem = { path: string; label: string; Icon: LucideIcon; end?: boolean; badge?: "needsReview" };
+type NavItem = { path: string; label: string; Icon: LucideIcon; end?: boolean; badge?: "needsReview"; needsAccount?: boolean };
 type NavGroup = { label?: string; items: NavItem[] };
 
 /** 機能の移動。path は /accounts/:id からの相対パス。 */
@@ -38,6 +38,8 @@ const NAV_GROUPS: NavGroup[] = [
   {
     items: [
       { path: "", label: "ホーム", Icon: HouseIcon, end: true },
+      // 「投稿をつくる」の画面へ移る。開いている間は選ばれた見た目にする（specs/014 FR-160。2026-11-02にホームの次へ移した）。Accountがないと開けないので出さない
+      { path: "create", label: "投稿をつくる", Icon: SquarePenIcon, needsAccount: true },
       { path: "stock", label: "投稿ストック", Icon: InboxIcon, badge: "needsReview" },
     ],
   },
@@ -107,16 +109,10 @@ export function Sidebar({ onCollapse, onNavigate }: { onCollapse?: () => void; o
         </div>
       )}
       <nav aria-label="このアカウント" className="flex-1 space-y-0.5 overflow-y-auto px-2 py-1">
-        {accountId && (
-          // 「投稿をつくる」の画面へ移る。開いている間は選ばれた見た目にする（specs/014 FR-160。見た目・並び・名前は今のまま）
-          <NavLink to={`${base}/create`} className={itemClass} onClick={onNavigate}>
-            <SquarePenIcon className="size-5 lg:size-[18px]" /> 投稿をつくる
-          </NavLink>
-        )}
         {NAV_GROUPS.map((group, i) => (
           <div key={group.label ?? i} className="space-y-0.5">
             {group.label && <div className="px-3 pt-4 pb-1 text-xs text-muted-foreground lg:px-2.5">{group.label}</div>}
-            {group.items.map(({ path, label, Icon, end, badge }) => {
+            {group.items.filter((item) => accountId || !item.needsAccount).map(({ path, label, Icon, end, badge }) => {
               const n = badge ? (counts.data?.[badge] ?? 0) : 0;
               return (
                 <NavLink key={label} to={path ? `${base}/${path}` : base} end={end} className={itemClass} onClick={onNavigate}>

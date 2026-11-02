@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { Link } from "react-router";
 import { NextPostCard } from "@/components/NextPostCard";
+import { ShareAppCard } from "@/components/ShareAppCard";
 import { AssignedNotice } from "@/components/team/AssignedNotice";
 import { TokenWarnings } from "@/components/connect/TokenWarnings";
 import { AutoPostNotices } from "@/components/AutoPostNotices";
@@ -66,7 +67,7 @@ function nextStep(s: ProfileStatus): { area: Area | null; title: string; body: s
 }
 
 /**
- * Account のホーム。Account の表示、無料体験の案内、次にやること、入力状況の3枚のカード。
+ * Account のホーム。Account の表示、無料体験の案内、次にやること、入力状況の3枚のカード、アプリを紹介する。
  * @returns Account のホーム
  */
 export function AccountHome() {
@@ -201,6 +202,7 @@ export function AccountHome() {
                 </Link>
               ))}
             </nav>
+            <ShareAppCard />
           </>
         )}
       </PageBody>
