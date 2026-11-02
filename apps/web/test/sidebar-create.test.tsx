@@ -89,14 +89,14 @@ afterEach(() => {
 });
 
 describe("サイドバーの「投稿をつくる」", () => {
-  it("並び・名前は今のまま。押すと「投稿をつくる」の画面（/create）へ移る", async () => {
+  it("ホームの次に並ぶ。押すと「投稿をつくる」の画面（/create）へ移る", async () => {
     const user = userEvent.setup();
     const router = renderAt("/accounts/a1");
     const nav = await screen.findByRole("navigation", { name: "このアカウント" });
     const labels = within(nav)
       .getAllByRole("link")
       .map((l) => l.textContent?.replace(/\s+/g, ""));
-    expect(labels).toEqual(["投稿をつくる", "ホーム", "投稿ストック", "課題", "宣伝内容", "リサーチ", "パフォーマンス"]);
+    expect(labels).toEqual(["ホーム", "投稿をつくる", "投稿ストック", "課題", "宣伝内容", "リサーチ", "パフォーマンス"]);
     const create = within(nav).getByRole("link", { name: "投稿をつくる" });
     expect(create).toHaveAttribute("href", "/accounts/a1/create");
     expect(create).not.toHaveAttribute("aria-current");

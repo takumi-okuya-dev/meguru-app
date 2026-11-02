@@ -1,6 +1,7 @@
 // US4：Accountのホーム（specs/002 FR-017・FR-024b、contracts/ui-routes.md「ホーム」、research.md R11）
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import type { AccountSummary, ProfileStatus, AutoPostStatus } from "@threads-grower/shared";
 import { createMemoryRouter, Outlet, RouterProvider } from "react-router";
 import { describe, expect, it, vi } from "vitest";
@@ -8,6 +9,7 @@ import { OWNER_ACCESS } from "./helpers/access";
 
 let current: ProfileStatus | Error;
 let approved = 0;
+let referral: () => Promise<{ url: string; referredCount: number }> = async () => ({ url: "https://app.example/r/r_abcdefghijklmnopqrstuv", referredCount: 2 });
 let auto: AutoPostStatus = { autoPost: { enabled: false, slotCount: 0, stoppedReason: null }, next: null, approvedCount: 0, daysLeft: null, notices: [] };
 vi.mock("@/lib/api-client", async (orig) => {
   const actual = await orig<typeof import("@/lib/api-client")>();
@@ -20,6 +22,7 @@ vi.mock("@/lib/api-client", async (orig) => {
       accountAccess: async () => OWNER_ACCESS,
       // 「はじめに読んでほしいこと」は利用者が分かってから出す（specs/014 FR-061）。ここでは出さない
       me: () => new Promise(() => {}),
+      referral: () => referral(),
       getProfileStatus: () => (current instanceof Error ? Promise.reject(current) : Promise.resolve(current)),
     },
   };
@@ -180,5 +183,56 @@ describe("未接続のアカウントのホーム（specs/012 US4、Clarificatio
     await screen.findByRole("heading", { name: "まずは「課題」から埋めましょう" });
     expect(screen.queryByRole("region", { name: "Threadsとの接続" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Threadsにつなぐ" })).not.toBeInTheDocument();
+  });
+});
+
+describe("017：アプリを紹介する", () => {
+  it("紹介リンクをコピーでき、紹介した人数は設定 › 紹介 へ案内する", async () => {
+    const user = userEvent.setup();
+    renderHome(status());
+    const card = await screen.findByRole("region", { name: "アプリを紹介する" });
+    const copy = await within(card).findByRole("button", { name: "リンクをコピー" });
+    await vi.waitFor(() => expect(copy).toBeEnabled());
+    await user.click(copy);
+    await expect(navigator.clipboard.readText()).resolves.toBe("https://app.example/r/r_abcdefghijklmnopqrstuv");
+    expect(within(card).getByRole("button", { name: "コピーしました" })).toBeInTheDocument();
+    expect(within(card).getByRole("link", { name: "紹介した人数を見る" })).toHaveAttribute("href", "/settings/referral");
+    // 人数はホームには出さない
+    expect(within(card).queryByText(/2人/)).not.toBeInTheDocument();
+  });
+
+  it("共有できる端末では「共有する」で紹介リンクを渡す", async () => {
+    const share = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "share", { value: share, configurable: true });
+    try {
+      const user = userEvent.setup();
+      renderHome(status());
+      const card = await screen.findByRole("region", { name: "アプリを紹介する" });
+      const button = within(card).getByRole("button", { name: "共有する" });
+      await vi.waitFor(() => expect(button).toBeEnabled());
+      await user.click(button);
+      expect(share).toHaveBeenCalledWith(expect.objectContaining({ url: "https://app.example/r/r_abcdefghijklmnopqrstuv" }));
+    } finally {
+      // @ts-expect-error テストで足したものを消す
+      delete navigator.share;
+    }
+  });
+
+  it("共有できない端末では「共有する」を出さない", async () => {
+    renderHome(status());
+    const card = await screen.findByRole("region", { name: "アプリを紹介する" });
+    expect(within(card).queryByRole("button", { name: "共有する" })).not.toBeInTheDocument();
+  });
+
+  it("紹介リンクを読めなければ、カードを出さずにホームの残りは出す", async () => {
+    const { ApiError } = await import("@/lib/api-client");
+    referral = () => Promise.reject(new ApiError("INTERNAL_ERROR", 500));
+    try {
+      renderHome(status());
+      expect(await screen.findByRole("heading", { name: "まずは「課題」から埋めましょう" })).toBeInTheDocument();
+      await vi.waitFor(() => expect(screen.queryByRole("region", { name: "アプリを紹介する" })).not.toBeInTheDocument());
+    } finally {
+      referral = async () => ({ url: "https://app.example/r/r_abcdefghijklmnopqrstuv", referredCount: 2 });
+    }
   });
 });
