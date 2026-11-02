@@ -42,7 +42,7 @@ description: "Task list for feature 018 strategy AI sparring"
 - [ ] T003 [P] `packages/shared/test/strategy-prompts.test.ts`に、`buildSparringPrompt(values, targets)`のテストを足す（contracts/prompt-template.md 1、FR-006・FR-007）：
   - 質問の対象ごとに`【n】{label}`・考えること（`description`）・ヒント（コツ・悪い例・良い例・足してみたい観点・こんな場合は・もっと良くするなら）・「今の私の答え」（空なら「未入力」、未保存の値を使う）が入る。活動の軸はヒントの行がない
   - 質問の対象ではない対象の項目のうち入力のあるものだけが「■ほかの項目に書いたこと」に入る。なければ節ごと入らない
-  - 近い人間性・下書きの4項目の名前と値が、どこにも入らない
+  - 近い人間性は質問の対象と「完成版の形」に入らず、選んでいれば「ほかの項目に書いたこと」に選んだ名前（例：「丁寧・温かい」）で入る。下書きの4項目の名前と値は、どこにも入らない
   - 進め方の5点（1〜2問ずつ・作らない・今の文を活かす・重なりと食い違い・完成版の出し方と「完成版を出して」）が入る
   - 「完成版の形」に、質問の対象ごとの`【項目：{label}】`と`【項目ここまで】`が、対象の順で入る
   - `contentThemeMix`が対象のときだけ、進め方に6（候補を3つ以上・相談して1つに）が入る
@@ -53,7 +53,7 @@ description: "Task list for feature 018 strategy AI sparring"
 ### Implementation
 
 - [ ] T006 `packages/shared/src/strategy-sparring.ts`に`selectSparringTargets`を実装する（T002を通す）。
-- [ ] T007 `packages/shared/src/strategy-prompts.ts`に`buildSparringPrompt(values, targets)`を実装する（T003を通す。`fieldOf`・`valueText`・`hintOf`を使い、文はcontracts/prompt-template.md 1のとおり。ファイル先頭のコメントに specs/018 を足す）。
+- [ ] T007 `packages/shared/src/strategy-prompts.ts`に`buildSparringPrompt(values, targets)`を実装する（T003を通す。文脈は014の`CONTEXT_KEYS`と同じ集まり（近い人間性を含み、下書きを含まない）から質問の対象を除いたもの。`fieldOf`・`valueText`・`hintOf`を使い、文はcontracts/prompt-template.md 1のとおり。ファイル先頭のコメントに specs/018 を足す）。
 - [ ] T008 `packages/shared/src/strategy-sparring.ts`に`parseSparringAnswer`を実装する（T004を通す。行ごとに見て、NFKCにそろえて目印を判定し、名前は`label`と同じ正規化で引き当てる。目的の5問は「Q1」〜「Q5」で始まる名前も引き当てる）。
 - [ ] T009 `packages/shared/src/strategy-sparring.ts`に`buildSparringCandidates`を実装する（T005を通す）。
 
@@ -74,17 +74,19 @@ description: "Task list for feature 018 strategy AI sparring"
   - 21項目の完成版を含む答えを貼ると、候補が21並び、すべて選ばれている。「選んだ項目を反映する」で、21の入力欄が置き換わり、欄が閉じ、上の「保存」が押せる（未保存）。`putStrategy`は呼ばれていない（SC-003）。「保存」で`putStrategy`に反映した値が渡る
   - 反映したあと、完了の数・区分のチップの数が変わる（FR-020）
   - 貼った答えがあるまま「閉じる」を押すと、「貼り付けたAIの答えがあります。破棄しますか？」が出て、「破棄して閉じる」で閉じる
+  - ある項目の「AIと深掘り」の欄を開いたまま、壁打ちの欄を開ける。片方を閉じても、もう片方は開いたまま（spec Edge Cases）
+  - クリップボードに書けないとき、「コピーできませんでした。全体を選んでコピーしてください」と、プロンプトを選べる形の欄が出る（spec Edge Cases）
 
 ### Implementation
 
-- [ ] T011 [P] [US1] `apps/web/src/components/strategy/SparringCandidates.tsx`を作る：候補の一覧（各行に、ラベルが項目の名前のチェックボックス・「今」（空なら「未入力」）・「新しい案」。今と新しい案は縦に並べ、長い文は高さを決めてその中でスクロール）。props は候補の配列と`onToggle(key)`（contracts/ui-routes.md 5）。
+- [ ] T011 [P] [US1] `apps/web/src/components/strategy/SparringCandidates.tsx`を作る：候補の一覧。見た目は、今あるチェック付きの一覧（`apps/web/src/components/research/ExplainBatchPanel.tsx`の候補：`<ul className="space-y-1.5">`、各行は`label`の`flex items-start gap-3 rounded-xl border bg-card px-3 py-2`、`input type="checkbox" className="mt-1 size-4"`、印は`rounded-full bg-warning-bg px-2 text-[11px] font-medium text-warning`）にそろえる。各行に、ラベルが項目の名前のチェックボックス・「今」（空なら「未入力」）・「新しい案」。今と新しい案は縦に並べ、長い文は高さを決めてその中でスクロール）。props は候補の配列と`onToggle(key)`（contracts/ui-routes.md 5）。
 - [ ] T012 [US1] `apps/web/src/components/strategy/SparringPanel.tsx`を作る（contracts/ui-routes.md「壁打ちの欄」、research.md R1・R7）：
   - 4つの手順、`useCopyPrompt`＋`CopyPromptTrigger`（「プロンプトをコピーする」）＋`CopyPromptStatus`（「コピーしました。ChatGPTやClaudeに貼り付けて送ってください」。ボタンの行の下）
   - 貼り付け欄（`DeepenPanel`と同じ見た目・ラベル・プレースホルダー）。貼った文が変わるたびに`parseSparringAnswer`→`buildSparringCandidates`で候補を作り、選択をはじめの状態に戻す。候補の`current`は親から受け取る今の`values`で、その都度出す（research.md R6）
   - 「選んだ項目を反映する」（塗り。選んだ数が0なら押せない）・「閉じる」（`ghost`）・「反映しても、まだ保存されません。上の『保存』で保存します。」
   - 貼った文があれば`useUnsavedChanges`で画面の移動を確かめ、`onDirtyChange`で親に知らせる（`DeepenPanel`と同じ）
   - props：`values`・`onApply(patch)`・`onClose`・`onDirtyChange`
-  - この段階の範囲は、はじめの範囲（6区分すべて・未入力と短めだけ）で固定し、選ぶ欄はUS2で足す
+  - この段階の範囲は、はじめの範囲（6区分すべて・未入力と短めだけ）で固定し、選ぶ欄はUS2で足す。spec.md US1 のシナリオ1・FR-002 のうち「範囲の選び方」と「質問の対象の項目の数」は、US2（T016）で満たす（analyze の F1）
 - [ ] T013 [US1] `apps/web/src/components/strategy/ProgressCard.tsx`の`actions`の入れ物を、2つのボタンが折り返して並ぶ`flex flex-wrap gap-2`にする（右寄せのまま。ファイル先頭のコメントに specs/018 を足す）。
 - [ ] T014 [US1] `apps/web/src/pages/strategy.tsx`をつなぐ：
   - 直せる人だけ、`actions`に「AIと壁打ちして埋める」（`Button variant="outline"`、`CopyPromptTrigger`と同じ高さ・角丸、先頭の`ChevronRightIcon`を開いたとき`rotate-90`、`aria-expanded`、文言は変えない）を「全体をAIと整理する」の前に置く
@@ -107,7 +109,7 @@ description: "Task list for feature 018 strategy AI sparring"
   - 区分をすべて外すと「この範囲には、相談する項目がありません」が出て、「プロンプトをコピーする」が押せない
   - 範囲を変えても「AIと壁打ちして埋める」「全体をAIと整理する」「プロンプトをコピーする」の名前が変わらない
   - 欄を閉じて開き直すと、範囲がはじめに戻る
-- [ ] T016 [US2] `apps/web/src/components/strategy/SparringPanel.tsx`に範囲の欄を足す（contracts/ui-routes.md 2）：「相談する区分」（`fieldset`と`legend`。区分のトグルのチップは`aria-pressed`、名前は`STRATEGY_SECTIONS`の`chip`）、「未入力と短めの項目だけにする」（`Switch`かチェックボックス。今の画面にあるものを使う）、決まった1行の「〇項目を相談します」／「この範囲には、相談する項目がありません」。質問の対象は`selectSparringTargets(values, 範囲)`で求め、プロンプトにもそれを渡す。範囲は欄の中の状態だけで持つ（閉じると消える）。
+- [ ] T016 [US2] `apps/web/src/components/strategy/SparringPanel.tsx`に範囲の欄を足す（contracts/ui-routes.md 2）：「相談する区分」（`fieldset`と`legend`。区分のトグルのチップは`aria-pressed`、名前は`STRATEGY_SECTIONS`の`chip`）、「未入力と短めの項目だけにする」（`apps/web/src/components/ui/switch.tsx`の`Switch`と`label`。自動投稿のスイッチ（`PostingScheduleDialog.tsx`）と同じ使い方）、決まった1行の「〇項目を相談します」／「この範囲には、相談する項目がありません」。質問の対象は`selectSparringTargets(values, 範囲)`で求め、プロンプトにもそれを渡す。範囲は欄の中の状態だけで持つ（閉じると消える）。
 
 **Checkpoint**: 書き終えた項目を聞き直されずに、残りの項目だけを相談できる。
 
