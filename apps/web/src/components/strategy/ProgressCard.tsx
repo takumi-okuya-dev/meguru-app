@@ -1,5 +1,6 @@
 // 課題の進み具合のカード（specs/014-strategy-guidance FR-014・FR-015、contracts/ui-routes.md「課題」）。
 // 完了n/16項目・要確認n件・活動の目的n/5問・バー・次におすすめ。「全体をAIと整理する」は actions に、その結果の文は below に入れる（行の下に全幅で出し、ボタンを動かさない）。
+// actions には「AIと壁打ちして埋める」も並び、狭い幅では折り返す。壁打ちの欄も below に開く（specs/018 contracts/ui-routes.md）。
 import { STRATEGY_TOTAL, type StrategyCheck } from "@threads-grower/shared";
 import { ChevronRightIcon } from "lucide-react";
 import type { ReactNode } from "react";
@@ -47,7 +48,7 @@ export function ProgressCard({
         ) : (
           <p className="text-sm font-medium">すべての項目が十分に書けています</p>
         )}
-        {actions && <div className="ml-auto">{actions}</div>}
+        {actions && <div className="ml-auto flex flex-wrap justify-end gap-2">{actions}</div>}
       </div>
       {below}
     </section>

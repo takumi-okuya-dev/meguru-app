@@ -21,7 +21,7 @@ import {
   type StrategyValues,
   type TonePreset,
 } from "@threads-grower/shared";
-import { EllipsisIcon, SparklesIcon } from "lucide-react";
+import { ChevronRightIcon, EllipsisIcon, SparklesIcon } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 import { useLocation } from "react-router";
 import { toast } from "sonner";
@@ -34,6 +34,7 @@ import { DeepenPanel } from "@/components/strategy/DeepenPanel";
 import { FieldCheckBadge } from "@/components/strategy/FieldCheckBadge";
 import { HintPanel } from "@/components/strategy/HintPanel";
 import { ProgressCard } from "@/components/strategy/ProgressCard";
+import { SparringPanel } from "@/components/strategy/SparringPanel";
 import { SectionChips, sectionElementId } from "@/components/strategy/SectionChips";
 import { BillingRequiredDialog } from "@/components/billing/BillingRequiredDialog";
 import { PageBody, PageHeader } from "@/components/layout/PageHeader";
@@ -109,6 +110,14 @@ function StrategyEditor({ accountId, initial }: { accountId: string; initial: St
   // 深掘りの欄に、まだ反映していない答えがあるか。あれば閉じる・切り替えの前に確かめる（PR #17 のCodexレビュー）
   const [deepenDirty, setDeepenDirty] = useState(false);
   const [confirmDeepen, setConfirmDeepen] = useState<{ next: string | null } | null>(null);
+  // 「AIと壁打ちして埋める」の欄（specs/018）。深掘りの欄とは別に持ち、同時に開ける
+  const [sparringOpen, setSparringOpen] = useState(false);
+  const [sparringDirty, setSparringDirty] = useState(false);
+  const [confirmSparring, setConfirmSparring] = useState(false);
+  const closeSparring = () => {
+    if (sparringDirty) return setConfirmSparring(true);
+    setSparringOpen(false);
+  };
 
   // 深掘りの欄を開く・閉じる・切り替える
   const requestDeepen = (next: string | null) => {
@@ -218,19 +227,47 @@ function StrategyEditor({ accountId, initial }: { accountId: string; initial: St
           onNext={() => check.next && goToField(check.next, canEdit)}
           actions={
             canEdit && (
-              <CopyPromptTrigger
-                variant="outline"
-                label="全体をAIと整理する"
-                disabled={overall.loading}
-                onClick={() => void overall.copy()}
-              />
+              <>
+                {/* 開閉で文言を変えず、矢印の向きで示す（「全体をAIと整理する」と同じ見た目。specs/018 contracts/ui-routes.md） */}
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="h-10 rounded-full px-4"
+                  aria-expanded={sparringOpen}
+                  onClick={() => (sparringOpen ? closeSparring() : setSparringOpen(true))}
+                >
+                  <ChevronRightIcon className={cn("size-4 transition-transform", sparringOpen && "rotate-90")} aria-hidden="true" />
+                  AIと壁打ちして埋める
+                </Button>
+                <CopyPromptTrigger
+                  variant="outline"
+                  label="全体をAIと整理する"
+                  disabled={overall.loading}
+                  onClick={() => void overall.copy()}
+                />
+              </>
             )
           }
           below={
-            <CopyPromptStatus
-              state={overall.state}
-              copiedMessage="コピーしました。ChatGPTやClaudeに貼り付けて送ると、項目どうしの重複・矛盾・抜けを質問の形で返してくれます"
-            />
+            <>
+              <CopyPromptStatus
+                state={overall.state}
+                copiedMessage="コピーしました。ChatGPTやClaudeに貼り付けて送ると、項目どうしの重複・矛盾・抜けを質問の形で返してくれます"
+              />
+              {canEdit && sparringOpen && (
+                <SparringPanel
+                  values={values}
+                  check={check}
+                  onApply={(patch) => {
+                    setValues((v) => ({ ...v, ...patch }));
+                    setSparringDirty(false);
+                    setSparringOpen(false);
+                  }}
+                  onClose={closeSparring}
+                  onDirtyChange={setSparringDirty}
+                />
+              )}
+            </>
           }
         />
         <div className="mt-9 space-y-11">
@@ -372,6 +409,18 @@ function StrategyEditor({ accountId, initial }: { accountId: string; initial: St
       </PageBody>
 
       <UnsavedChangesDialog
+        open={confirmSparring}
+        title="貼り付けたAIの答えがあります。破棄しますか？"
+        description="まだ入力欄に反映していません。破棄すると失われます。"
+        discardLabel="破棄して閉じる"
+        onStay={() => setConfirmSparring(false)}
+        onDiscard={() => {
+          setConfirmSparring(false);
+          setSparringDirty(false);
+          setSparringOpen(false);
+        }}
+      />
+      <UnsavedChangesDialog
         open={confirmDeepen !== null}
         title="貼り付けたAIの答えがあります。破棄しますか？"
         description="まだ入力欄に反映していません。破棄すると失われます。"
@@ -407,6 +456,9 @@ function StrategyEditor({ accountId, initial }: { accountId: string; initial: St
         onClose={() => {
           setBillingReason(null);
           setCanEdit(false);
+          // 読むだけになったら、壁打ちの欄も閉じる（直せないので、貼った答えは使えない）
+          setSparringOpen(false);
+          setSparringDirty(false);
         }}
       />
     </>
