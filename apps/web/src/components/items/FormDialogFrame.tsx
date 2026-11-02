@@ -3,13 +3,12 @@
 // 767px以下は全画面のシート（左上に✕、右上に「保存」）。
 import { XIcon } from "lucide-react";
 import type { ReactNode } from "react";
-import { SwapLabel } from "@/components/SwapLabel";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 
 /**
  * 追加・編集のダイアログの枠。閉じる操作（✕・キャンセル・Esc・背景のクリック）は、すべて onRequestClose を通す。
- * @param props - title：見出し、submitLabel：主な操作の文言、submittingLabel：保存中の主な操作の文言（幅は変えない）、onSubmit：保存、onRequestClose：閉じる操作、submitting：保存中、locked：保存できない、
+ * @param props - title：見出し、submitLabel：主な操作の文言、onSubmit：保存、onRequestClose：閉じる操作、submitting：保存中、locked：保存できない、
  *   lockedNotice：保存できないときの案内（省略すると grower機能の案内）、submitDisabled：入力に誤りがあり保存できない、children：入力欄
  * @returns ダイアログ
  */
@@ -17,7 +16,6 @@ export function FormDialogFrame({
   title,
   description,
   submitLabel,
-  submittingLabel,
   submitting,
   locked = false,
   lockedNotice,
@@ -29,7 +27,6 @@ export function FormDialogFrame({
   title: string;
   description: string;
   submitLabel: string;
-  submittingLabel?: string;
   submitting: boolean;
   /** grower機能が使えなくなった（保存の操作を出さず、案内を出す） */
   locked?: boolean;
@@ -68,7 +65,7 @@ export function FormDialogFrame({
                 disabled={submitting || submitDisabled}
                 onClick={onSubmit}
               >
-                <SwapLabel current={submitting && submittingLabel ? submittingLabel : submitLabel} labels={[submitLabel, submittingLabel]} />
+                {submitLabel}
               </Button>
             )}
           </div>
@@ -90,7 +87,7 @@ export function FormDialogFrame({
               disabled={submitting || submitDisabled}
               onClick={onSubmit}
             >
-              <SwapLabel current={submitting && submittingLabel ? submittingLabel : submitLabel} labels={[submitLabel, submittingLabel]} />
+              {submitLabel}
             </Button>
           )}
         </div>

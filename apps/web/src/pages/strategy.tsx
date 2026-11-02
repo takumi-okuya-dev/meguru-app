@@ -28,7 +28,7 @@ import { toast } from "sonner";
 import { ApiErrorScreen } from "@/components/ApiErrorScreen";
 import { ConflictDialog } from "@/components/ConflictDialog";
 import { UnsavedChangesDialog } from "@/components/UnsavedChangesDialog";
-import { CopyPromptButton } from "@/components/CopyPromptButton";
+import { CopyPromptStatus, CopyPromptTrigger, useCopyPrompt } from "@/components/CopyPromptButton";
 import { FieldWithCounter } from "@/components/FieldWithCounter";
 import { DeepenPanel } from "@/components/strategy/DeepenPanel";
 import { FieldCheckBadge } from "@/components/strategy/FieldCheckBadge";
@@ -127,6 +127,8 @@ function StrategyEditor({ accountId, initial }: { accountId: string; initial: St
   const baseline = pickValues(saved);
   const dirty = canEdit && !sameValues(values, baseline);
   useUnsavedChanges(dirty);
+  // 「全体をAIと整理する」。結果の文はカードの下に出す（ボタンを動かさない）
+  const overall = useCopyPrompt({ getText: () => buildOverallPrompt(values) });
   const overLimit = STRATEGY_TEXT_KEYS.some((k) => countChars(values[k]) > STRATEGY_TEXT_MAX);
   // 自動チェック（入力のたびに、保存を待たずに求める。FR-012）
   const check = checkStrategy(values);
@@ -216,13 +218,19 @@ function StrategyEditor({ accountId, initial }: { accountId: string; initial: St
           onNext={() => check.next && goToField(check.next, canEdit)}
           actions={
             canEdit && (
-              <CopyPromptButton
+              <CopyPromptTrigger
                 variant="outline"
                 label="全体をAIと整理する"
-                getText={() => buildOverallPrompt(values)}
-                copiedMessage="コピーしました。ChatGPTやClaudeに貼り付けて送ると、項目どうしの重複・矛盾・抜けを質問の形で返してくれます"
+                disabled={overall.loading}
+                onClick={() => void overall.copy()}
               />
             )
+          }
+          below={
+            <CopyPromptStatus
+              state={overall.state}
+              copiedMessage="コピーしました。ChatGPTやClaudeに貼り付けて送ると、項目どうしの重複・矛盾・抜けを質問の形で返してくれます"
+            />
           }
         />
         <div className="mt-9 space-y-11">

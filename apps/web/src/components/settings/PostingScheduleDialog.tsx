@@ -153,8 +153,7 @@ export function PostingScheduleDialog({
       <FormDialogFrame
         title="投稿のスケジュール"
         description="自動投稿のオン・オフと、1日に投稿する時刻を決めます"
-        submitLabel="保存"
-        submittingLabel={f.form.enabled ? "確かめています…" : undefined}
+        submitLabel={f.submitting && f.form.enabled ? "確かめています…" : "保存"}
         submitting={f.submitting}
         submitDisabled={message !== null}
         onSubmit={f.submit}

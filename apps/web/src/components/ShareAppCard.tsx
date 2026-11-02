@@ -63,7 +63,7 @@ export function ShareAppCard() {
           </Button>
         )}
         <Button size="sm" variant="outline" className="rounded-full" onClick={() => void copyUrl()}>
-          <SwapLabel current={copy === "copied" ? "コピーしました" : "リンクをコピー"} labels={["リンクをコピー", "コピーしました"]} />
+          <SwapLabel labels={{ idle: "リンクをコピー", done: "コピーしました" }} show={copy === "copied" ? "done" : "idle"} />
         </Button>
         <Link to="/settings/referral" className="text-[13px] text-muted-foreground underline-offset-4 hover:underline">
           紹介した人数を見る

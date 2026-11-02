@@ -5,7 +5,6 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { errorMessage, type WithdrawalPreview } from "@threads-grower/shared";
 import { useState } from "react";
 import { useNavigate } from "react-router";
-import { SwapLabel } from "@/components/SwapLabel";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -126,7 +125,7 @@ export function WithdrawDialog({ open, onOpenChange }: { open: boolean; onOpenCh
             disabled={!matches || withdraw.isPending}
             onClick={() => withdraw.mutate()}
           >
-            <SwapLabel current={withdraw.isPending ? "退会しています…" : "退会する"} labels={["退会する", "退会しています…"]} />
+            {withdraw.isPending ? "退会しています…" : "退会する"}
           </Button>
         </DialogFooter>
       </DialogContent>

@@ -4,11 +4,13 @@ import { describe, expect, it } from "vitest";
 import { SwapLabel } from "@/components/SwapLabel";
 import { Button } from "@/components/ui/button";
 
+const labels = { idle: "コピー", done: "コピーしました" };
+
 describe("SwapLabel", () => {
   it("今の文言だけが名前になり、ほかの文言は幅を取るためだけに隠して置く", () => {
     const { rerender } = render(
       <Button>
-        <SwapLabel current="コピー" labels={["コピー", "コピーしました"]} />
+        <SwapLabel labels={labels} show="idle" />
       </Button>,
     );
     expect(screen.getByRole("button", { name: "コピー" })).toBeInTheDocument();
@@ -16,15 +18,24 @@ describe("SwapLabel", () => {
 
     rerender(
       <Button>
-        <SwapLabel current="コピーしました" labels={["コピー", "コピーしました"]} />
+        <SwapLabel labels={labels} show="done" />
       </Button>,
     );
     expect(screen.getByRole("button", { name: "コピーしました" })).toBeInTheDocument();
     expect(screen.getByText("コピー")).toHaveAttribute("aria-hidden", "true");
   });
+});
 
-  it("文言が1つしかなければ、隠す文言を置かない", () => {
-    render(<SwapLabel current="保存" labels={["保存", undefined]} />);
-    expect(screen.getByText("保存").parentElement?.children).toHaveLength(1);
+describe("CopyPromptButton の結果の文", () => {
+  it("読み上げの知らせは先に置いておき、コピーできたら文だけを入れる", async () => {
+    const { CopyPromptButton } = await import("@/components/CopyPromptButton");
+    const { default: userEvent } = await import("@testing-library/user-event");
+    const user = userEvent.setup();
+    render(<CopyPromptButton getText={() => "プロンプト"} copiedMessage="コピーしました。送ってください" />);
+    const status = screen.getByRole("status");
+    expect(status).toBeEmptyDOMElement();
+    await user.click(screen.getByRole("button", { name: "プロンプトをコピーする" }));
+    expect(screen.getByRole("status")).toBe(status);
+    expect(status).toHaveTextContent("コピーしました。送ってください");
   });
 });

@@ -4,7 +4,7 @@ import { useMutation } from "@tanstack/react-query";
 import { EXPLAIN_BATCH_MAX, isBlank, parseExplanations, type ExplanationProblem, type ReferencePost } from "@threads-grower/shared";
 import { useId, useState } from "react";
 import { toast } from "sonner";
-import { CopyPromptButton } from "@/components/CopyPromptButton";
+import { CopyPromptStatus, CopyPromptTrigger, useCopyPrompt } from "@/components/CopyPromptButton";
 import { Button } from "@/components/ui/button";
 import { api } from "@/lib/api-client";
 import { billingReasonOf, isBillingRequired, saveErrorMessage } from "@/lib/save-error";
@@ -70,6 +70,15 @@ export function ExplainBatchPanel({
     },
   });
 
+  // 結果の文は、説明とボタンの行の下に出す（行の中に出すと、ボタンが動く）
+  const prompt = useCopyPrompt({
+    getText: async () => (await api.getExplainPrompt(accountId, undefined)).prompt,
+    onCopied: () => {
+      setOpen(true);
+      setSkippedCount(0);
+    },
+  });
+
   // 貼り付けた答えが残っている間は、ほかの人が解説を入れて0件になっても欄を消さない（PR #17 のCodexレビュー）
   if (pending === 0 && skippedCount === 0 && paste.trim() === "") return null;
 
@@ -88,17 +97,17 @@ export function ExplainBatchPanel({
           </p>
         </div>
         {pending > 0 && !readOnly && (
-          <CopyPromptButton
+          <CopyPromptTrigger
             label={`まとめてAIに解説してもらう（${batchCount}件）`}
-            copiedMessage={`${batchCount}件分のプロンプトをコピーしました。ChatGPTやClaudeに貼り付けて送り、返ってきた答えをまるごと下に貼り付けてください`}
-            getText={async () => (await api.getExplainPrompt(accountId, undefined)).prompt}
-            onCopied={() => {
-              setOpen(true);
-              setSkippedCount(0);
-            }}
+            disabled={prompt.loading}
+            onClick={() => void prompt.copy()}
           />
         )}
       </div>
+      <CopyPromptStatus
+        state={prompt.state}
+        copiedMessage={`${batchCount}件分のプロンプトをコピーしました。ChatGPTやClaudeに貼り付けて送り、返ってきた答えをまるごと下に貼り付けてください`}
+      />
       {skippedCount > 0 && (
         <p role="status" className="text-[13px] text-warning">
           {skippedCount}件は、ほかで解説が入っていたため保存しませんでした

@@ -297,7 +297,7 @@ export function TestGroupDetailPage() {
               className="h-9 min-w-0 flex-1 rounded-md border border-input bg-transparent px-3 text-sm"
             />
             <Button variant="outline" onClick={() => void copy()}>
-              <SwapLabel current={copied ? "コピーしました" : "コピー"} labels={["コピー", "コピーしました"]} />
+              <SwapLabel labels={{ idle: "コピー", done: "コピーしました" }} show={copied ? "done" : "idle"} />
             </Button>
           </div>
           <Button variant="link" className="h-auto p-0 text-sm" onClick={() => setConfirm({ kind: "rotate" })}>

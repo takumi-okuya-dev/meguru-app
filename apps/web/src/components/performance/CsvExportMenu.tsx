@@ -15,6 +15,7 @@ import {
 import { ChevronDownIcon, DownloadIcon } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
+import { SwapLabel } from "@/components/SwapLabel";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -83,7 +84,7 @@ export function CsvExportMenu({ accountId, username }: { accountId: string; user
       <DropdownMenuTrigger asChild>
         <Button variant="outline" size="sm" className="rounded-full" disabled={busy} aria-label="CSVで書き出す">
           <DownloadIcon className="size-4" aria-hidden="true" />
-          <span className="hidden md:inline">{busy ? "書き出し中…" : "CSVで書き出す"}</span>
+          <span className="hidden md:inline"><SwapLabel labels={{ idle: "CSVで書き出す", busy: "書き出し中…" }} show={busy ? "busy" : "idle"} /></span>
           <ChevronDownIcon className="hidden size-3.5 md:inline" aria-hidden="true" />
         </Button>
       </DropdownMenuTrigger>

@@ -115,7 +115,7 @@ export function InviteLinkDialog({
                   onClick={() => void copy()}
                 >
                   <CopyIcon className="size-4" />
-                  <SwapLabel current={copied ? "コピーしました" : "コピー"} labels={["コピー", "コピーしました"]} />
+                  <SwapLabel labels={{ idle: "コピー", done: "コピーしました" }} show={copied ? "done" : "idle"} />
                 </Button>
               </div>
             )}

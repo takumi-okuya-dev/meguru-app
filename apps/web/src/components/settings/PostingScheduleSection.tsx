@@ -193,7 +193,7 @@ export function PostingScheduleSection({
           disabled={check.isPending}
           onClick={() => check.mutate()}
         >
-          <SwapLabel current={check.isPending ? "確かめています…" : "接続を確かめる"} labels={["接続を確かめる", "確かめています…"]} />
+          <SwapLabel labels={{ idle: "接続を確かめる", busy: "確かめています…" }} show={check.isPending ? "busy" : "idle"} />
         </Button>
         {check.isError && (
           <span className="text-sm text-destructive">{THREADS_CHECK_MESSAGES.unknown}</span>
