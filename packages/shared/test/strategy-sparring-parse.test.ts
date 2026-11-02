@@ -138,4 +138,45 @@ describe("parseSparringAnswer", () => {
     const text = ["```", "【項目：活動の軸】", "ひとりにしない", "```"].join("\n");
     expect(parseSparringAnswer(text).items).toEqual([{ key: "activityAxis", text: "ひとりにしない" }]);
   });
+
+  it("目印と文が1行に詰まっていても、終わりの目印で区切る（改行が詰まって貼られたときも）", () => {
+    const text = "【項目：活動の軸】 丁寧に寄り添う 【項目ここまで】\nほかに何かあれば\n【項目：来てほしくない人】すぐ売り込む人【項目ここまで】【項目：ターゲットの本音の悩み】お金が残らない【項目ここまで】";
+    expect(parseSparringAnswer(text).items).toEqual([
+      { key: "activityAxis", text: "丁寧に寄り添う" },
+      { key: "realWorries", text: "お金が残らない" },
+      { key: "antiPersona", text: "すぐ売り込む人" },
+    ]);
+  });
+
+  it("番号や「-」のリストにした目印も読み取り、印だけの行は中身に入れない", () => {
+    const text = [
+      "1. **【項目：活動の軸】**",
+      "ひとりにしない",
+      `**${END}**`,
+      "- 【項目：来てほしくない人】",
+      "- すぐ売り込む人",
+      `- ${END}`,
+      "2.",
+    ].join("\n");
+    expect(parseSparringAnswer(text).items).toEqual([
+      { key: "activityAxis", text: "ひとりにしない" },
+      { key: "antiPersona", text: "- すぐ売り込む人" },
+    ]);
+  });
+
+  it("プロンプトの見本の「(完成版)」は案にしない（AIが形を書き写したとき・会話ごと貼ったとき）", () => {
+    const text = [
+      "この形で出します。",
+      "【項目：活動の軸】",
+      "(完成版)",
+      END,
+      "【項目：来てほしくない人】",
+      "（完成版）",
+      END,
+      "【項目：活動の軸】",
+      "ひとりにしない",
+      END,
+    ].join("\n");
+    expect(parseSparringAnswer(text).items).toEqual([{ key: "activityAxis", text: "ひとりにしない" }]);
+  });
 });

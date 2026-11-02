@@ -9,7 +9,9 @@ import {
   parseSparringAnswer,
   selectSparringTargets,
   type SparringKey,
+  type SparringParseResult,
   type SparringSectionId,
+  type StrategyCheck,
   type StrategyValues,
 } from "@threads-grower/shared";
 import { useEffect, useId, useState } from "react";
@@ -20,6 +22,8 @@ import { Switch } from "@/components/ui/switch";
 import { useUnsavedChanges } from "@/lib/use-unsaved-changes";
 import { cn } from "@/lib/utils";
 
+const EMPTY_PARSE: SparringParseResult = { items: [], unknown: [], markerFound: false };
+
 const STEPS = [
   "範囲を選んで「プロンプトをコピーする」を押す",
   "ChatGPTやClaudeに貼り付けて送り、AIの質問に答える",
@@ -29,17 +33,19 @@ const STEPS = [
 
 /**
  * AIと壁打ちして埋める欄。範囲は欄の中だけで持ち、閉じると初めに戻る（FR-003）。
- * @param props - values：課題の今の値（未保存を含む）、onApply：選んだ項目の新しい案を入力欄に入れる、
+ * @param props - values：課題の今の値（未保存を含む）、check：画面が求めた自動チェック、onApply：選んだ項目の新しい案を入力欄に入れる、
  *   onClose：閉じる（まだ反映していない答えがあれば、親が破棄してよいか確かめる）、onDirtyChange：まだ反映していない答えがあるか
  * @returns 欄
  */
 export function SparringPanel({
   values,
+  check,
   onApply,
   onClose,
   onDirtyChange,
 }: {
   values: StrategyValues;
+  check: StrategyCheck;
   onApply: (patch: Partial<Record<SparringKey, string>>) => void;
   onClose: () => void;
   onDirtyChange?: (dirty: boolean) => void;
@@ -47,6 +53,8 @@ export function SparringPanel({
   const [sections, setSections] = useState<readonly SparringSectionId[]>(SPARRING_SECTION_IDS);
   const [onlyIncomplete, setOnlyIncomplete] = useState(true);
   const [paste, setPaste] = useState("");
+  // 読み取りは貼った文が変わったときだけ行う（ほかの入力欄を打つたびに読み直さない）
+  const [parsed, setParsed] = useState<SparringParseResult>(EMPTY_PARSE);
   const [selected, setSelected] = useState<ReadonlySet<SparringKey>>(new Set());
   const pasteId = useId();
   const onlyId = useId();
@@ -59,22 +67,29 @@ export function SparringPanel({
     return () => onDirtyChange?.(false);
   }, [dirty, onDirtyChange]);
 
-  const targets = selectSparringTargets(values, { sections, onlyIncomplete });
+  const targets = selectSparringTargets(values, { sections, onlyIncomplete }, check);
   const copy = useCopyPrompt({ getText: () => buildSparringPrompt(values, targets) });
-  const parsed = parseSparringAnswer(paste);
   // 候補の「今」は、画面の今の入力をその都度出す（research.md R6）
   const candidates = buildSparringCandidates(parsed.items, values);
   const picked = candidates.filter((c) => selected.has(c.key));
 
   // 貼った文が変わったら読み取り直し、選ぶ印をはじめの状態（空の項目だけ）に戻す（FR-016）
   const changePaste = (text: string) => {
+    const next = parseSparringAnswer(text);
     setPaste(text);
-    const next = buildSparringCandidates(parseSparringAnswer(text).items, values);
-    setSelected(new Set(next.filter((c) => c.selected).map((c) => c.key)));
+    setParsed(next);
+    setSelected(new Set(buildSparringCandidates(next.items, values).filter((c) => c.selected).map((c) => c.key)));
   };
 
-  const toggleSection = (id: SparringSectionId) =>
+  // 範囲を変えるとプロンプトが変わるので、前のコピーの結果（「コピーしました」・手でコピーする欄）を消す
+  const toggleSection = (id: SparringSectionId) => {
+    copy.reset();
     setSections((cur) => (cur.includes(id) ? cur.filter((x) => x !== id) : SPARRING_SECTION_IDS.filter((x) => x === id || cur.includes(x))));
+  };
+  const changeOnlyIncomplete = (on: boolean) => {
+    copy.reset();
+    setOnlyIncomplete(on);
+  };
 
   const toggleCandidate = (key: SparringKey) =>
     setSelected((cur) => {
@@ -118,7 +133,7 @@ export function SparringPanel({
           </div>
         </div>
         <label htmlFor={onlyId} className="flex min-h-11 items-center gap-3">
-          <Switch id={onlyId} checked={onlyIncomplete} onCheckedChange={setOnlyIncomplete} />
+          <Switch id={onlyId} checked={onlyIncomplete} onCheckedChange={changeOnlyIncomplete} />
           <span>未入力と短めの項目だけにする</span>
         </label>
         <p className={cn("text-[13px]", targets.length === 0 ? "text-warning" : "text-muted-foreground")}>

@@ -23,6 +23,12 @@ describe("SPARRING_KEYS", () => {
     }
   });
 
+  it("課題の項目から、下書きと近い人間性を除いたものと一致する（項目を足したときにずれないように）", () => {
+    expect([...SPARRING_KEYS]).toEqual(
+      STRATEGY_FIELDS.filter((f) => f.section !== "drafts" && f.key !== "tonePreset").map((f) => f.key),
+    );
+  });
+
   it("区分は下書きを含まない6つ", () => {
     expect([...SPARRING_SECTION_IDS]).toEqual(["purpose", "sales", "account", "funnel", "tone", "other"]);
   });

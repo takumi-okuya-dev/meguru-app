@@ -257,6 +257,7 @@ function StrategyEditor({ accountId, initial }: { accountId: string; initial: St
               {canEdit && sparringOpen && (
                 <SparringPanel
                   values={values}
+                  check={check}
                   onApply={(patch) => {
                     setValues((v) => ({ ...v, ...patch }));
                     setSparringDirty(false);
@@ -455,6 +456,9 @@ function StrategyEditor({ accountId, initial }: { accountId: string; initial: St
         onClose={() => {
           setBillingReason(null);
           setCanEdit(false);
+          // 読むだけになったら、壁打ちの欄も閉じる（直せないので、貼った答えは使えない）
+          setSparringOpen(false);
+          setSparringDirty(false);
         }}
       />
     </>

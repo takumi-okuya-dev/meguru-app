@@ -2,8 +2,8 @@
 // 対象の項目・範囲の絞り込み・AIの答えの読み取り・反映の候補を、画面から切り離した純粋な関数で持つ。
 // プロンプトの文は strategy-prompts.ts の buildSparringPrompt。アプリはAIを呼ばない（Constitution原則III）。
 import { STRATEGY_TEXT_MAX } from "./limits";
-import { STRATEGY_FIELDS, type StrategySectionId, type StrategyTextKey, type StrategyValues } from "./strategy";
-import { checkStrategy } from "./strategy-guidance";
+import { strategyFieldOf as fieldOf, type StrategySectionId, type StrategyTextKey, type StrategyValues } from "./strategy";
+import { checkStrategy, type StrategyCheck } from "./strategy-guidance";
 import { countChars, isBlank } from "./text";
 
 /** 壁打ちで扱う項目（表示の順）。テキストの15項目・目的の5問・活動の軸。近い人間性と下書きの4項目は入れない（Clarifications 2026-11-02）。 */
@@ -54,23 +54,18 @@ export function sparringBeginLine(label: string): string {
   return `${SPARRING_ITEM_BEGIN_PREFIX}${label}】`;
 }
 
-function fieldOf(key: SparringKey) {
-  const f = STRATEGY_FIELDS.find((x) => x.key === key);
-  if (!f) throw new Error(`unknown strategy field: ${key}`);
-  return f;
-}
-
 /**
  * 質問の対象を求める（FR-004）。
  * @param values - 課題の今の値（未保存を含む）
  * @param range - sections：選んだ区分、onlyIncomplete：未入力と短めの項目だけにするか
+ * @param check - 求め済みの自動チェック（画面がすでに求めていれば渡す。省略すると求める）
  * @returns 質問の対象のキー（表示の順）
  */
 export function selectSparringTargets(
   values: StrategyValues,
   range: { sections: readonly SparringSectionId[]; onlyIncomplete: boolean },
+  check: StrategyCheck = checkStrategy(values),
 ): SparringKey[] {
-  const check = checkStrategy(values);
   return SPARRING_KEYS.filter((key) => {
     if (!(range.sections as readonly string[]).includes(fieldOf(key).section)) return false;
     if (!range.onlyIncomplete) return true;
@@ -138,17 +133,25 @@ function keyOfName(name: string): SparringKey | null {
 }
 
 /**
- * 行を囲む装飾（太字・コード・見出し・引用）を除く。
+ * 行を囲む装飾（リストの印・太字・コード・見出し・引用）を除く。
  * @param line - 答えの1行
  * @returns 装飾を除いた行
  */
 function stripDecoration(line: string): string {
-  return line.trim().replace(/^[#>*_`\s]+/, "").replace(/[*_`\s]+$/, "");
+  return line
+    .trim()
+    .replace(/^(?:[-*+・]|\d+[.)．])(?:\s+|$)/, "")
+    .replace(/^[#>*_`\s]+/, "")
+    .replace(/[*_`\s]+$/, "");
 }
 
-const BEGIN_RE = /^【\s*項目\s*[：:]\s*(.*?)\s*】(.*)$/;
+const BEGIN_RE = /^【\s*項目\s*[：:]\s*(.*?)\s*】$/;
 const END_RE = /^【\s*項目\s*ここまで\s*】$/;
 const FENCE_RE = /^\s*```/;
+/** 目印を、同じ行の文から切り離すための形（AIが目印と文を1行に書いたとき・改行が詰まって貼られたとき）。 */
+const MARKER_SPLIT_RE = /(【\s*項目\s*(?:[：:][^】\n]*|ここまで\s*)】)/g;
+/** プロンプトの「完成版の形」の見本の中身。AIが形をそのまま書き写したときは、案として扱わない。 */
+const PLACEHOLDER = "(完成版)";
 
 /**
  * 貼り付けたAIの答えから、項目ごとの完成版を読み取る（FR-010〜FR-014、research.md R3）。
@@ -167,28 +170,29 @@ export function parseSparringAnswer(text: string): SparringParseResult {
     const key = keyOfName(current.name);
     if (key === null) {
       if (current.name !== "" && !unknown.includes(current.name)) unknown.push(current.name);
-    } else if (body !== "") {
+    } else if (body !== "" && body.normalize("NFKC") !== PLACEHOLDER) {
       // 同じ項目が2回以上あれば、後のもの（会話の中で直した版が後に出るため。FR-011）
       found.set(key, body);
     }
     current = null;
   };
 
-  for (const raw of text.split(/\r?\n/)) {
+  const lines = text.replace(MARKER_SPLIT_RE, "\n$1\n").split(/\r?\n/);
+  for (const raw of lines) {
     const line = stripDecoration(raw);
     const begin = BEGIN_RE.exec(line);
     if (begin) {
       finish();
       markerFound = true;
-      const rest = (begin[2] ?? "").trim();
-      current = { name: (begin[1] ?? "").trim(), lines: rest === "" ? [] : [rest] };
+      current = { name: (begin[1] ?? "").trim(), lines: [] };
       continue;
     }
     if (END_RE.test(line)) {
       finish();
       continue;
     }
-    if (current && !FENCE_RE.test(raw)) current.lines.push(raw);
+    // 目印を切り離したあとに残る、装飾だけの行（「**」「1.」、コードブロックの「```」など）は中身に入れない
+    if (current && (raw.trim() === "" || (line !== "" && !FENCE_RE.test(raw)))) current.lines.push(raw.trim() === "" ? "" : raw);
   }
   finish();
 

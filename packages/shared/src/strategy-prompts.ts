@@ -1,7 +1,15 @@
 // 課題のAIのプロンプト（specs/014-strategy-guidance research.md R4、contracts/prompt-template.md 2〜4。
 // 壁打ちは specs/018-strategy-ai-sparring contracts/prompt-template.md 1）。
 // 画面の今の入力（未保存を含む）から作る。アプリはAIを呼ばない（Constitution原則III）。
-import { PURPOSE_KEYS, STRATEGY_FIELDS, STRATEGY_SECTIONS, TONE_PRESETS, type StrategyField, type StrategyValues } from "./strategy";
+import {
+  PURPOSE_KEYS,
+  STRATEGY_FIELDS,
+  STRATEGY_SECTIONS,
+  TONE_PRESETS,
+  strategyFieldOf as fieldOf,
+  type StrategyField,
+  type StrategyValues,
+} from "./strategy";
 import { HINTED_KEYS, hintOf, type HintedKey } from "./strategy-guidance";
 import { SPARRING_ITEM_END, sparringBeginLine, type SparringKey } from "./strategy-sparring";
 import { isBlank } from "./text";
@@ -13,12 +21,6 @@ export const FINAL_END = "【完成版ここまで】";
 
 /** 深掘りのプロンプトの文脈に入れる項目（数える16項目・目的の5問・活動の軸。下書きは入れない）。 */
 const CONTEXT_KEYS: readonly StrategyField["key"][] = [...HINTED_KEYS, "activityAxis"];
-
-function fieldOf(key: StrategyField["key"]): StrategyField {
-  const f = STRATEGY_FIELDS.find((x) => x.key === key);
-  if (!f) throw new Error(`unknown strategy field: ${key}`);
-  return f;
-}
 
 /**
  * 項目の値を、プロンプトに書く文字にする。近い人間性は選択肢の名前。空なら null。

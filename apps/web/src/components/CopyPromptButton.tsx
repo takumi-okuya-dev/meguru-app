@@ -24,7 +24,7 @@ type CopyOptions = {
 /**
  * プロンプトをコピーする処理と結果。ボタンと結果の文を別の場所に置くときに使う。
  * @param options - getText・onCopied
- * @returns state：結果、loading：プロンプトを作っている途中か、copy：コピーする
+ * @returns state：結果、loading：プロンプトを作っている途中か、copy：コピーする、reset：結果を消す（プロンプトの中身が変わったとき）
  */
 export function useCopyPrompt({ getText, onCopied }: CopyOptions) {
   const [state, setState] = useState<CopyState>({ kind: "idle" });
@@ -51,7 +51,8 @@ export function useCopyPrompt({ getText, onCopied }: CopyOptions) {
       onCopied?.();
     }
   };
-  return { state, loading, copy };
+  const reset = () => setState({ kind: "idle" });
+  return { state, loading, copy, reset };
 }
 
 /**

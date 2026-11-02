@@ -224,6 +224,19 @@ describe("US2：範囲を絞って壁打ちする", () => {
     expect(screen.getByRole("button", { name: "全体をAIと整理する" })).toBeInTheDocument();
   });
 
+  it("範囲を変えると、前のコピーの結果が消える（プロンプトが変わるため）", async () => {
+    getStrategy.mockResolvedValue(strategyOf());
+    const user = userEvent.setup();
+    vi.spyOn(navigator.clipboard, "writeText").mockRejectedValueOnce(new Error("denied"));
+    renderStrategyPage(StrategyPage, UnsavedChangesProvider);
+    const panel = await openPanel(user);
+    await user.click(panel.getByRole("button", { name: "プロンプトをコピーする" }));
+    expect(panel.getByLabelText("プロンプト")).toBeInTheDocument();
+    await user.click(within(panel.getByRole("group", { name: "相談する区分" })).getByRole("button", { name: "目的" }));
+    expect(panel.queryByLabelText("プロンプト")).not.toBeInTheDocument();
+    expect(panel.queryByText("コピーできませんでした。全体を選んでコピーしてください")).not.toBeInTheDocument();
+  });
+
   it("閉じて開き直すと、範囲がはじめに戻る", async () => {
     getStrategy.mockResolvedValue(strategyOf());
     renderStrategyPage(StrategyPage, UnsavedChangesProvider);
