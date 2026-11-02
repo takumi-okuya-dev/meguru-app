@@ -38,7 +38,7 @@ const NAV_GROUPS: NavGroup[] = [
   {
     items: [
       { path: "", label: "ホーム", Icon: HouseIcon, end: true },
-      // 「投稿をつくる」の画面へ移る。開いている間は選ばれた見た目にする（specs/014 FR-160）。Accountがないと開けないので出さない
+      // 「投稿をつくる」の画面へ移る。開いている間は選ばれた見た目にする（specs/014 FR-160。2026-11-02にホームの次へ移した）。Accountがないと開けないので出さない
       { path: "create", label: "投稿をつくる", Icon: SquarePenIcon, needsAccount: true },
       { path: "stock", label: "投稿ストック", Icon: InboxIcon, badge: "needsReview" },
     ],

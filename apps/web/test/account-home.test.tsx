@@ -191,9 +191,7 @@ describe("017：アプリを紹介する", () => {
     const user = userEvent.setup();
     renderHome(status());
     const card = await screen.findByRole("region", { name: "アプリを紹介する" });
-    const copy = await within(card).findByRole("button", { name: "リンクをコピー" });
-    await vi.waitFor(() => expect(copy).toBeEnabled());
-    await user.click(copy);
+    await user.click(within(card).getByRole("button", { name: "リンクをコピー" }));
     await expect(navigator.clipboard.readText()).resolves.toBe("https://app.example/r/r_abcdefghijklmnopqrstuv");
     expect(within(card).getByRole("button", { name: "コピーしました" })).toBeInTheDocument();
     expect(within(card).getByRole("link", { name: "紹介した人数を見る" })).toHaveAttribute("href", "/settings/referral");
@@ -208,9 +206,7 @@ describe("017：アプリを紹介する", () => {
       const user = userEvent.setup();
       renderHome(status());
       const card = await screen.findByRole("region", { name: "アプリを紹介する" });
-      const button = within(card).getByRole("button", { name: "共有する" });
-      await vi.waitFor(() => expect(button).toBeEnabled());
-      await user.click(button);
+      await user.click(within(card).getByRole("button", { name: "共有する" }));
       expect(share).toHaveBeenCalledWith(expect.objectContaining({ url: "https://app.example/r/r_abcdefghijklmnopqrstuv" }));
     } finally {
       // @ts-expect-error テストで足したものを消す
@@ -224,13 +220,25 @@ describe("017：アプリを紹介する", () => {
     expect(within(card).queryByRole("button", { name: "共有する" })).not.toBeInTheDocument();
   });
 
+  it("コピーできなければ、リンクを選んだ状態で出す", async () => {
+    const user = userEvent.setup();
+    renderHome(status());
+    const card = await screen.findByRole("region", { name: "アプリを紹介する" });
+    vi.spyOn(navigator.clipboard, "writeText").mockRejectedValueOnce(new Error("denied"));
+    await user.click(within(card).getByRole("button", { name: "リンクをコピー" }));
+    expect(await within(card).findByRole("alert")).toHaveTextContent("コピーできませんでした");
+    const input = within(card).getByRole("textbox", { name: "紹介リンク" });
+    expect(input).toHaveValue("https://app.example/r/r_abcdefghijklmnopqrstuv");
+    await vi.waitFor(() => expect(input).toHaveFocus());
+  });
+
   it("紹介リンクを読めなければ、カードを出さずにホームの残りは出す", async () => {
     const { ApiError } = await import("@/lib/api-client");
     referral = () => Promise.reject(new ApiError("INTERNAL_ERROR", 500));
     try {
       renderHome(status());
       expect(await screen.findByRole("heading", { name: "まずは「課題」から埋めましょう" })).toBeInTheDocument();
-      await vi.waitFor(() => expect(screen.queryByRole("region", { name: "アプリを紹介する" })).not.toBeInTheDocument());
+      expect(screen.queryByRole("region", { name: "アプリを紹介する" })).not.toBeInTheDocument();
     } finally {
       referral = async () => ({ url: "https://app.example/r/r_abcdefghijklmnopqrstuv", referredCount: 2 });
     }
