@@ -2,6 +2,7 @@
 // PCは中央のダイアログ、767px以下は全画面のシート。
 import { CopyIcon, ShareIcon, XIcon } from "lucide-react";
 import { useRef, useState, type ReactNode } from "react";
+import { SwapLabel } from "@/components/SwapLabel";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { QrCode } from "./QrCode";
@@ -114,7 +115,7 @@ export function InviteLinkDialog({
                   onClick={() => void copy()}
                 >
                   <CopyIcon className="size-4" />
-                  {copied ? "コピーしました" : "コピー"}
+                  <SwapLabel current={copied ? "コピーしました" : "コピー"} labels={["コピー", "コピーしました"]} />
                 </Button>
               </div>
             )}

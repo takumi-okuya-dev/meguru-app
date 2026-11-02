@@ -1,5 +1,5 @@
 // AIのプロンプトをコピーするボタン（specs/014-strategy-guidance。深掘り・全体の整理・解説・キーワードの案で共有する）。
-// コピーできたら「コピーしました」を出し、できなければプロンプトを選べる形で出す（003の投稿のプロンプトと同じ扱い）。
+// コピーできたら、ボタンの下に「コピーしました」を出し（ボタンは動かさない）、できなければプロンプトを選べる形で出す（003の投稿のプロンプトと同じ扱い）。
 import { CopyIcon } from "lucide-react";
 import { useEffect, useId, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -70,17 +70,17 @@ export function CopyPromptButton({
 
   return (
     <div className={cn("space-y-2", className)}>
-      <div className="flex flex-wrap items-center gap-2.5">
-        <Button type="button" variant={variant} className="h-10 rounded-full px-4" disabled={disabled || loading} onClick={() => void copy()}>
-          <CopyIcon className="size-4" />
-          {label}
-        </Button>
-        {state.kind === "copied" && (
-          <span role="status" className="text-[13px] text-success">
-            {copiedMessage}
-          </span>
-        )}
-      </div>
+      <Button type="button" variant={variant} className="h-10 rounded-full px-4" disabled={disabled || loading} onClick={() => void copy()}>
+        <CopyIcon className="size-4" />
+        {label}
+      </Button>
+      {state.kind === "copied" && (
+        // ボタンの下に、ボタンの幅で出す（w-0 min-w-full で文の長さを幅に数えない）。
+        // 横に並べると、右寄せや隣と並んだボタンが、文の分だけ動いてしまう（2026-11-02）
+        <p role="status" className="w-0 min-w-full text-[13px] text-success">
+          {copiedMessage}
+        </p>
+      )}
       {state.kind === "error" && (
         <p role="alert" className="rounded-xl border border-warning/40 bg-warning-bg px-3 py-2 text-sm">
           プロンプトを作れませんでした。{state.message}もう一度押してください

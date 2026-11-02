@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Share2Icon } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router";
+import { SwapLabel } from "@/components/SwapLabel";
 import { Button } from "@/components/ui/button";
 import { api } from "@/lib/api-client";
 import { queryKeys } from "@/lib/query";
@@ -62,7 +63,7 @@ export function ShareAppCard() {
           </Button>
         )}
         <Button size="sm" variant="outline" className="rounded-full" onClick={() => void copyUrl()}>
-          {copy === "copied" ? "コピーしました" : "リンクをコピー"}
+          <SwapLabel current={copy === "copied" ? "コピーしました" : "リンクをコピー"} labels={["リンクをコピー", "コピーしました"]} />
         </Button>
         <Link to="/settings/referral" className="text-[13px] text-muted-foreground underline-offset-4 hover:underline">
           紹介した人数を見る

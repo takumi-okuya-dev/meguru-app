@@ -12,6 +12,7 @@ import { ChevronLeftIcon, ChevronRightIcon } from "lucide-react";
 import { useRef, useState, type FormEvent } from "react";
 import { Link, useNavigate, useParams } from "react-router";
 import { ConfirmDialog } from "@/components/team/ConfirmDialog";
+import { SwapLabel } from "@/components/SwapLabel";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -296,7 +297,7 @@ export function TestGroupDetailPage() {
               className="h-9 min-w-0 flex-1 rounded-md border border-input bg-transparent px-3 text-sm"
             />
             <Button variant="outline" onClick={() => void copy()}>
-              {copied ? "コピーしました" : "コピー"}
+              <SwapLabel current={copied ? "コピーしました" : "コピー"} labels={["コピー", "コピーしました"]} />
             </Button>
           </div>
           <Button variant="link" className="h-auto p-0 text-sm" onClick={() => setConfirm({ kind: "rotate" })}>
