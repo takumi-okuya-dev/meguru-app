@@ -82,8 +82,9 @@ export function PromptMaterials({ accountId, materials }: { accountId: string; m
         </span>
         <ChevronDownIcon className={cn("size-4 shrink-0 transition-transform", open && "rotate-180")} aria-hidden="true" />
       </button>
+      {/* 列の幅を決めないと、スマートフォンで長い項目名に合わせて列が広がり、灰色の枠からはみ出す */}
       {open && (
-        <div className="grid gap-2.5 px-3 pb-3 md:grid-cols-2">
+        <div className="grid grid-cols-1 gap-2.5 px-3 pb-3 md:grid-cols-2">
           <Card title="課題" where="→ プロンプトの「戦略設計」「活動の目的・在り方」に入ります">
             <ul className="divide-y text-[13px]">
               {strategy.items.map((item) => {
