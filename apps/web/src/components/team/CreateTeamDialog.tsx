@@ -1,7 +1,9 @@
 // 「チームを作る」のダイアログ（specs/011-team-revision FR-010、contracts/ui-routes.md「チームを作る」）。
 // 名前（1〜50文字）と、チームに入れる自分のアカウント（1つ以上）を選ぶ。作った人が管理者になる。
+// スマートフォンでは全画面のシート。上の帯（✕と見出し）と、余白を取った中身は、招待リンクのダイアログ（InviteLinkDialog）と同じ形にする（2026-11-03）。
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { TEAM_NAME_MAX, countChars } from "@threads-grower/shared";
+import { XIcon } from "lucide-react";
 import { useState } from "react";
 import { Link, useNavigate } from "react-router";
 import { AccountAvatar } from "@/components/AccountAvatar";
@@ -30,13 +32,18 @@ export function CreateTeamDialog({
   const me = useQuery({ queryKey: queryKeys.me, queryFn: api.me });
   const own = (me.data?.accounts ?? []).filter((a) => a.role === "owner");
   // 未接続のアカウントはチームに入れられない（specs/012 FR-050・FR-051）
-  const connectedIds = new Set(own.filter((a) => a.connectionStatus !== "not_connected").map((a) => a.id));
+  const connectedIds = new Set(
+    own.filter((a) => a.connectionStatus !== "not_connected").map((a) => a.id),
+  );
   const noConnected = me.data !== undefined && connectedIds.size === 0;
   // つなぐ入口は、開いた画面のアカウントを優先する（名前は重なりうるので、ほかのアカウントへ移らないように。PR #15 のCodexレビュー）
   const connectTarget =
-    own.find((a) => a.id === initialAccountId && !connectedIds.has(a.id)) ?? own.find((a) => !connectedIds.has(a.id));
+    own.find((a) => a.id === initialAccountId && !connectedIds.has(a.id)) ??
+    own.find((a) => !connectedIds.has(a.id));
   const [name, setName] = useState("");
-  const [picked, setPicked] = useState<Set<string>>(() => new Set(initialAccountId ? [initialAccountId] : []));
+  const [picked, setPicked] = useState<Set<string>>(
+    () => new Set(initialAccountId ? [initialAccountId] : []),
+  );
   const chosen = [...picked].filter((id) => connectedIds.has(id));
   // ほかのチームに入っていたアカウント（作るときに分かったもの）
   const [busy, setBusy] = useState<Set<string>>(new Set());
@@ -67,93 +74,135 @@ export function CreateTeamDialog({
 
   return (
     <Dialog open onOpenChange={(v) => !v && onClose()}>
-      <DialogContent mobileFullScreen className="sm:max-w-lg" aria-describedby="create-team-desc">
-        <DialogTitle>チームを作る</DialogTitle>
-        <DialogDescription id="create-team-desc" className="text-sm text-foreground/80">
-          あなたが管理者になります。招待リンクを送ると、受け取った人が自分のアカウントを入れて参加します。
-        </DialogDescription>
+      <DialogContent
+        mobileFullScreen
+        showClose={false}
+        className="gap-0 p-0 sm:max-w-lg"
+        aria-describedby="create-team-desc"
+      >
+        <div className="flex h-[52px] shrink-0 items-center gap-1 border-b px-1.5 md:h-auto md:border-0 md:px-6 md:pt-5 md:pb-2">
+          <button
+            type="button"
+            aria-label="閉じる"
+            onClick={onClose}
+            className="flex size-11 items-center justify-center rounded-lg hover:bg-accent md:order-last md:-mr-2 md:size-9"
+          >
+            <XIcon className="size-5" />
+          </button>
+          <DialogTitle className="flex-1 truncate text-base font-semibold md:text-[17px]">
+            チームを作る
+          </DialogTitle>
+        </div>
         <form
-          className="space-y-5"
+          className="flex min-h-0 flex-1 flex-col"
           onSubmit={(e) => {
             e.preventDefault();
             if (nameOk && chosen.length > 0) create.mutate();
           }}
         >
-          <div className="space-y-1.5">
-            <label htmlFor="team-name" className="text-sm font-medium">
-              チーム名
-            </label>
-            <input
-              id="team-name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              aria-describedby="team-name-help"
-              className="h-11 w-full rounded-xl border bg-background px-3 text-base md:text-sm"
-            />
-            <p id="team-name-help" className={cn("text-xs text-muted-foreground", length > TEAM_NAME_MAX && "text-destructive")}>
-              1〜{TEAM_NAME_MAX}文字（{length}/{TEAM_NAME_MAX}）
-            </p>
-          </div>
-          <fieldset className="space-y-2">
-            <legend className="mb-1 text-sm font-medium">チームに入れる自分のアカウント（1つ以上）</legend>
-            {noConnected && (
-              <div role="status" className="space-y-1.5 rounded-xl border bg-muted/40 px-3 py-2 text-sm">
-                <p>先にThreadsにつないでください。チームに入れられるのは、Threadsにつないだアカウントだけです。</p>
-                {/* 「Threadsとの接続」へ進む入口（PR #15 のCodexレビュー） */}
-                {connectTarget && (
-                  <Link
-                    className="font-medium underline underline-offset-4"
-                    to={`/accounts/${connectTarget.id}/settings#threads`}
-                    onClick={onClose}
-                  >
-                    「{connectTarget.name}」をThreadsにつなぐ
-                  </Link>
+          <div className="flex-1 space-y-5 overflow-y-auto px-4 py-4 md:max-h-[70vh] md:px-6 md:py-3">
+            <DialogDescription id="create-team-desc" className="text-sm text-foreground/80">
+              あなたが管理者になります。招待リンクを送ると、受け取った人が自分のアカウントを入れて参加します。
+            </DialogDescription>
+            <div className="space-y-1.5">
+              <label htmlFor="team-name" className="text-sm font-medium">
+                チーム名
+              </label>
+              <input
+                id="team-name"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                aria-describedby="team-name-help"
+                className="h-11 w-full rounded-xl border bg-background px-3 text-base md:text-sm"
+              />
+              <p
+                id="team-name-help"
+                className={cn(
+                  "text-xs text-muted-foreground",
+                  length > TEAM_NAME_MAX && "text-destructive",
                 )}
-              </div>
-            )}
-            {own.map((a) => {
-              const inOther = busy.has(a.id);
-              const notConnected = !connectedIds.has(a.id);
-              return (
-                <label
-                  key={a.id}
-                  className={cn(
-                    "flex min-h-11 items-center gap-3 rounded-xl border px-3 py-2",
-                    chosen.includes(a.id) && "border-foreground",
-                    (inOther || notConnected) && "opacity-60",
-                  )}
+              >
+                1〜{TEAM_NAME_MAX}文字（{length}/{TEAM_NAME_MAX}）
+              </p>
+            </div>
+            <fieldset className="space-y-2">
+              <legend className="mb-1 text-sm font-medium">
+                チームに入れる自分のアカウント（1つ以上）
+              </legend>
+              {noConnected && (
+                <div
+                  role="status"
+                  className="space-y-1.5 rounded-xl border bg-muted/40 px-3 py-2 text-sm"
                 >
-                  <input
-                    type="checkbox"
-                    className="size-5 accent-foreground"
-                    checked={chosen.includes(a.id)}
-                    disabled={inOther || notConnected}
-                    aria-label={`${a.name}をチームに入れる`}
-                    onChange={() => toggle(a.id)}
-                  />
-                  <AccountAvatar account={a} className="size-8" />
-                  <span className="flex min-w-0 flex-1 flex-col leading-tight">
-                    <span className="truncate font-medium">{a.name}</span>
-                    <span className="truncate text-xs text-muted-foreground">
-                      {notConnected ? "Threadsにつなぐと入れられます" : a.username ? `@${a.username}` : ""}
-                      {inOther ? " · ほかのチームに入っています" : ""}
+                  <p>
+                    先にThreadsにつないでください。チームに入れられるのは、Threadsにつないだアカウントだけです。
+                  </p>
+                  {/* 「Threadsとの接続」へ進む入口（PR #15 のCodexレビュー） */}
+                  {connectTarget && (
+                    <Link
+                      className="font-medium underline underline-offset-4"
+                      to={`/accounts/${connectTarget.id}/settings#threads`}
+                      onClick={onClose}
+                    >
+                      「{connectTarget.name}」をThreadsにつなぐ
+                    </Link>
+                  )}
+                </div>
+              )}
+              {own.map((a) => {
+                const inOther = busy.has(a.id);
+                const notConnected = !connectedIds.has(a.id);
+                return (
+                  <label
+                    key={a.id}
+                    className={cn(
+                      "flex min-h-11 items-center gap-3 rounded-xl border px-3 py-2",
+                      chosen.includes(a.id) && "border-foreground",
+                      (inOther || notConnected) && "opacity-60",
+                    )}
+                  >
+                    <input
+                      type="checkbox"
+                      className="size-5 accent-foreground"
+                      checked={chosen.includes(a.id)}
+                      disabled={inOther || notConnected}
+                      aria-label={`${a.name}をチームに入れる`}
+                      onChange={() => toggle(a.id)}
+                    />
+                    <AccountAvatar account={a} className="size-8" />
+                    <span className="flex min-w-0 flex-1 flex-col leading-tight">
+                      <span className="truncate font-medium">{a.name}</span>
+                      <span className="truncate text-xs text-muted-foreground">
+                        {notConnected
+                          ? "Threadsにつなぐと入れられます"
+                          : a.username
+                            ? `@${a.username}`
+                            : ""}
+                        {inOther ? " · ほかのチームに入っています" : ""}
+                      </span>
                     </span>
-                  </span>
-                </label>
-              );
-            })}
-            <p className="text-xs text-muted-foreground">入れたアカウントは、初めはチームに見せません。あとから切り替えられます。</p>
-          </fieldset>
-          {create.isError && (
-            <p role="alert" className="text-sm text-destructive">
-              {describeError(create.error)}
-            </p>
-          )}
-          <div className="flex justify-end gap-2">
+                  </label>
+                );
+              })}
+              <p className="text-xs text-muted-foreground">
+                入れたアカウントは、初めはチームに見せません。あとから切り替えられます。
+              </p>
+            </fieldset>
+            {create.isError && (
+              <p role="alert" className="text-sm text-destructive">
+                {describeError(create.error)}
+              </p>
+            )}
+          </div>
+          <div className="flex shrink-0 justify-end gap-2 border-t px-4 py-3 md:border-0 md:px-6 md:pt-3 md:pb-5">
             <Button type="button" variant="outline" className="h-10 rounded-full" onClick={onClose}>
               キャンセル
             </Button>
-            <Button type="submit" className="h-10 rounded-full" disabled={!nameOk || chosen.length === 0 || create.isPending}>
+            <Button
+              type="submit"
+              className="h-10 rounded-full"
+              disabled={!nameOk || chosen.length === 0 || create.isPending}
+            >
               作る
             </Button>
           </div>
