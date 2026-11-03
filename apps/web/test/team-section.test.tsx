@@ -93,7 +93,8 @@ describe("TeamSection（チームに入っていないオーナー）", () => {
     const router = renderSection();
     await user.click(screen.getByRole("button", { name: "チームを作る" }));
     const dialog = await screen.findByRole("dialog", { name: "チームを作る" });
-    const submit = within(dialog).getByRole("button", { name: "作る" });
+    // 「作る」はスマートフォンの右上とPCの下の2つ（FormDialogFrame）。PCの方で確かめる
+    const submit = within(dialog).getAllByRole("button", { name: "作る" }).at(-1)!;
     expect(submit).toBeDisabled();
     expect(await within(dialog).findByRole("checkbox")).toBeChecked();
     await user.type(within(dialog).getByLabelText("チーム名"), "あ".repeat(51));
@@ -122,7 +123,7 @@ describe("TeamSection（チームに入っていないオーナー）", () => {
     expect(box).not.toBeChecked();
     expect(within(dialog).getByText("Threadsにつなぐと入れられます")).toBeInTheDocument();
     await user.type(within(dialog).getByLabelText("チーム名"), "飲食チーム");
-    expect(within(dialog).getByRole("button", { name: "作る" })).toBeDisabled();
+    for (const b of within(dialog).getAllByRole("button", { name: "作る" })) expect(b).toBeDisabled();
     // 「Threadsとの接続」へ進む入口を添える（PR #15 のCodexレビュー）
     const link = within(dialog).getByRole("link", { name: "「カフェの公式」をThreadsにつなぐ" });
     expect(link).toHaveAttribute("href", "/accounts/a1/settings#threads");
