@@ -274,16 +274,33 @@ export function ActivityPage() {
 
   return (
     <>
-      <PageHeader
-        title="操作の記録"
-        actions={
-          <label className="flex items-center gap-2 text-sm text-muted-foreground">
-            <span className="max-md:sr-only">人</span>
+      <PageHeader title="操作の記録" />
+      <PageBody className="space-y-5">
+        {/* 人の絞り込みは、スマートフォンの上部バーに入りきらず画面名と重なるので、種類のチップと同じ行に置く */}
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="flex flex-wrap gap-2" role="group" aria-label="種類で絞り込む">
+            {KINDS.map((k) => (
+              <button
+                key={k.value}
+                type="button"
+                aria-pressed={kind === k.value}
+                onClick={() => setKind(k.value)}
+                className={cn(
+                  "h-9 rounded-full px-4 text-[13px]",
+                  kind === k.value ? "bg-foreground text-background" : "border hover:bg-accent",
+                )}
+              >
+                {k.label}
+              </button>
+            ))}
+          </div>
+          <label className="flex min-w-0 max-w-full items-center gap-2 text-sm text-muted-foreground md:ml-auto">
+            <span>人</span>
             <select
               aria-label="人で絞り込む"
               value={actor}
               onChange={(e) => setActor(e.target.value)}
-              className="h-9 rounded-full border bg-background px-3 text-sm text-foreground"
+              className="h-9 min-w-0 rounded-full border bg-background px-3 text-sm text-foreground"
             >
               <option value="">全員</option>
               {actors.map((a) => (
@@ -293,24 +310,6 @@ export function ActivityPage() {
               ))}
             </select>
           </label>
-        }
-      />
-      <PageBody className="space-y-5">
-        <div className="flex flex-wrap gap-2" role="group" aria-label="種類で絞り込む">
-          {KINDS.map((k) => (
-            <button
-              key={k.value}
-              type="button"
-              aria-pressed={kind === k.value}
-              onClick={() => setKind(k.value)}
-              className={cn(
-                "h-9 rounded-full px-4 text-[13px]",
-                kind === k.value ? "bg-foreground text-background" : "border hover:bg-accent",
-              )}
-            >
-              {k.label}
-            </button>
-          ))}
         </div>
         {list.isPending ? (
           <div className="h-40 animate-pulse rounded-2xl bg-muted" aria-busy="true" />
