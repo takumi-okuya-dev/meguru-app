@@ -43,6 +43,17 @@ async function openSettings(user: ReturnType<typeof userEvent.setup>) {
   return within(screen.getByRole("region", { name: "文字数と長さの割合" }));
 }
 
+/**
+ * 文字数と長さの割合を（閉じていれば開いて）、目標の文字数の欄を返す。まとめの行がないので、保存済みの値は欄で確かめる。
+ * @param user - userEvent
+ * @returns 目標の文字数の欄
+ */
+async function targetField(user: ReturnType<typeof userEvent.setup>) {
+  const toggle = await screen.findByRole("button", { name: /文字数と長さの割合/ }, { timeout: 2000 });
+  if (toggle.getAttribute("aria-expanded") === "false") await user.click(toggle);
+  return within(screen.getByRole("region", { name: "文字数と長さの割合" })).getByRole("spinbutton", { name: "1投稿の文字数の目標" });
+}
+
 beforeEach(() => {
   accountAccess.mockResolvedValue(OWNER_ACCESS);
   listPostDrafts.mockReset().mockResolvedValue(listResponse());
@@ -52,11 +63,12 @@ beforeEach(() => {
 });
 
 describe("文字数と長さの割合", () => {
-  it("初めは閉じていて、1行のまとめを出す", async () => {
+  it("初めは閉じていて、まとめの行は出さない（2026-11-04）", async () => {
     renderCreate();
     const toggle = await screen.findByRole("button", { name: /文字数と長さの割合/ });
     expect(toggle).toHaveAttribute("aria-expanded", "false");
-    expect(toggle).toHaveTextContent("目標 150字・短文 55字 35%・中文 100字 45%・長文 135字 20%");
+    expect(toggle).toHaveTextContent(/^文字数と長さの割合$/);
+    expect(screen.queryByRole("region", { name: "文字数と長さの割合" })).not.toBeInTheDocument();
   });
 
   it("入力のたびに、作る件数の内訳（合計は作る件数）が変わる（FR-141）", async () => {
@@ -174,7 +186,7 @@ describe("文字数と長さの割合", () => {
     const count = await screen.findByRole("spinbutton", { name: "作る件数" });
     await user.clear(count);
     await user.type(count, "10");
-    await waitFor(() => expect(screen.getByRole("button", { name: /文字数と長さの割合/ })).toHaveTextContent("目標 200字"), {
+    await waitFor(async () => expect(await targetField(user)).toHaveValue(200), {
       timeout: 2000,
     });
   });
@@ -191,7 +203,7 @@ describe("文字数と長さの割合", () => {
     const count = screen.getByRole("spinbutton", { name: "作る件数" });
     await user.clear(count);
     await user.type(count, "10");
-    await waitFor(() => expect(screen.getByRole("button", { name: /文字数と長さの割合/ })).toHaveTextContent("目標 200字"), {
+    await waitFor(async () => expect(await targetField(user)).toHaveValue(200), {
       timeout: 2000,
     });
     // 入力していた短文の文字数は残り、入力していない目標は最新の値になる
@@ -228,7 +240,7 @@ describe("文字数と長さの割合", () => {
     fireEvent.change(s.getByRole("slider", { name: "短文の割合" }), { target: { value: "40" } });
     fireEvent.change(s.getByRole("slider", { name: "中文の割合" }), { target: { value: "40" } });
     await user.click(s.getByRole("button", { name: "保存" }));
-    await waitFor(() => expect(screen.getByRole("button", { name: /文字数と長さの割合/ })).toHaveTextContent("目標 200字"));
+    await waitFor(async () => expect(await targetField(user)).toHaveValue(200));
   });
 
   it("409 で入れた最新の文字数と割合を、古いプロンプトの設定で上書きしない（PR #17 のCodexレビュー7回目）", async () => {
@@ -241,13 +253,13 @@ describe("文字数と長さの割合", () => {
     const count = await screen.findByRole("spinbutton", { name: "作る件数" });
     await user.clear(count);
     await user.type(count, "12");
-    await waitFor(() => expect(screen.getByRole("button", { name: /文字数と長さの割合/ })).toHaveTextContent("目標 200字"), {
+    await waitFor(async () => expect(await targetField(user)).toHaveValue(200), {
       timeout: 2000,
     });
     await waitFor(() => expect(getPrompt).toHaveBeenCalledWith("a1", 12));
     // 古い版の設定で上書きしない
     await new Promise((r) => setTimeout(r, 100));
-    expect(screen.getByRole("button", { name: /文字数と長さの割合/ })).toHaveTextContent("目標 200字");
+    expect(await targetField(user)).toHaveValue(200);
   });
 
   it("プロンプトが新しい版の設定を返したら、版と保存済みの件数もそろえる（PR #17 のCodexレビュー8回目）", async () => {
@@ -320,7 +332,7 @@ describe("文字数と長さの割合", () => {
     const count = screen.getByRole("spinbutton", { name: "作る件数" });
     await user.clear(count);
     await user.type(count, "10");
-    expect(await screen.findByRole("button", { name: /文字数と長さの割合/ }, { timeout: 2000 })).toHaveTextContent("目標 200字");
+    expect(await targetField(user)).toHaveValue(200);
   });
 
   it("件数の入力の途中に新しい版が届いても、古い件数を新しい版で保存しない（PR #17 のCodexレビュー9回目）", async () => {
@@ -357,7 +369,7 @@ describe("文字数と長さの割合", () => {
     await user.clear(count);
     await user.type(count, "10");
     await waitFor(() => expect(putPromptSettings).toHaveBeenCalledWith("a1", 10, 1), { timeout: 2000 });
-    await waitFor(() => expect(screen.getByRole("button", { name: /文字数と長さの割合/ })).toHaveTextContent("目標 200字"));
+    await waitFor(async () => expect(await targetField(user)).toHaveValue(200));
     // 遅れて届いた版2の応答は使わない（版3を巻き戻さない）
     await act(async () => finishFirst({ postCount: 10, length: { ...POST_LENGTH_DEFAULTS }, version: 2 }));
     await user.clear(count);

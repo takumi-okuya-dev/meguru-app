@@ -52,7 +52,7 @@ function CreatePageContent() {
   if (drafts.error) return <ApiErrorScreen error={drafts.error} onRetry={() => void drafts.refetch()} />;
 
   const atLimit = data ? data.needsReview.length >= data.limits.needsReview : false;
-  // 手順の案内と自分で1件書く入口は、直せる人だけ（読むだけのときは出さない。specs/014 FR-130・FR-132）
+  // 手順の案内は、直せる人だけ（読むだけのときは出さない。specs/014 FR-130）
   const canCreate = !!data && data.canGeneratePrompt && !promptLocked && can("content");
 
   return (
@@ -82,7 +82,6 @@ function CreatePageContent() {
           accountId={account.id}
           atLimit={atLimit}
           focusKey={data && (!data.canGeneratePrompt || promptLocked) ? openKey : undefined}
-          showSelfWrite={canCreate}
         />
       </PageBody>
     </>

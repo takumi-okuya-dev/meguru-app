@@ -42,11 +42,11 @@ beforeEach(() => {
 });
 
 describe("プロンプトに入っている情報", () => {
-  it("初めは閉じていて、1行のまとめ（課題・目的・下書き・宣伝内容・参考投稿）を出す（FR-120）", async () => {
+  it("初めは閉じていて、まとめの行は出さない（FR-120。文字を減らすため 2026-11-04）", async () => {
     renderCreate();
     const toggle = await screen.findByRole("button", { name: /プロンプトに入っている情報/ });
     expect(toggle).toHaveAttribute("aria-expanded", "false");
-    expect(toggle).toHaveTextContent("課題 15/16・目的 0/5・下書き 2/4・宣伝内容 2件・参考投稿 12件（解説あり 4件）");
+    expect(toggle).toHaveTextContent(/^プロンプトに入っている情報$/);
     expect(screen.queryByRole("region", { name: "課題" })).not.toBeInTheDocument();
   });
 
