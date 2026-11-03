@@ -1,5 +1,5 @@
 // 「投稿をつくる」の、1投稿の文字数と短文・中文・長文の割合（specs/014-strategy-guidance US13、FR-140〜FR-142、research.md R11）。
-// 初めは閉じていて1行のまとめを出す。入力のたびに内訳を出し、保存できない理由があれば示す。保存はオーナーだけ。
+// 初めは閉じている（まとめの行は出さない。文字を減らすため 2026-11-04）。入力のたびに内訳を出し、保存できない理由があれば示す。保存はオーナーだけ。
 import {
   POST_KIND_LENGTH_MAX,
   POST_KIND_LENGTH_MIN,
@@ -106,7 +106,6 @@ export function LengthSettings({
   useUnsavedChanges(
     canSave && (Object.keys(settings) as (keyof PostLengthSettings)[]).some((k) => draft[k] !== String(settings[k])),
   );
-  const summary = `目標 ${settings.target}字・${KINDS.map((k) => `${k.name} ${settings[k.length]}字 ${settings[k.ratio]}%`).join("・")}`;
   const set = (k: keyof PostLengthSettings, v: string) => setDraft((d) => ({ ...d, [k]: v }));
   const numberClass = "h-10 w-20 rounded-xl border border-input bg-card px-3 text-right text-base disabled:opacity-60 md:h-9 md:text-[15px]";
 
@@ -118,10 +117,7 @@ export function LengthSettings({
         onClick={() => setOpen((v) => !v)}
         className="flex min-h-11 w-full items-center gap-2 px-3.5 py-2 text-left"
       >
-        <span className="min-w-0 flex-1">
-          <span className="block text-sm font-medium">文字数と長さの割合</span>
-          <span className="block text-xs text-muted-foreground">{summary}</span>
-        </span>
+        <span className="min-w-0 flex-1 text-sm font-medium">文字数と長さの割合</span>
         <ChevronDownIcon className={cn("size-4 shrink-0 transition-transform", open && "rotate-180")} aria-hidden="true" />
       </button>
       {open && (

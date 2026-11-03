@@ -1,6 +1,6 @@
 // 「プロンプトに入っている情報」（specs/014-strategy-guidance US11、FR-120〜FR-123、contracts/ui-routes.md「投稿をつくる」）。
 // 数はAPIがプロンプトを作るときの数え方のまま（materials）。画面では並べて、編集の画面へのリンクを作るだけ。
-import { STRATEGY_FIELDS, STRATEGY_TOTAL, type PromptMaterials as Materials } from "@threads-grower/shared";
+import { STRATEGY_FIELDS, type PromptMaterials as Materials } from "@threads-grower/shared";
 import { ChevronDownIcon } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import { Link } from "react-router";
@@ -57,7 +57,7 @@ function EditLink({ to }: { to: string }) {
 }
 
 /**
- * プロンプトに入っている情報。初めは閉じていて、1行のまとめを出す。
+ * プロンプトに入っている情報。初めは閉じている（まとめの行は出さない。文字を減らすため 2026-11-04）。
  * @param props - accountId：Account の ID、materials：情報の一覧
  * @returns 情報の一覧
  */
@@ -66,7 +66,6 @@ export function PromptMaterials({ accountId, materials }: { accountId: string; m
   const base = `/accounts/${accountId}`;
   const { strategy, drafts, promotions, research } = materials;
   const draftFilled = [drafts.profileBio, ...drafts.pinned];
-  const summary = `課題 ${strategy.done}/${STRATEGY_TOTAL}・目的 ${strategy.purposeDone}/5・下書き ${draftFilled.filter(Boolean).length}/4・宣伝内容 ${promotions.included}件・参考投稿 ${research.total}件（解説あり ${research.explained}件）`;
 
   return (
     <div className="rounded-xl bg-muted/50">
@@ -76,10 +75,7 @@ export function PromptMaterials({ accountId, materials }: { accountId: string; m
         onClick={() => setOpen((v) => !v)}
         className="flex min-h-11 w-full items-center gap-2 px-3.5 py-2 text-left"
       >
-        <span className="min-w-0 flex-1">
-          <span className="block text-sm font-medium">プロンプトに入っている情報</span>
-          <span className="block text-xs text-muted-foreground">{summary}</span>
-        </span>
+        <span className="min-w-0 flex-1 text-sm font-medium">プロンプトに入っている情報</span>
         <ChevronDownIcon className={cn("size-4 shrink-0 transition-transform", open && "rotate-180")} aria-hidden="true" />
       </button>
       {/* 列の幅を決めないと、スマートフォンで長い項目名に合わせて列が広がり、灰色の枠からはみ出す */}

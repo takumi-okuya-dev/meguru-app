@@ -1,6 +1,7 @@
 // 貼り付け欄（specs/003 US2、contracts/ui-routes.md「貼り付け欄」「登録直後の案内」、research.md R5）。
 // 外部LLMの回答を貼り付けて送ると、「@@@」の行で分けて要確認に一括登録する。
 // 014で投稿ストックの画面の下から「投稿をつくる」の画面に移し、見出しと登録の後の案内を足した（specs/014 FR-161・FR-162）。
+// 文字を減らすため、コピーの注意（FR-131）と「自分で1件書く」（FR-132）を外し、区切りの案内は欄の中に入れた（2026-11-04）。
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   DRAFT_BODY_MAX,
@@ -22,8 +23,7 @@ import { STOCK_LIMIT_MESSAGE } from "./messages";
 import { flushPendingDeletes } from "./use-deferred-delete";
 
 type Notice = { message: string; retry: boolean };
-// self：自分で1件書いて登録した（区切りがないのは当たり前なので、その注意は出さない）
-type Registered = { result: DraftBatchResult; text: string; self: boolean };
+type Registered = { result: DraftBatchResult; text: string };
 
 /**
  * 上限を超えたときの案内。N件目が長いときは、その件も添える。
@@ -39,20 +39,17 @@ function pasteTooLargeMessage(details: string[]): string {
 /**
  * 貼り付け欄。登録直後の案内（件数・投稿ストックで確かめる・取り消し）も、この欄のすぐ上に出す。
  * @param props - accountId：Account の ID、atLimit：要確認の下書きが上限に達しているか（送るボタンを無効にする）、
- *   focusKey：欄にフォーカスを当てる移動のキー（画面を開くたびに変わる）、
- *   showSelfWrite：「自分で1件書く」とリサーチへの案内を出すか（直せる人だけ。specs/014 FR-132）
+ *   focusKey：欄にフォーカスを当てる移動のキー（画面を開くたびに変わる）
  * @returns 貼り付け欄
  */
 export function PasteComposer({
   accountId,
   atLimit,
   focusKey,
-  showSelfWrite = false,
 }: {
   accountId: string;
   atLimit: boolean;
   focusKey?: string;
-  showSelfWrite?: boolean;
 }) {
   const queryClient = useQueryClient();
   const [text, setText] = useState("");
@@ -60,8 +57,6 @@ export function PasteComposer({
   const [registered, setRegistered] = useState<Registered | null>(null);
   // 送る前に、待っている削除（投稿ストックの「元に戻す」の間）を確定している間（PR #17 のCodexレビュー）
   const [preparing, setPreparing] = useState(false);
-  // 「自分で1件書く」を押した（欄の案内を変え、区切りがない注意を出さない）
-  const [selfWrite, setSelfWrite] = useState(false);
   // 失敗した送信のIDと内容。同じ内容を送り直すときは同じIDを使う（二重登録を防ぐ。research.md R5）
   const pending = useRef<{ id: string; text: string } | null>(null);
   const areaRef = useRef<HTMLTextAreaElement>(null);
@@ -79,14 +74,13 @@ export function PasteComposer({
   };
 
   const send = useMutation({
-    mutationFn: (req: { clientRequestId: string; text: string; self: boolean }) =>
+    mutationFn: (req: { clientRequestId: string; text: string }) =>
       api.createDraftBatch(accountId, { clientRequestId: req.clientRequestId, text: req.text }),
     onSuccess: (result, req) => {
       pending.current = null;
       setText((current) => (current === req.text ? "" : current));
       setNotice(null);
-      setRegistered({ result, text: req.text, self: req.self });
-      setSelfWrite(false);
+      setRegistered({ result, text: req.text });
       refresh();
     },
     onError: (err) => {
@@ -133,7 +127,7 @@ export function PasteComposer({
     } finally {
       setPreparing(false);
     }
-    send.mutate({ clientRequestId: id, text, self: selfWrite });
+    send.mutate({ clientRequestId: id, text });
   };
 
   const busy = preparing || send.isPending;
@@ -155,14 +149,10 @@ export function PasteComposer({
       <h2 id={headingId} className="font-semibold">
         AIの答えを貼り付けて、投稿ストックに登録する
       </h2>
-      <p className="text-[13px] text-muted-foreground">
-        AIの答えは、答えの下にあるコピーボタンで全体をコピーしてから貼り付けてください（マウスで選ぶと、区切りの行が抜けることがあります）
-      </p>
       {registered && (
         <RegisteredNotice
           accountId={accountId}
           result={registered.result}
-          self={registered.self}
           undoing={undo.isPending}
           onUndo={() => undo.mutate(registered)}
           onClose={() => setRegistered(null)}
@@ -182,7 +172,7 @@ export function PasteComposer({
         <textarea
           ref={areaRef}
           aria-label="AIの返信を貼り付ける欄"
-          placeholder={selfWrite ? "投稿の本文を1件書く…" : "AIの返信をここに貼り付け…"}
+          placeholder={"AIの返信をここに貼り付け…\n「@@@」で区切られた投稿が、まとめて「要確認」に登録されます"}
           value={text}
           disabled={busy}
           onChange={(e) => setText(e.target.value)}
@@ -199,34 +189,6 @@ export function PasteComposer({
           <ArrowUpIcon className="size-5" />
         </Button>
       </div>
-      <p className="px-2 text-xs text-muted-foreground">
-        「@@@」で区切られた投稿が、まとめて「要確認」に登録されます
-      </p>
-      {showSelfWrite && (
-        <div className="space-y-1.5 rounded-xl bg-muted/50 px-3.5 py-3 text-[13px]">
-          <div className="flex flex-wrap items-center gap-2">
-            <p className="min-w-0 flex-1">自分で1件書く：AIを使わずに、1件の本文を書いて登録することもできます</p>
-            <Button
-              variant="outline"
-              size="sm"
-              className="rounded-full"
-              disabled={busy}
-              onClick={() => {
-                setSelfWrite(true);
-                areaRef.current?.focus();
-              }}
-            >
-              自分で1件書く
-            </Button>
-          </div>
-          <p className="text-muted-foreground">
-            リサーチした投稿を、自分なりに真似して書いてみよう →{" "}
-            <Link to={`/accounts/${accountId}/research`} className="text-ring underline">
-              リサーチを見る
-            </Link>
-          </p>
-        </div>
-      )}
     </section>
   );
 }
@@ -234,14 +196,12 @@ export function PasteComposer({
 function RegisteredNotice({
   accountId,
   result,
-  self,
   undoing,
   onUndo,
   onClose,
 }: {
   accountId: string;
   result: DraftBatchResult;
-  self: boolean;
   undoing: boolean;
   onUndo: () => void;
   onClose: () => void;
@@ -250,7 +210,7 @@ function RegisteredNotice({
     <div role="status" className="flex items-start gap-2 rounded-xl border bg-muted/60 px-3 py-2 text-sm">
       <div className="min-w-0 flex-1 space-y-0.5 py-1">
         <p className="font-medium">{result.draftCount}件を投稿ストックに登録しました</p>
-        {!result.delimiterFound && !self && (
+        {!result.delimiterFound && (
           <p className="text-muted-foreground">区切り（@@@）が見つからなかったため、1件として登録しました</p>
         )}
         {result.overLimitCount > 0 && (
