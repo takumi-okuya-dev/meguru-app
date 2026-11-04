@@ -89,8 +89,9 @@ export function ExplainBatchPanel({
       aria-label="まとめてAIに解説してもらう"
       className="scroll-mt-28 space-y-3 rounded-2xl border bg-muted/30 px-4 py-3.5 text-sm"
     >
+      {/* 狭い画面では、説明が細い縦の列にならないよう、ボタンを下の行へ回す */}
       <div className="flex flex-wrap items-center gap-3">
-        <div className="min-w-0 flex-1">
+        <div className="min-w-48 flex-1">
           <p className="font-medium">解説がまだの参考投稿：{pending}件</p>
           <p className="text-xs text-muted-foreground">
             「なぜ伸びたか」をAIにまとめて解説してもらうと、投稿づくりに活かせます（1回に{EXPLAIN_BATCH_MAX}件まで）
