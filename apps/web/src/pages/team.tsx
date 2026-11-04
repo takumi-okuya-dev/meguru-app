@@ -12,6 +12,7 @@ import { AccountAvatar } from "@/components/AccountAvatar";
 import { LoadingSkeleton } from "@/components/guards";
 import { PageBody, PageHeader } from "@/components/layout/PageHeader";
 import { ConfirmDialog } from "@/components/team/ConfirmDialog";
+import { HelpToggle } from "@/components/team/HelpToggle";
 import { InviteLinkDialog } from "@/components/team/InviteLinkDialog";
 import { LeaveTeamDialog } from "@/components/team/LeaveTeamDialog";
 import { Button } from "@/components/ui/button";
@@ -29,6 +30,13 @@ import { cn } from "@/lib/utils";
 import { NotFound } from "@/pages/not-found";
 
 const ROLE_NAMES = { admin: "管理者", member: "メンバー", editor: "編集者" } as const;
+
+// チームで誰に何が見えるか（specs/020 FR-005、contracts/ui-routes.md 1）
+const VISIBILITY_HELP = [
+  "「チームに見せる」をオンにしたアカウントは、チームの人が投稿ストックと戦略を読めます",
+  "管理者と、担当の編集者は、運用状況（投稿の数・伸び・最後に動いた日）を見られます",
+  "投稿の本文や戦略は、運用状況には出ません",
+] as const;
 
 /** 開いている確認のダイアログ。 */
 type Pending =
@@ -234,6 +242,12 @@ export function TeamPage() {
   const team = useQuery({ queryKey: queryKeys.team(teamId), queryFn: () => api.getTeam(teamId) });
   const me = useQuery({ queryKey: queryKeys.me, queryFn: api.me });
   const isAdmin = team.data?.myRole === "admin";
+  // 運用状況を開ける人だけ、ボタンの件数の印のために読む（運用状況の画面と同じキー。specs/020 research.md R8）
+  const status = useQuery({
+    queryKey: queryKeys.teamStatus(teamId),
+    queryFn: () => api.teamStatus(teamId),
+    enabled: team.data?.statusVisible === true,
+  });
   const [inviteOpen, setInviteOpen] = useState(false);
   const invite = useQuery({
     queryKey: queryKeys.teamInvite(teamId),
@@ -330,12 +344,27 @@ export function TeamPage() {
       />
       <PageBody className="max-w-5xl space-y-6">
         {/* 人数と管理者・「担当を決める」・「⋯」を1行に置く。「チームを抜ける」は誤って押さないよう画面の一番下（2026-11-04） */}
+        {/* 狭い画面では、説明が細い縦の列にならないよう、ボタンを下の行へ回す */}
         <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-          <span className="min-w-0 flex-1 text-sm text-muted-foreground">
+          <span className="min-w-48 flex-1 text-sm text-muted-foreground">
             メンバー {t.members.length}人 · 管理者：{t.admin.name}
             {!isAdmin && mine ? ` · あなたのロール：${ROLE_NAMES[mine.role]}` : ""}
           </span>
           <span className="flex items-center gap-1">
+            {t.statusVisible && (
+              <Button asChild variant="outline" className="h-10 rounded-full md:h-9">
+                <Link to={`/teams/${teamId}/status`}>
+                  運用状況
+                  {/* 止まっている人とアカウントの数（FR-031の例外。2026-11-04 のモックで決めた） */}
+                  {(status.data?.stoppedCount ?? 0) > 0 && (
+                    <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-warning-bg px-1.5 text-[11px] font-semibold text-warning">
+                      <span className="sr-only">止まっている</span>
+                      {status.data?.stoppedCount}
+                    </span>
+                  )}
+                </Link>
+              </Button>
+            )}
             {isAdmin && (
               <Button asChild variant="outline" className="h-10 rounded-full md:h-9">
                 <Link to={`/teams/${teamId}/assign`}>担当を決める</Link>
@@ -481,6 +510,7 @@ export function TeamPage() {
             ))}
           </ul>
           {isAdmin && <RoleHelp />}
+          <HelpToggle label="チームで見えること" points={VISIBILITY_HELP} />
         </section>
 
         <div>

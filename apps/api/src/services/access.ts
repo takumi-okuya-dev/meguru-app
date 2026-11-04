@@ -275,6 +275,56 @@ export async function authorizeTeamAdmin(
   return access;
 }
 
+/** 運用状況を見る範囲（specs/020 research.md R5）。管理者はすべて、編集者は担当のAccountだけ。 */
+export type TeamStatusScope = { kind: "all" } | { kind: "assigned"; accountIds: string[] };
+
+/**
+ * チームの人が運用状況を見られる範囲を決める（specs/020 FR-001・FR-002a、research.md R5・R6）。
+ * 管理者はすべて。編集者は、同じチーム経由の担当のうち、オーナーがチームのまとまりを使えるAccountだけ
+ * （019：チームを使えない人は手伝ってもらえない）。メンバー・担当のない編集者は null。
+ * @param db - データベース（トランザクションの中でもよい）
+ * @param teamAccess - authorizeTeamMember の結果
+ * @returns 範囲（見られなければ null）
+ */
+export async function statusScopeOf(db: Db | TxDb, teamAccess: TeamAccess): Promise<TeamStatusScope | null> {
+  if (teamAccess.member.role === "admin") return { kind: "all" };
+  if (teamAccess.member.role !== "editor") return null;
+  const ownerM = alias(memberships, "owner_m");
+  const rows = await db
+    .select({ accountId: memberships.accountId })
+    .from(memberships)
+    .innerJoin(teamAccounts, and(eq(teamAccounts.accountId, memberships.accountId), eq(teamAccounts.teamId, teamAccess.team.id)))
+    .innerJoin(ownerM, and(eq(ownerM.accountId, memberships.accountId), eq(ownerM.role, "owner")))
+    .where(
+      and(
+        eq(memberships.userId, teamAccess.member.id),
+        eq(memberships.role, "editor"),
+        eq(memberships.teamId, teamAccess.team.id),
+        featureOnSql(ownerM.userId, "team"),
+      ),
+    );
+  return rows.length > 0 ? { kind: "assigned", accountIds: rows.map((r) => r.accountId) } : null;
+}
+
+/**
+ * ログインした人が、チームの運用状況を見られるかを判定する（specs/020 contracts/api.md）。
+ * @param db - データベース
+ * @param user - リクエストしたユーザー
+ * @param teamId - teams.id
+ * @returns TeamAccess と範囲
+ * @throws AppError TEAM_NOT_FOUND・FEATURE_DISABLED（authorizeTeamMember）、ROLE_FORBIDDEN（メンバー・担当のない編集者）
+ */
+export async function authorizeTeamStatus(
+  db: Db | TxDb,
+  user: Pick<RequestUser, "id">,
+  teamId: string,
+): Promise<TeamAccess & { scope: TeamStatusScope }> {
+  const access = await authorizeTeamMember(db, user, teamId);
+  const scope = await statusScopeOf(db, access);
+  if (!scope) throw new AppError("ROLE_FORBIDDEN", 403, "team admin or assigned editor only");
+  return { ...access, scope };
+}
+
 /** 担当にしてよいAccount（authorizeAssignment の結果）。 */
 export type AssignmentTarget = { account: AccountRow; ownerUserId: string; person: { id: string; role: TeamRole } };
 

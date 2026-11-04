@@ -1426,9 +1426,62 @@ export const teamDetailSchema = z.object({
   admin: z.object({ userId: z.string(), name: z.string() }),
   members: z.array(teamMemberSchema),
   limits: z.object({ members: z.number().int(), editors: z.number().int() }),
+  /** 運用状況を開けるか（管理者、または同じチーム経由の担当がある編集者。specs/020） */
+  statusVisible: z.boolean(),
 });
 /** チームの詳細。 */
 export type TeamDetail = z.infer<typeof teamDetailSchema>;
+
+/** 運用状況の人の行（specs/020 contracts/api.md）。 */
+export const teamStatusPersonSchema = z.object({
+  userId: z.string(),
+  name: z.string(),
+  role: teamRoleSchema,
+  isMe: z.boolean(),
+  joinedAt: z.string(),
+  lastActiveAt: z.string().nullable(),
+  activeCount7d: z.number().int(),
+  stopped: z.boolean(),
+  /** 記録がなく、入って90日を過ぎている（操作の記録は90日で消える。research.md R2） */
+  retentionLimited: z.boolean(),
+});
+/** 運用状況のアカウントの伸び（research.md R4・R7）。 */
+export const teamStatusGrowthSchema = z.discriminatedUnion("state", [
+  z.object({ state: z.literal("metrics_off") }),
+  z.object({ state: z.literal("insufficient") }),
+  z.object({ state: z.literal("ok"), ratio: z.number(), recentMedian: z.number(), previousMedian: z.number() }),
+  z.object({ state: z.literal("poor"), ratio: z.number(), recentMedian: z.number(), previousMedian: z.number() }),
+]);
+/** 運用状況のアカウントの行。 */
+export const teamStatusAccountSchema = z.object({
+  accountId: z.string(),
+  name: z.string(),
+  username: z.string().nullable(),
+  displayName: z.string().nullable(),
+  profilePictureUrl: z.string().nullable(),
+  owner: z.object({ userId: z.string(), name: z.string(), isMe: z.boolean() }),
+  connection: z.enum(["connected", "disconnected"]),
+  addedAt: z.string(),
+  lastPostedAt: z.string().nullable(),
+  postCount7d: z.number().int(),
+  approvedCount: z.number().int(),
+  needsReviewCount: z.number().int(),
+  stopped: z.boolean(),
+  growth: teamStatusGrowthSchema,
+});
+/** GET /api/teams/:teamId/status の応答（specs/020 contracts/api.md）。 */
+export const teamStatusSchema = z.object({
+  scope: z.enum(["all", "assigned"]),
+  generatedAt: z.string(),
+  /** 止まっている人とアカウントの数（チームの画面のボタンの印） */
+  stoppedCount: z.number().int(),
+  people: z.array(teamStatusPersonSchema),
+  accounts: z.array(teamStatusAccountSchema),
+});
+/** チームの運用状況。 */
+export type TeamStatus = z.infer<typeof teamStatusSchema>;
+/** 運用状況のアカウントの伸び。 */
+export type TeamStatusGrowth = z.infer<typeof teamStatusGrowthSchema>;
 
 /** GET /api/teams/:teamId/invite の応答。 */
 export const teamInviteSchema = z.object({ url: z.string(), rotatedAt: z.string() });

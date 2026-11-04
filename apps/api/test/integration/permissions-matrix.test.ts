@@ -159,6 +159,8 @@ const TEAM_ROUTES: [string, string, "member" | "admin" | "login"][] = [
   ["GET", "/api/teams/:teamId/assignments", "admin"],
   ["PUT", "/api/teams/:teamId/assignments/:userId/accounts/:accountId", "admin"],
   ["DELETE", "/api/teams/:teamId/assignments/:userId/accounts/:accountId", "admin"],
+  // 運用状況（specs/020）。管理者と担当のある編集者。メンバーが断られることは team-status.test.ts で確かめる
+  ["GET", "/api/teams/:teamId/status", "member"],
 ];
 
 describe("チームのAPIの表（SC-002、research.md R4）", () => {

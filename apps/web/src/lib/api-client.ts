@@ -22,6 +22,7 @@ import {
   teamAssignmentsSchema,
   teamCreateResponseSchema,
   teamDetailSchema,
+  teamStatusSchema,
   teamInviteSchema,
   accountSummarySchema,
   exportPageSchema,
@@ -283,6 +284,8 @@ export const api = {
     request(`/api/teams/${teamId}`, null, { method: "PATCH", body: JSON.stringify({ name }) }),
   deleteTeam: (teamId: string) => request(`/api/teams/${teamId}`, null, { method: "DELETE" }),
   getTeamInvite: (teamId: string) => request(`/api/teams/${teamId}/invite`, teamInviteSchema),
+  // 運用状況（specs/020 contracts/api.md）
+  teamStatus: (teamId: string) => request(`/api/teams/${teamId}/status`, teamStatusSchema),
   rotateTeamInvite: (teamId: string) => request(`/api/teams/${teamId}/invite/rotate`, teamInviteSchema, { method: "POST" }),
   setMemberRole: (teamId: string, userId: string, role: "member" | "editor") =>
     request(`/api/teams/${teamId}/members/${userId}`, null, { method: "PATCH", body: JSON.stringify({ role }) }),

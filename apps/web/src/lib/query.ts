@@ -42,6 +42,7 @@ export const queryKeys = {
   team: (id: string) => ["team", id] as const,
   teamInvite: (id: string) => ["team", id, "invite"] as const,
   teamAssignments: (id: string) => ["team", id, "assignments"] as const,
+  teamStatus: (id: string) => ["team", id, "status"] as const,
   // 戦略プロファイル（specs/002-strategy-profile）。Account 単位で持ち、Account の削除で一緒に消す
   profileStatus: (id: string) => ["account", id, "profile-status"] as const,
   strategy: (id: string) => ["account", id, "strategy"] as const,

@@ -17,6 +17,7 @@ import { RequireFeature } from "@/components/FeatureUnavailable";
 import { PerformancePage } from "@/pages/performance";
 import { TeamPage } from "@/pages/team";
 import { TeamAssignPage } from "@/pages/team-assign";
+import { TeamStatusPage } from "@/pages/team-status";
 import { TeamLayout } from "@/pages/team-layout";
 import { TeamSharedAccountPage } from "@/pages/team-shared-account";
 import { SignInPage } from "@/pages/sign-in";
@@ -99,6 +100,7 @@ export const routes = [
         children: [
           { index: true, element: <TeamPage /> },
           { path: "assign", element: <TeamAssignPage /> },
+          { path: "status", element: <TeamStatusPage /> },
         ],
       },
       // 見せてもらっているアカウントは、読むだけの1カラムの画面（Accountのサイドバーには入らない）

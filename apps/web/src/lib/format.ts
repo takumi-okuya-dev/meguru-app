@@ -97,6 +97,21 @@ export function formatSlotTime(hhmm: string): string {
   return `${Number(h)}:${m}`;
 }
 
+/**
+ * 過ぎた日を「今日」「昨日」「10/26（9日前）」にする（日本時間の日付で数える。specs/020 contracts/ui-routes.md 2）。
+ * @param iso - ISO 8601 の日時
+ * @param now - 今の時刻
+ * @returns 表示用の文字列
+ */
+export function formatDaysAgoJst(iso: string, now: Date = new Date()): string {
+  const d = new Date(iso);
+  const diff = jstDayIndex(now) - jstDayIndex(d);
+  if (diff <= 0) return "今日";
+  if (diff === 1) return "昨日";
+  const p = jstParts(d);
+  return `${p.m}/${p.day}（${diff}日前）`;
+}
+
 const WEEKDAYS = ["日", "月", "火", "水", "木", "金", "土"];
 
 /**
