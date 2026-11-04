@@ -53,6 +53,8 @@ describe("テスト版に入れない人", () => {
     expect(screen.getByText("アプリの画面")).toBeInTheDocument();
     act(() => setTestAccessRequired(true));
     expect(await screen.findByRole("heading", { name: "テスト版は招待された方だけが使えます" })).toBeInTheDocument();
+    expect(screen.getByText("届いた招待のリンクを、このブラウザで開き直してください。")).toBeInTheDocument();
+    expect(screen.getByText("・ログインしたままで大丈夫です")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "ログアウト" })).toBeInTheDocument();
     expect(screen.queryByText("アプリの画面")).not.toBeInTheDocument();
   });
