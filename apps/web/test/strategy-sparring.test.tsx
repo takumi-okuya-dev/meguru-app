@@ -1,12 +1,16 @@
-// AIと壁打ちして課題を埋める（specs/018-strategy-ai-sparring US1〜US4、contracts/ui-routes.md、SC-001〜SC-005）
+// AIと考える（区分ごとのポップアップ。specs/018-strategy-ai-sparring US1〜US4、contracts/ui-routes.md、SC-001〜SC-005）。
+// 2026-11-04：全部の項目を一度に相談するのは大変なので、区分の見出しの横から、区分ごとのポップアップで開く形にした
 import { screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import {
   SPARRING_ITEM_END,
   SPARRING_KEYS,
   STRATEGY_FIELDS,
+  emptyStrategyValues,
+  selectSparringTargets,
   sparringBeginLine,
   type SparringKey,
+  type SparringSectionId,
 } from "@threads-grower/shared";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderStrategyPage, strategyOf } from "./helpers/strategy-page";
@@ -22,7 +26,7 @@ vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 const { UnsavedChangesProvider } = await import("@/components/UnsavedChangesProvider");
 const { StrategyPage } = await import("@/pages/strategy");
 
-const OPEN = "AIと壁打ちして埋める";
+const SALES = "AIと考える（営業導線）";
 
 function labelOf(key: string): string {
   const f = STRATEGY_FIELDS.find((x) => x.key === key);
@@ -47,11 +51,22 @@ function answerOf(entries: [string, string][]): string {
 
 const fullAnswer = () => answerOf(SPARRING_KEYS.map((k) => [labelOf(k), proposalOf(k)]));
 
-async function openPanel(user: { click: (el: Element) => Promise<void> } = userEvent) {
+/** 空の課題で、その区分の相談する項目の数。 */
+const countOf = (section: SparringSectionId) =>
+  selectSparringTargets(emptyStrategyValues(), { sections: [section], onlyIncomplete: true }).length;
+
+/**
+ * 区分の見出しの横の「AIと考える」を押し、ポップアップを返す。
+ * @param name - 入口のボタンの名前（例：AIと考える（営業導線））
+ */
+async function openPanel(user: { click: (el: Element) => Promise<void> } = userEvent, name = SALES) {
   await screen.findByRole("heading", { name: "営業導線設計" });
-  await user.click(screen.getByRole("button", { name: OPEN }));
-  return within(screen.getByRole("region", { name: "AIと壁打ち" }));
+  await user.click(screen.getByRole("button", { name }));
+  return within(await screen.findByRole("dialog", { name }));
 }
+
+/** 「反映する」（スマートフォンの右上と、パソコンの下の2つがある。どちらも同じ）。 */
+const applyButton = (panel: ReturnType<typeof within>) => panel.getAllByRole("button", { name: "反映する" })[0]!;
 
 async function paste(box: HTMLElement, text: string) {
   await userEvent.click(box);
@@ -64,17 +79,21 @@ function fieldBox(key: string) {
   return within(el);
 }
 
-describe("US1：まとめて壁打ちし、一括で反映する", () => {
+describe("US1：区分ごとに相談し、一括で反映する", () => {
   beforeEach(() => {
     getStrategy.mockReset();
     putStrategy.mockReset();
   });
 
-  it("直せる人には「全体をAIと整理する」と並べて出し、見せてもらっている人には出さない（FR-001）", async () => {
+  it("直せる人には、区分の見出しの横に「AIと考える」を出す。下書きには出さない。上のカードには「全体をAIと整理する」だけ", async () => {
     getStrategy.mockResolvedValue(strategyOf());
     renderStrategyPage(StrategyPage, UnsavedChangesProvider);
-    const open = await screen.findByRole("button", { name: OPEN });
-    expect(open).toHaveAttribute("aria-expanded", "false");
+    await screen.findByRole("heading", { name: "営業導線設計" });
+    for (const chip of ["目的", "営業導線", "アカウント", "集客導線", "人柄", "その他"]) {
+      expect(screen.getByRole("button", { name: `AIと考える（${chip}）` })).toBeInTheDocument();
+    }
+    expect(screen.queryByRole("button", { name: "AIと考える（下書き）" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "AIと壁打ちして埋める" })).toBeNull();
     expect(screen.getByRole("button", { name: "全体をAIと整理する" })).toBeInTheDocument();
   });
 
@@ -82,24 +101,23 @@ describe("US1：まとめて壁打ちし、一括で反映する", () => {
     getStrategy.mockResolvedValue(strategyOf({ canEdit: false }));
     renderStrategyPage(StrategyPage, UnsavedChangesProvider);
     await screen.findByRole("heading", { name: "営業導線設計" });
-    expect(screen.queryByRole("button", { name: OPEN })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: SALES })).not.toBeInTheDocument();
   });
 
-  it("押すと開き、ボタンの名前は変わらない。もう一度押すと閉じる（FR-002、docs/ui-design.md §6）", async () => {
+  it("押すとポップアップが開き、手順・コピー・貼る欄が出る。区分のチップは出さない。✕で閉じる", async () => {
     getStrategy.mockResolvedValue(strategyOf());
     renderStrategyPage(StrategyPage, UnsavedChangesProvider);
     const panel = await openPanel();
-    const toggle = screen.getByRole("button", { name: OPEN });
-    expect(toggle).toHaveAttribute("aria-expanded", "true");
-    expect(panel.getByText("ChatGPTやClaudeに貼り付けて送り、AIの質問に答える")).toBeInTheDocument();
+    expect(panel.getByText("AIの質問に答える")).toBeInTheDocument();
     expect(panel.getByRole("button", { name: "プロンプトをコピーする" })).toBeInTheDocument();
     expect(panel.getByLabelText("AIの答えを貼り付ける")).toBeInTheDocument();
-    await userEvent.click(toggle);
-    expect(screen.queryByRole("region", { name: "AIと壁打ち" })).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: OPEN })).toHaveAttribute("aria-expanded", "false");
+    expect(panel.queryByRole("group", { name: "相談する区分" })).toBeNull();
+    expect(panel.getByText(`${countOf("sales")}項目を相談します`)).toBeInTheDocument();
+    await userEvent.click(panel.getByRole("button", { name: "閉じる" }));
+    expect(screen.queryByRole("dialog", { name: SALES })).not.toBeInTheDocument();
   });
 
-  it("コピーすると、壁打ちのプロンプトが入り、ボタンの下に結果が出る（US1-2・US1-3）", async () => {
+  it("コピーすると、その区分の項目だけのプロンプトが入り、ボタンの下に結果が出る（US1-2・US1-3）", async () => {
     getStrategy.mockResolvedValue(strategyOf());
     const user = userEvent.setup();
     const writeText = vi.spyOn(navigator.clipboard, "writeText");
@@ -107,8 +125,10 @@ describe("US1：まとめて壁打ちし、一括で反映する", () => {
     const panel = await openPanel(user);
     await user.click(panel.getByRole("button", { name: "プロンプトをコピーする" }));
     const copied = writeText.mock.calls.at(-1)?.[0] ?? "";
-    expect(copied).toContain("下の21項目を、一緒に考えて完成させてください");
+    expect(copied).toContain(`下の${countOf("sales")}項目を、一緒に考えて完成させてください`);
     expect(copied).toContain(sparringBeginLine(labelOf("realWorries")));
+    // ほかの区分の項目は、相談の対象に入らない
+    expect(copied).not.toContain(sparringBeginLine(labelOf("purposeOrigin")));
     expect(panel.getByText("コピーしました。ChatGPTやClaudeに貼り付けて送ってください")).toBeInTheDocument();
   });
 
@@ -123,18 +143,19 @@ describe("US1：まとめて壁打ちし、一括で反映する", () => {
     expect((panel.getByLabelText("プロンプト") as HTMLTextAreaElement).value).toContain("一緒に考えて完成させてください");
   });
 
-  it("21項目の答えを貼ってまとめて反映すると、入力欄が置き換わり、保存するまで送らない（SC-001・SC-003、FR-019・FR-020）", async () => {
+  it("答えを貼ってまとめて反映すると、入力欄が置き換わり、保存するまで送らない（SC-001・SC-003、FR-019・FR-020）", async () => {
     getStrategy.mockResolvedValue(strategyOf());
     putStrategy.mockImplementation(async (_id: string, body: Record<string, unknown>) => strategyOf({ ...body, version: 2 }));
     renderStrategyPage(StrategyPage, UnsavedChangesProvider);
     const panel = await openPanel();
     await paste(panel.getByLabelText("AIの答えを貼り付ける"), fullAnswer());
+    // 区分の外の項目も、読み取れたものは候補に並ぶ（FR-012）
     const boxes = panel.getAllByRole("checkbox");
     expect(boxes).toHaveLength(21);
     for (const b of boxes) expect(b).toBeChecked();
 
-    await userEvent.click(panel.getByRole("button", { name: "選んだ項目を反映する" }));
-    expect(screen.queryByRole("region", { name: "AIと壁打ち" })).not.toBeInTheDocument();
+    await userEvent.click(applyButton(panel));
+    expect(screen.queryByRole("dialog", { name: SALES })).not.toBeInTheDocument();
     for (const k of SPARRING_KEYS) {
       expect(fieldBox(k).getByLabelText(labelOf(k))).toHaveValue(proposalOf(k));
     }
@@ -152,41 +173,24 @@ describe("US1：まとめて壁打ちし、一括で反映する", () => {
     const panel = await openPanel();
     await paste(panel.getByLabelText("AIの答えを貼り付ける"), fullAnswer());
     await userEvent.click(panel.getByRole("button", { name: "閉じる" }));
-    const dialog = await screen.findByRole("dialog");
-    expect(within(dialog).getByText("貼り付けたAIの答えがあります。破棄しますか？")).toBeInTheDocument();
-    await userEvent.click(within(dialog).getByRole("button", { name: "破棄して閉じる" }));
-    expect(screen.queryByRole("region", { name: "AIと壁打ち" })).not.toBeInTheDocument();
-  });
-
-  it("項目の「AIと深掘り」と同時に開け、片方を閉じてももう片方は開いたまま（Edge Cases）", async () => {
-    getStrategy.mockResolvedValue(strategyOf());
-    renderStrategyPage(StrategyPage, UnsavedChangesProvider);
-    await openPanel();
-    const f = fieldBox("realWorries");
-    await userEvent.click(f.getByRole("button", { name: "AIと深掘り" }));
-    expect(f.getByLabelText("AIの答えを貼り付ける")).toBeInTheDocument();
-    expect(screen.getByRole("region", { name: "AIと壁打ち" })).toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: OPEN }));
-    expect(f.getByLabelText("AIの答えを貼り付ける")).toBeInTheDocument();
+    expect(await screen.findByText("貼り付けたAIの答えがあります。破棄しますか？")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "破棄して閉じる" }));
+    expect(screen.queryByRole("dialog", { name: SALES })).not.toBeInTheDocument();
   });
 });
 
-describe("US2：範囲を絞って壁打ちする", () => {
+describe("US2：区分の中で、未入力と短めの項目だけにする", () => {
   beforeEach(() => {
     getStrategy.mockReset();
     putStrategy.mockReset();
   });
 
-  it("はじめはすべての区分とスイッチがオンで、相談する項目の数が出る（FR-003）", async () => {
+  it("はじめはスイッチがオンで、その区分の相談する項目の数が出る（FR-003）", async () => {
     getStrategy.mockResolvedValue(strategyOf());
     renderStrategyPage(StrategyPage, UnsavedChangesProvider);
-    const panel = await openPanel();
-    const group = within(panel.getByRole("group", { name: "相談する区分" }));
-    for (const name of ["目的", "営業導線", "アカウント", "集客導線", "人柄", "その他"]) {
-      expect(group.getByRole("button", { name })).toHaveAttribute("aria-pressed", "true");
-    }
+    const panel = await openPanel(userEvent, "AIと考える（目的）");
     expect(panel.getByRole("switch", { name: "未入力と短めの項目だけにする" })).toBeChecked();
-    expect(panel.getByText("21項目を相談します")).toBeInTheDocument();
+    expect(panel.getByText(`${countOf("purpose")}項目を相談します`)).toBeInTheDocument();
   });
 
   it("十分な項目は質問の対象から外れ、ほかの項目として文脈に入る。スイッチをオフにすると戻る（FR-004）", async () => {
@@ -196,35 +200,25 @@ describe("US2：範囲を絞って壁打ちする", () => {
     const writeText = vi.spyOn(navigator.clipboard, "writeText");
     renderStrategyPage(StrategyPage, UnsavedChangesProvider);
     const panel = await openPanel(user);
-    expect(panel.getByText("20項目を相談します")).toBeInTheDocument();
+    expect(panel.getByText(`${countOf("sales") - 1}項目を相談します`)).toBeInTheDocument();
     await user.click(panel.getByRole("button", { name: "プロンプトをコピーする" }));
     const copied = writeText.mock.calls.at(-1)?.[0] ?? "";
     expect(copied).not.toContain(sparringBeginLine(labelOf("finalAction")));
     expect(copied).toContain(`- ${labelOf("finalAction")}: ${done}`);
 
     await user.click(panel.getByRole("switch", { name: "未入力と短めの項目だけにする" }));
-    expect(panel.getByText("21項目を相談します")).toBeInTheDocument();
+    expect(panel.getByText(`${countOf("sales")}項目を相談します`)).toBeInTheDocument();
   });
 
-  it("区分を1つにすると、その区分の数になる。すべて外すと押せない（FR-005）", async () => {
-    getStrategy.mockResolvedValue(strategyOf());
+  it("相談する項目がなければ、その旨を出してコピーできない（FR-005）", async () => {
+    getStrategy.mockResolvedValue(strategyOf({ toneNotes: proposalOf("toneNotes") }));
     renderStrategyPage(StrategyPage, UnsavedChangesProvider);
-    const panel = await openPanel();
-    const group = within(panel.getByRole("group", { name: "相談する区分" }));
-    for (const name of ["目的", "営業導線", "アカウント", "集客導線", "その他"]) {
-      await userEvent.click(group.getByRole("button", { name }));
-    }
-    expect(group.getByRole("button", { name: "人柄" })).toHaveAttribute("aria-pressed", "true");
-    expect(panel.getByText("1項目を相談します")).toBeInTheDocument();
-    await userEvent.click(group.getByRole("button", { name: "人柄" }));
-    expect(panel.getByText("この範囲には、相談する項目がありません")).toBeInTheDocument();
+    const panel = await openPanel(userEvent, "AIと考える（人柄）");
+    expect(panel.getByText("この区分には、相談する項目がありません")).toBeInTheDocument();
     expect(panel.getByRole("button", { name: "プロンプトをコピーする" })).toBeDisabled();
-    // 範囲を変えても、ボタンの名前は変わらない
-    expect(screen.getByRole("button", { name: OPEN })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "全体をAIと整理する" })).toBeInTheDocument();
   });
 
-  it("範囲を変えると、前のコピーの結果が消える（プロンプトが変わるため）", async () => {
+  it("スイッチを変えると、前のコピーの結果が消える（プロンプトが変わるため）", async () => {
     getStrategy.mockResolvedValue(strategyOf());
     const user = userEvent.setup();
     vi.spyOn(navigator.clipboard, "writeText").mockRejectedValueOnce(new Error("denied"));
@@ -232,22 +226,18 @@ describe("US2：範囲を絞って壁打ちする", () => {
     const panel = await openPanel(user);
     await user.click(panel.getByRole("button", { name: "プロンプトをコピーする" }));
     expect(panel.getByLabelText("プロンプト")).toBeInTheDocument();
-    await user.click(within(panel.getByRole("group", { name: "相談する区分" })).getByRole("button", { name: "目的" }));
+    await user.click(panel.getByRole("switch", { name: "未入力と短めの項目だけにする" }));
     expect(panel.queryByLabelText("プロンプト")).not.toBeInTheDocument();
-    expect(panel.queryByText("コピーできませんでした。全体を選んでコピーしてください")).not.toBeInTheDocument();
   });
 
-  it("閉じて開き直すと、範囲がはじめに戻る", async () => {
+  it("閉じて開き直すと、スイッチがはじめに戻る", async () => {
     getStrategy.mockResolvedValue(strategyOf());
     renderStrategyPage(StrategyPage, UnsavedChangesProvider);
     let panel = await openPanel();
     await userEvent.click(panel.getByRole("switch", { name: "未入力と短めの項目だけにする" }));
-    await userEvent.click(within(panel.getByRole("group", { name: "相談する区分" })).getByRole("button", { name: "目的" }));
-    await userEvent.click(screen.getByRole("button", { name: OPEN }));
-    await userEvent.click(screen.getByRole("button", { name: OPEN }));
-    panel = within(screen.getByRole("region", { name: "AIと壁打ち" }));
+    await userEvent.click(panel.getByRole("button", { name: "閉じる" }));
+    panel = await openPanel();
     expect(panel.getByRole("switch", { name: "未入力と短めの項目だけにする" })).toBeChecked();
-    expect(panel.getByText("21項目を相談します")).toBeInTheDocument();
   });
 });
 
@@ -281,7 +271,7 @@ describe("US3：反映する前に、案を見比べて選ぶ", () => {
     for (const b of panel.getAllByRole("checkbox")) expect(b).toBeChecked();
     await userEvent.click(panel.getByRole("button", { name: "すべて外す" }));
     expect(panel.getByText("2件中0件を選んでいます")).toBeInTheDocument();
-    expect(panel.getByRole("button", { name: "選んだ項目を反映する" })).toBeDisabled();
+    expect(applyButton(panel)).toBeDisabled();
   });
 
   it("上限を超える案に印を出し、反映はできるが保存できない（FR-018）", async () => {
@@ -290,7 +280,7 @@ describe("US3：反映する前に、案を見比べて選ぶ", () => {
     const panel = await openPanel();
     await paste(panel.getByLabelText("AIの答えを貼り付ける"), answerOf([[labelOf("finalAction"), "あ".repeat(2001)]]));
     expect(panel.getByText("2000文字を超えています。反映した後に短くしてください")).toBeInTheDocument();
-    await userEvent.click(panel.getByRole("button", { name: "選んだ項目を反映する" }));
+    await userEvent.click(applyButton(panel));
     expect(screen.getByRole("button", { name: "保存" })).toBeDisabled();
   });
 
@@ -299,18 +289,9 @@ describe("US3：反映する前に、案を見比べて選ぶ", () => {
     renderStrategyPage(StrategyPage, UnsavedChangesProvider);
     const panel = await openPanel();
     await paste(panel.getByLabelText("AIの答えを貼り付ける"), answerOf(entries(["realWorries", "finalAction"])));
-    await userEvent.click(panel.getByRole("button", { name: "選んだ項目を反映する" }));
+    await userEvent.click(applyButton(panel));
     expect(fieldBox("realWorries").getByLabelText(labelOf("realWorries"))).toHaveValue("お金が残らない");
     expect(fieldBox("finalAction").getByLabelText(labelOf("finalAction"))).toHaveValue(proposalOf("finalAction"));
-  });
-
-  it("貼ったあとに入力欄を直すと、候補の「今」も変わる（research.md R6）", async () => {
-    getStrategy.mockResolvedValue(strategyOf({ realWorries: "お金が残らない" }));
-    renderStrategyPage(StrategyPage, UnsavedChangesProvider);
-    const panel = await openPanel();
-    await paste(panel.getByLabelText("AIの答えを貼り付ける"), answerOf(entries(["realWorries"])));
-    await userEvent.type(fieldBox("realWorries").getByLabelText(labelOf("realWorries")), "。貯金もない");
-    expect(panel.getByText("お金が残らない。貯金もない")).toBeInTheDocument();
   });
 });
 
@@ -331,14 +312,13 @@ describe("US4：答えの形が崩れていても、読めた分だけ使う", (
       ),
     ).toBeInTheDocument();
     expect(panel.queryAllByRole("checkbox")).toHaveLength(0);
-    expect(panel.getByRole("button", { name: "選んだ項目を反映する" })).toBeDisabled();
+    expect(applyButton(panel)).toBeDisabled();
   });
 
   it("対象ではない名前を知らせ、範囲の外の項目も候補にする（FR-012・FR-013）", async () => {
     getStrategy.mockResolvedValue(strategyOf());
     renderStrategyPage(StrategyPage, UnsavedChangesProvider);
     const panel = await openPanel();
-    await userEvent.click(within(panel.getByRole("group", { name: "相談する区分" })).getByRole("button", { name: "営業導線" }));
     await paste(
       panel.getByLabelText("AIの答えを貼り付ける"),
       answerOf([

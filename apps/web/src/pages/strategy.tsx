@@ -10,6 +10,7 @@ import {
   TONE_PRESETS,
   SHORT_TIP,
   PURPOSE_KEYS,
+  SPARRING_SECTION_IDS,
   buildAxisPrompt,
   buildDeepenPrompt,
   buildOverallPrompt,
@@ -18,10 +19,11 @@ import {
   hintOf,
   type Strategy,
   type HintedKey,
+  type SparringSectionId,
   type StrategyValues,
   type TonePreset,
 } from "@threads-grower/shared";
-import { ChevronRightIcon, EllipsisIcon, SparklesIcon } from "lucide-react";
+import { EllipsisIcon, SparklesIcon } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 import { useLocation } from "react-router";
 import { toast } from "sonner";
@@ -34,7 +36,7 @@ import { DeepenPanel } from "@/components/strategy/DeepenPanel";
 import { FieldCheckBadge } from "@/components/strategy/FieldCheckBadge";
 import { HintPanel } from "@/components/strategy/HintPanel";
 import { ProgressCard } from "@/components/strategy/ProgressCard";
-import { SparringPanel } from "@/components/strategy/SparringPanel";
+import { SparringDialog, sparringTitle } from "@/components/strategy/SparringDialog";
 import { SectionChips, sectionElementId } from "@/components/strategy/SectionChips";
 import { BillingRequiredDialog } from "@/components/billing/BillingRequiredDialog";
 import { PageBody, PageHeader } from "@/components/layout/PageHeader";
@@ -110,13 +112,13 @@ function StrategyEditor({ accountId, initial }: { accountId: string; initial: St
   // 深掘りの欄に、まだ反映していない答えがあるか。あれば閉じる・切り替えの前に確かめる（PR #17 のCodexレビュー）
   const [deepenDirty, setDeepenDirty] = useState(false);
   const [confirmDeepen, setConfirmDeepen] = useState<{ next: string | null } | null>(null);
-  // 「AIと壁打ちして埋める」の欄（specs/018）。深掘りの欄とは別に持ち、同時に開ける
-  const [sparringOpen, setSparringOpen] = useState(false);
+  // 「AIと考える」のポップアップを開いている区分（specs/018。2026-11-04に区分ごとにした）。深掘りの欄とは別に持つ
+  const [sparringSection, setSparringSection] = useState<SparringSectionId | null>(null);
   const [sparringDirty, setSparringDirty] = useState(false);
   const [confirmSparring, setConfirmSparring] = useState(false);
   const closeSparring = () => {
     if (sparringDirty) return setConfirmSparring(true);
-    setSparringOpen(false);
+    setSparringSection(null);
   };
 
   // 深掘りの欄を開く・閉じる・切り替える
@@ -228,17 +230,6 @@ function StrategyEditor({ accountId, initial }: { accountId: string; initial: St
           actions={
             canEdit && (
               <>
-                {/* 開閉で文言を変えず、矢印の向きで示す（「全体をAIと整理する」と同じ見た目。specs/018 contracts/ui-routes.md） */}
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="h-10 rounded-full px-4"
-                  aria-expanded={sparringOpen}
-                  onClick={() => (sparringOpen ? closeSparring() : setSparringOpen(true))}
-                >
-                  <ChevronRightIcon className={cn("size-4 transition-transform", sparringOpen && "rotate-90")} aria-hidden="true" />
-                  AIと壁打ちして埋める
-                </Button>
                 <CopyPromptTrigger
                   variant="outline"
                   label="全体をAIと整理する"
@@ -254,26 +245,18 @@ function StrategyEditor({ accountId, initial }: { accountId: string; initial: St
                 state={overall.state}
                 copiedMessage="コピーしました。ChatGPTやClaudeに貼り付けて送ると、項目どうしの重複・矛盾・抜けを質問の形で返してくれます"
               />
-              {canEdit && sparringOpen && (
-                <SparringPanel
-                  values={values}
-                  check={check}
-                  onApply={(patch) => {
-                    setValues((v) => ({ ...v, ...patch }));
-                    setSparringDirty(false);
-                    setSparringOpen(false);
-                  }}
-                  onClose={closeSparring}
-                  onDirtyChange={setSparringDirty}
-                />
-              )}
+
             </>
           }
         />
         <div className="mt-9 space-y-11">
           {STRATEGY_SECTIONS.map((section) => (
             <section key={section.id} id={sectionElementId(section.id)} className="scroll-mt-36 space-y-5">
-              <h2 className="text-[17px] font-semibold">{section.title}</h2>
+              <div className="flex items-center gap-2">
+                <h2 className="min-w-0 flex-1 text-[17px] font-semibold">{section.title}</h2>
+                {/* 区分ごとに「AIと考える」（下書きは対象にしない。specs/018 FR-006）。押すとポップアップ */}
+                {canEdit && isSparringSection(section.id) && <ThinkButton section={section.id} onOpen={setSparringSection} />}
+              </div>
               {section.id === "purpose" && (
                 <p className="-mt-3 text-[13px] text-muted-foreground">
                   何のために発信するかを先に決めると、ほかの項目が書きやすくなります。ここに書いた内容も、投稿づくりの材料になります。
@@ -408,6 +391,20 @@ function StrategyEditor({ accountId, initial }: { accountId: string; initial: St
         </div>
       </PageBody>
 
+      {canEdit && sparringSection && (
+        <SparringDialog
+          section={sparringSection}
+          values={values}
+          check={check}
+          onApply={(patch) => {
+            setValues((v) => ({ ...v, ...patch }));
+            setSparringDirty(false);
+            setSparringSection(null);
+          }}
+          onRequestClose={closeSparring}
+          onDirtyChange={setSparringDirty}
+        />
+      )}
       <UnsavedChangesDialog
         open={confirmSparring}
         title="貼り付けたAIの答えがあります。破棄しますか？"
@@ -417,7 +414,7 @@ function StrategyEditor({ accountId, initial }: { accountId: string; initial: St
         onDiscard={() => {
           setConfirmSparring(false);
           setSparringDirty(false);
-          setSparringOpen(false);
+          setSparringSection(null);
         }}
       />
       <UnsavedChangesDialog
@@ -456,12 +453,40 @@ function StrategyEditor({ accountId, initial }: { accountId: string; initial: St
         onClose={() => {
           setBillingReason(null);
           setCanEdit(false);
-          // 読むだけになったら、壁打ちの欄も閉じる（直せないので、貼った答えは使えない）
-          setSparringOpen(false);
+          // 読むだけになったら、「AIと考える」も閉じる（直せないので、貼った答えは使えない）
+          setSparringSection(null);
           setSparringDirty(false);
         }}
       />
     </>
+  );
+}
+
+/**
+ * 「AIと考える」を置く区分か（下書きは対象にしない。specs/018 FR-006）。
+ * @param id - 区分の ID
+ * @returns 置くなら true
+ */
+function isSparringSection(id: string): id is SparringSectionId {
+  return (SPARRING_SECTION_IDS as readonly string[]).includes(id);
+}
+
+/**
+ * 区分の見出しの横の「AIと考える」（今ある「AIと壁打ちして埋める」と同じ枠線のボタン。押すとポップアップ）。
+ * @param props - section：区分、onOpen：開く
+ * @returns ボタン
+ */
+function ThinkButton({ section, onOpen }: { section: SparringSectionId; onOpen: (s: SparringSectionId) => void }) {
+  return (
+    <Button
+      type="button"
+      variant="outline"
+      className="h-9 shrink-0 rounded-full px-3.5 text-[13px]"
+      aria-label={sparringTitle(section)}
+      onClick={() => onOpen(section)}
+    >
+      AIと考える
+    </Button>
   );
 }
 
