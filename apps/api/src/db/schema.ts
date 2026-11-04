@@ -24,6 +24,9 @@ import {
 import {
   FEATURE_EVENT_ACTIONS,
   FEATURES,
+  IMAGE_STYLES,
+  LISTING_STATUSES,
+  MEDIA,
   POST_LENGTH_DEFAULTS,
   PROMOTION_RATIO_DEFAULT,
   PROMPT_COUNT_DEFAULT,
@@ -33,6 +36,7 @@ import {
   TEST_GROUP_CAPACITY_MIN,
   TEST_GROUP_EVENT_ACTIONS,
   TEST_GROUP_NAME_MAX,
+  type PromotionEvent,
 } from "@threads-grower/shared";
 
 const bytea = customType<{ data: Uint8Array; driverData: Uint8Array | string }>({
@@ -413,6 +417,8 @@ export const promotions = pgTable(
     priority: smallint("priority").notNull().default(0),
     status: promotionStatus("status").notNull().default("active"),
     validUntil: date("valid_until", { mode: "string" }),
+    // イベントの情報（specs/021 data-model.md。NULL＝なし。中身は shared の promotionEventSchema で確かめる）
+    event: jsonb("event").$type<PromotionEvent>(),
     version: versionColumn(),
     // 最後に保存した人（specs/008 research.md R8。保存の衝突で名前を出す）
     updatedByUserId: uuid("updated_by_user_id").references((): AnyPgColumn => users.id, { onDelete: "set null" }),
@@ -1168,5 +1174,64 @@ export const featureSettingEvents = pgTable(
     check("feature_setting_events_one_subject", sql`(${t.subjectUserId} IS NULL) <> (${t.subjectGroupId} IS NULL)`),
     index("feature_setting_events_created_idx").on(t.createdAt.desc()),
     index("feature_setting_events_subject_created_idx").on(t.subjectUserId, t.createdAt.desc()),
+  ],
+);
+
+// ---- 外部媒体展開（specs/021-external-media data-model.md）----
+
+/** 宣伝内容×媒体の掲載内容と状況。宣伝内容を消したら消す。 */
+export const promotionListings = pgTable(
+  "promotion_listings",
+  {
+    promotionId: uuid("promotion_id")
+      .notNull()
+      .references(() => promotions.id, { onDelete: "cascade" }),
+    accountId: uuid("account_id")
+      .notNull()
+      .references(() => accounts.id, { onDelete: "cascade" }),
+    media: text("media").notNull(),
+    status: text("status").notNull().default("not_started"),
+    postedUrl: text("posted_url"),
+    /** 欄の値（key → 値）。NULL＝まだ作っていない */
+    fields: jsonb("fields").$type<Record<string, string>>(),
+    /** 自動で直した内容 */
+    fixes: jsonb("fixes").$type<{ field: string; excerpt: string; reason: string }[]>(),
+    imageStyle: text("image_style").notNull().default("illustration"),
+    /** 作ったときの宣伝内容の version（research.md R8） */
+    sourceVersion: integer("source_version"),
+    generatedAt: timestamp("generated_at", { withTimezone: true, precision: 6 }),
+    version: versionColumn(),
+    updatedByUserId: uuid("updated_by_user_id").references((): AnyPgColumn => users.id, { onDelete: "set null" }),
+    ...timestamps,
+  },
+  (t) => [
+    primaryKey({ name: "promotion_listings_pkey", columns: [t.promotionId, t.media] }),
+    index("promotion_listings_account_idx").on(t.accountId),
+    check("promotion_listings_media_valid", sql`${t.media} IN (${inList(MEDIA)})`),
+    check("promotion_listings_status_valid", sql`${t.status} IN (${inList(LISTING_STATUSES)})`),
+    check("promotion_listings_image_style_valid", sql`${t.imageStyle} IN (${inList(IMAGE_STYLES)})`),
+    check(
+      "promotion_listings_posted_url_valid",
+      sql`${t.postedUrl} IS NULL OR (${t.postedUrl} ~ '^https?://' AND char_length(${t.postedUrl}) <= 2000)`,
+    ),
+  ],
+);
+
+/** Account×媒体の既定値（事務局名・連絡先など。spec FR-002）。Accountを消したら消す。 */
+export const mediaDefaults = pgTable(
+  "media_defaults",
+  {
+    accountId: uuid("account_id")
+      .notNull()
+      .references(() => accounts.id, { onDelete: "cascade" }),
+    media: text("media").notNull(),
+    values: jsonb("values").$type<Record<string, string>>().notNull().default({}),
+    version: versionColumn(),
+    updatedByUserId: uuid("updated_by_user_id").references((): AnyPgColumn => users.id, { onDelete: "set null" }),
+    updatedAt: timestamp("updated_at", { withTimezone: true, precision: 6 }).notNull().defaultNow(),
+  },
+  (t) => [
+    primaryKey({ name: "media_defaults_pkey", columns: [t.accountId, t.media] }),
+    check("media_defaults_media_valid", sql`${t.media} IN (${inList(MEDIA)})`),
   ],
 );

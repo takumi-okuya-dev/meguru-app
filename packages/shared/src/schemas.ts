@@ -44,6 +44,8 @@ import {
   POST_KIND_RATIO_STEP,
 } from "./limits";
 import { REJECT_REASON_CODES } from "./review";
+import { IMAGE_STYLES, LISTING_STATUSES, MEDIA } from "./media/types";
+import { EVENT_FORMATS, isEventDateTime, PREFECTURES } from "./promotion-event";
 import { isValidYmd, jstToday } from "./promotions";
 import { FRESHNESS_VALUES, POSTED_DATE_MODE_VALUES, REFERENCE_PLATFORM_VALUES } from "./research";
 import { PURPOSE_KEYS, STRATEGY_TEXT_KEYS, TONE_PRESET_VALUES, type PurposeKey, type StrategyTextKey } from "./strategy";
@@ -410,6 +412,34 @@ const itemMeta = { id: z.string(), version: z.number().int(), createdAt: z.strin
 /** 宣伝内容の状態のスキーマ。 */
 export const promotionStatusSchema = z.enum(["active", "paused", "ended"]);
 
+// 任意の文字（空・NULLは null にする）
+const nullableText = (max: number) =>
+  z
+    .string()
+    .nullable()
+    .transform((s) => (s === null || s.trim() === "" ? null : s.trim()))
+    .refine((s) => s === null || countChars(s) <= max, { message: `max ${max}` });
+
+/** 宣伝内容の「イベントの情報」（specs/021 data-model.md）。 */
+export const promotionEventSchema = z
+  .object({
+    startAt: z.string().refine(isEventDateTime, { message: "YYYY-MM-DDTHH:mm" }),
+    endAt: z.string().refine(isEventDateTime, { message: "YYYY-MM-DDTHH:mm" }).nullable().default(null),
+    format: z.enum(EVENT_FORMATS),
+    venueName: nullableText(100).default(null),
+    prefecture: z.enum(PREFECTURES).nullable().default(null),
+    address: nullableText(200).default(null),
+    building: nullableText(100).default(null),
+    station: nullableText(60).default(null),
+    capacity: z.number().int().min(1).max(100000).nullable().default(null),
+    feeYen: z.number().int().min(0).max(1000000).nullable().default(null),
+    feeNote: nullableText(500).default(null),
+    cancelPolicy: nullableText(1000).default(null),
+    audience: nullableText(300).default(null),
+    organizer: nullableText(100).default(null),
+  })
+  .refine((e) => e.endAt === null || e.endAt >= e.startAt, { message: "endAt before startAt", path: ["endAt"] });
+
 /** 宣伝内容の入力のスキーマ（contracts/api.md の PromotionInput）。 */
 export const promotionInputSchema = z.object({
   title: requiredText(SHORT_TEXT_MAX),
@@ -427,6 +457,8 @@ export const promotionInputSchema = z.object({
     .refine(isValidYmd, { message: "YYYY-MM-DD" })
     .nullable()
     .default(null),
+  /** イベントの情報（specs/021）。省けば今のまま、null で消す */
+  event: promotionEventSchema.nullable().optional(),
 });
 /** 宣伝内容の入力。 */
 export type PromotionInput = z.infer<typeof promotionInputSchema>;
@@ -438,6 +470,7 @@ export const updatePromotionRequestSchema = promotionInputSchema.extend({
 
 /** 宣伝内容（レスポンス）のスキーマ。 */
 export const promotionSchema = promotionInputSchema.extend({
+  event: promotionEventSchema.nullable(),
   ...itemMeta,
   isExpired: z.boolean(),
   isTargetable: z.boolean(),
@@ -1780,3 +1813,86 @@ export const featureSettingsListSchema = z.object({
 });
 /** 運営者の画面の、OFFの人の一覧と最近の変更。 */
 export type FeatureSettingsList = z.infer<typeof featureSettingsListSchema>;
+
+// ---- 外部媒体展開（specs/021-external-media contracts/api.md）----
+
+/** 媒体。 */
+export const mediaSchema = z.enum(MEDIA);
+/** 掲載の状況。 */
+export const listingStatusSchema = z.enum(LISTING_STATUSES);
+/** 自動で直した内容。 */
+export const listingFixSchema = z.object({ field: z.string(), excerpt: z.string(), reason: z.string() });
+
+/** GET /api/accounts/:accountId/external-media の応答。 */
+export const externalMediaListSchema = z.object({
+  promotions: z.array(
+    z.object({
+      id: z.string(),
+      title: z.string(),
+      version: z.number().int(),
+      event: promotionEventSchema.nullable(),
+      listings: z.array(z.object({ media: mediaSchema, status: listingStatusSchema, postedUrl: z.string().nullable() })),
+    }),
+  ),
+  canEdit: z.boolean(),
+});
+/** 外部媒体展開の一覧。 */
+export type ExternalMediaList = z.infer<typeof externalMediaListSchema>;
+
+/** 媒体ごとの掲載内容と状況。 */
+export const listingSchema = z.object({
+  status: listingStatusSchema,
+  postedUrl: z.string().nullable(),
+  imageStyle: z.enum(IMAGE_STYLES),
+  fields: z.record(z.string(), z.string()).nullable(),
+  fixes: z.array(listingFixSchema),
+  generatedAt: z.string().nullable(),
+  sourceVersion: z.number().int().nullable(),
+  version: z.number().int().nullable(),
+});
+/** 掲載内容と状況。 */
+export type Listing = z.infer<typeof listingSchema>;
+
+/** GET /api/accounts/:accountId/external-media/:promotionId/:media の応答。 */
+export const listingDetailSchema = z.object({
+  promotion: promotionSchema,
+  media: mediaSchema,
+  listing: listingSchema,
+  defaults: z.record(z.string(), z.string()),
+  sourceChanged: z.boolean(),
+  canEdit: z.boolean(),
+});
+/** 入力の画面の中身。 */
+export type ListingDetail = z.infer<typeof listingDetailSchema>;
+
+/** POST …/generate のリクエスト。 */
+export const listingGenerateRequestSchema = z.object({ expectedVersion: z.number().int().positive().nullable() });
+
+/** PUT …/:media のリクエスト（欄の key と上限は、APIが媒体の決まりで確かめる）。 */
+export const listingUpdateRequestSchema = z.object({
+  expectedVersion: z.number().int().positive().nullable(),
+  status: listingStatusSchema.optional(),
+  postedUrl: z
+    .string()
+    .nullable()
+    .optional()
+    .refine((s) => s === undefined || s === null || s === "" || (countChars(s) <= URL_MAX && isHttpUrl(s)), { message: "http(s) url" }),
+  imageStyle: z.enum(IMAGE_STYLES).optional(),
+  fields: z.record(z.string(), z.string()).optional(),
+});
+/** 掲載内容の保存のリクエスト。 */
+export type ListingUpdateRequest = z.infer<typeof listingUpdateRequestSchema>;
+
+/** 媒体の既定値（1つの媒体）。 */
+export const mediaDefaultsSchema = z.object({
+  media: mediaSchema,
+  values: z.record(z.string(), z.string()),
+  version: z.number().int().nullable(),
+});
+/** GET /api/accounts/:accountId/media-defaults の応答。 */
+export const mediaDefaultsListSchema = z.object({ items: z.array(mediaDefaultsSchema), canEdit: z.boolean() });
+/** PUT /api/accounts/:accountId/media-defaults/:media のリクエスト。 */
+export const mediaDefaultsUpdateSchema = z.object({
+  expectedVersion: z.number().int().positive().nullable(),
+  values: z.record(z.string(), z.string().max(500)),
+});

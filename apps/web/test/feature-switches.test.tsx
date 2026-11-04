@@ -108,7 +108,7 @@ describe("サイドバー", () => {
     renderShell();
     const n = await nav();
     await n.findByRole("link", { name: /飲食チーム/ });
-    expect(links(n)).toEqual(["ホーム", "投稿をつくる", "投稿ストック", "パフォーマンス", "課題", "宣伝内容", "リサーチ", "飲飲食チーム3人"]);
+    expect(links(n)).toEqual(["ホーム", "投稿をつくる", "投稿ストック", "パフォーマンス", "課題", "宣伝内容", "外部媒体展開", "リサーチ", "飲飲食チーム3人"]);
     expect(n.getByText("自動投稿")).toBeInTheDocument();
     expect(n.getByText("戦略")).toBeInTheDocument();
     expect(n.queryByText("分析")).toBeNull();

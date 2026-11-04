@@ -12,6 +12,7 @@ import {
   PanelLeftIcon,
   PlusIcon,
   SearchIcon,
+  Share2Icon,
   SlidersHorizontalIcon,
   SquarePenIcon,
   TargetIcon,
@@ -55,6 +56,7 @@ const NAV_GROUPS: NavGroup[] = [
     items: [
       { path: "strategy", label: "課題", Icon: TargetIcon },
       { path: "promotions", label: "宣伝内容", Icon: MegaphoneIcon },
+      { path: "external-media", label: "外部媒体展開", Icon: Share2Icon },
       { path: "research", label: "リサーチ", Icon: SearchIcon },
     ],
   },

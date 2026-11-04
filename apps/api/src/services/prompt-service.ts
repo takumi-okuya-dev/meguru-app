@@ -102,6 +102,8 @@ function toPromptPromotion(r: PromotionRow): PromptPromotion {
     targetAgeRange: r.targetAgeRange ?? "",
     cta: r.cta ?? "",
     linkedUrl: r.linkedUrl,
+    // イベントの情報（specs/021 FR-001a）。あるときだけプロンプトに1行が入る
+    event: r.event ?? null,
   };
 }
 
