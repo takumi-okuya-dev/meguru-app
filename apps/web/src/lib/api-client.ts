@@ -24,10 +24,17 @@ import {
   teamDetailSchema,
   teamStatusSchema,
   externalMediaListSchema,
+  analysisResponseSchema,
+  analysisSettingsResponseSchema,
+  classificationsResponseSchema,
+  classificationsSaveResponseSchema,
   listingDetailSchema,
   mediaDefaultsListSchema,
   mediaDefaultsSchema,
   type ListingUpdateRequest,
+  type AnalysisScope,
+  type AnalysisSettingsRequest,
+  type ClassificationsRequest,
   type Media,
   teamInviteSchema,
   accountSummarySchema,
@@ -425,6 +432,21 @@ export const api = {
     }),
   deletePromotion: (accountId: string, id: string) =>
     request(`/api/accounts/${accountId}/promotions/${id}`, null, { method: "DELETE" }),
+  // アルゴリズムの解析（specs/022 contracts/api.md）
+  analysis: (accountId: string, scope: AnalysisScope) =>
+    request(`/api/accounts/${accountId}/analysis?scope=${scope}`, analysisResponseSchema),
+  patchAnalysisSettings: (accountId: string, body: AnalysisSettingsRequest) =>
+    request(`/api/accounts/${accountId}/analysis/settings`, analysisSettingsResponseSchema, {
+      method: "PATCH",
+      body: JSON.stringify(body),
+    }),
+  classifications: (accountId: string, mode: "unclassified" | "classified") =>
+    request(`/api/accounts/${accountId}/analysis/classifications?mode=${mode}`, classificationsResponseSchema),
+  putClassifications: (accountId: string, body: ClassificationsRequest) =>
+    request(`/api/accounts/${accountId}/analysis/classifications`, classificationsSaveResponseSchema, {
+      method: "PUT",
+      body: JSON.stringify(body),
+    }),
   // 外部媒体展開（specs/021 contracts/api.md）
   externalMedia: (accountId: string) => request(`/api/accounts/${accountId}/external-media`, externalMediaListSchema),
   listing: (accountId: string, promotionId: string, media: Media) =>

@@ -48,6 +48,10 @@ export const queryKeys = {
   strategy: (id: string) => ["account", id, "strategy"] as const,
   promotions: (id: string) => ["account", id, "promotions"] as const,
   externalMedia: (id: string) => ["account", id, "external-media"] as const,
+  // アルゴリズムの解析（specs/022）。取り直しは ["account", id, "analysis"] の範囲で行う
+  analysis: (id: string, scope: string) => ["account", id, "analysis", scope] as const,
+  analysisAll: (id: string) => ["account", id, "analysis"] as const,
+  classifications: (id: string, mode: string) => ["account", id, "analysis", "classifications", mode] as const,
   listing: (id: string, promotionId: string, media: string) => ["account", id, "external-media", promotionId, media] as const,
   mediaDefaults: (id: string) => ["account", id, "media-defaults"] as const,
   promotionSettings: (id: string) => ["account", id, "promotion-settings"] as const,

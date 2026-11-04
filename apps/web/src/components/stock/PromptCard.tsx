@@ -35,6 +35,7 @@ function reviewSummary(summary: PromptSummary): string {
     summary.ngWordCount > 0 ? `・NGワード ${summary.ngWordCount}語` : "",
     summary.rejectedCount > 0 ? `・却下 ${summary.rejectedCount}件` : "",
     summary.poorPostCount > 0 ? `・反応が低かった投稿 ${summary.poorPostCount}件` : "",
+    summary.trendCount > 0 ? `・伸びた傾向 ${summary.trendCount}つ` : "",
   ].join("");
 }
 

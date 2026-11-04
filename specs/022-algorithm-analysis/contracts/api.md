@@ -36,7 +36,7 @@
     } | null;
   };
   schedule: { slotTimes: string[] };          // 今の投稿の時刻（HH:mm）。「自動投稿の時刻の見直しの参考に」
-  settings: { trendsInPrompt: boolean; themes: { id: string; name: string }[]; version: number };
+  settings: { trendsInPrompt: boolean; themes: { id: string; name: string }[]; version: number | null }; // null＝まだ保存していない
   canEdit: boolean;         // content があるか
 }
 
@@ -47,6 +47,7 @@ type CompareValues = {
 ```
 
 - 未接続のアカウントでも返す（確定した投稿が0件なら `needMore` が20）。
+- `totals.promo` は、選んだ範囲によらず期間の全体で数える。
 - 投稿の本文は、おすすめに乗った目安の `head`（初めの40文字）だけを返す。
 
 ## PATCH /api/accounts/:accountId/analysis/settings
@@ -55,12 +56,12 @@ type CompareValues = {
 
 ```ts
 // 入力（analysisSettingsRequestSchema）
-{ version: number; trendsInPrompt?: boolean; themes?: { id?: string; name: string }[] }
+{ expectedVersion: number | null; trendsInPrompt?: boolean; themes?: { id?: string; name: string }[] }  // 021の既定値と同じ書き方
 // 応答
 { settings: { trendsInPrompt: boolean; themes: { id: string; name: string }[]; version: number } }
 ```
 
-- 行がないときの `version` は 1（初めの値の版）。合わなければ `STALE_UPDATE`（409）。
+- 行がないときは `expectedVersion: null`。今の版と合わなければ `STALE_UPDATE`（409。`details` なしで、今の設定を返す）。
 - `themes` は10個まで、名前は前後の空白を除いて1〜20文字、重なりは `VALIDATION_FAILED`。`id` のないものは新しいid（`t`＋英数字）を付ける。前の一覧にあって今回ないidは消したものとして、そのテーマの分類の `theme_id` をNULLにする（同じトランザクション）。
 - 操作の記録：`analysis_settings_updated`（`kind: "content"`）。
 
