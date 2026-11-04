@@ -1,7 +1,7 @@
 // 解析（/accounts/:accountId/analysis。specs/022-algorithm-analysis contracts/ui-routes.md、モック https://claude.ai/artifact/5GK8yF32kwsAqPVU1SaT8A ）。
 // 計算はAPI（shared の analyzePosts）で行い、画面は出すだけ。説明は閉じたトグルに置く（FR-064）。
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { AnalysisScope } from "@threads-grower/shared";
+import type { AnalysisResponse, AnalysisScope } from "@threads-grower/shared";
 import { useState } from "react";
 import { useSearchParams } from "react-router";
 import { toast } from "sonner";
@@ -66,7 +66,9 @@ export function AnalysisPage() {
   const toggle = useMutation({
     mutationFn: (on: boolean) =>
       api.patchAnalysisSettings(account.id, { expectedVersion: query.data?.settings.version ?? null, trendsInPrompt: on }),
-    onSuccess: () => {
+    onSuccess: (res) => {
+      // 続けて切り替えても古い版を送らないよう、保存した設定をすぐ入れる
+      queryClient.setQueryData<AnalysisResponse>(queryKeys.analysis(account.id, scope), (d) => (d ? { ...d, settings: res.settings } : d));
       void queryClient.invalidateQueries({ queryKey: queryKeys.analysisAll(account.id) });
       void queryClient.invalidateQueries({ queryKey: queryKeys.promptAll(account.id) });
     },

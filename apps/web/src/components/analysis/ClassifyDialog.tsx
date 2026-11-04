@@ -85,16 +85,22 @@ function ClassSelects({
 
 /**
  * テーマの一覧（タグ）と、直す欄。
- * @param props - accountId：Account、themes：今のテーマ、version：設定の版、canSave：保存できるか
+ * @param props - accountId：Account、themes：今のテーマ、version：設定の版
  * @returns テーマの一覧
  */
 function ThemeEditor({ accountId, themes, version }: { accountId: string; themes: readonly AnalysisTheme[]; version: number | null }) {
   const queryClient = useQueryClient();
   const [editing, setEditing] = useState<{ id?: string; name: string }[] | null>(null);
+  // 保存したあと、画面の読み直しを待たずに続けて保存しても古い版を送らない
+  const [savedVersion, setSavedVersion] = useState<number | null | undefined>(undefined);
   const save = useMutation({
     mutationFn: (next: { id?: string; name: string }[]) =>
-      api.patchAnalysisSettings(accountId, { expectedVersion: version, themes: next.filter((t) => t.name.trim() !== "") }),
-    onSuccess: () => {
+      api.patchAnalysisSettings(accountId, {
+        expectedVersion: savedVersion === undefined ? version : savedVersion,
+        themes: next.filter((t) => t.name.trim() !== ""),
+      }),
+    onSuccess: (res) => {
+      setSavedVersion(res.settings.version);
       setEditing(null);
       void queryClient.invalidateQueries({ queryKey: queryKeys.analysisAll(accountId) });
     },
