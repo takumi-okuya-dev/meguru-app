@@ -11,6 +11,7 @@ import {
   PROMPT_REFERENCE_POSTS,
   PROMPT_REJECTED_DRAFTS,
 } from "./limits";
+import { formatRatio } from "./performance";
 import { POLICY_PROMPT_RULES } from "./policy";
 import { FRESHNESS_LEVELS, REFERENCE_PLATFORMS, type Freshness, type ReferenceMetrics, type ReferencePlatform } from "./research";
 import type { PostLengthSettings, PromptSummary } from "./schemas";
@@ -51,6 +52,9 @@ export type PromptRejectedDraft = { body: string; reasonLabels: string[]; note: 
 /** 反応が低かった投稿（006 FR-026）。本文と傾向メモ。 */
 export type PromptPoorPost = { body: string; memo: string | null };
 
+/** 伸びた傾向（specs/022 contracts/analysis.md「プロンプトの節」）。 */
+export type PromptTrend = { text: string; count: number; ratio: number };
+
 /** buildPrompt の入力（contracts/prompt-template.md「入力」）。 */
 export type PromptInput = {
   /** 作る件数（1〜50） */
@@ -75,6 +79,8 @@ export type PromptInput = {
   dailyPostCount?: number;
   /** 反応が低かった投稿。投稿の新しい順で、呼び出し側が最大 PROMPT_POOR_POSTS 件にする（006 FR-026）。省略は [] */
   poorPosts?: PromptPoorPost[];
+  /** 伸びた傾向。呼び出し側が trendsForPrompt で選ぶ（specs/022 FR-040）。省略は [] */
+  trends?: PromptTrend[];
   /** 今日の日付（日本時間、YYYY-MM-DD）。宣伝内容の残り日数に使う。省略すると残り日数を書かない（014 FR-114） */
   today?: string;
   /** 文字数と長さの割合。省略は POST_LENGTH_DEFAULTS（014 FR-140・FR-171） */
@@ -583,6 +589,8 @@ function assemble(
     rejected.length > 0 ? rejectedSection(rejected) : null,
     // 長さの調整で減らさない（006 contracts/prompt-template.md、Constitution原則VI）
     (input.poorPosts ?? []).length > 0 ? poorSection(input.poorPosts!) : null,
+    // 伸びた傾向（specs/022 FR-040）。短いので長さの調整で減らさない
+    (input.trends ?? []).length > 0 ? trendSection(input.trends!) : null,
     posts.length > 0 ? researchSection(c, posts) : null,
     dedupeSection(c.count, drafts, rejected.length > 0),
     lengthMixSection(c),
@@ -683,6 +691,7 @@ export function buildPrompt(input: PromptInput): {
       rejectedCount: rejected.length,
       dailyPostCount: input.dailyPostCount ?? 0,
       poorPostCount: (input.poorPosts ?? []).length,
+      trendCount: (input.trends ?? []).length,
     },
   };
 }
@@ -697,5 +706,17 @@ function poorSection(posts: PromptPoorPost[]): string {
   return [
     "■反応が低かった投稿(このアカウントで閲覧数が基準の半分以下だった投稿。同じ書き方・切り口は避けること)",
     ...items,
+  ].join("\n");
+}
+
+/**
+ * 「■伸びた傾向」の節（specs/022 contracts/analysis.md「プロンプトの節」、research.md R7）。
+ * @param trends - 伸びた傾向（倍率の大きい順）
+ * @returns 節の文面
+ */
+function trendSection(trends: PromptTrend[]): string {
+  return [
+    "■伸びた傾向(取りためた反応数から見た傾向。合わせすぎず、人柄とCORE RULESを優先すること)",
+    ...trends.map((t) => `・${t.text}(${t.count}件。閲覧の中央値が、ほかの投稿の${formatRatio(t.ratio)}倍)`),
   ].join("\n");
 }

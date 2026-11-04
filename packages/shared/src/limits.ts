@@ -278,3 +278,23 @@ export const TEST_GROUP_EVENTS_LIMIT = 50;
 export const REFERRAL_REMEMBER_DAYS = 30;
 /** 紹介の文字列の形（「r_」＋16バイトの base64url 22文字）。画面とAPIで同じ形を使う。 */
 export const REFERRAL_CODE_PATTERN = /^r_[A-Za-z0-9_-]{22}$/;
+
+// アルゴリズムの解析（specs/022-algorithm-analysis data-model.md「共有の定数」）。しきい値は仮の値（spec Assumptions）
+/** 解析の期間（日。FR-001）。 */
+export const ANALYSIS_PERIOD_DAYS = 90;
+/** 表と傾向を出す最小の件数（research.md R11）。 */
+export const ANALYSIS_MIN_TOTAL = 20;
+/** 区切りの件数のしきい値（FR-011・FR-030）。 */
+export const ANALYSIS_MIN_BUCKET = 10;
+/** 傾向にする中央値の差（倍。FR-030）。 */
+export const ANALYSIS_TREND_RATIO = 1.5;
+/** おすすめに乗った目安の上位の割合（FR-020）。 */
+export const ANALYSIS_RECOMMENDED_TOP = 0.2;
+/** 傾向の数の上限（FR-040）。 */
+export const ANALYSIS_MAX_TRENDS = 5;
+/** 分類のプロンプトに入れる投稿の数（FR-051）。 */
+export const ANALYSIS_CLASSIFY_BATCH = 50;
+/** テーマの数の上限（FR-050）。 */
+export const ANALYSIS_THEMES_MAX = 10;
+/** テーマの名前の上限（文字）。 */
+export const ANALYSIS_THEME_NAME_MAX = 20;

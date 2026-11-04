@@ -42,8 +42,12 @@ import {
   POST_KIND_LENGTH_MAX,
   POST_KIND_LENGTH_STEP,
   POST_KIND_RATIO_STEP,
+  ANALYSIS_CLASSIFY_BATCH,
+  ANALYSIS_THEME_NAME_MAX,
+  ANALYSIS_THEMES_MAX,
 } from "./limits";
 import { REJECT_REASON_CODES } from "./review";
+import { OPENING_TYPES } from "./analysis/types";
 import { IMAGE_STYLES, LISTING_STATUSES, MEDIA } from "./media/types";
 import { EVENT_FORMATS, isEventDateTime, PREFECTURES } from "./promotion-event";
 import { isValidYmd, jstToday } from "./promotions";
@@ -930,6 +934,8 @@ export const promptSummarySchema = z.object({
   dailyPostCount: z.number().int(),
   /** 含めた反応が低かった投稿の件数（006） */
   poorPostCount: z.number().int(),
+  /** 含めた伸びた傾向の数（022） */
+  trendCount: z.number().int(),
 });
 /** プロンプトに実際に含めた内容の要約。 */
 export type PromptSummary = z.infer<typeof promptSummarySchema>;
@@ -1896,3 +1902,172 @@ export const mediaDefaultsUpdateSchema = z.object({
   expectedVersion: z.number().int().positive().nullable(),
   values: z.record(z.string(), z.string().max(500)),
 });
+
+// ---- アルゴリズムの解析（specs/022-algorithm-analysis contracts/api.md）----
+
+/** テーマのid（`t`＋英数字）。 */
+export const ANALYSIS_THEME_ID_PATTERN = /^t[0-9a-z]{1,8}$/;
+const themeIdSchema = z.string().regex(ANALYSIS_THEME_ID_PATTERN);
+/** 書き出しの型のスキーマ。 */
+export const openingTypeSchema = z.enum(OPENING_TYPES);
+const themeSchema = z.object({ id: themeIdSchema, name: z.string() });
+
+/** GET …/analysis のクエリ。 */
+export const analysisQuerySchema = z.object({ scope: z.enum(["all", "regular"]).default("all") });
+/** 解析の範囲（すべて・ふだんの投稿）。 */
+export type AnalysisScope = z.infer<typeof analysisQuerySchema>["scope"];
+
+/** テーマの一覧の入力（10個まで、名前は前後の空白を除いて1〜20文字、重ならない。data-model.md）。 */
+export const analysisThemesSchema = z
+  .array(
+    z.object({
+      id: themeIdSchema.optional(),
+      name: z
+        .string()
+        .transform((s) => s.trim())
+        .refine((s) => countChars(s) >= 1 && countChars(s) <= ANALYSIS_THEME_NAME_MAX, { message: `1-${ANALYSIS_THEME_NAME_MAX}` }),
+    }),
+  )
+  .max(ANALYSIS_THEMES_MAX)
+  .superRefine((items, ctx) => {
+    const names = new Set<string>();
+    const ids = new Set<string>();
+    items.forEach((t, i) => {
+      if (names.has(t.name)) ctx.addIssue({ code: "custom", path: [i, "name"], message: "duplicate" });
+      names.add(t.name);
+      if (t.id) {
+        if (ids.has(t.id)) ctx.addIssue({ code: "custom", path: [i, "id"], message: "duplicate" });
+        ids.add(t.id);
+      }
+    });
+  });
+
+/** 解析の設定（応答）。`version` が null＝まだ保存していない（初めの値）。 */
+export const analysisSettingsSchema = z.object({
+  trendsInPrompt: z.boolean(),
+  themes: z.array(themeSchema),
+  version: z.number().int().nullable(),
+});
+/** 解析の設定。 */
+export type AnalysisSettings = z.infer<typeof analysisSettingsSchema>;
+
+/** PATCH …/analysis/settings のリクエスト。 */
+export const analysisSettingsRequestSchema = z
+  .object({
+    expectedVersion: z.number().int().positive().nullable(),
+    trendsInPrompt: z.boolean().optional(),
+    themes: analysisThemesSchema.optional(),
+  })
+  .refine((v) => v.trendsInPrompt !== undefined || v.themes !== undefined, { message: "nothing to update" });
+/** 解析の設定の保存のリクエスト。 */
+export type AnalysisSettingsRequest = z.infer<typeof analysisSettingsRequestSchema>;
+/** PATCH …/analysis/settings の応答。 */
+export const analysisSettingsResponseSchema = z.object({ settings: analysisSettingsSchema });
+
+const bucketMarkSchema = z.enum(["few", "untried"]).nullable();
+const bucketRowSchema = z.object({
+  key: z.string(),
+  label: z.string(),
+  count: z.number().int(),
+  views: z.number().nullable(),
+  engagementRate: z.number().nullable(),
+  replyRate: z.number().nullable(),
+  mark: bucketMarkSchema,
+});
+const sideSchema = z.object({ count: z.number().int(), views: z.number().nullable() });
+const compareSchema = z.object({
+  count: z.number().int(),
+  firstSpeed: z.number().nullable(),
+  laterGrowth: z.number().nullable(),
+  replyRate: z.number().nullable(),
+  length: z.number().nullable(),
+  questionCount: z.number().int(),
+});
+
+/** GET …/analysis の応答。 */
+export const analysisResponseSchema = z.object({
+  period: z.object({ from: z.string(), to: z.string(), days: z.number().int() }),
+  scope: z.enum(["all", "regular"]),
+  totals: z.object({
+    confirmed: z.number().int(),
+    promo: z.number().int(),
+    withFollowers: z.number().int(),
+    classified: z.number().int(),
+  }),
+  needMore: z.number().int().nullable(),
+  trends: z.array(
+    z.object({
+      dimension: z.enum(["time", "day", "length", "feature", "opening", "theme"]),
+      key: z.string(),
+      text: z.string(),
+      count: z.number().int(),
+      views: z.number(),
+      otherCount: z.number().int(),
+      otherViews: z.number(),
+      ratio: z.number(),
+      promptable: z.boolean(),
+    }),
+  ),
+  time: z.array(bucketRowSchema),
+  day: z.array(bucketRowSchema),
+  length: z.array(bucketRowSchema),
+  features: z.array(
+    z.object({ key: z.string(), label: z.string(), with: sideSchema, without: sideSchema, ratio: z.number().nullable(), mark: bucketMarkSchema }),
+  ),
+  opening: z.array(bucketRowSchema),
+  theme: z.array(bucketRowSchema),
+  recommended: z.object({
+    available: z.boolean(),
+    posts: z.array(
+      z.object({
+        id: z.string(),
+        head: z.string(),
+        publishedAt: z.string(),
+        views: z.number(),
+        spread: z.number(),
+        firstSpeed: z.number().nullable(),
+        laterGrowth: z.number().nullable(),
+        replyRate: z.number().nullable(),
+      }),
+    ),
+    compare: z.object({ recommended: compareSchema, others: compareSchema }).nullable(),
+  }),
+  schedule: z.object({ slotTimes: z.array(z.string()) }),
+  settings: analysisSettingsSchema,
+  canEdit: z.boolean(),
+});
+/** 解析の画面のデータ。 */
+export type AnalysisResponse = z.infer<typeof analysisResponseSchema>;
+
+/** GET …/analysis/classifications のクエリ。 */
+export const classificationsQuerySchema = z.object({ mode: z.enum(["unclassified", "classified"]).default("unclassified") });
+
+/** GET …/analysis/classifications の応答。 */
+export const classificationsResponseSchema = z.object({
+  posts: z.array(
+    z.object({
+      draftId: z.string(),
+      body: z.string(),
+      publishedAt: z.string(),
+      openingType: openingTypeSchema.nullable(),
+      themeId: z.string().nullable(),
+    }),
+  ),
+  remaining: z.number().int(),
+  themes: z.array(themeSchema),
+});
+/** 分類する投稿の一覧。 */
+export type ClassificationsResponse = z.infer<typeof classificationsResponseSchema>;
+
+/** PUT …/analysis/classifications のリクエスト（1〜50件）。 */
+export const classificationsRequestSchema = z.object({
+  source: z.enum(["ai", "manual"]),
+  items: z
+    .array(z.object({ draftId: z.string().uuid(), openingType: openingTypeSchema, themeId: themeIdSchema.nullable() }))
+    .min(1)
+    .max(ANALYSIS_CLASSIFY_BATCH),
+});
+/** 分類の保存のリクエスト。 */
+export type ClassificationsRequest = z.infer<typeof classificationsRequestSchema>;
+/** PUT …/analysis/classifications の応答。 */
+export const classificationsSaveResponseSchema = z.object({ saved: z.number().int(), skipped: z.array(z.string()) });

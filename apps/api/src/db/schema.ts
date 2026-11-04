@@ -26,6 +26,7 @@ import {
   FEATURES,
   IMAGE_STYLES,
   LISTING_STATUSES,
+  OPENING_TYPES,
   MEDIA,
   POST_LENGTH_DEFAULTS,
   PROMOTION_RATIO_DEFAULT,
@@ -36,6 +37,7 @@ import {
   TEST_GROUP_CAPACITY_MIN,
   TEST_GROUP_EVENT_ACTIONS,
   TEST_GROUP_NAME_MAX,
+  type AnalysisTheme,
   type PromotionEvent,
 } from "@threads-grower/shared";
 
@@ -1233,5 +1235,47 @@ export const mediaDefaults = pgTable(
   (t) => [
     primaryKey({ name: "media_defaults_pkey", columns: [t.accountId, t.media] }),
     check("media_defaults_media_valid", sql`${t.media} IN (${inList(MEDIA)})`),
+  ],
+);
+
+// ---- アルゴリズムの解析（specs/022-algorithm-analysis data-model.md）----
+
+/** Accountの解析の設定。行がなければ初めの値（傾向をプロンプトに入れる・テーマなし）。 */
+export const analysisSettings = pgTable("analysis_settings", {
+  accountId: uuid("account_id")
+    .primaryKey()
+    .references(() => accounts.id, { onDelete: "cascade" }),
+  trendsInPrompt: boolean("trends_in_prompt").notNull().default(true),
+  /** テーマの一覧（中身は shared の analysisThemesSchema で確かめる） */
+  themes: jsonb("themes").$type<AnalysisTheme[]>().notNull().default([]),
+  version: versionColumn(),
+  updatedByUserId: uuid("updated_by_user_id").references((): AnyPgColumn => users.id, { onDelete: "set null" }),
+  updatedAt: timestamp("updated_at", { withTimezone: true, precision: 6 }).notNull().defaultNow(),
+});
+
+const CLASSIFICATION_SOURCES = ["ai", "manual"] as const;
+
+/** 投稿の内容の分類（書き出しの型・テーマ）。投稿を消したら消す。 */
+export const postClassifications = pgTable(
+  "post_classifications",
+  {
+    draftId: uuid("draft_id")
+      .primaryKey()
+      .references(() => postDrafts.id, { onDelete: "cascade" }),
+    accountId: uuid("account_id")
+      .notNull()
+      .references(() => accounts.id, { onDelete: "cascade" }),
+    openingType: text("opening_type").notNull(),
+    /** analysis_settings.themes の id。NULL＝テーマなし */
+    themeId: text("theme_id"),
+    source: text("source").notNull(),
+    updatedByUserId: uuid("updated_by_user_id").references((): AnyPgColumn => users.id, { onDelete: "set null" }),
+    updatedAt: timestamp("updated_at", { withTimezone: true, precision: 6 }).notNull().defaultNow(),
+  },
+  (t) => [
+    index("post_classifications_account_idx").on(t.accountId),
+    check("post_classifications_opening_type_valid", sql`${t.openingType} IN (${inList(OPENING_TYPES)})`),
+    check("post_classifications_theme_id_valid", sql`${t.themeId} IS NULL OR ${t.themeId} ~ '^t[0-9a-z]{1,8}$'`),
+    check("post_classifications_source_valid", sql`${t.source} IN (${inList(CLASSIFICATION_SOURCES)})`),
   ],
 );

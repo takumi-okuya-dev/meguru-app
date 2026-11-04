@@ -700,3 +700,48 @@ describe("宣伝内容のイベントの情報（specs/021 FR-001a・research.md
     expect(a).not.toContain("(イベント:");
   });
 });
+
+describe("伸びた傾向の節（specs/022 contracts/analysis.md「プロンプトの節」、T027）", () => {
+  const HEADING = "■伸びた傾向(取りためた反応数から見た傾向。合わせすぎず、人柄とCORE RULESを優先すること)";
+  const trends = [
+    { text: "最後に問いかけがある投稿が伸びやすい", count: 20, ratio: 1.92 },
+    { text: "「あるある」の書き出しが伸びやすい", count: 11, ratio: 1.68 },
+  ];
+
+  it("低調の節の後・リサーチの節の前に、件数と倍率つきで入る", () => {
+    const { prompt, summary } = buildPrompt(
+      input({
+        trends,
+        poorPosts: [{ body: "低調", memo: null }],
+        referencePosts: [{ body: "参考", keyword: "", whyGood: "" }],
+      }),
+    );
+    const at = prompt.indexOf(HEADING);
+    expect(at).toBeGreaterThan(prompt.indexOf("■反応が低かった投稿"));
+    expect(at).toBeLessThan(prompt.indexOf("■リサーチで見つけた"));
+    expect(prompt).toContain(
+      `${HEADING}\n・最後に問いかけがある投稿が伸びやすい(20件。閲覧の中央値が、ほかの投稿の1.9倍)\n・「あるある」の書き出しが伸びやすい(11件。閲覧の中央値が、ほかの投稿の1.7倍)`,
+    );
+    expect(summary.trendCount).toBe(2);
+  });
+
+  it("傾向が空・省略なら、文は本featureの前と同じ（SC-004）", () => {
+    expect(buildPrompt(input({ trends: [] })).prompt).toBe(buildPrompt(input()).prompt);
+    expect(buildPrompt(input()).prompt).not.toContain("■伸びた傾向");
+    expect(buildPrompt(input()).summary.trendCount).toBe(0);
+  });
+
+  it("長さの調整で減らさない", () => {
+    const long = "あ".repeat(800);
+    const { prompt, summary } = buildPrompt(
+      input({
+        trends,
+        recentDrafts: Array.from({ length: 20 }, () => long),
+        rejectedDrafts: Array.from({ length: 10 }, () => ({ body: long, reasonLabels: ["抽象的"], note: null })),
+        referencePosts: Array.from({ length: 10 }, () => ({ body: long, keyword: "", whyGood: "" })) }),
+    );
+    expect(summary.recentDraftCount).toBeLessThan(20);
+    expect(summary.trendCount).toBe(2);
+    expect(prompt).toContain(HEADING);
+  });
+});
