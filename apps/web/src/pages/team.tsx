@@ -4,7 +4,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { TEAM_NAME_MAX, countChars, errorMessage, type TeamDetail, type TeamMember } from "@threads-grower/shared";
 import { ChevronRightIcon, EllipsisIcon, PlusIcon, UsersIcon, XIcon } from "lucide-react";
-import { useState } from "react";
+import { useId, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
 import { toast } from "sonner";
 import { ApiErrorScreen } from "@/components/ApiErrorScreen";
@@ -179,6 +179,50 @@ function RenameDialog({
   );
 }
 
+const ROLE_HELP: { title: string; points: string[] }[] = [
+  { title: "オーナー（アカウントの持ち主）", points: ["自分のアカウントでは、誰でもオーナー", "承認・設定・支払いは、オーナーだけ"] },
+  { title: "メンバー", points: ["見せているアカウントの、投稿ストックと戦略を読める", "招待リンクから入った人は、まずメンバー"] },
+  { title: "編集者", points: ["メンバーと同じく読める", "担当のアカウントで、投稿の案を作る・直す", "承認と設定はできない"] },
+  { title: "ロールの切り替え", points: ["管理者がいつでも切り替えられる", "切り替えても、アカウントの持ち主は変わらない"] },
+];
+
+/**
+ * ロールの説明。初めは閉じていて、押すと箇条書きで開く（課題の「考えるヒント」と同じ形。docs/ui-design.md §6）。
+ * @returns 開閉のボタンと説明
+ */
+function RoleHelp() {
+  const [open, setOpen] = useState(false);
+  const panelId = useId();
+  return (
+    <div className="space-y-2">
+      <button
+        type="button"
+        aria-expanded={open}
+        aria-controls={panelId}
+        onClick={() => setOpen((v) => !v)}
+        className="inline-flex h-9 items-center gap-1.5 rounded-full bg-muted px-3 text-[13px] hover:bg-accent"
+      >
+        <ChevronRightIcon className={cn("size-4 transition-transform", open && "rotate-90")} aria-hidden="true" />
+        ロールについて
+      </button>
+      {open && (
+        <div id={panelId} aria-label="ロールの説明" role="region" className="space-y-3.5 rounded-2xl bg-muted/60 px-4 py-3.5 text-sm leading-relaxed">
+          {ROLE_HELP.map((r) => (
+            <div key={r.title} className="space-y-1">
+              <div className="font-medium">{r.title}</div>
+              <ul className="space-y-0.5 text-[13px] text-foreground/80">
+                {r.points.map((p) => (
+                  <li key={p}>・{p}</li>
+                ))}
+              </ul>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 /**
  * チームの画面。
  * @returns 画面
@@ -285,36 +329,34 @@ export function TeamPage() {
         }
       />
       <PageBody className="max-w-5xl space-y-6">
+        {/* 人数と管理者・「担当を決める」・「⋯」を1行に置く。「チームを抜ける」は誤って押さないよう画面の一番下（2026-11-04） */}
         <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-          <span className="text-sm text-muted-foreground">
+          <span className="min-w-0 flex-1 text-sm text-muted-foreground">
             メンバー {t.members.length}人 · 管理者：{t.admin.name}
             {!isAdmin && mine ? ` · あなたのロール：${ROLE_NAMES[mine.role]}` : ""}
           </span>
-          <span className="flex flex-1 flex-wrap justify-end gap-2">
-            <Button variant="ghost" className="h-10 rounded-full md:h-9" onClick={() => setPending({ kind: "leave" })}>
-              チームを抜ける
-            </Button>
+          <span className="flex items-center gap-1">
             {isAdmin && (
-              <>
-                <Button asChild variant="outline" className="h-10 rounded-full md:h-9">
-                  <Link to={`/teams/${teamId}/assign`}>担当を決める</Link>
-                </Button>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="icon" className="size-10 md:size-9" aria-label="チームの操作">
-                      <EllipsisIcon className="size-5" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="rounded-xl p-1.5">
-                    <DropdownMenuItem className="min-h-11 rounded-lg" onSelect={() => setPending({ kind: "rename" })}>
-                      チーム名を直す
-                    </DropdownMenuItem>
-                    <DropdownMenuItem className="min-h-11 rounded-lg text-destructive" onSelect={() => setPending({ kind: "delete" })}>
-                      チームを削除する
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </>
+              <Button asChild variant="outline" className="h-10 rounded-full md:h-9">
+                <Link to={`/teams/${teamId}/assign`}>担当を決める</Link>
+              </Button>
+            )}
+            {isAdmin && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="icon" className="size-10 md:size-9" aria-label="チームの操作">
+                    <EllipsisIcon className="size-5" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="rounded-xl p-1.5">
+                  <DropdownMenuItem className="min-h-11 rounded-lg" onSelect={() => setPending({ kind: "rename" })}>
+                    チーム名を直す
+                  </DropdownMenuItem>
+                  <DropdownMenuItem className="min-h-11 rounded-lg text-destructive" onSelect={() => setPending({ kind: "delete" })}>
+                    チームを削除する
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             )}
           </span>
         </div>
@@ -336,7 +378,7 @@ export function TeamPage() {
 
         <section aria-labelledby="mine-heading" className="space-y-2.5">
           <h2 id="mine-heading" className="font-medium">
-            チームに入れている、あなたのアカウント
+            あなたのアカウント
           </h2>
           <ul className="divide-y overflow-hidden rounded-2xl border">
             {myAccounts.map((a) => {
@@ -344,12 +386,7 @@ export function TeamPage() {
               return (
                 <li key={a.id} className="flex flex-wrap items-center gap-3 px-4 py-3">
                   <AccountAvatar account={a} className="size-9" />
-                  <span className="flex min-w-0 flex-1 flex-col leading-snug">
-                    <span className="truncate font-medium">{label}</span>
-                    <span className="text-[13px] text-muted-foreground">
-                      {a.shared ? "チームの人が、投稿ストックと戦略を読めます" : "チームの人には、名前だけが出ます"}
-                    </span>
-                  </span>
+                  <span className="min-w-0 flex-1 truncate font-medium">{label}</span>
                   <label className="flex items-center gap-2 text-[13px]">
                     チームに見せる
                     <Switch
@@ -381,97 +418,75 @@ export function TeamPage() {
           )}
         </section>
 
-        <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_16rem]">
-          <section aria-labelledby="members-heading" className="min-w-0 space-y-2.5">
-            <h2 id="members-heading" className="font-medium">
-              メンバー
-            </h2>
-            {isAdmin && (
-              <p className="text-sm text-muted-foreground">
-                全員が自分のThreadsアカウントを持っています。自分のアカウントでは、誰でもそのアカウントのオーナー（承認・設定・支払い）です。下のロールは、ほかの人のアカウントに何ができるかを決めます。
-              </p>
-            )}
-            <ul aria-label="メンバーの一覧" className="divide-y overflow-hidden rounded-2xl border">
-              {t.members.map((m) => (
-                <li key={m.userId} className="flex flex-col gap-3 px-4 py-3 md:flex-row md:items-center">
-                  <span className="flex min-w-0 items-center gap-2.5 md:w-52 md:shrink-0">
-                    <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-muted text-[13px] font-semibold">
-                      {[...m.name][0]}
-                    </span>
-                    <span className="flex min-w-0 flex-col leading-tight">
-                      <span className="flex items-center gap-1.5">
-                        <span className="truncate font-medium">{m.name}</span>
-                        {m.isMe && (
-                          <span className="shrink-0 rounded-full bg-foreground px-2 py-0.5 text-[11px] font-medium text-background">
-                            あなた
-                          </span>
-                        )}
-                      </span>
-                      {!(isAdmin && m.role !== "admin") && (
-                        <span className="text-xs text-muted-foreground">
-                          {m.role === "admin" && m.isMe ? "管理者（あなた）" : ROLE_NAMES[m.role]}
+        <section aria-labelledby="members-heading" className="min-w-0 space-y-2.5">
+          <h2 id="members-heading" className="font-medium">
+            メンバー
+          </h2>
+          <ul aria-label="メンバーの一覧" className="divide-y overflow-hidden rounded-2xl border">
+            {t.members.map((m) => (
+              <li key={m.userId} className="flex flex-col gap-3 px-4 py-3 md:flex-row md:items-center">
+                <span className="flex min-w-0 items-center gap-2.5 md:w-52 md:shrink-0">
+                  <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-muted text-[13px] font-semibold">
+                    {[...m.name][0]}
+                  </span>
+                  <span className="flex min-w-0 flex-col leading-tight">
+                    <span className="flex items-center gap-1.5">
+                      <span className="truncate font-medium">{m.name}</span>
+                      {m.isMe && (
+                        <span className="shrink-0 rounded-full bg-foreground px-2 py-0.5 text-[11px] font-medium text-background">
+                          あなた
                         </span>
                       )}
                     </span>
+                    {!(isAdmin && m.role !== "admin") && (
+                      <span className="text-xs text-muted-foreground">
+                        {m.role === "admin" && m.isMe ? "管理者（あなた）" : ROLE_NAMES[m.role]}
+                      </span>
+                    )}
                   </span>
-                  <span className="flex min-w-0 flex-1 flex-wrap gap-2">
-                    {m.accounts.map((a) => (
-                      <AccountChip key={a.id} teamId={teamId} account={a} owner={m.name} />
-                    ))}
+                </span>
+                <span className="flex min-w-0 flex-1 flex-wrap gap-2">
+                  {m.accounts.map((a) => (
+                    <AccountChip key={a.id} teamId={teamId} account={a} owner={m.name} />
+                  ))}
+                </span>
+                {isAdmin && m.role !== "admin" && (
+                  <span className="flex items-center gap-1">
+                    <RoleToggle
+                      member={m}
+                      disabled={quick.isPending}
+                      onChange={(role) => quick.mutate(() => api.setMemberRole(teamId, m.userId, role))}
+                    />
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon" className="size-10 md:size-9" aria-label={`${m.name}さんの操作`}>
+                          <EllipsisIcon className="size-5" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="rounded-xl p-1.5">
+                        <DropdownMenuItem className="min-h-11 rounded-lg" onSelect={() => setPending({ kind: "transfer", member: m })}>
+                          管理者を引き継ぐ
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          className="min-h-11 rounded-lg text-destructive"
+                          onSelect={() => setPending({ kind: "remove", member: m })}
+                        >
+                          チームから外す
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </span>
-                  {isAdmin && m.role !== "admin" && (
-                    <span className="flex items-center gap-1">
-                      <RoleToggle
-                        member={m}
-                        disabled={quick.isPending}
-                        onChange={(role) => quick.mutate(() => api.setMemberRole(teamId, m.userId, role))}
-                      />
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon" className="size-10 md:size-9" aria-label={`${m.name}さんの操作`}>
-                            <EllipsisIcon className="size-5" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="rounded-xl p-1.5">
-                          <DropdownMenuItem className="min-h-11 rounded-lg" onSelect={() => setPending({ kind: "transfer", member: m })}>
-                            管理者を引き継ぐ
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            className="min-h-11 rounded-lg text-destructive"
-                            onSelect={() => setPending({ kind: "remove", member: m })}
-                          >
-                            チームから外す
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </span>
-                  )}
-                </li>
-              ))}
-            </ul>
-            <p className="text-xs text-muted-foreground">
-              ほかの人が見せているアカウントは、投稿ストックと戦略を読めます（直すことはできません）。見せていないアカウントは、名前だけが出ます。
-            </p>
-          </section>
-          {isAdmin && (
-            <aside aria-label="ロールの説明" className="space-y-2.5 text-sm">
-              <div className="space-y-1 rounded-2xl border p-4">
-                <div className="font-medium">メンバー</div>
-                <p className="text-[13px] text-foreground/80">
-                  ほかの人が「チームに見せる」にしたアカウントの、投稿ストックと戦略を見られる（読むだけ）。招待リンクから入った人は、まずメンバーになります。
-                </p>
-              </div>
-              <div className="space-y-1 rounded-2xl border p-4">
-                <div className="font-medium">編集者</div>
-                <p className="text-[13px] text-foreground/80">
-                  メンバーと同じく見られるうえに、担当になったアカウントで投稿の案を作る・直す。承認と設定は、そのアカウントのオーナーだけ。
-                </p>
-              </div>
-              <p className="text-xs text-muted-foreground">
-                ロールは、管理者がいつでも切り替えられます。切り替えても、その人のアカウントの持ち主は変わりません。
-              </p>
-            </aside>
-          )}
+                )}
+              </li>
+            ))}
+          </ul>
+          {isAdmin && <RoleHelp />}
+        </section>
+
+        <div>
+          <Button variant="ghost" className="h-10 rounded-full md:h-9" onClick={() => setPending({ kind: "leave" })}>
+            チームを抜ける
+          </Button>
         </div>
       </PageBody>
 
