@@ -21,6 +21,7 @@ const mocks = vi.hoisted(() => ({
   renameTeam: vi.fn(),
   deleteTeam: vi.fn(),
   dismissJoinedNotice: vi.fn(),
+  teamStatus: vi.fn(),
   me: vi.fn(),
 }));
 vi.mock("@/lib/api-client", async (orig) => {
@@ -58,6 +59,7 @@ function adminView(): TeamDetail {
       { userId: "u-e", name: "佐藤 美咲", role: "editor", isMe: false, joinedAt: "", joinedNotice: false, accounts: [acc("a-e", "佐藤のおうちごはん")] },
     ],
     limits: { members: 50, editors: 10 },
+    statusVisible: true,
   };
 }
 
@@ -66,6 +68,7 @@ function memberView(): TeamDetail {
   return {
     ...t,
     myRole: "member",
+    statusVisible: false,
     members: t.members.map((m) => ({
       ...m,
       isMe: m.userId === "u-s",
@@ -94,6 +97,7 @@ function renderPage() {
     [
       { path: "/teams/:teamId", element: <TeamPage /> },
       { path: "/teams/:teamId/assign", element: <p>担当の表</p> },
+      { path: "/teams/:teamId/status", element: <p>運用状況の画面</p> },
       { path: "/teams/:teamId/accounts/:accountId", element: <p>見せてもらっているアカウント</p> },
       { path: "/accounts/:accountId", element: <p>Accountの画面</p> },
       { path: "/", element: <p>最初の画面</p> },
@@ -112,6 +116,7 @@ beforeEach(() => {
   for (const fn of Object.values(mocks)) fn.mockReset();
   for (const fn of Object.values(toast)) fn.mockReset();
   mocks.me.mockResolvedValue(meData);
+  mocks.teamStatus.mockResolvedValue({ scope: "all", generatedAt: "", stoppedCount: 3, people: [], accounts: [] });
   for (const fn of [mocks.setMemberRole, mocks.setTeamShared, mocks.removeTeamAccount, mocks.addTeamAccount, mocks.leaveTeam, mocks.removeMember, mocks.transferAdmin, mocks.renameTeam, mocks.deleteTeam, mocks.dismissJoinedNotice])
     fn.mockResolvedValue(undefined);
 });
@@ -325,5 +330,47 @@ describe("チームの画面（メンバー・編集者）", () => {
     mocks.getTeam.mockRejectedValue(new ApiError("TEAM_NOT_FOUND", 404));
     renderPage();
     expect(await screen.findByText("チームが見つかりません。")).toBeInTheDocument();
+  });
+});
+
+describe("運用状況のボタンと見える範囲（specs/020 T014・T023・T031）", () => {
+  it("statusVisible なら「担当を決める」の前に「運用状況」。止まっている数の印が付き、押すと運用状況の画面へ", async () => {
+    mocks.getTeam.mockResolvedValue(adminView());
+    const user = userEvent.setup();
+    const router = renderPage();
+    const link = await screen.findByRole("link", { name: /運用状況/ });
+    expect(link).toHaveAttribute("href", "/teams/t1/status");
+    expect(await within(link).findByText("3")).toBeInTheDocument();
+    const links = screen.getAllByRole("link").map((l) => l.textContent);
+    expect(links.findIndex((t) => t?.includes("運用状況"))).toBeLessThan(links.indexOf("担当を決める"));
+    await user.click(link);
+    expect(router.state.location.pathname).toBe("/teams/t1/status");
+  });
+
+  it("止まっている数が0なら印を付けない", async () => {
+    mocks.getTeam.mockResolvedValue(adminView());
+    mocks.teamStatus.mockResolvedValue({ scope: "all", generatedAt: "", stoppedCount: 0, people: [], accounts: [] });
+    renderPage();
+    const link = await screen.findByRole("link", { name: /運用状況/ });
+    await vi.waitFor(() => expect(mocks.teamStatus).toHaveBeenCalled());
+    expect(link.textContent).toBe("運用状況");
+  });
+
+  it("statusVisible でなければ、ボタンも運用状況の読み込みも出さない（メンバー）", async () => {
+    mocks.getTeam.mockResolvedValue(memberView());
+    renderPage();
+    expect(await screen.findByRole("heading", { name: "飲食チーム" })).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /運用状況/ })).not.toBeInTheDocument();
+    expect(mocks.teamStatus).not.toHaveBeenCalled();
+  });
+
+  it("閉じたトグル「チームで見えること」は全員に出て、開くと3つの箇条書き", async () => {
+    mocks.getTeam.mockResolvedValue(memberView());
+    const user = userEvent.setup();
+    renderPage();
+    await user.click(await screen.findByRole("button", { name: "チームで見えること" }));
+    const help = screen.getByRole("list", { name: "チームで見えること" });
+    expect(within(help).getAllByRole("listitem")).toHaveLength(3);
+    expect(within(help).getByText(/管理者と、担当の編集者は、運用状況/)).toBeInTheDocument();
   });
 });

@@ -14,6 +14,7 @@ import { insertActivity } from "./activity-log";
 import {
   authorizeAssignment,
   personName,
+  statusScopeOf,
   teamNotFound,
   type AccountAccess,
   type ActorRole,
@@ -238,6 +239,8 @@ export async function getTeamDetail(db: Db | TxDb, teamAccess: TeamAccess) {
       }),
     })),
     limits: { members: TEAM_MEMBER_LIMIT, editors: TEAM_EDITOR_LIMIT },
+    // 運用状況を開けるか（判定は access.ts の statusScopeOf だけ。specs/020 research.md R8）
+    statusVisible: (await statusScopeOf(db, teamAccess)) !== null,
   };
 }
 

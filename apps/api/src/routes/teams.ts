@@ -15,7 +15,7 @@ import { Hono, type Context, type MiddlewareHandler } from "hono";
 import type { AppEnv } from "../app";
 import { createDb, withTransaction } from "../db/client";
 import { parseBody } from "../lib/validate";
-import { authorizeTeamAdmin, authorizeTeamMember, isUuid, requireFeature, teamNotFound } from "../services/access";
+import { authorizeTeamAdmin, authorizeTeamMember, authorizeTeamStatus, isUuid, requireFeature, teamNotFound } from "../services/access";
 import {
   addTeamAccount,
   changeRole,
@@ -34,6 +34,7 @@ import {
   setShared,
   transferAdmin,
 } from "../services/team-service";
+import { getTeamStatus } from "../services/team-status";
 
 /**
  * パスのIDがUUIDの形かを確かめる（違えば見つからない扱い）。
@@ -76,6 +77,13 @@ export function teamsRoutes(authed: MiddlewareHandler<AppEnv>) {
       const access = await authorizeTeamMember(db, c.get("user"), c.req.param("teamId"));
       c.header("Cache-Control", "no-store");
       return c.json(await getTeamDetail(db, access));
+    })
+    // 運用状況（specs/020 contracts/api.md）。範囲は authorizeTeamStatus が決める。読むだけ
+    .get("/teams/:teamId/status", authed, teamOn, async (c) => {
+      const db = createDb(c.env.DATABASE_URL);
+      const access = await authorizeTeamStatus(db, c.get("user"), c.req.param("teamId"));
+      c.header("Cache-Control", "no-store");
+      return c.json(await getTeamStatus(db, access, access.scope));
     })
     .patch("/teams/:teamId", authed, teamOn, async (c) => {
       await precheck(c, "admin");

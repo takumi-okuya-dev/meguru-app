@@ -213,6 +213,23 @@ export const ACTIVITY_SUMMARY_CHARS = 30;
 export const TEAM_NAME_MAX = 50;
 /** 1チームの人数の上限（管理者・メンバー・編集者を合わせて。specs/011 Assumptions）。 */
 export const TEAM_MEMBER_LIMIT = 50;
+
+// ---- チームの運用状況（specs/020-team-monitoring data-model.md「定数」）----
+/** 「止まっている」の日数と、「この7日」の数の期間（FR-010・FR-011）。 */
+export const TEAM_STATUS_STOPPED_DAYS = 7;
+/** 伸びを比べる期間（日。直近とその前。FR-020）。 */
+export const TEAM_STATUS_GROWTH_WINDOW_DAYS = 30;
+/** 伸びの判定に要る、それぞれの期間の確定した投稿の数（006の判定を始める件数にそろえる。FR-020a）。 */
+export const TEAM_STATUS_GROWTH_MIN_POSTS = 5;
+/** この比以下で「伸びていない」（仮の値。research.md R4）。 */
+export const TEAM_STATUS_GROWTH_POOR_RATIO = 0.8;
+/** 人の動きに数える操作の記録（案を作る・直す・承認・却下。research.md R1）。 */
+export const TEAM_STATUS_ACTIVITY_ACTIONS = [
+  "drafts_registered",
+  "draft_edited",
+  "drafts_approved",
+  "drafts_rejected",
+] as const;
 /** 1人が管理者のチームの上限（specs/011 Assumptions）。 */
 export const TEAMS_PER_ADMIN = 20;
 /** 操作の記録の1回の件数（既定。FR-052）。 */

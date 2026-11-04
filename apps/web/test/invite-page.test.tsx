@@ -75,6 +75,10 @@ describe("招待の確認", () => {
     expect(await screen.findByRole("heading", { name: "「飲食チーム」に招待されています" })).toBeInTheDocument();
     expect(screen.getByText("管理者：田中 健 · 5人")).toBeInTheDocument();
     expect(screen.getByText("メンバーとして入ります")).toBeInTheDocument();
+    // 管理者と担当の編集者に見える範囲（specs/020 FR-005・SC-006）
+    expect(
+      screen.getByText("管理者と、あなたのアカウントの担当の編集者は、運用状況（投稿の数・伸び・最後に動いた日）を見られます。投稿の本文や戦略は見られません。"),
+    ).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Googleで続ける" }));
     expect(router.state.location.pathname).toBe("/sign-in");
     expect(new URLSearchParams(router.state.location.search).get("next")).toBe(`/invite/${TOKEN}`);
