@@ -42,7 +42,7 @@ export function postDraftRoutes(authed: MiddlewareHandler<AppEnv>) {
     .get("/accounts/:accountId/post-drafts", authed, async (c) => {
       const db = createDb(c.env.DATABASE_URL);
       const user = c.get("user");
-      const access = await authorizeAccount(db, user, c.req.param("accountId"), "read");
+      const access = await authorizeAccount(db, user, c.req.param("accountId"), "read", { feature: "autopost" });
       const account = access.account;
       // 見せてもらっている人には、設定（NGワード・作る件数）と自動投稿の状態を見せない（specs/011 FR-031、Constitution原則V）
       const viewer = access.relation === "shared_viewer";
@@ -68,7 +68,7 @@ export function postDraftRoutes(authed: MiddlewareHandler<AppEnv>) {
     .get("/accounts/:accountId/post-drafts/published", authed, async (c) => {
       // 投稿済みのタブ（005 FR-020）。タブを開いたときだけ50件ずつ読む（research.md R14）
       const db = createDb(c.env.DATABASE_URL);
-      const access = await authorizeAccount(db, c.get("user"), c.req.param("accountId"), "read");
+      const access = await authorizeAccount(db, c.get("user"), c.req.param("accountId"), "read", { feature: "autopost" });
       const account = access.account;
       const parsed = publishedQuerySchema.safeParse(c.req.query());
       if (!parsed.success)
@@ -78,14 +78,14 @@ export function postDraftRoutes(authed: MiddlewareHandler<AppEnv>) {
     .get("/accounts/:accountId/post-drafts/counts", authed, async (c) => {
       // サイドバーの件数（FR-013）。本文を含まない軽いAPI
       const db = createDb(c.env.DATABASE_URL);
-      const access = await authorizeAccount(db, c.get("user"), c.req.param("accountId"), "read");
+      const access = await authorizeAccount(db, c.get("user"), c.req.param("accountId"), "read", { feature: "autopost" });
       const account = access.account;
       return c.json(await countDrafts(db, account.id));
     })
     .post("/accounts/:accountId/draft-batches", authed, async (c) => {
       const db = createDb(c.env.DATABASE_URL);
       const user = c.get("user");
-      const access = await authorizeAccount(db, user, c.req.param("accountId"), "content");
+      const access = await authorizeAccount(db, user, c.req.param("accountId"), "content", { feature: "autopost" });
       const account = access.account;
       const req = await parseBody(createDraftBatchRequestSchema, c.req.json());
       const { created, result } = await createDraftBatch(c.env, account.id, req, access);
@@ -94,7 +94,7 @@ export function postDraftRoutes(authed: MiddlewareHandler<AppEnv>) {
     .delete("/accounts/:accountId/draft-batches/:batchId", authed, async (c) => {
       const db = createDb(c.env.DATABASE_URL);
       const user = c.get("user");
-      const access = await authorizeAccount(db, user, c.req.param("accountId"), "content");
+      const access = await authorizeAccount(db, user, c.req.param("accountId"), "content", { feature: "autopost" });
       const account = access.account;
       const batchId = assertItemId(c.req.param("batchId"));
       // 取り消しと記録を同じトランザクションで行う（specs/008 research.md R9）
@@ -105,7 +105,7 @@ export function postDraftRoutes(authed: MiddlewareHandler<AppEnv>) {
     .put("/accounts/:accountId/post-drafts/:draftId", authed, async (c) => {
       const db = createDb(c.env.DATABASE_URL);
       const user = c.get("user");
-      const access = await authorizeAccount(db, user, c.req.param("accountId"), "content");
+      const access = await authorizeAccount(db, user, c.req.param("accountId"), "content", { feature: "autopost" });
       const account = access.account;
       const id = assertItemId(c.req.param("draftId"));
       const req = await parseBody(updatePostDraftRequestSchema, c.req.json());
@@ -114,7 +114,7 @@ export function postDraftRoutes(authed: MiddlewareHandler<AppEnv>) {
     .post("/accounts/:accountId/post-drafts/delete", authed, async (c) => {
       const db = createDb(c.env.DATABASE_URL);
       const user = c.get("user");
-      const access = await authorizeAccount(db, user, c.req.param("accountId"), "content");
+      const access = await authorizeAccount(db, user, c.req.param("accountId"), "content", { feature: "autopost" });
       const account = access.account;
       const { ids } = await parseBody(deletePostDraftsRequestSchema, c.req.json());
       return c.json({
@@ -125,7 +125,7 @@ export function postDraftRoutes(authed: MiddlewareHandler<AppEnv>) {
     })
     .post("/accounts/:accountId/post-drafts/:draftId/prioritize", authed, async (c) => {
       const db = createDb(c.env.DATABASE_URL);
-      const access = await authorizeAccount(db, c.get("user"), c.req.param("accountId"), "review");
+      const access = await authorizeAccount(db, c.get("user"), c.req.param("accountId"), "review", { feature: "autopost" });
       const account = access.account;
       const id = assertItemId(c.req.param("draftId"));
       const req = await parseBody(prioritizeRequestSchema, c.req.json());
@@ -134,7 +134,7 @@ export function postDraftRoutes(authed: MiddlewareHandler<AppEnv>) {
     .post("/accounts/:accountId/post-drafts/review", authed, async (c) => {
       // 承認・却下・要確認に戻す（specs/004-review-approval contracts/api.md）。全プランで使える（FR-034）
       const db = createDb(c.env.DATABASE_URL);
-      const access = await authorizeAccount(db, c.get("user"), c.req.param("accountId"), "review");
+      const access = await authorizeAccount(db, c.get("user"), c.req.param("accountId"), "review", { feature: "autopost" });
       const account = access.account;
       const req = await parseBody(reviewRequestSchema, c.req.json());
       return c.json(await reviewDrafts(c.env, account.id, req, access));

@@ -34,6 +34,7 @@ import { accounts, memberships, postDrafts, postingSchedules, publishAttempts, s
 import type { Env } from "../env";
 import { billingModeOf } from "../lib/config";
 import { entitlementFromFacts } from "./billing-service";
+import { featureOnSql } from "./feature-sql";
 import { billingExemptSql, testAccessSql } from "./test-group-service";
 import { logger } from "../lib/logger";
 import { createThreadsClient, type ThreadsClient } from "../lib/threads-client";
@@ -186,6 +187,8 @@ export async function runAutoPost(
       ownerTestAccess: mode.testGroups ? testAccessSql(users, mode.operators) : sql<boolean>`true`,
       subStatus: subscriptions.status,
       subCancelAtPeriodEnd: subscriptions.cancelAtPeriodEnd,
+      // オーナーが自動投稿を使えるか（specs/019 FR-008）
+      ownerAutopostOn: featureOnSql(users.id, "autopost"),
     })
     .from(postingSchedules)
     .innerJoin(accounts, eq(accounts.id, postingSchedules.accountId))
@@ -194,9 +197,10 @@ export async function runAutoPost(
     .leftJoin(subscriptions, eq(subscriptions.userId, users.id))
     // 未接続のアカウントは見ない（オンにはできないが、試み（飛ばした記録）も作らない。specs/012 FR-035）
     .where(and(eq(postingSchedules.enabled, true), ne(accounts.connectionStatus, "not_connected")));
-  // オーナーが読むだけのアカウントも見ない（試みも作らない。specs/013 research.md R8）
+  // オーナーが読むだけのアカウントも、自動投稿を使えないアカウントも見ない（試みも作らない。specs/013 research.md R8、specs/019 FR-008）
   const schedules = scheduleRows.filter(
     (r) =>
+      r.ownerAutopostOn &&
       entitlementFromFacts(
         mode,
         {

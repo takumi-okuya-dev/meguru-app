@@ -1,6 +1,6 @@
 // GET /api/me（FR-004・FR-005、research.md R10。specs/008 research.md R11 で役割つきに広げ、
 // specs/011 research.md R5 で入っているチームを足した）
-import type { Role } from "@threads-grower/shared";
+import { FEATURES, type Role } from "@threads-grower/shared";
 import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { Hono, type MiddlewareHandler } from "hono";
@@ -10,6 +10,7 @@ import { createDb } from "../db/client";
 import { accounts, memberships, users } from "../db/schema";
 import { personName, toAccountSummary, type AccountRow } from "../services/access";
 import { countOwnedAccountNeedsReview } from "../services/account-review-counts";
+import { featureOnSql } from "../services/feature-sql";
 import { loadEntitlement, toMeBilling } from "../services/billing-service";
 import { withdraw, withdrawalPreview, type ClerkUserDeleter } from "../services/withdrawal-service";
 import type { Env } from "../env";
@@ -53,7 +54,14 @@ export function meRoutes(authed: MiddlewareHandler<AppEnv>, deleteClerkUser: (en
     const ownerM = alias(memberships, "owner_m");
     const ownerU = alias(users, "owner_u");
     const rows = await db
-      .select({ account: accounts, role: memberships.role, ownerDisplayName: ownerU.displayName, ownerEmail: ownerU.email })
+      .select({
+        account: accounts,
+        role: memberships.role,
+        ownerDisplayName: ownerU.displayName,
+        ownerEmail: ownerU.email,
+        // 担当しているAccountは、オーナーもチームを使えるときだけ出す（specs/019 FR-009）
+        ownerTeamOn: featureOnSql(ownerU.id, "team"),
+      })
       .from(accounts)
       .innerJoin(memberships, eq(memberships.accountId, accounts.id))
       .innerJoin(ownerM, and(eq(ownerM.accountId, accounts.id), eq(ownerM.role, "owner")))
@@ -64,15 +72,21 @@ export function meRoutes(authed: MiddlewareHandler<AppEnv>, deleteClerkUser: (en
         sql`${accounts.lastUsedAt} DESC NULLS LAST`,
         desc(accounts.createdAt),
       );
-    const owned = rows.filter((r) => r.role === "owner").map((r) => r.account);
-    const helped = rows.filter((r) => r.role !== "owner").map((r) => r.account);
+    // チームを使えない人には、担当しているAccountとチームを出さない（specs/019 research.md R13）
+    const teamOn = user.features.has("team");
+    const visible = rows.filter((r) => r.role === "owner" || (teamOn && r.ownerTeamOn));
+    const owned = visible.filter((r) => r.role === "owner").map((r) => r.account);
+    const helped = visible.filter((r) => r.role !== "owner").map((r) => r.account);
     const now = new Date();
-    const [teams, entitlement] = await Promise.all([listMyTeams(db, user.id), loadEntitlement(db, user.id, user.billing, now)]);
+    const [teams, entitlement] = await Promise.all([
+      teamOn ? listMyTeams(db, user.id) : Promise.resolve([]),
+      loadEntitlement(db, user.id, user.billing, now),
+    ]);
     // Account切り替えメニューは開くたびに一覧を読み直すため、ブラウザに保存させない。
     c.header("Cache-Control", "no-store");
     return c.json({
       user: { id: user.id, email: user.email, displayName: user.displayName },
-      accounts: rows.map((r) =>
+      accounts: visible.map((r) =>
         toAccountSummary(
           r.account,
           r.role as Role,
@@ -90,6 +104,9 @@ export function meRoutes(authed: MiddlewareHandler<AppEnv>, deleteClerkUser: (en
       withdrawalInProgress: user.withdrawalRequestedAt !== null,
       // テスト用のグループ（specs/016 contracts/api.md「GET /api/me」）
       testGroups: { enabled: Boolean(user.billing.testGroups), ...user.testAccess },
+      operator: user.operator,
+      // 自分の使えるまとまり（サイドバーの「チーム」の出し分けに使う。specs/019 research.md R6）
+      features: FEATURES.filter((f) => user.features.has(f)),
     });
   }).get("/me/needs-review-counts", authed, async (c) => {
     const user = c.get("user");

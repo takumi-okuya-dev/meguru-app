@@ -101,8 +101,8 @@ describe("サイドバーの「チーム」", () => {
     const labels = within(nav)
       .getAllByRole("link")
       .map((l) => l.textContent?.replace(/\s+/g, ""));
-    // ホーム・投稿をつくる・投稿ストック → 戦略 → 分析 → チーム
-    expect(labels).toEqual(["ホーム", "投稿をつくる", "投稿ストック", "課題", "宣伝内容", "リサーチ", "パフォーマンス", "飲飲食チーム5人", "美美容チーム3人"]);
+    // ホーム → 自動投稿（投稿をつくる・投稿ストック・パフォーマンス）→ 戦略 → チーム（specs/019 FR-004）
+    expect(labels).toEqual(["ホーム", "投稿をつくる", "投稿ストック", "パフォーマンス", "課題", "宣伝内容", "リサーチ", "飲飲食チーム5人", "美美容チーム3人"]);
     expect(within(nav).getByText("チーム")).toBeInTheDocument();
     // 管理者でなければ「チームを作る」は出さない（このアカウントの設定から作る）
     expect(within(nav).queryByRole("button", { name: /チームを作る/ })).not.toBeInTheDocument();

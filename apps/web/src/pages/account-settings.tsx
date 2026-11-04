@@ -38,7 +38,7 @@ import { useCurrentAccount } from "@/pages/account-layout";
 import { TeamSection } from "@/components/team/TeamSection";
 import { ReconnectDialog } from "@/components/connect/ReconnectDialog";
 import { TokenWarnings } from "@/components/connect/TokenWarnings";
-import { useAccountAccess } from "@/lib/use-account-access";
+import { featureOn, useAccountAccess } from "@/lib/use-account-access";
 
 /**
  * Account の設定（FR-013・FR-019・FR-020・FR-022、規則9・10）。認可し直す操作と、確認つきの削除。
@@ -62,6 +62,8 @@ function AccountSettingsContent() {
   const notConnected = account.connectionStatus === "not_connected";
   // 関わりで出し分ける（specs/008 FR-041、specs/011 FR-060）。設定の操作は settings、接続・削除・チームに見せるは owner の権限
   const { access, can } = useAccountAccess(account.id);
+  // 使えるかがわかるまで、自動投稿の区分を出さない（使えないAccountで、区分のAPIを呼ばないように。specs/019）
+  const autopostOn = !!access && featureOn(access, "autopost");
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
@@ -152,7 +154,7 @@ function AccountSettingsContent() {
         {can("owner") && <AccountNameSection account={account} />}
 
         {/* つないだ直後の案内（specs/012 contracts/ui-routes.md「Threadsとの接続」） */}
-        {justConnected && !notConnected && (
+        {justConnected && !notConnected && autopostOn && (
           <Alert role="status">
             <AlertDescription className="space-y-3 text-foreground">
               <p className="flex items-center gap-2 font-medium">
@@ -172,15 +174,18 @@ function AccountSettingsContent() {
           </Alert>
         )}
 
-        <PostingScheduleSection
-          account={account}
-          canEdit={can("settings")}
-          canReconnect={can("owner")}
-          onReconnect={() => setReconnectOpen(true)}
-          editRequest={editRequest}
-        />
+        {/* 自動投稿を使えなければ、投稿のスケジュールと投稿ルールを出さない（specs/019 FR-004） */}
+        {autopostOn && (
+          <PostingScheduleSection
+            account={account}
+            canEdit={can("settings")}
+            canReconnect={can("owner")}
+            onReconnect={() => setReconnectOpen(true)}
+            editRequest={editRequest}
+          />
+        )}
 
-        <PostingRulesSection accountId={account.id} canEdit={can("settings")} />
+        {autopostOn && <PostingRulesSection accountId={account.id} canEdit={can("settings")} />}
 
         {notConnected ? (
           <section id="threads" className="space-y-3">
@@ -216,7 +221,8 @@ function AccountSettingsContent() {
         </section>
         )}
 
-        {access && <TeamSection accountId={account.id} access={access} />}
+        {/* チームを使えなければ、チームの区分を出さない（specs/019 FR-009） */}
+        {access && featureOn(access, "team") && <TeamSection accountId={account.id} access={access} />}
 
         {can("owner") && (
         <section className="space-y-3">

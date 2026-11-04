@@ -1,10 +1,12 @@
 // 関わりによる判定（specs/011-team-revision contracts/permissions.md、research.md R3・R4）。
 // 「誰がどのAccount（とチーム）で何をできるか」の判定はこのファイルだけに置き、すべてのAPIがここを通す（Constitution原則V）。
 // Accountに関わっていない人には、存在の有無を漏らさないよう 404 ACCOUNT_NOT_FOUND を返す（001から同じ）。
+// 機能のまとまりのON/OFFの判定もここだけに置く（specs/019-feature-switches research.md R1、Constitution原則V 4.2.0）。
 import {
   narrowForReadOnly,
   permissionsFor,
   type Permission,
+  type Feature,
   type ReadOnlyReason,
   type Relation,
   type Role,
@@ -17,6 +19,7 @@ import { accounts, memberships, subscriptions, teamAccounts, teamMembers, teams,
 import type { BillingMode } from "../lib/config";
 import { AppError, notFound } from "../lib/errors";
 import { entitlementFromFacts } from "./billing-service";
+import { disabledFeaturesSql, featureOnSql, featuresFrom } from "./feature-sql";
 import { billingExemptSql, testAccessSql } from "./test-group-service";
 
 /** accounts の行。 */
@@ -53,6 +56,8 @@ export type AccountAccess = {
   hasTeam: boolean;
   /** オーナーが読むだけなら、その理由（判定した人がオーナーでなければ owner_inactive）。すべて使えるなら NULL（specs/013） */
   readOnly: { reason: AccessReadOnlyReason } | null;
+  /** オーナーの設定でONの機能のまとまり。チームの人もオーナーの設定に従う（specs/019 FR-012） */
+  features: ReadonlySet<Feature>;
 };
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -96,14 +101,17 @@ function actorRoleOf(relation: Relation, teamRole: TeamRole | null): ActorRole {
  * @param user - リクエストしたユーザー
  * @param accountId - accounts.id
  * @param permission - 要る権限
+ * @param opts - feature：その操作が属する機能のまとまり（オーナーの設定でOFFなら拒む。specs/019）
  * @returns AccountAccess
- * @throws AppError ACCOUNT_NOT_FOUND（IDの形が違う・存在しない・関わっていない）、ROLE_FORBIDDEN（権限が足りない）
+ * @throws AppError ACCOUNT_NOT_FOUND（IDの形が違う・存在しない・関わっていない）、FEATURE_DISABLED（まとまりがOFF）、
+ *   ROLE_FORBIDDEN（権限が足りない）
  */
 export async function authorizeAccount(
   db: Db | TxDb,
   user: RequestUser,
   accountId: string,
   permission: Permission,
+  opts: { feature?: Feature } = {},
 ): Promise<AccountAccess> {
   if (!UUID.test(accountId)) throw notFound();
   const own = alias(memberships, "own_m");
@@ -122,6 +130,10 @@ export async function authorizeAccount(
       ownerBillingExempt: billingExemptSql(ownerU, user.billing),
       // オーナーがテスト版に入れるか（specs/016 research.md R4）。OFFの環境では読まない
       ownerTestAccess: user.billing.testGroups ? testAccessSql(ownerU, user.billing.operators) : sql<boolean>`true`,
+      // オーナーの使えないまとまり（人 ∪ グループ。行がなければすべてON。specs/019 research.md R10）
+      ownerDisabled: disabledFeaturesSql(ownerU.id),
+      // チーム経由の関わりは、見る人もチームを使えるときだけ（specs/019 FR-009）
+      meTeamOn: featureOnSql(meU.id, "team"),
       subStatus: subscriptions.status,
       subCancelAtPeriodEnd: subscriptions.cancelAtPeriodEnd,
       meDisplayName: meU.displayName,
@@ -151,6 +163,11 @@ export async function authorizeAccount(
   else if (row.ownRole === "editor" && inTeam && row.ownTeamId === row.teamId) relation = "assigned";
   else if (inTeam && row.shared) relation = "shared_viewer";
   else throw notFound();
+  // まとまりの判定は、関わりを決めたあと（404 を先に返し、Accountの有無を漏らさない）、ロール・決済の前（contracts/api.md）
+  const features = featuresFrom(row.ownerDisabled);
+  // オーナーか見る人がチームを使えなければ、チーム経由の関わりはないのと同じ（チームを抜けたのと同じに見せる。FR-009・FR-012）
+  if (relation !== "owner" && (!features.has("team") || !row.meTeamOn)) throw notFound();
+  if (opts.feature && !features.has(opts.feature)) throw featureDisabled(opts.feature);
   const isTeamAdmin = row.myTeamRole === "admin";
   const byRelation = permissionsFor(relation, { isTeamAdmin });
   if (!byRelation.has(permission)) {
@@ -190,6 +207,7 @@ export async function authorizeAccount(
     isTeamAdmin,
     hasTeam: row.teamId !== null,
     readOnly,
+    features,
   };
 }
 
@@ -203,7 +221,7 @@ export type TeamAccess = { team: TeamRow; member: { id: string; name: string; ro
  * @param teamId - teams.id
  * @param opts - lock：チームの行を FOR UPDATE で取る（人数を数える・ロールや担当を書くとき。research.md R7）
  * @returns TeamAccess
- * @throws AppError TEAM_NOT_FOUND（IDの形が違う・チームがない・チームの人でない）
+ * @throws AppError TEAM_NOT_FOUND（IDの形が違う・チームがない・チームの人でない）、FEATURE_DISABLED（チームを使えない）
  */
 export async function authorizeTeamMember(
   db: Db | TxDb,
@@ -219,13 +237,21 @@ export async function authorizeTeamMember(
     if (!locked) throw teamNotFound();
   }
   const [row] = await db
-    .select({ team: teams, role: teamMembers.role, displayName: users.displayName, email: users.email })
+    .select({
+      team: teams,
+      role: teamMembers.role,
+      displayName: users.displayName,
+      email: users.email,
+      // チームを使えない人は、チームの画面と操作を使えない（specs/019 FR-009）
+      teamOn: featureOnSql(users.id, "team"),
+    })
     .from(teams)
     .innerJoin(teamMembers, and(eq(teamMembers.teamId, teams.id), eq(teamMembers.userId, user.id)))
     .innerJoin(users, eq(users.id, teamMembers.userId))
     .where(eq(teams.id, teamId))
     .limit(1);
   if (!row) throw teamNotFound();
+  if (!row.teamOn) throw featureDisabled("team");
   return { team: row.team, member: { id: user.id, name: personName(row), role: row.role } };
 }
 
@@ -288,6 +314,23 @@ export async function authorizeAssignment(
     throw new AppError("ASSIGNMENT_NOT_ALLOWED", 409, "account not assignable");
   }
   return { account: target.account, ownerUserId: target.ownerUserId, person: { id: personUserId, role: person.role } };
+}
+
+/**
+ * まとまりを使えないことを表すエラーを作る（specs/019 contracts/api.md「新しいエラーコード」）。
+ * @param feature - 使えないまとまり
+ * @returns 403 FEATURE_DISABLED の AppError
+ */
+export const featureDisabled = (feature: Feature) => new AppError("FEATURE_DISABLED", 403, "feature disabled", undefined, [feature]);
+
+/**
+ * まとまりを使えるかを確かめる（Accountに関わらない操作。チームを作る・招待から入るなど。research.md R13）。
+ * @param user - 認証のミドルウェアが入れた、自分の使えるまとまり
+ * @param feature - まとまり
+ * @throws AppError FEATURE_DISABLED
+ */
+export function requireFeature(user: { features: ReadonlySet<Feature> }, feature: Feature): void {
+  if (!user.features.has(feature)) throw featureDisabled(feature);
 }
 
 /**

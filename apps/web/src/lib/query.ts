@@ -36,6 +36,8 @@ export const queryKeys = {
   referral: ["referral"] as const,
   referralPage: ["referral-page"] as const,
   testGroup: (id: string) => ["test-groups", id] as const,
+  // 機能のまとまりごとのON/OFF（specs/019）
+  featureSettings: ["feature-settings"] as const,
   // チーム（specs/011）。Account の下に置かない（チームは Account をまたぐ）。取り直しは ["team", id] の範囲で行う
   team: (id: string) => ["team", id] as const,
   teamInvite: (id: string) => ["team", id, "invite"] as const,

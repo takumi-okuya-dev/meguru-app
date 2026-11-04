@@ -109,7 +109,7 @@ export function SettingsLayout() {
   const [query, setQuery] = useState("");
   // 運営者には「運営」の区分を出す（specs/016 contracts/ui-routes.md 3）
   const me = useQuery({ queryKey: queryKeys.me, queryFn: api.me });
-  const allGroups = settingsGroupsFor(Boolean(me.data?.testGroups.enabled && me.data.testGroups.operator));
+  const allGroups = settingsGroupsFor(Boolean(me.data?.operator));
   const groups = filterSettingsGroups(allGroups, query);
 
   if (!isWide) {

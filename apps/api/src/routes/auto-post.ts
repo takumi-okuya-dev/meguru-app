@@ -16,13 +16,13 @@ export function autoPostRoutes(authed: MiddlewareHandler<AppEnv>) {
   return new Hono<AppEnv>()
     .get("/accounts/:accountId/auto-post", authed, async (c) => {
       const db = createDb(c.env.DATABASE_URL);
-      const access = await authorizeAccount(db, c.get("user"), c.req.param("accountId"), "view");
+      const access = await authorizeAccount(db, c.get("user"), c.req.param("accountId"), "view", { feature: "autopost" });
       // オーナーが読むだけなら、自動投稿は止まっている（specs/013 research.md R8）
       return c.json(await getAutoPostStatus(db, { ...access.account, ownerReadOnly: access.readOnly !== null }));
     })
     .post("/accounts/:accountId/auto-post/notices/blocked/dismiss", authed, async (c) => {
       const db = createDb(c.env.DATABASE_URL);
-      const access = await authorizeAccount(db, c.get("user"), c.req.param("accountId"), "review");
+      const access = await authorizeAccount(db, c.get("user"), c.req.param("accountId"), "review", { feature: "autopost" });
       const account = access.account;
       // 時刻はDBの時計で入れる。Workers の Date は最後の入出力の時点で止まるので、
       // 直前に `blocked_at = now()` で止められた下書きより前の時刻になり、知らせが消えないことがある

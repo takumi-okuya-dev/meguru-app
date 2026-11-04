@@ -133,7 +133,7 @@ export function researchRoutes(authed: MiddlewareHandler<AppEnv>) {
       .get("/accounts/:accountId/reference-posts", authed, async (c) => {
         const db = createDb(c.env.DATABASE_URL);
         const user = c.get("user");
-        const access = await authorizeAccount(db, user, c.req.param("accountId"), "read");
+        const access = await authorizeAccount(db, user, c.req.param("accountId"), "read", { feature: "strategy" });
         const account = access.account;
         const rows = await db
           .select()
@@ -152,7 +152,7 @@ export function researchRoutes(authed: MiddlewareHandler<AppEnv>) {
       .post("/accounts/:accountId/reference-posts", authed, async (c) => {
         const db = createDb(c.env.DATABASE_URL);
         const user = c.get("user");
-        const access = await authorizeAccount(db, user, c.req.param("accountId"), "content");
+        const access = await authorizeAccount(db, user, c.req.param("accountId"), "content", { feature: "strategy" });
         const account = access.account;
         const input = await parseBody(referencePostInputSchema, c.req.json());
         const row = await insertWithLimit(
@@ -179,7 +179,7 @@ export function researchRoutes(authed: MiddlewareHandler<AppEnv>) {
       .post("/accounts/:accountId/reference-posts/batch", authed, async (c) => {
         const db = createDb(c.env.DATABASE_URL);
         const user = c.get("user");
-        const access = await authorizeAccount(db, user, c.req.param("accountId"), "content");
+        const access = await authorizeAccount(db, user, c.req.param("accountId"), "content", { feature: "strategy" });
         const account = access.account;
         const parsed = referencePostBatchRequestSchema.safeParse(await c.req.json().catch(() => null));
         if (!parsed.success) {
@@ -226,7 +226,7 @@ export function researchRoutes(authed: MiddlewareHandler<AppEnv>) {
       // 解説のプロンプト（specs/014 FR-086・FR-100・FR-101、research.md R8）。?id= で1件、なしで解説がまだのものをまとめて
       .get("/accounts/:accountId/reference-posts/explain-prompt", authed, async (c) => {
         const db = createDb(c.env.DATABASE_URL);
-        const access = await authorizeAccount(db, c.get("user"), c.req.param("accountId"), "content");
+        const access = await authorizeAccount(db, c.get("user"), c.req.param("accountId"), "content", { feature: "strategy" });
         const account = access.account;
         const [rows, strategy] = await Promise.all([
           db.select().from(referencePosts).where(eq(referencePosts.accountId, account.id)),
@@ -253,7 +253,7 @@ export function researchRoutes(authed: MiddlewareHandler<AppEnv>) {
       // まとめての解説の保存（specs/014 FR-104、research.md R8）。解説が空の行だけを更新し、ほかは飛ばす
       .post("/accounts/:accountId/reference-posts/explanations", authed, async (c) => {
         const db = createDb(c.env.DATABASE_URL);
-        const access = await authorizeAccount(db, c.get("user"), c.req.param("accountId"), "content");
+        const access = await authorizeAccount(db, c.get("user"), c.req.param("accountId"), "content", { feature: "strategy" });
         const account = access.account;
         const { items } = await parseBody(explanationsRequestSchema, c.req.json());
         const result = await withActivityTx(c.env.DATABASE_URL, db, access, async (q) => {
@@ -298,7 +298,7 @@ export function researchRoutes(authed: MiddlewareHandler<AppEnv>) {
       .put("/accounts/:accountId/reference-posts/:referencePostId", authed, async (c) => {
         const db = createDb(c.env.DATABASE_URL);
         const user = c.get("user");
-        const access = await authorizeAccount(db, user, c.req.param("accountId"), "content");
+        const access = await authorizeAccount(db, user, c.req.param("accountId"), "content", { feature: "strategy" });
         const account = access.account;
         const id = assertItemId(c.req.param("referencePostId"));
         const { expectedVersion, ...input } = await parseBody(updateReferencePostRequestSchema, c.req.json());
@@ -330,7 +330,7 @@ export function researchRoutes(authed: MiddlewareHandler<AppEnv>) {
       .delete("/accounts/:accountId/reference-posts/:referencePostId", authed, async (c) => {
         const db = createDb(c.env.DATABASE_URL);
         const user = c.get("user");
-        const access = await authorizeAccount(db, user, c.req.param("accountId"), "content");
+        const access = await authorizeAccount(db, user, c.req.param("accountId"), "content", { feature: "strategy" });
         const account = access.account;
         const id = assertItemId(c.req.param("referencePostId"));
         // 削除と操作の記録を同じトランザクションにする（PR #9 のCodexレビュー）
@@ -350,7 +350,7 @@ export function researchRoutes(authed: MiddlewareHandler<AppEnv>) {
       .get("/accounts/:accountId/research-keywords", authed, async (c) => {
         const db = createDb(c.env.DATABASE_URL);
         const user = c.get("user");
-        const access = await authorizeAccount(db, user, c.req.param("accountId"), "read");
+        const access = await authorizeAccount(db, user, c.req.param("accountId"), "read", { feature: "strategy" });
         const account = access.account;
         const rows = await db
           .select()
@@ -363,7 +363,7 @@ export function researchRoutes(authed: MiddlewareHandler<AppEnv>) {
       .post("/accounts/:accountId/research-keywords", authed, async (c) => {
         const db = createDb(c.env.DATABASE_URL);
         const user = c.get("user");
-        const access = await authorizeAccount(db, user, c.req.param("accountId"), "content");
+        const access = await authorizeAccount(db, user, c.req.param("accountId"), "content", { feature: "strategy" });
         const account = access.account;
         const input = await parseBody(researchKeywordInputSchema, c.req.json());
         const row = await withDuplicateCheck(() =>
@@ -397,14 +397,14 @@ export function researchRoutes(authed: MiddlewareHandler<AppEnv>) {
       // キーワードの案のプロンプト（specs/014 FR-090、research.md R16）
       .get("/accounts/:accountId/research-keywords/idea-prompt", authed, async (c) => {
         const db = createDb(c.env.DATABASE_URL);
-        const access = await authorizeAccount(db, c.get("user"), c.req.param("accountId"), "content");
+        const access = await authorizeAccount(db, c.get("user"), c.req.param("accountId"), "content", { feature: "strategy" });
         return c.json({ prompt: buildKeywordIdeaPrompt(await getStrategy(db, access.account.id)) });
       })
       // キーワードの案のまとめての登録（specs/014 FR-092・FR-094）。1件でも通らなければ1件も入れない
       .post("/accounts/:accountId/research-keywords/batch", authed, async (c) => {
         const db = createDb(c.env.DATABASE_URL);
         const user = c.get("user");
-        const access = await authorizeAccount(db, user, c.req.param("accountId"), "content");
+        const access = await authorizeAccount(db, user, c.req.param("accountId"), "content", { feature: "strategy" });
         const account = access.account;
         const parsed = keywordBatchRequestSchema.safeParse(await c.req.json().catch(() => null));
         if (!parsed.success) {
@@ -466,7 +466,7 @@ export function researchRoutes(authed: MiddlewareHandler<AppEnv>) {
       .put("/accounts/:accountId/research-keywords/:keywordId", authed, async (c) => {
         const db = createDb(c.env.DATABASE_URL);
         const user = c.get("user");
-        const access = await authorizeAccount(db, user, c.req.param("accountId"), "content");
+        const access = await authorizeAccount(db, user, c.req.param("accountId"), "content", { feature: "strategy" });
         const account = access.account;
         const id = assertItemId(c.req.param("keywordId"));
         const { expectedVersion, ...input } = await parseBody(updateResearchKeywordRequestSchema, c.req.json());
@@ -502,7 +502,7 @@ export function researchRoutes(authed: MiddlewareHandler<AppEnv>) {
       .delete("/accounts/:accountId/research-keywords/:keywordId", authed, async (c) => {
         const db = createDb(c.env.DATABASE_URL);
         const user = c.get("user");
-        const access = await authorizeAccount(db, user, c.req.param("accountId"), "content");
+        const access = await authorizeAccount(db, user, c.req.param("accountId"), "content", { feature: "strategy" });
         const account = access.account;
         const id = assertItemId(c.req.param("keywordId"));
         // 削除と操作の記録を同じトランザクションにする（PR #9 のCodexレビュー）

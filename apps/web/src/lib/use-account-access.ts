@@ -1,6 +1,6 @@
 // Accountでの役割と権限（specs/008-team-operations contracts/permissions.md「画面での出し分け」、contracts/ui-routes.md「共通の振る舞い」）。
 // 出し分けは見た目のためだけで、守りはAPIの判定にある（FR-003）。
-import { ACCOUNT_ACCESS_LOST_MESSAGE, type AccountAccessResponse, type Permission } from "@threads-grower/shared";
+import { ACCOUNT_ACCESS_LOST_MESSAGE, type AccountAccessResponse, type Feature, type Permission } from "@threads-grower/shared";
 import { useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
 import { useEffect } from "react";
 import { useNavigate } from "react-router";
@@ -30,6 +30,17 @@ export function useAccountAccess(accountId: string | undefined) {
  */
 export function canDo(access: AccountAccessResponse | undefined, permission: Permission): boolean {
   return access?.permissions.includes(permission) ?? false;
+}
+
+/**
+ * 機能のまとまりがONか（specs/019 research.md R6）。読み込み前は「OFFとはわかっていない」として true にする
+ * （設定のない人の画面が、読み込みのたびに一瞬消えないように）。中身を読む前に確かめたいときは、読み込み後に使う。
+ * @param access - 役割と権限
+ * @param feature - 確かめるまとまり
+ * @returns OFFとわかっていなければ true
+ */
+export function featureOn(access: AccountAccessResponse | undefined, feature: Feature): boolean {
+  return access?.features.includes(feature) ?? true;
 }
 
 /**

@@ -13,6 +13,7 @@ import { ReferralLandingPage } from "@/pages/referral-landing";
 import { ReferralSettingsPage } from "@/pages/settings/referral";
 import { Landing } from "@/pages/landing";
 import { NotFound } from "@/pages/not-found";
+import { RequireFeature } from "@/components/FeatureUnavailable";
 import { PerformancePage } from "@/pages/performance";
 import { TeamPage } from "@/pages/team";
 import { TeamAssignPage } from "@/pages/team-assign";
@@ -21,6 +22,7 @@ import { TeamSharedAccountPage } from "@/pages/team-shared-account";
 import { SignInPage } from "@/pages/sign-in";
 import { AccountSettingsPage } from "@/pages/settings/account";
 import { BillingSettingsPage } from "@/pages/settings/billing";
+import { FeaturesPage } from "@/pages/settings/features";
 import { TestGroupDetailPage, TestGroupsPage } from "@/pages/settings/test-groups";
 import { LegalCommercePage } from "@/pages/legal-commerce";
 import { AppearanceSettings } from "@/pages/settings/appearance";
@@ -85,6 +87,7 @@ export const routes = [
           { path: "billing", element: <BillingSettingsPage /> },
           { path: "referral", element: <ReferralSettingsPage /> },
           // 運営者だけ（specs/016 contracts/ui-routes.md 3）。運営者でなければ画面の中で断る
+          { path: "features", element: <FeaturesPage /> },
           { path: "test-groups", element: <TestGroupsPage /> },
           { path: "test-groups/:groupId", element: <TestGroupDetailPage /> },
         ],
@@ -106,15 +109,16 @@ export const routes = [
         children: [
           { index: true, element: <AccountHome /> },
           { path: "settings", element: <AccountSettings /> },
-          { path: "strategy", element: <StrategyPage /> },
-          { path: "promotions", element: <PromotionsPage /> },
-          { path: "research", element: <ResearchPage /> },
+          // 機能のまとまりがOFFなら「この機能は今は使えません」（specs/019 FR-006）
+          { path: "strategy", element: <RequireFeature feature="strategy"><StrategyPage /></RequireFeature> },
+          { path: "promotions", element: <RequireFeature feature="strategy"><PromotionsPage /></RequireFeature> },
+          { path: "research", element: <RequireFeature feature="strategy"><ResearchPage /></RequireFeature> },
           // 投稿をつくる（specs/014 US15）。投稿ストックは一覧だけにした
-          { path: "create", element: <CreatePage /> },
-          { path: "stock", element: <StockPage /> },
-          { path: "performance", element: <PerformancePage /> },
+          { path: "create", element: <RequireFeature feature="autopost"><CreatePage /></RequireFeature> },
+          { path: "stock", element: <RequireFeature feature="autopost"><StockPage /></RequireFeature> },
+          { path: "performance", element: <RequireFeature feature="autopost"><PerformancePage /></RequireFeature> },
           // 操作の記録（specs/008 FR-052）。オーナーと、担当の管理者だけ（specs/011 FR-002）
-          { path: "activity", element: <ActivityPage /> },
+          { path: "activity", element: <RequireFeature feature="team"><ActivityPage /></RequireFeature> },
         ],
       },
     ],

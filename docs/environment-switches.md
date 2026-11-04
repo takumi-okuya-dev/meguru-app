@@ -9,8 +9,8 @@
 | `APP_ENV` | 環境の名前。ログの印と、設定の誤りを詳しく返すか（手元だけ） | `development` | `staging` | `production` | `wrangler.toml`・`.dev.vars` |
 | `VITE_APP_ENV` | 画面の環境の帯（本番以外で「テスト版」などと出す）、検索に載せない指定 | `development` | `staging` | `production` | GitHub の Environment の変数・`apps/web/.env.local` |
 | `BILLING_ENABLED` | 決済（無料体験・契約・料金の画面・読むだけ）。OFFなら全員がすべての機能を使える | `false` | `true` | `true` | `wrangler.toml`・`.dev.vars` |
-| `TEST_GROUPS_ENABLED` | 招待制（テスト用のグループ・運営者の画面）。ONなら、招待リンクから入った人だけが使える | `false` | `true` | `false` | `wrangler.toml`・`.dev.vars` |
-| `OPERATOR_CLERK_USER_IDS` | 運営者（Clerk のユーザーIDのカンマ区切り）。`TEST_GROUPS_ENABLED` がONのときだけ効く。運営者は運営者の画面を使え、**料金なし（無料体験も読むだけもない）**になる | 空 | 開発者 | 空 | Secret（`wrangler secret put`） |
+| `TEST_GROUPS_ENABLED` | 招待制。ONなら、グループの招待リンクから入った人だけが使え、入った人は料金なしになる。OFFでもグループは作れるが、機能の設定にだけ使う（誰でも登録でき、料金なしにならない。specs/019） | `false` | `true` | `false` | `wrangler.toml`・`.dev.vars` |
+| `OPERATOR_CLERK_USER_IDS` | 運営者（Clerk のユーザーIDのカンマ区切り）。運営者は、設定の「運営 › 使える機能」「運営 › グループ」（機能のまとまりのON/OFFと組織ごとの設定。specs/019）をどの環境でも使える。`TEST_GROUPS_ENABLED` がONのときだけ、加えて**料金なし（無料体験も読むだけもない）**になる | 空 | 開発者 | 空（使うときに入れる） | Secret（`wrangler secret put`） |
 | `THREADS_CONNECT_METHODS` | Threads につなぐ方法（`token`＝トークンを貼る、`app`＝Meta の画面で許可）。空なら両方 | 両方 | `token` | 両方 | `wrangler.toml`・`.dev.vars` |
 | `THREADS_ACCESS_MODE` | Threads 連携の公開範囲の案内（`testers`＝Meta の審査前、`public`＝審査後） | `testers` | `testers` | `testers` | `wrangler.toml`・`.dev.vars` |
 
@@ -30,7 +30,7 @@
 - **GitHub の Environment の変数**：Settings → Environments → その環境で変えます。画面に焼き込まれる値なので、変えたら Web を出し直します（develop か main に何かマージする）。
 - **手元**：`apps/api/.dev.vars` と `apps/web/.env.local` を直し、開発用のサーバーを起動し直します。
 
-**運営者を足すときの注意**：運営者になると、テスト版ではグループの管理に加えて料金なしになります。運営者の画面だけを任せたい人でも、料金なしになることを承知の上で足してください。また、運営者には料金なしの印（`admin:set-billing-exempt`）が効きません。印を外しても料金なしのままです。テスト版で無料体験や読むだけの画面を確かめたいときは、運営者でないアカウントで確かめます。
+**運営者を足すときの注意**：運営者は、どの環境でも、ほかの人とグループの機能のまとまり（自動投稿・戦略・チーム）をON/OFFでき、グループを作れます。本番で使うときは、本番の Secret に入れます（`--env production`）。テスト版では、加えて料金なしになります。運営者の画面だけを任せたい人でも、料金なしになることを承知の上で足してください。また、運営者には料金なしの印（`admin:set-billing-exempt`）が効きません。印を外しても料金なしのままです。テスト版で無料体験や読むだけの画面を確かめたいときは、運営者でないアカウントで確かめます。
 
 `BILLING_ENABLED`・`TEST_GROUPS_ENABLED` は、`"true"`／`"false"` 以外の値や空にすると、API が設定の誤りとして止まります。打ち間違いで、黙って ON や OFF にならないようにするためです。
 

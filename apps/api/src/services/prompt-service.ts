@@ -8,6 +8,7 @@ import {
   HINTED_KEYS,
   buildPrompt,
   checkStrategy,
+  emptyStrategyValues,
   countChars,
   freshnessOf,
   isBlank,
@@ -15,6 +16,7 @@ import {
   jstToday,
   rejectReasonLabel,
   sortForPrompt,
+  type Feature,
   type PostLengthSettings,
   type PostedDateMode,
   type PromptMaterials,
@@ -174,23 +176,29 @@ function promptMaterials(
 
 /**
  * 最新の材料からプロンプトを組み立てる（FR-002・FR-007）。材料の取得は並べて行う。
+ * オーナーが戦略を使えなければ、課題・宣伝内容・参考投稿を読まない（specs/019 research.md R4）。
+ * 空の材料の節は buildPrompt が入れないので、プロンプトの組み立ては変えない。
  * @param db - データベース
  * @param account - Account の行
  * @param count - 作る件数
- * @returns 全文・件数・要約
+ * @param features - オーナーの使えるまとまり（authorizeAccount の結果）
+ * @returns 全文・件数・要約。戦略がOFFなら materials は null
  */
-export async function getPrompt(db: Db, account: AccountRow, count: number) {
+export async function getPrompt(db: Db, account: AccountRow, count: number, features: ReadonlySet<Feature>) {
   const now = new Date();
+  const useStrategy = features.has("strategy");
   const [strategy, promotionRows, postRows, draftBodies, ngWordRows, rejectedRows, schedule, poorRows] =
     await Promise.all([
-      getStrategy(db, account.id),
-      db.select().from(promotions).where(eq(promotions.accountId, account.id)),
+      useStrategy ? getStrategy(db, account.id) : Promise.resolve(emptyStrategyValues()),
+      useStrategy ? db.select().from(promotions).where(eq(promotions.accountId, account.id)) : Promise.resolve([]),
       // 鮮度の順に並べるため、全件（上限200件）を読んでから選ぶ（specs/014 FR-099、research.md R6）
-      db
-        .select()
-        .from(referencePosts)
-        .where(eq(referencePosts.accountId, account.id))
-        .orderBy(desc(referencePosts.createdAt), desc(referencePosts.id)),
+      useStrategy
+        ? db
+            .select()
+            .from(referencePosts)
+            .where(eq(referencePosts.accountId, account.id))
+            .orderBy(desc(referencePosts.createdAt), desc(referencePosts.id))
+        : Promise.resolve([]),
       recentDraftBodies(db, account.id),
       listNgWords(db, account.id),
       listReviewedRows(db, account.id, "rejected", PROMPT_REJECTED_DRAFTS),
@@ -252,6 +260,7 @@ export async function getPrompt(db: Db, account: AccountRow, count: number) {
     splitRecommended: length > PROMPT_SPLIT_THRESHOLD,
     // 作る件数と文字数・割合（specs/014 research.md R11）
     settings: { postCount: account.promptPostCount, length: lengthSettingsOf(account), version: account.promptPostCountVersion },
-    materials: promptMaterials(strategy, includedPromotions, postRows, summary.referencePostCount),
+    // 戦略がOFFなら「プロンプトに入っている情報」を出さない（specs/019 FR-007）
+    materials: useStrategy ? promptMaterials(strategy, includedPromotions, postRows, summary.referencePostCount) : null,
   };
 }

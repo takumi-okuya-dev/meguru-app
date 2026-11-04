@@ -22,6 +22,8 @@ import {
   type AnyPgColumn,
 } from "drizzle-orm/pg-core";
 import {
+  FEATURE_EVENT_ACTIONS,
+  FEATURES,
   POST_LENGTH_DEFAULTS,
   PROMOTION_RATIO_DEFAULT,
   PROMPT_COUNT_DEFAULT,
@@ -1106,5 +1108,65 @@ export const testGroupEvents = pgTable(
   (t) => [
     check("test_group_events_action_valid", sql`${t.action} IN (${inList(TEST_GROUP_EVENT_ACTIONS)})`),
     index("test_group_events_group_created_idx").on(t.groupId, t.createdAt.desc()),
+  ],
+);
+
+/**
+ * 機能のまとまりごとのON/OFF（specs/019-feature-switches data-model.md）。人の設定で、OFFのまとまりだけを行で持ち、行がなければON。
+ * 人の設定（feature_disables）とグループの設定（group_feature_disables）の、どちらかでOFFなら使えない（FR-018）。
+ */
+export const featureDisables = pgTable(
+  "feature_disables",
+  {
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    feature: text("feature").notNull(),
+    disabledAt: timestamp("disabled_at", { withTimezone: true, precision: 6 }).notNull().defaultNow(),
+    disabledByUserId: uuid("disabled_by_user_id").references(() => users.id, { onDelete: "set null" }),
+  },
+  (t) => [
+    primaryKey({ name: "feature_disables_pkey", columns: [t.userId, t.feature] }),
+    check("feature_disables_feature_valid", sql`${t.feature} IN (${inList(FEATURES)})`),
+  ],
+);
+
+/** グループ（組織）の設定（specs/019 FR-017）。閉じたグループの行は残すが、判定では使わない。 */
+export const groupFeatureDisables = pgTable(
+  "group_feature_disables",
+  {
+    groupId: uuid("group_id")
+      .notNull()
+      .references(() => testGroups.id, { onDelete: "cascade" }),
+    feature: text("feature").notNull(),
+    disabledAt: timestamp("disabled_at", { withTimezone: true, precision: 6 }).notNull().defaultNow(),
+    disabledByUserId: uuid("disabled_by_user_id").references(() => users.id, { onDelete: "set null" }),
+  },
+  (t) => [
+    primaryKey({ name: "group_feature_disables_pkey", columns: [t.groupId, t.feature] }),
+    check("group_feature_disables_feature_valid", sql`${t.feature} IN (${inList(FEATURES)})`),
+  ],
+);
+
+/** 機能の設定を変えた記録（specs/019 FR-014、research.md R7）。人かグループのどちらか一方。変えられた人が退会したら・グループを消したら消す。 */
+export const featureSettingEvents = pgTable(
+  "feature_setting_events",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    subjectUserId: uuid("subject_user_id").references(() => users.id, { onDelete: "cascade" }),
+    subjectGroupId: uuid("subject_group_id").references(() => testGroups.id, { onDelete: "cascade" }),
+    feature: text("feature").notNull(),
+    action: text("action").notNull(),
+    actorUserId: uuid("actor_user_id").references(() => users.id, { onDelete: "set null" }),
+    actorName: text("actor_name").notNull(),
+    subjectName: text("subject_name").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true, precision: 6 }).notNull().defaultNow(),
+  },
+  (t) => [
+    check("feature_setting_events_feature_valid", sql`${t.feature} IN (${inList(FEATURES)})`),
+    check("feature_setting_events_action_valid", sql`${t.action} IN (${inList(FEATURE_EVENT_ACTIONS)})`),
+    check("feature_setting_events_one_subject", sql`(${t.subjectUserId} IS NULL) <> (${t.subjectGroupId} IS NULL)`),
+    index("feature_setting_events_created_idx").on(t.createdAt.desc()),
+    index("feature_setting_events_subject_created_idx").on(t.subjectUserId, t.createdAt.desc()),
   ],
 );

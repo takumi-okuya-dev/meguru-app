@@ -96,7 +96,8 @@ describe("サイドバーの「投稿をつくる」", () => {
     const labels = within(nav)
       .getAllByRole("link")
       .map((l) => l.textContent?.replace(/\s+/g, ""));
-    expect(labels).toEqual(["ホーム", "投稿をつくる", "投稿ストック", "課題", "宣伝内容", "リサーチ", "パフォーマンス"]);
+    // 2026-11-04（specs/019）：パフォーマンスは「自動投稿」の見出しの下（投稿ストックの次）
+    expect(labels).toEqual(["ホーム", "投稿をつくる", "投稿ストック", "パフォーマンス", "課題", "宣伝内容", "リサーチ"]);
     const create = within(nav).getByRole("link", { name: "投稿をつくる" });
     expect(create).toHaveAttribute("href", "/accounts/a1/create");
     expect(create).not.toHaveAttribute("aria-current");

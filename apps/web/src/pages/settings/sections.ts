@@ -1,5 +1,5 @@
 // 設定画面の項目の一覧。項目を足すときは、ここに1行足して画面を作るだけにする
-import { CreditCardIcon, PaletteIcon, Share2Icon, UserCircleIcon, UsersRoundIcon, type LucideIcon } from "lucide-react";
+import { CreditCardIcon, PaletteIcon, Share2Icon, ToggleRightIcon, UserCircleIcon, UsersRoundIcon, type LucideIcon } from "lucide-react";
 
 /** 設定画面の項目。 */
 export type SettingsSection = {
@@ -29,15 +29,18 @@ export const SETTINGS_GROUPS: SettingsGroup[] = [
   },
 ];
 
-/** 運営者にだけ出す項目のグループ（specs/016 contracts/ui-routes.md 3）。 */
+/** 運営者にだけ出す項目のグループ（specs/016 contracts/ui-routes.md 3、specs/019 contracts/ui-routes.md 4）。どの環境でも出す。 */
 export const OPERATOR_SETTINGS_GROUP: SettingsGroup = {
   label: "運営",
-  sections: [{ slug: "test-groups", label: "テスト用のグループ", Icon: UsersRoundIcon, keywords: ["テスト", "招待", "グループ", "運営", "上限"] }],
+  sections: [
+    { slug: "features", label: "使える機能", Icon: ToggleRightIcon, keywords: ["機能", "ON", "OFF", "プラン", "戦略", "自動投稿", "チーム", "運営"] },
+    { slug: "test-groups", label: "グループ", Icon: UsersRoundIcon, keywords: ["テスト", "招待", "グループ", "組織", "運営", "上限"] },
+  ],
 };
 
 /**
  * その人に出す項目のグループ。運営者には「運営」の区分を足す。
- * @param operator - 運営者か（/api/me の testGroups.operator）
+ * @param operator - 運営者か（/api/me の operator。招待制に関わらない。specs/019）
  * @returns 項目のグループ
  */
 export function settingsGroupsFor(operator: boolean): SettingsGroup[] {

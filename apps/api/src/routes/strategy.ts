@@ -18,6 +18,7 @@ export function strategyRoutes(authed: MiddlewareHandler<AppEnv>) {
   return new Hono<AppEnv>()
     .get("/accounts/:accountId/profile-status", authed, async (c) => {
       // ホームの入力状況（FR-017）。読み取りなので grower機能の判定はしない
+      // 機能のまとまりでは守らない（ホームが使う数だけで、中身は返さない。specs/019 research.md R3）
       const db = createDb(c.env.DATABASE_URL);
       const user = c.get("user");
       const access = await authorizeAccount(db, user, c.req.param("accountId"), "view");
@@ -26,7 +27,7 @@ export function strategyRoutes(authed: MiddlewareHandler<AppEnv>) {
     .get("/accounts/:accountId/strategy", authed, async (c) => {
       const db = createDb(c.env.DATABASE_URL);
       const user = c.get("user");
-      const access = await authorizeAccount(db, user, c.req.param("accountId"), "read");
+      const access = await authorizeAccount(db, user, c.req.param("accountId"), "read", { feature: "strategy" });
       const account = access.account;
       // 直せるのは content の権限がある人だけ（見せてもらっている人は読むだけ。PR #14 のCodexレビュー）
       return c.json({
@@ -38,7 +39,7 @@ export function strategyRoutes(authed: MiddlewareHandler<AppEnv>) {
       const db = createDb(c.env.DATABASE_URL);
       const user = c.get("user");
       // 必ず「所有 → grower機能 → 入力の検証」の順で確かめる（FR-023・FR-024）
-      const access = await authorizeAccount(db, user, c.req.param("accountId"), "content");
+      const access = await authorizeAccount(db, user, c.req.param("accountId"), "content", { feature: "strategy" });
       const account = access.account;
       const parsed = putStrategyRequestSchema.safeParse(await c.req.json().catch(() => null));
       if (!parsed.success) {

@@ -4,6 +4,7 @@ import { inviteAcceptRequestSchema } from "@threads-grower/shared";
 import { Hono, type MiddlewareHandler } from "hono";
 import type { AppEnv } from "../app";
 import { parseBody } from "../lib/validate";
+import { requireFeature } from "../services/access";
 import { acceptTeamInvite, previewTeamInvite } from "../services/invite-service";
 
 /**
@@ -20,6 +21,8 @@ export function inviteRoutes(authed: MiddlewareHandler<AppEnv>, maybeAuthed: Mid
       return c.json(await previewTeamInvite(c.env, c.req.param("token"), user ?? null));
     })
     .post("/invites/:token/accept", authed, async (c) => {
+      // チームを使えない人は、招待から入れない（specs/019 FR-009）
+      requireFeature(c.get("user"), "team");
       const req = await parseBody(inviteAcceptRequestSchema, c.req.json());
       return c.json(await acceptTeamInvite(c.env, c.get("user"), c.req.param("token"), req.accounts));
     });

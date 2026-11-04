@@ -3,6 +3,7 @@ export * from "./billing";
 export * from "./csv";
 export * from "./drafts";
 export * from "./errors";
+export * from "./features";
 export * from "./limits";
 export * from "./ng-words";
 export * from "./performance";

@@ -25,7 +25,7 @@ const { TestInvitePage } = await import("@/pages/test-invite");
 const TOKEN = "g_" + "a".repeat(43);
 
 function preview(over: Partial<TestInvitePreview> = {}): TestInvitePreview {
-  return { group: { name: "飲食の会" }, full: false, viewer: null, ...over };
+  return { group: { name: "飲食の会" }, testVersion: true, full: false, viewer: null, ...over };
 }
 
 function renderAt() {
@@ -64,6 +64,15 @@ describe("グループの招待", () => {
     await user.click(screen.getByRole("button", { name: "Googleで始める" }));
     expect(router.state.location.pathname).toBe("/sign-in");
     expect(router.state.location.search).toBe(`?next=${encodeURIComponent(`/test-invite/${TOKEN}`)}`);
+  });
+
+  it("本番（testVersion: false）では、見出しを「（グループ名）に招待されています」にし、テスト版の注意を出さない（specs/019 FR-019）", async () => {
+    previewTestInvite.mockResolvedValue(preview({ testVersion: false }));
+    renderAt();
+    expect(await screen.findByRole("heading", { name: "飲食の会に招待されています" })).toBeInTheDocument();
+    expect(screen.queryByText("料金はかかりません")).toBeNull();
+    expect(screen.queryByText(/テスト版/)).toBeNull();
+    expect(screen.getByRole("button", { name: "Googleで始める" })).toBeInTheDocument();
   });
 
   it("ログイン前で定員なら、「Googleで始める」の代わりに定員の文", async () => {

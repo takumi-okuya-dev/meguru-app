@@ -1,4 +1,4 @@
-// 設定 > 運営 > テスト用のグループ（specs/016-test-groups contracts/ui-routes.md 3、US2、T024・T025）
+// 設定 > 運営 > グループ（specs/016-test-groups contracts/ui-routes.md 3、US2、T024・T025。specs/019 で「グループ」に改名し、使える機能を足した）
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -13,9 +13,13 @@ const createTestGroup = vi.fn();
 const testGroup = vi.fn();
 const removeTestGroupMember = vi.fn();
 const closeTestGroup = vi.fn();
+const putTestGroupFeatures = vi.fn();
 vi.mock("@/lib/api-client", async (orig) => {
   const actual = await orig<typeof import("@/lib/api-client")>();
-  return { ...actual, api: { ...actual.api, me, testGroups, createTestGroup, testGroup, removeTestGroupMember, closeTestGroup } };
+  return {
+    ...actual,
+    api: { ...actual.api, me, testGroups, createTestGroup, testGroup, removeTestGroupMember, closeTestGroup, putTestGroupFeatures },
+  };
 });
 
 const { ApiError } = await import("@/lib/api-client");
@@ -41,6 +45,7 @@ const DETAIL: TestGroupDetail = {
   inviteUrl: "https://app.test/test-invite/g_x",
   closedAt: null,
   createdAt: "2026-10-31T00:00:00.000Z",
+  disabled: [],
   members: [
     { userId: "m1", name: "鈴木", email: "suzuki@example.com", joinedAt: "2026-10-31T01:00:00.000Z" },
     { userId: "m2", name: "佐藤", email: "sato@example.com", joinedAt: "2026-10-31T02:00:00.000Z" },
@@ -72,21 +77,22 @@ function renderAt(path: string) {
 }
 
 beforeEach(() => {
-  for (const fn of [me, testGroups, createTestGroup, testGroup, removeTestGroupMember, closeTestGroup]) fn.mockReset();
+  for (const fn of [me, testGroups, createTestGroup, testGroup, removeTestGroupMember, closeTestGroup, putTestGroupFeatures]) fn.mockReset();
 });
 
 describe("「運営」の区分", () => {
-  it("運営者にだけ「テスト用のグループ」を出す", async () => {
-    me.mockResolvedValue({ ...ME, testGroups: { enabled: true, admitted: true, operator: true } });
+  it("運営者にだけ「グループ」と「使える機能」を出す（specs/019 で項目名を「グループ」にした）", async () => {
+    me.mockResolvedValue({ ...ME, testGroups: { enabled: true, admitted: true, operator: true }, operator: true });
     renderAt("/settings/appearance");
-    expect(await screen.findByRole("link", { name: /テスト用のグループ/ })).toHaveAttribute("href", "/settings/test-groups");
+    expect(await screen.findByRole("link", { name: "グループ" })).toHaveAttribute("href", "/settings/test-groups");
+    expect(screen.getByRole("link", { name: "使える機能" })).toHaveAttribute("href", "/settings/features");
   });
 
   it("運営者でなければ出さない", async () => {
     me.mockResolvedValue({ ...ME, testGroups: { enabled: true, admitted: true, operator: false } });
     renderAt("/settings/appearance");
     await screen.findByText("外観の中身");
-    expect(screen.queryByRole("link", { name: /テスト用のグループ/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "グループ" })).not.toBeInTheDocument();
   });
 
   it("運営者でない人が直接開くと「運営者だけ」", async () => {
@@ -97,7 +103,7 @@ describe("「運営」の区分", () => {
   });
 
   it("運営者でも、読み込めなかったときはエラーの中身を出す（「運営者だけ」と言わない）", async () => {
-    me.mockResolvedValue({ ...ME, testGroups: { enabled: true, admitted: true, operator: true } });
+    me.mockResolvedValue({ ...ME, testGroups: { enabled: true, admitted: true, operator: true }, operator: true });
     testGroups.mockRejectedValue(new ApiError("API_UNREACHABLE", 0));
     renderAt("/settings/test-groups");
     expect(await screen.findByRole("alert")).toBeInTheDocument();
@@ -105,7 +111,7 @@ describe("「運営」の区分", () => {
   });
 
   it("グループが見つからないときは、その旨を出す", async () => {
-    me.mockResolvedValue({ ...ME, testGroups: { enabled: true, admitted: true, operator: true } });
+    me.mockResolvedValue({ ...ME, testGroups: { enabled: true, admitted: true, operator: true }, operator: true });
     testGroup.mockRejectedValue(new ApiError("ITEM_NOT_FOUND", 404));
     renderAt("/settings/test-groups/g1");
     expect(await screen.findByRole("alert")).toBeInTheDocument();
@@ -115,7 +121,7 @@ describe("「運営」の区分", () => {
 
 describe("一覧", () => {
   beforeEach(() => {
-    me.mockResolvedValue({ ...ME, testGroups: { enabled: true, admitted: true, operator: true } });
+    me.mockResolvedValue({ ...ME, testGroups: { enabled: true, admitted: true, operator: true }, operator: true });
   });
 
   it("グループごとに人数／上限、定員、閉じたものを出す", async () => {
@@ -152,7 +158,7 @@ describe("一覧", () => {
 
 describe("詳しい画面", () => {
   beforeEach(() => {
-    me.mockResolvedValue({ ...ME, testGroups: { enabled: true, admitted: true, operator: true } });
+    me.mockResolvedValue({ ...ME, testGroups: { enabled: true, admitted: true, operator: true }, operator: true });
     testGroup.mockResolvedValue(DETAIL);
   });
 
@@ -188,5 +194,39 @@ describe("詳しい画面", () => {
     expect(await screen.findByText(/閉じています/)).toBeInTheDocument();
     expect(screen.queryByRole("textbox", { name: "招待リンク" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "グループを閉じる" })).not.toBeInTheDocument();
+  });
+});
+
+describe("グループの使える機能（specs/019 contracts/ui-routes.md 5）", () => {
+  it("3つのスイッチ（今の設定）と保存。保存すると PUT に3つの値が渡り、「保存しました」", async () => {
+    const user = userEvent.setup();
+    me.mockResolvedValue({ ...ME, operator: true });
+    testGroup.mockResolvedValue({ ...DETAIL, disabled: ["strategy"] });
+    putTestGroupFeatures.mockResolvedValue({ ...DETAIL, disabled: ["strategy", "team"] });
+    renderAt("/settings/test-groups/g1");
+    const group = within(await screen.findByRole("group", { name: "飲食の会の使える機能" }));
+    expect(group.getByRole("switch", { name: "自動投稿" })).toBeChecked();
+    expect(group.getByRole("switch", { name: "戦略" })).not.toBeChecked();
+    await user.click(group.getByRole("switch", { name: "チーム" }));
+    await user.click(group.getByRole("button", { name: "保存" }));
+    expect(putTestGroupFeatures).toHaveBeenCalledWith("g1", { autopost: true, strategy: false, team: false });
+    expect(await screen.findByText("保存しました")).toBeInTheDocument();
+    expect(group.getByRole("button", { name: "保存" })).toBeInTheDocument();
+  });
+
+  it("閉じたグループには出さない。招待リンクの「テスト版を使えます」は、テスト版でだけ出す", async () => {
+    me.mockResolvedValue({ ...ME, operator: true });
+    testGroup.mockResolvedValue({ ...DETAIL, closedAt: "2026-11-01T00:00:00.000Z", inviteUrl: null });
+    renderAt("/settings/test-groups/g1");
+    await screen.findByRole("heading", { name: "飲食の会" });
+    expect(screen.queryByRole("group", { name: /使える機能/ })).toBeNull();
+  });
+
+  it("本番（招待制がOFF）では、招待リンクにテスト版の説明を出さない", async () => {
+    me.mockResolvedValue({ ...ME, operator: true });
+    testGroup.mockResolvedValue(DETAIL);
+    renderAt("/settings/test-groups/g1");
+    await screen.findByRole("heading", { name: "招待リンク" });
+    expect(screen.queryByText(/テスト版を使えます/)).toBeNull();
   });
 });

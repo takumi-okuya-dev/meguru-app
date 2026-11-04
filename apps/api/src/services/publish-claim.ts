@@ -17,6 +17,7 @@ import { accounts, postDrafts, postingSchedules, publishAttempts } from "../db/s
 import type { Env } from "../env";
 import { billingModeOf, type BillingMode } from "../lib/config";
 import { loadOwnerEntitlement } from "./billing-service";
+import { ownerAutopostOn } from "./feature-sql";
 import { CLEAR_QUEUE_FIELDS, listQueueRows } from "./draft-service";
 import { listNgWords } from "./posting-rules-service";
 
@@ -78,6 +79,8 @@ async function skipReasonOf(
   // 一覧を読んだ後にオーナーが読むだけになった（specs/013 research.md R8）
   const owner = await loadOwnerEntitlement(tx, accountId, mode, now);
   if (owner && !owner.fullAccess) return "billing_inactive";
+  // 一覧を読んだ後に、オーナーが自動投稿を使えなくなった（specs/019 FR-008）
+  if (!(await ownerAutopostOn(tx, accountId))) return "auto_post_off";
   if (schedule.pausedUntil && schedule.pausedUntil.getTime() > now.getTime()) return "rate_limited";
   const published = (from: Date, to: Date) =>
     tx

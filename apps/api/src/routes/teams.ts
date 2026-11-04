@@ -15,7 +15,7 @@ import { Hono, type Context, type MiddlewareHandler } from "hono";
 import type { AppEnv } from "../app";
 import { createDb, withTransaction } from "../db/client";
 import { parseBody } from "../lib/validate";
-import { authorizeTeamAdmin, authorizeTeamMember, isUuid, teamNotFound } from "../services/access";
+import { authorizeTeamAdmin, authorizeTeamMember, isUuid, requireFeature, teamNotFound } from "../services/access";
 import {
   addTeamAccount,
   changeRole,
@@ -60,19 +60,24 @@ async function precheck(c: Context<AppEnv>, who: "member" | "admin") {
  * @returns Hono のルート
  */
 export function teamsRoutes(authed: MiddlewareHandler<AppEnv>) {
+  // チームを使えない人は、チームを作ることも、チームの画面と操作も使えない（specs/019 FR-009、research.md R13）
+  const teamOn: MiddlewareHandler<AppEnv> = async (c, next) => {
+    requireFeature(c.get("user"), "team");
+    await next();
+  };
   return new Hono<AppEnv>()
-    .post("/teams", authed, async (c) => {
+    .post("/teams", authed, teamOn, async (c) => {
       const req = await parseBody(teamCreateRequestSchema, c.req.json());
       const teamId = await withTransaction(c.env.DATABASE_URL, (tx) => createTeam(c.env, tx, c.get("user"), req));
       return c.json({ teamId }, 201);
     })
-    .get("/teams/:teamId", authed, async (c) => {
+    .get("/teams/:teamId", authed, teamOn, async (c) => {
       const db = createDb(c.env.DATABASE_URL);
       const access = await authorizeTeamMember(db, c.get("user"), c.req.param("teamId"));
       c.header("Cache-Control", "no-store");
       return c.json(await getTeamDetail(db, access));
     })
-    .patch("/teams/:teamId", authed, async (c) => {
+    .patch("/teams/:teamId", authed, teamOn, async (c) => {
       await precheck(c, "admin");
       const { name } = await parseBody(teamRenameRequestSchema, c.req.json());
       await withTransaction(c.env.DATABASE_URL, async (tx) => {
@@ -81,26 +86,26 @@ export function teamsRoutes(authed: MiddlewareHandler<AppEnv>) {
       });
       return c.body(null, 204);
     })
-    .delete("/teams/:teamId", authed, async (c) => {
+    .delete("/teams/:teamId", authed, teamOn, async (c) => {
       await withTransaction(c.env.DATABASE_URL, async (tx) => {
         const access = await authorizeTeamAdmin(tx, c.get("user"), c.req.param("teamId"), { lock: true });
         await deleteTeam(tx, access);
       });
       return c.body(null, 204);
     })
-    .get("/teams/:teamId/invite", authed, async (c) => {
+    .get("/teams/:teamId/invite", authed, teamOn, async (c) => {
       const access = await authorizeTeamAdmin(createDb(c.env.DATABASE_URL), c.get("user"), c.req.param("teamId"));
       c.header("Cache-Control", "no-store");
       return c.json(await getTeamInvite(c.env, access.team));
     })
-    .post("/teams/:teamId/invite/rotate", authed, async (c) => {
+    .post("/teams/:teamId/invite/rotate", authed, teamOn, async (c) => {
       const invite = await withTransaction(c.env.DATABASE_URL, async (tx) => {
         const access = await authorizeTeamAdmin(tx, c.get("user"), c.req.param("teamId"), { lock: true });
         return rotateTeamInvite(c.env, tx, access);
       });
       return c.json(invite);
     })
-    .patch("/teams/:teamId/members/:userId", authed, async (c) => {
+    .patch("/teams/:teamId/members/:userId", authed, teamOn, async (c) => {
       await precheck(c, "admin");
       assertIds(c.req.param("userId"));
       const { role } = await parseBody(teamRoleUpdateSchema, c.req.json());
@@ -110,7 +115,7 @@ export function teamsRoutes(authed: MiddlewareHandler<AppEnv>) {
       });
       return c.body(null, 204);
     })
-    .delete("/teams/:teamId/members/:userId", authed, async (c) => {
+    .delete("/teams/:teamId/members/:userId", authed, teamOn, async (c) => {
       await precheck(c, "admin");
       assertIds(c.req.param("userId"));
       await withTransaction(c.env.DATABASE_URL, async (tx) => {
@@ -119,14 +124,14 @@ export function teamsRoutes(authed: MiddlewareHandler<AppEnv>) {
       });
       return c.body(null, 204);
     })
-    .post("/teams/:teamId/members/:userId/joined-notice/dismiss", authed, async (c) => {
+    .post("/teams/:teamId/members/:userId/joined-notice/dismiss", authed, teamOn, async (c) => {
       const db = createDb(c.env.DATABASE_URL);
       const access = await authorizeTeamAdmin(db, c.get("user"), c.req.param("teamId"));
       assertIds(c.req.param("userId"));
       await dismissJoinedNotice(db, access.team.id, c.req.param("userId"));
       return c.body(null, 204);
     })
-    .post("/teams/:teamId/leave", authed, async (c) => {
+    .post("/teams/:teamId/leave", authed, teamOn, async (c) => {
       await precheck(c, "member");
       const { newAdminUserId } = await parseBody(teamLeaveRequestSchema, c.req.json().catch(() => ({})));
       await withTransaction(c.env.DATABASE_URL, async (tx) => {
@@ -135,7 +140,7 @@ export function teamsRoutes(authed: MiddlewareHandler<AppEnv>) {
       });
       return c.body(null, 204);
     })
-    .post("/teams/:teamId/admin", authed, async (c) => {
+    .post("/teams/:teamId/admin", authed, teamOn, async (c) => {
       await precheck(c, "admin");
       const { userId } = await parseBody(teamAdminTransferSchema, c.req.json());
       await withTransaction(c.env.DATABASE_URL, async (tx) => {
@@ -144,7 +149,7 @@ export function teamsRoutes(authed: MiddlewareHandler<AppEnv>) {
       });
       return c.body(null, 204);
     })
-    .post("/teams/:teamId/accounts", authed, async (c) => {
+    .post("/teams/:teamId/accounts", authed, teamOn, async (c) => {
       await precheck(c, "member");
       const { accountId, shared } = await parseBody(teamAccountAddSchema, c.req.json());
       await withTransaction(c.env.DATABASE_URL, async (tx) => {
@@ -153,7 +158,7 @@ export function teamsRoutes(authed: MiddlewareHandler<AppEnv>) {
       });
       return c.body(null, 204);
     })
-    .patch("/teams/:teamId/accounts/:accountId", authed, async (c) => {
+    .patch("/teams/:teamId/accounts/:accountId", authed, teamOn, async (c) => {
       await precheck(c, "member");
       assertIds(c.req.param("accountId"));
       const { shared } = await parseBody(teamShareUpdateSchema, c.req.json());
@@ -163,7 +168,7 @@ export function teamsRoutes(authed: MiddlewareHandler<AppEnv>) {
       });
       return c.body(null, 204);
     })
-    .delete("/teams/:teamId/accounts/:accountId", authed, async (c) => {
+    .delete("/teams/:teamId/accounts/:accountId", authed, teamOn, async (c) => {
       assertIds(c.req.param("accountId"));
       await withTransaction(c.env.DATABASE_URL, async (tx) => {
         const access = await authorizeTeamMember(tx, c.get("user"), c.req.param("teamId"), { lock: true });
@@ -171,13 +176,13 @@ export function teamsRoutes(authed: MiddlewareHandler<AppEnv>) {
       });
       return c.body(null, 204);
     })
-    .get("/teams/:teamId/assignments", authed, async (c) => {
+    .get("/teams/:teamId/assignments", authed, teamOn, async (c) => {
       const db = createDb(c.env.DATABASE_URL);
       const access = await authorizeTeamAdmin(db, c.get("user"), c.req.param("teamId"));
       c.header("Cache-Control", "no-store");
       return c.json(await getAssignments(db, access));
     })
-    .put("/teams/:teamId/assignments/:userId/accounts/:accountId", authed, async (c) => {
+    .put("/teams/:teamId/assignments/:userId/accounts/:accountId", authed, teamOn, async (c) => {
       assertIds(c.req.param("userId"), c.req.param("accountId"));
       await withTransaction(c.env.DATABASE_URL, async (tx) => {
         const access = await authorizeTeamAdmin(tx, c.get("user"), c.req.param("teamId"), { lock: true });
@@ -185,7 +190,7 @@ export function teamsRoutes(authed: MiddlewareHandler<AppEnv>) {
       });
       return c.body(null, 204);
     })
-    .delete("/teams/:teamId/assignments/:userId/accounts/:accountId", authed, async (c) => {
+    .delete("/teams/:teamId/assignments/:userId/accounts/:accountId", authed, teamOn, async (c) => {
       assertIds(c.req.param("userId"), c.req.param("accountId"));
       await withTransaction(c.env.DATABASE_URL, async (tx) => {
         const access = await authorizeTeamAdmin(tx, c.get("user"), c.req.param("teamId"), { lock: true });

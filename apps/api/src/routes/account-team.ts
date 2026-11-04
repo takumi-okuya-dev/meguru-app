@@ -1,4 +1,5 @@
 // /api/accounts/:accountId のチーム（specs/011-team-revision contracts/api.md「Account（変わる）」）。
+import { FEATURES } from "@threads-grower/shared";
 import { Hono, type MiddlewareHandler } from "hono";
 import type { AppEnv } from "../app";
 import { createDb } from "../db/client";
@@ -26,11 +27,13 @@ export function accountTeamRoutes(authed: MiddlewareHandler<AppEnv>) {
         assignedNotice: await assignedNoticeVisible(db, access),
         // オーナーが読むだけなら、その理由（オーナー以外には owner_inactive。specs/013 FR-045）
         readOnly: access.readOnly,
+        // オーナーの設定でONの機能のまとまり（specs/019 research.md R6）。並びは FEATURES の順
+        features: FEATURES.filter((f) => access.features.has(f)),
       });
     })
     .get("/accounts/:accountId/team", authed, async (c) => {
       const db = createDb(c.env.DATABASE_URL);
-      const access = await authorizeAccount(db, c.get("user"), c.req.param("accountId"), "read");
+      const access = await authorizeAccount(db, c.get("user"), c.req.param("accountId"), "read", { feature: "team" });
       c.header("Cache-Control", "no-store");
       return c.json(await getAccountTeam(db, access));
     })

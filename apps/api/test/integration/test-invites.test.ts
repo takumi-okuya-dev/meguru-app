@@ -29,9 +29,9 @@ async function events(groupId: string) {
 }
 
 describe("招待の確認", () => {
-  it("ログインしていなければ、グループ名と定員かだけを返す", async () => {
+  it("ログインしていなければ、グループ名と定員かと、テスト版か（specs/019）だけを返す", async () => {
     const { token } = await createGroup(app, "飲食の会", 2);
-    expect(await preview(token)).toEqual({ status: 200, body: { group: { name: "飲食の会" }, full: false, viewer: null } });
+    expect(await preview(token)).toEqual({ status: 200, body: { group: { name: "飲食の会" }, full: false, testVersion: true, viewer: null } });
   });
 
   it("ログインしていれば、参加できるか・定員か・すでに入っているかを返す", async () => {

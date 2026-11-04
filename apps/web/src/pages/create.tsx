@@ -13,7 +13,7 @@ import { PromptCard } from "@/components/stock/PromptCard";
 import { STOCK_LIMIT_MESSAGE } from "@/components/stock/messages";
 import { api } from "@/lib/api-client";
 import { queryKeys } from "@/lib/query";
-import { useAccountAccess } from "@/lib/use-account-access";
+import { featureOn, useAccountAccess } from "@/lib/use-account-access";
 import { useCurrentAccount } from "@/pages/account-layout";
 
 /**
@@ -37,7 +37,7 @@ function CreatePageContent() {
     queryKey: queryKeys.postDrafts(account.id),
     queryFn: () => api.listPostDrafts(account.id),
   });
-  const { can } = useAccountAccess(account.id);
+  const { access, can } = useAccountAccess(account.id);
   // 投稿ストックで削除して「元に戻す」を待っている下書きは、この画面を開いたときに確定する
   // （件数・上限の表示が古くならないように。PR #17 のCodexレビュー）
   useEffect(() => {
@@ -59,7 +59,7 @@ function CreatePageContent() {
     <>
       <PageHeader title="投稿をつくる" />
       <PageBody className="space-y-6 pb-16">
-        {canCreate && <CreateSteps accountId={account.id} />}
+        {canCreate && <CreateSteps accountId={account.id} strategy={featureOn(access, "strategy")} />}
         {data ? (
           <PromptCard
             accountId={account.id}

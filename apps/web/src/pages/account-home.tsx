@@ -16,7 +16,7 @@ import { AssignedNotice } from "@/components/team/AssignedNotice";
 import { TokenWarnings } from "@/components/connect/TokenWarnings";
 import { AutoPostNotices } from "@/components/AutoPostNotices";
 import { NotConnectedBanner, connectPath } from "@/components/NotConnectedNotice";
-import { useAccountAccess } from "@/lib/use-account-access";
+import { featureOn, useAccountAccess } from "@/lib/use-account-access";
 import { AccountAvatar } from "@/components/AccountAvatar";
 import { IntroGuide } from "@/components/guides/IntroGuide";
 import { ApiErrorScreen } from "@/components/ApiErrorScreen";
@@ -33,10 +33,14 @@ type Area = "strategy" | "promotions" | "research";
 
 /**
  * 「次にやること」を決める（research.md R11）。上から順に、最初に当てはまるもの。
+ * 使えないまとまりの画面は案内しない（specs/019 FR-004）。自動投稿を使えなければ、投稿をつくる案内も出さない。
  * @param s - 入力状況
- * @returns 案内する画面と文言（すべて入力済みなら area は null で、投稿ストックへ案内する）
+ * @param on - strategy・autopost：そのまとまりを使えるか
+ * @returns 案内する画面と文言（すべて入力済みなら area は null で、投稿をつくるへ案内する）。案内がなければ null
  */
-function nextStep(s: ProfileStatus): { area: Area | null; title: string; body: string } {
+function nextStep(s: ProfileStatus, on: { strategy: boolean; autopost: boolean }): { area: Area | null; title: string; body: string } | null {
+  const create = on.autopost ? CREATE_STEP : null;
+  if (!on.strategy) return create;
   if (s.strategy.filledCount === 0) {
     return {
       area: "strategy",
@@ -58,13 +62,15 @@ function nextStep(s: ProfileStatus): { area: Area | null; title: string; body: s
       body: "Threadsで伸びている投稿を保存しておくと、投稿の精度が上がります。",
     };
   }
-  // 材料がそろったら、「投稿をつくる」の画面へ案内する（specs/003 contracts/ui-routes.md「ホーム」、specs/014 FR-164）
-  return {
-    area: null,
-    title: "投稿をつくりましょう",
-    body: "プロンプトをChatGPTやClaudeに送り、返ってきた投稿案を投稿ストックに登録します。",
-  };
+  return create;
 }
+
+/** 材料がそろったら、「投稿をつくる」の画面へ案内する（specs/003 contracts/ui-routes.md「ホーム」、specs/014 FR-164）。 */
+const CREATE_STEP = {
+  area: null,
+  title: "投稿をつくりましょう",
+  body: "プロンプトをChatGPTやClaudeに送り、返ってきた投稿案を投稿ストックに登録します。",
+};
 
 /**
  * Account のホーム。Account の表示、無料体験の案内、次にやること、入力状況の3枚のカード、アプリを紹介する。
@@ -74,12 +80,14 @@ export function AccountHome() {
   const account = useCurrentAccount();
   // Threadsとつないだ結果と、招待へ戻す処理は「このアカウントの設定」で扱う（specs/012 research.md R4・R7）
   const notConnected = account.connectionStatus === "not_connected";
-  const { can } = useAccountAccess(account.id);
+  const { access, can } = useAccountAccess(account.id);
+  const strategyOn = featureOn(access, "strategy");
+  const autopostOn = featureOn(access, "autopost");
   // 未接続で承認済みの案があれば、次にやることを「つなぐ」にする（Clarifications 2026-10-14）
   const counts = useQuery({
     queryKey: queryKeys.draftCounts(account.id),
     queryFn: () => api.getDraftCounts(account.id),
-    enabled: notConnected,
+    enabled: notConnected && autopostOn,
   });
   const connectFirst = notConnected && can("owner") && (counts.data?.approved ?? 0) > 0;
   const status = useQuery({
@@ -90,10 +98,11 @@ export function AccountHome() {
   // 読み込めなかったら、読み込み中のまま止めずに原因と再読み込みを出す
   if (status.isError)
     return <ApiErrorScreen error={status.error} onRetry={() => void status.refetch()} />;
-  const step = s ? nextStep(s) : null;
+  const step = s ? nextStep(s, { strategy: strategyOn, autopost: autopostOn }) : null;
   const canEdit = s?.access.canEdit ?? true;
 
-  const cards: { area: Area; label: string; Icon: LucideIcon; text: string }[] = s
+  // 戦略がOFFなら、課題・宣伝内容・リサーチのカードを出さない（specs/019 FR-004）
+  const cards: { area: Area; label: string; Icon: LucideIcon; text: string }[] = s && strategyOn
     ? [
         {
           area: "strategy",
@@ -156,19 +165,19 @@ export function AccountHome() {
                     <Link to={connectPath(account.id)}>Threadsにつなぐ</Link>
                   </Button>
                 </>
-              ) : canEdit ? (
+              ) : canEdit && step ? (
                 <>
                   <h2 className="text-[22px] leading-snug font-semibold md:text-[26px]">
-                    {step!.title}
+                    {step.title}
                   </h2>
-                  <p className="text-[15px] text-muted-foreground">{step!.body}</p>
-                  {step!.area === null && (
+                  <p className="text-[15px] text-muted-foreground">{step.body}</p>
+                  {step.area === null && (
                     <Button asChild className="mt-3 h-11 rounded-full px-5 md:h-9">
                       <Link to={`/accounts/${account.id}/create`}>投稿をつくる</Link>
                     </Button>
                   )}
                 </>
-              ) : (
+              ) : canEdit ? null : (
                 <>
                   <h2 className="text-[22px] leading-snug font-semibold md:text-[26px]">
                     このアカウントは今、読むだけです
@@ -177,9 +186,11 @@ export function AccountHome() {
                 </>
               )}
             </section>
-            <NextPostCard accountId={account.id} />
+            {/* 自動投稿を使えなければ、次の投稿と自動投稿の知らせを出さない（specs/019 FR-004） */}
+            {autopostOn && <NextPostCard accountId={account.id} />}
             {/* 未接続の知らせは、上の帯で出しているので重ねない */}
-            <AutoPostNotices accountId={account.id} hideNotConnected />
+            {autopostOn && <AutoPostNotices accountId={account.id} hideNotConnected />}
+            {cards.length > 0 && (
             <nav aria-label="投稿の材料" className="grid w-full gap-2.5 md:grid-cols-3 md:gap-3">
               {cards.map(({ area, label, Icon, text }) => (
                 <Link
@@ -202,6 +213,7 @@ export function AccountHome() {
                 </Link>
               ))}
             </nav>
+            )}
             <ShareAppCard />
           </>
         )}
