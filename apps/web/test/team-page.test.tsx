@@ -130,7 +130,25 @@ describe("チームの画面（管理者）", () => {
     expect(within(rows[0]!).getByText("管理者（あなた）")).toBeInTheDocument();
     expect(within(rows[1]!).getByRole("link", { name: "鈴木 花子さんのカフェ B店を見る" })).toHaveAttribute("href", "/teams/t1/accounts/a-s");
     expect(within(rows[2]!).getByText("ベーカリー E · 見せていません")).toBeInTheDocument();
-    expect(screen.getByLabelText("ロールの説明")).toBeInTheDocument();
+  });
+
+  it("ロールの説明は「ロールについて」で開き、箇条書きで出す。「チームを抜ける」は一番下（2026-11-04）", async () => {
+    mocks.getTeam.mockResolvedValue(adminView());
+    const user = userEvent.setup();
+    renderPage();
+    const toggle = await screen.findByRole("button", { name: "ロールについて" });
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByRole("region", { name: "ロールの説明" })).not.toBeInTheDocument();
+    await user.click(toggle);
+    const help = screen.getByRole("region", { name: "ロールの説明" });
+    expect(within(help).getByText("・担当のアカウントで、投稿の案を作る・直す")).toBeInTheDocument();
+    expect(toggle).toHaveTextContent(/^ロールについて$/);
+    // 「⋯」の中は、チーム名を直す・チームを削除するだけ
+    await user.click(screen.getByRole("button", { name: "チームの操作" }));
+    expect((await screen.findAllByRole("menuitem")).map((i) => i.textContent)).toEqual(["チーム名を直す", "チームを削除する"]);
+    await user.keyboard("{Escape}");
+    const buttons = screen.getAllByRole("button");
+    expect(buttons.at(-1)).toHaveTextContent("チームを抜ける");
   });
 
   it("ロールの切り替え（aria-pressed の2つのボタン）。管理者自身の行には出さない（T023）", async () => {
@@ -239,7 +257,7 @@ describe("チームの画面（管理者）", () => {
 });
 
 describe("チームの画面（メンバー・編集者）", () => {
-  it("「管理者：・あなたのロール：」と「チームを抜ける」だけ。招待・担当・ロールの切り替え・⋯は出ない", async () => {
+  it("「管理者：・あなたのロール：」と「チームを抜ける」だけ。招待・担当・ロールの切り替え・⋯・ロールについては出ない", async () => {
     mocks.getTeam.mockResolvedValue(memberView());
     renderPage();
     expect(await screen.findByText(/管理者：田中 健 · あなたのロール：メンバー/)).toBeInTheDocument();
@@ -248,15 +266,15 @@ describe("チームの画面（メンバー・編集者）", () => {
     expect(screen.queryByRole("link", { name: "担当を決める" })).not.toBeInTheDocument();
     expect(screen.queryByRole("group", { name: /のロール$/ })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /の操作$/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "ロールについて" })).not.toBeInTheDocument();
   });
 
-  it("「チームに入れている、あなたのアカウント」の「チームに見せる」のスイッチ（T029）", async () => {
+  it("「あなたのアカウント」の「チームに見せる」のスイッチ（T029）", async () => {
     mocks.getTeam.mockResolvedValue(memberView());
     const user = userEvent.setup();
     renderPage();
     const sw = await screen.findByRole("switch", { name: "カフェ B店をチームに見せる" });
     expect(sw).toBeChecked();
-    expect(screen.getByText("チームの人が、投稿ストックと戦略を読めます")).toBeInTheDocument();
     await user.click(sw);
     expect(mocks.setTeamShared).toHaveBeenCalledWith("t1", "a-s", false);
     // 最後の1つには「チームから外す」を出さない
