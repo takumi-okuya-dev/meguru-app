@@ -37,6 +37,7 @@ import { promotionRoutes } from "./routes/promotions";
 import { promptRoutes } from "./routes/prompt";
 import { researchRoutes } from "./routes/research";
 import { strategyRoutes } from "./routes/strategy";
+import { externalMediaRoutes } from "./routes/external-media";
 import { threadsConnectRoutes } from "./routes/threads-connect";
 import { clerkUserDeleter, type ClerkUserDeleter } from "./services/withdrawal-service";
 
@@ -179,6 +180,7 @@ export function createApp(deps: AppDeps = defaultDeps) {
     .route("/", teamsRoutes(authed))
     .route("/", activityRoutes(authed))
     .route("/", strategyRoutes(authed))
+    .route("/", externalMediaRoutes(authed))
     .route("/", promotionRoutes(authed))
     .route("/", researchRoutes(authed))
     .route("/", promptRoutes(authed))

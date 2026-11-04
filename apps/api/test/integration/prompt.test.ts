@@ -230,3 +230,16 @@ describe("反応が低かった投稿の反映（specs/006 FR-025〜FR-027、SC-
     expect(prompt).not.toContain("■反応が低かった投稿");
   });
 });
+
+describe("宣伝内容のイベントの情報（specs/021 FR-001a）", () => {
+  it("イベントの情報があるときだけ、プロンプトの宣伝内容に1行が入る", async () => {
+    const { accountId } = await createUserWithAccount("u1");
+    await call(app, "POST", `${base(accountId)}/promotions`, {
+      user: "u1",
+      body: { title: "IT交流会", content: "飲み会です", event: { startAt: "2099-11-25T20:00", format: "venue", venueName: "バー", feeYen: 5000, capacity: 25 } },
+    });
+    const res = await call(app, "GET", `${base(accountId)}/prompt`, { user: "u1" });
+    const { prompt } = (await res.json()) as { prompt: string };
+    expect(prompt).toContain("(イベント: 日時: 2099年11月25日(水) 20:00 〜 / 場所: バー / 参加費: 5,000円 / 定員: 25名)");
+  });
+});

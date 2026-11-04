@@ -23,6 +23,12 @@ import {
   teamCreateResponseSchema,
   teamDetailSchema,
   teamStatusSchema,
+  externalMediaListSchema,
+  listingDetailSchema,
+  mediaDefaultsListSchema,
+  mediaDefaultsSchema,
+  type ListingUpdateRequest,
+  type Media,
   teamInviteSchema,
   accountSummarySchema,
   exportPageSchema,
@@ -419,6 +425,26 @@ export const api = {
     }),
   deletePromotion: (accountId: string, id: string) =>
     request(`/api/accounts/${accountId}/promotions/${id}`, null, { method: "DELETE" }),
+  // 外部媒体展開（specs/021 contracts/api.md）
+  externalMedia: (accountId: string) => request(`/api/accounts/${accountId}/external-media`, externalMediaListSchema),
+  listing: (accountId: string, promotionId: string, media: Media) =>
+    request(`/api/accounts/${accountId}/external-media/${promotionId}/${media}`, listingDetailSchema),
+  generateListing: (accountId: string, promotionId: string, media: Media, expectedVersion: number | null) =>
+    request(`/api/accounts/${accountId}/external-media/${promotionId}/${media}/generate`, listingDetailSchema, {
+      method: "POST",
+      body: JSON.stringify({ expectedVersion }),
+    }),
+  updateListing: (accountId: string, promotionId: string, media: Media, body: ListingUpdateRequest) =>
+    request(`/api/accounts/${accountId}/external-media/${promotionId}/${media}`, listingDetailSchema, {
+      method: "PUT",
+      body: JSON.stringify(body),
+    }),
+  mediaDefaults: (accountId: string) => request(`/api/accounts/${accountId}/media-defaults`, mediaDefaultsListSchema),
+  putMediaDefaults: (accountId: string, media: Media, expectedVersion: number | null, values: Record<string, string>) =>
+    request(`/api/accounts/${accountId}/media-defaults/${media}`, mediaDefaultsSchema, {
+      method: "PUT",
+      body: JSON.stringify({ expectedVersion, values }),
+    }),
   getPromotionSettings: (accountId: string) =>
     request(`/api/accounts/${accountId}/promotion-settings`, promotionSettingsSchema),
   putPromotionSettings: (accountId: string, ratioPercent: number, expectedVersion: number) =>

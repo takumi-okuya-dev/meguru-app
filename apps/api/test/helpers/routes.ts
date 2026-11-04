@@ -22,6 +22,13 @@ export const ACCOUNT_ROUTES: [string, string, Permission][] = [
   ["POST", "/api/accounts/:accountId/promotions", "content"],
   ["PUT", "/api/accounts/:accountId/promotions/:promotionId", "content"],
   ["DELETE", "/api/accounts/:accountId/promotions/:promotionId", "content"],
+  // 外部媒体展開（specs/021 contracts/api.md）。見せてもらっている人には出さない（view）
+  ["GET", "/api/accounts/:accountId/external-media", "view"],
+  ["GET", "/api/accounts/:accountId/external-media/:promotionId/:media", "view"],
+  ["POST", "/api/accounts/:accountId/external-media/:promotionId/:media/generate", "content"],
+  ["PUT", "/api/accounts/:accountId/external-media/:promotionId/:media", "content"],
+  ["GET", "/api/accounts/:accountId/media-defaults", "view"],
+  ["PUT", "/api/accounts/:accountId/media-defaults/:media", "content"],
   ["GET", "/api/accounts/:accountId/posting-rules", "view"],
   ["POST", "/api/accounts/:accountId/ng-words", "settings"],
   ["DELETE", "/api/accounts/:accountId/ng-words/:ngWordId", "settings"],

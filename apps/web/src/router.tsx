@@ -29,6 +29,8 @@ import { LegalCommercePage } from "@/pages/legal-commerce";
 import { AppearanceSettings } from "@/pages/settings/appearance";
 import { SettingsIndex, SettingsLayout } from "@/pages/settings/settings-layout";
 import { PromotionsPage } from "@/pages/promotions";
+import { ExternalMediaPage } from "@/pages/external-media";
+import { ExternalMediaListingPage } from "@/pages/external-media-listing";
 import { ResearchPage } from "@/pages/research";
 import { StockPage } from "@/pages/stock";
 import { ThreadsComplete } from "@/pages/threads-complete";
@@ -114,6 +116,9 @@ export const routes = [
           // 機能のまとまりがOFFなら「この機能は今は使えません」（specs/019 FR-006）
           { path: "strategy", element: <RequireFeature feature="strategy"><StrategyPage /></RequireFeature> },
           { path: "promotions", element: <RequireFeature feature="strategy"><PromotionsPage /></RequireFeature> },
+          // 外部媒体展開（specs/021 contracts/ui-routes.md）。作業の画面は ?view=work
+          { path: "external-media", element: <RequireFeature feature="strategy"><ExternalMediaPage /></RequireFeature> },
+          { path: "external-media/:promotionId/:media", element: <RequireFeature feature="strategy"><ExternalMediaListingPage /></RequireFeature> },
           { path: "research", element: <RequireFeature feature="strategy"><ResearchPage /></RequireFeature> },
           // 投稿をつくる（specs/014 US15）。投稿ストックは一覧だけにした
           { path: "create", element: <RequireFeature feature="autopost"><CreatePage /></RequireFeature> },

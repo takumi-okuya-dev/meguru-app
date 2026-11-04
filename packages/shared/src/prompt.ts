@@ -15,6 +15,7 @@ import { POLICY_PROMPT_RULES } from "./policy";
 import { FRESHNESS_LEVELS, REFERENCE_PLATFORMS, type Freshness, type ReferenceMetrics, type ReferencePlatform } from "./research";
 import type { PostLengthSettings, PromptSummary } from "./schemas";
 import { countFilled, TONE_PRESETS, type StrategyValues } from "./strategy";
+import { formatEventFee, formatEventPlace, formatEventWhen, type PromotionEvent } from "./promotion-event";
 import { isBlank } from "./text";
 import { THREADS_TEXT_LIMIT } from "./threads-text";
 
@@ -30,6 +31,8 @@ export type PromptPromotion = {
   targetAgeRange: string;
   cta: string;
   linkedUrl: string | null;
+  /** イベントの情報（specs/021 FR-001a）。あるときだけ、日時・場所・参加費・定員の1行を足す */
+  event?: PromotionEvent | null;
 };
 
 /** プロンプトに含める参考投稿。媒体・数字・鮮度は014で足した（FR-115）。 */
@@ -286,6 +289,15 @@ function promotionLine(p: PromptPromotion, i: number, today: string | undefined)
   if (target.length > 0) line += `(届けたい相手: ${target.join(" / ")})`;
   if (!isBlank(p.cta)) line += ` / 行動喚起: ${p.cta}`;
   if (p.linkedUrl) line += ` / 専用URL: ${p.linkedUrl}`;
+  if (p.event) {
+    const facts = [
+      `日時: ${formatEventWhen(p.event)}`,
+      formatEventPlace(p.event) ? `場所: ${formatEventPlace(p.event)}` : null,
+      formatEventFee(p.event) ? `参加費: ${formatEventFee(p.event)}` : null,
+      p.event.capacity ? `定員: ${p.event.capacity}名` : null,
+    ].filter(Boolean);
+    line += `\n   (イベント: ${facts.join(" / ")})`;
+  }
   return line;
 }
 

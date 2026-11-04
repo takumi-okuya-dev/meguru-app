@@ -669,3 +669,34 @@ describe("件数が少ないときに矛盾した指示を出さない（PR #17 
   });
 });
 
+
+describe("宣伝内容のイベントの情報（specs/021 FR-001a・research.md R9）", () => {
+  const event = {
+    startAt: "2026-11-25T20:00",
+    endAt: "2026-11-25T22:00",
+    format: "venue" as const,
+    venueName: "バー SHITEN",
+    prefecture: "東京都" as const,
+    address: null,
+    building: null,
+    station: "御徒町駅 徒歩3分",
+    capacity: 25,
+    feeYen: 5000,
+    feeNote: null,
+    cancelPolicy: null,
+    audience: null,
+    organizer: null,
+  };
+
+  it("イベントの情報があるときだけ、日時・場所・参加費・定員の1行が入る", () => {
+    const withEvent = buildPrompt(input({ promotions: [promo("A", { event })] })).prompt;
+    expect(withEvent).toContain("(イベント: 日時: 2026年11月25日(水) 20:00 〜 22:00 / 場所: バー SHITEN（御徒町駅 徒歩3分） / 参加費: 5,000円 / 定員: 25名)");
+  });
+
+  it("イベントの情報がなければ、今と同じ文", () => {
+    const a = buildPrompt(input({ promotions: [promo("A")] })).prompt;
+    const b = buildPrompt(input({ promotions: [promo("A", { event: null })] })).prompt;
+    expect(a).toBe(b);
+    expect(a).not.toContain("(イベント:");
+  });
+});

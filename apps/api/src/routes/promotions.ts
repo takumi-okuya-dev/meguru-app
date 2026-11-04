@@ -29,7 +29,7 @@ type PromotionRow = typeof promotions.$inferSelect;
  * @param now - 現在時刻（期限切れの判定に使う）
  * @returns レスポンスの宣伝内容
  */
-function toPromotion(row: PromotionRow, now: Date) {
+export function toPromotion(row: PromotionRow, now: Date) {
   return {
     id: row.id,
     title: row.title,
@@ -42,6 +42,7 @@ function toPromotion(row: PromotionRow, now: Date) {
     priority: row.priority,
     status: row.status,
     validUntil: row.validUntil,
+    event: row.event ?? null,
     isExpired: isExpired(row.validUntil, now),
     isTargetable: isTargetable(row.status, row.validUntil, now),
     version: row.version,
@@ -68,6 +69,8 @@ function toColumns(input: PromotionInput) {
     priority: input.priority,
     status: input.status,
     validUntil: input.validUntil,
+    // イベントの情報は、省いたら今のまま（specs/021 contracts/api.md）
+    ...(input.event === undefined ? {} : { event: input.event }),
   };
 }
 
