@@ -110,7 +110,7 @@ description: "Task list for feature 019 feature switches"
 - [X] T043 [P] `docs/user-guide.md`・`docs/architecture.md`・`docs/next-features.md`を、新しいまとまりとグループごとの設定に合わせて直す（共有用の文書なので、アカウントのID・テスト版のURL・秘密の値は書かない）。
 - [X] T044 `.specify/memory/constitution.md`の先頭の Sync Impact Report を消す。
 - [X] T045 全体のテスト・lint・型チェック・Webのビルドを通す（`pnpm --filter ./packages/shared test`、`pnpm --filter ./apps/api test`、`pnpm --filter ./apps/web test`、`pnpm lint`、`pnpm -r exec tsc --noEmit`、`pnpm --filter ./apps/web build`）。
-- [ ] T046 quickstart.md の「テスト版で確かめる」を、マージのあとにユーザーとテスト版で通す。
+- [X] T046 quickstart.md の「テスト版で確かめる」を、マージのあとにユーザーとテスト版で通す。
 
 ## Dependencies & Execution Order
 
