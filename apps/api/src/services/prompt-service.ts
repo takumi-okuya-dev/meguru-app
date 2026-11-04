@@ -31,6 +31,7 @@ import type { Db } from "../db/client";
 import { draftBatches, postDrafts, postMetrics, promotions, referencePosts } from "../db/schema";
 import type { AccountRow } from "./access";
 import { listReviewedRows } from "./draft-service";
+import { trendsForAccountPrompt } from "./analysis-service";
 import { poorForPrompt } from "./performance-service";
 import { listNgWords } from "./posting-rules-service";
 import { readPostingSchedule } from "./posting-schedule-service";
@@ -215,6 +216,12 @@ export async function getPrompt(db: Db, account: AccountRow, count: number, feat
         .limit(PROMPT_POOR_POSTS),
     ]);
   const today = jstToday(now);
+  const coreRules = coreRuleLines(account.coreRules);
+  const ngWords = ngWordRows.map((w) => w.word);
+  // 伸びた傾向（specs/022 research.md R7）。自動投稿のまとまりが使えるときだけ求める（解析も自動投稿のまとまり）
+  const trends = features.has("autopost")
+    ? await trendsForAccountPrompt(db, account, lengthSettingsOf(account), coreRules, ngWords, now)
+    : [];
   const targetable = targetPromotions(promotionRows, now).map(toPromptPromotion);
   const { prompt, parts, summary, length } = buildPrompt({
     count,
@@ -241,14 +248,15 @@ export async function getPrompt(db: Db, account: AccountRow, count: number, feat
         freshness: freshnessOf(p, today),
       })),
     recentDrafts: draftBodies,
-    coreRules: coreRuleLines(account.coreRules),
-    ngWords: ngWordRows.map((w) => w.word),
+    coreRules,
+    ngWords,
     rejectedDrafts: rejectedRows.map((r) => ({
       body: r.body,
       reasonLabels: ((r.rejectReasons ?? []) as RejectReasonCode[]).map(rejectReasonLabel),
       note: r.rejectNote,
     })),
     poorPosts: poorRows,
+    trends,
   });
   // 宣伝の節が入らない（割合0%）なら、宣伝内容は入らない
   const includedPromotions = summary.promotionCount > 0 ? targetable : [];

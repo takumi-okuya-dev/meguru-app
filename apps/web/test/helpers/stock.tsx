@@ -56,6 +56,7 @@ export function promptResponse(
       rejectedCount: 0,
       dailyPostCount: 0,
       poorPostCount: 0,
+      trendCount: 0,
       ...overrides,
     },
   };

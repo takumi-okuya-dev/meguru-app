@@ -29,6 +29,11 @@ export const ACCOUNT_ROUTES: [string, string, Permission][] = [
   ["PUT", "/api/accounts/:accountId/external-media/:promotionId/:media", "content"],
   ["GET", "/api/accounts/:accountId/media-defaults", "view"],
   ["PUT", "/api/accounts/:accountId/media-defaults/:media", "content"],
+  // アルゴリズムの解析（specs/022 contracts/api.md）。見せてもらっている人には出さない（view）
+  ["GET", "/api/accounts/:accountId/analysis", "view"],
+  ["PATCH", "/api/accounts/:accountId/analysis/settings", "content"],
+  ["GET", "/api/accounts/:accountId/analysis/classifications", "content"],
+  ["PUT", "/api/accounts/:accountId/analysis/classifications", "content"],
   ["GET", "/api/accounts/:accountId/posting-rules", "view"],
   ["POST", "/api/accounts/:accountId/ng-words", "settings"],
   ["DELETE", "/api/accounts/:accountId/ng-words/:ngWordId", "settings"],

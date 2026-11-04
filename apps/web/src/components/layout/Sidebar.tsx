@@ -5,6 +5,7 @@
 // チームに入っていない人には、チームのものを何も出さない（Constitution原則V）。
 import {
   ChartColumnIcon,
+  ChartLineIcon,
   HistoryIcon,
   HouseIcon,
   InboxIcon,
@@ -48,6 +49,7 @@ const NAV_GROUPS: NavGroup[] = [
       { path: "create", label: "投稿をつくる", Icon: SquarePenIcon, needsAccount: true },
       { path: "stock", label: "投稿ストック", Icon: InboxIcon, badge: "needsReview" },
       { path: "performance", label: "パフォーマンス", Icon: ChartColumnIcon },
+      { path: "analysis", label: "解析", Icon: ChartLineIcon },
     ],
   },
   {

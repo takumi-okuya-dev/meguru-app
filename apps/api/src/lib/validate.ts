@@ -14,3 +14,15 @@ export async function parseBody<S extends z.ZodTypeAny>(schema: S, body: Promise
   if (!parsed.success) throw new AppError("VALIDATION_FAILED", 400, "invalid request", undefined, invalidFields(parsed.error));
   return parsed.data;
 }
+
+/**
+ * クエリを検証する。違反は 400 VALIDATION_FAILED（details に項目名）。
+ * @param schema - zod のスキーマ
+ * @param query - クエリ
+ * @returns 検証済みの値
+ */
+export function parseQuery<S extends z.ZodTypeAny>(schema: S, query: unknown): z.infer<S> {
+  const parsed = schema.safeParse(query);
+  if (!parsed.success) throw new AppError("VALIDATION_FAILED", 400, "invalid query", undefined, invalidFields(parsed.error));
+  return parsed.data;
+}

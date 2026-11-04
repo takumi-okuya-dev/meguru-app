@@ -14,6 +14,7 @@ import { ReferralSettingsPage } from "@/pages/settings/referral";
 import { Landing } from "@/pages/landing";
 import { NotFound } from "@/pages/not-found";
 import { RequireFeature } from "@/components/FeatureUnavailable";
+import { AnalysisPage } from "@/pages/analysis";
 import { PerformancePage } from "@/pages/performance";
 import { TeamPage } from "@/pages/team";
 import { TeamAssignPage } from "@/pages/team-assign";
@@ -124,6 +125,7 @@ export const routes = [
           { path: "create", element: <RequireFeature feature="autopost"><CreatePage /></RequireFeature> },
           { path: "stock", element: <RequireFeature feature="autopost"><StockPage /></RequireFeature> },
           { path: "performance", element: <RequireFeature feature="autopost"><PerformancePage /></RequireFeature> },
+          { path: "analysis", element: <RequireFeature feature="autopost"><AnalysisPage /></RequireFeature> },
           // 操作の記録（specs/008 FR-052）。オーナーと、担当の管理者だけ（specs/011 FR-002）
           { path: "activity", element: <RequireFeature feature="team"><ActivityPage /></RequireFeature> },
         ],
