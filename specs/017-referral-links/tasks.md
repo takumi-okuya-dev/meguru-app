@@ -94,7 +94,7 @@ description: "Task list for feature 017 referral links"
 - [X] T023 [P] `docs/user-guide.md`に「紹介リンク」（設定 › 紹介でコピーして送る。特典はない。人数だけ見える）を足す。`docs/architecture.md`の機能の一覧に紹介リンクを1行足す。
 - [X] T024 [P] `docs/next-features.md`の§Eの「017で決めること」を、決めた内容（specs/017-referral-links へのリンク）に置き換える。
 - [X] T025 全体のテスト・lint・型チェック・Webのビルドを通す（`pnpm --filter ./apps/api test`、`pnpm --filter ./apps/web test`、`pnpm --filter ./packages/shared test`、`pnpm lint`、`pnpm -r exec tsc --noEmit`、`pnpm --filter ./apps/web build`）。
-- [ ] T026 quickstart.mdの「2. テスト版で手で確かめる」を、マージのあとにユーザーとテスト版で通す。
+- [X] T026 quickstart.mdの「2. テスト版で手で確かめる」を、マージのあとにユーザーとテスト版で通す。
 
 ## Dependencies & Execution Order
 

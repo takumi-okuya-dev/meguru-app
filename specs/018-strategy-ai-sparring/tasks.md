@@ -146,7 +146,7 @@ description: "Task list for feature 018 strategy AI sparring"
 - [X] T022 [P] `docs/user-guide.md`の「ふだんの使い方」の課題の書き方に、「AIと壁打ちして埋める」の使い方（範囲を選んでコピー → ChatGPTやClaudeと相談 → 答えを貼って選んで反映 → 保存）を足し、更新日を直す。項目ごとの「AIと深掘り」との使い分け（まとめて埋めるなら壁打ち、1項目を深めるなら深掘り）を1行で書く。
 - [X] T023 [P] `docs/next-features.md`の§Fの1「AIと壁打ちして戦略を考える機能」に、「2026-11-02に018として仕様にした（specs/018-strategy-ai-sparring）」を書き、最終更新を直す。
 - [X] T024 全体のテスト・lint・型チェック・Webのビルドを通す（`pnpm --filter ./packages/shared test`、`pnpm --filter ./apps/web test`、`pnpm lint`、`pnpm -r exec tsc --noEmit`、`pnpm --filter ./apps/web build`）。014の`strategy-deepen.test.tsx`・`strategy-progress.test.tsx`が変わらず通ることも確かめる。
-- [ ] T025 quickstart.mdの「2. テスト版で手で確かめる」を、マージのあとにユーザーとテスト版で通す（ChatGPTとClaudeの両方で、実際の答えが読み取れるか。スマートフォンで候補が読めて、ボタンが動かないか）。
+- [X] T025 quickstart.mdの「2. テスト版で手で確かめる」を、マージのあとにユーザーとテスト版で通す（ChatGPTとClaudeの両方で、実際の答えが読み取れるか。スマートフォンで候補が読めて、ボタンが動かないか）。
 
 ## Dependencies & Execution Order
 

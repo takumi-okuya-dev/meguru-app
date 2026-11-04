@@ -133,7 +133,7 @@ description: "Task list for feature 020 team monitoring"
 - [X] T033 [P] `docs/user-guide.md`（「チームで使う」に運用状況と見える範囲）・`docs/architecture.md`・`docs/team-roles.md` を直す（共有用の文書なので、アカウントのID・テスト版のURL・秘密の値は書かない）。
 - [X] T034 `.specify/memory/constitution.md` の先頭の Sync Impact Report を消す。
 - [X] T035 全体のテスト・lint・型チェック・Webのビルドを通す（`pnpm --filter ./packages/shared test`、`pnpm --filter ./apps/api test`、`pnpm --filter ./apps/web test`、`pnpm lint`、`pnpm -r exec tsc --noEmit`、`pnpm --filter ./apps/web build`）。SC-002（3秒以内）は、次で確かめる：`team-status.ts` の問い合わせが、Accountの数によらず固定の回数（判定のほか、人・Account・伸びの3回）であることをテストで数える。今ある索引（`activity_logs_account_actor_idx`・`post_drafts_published_idx`）を使う条件で書く。テスト版で、20件のAccountのチームで開いて確かめる（T036）。
-- [ ] T036 quickstart.md の「テスト版で確かめる」を、マージのあとにユーザーとテスト版で通す。
+- [X] T036 quickstart.md の「テスト版で確かめる」を、マージのあとにユーザーとテスト版で通す。
 
 ## Dependencies & Execution Order
 
