@@ -45,6 +45,7 @@
    - 2026-11-02に、018として仕様にした（[specs/018-strategy-ai-sparring](../specs/018-strategy-ai-sparring/spec.md)）。外のAIとまとめて相談し、答えを貼って一括で反映する形。
 2. **外部媒体のイベント募集を補助する機能**
    - 近い今の機能：002の「宣伝内容」（案内したいイベントやサービスを登録する）。
+   - 2026-11-04に、021として仕様にした（[specs/021-external-media](../specs/021-external-media/spec.md)）。参考は、ユーザーの運営する「港」の管理画面「外部媒体展開」。
 3. **Threadsのアルゴリズムの解析**
    - 近い今の機能・資料：006（パフォーマンス分析・CSVの書き出し）、[threads-algorithm-research.md](threads-algorithm-research.md)（2026-10-08の調査）。
 4. **このアプリ専用のThreadsコンサルAIエージェントを作る**
