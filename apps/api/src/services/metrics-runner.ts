@@ -39,6 +39,7 @@ import {
 import type { Env } from "../env";
 import { billingModeOf, type BillingMode } from "../lib/config";
 import { entitlementFromFacts, fullAccessSql } from "./billing-service";
+import { featureOnSql } from "./feature-sql";
 import { createTokenCipher } from "../lib/crypto";
 import { logger } from "../lib/logger";
 import {
@@ -371,6 +372,8 @@ async function loadCandidates(
         or(isNull(postMetrics.state), eq(postMetrics.state, "updating")),
         // オーナーが読むだけの行は、件数の上限の前に外す（PR #16 のCodexレビュー）
         fullAccessSql(mode, now),
+        // オーナーが自動投稿を使えないアカウントも、反応を取り込まない（specs/019 FR-008。決済の判定には混ぜない）
+        featureOnSql(users.id, "autopost"),
         due,
       ),
     )
@@ -427,6 +430,8 @@ async function loadFollowerTargets(db: Db, mode: BillingMode, now: Date, today: 
         or(isNull(accounts.insightsDeniedAt), lt(accounts.insightsDeniedAt, todayStart)),
         // オーナーが読むだけの行は、件数の上限の前に外す（PR #16 のCodexレビュー）
         fullAccessSql(mode, now),
+        // オーナーが自動投稿を使えないアカウントも、反応を取り込まない（specs/019 FR-008。決済の判定には混ぜない）
+        featureOnSql(users.id, "autopost"),
         sql`EXISTS (SELECT 1 FROM ${postDrafts} d WHERE d.account_id = ${accounts.id} AND d.status = 'published'
           AND d.published_at >= ${new Date(now.getTime() - FOLLOWER_ACTIVE_DAYS * 24 * HOUR).toISOString()})`,
         sql`NOT EXISTS (SELECT 1 FROM ${followerSnapshots} f WHERE f.account_id = ${accounts.id} AND f.snapshot_date = ${today}::date)`,

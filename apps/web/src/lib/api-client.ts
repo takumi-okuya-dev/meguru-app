@@ -10,6 +10,9 @@ import {
   invitePreviewSchema,
   testGroupDetailSchema,
   testGroupListSchema,
+  featureSettingsListSchema,
+  operatorUserSchema,
+  type FeatureSettingsRequest,
   testGroupSummarySchema,
   testInviteJoinResponseSchema,
   testInvitePreviewSchema,
@@ -331,6 +334,21 @@ export const api = {
       testGroupDetailSchema,
       { method: "DELETE" },
     ),
+  // 機能のまとまりごとのON/OFF（specs/019 contracts/api.md「運営者のAPI」）
+  putTestGroupFeatures: (id: string, features: FeatureSettingsRequest["features"]) =>
+    request(`/api/operator/test-groups/${encodeURIComponent(id)}/features`, testGroupDetailSchema, {
+      method: "PUT",
+      body: JSON.stringify({ features }),
+    }),
+  featureSettings: () => request("/api/operator/feature-settings", featureSettingsListSchema),
+  findOperatorUser: (email: string) => request(`/api/operator/users?email=${encodeURIComponent(email)}`, operatorUserSchema),
+  putFeatureSettings: (userId: string, features: FeatureSettingsRequest["features"]) =>
+    request(`/api/operator/feature-settings/${encodeURIComponent(userId)}`, operatorUserSchema, {
+      method: "PUT",
+      body: JSON.stringify({ features }),
+    }),
+  resetFeatureSettings: (userId: string) =>
+    request(`/api/operator/feature-settings/${encodeURIComponent(userId)}`, operatorUserSchema, { method: "DELETE" }),
   acceptInvite: (token: string, accounts: { id: string; shared: boolean }[]) =>
     request(`/api/invites/${encodeURIComponent(token)}/accept`, inviteAcceptResponseSchema, {
       method: "POST",

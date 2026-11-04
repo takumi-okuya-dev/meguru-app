@@ -44,7 +44,7 @@ export function postingScheduleRoutes(authed: MiddlewareHandler<AppEnv>) {
   return new Hono<AppEnv>()
     .get("/accounts/:accountId/posting-schedule", authed, async (c) => {
       const db = createDb(c.env.DATABASE_URL);
-      const access = await authorizeAccount(db, c.get("user"), c.req.param("accountId"), "view");
+      const access = await authorizeAccount(db, c.get("user"), c.req.param("accountId"), "view", { feature: "autopost" });
       const account = access.account;
       return c.json({
         schedule: toPostingSchedule(await readPostingSchedule(db, account.id)),
@@ -57,7 +57,7 @@ export function postingScheduleRoutes(authed: MiddlewareHandler<AppEnv>) {
     })
     .put("/accounts/:accountId/posting-schedule", authed, async (c) => {
       const db = createDb(c.env.DATABASE_URL);
-      const access = await authorizeAccount(db, c.get("user"), c.req.param("accountId"), "settings");
+      const access = await authorizeAccount(db, c.get("user"), c.req.param("accountId"), "settings", { feature: "autopost" });
       const account = access.account;
       const req = await parseBody(putPostingScheduleRequestSchema, c.req.json());
       const now = new Date();

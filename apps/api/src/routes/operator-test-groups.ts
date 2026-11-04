@@ -1,11 +1,11 @@
 // /api/operator/test-groups（specs/016-test-groups contracts/api.md「運営者のAPI」）。
-// 運営者（OPERATOR_CLERK_USER_IDS）だけ。テスト用のグループがOFFの環境では、ルートがないのと同じ 404。
-import { testGroupCreateRequestSchema, testGroupUpdateRequestSchema } from "@threads-grower/shared";
+// 運営者（OPERATOR_CLERK_USER_IDS）だけ。招待制がOFFの環境（本番）でも、機能の設定のために使う（specs/019 FR-017、research.md R11）。
+import { featureSettingsRequestSchema, testGroupCreateRequestSchema, testGroupUpdateRequestSchema } from "@threads-grower/shared";
 import { Hono, type MiddlewareHandler } from "hono";
 import type { z } from "zod";
 import type { AppEnv } from "../app";
-import { billingModeOf } from "../lib/config";
 import { AppError } from "../lib/errors";
+import { parseBody } from "../lib/validate";
 import {
   closeTestGroup,
   createTestGroup,
@@ -14,6 +14,7 @@ import {
   rotateTestGroupInvite,
   testGroupDetail,
   updateTestGroup,
+  updateTestGroupFeatures,
 } from "../services/test-group-service";
 
 /**
@@ -37,16 +38,13 @@ async function parseGroupInput<S extends z.ZodTypeAny>(schema: S, body: Promise<
  * @returns Hono のルート
  */
 export function operatorTestGroupRoutes(authed: MiddlewareHandler<AppEnv>) {
-  const enabledOnly: MiddlewareHandler<AppEnv> = async (c, next) => {
-    if (!billingModeOf(c.env).testGroups) return c.notFound();
-    await next();
-  };
   const operatorOnly: MiddlewareHandler<AppEnv> = async (c, next) => {
-    if (!c.get("user").testAccess.operator) throw new AppError("OPERATOR_ONLY", 403, "operator only");
+    // 運営者は招待制にかかわらず決める（specs/019 research.md R5）
+    if (!c.get("user").operator) throw new AppError("OPERATOR_ONLY", 403, "operator only");
     c.header("Cache-Control", "no-store");
     await next();
   };
-  const guard = [enabledOnly, authed, operatorOnly] as const;
+  const guard = [authed, operatorOnly] as const;
   return new Hono<AppEnv>()
     .get("/operator/test-groups", ...guard, async (c) => c.json({ groups: await listTestGroups(c.env) }))
     .post("/operator/test-groups", ...guard, async (c) => {
@@ -64,6 +62,10 @@ export function operatorTestGroupRoutes(authed: MiddlewareHandler<AppEnv>) {
     .post("/operator/test-groups/:groupId/close", ...guard, async (c) =>
       c.json(await closeTestGroup(c.env, c.get("user"), c.req.param("groupId"))),
     )
+    .put("/operator/test-groups/:groupId/features", ...guard, async (c) => {
+      const { features } = await parseBody(featureSettingsRequestSchema, c.req.json());
+      return c.json(await updateTestGroupFeatures(c.env, c.get("user"), c.req.param("groupId"), features));
+    })
     .delete("/operator/test-groups/:groupId/members/:userId", ...guard, async (c) =>
       c.json(await removeTestGroupMember(c.env, c.get("user"), c.req.param("groupId"), c.req.param("userId"))),
     );

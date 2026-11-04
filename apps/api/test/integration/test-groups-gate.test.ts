@@ -113,10 +113,10 @@ describe("OFFの環境（FR-015・SC-006）", () => {
     expect(me.testGroups).toEqual({ enabled: false, admitted: true, operator: false });
   });
 
-  it("招待の確認・運営者のAPIは、ないのと同じ", async () => {
+  it("招待の確認・運営者のAPIは、OFFでも使う（specs/019 FR-017）。ないリンクは TEST_INVITE_INVALID、運営者でなければ OPERATOR_ONLY", async () => {
     const res = await call(app, "GET", "/api/test-invites/g_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", { user: "x" });
     expect(res.status).toBe(404);
     expect(await codeOf(res)).toBe("TEST_INVITE_INVALID");
-    expect((await call(app, "GET", "/api/operator/test-groups", { user: OPERATOR })).status).toBe(404);
+    expect(await codeOf(await call(app, "GET", "/api/operator/test-groups", { user: OPERATOR }))).toBe("OPERATOR_ONLY");
   });
 });

@@ -23,6 +23,7 @@ import {
 import type { Env } from "../env";
 import { billingModeOf } from "../lib/config";
 import { loadOwnerEntitlement } from "./billing-service";
+import { ownerAutopostOn } from "./feature-sql";
 import { logger } from "../lib/logger";
 import {
   ThreadsApiError,
@@ -55,7 +56,7 @@ export type ExecuteOutcome =
   | { kind: "retry" }
   | { kind: "carried_over" }
   | { kind: "failed" }
-  | { kind: "skipped"; reason: "needs_reconnect" | "rate_limited" | "billing_inactive" };
+  | { kind: "skipped"; reason: "needs_reconnect" | "rate_limited" | "billing_inactive" | "auto_post_off" };
 
 /** 持ち時間を別の処理に取られた（再接続の片付けを含む）。この処理では、それ以上何も書かず、公開もしない。 */
 class LeaseLostError extends Error {
@@ -156,6 +157,8 @@ async function executeOwned(
   if (!attempt.publishRequestedAt) {
     const owner = await loadOwnerEntitlement(db, attempt.accountId, billingModeOf(env), now);
     if (owner && !owner.fullAccess) return ctx.backToApproved("billing_inactive");
+    // オーナーが自動投稿を使えなくなったら、新しく公開しない（specs/019 FR-008）
+    if (!(await ownerAutopostOn(db, attempt.accountId))) return ctx.backToApproved("auto_post_off");
   }
   if (!cred?.token || cred.threadsUserId === null) {
     // 接続がない・鍵の設定ミスで復号できない。結果がわからない途中なら待ち、そうでなければ一時的な失敗として数える
@@ -578,7 +581,7 @@ class AttemptContext {
    * @returns 飛ばした結果
    */
   async backToApproved(
-    reason: "needs_reconnect" | "rate_limited" | "billing_inactive",
+    reason: "needs_reconnect" | "rate_limited" | "billing_inactive" | "auto_post_off",
   ): Promise<ExecuteOutcome> {
     await this.commit(
       { state: "skipped", skipReason: reason, draftId: null, leaseUntil: null },

@@ -1,11 +1,17 @@
 // /api/me の決済の部分のテスト用の値（specs/013）。既定は決済OFF（001〜012の画面のテストは今のまま）。
-import type { MeBilling, MeResponse } from "@threads-grower/shared";
+import { FEATURES, type MeBilling, type MeResponse } from "@threads-grower/shared";
 
 /** テスト用のグループがOFFの環境の /api/me の testGroups（specs/016）。 */
 export const ME_TEST_GROUPS_OFF: MeResponse["testGroups"] = { enabled: false, admitted: true, operator: false };
 
-/** 決済OFFの環境の /api/me の billing と、退会の途中でないこと。テスト用のグループもOFF（specs/016）。 */
-export const ME_BILLING_OFF: { billing: MeBilling; withdrawalInProgress: boolean; testGroups: MeResponse["testGroups"] } = {
+/** 決済OFFの環境の /api/me の billing と、退会の途中でないこと。テスト用のグループもOFF（specs/016）。運営者ではない（specs/019）。 */
+export const ME_BILLING_OFF: {
+  billing: MeBilling;
+  withdrawalInProgress: boolean;
+  testGroups: MeResponse["testGroups"];
+  operator: boolean;
+  features: MeResponse["features"];
+} = {
   billing: {
     mode: "disabled",
     state: "billing_disabled",
@@ -15,6 +21,8 @@ export const ME_BILLING_OFF: { billing: MeBilling; withdrawalInProgress: boolean
   },
   withdrawalInProgress: false,
   testGroups: ME_TEST_GROUPS_OFF,
+  operator: false,
+  features: [...FEATURES],
 };
 
 /**

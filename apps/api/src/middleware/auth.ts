@@ -2,14 +2,16 @@
 // Authorization: Bearer <Clerkのセッショントークン> を検証し、失敗したら 401 AUTH_REQUIRED。
 // 成功したら clerk_user_id で users を探し、なければその場で作る（JIT作成）。
 import { createClerkClient, verifyToken } from "@clerk/backend";
+import type { Feature } from "@threads-grower/shared";
 import { eq, sql } from "drizzle-orm";
 import { createMiddleware } from "hono/factory";
 import type { Env } from "../env";
 import { createDb } from "../db/client";
 import { users, withdrawnUsers } from "../db/schema";
-import { billingModeOf, type BillingMode } from "../lib/config";
+import { billingModeOf, operatorIdsOf, type BillingMode } from "../lib/config";
 import { AppError, pgErrorCode } from "../lib/errors";
 import { referrerIdByCode } from "../services/referral-service";
+import { disabledFeaturesSql, featuresFrom } from "../services/feature-sql";
 import { testAccessSql } from "../services/test-group-service";
 
 /**
@@ -46,6 +48,10 @@ export type CurrentUser = typeof users.$inferSelect & {
    * `{ admitted: true, operator: false }`
    */
   testAccess: { admitted: boolean; operator: boolean };
+  /** 運営者か（招待制に関わらない。機能の設定の画面とAPIに使う。specs/019 research.md R5） */
+  operator: boolean;
+  /** 自分の使えるまとまり（人 ∪ グループ。チームを作る・入るの判定と /api/me に使う。specs/019 research.md R13） */
+  features: ReadonlySet<Feature>;
 };
 /** 認証済みのリクエストで Hono のコンテキストに置く値。 */
 export type AuthVariables = { user: CurrentUser };
@@ -107,13 +113,19 @@ export function authMiddleware(makeVerifier: (env: Env) => AuthVerifier) {
     // テスト用のグループがONなら、テスト版に入れるかも同じ問い合わせで読む（specs/016 plan.md「性能の目標」）
     const selectUser = () =>
       db
-        .select({ row: users, admitted: mode.testGroups ? testAccessSql(users, mode.operators) : sql<boolean>`true` })
+        .select({
+          row: users,
+          admitted: mode.testGroups ? testAccessSql(users, mode.operators) : sql<boolean>`true`,
+          // 自分の使えないまとまり（specs/019）。同じ問い合わせで読む
+          disabled: disabledFeaturesSql(users.id),
+        })
         .from(users)
         .where(eq(users.clerkUserId, identity.clerkUserId))
         .limit(1);
     const [found] = await selectUser();
     const existing = found?.row;
     let admitted = found?.admitted ?? true;
+    let disabled = found?.disabled ?? [];
 
     let user: typeof users.$inferSelect;
     if (existing) {
@@ -165,6 +177,7 @@ export function authMiddleware(makeVerifier: (env: Env) => AuthVerifier) {
       const [created] = await selectUser();
       user = created!.row;
       admitted = created!.admitted;
+      disabled = created!.disabled;
     }
 
     // 退会の途中の人は、退会のAPIと GET /api/me のほかを止める（途中でデータを足させない。specs/013 research.md R10）
@@ -177,7 +190,13 @@ export function authMiddleware(makeVerifier: (env: Env) => AuthVerifier) {
     if (!testAccess.admitted && !SELF_SERVICE_ALLOWED.has(`${c.req.method} ${c.req.path}`) && !TEST_INVITE_PATH.test(c.req.path)) {
       throw new AppError("TEST_ACCESS_REQUIRED", 403, "test access required");
     }
-    c.set("user", { ...user, billing: mode, testAccess });
+    c.set("user", {
+      ...user,
+      billing: mode,
+      testAccess,
+      operator: operatorIdsOf(c.env).includes(user.clerkUserId),
+      features: featuresFrom(disabled),
+    });
     await next();
   });
 }

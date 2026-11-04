@@ -31,8 +31,11 @@ describe("運営者だけ", () => {
     expect((await json(res)).error?.code).toBe("OPERATOR_ONLY");
   });
 
-  it("OFFの環境では 404", async () => {
-    expect((await call(app, "GET", "/api/operator/test-groups", { user: OPERATOR })).status).toBe(404);
+  it("OFFの環境でも、運営者の決まり（OPERATOR_CLERK_USER_IDS）で守る（specs/019 で本番でも使うようにした）", async () => {
+    // テストの env の OFF の環境には運営者がいない
+    const res = await call(app, "GET", "/api/operator/test-groups", { user: OPERATOR });
+    expect(res.status).toBe(403);
+    expect((await json(res)).error?.code).toBe("OPERATOR_ONLY");
   });
 });
 

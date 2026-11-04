@@ -509,3 +509,20 @@ describe("「接続を確かめる」（FR-002b）", () => {
     await act(async () => resolve({ status: "ok", quotaUsage: 0, quotaTotal: 250 }));
   });
 });
+
+describe("機能のまとまりがOFFのとき（specs/019 contracts/ui-routes.md 2）", () => {
+  it("自動投稿とチームを使えなければ、投稿のスケジュール・投稿のルール・チームの区分を出さず、そのAPIを呼ばない", async () => {
+    accountAccess.mockResolvedValue({ ...OWNER_ACCESS, features: ["strategy"] });
+    try {
+      renderPage();
+      expect(await screen.findByRole("heading", { name: "Threadsとの接続" })).toBeInTheDocument();
+      expect(screen.queryByRole("heading", { name: "投稿のスケジュール" })).toBeNull();
+      expect(screen.queryByRole("heading", { name: "投稿のルール" })).toBeNull();
+      expect(screen.queryByRole("heading", { name: "チーム" })).toBeNull();
+      expect(getPostingSchedule).not.toHaveBeenCalled();
+      expect(getPostingRules).not.toHaveBeenCalled();
+    } finally {
+      accountAccess.mockResolvedValue(OWNER_ACCESS);
+    }
+  });
+});

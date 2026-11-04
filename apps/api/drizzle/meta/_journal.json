@@ -127,6 +127,13 @@
       "when": 1793500735193,
       "tag": "0017_referral_links",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1793765053289,
+      "tag": "0018_feature_switches",
+      "breakpoints": true
     }
   ]
 }

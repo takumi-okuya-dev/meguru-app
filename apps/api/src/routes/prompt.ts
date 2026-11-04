@@ -58,16 +58,16 @@ export function promptRoutes(authed: MiddlewareHandler<AppEnv>) {
     .get("/accounts/:accountId/prompt", authed, async (c) => {
       const db = createDb(c.env.DATABASE_URL);
       const user = c.get("user");
-      const access = await authorizeAccount(db, user, c.req.param("accountId"), "view");
+      const access = await authorizeAccount(db, user, c.req.param("accountId"), "view", { feature: "autopost" });
       const account = access.account;
       const count = parseCount(c.req.query("count")) ?? account.promptPostCount;
-      return c.json(await getPrompt(db, account, count));
+      return c.json(await getPrompt(db, account, count, access.features));
     })
     .put("/accounts/:accountId/prompt-settings", authed, async (c) => {
       const db = createDb(c.env.DATABASE_URL);
       const user = c.get("user");
       // 作る件数は設定（オーナーだけ。specs/011 contracts/permissions.md、PR #14 のCodexレビュー）
-      const access = await authorizeAccount(db, user, c.req.param("accountId"), "settings");
+      const access = await authorizeAccount(db, user, c.req.param("accountId"), "settings", { feature: "autopost" });
       const account = access.account;
       const { postCount, length, expectedVersion } = await parseSettings(c.req.json());
       const before = lengthSettingsOf(account);

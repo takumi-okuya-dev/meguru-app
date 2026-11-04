@@ -15,7 +15,7 @@ import { listActivity } from "../services/activity-log";
 export function activityRoutes(authed: MiddlewareHandler<AppEnv>) {
   return new Hono<AppEnv>().get("/accounts/:accountId/activity", authed, async (c) => {
     const db = createDb(c.env.DATABASE_URL);
-    const access = await authorizeAccount(db, c.get("user"), c.req.param("accountId"), "activity");
+    const access = await authorizeAccount(db, c.get("user"), c.req.param("accountId"), "activity", { feature: "team" });
     const parsed = activityQuerySchema.safeParse(c.req.query());
     if (!parsed.success) throw new AppError("VALIDATION_FAILED", 400, "invalid query", undefined, invalidFields(parsed.error));
     c.header("Cache-Control", "no-store");

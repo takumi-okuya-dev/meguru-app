@@ -18,6 +18,7 @@ import { billingRoutes } from "./routes/billing";
 import { stripeWebhookRoutes } from "./routes/stripe-webhook";
 import { accountTeamRoutes } from "./routes/account-team";
 import { inviteRoutes } from "./routes/invites";
+import { operatorFeatureRoutes } from "./routes/operator-features";
 import { operatorTestGroupRoutes } from "./routes/operator-test-groups";
 import { testInviteRoutes } from "./routes/test-invites";
 import { referralRoutes } from "./routes/referrals";
@@ -174,6 +175,7 @@ export function createApp(deps: AppDeps = defaultDeps) {
     .route("/", testInviteRoutes(authed, maybeAuthed))
     .route("/", referralRoutes(authed))
     .route("/", operatorTestGroupRoutes(authed))
+    .route("/", operatorFeatureRoutes(authed))
     .route("/", teamsRoutes(authed))
     .route("/", activityRoutes(authed))
     .route("/", strategyRoutes(authed))

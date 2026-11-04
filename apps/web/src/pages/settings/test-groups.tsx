@@ -1,5 +1,6 @@
-// 設定 > 運営 > テスト用のグループ（specs/016-test-groups contracts/ui-routes.md 3、US2、FR-009〜FR-011・FR-013）。
-// 運営者だけ。一覧（作る）と、グループの詳しい画面（名前と上限・招待リンク・人を外す・閉じる・記録）。
+// 設定 > 運営 > グループ（specs/016-test-groups contracts/ui-routes.md 3、US2、FR-009〜FR-011・FR-013）。
+// 運営者だけ。一覧（作る）と、グループの詳しい画面（名前と上限・使える機能・招待リンク・人を外す・閉じる・記録）。
+// 2026-11-04（specs/019）：本番でも組織の単位として使うので、項目名を「グループ」にし、「使える機能」を足した。
 import {
   TEST_GROUP_CAPACITY_MAX,
   TEST_GROUP_CAPACITY_MIN,
@@ -11,6 +12,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ChevronLeftIcon, ChevronRightIcon } from "lucide-react";
 import { useRef, useState, type FormEvent } from "react";
 import { Link, useNavigate, useParams } from "react-router";
+import { FeatureSwitches } from "@/components/settings/FeatureSwitches";
 import { ConfirmDialog } from "@/components/team/ConfirmDialog";
 import { SwapLabel } from "@/components/SwapLabel";
 import { Button } from "@/components/ui/button";
@@ -152,7 +154,7 @@ export function TestGroupsPage() {
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-2xl font-semibold max-md:hidden">テスト用のグループ</h1>
+        <h1 className="text-2xl font-semibold max-md:hidden">グループ</h1>
         <Button className="rounded-full" onClick={() => setCreating(true)}>
           グループを作る
         </Button>
@@ -226,6 +228,9 @@ export function TestGroupDetailPage() {
   const { groupId = "" } = useParams<{ groupId: string }>();
   const queryClient = useQueryClient();
   const detail = useQuery({ queryKey: queryKeys.testGroup(groupId), queryFn: () => api.testGroup(groupId), retry: false });
+  // 招待リンクの「テスト版を使えます」は、テスト版（招待制がON）でだけ出す（specs/019 contracts/ui-routes.md 5）
+  const me = useQuery({ queryKey: queryKeys.me, queryFn: api.me });
+  const testVersion = Boolean(me.data?.testGroups.enabled);
   const [editing, setEditing] = useState(false);
   const [confirm, setConfirm] = useState<Confirm | null>(null);
   const [copied, setCopied] = useState(false);
@@ -282,12 +287,29 @@ export function TestGroupDetailPage() {
         )}
       </div>
 
+      {!closed && (
+        <section aria-labelledby="group-features-title" className="space-y-2 rounded-xl border bg-card px-4 py-3">
+          <h2 id="group-features-title" className="text-sm font-medium">
+            使える機能
+          </h2>
+          <FeatureSwitches
+            key={g.id}
+            label={`${g.name}の使える機能`}
+            disabled={g.disabled}
+            onSave={async (values) => {
+              queryClient.setQueryData(queryKeys.testGroup(g.id), await api.putTestGroupFeatures(g.id, values));
+              await queryClient.invalidateQueries({ queryKey: queryKeys.featureSettings });
+            }}
+          />
+        </section>
+      )}
+
       {!closed && g.inviteUrl && (
         <section aria-labelledby="invite-title" className="space-y-2 rounded-xl border bg-card p-4">
           <h2 id="invite-title" className="text-sm font-medium">
             招待リンク
           </h2>
-          <p className="text-xs text-muted-foreground">このリンクから「参加する」を押した人が、テスト版を使えます。</p>
+          {testVersion && <p className="text-xs text-muted-foreground">このリンクから「参加する」を押した人が、テスト版を使えます。</p>}
           <div className="flex flex-wrap gap-2">
             <input
               ref={urlRef}

@@ -335,7 +335,8 @@ function PromptReadyCard({
       <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
         <div className="min-w-0 space-y-1">
           <h2 className="font-semibold">プロンプトをコピーして、ChatGPTやClaudeに送る</h2>
-          {summary &&
+          {/* 戦略がOFF（materials が null）なら、課題の案内と数を出さない（specs/019 FR-004） */}
+          {summary && prompt.data?.materials !== null &&
             (summary.strategyFilledCount === 0 ? (
               <p className="text-[13px] text-muted-foreground">
                 <span>課題を入力すると、投稿の精度が上がります</span>{" "}

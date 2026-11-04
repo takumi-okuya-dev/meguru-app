@@ -18,7 +18,7 @@ export function performanceRoutes(authed: MiddlewareHandler<AppEnv>) {
   return new Hono<AppEnv>().get("/accounts/:accountId/performance", authed, async (c) => {
     const db = createDb(c.env.DATABASE_URL);
     const user = c.get("user");
-    const access = await authorizeAccount(db, user, c.req.param("accountId"), "view");
+    const access = await authorizeAccount(db, user, c.req.param("accountId"), "view", { feature: "autopost" });
     const account = access.account;
     const parsed = performanceQuerySchema.safeParse(c.req.query());
     if (!parsed.success) {
@@ -34,7 +34,7 @@ export function performanceRoutes(authed: MiddlewareHandler<AppEnv>) {
       // 傾向メモと「プロンプトに入れる」（FR-021）。保存ボタンなしで、Webが入力欄から離れたとき・切り替えたときに呼ぶ
       const db = createDb(c.env.DATABASE_URL);
       const user = c.get("user");
-      const access = await authorizeAccount(db, user, c.req.param("accountId"), "content");
+      const access = await authorizeAccount(db, user, c.req.param("accountId"), "content", { feature: "autopost" });
       const account = access.account;
       const parsed = feedbackRequestSchema.safeParse(await c.req.json().catch(() => null));
       if (!parsed.success) {
@@ -51,7 +51,7 @@ export function performanceRoutes(authed: MiddlewareHandler<AppEnv>) {
       // CSVの行のデータ（FR-028〜FR-030）。CSVはWebで組み立てる（research.md R7）
       const db = createDb(c.env.DATABASE_URL);
       const user = c.get("user");
-      const access = await authorizeAccount(db, user, c.req.param("accountId"), "view");
+      const access = await authorizeAccount(db, user, c.req.param("accountId"), "view", { feature: "autopost" });
       const account = access.account;
       // 未接続のアカウントには書き出すものがない（specs/012 FR-033）
       if (account.connectionStatus === "not_connected")

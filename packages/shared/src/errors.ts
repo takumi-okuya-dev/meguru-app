@@ -65,6 +65,9 @@ export const ERROR_CODES = [
   "TEST_GROUP_CLOSED",
   "TEST_GROUP_CAPACITY_INVALID",
   "OPERATOR_ONLY",
+  // 機能のまとまりごとのON/OFF（specs/019-feature-switches contracts/api.md「新しいエラーコード」）
+  "FEATURE_DISABLED",
+  "USER_NOT_FOUND",
 ] as const;
 
 /** エラーコード。 */
@@ -238,6 +241,10 @@ export function errorMessage(code: ErrorCode, ctx: ErrorMessageContext = {}): Er
       return { message: `上限は${TEST_GROUP_CAPACITY_MIN}〜${TEST_GROUP_CAPACITY_MAX}人で決めてください。`, action: "none" };
     case "OPERATOR_ONLY":
       return { message: "この操作は運営者だけができます。", action: "none" };
+    case "FEATURE_DISABLED":
+      return { message: "この機能は今は使えません。", action: "none" };
+    case "USER_NOT_FOUND":
+      return { message: "見つかりません。", action: "none" };
     case "INVITE_INVALID":
       return {
         message: "このリンクは使えません。作り直されたか、チームが削除されました。管理者に、新しいリンクを頼んでください。",

@@ -1,6 +1,7 @@
 // APIの入出力スキーマ（contracts/api.md「型」）。WebとAPIで共有する。
 import { z } from "zod";
 import { ERROR_CODES } from "./errors";
+import { FEATURE_EVENT_ACTIONS, FEATURES } from "./features";
 import {
   ACCOUNT_NAME_MAX,
   PRIORITY_MAX,
@@ -190,6 +191,10 @@ export const meResponseSchema = z.object({
    * 入れるか（OFFなら常に true）、operator は運営者か（OFFなら常に false）
    */
   testGroups: z.object({ enabled: z.boolean(), admitted: z.boolean(), operator: z.boolean() }),
+  /** 運営者か（招待制に関わらない。機能の設定の画面に使う。specs/019 research.md R5） */
+  operator: z.boolean(),
+  /** 自分の使えるまとまり（人 ∪ グループ。specs/019 contracts/api.md） */
+  features: z.array(z.enum(FEATURES)),
 });
 /** GET /api/me のレスポンス。ログイン中のユーザー、Account一覧、ログイン後の遷移先、登録数上限。 */
 export type MeResponse = z.infer<typeof meResponseSchema>;
@@ -956,7 +961,8 @@ export const promptResponseSchema = z.object({
     version: z.number().int(),
   }),
   summary: promptSummarySchema,
-  materials: promptMaterialsSchema,
+  /** 戦略がOFFなら null（「プロンプトに入っている情報」を出さない。specs/019 FR-007） */
+  materials: promptMaterialsSchema.nullable(),
 });
 /** GET /prompt のレスポンス。 */
 export type PromptResponse = z.infer<typeof promptResponseSchema>;
@@ -1359,6 +1365,8 @@ export const accountAccessResponseSchema = z.object({
   assignedNotice: z.boolean(),
   /** オーナーが読むだけなら、その理由（チームの人には owner_inactive だけ。specs/013 FR-045）。すべて使えるなら NULL */
   readOnly: z.object({ reason: z.enum(["trial_ended", "payment_failed", "canceled", "test_access", "owner_inactive"]) }).nullable(),
+  /** オーナーの設定でONの機能のまとまり（画面の出し分けに使う。specs/019 contracts/api.md） */
+  features: z.array(z.enum(FEATURES)),
 });
 /** Accountとの関わりと権限（画面の出し分けに使う）。 */
 export type AccountAccessResponse = z.infer<typeof accountAccessResponseSchema>;
@@ -1578,6 +1586,8 @@ export type WithdrawalPreview = z.infer<typeof withdrawalPreviewSchema>;
 /** GET /api/test-invites/:token の応答。viewer はログインしていなければ null。 */
 export const testInvitePreviewSchema = z.object({
   group: z.object({ name: z.string() }),
+  /** テスト版（招待制がONの環境）か。false なら、テスト版のための注意を出さない（specs/019 FR-019） */
+  testVersion: z.boolean(),
   /** 定員に達しているか */
   full: z.boolean(),
   viewer: z
@@ -1626,6 +1636,8 @@ export const testGroupListSchema = z.object({ groups: z.array(testGroupSummarySc
 
 /** 運営者の画面のグループの詳しい内容。 */
 export const testGroupDetailSchema = testGroupSummarySchema.extend({
+  /** グループの設定でOFFのまとまり（specs/019 FR-017） */
+  disabled: z.array(z.enum(FEATURES)),
   /** 入っている人（入った順） */
   members: z.array(z.object({ userId: z.string(), name: z.string(), email: z.string(), joinedAt: z.string() })),
   /** 記録（新しい順に TEST_GROUP_EVENTS_LIMIT 件） */
@@ -1669,3 +1681,49 @@ export type ReferralResponse = z.infer<typeof referralResponseSchema>;
 export const referralPageSchema = z.object({ testGroups: z.boolean() });
 /** 紹介リンクの画面に出す注意のための情報。 */
 export type ReferralPage = z.infer<typeof referralPageSchema>;
+
+// ---- 機能のまとまりごとのON/OFF（specs/019-feature-switches contracts/api.md「運営者のAPI」） ----
+
+const featureSchema = z.enum(FEATURES);
+
+/** GET /api/operator/users?email= のクエリ（完全一致。前後の空白を除き、大文字・小文字を区別しない）。 */
+export const operatorUserQuerySchema = z.object({ email: z.string().trim().toLowerCase().pipe(z.email()) });
+
+/** 運営者の画面の、見つかった人と今の設定（disabled は人の設定、group.disabled はグループの設定。FEATURES の順）。 */
+export const operatorUserSchema = z.object({
+  userId: z.string(),
+  name: z.string(),
+  email: z.string(),
+  disabled: z.array(featureSchema),
+  /** 入っている閉じていないグループ（入っていなければ null） */
+  group: z.object({ id: z.string(), name: z.string(), disabled: z.array(featureSchema) }).nullable(),
+});
+/** 運営者の画面の、見つかった人と今の設定。 */
+export type OperatorUser = z.infer<typeof operatorUserSchema>;
+
+/** PUT /api/operator/feature-settings/:userId のリクエスト（3つすべての値）。 */
+export const featureSettingsRequestSchema = z.object({
+  features: z.object({ autopost: z.boolean(), strategy: z.boolean(), team: z.boolean() }),
+});
+/** 機能の設定の保存の値。 */
+export type FeatureSettingsRequest = z.infer<typeof featureSettingsRequestSchema>;
+
+/** GET /api/operator/feature-settings の応答（FR-013・FR-014）。 */
+export const featureSettingsListSchema = z.object({
+  /** OFFのまとまりがある人。updatedAt は、その人の設定を最後に変えた日時（ONに戻した変更も含む）の新しい順 */
+  users: z.array(operatorUserSchema.omit({ group: true }).extend({ updatedAt: z.string() })),
+  /** 最近の変更（新しい順に FEATURE_EVENTS_LIMIT 件まで） */
+  events: z.array(
+    z.object({
+      feature: featureSchema,
+      action: z.enum(FEATURE_EVENT_ACTIONS),
+      actorName: z.string(),
+      subjectName: z.string(),
+      /** 人の設定の変更か、グループの設定の変更か */
+      subjectKind: z.enum(["user", "group"]),
+      createdAt: z.string(),
+    }),
+  ),
+});
+/** 運営者の画面の、OFFの人の一覧と最近の変更。 */
+export type FeatureSettingsList = z.infer<typeof featureSettingsListSchema>;

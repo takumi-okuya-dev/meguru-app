@@ -306,6 +306,15 @@ export function TeamSharedAccountPage() {
     return <Navigate to={`/accounts/${accountId}`} replace />;
   const a = account.data;
   const owner = access.data.owner.name;
+  // オーナーが使えないまとまりのタブは出さず、そのAPIも読まない（specs/019 FR-012・FR-004）。
+  // 投稿ストックは自動投稿、戦略は戦略のまとまり
+  const tabs = (
+    [
+      ["stock", "投稿ストック", "autopost"],
+      ["strategy", "戦略", "strategy"],
+    ] as const
+  ).filter(([, , feature]) => access.data.features.includes(feature));
+  const shown = tabs.some(([key]) => key === tab) ? tab : tabs[0]?.[0];
 
   return (
     <div className="flex min-h-svh flex-col">
@@ -334,22 +343,17 @@ export function TeamSharedAccountPage() {
         aria-label="見る内容"
         className="mx-auto mt-3 flex w-full max-w-3xl gap-1 border-b px-4 md:px-6"
       >
-        {(
-          [
-            ["stock", "投稿ストック"],
-            ["strategy", "戦略"],
-          ] as const
-        ).map(([key, label]) => (
+        {tabs.map(([key, label]) => (
           <button
             key={key}
             type="button"
-            aria-current={tab === key ? "page" : undefined}
+            aria-current={shown === key ? "page" : undefined}
             onClick={() =>
               setParams(key === "strategy" ? { tab: "strategy" } : {}, { replace: true })
             }
             className={cn(
               "h-10 border-b-2 px-3.5 text-sm",
-              tab === key
+              shown === key
                 ? "border-foreground font-semibold"
                 : "border-transparent text-muted-foreground",
             )}
@@ -359,10 +363,12 @@ export function TeamSharedAccountPage() {
         ))}
       </nav>
       <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-5 md:px-6">
-        {tab === "stock" ? (
+        {shown === "stock" ? (
           <StockTab accountId={accountId} onLost={onLost} />
-        ) : (
+        ) : shown === "strategy" ? (
           <StrategyTab accountId={accountId} onLost={onLost} />
+        ) : (
+          <p className="text-sm text-muted-foreground">見られる内容はありません。</p>
         )}
       </main>
     </div>

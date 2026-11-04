@@ -17,6 +17,7 @@ import {
   TargetIcon,
   type LucideIcon,
 } from "lucide-react";
+import type { Feature } from "@threads-grower/shared";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { Link, NavLink, useMatch, useParams } from "react-router";
@@ -25,35 +26,37 @@ import { TeamMark } from "@/components/team/TeamMark";
 import { Button } from "@/components/ui/button";
 import { api } from "@/lib/api-client";
 import { queryKeys } from "@/lib/query";
-import { useAccountAccess } from "@/lib/use-account-access";
+import { featureOn, useAccountAccess } from "@/lib/use-account-access";
 import { cn } from "@/lib/utils";
 import { AccountSwitcher } from "./AccountSwitcher";
 import { UserMenu } from "./UserMenu";
 
 type NavItem = { path: string; label: string; Icon: LucideIcon; end?: boolean; badge?: "needsReview"; needsAccount?: boolean };
-type NavGroup = { label?: string; items: NavItem[] };
+/** feature：区分ごとON/OFFする機能のまとまり。OFFなら見出しごと出さない（specs/019 FR-004） */
+type NavGroup = { label?: string; items: NavItem[]; feature?: Feature };
 
 /** 機能の移動。path は /accounts/:id からの相対パス。 */
+// 並びは ホーム → 自動投稿 → 戦略 → チーム（specs/019 FR-004。2026-11-04に「分析」の見出しをなくし、パフォーマンスを自動投稿に入れた）
 const NAV_GROUPS: NavGroup[] = [
+  { items: [{ path: "", label: "ホーム", Icon: HouseIcon, end: true }] },
   {
+    label: "自動投稿",
+    feature: "autopost",
     items: [
-      { path: "", label: "ホーム", Icon: HouseIcon, end: true },
-      // 「投稿をつくる」の画面へ移る。開いている間は選ばれた見た目にする（specs/014 FR-160。2026-11-02にホームの次へ移した）。Accountがないと開けないので出さない
+      // 「投稿をつくる」の画面へ移る。開いている間は選ばれた見た目にする（specs/014 FR-160）。Accountがないと開けないので出さない
       { path: "create", label: "投稿をつくる", Icon: SquarePenIcon, needsAccount: true },
       { path: "stock", label: "投稿ストック", Icon: InboxIcon, badge: "needsReview" },
+      { path: "performance", label: "パフォーマンス", Icon: ChartColumnIcon },
     ],
   },
   {
     label: "戦略",
+    feature: "strategy",
     items: [
       { path: "strategy", label: "課題", Icon: TargetIcon },
       { path: "promotions", label: "宣伝内容", Icon: MegaphoneIcon },
       { path: "research", label: "リサーチ", Icon: SearchIcon },
     ],
-  },
-  {
-    label: "分析",
-    items: [{ path: "performance", label: "パフォーマンス", Icon: ChartColumnIcon }],
   },
 ];
 
@@ -78,13 +81,17 @@ export function Sidebar({ onCollapse, onNavigate }: { onCollapse?: () => void; o
   const openTeam = useMatch("/teams/:teamId/*")?.params.teamId;
   const [creating, setCreating] = useState(false);
   // 投稿ストックの右に出す要確認の件数（specs/004 FR-013）。本文を含まない軽いAPIで読む
+  // 機能の移動と同じく、チームの画面では最後に使ったAccountで読む（でないと「操作の記録」が消える）
+  const { access, isPending: accessPending } = useAccountAccess(accountId);
+  const autopostOn = featureOn(access, "autopost");
   const counts = useQuery({
     queryKey: queryKeys.draftCounts(accountId ?? ""),
     queryFn: () => api.getDraftCounts(accountId!),
-    enabled: !!accountId,
+    // 自動投稿を使えないAccountでは、投稿ストックを出さないので読まない。使えるかがわかってから読む（specs/019）
+    enabled: !!accountId && !accessPending && autopostOn,
   });
-  // 機能の移動と同じく、チームの画面では最後に使ったAccountで読む（でないと「操作の記録」が消える）
-  const { access } = useAccountAccess(accountId);
+  // チームの区分は、自分とAccountのオーナーの両方がチームを使えるときだけ（specs/019 FR-009・FR-012）
+  const teamOn = (me.data?.features.includes("team") ?? true) && featureOn(access, "team");
   return (
     <div className="flex h-full flex-col">
       <div className="flex items-center gap-1 p-2">
@@ -109,7 +116,7 @@ export function Sidebar({ onCollapse, onNavigate }: { onCollapse?: () => void; o
         </div>
       )}
       <nav aria-label="このアカウント" className="flex-1 space-y-0.5 overflow-y-auto px-2 py-1">
-        {NAV_GROUPS.map((group, i) => (
+        {NAV_GROUPS.filter((group) => !group.feature || featureOn(access, group.feature)).map((group, i) => (
           <div key={group.label ?? i} className="space-y-0.5">
             {group.label && <div className="px-3 pt-4 pb-1 text-xs text-muted-foreground lg:px-2.5">{group.label}</div>}
             {group.items.filter((item) => accountId || !item.needsAccount).map(({ path, label, Icon, end, badge }) => {
@@ -128,7 +135,7 @@ export function Sidebar({ onCollapse, onNavigate }: { onCollapse?: () => void; o
             })}
           </div>
         ))}
-        {(teams.length > 0 || (access?.hasTeam && access.permissions.includes("activity"))) && (
+        {teamOn && (teams.length > 0 || (access?.hasTeam && access.permissions.includes("activity"))) && (
           <div className="space-y-0.5">
             <div className="px-3 pt-4 pb-1 text-xs text-muted-foreground lg:px-2.5">チーム</div>
             {teams.map((t) => (

@@ -90,7 +90,7 @@ export function promotionRoutes(authed: MiddlewareHandler<AppEnv>) {
     .get("/accounts/:accountId/promotion-settings", authed, async (c) => {
       const db = createDb(c.env.DATABASE_URL);
       const user = c.get("user");
-      const access = await authorizeAccount(db, user, c.req.param("accountId"), "view");
+      const access = await authorizeAccount(db, user, c.req.param("accountId"), "view", { feature: "strategy" });
       const account = access.account;
       return c.json({
         ratioPercent: account.promotionRatioPercent,
@@ -102,7 +102,7 @@ export function promotionRoutes(authed: MiddlewareHandler<AppEnv>) {
     .put("/accounts/:accountId/promotion-settings", authed, async (c) => {
       const db = createDb(c.env.DATABASE_URL);
       const user = c.get("user");
-      const access = await authorizeAccount(db, user, c.req.param("accountId"), "settings");
+      const access = await authorizeAccount(db, user, c.req.param("accountId"), "settings", { feature: "strategy" });
       const account = access.account;
       const { ratioPercent, expectedVersion } = await parseBody(putPromotionSettingsRequestSchema, c.req.json());
       // 読み込んだときの版が一致するときだけ保存する（黙って上書きしない。specs/008 FR-007、PR #9 のCodexレビュー）。
@@ -138,7 +138,7 @@ export function promotionRoutes(authed: MiddlewareHandler<AppEnv>) {
     .get("/accounts/:accountId/promotions", authed, async (c) => {
       const db = createDb(c.env.DATABASE_URL);
       const user = c.get("user");
-      const access = await authorizeAccount(db, user, c.req.param("accountId"), "read");
+      const access = await authorizeAccount(db, user, c.req.param("accountId"), "read", { feature: "strategy" });
       const account = access.account;
       const now = new Date();
       const rows = await db.select().from(promotions).where(eq(promotions.accountId, account.id));
@@ -152,7 +152,7 @@ export function promotionRoutes(authed: MiddlewareHandler<AppEnv>) {
     .post("/accounts/:accountId/promotions", authed, async (c) => {
       const db = createDb(c.env.DATABASE_URL);
       const user = c.get("user");
-      const access = await authorizeAccount(db, user, c.req.param("accountId"), "content");
+      const access = await authorizeAccount(db, user, c.req.param("accountId"), "content", { feature: "strategy" });
       const account = access.account;
       const input = await parseBody(promotionInputSchema, c.req.json());
       const row = await insertWithLimit(
@@ -176,7 +176,7 @@ export function promotionRoutes(authed: MiddlewareHandler<AppEnv>) {
     .put("/accounts/:accountId/promotions/:promotionId", authed, async (c) => {
       const db = createDb(c.env.DATABASE_URL);
       const user = c.get("user");
-      const access = await authorizeAccount(db, user, c.req.param("accountId"), "content");
+      const access = await authorizeAccount(db, user, c.req.param("accountId"), "content", { feature: "strategy" });
       const account = access.account;
       const id = assertItemId(c.req.param("promotionId"));
       const { expectedVersion, ...input } = await parseBody(updatePromotionRequestSchema, c.req.json());
@@ -203,7 +203,7 @@ export function promotionRoutes(authed: MiddlewareHandler<AppEnv>) {
     .delete("/accounts/:accountId/promotions/:promotionId", authed, async (c) => {
       const db = createDb(c.env.DATABASE_URL);
       const user = c.get("user");
-      const access = await authorizeAccount(db, user, c.req.param("accountId"), "content");
+      const access = await authorizeAccount(db, user, c.req.param("accountId"), "content", { feature: "strategy" });
       const account = access.account;
       const id = assertItemId(c.req.param("promotionId"));
       // すでに消えていても成功とする（contracts/api.md）

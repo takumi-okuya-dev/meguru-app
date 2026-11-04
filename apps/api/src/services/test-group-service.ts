@@ -3,6 +3,7 @@
 // （料金なしの印を手で付けたときの granted_billing_exempt だけは billing-service.ts が外す。R7）。
 import {
   TEST_GROUP_EVENTS_LIMIT,
+  type FeatureSettingsRequest,
   type TestGroupDetail,
   type TestGroupEventAction,
   type TestGroupSummary,
@@ -10,12 +11,13 @@ import {
 } from "@threads-grower/shared";
 import { and, asc, count, desc, eq, getTableName, inArray, isNull, sql, type AnyColumn, type SQL, type Table } from "drizzle-orm";
 import type { Env } from "../env";
-import type { BillingMode } from "../lib/config";
+import { billingModeOf, type BillingMode } from "../lib/config";
 import { createDb, withTransaction, type Db, type TxDb } from "../db/client";
 import { testGroupEvents, testGroupMembers, testGroups, users } from "../db/schema";
 import { AppError } from "../lib/errors";
 import { sha256Hex } from "../lib/identifier-hash";
 import { personName } from "./access";
+import { groupDisabledFeatures, saveGroupFeatures } from "./feature-service";
 import { inviteUrl, newInviteToken, openInviteToken, sealInviteToken } from "./invite-service";
 
 /** users の表か、その別名（alias(users, …)）。 */
@@ -205,15 +207,17 @@ export async function previewTestInvite(env: Env, token: string, viewer: { id: s
   const db = createDb(env.DATABASE_URL);
   const g = await groupByToken(db, token);
   const full = (await memberCountOf(db, g.id)) >= g.capacity;
-  if (!viewer) return { group: { name: g.name }, full, viewer: null };
+  // 本番（招待制がOFF）では、グループは機能の設定にだけ使う（specs/019 FR-019）
+  const base = { group: { name: g.name }, full, testVersion: Boolean(billingModeOf(env).testGroups) };
+  if (!viewer) return { ...base, viewer: null };
   const current = await currentGroupOf(db, viewer.id);
-  if (current) return { group: { name: g.name }, full, viewer: { state: "already_member", groupName: current.name } };
-  return { group: { name: g.name }, full, viewer: { state: full ? "full" : "can_join" } };
+  if (current) return { ...base, viewer: { state: "already_member", groupName: current.name } };
+  return { ...base, viewer: { state: full ? "full" : "can_join" } };
 }
 
 /**
  * 「参加する」（FR-004・FR-005・FR-008、research.md R3・R7）。グループの行に鍵をかけてから数え、上限を超えない。
- * 入ったら料金なしの印を付ける（もともと付いていれば触らない）。
+ * 入ったら料金なしの印を付ける（もともと付いていれば触らない）。料金なしはテスト版（招待制がON）だけ（specs/019 FR-019）。
  * @param env - Workers のバインディング
  * @param user - ログインした人
  * @param token - 招待の文字列
@@ -238,8 +242,8 @@ export async function joinTestGroup(env: Env, user: { id: string }, token: strin
     const current = await currentGroupOf(tx, user.id);
     if (current) throw new AppError("TEST_GROUP_ALREADY_MEMBER", 409, "already in a test group", undefined, [current.name]);
     if ((await memberCountOf(tx, g.id)) >= g.capacity) throw new AppError("TEST_GROUP_FULL", 409, "test group full");
-    // 料金なしの印（research.md R7）。もともと付いていれば、グループで付けたことにしない
-    const granted = u ? !u.exempt : false;
+    // 料金なしの印（research.md R7）。もともと付いていれば、グループで付けたことにしない。本番では付けない（specs/019 FR-019）
+    const granted = billingModeOf(env).testGroups && u ? !u.exempt : false;
     await tx.insert(testGroupMembers).values({ userId: user.id, groupId: g.id, grantedBillingExempt: granted });
     if (granted) await tx.update(users).set({ billingExempt: true, updatedAt: new Date() }).where(eq(users.id, user.id));
     const name = await nameOf(tx, user.id);
@@ -322,6 +326,7 @@ export async function testGroupDetail(env: Env, groupId: string): Promise<TestGr
   ]);
   return {
     ...(await toSummary(env, g, members.length)),
+    disabled: await groupDisabledFeatures(db, g.id),
     members: members.map((m) => ({ userId: m.userId, name: personName(m), email: m.email, joinedAt: m.joinedAt.toISOString() })),
     events: events.map((e) => ({
       action: e.action as TestGroupEventAction,
@@ -475,6 +480,29 @@ export async function closeTestGroup(env: Env, operator: { id: string }, groupId
     const now = new Date();
     await tx.update(testGroups).set({ closedAt: now, updatedAt: now }).where(eq(testGroups.id, g.id));
     await recordEvent(tx, { groupId: g.id, action: "closed", actorUserId: operator.id, details: { removed: rows.length } });
+  });
+  return testGroupDetail(env, groupId);
+}
+
+/**
+ * グループの使える機能を保存する（specs/019 FR-017）。閉じたグループは変えられない。
+ * @param env - Workers のバインディング
+ * @param operator - 運営者
+ * @param groupId - test_groups.id
+ * @param features - 3つすべての値（true ならON）
+ * @returns 保存した後の詳しい内容
+ * @throws AppError ITEM_NOT_FOUND・TEST_GROUP_CLOSED
+ */
+export async function updateTestGroupFeatures(
+  env: Env,
+  operator: { id: string; displayName: string | null; email: string },
+  groupId: string,
+  features: FeatureSettingsRequest["features"],
+) {
+  await withTransaction(env.DATABASE_URL, async (tx) => {
+    const g = await findGroup(tx, groupId, true);
+    if (g.closedAt) throw groupClosed();
+    await saveGroupFeatures(tx, operator, g, features);
   });
   return testGroupDetail(env, groupId);
 }

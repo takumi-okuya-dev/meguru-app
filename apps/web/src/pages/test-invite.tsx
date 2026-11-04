@@ -75,19 +75,22 @@ export function TestInvitePage() {
         <div className="text-center text-base font-semibold">ThreadsGrower</div>
         <section aria-labelledby="test-invite-title" className="space-y-5 rounded-2xl border bg-card p-6">
           <div className="space-y-1">
+            {/* 本番では、グループは機能の設定にだけ使うので、テスト版のための注意を出さない（specs/019 FR-019） */}
             <h1 id="test-invite-title" className="text-lg font-semibold">
-              テスト版に招待されています
+              {p.testVersion ? "テスト版に招待されています" : `${p.group.name}に招待されています`}
             </h1>
-            <p className="text-sm text-muted-foreground">グループ：{p.group.name}</p>
+            {p.testVersion && <p className="text-sm text-muted-foreground">グループ：{p.group.name}</p>}
           </div>
-          <ul className="space-y-1.5 rounded-xl bg-muted/50 p-4 text-sm">
-            {NOTES.map((n) => (
-              <li key={n} className="flex gap-2">
-                <span aria-hidden="true">・</span>
-                <span>{n}</span>
-              </li>
-            ))}
-          </ul>
+          {p.testVersion && (
+            <ul className="space-y-1.5 rounded-xl bg-muted/50 p-4 text-sm">
+              {NOTES.map((n) => (
+                <li key={n} className="flex gap-2">
+                  <span aria-hidden="true">・</span>
+                  <span>{n}</span>
+                </li>
+              ))}
+            </ul>
+          )}
 
           {viewer === null &&
             (p.full ? (

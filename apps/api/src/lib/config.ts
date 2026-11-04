@@ -156,7 +156,8 @@ export function validateConfig(env: Env): string[] {
  * 決済のモード（specs/013 research.md R2・R11）。環境ごとに1つで、判定する人の値に持たせる。
  * testGroups はテスト用のグループの仕組みがONか（specs/016 research.md R4）。ONなら、テスト環境に入れない
  * オーナーは読むだけになる（定期処理・権限の判定に同じモードで届けるため、ここに載せる）。
- * operators は運営者のClerkのユーザーID（ONのときだけ。運営者はいつもテスト版に入れる）。
+ * operators は運営者のClerkのユーザーID（ONのときだけ。運営者はいつもテスト版に入れる）。機能の設定の画面の運営者は、
+ * ここではなく認証のミドルウェアが `operatorIdsOf` で決める（招待制に関わらない。specs/019 research.md R5）。
  */
 export type BillingMode = { enabled: boolean; testGroups?: boolean; operators?: readonly string[] };
 

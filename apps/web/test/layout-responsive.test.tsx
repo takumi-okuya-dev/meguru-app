@@ -29,7 +29,9 @@ const meResponse: MeResponse = {
 const getDraftCounts = vi.fn();
 vi.mock("@/lib/api-client", async (orig) => {
   const actual = await orig<typeof import("@/lib/api-client")>();
-  return { ...actual, api: { ...actual.api, me: () => Promise.resolve(meResponse), getDraftCounts } };
+  // サイドバーは /access の features（specs/019）を見てから件数を読む
+  const { OWNER_ACCESS } = await import("./helpers/access");
+  return { ...actual, api: { ...actual.api, me: () => Promise.resolve(meResponse), getDraftCounts, accountAccess: async () => OWNER_ACCESS } };
 });
 
 const { AppShell } = await import("@/components/layout/AppShell");
