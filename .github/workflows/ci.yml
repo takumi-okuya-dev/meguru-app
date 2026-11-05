@@ -1,5 +1,10 @@
-# CI：PRのたび（と main への push）に、lint・型チェック・テストを実行する。
-# develop への push（PR のマージ）では流さない。同じ中身を PR で確かめ済みで、Actions の持ち時間（月3,000分）を倍使うため（2026-11-01）。
+# CI：マージすると決めたときだけ、lint・型チェック・テストを実行する（2026-11-05。コミットのたびに流すと、
+# Actions の持ち時間（Teamで月3,000分ぶん）をすぐ使い切るため）。
+# - 流し方：PRにラベル「run-ci」を付ける（付け直すと、もう一度流れる）。Actions の画面から手で動かすこともできる。
+# - コミットを足すと、前の結果は新しいコミットに付かないので、マージの前にもう一度ラベルを付け直す。
+# - ほかのラベルを付けたときは、check を「失敗」にする。必須のチェックは「飛ばされた」でも通った扱いになるため、
+#   飛ばすとCIを流さずにマージできてしまう。
+# develop・main への push（PRのマージ）では流さない。同じ中身をPRで確かめ済みのため。
 # API の結合テストに使う Postgres 17 と local-neon-http-proxy は、サービスコンテナとして起動する（research.md R12）。
 # E2E は Clerk の開発用キーが必要なので、ここでは実行しない（README の E2E の項を参照）。
 #
@@ -11,11 +16,12 @@ name: CI
 
 on:
   pull_request:
-  push:
-    branches: [main]
+    types: [labeled]
+  workflow_dispatch:
 
+# ラベルごとに分ける（ほかのラベルを付けても、流れている run-ci の回を取り消さない）
 concurrency:
-  group: ci-${{ github.ref }}
+  group: ci-${{ github.ref }}-${{ github.event.label.name || 'manual' }}
   cancel-in-progress: true
 
 # GITHUB_TOKEN は既定では何も渡さない。要るジョブでだけ足す
@@ -24,6 +30,7 @@ permissions: {}
 jobs:
   web:
     name: lint・型チェック・共通とWeb
+    if: github.event_name == 'workflow_dispatch' || github.event.label.name == 'run-ci'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
@@ -58,6 +65,7 @@ jobs:
 
   api:
     name: API のテスト（${{ matrix.shard }}/4）
+    if: github.event_name == 'workflow_dispatch' || github.event.label.name == 'run-ci'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
