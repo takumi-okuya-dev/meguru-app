@@ -235,7 +235,7 @@ description: "Task list for feature 023 delayed mention"
 - [X] T039 [P] `docs/architecture.md` に、定期処理の段階・新しい表・二重に出さない仕組みを足す。`docs/external-services-setup.md` のトークンの権限に `threads_manage_replies` を足す。`docs/next-features.md` §K に、023で作ったものを書く。
 - [X] T040 `pnpm --filter ./packages/shared test && pnpm --filter ./apps/api test && pnpm --filter ./apps/web test && pnpm lint && pnpm -r exec tsc --noEmit` を通す。
 - [X] T041 PRを出し、`/code-review low` でセルフレビューして、結果をPRにコメントする。
-- [ ] T042 **本番（main）に出す前に、ユーザーとテスト版で確かめる**（quickstart.md「2. テスト版で確かめる」）。作業用のブランチはテスト版に出せない（デプロイの関所が develop と main だけを通す）ので、CIが通りユーザーのOKが出たら `develop` に入れてテスト版で確かめる。main は develop より遅れて出すので、本番の利用者には影響しない。問題があれば、直しのPRを出す。確かめること：
+- [X] T042 **本番（main）に出す前に、ユーザーとテスト版で確かめる**（quickstart.md「2. テスト版で確かめる」）。作業用のブランチはテスト版に出せない（デプロイの関所が develop と main だけを通す）ので、CIが通りユーザーのOKが出たら `develop` に入れてテスト版で確かめる。main は develop より遅れて出すので、本番の利用者には影響しない。問題があれば、直しのPRを出す。確かめること：
   - トークンに返信の権限（`threads_manage_replies`）が入っているか。ユーザーは入っていた記憶がある。設定に注意の帯が出ないことで確かめる
   - 時間差のメンションを付けて承認し、時間差のあとに、その投稿への返信が出て、相手に通知が届くか
   - 投稿済みの投稿で「返信する」を押し、数分以内に返信が出るか
@@ -248,7 +248,7 @@ description: "Task list for feature 023 delayed mention"
 - **Phase 2 → US2 → US1**：US1はメンションする人と「いつも付ける」を使う。
 - **US1 → US3**：出す処理に理由ごとの扱いを足す。
 - **US1 → US4**：付ける・出す処理に、投稿済みの扱いを足す。US3とは独立。
-- **Polish**：全部の後。T042はPRのあと、マージの前。
+- **Polish**：全部の後。T042は develop に入れたあと、本番（main）に出す前。
 
 ### 同じファイルを触るタスク（順に行う）
 
@@ -278,4 +278,4 @@ T014・T015 mention-attach.test.ts ／ T016 mention-runner.test.ts ／ T017 ment
 2. **次**：US3（出せなかった理由・返信の権限）。
 3. **その次**：US4（投稿済みの投稿にあとから）。
 4. 各Checkpointで、そのStoryのテストと今までのテストが通ることを確かめる。
-5. T042 のテスト版の確認が通るまでマージしない。
+5. T042 のテスト版の確認が通るまで、本番（main）に出さない。
