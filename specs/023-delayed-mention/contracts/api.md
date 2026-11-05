@@ -45,7 +45,15 @@
 
 ### DELETE /api/accounts/:accountId/mention-people/:personId
 
-判定：`settings`。その人を消し、まだ出していない時間差のメンションの `usernames` から外す。外した結果だれも残らなければ、その時間差のメンションも外す（要確認・承認済みは行を消す、投稿済みは `canceled`）。文の @ユーザー名 も消す。応答は GET と同じ形。
+判定：`settings`。その人を消し、その人を含む、まだ出していない時間差のメンションを次のように扱う（research.md R6。承認した文を書き換えて出さない）。
+
+| 下書き | 扱い |
+|---|---|
+| 要確認 | `usernames` と文からその人を外す。だれも残らなければ行を消す |
+| 承認済み | 要確認と同じく外し、下書きを要確認に戻す（`version` を上げる） |
+| 投稿済み（`pending`） | `canceled` にする |
+
+応答は GET と同じ形。
 
 ## 下書きの応答（004・005を変える）
 
@@ -74,6 +82,8 @@ mention: {
 
 - `usernames` は1〜5人で、そのAccountのメンションする人であること。選べない人（research.md R6）がいれば `VALIDATION_FAILED`（`details` にその人のユーザー名）。
 - `text` を省くと `buildMentionText(ひとこと, usernames)`。500文字まで。
+- `text` を送ったときは、`usernames` を `mentionUsernamesIn(text, 一覧の人)` で求め直す（文が正。spec FR-011）。求め直した人が1〜5人でなければ `VALIDATION_FAILED`（`details: ["text"]`）。
+- 丸いボタンで人を入れ替えるときは、Webが `toggleMentionInText(text, username)` で文を作り直して、`text` と一緒に送る。
 - 下書きの状態ごとの扱い：
   - **要確認・承認済み**：行を作るか、入れ替える（`delay_minutes` は今の設定の値）。下書きの `version` を1つ上げ、承認済みなら要確認に戻す。
   - **投稿済み**：次のときだけ作る（`send_after = now`）。

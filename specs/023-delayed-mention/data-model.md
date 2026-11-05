@@ -109,4 +109,6 @@ pending ──出せない（not_found・post_failed・no_permission・expired�
 | `normalizeMentionUsername(s)` | 前後の空白と先頭の@を外し、小文字にする。形が違えば null |
 | `buildMentionText(message, usernames)` | ひとこと、改行、`@a @b`。ひとことが空なら `@a @b` だけ |
 | `mentionDueAt(m, publishedAt)` | 返信の時刻（research.md R3） |
+| `mentionUsernamesIn(text, people)` | 文の中の `@ユーザー名` のうち、一覧にある人（重なりなし・文の順） |
+| `toggleMentionInText(text, username)` | 文の最後の行に `@ユーザー名` を足す（なければ行を足す）・あれば消す |
 | `MENTION_FAILURE_LABELS` | 出せなかった理由の表示名（投稿が見つかりません・返信の権限がありません など） |

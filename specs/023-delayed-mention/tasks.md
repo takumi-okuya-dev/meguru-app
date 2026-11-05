@@ -36,6 +36,8 @@ description: "Task list for feature 023 delayed mention"
   - `normalizeMentionUsername`：前後の空白と先頭の@を外して小文字にし、`^[a-z0-9._]{1,30}$` でなければ null
   - `buildMentionText(message, usernames)`：ひとこと＋改行＋`@a @b`。ひとことが空なら `@a @b` だけ
   - `mentionDueAt({ delayMinutes, sendAfter }, publishedAt)`：`sendAfter` があればそれ。なければ `publishedAt＋delayMinutes`。投稿の前なら null
+  - `mentionUsernamesIn(text, people)`：文の中の `@ユーザー名` のうち一覧にある人（大文字・小文字をそろえる、重なりなし、文の順）
+  - `toggleMentionInText(text, username)`：最後の行に足す（最後の行に @ がなければ行を足す）・あれば消す（空の行は残さない）
   - `MENTION_FAILURE_LABELS`：`not_found` 投稿が見つかりません・`post_failed` 投稿されませんでした・`no_permission` 返信の権限がありません・`expired` 時間が過ぎました・`ng_word` NGワード・`limit` 同じ人へのメンションが多すぎます・`error` Threadsが受け付けませんでした
   - `packages/shared/src/index.ts` から出す
 - [ ] T003 [P] `packages/shared/src/schemas.ts` に入出力を足す（contracts/api.md）：
@@ -85,7 +87,7 @@ description: "Task list for feature 023 delayed mention"
   - 人の追加：`@Minato_Place` → `minato_place`。形が違う・21人目・同じ人・そのAccountのユーザー名は `VALIDATION_FAILED`
   - 「いつも付ける」と呼び名の変更
   - `pendingCount`
-  - 人を消すと、まだ出していない時間差のメンションから外れ、文の @ユーザー名 も消える。だれも残らなければ、要確認は行が消え、投稿済みは `canceled`
+  - 人を消したとき（research.md R6）：要確認の下書きでは選んだ人と文から外れ、だれも残らなければ行が消える。承認済みの下書きは同じく外れて要確認に戻る。投稿済みの `pending` は文を変えずに `canceled`
   - 操作の記録（`mention_settings_updated`）
 - [ ] T010 [P] [US2] `apps/web/test/mention-settings.test.tsx` を書く（contracts/ui-routes.md「このアカウントの設定」）：
   - 時間差を選ぶと保存される
@@ -114,6 +116,8 @@ description: "Task list for feature 023 delayed mention"
 
 - [ ] T014 [P] [US1] `apps/api/test/integration/mention-attach.test.ts` を書く（contracts/api.md「付ける・直す・外す」）：
   - 要確認に付けると行ができ、下書きの `version` が上がる。`text` を省くと `buildMentionText`
+  - 付けたあとに設定の時間差を変えても、付けた行の `delay_minutes` は変わらない（FR-005）
+  - `text` を送ると、`usernames` が文の中の一覧の人で求め直される。一覧にない @ユーザー名 は数えない。0人・6人は `VALIDATION_FAILED`（FR-011）
   - 承認済みに付ける・直すと要確認に戻る
   - 一覧にない人・6人は `VALIDATION_FAILED`
   - 選べない人（ほかの下書きで `pending`・24時間以内に `sent`）は `VALIDATION_FAILED`。応答の `blocked` に理由が入る
@@ -133,13 +137,13 @@ description: "Task list for feature 023 delayed mention"
   - 過ぎた最初の回に、`replyToId` を投稿の `threads_media_id` にして出し、`sent`・`sent_at`・`reply_media_id` が入る
   - 公開の結果が分からない → 次の回に `getContainerStatus` で `PUBLISHED` なら `sent`、`FINISHED` なら送り直す。同じ投稿に2回出ない（SC-003）
   - 出す直前のNGワード → `failed`（`ng_word`）
-  - 過去24時間に出した人を外す。だれも残らなければ `failed`（`limit`）（SC-004）
+  - 過去24時間に返信を出した人が入っていれば、文を書き換えずに `failed`（`limit`）にする。出した文は承認した文と1文字も変わらない（SC-002・SC-004）
   - 1回に10件まで、残りがあれば関所が「すぐ続ける」
   - 次の予定の時刻が関所の候補に入る
   - 段階が例外を投げても、公開の結果（`RunSummary.published`）は変わらない
 - [ ] T017 [P] [US1] `apps/web/test/mention.test.tsx` を書く（contracts/ui-routes.md「投稿ストック（要確認）」）：
   - 「メンションを付ける」の1回で `PUT` が送られ、カードの中に「投稿の30分後にメンション」・丸いボタン・文が出る（SC-007）
-  - 丸いボタンで入れ替え（その場で `PUT`）
+  - 丸いボタンで入れ替え（`toggleMentionInText` で作った文と一緒に、その場で `PUT`）
   - 選べない人は押せず理由が出る
   - 「文を直す」→「文を保存」
   - 「外す」
@@ -188,7 +192,7 @@ description: "Task list for feature 023 delayed mention"
 ### Implementation
 
 - [ ] T026 [US3] `apps/api/src/services/mention-runner.ts` に 7-2・7-3 の理由ごとの扱いを足す（T023を通す）。
-- [ ] T027 [US3] `apps/api/src/services/token-connect.ts`・`token-recheck.ts`・`account-service.ts` で、`replies_denied_at` を入れる・消す。`TokenWarning` に `no_replies_permission` を足し、Webのトークンの結果の案内（`apps/web/src/components/` のトークンの警告）に文を足す。`apps/api/src/lib/threads-client.ts` の `THREADS_SCOPES` に `threads_manage_replies` を足す（T024を通す）。
+- [ ] T027 [US3] `apps/api/src/services/token-connect.ts`・`token-recheck.ts`・`account-service.ts` で、`replies_denied_at` を入れる・消す。`TokenWarning` に `no_replies_permission` を足し、Webのトークンの結果の案内（`apps/web/src/components/` のトークンの警告）に文を足す。`apps/api/src/lib/threads-client.ts` の `THREADS_SCOPES` に `threads_manage_replies` を足し、`docs/next-features.md` §I（審査）の「申し込む権限」に `threads_manage_replies`（時間差のメンションの返信）を書き足す（T024を通す）。
 - [ ] T028 [US3] `apps/web/src/components/stock/PublishedCard.tsx` に状態の枠と「メンションをやめる」を足す（`DELETE …/mention`）（T025を通す）。
 - [ ] T029 [P] [US3] `apps/web/src/pages/guide-threads-token.tsx` の権限の一覧に「threads_manage_replies：時間差のメンションの返信を出す」を足す。
 
@@ -231,7 +235,7 @@ description: "Task list for feature 023 delayed mention"
 - [ ] T039 [P] `docs/architecture.md` に、定期処理の段階・新しい表・二重に出さない仕組みを足す。`docs/external-services-setup.md` のトークンの権限に `threads_manage_replies` を足す。`docs/next-features.md` §K に、023で作ったものを書く。
 - [ ] T040 `pnpm --filter ./packages/shared test && pnpm --filter ./apps/api test && pnpm --filter ./apps/web test && pnpm lint && pnpm -r exec tsc --noEmit` を通す。
 - [ ] T041 PRを出し、`/code-review low` でセルフレビューして、結果をPRにコメントする。
-- [ ] T042 **マージの前に、ユーザーとテスト版で確かめる**（quickstart.md「2. テスト版で確かめる」）。PRのブランチをテスト版に出す方法は、`develop` に入れる前にユーザーと決める（テスト版への反映は `develop` のマージで起きるため）。確かめること：
+- [ ] T042 **本番（main）に出す前に、ユーザーとテスト版で確かめる**（quickstart.md「2. テスト版で確かめる」）。作業用のブランチはテスト版に出せない（デプロイの関所が develop と main だけを通す）ので、CIが通りユーザーのOKが出たら `develop` に入れてテスト版で確かめる。main は develop より遅れて出すので、本番の利用者には影響しない。問題があれば、直しのPRを出す。確かめること：
   - トークンに返信の権限（`threads_manage_replies`）が入っているか。ユーザーは入っていた記憶がある。設定に注意の帯が出ないことで確かめる
   - 時間差のメンションを付けて承認し、時間差のあとに、その投稿への返信が出て、相手に通知が届くか
   - 投稿済みの投稿で「返信する」を押し、数分以内に返信が出るか
