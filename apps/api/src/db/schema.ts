@@ -26,6 +26,10 @@ import {
   FEATURES,
   IMAGE_STYLES,
   LISTING_STATUSES,
+  MENTION_DELAY_DEFAULT,
+  MENTION_DELAY_OPTIONS,
+  MENTION_FAILURE_REASONS,
+  MENTION_STATES,
   OPENING_TYPES,
   MEDIA,
   POST_LENGTH_DEFAULTS,
@@ -162,6 +166,8 @@ export const accounts = pgTable("accounts", {
   longRatio: smallint("long_ratio").notNull().default(POST_LENGTH_DEFAULTS.longRatio),
   // 反応数を読む権限がないと分かった日時（006 research.md R11）。再接続で消す
   insightsDeniedAt: timestamp("insights_denied_at", { withTimezone: true, precision: 6 }),
+  // 返信の権限がないと分かった時刻（specs/023 research.md R1）。つなぎ直すとNULL
+  repliesDeniedAt: timestamp("replies_denied_at", { withTimezone: true, precision: 6 }),
   // 今の接続の方法と、要再接続の理由の補い（specs/010 data-model.md。hint は short_lived_token だけ）
   connectionMethod: connectionMethod("connection_method").default("app"),
   reconnectHint: text("reconnect_hint"),
@@ -1277,5 +1283,87 @@ export const postClassifications = pgTable(
     check("post_classifications_opening_type_valid", sql`${t.openingType} IN (${inList(OPENING_TYPES)})`),
     check("post_classifications_theme_id_valid", sql`${t.themeId} IS NULL OR ${t.themeId} ~ '^t[0-9a-z]{1,8}$'`),
     check("post_classifications_source_valid", sql`${t.source} IN (${inList(CLASSIFICATION_SOURCES)})`),
+  ],
+);
+
+// ---- 時間差のメンション（specs/023-delayed-mention data-model.md）----
+
+/** Accountのひとことと時間差。行がなければ初めの値（ひとことは空・30分）。 */
+export const mentionSettings = pgTable(
+  "mention_settings",
+  {
+    accountId: uuid("account_id")
+      .primaryKey()
+      .references(() => accounts.id, { onDelete: "cascade" }),
+    message: text("message").notNull().default(""),
+    delayMinutes: integer("delay_minutes").notNull().default(MENTION_DELAY_DEFAULT),
+    version: versionColumn(),
+    updatedByUserId: uuid("updated_by_user_id").references((): AnyPgColumn => users.id, { onDelete: "set null" }),
+    updatedAt: timestamp("updated_at", { withTimezone: true, precision: 6 }).notNull().defaultNow(),
+  },
+  (t) => [
+    check("mention_settings_message_length", sql`char_length(${t.message}) <= 100`),
+    check("mention_settings_delay_valid", sql`${t.delayMinutes} IN (${sql.raw(MENTION_DELAY_OPTIONS.join(", "))})`),
+  ],
+);
+
+/** メンションする人。Accountに20人まで（サービスで確かめる）。 */
+export const mentionPeople = pgTable(
+  "mention_people",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    accountId: uuid("account_id")
+      .notNull()
+      .references(() => accounts.id, { onDelete: "cascade" }),
+    username: text("username").notNull(),
+    label: text("label").notNull(),
+    always: boolean("always").notNull().default(false),
+    createdAt: timestamp("created_at", { withTimezone: true, precision: 6 }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("mention_people_account_username_unique").on(t.accountId, t.username),
+    check("mention_people_username_valid", sql`${t.username} ~ '^[a-z0-9._]{1,30}$'`),
+    check("mention_people_label_length", sql`char_length(${t.label}) BETWEEN 1 AND 30`),
+  ],
+);
+
+/** 時間差のメンション。下書きに0か1行。下書きを消したら消す。 */
+export const postMentions = pgTable(
+  "post_mentions",
+  {
+    draftId: uuid("draft_id")
+      .primaryKey()
+      .references(() => postDrafts.id, { onDelete: "cascade" }),
+    accountId: uuid("account_id")
+      .notNull()
+      .references(() => accounts.id, { onDelete: "cascade" }),
+    usernames: text("usernames").array().notNull(),
+    text: text("text").notNull(),
+    /** 付けたときの時間差。NULL＝投稿済みの投稿に付けた（send_after を使う） */
+    delayMinutes: integer("delay_minutes"),
+    sendAfter: timestamp("send_after", { withTimezone: true, precision: 6 }),
+    state: text("state").notNull().default("pending"),
+    failureReason: text("failure_reason"),
+    containerId: text("container_id"),
+    publishRequestedAt: timestamp("publish_requested_at", { withTimezone: true, precision: 6 }),
+    replyMediaId: text("reply_media_id"),
+    sentAt: timestamp("sent_at", { withTimezone: true, precision: 6 }),
+    attempts: integer("attempts").notNull().default(0),
+    nextAttemptAt: timestamp("next_attempt_at", { withTimezone: true, precision: 6 }),
+    leaseToken: uuid("lease_token"),
+    leaseUntil: timestamp("lease_until", { withTimezone: true, precision: 6 }),
+    createdByUserId: uuid("created_by_user_id").references((): AnyPgColumn => users.id, { onDelete: "set null" }),
+    updatedAt: timestamp("updated_at", { withTimezone: true, precision: 6 }).notNull().defaultNow(),
+  },
+  (t) => [
+    index("post_mentions_due_idx").on(t.accountId, t.state).where(sql`${t.state} = 'pending'`),
+    index("post_mentions_sent_idx").on(t.accountId, t.sentAt),
+    check("post_mentions_state_valid", sql`${t.state} IN (${inList(MENTION_STATES)})`),
+    check("post_mentions_failure_reason_valid", sql`${t.failureReason} IS NULL OR ${t.failureReason} IN (${inList(MENTION_FAILURE_REASONS)})`),
+    check("post_mentions_failed_has_reason", sql`(${t.state} = 'failed') = (${t.failureReason} IS NOT NULL)`),
+    check("post_mentions_sent_has_time", sql`(${t.state} = 'sent') = (${t.sentAt} IS NOT NULL)`),
+    check("post_mentions_when", sql`${t.delayMinutes} IS NOT NULL OR ${t.sendAfter} IS NOT NULL`),
+    check("post_mentions_usernames_count", sql`cardinality(${t.usernames}) BETWEEN 1 AND 5`),
+    check("post_mentions_text_length", sql`char_length(${t.text}) BETWEEN 1 AND 500`),
   ],
 );

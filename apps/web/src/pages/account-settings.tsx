@@ -16,6 +16,7 @@ import { ConnectMethods } from "@/components/connect/ConnectMethods";
 import { AccountNameSection } from "@/components/settings/AccountNameSection";
 import { ConnectionBadge } from "@/components/ConnectionBadge";
 import { PageBody, PageHeader } from "@/components/layout/PageHeader";
+import { MentionSettingsSection } from "@/components/settings/MentionSettingsSection";
 import { PostingRulesSection } from "@/components/settings/PostingRulesSection";
 import { PostingScheduleSection } from "@/components/settings/PostingScheduleSection";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -37,7 +38,7 @@ import { queryKeys } from "@/lib/query";
 import { useCurrentAccount } from "@/pages/account-layout";
 import { TeamSection } from "@/components/team/TeamSection";
 import { ReconnectDialog } from "@/components/connect/ReconnectDialog";
-import { TokenWarnings } from "@/components/connect/TokenWarnings";
+import { TOKEN_WARNING_KIND, TokenWarnings } from "@/components/connect/TokenWarnings";
 import { featureOn, useAccountAccess } from "@/lib/use-account-access";
 
 /**
@@ -169,7 +170,7 @@ function AccountSettingsContent() {
                   自動投稿を始める
                 </Button>
               )}
-              <TokenWarnings warnings={tokenWarnings.map((w) => (w === "no_publish_permission" ? "publish" : "insights"))} />
+              <TokenWarnings warnings={tokenWarnings.map((w) => TOKEN_WARNING_KIND[w])} />
             </AlertDescription>
           </Alert>
         )}
@@ -186,6 +187,9 @@ function AccountSettingsContent() {
         )}
 
         {autopostOn && <PostingRulesSection accountId={account.id} canEdit={can("settings")} />}
+
+        {/* 時間差のメンション（specs/023）。設定を読めるのは view の人だけ */}
+        {autopostOn && can("view") && <MentionSettingsSection accountId={account.id} />}
 
         {notConnected ? (
           <section id="threads" className="space-y-3">
@@ -213,7 +217,7 @@ function AccountSettingsContent() {
             </Alert>
           )}
           {!justConnected && (
-            <TokenWarnings warnings={tokenWarnings.map((w) => (w === "no_publish_permission" ? "publish" : "insights"))} />
+            <TokenWarnings warnings={tokenWarnings.map((w) => TOKEN_WARNING_KIND[w])} />
           )}
           <Button variant={needsReconnect ? "default" : "outline"} onClick={() => setReconnectOpen(true)}>
             {needsReconnect ? "再接続" : "接続し直す"}

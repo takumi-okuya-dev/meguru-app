@@ -12,7 +12,7 @@ import { queryKeys } from "@/lib/query";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { TokenConnectForm } from "./TokenConnectForm";
-import { TokenWarnings } from "./TokenWarnings";
+import { TOKEN_WARNING_KIND, TokenWarnings } from "./TokenWarnings";
 
 /** 接続し直すAccount。 */
 export type ReconnectTarget = {
@@ -80,7 +80,7 @@ export function ReconnectDialog({
           {doneWarnings ? (
             <div className="space-y-4">
               <p className="text-sm">接続し直しました。</p>
-              <TokenWarnings warnings={doneWarnings.map((w) => (w === "no_publish_permission" ? "publish" : "insights"))} />
+              <TokenWarnings warnings={doneWarnings.map((w) => TOKEN_WARNING_KIND[w])} />
               <Button className="w-full rounded-full" onClick={onClose}>
                 閉じる
               </Button>

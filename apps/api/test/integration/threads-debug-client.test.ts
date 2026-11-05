@@ -14,7 +14,7 @@ describe("debugToken", () => {
     const token = await fake.issueToken({ user: "9003" });
     const info = await threads.debugToken(token);
     expect(info.isValid).toBe(true);
-    expect(info.scopes).toEqual(["threads_basic", "threads_content_publish", "threads_manage_insights"]);
+    expect(info.scopes).toEqual(["threads_basic", "threads_content_publish", "threads_manage_insights", "threads_manage_replies"]);
     const days = (info.expiresAt!.getTime() - Date.now()) / 86_400_000;
     expect(days).toBeGreaterThan(59);
     expect(Math.abs(info.issuedAt!.getTime() - Date.now())).toBeLessThan(5_000);

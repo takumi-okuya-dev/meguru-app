@@ -60,7 +60,7 @@ function rejectReasonText(draft: PostDraft): string {
  * @param props - draft：下書き、selected：選ばれているか、check：承認できるかの判定、
  *   labels：ラベルの行（類似度・NGワード・規約に注意）、body：本文の表示（強調つき。省略すると文字のまま）、
  *   busy：状態を変えている途中、actions：操作、canReview：承認の操作ができる（できない人には「オーナーの確認待ち」。specs/008 FR-041）、
- *   people：作った人・直した人の名前（チームがあるAccountだけ渡す。specs/008 FR-053）
+ *   people：作った人・直した人の名前（チームがあるAccountだけ渡す。specs/008 FR-053）、mention：時間差のメンションの枠（specs/023）
  * @returns カード
  */
 export function DraftCard({
@@ -74,6 +74,7 @@ export function DraftCard({
   scheduledAt,
   canReview = true,
   people,
+  mention,
 }: {
   draft: PostDraft;
   selected: boolean;
@@ -85,6 +86,8 @@ export function DraftCard({
   scheduledAt?: string;
   canReview?: boolean;
   people?: Record<string, string>;
+  /** 時間差のメンションの枠（specs/023。MentionPanel） */
+  mention?: ReactNode;
 }) {
   const [expanded, setExpanded] = useState(false);
   const long = draft.body.split("\n").length > LONG_LINES || draft.body.length > LONG_CHARS;
@@ -172,6 +175,7 @@ export function DraftCard({
         {labels}
         {people && <DraftAuthors draft={draft} people={people} />}
         <ThreadsLengthBar text={draft.body} />
+        {mention}
         {draft.status === "needs_review" && !canReview && (
           <p className="text-[13px] text-muted-foreground md:text-right">オーナーの確認待ち</p>
         )}

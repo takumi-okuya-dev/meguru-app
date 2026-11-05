@@ -73,7 +73,12 @@ export function postDraftRoutes(authed: MiddlewareHandler<AppEnv>) {
       const parsed = publishedQuerySchema.safeParse(c.req.query());
       if (!parsed.success)
         throw new AppError("VALIDATION_FAILED", 400, "invalid query", undefined, ["limit"]);
-      return c.json(await listPublishedPage(db, account.id, parsed.data));
+      return c.json(
+        await listPublishedPage(db, account.id, parsed.data, {
+          username: account.username,
+          withMentions: access.relation !== "shared_viewer",
+        }),
+      );
     })
     .get("/accounts/:accountId/post-drafts/counts", authed, async (c) => {
       // サイドバーの件数（FR-013）。本文を含まない軽いAPI

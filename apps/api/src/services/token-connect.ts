@@ -39,7 +39,7 @@ const MIN = 60_000;
 export type TokenConnectRequest = { mode: "connect" | "reconnect"; accountId: string; token: string };
 
 /** 権限がないものの案内（contracts/api.md）。 */
-export type TokenWarning = "no_publish_permission" | "no_insights_permission";
+export type TokenWarning = "no_publish_permission" | "no_insights_permission" | "no_replies_permission";
 
 /** つなぐ・接続し直しの結果。 */
 export type TokenConnectResult = {
@@ -172,6 +172,9 @@ async function inspectToken(threads: ThreadsClient, token: string): Promise<Insp
       // 一時的な失敗などで確かめられない権限は、案内しない（次の確認で分かる）
     }
   }
+  // 返信の権限は、読むだけの呼び出しでは確かめられないので、権限の一覧で見る（specs/023 research.md R1）。
+  // 一覧が読めないときは「分からない」とし、案内しない（出したときのエラーで分かる）
+  if (debug && debug.scopes.length > 0 && !debug.scopes.includes("threads_manage_replies")) warnings.push("no_replies_permission");
   return { profile, debug, warnings };
 }
 
@@ -276,6 +279,7 @@ async function checkAndConnect(
       scopes: debug?.scopes.length ? debug.scopes : THREADS_SCOPES,
       recheckAt,
       insightsDenied: warnings.includes("no_insights_permission"),
+      repliesDenied: warnings.includes("no_replies_permission"),
     });
   } catch (err) {
     if (err instanceof AppError && err.code === "RECONNECT_ACCOUNT_MISMATCH") throw fail("account_mismatch", err);

@@ -543,7 +543,7 @@ describe("005：処理中・投稿済みの下書き（FR-008・FR-020）と、�
       const order = Date.parse(prev.publishedAt) - Date.parse(cur.publishedAt);
       expect(order > 0 || (order === 0 && prev.id < cur.id)).toBe(true);
     }
-    expect(Object.keys(p1.items[0]!).sort()).toEqual(["body", "id", "publishedAt", "threadsMediaId", "threadsPermalink"]);
+    expect(Object.keys(p1.items[0]!).sort()).toEqual(["body", "id", "mention", "publishedAt", "threadsMediaId", "threadsPermalink", "version"]);
   });
 
   it("GET /post-drafts/published：読めないカーソル（IDがUUIDでない など）は 400 VALIDATION_FAILED（PR #6 のCodexレビュー）", async () => {

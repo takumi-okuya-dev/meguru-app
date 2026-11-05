@@ -40,6 +40,8 @@ import { logger } from "../lib/logger";
 import { createThreadsClient, type ThreadsClient } from "../lib/threads-client";
 import { computeNextCheckAt, readGate, shouldRun, writeCatchupDate, writeGate } from "./auto-post-gate";
 import { nextCatchupAt, runMetricsStage } from "./metrics-runner";
+import { runMentionStage } from "./mention-runner";
+import { nextMentionDueAt } from "./mention-service";
 import { nextRecheckAt, runTokenRecheck } from "./token-recheck";
 import { claimSlot } from "./publish-claim";
 import { executeAttempt, fillPermalink, type ExecuteOutcome } from "./publish-executor";
@@ -323,6 +325,14 @@ export async function runAutoPost(
     logger.error("token recheck: stage failed", { err });
   }
 
+  // 6c. メンションの返信の段階（specs/023 contracts/mention-job.md）。失敗しても公開の結果に影響させない
+  let mentionRemaining = false;
+  try {
+    mentionRemaining = (await runMentionStage(env, db, threads, { now })).remaining;
+  } catch (err) {
+    logger.error("mention: stage failed", { err });
+  }
+
   // 7. 関所の書き込み
   const [[nextRetry], [inProgress]] = await Promise.all([
     db
@@ -347,6 +357,9 @@ export async function runAutoPost(
   // トークンの確かめ直しの時刻も候補にする（specs/010 research.md R8）
   const recheck = await nextRecheckAt(db);
   if (recheck) candidates.push(recheck);
+  // 次のメンションの返信の時刻も候補にする（specs/023 contracts/mention-job.md 7-4）
+  const mentionAt = await nextMentionDueAt(db);
+  if (mentionAt) candidates.push(mentionAt);
   // 読むだけのオーナーの予定も、次に見る時刻には入れる（契約が戻ったとき、どの経路で戻っても次の時刻に動けるように。
   // PR #16 のCodexレビュー）。その回の処理は、上の「時刻の処理」で読むだけの予定を外している
   for (const { schedule: s } of scheduleRows) {
@@ -372,7 +385,8 @@ export async function runAutoPost(
       (inProgress?.unleased ?? 0) > 0 ||
       permalinkPending ||
       summary.metricsRemaining ||
-      recheckRemaining,
+      recheckRemaining ||
+      mentionRemaining,
   });
   if (
     !(await writeGate(env.AUTOPOST_KV, {

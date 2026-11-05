@@ -1,14 +1,22 @@
 import { ApiErrorScreen } from "@/components/ApiErrorScreen";
 import { Button } from "@/components/ui/button";
+import type { MentionSettings, NgWordForMatch } from "@threads-grower/shared";
+import { MentionPanel } from "./MentionPanel";
 import { PublishedCard } from "./PublishedCard";
 import { usePublished } from "./use-published";
 
 /**
  * 投稿済みのタブ。開いている間だけページを読み、失敗時には再読み込みできる。
- * @param props - accountId：AccountのID
+ * @param props - accountId：AccountのID、mention：時間差のメンションの設定・NGワード・付けられるか（specs/023）
  * @returns 投稿済みの一覧
  */
-export function PublishedList({ accountId }: { accountId: string }) {
+export function PublishedList({
+  accountId,
+  mention,
+}: {
+  accountId: string;
+  mention?: { settings: MentionSettings | undefined; ngWords: readonly NgWordForMatch[]; canReview: boolean };
+}) {
   const query = usePublished(accountId);
   if (query.isError)
     return <ApiErrorScreen error={query.error} onRetry={() => void query.refetch()} />;
@@ -25,7 +33,21 @@ export function PublishedList({ accountId }: { accountId: string }) {
     <div className="space-y-3">
       <ul className="space-y-2">
         {posts.map((post) => (
-          <PublishedCard key={post.id} post={post} />
+          <PublishedCard
+            key={post.id}
+            post={post}
+            mention={
+              mention && (
+                <MentionPanel
+                  accountId={accountId}
+                  target={{ id: post.id, version: post.version, kind: "published", mention: post.mention, publishedAt: post.publishedAt, threadsMediaId: post.threadsMediaId }}
+                  settings={mention.settings}
+                  ngWords={mention.ngWords}
+                  canReview={mention.canReview}
+                />
+              )
+            }
+          />
         ))}
       </ul>
       {query.hasNextPage && (

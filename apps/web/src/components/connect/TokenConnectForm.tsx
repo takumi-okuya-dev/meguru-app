@@ -7,6 +7,7 @@ import { Link } from "react-router";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { TOKEN_WARNING_KIND } from "@/components/connect/TokenWarnings";
 import { ApiError, api, describeError } from "@/lib/api-client";
 
 /** 隠している間に欄に出す文字。 */
@@ -47,7 +48,7 @@ type Props = (
  * @returns warn の値（なければ空）
  */
 export function warnParam(warnings: TokenConnectResponse["warnings"]): string {
-  return warnings.map((w) => (w === "no_publish_permission" ? "publish" : "insights")).join(",");
+  return warnings.map((w) => TOKEN_WARNING_KIND[w]).join(",");
 }
 
 /**

@@ -298,3 +298,27 @@ export const ANALYSIS_CLASSIFY_BATCH = 50;
 export const ANALYSIS_THEMES_MAX = 10;
 /** テーマの名前の上限（文字）。 */
 export const ANALYSIS_THEME_NAME_MAX = 20;
+
+// 時間差のメンション（specs/023-delayed-mention data-model.md「共有の定数」）。人数・回数・期間は仮の値（spec Assumptions）
+/** メンションする人の上限。 */
+export const MENTION_PEOPLE_MAX = 20;
+/** 1つの返信で選べる人。 */
+export const MENTION_PER_REPLY_MAX = 5;
+/** ひとことの上限（文字）。 */
+export const MENTION_MESSAGE_MAX = 100;
+/** 呼び名の上限（文字）。 */
+export const MENTION_LABEL_MAX = 30;
+/** 時間差（分）。 */
+export const MENTION_DELAY_OPTIONS = [10, 30, 60, 180, 360, 720, 1440] as const;
+/** 時間差の初めの値（分）。 */
+export const MENTION_DELAY_DEFAULT = 30;
+/** 同じ人へのメンションの間隔（時間）。 */
+export const MENTION_SAME_PERSON_HOURS = 24;
+/** この時間を過ぎたら返信を出さない（時間）。 */
+export const MENTION_EXPIRE_HOURS = 24;
+/** 投稿済みの投稿に付けられる期間（日）。 */
+export const MENTION_PUBLISHED_DAYS = 7;
+/** 一時的な失敗の上限。 */
+export const MENTION_MAX_ATTEMPTS = 3;
+/** 1回の処理で出す返信の上限。 */
+export const MENTION_MAX_PER_TICK = 10;

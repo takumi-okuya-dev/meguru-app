@@ -7,6 +7,7 @@ export * from "./errors";
 export * from "./features";
 export * from "./limits";
 export * from "./media";
+export * from "./mention";
 export * from "./ng-words";
 export * from "./performance";
 export * from "./permissions";

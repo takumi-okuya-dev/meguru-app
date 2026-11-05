@@ -290,3 +290,15 @@ describe("内容の分類（T035）", () => {
     expect(((await sql()`SELECT 1 FROM post_classifications`) as unknown[]).length).toBe(0);
   });
 });
+
+describe("時間差のメンションの返信を返信率から除く（specs/023 research.md R7、T035）", () => {
+  it("反応数の取り込みより前に出した自分の返信のぶん、返信の数から1を引く", async () => {
+    const { accountId } = await createUserWithAccount("u1");
+    const ids = await seed(accountId, 20, () => ({ replies: 1 }));
+    await sql()`INSERT INTO post_mentions (draft_id, account_id, usernames, text, delay_minutes, state, sent_at)
+      SELECT id, account_id, ARRAY['a'], '@a', 30, 'sent', now() - interval '1 day' FROM post_drafts WHERE id = ANY(${ids})`;
+    const r = await getAnalysis(accountId);
+    expect(r.time.every((b) => b.replyRate === null || b.replyRate === 0)).toBe(true);
+  });
+});
+
