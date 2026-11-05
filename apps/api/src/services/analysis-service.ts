@@ -19,7 +19,7 @@ import {
 import { and, desc, eq, gte, inArray, isNotNull, isNull, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import type { Db, TxDb } from "../db/client";
-import { analysisSettings, postClassifications, postDrafts, postMetricSnapshots, postMetrics, promotions } from "../db/schema";
+import { analysisSettings, postClassifications, postDrafts, postMentions, postMetricSnapshots, postMetrics, promotions } from "../db/schema";
 import { AppError } from "../lib/errors";
 import type { AccountAccess, AccountRow } from "./access";
 import { recordActivity } from "./activity-log";
@@ -91,11 +91,14 @@ export async function loadAnalysisPosts(db: Db | TxDb, accountId: string, now: D
         h24Views: s24.views,
         openingType: postClassifications.openingType,
         themeId: postClassifications.themeId,
+        // 時間差のメンションの返信（自分の返信）が、反応数の取り込みより前に出ていれば1（specs/023 research.md R7）
+        ownReply: sql<number>`CASE WHEN ${postMentions.sentAt} IS NOT NULL AND ${postMentions.sentAt} <= ${postMetrics.lastFetchedAt} THEN 1 ELSE 0 END`,
       })
       .from(postDrafts)
       .innerJoin(postMetrics, eq(postMetrics.draftId, postDrafts.id))
       .leftJoin(s24, and(eq(s24.draftId, postDrafts.id), eq(s24.kind, "h24")))
       .leftJoin(postClassifications, eq(postClassifications.draftId, postDrafts.id))
+      .leftJoin(postMentions, and(eq(postMentions.draftId, postDrafts.id), eq(postMentions.state, "sent")))
       .where(confirmedInPeriod(accountId, since))
       .orderBy(desc(postDrafts.publishedAt)),
     promoMatcher(db, accountId),
@@ -106,7 +109,7 @@ export async function loadAnalysisPosts(db: Db | TxDb, accountId: string, now: D
     publishedAt: r.publishedAt!.toISOString(),
     views: r.views ?? 0,
     likes: r.likes ?? 0,
-    replies: r.replies ?? 0,
+    replies: Math.max(0, (r.replies ?? 0) - Number(r.ownReply)),
     reposts: r.reposts ?? 0,
     quotes: r.quotes ?? 0,
     followersAtPost: r.followersAtPost === null ? null : Number(r.followersAtPost),

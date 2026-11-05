@@ -48,13 +48,14 @@ export function GuideThreadsTokenPage() {
         <p>作ったアプリは「開発モード」のままで構いません。自分のアカウントで使うだけなら、Metaの審査（App Review）は要りません。</p>
       </Step>
 
-      <Step title="3. 権限を加える" purpose="ThreadsGrowerが使う3つの権限を、トークンに含められるようにします。">
+      <Step title="3. 権限を加える" purpose="ThreadsGrowerが使う4つの権限を、トークンに含められるようにします。">
         <ul className="list-disc space-y-1 pl-5">
           <li>threads_basic：プロフィール（ユーザー名・表示名・画像）を読む。必ず要ります</li>
           <li>threads_content_publish：承認した投稿を自動投稿する</li>
           <li>threads_manage_insights：投稿の反応数とフォロワー数を読み、パフォーマンスを出す</li>
+          <li>threads_manage_replies：時間差のメンションの返信を出す</li>
         </ul>
-        <p>アプリのThreadsの使い方の設定で、この3つを加えます。後の2つがないと、自動投稿やパフォーマンスが使えません。</p>
+        <p>アプリのThreadsの使い方の設定で、この4つを加えます。後の3つがないと、自動投稿・パフォーマンス・時間差のメンションが使えません。</p>
       </Step>
 
       <Step title="4. 自分をテスターに加える" purpose="開発モードのアプリで、自分のThreadsアカウントのトークンを作れるようにします。">

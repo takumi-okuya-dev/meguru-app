@@ -10,11 +10,20 @@ export const TOKEN_WARNING_TEXT = {
     "このトークンには投稿の権限がありません。自動投稿を使うには、権限を付けて作り直したトークンで接続し直してください。",
   insights:
     "このトークンには反応数を読む権限がありません。パフォーマンスを見るには、権限を付けて作り直したトークンで接続し直してください。",
+  replies:
+    "このトークンには返信の権限がありません。時間差のメンションを使うには、返信の権限を付けて作り直したトークンで接続し直してください。",
 } as const;
+
+/** APIの権限の案内（warnings）を、画面の案内の種類にする（specs/023 で返信を足した）。 */
+export const TOKEN_WARNING_KIND = {
+  no_publish_permission: "publish",
+  no_insights_permission: "insights",
+  no_replies_permission: "replies",
+} as const satisfies Record<string, Kind>;
 
 type Kind = keyof typeof TOKEN_WARNING_TEXT;
 const parse = (v: string | null): Kind[] =>
-  (v ?? "").split(",").filter((k): k is Kind => k === "publish" || k === "insights");
+  (v ?? "").split(",").filter((k): k is Kind => k in TOKEN_WARNING_TEXT);
 
 /**
  * 権限がないものの案内。warnings を渡さなければ、URL の warn を読む。

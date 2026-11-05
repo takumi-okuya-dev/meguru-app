@@ -40,7 +40,7 @@ describe("POST /api/threads/connect（mode = connect）", () => {
     const { authorizeUrl } = (await res.json()) as { authorizeUrl: string };
     const url = new URL(authorizeUrl);
     expect(url.pathname).toBe("/oauth/authorize");
-    expect(url.searchParams.get("scope")).toBe("threads_basic,threads_content_publish,threads_manage_insights");
+    expect(url.searchParams.get("scope")).toBe("threads_basic,threads_content_publish,threads_manage_insights,threads_manage_replies");
     const state = url.searchParams.get("state")!;
     expect(state.length).toBeGreaterThanOrEqual(43);
 
@@ -127,7 +127,7 @@ describe("GET /api/threads/callback（mode = connect）", () => {
     const ms = await db().select().from(memberships).where(eq(memberships.accountId, account.id));
     expect(ms.map((m) => m.role)).toEqual(["owner"]);
     const [conn] = await db().select().from(threadsConnections);
-    expect(conn!.scopes).toEqual(["threads_basic", "threads_content_publish", "threads_manage_insights"]);
+    expect(conn!.scopes).toEqual(["threads_basic", "threads_content_publish", "threads_manage_insights", "threads_manage_replies"]);
     expect(conn!.accessTokenIv).toHaveLength(12);
     expect(conn!.expiresAt.getTime()).toBeGreaterThan(Date.now() + 59 * 24 * 3600_000);
   });

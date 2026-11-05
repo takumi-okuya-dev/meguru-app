@@ -57,10 +57,14 @@ export async function recheckOne(
     throw err;
   }
   // 使えた：期限を読めれば直す（読めなければ60日とみなしたまま）
-  const expiresAt = await threads
-    .debugToken(cred.token)
-    .then((info) => info.expiresAt)
-    .catch(() => null);
+  const info = await threads.debugToken(cred.token).catch(() => null);
+  const expiresAt = info?.expiresAt ?? null;
+  // 権限の一覧が読めたら、返信の権限の印を合わせる（specs/023 research.md R1）
+  if (info && info.scopes.length > 0)
+    await db
+      .update(accounts)
+      .set({ repliesDeniedAt: info.scopes.includes("threads_manage_replies") ? null : now })
+      .where(eq(accounts.id, accountId));
   await db
     .update(threadsConnections)
     .set({ recheckAt: null, ...(expiresAt ? { expiresAt } : {}), updatedAt: now })

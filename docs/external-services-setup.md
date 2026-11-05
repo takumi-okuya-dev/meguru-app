@@ -164,6 +164,7 @@ APIは、セッショントークンにメールアドレスが含まれてい�
 - `threads_basic`（必須）
 - `threads_content_publish`（自動投稿で使う）
 - `threads_manage_insights`（分析で使う）
+- `threads_manage_replies`（時間差のメンションの返信で使う。specs/023）
 
 ### 3-3. 戻り先URLと通知先URLを登録する
 

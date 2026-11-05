@@ -86,6 +86,7 @@ export function draft(overrides: Partial<PostDraft> = {}): PostDraft {
     createdBy: null,
     editedBy: null,
     editedAt: null,
+    mention: null,
     createdAt: "2026-10-03T00:00:00.000Z",
     updatedAt: "2026-10-03T00:00:00.000Z",
     ...overrides,

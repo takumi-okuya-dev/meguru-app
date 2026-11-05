@@ -28,6 +28,7 @@ import {
   highlightsOf,
 } from "@/components/stock/DraftLabels";
 import { DraftList } from "@/components/stock/DraftList";
+import { MentionPanel, mentionAvailable } from "@/components/stock/MentionPanel";
 import { SelectionBar } from "@/components/stock/SelectionBar";
 import { useAccountAccess } from "@/lib/use-account-access";
 import { RejectDialog } from "@/components/stock/RejectDialog";
@@ -102,6 +103,12 @@ function StockPageContent() {
   const { access, can } = useAccountAccess(account.id);
   const canReview = can("review");
   const data = drafts.data;
+  // 時間差のメンションの設定（specs/023）。設定を読めるのは view の人だけ（見せてもらっている人は読まない）
+  const mentionSettings = useQuery({
+    queryKey: queryKeys.mentionSettings(account.id),
+    queryFn: () => api.mentionSettings(account.id),
+    enabled: can("view"),
+  });
 
   // 削除して確定を待っている下書きは、一覧から隠す
   const lists = useMemo<Record<StockTab, PostDraft[]>>(
@@ -129,8 +136,22 @@ function StockPageContent() {
   const checks = useMemo(() => {
     const ngWords = data?.ngWords ?? [];
     const map = new Map<string, PublishCheck>();
-    for (const d of [...lists.needs_review, ...lists.approved])
-      map.set(d.id, checkPublishable(d.body, ngWords));
+    for (const d of [...lists.needs_review, ...lists.approved]) {
+      const body = checkPublishable(d.body, ngWords);
+      // 時間差のメンションの返信の文も、下書きと一緒に承認する（specs/023 research.md R5）
+      const reply = d.mention?.state === "pending" ? checkPublishable(d.mention.text, ngWords) : null;
+      map.set(
+        d.id,
+        reply
+          ? {
+              ngWords: [...body.ngWords, ...reply.ngWords],
+              overThreadsLimit: body.overThreadsLimit || reply.overThreadsLimit,
+              policyCautions: [...body.policyCautions, ...reply.policyCautions],
+              approvable: body.approvable && reply.approvable,
+            }
+          : body,
+      );
+    }
     return map;
   }, [data, lists]);
 
@@ -229,6 +250,22 @@ function StockPageContent() {
     });
   const allSelected = selectable.length > 0 && selected.length === selectable.length;
 
+  // 選んだ下書きに「いつも付ける」の人でまとめて付ける（specs/023 FR-010a）
+  const mentionSelected = async () => {
+    setBusy(true);
+    try {
+      const r = await api.attachMentionsBulk(account.id, selected.map((d) => ({ id: d.id, expectedVersion: d.version })));
+      if (r.updated.length > 0) toast.success(`${r.updated.length}件にメンションを付けました`);
+      if (r.skipped.length > 0) toast.error(`${r.skipped.length}件には付けられませんでした（「いつも付ける」の人が、ほかの投稿で予定に入っています）`);
+      refresh();
+      void queryClient.invalidateQueries({ queryKey: queryKeys.mentionSettings(account.id) });
+    } catch (error) {
+      toast.error(describeError(error));
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const selectionActions =
     tab === "needs_review" ? (
       <>
@@ -240,6 +277,11 @@ function StockPageContent() {
         >
           削除
         </Button>
+        {mentionAvailable(mentionSettings.data) && (
+          <Button variant="outline" className="h-10 rounded-full md:h-9" disabled={busy} onClick={() => void mentionSelected()}>
+            メンションを付ける
+          </Button>
+        )}
         <Button
           variant="outline"
           className="h-10 rounded-full md:h-9"
@@ -318,6 +360,17 @@ function StockPageContent() {
         check={check}
         busy={busy}
         scheduledAt={data?.schedule[d.id]}
+        mention={
+          d.status === "needs_review" || d.status === "approved" ? (
+            <MentionPanel
+              accountId={account.id}
+              target={{ id: d.id, version: d.version, kind: "draft", mention: d.mention }}
+              settings={mentionSettings.data}
+              ngWords={data?.ngWords ?? []}
+              canReview={canReview}
+            />
+          ) : undefined
+        }
         labels={
           <LabelRow
             labels={[
@@ -437,7 +490,10 @@ function StockPageContent() {
           {TAB_VALUES.map((value) => (
             <TabsContent key={value} value={value}>
               {value === "published" ? (
-                <PublishedList accountId={account.id} />
+                <PublishedList
+                  accountId={account.id}
+                  mention={{ settings: mentionSettings.data, ngWords: data?.ngWords ?? [], canReview }}
+                />
               ) : !data ? (
                 <div className="h-32 animate-pulse rounded-2xl bg-muted" aria-busy="true" />
               ) : (

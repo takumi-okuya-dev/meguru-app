@@ -14,8 +14,8 @@ type Failure = { times: number; kind: "auth" | "server" };
 type PublishEndpoint = "createContainer" | "publish" | "containerStatus" | "getMedia" | "publishingLimit" | "listThreads";
 type PublishFailureKind = "transient" | "auth" | "rate_limit" | "invalid";
 type ContainerStatus = "IN_PROGRESS" | "FINISHED" | "PUBLISHED" | "ERROR" | "EXPIRED";
-type Container = { id: string; userId: string; text: string; status: ContainerStatus; mediaId: string | null };
-type Post = { id: string; userId: string; text: string; timestamp: string; permalink: string; containerId: string };
+type Container = { id: string; userId: string; text: string; status: ContainerStatus; mediaId: string | null; replyToId?: string };
+type Post = { id: string; userId: string; text: string; timestamp: string; permalink: string; containerId: string; replyToId?: string };
 type MetricName = "views" | "likes" | "replies" | "reposts" | "quotes" | "shares";
 const METRIC_NAMES: MetricName[] = ["views", "likes", "replies", "reposts", "quotes", "shares"];
 /** 利用者のMetaアプリで作ったトークンの情報（specs/010 research.md R13）。appScope ごとにユーザーIDが変わる。 */
@@ -123,7 +123,7 @@ export function createFakeThreads() {
     const meta = token ? tokens.get(token)?.meta : undefined;
     return meta ? `${u.id}-${meta.appScope}` : u.id;
   }
-  const ALL_SCOPES = ["threads_basic", "threads_content_publish", "threads_manage_insights"];
+  const ALL_SCOPES = ["threads_basic", "threads_content_publish", "threads_manage_insights", "threads_manage_replies"];
   /** 利用者のMetaアプリのトークンを作る（ユーザートークン生成ツールの代わり）。 */
   function issueAppToken(opts: { user: string; appScope?: string; lifetime?: "long" | "short"; debug?: boolean; scopes?: string[] }) {
     return issue("app", opts.user, {
@@ -321,8 +321,13 @@ export function createFakeThreads() {
     if (noPublishPermission.has(u.id) || lacksScope(c, "threads_content_publish")) return noPermission();
     const body = await form(c);
     if (body.media_type !== "TEXT" || !body.text) return publishFailure("invalid");
+    // 返信（specs/023）：返信の権限と、返信先の投稿があるかを確かめる
+    if (body.reply_to_id) {
+      if (lacksScope(c, "threads_manage_replies")) return noPermission();
+      if (!posts.some((p) => p.id === body.reply_to_id)) return publishFailure("invalid");
+    }
     const id = nextId();
-    containers.set(id, { id, userId: u.id, text: body.text, status: "FINISHED", mediaId: null });
+    containers.set(id, { id, userId: u.id, text: body.text, status: "FINISHED", mediaId: null, ...(body.reply_to_id ? { replyToId: body.reply_to_id } : {}) });
     return c.json({ id });
   });
 
@@ -343,6 +348,7 @@ export function createFakeThreads() {
       timestamp: new Date().toISOString().replace(/\.\d{3}Z$/, "+0000"),
       permalink: `https://www.threads.com/@${u.username}/post/${id}`,
       containerId: container.id,
+      ...(container.replyToId ? { replyToId: container.replyToId } : {}),
     };
     posts.push(post);
     container.status = "PUBLISHED";

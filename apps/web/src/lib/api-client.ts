@@ -25,6 +25,9 @@ import {
   teamStatusSchema,
   externalMediaListSchema,
   analysisResponseSchema,
+  mentionAttachResponseSchema,
+  mentionBulkResponseSchema,
+  mentionSettingsSchema,
   analysisSettingsResponseSchema,
   classificationsResponseSchema,
   classificationsSaveResponseSchema,
@@ -33,6 +36,7 @@ import {
   mediaDefaultsSchema,
   type ListingUpdateRequest,
   type AnalysisScope,
+  type MentionAttachRequest,
   type AnalysisSettingsRequest,
   type ClassificationsRequest,
   type Media,
@@ -432,6 +436,34 @@ export const api = {
     }),
   deletePromotion: (accountId: string, id: string) =>
     request(`/api/accounts/${accountId}/promotions/${id}`, null, { method: "DELETE" }),
+  // 時間差のメンション（specs/023 contracts/api.md）
+  mentionSettings: (accountId: string) => request(`/api/accounts/${accountId}/mention-settings`, mentionSettingsSchema),
+  putMentionSettings: (accountId: string, body: { expectedVersion: number | null; message: string; delayMinutes: number }) =>
+    request(`/api/accounts/${accountId}/mention-settings`, mentionSettingsSchema, { method: "PUT", body: JSON.stringify(body) }),
+  addMentionPerson: (accountId: string, body: { username: string; label: string; always?: boolean }) =>
+    request(`/api/accounts/${accountId}/mention-people`, mentionSettingsSchema, { method: "POST", body: JSON.stringify(body) }),
+  patchMentionPerson: (accountId: string, personId: string, body: { label?: string; always?: boolean }) =>
+    request(`/api/accounts/${accountId}/mention-people/${personId}`, mentionSettingsSchema, {
+      method: "PATCH",
+      body: JSON.stringify(body),
+    }),
+  deleteMentionPerson: (accountId: string, personId: string) =>
+    request(`/api/accounts/${accountId}/mention-people/${personId}`, mentionSettingsSchema, { method: "DELETE" }),
+  attachMention: (accountId: string, draftId: string, body: MentionAttachRequest) =>
+    request(`/api/accounts/${accountId}/post-drafts/${draftId}/mention`, mentionAttachResponseSchema, {
+      method: "PUT",
+      body: JSON.stringify(body),
+    }),
+  attachMentionsBulk: (accountId: string, items: { id: string; expectedVersion: number }[]) =>
+    request(`/api/accounts/${accountId}/post-drafts/mentions`, mentionBulkResponseSchema, {
+      method: "POST",
+      body: JSON.stringify({ items }),
+    }),
+  detachMention: (accountId: string, draftId: string, expectedVersion?: number) =>
+    request(`/api/accounts/${accountId}/post-drafts/${draftId}/mention`, mentionAttachResponseSchema.pick({ draft: true }), {
+      method: "DELETE",
+      body: JSON.stringify(expectedVersion === undefined ? {} : { expectedVersion }),
+    }),
   // アルゴリズムの解析（specs/022 contracts/api.md）
   analysis: (accountId: string, scope: AnalysisScope) =>
     request(`/api/accounts/${accountId}/analysis?scope=${scope}`, analysisResponseSchema),

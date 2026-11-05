@@ -5,13 +5,14 @@ import {
   NEEDS_REVIEW_LIMIT,
   checkPublishable,
   type PostDraft,
+  type PublishCheck,
   type ReviewRequest,
   type SkipReason,
 } from "@threads-grower/shared";
 import { and, eq, inArray, sql } from "drizzle-orm";
 import { withTransaction, type TxDb } from "../db/client";
 import { lockAccountDrafts } from "../db/locks";
-import { postDrafts } from "../db/schema";
+import { postDrafts, postMentions } from "../db/schema";
 import type { Env } from "../env";
 import { notFound, pgErrorCode } from "../lib/errors";
 import {
@@ -23,6 +24,25 @@ import {
 import { listNgWords } from "./posting-rules-service";
 import type { AccountAccess } from "./access";
 import { recordActivity } from "./activity-log";
+import { pendingMentionTexts } from "./mention-service";
+import { loadMentions } from "./mention-view";
+import { notifyWake } from "./posting-schedule-service";
+
+/**
+ * 下書きの本文と返信の文の確かめを1つにする（どちらかに当たれば当たり）。
+ * @param body - 本文の確かめ
+ * @param reply - 返信の文の確かめ（なければ null）
+ * @returns まとめた確かめ
+ */
+function mergeChecks(body: PublishCheck, reply: PublishCheck | null): PublishCheck {
+  if (!reply) return body;
+  return {
+    ngWords: [...body.ngWords, ...reply.ngWords],
+    overThreadsLimit: body.overThreadsLimit || reply.overThreadsLimit,
+    policyCautions: [...body.policyCautions, ...reply.policyCautions],
+    approvable: body.approvable && reply.approvable,
+  };
+}
 
 type PostDraftRow = typeof postDrafts.$inferSelect;
 type Status = PostDraftRow["status"];
@@ -129,8 +149,9 @@ const REVIEW_ACTIONS = {
  * @throws AppError ACCOUNT_NOT_FOUND（処理の途中でAccountが削除された）
  */
 export async function reviewDrafts(env: Env, accountId: string, req: ReviewRequest, access?: AccountAccess) {
+  let wake = false;
   try {
-    return await withTransaction(env.DATABASE_URL, async (tx) => {
+    const result = await withTransaction(env.DATABASE_URL, async (tx) => {
       // NGワードの追加と同じロックで直列化する（承認とNGワードの追加が同時でも、NGワードを含む承認済みを残さない。R3）
       await lockAccountDrafts(tx, accountId);
       const ids = req.items.map((i) => i.id);
@@ -142,6 +163,8 @@ export async function reviewDrafts(env: Env, accountId: string, req: ReviewReque
         req.action === "approve" ? listNgWords(tx, accountId) : Promise.resolve([]),
         countDrafts(tx, accountId),
       ]);
+      // 時間差のメンションの返信の文も、下書きと一緒に承認する（specs/023 research.md R5、原則I・II）
+      const mentionTexts = await pendingMentionTexts(tx, ids);
       const byId = new Map(rows.map((r) => [r.id, r]));
       const target = TARGET[req.action];
       const updated = new Map<string, PostDraft>();
@@ -173,7 +196,8 @@ export async function reviewDrafts(env: Env, accountId: string, req: ReviewReque
           continue;
         }
         if (req.action === "approve") {
-          const check = checkPublishable(row.body, ngWordRows);
+          const reply = mentionTexts.get(id);
+          const check = mergeChecks(checkPublishable(row.body, ngWordRows), reply === undefined ? null : checkPublishable(reply, ngWordRows));
           if (check.ngWords.length > 0) {
             skip("NG_WORD");
             continue;
@@ -212,7 +236,12 @@ export async function reviewDrafts(env: Env, accountId: string, req: ReviewReque
       }
 
       const changed = await applyChange(tx, accountId, req, toChange);
-      for (const row of changed) updated.set(row.id, toPostDraft(row));
+      // 却下した下書きの時間差のメンションは消す（specs/023 data-model.md「状態」）
+      if (req.action === "reject" && changed.length > 0)
+        await tx.delete(postMentions).where(inArray(postMentions.draftId, changed.map((r) => r.id)));
+      if (req.action === "approve" && changed.some((r) => mentionTexts.has(r.id))) wake = true;
+      const mentions = await loadMentions(tx, changed, access?.account.username ?? null);
+      for (const row of changed) updated.set(row.id, toPostDraft(row, { mentions }));
       // 1回の操作を1行で記録する（specs/008 FR-050a）。同じ requestId の再試行では changed が空なので書かない
       if (access && changed.length > 0) {
         await recordActivity(tx, access, {
@@ -238,6 +267,9 @@ export async function reviewDrafts(env: Env, accountId: string, req: ReviewReque
         counts: await countDrafts(tx, accountId),
       };
     });
+    // 時間差のメンションの付いた下書きを承認したら、関所を起こす（specs/023 research.md R2）
+    if (wake) await notifyWake(env.AUTOPOST_KV, new Date());
+    return result;
   } catch (err) {
     // 外部キー違反：処理の途中でAccountが削除された
     if (pgErrorCode(err) === "23503") throw notFound();

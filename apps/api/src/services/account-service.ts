@@ -169,6 +169,8 @@ export type CompleteConnectionInput = {
   recheckAt?: Date | null;
   /** 反応数を読む権限がない（specs/006 の insights_denied_at を今にする） */
   insightsDenied?: boolean;
+  /** 返信の権限がない（specs/023 の replies_denied_at を今にする） */
+  repliesDenied?: boolean;
 };
 
 /** 接続を確定した結果。connect（はじめてつないだ）、reconnect（接続し直した）。 */
@@ -334,6 +336,8 @@ async function writeConnection(
       // 再接続で反応数を読む権限が戻りうるので、権限のない印を消す（specs/006 research.md R11）。
       // トークンで権限がないと分かっているときは、今にする（specs/010 research.md R4）
       insightsDeniedAt: input.insightsDenied ? now : null,
+      // つなぎ直しで返信の権限が戻りうるので消す。トークンで権限がないと分かっているときは今にする（specs/023 research.md R1）
+      repliesDeniedAt: input.repliesDenied ? now : null,
       updatedAt: now,
     })
     .where(eq(accounts.id, accountId));

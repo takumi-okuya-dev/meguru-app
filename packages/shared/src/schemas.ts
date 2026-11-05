@@ -45,9 +45,14 @@ import {
   ANALYSIS_CLASSIFY_BATCH,
   ANALYSIS_THEME_NAME_MAX,
   ANALYSIS_THEMES_MAX,
+  MENTION_DELAY_OPTIONS,
+  MENTION_LABEL_MAX,
+  MENTION_MESSAGE_MAX,
+  MENTION_PER_REPLY_MAX,
 } from "./limits";
 import { REJECT_REASON_CODES } from "./review";
 import { OPENING_TYPES } from "./analysis/types";
+import { MENTION_FAILURE_REASONS, MENTION_STATES } from "./mention";
 import { IMAGE_STYLES, LISTING_STATUSES, MEDIA } from "./media/types";
 import { EVENT_FORMATS, isEventDateTime, PREFECTURES } from "./promotion-event";
 import { isValidYmd, jstToday } from "./promotions";
@@ -241,7 +246,7 @@ export const tokenConnectResponseSchema = z.object({
   accountId: z.string(),
   kind: z.enum(["connect", "reconnect"]),
   username: z.string(),
-  warnings: z.array(z.enum(["no_publish_permission", "no_insights_permission"])),
+  warnings: z.array(z.enum(["no_publish_permission", "no_insights_permission", "no_replies_permission"])),
 });
 /** POST /api/threads/token-connect のレスポンス。 */
 export type TokenConnectResponse = z.infer<typeof tokenConnectResponseSchema>;
@@ -701,6 +706,20 @@ export type BlockedReason = z.infer<typeof blockedReasonSchema>;
 /** 却下理由の候補のコードのスキーマ（004 research.md R10）。 */
 export const rejectReasonCodeSchema = z.enum(REJECT_REASON_CODES);
 
+/** 下書きの時間差のメンション（specs/023 contracts/api.md「下書きの応答」）。 */
+export const postMentionSchema = z.object({
+  usernames: z.array(z.string()),
+  text: z.string(),
+  delayMinutes: z.number().int().nullable(),
+  state: z.enum(MENTION_STATES),
+  dueAt: z.string().nullable(),
+  sentAt: z.string().nullable(),
+  failureReason: z.enum(MENTION_FAILURE_REASONS).nullable(),
+  replyPermalink: z.string().nullable(),
+});
+/** 下書きの時間差のメンション。 */
+export type PostMention = z.infer<typeof postMentionSchema>;
+
 /** 下書き（レスポンス）のスキーマ。 */
 export const postDraftSchema = z.object({
   id: z.string(),
@@ -736,6 +755,8 @@ export const postDraftSchema = z.object({
   createdBy: z.string().nullable().default(null),
   editedBy: z.string().nullable().default(null),
   editedAt: z.string().nullable().default(null),
+  // 時間差のメンション（specs/023）。見せてもらっている人には null
+  mention: postMentionSchema.nullable().default(null),
   createdAt: z.string(),
   updatedAt: z.string(),
 });
@@ -1163,6 +1184,9 @@ export const publishedPostSchema = z.object({
   publishedAt: z.string(),
   threadsMediaId: z.string().nullable(),
   threadsPermalink: z.string().nullable(),
+  // 時間差のメンション（specs/023）。付ける・やめるときの版と、見せてもらっている人には null のメンション
+  version: z.number().int().default(1),
+  mention: postMentionSchema.nullable().default(null),
 });
 /** 投稿済みの一覧の1件。 */
 export type PublishedPost = z.infer<typeof publishedPostSchema>;
@@ -2071,3 +2095,74 @@ export const classificationsRequestSchema = z.object({
 export type ClassificationsRequest = z.infer<typeof classificationsRequestSchema>;
 /** PUT …/analysis/classifications の応答。 */
 export const classificationsSaveResponseSchema = z.object({ saved: z.number().int(), skipped: z.array(z.string()) });
+
+// ---- 時間差のメンション（specs/023-delayed-mention contracts/api.md）----
+
+const mentionDelaySchema = z.number().int().refine((v) => (MENTION_DELAY_OPTIONS as readonly number[]).includes(v), { message: "delay" });
+
+/** GET …/mention-settings の応答。 */
+export const mentionSettingsSchema = z.object({
+  message: z.string(),
+  delayMinutes: z.number().int(),
+  version: z.number().int().nullable(),
+  people: z.array(
+    z.object({ id: z.string(), username: z.string(), label: z.string(), always: z.boolean(), pendingCount: z.number().int() }),
+  ),
+  repliesDenied: z.boolean(),
+  /** 今は選べない人（予定に入っている・24時間以内に済み）。draftId はその予定・済みの下書き */
+  blocked: z.array(z.object({ username: z.string(), draftId: z.string(), reason: z.enum(["pending", "recent"]) })),
+  canEdit: z.boolean(),
+});
+/** メンションの設定。 */
+export type MentionSettings = z.infer<typeof mentionSettingsSchema>;
+
+/** PUT …/mention-settings のリクエスト。 */
+export const mentionSettingsRequestSchema = z.object({
+  expectedVersion: z.number().int().positive().nullable(),
+  message: z
+    .string()
+    .transform((s) => s.trim())
+    .refine((s) => countChars(s) <= MENTION_MESSAGE_MAX, { message: `max ${MENTION_MESSAGE_MAX}` }),
+  delayMinutes: mentionDelaySchema,
+});
+
+const labelSchema = z
+  .string()
+  .transform((s) => s.trim())
+  .refine((s) => countChars(s) >= 1 && countChars(s) <= MENTION_LABEL_MAX, { message: `1-${MENTION_LABEL_MAX}` });
+
+/** POST …/mention-people のリクエスト。 */
+export const mentionPersonRequestSchema = z.object({ username: z.string().max(40), label: labelSchema, always: z.boolean().optional() });
+/** PATCH …/mention-people/:personId のリクエスト。 */
+export const mentionPersonPatchSchema = z
+  .object({ label: labelSchema.optional(), always: z.boolean().optional() })
+  .refine((v) => v.label !== undefined || v.always !== undefined, { message: "nothing to update" });
+
+/** PUT …/post-drafts/:draftId/mention のリクエスト。 */
+export const mentionAttachRequestSchema = z.object({
+  expectedVersion: z.number().int().positive(),
+  usernames: z.array(z.string()).min(1).max(MENTION_PER_REPLY_MAX),
+  text: z
+    .string()
+    .refine((s) => s.trim() !== "" && countChars(s) <= 500, { message: "1-500" })
+    .optional(),
+});
+/** 付けるリクエスト。 */
+export type MentionAttachRequest = z.infer<typeof mentionAttachRequestSchema>;
+
+/** 今は選べない人（理由：pending＝ほかの投稿で予定、recent＝24時間以内に済み）。 */
+export const mentionBlockedSchema = z.array(z.object({ username: z.string(), reason: z.enum(["pending", "recent"]) }));
+/** PUT …/mention の応答。 */
+export const mentionAttachResponseSchema = z.object({ draft: postDraftSchema, blocked: mentionBlockedSchema });
+
+/** POST …/post-drafts/mentions のリクエスト。 */
+export const mentionBulkRequestSchema = z.object({
+  items: z.array(z.object({ id: z.string().uuid(), expectedVersion: z.number().int().positive() })).min(1).max(50),
+});
+/** POST …/post-drafts/mentions の応答。 */
+export const mentionBulkResponseSchema = z.object({
+  updated: z.array(postDraftSchema),
+  skipped: z.array(z.object({ id: z.string(), reason: z.string() })),
+});
+/** DELETE …/post-drafts/:draftId/mention のリクエスト。 */
+export const mentionDetachRequestSchema = z.object({ expectedVersion: z.number().int().positive().optional() });

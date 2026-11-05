@@ -8,6 +8,7 @@ import {
   splitDrafts,
   type BlockedReason,
   type DraftCounts,
+  type PostMention,
   type PublishError,
   type RejectReasonCode,
 } from "@threads-grower/shared";
@@ -22,6 +23,7 @@ import type { AccountAccess, AccountRow } from "./access";
 import { recordActivity, updatedByOf } from "./activity-log";
 import { updateWithVersion } from "./item-service";
 import { upcomingSlots } from "./auto-post-status";
+import { loadMentions } from "./mention-view";
 import { readPostingSchedule, toAutoPostState } from "./posting-schedule-service";
 
 type PostDraftRow = typeof postDrafts.$inferSelect;
@@ -31,7 +33,11 @@ type PostDraftRow = typeof postDrafts.$inferSelect;
  * `redactSettings` は、設定（`settings` の権限）由来の値を伏せる。
  * 見せてもらっている人（`shared_viewer`）は `read` だけなので、オーナーの設定を見る権限が無い。
  */
-export type PostDraftView = { redactSettings?: boolean };
+export type PostDraftView = {
+  redactSettings?: boolean;
+  /** 時間差のメンション（specs/023）。渡さなければ null。見せてもらっている人には渡さない */
+  mentions?: ReadonlyMap<string, PostMention>;
+};
 
 /**
  * 下書きの行を、レスポンスの PostDraft にする。
@@ -67,6 +73,7 @@ export function toPostDraft(row: PostDraftRow, view: PostDraftView = {}) {
     createdBy: row.createdByUserId,
     editedBy: row.editedByUserId,
     editedAt: row.bodyEditedAt?.toISOString() ?? null,
+    mention: view.mentions?.get(row.id) ?? null,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   };
@@ -228,7 +235,12 @@ export async function listAllDrafts(
   const slots = await upcomingSlots(db, account, schedule, now, queue.length);
   // 設定由来の値の伏せ方は、整形する側に渡す。呼び出し側がフィールドごとに
   // 覚えておく形にすると、設定由来の値が増えたときに漏れる（セキュリティ監査 run-1）
-  const view: PostDraftView = { redactSettings: account.redactSettings === true };
+  const redact = account.redactSettings === true;
+  // 時間差のメンションは view の値なので、見せてもらっている人には読まない（specs/023 research.md R9）
+  const mentions = redact
+    ? undefined
+    : await loadMentions(db, [...needsReview, ...approved, ...rejected, ...publishFailed], account.username);
+  const view: PostDraftView = { redactSettings: redact, mentions };
   return {
     needsReview: needsReview.map((r) => toPostDraft(r, view)),
     approved: approved.map((r) => toPostDraft(r, view)),
@@ -558,12 +570,14 @@ export function decodeCursor(cursor: string): { publishedAt: Date; id: string } 
  * @param db - データベース
  * @param accountId - accounts.id
  * @param opts - before：前のページの nextCursor、limit：件数
+ * @param view - username：返信のURLに使うユーザー名、withMentions：時間差のメンションを入れるか（見せてもらっている人は false。specs/023）
  * @returns items と、続きを読むときの nextCursor（続きがなければ null）
  */
 export async function listPublishedPage(
   db: Db,
   accountId: string,
   opts: { before?: string; limit: number },
+  view: { username: string | null; withMentions: boolean } = { username: null, withMentions: false },
 ) {
   const cursor = opts.before ? decodeCursor(opts.before) : null;
   if (opts.before && !cursor)
@@ -575,6 +589,7 @@ export async function listPublishedPage(
       publishedAt: postDrafts.publishedAt,
       threadsMediaId: postDrafts.threadsMediaId,
       threadsPermalink: postDrafts.threadsPermalink,
+      version: postDrafts.version,
     })
     .from(postDrafts)
     .where(
@@ -591,8 +606,10 @@ export async function listPublishedPage(
     .limit(opts.limit + 1);
   const page = rows.slice(0, opts.limit);
   const last = page.at(-1);
+  // 時間差のメンション（specs/023）。見せてもらっている人には読まない
+  const mentions = view.withMentions ? await loadMentions(db, page, view.username) : new Map();
   return {
-    items: page.map((r) => ({ ...r, publishedAt: r.publishedAt!.toISOString() })),
+    items: page.map((r) => ({ ...r, publishedAt: r.publishedAt!.toISOString(), mention: mentions.get(r.id) ?? null })),
     nextCursor: rows.length > opts.limit && last ? encodeCursor(last.publishedAt!, last.id) : null,
   };
 }

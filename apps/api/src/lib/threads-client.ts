@@ -7,7 +7,7 @@
 import type { Env } from "../env";
 
 /** 接続時にまとめて要求する Threads の権限（research.md R3）。 */
-export const THREADS_SCOPES = ["threads_basic", "threads_content_publish", "threads_manage_insights"] as const;
+export const THREADS_SCOPES = ["threads_basic", "threads_content_publish", "threads_manage_insights", "threads_manage_replies"] as const;
 
 /** Threads の認証エラー（OAuthエラー190、HTTP 401）。トークンが無効になったことを表す。 */
 export class ThreadsAuthError extends Error {
@@ -99,8 +99,13 @@ export type ThreadsClient = {
    * 同じアプリのトークンでしか調べられないので、利用者のMetaアプリのトークンを自分自身で調べる。
    */
   debugToken(token: string): Promise<TokenDebugInfo>;
-  /** テキストのコンテナーを作る（2段階の1つ目）。 */
-  createTextContainer(accessToken: string, userId: string, text: string): Promise<{ containerId: string }>;
+  /** テキストのコンテナーを作る（2段階の1つ目）。replyToId を渡すと、その投稿への返信になる（specs/023 research.md R1）。 */
+  createTextContainer(
+    accessToken: string,
+    userId: string,
+    text: string,
+    opts?: { replyToId?: string },
+  ): Promise<{ containerId: string }>;
   /** コンテナーを公開する（2段階の2つ目）。1つのコンテナーは1回しか公開できない。 */
   publishContainer(accessToken: string, userId: string, containerId: string): Promise<{ mediaId: string }>;
   /** コンテナーの状態を読む。公開した投稿のIDは返らない。 */
@@ -277,11 +282,11 @@ export function createThreadsClient(env: Env, fetchImpl: typeof fetch = fetch): 
       return { isValid: true, expiresAt: at(d.expires_at), issuedAt: at(d.issued_at), scopes: d.scopes ?? [] };
     },
 
-    async createTextContainer(accessToken, userId, text) {
+    async createTextContainer(accessToken, userId, text, opts) {
       const body = await call<{ id: string | number }>("createTextContainer", `${graph}/v1.0/${userId}/threads`, {
         method: "POST",
         token: accessToken,
-        ...form({ media_type: "TEXT", text }),
+        ...form({ media_type: "TEXT", text, ...(opts?.replyToId ? { reply_to_id: opts.replyToId } : {}) }),
       });
       return { containerId: String(body.id) };
     },

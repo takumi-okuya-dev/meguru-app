@@ -95,10 +95,25 @@ describe("トークンで追加する（US1）", () => {
   it("投稿・反応数の権限がないトークンでも作り、warnings と反応数の印を返す（US1-4・US1-5、FR-011）", async () => {
     const token = await fake.issueToken({ user: "9003", scopes: ["threads_basic"] });
     const body = (await (await add(token)).json()) as Ok;
-    expect(body.warnings).toEqual(["no_publish_permission", "no_insights_permission"]);
+    expect(body.warnings).toEqual(["no_publish_permission", "no_insights_permission", "no_replies_permission"]);
     const a = await accountRow(body.accountId);
     expect(a.insights_denied_at).not.toBeNull();
+    expect(a.replies_denied_at).not.toBeNull();
     expect(a.scopes).toEqual(["threads_basic"]);
+  });
+
+  it("返信の権限（threads_manage_replies）がないと分かれば印を付け、権限の一覧が読めなければ付けない（specs/023 research.md R1）", async () => {
+    const without = await fake.issueToken({
+      user: "9003",
+      scopes: ["threads_basic", "threads_content_publish", "threads_manage_insights"],
+    });
+    const body = (await (await add(without)).json()) as Ok;
+    expect(body.warnings).toEqual(["no_replies_permission"]);
+    expect((await accountRow(body.accountId)).replies_denied_at).not.toBeNull();
+    const unknown = await fake.issueToken({ user: "9004", debug: false });
+    const body2 = (await (await add(unknown)).json()) as Ok;
+    expect(body2.warnings).toEqual([]);
+    expect((await accountRow(body2.accountId)).replies_denied_at).toBeNull();
   });
 
   it("無効・短期・形の違う文字列では作らない（US1-6、FR-003・FR-012）", async () => {
