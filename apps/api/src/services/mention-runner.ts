@@ -195,6 +195,8 @@ async function handleOne(
   // 7-3. 出す
   const token = cred.token;
   const userId = cred.threadsUserId;
+  // どこで失敗したか（返信のもとを作るところの4xxは、返信先が見つからない）
+  let stage: "status" | "create" | "publish" = "status";
   try {
     let containerId = m.containerId;
     if (m.publishRequestedAt && containerId) {
@@ -209,17 +211,22 @@ async function handleOne(
         containerId = null;
       }
       if (status === "IN_PROGRESS") {
+        // 処理中のまま時間を過ぎたら、出せなかったことにする（いつまでも借り直さない。PR #66 のセルフレビュー）
+        if (now.getTime() - m.publishRequestedAt.getTime() > MENTION_EXPIRE_HOURS * HOUR_MS)
+          return fail(db, m.draftId, leaseToken, "error", now);
         await release(db, m.draftId, leaseToken);
         return "waiting";
       }
     }
     if (!containerId) {
+      stage = "create";
       ({ containerId } = await threads.createTextContainer(token, userId, m.text, { replyToId: t.draft.threadsMediaId }));
       await db
         .update(postMentions)
         .set({ containerId })
         .where(and(eq(postMentions.draftId, m.draftId), eq(postMentions.leaseToken, leaseToken)));
     }
+    stage = "publish";
     await db
       .update(postMentions)
       .set({ publishRequestedAt: now })
@@ -252,7 +259,7 @@ async function handleOne(
       return "waiting";
     }
     // 確かな失敗（4xx）。返信先の投稿が見つからない・受け付けられない
-    return fail(db, m.draftId, leaseToken, m.containerId ? "error" : "not_found", now);
+    return fail(db, m.draftId, leaseToken, stage === "create" ? "not_found" : "error", now);
   }
 }
 

@@ -133,4 +133,17 @@ describe("出せなかったとき（T023）", () => {
     expect(await mentionRow(a.draftId)).toMatchObject({ state: "pending" });
     expect(await replies()).toEqual([]);
   });
+
+  it("返信のもとが処理中のまま24時間を過ぎたら error（いつまでも借り直さない）", async () => {
+    const t0 = new Date("2030-01-10T03:00:00Z");
+    const a = await seed({ publishedAt: t0 });
+    await fake.dropPublishResponse(1);
+    await run(new Date(t0.getTime() + 31 * MIN));
+    const row = await mentionRow(a.draftId);
+    await fake.setContainerStatus(String(row.container_id), "IN_PROGRESS");
+    await run(new Date(t0.getTime() + 36 * MIN));
+    expect(await mentionRow(a.draftId)).toMatchObject({ state: "pending" });
+    await run(new Date(t0.getTime() + 26 * 60 * MIN));
+    expect(await mentionRow(a.draftId)).toMatchObject({ state: "failed", failure_reason: "error" });
+  });
 });
