@@ -97,7 +97,7 @@ pending ──出せない（not_found・post_failed・no_permission・expired�
 | `MENTION_DELAY_OPTIONS` | `[10, 30, 60, 180, 360, 720, 1440]` | 時間差（分） |
 | `MENTION_DELAY_DEFAULT` | 30 | |
 | `MENTION_SAME_PERSON_HOURS` | 24 | 同じ人へのメンションの間隔 |
-| `MENTION_EXPIRE_HOURS` | 24 | この時間を過ぎたら出さない |
+| `MENTION_EXPIRE_HOURS` | 24 | 返信の時刻からこの時間を過ぎたら出さない |
 | `MENTION_PUBLISHED_DAYS` | 7 | 投稿済みの投稿に付けられる期間 |
 | `MENTION_MAX_ATTEMPTS` | 3 | 一時的な失敗の上限 |
 | `MENTION_MAX_PER_TICK` | 10 | 1回の処理で出す返信 |

@@ -2,7 +2,7 @@
 import { neon } from "@neondatabase/serverless";
 import { beforeEach, describe, expect, it } from "vitest";
 import { fake, makeApp, resetDb, testEnv } from "../helpers/app";
-import { connectedAccount, run } from "../helpers/auto-post";
+import { approvedDrafts, connectedAccount, draftRow, jst, run, setSchedule } from "../helpers/auto-post";
 import { draftOf } from "../helpers/mention";
 
 const app = makeApp();
@@ -145,5 +145,36 @@ describe("出せなかったとき（T023）", () => {
     expect(await mentionRow(a.draftId)).toMatchObject({ state: "pending" });
     await run(new Date(t0.getTime() + 26 * 60 * MIN));
     expect(await mentionRow(a.draftId)).toMatchObject({ state: "failed", failure_reason: "error" });
+  });
+
+  it("時間差が24時間でも、返信の時刻から数えるので出せる（PR #66 のCodexレビュー）", async () => {
+    const t0 = new Date("2030-01-10T03:00:00Z");
+    const a = await seed({ publishedAt: t0, delay: 1440 });
+    await run(new Date(t0.getTime() + 1440 * MIN + 3 * MIN));
+    expect(await mentionRow(a.draftId)).toMatchObject({ state: "sent" });
+  });
+
+  it("公開を送る前に取りやめていたら送らない（PR #66 のCodexレビュー）", async () => {
+    const t0 = new Date("2030-01-10T03:00:00Z");
+    const a = await seed({ publishedAt: t0 });
+    // 返信のもとを作ったあと、公開の前に「やめる」が入った状態
+    await fake.publishFail("publish", "transient", 1);
+    await run(new Date(t0.getTime() + 31 * MIN));
+    await sql()`UPDATE post_mentions SET state = 'canceled', publish_requested_at = NULL WHERE draft_id = ${a.draftId}`;
+    await run(new Date(t0.getTime() + 60 * MIN));
+    expect(await replies()).toEqual([]);
+    expect(await mentionRow(a.draftId)).toMatchObject({ state: "canceled" });
+  });
+
+  it("下書きの投稿に失敗したら、時間差のメンションも出せなかったことにする（予定のまま残さない。PR #66 のCodexレビュー）", async () => {
+    const { accountId } = await connectedAccount("u1", app);
+    const [id] = await approvedDrafts(accountId, ["INVALID"]);
+    await sql()`INSERT INTO post_mentions (draft_id, account_id, usernames, text, delay_minutes)
+      VALUES (${id}, ${accountId}, ${["a"]}, '@a', 30)`;
+    await setSchedule(accountId, { slotMinutes: [720] });
+    await fake.publishFail("createContainer", "invalid", 1);
+    await run(jst("2030-01-10 12:00"));
+    expect(await draftRow(id!)).toMatchObject({ status: "publish_failed" });
+    expect(await mentionRow(id!)).toMatchObject({ state: "failed", failure_reason: "post_failed" });
   });
 });

@@ -35,6 +35,8 @@ describe("mentionUsernamesIn", () => {
       "minato_place",
     ]);
     expect(mentionUsernamesIn("メンションなし", ["a"])).toEqual([]);
+    // 句読点のあとも見分け、メールアドレスの中は見分けない
+    expect(mentionUsernamesIn("@a、@b。x@a.com", ["a", "b"])).toEqual(["a", "b"]);
   });
 });
 
@@ -48,6 +50,9 @@ describe("toggleMentionInText", () => {
     // 名前の一部だけには当てない
     expect(toggleMentionInText("@ab @a", "a")).toBe("@ab");
     expect(toggleMentionInText("@a.b", "a")).toBe("@a.b @a");
+    // 句読点のあとの @ も消し、足し直さない（見分け方と同じ境目）
+    expect(toggleMentionInText("ぜひ@a、@b", "b")).toBe("ぜひ@a、");
+    expect(mentionUsernamesIn(toggleMentionInText("ぜひ@a、@b", "b"), ["a", "b"])).toEqual(["a"]);
   });
 });
 

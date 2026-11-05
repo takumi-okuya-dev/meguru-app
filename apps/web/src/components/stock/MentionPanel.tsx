@@ -96,7 +96,8 @@ export function MentionPanel({
     onError: (err) => toast.error(describeError(err)),
   });
 
-  const m = target.mention;
+  // 下書きでは、予定のものだけを付いているとみなす（投稿に失敗して「出せなかった」のあと、投稿の順に戻したときなど）
+  const m = target.kind === "draft" && target.mention?.state !== "pending" ? null : target.mention;
   if (target.kind === "published" && m) return <PublishedStatus mention={m} canReview={canReview} busy={remove.isPending} onCancel={() => remove.mutate()} />;
   if (!canReview || !mentionAvailable(settings)) return null;
   if (target.kind === "published") {

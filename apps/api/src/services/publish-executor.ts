@@ -17,6 +17,7 @@ import { withTransaction, type Db } from "../db/client";
 import {
   accounts,
   postDrafts,
+  postMentions,
   postingSchedules,
   publishAttempts,
 } from "../db/schema";
@@ -572,6 +573,11 @@ class AttemptContext {
         prioritizedAt: null,
         carryoverAttemptId: null,
       });
+    // 時間差のメンションも出せなかったことにする（予定のまま残すと、その人をほかの投稿で選べない。PR #66 のCodexレビュー）
+    await this.db
+      .update(postMentions)
+      .set({ state: "failed", failureReason: "post_failed", leaseToken: null, leaseUntil: null, updatedAt: this.now })
+      .where(and(eq(postMentions.draftId, this.draft.id), eq(postMentions.state, "pending")));
     return { kind: "failed" };
   }
 

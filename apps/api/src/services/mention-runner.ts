@@ -7,6 +7,7 @@ import {
   MENTION_MAX_PER_TICK,
   MENTION_SAME_PERSON_HOURS,
   findNgWords,
+  mentionDueAt,
   type MentionFailureReason,
 } from "@threads-grower/shared";
 import { and, eq, isNull, lt, ne, or, sql } from "drizzle-orm";
@@ -157,7 +158,8 @@ async function handleOne(
 
   // 7-2. 出す前の判定
   if (t.draft.status !== "published" || !t.draft.threadsMediaId) return fail(db, m.draftId, leaseToken, "post_failed", now);
-  const start = m.sendAfter ?? t.draft.publishedAt!;
+  // 期限は返信の時刻から数える（時間差を24時間にしても出せるように。PR #66 のCodexレビュー）
+  const start = mentionDueAt({ delayMinutes: m.delayMinutes, sendAfter: m.sendAfter }, t.draft.publishedAt)!;
   // 結果の分からない公開の途中なら、時間を過ぎても確かめる（二重に出さない）
   if (!m.publishRequestedAt && now.getTime() - start.getTime() > MENTION_EXPIRE_HOURS * HOUR_MS)
     return fail(db, m.draftId, leaseToken, "expired", now);
@@ -227,10 +229,13 @@ async function handleOne(
         .where(and(eq(postMentions.draftId, m.draftId), eq(postMentions.leaseToken, leaseToken)));
     }
     stage = "publish";
-    await db
+    // 公開を送る前に、まだ予定のままかを確かめる。「やめる」・人の削除で取りやめたら送らない（PR #66 のCodexレビュー）
+    const [still] = await db
       .update(postMentions)
       .set({ publishRequestedAt: now })
-      .where(and(eq(postMentions.draftId, m.draftId), eq(postMentions.leaseToken, leaseToken)));
+      .where(and(eq(postMentions.draftId, m.draftId), eq(postMentions.leaseToken, leaseToken), eq(postMentions.state, "pending")))
+      .returning({ draftId: postMentions.draftId });
+    if (!still) return "waiting";
     const { mediaId } = await threads.publishContainer(token, userId, containerId);
     return markSent(db, m.draftId, leaseToken, mediaId, now);
   } catch (err) {

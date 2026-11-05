@@ -21,7 +21,10 @@ export const MENTION_FAILURE_LABELS: Record<MentionFailureReason, string> = {
 };
 
 const USERNAME_RE = /^[a-z0-9._]{1,30}$/;
-const MENTION_RE = /@([A-Za-z0-9._]{1,30})/g;
+// @ユーザー名 の境目：前が英数字・._@ でなく、後ろが英数字・._ でない（見分けと消すときで同じ決まりを使う。PR #66 のCodexレビュー）
+const BEFORE = "(?<![A-Za-z0-9._@])";
+const AFTER = "(?![A-Za-z0-9._])";
+const MENTION_RE = new RegExp(`${BEFORE}@([A-Za-z0-9._]{1,30})${AFTER}`, "g");
 
 /**
  * Threadsのユーザー名をそろえる（前後の空白と先頭の@を外して小文字にする）。
@@ -68,11 +71,11 @@ export function mentionUsernamesIn(text: string, people: readonly string[]): str
  * @returns 新しい文
  */
 export function toggleMentionInText(text: string, username: string): string {
-  const re = new RegExp(`(^|\\s)@${username.replace(/\./g, "\\.")}(?![A-Za-z0-9._])`, "gi");
+  const re = new RegExp(`${BEFORE}@${username.replace(/\./g, "\\.")}${AFTER}`, "gi");
   if (re.test(text)) {
     // 消した行は詰め、消して空になった行は消す（ほかの空の行は残す）
     const lines = text.split("\n").flatMap((l) => {
-      const removed = l.replace(re, "$1");
+      const removed = l.replace(re, "");
       if (removed === l) return [l];
       const t = removed.replace(/[ \t]{2,}/g, " ").trim();
       return t === "" ? [] : [t];

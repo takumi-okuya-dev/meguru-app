@@ -206,7 +206,9 @@ export async function removeMentionPerson(tx: TxDb, access: AccountAccess, perso
         .where(eq(postDrafts.id, d.id));
     } else {
       // 投稿済み・処理中：承認した文を変えずに出さない
-      await tx.update(postMentions).set({ state: "canceled", updatedAt: now }).where(eq(postMentions.draftId, m.draftId));
+      // 公開を送ったあと（結果を確かめている途中）は、出たかどうかを正しく残すため取りやめない
+      if (!m.publishRequestedAt)
+        await tx.update(postMentions).set({ state: "canceled", updatedAt: now }).where(eq(postMentions.draftId, m.draftId));
     }
   }
   await recordActivity(tx, access, { kind: "settings", action: "mention_person_removed", summary: person.label });
@@ -406,6 +408,8 @@ export async function detachMention(tx: TxDb, access: AccountAccess, draftId: st
       .where(eq(postDrafts.id, draftId))
       .returning()) as [DraftRow];
   } else {
+    // 公開を送ったあとは、出たかどうかを確かめている途中なので、やめられない（PR #66 のCodexレビュー）
+    if (m.publishRequestedAt) throw invalid(["state"], "already sending");
     await tx.update(postMentions).set({ state: "canceled", updatedAt: new Date() }).where(eq(postMentions.draftId, draftId));
   }
   await recordActivity(tx, access, { kind: "review", action: "mention_detached", excerpts: [draft.body] });
