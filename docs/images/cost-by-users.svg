@@ -1,0 +1,48 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="760" height="400" viewBox="0 0 760 400" role="img" aria-label="利用者の数ごとの、毎月の総コスト">
+<rect width="760" height="400" fill="#fcfcfb" rx="8"/>
+<text x="24" y="34" font-family="'Hiragino Sans','Noto Sans JP','Yu Gothic',sans-serif" font-size="17" font-weight="600" fill="#0b0b0b">利用者の数ごとの、毎月の総コスト</text>
+<text x="24" y="56" font-family="'Hiragino Sans','Noto Sans JP','Yu Gothic',sans-serif" font-size="12" fill="#52514e">棒＝合計（円・消費税なし）。点線＝固定費（コードの置き場とドメインで月850円）</text>
+<line x1="70" x2="736" y1="340.0" y2="340.0" stroke="#e4e3df" stroke-width="1"/>
+<text x="62" y="344.0" text-anchor="end" font-family="'Hiragino Sans','Noto Sans JP','Yu Gothic',sans-serif" font-size="11" fill="#52514e">0</text>
+<line x1="70" x2="736" y1="302.9" y2="302.9" stroke="#e4e3df" stroke-width="1"/>
+<text x="62" y="306.9" text-anchor="end" font-family="'Hiragino Sans','Noto Sans JP','Yu Gothic',sans-serif" font-size="11" fill="#52514e">1,000</text>
+<line x1="70" x2="736" y1="265.7" y2="265.7" stroke="#e4e3df" stroke-width="1"/>
+<text x="62" y="269.7" text-anchor="end" font-family="'Hiragino Sans','Noto Sans JP','Yu Gothic',sans-serif" font-size="11" fill="#52514e">2,000</text>
+<line x1="70" x2="736" y1="228.6" y2="228.6" stroke="#e4e3df" stroke-width="1"/>
+<text x="62" y="232.6" text-anchor="end" font-family="'Hiragino Sans','Noto Sans JP','Yu Gothic',sans-serif" font-size="11" fill="#52514e">3,000</text>
+<line x1="70" x2="736" y1="191.4" y2="191.4" stroke="#e4e3df" stroke-width="1"/>
+<text x="62" y="195.4" text-anchor="end" font-family="'Hiragino Sans','Noto Sans JP','Yu Gothic',sans-serif" font-size="11" fill="#52514e">4,000</text>
+<line x1="70" x2="736" y1="154.3" y2="154.3" stroke="#e4e3df" stroke-width="1"/>
+<text x="62" y="158.3" text-anchor="end" font-family="'Hiragino Sans','Noto Sans JP','Yu Gothic',sans-serif" font-size="11" fill="#52514e">5,000</text>
+<line x1="70" x2="736" y1="117.1" y2="117.1" stroke="#e4e3df" stroke-width="1"/>
+<text x="62" y="121.1" text-anchor="end" font-family="'Hiragino Sans','Noto Sans JP','Yu Gothic',sans-serif" font-size="11" fill="#52514e">6,000</text>
+<line x1="70" x2="736" y1="80.0" y2="80.0" stroke="#e4e3df" stroke-width="1"/>
+<text x="62" y="84.0" text-anchor="end" font-family="'Hiragino Sans','Noto Sans JP','Yu Gothic',sans-serif" font-size="11" fill="#52514e">7,000</text>
+<path d="M90.8,340 V306.9 Q90.8,302.9 94.8,302.9 H128.4 Q132.4,302.9 132.4,306.9 V340 Z" fill="#2a78d6"/>
+<text x="111.6" y="294.9" text-anchor="middle" font-family="'Hiragino Sans','Noto Sans JP','Yu Gothic',sans-serif" font-size="12" fill="#0b0b0b">1,000円</text>
+<text x="111.6" y="360" text-anchor="middle" font-family="'Hiragino Sans','Noto Sans JP','Yu Gothic',sans-serif" font-size="12" fill="#52514e">1人</text>
+<path d="M174.1,340 V290.1 Q174.1,286.1 178.1,286.1 H211.7 Q215.7,286.1 215.7,290.1 V340 Z" fill="#2a78d6"/>
+<text x="194.9" y="278.1" text-anchor="middle" font-family="'Hiragino Sans','Noto Sans JP','Yu Gothic',sans-serif" font-size="12" fill="#0b0b0b">1,450円</text>
+<text x="194.9" y="360" text-anchor="middle" font-family="'Hiragino Sans','Noto Sans JP','Yu Gothic',sans-serif" font-size="12" fill="#52514e">5人</text>
+<path d="M257.3,340 V273.4 Q257.3,269.4 261.3,269.4 H294.9 Q298.9,269.4 298.9,273.4 V340 Z" fill="#2a78d6"/>
+<text x="278.1" y="261.4" text-anchor="middle" font-family="'Hiragino Sans','Noto Sans JP','Yu Gothic',sans-serif" font-size="12" fill="#0b0b0b">1,900円</text>
+<text x="278.1" y="360" text-anchor="middle" font-family="'Hiragino Sans','Noto Sans JP','Yu Gothic',sans-serif" font-size="12" fill="#52514e">10人</text>
+<path d="M340.6,340 V236.3 Q340.6,232.3 344.6,232.3 H378.2 Q382.2,232.3 382.2,236.3 V340 Z" fill="#2a78d6"/>
+<text x="361.4" y="224.3" text-anchor="middle" font-family="'Hiragino Sans','Noto Sans JP','Yu Gothic',sans-serif" font-size="12" fill="#0b0b0b">2,900円</text>
+<text x="361.4" y="360" text-anchor="middle" font-family="'Hiragino Sans','Noto Sans JP','Yu Gothic',sans-serif" font-size="12" fill="#52514e">20人</text>
+<path d="M423.8,340 V201.0 Q423.8,197.0 427.8,197.0 H461.4 Q465.4,197.0 465.4,201.0 V340 Z" fill="#2a78d6"/>
+<text x="444.6" y="189.0" text-anchor="middle" font-family="'Hiragino Sans','Noto Sans JP','Yu Gothic',sans-serif" font-size="12" fill="#0b0b0b">3,850円</text>
+<text x="444.6" y="360" text-anchor="middle" font-family="'Hiragino Sans','Noto Sans JP','Yu Gothic',sans-serif" font-size="12" fill="#52514e">50人</text>
+<path d="M507.1,340 V188.0 Q507.1,184.0 511.1,184.0 H544.7 Q548.7,184.0 548.7,188.0 V340 Z" fill="#2a78d6"/>
+<text x="527.9" y="176.0" text-anchor="middle" font-family="'Hiragino Sans','Noto Sans JP','Yu Gothic',sans-serif" font-size="12" fill="#0b0b0b">4,200円</text>
+<text x="527.9" y="360" text-anchor="middle" font-family="'Hiragino Sans','Noto Sans JP','Yu Gothic',sans-serif" font-size="12" fill="#52514e">100人</text>
+<path d="M590.3,340 V178.7 Q590.3,174.7 594.3,174.7 H627.9 Q631.9,174.7 631.9,178.7 V340 Z" fill="#2a78d6"/>
+<text x="611.1" y="166.7" text-anchor="middle" font-family="'Hiragino Sans','Noto Sans JP','Yu Gothic',sans-serif" font-size="12" fill="#0b0b0b">4,450円</text>
+<text x="611.1" y="360" text-anchor="middle" font-family="'Hiragino Sans','Noto Sans JP','Yu Gothic',sans-serif" font-size="12" fill="#52514e">300人</text>
+<path d="M673.6,340 V110.0 Q673.6,106.0 677.6,106.0 H711.2 Q715.2,106.0 715.2,110.0 V340 Z" fill="#2a78d6"/>
+<text x="694.4" y="98.0" text-anchor="middle" font-family="'Hiragino Sans','Noto Sans JP','Yu Gothic',sans-serif" font-size="12" fill="#0b0b0b">6,300円</text>
+<text x="694.4" y="360" text-anchor="middle" font-family="'Hiragino Sans','Noto Sans JP','Yu Gothic',sans-serif" font-size="12" fill="#52514e">1,000人</text>
+<line x1="70" x2="736" y1="308.4" y2="308.4" stroke="#52514e" stroke-width="2" stroke-dasharray="6 4"/>
+<line x1="70" x2="736" y1="340" y2="340" stroke="#52514e" stroke-width="1"/>
+<text x="403.0" y="386" text-anchor="middle" font-family="'Hiragino Sans','Noto Sans JP','Yu Gothic',sans-serif" font-size="12" fill="#52514e">利用者の数</text>
+</svg>
