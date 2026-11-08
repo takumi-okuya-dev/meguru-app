@@ -1,5 +1,6 @@
 // 投稿の設定（specs/005-auto-post research.md R1、contracts/api.md「GET・PUT /posting-schedule」）。
 // 自動投稿は全プランで使えるので、grower機能は判定しない（FR-004）。
+import { effectiveSlotMinutes } from "./limit-service";
 import type { AccountAccess } from "./access";
 import { recordActivity, updatedByOf, withActivityTx } from "./activity-log";
 import {
@@ -59,13 +60,14 @@ export function toPostingSchedule(row: PostingScheduleRow | null): PostingSchedu
 
 /**
  * 自動投稿の状態（オン・オフ、時刻の数、止まっている理由）。
- * @param account - Account の行（接続の状態）と、オーナーが読むだけか（specs/013。読むだけなら投稿しない）
+ * @param account - Account の行（接続の状態）と、オーナーが読むだけか（specs/013。読むだけなら投稿しない）、
+ *   オーナーの1日の投稿数の上限（specs/024。省けば切らない）
  * @param row - posting_schedules の行
  * @param now - 今の時刻
  * @returns AutoPostState
  */
 export function toAutoPostState(
-  account: Pick<AccountRow, "connectionStatus"> & { ownerReadOnly?: boolean },
+  account: Pick<AccountRow, "connectionStatus"> & { ownerReadOnly?: boolean; dailyPostLimit?: number },
   row: PostingScheduleRow | null,
   now: Date,
 ): AutoPostState {
@@ -76,7 +78,8 @@ export function toAutoPostState(
   else if (enabled && account.connectionStatus === "not_connected") stoppedReason = "not_connected";
   else if (enabled && row?.pausedUntil && row.pausedUntil.getTime() > now.getTime())
     stoppedReason = "rate_limited";
-  return { enabled, slotCount: row?.slotMinutes.length ?? 0, stoppedReason };
+  // 時刻の数は、オーナーの1日の投稿数の上限までに数える（あと何日分の計算にも使う。specs/024 FR-020）
+  return { enabled, slotCount: effectiveSlotMinutes(row?.slotMinutes ?? [], account.dailyPostLimit).length, stoppedReason };
 }
 
 /**

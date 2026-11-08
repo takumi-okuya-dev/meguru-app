@@ -197,6 +197,11 @@ describe("招待の管理がOFFの環境（US5・FR-027）", () => {
     for (const action of ["invite", "decline", "revert", "removed"]) {
       expect((await op(a.id, action, {}, publicEnv())).status).toBe(404);
     }
+    // 枠の数を変える操作も 404（PR #71 のセルフレビュー）
+    const cap = await callT(app, "PUT", "/api/operator/tester-settings", { user: OP, body: { slotCapacity: 40 }, env: publicEnv() });
+    expect(cap.status).toBe(404);
+    // UUID の形でない ID は 404（500 にしない）
+    expect((await op("-".repeat(36), "invite")).status).toBe(404);
     expect(await applicationRow(a.id)).toMatchObject({ status: "invited", holds_slot: true });
   });
 

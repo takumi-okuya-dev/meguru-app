@@ -29,6 +29,7 @@ import {
 import { and, asc, desc, eq, inArray } from "drizzle-orm";
 import type { Db } from "../db/client";
 import { draftBatches, postDrafts, postMetrics, promotions, referencePosts } from "../db/schema";
+import { effectiveSlotMinutes } from "./limit-service";
 import type { AccountRow } from "./access";
 import { listReviewedRows } from "./draft-service";
 import { trendsForAccountPrompt } from "./analysis-service";
@@ -185,9 +186,16 @@ function promptMaterials(
  * @param account - Account の行
  * @param count - 作る件数
  * @param features - オーナーの使えるまとまり（authorizeAccount の結果）
+ * @param dailyPostLimit - オーナーの1日の投稿数の上限（specs/024。省けば切らない）
  * @returns 全文・件数・要約。戦略がOFFなら materials は null
  */
-export async function getPrompt(db: Db, account: AccountRow, count: number, features: ReadonlySet<Feature>) {
+export async function getPrompt(
+  db: Db,
+  account: AccountRow,
+  count: number,
+  features: ReadonlySet<Feature>,
+  dailyPostLimit?: number,
+) {
   const now = new Date();
   const useStrategy = features.has("strategy");
   const [strategy, promotionRows, postRows, draftBodies, ngWordRows, rejectedRows, schedule, poorRows] =
@@ -228,7 +236,8 @@ export async function getPrompt(db: Db, account: AccountRow, count: number, feat
     today,
     // 文字数と長さの割合はアカウントの設定（specs/014 FR-140・FR-171）
     lengthSettings: lengthSettingsOf(account),
-    dailyPostCount: schedule?.slotMinutes.length ?? 0,
+    // 実際に投稿する数（オーナーの1日の投稿数の上限まで。specs/024 FR-020）
+    dailyPostCount: effectiveSlotMinutes(schedule?.slotMinutes ?? [], dailyPostLimit).length,
     // 話者はアカウントの名前（つなぐ前後でプロンプトを変えない。specs/012 FR-037）
     displayName: account.name,
     strategy,

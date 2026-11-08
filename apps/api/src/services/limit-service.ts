@@ -14,7 +14,9 @@ import { withTransaction, type Db, type TxDb } from "../db/client";
 import { memberships, operatorSettings, users } from "../db/schema";
 import { operatorIdsOf } from "../lib/config";
 import { AppError } from "../lib/errors";
+import { isUuid } from "./access";
 import { listOperatorEvents, recordOperatorEvent } from "./operator-events";
+import { isOperatorSql } from "./test-group-service";
 import { readOperatorSettings } from "./tester-application-service";
 
 /** 上限の判定に要る、利用者の値。 */
@@ -81,14 +83,36 @@ export function dailyPostLimitSql(
   operators: readonly string[],
 ) {
   const def = sql`(SELECT ${operatorSettings.defaultDailyPostLimit} FROM ${operatorSettings} WHERE ${operatorSettings.id} = 1)`;
-  const isOp =
-    operators.length === 0
-      ? sql`false`
-      : sql`${ownerClerkUserId} IN (${sql.join(
-          operators.map((o) => sql`${o}`),
-          sql`, `,
-        )})`;
-  return sql<number>`(CASE WHEN ${isOp} THEN ${DAILY_POST_LIMIT_MAX} ELSE coalesce(${ownerDailyPostLimit}, ${def}, ${DAILY_POST_LIMIT_MAX}) END)::int`;
+  return sql<number>`(CASE WHEN ${isOperatorSql(ownerClerkUserId, operators)} THEN ${DAILY_POST_LIMIT_MAX} ELSE coalesce(${ownerDailyPostLimit}, ${def}, ${DAILY_POST_LIMIT_MAX}) END)::int`;
+}
+
+/**
+ * アカウントのオーナーの1日の投稿数の上限（投稿の直前の確認で使う。specs/024 research.md R7）。
+ * @param db - データベース（トランザクションの中でもよい）
+ * @param accountId - accounts.id
+ * @param operators - 運営者の clerk_user_id
+ * @returns 上限（オーナーがいなければ Threads の上限）
+ */
+export async function ownerDailyPostLimit(db: Db | TxDb, accountId: string, operators: readonly string[]): Promise<number> {
+  const [row] = await db
+    .select({ limit: dailyPostLimitSql(users.clerkUserId, users.dailyPostLimit, operators) })
+    .from(memberships)
+    .innerJoin(users, eq(users.id, memberships.userId))
+    .where(and(eq(memberships.accountId, accountId), eq(memberships.role, "owner")))
+    .limit(1);
+  return row?.limit ?? DAILY_POST_LIMIT_MAX;
+}
+
+/**
+ * 投稿に使う時刻（早い時刻から、1日の投稿数の上限の数まで。specs/024 FR-020）。
+ * 時刻の一覧を読んで数える・予定を求める・投稿するところは、すべてここを通す（PR #71 のセルフレビュー）。
+ * @param slotMinutes - 登録した時刻（0時からの分）
+ * @param limit - 1日の投稿数の上限（省けば切らない）
+ * @returns 投稿に使う時刻（昇順）
+ */
+export function effectiveSlotMinutes(slotMinutes: readonly number[], limit: number | undefined): number[] {
+  const sorted = [...slotMinutes].sort((a, b) => a - b);
+  return limit === undefined ? sorted : sorted.slice(0, limit);
 }
 
 // ---- 運営者（US3。contracts/api.md「運営者の上限」） ----
@@ -184,7 +208,7 @@ async function toLimitUser(db: Db | TxDb, env: Pick<Env, "OPERATOR_CLERK_USER_ID
  * @throws AppError USER_NOT_FOUND
  */
 export async function setUserLimits(env: Env, operator: { id: string }, userId: string, v: UserLimitsRequest): Promise<OperatorLimitUser> {
-  if (!/^[0-9a-f-]{36}$/i.test(userId)) throw new AppError("USER_NOT_FOUND", 404, "user not found");
+  if (!isUuid(userId)) throw new AppError("USER_NOT_FOUND", 404, "user not found");
   return withTransaction(env.DATABASE_URL, async (tx) => {
     const [before] = await tx.select().from(users).where(eq(users.id, userId)).for("update").limit(1);
     if (!before) throw new AppError("USER_NOT_FOUND", 404, "user not found");

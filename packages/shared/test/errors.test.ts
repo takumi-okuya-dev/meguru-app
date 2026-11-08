@@ -159,5 +159,7 @@ describe("テスター招待・上限・契約前のエラー文言（specs/024 
     expect(errorMessage("TESTER_SLOTS_FULL", { details: ["25", "25"] }).message).toBe("テスター枠がいっぱいです（25 / 25）。");
     expect(errorMessage("POSTING_SLOT_LIMIT", { max: 5 }).message).toBe("1日に投稿できるのは5件までです。");
     expect(errorMessage("RATE_LIMITED").message).toBe("少し時間をおいてから、もう一度お試しください。");
+    // 契約前の人に「無料体験が終わりました」を出さない（PR #71 のセルフレビュー）
+    expect(errorMessage("BILLING_REQUIRED", { details: ["not_subscribed"] })).toEqual({ message: "契約してから使い始めます。", action: "subscribe" });
   });
 });

@@ -11,6 +11,7 @@ import {
 import { and, count, desc, eq, gt, gte, isNotNull, lt } from "drizzle-orm";
 import type { Db } from "../db/client";
 import { postDrafts, publishAttempts } from "../db/schema";
+import { effectiveSlotMinutes } from "./limit-service";
 import type { AccountRow } from "./access";
 import { countDrafts, listQueueRows, listPublishFailedRows } from "./draft-service";
 import {
@@ -76,7 +77,7 @@ export async function upcomingSlots(
     accountId: account.id,
     enabled: schedule.enabled,
     // オーナーの1日の投稿数の上限を超えた時刻には投稿しない（早い時刻から上限の数まで。specs/024 FR-020）
-    slotMinutes: account.dailyPostLimit === undefined ? schedule.slotMinutes : schedule.slotMinutes.slice(0, account.dailyPostLimit),
+    slotMinutes: effectiveSlotMinutes(schedule.slotMinutes, account.dailyPostLimit),
     jitter: schedule.jitter,
     effectiveFrom: schedule.effectiveFrom,
     pausedUntil: schedule.pausedUntil,

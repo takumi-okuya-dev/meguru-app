@@ -19,7 +19,7 @@ import { lockUserRow } from "../db/locks";
 import { accounts, operatorSettings, testerApplications, users } from "../db/schema";
 import { billingModeOf, testerInvitesEnabledOf, threadsAppIdOf } from "../lib/config";
 import { AppError, pgErrorCode } from "../lib/errors";
-import { authorizeAccount } from "./access";
+import { authorizeAccount, isUuid } from "./access";
 import { countRecentApplyActions, recordOperatorEvent } from "./operator-events";
 
 type Row = typeof testerApplications.$inferSelect;
@@ -432,7 +432,7 @@ async function operate(
   fn: (tx: TxDb, row: Row) => Promise<{ action: "invite" | "decline" | "revert" | "removed"; detail?: Record<string, unknown> }>,
 ) {
   assertTesterInvitesEnabled(env);
-  if (!/^[0-9a-f-]{36}$/i.test(id)) throw new AppError("ITEM_NOT_FOUND", 404, "application not found");
+  if (!isUuid(id)) throw new AppError("ITEM_NOT_FOUND", 404, "application not found");
   await withTransaction(env.DATABASE_URL, async (tx) => {
     const [row] = await tx.select().from(testerApplications).where(eq(testerApplications.id, id)).for("update").limit(1);
     if (!row) throw new AppError("ITEM_NOT_FOUND", 404, "application not found");
@@ -530,6 +530,8 @@ export async function markRemoved(env: Env, operator: { id: string }, id: string
  * @returns 枠の使用数と数
  */
 export async function setSlotCapacity(env: Env, operator: { id: string }, capacity: number) {
+  // ほかの運営者の操作と同じく、招待の管理がOFFなら 404（FR-027。PR #71 のセルフレビュー）
+  assertTesterInvitesEnabled(env);
   return withTransaction(env.DATABASE_URL, async (tx) => {
     const before = await readOperatorSettings(tx);
     await tx.update(operatorSettings).set({ testerSlotCapacity: capacity, updatedAt: new Date() }).where(eq(operatorSettings.id, 1));

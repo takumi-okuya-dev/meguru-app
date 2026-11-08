@@ -3,6 +3,7 @@
 import { featureSettingsRequestSchema, operatorUserQuerySchema } from "@threads-grower/shared";
 import { Hono, type MiddlewareHandler } from "hono";
 import type { AppEnv } from "../app";
+import { operatorOnly } from "../middleware/operator-only";
 import { createDb } from "../db/client";
 import { AppError } from "../lib/errors";
 import { parseBody } from "../lib/validate";
@@ -14,11 +15,6 @@ import { findUserByEmail, listFeatureSettings, resetFeatureSettings, saveFeature
  * @returns Hono のルート
  */
 export function operatorFeatureRoutes(authed: MiddlewareHandler<AppEnv>) {
-  const operatorOnly: MiddlewareHandler<AppEnv> = async (c, next) => {
-    if (!c.get("user").operator) throw new AppError("OPERATOR_ONLY", 403, "operator only");
-    c.header("Cache-Control", "no-store");
-    await next();
-  };
   return new Hono<AppEnv>()
     .get("/operator/feature-settings", authed, operatorOnly, async (c) => c.json(await listFeatureSettings(createDb(c.env.DATABASE_URL))))
     .get("/operator/users", authed, operatorOnly, async (c) => {

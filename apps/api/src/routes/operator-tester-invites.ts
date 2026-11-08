@@ -11,6 +11,7 @@ import type { AppEnv } from "../app";
 import { createDb } from "../db/client";
 import { AppError } from "../lib/errors";
 import { parseBody } from "../lib/validate";
+import { operatorOnly } from "../middleware/operator-only";
 import {
   decline,
   invite,
@@ -26,11 +27,6 @@ import {
  * @returns Hono のルート
  */
 export function operatorTesterInviteRoutes(authed: MiddlewareHandler<AppEnv>) {
-  const operatorOnly: MiddlewareHandler<AppEnv> = async (c, next) => {
-    if (!c.get("user").operator) throw new AppError("OPERATOR_ONLY", 403, "operator only");
-    c.header("Cache-Control", "no-store");
-    await next();
-  };
   return new Hono<AppEnv>()
     .get("/operator/tester-applications", authed, operatorOnly, async (c) => {
       const parsed = testerApplicationViewSchema.safeParse(c.req.query("view") ?? "pending");

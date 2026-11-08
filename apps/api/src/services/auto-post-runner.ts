@@ -34,7 +34,7 @@ import { accounts, memberships, postDrafts, postingSchedules, publishAttempts, s
 import type { Env } from "../env";
 import { billingModeOf, operatorIdsOf } from "../lib/config";
 import { entitlementFromFacts } from "./billing-service";
-import { dailyPostLimitSql } from "./limit-service";
+import { dailyPostLimitSql, effectiveSlotMinutes } from "./limit-service";
 import { featureOnSql } from "./feature-sql";
 import { billingExemptSql, testAccessSql } from "./test-group-service";
 import { logger } from "../lib/logger";
@@ -245,7 +245,7 @@ export async function runAutoPost(
   for (const { schedule: s, dailyPostLimit } of schedules) {
     const settings = {
       accountId: s.accountId,
-      slotMinutes: s.slotMinutes.slice(0, dailyPostLimit),
+      slotMinutes: effectiveSlotMinutes(s.slotMinutes, dailyPostLimit),
       jitter: s.jitter,
       effectiveFrom: s.effectiveFrom,
     };
@@ -254,7 +254,7 @@ export async function runAutoPost(
     // 60分を過ぎて飛ばした時刻・まとめないで飛ばした古い時刻を数える（ログだけ。FR-011）
     const today = jstDateOf(now);
     for (const date of [addDays(today, -1), today]) {
-      for (const minute of s.slotMinutes.slice(0, dailyPostLimit)) {
+      for (const minute of effectiveSlotMinutes(s.slotMinutes, dailyPostLimit)) {
         const at = plannedSlotTime(s.accountId, date, minute, s.jitter);
         const t = at.getTime();
         if (
@@ -371,7 +371,7 @@ export async function runAutoPost(
     const [next] = projectSchedule({
       accountId: s.accountId,
       enabled: true,
-      slotMinutes: s.slotMinutes.slice(0, dailyPostLimit),
+      slotMinutes: effectiveSlotMinutes(s.slotMinutes, dailyPostLimit),
       jitter: s.jitter,
       effectiveFrom: s.effectiveFrom,
       pausedUntil: s.pausedUntil,

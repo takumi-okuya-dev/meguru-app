@@ -45,6 +45,13 @@ describe("人ごとの上限", () => {
     expect((await operatorEventRows()).filter((e) => e.action === "user_limits")).toHaveLength(2);
   });
 
+  it("UUID の形でない ID は 404 USER_NOT_FOUND（500 にしない。PR #71 のセルフレビュー）", async () => {
+    for (const id of ["-".repeat(36), "a".repeat(36)]) {
+      const res = await callT(app, "PUT", `/api/operator/limits/users/${id}`, { user: OP, body: { accountLimit: 3, dailyPostLimit: 10 } });
+      expect([res.status, await codeOf(res)]).toEqual([404, "USER_NOT_FOUND"]);
+    }
+  });
+
   it("運営者を探すと operator: true", async () => {
     await callT(app, "GET", "/api/me", { user: OP });
     const found = (await (await callT(app, "GET", `/api/operator/limits/users?email=${OP}@example.com`, { user: OP })).json()) as OperatorLimitUser;

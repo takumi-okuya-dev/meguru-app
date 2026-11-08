@@ -5,6 +5,7 @@ import type { AppEnv } from "../app";
 import { createDb } from "../db/client";
 import { AppError } from "../lib/errors";
 import { parseBody } from "../lib/validate";
+import { operatorOnly } from "../middleware/operator-only";
 import { findLimitUser, listLimits, setDefaults, setUserLimits } from "../services/limit-service";
 
 /**
@@ -13,11 +14,6 @@ import { findLimitUser, listLimits, setDefaults, setUserLimits } from "../servic
  * @returns Hono のルート
  */
 export function operatorLimitRoutes(authed: MiddlewareHandler<AppEnv>) {
-  const operatorOnly: MiddlewareHandler<AppEnv> = async (c, next) => {
-    if (!c.get("user").operator) throw new AppError("OPERATOR_ONLY", 403, "operator only");
-    c.header("Cache-Control", "no-store");
-    await next();
-  };
   return new Hono<AppEnv>()
     .get("/operator/limits", authed, operatorOnly, async (c) => c.json(await listLimits(createDb(c.env.DATABASE_URL))))
     .put("/operator/limits", authed, operatorOnly, async (c) => {

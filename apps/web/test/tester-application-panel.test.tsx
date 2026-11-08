@@ -2,7 +2,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import type { AccountSummary, MeResponse, TesterApplicationResponse } from "@threads-grower/shared";
+import type { AccountSummary, ErrorCode, MeResponse, TesterApplicationResponse } from "@threads-grower/shared";
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ME_BILLING_OFF } from "./helpers/billing";
@@ -51,7 +51,7 @@ const app = (status: "pending" | "invited" | "declined", over: Partial<NonNullab
   ...over,
 });
 
-function renderIt(opts: { enabled?: boolean; initialError?: { code: "THREADS_AUTH_CANCELLED" | "THREADS_AUTH_FAILED"; account: string | null } } = {}) {
+function renderIt(opts: { enabled?: boolean; initialError?: { code: ErrorCode; account: string | null } } = {}) {
   meResponse = {
     user: { id: "u", email: "u@example.com", displayName: null },
     accounts: [account],
@@ -168,6 +168,13 @@ describe("招待済みでつなげなかったとき（FR-007）", () => {
     renderIt({ initialError: { code, account: null } });
     expect(await screen.findByText("招待を承認してから、もう一度お試しください。")).toBeInTheDocument();
     expect(screen.queryByText("Threadsとの接続がキャンセルされました。")).not.toBeInTheDocument();
+  });
+
+  it("招待済みでも、ほかのエラー（別の人が登録済みなど）はそのまま出す", async () => {
+    appResponse = { enabled: true, application: app("invited") };
+    renderIt({ initialError: { code: "THREADS_ACCOUNT_TAKEN", account: null } });
+    expect(await screen.findByText("このThreadsアカウントは別のユーザーが登録済みです。")).toBeInTheDocument();
+    expect(screen.queryByText("招待を承認してから、もう一度お試しください。")).not.toBeInTheDocument();
   });
 
   it("招待済みでなければ、今のエラーのまま", async () => {

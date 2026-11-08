@@ -57,7 +57,8 @@ export async function countOwnedAccounts(db: Db | TxDb, userId: string): Promise
  * @param mode - 決済のモード
  * @param env - Workers のバインディング（運営者の判定。specs/024）
  * @param now - 今の時刻
- * @returns 上限（max。null は上限なし、0 は作れない）、使用数（used）、使える状態、前からの無料体験の上限が効いているか（trialBound）
+ * @returns 上限（max。null は上限なし、0 は作れない）、使用数（used）、使える状態、前からの無料体験の上限が効いているか（trialBound）、
+ *   運営者が決める上限（limits）
  */
 export async function accountLimitFor(
   db: Db | TxDb,
@@ -77,7 +78,7 @@ export async function accountLimitFor(
   const max = byState === null ? byOperator : byOperator === null ? byState : Math.min(byState, byOperator);
   // 前からの無料体験の上限が効いているか（エラーの文で契約を案内する）
   const trialBound = entitlement?.state === "trial" && max === byState;
-  return { max, used, entitlement, trialBound };
+  return { max, used, entitlement, trialBound, limits };
 }
 
 /**

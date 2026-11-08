@@ -4,6 +4,7 @@ import { featureSettingsRequestSchema, testGroupCreateRequestSchema, testGroupUp
 import { Hono, type MiddlewareHandler } from "hono";
 import type { z } from "zod";
 import type { AppEnv } from "../app";
+import { operatorOnly } from "../middleware/operator-only";
 import { AppError } from "../lib/errors";
 import { parseBody } from "../lib/validate";
 import {
@@ -38,12 +39,6 @@ async function parseGroupInput<S extends z.ZodTypeAny>(schema: S, body: Promise<
  * @returns Hono のルート
  */
 export function operatorTestGroupRoutes(authed: MiddlewareHandler<AppEnv>) {
-  const operatorOnly: MiddlewareHandler<AppEnv> = async (c, next) => {
-    // 運営者は招待制にかかわらず決める（specs/019 research.md R5）
-    if (!c.get("user").operator) throw new AppError("OPERATOR_ONLY", 403, "operator only");
-    c.header("Cache-Control", "no-store");
-    await next();
-  };
   const guard = [authed, operatorOnly] as const;
   return new Hono<AppEnv>()
     .get("/operator/test-groups", ...guard, async (c) => c.json({ groups: await listTestGroups(c.env) }))

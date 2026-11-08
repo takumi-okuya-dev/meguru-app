@@ -11,13 +11,12 @@ import { accounts, memberships, users } from "../db/schema";
 import { personName, toAccountSummary, type AccountRow } from "../services/access";
 import { countOwnedAccountNeedsReview } from "../services/account-review-counts";
 import { featureOnSql } from "../services/feature-sql";
-import { loadEntitlement, toMeBilling } from "../services/billing-service";
+import { toMeBilling } from "../services/billing-service";
 import { withdraw, withdrawalPreview, type ClerkUserDeleter } from "../services/withdrawal-service";
 import type { Env } from "../env";
 import { withdrawRequestSchema } from "@threads-grower/shared";
 import { AppError } from "../lib/errors";
 import { listMyTeams } from "../services/team-service";
-import { effectiveLimits } from "../services/limit-service";
 import { accountLimitFor } from "../services/account-service";
 
 /**
@@ -80,12 +79,12 @@ export function meRoutes(authed: MiddlewareHandler<AppEnv>, deleteClerkUser: (en
     const owned = visible.filter((r) => r.role === "owner").map((r) => r.account);
     const helped = visible.filter((r) => r.role !== "owner").map((r) => r.account);
     const now = new Date();
-    const [teams, entitlement, limits] = await Promise.all([
+    // 使える状態・上限は accountLimitFor が1回で読む（同じ問い合わせを重ねない。PR #71 のセルフレビュー）
+    const [teams, accountLimit] = await Promise.all([
       teamOn ? listMyTeams(db, user.id) : Promise.resolve([]),
-      loadEntitlement(db, user.id, user.billing, now),
-      effectiveLimits(db, c.env, user.id),
+      accountLimitFor(db, user.id, user.billing, c.env, now),
     ]);
-    const accountLimit = await accountLimitFor(db, user.id, user.billing, c.env, now);
+    const { entitlement, limits } = accountLimit;
     // Account切り替えメニューは開くたびに一覧を読み直すため、ブラウザに保存させない。
     c.header("Cache-Control", "no-store");
     return c.json({

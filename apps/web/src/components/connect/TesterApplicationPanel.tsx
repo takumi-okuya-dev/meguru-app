@@ -67,11 +67,14 @@ export function TesterApplicationPanel({
   if (status === "invited") {
     return (
       <div className="space-y-4">
+        {/* キャンセル・失敗で戻ったら承認の案内。ほかのエラー（別の人が登録済みなど）は、そのまま出す（PR #71 のセルフレビュー） */}
         {authFailed ? (
           <Alert>
             <AlertDescription>招待を承認してから、もう一度お試しください。</AlertDescription>
           </Alert>
-        ) : null}
+        ) : (
+          fallbackError
+        )}
         <div className="space-y-3 rounded-2xl border bg-card px-4 py-3.5">
           <div className="flex flex-col gap-1">
             <span className="text-xs text-muted-foreground">招待済み</span>

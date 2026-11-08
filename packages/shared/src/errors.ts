@@ -224,6 +224,9 @@ export function errorMessage(code: ErrorCode, ctx: ErrorMessageContext = {}): Er
           return { message: "オーナーの契約の状態により、このアカウントは今、読むだけです。", action: "none" };
         case "test_access":
           return { message: "テスト版を使えなくなったため、今は読むだけです。", action: "none" };
+        case "not_subscribed":
+          // 契約前（無料体験なし。specs/024 FR-029）
+          return { message: "契約してから使い始めます。", action: "subscribe" };
         default:
           return { message: "無料体験が終わりました。今は読むだけです。契約すると、すぐに元どおり使えます。", action: "subscribe" };
       }

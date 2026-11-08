@@ -64,7 +64,18 @@ export function billingExemptSql(u: UsersLike, mode: BillingMode): SQL<boolean> 
  */
 function operatorOrSql(t: ReturnType<typeof sql.identifier>, operators: readonly string[]): SQL {
   if (operators.length === 0) return sql``;
-  return sql` OR ${t}."clerk_user_id" IN (${sql.join(
+  return sql` OR ${isOperatorSql(sql`${t}."clerk_user_id"`, operators)}`;
+}
+
+/**
+ * 「この clerk_user_id は運営者」のSQLの条件（運営者の判定をSQLで書くときは、ここだけを使う。specs/024 PR #71 のセルフレビュー）。
+ * @param clerkUserId - clerk_user_id の列（か式）
+ * @param operators - 運営者のClerkのユーザーID
+ * @returns 真偽のSQL（運営者がいなければ false）
+ */
+export function isOperatorSql(clerkUserId: SQL | AnyColumn, operators: readonly string[]): SQL<boolean> {
+  if (operators.length === 0) return sql<boolean>`false`;
+  return sql<boolean>`${clerkUserId} IN (${sql.join(
     operators.map((id) => sql`${id}`),
     sql`, `,
   )})`;
