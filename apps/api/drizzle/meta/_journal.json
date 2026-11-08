@@ -169,6 +169,13 @@
       "when": 1794151178558,
       "tag": "0023_connection_notice",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1794153249512,
+      "tag": "0024_tester_backfill_connected",
+      "breakpoints": true
     }
   ]
 }
