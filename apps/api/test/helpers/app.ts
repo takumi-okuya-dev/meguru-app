@@ -151,14 +151,15 @@ export const fake = {
  *
  * @param app - テストのアプリ
  * @param authorizeUrl - connect が返した認可URL
- * @param opts - 偽の認可画面の挙動と、完了を行う利用者（既定は state の作成者）
+ * @param opts - 偽の認可画面の挙動と、完了を行う利用者（既定は state の作成者）、環境（既定は testEnv）
  * @returns 302 の応答（Location は以前の callback と同じ行き先）
  */
 export async function authorizeAndCallback(
   app: TestApp,
   authorizeUrl: string,
-  opts: { fakeUser?: string; action?: "allow" | "deny"; user?: string } = {},
+  opts: { fakeUser?: string; action?: "allow" | "deny"; user?: string; env?: Env } = {},
 ) {
+  const env = opts.env ?? testEnv;
   const url = new URL(authorizeUrl);
   url.searchParams.set("fake_action", opts.action ?? "allow");
   if (opts.fakeUser) url.searchParams.set("fake_user", opts.fakeUser);
@@ -167,7 +168,7 @@ export async function authorizeAndCallback(
   if (!location) throw new Error(`fake authorize did not redirect: ${res.status}`);
   const cb = new URL(location);
   // callback は転送するだけ（DBにも Threads にも触らない）
-  const hop = await app.request(`${cb.pathname}${cb.search}`, { method: "GET" }, testEnv);
+  const hop = await app.request(`${cb.pathname}${cb.search}`, { method: "GET" }, env);
   const next = new URL(hop.headers.get("Location")!);
   const state = next.searchParams.get("state");
   const code = next.searchParams.get("code");
@@ -178,7 +179,7 @@ export async function authorizeAndCallback(
   const user = opts.user ?? (await stateOwner(state));
   // 許可しなかったときも state を渡して、元のアカウントの画面へ戻してもらう
   const body = error ? { state, error } : { state, code };
-  const done = await call(app, "POST", "/api/threads/complete", { user, body });
+  const done = await call(app, "POST", "/api/threads/complete", { user, body, env });
   if (!done.ok) return done;
   const { redirectTo } = (await done.json()) as { redirectTo: string };
   return redirectResponse(redirectTo);

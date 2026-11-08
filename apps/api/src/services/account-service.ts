@@ -15,7 +15,7 @@ import {
   threadsRevocations,
   users,
 } from "../db/schema";
-import { billingModeOf, type BillingMode } from "../lib/config";
+import { billingModeOf, testerInvitesEnabledOf, type BillingMode } from "../lib/config";
 import { createTokenCipher } from "../lib/crypto";
 import { AppError } from "../lib/errors";
 import { threadsUserHmac } from "../lib/identifier-hash";
@@ -308,9 +308,11 @@ export async function completeConnection(
     // 招待の申し込みを同じトランザクションで進める（specs/024 research.md R5）
     await advanceOnConnect(tx, {
       accountId: target.id,
+      userId: state.userId,
       method: state.method,
       username: input.profile.username,
       threadsUserId: input.threadsUserId,
+      invites: testerInvitesEnabledOf(env),
     });
     await recordActivity(tx, access, {
       kind: "settings",

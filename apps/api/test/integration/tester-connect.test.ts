@@ -2,7 +2,7 @@
 import { neon } from "@neondatabase/serverless";
 import { beforeEach, describe, expect, it } from "vitest";
 import { TEST_APP_SECRET } from "../env";
-import { call, connectExisting, fake, makeApp, resetDb, testEnv } from "../helpers/app";
+import { authorizeAndCallback, call, connectExisting, fake, makeApp, resetDb, testEnv } from "../helpers/app";
 import { makeSignedRequest } from "../helpers/signed-request";
 import {
   applicationRow,
@@ -10,6 +10,7 @@ import {
   applyFor,
   markInvited,
   operatorEventRows,
+  publicEnv,
   resetOperatorSettings,
   unconnectedAccountOf,
 } from "../helpers/tester-invites";
@@ -55,7 +56,7 @@ describe("Threadsで許可する（OAuth）でつながったとき", () => {
     expect(await applicationRow(id)).toMatchObject({ status: "connected", holds_slot: true });
   });
 
-  it("ユーザー名が違えば、取り下げ（username_mismatch）で外してよい", async () => {
+  it("ユーザー名が違えば、取り下げ（username_mismatch）で外してよい。つながったアカウントは接続済みの記録を作る", async () => {
     const { accountId, id } = await applied("u1", "shop_tokyo", { invited: true });
     await connectExisting(app, "u1", accountId, "9002");
     expect(await applicationRow(id)).toMatchObject({
@@ -65,6 +66,8 @@ describe("Threadsで許可する（OAuth）でつながったとき", () => {
       connected_username: "other_shop",
       connected_threads_user_id: "9002",
     });
+    const live = (await applicationsOf(accountId)).filter((r) => r.status === "connected");
+    expect(live).toEqual([expect.objectContaining({ threads_username: "other_shop", holds_slot: true })]);
   });
 
   it("接続の確定が失敗したら、申し込みも変わらない（同じトランザクション）", async () => {
@@ -72,6 +75,64 @@ describe("Threadsで許可する（OAuth）でつながったとき", () => {
     await fake.fail("getProfile", 1, "server");
     await connectExisting(app, "u1", accountId, "9001");
     expect(await applicationRow(id)).toMatchObject({ status: "invited", holds_slot: true });
+  });
+});
+
+describe("申し込みのないまま「Threadsで許可する」でつながったとき（024の前からのアカウント。fix）", () => {
+  it("つなぐと、接続済みの記録を作り、枠を使う", async () => {
+    const accountId = await unconnectedAccountOf(app, "u1");
+    await connectExisting(app, "u1", accountId, "9001");
+    const rows = await applicationsOf(accountId);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ threads_username: "shop_tokyo", status: "connected", holds_slot: true, connected_username: "shop_tokyo" });
+  });
+
+  it("接続し直したときも、記録がなければ作る。あればそのまま（二重に作らない）", async () => {
+    const accountId = await unconnectedAccountOf(app, "u1");
+    await connectExisting(app, "u1", accountId, "9001");
+    // 024の前からつながっていた（記録がない）状態にする
+    await q()`DELETE FROM tester_applications WHERE account_id = ${accountId}`;
+    const reconnect = async () => {
+      const res = await call(app, "POST", "/api/threads/connect", { user: "u1", body: { mode: "reconnect", accountId } });
+      const { authorizeUrl } = (await res.json()) as { authorizeUrl: string };
+      expect((await authorizeAndCallback(app, authorizeUrl, { fakeUser: "9001" })).status).toBe(302);
+    };
+    await reconnect();
+    await reconnect();
+    const rows = await applicationsOf(accountId);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ status: "connected", holds_slot: true, threads_username: "shop_tokyo" });
+  });
+
+  it("「Threadsで許可する」→ トークン → 「Threadsで許可する」と接続し直しても、枠を二重に使わない（PR #73 のCodexレビュー）", async () => {
+    const accountId = await unconnectedAccountOf(app, "u1");
+    await connectExisting(app, "u1", accountId, "9001");
+    const viaToken = async () => {
+      const token = await fake.issueToken({ user: "9001" });
+      const res = await call(app, "POST", "/api/threads/token-connect", { user: "u1", body: { mode: "reconnect", accountId, token } });
+      expect(res.status).toBe(200);
+    };
+    const viaApp = async () => {
+      const res = await call(app, "POST", "/api/threads/connect", { user: "u1", body: { mode: "reconnect", accountId } });
+      const { authorizeUrl } = (await res.json()) as { authorizeUrl: string };
+      expect((await authorizeAndCallback(app, authorizeUrl, { fakeUser: "9001" })).status).toBe(302);
+    };
+    for (let i = 0; i < 2; i++) {
+      await viaToken();
+      await viaApp();
+    }
+    const held = (await applicationsOf(accountId)).filter((r) => r.holds_slot);
+    expect(held).toEqual([expect.objectContaining({ status: "connected", removal_reason: null, threads_username: "shop_tokyo" })]);
+  });
+
+  it("招待の管理がOFFの環境では作らない", async () => {
+    const env = publicEnv();
+    const created = await call(app, "POST", "/api/accounts", { user: "u1", body: { name: "お店" }, env });
+    const { id: accountId } = (await created.json()) as { id: string };
+    const res = await call(app, "POST", "/api/threads/connect", { user: "u1", body: { mode: "connect", accountId }, env });
+    const { authorizeUrl } = (await res.json()) as { authorizeUrl: string };
+    expect((await authorizeAndCallback(app, authorizeUrl, { fakeUser: "9001", env })).status).toBe(302);
+    expect(await applicationsOf(accountId)).toHaveLength(0);
   });
 });
 

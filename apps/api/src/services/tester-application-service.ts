@@ -174,18 +174,76 @@ async function setStatus(tx: TxDb, id: string, values: Partial<typeof testerAppl
 // ---- 接続・アカウントの削除・退会（research.md R5・R15） ----
 
 /**
+ * 申し込みを経ずに「Threadsで許可する」でつながったアカウントの、接続済みの記録を作る（枠を使う）。
+ * 同じThreadsのユーザー名で枠を使ったまま取り下げになった記録（トークンへの切り替え・アカウントの削除など）があれば、
+ * 新しく作らずにそれを接続済みに戻す（同じMetaのテスターの枠を二重に数えない。PR #73 のCodexレビュー）。
+ * このアカウントの記録を先に使う。
+ * @param tx - トランザクション
+ * @param input - アカウントとつないだ人
+ * @param connected - つながったThreadsのユーザー名（正規化済み）
+ */
+async function insertConnected(tx: TxDb, input: { accountId: string; userId: string }, connected: string): Promise<void> {
+  const [held] = await tx
+    .select({ id: testerApplications.id })
+    .from(testerApplications)
+    .where(
+      and(
+        eq(testerApplications.holdsSlot, true),
+        eq(testerApplications.status, "withdrawn"),
+        eq(testerApplications.threadsUsername, connected),
+      ),
+    )
+    .orderBy(sql`${testerApplications.accountId} = ${input.accountId} DESC NULLS LAST`, desc(testerApplications.statusChangedAt))
+    .for("update")
+    .limit(1);
+  if (held) {
+    await setStatus(tx, held.id, {
+      status: "connected",
+      removalReason: null,
+      declineReason: null,
+      userId: input.userId,
+      accountId: input.accountId,
+      connectedUsername: connected,
+      connectedThreadsUserId: null,
+      mismatchNoticeDismissedAt: null,
+    });
+    return;
+  }
+  await tx.insert(testerApplications).values({
+    userId: input.userId,
+    accountId: input.accountId,
+    threadsUsername: connected,
+    status: "connected",
+    holdsSlot: true,
+    connectedUsername: connected,
+  });
+}
+
+/**
  * つないだときに、そのアカウントの生きている申し込みを進める（completeConnection のトランザクションの中で呼ぶ）。
  * Threadsで許可する（app）でユーザー名が同じなら接続済み、違えば外してよい。トークンなら取り下げ。
+ * 申し込みがないまま「Threadsで許可する」でつながったとき（024の前からのアカウントの、つなぐ・接続し直し）は、
+ * 招待の管理がONなら接続済みの記録を作り、Metaのテスターの枠を使っている扱いにする（運営者の一覧と枠の数に出すため）。
  * @param tx - トランザクション
- * @param input - アカウント・つないだ方法・つながったThreadsのユーザー名
+ * @param input - アカウント・つないだ人・つないだ方法・つながったThreadsのユーザー名とユーザーID・招待の管理がONか
  */
 export async function advanceOnConnect(
   tx: TxDb,
-  input: { accountId: string; method: "app" | "token"; username: string; threadsUserId: string },
+  input: {
+    accountId: string;
+    userId: string;
+    method: "app" | "token";
+    username: string;
+    threadsUserId: string;
+    invites: boolean;
+  },
 ): Promise<void> {
   const live = await liveFor(tx, input.accountId);
-  if (!live) return;
   const connected = normalizeUsername(input.username);
+  if (!live) {
+    if (input.method === "app" && input.invites) await insertConnected(tx, input, connected);
+    return;
+  }
   if (input.method === "app") {
     if (live.status === "connected") return;
     if (connected === live.threadsUsername) {
@@ -200,6 +258,8 @@ export async function advanceOnConnect(
       // 知らせは名前でなくIDで比べる（Threadsで名前を変えても消えない。specs/025 data-model.md 2）
       connectedThreadsUserId: input.threadsUserId,
     });
+    // つながったアカウントもテスターの枠を使うので、接続済みの記録を作る（申し込みのないままつながったときと同じ）
+    if (input.invites) await insertConnected(tx, input, connected);
     return;
   }
   await setStatus(tx, live.id, {
