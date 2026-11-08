@@ -1,7 +1,7 @@
 // US3：運営者の上限のAPI（specs/024-tester-invite-connect contracts/api.md「運営者の上限」、FR-016・FR-017、T043）
 import type { OperatorLimitUser, OperatorLimits } from "@threads-grower/shared";
 import { beforeEach, describe, expect, it } from "vitest";
-import { makeApp, resetDb } from "../helpers/app";
+import { makeApp, resetDb, testEnv } from "../helpers/app";
 import { TESTER_OPERATOR, callT, codeOf, operatorEventRows } from "../helpers/tester-invites";
 
 const app = makeApp();
@@ -18,7 +18,10 @@ describe("既定値", () => {
     expect((await limits()).defaults).toEqual({ accountLimit: 3, dailyPostLimit: 10 });
     expect((await callT(app, "PUT", "/api/operator/limits", { user: OP, body: { accountLimit: 0, dailyPostLimit: 10 } })).status).toBe(400);
     expect((await callT(app, "PUT", "/api/operator/limits", { user: OP, body: { accountLimit: 3, dailyPostLimit: 251 } })).status).toBe(400);
+    await testEnv.AUTOPOST_KV.delete("autopost:wake");
     expect((await callT(app, "PUT", "/api/operator/limits", { user: OP, body: { accountLimit: 5, dailyPostLimit: 8 } })).status).toBe(200);
+    // 上限を変えたら定期処理を起こす（次に見る時刻が変わりうる。PR #71 のCodexレビュー）
+    expect(await testEnv.AUTOPOST_KV.get("autopost:wake")).not.toBeNull();
     const after = await limits();
     expect(after.defaults).toEqual({ accountLimit: 5, dailyPostLimit: 8 });
     expect(after.events.map((e) => e.action)).toEqual(["default_limits"]);

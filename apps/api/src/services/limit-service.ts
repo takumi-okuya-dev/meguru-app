@@ -16,6 +16,7 @@ import { operatorIdsOf } from "../lib/config";
 import { AppError } from "../lib/errors";
 import { isUuid } from "./access";
 import { listOperatorEvents, recordOperatorEvent } from "./operator-events";
+import { notifyWake } from "./posting-schedule-service";
 import { isOperatorSql } from "./test-group-service";
 import { readOperatorSettings } from "./tester-application-service";
 
@@ -158,6 +159,10 @@ export async function setDefaults(env: Env, operator: { id: string }, v: Default
       .where(eq(operatorSettings.id, 1));
     await recordOperatorEvent(tx, { actorUserId: operator.id, action: "default_limits", detail: { before, after: v } });
     return v;
+  }).then(async (saved) => {
+    // 上限が上がると、次に見る時刻が早まることがある。定期処理を起こす（PR #71 のCodexレビュー）
+    await notifyWake(env.AUTOPOST_KV, new Date());
+    return saved;
   });
 }
 
@@ -227,5 +232,9 @@ export async function setUserLimits(env: Env, operator: { id: string }, userId: 
       },
     });
     return toLimitUser(tx, env, after!);
+  }).then(async (saved) => {
+    // 上限が上がると、次に見る時刻が早まることがある。定期処理を起こす（PR #71 のCodexレビュー）
+    await notifyWake(env.AUTOPOST_KV, new Date());
+    return saved;
   });
 }

@@ -233,6 +233,8 @@ export async function purgeForWithdrawal(tx: TxDb, userId: string): Promise<void
       status: "withdrawn",
       removalReason: sql`coalesce(${testerApplications.removalReason}, 'user_withdrawn')`,
       declineReason: null,
+      // 違うアカウントでつながったときのユーザー名も残さない（外すのに要るのは申し込んだユーザー名だけ。PR #71 のCodexレビュー）
+      connectedUsername: null,
       statusChangedAt: now,
       updatedAt: now,
     })

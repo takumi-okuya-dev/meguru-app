@@ -14,6 +14,7 @@ import { logger } from "../lib/logger";
 import { verifySignedRequest } from "../lib/signed-request";
 import { markQuantityDirty } from "./billing-service";
 import { beforeAccountDeleted } from "./team-service";
+import { withdrawForAccountDeletion } from "./tester-application-service";
 
 const LEASE_MS = 15 * 60_000;
 const IDENTIFIER_GRACE_MS = 15 * 60_000;
@@ -133,6 +134,8 @@ export async function attemptDeletion(
         await lockUserRow(tx, o.userId);
         // チームの最後のアカウントなら、チームを抜けたものとする（specs/011 FR-046。アカウントの削除と同じ）
         await beforeAccountDeleted(tx, o.accountId, o.userId);
+        // 招待の申し込みを取り下げにする（枠を使っていれば「外してよい」。specs/024 data-model.md 5、PR #71 のCodexレビュー）
+        await withdrawForAccountDeletion(tx, o.accountId);
         await tx.update(users).set({ lastAccountDeletedAt: now, updatedAt: now }).where(eq(users.id, o.userId));
         // 契約があれば、数の合わせ直しの印（日次の処理で合わせる。specs/013 research.md R6）
         await markQuantityDirty(tx, o.userId);
