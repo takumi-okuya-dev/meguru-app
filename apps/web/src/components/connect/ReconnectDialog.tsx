@@ -11,6 +11,7 @@ import { api, describeError } from "@/lib/api-client";
 import { queryKeys } from "@/lib/query";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { ThreadsAccountGuide } from "./ThreadsAccountGuide";
 import { TokenConnectForm } from "./TokenConnectForm";
 import { TOKEN_WARNING_KIND, TokenWarnings } from "./TokenWarnings";
 
@@ -115,6 +116,8 @@ export function ReconnectDialog({
                   <AlertDescription className="text-foreground">{describeError(oauth.error)}</AlertDescription>
                 </Alert>
               )}
+              {/* 押す前に、どのアカウントで許可されるかを知らせる（specs/025 US1） */}
+              {offered.includes("app") && <ThreadsAccountGuide expected={account.username} />}
             </div>
           ) : (
             <TokenConnectForm

@@ -40,6 +40,8 @@ export const queryKeys = {
   featureSettings: ["feature-settings"] as const,
   // テスター招待・上限（specs/024）。申し込みは Account の下に置き、Account の削除で一緒に消す
   testerApplication: (id: string) => ["account", id, "tester-application"] as const,
+  // 違うアカウントでつながった知らせ（specs/025）
+  connectionNotice: (id: string) => ["account", id, "connection-notice"] as const,
   operatorTesterApplications: (view: string) => ["operator-tester-applications", view] as const,
   operatorTesterApplicationsAll: ["operator-tester-applications"] as const,
   operatorLimits: ["operator-limits"] as const,

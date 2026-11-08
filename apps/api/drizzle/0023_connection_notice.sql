@@ -1,0 +1,1 @@
+ALTER TABLE "tester_applications" ADD COLUMN "mismatch_notice_dismissed_at" timestamp (6) with time zone;

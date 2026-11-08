@@ -25,6 +25,7 @@ vi.mock("@/lib/api-client", async (orig) => {
       getPostingSchedule: vi.fn(() => new Promise(() => {})),
       getAutoPost: vi.fn(() => new Promise(() => {})),
       accountTeam: vi.fn(() => new Promise(() => {})),
+      connectionNotice: vi.fn(() => Promise.resolve({ otherAccount: null })),
     },
   };
 });
@@ -55,7 +56,7 @@ function makeAccount(overrides: Partial<AccountSummary> = {}): AccountSummary {
   };
 }
 
-function renderSettings(account: AccountSummary) {
+function renderSettings(account: AccountSummary, path = "/accounts/a1/settings") {
   const router = createMemoryRouter(
     [
       {
@@ -68,7 +69,7 @@ function renderSettings(account: AccountSummary) {
         children: [{ path: "settings", element: <AccountSettings /> }],
       },
     ],
-    { initialEntries: ["/accounts/a1/settings"] },
+    { initialEntries: [path] },
   );
   render(
     <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
@@ -133,6 +134,29 @@ describe("接続し直しのダイアログ（US3）", () => {
     renderSettings(makeAccount({ role: "editor" }));
     await screen.findByRole("heading", { name: "このアカウントの設定" });
     expect(screen.queryByRole("button", { name: "接続し直す" })).not.toBeInTheDocument();
+  });
+});
+
+describe("接続し直しの押す前の案内（specs/025 US1）", () => {
+  it("「Threadsで許可する」を出すとき、今つながっている@名前の案内が出る。トークンを選んだ画面には出ない", async () => {
+    const user = userEvent.setup();
+    renderSettings(makeAccount());
+    await user.click(await screen.findByRole("button", { name: "接続し直す" }));
+    const dialog = await screen.findByRole("dialog", { name: "Threadsとの接続し直し" });
+    expect(within(dialog).getByText(/threads.comでログインしているアカウントで許可されます。/)).toBeInTheDocument();
+    expect(within(dialog).getByText("@cafe_b")).toBeInTheDocument();
+    await user.click(within(dialog).getByRole("button", { name: /トークンを貼り付ける/ }));
+    expect(within(dialog).queryByText(/threads.comでログインしているアカウントで許可されます。/)).not.toBeInTheDocument();
+  });
+
+  it("token だけの環境では案内を出さない", async () => {
+    me.mockResolvedValue({ threadsConnectMethods: ["token"] });
+    const user = userEvent.setup();
+    renderSettings(makeAccount());
+    await user.click(await screen.findByRole("button", { name: "接続し直す" }));
+    const dialog = await screen.findByRole("dialog", { name: "Threadsとの接続し直し" });
+    await within(dialog).findByRole("button", { name: /トークンを貼り付ける/ });
+    expect(within(dialog).queryByText(/threads.comでログインしているアカウントで許可されます。/)).not.toBeInTheDocument();
   });
 });
 
@@ -232,5 +256,22 @@ describe("接続し直しで、出していない方法を見せない", () => {
       expect(within(dialog).queryByRole("button", { name: /トークンを貼り付ける/ })).not.toBeInTheDocument(),
     );
     expect(within(dialog).getByRole("button", { name: /Threadsで許可する/ })).toBeInTheDocument();
+  });
+});
+
+describe("つながっているアカウントで、接続し直しから戻ったときのエラー（specs/025 US2・FR-011・research.md R2）", () => {
+  it("違うアカウント（RECONNECT_ACCOUNT_MISMATCH）なら、エラーの文に続けて、今の@名前と「接続し直す」を使った手順を出す", async () => {
+    renderSettings(makeAccount(), "/accounts/a1/settings?error=RECONNECT_ACCOUNT_MISMATCH");
+    expect(await screen.findByText("再接続には、元の@cafe_bで認可してください。別のアカウントで認可されました。")).toBeInTheDocument();
+    expect(screen.getByText("@cafe_b でログインし直す")).toBeInTheDocument();
+    expect(screen.getByText("このページに戻って、もう一度「接続し直す」を押す")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /threads.comを開く/ })).toHaveAttribute("target", "_blank");
+    expect(screen.getByRole("button", { name: "接続し直す" })).toBeInTheDocument();
+  });
+
+  it("ほかのエラー（キャンセル）は、文だけを出す（今は何も出ていなかった）", async () => {
+    renderSettings(makeAccount(), "/accounts/a1/settings?error=THREADS_AUTH_CANCELLED");
+    expect(await screen.findByText("Threadsとの接続がキャンセルされました。")).toBeInTheDocument();
+    expect(screen.queryByText(/今のアカウントからログアウトする/)).not.toBeInTheDocument();
   });
 });

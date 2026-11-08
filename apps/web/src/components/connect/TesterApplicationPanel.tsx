@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { api, describeError } from "@/lib/api-client";
 import { queryKeys } from "@/lib/query";
+import { ThreadsAccountGuide } from "./ThreadsAccountGuide";
 
 /** 招待を承認する手順（Threadsのアプリの画面の名前が変わったら直す。docs/threads-token-guide.md と同じ考え方）。 */
 export const APPROVE_STEPS = [
@@ -19,19 +20,19 @@ export const APPROVE_STEPS = [
 /**
  * 招待の申し込みの区分。
  * @param props - accountId：つなぐアカウント、allowButton：「Threadsで許可する」（招待済みのときだけ出す）、
- *   authFailed：許可の画面から失敗で戻ってきた、fallbackError：招待済みでないときに出す今のエラー
+ *   authFailed：許可の画面から失敗で戻ってきた、renderError：今のエラーの表示（使うべきアカウントを渡す。specs/025）
  * @returns 区分
  */
 export function TesterApplicationPanel({
   accountId,
   allowButton,
   authFailed,
-  fallbackError,
+  renderError,
 }: {
   accountId: string;
   allowButton: ReactNode;
   authFailed: boolean;
-  fallbackError: ReactNode;
+  renderError: (expected: string | null) => ReactNode;
 }) {
   const client = useQueryClient();
   const q = useQuery({ queryKey: queryKeys.testerApplication(accountId), queryFn: () => api.testerApplication(accountId) });
@@ -52,7 +53,7 @@ export function TesterApplicationPanel({
   if (status === "pending") {
     return (
       <div className="space-y-4">
-        {fallbackError}
+        {renderError(null)}
         <div className="flex flex-col gap-1.5 rounded-2xl border bg-card px-4 py-3.5">
           <span className="text-xs text-muted-foreground">申し込み中</span>
           <span className="font-semibold">@{application!.threadsUsername}</span>
@@ -73,7 +74,7 @@ export function TesterApplicationPanel({
             <AlertDescription>招待を承認してから、もう一度お試しください。</AlertDescription>
           </Alert>
         ) : (
-          fallbackError
+          renderError(application!.threadsUsername)
         )}
         <div className="space-y-3 rounded-2xl border bg-card px-4 py-3.5">
           <div className="flex flex-col gap-1">
@@ -87,6 +88,8 @@ export function TesterApplicationPanel({
           </ol>
         </div>
         {allowButton}
+        {/* 申し込んだアカウントで許可してもらう（specs/025 US1） */}
+        <ThreadsAccountGuide expected={application!.threadsUsername} />
         <Alert>
           <AlertDescription>つなげなかったときは、招待を承認してから、もう一度お試しください。</AlertDescription>
         </Alert>
@@ -98,7 +101,7 @@ export function TesterApplicationPanel({
 
   return (
     <div className="space-y-4">
-      {fallbackError}
+      {renderError(null)}
       {status === "declined" ? (
         <div className="flex flex-col gap-1 rounded-2xl border bg-card px-4 py-3.5">
           <span className="text-sm font-medium">今回は招待を見送りました</span>

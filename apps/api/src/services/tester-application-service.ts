@@ -12,7 +12,7 @@ import {
   type TesterApplicationView,
   type TesterRemovalReason,
 } from "@threads-grower/shared";
-import { and, asc, desc, eq, inArray, isNotNull, ne, sql, type SQL } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNotNull, isNull, ne, sql, type SQL } from "drizzle-orm";
 import type { Env } from "../env";
 import { createDb, withTransaction, type Db, type TxDb } from "../db/client";
 import { lockUserRow } from "../db/locks";
@@ -546,3 +546,47 @@ export async function setSlotCapacity(env: Env, operator: { id: string }, capaci
   });
 }
 
+
+// ---- 違うアカウントでつながった知らせ（specs/025-threads-account-guide data-model.md 2、research.md R5） ----
+
+/**
+ * 知らせを出す申し込みの条件（招待済みで違う名前でつながり、今もそのアカウントでつながっていて、閉じていない）。
+ * @param accountId - accounts.id
+ * @returns 条件
+ */
+function mismatchNoticeWhere(accountId: string) {
+  return and(
+    eq(testerApplications.accountId, accountId),
+    eq(testerApplications.removalReason, "username_mismatch"),
+    isNull(testerApplications.mismatchNoticeDismissedAt),
+    sql`${testerApplications.connectedUsername} = (SELECT lower(${accounts.username}) FROM ${accounts} WHERE ${accounts.id} = ${accountId})`,
+  );
+}
+
+/**
+ * 違うアカウントでつながった知らせ（GET /api/accounts/:id/connection-notice）。
+ * @param db - データベース
+ * @param accountId - accounts.id
+ * @returns 申し込んだ名前とつながった名前。出さなければ null
+ */
+export async function connectionNotice(db: Db, accountId: string) {
+  const [row] = await db
+    .select({ applied: testerApplications.threadsUsername, connected: testerApplications.connectedUsername })
+    .from(testerApplications)
+    .where(mismatchNoticeWhere(accountId))
+    .orderBy(desc(testerApplications.statusChangedAt))
+    .limit(1);
+  return { otherAccount: row?.connected ? { appliedUsername: row.applied, connectedUsername: row.connected } : null };
+}
+
+/**
+ * 知らせを閉じる（その接続については、もう出さない。FR-008）。行がなくても何もしない。
+ * @param db - データベース
+ * @param accountId - accounts.id
+ */
+export async function dismissConnectionNotice(db: Db, accountId: string): Promise<void> {
+  await db
+    .update(testerApplications)
+    .set({ mismatchNoticeDismissedAt: new Date(), updatedAt: new Date() })
+    .where(mismatchNoticeWhere(accountId));
+}

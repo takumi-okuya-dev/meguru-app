@@ -17,6 +17,7 @@ import {
   operatorTesterApplicationSchema,
   operatorTesterApplicationsSchema,
   testerApplicationResponseSchema,
+  connectionNoticeSchema,
   testerApplicationSchema,
   defaultLimitsRequestSchema,
   type FeatureSettingsRequest,
@@ -420,6 +421,10 @@ export const api = {
     }),
   cancelTesterApplication: (accountId: string) =>
     request(`/api/accounts/${accountId}/tester-application`, null, { method: "DELETE" }),
+  // 違うアカウントでつながった知らせ（specs/025 contracts/api.md）
+  connectionNotice: (accountId: string) => request(`/api/accounts/${accountId}/connection-notice`, connectionNoticeSchema),
+  dismissConnectionNotice: (accountId: string) =>
+    request(`/api/accounts/${accountId}/connection-notice/dismiss`, null, { method: "POST" }),
   operatorTesterApplications: (view: string) =>
     request(`/api/operator/tester-applications?view=${encodeURIComponent(view)}`, operatorTesterApplicationsSchema),
   operateTesterApplication: (id: string, action: "invite" | "decline" | "revert" | "removed", body: { force?: boolean; reason?: string } = {}) =>

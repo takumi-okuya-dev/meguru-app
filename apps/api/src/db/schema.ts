@@ -1223,6 +1223,8 @@ export const testerApplications = pgTable(
     removalReason: text("removal_reason"),
     declineReason: text("decline_reason"),
     connectedUsername: text("connected_username"),
+    // 「違うアカウントでつながった」知らせを、オーナーが閉じた日時（specs/025 data-model.md 1-1）
+    mismatchNoticeDismissedAt: timestamp("mismatch_notice_dismissed_at", { withTimezone: true, precision: 6 }),
     statusChangedAt: timestamp("status_changed_at", { withTimezone: true, precision: 6 }).notNull().defaultNow(),
     ...timestamps,
   },

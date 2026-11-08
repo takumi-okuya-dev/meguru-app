@@ -2306,3 +2306,12 @@ export const operatorLimitsSchema = z.object({
 });
 /** GET /api/operator/limits の応答。 */
 export type OperatorLimits = z.infer<typeof operatorLimitsSchema>;
+
+// ---- 違うアカウントでつながった知らせ（specs/025-threads-account-guide contracts/api.md） ----
+
+/** GET /api/accounts/:id/connection-notice の応答。 */
+export const connectionNoticeSchema = z.object({
+  otherAccount: z.object({ appliedUsername: z.string(), connectedUsername: z.string() }).nullable(),
+});
+/** 違うアカウントでつながった知らせ。 */
+export type ConnectionNotice = z.infer<typeof connectionNoticeSchema>;

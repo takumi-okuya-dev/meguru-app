@@ -6,12 +6,15 @@ import {
   accountLabel,
   connectedMessage,
   errorMessage,
+  isAccountSwitchError,
   type TokenConnectResponse,
 } from "@threads-grower/shared";
 import { CheckCircle2Icon } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router";
 import { toast } from "sonner";
+import { AccountSwitchSteps } from "@/components/connect/AccountSwitchSteps";
+import { ConnectionNotice } from "@/components/connect/ConnectionNotice";
 import { ConnectMethods } from "@/components/connect/ConnectMethods";
 import { AccountNameSection } from "@/components/settings/AccountNameSection";
 import { ConnectionBadge } from "@/components/ConnectionBadge";
@@ -208,6 +211,22 @@ function AccountSettingsContent() {
           <h2 ref={threadsHeading} tabIndex={-1} className="font-medium outline-none">
             Threadsとの接続
           </h2>
+          {/* 招待済みで違うアカウントでつながったときの知らせ（specs/025 US3） */}
+          <ConnectionNotice accountId={account.id} />
+          {/* 接続し直しから戻ってきたエラー。今まではどこにも出ていなかった（specs/025 FR-011・research.md R2）。
+              取り違えで起きるエラーなら、今の@名前で切り替えの手順を添える（US2・FR-005） */}
+          {callback.error && (
+            <Alert variant="destructive">
+              <AlertDescription className="space-y-1 text-foreground">
+                <p>{errorMessage(callback.error, { username: account.username ?? undefined }).message}</p>
+                {isAccountSwitchError(callback.error) && (
+                  <div className="pt-2">
+                    <AccountSwitchSteps expected={account.username} again="接続し直す" />
+                  </div>
+                )}
+              </AlertDescription>
+            </Alert>
+          )}
           <p className="text-sm text-muted-foreground">
             今の接続：{account.connectionMethod === "token" ? "自分のMetaアプリのトークン" : "このアプリで許可"}。同じThreadsアカウント（@{account.username}）で接続し直すと、接続情報を更新できます。
           </p>
