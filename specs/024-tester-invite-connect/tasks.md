@@ -437,6 +437,7 @@ description: "Task list for feature 024 tester invites, limits and no free trial
   - 2026-11-08：typecheck・lint・テスト（共有504・Web 721・API 1,228）はすべて通過。E2Eは、手元に Clerk のテスト用ユーザーの設定（`e2e/.env.local`）がなくログインで止まるため、通しては確かめていない。024に合わせて`e2e/tests/billing.spec.ts`（契約前 → 契約）と`e2e/playwright.config.ts`（8787 は `THREADS_ACCESS_MODE=public`）を直した。
 - [ ] T072 [quickstart.md](./quickstart.md)の0〜5を手元で行い、結果を`quickstart.md`の末尾に記録する。
 - [ ] T073 （運営者の作業。マージの前後）次を行い、`docs/staging-setup-record.md`に記録する。
+  - 2026-11-08：`THREADS_APP_SECRET`をテスト版に入れた（記録済み）。コールバックのURLの登録と、Stripeの1件1,000円の料金はまだ
   - ThreadsAutomationに3つのコールバックのURLを登録する。
   - `THREADS_APP_SECRET`をテスト版のSecretに入れる。
   - Stripeのテスト用環境に1件1,000円の料金を作り、`apps/api/wrangler.toml`のテスト版の`STRIPE_PRICE_ID`に入れる。
