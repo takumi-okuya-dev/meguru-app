@@ -32,8 +32,9 @@ import {
 import { createDb, type Db } from "../db/client";
 import { accounts, memberships, postDrafts, postingSchedules, publishAttempts, subscriptions, users } from "../db/schema";
 import type { Env } from "../env";
-import { billingModeOf } from "../lib/config";
+import { billingModeOf, operatorIdsOf } from "../lib/config";
 import { entitlementFromFacts } from "./billing-service";
+import { dailyPostLimitSql, effectiveSlotMinutes } from "./limit-service";
 import { featureOnSql } from "./feature-sql";
 import { billingExemptSql, testAccessSql } from "./test-group-service";
 import { logger } from "../lib/logger";
@@ -184,6 +185,7 @@ export async function runAutoPost(
     .select({
       schedule: postingSchedules,
       ownerCreatedAt: users.createdAt,
+      ownerLegacyTrial: users.legacyTrial,
       ownerBillingExempt: billingExemptSql(users, mode),
       // オーナーがテスト版に入れるか（specs/016 research.md R4）。OFFの環境では読まない
       ownerTestAccess: mode.testGroups ? testAccessSql(users, mode.operators) : sql<boolean>`true`,
@@ -191,6 +193,8 @@ export async function runAutoPost(
       subCancelAtPeriodEnd: subscriptions.cancelAtPeriodEnd,
       // オーナーが自動投稿を使えるか（specs/019 FR-008）
       ownerAutopostOn: featureOnSql(users.id, "autopost"),
+      // オーナーの1日の投稿数の上限（specs/024 research.md R7）。早い時刻から上限の数までだけ使う
+      dailyPostLimit: dailyPostLimitSql(users.clerkUserId, users.dailyPostLimit, operatorIdsOf(env)),
     })
     .from(postingSchedules)
     .innerJoin(accounts, eq(accounts.id, postingSchedules.accountId))
@@ -207,6 +211,7 @@ export async function runAutoPost(
         mode,
         {
           createdAt: r.ownerCreatedAt,
+          legacyTrial: r.ownerLegacyTrial,
           billingExempt: r.ownerBillingExempt,
           status: r.subStatus,
           cancelAtPeriodEnd: r.subCancelAtPeriodEnd,
@@ -237,10 +242,10 @@ export async function runAutoPost(
     : now.getTime() - 65 * 60_000;
   const windowMs = AUTOPOST_LATE_WINDOW_MINUTES * 60_000;
   const due: { accountId: string; slot: DueSlot }[] = [];
-  for (const { schedule: s } of schedules) {
+  for (const { schedule: s, dailyPostLimit } of schedules) {
     const settings = {
       accountId: s.accountId,
-      slotMinutes: s.slotMinutes,
+      slotMinutes: effectiveSlotMinutes(s.slotMinutes, dailyPostLimit),
       jitter: s.jitter,
       effectiveFrom: s.effectiveFrom,
     };
@@ -249,7 +254,7 @@ export async function runAutoPost(
     // 60分を過ぎて飛ばした時刻・まとめないで飛ばした古い時刻を数える（ログだけ。FR-011）
     const today = jstDateOf(now);
     for (const date of [addDays(today, -1), today]) {
-      for (const minute of s.slotMinutes) {
+      for (const minute of effectiveSlotMinutes(s.slotMinutes, dailyPostLimit)) {
         const at = plannedSlotTime(s.accountId, date, minute, s.jitter);
         const t = at.getTime();
         if (
@@ -362,11 +367,11 @@ export async function runAutoPost(
   if (mentionAt) candidates.push(mentionAt);
   // 読むだけのオーナーの予定も、次に見る時刻には入れる（契約が戻ったとき、どの経路で戻っても次の時刻に動けるように。
   // PR #16 のCodexレビュー）。その回の処理は、上の「時刻の処理」で読むだけの予定を外している
-  for (const { schedule: s } of scheduleRows) {
+  for (const { schedule: s, dailyPostLimit } of scheduleRows) {
     const [next] = projectSchedule({
       accountId: s.accountId,
       enabled: true,
-      slotMinutes: s.slotMinutes,
+      slotMinutes: effectiveSlotMinutes(s.slotMinutes, dailyPostLimit),
       jitter: s.jitter,
       effectiveFrom: s.effectiveFrom,
       pausedUntil: s.pausedUntil,

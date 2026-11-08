@@ -4,7 +4,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   ACCOUNT_NAME_MAX,
-  BILLING_EXTRA_PRICE_JPY,
+  BILLING_UNIT_PRICE_JPY,
   RECONNECT_FROM_SETTINGS_HINT,
   countChars,
   errorMessage,
@@ -58,8 +58,9 @@ export function AccountNew() {
       : createCode === "BILLING_REQUIRED"
         ? ((create.error as ApiError).details[0] ?? "trial_ended")
         : null;
-  // 上限は無料体験中だけ（null は上限なし。specs/013 research.md R9）
+  // 上限は運営者が決める値と、前からの無料体験の1件（null は上限なし。specs/024 FR-018）
   const limitReached = (max !== null && used >= max) || createCode === "ACCOUNT_LIMIT_REACHED";
+  const inTrial = billing.state === "trial";
   const subscribed = billing.state === "subscribed_trial" || billing.state === "active" || billing.state === "canceling";
   const trimmed = name.trim();
   const canSubmit = trimmed !== "" && countChars(trimmed) <= ACCOUNT_NAME_MAX && !create.isPending;
@@ -95,10 +96,13 @@ export function AccountNew() {
       ) : limitReached ? (
         <Alert variant="warning">
           <AlertDescription className="space-y-3 text-foreground">
-            <p>{errorMessage("ACCOUNT_LIMIT_REACHED", { max: max ?? 1 }).message}</p>
-            <Button asChild size="sm" className="rounded-full">
-              <Link to="/settings/billing">契約する</Link>
-            </Button>
+            <p>{errorMessage("ACCOUNT_LIMIT_REACHED", { max: max ?? 1, details: inTrial ? ["trial"] : [] }).message}</p>
+            {/* 前からの無料体験の上限なら契約で増やせる。運営者が決めた上限なら、運営者に連絡する（specs/024 FR-018） */}
+            {inTrial && (
+              <Button asChild size="sm" className="rounded-full">
+                <Link to="/settings/billing">契約する</Link>
+              </Button>
+            )}
             <p className="text-muted-foreground">{RECONNECT_FROM_SETTINGS_HINT}</p>
           </AlertDescription>
         </Alert>
@@ -121,7 +125,7 @@ export function AccountNew() {
           {/* 契約中の2件目からは料金がかかる（specs/013 FR-031） */}
           {subscribed && used >= 1 && (
             <p className="text-sm text-muted-foreground">
-              2件目からは1件につき月{BILLING_EXTRA_PRICE_JPY}円です。次の請求から反映されます。
+              アカウント1件につき月{BILLING_UNIT_PRICE_JPY.toLocaleString("ja-JP")}円です。次の請求から反映されます。
             </p>
           )}
           <Button type="submit" className="w-full" disabled={!canSubmit}>

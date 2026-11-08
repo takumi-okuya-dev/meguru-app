@@ -1,7 +1,7 @@
 // 利用規約（specs/010-token-account-add FR-052、contracts/ui-routes.md「利用規約」）。ログインなしで読める。
 // 本featureでは最小限の下書き。運営者が公開の前に文面を確かめ、運営者の名前・連絡先を書き足す。
 // 料金・無料体験・解約・未払い・退会の節は specs/013-billing（FR-070）で足した。金額は共通の定数から出す。
-import { BILLING_BASE_PRICE_JPY, BILLING_EXTRA_PRICE_JPY } from "@threads-grower/shared";
+import { BILLING_UNIT_PRICE_JPY } from "@threads-grower/shared";
 import type { ReactNode } from "react";
 import { Link } from "react-router";
 
@@ -71,8 +71,7 @@ export function TermsPage() {
 
       <Section title="6. 料金と支払い">
         <p>
-          料金は、基本料金 月{yen(BILLING_BASE_PRICE_JPY)}（アカウント1件目を含む）と、2件目以降のアカウント1件につき月
-          {yen(BILLING_EXTRA_PRICE_JPY)}です（どちらも税込み）。Threadsにつないでいないアカウントも数えます。
+          料金は、アカウント1件につき月{yen(BILLING_UNIT_PRICE_JPY)}です（税込み）。Threadsにつないでいないアカウントも数えます。本サービスは、契約してから使い始めます。
         </p>
         <p>
           支払いはクレジットカードで、毎月請求します。アカウントを足す・削除すると、次の請求からアカウントの数が反映されます。今の期間の分の日割りの請求・返金はしません。カードの情報は決済代行会社（Stripe）が扱い、本サービスは持ちません。
@@ -80,10 +79,10 @@ export function TermsPage() {
       </Section>
 
       <Section title="7. 無料体験">
+        <p>無料体験はありません。契約の手続きが終わると、その場で最初の請求をし、すぐに使えます。</p>
         <p>
-          登録から1か月間は、すべての機能を無料で使えます（無料体験）。無料体験中に作れるアカウントは1件までです。無料体験は1人1回です。
+          無料体験を廃止する前に始めた無料体験は、終わる日まで使えます（その間に作れるアカウントは1件まで）。その間に契約した場合、無料体験が終わる日から請求を始めます。
         </p>
-        <p>無料体験中に契約した場合、無料体験が終わる日から請求を始めます（残りが2日を切っているときは、契約から1日後になることがあります）。</p>
       </Section>
 
       <Section title="8. 解約">

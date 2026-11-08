@@ -11,6 +11,7 @@ import {
 import { and, count, desc, eq, gt, gte, isNotNull, lt } from "drizzle-orm";
 import type { Db } from "../db/client";
 import { postDrafts, publishAttempts } from "../db/schema";
+import { effectiveSlotMinutes } from "./limit-service";
 import type { AccountRow } from "./access";
 import { countDrafts, listQueueRows, listPublishFailedRows } from "./draft-service";
 import {
@@ -65,7 +66,7 @@ export async function readScheduleUsage(db: Db, accountId: string, now: Date) {
  */
 export async function upcomingSlots(
   db: Db,
-  account: AccountRow & { ownerReadOnly?: boolean },
+  account: AccountRow & { ownerReadOnly?: boolean; dailyPostLimit?: number },
   schedule: PostingScheduleRow | null,
   now: Date,
   n: number,
@@ -75,7 +76,8 @@ export async function upcomingSlots(
   return projectSchedule({
     accountId: account.id,
     enabled: schedule.enabled,
-    slotMinutes: schedule.slotMinutes,
+    // オーナーの1日の投稿数の上限を超えた時刻には投稿しない（早い時刻から上限の数まで。specs/024 FR-020）
+    slotMinutes: effectiveSlotMinutes(schedule.slotMinutes, account.dailyPostLimit),
     jitter: schedule.jitter,
     effectiveFrom: schedule.effectiveFrom,
     pausedUntil: schedule.pausedUntil,
@@ -94,7 +96,7 @@ export async function upcomingSlots(
  */
 export async function getAutoPostStatus(
   db: Db,
-  account: AccountRow & { ownerReadOnly?: boolean },
+  account: AccountRow & { ownerReadOnly?: boolean; dailyPostLimit?: number },
   now: Date = new Date(),
 ): Promise<AutoPostStatus> {
   const [schedule, counts] = await Promise.all([

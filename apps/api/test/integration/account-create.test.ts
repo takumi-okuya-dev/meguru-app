@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { accounts, memberships, threadsConnections, users } from "../../src/db/schema";
 import { call, db, makeApp, resetDb } from "../helpers/app";
 import { callBilling } from "../helpers/billing";
+import { ensureUser } from "../helpers/team";
 
 const app = makeApp();
 
@@ -74,6 +75,7 @@ describe("POST /api/accounts", () => {
   });
 
   it("未接続のアカウントも上限に数える。上限なら ACCOUNT_LIMIT_REACHED（決済ONの無料体験中は1件。specs/013 FR-010）", async () => {
+    await ensureUser("u1"); // 024の前からいた人（無料体験中）
     expect((await createOn("u1", "1つ目")).status).toBe(201);
     const res = await createOn("u1", "2つ目");
     expect(res.status).toBe(409);
@@ -82,6 +84,7 @@ describe("POST /api/accounts", () => {
   });
 
   it("同じ人が並べて送っても、上限を超えない（FR-004）", async () => {
+    await ensureUser("u1"); // 024の前からいた人（無料体験中）
     const results = await Promise.all([createOn("u1", "A"), createOn("u1", "B"), createOn("u1", "C")]);
     expect(results.map((r) => r.status).sort()).toEqual([201, 409, 409]);
     expect(await db().select().from(accounts)).toHaveLength(1);

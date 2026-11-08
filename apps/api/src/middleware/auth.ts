@@ -7,12 +7,13 @@ import { eq, sql } from "drizzle-orm";
 import { createMiddleware } from "hono/factory";
 import type { Env } from "../env";
 import { createDb } from "../db/client";
-import { users, withdrawnUsers } from "../db/schema";
+import { subscriptions, users, withdrawnUsers } from "../db/schema";
 import { billingModeOf, operatorIdsOf, type BillingMode } from "../lib/config";
 import { AppError, pgErrorCode } from "../lib/errors";
 import { referrerIdByCode } from "../services/referral-service";
 import { disabledFeaturesSql, featuresFrom } from "../services/feature-sql";
-import { testAccessSql } from "../services/test-group-service";
+import { billingExemptSql, testAccessSql } from "../services/test-group-service";
+import { entitlementFromFacts } from "../services/billing-service";
 
 /**
  * 退会の途中でも、テスト版に入れない人でも呼べるAPI（自分の状態を知る・自分で退会する）。
@@ -21,6 +22,28 @@ import { testAccessSql } from "../services/test-group-service";
 const SELF_SERVICE_ALLOWED = new Set(["GET /api/me", "GET /api/me/withdrawal-preview", "POST /api/me/withdraw"]);
 /** テスト版に入れない人には、ほかに招待から参加する経路も許す（specs/016 research.md R5）。 */
 const TEST_INVITE_PATH = /^\/api\/test-invites\//;
+/**
+ * 契約前の人（specs/024 research.md R9）に許す経路：自分の情報・退会、契約と支払い、テスト版の招待（入れば料金なし）、
+ * チームの招待の確認（参加は止める）。
+ */
+const SUBSCRIBE_ALLOWED = new Set([
+  ...SELF_SERVICE_ALLOWED,
+  "GET /api/billing",
+  "POST /api/billing/checkout",
+  "POST /api/billing/sync",
+  "POST /api/billing/portal",
+]);
+const TEAM_INVITE_PREVIEW = /^\/api\/invites\/[^/]+$/;
+
+/**
+ * 契約前の人に許す経路か。
+ * @param method - HTTPのメソッド
+ * @param path - パス
+ * @returns 許すなら true
+ */
+function subscribeAllowed(method: string, path: string): boolean {
+  return SUBSCRIBE_ALLOWED.has(`${method} ${path}`) || TEST_INVITE_PATH.test(path) || (method === "GET" && TEAM_INVITE_PREVIEW.test(path));
+}
 
 /** セッショントークンから確かめた本人。 */
 export type VerifiedIdentity = {
@@ -118,14 +141,20 @@ export function authMiddleware(makeVerifier: (env: Env) => AuthVerifier) {
           admitted: mode.testGroups ? testAccessSql(users, mode.operators) : sql<boolean>`true`,
           // 自分の使えないまとまり（specs/019）。同じ問い合わせで読む
           disabled: disabledFeaturesSql(users.id),
+          // 契約前か（specs/024 research.md R9）。同じ問い合わせで読む
+          billingExempt: billingExemptSql(users, mode),
+          subStatus: subscriptions.status,
+          subCancelAtPeriodEnd: subscriptions.cancelAtPeriodEnd,
         })
         .from(users)
+        .leftJoin(subscriptions, eq(subscriptions.userId, users.id))
         .where(eq(users.clerkUserId, identity.clerkUserId))
         .limit(1);
     const [found] = await selectUser();
     const existing = found?.row;
     let admitted = found?.admitted ?? true;
     let disabled = found?.disabled ?? [];
+    let facts = found;
 
     let user: typeof users.$inferSelect;
     if (existing) {
@@ -164,6 +193,8 @@ export function authMiddleware(makeVerifier: (env: Env) => AuthVerifier) {
             email: profile.email,
             displayName: profile.displayName,
             signedUpOpen: !mode.testGroups,
+            // 024の後に登録した人は、無料体験を使えない（specs/024 research.md R8。列の既定値は true）
+            legacyTrial: false,
             ...(withReferral && referredBy ? { referredByUserId: referredBy, referredAt: new Date() } : {}),
           })
           .onConflictDoNothing({ target: users.clerkUserId });
@@ -178,6 +209,7 @@ export function authMiddleware(makeVerifier: (env: Env) => AuthVerifier) {
       user = created!.row;
       admitted = created!.admitted;
       disabled = created!.disabled;
+      facts = created;
     }
 
     // 退会の途中の人は、退会のAPIと GET /api/me のほかを止める（途中でデータを足させない。specs/013 research.md R10）
@@ -189,6 +221,17 @@ export function authMiddleware(makeVerifier: (env: Env) => AuthVerifier) {
     const testAccess = mode.testGroups ? { admitted: Boolean(admitted), operator } : { admitted: true, operator: false };
     if (!testAccess.admitted && !SELF_SERVICE_ALLOWED.has(`${c.req.method} ${c.req.path}`) && !TEST_INVITE_PATH.test(c.req.path)) {
       throw new AppError("TEST_ACCESS_REQUIRED", 403, "test access required");
+    }
+    // 契約前の人は、許す経路のほかを止める（specs/024 FR-029、research.md R9）。判定の順は 退会の途中 → テスト版 → 契約前
+    if (mode.enabled && facts && !subscribeAllowed(c.req.method, c.req.path)) {
+      const e = entitlementFromFacts(mode, {
+        createdAt: user.createdAt,
+        legacyTrial: user.legacyTrial,
+        billingExempt: facts.billingExempt,
+        status: facts.subStatus,
+        cancelAtPeriodEnd: facts.subCancelAtPeriodEnd,
+      });
+      if (e.state === "unsubscribed") throw new AppError("SUBSCRIPTION_REQUIRED", 403, "subscription required");
     }
     c.set("user", {
       ...user,

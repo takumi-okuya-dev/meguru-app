@@ -3,7 +3,6 @@
 import {
   AUTOPOST_JITTER_SECONDS,
   AUTOPOST_MIN_GAP_MINUTES,
-  AUTOPOST_SLOT_LIMIT,
   putPostingScheduleRequestSchema,
 } from "@threads-grower/shared";
 import { Hono, type Context, type MiddlewareHandler } from "hono";
@@ -12,6 +11,7 @@ import { createDb } from "../db/client";
 import { createThreadsClient } from "../lib/threads-client";
 import { parseBody } from "../lib/validate";
 import { authorizeAccount } from "../services/access";
+import { effectiveLimits } from "../services/limit-service";
 import {
   notifyWake,
   readPostingSchedule,
@@ -46,10 +46,14 @@ export function postingScheduleRoutes(authed: MiddlewareHandler<AppEnv>) {
       const db = createDb(c.env.DATABASE_URL);
       const access = await authorizeAccount(db, c.get("user"), c.req.param("accountId"), "view", { feature: "autopost" });
       const account = access.account;
+      // 1日の投稿数の上限はオーナーの値（運営者は Threads の上限まで。specs/024 FR-019）
+      const [schedule, limits] = await Promise.all([readPostingSchedule(db, account.id), effectiveLimits(db, c.env, access.owner.id)]);
       return c.json({
-        schedule: toPostingSchedule(await readPostingSchedule(db, account.id)),
+        schedule: toPostingSchedule(schedule),
+        // 上限が下がって、登録した時刻の数が上限を超えている（画面の注意。FR-020）
+        overLimit: (schedule?.slotMinutes.length ?? 0) > limits.dailyPostLimit,
         limits: {
-          slots: AUTOPOST_SLOT_LIMIT,
+          slots: limits.dailyPostLimit,
           minGapMinutes: AUTOPOST_MIN_GAP_MINUTES,
           jitterMinutes: AUTOPOST_JITTER_SECONDS / 60,
         },
@@ -69,6 +73,7 @@ export function postingScheduleRoutes(authed: MiddlewareHandler<AppEnv>) {
         createThreadsClient(c.env),
         now,
         access,
+        (await effectiveLimits(db, c.env, access.owner.id)).dailyPostLimit,
       );
       // コミットの後、定期処理に設定の変更を知らせる（research.md R3）。時刻は保存が終わった後のもの
       // （接続の確認の間に定期処理の回が終わっていても、その回より新しい知らせにする）

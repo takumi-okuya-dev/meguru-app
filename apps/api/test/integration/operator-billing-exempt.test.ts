@@ -36,11 +36,13 @@ describe("運営者の料金なし", () => {
     expect(me.billing.readOnlyReason).not.toBeNull();
   });
 
-  it("テスト用のグループがOFF（本番）なら、運営者のIDが設定にあっても料金なしにしない", async () => {
+  it("テスト用のグループがOFF（本番）でも、運営者は料金なし（specs/024 FR-023）。リストから外れると、ほかの人と同じ", async () => {
     await createUserWithAccount(OPERATOR, { userCreatedAt: LONG_AGO });
     const env = billingEnv({ OPERATOR_CLERK_USER_IDS: OPERATOR });
     const me = (await (await call(app, "GET", "/api/me", { user: OPERATOR, env })).json()) as Me;
-    expect(me.billing.state).not.toBe("exempt");
+    expect(me.billing.state).toBe("exempt");
+    const other = (await (await call(app, "GET", "/api/me", { user: OPERATOR, env: billingEnv({ OPERATOR_CLERK_USER_IDS: "someone" }) })).json()) as Me;
+    expect(other.billing.state).not.toBe("exempt");
   });
 
   it("アカウントの権限の判定（オーナーを別名で読む）でも、運営者のアカウントは読むだけにならない", async () => {
@@ -48,8 +50,9 @@ describe("運営者の料金なし", () => {
     const res = await call(app, "GET", `/api/accounts/${accountId}/access`, { user: OPERATOR, env: bothOn() });
     expect(res.status).toBe(200);
     expect(((await res.json()) as { readOnly: unknown }).readOnly).toBeNull();
+    // 招待制がOFF（本番）でも読むだけにならない（specs/024 FR-023）
     const off = await call(app, "GET", `/api/accounts/${accountId}/access`, { user: OPERATOR, env: billingEnv({ OPERATOR_CLERK_USER_IDS: OPERATOR }) });
-    expect(((await off.json()) as { readOnly: unknown }).readOnly).not.toBeNull();
+    expect(((await off.json()) as { readOnly: unknown }).readOnly).toBeNull();
   });
 
   it("定期処理の条件（fullAccessSql）と、関数の判定（loadEntitlement）が同じ", async () => {

@@ -116,6 +116,17 @@ describe("wrangler.toml の環境ごとの設定", () => {
     expect(one(`env.${env}.vars`)?.THREADS_ACCESS_MODE).toMatch(/^"(testers|public)"$/);
   });
 
+  // 審査の前は両方とも「テスター招待」で「Threadsで許可する」を使う（specs/024 FR-028）。つなぐ方法は両方（書かない）
+  it.each(ENVS)("[env.%s.vars] は審査の前（testers）で、つなぐ方法を絞らない", (env) => {
+    expect(one(`env.${env}.vars`)?.THREADS_ACCESS_MODE).toBe('"testers"');
+    expect(one(`env.${env}.vars`)?.THREADS_CONNECT_METHODS).toBeUndefined();
+  });
+
+  it("テスト版の THREADS_APP_ID は ThreadsAutomation の数字のID", () => {
+    expect(one("env.staging.vars")?.THREADS_APP_ID).toMatch(/^"\d+"$/);
+    expect(one("env.staging.vars")?.THREADS_APP_ID).not.toBe('"000000000000000"');
+  });
+
   it("秘密情報は wrangler.toml に書かれていない", () => {
     expect(toml).not.toMatch(/sk_(live|test)_[A-Za-z0-9]{10,}/);
     expect(toml).not.toMatch(/whsec_[A-Za-z0-9]{10,}/);

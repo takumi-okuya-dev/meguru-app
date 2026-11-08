@@ -26,6 +26,8 @@ import { AccountSettingsPage } from "@/pages/settings/account";
 import { BillingSettingsPage } from "@/pages/settings/billing";
 import { FeaturesPage } from "@/pages/settings/features";
 import { TestGroupDetailPage, TestGroupsPage } from "@/pages/settings/test-groups";
+import { TesterInvitesPage } from "@/pages/settings/tester-invites";
+import { LimitsPage } from "@/pages/settings/limits";
 import { LegalCommercePage } from "@/pages/legal-commerce";
 import { AppearanceSettings } from "@/pages/settings/appearance";
 import { SettingsIndex, SettingsLayout } from "@/pages/settings/settings-layout";
@@ -94,6 +96,8 @@ export const routes = [
           { path: "features", element: <FeaturesPage /> },
           { path: "test-groups", element: <TestGroupsPage /> },
           { path: "test-groups/:groupId", element: <TestGroupDetailPage /> },
+          { path: "tester-invites", element: <TesterInvitesPage /> },
+          { path: "limits", element: <LimitsPage /> },
         ],
       },
       // チーム（specs/011 contracts/ui-routes.md「ルート」）。チームの画面と担当の表はサイドバーの中に出す

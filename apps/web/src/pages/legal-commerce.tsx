@@ -1,5 +1,5 @@
 // 特定商取引法に基づく表記（specs/013-billing FR-071、contracts/ui-routes.md「特定商取引法に基づく表記」）。ログインなしで読める。
-import { BILLING_BASE_PRICE_JPY, BILLING_EXTRA_PRICE_JPY } from "@threads-grower/shared";
+import { BILLING_UNIT_PRICE_JPY } from "@threads-grower/shared";
 import { Link } from "react-router";
 import { SELLER_INFO } from "@/lib/seller-info";
 
@@ -19,11 +19,11 @@ export function LegalCommercePage() {
     ["メールアドレス", SELLER_INFO.email || TBD],
     [
       "販売価格",
-      `基本料金 月${yen(BILLING_BASE_PRICE_JPY)}（アカウント1件目を含む）、2件目以降のアカウント1件につき月${yen(BILLING_EXTRA_PRICE_JPY)}（いずれも税込み）`,
+      `アカウント1件につき月${yen(BILLING_UNIT_PRICE_JPY)}（税込み）`,
     ],
     ["商品代金以外の必要料金", "なし（インターネットへの接続の費用は利用者の負担）"],
     ["支払い方法", "クレジットカード"],
-    ["支払いの時期", "無料体験（登録から1か月）の終わり、または無料体験の後に契約したとき。以後、毎月"],
+    ["支払いの時期", "契約の手続きをしたとき。以後、毎月"],
     ["提供の時期", "契約の手続きが終わってすぐ"],
     ["解約・返品", "いつでも解約でき、払った期間の終わりまで使えます。日割りの返金はしません"],
     ["動作環境", "最新のChrome・Safari・Edge・Firefox（パソコン・スマートフォン）"],

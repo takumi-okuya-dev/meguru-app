@@ -110,7 +110,7 @@ describe("アカウントを作る画面", () => {
     mocks.me.mockResolvedValue(me(1, 1, "testers", meBilling("trial")));
     renderAt();
     expect(
-      await screen.findByText("無料体験中に作れるアカウントは1件までです。契約すると、2件目から1件につき月500円で足せます。"),
+      await screen.findByText("無料体験中に作れるアカウントは1件までです。契約すると、2件目からも作れます。"),
     ).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "契約する" })).toHaveAttribute("href", "/settings/billing");
     expect(screen.queryByLabelText("アカウントの名前")).not.toBeInTheDocument();
@@ -131,19 +131,20 @@ describe("アカウントを作る画面", () => {
   it("契約中の2件目からは、料金の案内を添える（specs/013 FR-031）", async () => {
     mocks.me.mockResolvedValue(me(null, 1, "testers", meBilling("active")));
     renderAt();
-    expect(await screen.findByText("2件目からは1件につき月500円です。次の請求から反映されます。")).toBeInTheDocument();
+    expect(await screen.findByText("アカウント1件につき月1,000円です。次の請求から反映されます。")).toBeInTheDocument();
     expect(screen.getByLabelText("アカウントの名前")).toBeInTheDocument();
     expect(screen.getByText("登録済み 1件")).toBeInTheDocument();
   });
 
-  it("作る途中で上限になったら、案内に切り替える", async () => {
+  it("作る途中で上限になったら、案内に切り替える（運営者の上限なら運営者への連絡。specs/024 FR-018）", async () => {
     mocks.me.mockResolvedValue(me(null, 0));
     const { ApiError } = await import("@/lib/api-client");
     mocks.createAccount.mockRejectedValue(new ApiError("ACCOUNT_LIMIT_REACHED", 409));
     renderAt();
     await userEvent.type(await screen.findByLabelText("アカウントの名前"), "2つ目");
     await userEvent.click(screen.getByRole("button", { name: "作る" }));
-    expect(await screen.findByText(/無料体験中に作れるアカウントは1件までです/)).toBeInTheDocument();
+    expect(await screen.findByText(/増やしたいときは運営者に連絡してください/)).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "契約する" })).not.toBeInTheDocument();
   });
 
   it("2つ目以降は「登録済み n/m件」を出す（US6）", async () => {

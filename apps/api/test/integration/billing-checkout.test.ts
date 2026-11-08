@@ -118,6 +118,16 @@ describe("POST /api/billing/checkout", () => {
     expect(p!["subscription_data[trial_end]"]).toBeUndefined();
   });
 
+  it("契約前の人（024のあとに登録）は、試用なしでその場で請求する（specs/024 FR-030、T029）", async () => {
+    // JIT作成（legacy_trial は false）
+    expect((await callBilling(app, "GET", "/api/me", { user: "n1" })).status).toBe(200);
+    expect((await checkout("n1")).status).toBe(200);
+    const [p] = await sessionParams();
+    expect(p!["subscription_data[trial_end]"]).toBeUndefined();
+    expect(p!["subscription_data[trial_period_days]"]).toBeUndefined();
+    expect(p).toMatchObject({ "line_items[0][quantity]": "1" });
+  });
+
   it("Stripeが失敗したら 503 BILLING_UNAVAILABLE で、契約の状態は変わらない", async () => {
     const { userId } = await createUserWithAccount("u1");
     await fakeStripe.fail("/v1/checkout/sessions", { status: 500 });

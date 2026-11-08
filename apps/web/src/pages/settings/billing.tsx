@@ -29,6 +29,9 @@ function describe(s: BillingSummary): { title: string; body: string | null } {
   switch (s.state) {
     case "billing_disabled":
       return { title: "この環境では決済を使いません", body: null };
+    case "unsubscribed":
+      // 契約前（無料体験なし。specs/024 FR-029）
+      return { title: "まだ契約していません", body: "契約すると、すぐにアカウントを作れます" };
     case "exempt":
       return { title: "料金なし", body: "料金はかかりません" };
     case "trial":
@@ -75,7 +78,7 @@ function actionOf(s: BillingSummary): "checkout" | "portal" | null {
   if (s.state === "billing_disabled") return null;
   // 料金なしでも、前からの契約が残っていれば、解約できるよう支払いの画面を開ける（テスト版の運営者など）
   if (s.state === "exempt") return s.subscription ? "portal" : null;
-  if (s.state === "trial") return "checkout";
+  if (s.state === "trial" || s.state === "unsubscribed") return "checkout";
   if (s.state === "read_only") return s.readOnlyReason === "payment_failed" ? "portal" : "checkout";
   return "portal";
 }
@@ -194,7 +197,7 @@ export function BillingSettingsPage() {
           <SettingCard>
             <SettingRow
               label="料金"
-              description={`基本料金 月${yen(s.prices.base)}（アカウント1件目を含む）／2件目から1件につき月${yen(s.prices.extra)}（税込み）。アカウントの数は次の請求から反映し、日割りはしません`}
+              description={`アカウント1件につき月${yen(s.prices.perAccount)}（税込み）。アカウントの数は次の請求から反映し、日割りはしません`}
             />
           </SettingCard>
           <p className="text-sm text-muted-foreground">

@@ -17,6 +17,7 @@ import { Button } from "@/components/ui/button";
 import { ApiError, api, describeError } from "@/lib/api-client";
 import { queryKeys } from "@/lib/query";
 import { cn } from "@/lib/utils";
+import { TesterApplicationPanel } from "./TesterApplicationPanel";
 import { TokenConnectForm } from "./TokenConnectForm";
 
 /** 許可の画面から戻ってきたときのエラー（?error=…&account=…）。 */
@@ -103,6 +104,20 @@ export function ConnectMethods({
   const showToken = methods.includes("token");
   // OAuth を出さないときは、トークンの手順を最初から開いておく（唯一の方法なので畳まない）
   const tokenExpanded = tokenOpen || !showApp;
+  // 招待の管理（specs/024 research.md R4）。/api/me を読むまでは出さない
+  const invites = me.data?.testerInvites.enabled ?? false;
+  const allow = (
+    <>
+      <Button disabled={oauth.isPending} onClick={() => oauth.mutate()}>
+        Threadsで許可する
+      </Button>
+      {oauth.isError && (
+        <Alert variant="destructive">
+          <AlertDescription className="text-foreground">{describeError(oauth.error)}</AlertDescription>
+        </Alert>
+      )}
+    </>
+  );
 
   return (
     <div className="space-y-4">
@@ -110,17 +125,19 @@ export function ConnectMethods({
       <p className="text-sm text-muted-foreground">
         Threadsにつなぐと、承認した案を自動で投稿し、反応を分析できます。戦略・投稿ストック・設定は、つないでもそのまま残ります。
       </p>
-      {returned}
-      {showApp && (
+      {!invites && returned}
+      {showApp && invites && (
+        // 招待の管理がONなら、申し込み → 招待済みのときだけ「Threadsで許可する」を出す（specs/024 contracts/ui-routes.md 2）
+        <TesterApplicationPanel
+          accountId={account.id}
+          allowButton={allow}
+          authFailed={initialError?.code === "THREADS_AUTH_CANCELLED" || initialError?.code === "THREADS_AUTH_FAILED"}
+          fallbackError={returned}
+        />
+      )}
+      {showApp && !invites && (
         <>
-          <Button disabled={oauth.isPending} onClick={() => oauth.mutate()}>
-            Threadsで許可する
-          </Button>
-          {oauth.isError && (
-            <Alert variant="destructive">
-              <AlertDescription className="text-foreground">{describeError(oauth.error)}</AlertDescription>
-            </Alert>
-          )}
+          {allow}
           {/* Meta App Review の前（テスターだけが接続できる間）だけ出す（specs/002 FR-028） */}
           {me.data?.threadsAccessMode === "testers" && (
             <Alert>

@@ -35,6 +35,10 @@ export const ACCOUNT_ROUTES: [string, string, Permission][] = [
   ["GET", "/api/accounts/:accountId/analysis/classifications", "content"],
   ["PUT", "/api/accounts/:accountId/analysis/classifications", "content"],
   // 時間差のメンション（specs/023 contracts/api.md）
+  // テスター招待の申し込み（specs/024 contracts/api.md）。オーナーだけ
+  ["GET", "/api/accounts/:accountId/tester-application", "owner"],
+  ["POST", "/api/accounts/:accountId/tester-application", "owner"],
+  ["DELETE", "/api/accounts/:accountId/tester-application", "owner"],
   ["GET", "/api/accounts/:accountId/mention-settings", "view"],
   ["PUT", "/api/accounts/:accountId/mention-settings", "settings"],
   ["POST", "/api/accounts/:accountId/mention-people", "settings"],

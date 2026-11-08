@@ -126,9 +126,13 @@ describe("P1：読むだけの候補を、件数の上限の前に外す（SQL�
     ["incomplete_expired", false, 40],
     ["past_due", true, 40],
   ] as const)("契約 %s・料金なし %s・登録から%d日", async (status, exempt, daysAgo) => {
+    // 024の前からいた人（legacy_trial）と、024のあとの人（契約前）の両方で、SQLと関数の結果が同じ（specs/024 T029）
+    for (const legacy of [true, false]) {
+    await resetDb();
     const now = new Date();
     const created = new Date(now.getTime() - daysAgo * 86_400_000);
     const { userId } = await createUserWithAccount("u1", { userCreatedAt: created });
+    await db().update(users).set({ legacyTrial: legacy }).where(eq(users.id, userId));
     if (status) await insertSubscription(userId, { status });
     if (exempt) await setBillingExempt(userId, true);
     const mode = { enabled: true };
@@ -143,8 +147,10 @@ describe("P1：読むだけの候補を、件数の上限の前に外す（SQL�
       userCreatedAt: created,
       subscription: status ? { status: status as SubscriptionStatus, cancelAtPeriodEnd: false } : null,
       now,
+      legacyTrial: legacy,
     }).fullAccess;
-    expect(rows.length === 1).toBe(expected);
+    expect(rows.length === 1, `legacy ${legacy}`).toBe(expected);
+    }
   });
 
   it("月末の登録（1月31日）は2月の最終日まで（Postgres の1か月の丸めと同じ）", async () => {
@@ -200,6 +206,8 @@ describe("P2：同時の読み直し・数の反映", () => {
 
   it("アカウントを同時に作っても、Stripeの数は最後の件数になり、印が消える", async () => {
     const { userId } = await createUserWithAccount("u1");
+    // 4件まで作れるようにする（上限の既定値は3件。specs/024）
+    await db().update(users).set({ accountLimit: 10 }).where(eq(users.id, userId));
     const { url } = (await (await callBilling(app, "POST", "/api/billing/checkout", { user: "u1" })).json()) as { url: string };
     await fakeStripe.completeCheckout(url);
     await callBilling(app, "POST", "/api/billing/sync", { user: "u1" });

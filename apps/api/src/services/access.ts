@@ -127,6 +127,7 @@ export async function authorizeAccount(
       ownerDisplayName: ownerU.displayName,
       ownerEmail: ownerU.email,
       ownerCreatedAt: ownerU.createdAt,
+      ownerLegacyTrial: ownerU.legacyTrial,
       ownerBillingExempt: billingExemptSql(ownerU, user.billing),
       // オーナーがテスト版に入れるか（specs/016 research.md R4）。OFFの環境では読まない
       ownerTestAccess: user.billing.testGroups ? testAccessSql(ownerU, user.billing.operators) : sql<boolean>`true`,
@@ -176,6 +177,7 @@ export async function authorizeAccount(
   // オーナーが読むだけなら、だれの操作でも読む・見る・記録・削除だけにする（specs/013 FR-040・FR-042）
   const owner = entitlementFromFacts(user.billing, {
     createdAt: row.ownerCreatedAt,
+    legacyTrial: row.ownerLegacyTrial,
     billingExempt: row.ownerBillingExempt,
     status: row.subStatus,
     cancelAtPeriodEnd: row.subCancelAtPeriodEnd,

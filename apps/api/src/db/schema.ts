@@ -41,6 +41,16 @@ import {
   TEST_GROUP_CAPACITY_MIN,
   TEST_GROUP_EVENT_ACTIONS,
   TEST_GROUP_NAME_MAX,
+  ACCOUNT_LIMIT_MAX,
+  DAILY_POST_LIMIT_MAX,
+  DECLINE_REASON_MAX,
+  DEFAULT_ACCOUNT_LIMIT,
+  DEFAULT_DAILY_POST_LIMIT,
+  TESTER_APPLICATION_STATUSES,
+  TESTER_REMOVAL_REASONS,
+  TESTER_SLOT_CAPACITY_DEFAULT,
+  TESTER_SLOT_CAPACITY_MAX,
+  TESTER_SLOT_CAPACITY_MIN,
   type AnalysisTheme,
   type PromotionEvent,
 } from "@threads-grower/shared";
@@ -110,10 +120,18 @@ export const users = pgTable("users", {
   // この人を紹介した人。行を作るとき（JIT作成）だけ入れ、あとから変えない。紹介した人が退会したら NULL
   referredByUserId: uuid("referred_by_user_id").references((): AnyPgColumn => users.id, { onDelete: "set null" }),
   referredAt: timestamp("referred_at", { withTimezone: true }),
+  // この人だけのアカウントの数・1日の投稿数の上限。NULLなら既定値（operator_settings。specs/024 data-model.md 2-1）
+  accountLimit: integer("account_limit"),
+  dailyPostLimit: integer("daily_post_limit"),
+  // 024の前からいた人（無料体験を使える。specs/024 research.md R8）。既定は true にして、列を足してから新しいAPIに
+  // 替わるまでの間に古いAPIが作った人も締め出さない。新しいAPIは作るときに必ず false を渡す（016 の signed_up_open と同じ）
+  legacyTrial: boolean("legacy_trial").notNull().default(true),
   ...timestamps,
 }, (t) => [
   index("users_referred_by_idx").on(t.referredByUserId),
   check("users_not_self_referred", sql`${t.referredByUserId} <> ${t.id}`),
+  check("users_account_limit_range", sql`${t.accountLimit} IS NULL OR ${t.accountLimit} BETWEEN 1 AND ${sql.raw(String(ACCOUNT_LIMIT_MAX))}`),
+  check("users_daily_post_limit_range", sql`${t.dailyPostLimit} IS NULL OR ${t.dailyPostLimit} BETWEEN 1 AND ${sql.raw(String(DAILY_POST_LIMIT_MAX))}`),
 ]);
 
 /**
@@ -716,7 +734,8 @@ export const postingSchedules = pgTable(
   },
   (t) => [
     index("posting_schedules_enabled_idx").on(t.enabled).where(sql`${t.enabled}`),
-    check("posting_schedules_slot_count", sql`cardinality(${t.slotMinutes}) <= 10`),
+    // 時刻の数はオーナーの1日の投稿数の上限まで（判定は保存の処理）。DBは Threads の上限まで（specs/024 FR-019）
+    check("posting_schedules_slot_count", sql`cardinality(${t.slotMinutes}) <= ${sql.raw(String(DAILY_POST_LIMIT_MAX))}`),
     check("posting_schedules_slot_range", sql`0 <= ALL(${t.slotMinutes}) AND 1439 >= ALL(${t.slotMinutes})`),
     check("posting_schedules_enabled_requires_slots", sql`NOT ${t.enabled} OR cardinality(${t.slotMinutes}) >= 1`),
   ],
@@ -1182,6 +1201,97 @@ export const featureSettingEvents = pgTable(
     check("feature_setting_events_one_subject", sql`(${t.subjectUserId} IS NULL) <> (${t.subjectGroupId} IS NULL)`),
     index("feature_setting_events_created_idx").on(t.createdAt.desc()),
     index("feature_setting_events_subject_created_idx").on(t.subjectUserId, t.createdAt.desc()),
+  ],
+);
+
+// ---- テスター招待・上限（specs/024-tester-invite-connect data-model.md）----
+
+/**
+ * テスター招待の申し込み（data-model.md 1-1、research.md R1・R2・R15）。生きている申し込み（申し込み中・招待済み・接続済み）は
+ * アカウント1件に1つまで。退会・アカウントの削除では行を消さず、枠を使っている行を「外してよい」にする（運営者が「外した」で消す）。
+ */
+export const testerApplications = pgTable(
+  "tester_applications",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id").references(() => users.id, { onDelete: "set null" }),
+    accountId: uuid("account_id").references(() => accounts.id, { onDelete: "set null" }),
+    threadsUsername: text("threads_username").notNull(),
+    status: text("status").notNull().default("pending"),
+    // Metaのテスター枠を使っているか（「招待した」で true、「戻す」「外した」で false）
+    holdsSlot: boolean("holds_slot").notNull().default(false),
+    removalReason: text("removal_reason"),
+    declineReason: text("decline_reason"),
+    connectedUsername: text("connected_username"),
+    statusChangedAt: timestamp("status_changed_at", { withTimezone: true, precision: 6 }).notNull().defaultNow(),
+    ...timestamps,
+  },
+  (t) => [
+    check("tester_applications_username_valid", sql`${t.threadsUsername} ~ '^[a-z0-9._]{1,30}$'`),
+    check("tester_applications_status_valid", sql`${t.status} IN (${inList(TESTER_APPLICATION_STATUSES)})`),
+    check(
+      "tester_applications_removal_reason_valid",
+      sql`${t.removalReason} IS NULL OR (${t.removalReason} IN (${inList(TESTER_REMOVAL_REASONS)}) AND ${t.status} = 'withdrawn')`,
+    ),
+    check(
+      "tester_applications_decline_reason_length",
+      sql`${t.declineReason} IS NULL OR char_length(${t.declineReason}) <= ${sql.raw(String(DECLINE_REASON_MAX))}`,
+    ),
+    uniqueIndex("tester_applications_live_account_uq")
+      .on(t.accountId)
+      .where(sql`${t.status} IN ('pending', 'invited', 'connected')`),
+    index("tester_applications_status_idx").on(t.status, t.createdAt),
+    index("tester_applications_username_idx").on(t.threadsUsername),
+    index("tester_applications_slot_idx").on(t.holdsSlot).where(sql`${t.holdsSlot}`),
+    index("tester_applications_user_idx").on(t.userId),
+  ],
+);
+
+/** 運営者が決める値（1行だけ。data-model.md 1-2、research.md R6）。 */
+export const operatorSettings = pgTable(
+  "operator_settings",
+  {
+    id: smallint("id").primaryKey(),
+    defaultAccountLimit: integer("default_account_limit").notNull().default(DEFAULT_ACCOUNT_LIMIT),
+    defaultDailyPostLimit: integer("default_daily_post_limit").notNull().default(DEFAULT_DAILY_POST_LIMIT),
+    testerSlotCapacity: integer("tester_slot_capacity").notNull().default(TESTER_SLOT_CAPACITY_DEFAULT),
+    updatedAt: timestamp("updated_at", { withTimezone: true, precision: 6 }).notNull().defaultNow(),
+  },
+  (t) => [
+    check("operator_settings_singleton", sql`${t.id} = 1`),
+    check(
+      "operator_settings_account_limit_range",
+      sql`${t.defaultAccountLimit} BETWEEN 1 AND ${sql.raw(String(ACCOUNT_LIMIT_MAX))}`,
+    ),
+    check(
+      "operator_settings_daily_post_limit_range",
+      sql`${t.defaultDailyPostLimit} BETWEEN 1 AND ${sql.raw(String(DAILY_POST_LIMIT_MAX))}`,
+    ),
+    check(
+      "operator_settings_slot_capacity_range",
+      sql`${t.testerSlotCapacity} BETWEEN ${sql.raw(String(TESTER_SLOT_CAPACITY_MIN))} AND ${sql.raw(String(TESTER_SLOT_CAPACITY_MAX))}`,
+    ),
+  ],
+);
+
+/**
+ * 招待の管理と上限の記録（data-model.md 1-3、research.md R14・R15）。detail には Threads のユーザー名・名前・メールアドレスを入れない。
+ * 利用者の申し込み・取り消しも記録し、回数の制限に使う。
+ */
+export const operatorEvents = pgTable(
+  "operator_events",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    actorUserId: uuid("actor_user_id").references(() => users.id, { onDelete: "set null" }),
+    subjectUserId: uuid("subject_user_id").references(() => users.id, { onDelete: "set null" }),
+    applicationId: uuid("application_id").references(() => testerApplications.id, { onDelete: "set null" }),
+    action: text("action").notNull(),
+    detail: jsonb("detail"),
+    createdAt: timestamp("created_at", { withTimezone: true, precision: 6 }).notNull().defaultNow(),
+  },
+  (t) => [
+    index("operator_events_actor_action_idx").on(t.actorUserId, t.action, t.createdAt),
+    index("operator_events_created_idx").on(t.createdAt.desc()),
   ],
 );
 

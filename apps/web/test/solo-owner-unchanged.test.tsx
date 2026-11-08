@@ -155,7 +155,7 @@ describe("個人運用のオーナーと決済", () => {
         nextInvoiceAt: "2026-12-01T03:00:00.000Z",
         nextInvoiceAmount: 1000,
       },
-      prices: { base: 1000, extra: 500 },
+      prices: { perAccount: 1000 },
     });
     vi.spyOn(actual.api, "syncBilling").mockImplementation(() => new Promise(() => {}));
     renderAt(<BillingSettingsPage />);

@@ -232,6 +232,7 @@ export function PostingScheduleSection({
           onReconnect={onReconnect}
           onClose={() => setEditing(false)}
           notConnected={account.connectionStatus === "not_connected"}
+          maxSlots={query.data?.limits.slots}
         />
       )}
     </section>

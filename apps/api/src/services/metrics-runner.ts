@@ -81,6 +81,7 @@ type Candidate = {
   threadsUserId: string;
   generation: number;
   ownerCreatedAt: Date;
+  ownerLegacyTrial: boolean;
   ownerBillingExempt: boolean;
   subStatus: string | null;
   subCancelAtPeriodEnd: boolean | null;
@@ -153,10 +154,22 @@ export async function runMetricsStage(
   const candidates = await loadCandidates(db, mode, now, catchup, todayStart, limit);
   // オーナーが読むだけのアカウントは取らない（specs/013 research.md R8）。テスト版に入れないオーナー（specs/016）は、
   // 候補を読むSQL（fullAccessSql）で外れているので、ここでは決済の状態だけを見直す
-  const ownerFull = (t: { ownerCreatedAt: Date; ownerBillingExempt: boolean; subStatus: string | null; subCancelAtPeriodEnd: boolean | null }) =>
+  const ownerFull = (t: {
+    ownerCreatedAt: Date;
+    ownerLegacyTrial: boolean;
+    ownerBillingExempt: boolean;
+    subStatus: string | null;
+    subCancelAtPeriodEnd: boolean | null;
+  }) =>
     entitlementFromFacts(
       mode,
-      { createdAt: t.ownerCreatedAt, billingExempt: t.ownerBillingExempt, status: t.subStatus, cancelAtPeriodEnd: t.subCancelAtPeriodEnd },
+      {
+        createdAt: t.ownerCreatedAt,
+        legacyTrial: t.ownerLegacyTrial,
+        billingExempt: t.ownerBillingExempt,
+        status: t.subStatus,
+        cancelAtPeriodEnd: t.subCancelAtPeriodEnd,
+      },
       now,
     ).fullAccess;
   let catchupRemaining = catchup && candidates.length >= limit;
@@ -349,6 +362,7 @@ async function loadCandidates(
       threadsUserId: accounts.threadsUserId,
       generation: accounts.connectionGeneration,
       ownerCreatedAt: users.createdAt,
+      ownerLegacyTrial: users.legacyTrial,
       ownerBillingExempt: billingExemptSql(users, mode),
       subStatus: subscriptions.status,
       subCancelAtPeriodEnd: subscriptions.cancelAtPeriodEnd,
@@ -412,6 +426,7 @@ async function loadFollowerTargets(db: Db, mode: BillingMode, now: Date, today: 
       threadsUserId: accounts.threadsUserId,
       generation: accounts.connectionGeneration,
       ownerCreatedAt: users.createdAt,
+      ownerLegacyTrial: users.legacyTrial,
       ownerBillingExempt: billingExemptSql(users, mode),
       subStatus: subscriptions.status,
       subCancelAtPeriodEnd: subscriptions.cancelAtPeriodEnd,

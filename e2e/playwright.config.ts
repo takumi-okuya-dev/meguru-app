@@ -33,6 +33,8 @@ export default defineConfig({
       // Threads は偽サーバーに向ける。Clerk・DB・鍵などは apps/api/.dev.vars から読む（README 参照）
       command:
         "pnpm --filter api exec wrangler dev --port 8787" +
+        // テスター招待の申し込み（specs/024）は結合テストで確かめる。ここでは「Threadsで許可する」をすぐに押せる審査の後の形にする
+        " --var THREADS_ACCESS_MODE:public" +
         " --var THREADS_AUTH_BASE_URL:http://localhost:8790" +
         " --var THREADS_GRAPH_BASE_URL:http://localhost:8790" +
         " --var THREADS_REDIRECT_URI:http://localhost:8787/api/threads/callback",

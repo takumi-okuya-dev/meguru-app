@@ -1,8 +1,10 @@
 // 投稿の設定（specs/005-auto-post research.md R1、contracts/api.md「GET・PUT /posting-schedule」）。
 // 自動投稿は全プランで使えるので、grower機能は判定しない（FR-004）。
+import { effectiveSlotMinutes } from "./limit-service";
 import type { AccountAccess } from "./access";
 import { recordActivity, updatedByOf, withActivityTx } from "./activity-log";
 import {
+  DAILY_POST_LIMIT_MAX,
   minutesToTime,
   validatePostingSchedule,
   type AutoPostState,
@@ -58,13 +60,14 @@ export function toPostingSchedule(row: PostingScheduleRow | null): PostingSchedu
 
 /**
  * 自動投稿の状態（オン・オフ、時刻の数、止まっている理由）。
- * @param account - Account の行（接続の状態）と、オーナーが読むだけか（specs/013。読むだけなら投稿しない）
+ * @param account - Account の行（接続の状態）と、オーナーが読むだけか（specs/013。読むだけなら投稿しない）、
+ *   オーナーの1日の投稿数の上限（specs/024。省けば切らない）
  * @param row - posting_schedules の行
  * @param now - 今の時刻
  * @returns AutoPostState
  */
 export function toAutoPostState(
-  account: Pick<AccountRow, "connectionStatus"> & { ownerReadOnly?: boolean },
+  account: Pick<AccountRow, "connectionStatus"> & { ownerReadOnly?: boolean; dailyPostLimit?: number },
   row: PostingScheduleRow | null,
   now: Date,
 ): AutoPostState {
@@ -75,7 +78,8 @@ export function toAutoPostState(
   else if (enabled && account.connectionStatus === "not_connected") stoppedReason = "not_connected";
   else if (enabled && row?.pausedUntil && row.pausedUntil.getTime() > now.getTime())
     stoppedReason = "rate_limited";
-  return { enabled, slotCount: row?.slotMinutes.length ?? 0, stoppedReason };
+  // 時刻の数は、オーナーの1日の投稿数の上限までに数える（あと何日分の計算にも使う。specs/024 FR-020）
+  return { enabled, slotCount: effectiveSlotMinutes(row?.slotMinutes ?? [], account.dailyPostLimit).length, stoppedReason };
 }
 
 /**
@@ -103,6 +107,7 @@ function sameMinutes(a: number[], b: number[]): boolean {
  * @param access - 操作した人（操作の記録と、保存した人に使う。specs/008）。省略すると記録しない
  * @returns 保存した設定と、投稿の権限の確認の結果（オフの保存では null）
  * @throws AppError VALIDATION_FAILED（details と reason）、THREADS_NOT_READY（details に結果）、STALE_UPDATE（latest 付き）、ACCOUNT_NOT_FOUND
+ * @param dailyPostLimit - オーナーの1日の投稿数の上限（specs/024 FR-019。省けば Threads の上限）
  */
 export async function savePostingSchedule(
   env: Env,
@@ -112,8 +117,10 @@ export async function savePostingSchedule(
   threads: ThreadsClient,
   now: Date = new Date(),
   access?: AccountAccess,
+  dailyPostLimit: number = DAILY_POST_LIMIT_MAX,
 ): Promise<{ schedule: PostingSchedule; connectionCheck: ThreadsCheck | null }> {
-  const v = validatePostingSchedule(req);
+  // 形・重複・間は Threads の上限まで見て、オーナーの1日の投稿数の上限は下で別に確かめる（specs/024 FR-019）
+  const v = validatePostingSchedule(req, { maxSlots: DAILY_POST_LIMIT_MAX });
   if (!v.ok) {
     throw new AppError(
       "VALIDATION_FAILED",
@@ -127,6 +134,11 @@ export async function savePostingSchedule(
     );
   }
   const current = await readPostingSchedule(db, accountId);
+  // 上限を超える時刻は登録できない。ただし、上限が下がって超えている時刻を減らす保存は通す（FR-020）
+  const before = current?.slotMinutes.length ?? 0;
+  if (v.slotMinutes.length > dailyPostLimit && v.slotMinutes.length > before) {
+    throw new AppError("POSTING_SLOT_LIMIT", 409, "posting slot limit", undefined, [String(dailyPostLimit)], { max: dailyPostLimit });
+  }
   if ((current?.version ?? 0) !== req.expectedVersion) {
     // 先に保存した人の名前を添える（specs/008 FR-007）
     throw new AppError(

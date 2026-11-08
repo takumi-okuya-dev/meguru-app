@@ -102,7 +102,7 @@ describe("SQLの条件と関数の判定が同じ（fullAccessSql と entitlemen
         .leftJoin(subscriptions, eq(subscriptions.userId, users.id))
         .where(cond ? and(eq(users.id, userId), cond) : eq(users.id, userId));
       const [facts] = await db()
-        .select({ createdAt: users.createdAt, billingExempt: users.billingExempt, status: subscriptions.status, cancelAtPeriodEnd: subscriptions.cancelAtPeriodEnd })
+        .select({ createdAt: users.createdAt, legacyTrial: users.legacyTrial, billingExempt: users.billingExempt, status: subscriptions.status, cancelAtPeriodEnd: subscriptions.cancelAtPeriodEnd })
         .from(users)
         .leftJoin(subscriptions, eq(subscriptions.userId, users.id))
         .where(eq(users.id, userId));

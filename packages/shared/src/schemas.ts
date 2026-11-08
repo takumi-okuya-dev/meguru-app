@@ -22,7 +22,6 @@ import {
   REVIEW_MAX_ITEMS,
   FEEDBACK_MEMO_MAX,
   PERFORMANCE_PAGE_SIZE,
-  AUTOPOST_SLOT_LIMIT,
   PUBLISHED_PAGE_SIZE,
   TEAM_MEMBER_LIMIT,
   TEST_GROUP_CAPACITY_MAX,
@@ -49,7 +48,17 @@ import {
   MENTION_LABEL_MAX,
   MENTION_MESSAGE_MAX,
   MENTION_PER_REPLY_MAX,
+  ACCOUNT_LIMIT_MAX,
+  DAILY_POST_LIMIT_MAX,
 } from "./limits";
+import {
+  DECLINE_REASON_MAX,
+  TESTER_APPLICATION_STATUSES,
+  TESTER_APPLICATION_VIEWS,
+  TESTER_REMOVAL_REASONS,
+  TESTER_SLOT_CAPACITY_MAX,
+  TESTER_SLOT_CAPACITY_MIN,
+} from "./tester";
 import { REJECT_REASON_CODES } from "./review";
 import { OPENING_TYPES } from "./analysis/types";
 import { MENTION_FAILURE_REASONS, MENTION_STATES } from "./mention";
@@ -122,17 +131,18 @@ export const billingStateSchema = z.enum([
   "active",
   "canceling",
   "read_only",
+  "unsubscribed",
 ]);
 /** 読むだけの理由。 */
-export const readOnlyReasonSchema = z.enum(["trial_ended", "payment_failed", "canceled", "test_access"]);
+export const readOnlyReasonSchema = z.enum(["trial_ended", "payment_failed", "canceled", "test_access", "not_subscribed"]);
 
 /** /api/me の、使える状態。 */
 export const meBillingSchema = z.object({
   mode: z.enum(["enabled", "disabled"]),
   state: billingStateSchema,
   readOnlyReason: readOnlyReasonSchema.nullable(),
-  /** 無料体験の終わる時刻（ISO 8601） */
-  trialEndsAt: z.string(),
+  /** 無料体験の終わる時刻（ISO 8601）。024の前からいた人だけ（それ以外は null。specs/024） */
+  trialEndsAt: z.string().nullable(),
   /** 無料体験の残りの日数（state が trial のときだけ。日本時間の日付で数え、終わる日を含まない） */
   trialDaysLeft: z.number().int().nullable(),
 });
@@ -156,7 +166,8 @@ export const billingSummarySchema = z.object({
       nextInvoiceAmount: z.number().int().nullable(),
     })
     .nullable(),
-  prices: z.object({ base: z.number().int(), extra: z.number().int() }),
+  /** 料金（アカウント1件につき。specs/024 research.md R10） */
+  prices: z.object({ perAccount: z.number().int() }),
 });
 /** 「契約と支払い」の内容。 */
 export type BillingSummary = z.infer<typeof billingSummarySchema>;
@@ -206,6 +217,10 @@ export const meResponseSchema = z.object({
   operator: z.boolean(),
   /** 自分の使えるまとまり（人 ∪ グループ。specs/019 contracts/api.md） */
   features: z.array(z.enum(FEATURES)),
+  /** 自分のアカウントの1日の投稿数の上限。null は上限なし（運営者。specs/024 contracts/api.md） */
+  dailyPostLimit: z.number().int().nullable(),
+  /** 招待の管理（テスター招待の申し込み）がONか（specs/024 research.md R4） */
+  testerInvites: z.object({ enabled: z.boolean() }),
 });
 /** GET /api/me のレスポンス。ログイン中のユーザー、Account一覧、ログイン後の遷移先、登録数上限。 */
 export type MeResponse = z.infer<typeof meResponseSchema>;
@@ -1105,7 +1120,8 @@ export type PostingSchedule = z.infer<typeof postingScheduleSchema>;
 /** PUT /posting-schedule のリクエストのスキーマ。並び・重複・間の検証は validatePostingSchedule で行う。 */
 export const putPostingScheduleRequestSchema = z.object({
   enabled: z.boolean(),
-  slotTimes: z.array(slotTimeSchema).max(AUTOPOST_SLOT_LIMIT * 2),
+  // 上限の判定は保存の処理で行う（オーナーの1日の投稿数の上限。specs/024 FR-019）
+  slotTimes: z.array(slotTimeSchema).max(DAILY_POST_LIMIT_MAX * 2),
   jitter: z.boolean(),
   expectedVersion: z.number().int().min(0),
 });
@@ -1127,6 +1143,9 @@ export type ThreadsCheck = z.infer<typeof threadsCheckSchema>;
 /** GET /posting-schedule のレスポンスのスキーマ。 */
 export const postingScheduleResponseSchema = z.object({
   schedule: postingScheduleSchema,
+  /** 上限が下がって、登録した時刻の数が上限を超えている（specs/024 FR-020） */
+  overLimit: z.boolean().optional(),
+  /** slots はオーナーの1日の投稿数の上限（specs/024 FR-019） */
   limits: z.object({ slots: z.number().int(), minGapMinutes: z.number().int(), jitterMinutes: z.number().int() }),
 });
 /** GET /posting-schedule のレスポンス。 */
@@ -2166,3 +2185,124 @@ export const mentionBulkResponseSchema = z.object({
 });
 /** DELETE …/post-drafts/:draftId/mention のリクエスト。 */
 export const mentionDetachRequestSchema = z.object({ expectedVersion: z.number().int().positive().optional() });
+
+// ---- テスター招待・上限（specs/024-tester-invite-connect contracts/api.md） ----
+
+/** 申し込みの状態。 */
+export const testerApplicationStatusSchema = z.enum(TESTER_APPLICATION_STATUSES);
+/** 外してよい理由。 */
+export const testerRemovalReasonSchema = z.enum(TESTER_REMOVAL_REASONS);
+
+/** 利用者に見せる申し込み（GET・POST /api/accounts/:id/tester-application）。 */
+export const testerApplicationSchema = z.object({
+  id: z.string(),
+  threadsUsername: z.string(),
+  status: testerApplicationStatusSchema,
+  declineReason: z.string().nullable(),
+  createdAt: z.string(),
+  statusChangedAt: z.string(),
+});
+/** 利用者に見せる申し込み。 */
+export type TesterApplication = z.infer<typeof testerApplicationSchema>;
+
+/** GET /api/accounts/:id/tester-application の応答。 */
+export const testerApplicationResponseSchema = z.object({
+  enabled: z.boolean(),
+  application: testerApplicationSchema.nullable(),
+});
+/** GET /api/accounts/:id/tester-application の応答。 */
+export type TesterApplicationResponse = z.infer<typeof testerApplicationResponseSchema>;
+
+/** POST /api/accounts/:id/tester-application のリクエスト（形は API で normalizeThreadsUsername して確かめる）。 */
+export const testerApplyRequestSchema = z.object({ threadsUsername: z.string().max(100) });
+
+/** 運営者の一覧の見え方。 */
+export const testerApplicationViewSchema = z.enum(TESTER_APPLICATION_VIEWS);
+
+/** 運営者の一覧の1行。 */
+export const operatorTesterApplicationSchema = z.object({
+  id: z.string(),
+  threadsUsername: z.string(),
+  status: testerApplicationStatusSchema,
+  removalReason: testerRemovalReasonSchema.nullable(),
+  applicant: z.object({ userId: z.string(), name: z.string().nullable(), email: z.string() }).nullable(),
+  connectedUsername: z.string().nullable(),
+  declineReason: z.string().nullable(),
+  duplicate: z.boolean(),
+  alreadyConnected: z.boolean(),
+  createdAt: z.string(),
+  statusChangedAt: z.string(),
+});
+/** 運営者の一覧の1行。 */
+export type OperatorTesterApplication = z.infer<typeof operatorTesterApplicationSchema>;
+
+/** GET /api/operator/tester-applications の応答。 */
+export const operatorTesterApplicationsSchema = z.object({
+  enabled: z.boolean(),
+  threadsAppId: z.string().nullable(),
+  slots: z.object({ used: z.number().int(), capacity: z.number().int() }),
+  counts: z.object({ pending: z.number().int(), invited: z.number().int(), connected: z.number().int(), removable: z.number().int() }),
+  items: z.array(operatorTesterApplicationSchema),
+});
+/** GET /api/operator/tester-applications の応答。 */
+export type OperatorTesterApplications = z.infer<typeof operatorTesterApplicationsSchema>;
+
+/** POST /api/operator/tester-applications/:id/invite のリクエスト。 */
+export const testerInviteRequestSchema = z.object({ force: z.boolean().optional() });
+/** POST /api/operator/tester-applications/:id/decline のリクエスト。 */
+export const testerDeclineRequestSchema = z.object({ reason: z.string().trim().max(DECLINE_REASON_MAX).optional() });
+/** PUT /api/operator/tester-settings のリクエスト。 */
+export const testerSettingsRequestSchema = z.object({
+  slotCapacity: z.number().int().min(TESTER_SLOT_CAPACITY_MIN).max(TESTER_SLOT_CAPACITY_MAX),
+});
+
+/** アカウントの数の上限の値。 */
+const accountLimitValueSchema = z.number().int().min(1).max(ACCOUNT_LIMIT_MAX);
+/** 1日の投稿数の上限の値。 */
+const dailyPostLimitValueSchema = z.number().int().min(1).max(DAILY_POST_LIMIT_MAX);
+
+/** PUT /api/operator/limits のリクエスト（全員共通の既定値）。 */
+export const defaultLimitsRequestSchema = z.object({
+  accountLimit: accountLimitValueSchema,
+  dailyPostLimit: dailyPostLimitValueSchema,
+});
+/** 全員共通の既定値。 */
+export type DefaultLimits = z.infer<typeof defaultLimitsRequestSchema>;
+
+/** PUT /api/operator/limits/users/:userId のリクエスト（null は既定値に戻す）。 */
+export const userLimitsRequestSchema = z.object({
+  accountLimit: accountLimitValueSchema.nullable(),
+  dailyPostLimit: dailyPostLimitValueSchema.nullable(),
+});
+/** 利用者ごとの上限。 */
+export type UserLimitsRequest = z.infer<typeof userLimitsRequestSchema>;
+
+/** 運営者の画面の、見つかった人の上限（GET /api/operator/limits/users）。 */
+export const operatorLimitUserSchema = z.object({
+  userId: z.string(),
+  name: z.string().nullable(),
+  email: z.string(),
+  operator: z.boolean(),
+  accountLimit: z.number().int().nullable(),
+  dailyPostLimit: z.number().int().nullable(),
+  ownedAccountCount: z.number().int(),
+});
+/** 運営者の画面の、見つかった人の上限。 */
+export type OperatorLimitUser = z.infer<typeof operatorLimitUserSchema>;
+
+/** GET /api/operator/limits の応答。 */
+export const operatorLimitsSchema = z.object({
+  defaults: defaultLimitsRequestSchema,
+  overrides: z.array(
+    z.object({
+      userId: z.string(),
+      name: z.string().nullable(),
+      email: z.string(),
+      accountLimit: z.number().int().nullable(),
+      dailyPostLimit: z.number().int().nullable(),
+    }),
+  ),
+  events: z.array(z.object({ at: z.string(), actor: z.string().nullable(), action: z.string(), detail: z.unknown() })),
+});
+/** GET /api/operator/limits の応答。 */
+export type OperatorLimits = z.infer<typeof operatorLimitsSchema>;

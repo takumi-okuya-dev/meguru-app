@@ -1,17 +1,23 @@
 // ルートのガード（contracts/ui-routes.md「遷移の規則」）
 import { useAuth } from "@clerk/react";
 import { useEffect, useState, useSyncExternalStore } from "react";
-import { Navigate, Outlet } from "react-router";
+import { Navigate, Outlet, useLocation } from "react-router";
 import { ClerkLoadFailedScreen } from "@/components/ErrorScreen";
 import { CLERK_LOAD_TIMEOUT_MS } from "@/lib/config-check";
 import { WithdrawalInProgress } from "@/components/billing/WithdrawalInProgress";
+import { SubscribeRequired } from "@/components/billing/SubscribeRequired";
 import { TestAccessRequired } from "@/components/TestAccessRequired";
 import {
+  getSubscriptionRequired,
   getTestAccessRequired,
   getWithdrawalInProgress,
+  subscribeSubscriptionRequired,
   subscribeTestAccessRequired,
   subscribeWithdrawalInProgress,
 } from "@/lib/api-client";
+
+/** 契約前でも開ける画面（契約と支払い＝Checkoutからの戻り先、退会のあるアカウント。specs/024 contracts/ui-routes.md 1）。 */
+const SUBSCRIBE_ALLOWED_PATHS = ["/settings/billing", "/settings/account"];
 
 /**
  * 読み込み中の骨組み。データは出さない（規則1）。
@@ -50,6 +56,8 @@ export function RequireAuth() {
   const { isLoaded, isSignedIn } = useAuth();
   const withdrawing = useSyncExternalStore(subscribeWithdrawalInProgress, getWithdrawalInProgress);
   const testAccessRequired = useSyncExternalStore(subscribeTestAccessRequired, getTestAccessRequired);
+  const subscriptionRequired = useSyncExternalStore(subscribeSubscriptionRequired, getSubscriptionRequired);
+  const { pathname } = useLocation();
   const timedOut = useLoadTimeout(Boolean(isLoaded));
   if (timedOut) return <ClerkLoadFailedScreen />;
   if (!isLoaded) return <LoadingSkeleton />;
@@ -58,5 +66,7 @@ export function RequireAuth() {
   if (withdrawing) return <WithdrawalInProgress />;
   // テスト版に入れない人は、招待された方だけが使えると出す（specs/016 contracts/ui-routes.md 2）
   if (testAccessRequired) return <TestAccessRequired />;
+  // 契約前の人は、契約してから使い始める（無料体験なし。specs/024 FR-029）
+  if (subscriptionRequired && !SUBSCRIBE_ALLOWED_PATHS.includes(pathname)) return <SubscribeRequired />;
   return <Outlet />;
 }

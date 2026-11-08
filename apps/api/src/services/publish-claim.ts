@@ -16,6 +16,7 @@ import { lockAccountDrafts } from "../db/locks";
 import { accounts, postDrafts, postingSchedules, publishAttempts } from "../db/schema";
 import type { Env } from "../env";
 import { billingModeOf, type BillingMode } from "../lib/config";
+import { effectiveSlotMinutes, ownerDailyPostLimit } from "./limit-service";
 import { loadOwnerEntitlement } from "./billing-service";
 import { ownerAutopostOn } from "./feature-sql";
 import { CLEAR_QUEUE_FIELDS, listQueueRows } from "./draft-service";
@@ -41,12 +42,14 @@ export type ClaimResult =
  * @param accountId - accounts.id
  * @param slot - 来ている時刻（定期処理が先に読んだ設定で求めたもの）
  * @param schedule - 取り出しのトランザクションで読み直した設定
+ * @param dailyPostLimit - オーナーの1日の投稿数の上限（specs/024）
  * @returns 今の設定でも、この時刻が予定の時刻なら true
  */
-function isCurrentSlot(accountId: string, slot: DueSlot, schedule: ScheduleRow): boolean {
+function isCurrentSlot(accountId: string, slot: DueSlot, schedule: ScheduleRow, dailyPostLimit: number): boolean {
   return (
     slot.slotAt.getTime() > schedule.effectiveFrom.getTime() &&
-    schedule.slotMinutes.includes(slot.slotMinute) &&
+    // 1日の投稿数の上限を超えた時刻は、今の設定の予定の時刻ではない（specs/024 FR-020）
+    effectiveSlotMinutes(schedule.slotMinutes, dailyPostLimit).includes(slot.slotMinute) &&
     plannedSlotTime(accountId, slot.slotDate, slot.slotMinute, schedule.jitter).getTime() ===
       slot.slotAt.getTime()
   );
@@ -60,6 +63,7 @@ function isCurrentSlot(accountId: string, slot: DueSlot, schedule: ScheduleRow):
  * @param schedule - 読み直した設定
  * @param slot - 来ている時刻
  * @param now - 今の時刻
+ * @param dailyPostLimit - オーナーの1日の投稿数の上限（specs/024）
  * @returns 飛ばす理由。満たしていれば null
  */
 async function skipReasonOf(
@@ -69,6 +73,7 @@ async function skipReasonOf(
   schedule: ScheduleRow | undefined,
   slot: DueSlot,
   now: Date,
+  dailyPostLimit: number,
 ): Promise<SkipReason | null> {
   const [account] = await tx
     .select({ connectionStatus: accounts.connectionStatus })
@@ -98,8 +103,8 @@ async function skipReasonOf(
     published(jstMidnight(slot.slotDate), jstMidnight(addDays(slot.slotDate, 1))),
     published(new Date(now.getTime() - 86_400_000), new Date(now.getTime() + 1)),
   ]);
-  // その日の投稿数は時刻の数まで（SC-008）。24時間で250件を超えない（FR-017）
-  if (Number(day?.n ?? 0) >= schedule.slotMinutes.length) return "daily_limit";
+  // その日の投稿数は時刻の数まで（SC-008）、かつオーナーの1日の投稿数の上限まで（specs/024 FR-019）。24時間で250件を超えない（FR-017）
+  if (Number(day?.n ?? 0) >= effectiveSlotMinutes(schedule.slotMinutes, dailyPostLimit).length) return "daily_limit";
   if (Number(last24h?.n ?? 0) >= AUTOPOST_DAILY_API_LIMIT) return "rate_limited";
   return null;
 }
@@ -148,7 +153,9 @@ export async function claimSlot(
       .from(postingSchedules)
       .where(eq(postingSchedules.accountId, accountId))
       .for("share");
-    if (schedule?.enabled && !isCurrentSlot(accountId, slot, schedule))
+    // オーナーの1日の投稿数の上限は、設定と同じトランザクションで読み直す（一覧を読んだ後に下がっても超えない）
+    const dailyPostLimit = await ownerDailyPostLimit(tx, accountId, billingModeOf(env).operators ?? []);
+    if (schedule?.enabled && !isCurrentSlot(accountId, slot, schedule, dailyPostLimit))
       return { kind: "stale" } as const;
 
     const base = {
@@ -168,7 +175,7 @@ export async function claimSlot(
     };
 
     // 自分の記録で250件に達した場合は paused_until を入れない（直前24時間の件数が減れば、次の時刻から投稿する）
-    const reason = await skipReasonOf(tx, billingModeOf(env), accountId, schedule, slot, now);
+    const reason = await skipReasonOf(tx, billingModeOf(env), accountId, schedule, slot, now, dailyPostLimit);
     if (reason) return skip(reason, 0);
 
     const [queue, ngWordRows] = await Promise.all([

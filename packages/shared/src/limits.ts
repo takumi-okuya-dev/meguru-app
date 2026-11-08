@@ -125,7 +125,7 @@ export const SIMILARITY_EDIT_DISTANCE_MAX_LENGTH = 300;
 
 // ---- 自動投稿（specs/005-auto-post contracts/auto-post-job.md「定数」）----
 
-/** 1日に投稿する時刻の上限（FR-001）。 */
+/** 1日に投稿する時刻の上限（FR-001）。024で、運営者が決める上限の既定値（DEFAULT_DAILY_POST_LIMIT）に置き換える。 */
 export const AUTOPOST_SLOT_LIMIT = 10;
 /** 時刻をずらすときの、時刻どうしの間（分。FR-001a）。 */
 export const AUTOPOST_MIN_GAP_MINUTES = 30;
@@ -322,3 +322,16 @@ export const MENTION_PUBLISHED_DAYS = 7;
 export const MENTION_MAX_ATTEMPTS = 3;
 /** 1回の処理で出す返信の上限。 */
 export const MENTION_MAX_PER_TICK = 10;
+
+// ---- アカウントの数と1日の投稿数の上限（specs/024-tester-invite-connect data-model.md 3） ----
+
+/** アカウントの数の上限の、全員共通の既定値の初めの値（FR-016）。 */
+export const DEFAULT_ACCOUNT_LIMIT = 3;
+/** 1日の投稿数の上限（1アカウント）の、全員共通の既定値の初めの値。今までの1日10件と同じ（FR-016）。 */
+export const DEFAULT_DAILY_POST_LIMIT = AUTOPOST_SLOT_LIMIT;
+/** アカウントの数の上限の最大。 */
+export const ACCOUNT_LIMIT_MAX = 1000;
+/** 1日の投稿数の上限の最大（Threadsの24時間の上限）。運営者にはこの値をかける（research.md R7）。 */
+export const DAILY_POST_LIMIT_MAX = 250;
+/** 運営者の上限の記録を出す件数。 */
+export const LIMIT_EVENTS_LIMIT = 50;

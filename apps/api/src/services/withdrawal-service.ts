@@ -22,6 +22,7 @@ import { AppError } from "../lib/errors";
 import { logger } from "../lib/logger";
 import { createStripeClient, StripeError, type StripeClient } from "../lib/stripe-client";
 import { beforeAccountDeleted, chooseSuccessor } from "./team-service";
+import { purgeForWithdrawal } from "./tester-application-service";
 
 /** 退会した人を記録に出すときの名前（FR-053）。 */
 export const WITHDRAWN_ACTOR_NAME = "退会した人";
@@ -204,6 +205,8 @@ async function deleteUserData(tx: TxDb, user: { id: string; clerkUserId: string 
   const [exists] = await tx.select({ id: users.id }).from(users).where(eq(users.id, user.id));
   const now = new Date();
   if (exists) {
+    // 招待の申し込みを片づける（枠を使っていない行は消し、使っている行はユーザー名だけを残す。specs/024 research.md R15）
+    await purgeForWithdrawal(tx, user.id);
     const owned = await tx
       .select({ id: accounts.id, threadsUserId: accounts.threadsUserId })
       .from(accounts)

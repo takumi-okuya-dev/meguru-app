@@ -22,7 +22,7 @@ describe("/api/me の operator", () => {
     expect((await me("someone")).operator).toBe(false);
   });
 
-  it("招待制がOFFの運営者は、料金なしにならない（testGroups.operator は false のまま）", async () => {
+  it("招待制がOFFの運営者も料金なし（specs/024 FR-023）。testGroups.operator は false のまま", async () => {
     const env = billingEnv({ OPERATOR_CLERK_USER_IDS: FEATURE_OPERATOR });
     const { userId, accountId } = await createUserWithAccount(FEATURE_OPERATOR);
     await endTrial(userId);
@@ -33,8 +33,7 @@ describe("/api/me の operator", () => {
       env,
       body: { title: "宣伝", body: "本文" },
     });
-    expect(res.status).toBe(403);
-    expect(((await res.json()) as { error: { code: string } }).error.code).toBe("BILLING_REQUIRED");
+    expect(res.status).not.toBe(403);
   });
 
   it("招待制がONなら、016の振る舞い（運営者はテスト版の運営者）が変わらない", async () => {

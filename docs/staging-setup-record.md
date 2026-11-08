@@ -51,7 +51,7 @@
 | `STRIPE_SECRET_KEY` | Cloudflareのシークレット | Stripeのサンドボックスのシークレットキー（運営者が入れた） |
 | `STRIPE_WEBHOOK_SECRET` | Cloudflareのシークレット | Webhookを作ったときの応答から、表示せずに入れた |
 | `CLOUDFLARE_API_TOKEN` | GitHubの`staging`のSecret | Cloudflareのトークン`threads-grower-deploy`（Workers Scripts・Cloudflare Pages・Workers KV Storageの編集）。運営者が「パスワード」アプリにも控えた |
-| `THREADS_APP_SECRET` | **入れていない** | トークンを貼る方法だけなら要らない（PR #29） |
+| `THREADS_APP_SECRET` | Cloudflareのシークレット（`--env staging`） | Metaアプリ「ThreadsAutomation」のシークレット。2026-11-08に入れた（specs/024。テスト版も「Threadsで許可する」を出すため要る） |
 | `OPERATOR_CLERK_USER_IDS` | Cloudflareのシークレット（**016をマージするときに入れる**） | 運営者のClerkのユーザーID（`user_…`）。グループを作る・管理し、機能のまとまりをON/OFFする人（specs/016・019） |
 
 GitHubの`staging`の変数は、`CLOUDFLARE_ACCOUNT_ID`・`VITE_API_BASE_URL`（APIのURL、`/api`なし）・`VITE_CLERK_PUBLISHABLE_KEY`・`VITE_APP_ENV`（`staging`）の4つです。

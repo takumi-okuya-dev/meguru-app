@@ -363,7 +363,7 @@ describe("投稿のスケジュールのダイアログ", () => {
     });
     const { user, dialog } = await openDialog();
     for (const t of ["21:00", "07:30", "12:00"]) await addTime(user, dialog, t);
-    expect(within(dialog).getByText("1日 3件 投稿します")).toBeInTheDocument();
+    expect(within(dialog).getByText("1日 3件 投稿します（10件まで）")).toBeInTheDocument();
     await user.click(within(dialog).getByRole("switch", { name: "自動投稿" }));
     await user.click(saveButton(dialog));
     expect(putPostingSchedule).toHaveBeenCalledWith("a1", {
@@ -403,7 +403,21 @@ describe("投稿のスケジュールのダイアログ", () => {
     );
     const { dialog } = await openDialog();
     expect(within(dialog).getByLabelText("追加する時刻")).toBeDisabled();
-    expect(within(dialog).getByText("時刻は10件まで登録できます")).toBeInTheDocument();
+    expect(within(dialog).getByText("1日に投稿できるのは10件までです。")).toBeInTheDocument();
+  });
+
+  it("上限はオーナーの1日の投稿数の上限。下がって超えた時刻は「投稿しません」と出し、注意を出す（specs/024 FR-019・FR-020、T046）", async () => {
+    getPostingSchedule.mockResolvedValue({
+      ...scheduleResponse({ slotTimes: ["07:30", "10:00", "12:00", "15:00", "18:00", "20:00", "22:00"] }),
+      overLimit: true,
+      limits: { slots: 5, minGapMinutes: 30, jitterMinutes: 10 },
+    });
+    const { dialog } = await openDialog();
+    expect(within(dialog).getByText("1日 5件 投稿します（5件まで）")).toBeInTheDocument();
+    expect(within(dialog).getByText("上限が5件に下がったため、6つ目からの時刻には投稿しません。")).toBeInTheDocument();
+    expect(within(dialog).getAllByText("投稿しません")).toHaveLength(2);
+    expect(within(dialog).getByLabelText("追加する時刻")).toBeDisabled();
+    expect(within(dialog).getByText("1日に投稿できるのは5件までです。")).toBeInTheDocument();
   });
 
   it("深夜（2:00〜4:59）の時刻にだけ案内が出て、保存はできる（FR-001b）", async () => {

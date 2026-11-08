@@ -2,7 +2,7 @@
 // 002の追加・編集のダイアログの枠と振る舞い（未保存の警告・他の場所での更新）を使う。
 import {
   AUTOPOST_MIN_GAP_MINUTES,
-  AUTOPOST_SLOT_LIMIT,
+  DEFAULT_DAILY_POST_LIMIT,
   LATE_NIGHT_HINT,
   THREADS_CHECK_MESSAGES,
   isLateNightSlot,
@@ -38,10 +38,13 @@ const toItem = (s: PostingSchedule): Item => ({
 /**
  * 検証の結果を、画面に出す文言にする（contracts/ui-routes.md「投稿のスケジュールのダイアログ」）。
  * @param form - 入力値
+ * @param maxSlots - オーナーの1日の投稿数の上限（specs/024 FR-019）
+ * @param savedCount - 保存済みの時刻の数（上限が下がって超えている時刻を減らす保存は通す）
  * @returns 文言。問題がなければ null
  */
-function validationMessage(form: Form): string | null {
-  const v = validatePostingSchedule(form);
+function validationMessage(form: Form, maxSlots: number, savedCount: number): string | null {
+  // 上限が下がって超えている時刻を減らす保存は通す（APIと同じ。specs/024 FR-020）
+  const v = validatePostingSchedule(form, { maxSlots: Math.max(maxSlots, savedCount) });
   if (v.ok) return null;
   switch (v.reason) {
     case "duplicate":
@@ -51,7 +54,7 @@ function validationMessage(form: Form): string | null {
     case "required":
       return "自動投稿をオンにするには、時刻を1つ以上追加してください";
     case "too_many":
-      return `時刻は${AUTOPOST_SLOT_LIMIT}件まで登録できます`;
+      return `1日に投稿できるのは${maxSlots}件までです`;
     case "invalid_time":
       return "時刻の形が正しくありません";
   }
@@ -60,7 +63,8 @@ function validationMessage(form: Form): string | null {
 /**
  * 投稿のスケジュールのダイアログ。
  * @param props - accountId、schedule：保存済みの設定、onSaved：保存できた（設定と、投稿の権限の確認の結果）、
- *   onReconnect：再接続を始める、onClose：閉じる、notConnected：未接続（オンにできない。時刻は保存できる。specs/012 FR-032）
+ *   onReconnect：再接続を始める、onClose：閉じる、notConnected：未接続（オンにできない。時刻は保存できる。specs/012 FR-032）、
+ *   maxSlots：オーナーの1日の投稿数の上限（specs/024 FR-019。省けば既定値）
  * @returns ダイアログ
  */
 export function PostingScheduleDialog({
@@ -70,6 +74,7 @@ export function PostingScheduleDialog({
   onReconnect,
   onClose,
   notConnected = false,
+  maxSlots = DEFAULT_DAILY_POST_LIMIT,
 }: {
   accountId: string;
   schedule: PostingSchedule;
@@ -77,6 +82,7 @@ export function PostingScheduleDialog({
   onReconnect: () => void;
   onClose: () => void;
   notConnected?: boolean;
+  maxSlots?: number;
 }) {
   const [adding, setAdding] = useState("");
   const [addError, setAddError] = useState<string | null>(null);
@@ -92,7 +98,7 @@ export function PostingScheduleDialog({
     toForm: (item) => ({ enabled: item.enabled, slotTimes: item.slotTimes, jitter: item.jitter }),
     validate: () => ({}),
     // 検証に通らない間は保存しない（保存のボタンも無効にする）
-    overLimit: (form) => validationMessage(form) !== null,
+    overLimit: (form) => validationMessage(form, maxSlots, schedule.slotTimes.length) !== null,
     onSaved: (item) => onSaved(item, lastCheck.current),
     onClose,
     onReadOnly: () => {},
@@ -129,8 +135,11 @@ export function PostingScheduleDialog({
     },
   });
 
-  const message = validationMessage(f.form);
-  const full = f.form.slotTimes.length >= AUTOPOST_SLOT_LIMIT;
+  const message = validationMessage(f.form, maxSlots, schedule.slotTimes.length);
+  const full = f.form.slotTimes.length >= maxSlots;
+  // 早い時刻から上限の数まで投稿する。それより後の時刻には投稿しない（specs/024 FR-020）
+  const sortedTimes = [...f.form.slotTimes].sort((a, b) => (timeToMinutes(a) ?? 0) - (timeToMinutes(b) ?? 0));
+  const skipped = new Set(sortedTimes.slice(maxSlots));
 
   const add = () => {
     if (!adding || timeToMinutes(adding) === null) return;
@@ -206,9 +215,16 @@ export function PostingScheduleDialog({
               投稿する時刻
             </h3>
             <span className="text-xs text-muted-foreground">
-              1日 {f.form.slotTimes.length}件 投稿します
+              1日 {Math.min(f.form.slotTimes.length, maxSlots)}件 投稿します（{maxSlots}件まで）
             </span>
           </div>
+          {skipped.size > 0 && (
+            <Alert>
+              <AlertDescription>
+                上限が{maxSlots}件に下がったため、{maxSlots + 1}つ目からの時刻には投稿しません。
+              </AlertDescription>
+            </Alert>
+          )}
           {f.form.slotTimes.length > 0 && (
             <ul className="divide-y rounded-xl border">
               {f.form.slotTimes.map((t) => {
@@ -216,7 +232,10 @@ export function PostingScheduleDialog({
                 return (
                   <li key={t} className="px-3 py-2">
                     <div className="flex items-center justify-between gap-2">
-                      <span className="text-sm tabular-nums">{formatSlotTime(t)}</span>
+                      <span className={skipped.has(t) ? "text-sm tabular-nums text-muted-foreground" : "text-sm tabular-nums"}>
+                        {formatSlotTime(t)}
+                        {skipped.has(t) && <span className="ml-2.5 text-xs">投稿しません</span>}
+                      </span>
                       <Button
                         variant="ghost"
                         size="icon"
@@ -263,11 +282,7 @@ export function PostingScheduleDialog({
               追加
             </Button>
           </div>
-          {full && (
-            <p className="text-xs text-muted-foreground">
-              時刻は{AUTOPOST_SLOT_LIMIT}件まで登録できます
-            </p>
-          )}
+          {full && <p className="text-xs text-muted-foreground">1日に投稿できるのは{maxSlots}件までです。</p>}
           {addError && <p className="text-xs text-destructive">{addError}</p>}
           {message && (
             <p role="alert" className="text-xs text-destructive">

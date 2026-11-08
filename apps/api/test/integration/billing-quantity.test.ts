@@ -85,3 +85,25 @@ describe("日次の合わせ直し", () => {
     expect((await fakeStripe.requests()).length).toBe(before);
   });
 });
+
+describe("料金の切り替え（specs/024 research.md R10、T030）", () => {
+  it("契約の料金が STRIPE_PRICE_ID と違えば、数の合わせ直しで新しい料金にする（日割りなし）。同じなら替えない", async () => {
+    const { userId } = await subscribed("u1");
+    expect((await fakeStripe.subscriptions())[0]!.items.data[0]!.price.id).toBe(testEnv.STRIPE_PRICE_ID);
+    // 料金が同じで数も合っていれば、Stripeを呼ばない
+    const before = (await quantityUpdates()).length;
+    await db().update(subscriptions).set({ quantitySyncNeeded: true }).where(eq(subscriptions.userId, userId));
+    await reconcileSubscriptions(billingEnv());
+    expect((await quantityUpdates()).length).toBe(before);
+
+    // 1件1,000円の新しい料金に替えた環境
+    const env = billingEnv({ STRIPE_PRICE_ID: "price_NewPerAccount" });
+    expect(await reconcileSubscriptions(env)).toEqual({ synced: 1, failed: 0 });
+    expect((await fakeStripe.subscriptions())[0]!.items.data[0]!.price.id).toBe("price_NewPerAccount");
+    expect((await quantityUpdates()).at(-1)!.params).toMatchObject({
+      "items[0][price]": "price_NewPerAccount",
+      "items[0][quantity]": "1",
+      proration_behavior: "none",
+    });
+  });
+});
