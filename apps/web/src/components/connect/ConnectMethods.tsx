@@ -4,6 +4,7 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import {
   TESTER_NOTICE,
   errorMessage,
+  isAccountSwitchError,
   type AccountSummary,
   type ErrorCode,
   type TokenConnectResponse,
@@ -17,7 +18,9 @@ import { Button } from "@/components/ui/button";
 import { ApiError, api, describeError } from "@/lib/api-client";
 import { queryKeys } from "@/lib/query";
 import { cn } from "@/lib/utils";
+import { AccountSwitchSteps } from "./AccountSwitchSteps";
 import { TesterApplicationPanel } from "./TesterApplicationPanel";
+import { ThreadsAccountGuide } from "./ThreadsAccountGuide";
 import { TokenConnectForm } from "./TokenConnectForm";
 
 /** 許可の画面から戻ってきたときのエラー（?error=…&account=…）。 */
@@ -25,10 +28,20 @@ export type ConnectError = { code: ErrorCode; account: string | null };
 
 /**
  * 重なった自分のアカウントの案内（US3-1）。名前は自分のアカウントの一覧から引く。
- * @param props - accountId：重なったアカウント、message：文言、name：名前
+ * @param props - accountId：重なったアカウント、message：文言、name：名前、steps：切り替えの手順（specs/025）
  * @returns 案内
  */
-function RegisteredAlert({ accountId, message, name }: { accountId: string; message: string; name: string | null }) {
+function RegisteredAlert({
+  accountId,
+  message,
+  name,
+  steps = null,
+}: {
+  accountId: string;
+  message: string;
+  name: string | null;
+  steps?: React.ReactNode;
+}) {
   return (
     <Alert variant="destructive">
       <AlertDescription className="space-y-1 text-foreground">
@@ -36,6 +49,7 @@ function RegisteredAlert({ accountId, message, name }: { accountId: string; mess
         <Link className="underline" to={`/accounts/${accountId}/settings`}>
           {name ? `『${name}』を開く` : "そのアカウントの設定を開く"}
         </Link>
+        {steps}
       </AlertDescription>
     </Alert>
   );
@@ -80,22 +94,35 @@ export function ConnectMethods({
    * @returns アカウント。一覧になければNULL
    */
   const ownAccount = (id: string) => me.data?.accounts.find((a) => a.id === id) ?? null;
-  let returned: React.ReactNode = null;
-  if (initialError) {
+  /**
+   * 許可の画面から戻ってきたエラー。取り違えで起きるエラーなら、切り替えの手順を添える（specs/025 US2・FR-006）。
+   * @param expected - 使うべきアカウント（招待済みなら申し込んだ名前。決まっていなければ null）
+   * @returns エラーの表示（なければ null）
+   */
+  const returned = (expected: string | null): React.ReactNode => {
+    if (!initialError) return null;
+    const steps = isAccountSwitchError(initialError.code) ? (
+      <div className="pt-2">
+        <AccountSwitchSteps expected={expected} again="Threadsで許可する" />
+      </div>
+    ) : null;
     const own = initialError.code === "ACCOUNT_ALREADY_REGISTERED" && initialError.account ? ownAccount(initialError.account) : null;
-    returned =
-      own && initialError.account ? (
-        <RegisteredAlert
-          accountId={initialError.account}
-          name={own.name}
-          message={errorMessage("ACCOUNT_ALREADY_REGISTERED", { details: [own.id, own.name, own.username ?? ""] }).message}
-        />
-      ) : (
-        <Alert variant="destructive">
-          <AlertDescription className="text-foreground">{errorMessage(initialError.code).message}</AlertDescription>
-        </Alert>
-      );
-  }
+    return own && initialError.account ? (
+      <RegisteredAlert
+        accountId={initialError.account}
+        name={own.name}
+        message={errorMessage("ACCOUNT_ALREADY_REGISTERED", { details: [own.id, own.name, own.username ?? ""] }).message}
+        steps={steps}
+      />
+    ) : (
+      <Alert variant="destructive">
+        <AlertDescription className="space-y-1 text-foreground">
+          <p>{errorMessage(initialError.code).message}</p>
+          {steps}
+        </AlertDescription>
+      </Alert>
+    );
+  };
 
   // 出す方法は環境の設定で決まる（既定は両方）。App Review を通すまで、または
   // 通らなかったときは token だけにできる
@@ -125,19 +152,21 @@ export function ConnectMethods({
       <p className="text-sm text-muted-foreground">
         Threadsにつなぐと、承認した案を自動で投稿し、反応を分析できます。戦略・投稿ストック・設定は、つないでもそのまま残ります。
       </p>
-      {!invites && returned}
+      {!invites && returned(null)}
       {showApp && invites && (
         // 招待の管理がONなら、申し込み → 招待済みのときだけ「Threadsで許可する」を出す（specs/024 contracts/ui-routes.md 2）
         <TesterApplicationPanel
           accountId={account.id}
           allowButton={allow}
           authFailed={initialError?.code === "THREADS_AUTH_CANCELLED" || initialError?.code === "THREADS_AUTH_FAILED"}
-          fallbackError={returned}
+          renderError={returned}
         />
       )}
       {showApp && !invites && (
         <>
           {allow}
+          {/* 押す前に、threads.com でログインしているアカウントで許可されることを知らせる（specs/025 US1） */}
+          <ThreadsAccountGuide expected={null} />
           {/* Meta App Review の前（テスターだけが接続できる間）だけ出す（specs/002 FR-028） */}
           {me.data?.threadsAccessMode === "testers" && (
             <Alert>

@@ -39,6 +39,9 @@ export const ACCOUNT_ROUTES: [string, string, Permission][] = [
   ["GET", "/api/accounts/:accountId/tester-application", "owner"],
   ["POST", "/api/accounts/:accountId/tester-application", "owner"],
   ["DELETE", "/api/accounts/:accountId/tester-application", "owner"],
+  // 違うアカウントでつながった知らせ（specs/025 contracts/api.md）。オーナーだけ
+  ["GET", "/api/accounts/:accountId/connection-notice", "owner"],
+  ["POST", "/api/accounts/:accountId/connection-notice/dismiss", "owner"],
   ["GET", "/api/accounts/:accountId/mention-settings", "view"],
   ["PUT", "/api/accounts/:accountId/mention-settings", "settings"],
   ["POST", "/api/accounts/:accountId/mention-people", "settings"],

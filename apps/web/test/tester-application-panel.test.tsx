@@ -1,6 +1,6 @@
 // つなぐ画面の招待の申し込み（specs/024-tester-invite-connect contracts/ui-routes.md 2、FR-004〜FR-007、T013・T014・T060）
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen, waitFor } from "@testing-library/react";
+import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { AccountSummary, ErrorCode, MeResponse, TesterApplicationResponse } from "@threads-grower/shared";
 import { createMemoryRouter, RouterProvider } from "react-router";
@@ -162,6 +162,27 @@ describe("申し込み中・招待済み・見送り", () => {
   });
 });
 
+describe("押す前の案内（specs/025 US1）", () => {
+  it("招待済みでは、申し込んだ@名前の案内が出る", async () => {
+    appResponse = { enabled: true, application: app("invited") };
+    renderIt();
+    await screen.findByText("招待済み");
+    expect(screen.getByText(/threads.comでログインしているアカウントで許可されます。/)).toBeInTheDocument();
+    expect(screen.getByText("@shop_tokyo", { selector: "strong" })).toBeInTheDocument();
+  });
+
+  it("招待の管理がOFFのつなぐ画面では、名前のない案内が出る", async () => {
+    renderIt({ enabled: false });
+    expect(await screen.findByText("threads.comでログインしているアカウントで許可されます。")).toBeInTheDocument();
+  });
+
+  it("申し込み前・申し込み中には出さない（「Threadsで許可する」がないため）", async () => {
+    renderIt();
+    await screen.findByLabelText("Threadsのユーザー名");
+    expect(screen.queryByText(/threads.comでログインしているアカウントで許可されます。/)).not.toBeInTheDocument();
+  });
+});
+
 describe("招待済みでつなげなかったとき（FR-007）", () => {
   it.each(["THREADS_AUTH_CANCELLED", "THREADS_AUTH_FAILED"] as const)("%s で戻ったら、承認してからの案内を出す", async (code) => {
     appResponse = { enabled: true, application: app("invited") };
@@ -175,6 +196,23 @@ describe("招待済みでつなげなかったとき（FR-007）", () => {
     renderIt({ initialError: { code: "THREADS_ACCOUNT_TAKEN", account: null } });
     expect(await screen.findByText("このThreadsアカウントは別のユーザーが登録済みです。")).toBeInTheDocument();
     expect(screen.queryByText("招待を承認してから、もう一度お試しください。")).not.toBeInTheDocument();
+  });
+
+  it("招待済みで取り違えのエラーなら、申し込んだ@名前で切り替えの手順を出す（specs/025 US2）", async () => {
+    appResponse = { enabled: true, application: app("invited") };
+    renderIt({ initialError: { code: "THREADS_ACCOUNT_TAKEN", account: null } });
+    await screen.findByText("招待済み");
+    expect(await screen.findByText("@shop_tokyo でログインし直す")).toBeInTheDocument();
+    expect(screen.getAllByRole("link", { name: /threads.comを開く/ }).length).toBeGreaterThan(0);
+  });
+
+  it("招待の管理がOFFで取り違えのエラーなら、「つなぎたいアカウント」で手順を出す。キャンセルでは出さない", async () => {
+    renderIt({ enabled: false, initialError: { code: "THREADS_ACCOUNT_TAKEN", account: null } });
+    expect(await screen.findByText("つなぎたいアカウントでログインし直す")).toBeInTheDocument();
+    cleanup();
+    renderIt({ enabled: false, initialError: { code: "THREADS_AUTH_CANCELLED", account: null } });
+    expect(await screen.findByText("Threadsとの接続がキャンセルされました。")).toBeInTheDocument();
+    expect(screen.queryByText("つなぎたいアカウントでログインし直す")).not.toBeInTheDocument();
   });
 
   it("招待済みでなければ、今のエラーのまま", async () => {

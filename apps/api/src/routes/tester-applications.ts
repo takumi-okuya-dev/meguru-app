@@ -6,7 +6,14 @@ import type { AppEnv } from "../app";
 import { createDb } from "../db/client";
 import { parseBody } from "../lib/validate";
 import { authorizeAccount } from "../services/access";
-import { apply, assertTesterInvitesEnabled, cancel, getApplication } from "../services/tester-application-service";
+import {
+  apply,
+  assertTesterInvitesEnabled,
+  cancel,
+  connectionNotice,
+  dismissConnectionNotice,
+  getApplication,
+} from "../services/tester-application-service";
 
 /**
  * 利用者の申し込みのルート。
@@ -30,6 +37,18 @@ export function testerApplicationRoutes(authed: MiddlewareHandler<AppEnv>) {
     })
     .delete("/accounts/:accountId/tester-application", authed, async (c) => {
       await cancel(c.env, c.get("user"), c.req.param("accountId"));
+      return c.body(null, 204);
+    })
+    // 違うアカウントでつながった知らせ（specs/025 contracts/api.md）。招待の管理がOFFでも読める（research.md R6）
+    .get("/accounts/:accountId/connection-notice", authed, async (c) => {
+      const db = createDb(c.env.DATABASE_URL);
+      const { account } = await authorizeAccount(db, c.get("user"), c.req.param("accountId"), "owner");
+      return c.json(await connectionNotice(db, account.id));
+    })
+    .post("/accounts/:accountId/connection-notice/dismiss", authed, async (c) => {
+      const db = createDb(c.env.DATABASE_URL);
+      const { account } = await authorizeAccount(db, c.get("user"), c.req.param("accountId"), "owner");
+      await dismissConnectionNotice(db, account.id);
       return c.body(null, 204);
     });
 }

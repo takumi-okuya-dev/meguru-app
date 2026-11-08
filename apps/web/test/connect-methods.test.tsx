@@ -214,6 +214,9 @@ describe("自分の別のアカウントと重なったとき（US3-1）", () =>
     renderIt({ initialError: { code: "ACCOUNT_ALREADY_REGISTERED", account: "a9" } });
     expect(await screen.findByText("@cafe_bは、あなたのアカウント『カフェ本店』につながっています。")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "『カフェ本店』を開く" })).toHaveAttribute("href", "/accounts/a9/settings");
+    // 取り違えから戻ったときの切り替えの手順も、リンクを残したまま出す（specs/025 US2・FR-006）
+    expect(screen.getByText("つなぎたいアカウントでログインし直す")).toBeInTheDocument();
+    expect(screen.getByText("このページに戻って、もう一度「Threadsで許可する」を押す")).toBeInTheDocument();
   });
 });
 

@@ -11,6 +11,7 @@ import { api, describeError } from "@/lib/api-client";
 import { queryKeys } from "@/lib/query";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { ThreadsAccountGuide } from "./ThreadsAccountGuide";
 import { TokenConnectForm } from "./TokenConnectForm";
 import { TOKEN_WARNING_KIND, TokenWarnings } from "./TokenWarnings";
 
@@ -25,17 +26,20 @@ export type ReconnectTarget = {
 
 /**
  * 接続し直しのダイアログ。
- * @param props - account：接続し直すAccount、onClose：閉じる、onTokenSuccess：トークンで接続し直した後（権限の案内に使う）
+ * @param props - account：接続し直すAccount、onClose：閉じる、onTokenSuccess：トークンで接続し直した後（権限の案内に使う）、
+ *   opener：このダイアログを開いたボタンの名前（戻ってきたときにもう一度押すもの。案内の手順に出す）
  * @returns ダイアログ
  */
 export function ReconnectDialog({
   account,
   onClose,
   onTokenSuccess,
+  opener = "再接続",
 }: {
   account: ReconnectTarget;
   onClose: () => void;
   onTokenSuccess?: (result: TokenConnectResponse) => void;
+  opener?: string;
 }) {
   const queryClient = useQueryClient();
   const [choice, setChoice] = useState<"choose" | "token">("choose");
@@ -115,6 +119,9 @@ export function ReconnectDialog({
                   <AlertDescription className="text-foreground">{describeError(oauth.error)}</AlertDescription>
                 </Alert>
               )}
+              {/* 押す前に、どのアカウントで許可されるかを知らせる（specs/025 US1） */}
+              {/* 戻ってきたときはダイアログが閉じているので、手順はダイアログを開くボタンを押すように書く（/code-review 6） */}
+              {offered.includes("app") && <ThreadsAccountGuide expected={account.username} again={opener} />}
             </div>
           ) : (
             <TokenConnectForm

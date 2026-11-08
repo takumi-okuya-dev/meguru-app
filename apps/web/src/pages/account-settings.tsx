@@ -6,12 +6,15 @@ import {
   accountLabel,
   connectedMessage,
   errorMessage,
+  isAccountSwitchError,
   type TokenConnectResponse,
 } from "@threads-grower/shared";
 import { CheckCircle2Icon } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router";
 import { toast } from "sonner";
+import { AccountSwitchSteps } from "@/components/connect/AccountSwitchSteps";
+import { ConnectionNotice } from "@/components/connect/ConnectionNotice";
 import { ConnectMethods } from "@/components/connect/ConnectMethods";
 import { AccountNameSection } from "@/components/settings/AccountNameSection";
 import { ConnectionBadge } from "@/components/ConnectionBadge";
@@ -94,15 +97,20 @@ function AccountSettingsContent() {
   const [justConnected, setJustConnected] = useState(callback.connected === "connect");
   const [editRequest, setEditRequest] = useState(0);
 
-  // 接続し直しの結果と、つながっているアカウントの接続のエラーは、今までどおりトーストで出す
+  // 接続し直しの結果は、今までどおりトーストで出す。つながっているアカウントの接続のエラーは、切り替えの手順を添えられるように
+  // 「Threadsとの接続」の区分の中に出す（トーストとの二重には出さない。specs/025 FR-011・/code-review 1）。
+  // 接続し直しを始めたら（ダイアログを開いたら）消す（/code-review 2）
+  const [returnError, setReturnError] = useState(notConnected ? null : callback.error);
   const toasted = useRef(false);
   useEffect(() => {
     if (toasted.current) return;
     toasted.current = true;
     if (callback.connected === "reconnect") toast.success(connectedMessage("reconnect", account.name));
-    else if (callback.error && !notConnected)
-      toast.error(errorMessage(callback.error, { username: account.username ?? undefined }).message);
-  }, [callback, account.name, account.username, notConnected]);
+  }, [callback, account.name]);
+  const openReconnect = () => {
+    setReturnError(null);
+    setReconnectOpen(true);
+  };
 
   // 招待のリンクから来た人は、つないだら招待へ戻す（specs/011 T019、specs/012 research.md R7）
   useEffect(() => {
@@ -136,6 +144,8 @@ function AccountSettingsContent() {
   });
 
   const needsReconnect = account.connectionStatus === "needs_reconnect";
+  // 接続し直すボタンの名前。切り替えの手順にも同じ名前を出す（/code-review 3）
+  const reconnectLabel = needsReconnect ? "再接続" : "接続し直す";
   // 削除の確認はアカウントの名前で（specs/012 FR-043）。前後の空白は問わない
   const confirmed = confirm.trim() !== "" && confirm.trim() === account.name;
 
@@ -181,7 +191,7 @@ function AccountSettingsContent() {
             account={account}
             canEdit={can("settings")}
             canReconnect={can("owner")}
-            onReconnect={() => setReconnectOpen(true)}
+            onReconnect={openReconnect}
             editRequest={editRequest}
           />
         )}
@@ -208,6 +218,22 @@ function AccountSettingsContent() {
           <h2 ref={threadsHeading} tabIndex={-1} className="font-medium outline-none">
             Threadsとの接続
           </h2>
+          {/* 招待済みで違うアカウントでつながったときの知らせ（specs/025 US3） */}
+          <ConnectionNotice accountId={account.id} />
+          {/* 接続し直しから戻ってきたエラー（今まではトーストだけ。specs/025 FR-011・research.md R2）。
+              取り違えで起きるエラーなら、今の@名前で切り替えの手順を添える（US2・FR-005） */}
+          {returnError && (
+            <Alert variant="destructive">
+              <AlertDescription className="space-y-1 text-foreground">
+                <p>{errorMessage(returnError, { username: account.username ?? undefined }).message}</p>
+                {isAccountSwitchError(returnError) && (
+                  <div className="pt-2">
+                    <AccountSwitchSteps expected={account.username} again={reconnectLabel} />
+                  </div>
+                )}
+              </AlertDescription>
+            </Alert>
+          )}
           <p className="text-sm text-muted-foreground">
             今の接続：{account.connectionMethod === "token" ? "自分のMetaアプリのトークン" : "このアプリで許可"}。同じThreadsアカウント（@{account.username}）で接続し直すと、接続情報を更新できます。
           </p>
@@ -219,8 +245,8 @@ function AccountSettingsContent() {
           {!justConnected && (
             <TokenWarnings warnings={tokenWarnings.map((w) => TOKEN_WARNING_KIND[w])} />
           )}
-          <Button variant={needsReconnect ? "default" : "outline"} onClick={() => setReconnectOpen(true)}>
-            {needsReconnect ? "再接続" : "接続し直す"}
+          <Button variant={needsReconnect ? "default" : "outline"} onClick={openReconnect}>
+            {reconnectLabel}
           </Button>
         </section>
         )}
@@ -285,6 +311,7 @@ function AccountSettingsContent() {
       {reconnectOpen && (
         <ReconnectDialog
           account={account}
+          opener={reconnectLabel}
           onClose={() => setReconnectOpen(false)}
           onTokenSuccess={(result) => setTokenWarnings(result.warnings)}
         />
