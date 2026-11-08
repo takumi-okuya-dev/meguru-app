@@ -36,6 +36,15 @@ beforeAll(async () => {
      VALUES ($1, $2, 'invited_shop', 'connected', true, 'invited_shop')`,
     [owner, ids.applied],
   );
+  // トークンへ切り替えて、枠を使ったまま取り下げになった記録があり、また「Threadsで許可する」でつながっている
+  ids.switched = await account(owner, { status: "connected", method: "app", username: "switch_shop", tuid: "9005" });
+  ids.heldApp = (
+    await client.query<{ id: string }>(
+      `INSERT INTO tester_applications (user_id, account_id, threads_username, status, holds_slot, removal_reason, connected_username)
+       VALUES ($1, $2, 'switch_shop', 'withdrawn', true, 'token_connected', 'switch_shop') RETURNING id`,
+      [owner, ids.switched],
+    )
+  ).rows[0]!.id;
   await applyMigrations(client, migrationIndex("0024"), migrationIndex("0024"));
 });
 
@@ -53,6 +62,13 @@ describe("0024_tester_backfill_connected", () => {
       { user_id: ids.owner, threads_username: "shop_tokyo", status: "connected", holds_slot: true, connected_username: "shop_tokyo" },
     ]);
     expect(await rowsOf(ids.needs!)).toEqual([expect.objectContaining({ threads_username: "cafe_b", status: "connected" })]);
+  });
+
+  it("枠を使ったまま取り下げになった同じ名前の記録があれば、足さずにそれを接続済みに戻す（枠を二重に数えない）", async () => {
+    const rows = (
+      await client.query(`SELECT id, status, removal_reason, holds_slot FROM tester_applications WHERE account_id = $1`, [ids.switched])
+    ).rows;
+    expect(rows).toEqual([{ id: ids.heldApp, status: "connected", removal_reason: null, holds_slot: true }]);
   });
 
   it("トークン・つなぐ前・生きている申し込みがあるアカウントには足さない", async () => {

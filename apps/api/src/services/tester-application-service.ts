@@ -175,11 +175,40 @@ async function setStatus(tx: TxDb, id: string, values: Partial<typeof testerAppl
 
 /**
  * 申し込みを経ずに「Threadsで許可する」でつながったアカウントの、接続済みの記録を作る（枠を使う）。
+ * 同じThreadsのユーザー名で枠を使ったまま取り下げになった記録（トークンへの切り替え・アカウントの削除など）があれば、
+ * 新しく作らずにそれを接続済みに戻す（同じMetaのテスターの枠を二重に数えない。PR #73 のCodexレビュー）。
+ * このアカウントの記録を先に使う。
  * @param tx - トランザクション
  * @param input - アカウントとつないだ人
  * @param connected - つながったThreadsのユーザー名（正規化済み）
  */
 async function insertConnected(tx: TxDb, input: { accountId: string; userId: string }, connected: string): Promise<void> {
+  const [held] = await tx
+    .select({ id: testerApplications.id })
+    .from(testerApplications)
+    .where(
+      and(
+        eq(testerApplications.holdsSlot, true),
+        eq(testerApplications.status, "withdrawn"),
+        eq(testerApplications.threadsUsername, connected),
+      ),
+    )
+    .orderBy(sql`${testerApplications.accountId} = ${input.accountId} DESC NULLS LAST`, desc(testerApplications.statusChangedAt))
+    .for("update")
+    .limit(1);
+  if (held) {
+    await setStatus(tx, held.id, {
+      status: "connected",
+      removalReason: null,
+      declineReason: null,
+      userId: input.userId,
+      accountId: input.accountId,
+      connectedUsername: connected,
+      connectedThreadsUserId: null,
+      mismatchNoticeDismissedAt: null,
+    });
+    return;
+  }
   await tx.insert(testerApplications).values({
     userId: input.userId,
     accountId: input.accountId,

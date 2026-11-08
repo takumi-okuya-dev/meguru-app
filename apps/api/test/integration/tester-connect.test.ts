@@ -104,6 +104,27 @@ describe("申し込みのないまま「Threadsで許可する」でつながっ
     expect(rows[0]).toMatchObject({ status: "connected", holds_slot: true, threads_username: "shop_tokyo" });
   });
 
+  it("「Threadsで許可する」→ トークン → 「Threadsで許可する」と接続し直しても、枠を二重に使わない（PR #73 のCodexレビュー）", async () => {
+    const accountId = await unconnectedAccountOf(app, "u1");
+    await connectExisting(app, "u1", accountId, "9001");
+    const viaToken = async () => {
+      const token = await fake.issueToken({ user: "9001" });
+      const res = await call(app, "POST", "/api/threads/token-connect", { user: "u1", body: { mode: "reconnect", accountId, token } });
+      expect(res.status).toBe(200);
+    };
+    const viaApp = async () => {
+      const res = await call(app, "POST", "/api/threads/connect", { user: "u1", body: { mode: "reconnect", accountId } });
+      const { authorizeUrl } = (await res.json()) as { authorizeUrl: string };
+      expect((await authorizeAndCallback(app, authorizeUrl, { fakeUser: "9001" })).status).toBe(302);
+    };
+    for (let i = 0; i < 2; i++) {
+      await viaToken();
+      await viaApp();
+    }
+    const held = (await applicationsOf(accountId)).filter((r) => r.holds_slot);
+    expect(held).toEqual([expect.objectContaining({ status: "connected", removal_reason: null, threads_username: "shop_tokyo" })]);
+  });
+
   it("招待の管理がOFFの環境では作らない", async () => {
     const env = publicEnv();
     const created = await call(app, "POST", "/api/accounts", { user: "u1", body: { name: "お店" }, env });
