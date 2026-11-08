@@ -14,9 +14,9 @@ Threadsの許可の画面は、ブラウザでthreads.comにログインして�
 - **違うアカウントで戻ったとき（US2）**：
   - 新しい部品`AccountSwitchSteps`を作る。今のエラーの文に、3つの手順と「threads.comを開く」を足す。
   - 出す相手：`RECONNECT_ACCOUNT_MISMATCH`・`THREADS_ACCOUNT_TAKEN`・`ACCOUNT_ALREADY_REGISTERED`。
-  - **今の不具合も直す**：つながっているアカウントの「Threadsとの接続」は、接続し直しのエラーを受け取っても画面に出していなかった（`useCallbackResult({ silent: true })`で読んで、使っていない）。ここにエラーの文を出し、上の3つでは手順も出す（research.md R2）。
+  - **つながっているアカウント**：接続し直しのエラーは、今はトーストだけで出している。トーストの代わりに「Threadsとの接続」にエラーの文を出し、上の3つでは手順も出す（research.md R2）。
 - **招待済みで違うアカウントでつながったとき（US3）**：
-  - 024の申し込みの記録（`removal_reason = username_mismatch`・`connected_username`）を使う。
+  - 024の申し込みの記録（`removal_reason = username_mismatch`）を使い、つながったThreadsのユーザーIDを`tester_applications.connected_threads_user_id`に足して残す。
   - 「閉じた」を`tester_applications.mismatch_notice_dismissed_at`に持つ（マイグレーション`0023`、足すだけ）。
   - API`GET/POST /api/accounts/:id/connection-notice`で読み書きする。
 
@@ -36,7 +36,7 @@ Threadsの許可の画面は、ブラウザでthreads.comにログインして�
   - `ThreadsAccountGuide`：使うべき名前があるとき・ないとき・トグルの開閉・リンクが新しいタブ
   - 3か所の置き場所：接続し直す・招待済み・つなぐ前（招待の管理がOFF）
   - `AccountSwitchSteps`：3つのエラーで出る、ほかのエラーでは出ない、`ACCOUNT_ALREADY_REGISTERED`のリンクが残る
-  - つながっているアカウントの「Threadsとの接続」で、エラーが出る（今は出ていない）
+  - つながっているアカウントの「Threadsとの接続」で、エラーが（トーストの代わりに）出る
   - 違うアカウントでつながった知らせと「閉じる」
   - トークンの貼り付けの画面に案内が出ない
 - **E2E**：足さない。

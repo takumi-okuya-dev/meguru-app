@@ -30,7 +30,8 @@ vi.mock("@/lib/api-client", async (orig) => {
   };
 });
 const toastSuccess = vi.fn();
-vi.mock("sonner", () => ({ toast: { success: toastSuccess, error: vi.fn(), warning: vi.fn(), dismiss: vi.fn() } }));
+const toastError = vi.fn();
+vi.mock("sonner", () => ({ toast: { success: toastSuccess, error: toastError, warning: vi.fn(), dismiss: vi.fn() } }));
 
 const { UnsavedChangesProvider } = await import("@/components/UnsavedChangesProvider");
 const { AccountSettings } = await import("@/pages/account-settings");
@@ -79,7 +80,7 @@ function renderSettings(account: AccountSummary, path = "/accounts/a1/settings")
 }
 
 beforeEach(() => {
-  for (const fn of [tokenConnect, connect, accountAccess, toastSuccess, me]) fn.mockReset();
+  for (const fn of [tokenConnect, connect, accountAccess, toastSuccess, toastError, me]) fn.mockReset();
   accountAccess.mockResolvedValue(OWNER_ACCESS);
   me.mockResolvedValue({ threadsConnectMethods: ["app", "token"] });
 });
@@ -145,6 +146,9 @@ describe("接続し直しの押す前の案内（specs/025 US1）", () => {
     const dialog = await screen.findByRole("dialog", { name: "Threadsとの接続し直し" });
     expect(within(dialog).getByText(/threads.comでログインしているアカウントで許可されます。/)).toBeInTheDocument();
     expect(within(dialog).getByText("@cafe_b")).toBeInTheDocument();
+    // 戻ってきたときはダイアログが閉じているので、手順はダイアログを開くボタンを押すように書く（/code-review 6）
+    await user.click(within(dialog).getByRole("button", { name: /違うアカウントが出たときは/ }));
+    expect(within(dialog).getByText("・このページに戻って、もう一度「接続し直す」を押す")).toBeInTheDocument();
     await user.click(within(dialog).getByRole("button", { name: /トークンを貼り付ける/ }));
     expect(within(dialog).queryByText(/threads.comでログインしているアカウントで許可されます。/)).not.toBeInTheDocument();
   });
@@ -267,11 +271,28 @@ describe("つながっているアカウントで、接続し直しから戻っ�
     expect(screen.getByText("このページに戻って、もう一度「接続し直す」を押す")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /threads.comを開く/ })).toHaveAttribute("target", "_blank");
     expect(screen.getByRole("button", { name: "接続し直す" })).toBeInTheDocument();
+    // トーストとの二重には出さない（/code-review 1）
+    expect(toastError).not.toHaveBeenCalled();
   });
 
-  it("ほかのエラー（キャンセル）は、文だけを出す（今は何も出ていなかった）", async () => {
+  it("ほかのエラー（キャンセル）は、文だけを出す", async () => {
     renderSettings(makeAccount(), "/accounts/a1/settings?error=THREADS_AUTH_CANCELLED");
     expect(await screen.findByText("Threadsとの接続がキャンセルされました。")).toBeInTheDocument();
     expect(screen.queryByText(/今のアカウントからログアウトする/)).not.toBeInTheDocument();
+    expect(toastError).not.toHaveBeenCalled();
+  });
+
+  it("要再接続のときは、手順のボタンの名前も「再接続」にする（/code-review 3）", async () => {
+    renderSettings(makeAccount({ connectionStatus: "needs_reconnect" }), "/accounts/a1/settings?error=RECONNECT_ACCOUNT_MISMATCH");
+    expect(await screen.findByText("このページに戻って、もう一度「再接続」を押す")).toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: "再接続" }).length).toBeGreaterThan(0);
+  });
+
+  it("接続し直しを始めたら（ダイアログを開いたら）、戻ってきたエラーを消す（/code-review 2）", async () => {
+    const user = userEvent.setup();
+    renderSettings(makeAccount(), "/accounts/a1/settings?error=RECONNECT_ACCOUNT_MISMATCH");
+    await screen.findByText("@cafe_b でログインし直す");
+    await user.click(screen.getByRole("button", { name: "接続し直す" }));
+    expect(screen.queryByText("再接続には、元の@cafe_bで認可してください。別のアカウントで認可されました。")).not.toBeInTheDocument();
   });
 });

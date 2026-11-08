@@ -1,1 +1,2 @@
+ALTER TABLE "tester_applications" ADD COLUMN "connected_threads_user_id" text;--> statement-breakpoint
 ALTER TABLE "tester_applications" ADD COLUMN "mismatch_notice_dismissed_at" timestamp (6) with time zone;

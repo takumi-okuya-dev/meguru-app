@@ -15,7 +15,19 @@ export const ACCOUNT_SWITCH_ERRORS = ["RECONNECT_ACCOUNT_MISMATCH", "THREADS_ACC
  * @returns 出すなら true
  */
 export function isAccountSwitchError(code: ErrorCode | null | undefined): boolean {
-  return code !== null && code !== undefined && (ACCOUNT_SWITCH_ERRORS as readonly string[]).includes(code);
+  return !!code && (ACCOUNT_SWITCH_ERRORS as readonly string[]).includes(code);
+}
+
+/**
+ * 押す前の案内の文を、画面で@名前を太字にできるように分けて返す（FR-001・FR-002）。
+ * @param expected - 使うべきアカウントのユーザー名（@なし。決まっていなければ null）
+ * @returns lead：前半の文、check：@名前とそれに続く文（決まっていなければ null）
+ */
+export function accountGuideParts(expected: string | null): { lead: string; check: { name: string; rest: string } | null } {
+  return {
+    lead: "threads.comでログインしているアカウントで許可されます。",
+    check: expected ? { name: `@${expected}`, rest: " でログインしているか確かめてください。" } : null,
+  };
 }
 
 /**
@@ -24,8 +36,8 @@ export function isAccountSwitchError(code: ErrorCode | null | undefined): boolea
  * @returns 案内の文
  */
 export function accountGuideLead(expected: string | null): string {
-  const lead = "threads.comでログインしているアカウントで許可されます。";
-  return expected ? `${lead}@${expected} でログインしているか確かめてください。` : lead;
+  const { lead, check } = accountGuideParts(expected);
+  return check ? `${lead}${check.name}${check.rest}` : lead;
 }
 
 /**

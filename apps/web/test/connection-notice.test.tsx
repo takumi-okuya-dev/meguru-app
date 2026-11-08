@@ -15,7 +15,7 @@ const { ConnectionNotice } = await import("@/components/connect/ConnectionNotice
 function renderIt() {
   render(
     <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
-      <ConnectionNotice accountId="a1" />
+      <ConnectionNotice accountId="a1" again="接続し直す" />
     </QueryClientProvider>,
   );
 }
@@ -37,6 +37,15 @@ describe("ConnectionNotice", () => {
     await userEvent.setup().click(screen.getByRole("button", { name: "閉じる" }));
     await waitFor(() => expect(mocks.dismissConnectionNotice).toHaveBeenCalledWith("a1"));
     await waitFor(() => expect(screen.queryByText(/でつながりました。/)).not.toBeInTheDocument());
+  });
+
+  it("閉じるのが失敗したら、失敗の文を出し、知らせは残す（/code-review 5）", async () => {
+    mocks.connectionNotice.mockResolvedValue({ otherAccount: { appliedUsername: "shop_tokyo", connectedUsername: "other_shop" } });
+    mocks.dismissConnectionNotice.mockRejectedValue(new Error("network"));
+    renderIt();
+    await userEvent.setup().click(await screen.findByRole("button", { name: "閉じる" }));
+    await waitFor(() => expect(screen.getByText(/でつながりました。/).closest("[role=status]")?.querySelector(".text-destructive")).not.toBeNull());
+    expect(screen.getByText(/でつながりました。/)).toBeInTheDocument();
   });
 
   it("otherAccount が null なら何も出さない", async () => {

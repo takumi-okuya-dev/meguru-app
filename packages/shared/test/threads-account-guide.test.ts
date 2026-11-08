@@ -4,9 +4,19 @@ import {
   ACCOUNT_SWITCH_ERRORS,
   THREADS_WEB_URL,
   accountGuideLead,
+  accountGuideParts,
   accountSwitchSteps,
   isAccountSwitchError,
 } from "../src/threads-account-guide";
+
+describe("accountGuideParts", () => {
+  it("@名前を太字にできるように分けて返し、つなぐと accountGuideLead と同じ文になる", () => {
+    const parts = accountGuideParts("taku.it.ai");
+    expect(parts.check).toEqual({ name: "@taku.it.ai", rest: " でログインしているか確かめてください。" });
+    expect(parts.lead + parts.check!.name + parts.check!.rest).toBe(accountGuideLead("taku.it.ai"));
+    expect(accountGuideParts(null).check).toBeNull();
+  });
+});
 
 describe("accountGuideLead", () => {
   it("使うべきアカウントがあれば@名前を入れ、なければ前半だけ", () => {

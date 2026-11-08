@@ -69,7 +69,7 @@ description: "Task list for feature 025 threads account guide"
 
 ## Phase 4：User Story 2 - 接続し直しで違うアカウントだったとき、すぐ切り替えられる（P1）🎯 MVP
 
-**Goal**：違うアカウントで戻ったとき、エラーの文に続けて手順と「threads.comを開く」を出す。つながっているアカウントで、戻りのエラーが出ていない不具合も直す（research.md R2）。
+**Goal**：違うアカウントで戻ったとき、エラーの文に続けて手順と「threads.comを開く」を出す。つながっているアカウントでは、戻りのエラーをトーストの代わりに区分の中に出す（research.md R2）。
 
 **Independent Test**：つながっているアカウントの設定を`?error=RECONNECT_ACCOUNT_MISMATCH`で開くと、エラーの文・3つの手順・「threads.comを開く」が出る。
 
@@ -113,7 +113,7 @@ description: "Task list for feature 025 threads account guide"
   - **出る**：招待済みで違う名前でOAuthでつながると、`otherAccount: { appliedUsername, connectedUsername }`
   - **出ない**：
     - 同じ名前でつながったとき・申し込みがないとき
-    - 申し込んだ名前でつなぎ直したとき（今のユーザー名が`connected_username`と違う）
+    - 申し込んだアカウントでつなぎ直したとき（今の`threads_user_id`が`connected_threads_user_id`と違う）。Threadsで名前を変えただけなら出し続ける
   - **閉じる**：`POST …/dismiss`で`204`になり、そのあとは出ない。行がなくても`204`
   - **権限**：関わりがなければ`404`、オーナーでなければ`403`
   - **招待の管理がOFFの環境**：読める
@@ -166,7 +166,7 @@ T015 connection-notice.test.tsx（Web）
 
 ## Implementation Strategy
 
-1. **MVP**：Setup → US1 → US2 で、取り違えを防ぎ、起きたときにすぐやり直せるようにする（今の不具合R2もここで直る）。
+1. **MVP**：Setup → US1 → US2 で、取り違えを防ぎ、起きたときにすぐやり直せるようにする。
 2. **US3**：違うアカウントでつながった知らせを足す。
 3. **Polish**：文書とテスト版での確認。
 

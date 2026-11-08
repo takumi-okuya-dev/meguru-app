@@ -1,5 +1,5 @@
 {
-  "id": "6da99ff9-92d8-45ce-8617-28c4a5bd9903",
+  "id": "7b55479c-1e60-46b9-8612-48ae85d2268c",
   "prevId": "c2ba7d17-1e54-430f-a9bd-5453d9da8ff9",
   "version": "7",
   "dialect": "postgresql",
@@ -5460,6 +5460,12 @@
         },
         "connected_username": {
           "name": "connected_username",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "connected_threads_user_id": {
+          "name": "connected_threads_user_id",
           "type": "text",
           "primaryKey": false,
           "notNull": false

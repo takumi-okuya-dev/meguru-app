@@ -11,14 +11,17 @@
 - **ほかの案**：
   - threads.comのログアウトのURLを裏で開く：Metaが用意しておらず、別のサイトのログイン状態を操作することになるので採らない。
 
-## R2. つながっているアカウントで、接続し直しのエラーが出ていない
+## R2. つながっているアカウントで、接続し直しのエラーをどこに出すか
 
-- **見つけたこと**：
-  - 「このアカウントの設定」は`useCallbackResult({ silent: true })`で戻りのクエリを読み、トーストを出さない。
-  - 読んだエラー（`callback.error`）を使うのは、つなぐ前のアカウントの`ConnectMethods`だけ。
-  - そのため、つながっているアカウントで接続し直しに失敗すると（`RECONNECT_ACCOUNT_MISMATCH`など）、何も出ない。
-- **決定**：つながっているアカウントの「Threadsとの接続」の区分に、戻りのエラーの文をいつも出す（`Alert`の失敗の形）。手順を出すエラー（R3）では、`AccountSwitchSteps`も出す。
-- **理由**：US2の前提（「今のエラーの文に加えて」）が、つながっているアカウントでは満たされていないため。
+- **見つけたこと**（2026-11-09 の /code-review で直した）：
+  - 「このアカウントの設定」は`useCallbackResult({ silent: true })`で戻りのクエリを読み、つながっているアカウントのエラーは、ページの側でトーストに出していた。
+  - トーストには、切り替えの手順を添えられない。
+- **決定**：
+  - つながっているアカウントの「Threadsとの接続」の区分に、戻りのエラーの文を出す（`Alert`の失敗の形）。手順を出すエラー（R3）では、`AccountSwitchSteps`も出す。
+  - トーストは出さない（同じ文を二重に出さない）。
+  - 接続し直しを始めたら（ダイアログを開いたら）、エラーを消す。
+  - 手順の「もう一度押す」ボタンの名前は、画面のボタンに合わせる（要再接続なら「再接続」、ほかは「接続し直す」）。
+- **理由**：US2の手順は、エラーの文と並べて出さないと使えないため。
 
 ## R3. 手順を出すエラー
 
@@ -41,10 +44,11 @@
 ## R5. 違うアカウントでつながった知らせの持ち方
 
 - **決定**：
-  - 024の申し込みの行に`mismatch_notice_dismissed_at`（timestamptz、NULL可）を足す。
-  - **出す条件**：そのアカウントの申し込みのうち、`removal_reason = 'username_mismatch'`で、`connected_username`がアカウントの今のユーザー名（小文字）と同じで、`mismatch_notice_dismissed_at`が空の、いちばん新しい行。
+  - 024の申し込みの行に`connected_threads_user_id`（text、NULL可）と`mismatch_notice_dismissed_at`（timestamptz、NULL可）を足す。違う名前でつながったときに、つながったThreadsのユーザーIDを残す。
+  - **出す条件**：そのアカウントの申し込みのうち、`removal_reason = 'username_mismatch'`で、`connected_threads_user_id`がアカウントの今の`threads_user_id`と同じで、`mismatch_notice_dismissed_at`が空の、いちばん新しい行。
+  - 名前でなくIDで比べるのは、Threadsで名前を変えても知らせが消えないようにするため（2026-11-09 の /code-review）。知らせに出す「つながった名前」は、アカウントの今の名前にする。
   - **出さないとき**：
-    - 利用者が申し込んだ名前でつなぎ直した場合（今のユーザー名が`connected_username`と違う）
+    - 利用者が申し込んだアカウントでつなぎ直した場合（今の`threads_user_id`が`connected_threads_user_id`と違う）
     - 閉じた場合
 - **理由**：
   - 024は、招待済みで違う名前でつながると`username_mismatch`と`connected_username`を記録している。それをそのまま使える。
@@ -52,7 +56,7 @@
 - **ほかの案**：
   - `accounts`に列を足す：申し込みと切り離されるので、同じアカウントで申し込み直したときに古い印が残る。不採用。
   - ブラウザに覚えておく（localStorage）：端末を変えると、また出る。仕様（閉じたら二度と出さない）に合わない。不採用。
-- **退会・アカウントの削除のとき**：024のとおり`account_id`が空になり（`connected_username`も退会で消える）、知らせは出なくなる。
+- **退会・アカウントの削除のとき**：024のとおり`account_id`が空になり（`connected_username`・`connected_threads_user_id`も退会で消える）、知らせは出なくなる。
 
 ## R6. 招待の管理がOFFのとき
 

@@ -181,7 +181,7 @@ async function setStatus(tx: TxDb, id: string, values: Partial<typeof testerAppl
  */
 export async function advanceOnConnect(
   tx: TxDb,
-  input: { accountId: string; method: "app" | "token"; username: string },
+  input: { accountId: string; method: "app" | "token"; username: string; threadsUserId: string },
 ): Promise<void> {
   const live = await liveFor(tx, input.accountId);
   if (!live) return;
@@ -197,6 +197,8 @@ export async function advanceOnConnect(
       status: "withdrawn",
       removalReason: live.holdsSlot ? "username_mismatch" : null,
       connectedUsername: connected,
+      // 知らせは名前でなくIDで比べる（Threadsで名前を変えても消えない。specs/025 data-model.md 2）
+      connectedThreadsUserId: input.threadsUserId,
     });
     return;
   }
@@ -235,6 +237,7 @@ export async function purgeForWithdrawal(tx: TxDb, userId: string): Promise<void
       declineReason: null,
       // 違うアカウントでつながったときのユーザー名も残さない（外すのに要るのは申し込んだユーザー名だけ。PR #71 のCodexレビュー）
       connectedUsername: null,
+      connectedThreadsUserId: null,
       statusChangedAt: now,
       updatedAt: now,
     })
@@ -550,7 +553,8 @@ export async function setSlotCapacity(env: Env, operator: { id: string }, capaci
 // ---- 違うアカウントでつながった知らせ（specs/025-threads-account-guide data-model.md 2、research.md R5） ----
 
 /**
- * 知らせを出す申し込みの条件（招待済みで違う名前でつながり、今もそのアカウントでつながっていて、閉じていない）。
+ * 知らせを出す申し込みの条件（招待済みで違うアカウントでつながり、今もそのThreadsのユーザーIDでつながっていて、閉じていない）。
+ * 名前でなくIDで比べるので、Threadsで名前を変えても知らせは消えない。
  * @param accountId - accounts.id
  * @returns 条件
  */
@@ -559,7 +563,7 @@ function mismatchNoticeWhere(accountId: string) {
     eq(testerApplications.accountId, accountId),
     eq(testerApplications.removalReason, "username_mismatch"),
     isNull(testerApplications.mismatchNoticeDismissedAt),
-    sql`${testerApplications.connectedUsername} = (SELECT lower(${accounts.username}) FROM ${accounts} WHERE ${accounts.id} = ${accountId})`,
+    sql`${testerApplications.connectedThreadsUserId} = (SELECT ${accounts.threadsUserId} FROM ${accounts} WHERE ${accounts.id} = ${accountId})`,
   );
 }
 
@@ -571,8 +575,10 @@ function mismatchNoticeWhere(accountId: string) {
  */
 export async function connectionNotice(db: Db, accountId: string) {
   const [row] = await db
-    .select({ applied: testerApplications.threadsUsername, connected: testerApplications.connectedUsername })
+    // つながった名前は今の名前を出す（Threadsで名前を変えたときも合う）
+    .select({ applied: testerApplications.threadsUsername, connected: sql<string | null>`lower(${accounts.username})` })
     .from(testerApplications)
+    .innerJoin(accounts, eq(accounts.id, testerApplications.accountId))
     .where(mismatchNoticeWhere(accountId))
     .orderBy(desc(testerApplications.statusChangedAt))
     .limit(1);

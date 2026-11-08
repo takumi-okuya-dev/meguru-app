@@ -44,10 +44,19 @@ describe("GET /api/accounts/:id/connection-notice", () => {
     expect(((await (await notice(plain)).json()) as Notice).otherAccount).toBeNull();
   });
 
-  it("申し込んだ名前でつなぎ直したら（今の名前が違う）出さない", async () => {
+  it("申し込んだアカウントでつなぎ直したら（今のThreadsのユーザーIDが違う）出さない", async () => {
     const accountId = await invitedAndConnected("9002");
-    await q()`UPDATE accounts SET username = 'shop_tokyo' WHERE id = ${accountId}`;
+    await q()`UPDATE accounts SET threads_user_id = '9001', username = 'shop_tokyo' WHERE id = ${accountId}`;
     expect(((await (await notice(accountId)).json()) as Notice).otherAccount).toBeNull();
+  });
+
+  it("つながったアカウントがThreadsで名前を変えても出し続け、今の名前を返す（IDで比べる。/code-review 4）", async () => {
+    const accountId = await invitedAndConnected("9002");
+    await q()`UPDATE accounts SET username = 'other_shop2' WHERE id = ${accountId}`;
+    expect(((await (await notice(accountId)).json()) as Notice).otherAccount).toEqual({
+      appliedUsername: "shop_tokyo",
+      connectedUsername: "other_shop2",
+    });
   });
 
   it("招待の管理がOFFの環境でも読める", async () => {

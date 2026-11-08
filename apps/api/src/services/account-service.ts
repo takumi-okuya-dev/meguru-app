@@ -306,7 +306,12 @@ export async function completeConnection(
     // 7. 書き込む。チームがあるAccountでは、どちらの方法でも記録する（specs/010 FR-035、specs/012 FR-019）
     await writeConnection(tx, cipher, target.id, input);
     // 招待の申し込みを同じトランザクションで進める（specs/024 research.md R5）
-    await advanceOnConnect(tx, { accountId: target.id, method: state.method, username: input.profile.username });
+    await advanceOnConnect(tx, {
+      accountId: target.id,
+      method: state.method,
+      username: input.profile.username,
+      threadsUserId: input.threadsUserId,
+    });
     await recordActivity(tx, access, {
       kind: "settings",
       action: state.mode === "connect" ? "threads_connected" : "threads_reconnected",

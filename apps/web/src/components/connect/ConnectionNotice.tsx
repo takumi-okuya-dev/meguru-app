@@ -4,15 +4,15 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { CircleAlertIcon } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { api } from "@/lib/api-client";
+import { api, describeError } from "@/lib/api-client";
 import { queryKeys } from "@/lib/query";
 
 /**
  * 違うアカウントでつながった知らせ。出すものがなければ何も出さない（読めないときも出さない）。
- * @param props - accountId：アカウント
+ * @param props - accountId：アカウント、again：つなぎ直すときに押すボタンの名前（「接続し直す」か「再接続」）
  * @returns 知らせ
  */
-export function ConnectionNotice({ accountId }: { accountId: string }) {
+export function ConnectionNotice({ accountId, again }: { accountId: string; again: string }) {
   const client = useQueryClient();
   const q = useQuery({ queryKey: queryKeys.connectionNotice(accountId), queryFn: () => api.connectionNotice(accountId) });
   const dismiss = useMutation({
@@ -33,9 +33,10 @@ export function ConnectionNotice({ accountId }: { accountId: string }) {
           <ul className="space-y-0.5 text-[13px] text-muted-foreground">
             <li>・このままでよければ、閉じてください</li>
             <li>
-              ・@{other.appliedUsername} でつなぎ直すときは、threads.comで @{other.appliedUsername} にログインし直してから「接続し直す」を押す
+              ・@{other.appliedUsername} でつなぎ直すときは、threads.comで @{other.appliedUsername} にログインし直してから「{again}」を押す
             </li>
           </ul>
+          {dismiss.isError && <p className="text-[13px] text-destructive">{describeError(dismiss.error)}</p>}
           <Button variant="ghost" className="-ml-4 h-10 rounded-full md:h-9" disabled={dismiss.isPending} onClick={() => dismiss.mutate()}>
             閉じる
           </Button>

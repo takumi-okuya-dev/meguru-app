@@ -8,6 +8,7 @@
 
 | 列 | 型 | 制約・既定値 | 意味 |
 |---|---|---|---|
+| `connected_threads_user_id` | text | NULL可、既定値なし | 招待済みで違う名前でつながったときの、そのThreadsのユーザーID。退会で消す（research.md R5） |
 | `mismatch_notice_dismissed_at` | timestamptz | NULL可、既定値なし | 「違うアカウントでつながった」知らせを、オーナーが閉じた日時（research.md R5） |
 
 - 今ある行は、すべて NULL（閉じていない）。
@@ -19,7 +20,8 @@
 
 - `account_id = :accountId`
 - `removal_reason = 'username_mismatch'`
-- `connected_username = lower(accounts.username)`（今もそのアカウントでつながっている）
+- `connected_threads_user_id = accounts.threads_user_id`（今もそのアカウントでつながっている。名前でなくIDで比べるので、Threadsで名前を変えても消えない）
+- 知らせに出すつながった名前は、`accounts.username`（今の名前）
 - `mismatch_notice_dismissed_at IS NULL`
 
 なければ、知らせは出さない。

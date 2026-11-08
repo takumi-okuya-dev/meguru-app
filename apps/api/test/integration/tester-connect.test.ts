@@ -63,6 +63,7 @@ describe("Threadsで許可する（OAuth）でつながったとき", () => {
       removal_reason: "username_mismatch",
       holds_slot: true,
       connected_username: "other_shop",
+      connected_threads_user_id: "9002",
     });
   });
 
@@ -150,7 +151,7 @@ describe("退会したとき（research.md R15）", () => {
       const detail = JSON.stringify(e.detail ?? null);
       for (const word of ["shop_tokyo", "pending_one", "u1@example.com"]) expect(detail).not.toContain(word);
     }
-    expect(await applicationRow(mismatch.id)).toMatchObject({ removal_reason: "username_mismatch", connected_username: null });
+    expect(await applicationRow(mismatch.id)).toMatchObject({ removal_reason: "username_mismatch", connected_username: null, connected_threads_user_id: null });
     expect(await applicationsOf(invited.accountId)).toEqual([]);
   });
 });
