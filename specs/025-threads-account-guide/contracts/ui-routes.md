@@ -47,7 +47,8 @@
 - **出すとき**：`GET /api/accounts/:id/connection-notice`の`otherAccount`に値があるとき。オーナーだけ。
 - **中身**：
   - 枠（`Alert`の通常の形、注意の印）に、「@{connectedUsername} でつながりました。申し込んだ @{appliedUsername} とは違うアカウントです。」
-  - 箇条書き2行：
+  - 箇条書き3行（接続し直しは同じThreadsアカウントでしかできないため、つなぎ直しは案内しない。PR #72 のCodexレビュー）：
     - 「このままでよければ、閉じてください」
-    - 「@{appliedUsername} でつなぎ直すときは、threads.comで @{appliedUsername} にログインし直してから「接続し直す」を押す」（要再接続なら「再接続」）
+    - 「このアカウントのThreadsは、@{connectedUsername} から変えられません」
+    - 「@{appliedUsername} を使うときは、「アカウントを作る」で新しいアカウントを作り、@{appliedUsername} で招待を申し込み直す」
   - 「閉じる」（枠なしのボタン）。押すと`POST …/dismiss`を送り、知らせを消す。失敗したら失敗の文を出し、知らせは残す。

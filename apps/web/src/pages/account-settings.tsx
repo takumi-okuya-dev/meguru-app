@@ -144,7 +144,7 @@ function AccountSettingsContent() {
   });
 
   const needsReconnect = account.connectionStatus === "needs_reconnect";
-  // 接続し直すボタンの名前。手順と知らせにも同じ名前を出す（/code-review 3）
+  // 接続し直すボタンの名前。切り替えの手順にも同じ名前を出す（/code-review 3）
   const reconnectLabel = needsReconnect ? "再接続" : "接続し直す";
   // 削除の確認はアカウントの名前で（specs/012 FR-043）。前後の空白は問わない
   const confirmed = confirm.trim() !== "" && confirm.trim() === account.name;
@@ -219,7 +219,7 @@ function AccountSettingsContent() {
             Threadsとの接続
           </h2>
           {/* 招待済みで違うアカウントでつながったときの知らせ（specs/025 US3） */}
-          <ConnectionNotice accountId={account.id} again={reconnectLabel} />
+          <ConnectionNotice accountId={account.id} />
           {/* 接続し直しから戻ってきたエラー（今まではトーストだけ。specs/025 FR-011・research.md R2）。
               取り違えで起きるエラーなら、今の@名前で切り替えの手順を添える（US2・FR-005） */}
           {returnError && (

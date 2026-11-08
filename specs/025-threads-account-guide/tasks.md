@@ -113,7 +113,7 @@ description: "Task list for feature 025 threads account guide"
   - **出る**：招待済みで違う名前でOAuthでつながると、`otherAccount: { appliedUsername, connectedUsername }`
   - **出ない**：
     - 同じ名前でつながったとき・申し込みがないとき
-    - 申し込んだアカウントでつなぎ直したとき（今の`threads_user_id`が`connected_threads_user_id`と違う）。Threadsで名前を変えただけなら出し続ける
+    - 今の`threads_user_id`が`connected_threads_user_id`と違うとき（接続し直しでは起きないが、守りとして）。Threadsで名前を変えただけなら出し続ける
   - **閉じる**：`POST …/dismiss`で`204`になり、そのあとは出ない。行がなくても`204`
   - **権限**：関わりがなければ`404`、オーナーでなければ`403`
   - **招待の管理がOFFの環境**：読める

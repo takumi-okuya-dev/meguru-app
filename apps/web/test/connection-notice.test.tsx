@@ -15,7 +15,7 @@ const { ConnectionNotice } = await import("@/components/connect/ConnectionNotice
 function renderIt() {
   render(
     <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
-      <ConnectionNotice accountId="a1" again="接続し直す" />
+      <ConnectionNotice accountId="a1" />
     </QueryClientProvider>,
   );
 }
@@ -26,14 +26,19 @@ beforeEach(() => {
 });
 
 describe("ConnectionNotice", () => {
-  it("違うアカウントでつながったことと、2行の箇条書き。「閉じる」で dismiss を送って消える", async () => {
+  it("違うアカウントでつながったことと、3行の箇条書き。「閉じる」で dismiss を送って消える", async () => {
     mocks.connectionNotice.mockResolvedValue({ otherAccount: { appliedUsername: "shop_tokyo", connectedUsername: "other_shop" } });
     mocks.dismissConnectionNotice.mockResolvedValue(undefined);
     renderIt();
     expect(await screen.findByText(/でつながりました。申し込んだ/)).toBeInTheDocument();
     expect(screen.getByText("@other_shop").tagName).toBe("STRONG");
     expect(screen.getByText(/このままでよければ、閉じてください/)).toBeInTheDocument();
-    expect(screen.getByText(/@shop_tokyo にログインし直してから「接続し直す」を押す/)).toBeInTheDocument();
+    // 接続し直しでは別のアカウントに変えられないので、新しいアカウントで申し込み直す道を出す（PR #72 のCodexレビュー）
+    expect(screen.getByText("・このアカウントのThreadsは、@other_shop から変えられません")).toBeInTheDocument();
+    expect(
+      screen.getByText("・@shop_tokyo を使うときは、「アカウントを作る」で新しいアカウントを作り、@shop_tokyo で招待を申し込み直す"),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/接続し直す/)).not.toBeInTheDocument();
     await userEvent.setup().click(screen.getByRole("button", { name: "閉じる" }));
     await waitFor(() => expect(mocks.dismissConnectionNotice).toHaveBeenCalledWith("a1"));
     await waitFor(() => expect(screen.queryByText(/でつながりました。/)).not.toBeInTheDocument());

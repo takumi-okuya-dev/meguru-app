@@ -44,7 +44,8 @@ describe("GET /api/accounts/:id/connection-notice", () => {
     expect(((await (await notice(plain)).json()) as Notice).otherAccount).toBeNull();
   });
 
-  it("申し込んだアカウントでつなぎ直したら（今のThreadsのユーザーIDが違う）出さない", async () => {
+  // 接続し直しでは別のThreadsアカウントに変えられない（specs/010 FR-032）。記録と今のIDが合わないときの守りとして確かめる
+  it("アカウントの今のThreadsのユーザーIDが、つながった記録と違えば出さない", async () => {
     const accountId = await invitedAndConnected("9002");
     await q()`UPDATE accounts SET threads_user_id = '9001', username = 'shop_tokyo' WHERE id = ${accountId}`;
     expect(((await (await notice(accountId)).json()) as Notice).otherAccount).toBeNull();

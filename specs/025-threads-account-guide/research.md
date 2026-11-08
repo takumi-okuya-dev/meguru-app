@@ -48,7 +48,7 @@
   - **出す条件**：そのアカウントの申し込みのうち、`removal_reason = 'username_mismatch'`で、`connected_threads_user_id`がアカウントの今の`threads_user_id`と同じで、`mismatch_notice_dismissed_at`が空の、いちばん新しい行。
   - 名前でなくIDで比べるのは、Threadsで名前を変えても知らせが消えないようにするため（2026-11-09 の /code-review）。知らせに出す「つながった名前」は、アカウントの今の名前にする。
   - **出さないとき**：
-    - 利用者が申し込んだアカウントでつなぎ直した場合（今の`threads_user_id`が`connected_threads_user_id`と違う）
+    - 今の`threads_user_id`が`connected_threads_user_id`と違う場合（接続し直しは同じThreadsアカウントでしかできないので起きないが、守りとして見る）
     - 閉じた場合
 - **理由**：
   - 024は、招待済みで違う名前でつながると`username_mismatch`と`connected_username`を記録している。それをそのまま使える。

@@ -9,10 +9,12 @@ import { queryKeys } from "@/lib/query";
 
 /**
  * 違うアカウントでつながった知らせ。出すものがなければ何も出さない（読めないときも出さない）。
- * @param props - accountId：アカウント、again：つなぎ直すときに押すボタンの名前（「接続し直す」か「再接続」）
+ * 接続し直しは同じThreadsアカウントでしかできない（specs/010 FR-032）ので、申し込んだアカウントを使う道は
+ * 新しいアカウントを作って申し込み直すことだけを案内する（PR #72 のCodexレビュー）。
+ * @param props - accountId：アカウント
  * @returns 知らせ
  */
-export function ConnectionNotice({ accountId, again }: { accountId: string; again: string }) {
+export function ConnectionNotice({ accountId }: { accountId: string }) {
   const client = useQueryClient();
   const q = useQuery({ queryKey: queryKeys.connectionNotice(accountId), queryFn: () => api.connectionNotice(accountId) });
   const dismiss = useMutation({
@@ -32,8 +34,9 @@ export function ConnectionNotice({ accountId, again }: { accountId: string; agai
           </p>
           <ul className="space-y-0.5 text-[13px] text-muted-foreground">
             <li>・このままでよければ、閉じてください</li>
+            <li>・このアカウントのThreadsは、@{other.connectedUsername} から変えられません</li>
             <li>
-              ・@{other.appliedUsername} でつなぎ直すときは、threads.comで @{other.appliedUsername} にログインし直してから「{again}」を押す
+              ・@{other.appliedUsername} を使うときは、「アカウントを作る」で新しいアカウントを作り、@{other.appliedUsername} で招待を申し込み直す
             </li>
           </ul>
           {dismiss.isError && <p className="text-[13px] text-destructive">{describeError(dismiss.error)}</p>}
