@@ -36,7 +36,7 @@ export type FakeStripeSubscription = {
   created: number;
   cancel_at_period_end: boolean;
   trial_end: number | null;
-  items: { data: { id: string; quantity: number; current_period_end: number }[] };
+  items: { data: { id: string; quantity: number; current_period_end: number; price: { id: string } }[] };
 };
 export type FakeStripeRequest = { method: string; path: string; params: Record<string, string> };
 
@@ -49,7 +49,10 @@ export const fakeStripe = {
   subscriptions: async () => ((await control("subscriptions")) as { subscriptions: FakeStripeSubscription[] }).subscriptions,
   fail: (prefix: string, opts: { method?: string; times?: number; status?: number } = {}) =>
     control("fail", { body: { prefix, ...opts } }),
-  createSubscription: async (customer: string, opts: { quantity?: number; status?: string; trialEnd?: number | null } = {}) =>
+  createSubscription: async (
+    customer: string,
+    opts: { quantity?: number; status?: string; trialEnd?: number | null; priceId?: string } = {},
+  ) =>
     (await control("subscriptions", { body: { customer, ...opts } })) as FakeStripeSubscription,
   setStatus: async (
     target: { id?: string; customer?: string },

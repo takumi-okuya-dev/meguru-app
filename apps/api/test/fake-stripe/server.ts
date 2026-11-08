@@ -24,7 +24,7 @@ type Subscription = {
   cancel_at_period_end: boolean;
   cancel_at: number | null;
   trial_end: number | null;
-  items: { data: { id: string; quantity: number; current_period_end: number }[] };
+  items: { data: { id: string; quantity: number; current_period_end: number; price: { id: string } }[] };
 };
 type Recorded = { method: string; path: string; params: Record<string, string> };
 
@@ -68,7 +68,11 @@ export function createFakeStripe() {
     }).catch(() => undefined);
   }
 
-  function createSubscription(customer: string, quantity: number, opts: { status?: string; trialEnd?: number | null } = {}) {
+  function createSubscription(
+    customer: string,
+    quantity: number,
+    opts: { status?: string; trialEnd?: number | null; priceId?: string } = {},
+  ) {
     const trialEnd = opts.trialEnd ?? null;
     const sub: Subscription = {
       id: id("sub"),
@@ -78,7 +82,7 @@ export function createFakeStripe() {
       cancel_at_period_end: false,
       cancel_at: null,
       trial_end: trialEnd,
-      items: { data: [{ id: id("si"), quantity, current_period_end: trialEnd ?? now() + 30 * DAY }] },
+      items: { data: [{ id: id("si"), quantity, current_period_end: trialEnd ?? now() + 30 * DAY, price: { id: opts.priceId ?? "price_TestOnlyTiered" } }] },
     };
     subscriptions.set(sub.id, sub);
     return sub;
@@ -165,6 +169,8 @@ export function createFakeStripe() {
     const item = sub.items.data.find((i) => i.id === q["items[0][id]"]);
     if (!item) return stripeError(c, 400, "resource_missing");
     if (q["items[0][quantity]"]) item.quantity = Number(q["items[0][quantity]"]);
+    // 料金の切り替え（specs/024 research.md R10）
+    if (q["items[0][price]"]) item.price = { id: q["items[0][price]"] };
     return c.json(sub);
   });
 
@@ -226,9 +232,9 @@ export function createFakeStripe() {
   });
   // 契約を直接作る（Checkoutを通さない）
   app.post("/__control/subscriptions", async (c) => {
-    const b = await c.req.json<{ customer: string; quantity?: number; status?: string; trialEnd?: number | null }>();
+    const b = await c.req.json<{ customer: string; quantity?: number; status?: string; trialEnd?: number | null; priceId?: string }>();
     if (!customers.has(b.customer)) customers.set(b.customer, { id: b.customer, email: "", userId: "" });
-    return c.json(createSubscription(b.customer, b.quantity ?? 1, { status: b.status, trialEnd: b.trialEnd ?? null }));
+    return c.json(createSubscription(b.customer, b.quantity ?? 1, { status: b.status, trialEnd: b.trialEnd ?? null, priceId: b.priceId }));
   });
   // 契約の状態を変える（支払いの失敗・解約の予約・期間の終わり）。webhook を指定すれば送る
   app.post("/__control/subscription-status", async (c) => {

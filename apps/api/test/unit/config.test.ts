@@ -1,6 +1,6 @@
 // 設定の確認（誤りがあれば項目名だけを返す。値は返さない）
 import { describe, expect, it } from "vitest";
-import { billingModeOf, connectMethodsOf, operatorIdsOf, validateConfig } from "../../src/lib/config";
+import { billingModeOf, connectMethodsOf, operatorIdsOf, testerInvitesEnabledOf, threadsAppIdOf, validateConfig } from "../../src/lib/config";
 import type { Env } from "../../src/env";
 import { testBindings } from "../env";
 
@@ -201,5 +201,30 @@ describe("connectMethodsOf", () => {
 
   it("知らない語だけなら、両方に戻す（打ち間違いで「つなげない製品」にしない）", () => {
     expect(connectMethodsOf({ THREADS_CONNECT_METHODS: "oauth,paste" } as Env)).toEqual(["app", "token"]);
+  });
+});
+
+// 招待の管理のON/OFF（specs/024-tester-invite-connect research.md R4）。審査の前（testers）で、app を出しているときだけON
+describe("testerInvitesEnabledOf", () => {
+  it.each([
+    [{}, true],
+    [{ THREADS_ACCESS_MODE: "testers" }, true],
+    [{ THREADS_ACCESS_MODE: "testers", THREADS_CONNECT_METHODS: "app,token" }, true],
+    [{ THREADS_ACCESS_MODE: "public" }, false],
+    [{ THREADS_ACCESS_MODE: "testers", THREADS_CONNECT_METHODS: "token" }, false],
+  ])("%j は %j", (env, expected) => {
+    expect(testerInvitesEnabledOf(env as Env)).toBe(expected);
+  });
+});
+
+// 「Metaでテスターを加える」のリンクに使うアプリID（specs/024 contracts/api.md）。見本の値・未設定なら null
+describe("threadsAppIdOf", () => {
+  it.each([
+    [{ THREADS_APP_ID: "1367107908637398" }, "1367107908637398"],
+    [{ THREADS_APP_ID: "000000000000000" }, null],
+    [{ THREADS_APP_ID: "" }, null],
+    [{}, null],
+  ])("%j は %j", (env, expected) => {
+    expect(threadsAppIdOf(env as Env)).toBe(expected);
   });
 });

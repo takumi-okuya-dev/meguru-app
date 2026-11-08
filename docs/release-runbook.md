@@ -90,6 +90,13 @@ feature/* ──PR──▶ develop ──自動──▶ ステージング（�
 - [ ] マイグレーションがあるリリースでは、マージする直前の時刻（UTC）を控えた（6-3の1）。
 - [ ] 出したあと30分ほど、様子を見られる時間がある（夜遅くや出かける前に出さない）。
 
+### 4-1. 024（テスター招待・上限・無料体験の廃止）をはじめて本番に出すとき
+
+- [ ] 本番用のMetaアプリを作り、3つのコールバックのURLを登録した（[external-services-setup.md](external-services-setup.md) 9-8）。
+- [ ] 本番の`THREADS_APP_ID`と`STRIPE_PRICE_ID`（1件1,000円の料金。10-2）を、`apps/api/wrangler.toml`の`[env.production.vars]`を直すPRで入れた。
+- [ ] 本番の Secret に`THREADS_APP_SECRET`と、運営者の本番の Clerk のユーザーID（`OPERATOR_CLERK_USER_IDS`）を入れた。
+- [ ] 本番の`THREADS_ACCESS_MODE`が`testers`（審査の前）になっている。
+
 ## 5. リリースする
 
 1. `develop`→`main`のPRを作る（タイトルは「リリース：…」）。説明には、入る変更のPRを並べる。

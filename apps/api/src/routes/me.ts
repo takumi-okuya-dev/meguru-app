@@ -5,7 +5,7 @@ import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { Hono, type MiddlewareHandler } from "hono";
 import type { AppEnv } from "../app";
-import { connectMethodsOf } from "../lib/config";
+import { connectMethodsOf, testerInvitesEnabledOf } from "../lib/config";
 import { createDb } from "../db/client";
 import { accounts, memberships, users } from "../db/schema";
 import { personName, toAccountSummary, type AccountRow } from "../services/access";
@@ -17,6 +17,8 @@ import type { Env } from "../env";
 import { withdrawRequestSchema } from "@threads-grower/shared";
 import { AppError } from "../lib/errors";
 import { listMyTeams } from "../services/team-service";
+import { effectiveLimits } from "../services/limit-service";
+import { accountLimitFor } from "../services/account-service";
 
 /**
  * ログイン後の遷移先の Account を決める（FR-004、research.md R10。specs/008 FR-045）。
@@ -78,10 +80,12 @@ export function meRoutes(authed: MiddlewareHandler<AppEnv>, deleteClerkUser: (en
     const owned = visible.filter((r) => r.role === "owner").map((r) => r.account);
     const helped = visible.filter((r) => r.role !== "owner").map((r) => r.account);
     const now = new Date();
-    const [teams, entitlement] = await Promise.all([
+    const [teams, entitlement, limits] = await Promise.all([
       teamOn ? listMyTeams(db, user.id) : Promise.resolve([]),
       loadEntitlement(db, user.id, user.billing, now),
+      effectiveLimits(db, c.env, user.id),
     ]);
+    const accountLimit = await accountLimitFor(db, user.id, user.billing, c.env, now);
     // Account切り替えメニューは開くたびに一覧を読み直すため、ブラウザに保存させない。
     c.header("Cache-Control", "no-store");
     return c.json({
@@ -94,8 +98,8 @@ export function meRoutes(authed: MiddlewareHandler<AppEnv>, deleteClerkUser: (en
         ),
       ),
       landingAccountId: resolveLandingAccountId(owned, user.lastAccountId, helped),
-      // 上限は使える状態から（null は上限なし。specs/013 research.md R9）。未接続のアカウントも数える
-      accountLimit: { max: entitlement!.accountLimit, used: owned.length },
+      // 上限は使える状態と運営者が決める上限の小さい方（null は上限なし。specs/024 FR-018）。未接続のアカウントも数える
+      accountLimit: { max: accountLimit.max, used: owned.length },
       // Threads連携の公開範囲。Web はアカウント追加画面の案内の有無に使う（specs/002 FR-028）
       threadsAccessMode: c.env.THREADS_ACCESS_MODE ?? "testers",
       threadsConnectMethods: connectMethodsOf(c.env),
@@ -107,6 +111,10 @@ export function meRoutes(authed: MiddlewareHandler<AppEnv>, deleteClerkUser: (en
       operator: user.operator,
       // 自分の使えるまとまり（サイドバーの「チーム」の出し分けに使う。specs/019 research.md R6）
       features: FEATURES.filter((f) => user.features.has(f)),
+      // 自分のアカウントの1日の投稿数の上限（運営者は上限なし。specs/024 contracts/api.md）
+      dailyPostLimit: limits.operator ? null : limits.dailyPostLimit,
+      // 招待の管理がONか（つなぐ画面の申し込みの欄。specs/024 research.md R4）
+      testerInvites: { enabled: testerInvitesEnabledOf(c.env) },
     });
   }).get("/me/needs-review-counts", authed, async (c) => {
     const user = c.get("user");

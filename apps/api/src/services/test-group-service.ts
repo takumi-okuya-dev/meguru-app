@@ -44,15 +44,16 @@ export function testAccessSql(u: UsersLike = users, operators: readonly string[]
 
 /**
  * 「料金なし」のSQLの条件（料金なしの印か、テスト用のグループがONの環境の運営者）。
- * 運営者は、テスト版でテストユーザーと同じく料金なしで使う（無料体験の表示を出さない）。本番（OFF）では印だけ。
+ * 運営者は、招待制のON/OFFにかかわらず料金なし（specs/024 FR-023。016・019では招待制がONのときだけだった）。
  * 使える状態の判定（entitlementFromFacts の billingExempt・fullAccessSql）に渡す値は、すべてここから読む。
  * @param u - users の表か別名
- * @param mode - 決済のモード（testGroups と operators を見る）
+ * @param mode - 決済のモード（operators を見る）
  * @returns 真偽のSQL
  */
 export function billingExemptSql(u: UsersLike, mode: BillingMode): SQL<boolean> {
   const t = sql.identifier(getTableName(u));
-  return sql<boolean>`(${t}."billing_exempt"${mode.testGroups ? operatorOrSql(t, mode.operators ?? []) : sql``})`;
+  // 運営者は、招待制にかかわらず料金なし（specs/024 FR-023、research.md R11。016・019では招待制がONのときだけだった）
+  return sql<boolean>`(${t}."billing_exempt"${operatorOrSql(t, mode.operators ?? [])})`;
 }
 
 /**

@@ -38,6 +38,11 @@ export const queryKeys = {
   testGroup: (id: string) => ["test-groups", id] as const,
   // 機能のまとまりごとのON/OFF（specs/019）
   featureSettings: ["feature-settings"] as const,
+  // テスター招待・上限（specs/024）。申し込みは Account の下に置き、Account の削除で一緒に消す
+  testerApplication: (id: string) => ["account", id, "tester-application"] as const,
+  operatorTesterApplications: (view: string) => ["operator-tester-applications", view] as const,
+  operatorTesterApplicationsAll: ["operator-tester-applications"] as const,
+  operatorLimits: ["operator-limits"] as const,
   // チーム（specs/011）。Account の下に置かない（チームは Account をまたぐ）。取り直しは ["team", id] の範囲で行う
   team: (id: string) => ["team", id] as const,
   teamInvite: (id: string) => ["team", id, "invite"] as const,

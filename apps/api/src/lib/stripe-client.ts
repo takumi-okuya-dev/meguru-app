@@ -33,7 +33,7 @@ export type StripeSubscription = {
   trial_end: number | null;
   /** 古い版のAPIの置き場所（偽のStripe・前の版との互換のため読む） */
   current_period_end?: number;
-  items: { data: { id: string; quantity?: number; current_period_end?: number }[] };
+  items: { data: { id: string; quantity?: number; current_period_end?: number; price?: { id: string } }[] };
 };
 
 /** Checkoutのセッションを作る要求。 */
@@ -202,11 +202,13 @@ export function createStripeClient(
      * @param subscriptionId - 契約のID
      * @param itemId - 契約の項目のID
      * @param quantity - 新しい数
+     * @param priceId - 切り替える料金のID（変えないなら省く）
      * @returns 契約
      */
-    updateSubscriptionQuantity(subscriptionId: string, itemId: string, quantity: number) {
+    updateSubscriptionQuantity(subscriptionId: string, itemId: string, quantity: number, priceId?: string) {
+      // 料金が古い契約は、新しい料金へ切り替える（日割りなし。次の請求から。specs/024 research.md R10）
       return request<StripeSubscription>("POST", `/v1/subscriptions/${encodeURIComponent(subscriptionId)}`, {
-        items: [{ id: itemId, quantity }],
+        items: [{ id: itemId, quantity, ...(priceId ? { price: priceId } : {}) }],
         proration_behavior: "none",
       });
     },

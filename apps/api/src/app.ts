@@ -41,6 +41,9 @@ import { analysisRoutes } from "./routes/analysis";
 import { mentionRoutes } from "./routes/mention";
 import { externalMediaRoutes } from "./routes/external-media";
 import { threadsConnectRoutes } from "./routes/threads-connect";
+import { testerApplicationRoutes } from "./routes/tester-applications";
+import { operatorTesterInviteRoutes } from "./routes/operator-tester-invites";
+import { operatorLimitRoutes } from "./routes/operator-limits";
 import { clerkUserDeleter, type ClerkUserDeleter } from "./services/withdrawal-service";
 
 /** アプリに差し込む依存。テストでは偽の認証を渡す。 */
@@ -179,6 +182,10 @@ export function createApp(deps: AppDeps = defaultDeps) {
     .route("/", referralRoutes(authed))
     .route("/", operatorTestGroupRoutes(authed))
     .route("/", operatorFeatureRoutes(authed))
+    // テスター招待・上限（specs/024 contracts/api.md）
+    .route("/", testerApplicationRoutes(authed))
+    .route("/", operatorTesterInviteRoutes(authed))
+    .route("/", operatorLimitRoutes(authed))
     .route("/", teamsRoutes(authed))
     .route("/", activityRoutes(authed))
     .route("/", strategyRoutes(authed))

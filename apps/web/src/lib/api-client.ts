@@ -12,6 +12,13 @@ import {
   testGroupListSchema,
   featureSettingsListSchema,
   operatorUserSchema,
+  operatorLimitUserSchema,
+  operatorLimitsSchema,
+  operatorTesterApplicationSchema,
+  operatorTesterApplicationsSchema,
+  testerApplicationResponseSchema,
+  testerApplicationSchema,
+  defaultLimitsRequestSchema,
   type FeatureSettingsRequest,
   testGroupSummarySchema,
   testInviteJoinResponseSchema,
@@ -195,6 +202,38 @@ export function subscribeTestAccessRequired(listener: () => void): () => void {
   return () => testAccessListeners.delete(listener);
 }
 
+// ---- 契約前（specs/024 research.md R9）。/api/me か、どのAPIの応答で分かっても、画面を「契約してから使い始めます」に替える ----
+let subscriptionRequired = false;
+const subscriptionListeners = new Set<() => void>();
+
+/**
+ * 契約前であることを知らせる。
+ * @param value - 契約前なら true（契約したら false に戻す）
+ */
+export function setSubscriptionRequired(value: boolean) {
+  if (subscriptionRequired === value) return;
+  subscriptionRequired = value;
+  for (const l of subscriptionListeners) l();
+}
+
+/**
+ * 契約前かを読む（useSyncExternalStore 用）。
+ * @returns 契約前なら true
+ */
+export function getSubscriptionRequired(): boolean {
+  return subscriptionRequired;
+}
+
+/**
+ * 契約前かの変化を受け取る（useSyncExternalStore 用）。
+ * @param listener - 変わったときに呼ぶ
+ * @returns 受け取りをやめる関数
+ */
+export function subscribeSubscriptionRequired(listener: () => void): () => void {
+  subscriptionListeners.add(listener);
+  return () => subscriptionListeners.delete(listener);
+}
+
 /** Accountの API が権限・存在のエラーを返したときの受け取り口（specs/008 contracts/ui-routes.md「共通の振る舞い」2・3）。 */
 export type AccountAccessErrorListener = (code: "ROLE_FORBIDDEN" | "ACCOUNT_NOT_FOUND", accountId: string) => void;
 let onAccountAccessError: AccountAccessErrorListener | null = null;
@@ -246,6 +285,7 @@ async function request<T>(
     if (res.status === 401) onSessionExpired();
     if (code === "WITHDRAWAL_IN_PROGRESS") setWithdrawalInProgress(true);
     if (code === "TEST_ACCESS_REQUIRED") setTestAccessRequired(true);
+    if (code === "SUBSCRIPTION_REQUIRED") setSubscriptionRequired(true);
     const accountId = ACCOUNT_PATH.exec(path)?.[1];
     if (accountId && (code === "ROLE_FORBIDDEN" || code === "ACCOUNT_NOT_FOUND")) onAccountAccessError?.(code, accountId);
     throw new ApiError(
@@ -271,6 +311,7 @@ export const api = {
     clearReferral();
     if (me.withdrawalInProgress) setWithdrawalInProgress(true);
     setTestAccessRequired(me.testGroups.enabled && !me.testGroups.admitted);
+    setSubscriptionRequired(me.billing.state === "unsubscribed");
     return me;
   },
   // ---- 退会（specs/013 contracts/api.md「自分」）----
@@ -369,6 +410,39 @@ export const api = {
     }),
   resetFeatureSettings: (userId: string) =>
     request(`/api/operator/feature-settings/${encodeURIComponent(userId)}`, operatorUserSchema, { method: "DELETE" }),
+  // テスター招待（specs/024 contracts/api.md「利用者の申し込み」「運営者の招待の管理」）
+  testerApplication: (accountId: string) =>
+    request(`/api/accounts/${accountId}/tester-application`, testerApplicationResponseSchema),
+  applyTester: (accountId: string, threadsUsername: string) =>
+    request(`/api/accounts/${accountId}/tester-application`, testerApplicationSchema, {
+      method: "POST",
+      body: JSON.stringify({ threadsUsername }),
+    }),
+  cancelTesterApplication: (accountId: string) =>
+    request(`/api/accounts/${accountId}/tester-application`, null, { method: "DELETE" }),
+  operatorTesterApplications: (view: string) =>
+    request(`/api/operator/tester-applications?view=${encodeURIComponent(view)}`, operatorTesterApplicationsSchema),
+  operateTesterApplication: (id: string, action: "invite" | "decline" | "revert" | "removed", body: { force?: boolean; reason?: string } = {}) =>
+    request(`/api/operator/tester-applications/${encodeURIComponent(id)}/${action}`, operatorTesterApplicationSchema.nullable(), {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+  setTesterSlotCapacity: (slotCapacity: number) =>
+    request("/api/operator/tester-settings", z.object({ used: z.number(), capacity: z.number() }), {
+      method: "PUT",
+      body: JSON.stringify({ slotCapacity }),
+    }),
+  // 上限（specs/024 contracts/api.md「運営者の上限」）
+  operatorLimits: () => request("/api/operator/limits", operatorLimitsSchema),
+  putDefaultLimits: (v: { accountLimit: number; dailyPostLimit: number }) =>
+    request("/api/operator/limits", defaultLimitsRequestSchema, { method: "PUT", body: JSON.stringify(v) }),
+  findLimitUser: (email: string) =>
+    request(`/api/operator/limits/users?email=${encodeURIComponent(email)}`, operatorLimitUserSchema),
+  putUserLimits: (userId: string, v: { accountLimit: number | null; dailyPostLimit: number | null }) =>
+    request(`/api/operator/limits/users/${encodeURIComponent(userId)}`, operatorLimitUserSchema, {
+      method: "PUT",
+      body: JSON.stringify(v),
+    }),
   acceptInvite: (token: string, accounts: { id: string; shared: boolean }[]) =>
     request(`/api/invites/${encodeURIComponent(token)}/accept`, inviteAcceptResponseSchema, {
       method: "POST",

@@ -3,6 +3,7 @@
 import type { AccountAccess } from "./access";
 import { recordActivity, updatedByOf, withActivityTx } from "./activity-log";
 import {
+  DAILY_POST_LIMIT_MAX,
   minutesToTime,
   validatePostingSchedule,
   type AutoPostState,
@@ -103,6 +104,7 @@ function sameMinutes(a: number[], b: number[]): boolean {
  * @param access - 操作した人（操作の記録と、保存した人に使う。specs/008）。省略すると記録しない
  * @returns 保存した設定と、投稿の権限の確認の結果（オフの保存では null）
  * @throws AppError VALIDATION_FAILED（details と reason）、THREADS_NOT_READY（details に結果）、STALE_UPDATE（latest 付き）、ACCOUNT_NOT_FOUND
+ * @param dailyPostLimit - オーナーの1日の投稿数の上限（specs/024 FR-019。省けば Threads の上限）
  */
 export async function savePostingSchedule(
   env: Env,
@@ -112,8 +114,10 @@ export async function savePostingSchedule(
   threads: ThreadsClient,
   now: Date = new Date(),
   access?: AccountAccess,
+  dailyPostLimit: number = DAILY_POST_LIMIT_MAX,
 ): Promise<{ schedule: PostingSchedule; connectionCheck: ThreadsCheck | null }> {
-  const v = validatePostingSchedule(req);
+  // 形・重複・間は Threads の上限まで見て、オーナーの1日の投稿数の上限は下で別に確かめる（specs/024 FR-019）
+  const v = validatePostingSchedule(req, { maxSlots: DAILY_POST_LIMIT_MAX });
   if (!v.ok) {
     throw new AppError(
       "VALIDATION_FAILED",
@@ -127,6 +131,11 @@ export async function savePostingSchedule(
     );
   }
   const current = await readPostingSchedule(db, accountId);
+  // 上限を超える時刻は登録できない。ただし、上限が下がって超えている時刻を減らす保存は通す（FR-020）
+  const before = current?.slotMinutes.length ?? 0;
+  if (v.slotMinutes.length > dailyPostLimit && v.slotMinutes.length > before) {
+    throw new AppError("POSTING_SLOT_LIMIT", 409, "posting slot limit", undefined, [String(dailyPostLimit)], { max: dailyPostLimit });
+  }
   if ((current?.version ?? 0) !== req.expectedVersion) {
     // 先に保存した人の名前を添える（specs/008 FR-007）
     throw new AppError(

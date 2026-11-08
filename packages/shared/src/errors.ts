@@ -1,6 +1,5 @@
 // エラーコードと、画面に出す日本語の文言（contracts/ui-routes.md「エラー文言」）。
 // APIは code だけを返し、Webがここから文言を引く。
-import { BILLING_EXTRA_PRICE_JPY } from "./billing";
 import { TEAM_EDITOR_LIMIT, TEAM_MEMBER_LIMIT, TEAMS_PER_ADMIN, TEST_GROUP_CAPACITY_MAX, TEST_GROUP_CAPACITY_MIN } from "./limits";
 
 /** APIとWebで共有するエラーコードの一覧（contracts/api.md・ui-routes.md）。 */
@@ -68,6 +67,13 @@ export const ERROR_CODES = [
   // 機能のまとまりごとのON/OFF（specs/019-feature-switches contracts/api.md「新しいエラーコード」）
   "FEATURE_DISABLED",
   "USER_NOT_FOUND",
+  // テスター招待・上限・契約前（specs/024-tester-invite-connect contracts/api.md「新しいエラーコード」）
+  "SUBSCRIPTION_REQUIRED",
+  "TESTER_APPLICATION_EXISTS",
+  "TESTER_APPLICATION_NOT_PENDING",
+  "TESTER_SLOTS_FULL",
+  "POSTING_SLOT_LIMIT",
+  "RATE_LIMITED",
 ] as const;
 
 /** エラーコード。 */
@@ -131,10 +137,17 @@ export function errorMessage(code: ErrorCode, ctx: ErrorMessageContext = {}): Er
         action: "back-to-accounts",
       };
     case "ACCOUNT_LIMIT_REACHED":
-      // 無料体験中の上限（1件）だけで使う。契約すると上限はない（specs/013 research.md R9）
+      // 前からの無料体験の上限（1件）が効いたときは details: ["trial"]（specs/024 FR-018・FR-031）。
+      // それ以外は運営者が決める上限なので、運営者への連絡を案内する
+      if (ctx.details?.[0] === "trial") {
+        return {
+          message: `無料体験中に作れるアカウントは${ctx.max ?? 1}件までです。契約すると、2件目からも作れます。`,
+          action: "subscribe",
+        };
+      }
       return {
-        message: `無料体験中に作れるアカウントは${ctx.max ?? 1}件までです。契約すると、2件目から1件につき月${BILLING_EXTRA_PRICE_JPY}円で足せます。`,
-        action: "subscribe",
+        message: `作れるアカウントは${ctx.max ?? 1}件までです。増やしたいときは運営者に連絡してください。`,
+        action: "none",
       };
     case "THREADS_AUTH_CANCELLED":
       return { message: "Threadsとの接続がキャンセルされました。", action: "retry-connect" };
@@ -245,6 +258,18 @@ export function errorMessage(code: ErrorCode, ctx: ErrorMessageContext = {}): Er
       return { message: "この機能は今は使えません。", action: "none" };
     case "USER_NOT_FOUND":
       return { message: "見つかりません。", action: "none" };
+    case "SUBSCRIPTION_REQUIRED":
+      return { message: "契約してから使い始めます。", action: "subscribe" };
+    case "TESTER_APPLICATION_EXISTS":
+      return { message: "このアカウントは、すでに申し込んでいます。", action: "reload" };
+    case "TESTER_APPLICATION_NOT_PENDING":
+      return { message: "申し込みの状態が変わっています。画面を読み直してください。", action: "reload" };
+    case "TESTER_SLOTS_FULL":
+      return { message: `テスター枠がいっぱいです（${ctx.details?.[0] ?? "?"} / ${ctx.details?.[1] ?? "?"}）。`, action: "none" };
+    case "POSTING_SLOT_LIMIT":
+      return { message: `1日に投稿できるのは${ctx.max ?? 1}件までです。`, action: "none" };
+    case "RATE_LIMITED":
+      return { message: "少し時間をおいてから、もう一度お試しください。", action: "retry-later" };
     case "INVITE_INVALID":
       return {
         message: "このリンクは使えません。作り直されたか、チームが削除されました。管理者に、新しいリンクを頼んでください。",

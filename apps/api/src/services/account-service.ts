@@ -31,6 +31,8 @@ import { loadEntitlement, markQuantityDirty, syncQuantity } from "./billing-serv
 import { recordActivity } from "./activity-log";
 import type { ConsumedState } from "./threads-oauth";
 import { beforeAccountDeleted } from "./team-service";
+import { advanceOnConnect, withdrawForAccountDeletion } from "./tester-application-service";
+import { effectiveLimits } from "./limit-service";
 
 // ---- 登録数の上限（specs/013 research.md R9。001 FR-015〜FR-017 を置き換えた） ----
 
@@ -53,12 +55,29 @@ export async function countOwnedAccounts(db: Db | TxDb, userId: string): Promise
  * @param db - データベース（トランザクションの中でもよい）
  * @param userId - users.id
  * @param mode - 決済のモード
+ * @param env - Workers のバインディング（運営者の判定。specs/024）
  * @param now - 今の時刻
- * @returns 上限（max。null は上限なし、0 は作れない）、使用数（used）、使える状態
+ * @returns 上限（max。null は上限なし、0 は作れない）、使用数（used）、使える状態、前からの無料体験の上限が効いているか（trialBound）
  */
-export async function accountLimitFor(db: Db | TxDb, userId: string, mode: BillingMode, now: Date = new Date()) {
-  const [entitlement, used] = await Promise.all([loadEntitlement(db, userId, mode, now), countOwnedAccounts(db, userId)]);
-  return { max: entitlement ? entitlement.accountLimit : 0, used, entitlement };
+export async function accountLimitFor(
+  db: Db | TxDb,
+  userId: string,
+  mode: BillingMode,
+  env: Pick<Env, "OPERATOR_CLERK_USER_IDS">,
+  now: Date = new Date(),
+) {
+  const [entitlement, used, limits] = await Promise.all([
+    loadEntitlement(db, userId, mode, now),
+    countOwnedAccounts(db, userId),
+    effectiveLimits(db, env, userId),
+  ]);
+  // 使える状態の上限（前からの無料体験なら1。読むだけ・契約前なら0）と、運営者が決める上限の小さい方（specs/024 FR-018）
+  const byState = entitlement ? entitlement.accountLimit : 0;
+  const byOperator = limits.accountLimit;
+  const max = byState === null ? byOperator : byOperator === null ? byState : Math.min(byState, byOperator);
+  // 前からの無料体験の上限が効いているか（エラーの文で契約を案内する）
+  const trialBound = entitlement?.state === "trial" && max === byState;
+  return { max, used, entitlement, trialBound };
 }
 
 /**
@@ -68,17 +87,20 @@ export async function accountLimitFor(db: Db | TxDb, userId: string, mode: Billi
  * @param db - データベース（トランザクションの中でもよい）
  * @param userId - users.id
  * @param mode - 決済のモード
+ * @param env - Workers のバインディング（運営者の判定。specs/024）
  * @returns 上限・使用数
  * @throws AppError BILLING_REQUIRED・ACCOUNT_LIMIT_REACHED
  */
-export async function assertCanAddAccount(db: Db | TxDb, userId: string, mode: BillingMode) {
-  const limit = await accountLimitFor(db, userId, mode);
+export async function assertCanAddAccount(db: Db | TxDb, userId: string, mode: BillingMode, env: Pick<Env, "OPERATOR_CLERK_USER_IDS">) {
+  const limit = await accountLimitFor(db, userId, mode, env);
   const e = limit.entitlement;
   if (e && !e.fullAccess) {
     throw new AppError("BILLING_REQUIRED", 403, "billing required", undefined, [e.readOnlyReason ?? "trial_ended"]);
   }
   if (limit.max !== null && limit.used >= limit.max) {
-    throw new AppError("ACCOUNT_LIMIT_REACHED", 409, "account limit reached", undefined, undefined, { max: limit.max });
+    throw new AppError("ACCOUNT_LIMIT_REACHED", 409, "account limit reached", undefined, limit.trialBound ? ["trial"] : undefined, {
+      max: limit.max,
+    });
   }
   return limit;
 }
@@ -98,7 +120,7 @@ export async function assertCanAddAccount(db: Db | TxDb, userId: string, mode: B
 export async function createAccount(env: Env, userId: string, name: string) {
   const created = await withTransaction(env.DATABASE_URL, async (tx) => {
     await lockUserRow(tx, userId);
-    await assertCanAddAccount(tx, userId, billingModeOf(env));
+    await assertCanAddAccount(tx, userId, billingModeOf(env), env);
     const [account] = await tx
       .insert(accounts)
       .values({
@@ -282,6 +304,8 @@ export async function completeConnection(
 
     // 7. 書き込む。チームがあるAccountでは、どちらの方法でも記録する（specs/010 FR-035、specs/012 FR-019）
     await writeConnection(tx, cipher, target.id, input);
+    // 招待の申し込みを同じトランザクションで進める（specs/024 research.md R5）
+    await advanceOnConnect(tx, { accountId: target.id, method: state.method, username: input.profile.username });
     await recordActivity(tx, access, {
       kind: "settings",
       action: state.mode === "connect" ? "threads_connected" : "threads_reconnected",
@@ -566,6 +590,8 @@ export async function deleteAccount(
     }
     // チームの最後のアカウントなら、同じトランザクションでチームを抜けたものとする（specs/011 FR-046、research.md R7）
     await beforeAccountDeleted(tx, account.id, userId);
+    // 招待の申し込みを取り下げにする（枠を使っていれば「外してよい」。specs/024 data-model.md 5）
+    await withdrawForAccountDeletion(tx, account.id);
     const now = new Date();
     await tx
       .update(users)

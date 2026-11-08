@@ -47,16 +47,22 @@ export type PostingScheduleValidation =
  * 投稿の設定を検証する（FR-001・FR-001a・FR-002）。WebとAPIで同じものを使う。
  * 確かめる順は、時刻の形 → 件数 → 重複 → オンなら1件以上 → ずらすなら30分以上の間。
  * @param input - オン・オフ、時刻の一覧（"HH:MM"）、ずらすか
+ * @param opts - maxSlots：時刻の数の上限（オーナーの1日の投稿数の上限。省けば既定値の10件）
  * @returns 通れば昇順の分の一覧、通らなければ理由と、該当する時刻
  */
-export function validatePostingSchedule(input: PostingScheduleInput): PostingScheduleValidation {
+export function validatePostingSchedule(
+  input: PostingScheduleInput,
+  opts: { maxSlots?: number } = {},
+): PostingScheduleValidation {
+  // 時刻の数の上限は、オーナーの1日の投稿数の上限（specs/024 FR-019）。省けば既定値
+  const maxSlots = opts.maxSlots ?? AUTOPOST_SLOT_LIMIT;
   const minutes: number[] = [];
   for (const t of input.slotTimes) {
     const m = timeToMinutes(t);
     if (m === null) return { ok: false, reason: "invalid_time", times: [t] };
     minutes.push(m);
   }
-  if (minutes.length > AUTOPOST_SLOT_LIMIT) return { ok: false, reason: "too_many" };
+  if (minutes.length > maxSlots) return { ok: false, reason: "too_many" };
   const seen = new Set<number>();
   for (const m of minutes) {
     if (seen.has(m)) return { ok: false, reason: "duplicate", times: [minutesToTime(m)] };

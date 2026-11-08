@@ -1,7 +1,6 @@
 // 契約と支払い（specs/013-billing research.md R1・R4〜R7）。Stripeとのやり取りは、このファイルと lib/stripe-client.ts の外に書かない。
 import {
-  BILLING_BASE_PRICE_JPY,
-  BILLING_EXTRA_PRICE_JPY,
+  BILLING_UNIT_PRICE_JPY,
   SUBSCRIPTION_STATUSES,
   billingQuantity,
   checkoutTrialFor,
@@ -32,6 +31,8 @@ export type BillingFacts = {
   cancelAtPeriodEnd: boolean | null;
   /** テスト版に入れるか（specs/016 research.md R4。testAccessSql の値）。読んでいなければ undefined */
   testAccess?: boolean;
+  /** 024の前からいた人（無料体験を使える。specs/024 research.md R8） */
+  legacyTrial: boolean;
 };
 
 /**
@@ -51,6 +52,7 @@ export function entitlementFromFacts(mode: BillingMode, facts: BillingFacts, now
         ? null
         : { status: (facts.status as SubscriptionStatus | null) ?? null, cancelAtPeriodEnd: facts.cancelAtPeriodEnd ?? false },
     now,
+    legacyTrial: facts.legacyTrial,
   });
   // テスト用のグループがONで、テスト版に入れない人は読むだけ（specs/016 research.md R4）。
   // 決済のどの状態よりも先に効かせ、自動投稿・反応の取り込みも013の仕組みのまま止まる
@@ -78,6 +80,8 @@ export function fullAccessSql(mode: BillingMode, now: Date): SQL | undefined {
     billingExemptSql(users, mode),
     inArray(subscriptions.status, ["trialing", "active"]),
     and(
+      // 無料体験は024の前からいた人だけ（specs/024 research.md R8）
+      eq(users.legacyTrial, true),
       or(isNull(subscriptions.status), notInArray(subscriptions.status, ["past_due", "unpaid", "paused"])),
       sql`${trialEnd} > ${now.toISOString()}::timestamptz`,
     ),
@@ -98,6 +102,7 @@ export async function loadEntitlement(db: Db | TxDb, userId: string, mode: Billi
     .select({
       createdAt: users.createdAt,
       billingExempt: billingExemptSql(users, mode),
+      legacyTrial: users.legacyTrial,
       status: subscriptions.status,
       cancelAtPeriodEnd: subscriptions.cancelAtPeriodEnd,
       // OFFの環境では読まない（問い合わせを今と同じにする。specs/016 plan.md「性能の目標」）
@@ -123,7 +128,8 @@ export function toMeBilling(mode: BillingMode, e: Entitlement, now: Date = new D
     mode: mode.enabled ? "enabled" : "disabled",
     state: e.state,
     readOnlyReason: e.readOnlyReason,
-    trialEndsAt: e.trialEndsAt.toISOString(),
+    // 無料体験の終わりは、前からの無料体験の人だけに出す（specs/024 contracts/api.md）
+    trialEndsAt: e.state === "unsubscribed" ? null : e.trialEndsAt.toISOString(),
     trialDaysLeft: e.state === "trial" || e.state === "subscribed_trial" ? trialDaysLeft(e.trialEndsAt, now) : null,
   };
 }
@@ -143,7 +149,7 @@ const BILLED_STATUSES = ["trialing", "active", "past_due", "unpaid"];
  * @returns BillingSummary
  */
 export async function billingSummary(db: Db, user: { id: string; billing: BillingMode }, now: Date = new Date()): Promise<BillingSummary> {
-  const prices = { base: BILLING_BASE_PRICE_JPY, extra: BILLING_EXTRA_PRICE_JPY };
+  const prices = { perAccount: BILLING_UNIT_PRICE_JPY };
   if (!user.billing.enabled) {
     return {
       mode: "disabled",
@@ -168,7 +174,7 @@ export async function billingSummary(db: Db, user: { id: string; billing: Billin
     mode: "enabled",
     state: e.state,
     readOnlyReason: e.readOnlyReason,
-    trialEndsAt: e.trialEndsAt.toISOString(),
+    trialEndsAt: e.state === "unsubscribed" ? null : e.trialEndsAt.toISOString(),
     trialDaysLeft: e.state === "trial" || e.state === "subscribed_trial" ? trialDaysLeft(e.trialEndsAt, now) : null,
     ownedAccountCount: owned,
     subscription: sub?.status
@@ -459,7 +465,11 @@ export async function syncQuantity(env: Env, userId: string, stripe: StripeClien
       const quantity = billingQuantity(await countOwned(tx, userId));
       const sub = (await stripe.listSubscriptions(row.stripeCustomerId)).find((x) => x.id === row.stripeSubscriptionId);
       const item = sub?.items.data[0];
-      if (sub && item && item.quantity !== quantity) await stripe.updateSubscriptionQuantity(sub.id, item.id, quantity);
+      // 料金が今の STRIPE_PRICE_ID と違う（1件1,000円にする前の契約）なら、あわせて切り替える（specs/024 research.md R10）
+      const newPrice = env.STRIPE_PRICE_ID && item?.price?.id && item.price.id !== env.STRIPE_PRICE_ID ? env.STRIPE_PRICE_ID : undefined;
+      if (sub && item && (item.quantity !== quantity || newPrice)) {
+        await stripe.updateSubscriptionQuantity(sub.id, item.id, quantity, newPrice);
+      }
       await tx
         .update(subscriptions)
         .set({ quantity, quantitySyncNeeded: false, updatedAt: new Date() })
@@ -519,7 +529,7 @@ export async function reconcileSubscriptions(env: Env, stripe: StripeClient = cr
 export async function loadOwnerEntitlement(db: Db | TxDb, accountId: string, mode: BillingMode, now: Date = new Date()) {
   // 決済もテスト用のグループもOFFなら、オーナーを読むまでもなく全権（specs/016 research.md R4）
   if (!mode.enabled && !mode.testGroups) {
-    return entitlementFromFacts(mode, { createdAt: now, billingExempt: false, status: null, cancelAtPeriodEnd: null }, now);
+    return entitlementFromFacts(mode, { createdAt: now, legacyTrial: false, billingExempt: false, status: null, cancelAtPeriodEnd: null }, now);
   }
   const [owner] = await db
     .select({ userId: memberships.userId })

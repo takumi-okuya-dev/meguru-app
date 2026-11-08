@@ -165,6 +165,27 @@ export type BillingMode = { enabled: boolean; testGroups?: boolean; operators?: 
 export const CONNECT_METHODS = ["app", "token"] as const;
 
 /**
+ * 招待の管理（テスター招待の申し込み）を使うか（specs/024-tester-invite-connect research.md R4）。
+ * Meta App Review の前（`THREADS_ACCESS_MODE` が `testers`、未設定も同じ）で、「Threadsで許可する」（`app`）を
+ * 出しているときだけON。審査の後に `public` にすると切れる（新しいスイッチは作らない）。
+ * @param env - Workers のバインディング
+ * @returns 使うなら true
+ */
+export function testerInvitesEnabledOf(env: Pick<Env, "THREADS_ACCESS_MODE" | "THREADS_CONNECT_METHODS">): boolean {
+  return (env.THREADS_ACCESS_MODE ?? "testers") === "testers" && connectMethodsOf(env).includes("app");
+}
+
+/**
+ * 運営者の画面の「Metaでテスターを加える」のリンクに使う、このアプリのMetaアプリのID（specs/024 contracts/api.md）。
+ * @param env - Workers のバインディング
+ * @returns アプリID。見本の値・未設定・数字でなければ null
+ */
+export function threadsAppIdOf(env: Pick<Env, "THREADS_APP_ID">): string | null {
+  const id = env.THREADS_APP_ID;
+  return id && !isPlaceholder(id) && /^\d+$/.test(id) ? id : null;
+}
+
+/**
  * 画面に出すつなぐ方法を決める。
  *
  * 未設定なら両方（今までの挙動）。`THREADS_CONNECT_METHODS` はカンマ区切りで、
@@ -201,7 +222,8 @@ export function billingModeOf(env: Pick<Env, "BILLING_ENABLED" | "TEST_GROUPS_EN
   else throw new Error(`BILLING_ENABLED must be "true" or "false"`);
   // テスト用のグループも同じ理由で、列挙外の値では落とす（specs/016 research.md R1）
   if (env.TEST_GROUPS_ENABLED === "true") return { enabled, testGroups: true, operators: operatorIdsOf(env) };
-  if (env.TEST_GROUPS_ENABLED === "false") return { enabled, testGroups: false };
+  // 運営者は、招待制にかかわらず料金なし（specs/024 FR-023、research.md R11）
+  if (env.TEST_GROUPS_ENABLED === "false") return { enabled, testGroups: false, operators: operatorIdsOf(env) };
   throw new Error(`TEST_GROUPS_ENABLED must be "true" or "false"`);
 }
 

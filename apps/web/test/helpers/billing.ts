@@ -11,6 +11,8 @@ export const ME_BILLING_OFF: {
   testGroups: MeResponse["testGroups"];
   operator: boolean;
   features: MeResponse["features"];
+  dailyPostLimit: MeResponse["dailyPostLimit"];
+  testerInvites: MeResponse["testerInvites"];
 } = {
   billing: {
     mode: "disabled",
@@ -23,6 +25,9 @@ export const ME_BILLING_OFF: {
   testGroups: ME_TEST_GROUPS_OFF,
   operator: false,
   features: [...FEATURES],
+  // 上限の既定値と、招待の管理OFF（specs/024。001〜023の画面のテストは今のまま）
+  dailyPostLimit: 10,
+  testerInvites: { enabled: false },
 };
 
 /**

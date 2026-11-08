@@ -1,6 +1,6 @@
 import { and, eq } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
-import { accounts, memberships } from "../../src/db/schema";
+import { accounts, memberships, operatorSettings } from "../../src/db/schema";
 import { call, connectNew, createUserWithAccount, db, fake, makeApp, resetDb } from "../helpers/app";
 import { makeTeam, putInTeam } from "../helpers/team";
 
@@ -42,6 +42,8 @@ describe("GET /api/me/needs-review-counts", () => {
   });
 
   it("ownerの3件を5・2・0件で返し、他人とowner以外を除き、要再接続も数える", async () => {
+    // 4件作るので、上限の既定値（3件。specs/024）を上げる
+    await db().update(operatorSettings).set({ defaultAccountLimit: 10 });
     const first = await addAccount("u1", "7001");
     const second = await addAccount("u1", "7002");
     const third = await addAccount("u1", "7003");

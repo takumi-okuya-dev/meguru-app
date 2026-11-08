@@ -220,7 +220,7 @@ export async function listReviewedRows(
  */
 export async function listAllDrafts(
   db: Db,
-  account: AccountRow & { ownerReadOnly?: boolean } & PostDraftView,
+  account: AccountRow & { ownerReadOnly?: boolean; dailyPostLimit?: number } & PostDraftView,
   now: Date = new Date(),
 ) {
   const [needsReview, approved, rejected, publishFailed, counts, schedule] = await Promise.all([

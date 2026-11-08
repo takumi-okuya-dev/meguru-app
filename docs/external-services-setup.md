@@ -489,16 +489,38 @@ done
 3. **GoogleのOAuthを自分の認証情報にします**：Google Cloud ConsoleでOAuthクライアント（種類は「ウェブアプリケーション」）を作り、ClerkのGoogle接続で「Use custom credentials」をオンにします。Clerkの画面に出る「Authorized Redirect URI」を、Google側の「承認済みのリダイレクトURI」に登録します。
 4. 本番の`CLERK_SECRET_KEY`（9-6）と`CLERK_PUBLISHABLE_KEY`（`wrangler.toml`とGitHubの変数）を、本番インスタンスのものにします。
 
-### 9-8. Meta（Threads）のコールバックURL（T025・T032）
+### 9-8. Meta（Threads）のアプリとコールバックURL（T025・T032。specs/024 で改めた）
 
-**Metaのアプリは1つのまま**で、戻り先URLを両方登録します（アプリの設定 → Threads API → Redirect Callback URLs）。
+**Metaのアプリは環境ごとに分けます**（specs/024 research.md R12）。
 
-| 環境 | 登録するURL |
+| 環境 | Metaのアプリ |
 |---|---|
-| ステージング | `https://<ステージングのAPIのURL>/api/threads/callback` |
-| 本番 | `https://api.<ドメイン>/api/threads/callback` |
+| ステージング | 「ThreadsAutomation」（今の個人のアプリ。アプリID `1367107908637398`） |
+| 本番 | 本番用に新しく作るアプリ（3-1〜3-4と同じ手順） |
 
-同じ値を、`wrangler.toml`の各環境の`THREADS_REDIRECT_URI`にも入れます（**完全一致**でないとMetaが拒否します）。
+それぞれのアプリの「ユースケース」→「Threads APIにアクセス」→「カスタマイズ」→「設定」で、次の3つを登録します（3-3）。
+
+| 項目 | ステージング | 本番 |
+|---|---|---|
+| リダイレクトコールバックURL | `https://threads-grower-api-staging.marron-taku.workers.dev/api/threads/callback` | `https://api.<ドメイン>/api/threads/callback` |
+| アンインストールコールバックURL | `https://threads-grower-api-staging.marron-taku.workers.dev/api/threads/webhooks/uninstall` | `https://api.<ドメイン>/api/threads/webhooks/uninstall` |
+| 削除コールバックURL | `https://threads-grower-api-staging.marron-taku.workers.dev/api/threads/webhooks/data-deletion` | `https://api.<ドメイン>/api/threads/webhooks/data-deletion` |
+
+- リダイレクトの値は、`wrangler.toml`の各環境の`THREADS_REDIRECT_URI`と**完全一致**させます（違うとMetaが拒否します）。
+- アプリIDは`wrangler.toml`の`THREADS_APP_ID`に、シークレットは Secret に入れます：`printf '%s' '<シークレット>' | pnpm --filter api exec wrangler secret put THREADS_APP_SECRET --env staging`（本番は`--env production`）。
+- **ステージングは、`THREADS_APP_SECRET`を入れてから024を`develop`にマージします**。`app`を出す環境でシークレットがないと、APIが設定の誤り（`CONFIG_ERROR`）で止まります。
+
+#### テスター招待の運用（specs/024）
+
+審査の前は、テスターに入っていて招待を承認したThreadsアカウントだけが「Threadsで許可する」でつなげます。アプリの中で、次の流れで管理します。
+
+1. 利用者が、つなぐ前のアカウントの「Threadsにつなぐ」で、Threadsのユーザー名を書いて申し込みます。
+2. 運営者が、設定の「運営 › テスター招待」を開き、「Metaでテスターを加える」からMetaのアプリの「アプリの役割」→「役割」で、そのユーザー名を「Threadsテスター」に加えます（3-5）。
+3. アプリに戻り、その申し込みの「招待した」を押します。
+4. 利用者がThreadsのアプリで招待を承認し、「Threadsで許可する」でつなぎます。つながると、申し込みは自動で「接続済み」になります。
+5. アカウントが消された・退会した・取り下げられたなどで「外してよい」に出たら、Metaのテスターから外し、「外した」を押します。
+
+運営者はトークンを作りません（Metaのユーザートークン生成ツールは、そのThreadsアカウントへのログインが要るため）。テスター枠の数は、画面の「枠の数を変える」で、Metaのアプリの上限に合わせます。
 
 ### 9-9. Pagesに独自ドメインを当てる（T023・T032）
 
@@ -603,7 +625,8 @@ App Reviewを通すまで、または通らなかったときは、**利用者�
 
 - 公開権限（`threads_content_publish`）が無いトークンでも**接続自体は通り、警告だけ出ます**。利用者が付け忘れると、繋がったように見えて自動投稿だけ失敗します。
 - アンインストール・データ削除の通知は利用者のMetaアプリに届くので、このアプリには届きません。次の問い合わせの認証エラーで「要再接続」になります（[specs/010 spec.md](../specs/010-token-account-add/spec.md)に受容済みとして記録）。
-- **`token`だけなら、このアプリのMetaアプリ（`THREADS_APP_ID`・`THREADS_APP_SECRET`・`THREADS_REDIRECT_URI`）は要りません**。設定の確認（`validateConfig`）は、`app`を出すときだけこの3つを求めます。シークレットを入れていない間は、アンインストール・データ削除の通知の窓口が、署名を見る前にすべて400で断ります（空や見本の鍵の署名は誰でも作れるため。2026-10-31）。審査が通って`app,token`にするときに、3つを入れ、Metaのアプリにコールバックの3つのURL（3-3・9-8）を登録します。
+- **`token`だけなら、このアプリのMetaアプリ（`THREADS_APP_ID`・`THREADS_APP_SECRET`・`THREADS_REDIRECT_URI`）は要りません**。設定の確認（`validateConfig`）は、`app`を出すときだけこの3つを求めます。シークレットを入れていない間は、アンインストール・データ削除の通知の窓口が、署名を見る前にすべて400で断ります（空や見本の鍵の署名は誰でも作れるため。2026-10-31）。
+- **024から、テスト版も本番も`app`と`token`の両方を出します**（審査の前は、テスター招待のあと「Threadsで許可する」でつなぐ。9-8）。3つの値を入れ、Metaのアプリにコールバックの3つのURL（3-3・9-8）を登録してから出します。
 - トークンは、利用者が自分で作ったMetaアプリでも、チームのオーナーが作ったMetaアプリ（利用者をThreadsテスターに招いて作る）でも構いません。審査後も、この方法は残します。
 
 **`THREADS_ACCESS_MODE`を`public`にする前に**：Threads接続の完了は`POST /api/threads/complete`（ログイン済み）で行い、`state`を作った人と呼び出し元の一致を要求しています（セキュリティ監査run-1）。この仕組みが入っていることを確かめてから`public`にしてください。
@@ -632,12 +655,13 @@ Stripeのダッシュボードの左上で「テスト環境」（sandbox）と�
 
 「商品カタログ」→「商品を追加」で、商品「ThreadsGrower」を作り、料金を次のとおりにします（research.md R3）。
 
-- 料金体系：**段階制（graduated）**、毎月、JPY
-- 1段目：1〜1件 **1,000円**
-- 2段目：2件〜 **1件につき500円**
+- 料金体系：**標準の料金（1件あたりの定額）**、毎月、JPY
+- 金額：**1件につき1,000円**（数＝アカウントの数）
 - 税：**内税（税込み）**
 
-できた料金のID（`price_…`）を`STRIPE_PRICE_ID`に入れます。金額は`packages/shared/src/billing.ts`の`BILLING_BASE_PRICE_JPY`・`BILLING_EXTRA_PRICE_JPY`と同じ値にします。金額を変えるときは、両方と利用規約を直し、利用者に告知します。
+できた料金のID（`price_…`）を`STRIPE_PRICE_ID`に入れます。金額は`packages/shared/src/billing.ts`の`BILLING_UNIT_PRICE_JPY`と同じ値にします。金額を変えるときは、定数・利用規約・特定商取引法に基づく表記を直し、利用者に告知します。
+
+**2026-11-08の料金の変更（specs/024）**：「1件目1,000円・2件目から500円」の段階制から、1件につき1,000円に改めました。Stripeの料金は金額を変えられないので、テスト用環境と本番のそれぞれで、上の形の料金を**新しく作り**、`STRIPE_PRICE_ID`を替えます。すでにある契約は、次の数の合わせ直し（アカウントを足す・消す、または日次の処理）で、新しい料金に切り替わります（日割りなし。次の請求から）。
 
 ### 10-3. Webhookの宛先を登録する
 

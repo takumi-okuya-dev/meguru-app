@@ -64,6 +64,8 @@ export async function resetDb() {
   const sql = neon(testEnv.DATABASE_URL);
   createDb(testEnv.DATABASE_URL); // ローカルプロキシの設定を有効にする
   await sql`TRUNCATE users, accounts, memberships, threads_connections, oauth_states, threads_deletion_requests, threads_revocations, strategy_designs, promotions, reference_posts, research_keywords, draft_batches, post_drafts, ng_words, posting_schedules, publish_attempts, teams, team_members, team_accounts, activity_logs, token_check_failures, subscriptions, withdrawn_users CASCADE`;
+  // 運営者が決める値（1行だけ。TRUNCATE では消さない）を初めの値に戻す（specs/024）
+  await sql`UPDATE operator_settings SET default_account_limit = 3, default_daily_post_limit = 10, tester_slot_capacity = 25`;
 }
 
 export function db() {
@@ -386,5 +388,6 @@ export async function insertSubscription(
 export async function endTrial(userId: string) {
   const sql = neon(testEnv.DATABASE_URL);
   createDb(testEnv.DATABASE_URL);
-  await sql`UPDATE users SET created_at = ${AFTER_TRIAL().toISOString()} WHERE id = ${userId}`;
+  // 無料体験が終わるのは、024の前からいた人だけ（specs/024 research.md R8）
+  await sql`UPDATE users SET created_at = ${AFTER_TRIAL().toISOString()}, legacy_trial = true WHERE id = ${userId}`;
 }

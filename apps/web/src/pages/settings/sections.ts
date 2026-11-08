@@ -1,5 +1,5 @@
 // 設定画面の項目の一覧。項目を足すときは、ここに1行足して画面を作るだけにする
-import { CreditCardIcon, PaletteIcon, Share2Icon, ToggleRightIcon, UserCircleIcon, UsersRoundIcon, type LucideIcon } from "lucide-react";
+import { CreditCardIcon, GaugeIcon, MailPlusIcon, PaletteIcon, Share2Icon, ToggleRightIcon, UserCircleIcon, UsersRoundIcon, type LucideIcon } from "lucide-react";
 
 /** 設定画面の項目。 */
 export type SettingsSection = {
@@ -35,6 +35,9 @@ export const OPERATOR_SETTINGS_GROUP: SettingsGroup = {
   sections: [
     { slug: "features", label: "使える機能", Icon: ToggleRightIcon, keywords: ["機能", "ON", "OFF", "プラン", "戦略", "自動投稿", "チーム", "運営"] },
     { slug: "test-groups", label: "グループ", Icon: UsersRoundIcon, keywords: ["テスト", "招待", "グループ", "組織", "運営", "上限"] },
+    // テスター招待・上限（specs/024 contracts/ui-routes.md 5・6）
+    { slug: "tester-invites", label: "テスター招待", Icon: MailPlusIcon, keywords: ["テスター", "招待", "Meta", "申し込み", "運営"] },
+    { slug: "limits", label: "上限", Icon: GaugeIcon, keywords: ["上限", "アカウント", "投稿", "件数", "運営"] },
   ],
 };
 

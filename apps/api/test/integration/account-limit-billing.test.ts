@@ -14,7 +14,7 @@ import {
   setBillingExempt,
 } from "../helpers/app";
 import { callBilling } from "../helpers/billing";
-import { putInTeam } from "../helpers/team";
+import { ensureUser, putInTeam } from "../helpers/team";
 
 const app = makeApp();
 
@@ -43,6 +43,7 @@ describe("無料体験中（契約なし）", () => {
   });
 
   it("並べて2つ送っても、作られるのは1件まで", async () => {
+    await ensureUser("u1"); // 024の前からいた人（無料体験中）
     const results = await Promise.all([create("u1", "A"), create("u1", "B")]);
     expect(results.map((r) => r.status).sort()).toEqual([201, 409]);
     expect(await db().select().from(accounts)).toHaveLength(1);
@@ -72,12 +73,13 @@ describe("無料体験中（契約なし）", () => {
 });
 
 describe("契約中・料金なし・決済OFF", () => {
-  it.each(["trialing", "active"] as const)("契約が %s なら3件目も作れ、上限は null", async (status) => {
+  it.each(["trialing", "active"] as const)("契約が %s なら3件目も作れ、上限は運営者が決める既定値（3件。specs/024 FR-018）", async (status) => {
     const { userId } = await createUserWithAccount("u1");
     await insertSubscription(userId, { status });
     expect((await create("u1", "2")).status).toBe(201);
     expect((await create("u1", "3")).status).toBe(201);
-    expect(await meLimit("u1")).toEqual({ max: null, used: 3 });
+    expect(await meLimit("u1")).toEqual({ max: 3, used: 3 });
+    expect((await create("u1", "4")).status).toBe(409);
   });
 
   it("解約の予約（canceling）でも、期間の終わりまでは作れる", async () => {

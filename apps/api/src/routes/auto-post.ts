@@ -5,6 +5,7 @@ import type { AppEnv } from "../app";
 import { createDb } from "../db/client";
 import { postingSchedules } from "../db/schema";
 import { authorizeAccount } from "../services/access";
+import { effectiveLimits } from "../services/limit-service";
 import { getAutoPostStatus } from "../services/auto-post-status";
 
 /**
@@ -18,7 +19,8 @@ export function autoPostRoutes(authed: MiddlewareHandler<AppEnv>) {
       const db = createDb(c.env.DATABASE_URL);
       const access = await authorizeAccount(db, c.get("user"), c.req.param("accountId"), "view", { feature: "autopost" });
       // オーナーが読むだけなら、自動投稿は止まっている（specs/013 research.md R8）
-      return c.json(await getAutoPostStatus(db, { ...access.account, ownerReadOnly: access.readOnly !== null }));
+      const { dailyPostLimit } = await effectiveLimits(db, c.env, access.owner.id);
+      return c.json(await getAutoPostStatus(db, { ...access.account, ownerReadOnly: access.readOnly !== null, dailyPostLimit }));
     })
     .post("/accounts/:accountId/auto-post/notices/blocked/dismiss", authed, async (c) => {
       const db = createDb(c.env.DATABASE_URL);

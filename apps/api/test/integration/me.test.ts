@@ -28,7 +28,8 @@ describe("GET /api/me", () => {
     expect(me.landingAccountId).toBeNull();
     expect(me.accounts).toEqual([]);
     // 決済OFFの環境では上限なし（null）。決済ONの無料体験中は1（specs/013 account-limit-billing.test.ts）
-    expect(me.accountLimit).toEqual({ max: null, used: 0 });
+    // 上限は運営者が決める既定値（3件。specs/024 FR-016）
+    expect(me.accountLimit).toEqual({ max: 3, used: 0 });
     const rows = await db().select().from(users).where(eq(users.clerkUserId, "new-user"));
     expect(rows).toHaveLength(1);
     expect(rows[0]!.email).toBe("new-user@example.com");
@@ -39,7 +40,7 @@ describe("GET /api/me", () => {
     const me = (await (await call(app, "GET", "/api/me", { user: "u1" })).json()) as Me;
     expect(me.accounts).toHaveLength(1);
     expect(me.landingAccountId).toBe(me.accounts[0]!.id);
-    expect(me.accountLimit).toEqual({ max: null, used: 1 });
+    expect(me.accountLimit).toEqual({ max: 3, used: 1 });
   });
 
   it("Accountの要約に接続の方法を出す。このアプリで接続したAccountは app、補いは NULL（specs/010）", async () => {
