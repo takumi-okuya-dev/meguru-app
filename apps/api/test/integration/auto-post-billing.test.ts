@@ -1,6 +1,6 @@
 // 読むだけの間の自動投稿（specs/013-billing FR-041、research.md R8、T031）。決済ONで確かめる。
 import { beforeEach, describe, expect, it } from "vitest";
-import { runAutoPost } from "../../src/services/auto-post-runner";
+import { runAutoPost } from "../../src/apps/threads/publish/auto-post-runner";
 import { endTrial, fake, insertSubscription, makeApp, resetDb, setBillingExempt } from "../helpers/app";
 import { addMin, approvedDrafts, attempts, connectedAccount, db, draftRow, jst, setSchedule } from "../helpers/auto-post";
 import { billingEnv } from "../helpers/billing";

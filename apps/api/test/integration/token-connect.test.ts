@@ -2,7 +2,7 @@
 // specs/012 で「トークンでアカウントを作る」は「名前で作ったアカウントに、トークンではじめてつなぐ」（mode = connect）になった。
 import { neon } from "@neondatabase/serverless";
 import { beforeEach, describe, expect, it } from "vitest";
-import { runDailyJobs } from "../../src/services/daily-jobs";
+import { runDailyJobs } from "../../src/jobs/daily-jobs";
 import { call, createAccountVia, fake, makeApp, resetDb, testEnv } from "../helpers/app";
 
 const app = makeApp();
@@ -178,7 +178,7 @@ describe("トークンで追加する（US1）", () => {
   });
 
   it("最初のプロフィールの取得で通信が失敗したら THREADS_UNAVAILABLE（503）にし、失敗に数えない（PR #12 のCodexレビュー）", async () => {
-    const { connectWithToken } = await import("../../src/services/token-connect");
+    const { connectWithToken } = await import("../../src/apps/threads/connection/token-connect");
     const { createThreadsClient } = await import("../../src/adapters/threads-api/threads-client");
     const { AppError } = await import("../../src/kernel/errors");
     await call(app, "GET", "/api/me", { user: "u1" });

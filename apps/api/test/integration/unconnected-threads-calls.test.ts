@@ -3,7 +3,7 @@
 import { eq } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
 import { accounts, publishAttempts } from "../../src/db/schema";
-import { runDailyJobs } from "../../src/services/daily-jobs";
+import { runDailyJobs } from "../../src/jobs/daily-jobs";
 import { call, createAccountVia, db, fake, makeApp, resetDb, testEnv } from "../helpers/app";
 import { approvedDrafts, jst, jstMinuteOf, run, setSchedule } from "../helpers/auto-post";
 

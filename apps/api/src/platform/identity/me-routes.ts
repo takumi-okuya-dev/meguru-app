@@ -1,6 +1,6 @@
 // GET /api/me（FR-004・FR-005、research.md R10。specs/008 research.md R11 で役割つきに広げ、
 // specs/011 research.md R5 で入っているチームを足した）
-import { FEATURES, type Role } from "@threads-grower/shared";
+import { FEATURES, type Role, withdrawRequestSchema } from "@threads-grower/shared";
 import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { Hono, type MiddlewareHandler } from "hono";
@@ -13,7 +13,6 @@ import { featureOnSql } from "../features/feature-sql";
 import { toMeBilling } from "../billing/billing-service";
 import { withdraw, withdrawalPreview, type ClerkUserDeleter } from "../withdrawal/withdrawal-service";
 import type { Env } from "../../kernel/env";
-import { withdrawRequestSchema } from "@threads-grower/shared";
 import { AppError } from "../../kernel/errors";
 import { listMyTeams } from "../teams/team-service";
 import { accountLimitFor } from "../accounts/account-service";

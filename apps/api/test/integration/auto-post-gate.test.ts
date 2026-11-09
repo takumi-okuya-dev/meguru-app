@@ -7,7 +7,7 @@ import {
   waitOnExecutionContext,
 } from "cloudflare:test";
 import worker from "../../src/index";
-import { runAutoPost } from "../../src/services/auto-post-runner";
+import { runAutoPost } from "../../src/apps/threads/publish/auto-post-runner";
 import { fake, makeApp, resetDb, testEnv, tokenConnectNew } from "../helpers/app";
 import { addMin, connectedAccount, jst, setSchedule } from "../helpers/auto-post";
 

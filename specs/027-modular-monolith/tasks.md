@@ -108,12 +108,12 @@ description: "Task list for feature 027 modular monolith"
 
 ### 段階3：Threads（コミット3）
 
-- [ ] T021 [US2] Threadsへ移す（data-model.md 2-4）：残りの`services/*.ts`（`connection-service.ts`・`threads-hooks.ts`を含む）と`routes/*.ts`を`apps/threads/<小分け>/`へ。`services/daily-jobs.ts`は`jobs/daily-jobs.ts`（組み立て）へ。
-- [ ] T022 [US2] `apps/api/src/apps/threads/index.ts`を作る：APIの入口を作る関数と`registerThreads()`を出す。`app.ts`・`index.ts`・テストの準備は、この入口の`registerThreads()`を呼ぶ。
-- [ ] T023 [US2] Threadsの表の定義を`apps/api/src/apps/threads/schema.ts`へ分ける（data-model.md 1-2の25表）。`db/schema.ts`は共通とThreadsの`schema.ts`を読み直して出すだけにする（research.md R6）。Threadsのファイルは自分の`schema.ts`と共通の入口から表を読む。
-- [ ] T024 [US2] Threadsのファイルの、共通・窓口への読みこみを入口に直す（`../../platform`・`../../adapters/<名前>`）。`app.ts`・`index.ts`・`jobs/`は各モジュールの入口から読む。
-- [ ] T025 [US2] `eslint.config.js`で規則に`{ strictPlacement: true }`を渡し（組み立ての場所のほかに残ったファイルを知らせる）、`pnpm lint`で`module-boundaries`の違反が0件になるまで直す。直せないものがあれば、理由を`docs/module-map.md`の「境界の例外」に書く（5件以下）。
-- [ ] T026 [US2] 段階3の確かめ：型の確認・ESLint・すべてのテストが通ること。ここで1つコミットする。
+- [X] T021 [US2] Threadsへ移す（data-model.md 2-4）：残りの`services/*.ts`（`connection-service.ts`・`threads-hooks.ts`を含む）と`routes/*.ts`を`apps/threads/<小分け>/`へ。`services/daily-jobs.ts`は`jobs/daily-jobs.ts`（組み立て）へ。
+- [X] T022 [US2] `apps/api/src/apps/threads/index.ts`を作る：APIの入口を作る関数と`registerThreads()`を出す。`app.ts`・`index.ts`・テストの準備は、この入口の`registerThreads()`を呼ぶ。
+- [X] T023 [US2] Threadsの表の定義を`apps/api/src/apps/threads/schema.ts`へ分ける（data-model.md 1-2の25表）。`db/schema.ts`は共通とThreadsの`schema.ts`を読み直して出すだけにする（research.md R6）。Threadsのファイルは自分の`schema.ts`と共通の入口から表を読む。
+- [X] T024 [US2] Threadsのファイルの、共通・窓口への読みこみを入口に直す（`../../platform`・`../../adapters/<名前>`）。`app.ts`・`index.ts`・`jobs/`は各モジュールの入口から読む。
+- [X] T025 [US2] `eslint.config.js`で規則に`{ strictPlacement: true }`を渡し（組み立ての場所のほかに残ったファイルを知らせる）、`pnpm lint`で`module-boundaries`の違反が0件になるまで直す。直せないものがあれば、理由を`docs/module-map.md`の「境界の例外」に書く（5件以下）。
+- [X] T026 [US2] 段階3の確かめ：型の確認・ESLint・すべてのテストが通ること。ここで1つコミットする。
 
 **Checkpoint**：違反0件で、境界が規則で守られている。
 
@@ -123,10 +123,10 @@ description: "Task list for feature 027 modular monolith"
 
 **Independent Test**：quickstart.md 1。
 
-- [ ] T027 [US3] `pnpm -r typecheck`・`pnpm lint`・`pnpm test`がすべて通り、テストの数が基準（共有512件・Web 751件・API 1,266件＋足したテスト）以上であることを確かめる。
-- [ ] T028 [US3] `pnpm --filter api db:generate`で新しいマイグレーションができないこと（No schema changes）を確かめる。できたら、表の定義の移し間違いを直す。
-- [ ] T029 [US3] `test/repo/routes-snapshot.test.ts`が通る（APIの入口の一覧が`routes.snapshot.txt`と同じ）ことを確かめる。
-- [ ] T030 [US3] `apps/api/scripts/dump-routes.ts`・`rotate-token-key.ts`など`scripts/`が、新しい場所で動くことを確かめる（`pnpm --filter api exec tsx scripts/dump-routes.ts`）。
+- [X] T027 [US3] `pnpm -r typecheck`・`pnpm lint`・`pnpm test`がすべて通り、テストの数が基準（共有512件・Web 751件・API 1,266件＋足したテスト）以上であることを確かめる。
+- [X] T028 [US3] `pnpm --filter api db:generate`で新しいマイグレーションができないこと（No schema changes）を確かめる。できたら、表の定義の移し間違いを直す。
+- [X] T029 [US3] `test/repo/routes-snapshot.test.ts`が通る（APIの入口の一覧が`routes.snapshot.txt`と同じ）ことを確かめる。
+- [X] T030 [US3] `apps/api/scripts/dump-routes.ts`・`rotate-token-key.ts`など`scripts/`が、新しい場所で動くことを確かめる（`pnpm --filter api exec tsx scripts/dump-routes.ts`）。
 
 ## Phase 6：User Story 4 - 2作目をThreadsと並ぶモジュールとして足せる（P2）
 
@@ -134,14 +134,14 @@ description: "Task list for feature 027 modular monolith"
 
 **Independent Test**：quickstart.md 2-3。
 
-- [ ] T031 [US4] `docs/module-map.md`に「アプリのモジュールを足す手順」を書く：`apps/<名前>/`に`index.ts`・`schema.ts`・小分けを作る、共通の入口だけを使う、表は今の`accounts`・`users`を参照する（`workspaces`は2作目で見直す）、`app.ts`で入口をつなぎ`registerXxx()`を呼ぶ、規則は設定なしで当たる。
-- [ ] T032 [US4] quickstart.md 2の1〜3（共通 → アプリ・入口の外・仮のアプリ`apps/sample`からThreads）で`pnpm lint`が失敗することを確かめ、足した行と仮のアプリを消す。
+- [X] T031 [US4] `docs/module-map.md`に「アプリのモジュールを足す手順」を書く：`apps/<名前>/`に`index.ts`・`schema.ts`・小分けを作る、共通の入口だけを使う、表は今の`accounts`・`users`を参照する（`workspaces`は2作目で見直す）、`app.ts`で入口をつなぎ`registerXxx()`を呼ぶ、規則は設定なしで当たる。
+- [X] T032 [US4] quickstart.md 2の1〜3（共通 → アプリ・入口の外・仮のアプリ`apps/sample`からThreads）で`pnpm lint`が失敗することを確かめ、足した行と仮のアプリを消す。
 
 ## Phase 7：Polish & Cross-Cutting
 
-- [ ] T033 [P] `docs/module-map.md`の処理の一覧と、並べ替えのあとの`apps/api/src`のファイルを突き合わせ、パスを最終の場所に直す（SC-001）。表を3つ・APIの入口を3つ選び、地図から持ち主を1分以内に答えられることを人が確かめる（SC-006）。
-- [ ] T034 [P] `docs/project-report.md`に027（モジュラーモノリスへの整理）を1項目足す（共有用の文書の同期は「共有用を更新して」のときだけ）。
-- [ ] T035 `pnpm -r typecheck`・`pnpm lint`・`pnpm test`を通す。
+- [X] T033 [P] `docs/module-map.md`の処理の一覧と、並べ替えのあとの`apps/api/src`のファイルを突き合わせ、パスを最終の場所に直す（SC-001）。表を3つ・APIの入口を3つ選び、地図から持ち主を1分以内に答えられることを人が確かめる（SC-006）。
+- [X] T034 [P] `docs/project-report.md`に027（モジュラーモノリスへの整理）を1項目足す（共有用の文書の同期は「共有用を更新して」のときだけ）。
+- [X] T035 `pnpm -r typecheck`・`pnpm lint`・`pnpm test`を通す。
 - [ ] T036 （マージのあと）quickstart.md 3のとおり、テスト版で基本の操作5つを確かめる（SC-005）。
 
 ## Dependencies & Execution Order

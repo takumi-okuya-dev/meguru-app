@@ -3,7 +3,7 @@ import { neon } from "@neondatabase/serverless";
 import { beforeEach, describe, expect, it } from "vitest";
 import { createThreadsClient } from "../../src/adapters/threads-api/threads-client";
 import { createDb } from "../../src/kernel/db/client";
-import { runTokenRecheck } from "../../src/services/token-recheck";
+import { runTokenRecheck } from "../../src/apps/threads/connection/token-recheck";
 import { fake, makeApp, resetDb, testEnv, tokenConnectNew } from "../helpers/app";
 
 const app = makeApp();
@@ -80,7 +80,7 @@ describe("確かめ直し", () => {
 
 describe("日次の延長（SC-006、FR-040）", () => {
   it("トークンの接続も、期限まで7日を切れば延長され、アプリのユーザーIDのまま", async () => {
-    const { refreshExpiringTokens } = await import("../../src/services/token-refresh");
+    const { refreshExpiringTokens } = await import("../../src/apps/threads/connection/token-refresh");
     await tokenConnectNew(app, "u1", await fake.issueToken({ user: "9003" }));
     await q()`UPDATE threads_connections SET expires_at = now() + interval '3 days', issued_at = now() - interval '2 days'`;
     const result = await refreshExpiringTokens(testEnv, createThreadsClient(testEnv), new Date());

@@ -1,10 +1,9 @@
 import { createApp } from "./app";
 import type { Env } from "./kernel/env";
-import { runAutoPost } from "./services/auto-post-runner";
+import { runAutoPost, registerThreads } from "./apps/threads";
 import { validateConfig } from "./kernel/config";
 import { logger, setLogAppEnv } from "./kernel/logger";
-import { runDailyJobs } from "./services/daily-jobs";
-import { registerThreads } from "./services/threads-hooks";
+import { runDailyJobs } from "./jobs/daily-jobs";
 
 const app = createApp();
 

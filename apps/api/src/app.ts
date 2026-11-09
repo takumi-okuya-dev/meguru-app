@@ -12,42 +12,45 @@ import {
   clerkVerifier,
   type AuthVerifier,
   type AppEnv,
+  accountRoutes,
+  billingRoutes,
+  stripeWebhookRoutes,
+  accountTeamRoutes,
+  inviteRoutes,
+  operatorFeatureRoutes,
+  operatorTestGroupRoutes,
+  testInviteRoutes,
+  referralRoutes,
+  teamsRoutes,
+  activityRoutes,
+  meRoutes,
+  operatorLimitRoutes,
+  clerkUserDeleter,
+  type ClerkUserDeleter,
 } from "./platform";
-import { accountRoutes } from "./platform";
-import { billingRoutes } from "./platform";
-import { stripeWebhookRoutes } from "./platform";
-import { accountTeamRoutes } from "./platform";
-import { inviteRoutes } from "./platform";
-import { operatorFeatureRoutes } from "./platform";
-import { operatorTestGroupRoutes } from "./platform";
-import { testInviteRoutes } from "./platform";
-import { referralRoutes } from "./platform";
-import { teamsRoutes } from "./platform";
-import { activityRoutes } from "./platform";
-import { dataDeletionRoutes } from "./routes/data-deletion";
-import { threadsWebhookRoutes } from "./routes/threads-webhooks";
-import { meRoutes } from "./platform";
-import { needsReviewCountRoutes } from "./routes/needs-review-counts";
-import { registerThreads } from "./services/threads-hooks";
-import { performanceRoutes } from "./routes/performance";
-import { postDraftRoutes } from "./routes/post-drafts";
-import { autoPostRoutes } from "./routes/auto-post";
-import { postingRulesRoutes } from "./routes/posting-rules";
-import { postingScheduleRoutes } from "./routes/posting-schedule";
-import { threadsCheckRoutes } from "./routes/threads-check";
-import { promotionRoutes } from "./routes/promotions";
-import { promptRoutes } from "./routes/prompt";
-import { researchRoutes } from "./routes/research";
-import { strategyRoutes } from "./routes/strategy";
-import { analysisRoutes } from "./routes/analysis";
-import { mentionRoutes } from "./routes/mention";
-import { externalMediaRoutes } from "./routes/external-media";
-import { threadsConnectRoutes } from "./routes/threads-connect";
-import { testerApplicationRoutes } from "./routes/tester-applications";
-import { operatorAccountRoutes } from "./routes/operator-accounts";
-import { operatorTesterInviteRoutes } from "./routes/operator-tester-invites";
-import { operatorLimitRoutes } from "./platform";
-import { clerkUserDeleter, type ClerkUserDeleter } from "./platform";
+import {
+  dataDeletionRoutes,
+  threadsWebhookRoutes,
+  needsReviewCountRoutes,
+  registerThreads,
+  performanceRoutes,
+  postDraftRoutes,
+  autoPostRoutes,
+  postingRulesRoutes,
+  postingScheduleRoutes,
+  threadsCheckRoutes,
+  promotionRoutes,
+  promptRoutes,
+  researchRoutes,
+  strategyRoutes,
+  analysisRoutes,
+  mentionRoutes,
+  externalMediaRoutes,
+  threadsConnectRoutes,
+  testerApplicationRoutes,
+  operatorAccountRoutes,
+  operatorTesterInviteRoutes,
+} from "./apps/threads";
 
 /** アプリに差し込む依存。テストでは偽の認証を渡す。 */
 export type AppDeps = {

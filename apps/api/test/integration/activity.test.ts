@@ -3,7 +3,7 @@
 import { neon } from "@neondatabase/serverless";
 import { emptyStrategyValues } from "@threads-grower/shared";
 import { beforeEach, describe, expect, it } from "vitest";
-import { runDailyJobs } from "../../src/services/daily-jobs";
+import { runDailyJobs } from "../../src/jobs/daily-jobs";
 import { call, createUserWithAccount, makeApp, resetDb, testEnv } from "../helpers/app";
 import { activityRows, assign, joinTeam, makeTeam, setRole } from "../helpers/team";
 

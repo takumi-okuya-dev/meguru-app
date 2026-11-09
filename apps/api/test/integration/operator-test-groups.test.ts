@@ -1,10 +1,9 @@
 // 運営者のAPI（specs/016-test-groups US2、FR-009〜FR-011・FR-013、T020）
 import { beforeEach, describe, expect, it } from "vitest";
 import { neon } from "@neondatabase/serverless";
-import { call, makeApp, resetDb, testEnv } from "../helpers/app";
+import { call, makeApp, resetDb, testEnv, db } from "../helpers/app";
 import { OPERATOR, callOn, createGroup, join, userRow } from "../helpers/test-groups";
 import { setBillingExemptByEmail } from "../../src/platform/billing/billing-service";
-import { db } from "../helpers/app";
 
 const app = makeApp();
 

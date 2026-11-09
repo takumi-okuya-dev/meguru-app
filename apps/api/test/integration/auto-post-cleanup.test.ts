@@ -1,5 +1,5 @@
 import { beforeEach, expect, it } from "vitest";
-import { runDailyJobs } from "../../src/services/daily-jobs";
+import { runDailyJobs } from "../../src/jobs/daily-jobs";
 import { call, fake, makeApp, resetDb, testEnv, authorizeAndCallback } from "../helpers/app";
 import { approvedDrafts, connectedAccount, db, jst, run, setSchedule } from "../helpers/auto-post";
 

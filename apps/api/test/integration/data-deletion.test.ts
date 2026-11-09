@@ -7,7 +7,7 @@ import {
   cleanupDeletionIdentifiers,
   receiveDeletion,
   retryDeletions,
-} from "../../src/services/data-deletion";
+} from "../../src/apps/threads/connection/data-deletion";
 import { TEST_APP_SECRET } from "../env";
 import { call, connectNew, db, fake, makeApp, redirectTarget, resetDb, testEnv } from "../helpers/app";
 import { makeSignedRequest } from "../helpers/signed-request";

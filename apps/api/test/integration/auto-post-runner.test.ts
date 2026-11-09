@@ -2,7 +2,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { fake, makeApp, resetDb, testEnv } from "../helpers/app";
 import { createThreadsClient } from "../../src/adapters/threads-api/threads-client";
-import { runAutoPost } from "../../src/services/auto-post-runner";
+import { runAutoPost } from "../../src/apps/threads/publish/auto-post-runner";
 import {
   addMin,
   approvedDrafts,

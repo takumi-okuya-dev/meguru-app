@@ -338,7 +338,7 @@ describe("オーナーが読むだけ（決済ON）", () => {
   async function runOn(now: Date) {
     const env = billingEnv();
     await env.AUTOPOST_KV.delete("autopost:gate");
-    const { runAutoPost } = await import("../../src/services/auto-post-runner");
+    const { runAutoPost } = await import("../../src/apps/threads/publish/auto-post-runner");
     return runAutoPost(env, now, undefined, () => now);
   }
   async function ownerOf(accountId: string) {

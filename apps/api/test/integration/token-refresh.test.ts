@@ -3,8 +3,8 @@ import { eq } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
 import { accounts, threadsConnections } from "../../src/db/schema";
 import { createThreadsClient } from "../../src/adapters/threads-api/threads-client";
-import { handleUninstall } from "../../src/services/revocation";
-import { refreshExpiringTokens, refreshOne, selectRefreshCandidates } from "../../src/services/token-refresh";
+import { handleUninstall } from "../../src/apps/threads/connection/revocation";
+import { refreshExpiringTokens, refreshOne, selectRefreshCandidates } from "../../src/apps/threads/connection/token-refresh";
 import { authorizeAndCallback, call, connectNew, db, fake, makeApp, resetDb, testEnv } from "../helpers/app";
 
 const app = makeApp();

@@ -47,6 +47,7 @@ await runHook(name, payload)       // 共通の中で、今の呼び出しと同
 
 - 受け取る関数は、登録した順に1つずつ`await`する。例外は呼んだ側にそのまま返す（今の動きと同じ）。
 - 受け取るものがなければ何もしない。
+- 知らせの一覧（5つ）は[docs/module-map.md](../../../docs/module-map.md) 1-4。
 
 ## 4. ESLintの規則（`module-boundaries`）
 
