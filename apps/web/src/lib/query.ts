@@ -43,6 +43,8 @@ export const queryKeys = {
   // 違うアカウントでつながった知らせ（specs/025）
   connectionNotice: (id: string) => ["account", id, "connection-notice"] as const,
   operatorTesterApplications: (view: string) => ["operator-tester-applications", view] as const,
+  // 運営者のアカウント一覧（specs/026）
+  operatorAccounts: (method: string, q: string) => ["operator-accounts", method, q] as const,
   operatorTesterApplicationsAll: ["operator-tester-applications"] as const,
   operatorLimits: ["operator-limits"] as const,
   // チーム（specs/011）。Account の下に置かない（チームは Account をまたぐ）。取り直しは ["team", id] の範囲で行う

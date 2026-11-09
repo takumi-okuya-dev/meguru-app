@@ -27,6 +27,7 @@ import { BillingSettingsPage } from "@/pages/settings/billing";
 import { FeaturesPage } from "@/pages/settings/features";
 import { TestGroupDetailPage, TestGroupsPage } from "@/pages/settings/test-groups";
 import { TesterInvitesPage } from "@/pages/settings/tester-invites";
+import { OperatorAccountsPage } from "@/pages/settings/operator-accounts";
 import { LimitsPage } from "@/pages/settings/limits";
 import { LegalCommercePage } from "@/pages/legal-commerce";
 import { AppearanceSettings } from "@/pages/settings/appearance";
@@ -97,6 +98,7 @@ export const routes = [
           { path: "test-groups", element: <TestGroupsPage /> },
           { path: "test-groups/:groupId", element: <TestGroupDetailPage /> },
           { path: "tester-invites", element: <TesterInvitesPage /> },
+          { path: "operator-accounts", element: <OperatorAccountsPage /> },
           { path: "limits", element: <LimitsPage /> },
         ],
       },

@@ -42,6 +42,7 @@ import { mentionRoutes } from "./routes/mention";
 import { externalMediaRoutes } from "./routes/external-media";
 import { threadsConnectRoutes } from "./routes/threads-connect";
 import { testerApplicationRoutes } from "./routes/tester-applications";
+import { operatorAccountRoutes } from "./routes/operator-accounts";
 import { operatorTesterInviteRoutes } from "./routes/operator-tester-invites";
 import { operatorLimitRoutes } from "./routes/operator-limits";
 import { clerkUserDeleter, type ClerkUserDeleter } from "./services/withdrawal-service";
@@ -185,6 +186,7 @@ export function createApp(deps: AppDeps = defaultDeps) {
     // テスター招待・上限（specs/024 contracts/api.md）
     .route("/", testerApplicationRoutes(authed))
     .route("/", operatorTesterInviteRoutes(authed))
+    .route("/", operatorAccountRoutes(authed))
     .route("/", operatorLimitRoutes(authed))
     .route("/", teamsRoutes(authed))
     .route("/", activityRoutes(authed))
