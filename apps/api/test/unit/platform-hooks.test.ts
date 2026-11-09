@@ -1,6 +1,6 @@
 // 知らせ（共通 → アプリ）の仕組み（specs/027-modular-monolith contracts/module-boundaries.md 3、T012）
 import { afterEach, describe, expect, it } from "vitest";
-import { registerHook, resetHooks, runHook } from "../../src/platform/hooks";
+import { registerHook, registerModule, resetHooks, runHook } from "../../src/platform/hooks";
 
 const env = {} as never;
 
@@ -41,17 +41,29 @@ describe("platform/hooks", () => {
     expect(called).toBe(false);
   });
 
-  it("登録がなければ何もしない", async () => {
-    await expect(runHook("userWithdrawing", { tx: {} as never, userId: "u1" })).resolves.toBeUndefined();
+  it("受け取りが登録されていなければ例外にする（片づけを黙って飛ばさない。PR #76 のセルフレビュー）", async () => {
+    await expect(runHook("userWithdrawing", { tx: {} as never, userId: "u1" })).rejects.toThrow("受け取りが登録されていません");
+  });
+
+  it("registerModule は同じ名前で1回だけ登録し、resetHooks のあとはまた登録できる", async () => {
+    let n = 0;
+    const register = () =>
+      registerHook("limitsChanged", () => {
+        n += 1;
+      });
+    registerModule("app", register);
+    registerModule("app", register);
+    await runHook("limitsChanged", { env });
+    expect(n).toBe(1);
+    resetHooks();
+    registerModule("app", register);
+    await runHook("limitsChanged", { env });
+    expect(n).toBe(2);
   });
 
   it("resetHooks で登録を消せる", async () => {
-    let n = 0;
-    registerHook("limitsChanged", () => {
-      n += 1;
-    });
+    registerHook("limitsChanged", () => {});
     resetHooks();
-    await runHook("limitsChanged", { env });
-    expect(n).toBe(0);
+    await expect(runHook("limitsChanged", { env })).rejects.toThrow();
   });
 });

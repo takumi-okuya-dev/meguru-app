@@ -2,7 +2,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { threadsConnections } from "../../src/db/schema";
 import { createTokenCipher, KeyRingError } from "../../src/kernel/crypto";
-import { rotateTokenKeys } from "../../src/apps/threads/connection/key-rotation";
+import { rotateTokenKeys } from "../../src/jobs/key-rotation";
 import { createApp } from "../../src/app";
 import { call, connectNew, createUserWithAccount, db, fake, fakeVerifier, makeApp, resetDb, testEnv } from "../helpers/app";
 

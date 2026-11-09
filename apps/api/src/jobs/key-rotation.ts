@@ -2,12 +2,13 @@
 // 古いバージョンの行を、IVを新しく作って現在の鍵で暗号化し直す。
 // 各行の書き込みは、読んだ時点の key_version と accounts.connection_generation を条件にし、
 // その間に再接続などで書き換わった行は飛ばす（トークンの値は変わらないので世代番号は上げない）。
+// 組み立て（docs/module-map.md 2-5）に置く：共通（チームの招待のトークン）とThreads（接続のトークン）の両方の暗号を入れ替えるため（specs/027）。
 import { and, eq, ne, sql } from "drizzle-orm";
-import type { Env } from "../../../kernel/env";
-import { createDb } from "../../../kernel/db/client";
-import { threadsConnections } from "../schema";
-import { accounts, teams } from "../../../platform";
-import { createTokenCipher, KeyRingError } from "../../../kernel/crypto";
+import type { Env } from "../kernel/env";
+import { createDb } from "../kernel/db/client";
+import { threadsConnections } from "../apps/threads/schema";
+import { accounts, teams } from "../platform";
+import { createTokenCipher, KeyRingError } from "../kernel/crypto";
 
 /**
  * 暗号鍵のローテーション（research.md R5 の手順3・4）。古いバージョンの行を、新しいIVと現在の鍵で暗号化し直す。

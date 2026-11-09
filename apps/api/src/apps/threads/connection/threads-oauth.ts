@@ -1,8 +1,9 @@
 // Threads接続フローの開始と state の扱い（research.md R3・R4）。
 // state は32バイトの乱数。DBには SHA-256 だけを保存し、有効期限は10分、使えるのは1回だけ。
-import { eq } from "drizzle-orm";
+import { eq, lt } from "drizzle-orm";
 import type { ConnectRequest } from "@threads-grower/shared";
-import type { Db } from "../../../kernel/db/client";
+import { createDb, type Db } from "../../../kernel/db/client";
+import type { Env } from "../../../kernel/env";
 import { oauthStates } from "../schema";
 import { sha256Hex } from "../../../kernel/identifier-hash";
 import type { ThreadsClient } from "../../../adapters/threads-api";
@@ -75,4 +76,14 @@ export async function consumeState(db: Db, state: string): Promise<ConsumedState
     .returning();
   if (!row || row.expiresAt.getTime() < Date.now()) return null;
   return row;
+}
+
+/**
+ * 期限の過ぎた認可の state を消す（毎日の処理。027で jobs/daily-jobs.ts から移した）。
+ * @param env - Workers のバインディング
+ * @param now - 基準の時刻
+ * @returns 消した数
+ */
+export async function cleanupExpiredOauthStates(env: Pick<Env, "DATABASE_URL">, now: Date) {
+  return { deleted: (await createDb(env.DATABASE_URL).delete(oauthStates).where(lt(oauthStates.expiresAt, now)).returning()).length };
 }

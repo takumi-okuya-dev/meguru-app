@@ -21,7 +21,7 @@ import { AppError } from "../../kernel/errors";
 import { logger } from "../../kernel/logger";
 import { createStripeClient, StripeError, type StripeClient } from "../../adapters/stripe";
 import { beforeAccountDeleted, chooseSuccessor } from "../teams/team-service";
-import { runHook } from "..";
+import { runHook } from "../hooks";
 
 /** 退会した人を記録に出すときの名前（FR-053）。 */
 export const WITHDRAWN_ACTOR_NAME = "退会した人";
@@ -215,6 +215,8 @@ async function deleteUserData(tx: TxDb, user: { id: string; clerkUserId: string 
       .orderBy(asc(accounts.id));
     for (const a of owned) {
       await beforeAccountDeleted(tx, a.id, user.id);
+      // アプリの片づけ（知らせ。アカウントの削除と同じ。Threadsのテスター招待は userWithdrawing で片づけ済みなので、ここでは何もしない）
+      await runHook("accountDeleting", { tx, accountId: a.id });
       await tx.delete(accounts).where(eq(accounts.id, a.id));
     }
     // アプリの片づけ（Threads：データ削除の求めが処理中なら、退会で消したので完了にする。spec Edge Cases）。知らせで呼ぶ（specs/027）

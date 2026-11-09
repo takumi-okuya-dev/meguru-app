@@ -34,11 +34,11 @@ APIのコードを、どのモジュールが持つかを決めた地図。表�
 
 ### 1-4. 知らせ（共通 → アプリ）
 
-共通の処理の途中でアプリの処理を呼ぶ必要があるときは、共通が知らせを出し、アプリが受け取る（`platform/hooks.ts`）。受け取る関数は、組み立てでアプリの`registerXxx()`を1回呼んで登録する。今の呼び出しと同じ場所・同じ順番・同じトランザクションで`await`する。
+共通の処理の途中でアプリの処理を呼ぶ必要があるときは、共通が知らせを出し、アプリが受け取る（`platform/hooks.ts`）。受け取る関数は、組み立てでアプリの`registerXxx()`を呼んで登録する（中で`registerModule("<名前>", …)`を使い、何度呼んでも1回だけ）。今の呼び出しと同じ場所・同じ順番・同じトランザクションで`await`する。受け取りが1つも登録されていない知らせを出すと例外になる（アプリの片づけを黙って飛ばさないため）。
 
 | 知らせ | 出すところ | Threadsでの受け取り |
 |---|---|---|
-| `accountDeleting` | アカウントを消す前（`platform/accounts/account-service.ts`の`deleteAccount`） | テスター招待の取り下げ（`withdrawForAccountDeletion`） |
+| `accountDeleting` | アカウントを消す前（`deleteAccount`・Metaからのデータ削除の`deleteAccountsOfThreadsUser`・退会の`withdrawal-service`の3か所すべて） | テスター招待の取り下げ（`withdrawForAccountDeletion`） |
 | `userWithdrawing` | 退会で、持っているアカウントを消す前（`platform/withdrawal/withdrawal-service.ts`） | テスター招待の片づけ（`purgeForWithdrawal`） |
 | `userAccountsDeleted` | 退会で、持っているアカウントを消したあと（同上） | Metaのデータ削除の要求が処理中なら完了にする |
 | `limitsChanged` | 上限を保存したあと（`platform/operator/limit-service.ts`） | 自動投稿を起こす（`notifyWake`） |
@@ -61,7 +61,7 @@ APIのコードを、どのモジュールが持つかを決めた地図。表�
 |---|---|---|
 | `identity/`（利用者） | `users`・`withdrawn_users` | `auth.ts`（認証のミドルウェア・`AppEnv`の型）・`me-routes.ts`（`/api/me`・退会） |
 | `access/`（権限） | — | `access.ts`（`authorizeAccount`：誰がどのアカウントで何をできるか） |
-| `accounts/`（運用するアカウントとメンバー） | `accounts`（3章の例外あり）・`memberships` | `account-service.ts`（作る・名前・消す・数える・上限・最後に開いたアカウント）・`account-routes.ts` |
+| `accounts/`（運用するアカウントとメンバー） | `accounts`（3章の例外あり）・`memberships` | `account-service.ts`（作る・名前・消す・数える・上限・最後に開いたアカウント・Metaからのデータ削除でのアカウントの削除`deleteAccountsOfThreadsUser`）・`account-routes.ts` |
 | `teams/`（チーム・招待） | `teams`・`team_members`・`team_accounts` | `team-service.ts`・`team-status.ts`・`invite-service.ts`・`team-routes.ts`・`account-team-routes.ts`・`invite-routes.ts` |
 | `billing/`（契約と決済） | `subscriptions` | `billing-service.ts`・`billing-routes.ts`・`stripe-webhook-routes.ts` |
 | `features/`（機能のON/OFF） | `feature_disables`・`group_feature_disables`・`feature_setting_events` | `feature-service.ts`・`feature-sql.ts`・`operator-feature-routes.ts` |
@@ -76,10 +76,10 @@ APIのコードを、どのモジュールが持つかを決めた地図。表�
 
 | 小分け | 表 | 処理とAPIの入口 |
 |---|---|---|
-| `connection/`（接続・トークン・Metaの要求） | `threads_connections`・`token_check_failures`・`oauth_states`・`threads_deletion_requests`・`threads_revocations` | `connection-service.ts`（接続の確定・開いたときの確かめ）・`threads-oauth.ts`・`token-connect.ts`・`token-recheck.ts`・`token-refresh.ts`・`username-match.ts`・`threads-credentials.ts`・`revocation.ts`・`threads-check-service.ts`・`data-deletion.ts`・`key-rotation.ts`・`threads-connect-routes.ts`・`threads-webhook-routes.ts`・`threads-check-routes.ts`・`data-deletion-routes.ts` |
+| `connection/`（接続・トークン・Metaの要求） | `threads_connections`・`token_check_failures`・`oauth_states`・`threads_deletion_requests`・`threads_revocations` | `connection-service.ts`（接続の確定・開いたときの確かめ）・`threads-oauth.ts`・`token-connect.ts`・`token-recheck.ts`・`token-refresh.ts`・`username-match.ts`・`threads-credentials.ts`・`revocation.ts`・`threads-check-service.ts`・`data-deletion.ts`（アカウントの削除は共通の`deleteAccountsOfThreadsUser`に頼む）・`threads-connect-routes.ts`・`threads-webhook-routes.ts`・`threads-check-routes.ts`・`data-deletion-routes.ts` |
 | `strategy/`（戦略・宣伝・リサーチ） | `strategy_designs`・`promotions`・`reference_posts`・`research_keywords` | `strategy-service.ts`・`profile-status.ts`・`materials.ts`・`item-service.ts`・`strategy-routes.ts`・`promotion-routes.ts`・`research-routes.ts` |
 | `drafts/`（投稿の案・確かめる・投稿ルール） | `draft_batches`・`post_drafts`・`ng_words` | `draft-service.ts`・`review-service.ts`・`posting-rules-service.ts`・`account-review-counts.ts`・`post-draft-routes.ts`・`posting-rule-routes.ts`・`needs-review-count-routes.ts`（`GET /api/me/needs-review-counts`） |
-| `publish/`（予約と自動投稿） | `posting_schedules`・`publish_attempts` | `posting-schedule-service.ts`・`auto-post-runner.ts`・`auto-post-gate.ts`・`auto-post-status.ts`・`publish-claim.ts`・`publish-executor.ts`・`posting-schedule-routes.ts`・`auto-post-routes.ts` |
+| `publish/`（予約と自動投稿） | `posting_schedules`・`publish_attempts` | `posting-schedule-service.ts`・`auto-post-runner.ts`・`auto-post-gate.ts`・`auto-post-status.ts`・`publish-claim.ts`・`publish-executor.ts`・`publish-cleanup.ts`（毎日の片づけ）・`posting-schedule-routes.ts`・`auto-post-routes.ts` |
 | `metrics/`（数字の取得・分析） | `post_metrics`・`post_metric_snapshots`・`follower_snapshots`・`analysis_settings`・`post_classifications` | `metrics-runner.ts`・`performance-service.ts`・`analysis-service.ts`・`prompt-service.ts`・`performance-routes.ts`・`analysis-routes.ts`・`prompt-routes.ts` |
 | `mention/`（時間差のメンション） | `mention_settings`・`mention_people`・`post_mentions` | `mention-runner.ts`・`mention-service.ts`・`mention-view.ts`・`mention-routes.ts` |
 | `external-media/`（外部媒体） | `promotion_listings`・`media_defaults` | `external-media-service.ts`・`external-media-routes.ts` |
@@ -106,7 +106,8 @@ APIのコードを、どのモジュールが持つかを決めた地図。表�
 |---|---|
 | `app.ts` | APIの入口の登録。初めに`registerThreads()`を呼ぶ |
 | `index.ts` | Workersの入口（`fetch`・`scheduled`）。定期処理の初めに`registerThreads()`を呼ぶ |
-| `jobs/daily-jobs.ts` | 毎日の処理（共通の退会のやり直しとThreadsのトークンの更新など）。初めに`registerThreads()`を呼ぶ |
+| `jobs/daily-jobs.ts` | 毎日の処理（共通の退会のやり直しとThreadsのトークンの更新・片づけなど）。各モジュールの入口の関数を順に呼ぶだけ。初めに`registerThreads()`を呼ぶ |
+| `jobs/key-rotation.ts` | 暗号の鍵の入れ替え（`scripts/rotate-token-key.ts`から使う）。共通（チームの招待のトークン）とThreads（接続のトークン）の両方の表を書き換えるので、組み立てに置く |
 | `db/schema.ts` | 共通とThreadsの`schema.ts`を読み直して出すだけ（drizzle-kitとテスト用） |
 
 ## 3. 例外：持ち主でないモジュールが書き換えてよい列

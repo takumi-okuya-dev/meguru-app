@@ -10,7 +10,7 @@ import { authorizeAccount } from "../access/access";
 import { loadEntitlement, markQuantityDirty, syncQuantity } from "../billing/billing-service";
 import { recordActivity } from "../activity/activity-log";
 import { beforeAccountDeleted } from "../teams/team-service";
-import { runHook } from "..";
+import { runHook } from "../hooks";
 import { effectiveLimits } from "../operator/limit-service";
 
 // ---- 登録数の上限（specs/013 research.md R9。001 FR-015〜FR-017 を置き換えた） ----
@@ -119,7 +119,7 @@ export async function createAccount(env: Env, userId: string, name: string) {
   return created;
 }
 
-// ---- 接続の確定（research.md R8 の手順。specs/010 research.md R5 でトークンの接続と共通にした） ----
+// ---- 最後に開いたアカウント（Threadsとの接続の確定は apps/threads/connection/connection-service.ts。specs/027） ----
 
 /**
  * 「最後に使ったAccount」を記録する（FR-007、research.md R10）。
@@ -172,6 +172,8 @@ export async function openAccount(
   return true;
 }
 
+// ---- 名前を直す（specs/012 FR-040） ----
+
 /**
  * アカウントの名前を直す。オーナーだけ。チームに入っているアカウントでは、前後の名前を操作の記録に残す。
  * @param env - Workers のバインディング
@@ -222,8 +224,8 @@ export async function deleteAccount(
     }
     // チームの最後のアカウントなら、同じトランザクションでチームを抜けたものとする（specs/011 FR-046、research.md R7）
     await beforeAccountDeleted(tx, account.id, userId);
-    // 招待の申し込みを取り下げにする（枠を使っていれば「外してよい」。specs/024 data-model.md 5）
-    // アプリの片づけ（Threads：テスター招待の取り下げ）。知らせで呼ぶ（specs/027 research.md R4）
+    // アプリの片づけ（Threads：テスター招待の申し込みを取り下げ、枠を使っていれば「外してよい」にする。specs/024 data-model.md 5）。
+    // 知らせで呼ぶ（specs/027 research.md R4）
     await runHook("accountDeleting", { tx, accountId: account.id });
     const now = new Date();
     await tx
@@ -235,4 +237,31 @@ export async function deleteAccount(
   });
   // 次の請求から数を減らす（日割りの返金はしない。specs/013 FR-030）
   await syncQuantity(env, userId);
+}
+
+/**
+ * Threadsのユーザーで、そのアカウントをすべて消す（Metaからのデータ削除の求め。specs/001 research.md R13）。
+ * 持ち主ごとに users の行をロックし、チームの片づけ・アプリの片づけ（知らせ）・最後に消した日時・数の合わせ直しの印をしてから消す。
+ * 027で apps/threads/connection/data-deletion.ts から移した（accounts・users の持ち主は共通）。トランザクションの中で呼ぶ。
+ * @param tx - トランザクション
+ * @param threadsUserId - accounts.threads_user_id
+ * @param now - 削除の時刻
+ */
+export async function deleteAccountsOfThreadsUser(tx: TxDb, threadsUserId: string, now: Date): Promise<void> {
+  const owners = await tx
+    .select({ userId: memberships.userId, accountId: accounts.id })
+    .from(accounts)
+    .innerJoin(memberships, and(eq(memberships.accountId, accounts.id), eq(memberships.role, "owner")))
+    .where(eq(accounts.threadsUserId, threadsUserId));
+  for (const o of owners) {
+    await lockUserRow(tx, o.userId);
+    // チームの最後のアカウントなら、チームを抜けたものとする（specs/011 FR-046。アカウントの削除と同じ）
+    await beforeAccountDeleted(tx, o.accountId, o.userId);
+    // アプリの片づけ（Threads：テスター招待の取り下げ。specs/024 data-model.md 5、PR #71 のCodexレビュー）。知らせで呼ぶ（specs/027）
+    await runHook("accountDeleting", { tx, accountId: o.accountId });
+    await tx.update(users).set({ lastAccountDeletedAt: now, updatedAt: now }).where(eq(users.id, o.userId));
+    // 契約があれば、数の合わせ直しの印（日次の処理で合わせる。specs/013 research.md R6）
+    await markQuantityDirty(tx, o.userId);
+  }
+  await tx.delete(accounts).where(eq(accounts.threadsUserId, threadsUserId));
 }

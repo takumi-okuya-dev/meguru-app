@@ -11,7 +11,7 @@ import { createDb } from "../../kernel/db/client";
 import { AppError } from "../../kernel/errors";
 import { authorizeAccount, summaryRoleOf, toAccountSummary, type AccountAccess } from "../access/access";
 import { createAccount, deleteAccount, openAccount, renameAccount } from "./account-service";
-import { runHook } from "..";
+import { runHook } from "../hooks";
 import { parseBody } from "../../kernel/validate";
 
 /**

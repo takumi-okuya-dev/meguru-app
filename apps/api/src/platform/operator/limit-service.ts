@@ -16,7 +16,7 @@ import { operatorIdsOf } from "../../kernel/config";
 import { AppError } from "../../kernel/errors";
 import { isUuid } from "../access/access";
 import { listOperatorEvents, recordOperatorEvent } from "./operator-events";
-import { runHook } from "..";
+import { runHook } from "../hooks";
 import { isOperatorSql } from "../test-groups/test-group-service";
 import { readOperatorSettings } from "./operator-settings";
 

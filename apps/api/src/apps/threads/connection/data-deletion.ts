@@ -7,13 +7,12 @@
 import { and, eq, inArray, isNotNull, lt, min, ne, sql } from "drizzle-orm";
 import type { Env } from "../../../kernel/env";
 import { createDb, withTransaction } from "../../../kernel/db/client";
-import { lockThreadsUser, lockUserRow } from "../../../kernel/db/locks";
+import { lockThreadsUser } from "../../../kernel/db/locks";
 import { threadsDeletionRequests } from "../schema";
-import { accounts, memberships, users, markQuantityDirty, beforeAccountDeleted } from "../../../platform";
+import { deleteAccountsOfThreadsUser } from "../../../platform";
 import { sha256Hex, threadsUserHmac, toHex } from "../../../kernel/identifier-hash";
 import { logger } from "../../../kernel/logger";
 import { verifySignedRequest } from "../../../adapters/threads-api";
-import { withdrawForAccountDeletion } from "../tester-invites/tester-application-service";
 
 const LEASE_MS = 15 * 60_000;
 const IDENTIFIER_GRACE_MS = 15 * 60_000;
@@ -123,23 +122,9 @@ export async function attemptDeletion(
 
       await hooks.beforeDelete?.();
 
-      // 4. Accountを削除する。所有者の users 行をロックして last_account_deleted_at を記録する（research.md R13）
-      const owners = await tx
-        .select({ userId: memberships.userId, accountId: accounts.id })
-        .from(accounts)
-        .innerJoin(memberships, and(eq(memberships.accountId, accounts.id), eq(memberships.role, "owner")))
-        .where(eq(accounts.threadsUserId, threadsUserId));
-      for (const o of owners) {
-        await lockUserRow(tx, o.userId);
-        // チームの最後のアカウントなら、チームを抜けたものとする（specs/011 FR-046。アカウントの削除と同じ）
-        await beforeAccountDeleted(tx, o.accountId, o.userId);
-        // 招待の申し込みを取り下げにする（枠を使っていれば「外してよい」。specs/024 data-model.md 5、PR #71 のCodexレビュー）
-        await withdrawForAccountDeletion(tx, o.accountId);
-        await tx.update(users).set({ lastAccountDeletedAt: now, updatedAt: now }).where(eq(users.id, o.userId));
-        // 契約があれば、数の合わせ直しの印（日次の処理で合わせる。specs/013 research.md R6）
-        await markQuantityDirty(tx, o.userId);
-      }
-      await tx.delete(accounts).where(eq(accounts.threadsUserId, threadsUserId));
+      // 4. Accountを削除する。所有者の users 行をロックして last_account_deleted_at を記録する（research.md R13）。
+      //    accounts・users の持ち主は共通なので、共通の処理に頼む（specs/027）
+      await deleteAccountsOfThreadsUser(tx, threadsUserId, now);
 
       // 5. 完了を記録し、平文のIDを消す（hmac は完了の直前に始めた認可フローの照合に使うので残す）
       await tx

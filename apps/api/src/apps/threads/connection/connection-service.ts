@@ -367,5 +367,3 @@ export async function verifyConnection(
     logger.warn("threads profile check failed", { accountId, err });
   }
 }
-
-// ---- 名前を直す（specs/012 FR-040） ----

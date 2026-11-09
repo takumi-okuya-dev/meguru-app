@@ -4,7 +4,7 @@
 import { neonConfig } from "@neondatabase/serverless";
 import ws from "ws";
 import type { Env } from "../src/kernel/env";
-import { rotateTokenKeys } from "../src/apps/threads/connection/key-rotation";
+import { rotateTokenKeys } from "../src/jobs/key-rotation";
 
 neonConfig.webSocketConstructor = ws;
 
