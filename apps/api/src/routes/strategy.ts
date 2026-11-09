@@ -2,9 +2,9 @@
 import { invalidFields, putStrategyRequestSchema } from "@threads-grower/shared";
 import { Hono, type MiddlewareHandler } from "hono";
 import type { AppEnv } from "../app";
-import { createDb } from "../db/client";
+import { createDb } from "../kernel/db/client";
 import { withActivityTx } from "../services/activity-log";
-import { AppError } from "../lib/errors";
+import { AppError } from "../kernel/errors";
 import { authorizeAccount } from "../services/access";
 import { getProfileStatus } from "../services/profile-status";
 import { getStrategy, saveStrategy } from "../services/strategy-service";

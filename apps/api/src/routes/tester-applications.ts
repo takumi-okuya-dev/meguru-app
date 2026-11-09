@@ -3,8 +3,8 @@
 import { testerApplyRequestSchema } from "@threads-grower/shared";
 import { Hono, type MiddlewareHandler } from "hono";
 import type { AppEnv } from "../app";
-import { createDb } from "../db/client";
-import { parseBody } from "../lib/validate";
+import { createDb } from "../kernel/db/client";
+import { parseBody } from "../kernel/validate";
 import { authorizeAccount } from "../services/access";
 import {
   apply,

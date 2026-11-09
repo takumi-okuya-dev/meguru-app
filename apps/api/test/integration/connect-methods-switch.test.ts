@@ -3,7 +3,7 @@
 // トークンを貼る方法だけで運用できるようにする。画面から消すだけにせず、
 // サーバー側でも断る。既定は両方（今までの挙動）。
 import { describe, expect, it, beforeEach } from "vitest";
-import type { Env } from "../../src/env";
+import type { Env } from "../../src/kernel/env";
 import { call, createAccountVia, fake, makeApp, resetDb, testEnv } from "../helpers/app";
 
 const app = makeApp();

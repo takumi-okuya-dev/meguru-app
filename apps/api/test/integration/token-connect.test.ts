@@ -179,8 +179,8 @@ describe("トークンで追加する（US1）", () => {
 
   it("最初のプロフィールの取得で通信が失敗したら THREADS_UNAVAILABLE（503）にし、失敗に数えない（PR #12 のCodexレビュー）", async () => {
     const { connectWithToken } = await import("../../src/services/token-connect");
-    const { createThreadsClient } = await import("../../src/lib/threads-client");
-    const { AppError } = await import("../../src/lib/errors");
+    const { createThreadsClient } = await import("../../src/adapters/threads-api/threads-client");
+    const { AppError } = await import("../../src/kernel/errors");
     await call(app, "GET", "/api/me", { user: "u1" });
     const id = ((await q()`SELECT id FROM users WHERE clerk_user_id = 'u1'`) as { id: string }[])[0]!.id;
     const broken = createThreadsClient(testEnv, () => Promise.reject(new TypeError("fetch failed: getaddrinfo ENOTFOUND")));

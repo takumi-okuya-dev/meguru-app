@@ -2,8 +2,8 @@
 // 無料体験の状態はオーナーの使える状態から出す（specs/013 research.md R12）。
 import { jstToday, trialDaysLeft } from "@threads-grower/shared";
 import { sql } from "drizzle-orm";
-import type { Db } from "../db/client";
-import type { BillingMode } from "../lib/config";
+import type { Db } from "../kernel/db/client";
+import type { BillingMode } from "../kernel/config";
 import type { AccountAccess } from "./access";
 import { loadEntitlement } from "./billing-service";
 import { getStrategy } from "./strategy-service";

@@ -14,10 +14,10 @@ import {
 } from "@threads-grower/shared";
 import { and, eq, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
-import type { Db, TxDb } from "../db/client";
+import type { Db, TxDb } from "../kernel/db/client";
 import { accounts, memberships, subscriptions, teamAccounts, teamMembers, teams, users } from "../db/schema";
-import type { BillingMode } from "../lib/config";
-import { AppError, notFound } from "../lib/errors";
+import type { BillingMode } from "../kernel/config";
+import { AppError, notFound } from "../kernel/errors";
 import { entitlementFromFacts } from "./billing-service";
 import { disabledFeaturesSql, featureOnSql, featuresFrom } from "./feature-sql";
 import { billingExemptSql, testAccessSql } from "./test-group-service";

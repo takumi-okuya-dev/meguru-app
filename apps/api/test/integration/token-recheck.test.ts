@@ -1,8 +1,8 @@
 // US4：期限を確かめられなかったトークンの、2時間後の確かめ直し（specs/010-token-account-add FR-012、research.md R8）
 import { neon } from "@neondatabase/serverless";
 import { beforeEach, describe, expect, it } from "vitest";
-import { createThreadsClient } from "../../src/lib/threads-client";
-import { createDb } from "../../src/db/client";
+import { createThreadsClient } from "../../src/adapters/threads-api/threads-client";
+import { createDb } from "../../src/kernel/db/client";
 import { runTokenRecheck } from "../../src/services/token-recheck";
 import { fake, makeApp, resetDb, testEnv, tokenConnectNew } from "../helpers/app";
 

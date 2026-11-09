@@ -1,6 +1,6 @@
 // トークンを調べる呼び出し（specs/010-token-account-add research.md R3）
 import { beforeEach, describe, expect, it } from "vitest";
-import { ThreadsAuthError, ThreadsPermissionError, createThreadsClient } from "../../src/lib/threads-client";
+import { ThreadsAuthError, ThreadsPermissionError, createThreadsClient } from "../../src/adapters/threads-api/threads-client";
 import { fake, testEnv } from "../helpers/app";
 
 describe("debugToken", () => {

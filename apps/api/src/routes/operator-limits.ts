@@ -2,9 +2,9 @@
 import { defaultLimitsRequestSchema, operatorUserQuerySchema, userLimitsRequestSchema } from "@threads-grower/shared";
 import { Hono, type MiddlewareHandler } from "hono";
 import type { AppEnv } from "../app";
-import { createDb } from "../db/client";
-import { AppError } from "../lib/errors";
-import { parseBody } from "../lib/validate";
+import { createDb } from "../kernel/db/client";
+import { AppError } from "../kernel/errors";
+import { parseBody } from "../kernel/validate";
 import { operatorOnly } from "../middleware/operator-only";
 import { findLimitUser, listLimits, setDefaults, setUserLimits } from "../services/limit-service";
 

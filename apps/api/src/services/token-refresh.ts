@@ -3,12 +3,12 @@
 // 書き込みはすべて読んだ時点の accounts.connection_generation を条件にし、その間に再接続・アンインストールで
 // 接続が変わっていれば結果を捨てる（行を作り直しても番号は戻らないので ABA も起きない）。
 import { and, eq, gt, lt } from "drizzle-orm";
-import type { Env } from "../env";
-import { createDb, withTransaction } from "../db/client";
+import type { Env } from "../kernel/env";
+import { createDb, withTransaction } from "../kernel/db/client";
 import { accounts, threadsConnections } from "../db/schema";
-import { createTokenCipher } from "../lib/crypto";
-import { logger } from "../lib/logger";
-import { ThreadsAuthError, type ThreadsClient } from "../lib/threads-client";
+import { createTokenCipher } from "../kernel/crypto";
+import { logger } from "../kernel/logger";
+import { ThreadsAuthError, type ThreadsClient } from "../adapters/threads-api";
 import { lockUsernameForUpdate } from "./username-match";
 
 const DAY_MS = 24 * 3600_000;

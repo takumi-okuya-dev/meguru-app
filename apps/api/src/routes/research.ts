@@ -24,10 +24,10 @@ import {
 import { and, count, desc, eq, inArray, sql } from "drizzle-orm";
 import { Hono, type MiddlewareHandler } from "hono";
 import type { AppEnv } from "../app";
-import { createDb } from "../db/client";
+import { createDb } from "../kernel/db/client";
 import { referencePosts, researchKeywords } from "../db/schema";
-import { AppError, pgErrorCode } from "../lib/errors";
-import { parseBody } from "../lib/validate";
+import { AppError, pgErrorCode } from "../kernel/errors";
+import { parseBody } from "../kernel/validate";
 import { authorizeAccount } from "../services/access";
 import { recordActivity, updatedByOf, withActivityTx } from "../services/activity-log";
 import { touchMaterials } from "../services/materials";

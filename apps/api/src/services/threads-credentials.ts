@@ -1,11 +1,11 @@
 // 投稿と投稿の権限の確認で使う、Threadsの接続（トークン・ユーザーID・世代番号）の読み出し（specs/005-auto-post）。
 // 要再接続にするときは、001 R6 と同じく、読んだ時点の connection_generation を条件にする。
 import { and, eq } from "drizzle-orm";
-import type { Db } from "../db/client";
+import type { Db } from "../kernel/db/client";
 import { accounts, threadsConnections } from "../db/schema";
-import type { Env } from "../env";
-import { createTokenCipher } from "../lib/crypto";
-import { logger } from "../lib/logger";
+import type { Env } from "../kernel/env";
+import { createTokenCipher } from "../kernel/crypto";
+import { logger } from "../kernel/logger";
 
 /** Threadsへの呼び出しに必要な、Accountの接続。 */
 export type ThreadsCredentials = {

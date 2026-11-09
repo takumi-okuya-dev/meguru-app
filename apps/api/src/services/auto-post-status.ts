@@ -9,7 +9,7 @@ import {
   type AutoPostStatus,
 } from "@threads-grower/shared";
 import { and, count, desc, eq, gt, gte, isNotNull, lt } from "drizzle-orm";
-import type { Db } from "../db/client";
+import type { Db } from "../kernel/db/client";
 import { postDrafts, publishAttempts } from "../db/schema";
 import { effectiveSlotMinutes } from "./limit-service";
 import type { AccountRow } from "./access";

@@ -3,7 +3,7 @@
 import { inviteAcceptRequestSchema } from "@threads-grower/shared";
 import { Hono, type MiddlewareHandler } from "hono";
 import type { AppEnv } from "../app";
-import { parseBody } from "../lib/validate";
+import { parseBody } from "../kernel/validate";
 import { requireFeature } from "../services/access";
 import { acceptTeamInvite, previewTeamInvite } from "../services/invite-service";
 

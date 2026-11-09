@@ -2,8 +2,8 @@
 import { activityQuerySchema, invalidFields } from "@threads-grower/shared";
 import { Hono, type MiddlewareHandler } from "hono";
 import type { AppEnv } from "../app";
-import { createDb } from "../db/client";
-import { AppError } from "../lib/errors";
+import { createDb } from "../kernel/db/client";
+import { AppError } from "../kernel/errors";
 import { authorizeAccount } from "../services/access";
 import { listActivity } from "../services/activity-log";
 

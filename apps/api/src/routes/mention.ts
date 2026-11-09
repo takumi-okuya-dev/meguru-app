@@ -10,8 +10,8 @@ import {
 } from "@threads-grower/shared";
 import { Hono, type MiddlewareHandler } from "hono";
 import type { AppEnv } from "../app";
-import { createDb, withTransaction } from "../db/client";
-import { parseBody } from "../lib/validate";
+import { createDb, withTransaction } from "../kernel/db/client";
+import { parseBody } from "../kernel/validate";
 import { authorizeAccount } from "../services/access";
 import { assertItemId } from "../services/item-service";
 import {

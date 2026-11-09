@@ -7,12 +7,12 @@ import {
 } from "@threads-grower/shared";
 import { Hono, type MiddlewareHandler } from "hono";
 import type { AppEnv } from "../app";
-import { createDb } from "../db/client";
-import { AppError } from "../lib/errors";
-import { createThreadsClient } from "../lib/threads-client";
+import { createDb } from "../kernel/db/client";
+import { AppError } from "../kernel/errors";
+import { createThreadsClient } from "../adapters/threads-api";
 import { authorizeAccount, summaryRoleOf, toAccountSummary, type AccountAccess } from "../services/access";
 import { createAccount, deleteAccount, openAccount, renameAccount, verifyConnection } from "../services/account-service";
-import { parseBody } from "../lib/validate";
+import { parseBody } from "../kernel/validate";
 
 /**
  * 判定の結果を、ログインした人から見た AccountSummary にする（specs/011 contracts/permissions.md）。

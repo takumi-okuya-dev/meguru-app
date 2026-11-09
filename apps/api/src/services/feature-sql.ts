@@ -4,7 +4,7 @@
 import { FEATURES, type Feature } from "@threads-grower/shared";
 import { and, eq, sql, type SQL } from "drizzle-orm";
 import type { AnyPgColumn } from "drizzle-orm/pg-core";
-import type { Db, TxDb } from "../db/client";
+import type { Db, TxDb } from "../kernel/db/client";
 import { featureDisables, groupFeatureDisables, memberships, testGroupMembers, testGroups } from "../db/schema";
 
 /**

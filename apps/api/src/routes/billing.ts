@@ -2,8 +2,8 @@
 // 決済がOFFの環境では、GET /api/billing 以外はルートがないのと同じ 404 にする（research.md R11）。
 import { Hono, type MiddlewareHandler } from "hono";
 import type { AppEnv } from "../app";
-import { createDb } from "../db/client";
-import { billingModeOf } from "../lib/config";
+import { createDb } from "../kernel/db/client";
+import { billingModeOf } from "../kernel/config";
 import { billingSummary, openPortal, startCheckout, syncUser } from "../services/billing-service";
 
 /**

@@ -8,11 +8,11 @@ import {
 import { Hono, type MiddlewareHandler } from "hono";
 import { bodyLimit } from "hono/body-limit";
 import type { AppEnv } from "../app";
-import { createDb } from "../db/client";
-import { connectMethodsOf } from "../lib/config";
-import { AppError } from "../lib/errors";
-import { logger } from "../lib/logger";
-import { createThreadsClient, ThreadsApiError, ThreadsAuthError } from "../lib/threads-client";
+import { createDb } from "../kernel/db/client";
+import { connectMethodsOf } from "../kernel/config";
+import { AppError } from "../kernel/errors";
+import { logger } from "../kernel/logger";
+import { createThreadsClient, ThreadsApiError, ThreadsAuthError } from "../adapters/threads-api";
 import { completeConnection, requestFromState } from "../services/account-service";
 import { consumeState, startConnect } from "../services/threads-oauth";
 import { connectWithToken } from "../services/token-connect";

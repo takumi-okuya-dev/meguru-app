@@ -3,10 +3,10 @@
 // 各行の書き込みは、読んだ時点の key_version と accounts.connection_generation を条件にし、
 // その間に再接続などで書き換わった行は飛ばす（トークンの値は変わらないので世代番号は上げない）。
 import { and, eq, ne, sql } from "drizzle-orm";
-import type { Env } from "../env";
-import { createDb } from "../db/client";
+import type { Env } from "../kernel/env";
+import { createDb } from "../kernel/db/client";
 import { accounts, teams, threadsConnections } from "../db/schema";
-import { createTokenCipher, KeyRingError } from "../lib/crypto";
+import { createTokenCipher, KeyRingError } from "../kernel/crypto";
 
 /**
  * 暗号鍵のローテーション（research.md R5 の手順3・4）。古いバージョンの行を、新しいIVと現在の鍵で暗号化し直す。

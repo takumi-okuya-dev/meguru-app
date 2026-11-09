@@ -14,11 +14,11 @@ import {
 } from "@threads-grower/shared";
 import { and, asc, count, desc, eq, inArray, sql } from "drizzle-orm";
 import { z } from "zod";
-import { withTransaction, type Db, type TxDb } from "../db/client";
-import { lockAccountDrafts } from "../db/locks";
+import { withTransaction, type Db, type TxDb } from "../kernel/db/client";
+import { lockAccountDrafts } from "../kernel/db/locks";
 import { accounts, draftBatches, postDrafts, strategyDesigns } from "../db/schema";
-import type { Env } from "../env";
-import { AppError, itemNotFound, notFound, pgErrorCode } from "../lib/errors";
+import type { Env } from "../kernel/env";
+import { AppError, itemNotFound, notFound, pgErrorCode } from "../kernel/errors";
 import type { AccountAccess, AccountRow } from "./access";
 import { recordActivity, updatedByOf } from "./activity-log";
 import { updateWithVersion } from "./item-service";

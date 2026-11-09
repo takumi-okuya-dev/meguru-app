@@ -1,16 +1,16 @@
 // 投稿の権限の確認（specs/005-auto-post FR-002a・FR-002b、research.md R15）。
 // threads_publishing_limit は投稿の権限（threads_content_publish）がないと呼べないので、投稿せずに確かめられる。
 import type { ThreadsCheck } from "@threads-grower/shared";
-import type { Db } from "../db/client";
-import type { Env } from "../env";
-import { logger } from "../lib/logger";
+import type { Db } from "../kernel/db/client";
+import type { Env } from "../kernel/env";
+import { logger } from "../kernel/logger";
 import {
   ThreadsApiError,
   ThreadsAuthError,
   ThreadsRateLimitError,
   ThreadsTransientError,
   type ThreadsClient,
-} from "../lib/threads-client";
+} from "../adapters/threads-api";
 import { loadThreadsCredentials, markNeedsReconnect } from "./threads-credentials";
 
 /**

@@ -7,9 +7,9 @@ import {
 } from "@threads-grower/shared";
 import { Hono, type Context, type MiddlewareHandler } from "hono";
 import type { AppEnv } from "../app";
-import { createDb } from "../db/client";
-import { createThreadsClient } from "../lib/threads-client";
-import { parseBody } from "../lib/validate";
+import { createDb } from "../kernel/db/client";
+import { createThreadsClient } from "../adapters/threads-api";
+import { parseBody } from "../kernel/validate";
 import { authorizeAccount } from "../services/access";
 import { effectiveLimits } from "../services/limit-service";
 import {

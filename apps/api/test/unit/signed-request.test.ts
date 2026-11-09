@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { SignedRequestError, verifySignedRequest } from "../../src/lib/signed-request";
+import { SignedRequestError, verifySignedRequest } from "../../src/adapters/threads-api/signed-request";
 import { makeSignedRequest } from "../helpers/signed-request";
 
 const SECRET = "app-secret";

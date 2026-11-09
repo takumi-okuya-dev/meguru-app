@@ -27,7 +27,7 @@ import {
   type StrategyValues,
 } from "@threads-grower/shared";
 import { and, asc, desc, eq, inArray } from "drizzle-orm";
-import type { Db } from "../db/client";
+import type { Db } from "../kernel/db/client";
 import { draftBatches, postDrafts, postMetrics, promotions, referencePosts } from "../db/schema";
 import { effectiveSlotMinutes } from "./limit-service";
 import type { AccountRow } from "./access";

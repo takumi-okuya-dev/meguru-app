@@ -4,7 +4,7 @@
 // - 認証エラー（OAuthエラー190、HTTP 401）は ThreadsAuthError として区別する
 // - 投稿（specs/005-auto-post research.md R7）：上限は ThreadsRateLimitError、通信の失敗・5xx は ThreadsTransientError、
 //   それ以外は ThreadsApiError（確かな失敗）。Graph API は上限・権限のエラーも type を OAuthException で返すので、code で見分ける
-import type { Env } from "../env";
+import type { Env } from "../../kernel/env";
 
 /** 接続時にまとめて要求する Threads の権限（research.md R3）。 */
 export const THREADS_SCOPES = ["threads_basic", "threads_content_publish", "threads_manage_insights", "threads_manage_replies"] as const;

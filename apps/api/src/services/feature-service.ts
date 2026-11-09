@@ -9,10 +9,10 @@ import {
   type OperatorUser,
 } from "@threads-grower/shared";
 import { and, desc, eq, inArray, isNull, sql, type SQL } from "drizzle-orm";
-import { withTransaction, type Db, type TxDb } from "../db/client";
+import { withTransaction, type Db, type TxDb } from "../kernel/db/client";
 import { featureDisables, featureSettingEvents, groupFeatureDisables, testGroupMembers, testGroups, users } from "../db/schema";
-import type { Env } from "../env";
-import { AppError } from "../lib/errors";
+import type { Env } from "../kernel/env";
+import { AppError } from "../kernel/errors";
 import { isUuid, personName } from "./access";
 
 /** 運営者（認証のミドルウェアが入れる users の行の一部）。 */

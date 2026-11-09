@@ -11,11 +11,11 @@ import {
   type DueSlot,
 } from "@threads-grower/shared";
 import { and, count, eq, gte, inArray, lt, sql } from "drizzle-orm";
-import { withTransaction, type TxDb } from "../db/client";
-import { lockAccountDrafts } from "../db/locks";
+import { withTransaction, type TxDb } from "../kernel/db/client";
+import { lockAccountDrafts } from "../kernel/db/locks";
 import { accounts, postDrafts, postingSchedules, publishAttempts } from "../db/schema";
-import type { Env } from "../env";
-import { billingModeOf, type BillingMode } from "../lib/config";
+import type { Env } from "../kernel/env";
+import { billingModeOf, type BillingMode } from "../kernel/config";
 import { effectiveSlotMinutes, ownerDailyPostLimit } from "./limit-service";
 import { loadOwnerEntitlement } from "./billing-service";
 import { ownerAutopostOn } from "./feature-sql";

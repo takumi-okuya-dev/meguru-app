@@ -13,15 +13,15 @@ import {
   type SubscriptionStatus,
 } from "@threads-grower/shared";
 import { and, eq, inArray, isNull, lt, notInArray, or, sql, type SQL } from "drizzle-orm";
-import type { Env } from "../env";
-import { createDb, withTransaction, type Db, type TxDb } from "../db/client";
-import { lockUserRow } from "../db/locks";
+import type { Env } from "../kernel/env";
+import { createDb, withTransaction, type Db, type TxDb } from "../kernel/db/client";
+import { lockUserRow } from "../kernel/db/locks";
 import { billingExemptSql, testAccessSql } from "./test-group-service";
 import { memberships, subscriptions, testGroupMembers, users } from "../db/schema";
-import { billingModeOf, type BillingMode } from "../lib/config";
-import { AppError } from "../lib/errors";
-import { logger } from "../lib/logger";
-import { createStripeClient, periodEndOf, StripeError, type StripeClient } from "../lib/stripe-client";
+import { billingModeOf, type BillingMode } from "../kernel/config";
+import { AppError } from "../kernel/errors";
+import { logger } from "../kernel/logger";
+import { createStripeClient, periodEndOf, StripeError, type StripeClient } from "../adapters/stripe";
 
 /** 判定に使う、利用者と契約の値（users・subscriptions の行の一部）。 */
 export type BillingFacts = {

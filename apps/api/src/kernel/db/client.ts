@@ -1,10 +1,10 @@
 // DBクライアント（research.md R8・R12）。
 // 通常のクエリは HTTP 経由（neon-http）、対話的トランザクションは WebSocket 経由（neon-serverless の Pool）。
 // Pool はリクエストごとに作って破棄する（Workers ではリクエストをまたいで接続を持てない）。
+// 表の定義は渡さない（db.query のリレーションの問い合わせは使っていない。土台が表の定義（共通・アプリ）に依存しないため。specs/027）。
 import { neon, neonConfig, Pool } from "@neondatabase/serverless";
 import { drizzle as drizzleHttp } from "drizzle-orm/neon-http";
 import { drizzle as drizzleWs } from "drizzle-orm/neon-serverless";
-import * as schema from "./schema";
 
 const LOCAL_PROXY_HOST = "db.localtest.me";
 
@@ -33,7 +33,7 @@ function configureLocalProxy(connectionString: string) {
  */
 export function createDb(connectionString: string) {
   configureLocalProxy(connectionString);
-  return drizzleHttp({ client: neon(connectionString), schema });
+  return drizzleHttp({ client: neon(connectionString) });
 }
 
 /** 通常のクエリ用の Drizzle のデータベース。 */
@@ -55,13 +55,13 @@ export async function withTransaction<T>(
   // 終了後に WebSocket が閉じたときのエラーを、未処理のまま投げさせない
   pool.on("error", () => {});
   try {
-    const db = drizzleWs({ client: pool, schema });
+    const db = drizzleWs({ client: pool });
     return await db.transaction(fn);
   } finally {
     await pool.end();
   }
 }
 
-type WsDb = ReturnType<typeof drizzleWs<typeof schema>>;
+type WsDb = ReturnType<typeof drizzleWs>;
 /** トランザクションの中で使う Drizzle のデータベース。 */
 export type TxDb = Parameters<Parameters<WsDb["transaction"]>[0]>[0];

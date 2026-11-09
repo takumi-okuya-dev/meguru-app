@@ -9,9 +9,9 @@ import {
   ACTIVITY_SUMMARY_CHARS,
 } from "@threads-grower/shared";
 import { and, desc, eq, gte, inArray, lt, or, sql } from "drizzle-orm";
-import { withTransaction, type Db, type TxDb } from "../db/client";
+import { withTransaction, type Db, type TxDb } from "../kernel/db/client";
 import { activityLogs, users } from "../db/schema";
-import { AppError } from "../lib/errors";
+import { AppError } from "../kernel/errors";
 import { isUuid, personName, type AccountAccess, type ActorRole } from "./access";
 
 /** 操作の記録の種類（画面の絞り込みの単位）。 */

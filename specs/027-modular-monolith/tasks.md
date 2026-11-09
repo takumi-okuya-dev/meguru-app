@@ -83,10 +83,10 @@ description: "Task list for feature 027 modular monolith"
 
 ### 段階1：土台と窓口（コミット1）
 
-- [ ] T008 [US2] 移動のスクリプト`apps/api/scripts/move-modules.ts`を作る：「元のパス → 新しいパス」の一覧を受け取り、`git mv`し、`apps/api/src`・`apps/api/test`・`apps/api/scripts`のすべての相対の読みこみ先を新しいパスに直す（拡張子なしの読みこみ・`../`の数を正しく計算する）。
-- [ ] T009 [US2] 土台へ移す（data-model.md 2-1）：`env.ts`→`kernel/env.ts`、`lib/config.ts`・`errors.ts`・`logger.ts`・`validate.ts`・`crypto.ts`・`identifier-hash.ts`→`kernel/`、`db/client.ts`・`db/locks.ts`→`kernel/db/`。`wrangler.toml`・`vitest`の設定・`drizzle.config.ts`で、移したファイルを指している場所があれば直す。
-- [ ] T010 [US2] 窓口へ移す（2-2）：`lib/stripe-client.ts`→`adapters/stripe/stripe-client.ts`、`lib/threads-client.ts`・`lib/signed-request.ts`→`adapters/threads-api/`。それぞれに`index.ts`（外で使っているものを出す）を置き、`src`の中の読みこみを入口に直す。
-- [ ] T011 [US2] 段階1の確かめ：型の確認・ESLint（`module-boundaries`を含む）・APIのテストが通ること。ここで1つコミットする。
+- [X] T008 [US2] 移動のスクリプト`apps/api/scripts/move-modules.ts`を作る：「元のパス → 新しいパス」の一覧を受け取り、`git mv`し、`apps/api/src`・`apps/api/test`・`apps/api/scripts`のすべての相対の読みこみ先を新しいパスに直す（拡張子なしの読みこみ・`../`の数を正しく計算する）。
+- [X] T009 [US2] 土台へ移す（data-model.md 2-1）：`env.ts`→`kernel/env.ts`、`lib/config.ts`・`errors.ts`・`logger.ts`・`validate.ts`・`crypto.ts`・`identifier-hash.ts`→`kernel/`、`db/client.ts`・`db/locks.ts`→`kernel/db/`。`wrangler.toml`・`vitest`の設定・`drizzle.config.ts`で、移したファイルを指している場所があれば直す。
+- [X] T010 [US2] 窓口へ移す（2-2）：`lib/stripe-client.ts`→`adapters/stripe/stripe-client.ts`、`lib/threads-client.ts`・`lib/signed-request.ts`→`adapters/threads-api/`。それぞれに`index.ts`（外で使っているものを出す）を置き、`src`の中の読みこみを入口に直す。
+- [X] T011 [US2] 段階1の確かめ：型の確認・ESLint（`module-boundaries`を含む）・APIのテストが通ること。ここで1つコミットする。
 
 ### 段階2：逆向きの依存の解消と共通（コミット2）
 

@@ -3,12 +3,12 @@
 import { Hono } from "hono";
 import { bodyLimit } from "hono/body-limit";
 import type { AppEnv } from "../app";
-import { logger } from "../lib/logger";
-import { SignedRequestError, verifySignedRequest } from "../lib/signed-request";
-import { createThreadsClient } from "../lib/threads-client";
+import { logger } from "../kernel/logger";
+import { SignedRequestError, verifySignedRequest } from "../adapters/threads-api";
+import { createThreadsClient } from "../adapters/threads-api";
 import { attemptDeletion, receiveDeletion } from "../services/data-deletion";
 import { handleUninstall } from "../services/revocation";
-import { createDb } from "../db/client";
+import { createDb } from "../kernel/db/client";
 import { threadsDeletionRequests } from "../db/schema";
 import { eq } from "drizzle-orm";
 

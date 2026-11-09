@@ -1,7 +1,7 @@
 // 設定（環境変数・Secret）の確認。誤っている項目名だけを返し、値は返さない・ログに出さない。
 // 見本の値（.dev.vars.example）のまま起動されたときに、理由のわからない INTERNAL_ERROR ではなく、
 // どの項目が悪いかを API の応答とログで示すために使う。
-import type { Env } from "../env";
+import type { Env } from "./env";
 import { createTokenCipher } from "./crypto";
 
 /** APP_ENV に入れてよい値（specs/015-deploy-environments contracts/environments.md 2）。 */

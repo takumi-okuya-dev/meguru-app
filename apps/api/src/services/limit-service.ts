@@ -9,11 +9,11 @@ import {
   type UserLimitsRequest,
 } from "@threads-grower/shared";
 import { and, asc, eq, inArray, isNotNull, or, sql } from "drizzle-orm";
-import type { Env } from "../env";
-import { withTransaction, type Db, type TxDb } from "../db/client";
+import type { Env } from "../kernel/env";
+import { withTransaction, type Db, type TxDb } from "../kernel/db/client";
 import { memberships, operatorSettings, users } from "../db/schema";
-import { operatorIdsOf } from "../lib/config";
-import { AppError } from "../lib/errors";
+import { operatorIdsOf } from "../kernel/config";
+import { AppError } from "../kernel/errors";
 import { isUuid } from "./access";
 import { listOperatorEvents, recordOperatorEvent } from "./operator-events";
 import { notifyWake } from "./posting-schedule-service";

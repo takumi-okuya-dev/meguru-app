@@ -29,16 +29,16 @@ import {
   or,
   sql,
 } from "drizzle-orm";
-import { createDb, type Db } from "../db/client";
+import { createDb, type Db } from "../kernel/db/client";
 import { accounts, memberships, postDrafts, postingSchedules, publishAttempts, subscriptions, users } from "../db/schema";
-import type { Env } from "../env";
-import { billingModeOf, operatorIdsOf } from "../lib/config";
+import type { Env } from "../kernel/env";
+import { billingModeOf, operatorIdsOf } from "../kernel/config";
 import { entitlementFromFacts } from "./billing-service";
 import { dailyPostLimitSql, effectiveSlotMinutes } from "./limit-service";
 import { featureOnSql } from "./feature-sql";
 import { billingExemptSql, testAccessSql } from "./test-group-service";
-import { logger } from "../lib/logger";
-import { createThreadsClient, type ThreadsClient } from "../lib/threads-client";
+import { logger } from "../kernel/logger";
+import { createThreadsClient, type ThreadsClient } from "../adapters/threads-api";
 import { computeNextCheckAt, readGate, shouldRun, writeCatchupDate, writeGate } from "./auto-post-gate";
 import { nextCatchupAt, runMetricsStage } from "./metrics-runner";
 import { runMentionStage } from "./mention-runner";

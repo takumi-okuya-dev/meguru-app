@@ -2,11 +2,11 @@
 // state は32バイトの乱数。DBには SHA-256 だけを保存し、有効期限は10分、使えるのは1回だけ。
 import { eq } from "drizzle-orm";
 import type { ConnectRequest } from "@threads-grower/shared";
-import type { Db } from "../db/client";
+import type { Db } from "../kernel/db/client";
 import { oauthStates } from "../db/schema";
-import { sha256Hex } from "../lib/identifier-hash";
-import type { ThreadsClient } from "../lib/threads-client";
-import { AppError } from "../lib/errors";
+import { sha256Hex } from "../kernel/identifier-hash";
+import type { ThreadsClient } from "../adapters/threads-api";
+import { AppError } from "../kernel/errors";
 import { authorizeAccount, type RequestUser } from "./access";
 
 const STATE_TTL_MS = 10 * 60 * 1000;

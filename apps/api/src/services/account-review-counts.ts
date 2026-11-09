@@ -1,5 +1,5 @@
 import { and, count, eq, inArray } from "drizzle-orm";
-import type { Db } from "../db/client";
+import type { Db } from "../kernel/db/client";
 import { accounts, memberships, postDrafts } from "../db/schema";
 
 /**

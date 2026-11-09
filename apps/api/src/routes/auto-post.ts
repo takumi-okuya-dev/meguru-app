@@ -2,7 +2,7 @@
 import { sql } from "drizzle-orm";
 import { Hono, type MiddlewareHandler } from "hono";
 import type { AppEnv } from "../app";
-import { createDb } from "../db/client";
+import { createDb } from "../kernel/db/client";
 import { postingSchedules } from "../db/schema";
 import { authorizeAccount } from "../services/access";
 import { effectiveLimits } from "../services/limit-service";

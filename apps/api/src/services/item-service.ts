@@ -1,9 +1,9 @@
 // 宣伝内容・参考投稿・キーワードで共通の処理（specs/002-strategy-profile research.md R3・R4）。
 // 表ごとのクエリは呼び出し側が渡し、ここでは「上限つきの追加」「version つきの更新」の手順だけを持つ。
 import { sql } from "drizzle-orm";
-import { withTransaction, type TxDb } from "../db/client";
-import type { Env } from "../env";
-import { AppError, itemNotFound, notFound, pgErrorCode } from "../lib/errors";
+import { withTransaction, type TxDb } from "../kernel/db/client";
+import type { Env } from "../kernel/env";
+import { AppError, itemNotFound, notFound, pgErrorCode } from "../kernel/errors";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 

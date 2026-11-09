@@ -24,7 +24,7 @@ import {
 } from "@threads-grower/shared";
 import { and, asc, eq, gte, inArray, isNull, lt, or, sql, type SQL } from "drizzle-orm";
 import type { BatchItem } from "drizzle-orm/batch";
-import type { Db } from "../db/client";
+import type { Db } from "../kernel/db/client";
 import {
   accounts,
   followerSnapshots,
@@ -36,12 +36,12 @@ import {
   subscriptions,
   users,
 } from "../db/schema";
-import type { Env } from "../env";
-import { billingModeOf, type BillingMode } from "../lib/config";
+import type { Env } from "../kernel/env";
+import { billingModeOf, type BillingMode } from "../kernel/config";
 import { entitlementFromFacts, fullAccessSql } from "./billing-service";
 import { featureOnSql } from "./feature-sql";
-import { createTokenCipher } from "../lib/crypto";
-import { logger } from "../lib/logger";
+import { createTokenCipher } from "../kernel/crypto";
+import { logger } from "../kernel/logger";
 import {
   ThreadsAuthError,
   ThreadsNotFoundError,
@@ -49,7 +49,7 @@ import {
   ThreadsRateLimitError,
   type ThreadsClient,
   type ThreadsMediaInsights,
-} from "../lib/threads-client";
+} from "../adapters/threads-api";
 import { markNeedsReconnect } from "./threads-credentials";
 import { billingExemptSql } from "./test-group-service";
 

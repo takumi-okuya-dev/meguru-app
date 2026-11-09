@@ -1,6 +1,6 @@
 // 設定の誤りの案内：CONFIG_ERROR と項目名（値は返さない）、callback は Web へ戻す
 import { describe, expect, it } from "vitest";
-import type { Env } from "../../src/env";
+import type { Env } from "../../src/kernel/env";
 import { makeApp, testEnv } from "../helpers/app";
 
 const app = makeApp();

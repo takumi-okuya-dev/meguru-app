@@ -16,11 +16,11 @@ import {
   type MentionAttachRequest,
 } from "@threads-grower/shared";
 import { and, asc, eq, inArray, ne, sql } from "drizzle-orm";
-import type { Db, TxDb } from "../db/client";
-import { lockAccountDrafts } from "../db/locks";
+import type { Db, TxDb } from "../kernel/db/client";
+import { lockAccountDrafts } from "../kernel/db/locks";
 import { accounts, mentionPeople, mentionSettings, postDrafts, postMentions } from "../db/schema";
-import type { Env } from "../env";
-import { AppError, itemNotFound } from "../lib/errors";
+import type { Env } from "../kernel/env";
+import { AppError, itemNotFound } from "../kernel/errors";
 import type { AccountAccess } from "./access";
 import { recordActivity } from "./activity-log";
 import { CLEAR_BLOCKED_FIELDS, CLEAR_QUEUE_FIELDS, toPostDraft } from "./draft-service";

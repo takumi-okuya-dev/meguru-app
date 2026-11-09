@@ -10,12 +10,12 @@ import {
   type TestInvitePreview,
 } from "@threads-grower/shared";
 import { and, asc, count, desc, eq, getTableName, inArray, isNull, sql, type AnyColumn, type SQL, type Table } from "drizzle-orm";
-import type { Env } from "../env";
-import { billingModeOf, type BillingMode } from "../lib/config";
-import { createDb, withTransaction, type Db, type TxDb } from "../db/client";
+import type { Env } from "../kernel/env";
+import { billingModeOf, type BillingMode } from "../kernel/config";
+import { createDb, withTransaction, type Db, type TxDb } from "../kernel/db/client";
 import { testGroupEvents, testGroupMembers, testGroups, users } from "../db/schema";
-import { AppError } from "../lib/errors";
-import { sha256Hex } from "../lib/identifier-hash";
+import { AppError } from "../kernel/errors";
+import { sha256Hex } from "../kernel/identifier-hash";
 import { personName } from "./access";
 import { groupDisabledFeatures, saveGroupFeatures } from "./feature-service";
 import { inviteUrl, newInviteToken, openInviteToken, sealInviteToken } from "./invite-service";

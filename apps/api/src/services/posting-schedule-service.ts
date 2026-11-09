@@ -13,12 +13,12 @@ import {
   type ThreadsCheck,
 } from "@threads-grower/shared";
 import { and, eq, sql } from "drizzle-orm";
-import type { Db, TxDb } from "../db/client";
+import type { Db, TxDb } from "../kernel/db/client";
 import { postingSchedules } from "../db/schema";
-import type { Env } from "../env";
-import { AppError, notFound, pgErrorCode } from "../lib/errors";
-import { logger } from "../lib/logger";
-import type { ThreadsClient } from "../lib/threads-client";
+import type { Env } from "../kernel/env";
+import { AppError, notFound, pgErrorCode } from "../kernel/errors";
+import { logger } from "../kernel/logger";
+import type { ThreadsClient } from "../adapters/threads-api";
 import type { AccountRow } from "./access";
 import { checkThreadsPublish } from "./threads-check-service";
 

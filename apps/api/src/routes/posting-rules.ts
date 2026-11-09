@@ -3,9 +3,9 @@
 import { addNgWordsRequestSchema, coreRulesRequestSchema } from "@threads-grower/shared";
 import { Hono, type MiddlewareHandler } from "hono";
 import type { AppEnv } from "../app";
-import { createDb } from "../db/client";
+import { createDb } from "../kernel/db/client";
 import { withActivityTx } from "../services/activity-log";
-import { parseBody } from "../lib/validate";
+import { parseBody } from "../kernel/validate";
 import { authorizeAccount } from "../services/access";
 import { assertItemId } from "../services/item-service";
 import { addNgWords, deleteNgWord, getPostingRules, saveCoreRules } from "../services/posting-rules-service";

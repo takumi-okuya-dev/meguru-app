@@ -2,8 +2,8 @@
 import { operatorAccountsQuerySchema } from "@threads-grower/shared";
 import { Hono, type MiddlewareHandler } from "hono";
 import type { AppEnv } from "../app";
-import { createDb } from "../db/client";
-import { AppError } from "../lib/errors";
+import { createDb } from "../kernel/db/client";
+import { AppError } from "../kernel/errors";
 import { operatorOnly } from "../middleware/operator-only";
 import { listOperatorAccounts } from "../services/operator-account-service";
 

@@ -2,10 +2,10 @@
 // （本番コードにテスト用の抜け道は作らない）。
 import { Hono } from "hono";
 import { cors } from "hono/cors";
-import type { Env } from "./env";
-import { validateConfig } from "./lib/config";
-import { AppError } from "./lib/errors";
-import { logger, setLogAppEnv } from "./lib/logger";
+import type { Env } from "./kernel/env";
+import { validateConfig } from "./kernel/config";
+import { AppError } from "./kernel/errors";
+import { logger, setLogAppEnv } from "./kernel/logger";
 import {
   authMiddleware,
   optionalAuthMiddleware,

@@ -4,14 +4,14 @@
 import { TEAM_MEMBER_LIMIT } from "@threads-grower/shared";
 import { and, asc, count, eq, inArray } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
-import type { Env } from "../env";
-import { billingModeOf, type BillingMode } from "../lib/config";
+import type { Env } from "../kernel/env";
+import { billingModeOf, type BillingMode } from "../kernel/config";
 import { loadEntitlement } from "./billing-service";
-import { createDb, withTransaction, type Db, type TxDb } from "../db/client";
+import { createDb, withTransaction, type Db, type TxDb } from "../kernel/db/client";
 import { accounts, memberships, teamAccounts, teamMembers, teams, users } from "../db/schema";
-import { createTokenCipher } from "../lib/crypto";
-import { AppError } from "../lib/errors";
-import { sha256Hex } from "../lib/identifier-hash";
+import { createTokenCipher } from "../kernel/crypto";
+import { AppError } from "../kernel/errors";
+import { sha256Hex } from "../kernel/identifier-hash";
 import { personName } from "./access";
 import { insertActivity } from "./activity-log";
 

@@ -11,11 +11,11 @@ import {
   type MentionFailureReason,
 } from "@threads-grower/shared";
 import { and, eq, isNull, lt, ne, or, sql } from "drizzle-orm";
-import type { Db } from "../db/client";
+import type { Db } from "../kernel/db/client";
 import { accounts, postDrafts, postMentions } from "../db/schema";
-import type { Env } from "../env";
-import { billingModeOf } from "../lib/config";
-import { logger } from "../lib/logger";
+import type { Env } from "../kernel/env";
+import { billingModeOf } from "../kernel/config";
+import { logger } from "../kernel/logger";
 import {
   ThreadsApiError,
   ThreadsAuthError,
@@ -23,7 +23,7 @@ import {
   ThreadsRateLimitError,
   ThreadsTransientError,
   type ThreadsClient,
-} from "../lib/threads-client";
+} from "../adapters/threads-api";
 import { loadOwnerEntitlement } from "./billing-service";
 import { ownerAutopostOn } from "./feature-sql";
 import { listNgWords } from "./posting-rules-service";

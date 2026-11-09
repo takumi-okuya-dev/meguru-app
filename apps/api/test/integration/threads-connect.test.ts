@@ -3,7 +3,7 @@
 import { eq } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
 import { accounts, memberships, oauthStates, threadsConnections, users } from "../../src/db/schema";
-import { sha256Hex } from "../../src/lib/identifier-hash";
+import { sha256Hex } from "../../src/kernel/identifier-hash";
 import { TEST_WEB_ORIGIN } from "../env";
 import {
   authorizeAndCallback,

@@ -2,7 +2,7 @@
 // 一覧ごとに1回の問い合わせで読み、draft-service と mention-service の両方から使う（互いを読み込まないよう、ここに分ける）。
 import { mentionDueAt, type MentionFailureReason, type MentionState, type PostMention } from "@threads-grower/shared";
 import { inArray } from "drizzle-orm";
-import type { Db, TxDb } from "../db/client";
+import type { Db, TxDb } from "../kernel/db/client";
 import { postMentions } from "../db/schema";
 
 /** post_mentions の行。 */

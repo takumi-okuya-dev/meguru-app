@@ -1,11 +1,11 @@
 // 日次の定期処理（contracts/api.md「定期処理」1〜6）。1件・1つの処理の失敗で全体を止めない
 import { AUTOPOST_ATTEMPT_RETENTION_DAYS, addDays, jstDateOf } from "@threads-grower/shared";
-import type { Env } from "../env";
-import { createDb } from "../db/client";
+import type { Env } from "../kernel/env";
+import { createDb } from "../kernel/db/client";
 import { oauthStates, postDrafts, postingSchedules, publishAttempts } from "../db/schema";
 import { and, eq, isNotNull, lt, notExists, notInArray } from "drizzle-orm";
-import { logger } from "../lib/logger";
-import { createThreadsClient } from "../lib/threads-client";
+import { logger } from "../kernel/logger";
+import { createThreadsClient } from "../adapters/threads-api";
 import { cleanupDeletionIdentifiers, retryDeletions } from "./data-deletion";
 import { cleanupRevocations } from "./revocation";
 import { refreshExpiringTokens } from "./token-refresh";

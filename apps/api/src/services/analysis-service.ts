@@ -18,9 +18,9 @@ import {
 } from "@threads-grower/shared";
 import { and, desc, eq, gte, inArray, isNotNull, isNull, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
-import type { Db, TxDb } from "../db/client";
+import type { Db, TxDb } from "../kernel/db/client";
 import { analysisSettings, postClassifications, postDrafts, postMentions, postMetricSnapshots, postMetrics, promotions } from "../db/schema";
-import { AppError } from "../lib/errors";
+import { AppError } from "../kernel/errors";
 import type { AccountAccess, AccountRow } from "./access";
 import { recordActivity } from "./activity-log";
 import { readPostingSchedule, toPostingSchedule } from "./posting-schedule-service";

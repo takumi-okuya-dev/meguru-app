@@ -1,11 +1,11 @@
 // 投稿のルール：NGワードと投稿ルール（CORE RULES）（specs/004-review-approval research.md R6・R11）。
 import { NG_WORD_LIMIT, findNgWords, normalizeNgWord } from "@threads-grower/shared";
 import { and, asc, eq, inArray, sql } from "drizzle-orm";
-import { withTransaction, type Db, type TxDb } from "../db/client";
-import { lockAccountDrafts } from "../db/locks";
+import { withTransaction, type Db, type TxDb } from "../kernel/db/client";
+import { lockAccountDrafts } from "../kernel/db/locks";
 import { accounts, ngWords, postDrafts } from "../db/schema";
-import type { Env } from "../env";
-import { AppError, itemNotFound, notFound, pgErrorCode } from "../lib/errors";
+import type { Env } from "../kernel/env";
+import { AppError, itemNotFound, notFound, pgErrorCode } from "../kernel/errors";
 import type { AccountRow } from "./access";
 import { CLEAR_QUEUE_FIELDS } from "./draft-service";
 import type { AccountAccess } from "./access";

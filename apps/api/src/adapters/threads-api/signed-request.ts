@@ -1,6 +1,6 @@
 // Metaの signed_request の検証（research.md R7）。
 // 形式は "<base64urlの署名>.<base64urlのJSONペイロード>"。署名は App Secret による HMAC-SHA256。
-import { isPlaceholder } from "./config";
+import { isPlaceholder } from "../../kernel/config";
 
 /** Meta の signed_request が不正（形式・署名・内容の誤り）であることを表す。 */
 export class SignedRequestError extends Error {

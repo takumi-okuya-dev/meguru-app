@@ -13,7 +13,7 @@ import {
 } from "@threads-grower/shared";
 import { and, eq, inArray, sql, type SQL } from "drizzle-orm";
 import { alias, type AnyPgColumn } from "drizzle-orm/pg-core";
-import type { Db, TxDb } from "../db/client";
+import type { Db, TxDb } from "../kernel/db/client";
 import { accounts, memberships, teamAccounts, teamMembers, users } from "../db/schema";
 import { personName, type TeamAccess, type TeamStatusScope } from "./access";
 import { featureOnSql } from "./feature-sql";

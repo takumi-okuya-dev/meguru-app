@@ -13,7 +13,7 @@ import {
   jstMidnight,
 } from "@threads-grower/shared";
 import { and, eq, sql } from "drizzle-orm";
-import { withTransaction, type Db } from "../db/client";
+import { withTransaction, type Db } from "../kernel/db/client";
 import {
   accounts,
   postDrafts,
@@ -21,18 +21,18 @@ import {
   postingSchedules,
   publishAttempts,
 } from "../db/schema";
-import type { Env } from "../env";
-import { billingModeOf } from "../lib/config";
+import type { Env } from "../kernel/env";
+import { billingModeOf } from "../kernel/config";
 import { loadOwnerEntitlement } from "./billing-service";
 import { ownerAutopostOn } from "./feature-sql";
-import { logger } from "../lib/logger";
+import { logger } from "../kernel/logger";
 import {
   ThreadsApiError,
   ThreadsAuthError,
   ThreadsRateLimitError,
   ThreadsTransientError,
   type ThreadsClient,
-} from "../lib/threads-client";
+} from "../adapters/threads-api";
 import {
   loadThreadsCredentials,
   markNeedsReconnect,

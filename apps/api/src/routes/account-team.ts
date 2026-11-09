@@ -2,7 +2,7 @@
 import { FEATURES } from "@threads-grower/shared";
 import { Hono, type MiddlewareHandler } from "hono";
 import type { AppEnv } from "../app";
-import { createDb } from "../db/client";
+import { createDb } from "../kernel/db/client";
 import { authorizeAccount } from "../services/access";
 import { assignedNoticeVisible, dismissAssignedNotice, getAccountTeam } from "../services/team-service";
 

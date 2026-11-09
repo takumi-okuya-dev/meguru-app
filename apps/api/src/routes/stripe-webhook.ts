@@ -4,9 +4,9 @@
 import { Hono } from "hono";
 import { bodyLimit } from "hono/body-limit";
 import type { AppEnv } from "../app";
-import { billingModeOf } from "../lib/config";
-import { logger } from "../lib/logger";
-import { verifyWebhookSignature } from "../lib/stripe-client";
+import { billingModeOf } from "../kernel/config";
+import { logger } from "../kernel/logger";
+import { verifyWebhookSignature } from "../adapters/stripe";
 import { syncCustomer } from "../services/billing-service";
 
 /**

@@ -13,12 +13,12 @@ import {
   type TesterRemovalReason,
 } from "@threads-grower/shared";
 import { and, asc, desc, eq, inArray, isNotNull, isNull, ne, sql, type SQL } from "drizzle-orm";
-import type { Env } from "../env";
-import { createDb, withTransaction, type Db, type TxDb } from "../db/client";
-import { lockUserRow } from "../db/locks";
+import type { Env } from "../kernel/env";
+import { createDb, withTransaction, type Db, type TxDb } from "../kernel/db/client";
+import { lockUserRow } from "../kernel/db/locks";
 import { accounts, operatorSettings, testerApplications, users } from "../db/schema";
-import { billingModeOf, testerInvitesEnabledOf, threadsAppIdOf } from "../lib/config";
-import { AppError, pgErrorCode } from "../lib/errors";
+import { billingModeOf, testerInvitesEnabledOf, threadsAppIdOf } from "../kernel/config";
+import { AppError, pgErrorCode } from "../kernel/errors";
 import { authorizeAccount, isUuid } from "./access";
 import { countRecentApplyActions, recordOperatorEvent } from "./operator-events";
 

@@ -5,8 +5,8 @@ import { Hono, type MiddlewareHandler } from "hono";
 import type { z } from "zod";
 import type { AppEnv } from "../app";
 import { operatorOnly } from "../middleware/operator-only";
-import { AppError } from "../lib/errors";
-import { parseBody } from "../lib/validate";
+import { AppError } from "../kernel/errors";
+import { parseBody } from "../kernel/validate";
 import {
   closeTestGroup,
   createTestGroup,

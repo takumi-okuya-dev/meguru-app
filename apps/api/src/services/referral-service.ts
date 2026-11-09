@@ -3,10 +3,10 @@
 // 紹介の記録は、料金・使える状態・権限・テスト版に入れるかの判定に使わない（FR-008）。
 import { REFERRAL_CODE_PATTERN, type ReferralResponse } from "@threads-grower/shared";
 import { and, count, eq, isNull } from "drizzle-orm";
-import type { Env } from "../env";
-import { createDb, type Db } from "../db/client";
+import type { Env } from "../kernel/env";
+import { createDb, type Db } from "../kernel/db/client";
 import { users } from "../db/schema";
-import { pgErrorCode } from "../lib/errors";
+import { pgErrorCode } from "../kernel/errors";
 import { inviteUrl, newInviteToken } from "./invite-service";
 
 /**

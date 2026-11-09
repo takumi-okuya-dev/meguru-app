@@ -11,12 +11,12 @@ import {
   isTokenShaped,
 } from "@threads-grower/shared";
 import { and, desc, eq, lt } from "drizzle-orm";
-import type { Env } from "../env";
-import { createDb, withTransaction, type Db, type TxDb } from "../db/client";
-import { lockUserRow } from "../db/locks";
+import type { Env } from "../kernel/env";
+import { createDb, withTransaction, type Db, type TxDb } from "../kernel/db/client";
+import { lockUserRow } from "../kernel/db/locks";
 import { tokenCheckFailures } from "../db/schema";
-import { AppError } from "../lib/errors";
-import { logger } from "../lib/logger";
+import { AppError } from "../kernel/errors";
+import { logger } from "../kernel/logger";
 import {
   THREADS_SCOPES,
   ThreadsAuthError,
@@ -27,7 +27,7 @@ import {
   type ThreadsClient,
   type ThreadsProfile,
   type TokenDebugInfo,
-} from "../lib/threads-client";
+} from "../adapters/threads-api";
 import { authorizeAccount, type RequestUser } from "./access";
 import { completeConnection } from "./account-service";
 import { notifyWake } from "./posting-schedule-service";

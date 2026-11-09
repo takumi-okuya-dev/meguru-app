@@ -2,12 +2,12 @@
 // Threadsでは手放されたユーザー名を別の人が取れるので、名前だけの一致で二重登録と決めつけない。
 import { normalizeUsername } from "@threads-grower/shared";
 import { and, eq, ne, sql } from "drizzle-orm";
-import { createDb, withTransaction, type TxDb } from "../db/client";
-import { lockThreadsUsername } from "../db/locks";
+import { createDb, withTransaction, type TxDb } from "../kernel/db/client";
+import { lockThreadsUsername } from "../kernel/db/locks";
 import { accounts } from "../db/schema";
-import type { Env } from "../env";
-import { logger } from "../lib/logger";
-import type { ThreadsClient, ThreadsProfile } from "../lib/threads-client";
+import type { Env } from "../kernel/env";
+import { logger } from "../kernel/logger";
+import type { ThreadsClient, ThreadsProfile } from "../adapters/threads-api";
 import { loadThreadsCredentials } from "./threads-credentials";
 
 /**

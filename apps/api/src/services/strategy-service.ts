@@ -12,9 +12,9 @@ import {
   type StrategyValues,
 } from "@threads-grower/shared";
 import { and, eq } from "drizzle-orm";
-import type { Db, TxDb } from "../db/client";
+import type { Db, TxDb } from "../kernel/db/client";
 import { strategyDesigns } from "../db/schema";
-import { AppError } from "../lib/errors";
+import { AppError } from "../kernel/errors";
 
 type StrategyRow = typeof strategyDesigns.$inferSelect;
 

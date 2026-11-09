@@ -1,8 +1,8 @@
 import { createApp } from "./app";
-import type { Env } from "./env";
+import type { Env } from "./kernel/env";
 import { runAutoPost } from "./services/auto-post-runner";
-import { validateConfig } from "./lib/config";
-import { logger, setLogAppEnv } from "./lib/logger";
+import { validateConfig } from "./kernel/config";
+import { logger, setLogAppEnv } from "./kernel/logger";
 import { runDailyJobs } from "./services/daily-jobs";
 
 const app = createApp();

@@ -1,8 +1,8 @@
 // /api/accounts/:accountId/threads-check（「接続を確かめる」。specs/005-auto-post FR-002b、research.md R15）。
 import { Hono, type MiddlewareHandler } from "hono";
 import type { AppEnv } from "../app";
-import { createDb } from "../db/client";
-import { createThreadsClient } from "../lib/threads-client";
+import { createDb } from "../kernel/db/client";
+import { createThreadsClient } from "../adapters/threads-api";
 import { authorizeAccount } from "../services/access";
 import { recordActivity } from "../services/activity-log";
 import { checkThreadsPublish } from "../services/threads-check-service";

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { KeyRingError, createTokenCipher } from "../../src/lib/crypto";
+import { KeyRingError, createTokenCipher } from "../../src/kernel/crypto";
 
 const KEY1 = btoa(String.fromCharCode(...new Uint8Array(32).fill(1)));
 const KEY2 = btoa(String.fromCharCode(...new Uint8Array(32).fill(2)));

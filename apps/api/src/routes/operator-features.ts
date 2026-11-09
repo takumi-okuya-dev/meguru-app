@@ -4,9 +4,9 @@ import { featureSettingsRequestSchema, operatorUserQuerySchema } from "@threads-
 import { Hono, type MiddlewareHandler } from "hono";
 import type { AppEnv } from "../app";
 import { operatorOnly } from "../middleware/operator-only";
-import { createDb } from "../db/client";
-import { AppError } from "../lib/errors";
-import { parseBody } from "../lib/validate";
+import { createDb } from "../kernel/db/client";
+import { AppError } from "../kernel/errors";
+import { parseBody } from "../kernel/validate";
 import { findUserByEmail, listFeatureSettings, resetFeatureSettings, saveFeatureSettings } from "../services/feature-service";
 
 /**

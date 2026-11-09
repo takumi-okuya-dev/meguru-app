@@ -12,9 +12,9 @@ import {
   type Media,
 } from "@threads-grower/shared";
 import { and, eq, sql } from "drizzle-orm";
-import type { Db, TxDb } from "../db/client";
+import type { Db, TxDb } from "../kernel/db/client";
 import { mediaDefaults, promotionListings, promotions } from "../db/schema";
-import { AppError, itemNotFound } from "../lib/errors";
+import { AppError, itemNotFound } from "../kernel/errors";
 import type { AccountAccess } from "./access";
 import { recordActivity, updatedByOf } from "./activity-log";
 

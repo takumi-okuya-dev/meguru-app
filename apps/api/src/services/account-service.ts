@@ -1,9 +1,9 @@
 // Accountの作成・更新・上限（FR-008〜FR-017、research.md R8・R9）
 import { and, eq, gte, inArray, isNull, lt, ne, or, sql } from "drizzle-orm";
 import { normalizeUsername } from "@threads-grower/shared";
-import type { Env } from "../env";
-import { createDb, withTransaction, type Db, type TxDb } from "../db/client";
-import { lockThreadsUser, lockThreadsUsername, lockUserRow } from "../db/locks";
+import type { Env } from "../kernel/env";
+import { createDb, withTransaction, type Db, type TxDb } from "../kernel/db/client";
+import { lockThreadsUser, lockThreadsUsername, lockUserRow } from "../kernel/db/locks";
 import {
   accounts,
   memberships,
@@ -15,17 +15,17 @@ import {
   threadsRevocations,
   users,
 } from "../db/schema";
-import { billingModeOf, testerInvitesEnabledOf, type BillingMode } from "../lib/config";
-import { createTokenCipher } from "../lib/crypto";
-import { AppError } from "../lib/errors";
-import { threadsUserHmac } from "../lib/identifier-hash";
-import { logger } from "../lib/logger";
+import { billingModeOf, testerInvitesEnabledOf, type BillingMode } from "../kernel/config";
+import { createTokenCipher } from "../kernel/crypto";
+import { AppError } from "../kernel/errors";
+import { threadsUserHmac } from "../kernel/identifier-hash";
+import { logger } from "../kernel/logger";
 import {
   THREADS_SCOPES,
   ThreadsAuthError,
   type ThreadsClient,
   type ThreadsProfile,
-} from "../lib/threads-client";
+} from "../adapters/threads-api";
 import { authorizeAccount } from "./access";
 import { loadEntitlement, markQuantityDirty, syncQuantity } from "./billing-service";
 import { recordActivity } from "./activity-log";

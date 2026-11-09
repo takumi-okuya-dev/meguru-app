@@ -1,7 +1,7 @@
 // 招待の管理と上限の記録（specs/024-tester-invite-connect research.md R14・R15、data-model.md 1-3）。
 // detail には Threads のユーザー名・名前・メールアドレスを入れない（退会したら、たどれなくなるようにする）。
 import { and, desc, eq, gte, inArray, sql } from "drizzle-orm";
-import type { Db, TxDb } from "../db/client";
+import type { Db, TxDb } from "../kernel/db/client";
 import { operatorEvents, users } from "../db/schema";
 
 /** 記録の種類。 */

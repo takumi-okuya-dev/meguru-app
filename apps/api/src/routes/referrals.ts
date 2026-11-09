@@ -2,7 +2,7 @@
 // GET /api/me/referral は本人の紹介リンクと人数、GET /api/referral-page は紹介リンクの画面の注意のための情報（認証なし）。
 import { Hono, type MiddlewareHandler } from "hono";
 import type { AppEnv } from "../app";
-import { billingModeOf } from "../lib/config";
+import { billingModeOf } from "../kernel/config";
 import { referralOf } from "../services/referral-service";
 
 /**

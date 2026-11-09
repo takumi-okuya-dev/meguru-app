@@ -1,6 +1,6 @@
 // 自動投稿の結合テストの共通部品（specs/005-auto-post）：接続済みのAccount、承認済みの下書き、投稿の設定、定期処理の実行
 import { neon } from "@neondatabase/serverless";
-import { createDb } from "../../src/db/client";
+import { createDb } from "../../src/kernel/db/client";
 import { runAutoPost } from "../../src/services/auto-post-runner";
 import { call, connectNew, fake, makeApp, testEnv, type TestApp } from "./app";
 

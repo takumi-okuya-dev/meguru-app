@@ -1,13 +1,13 @@
 // Metaのアンインストール通知（research.md R7、contracts/api.md の手順1〜7）
 import { and, eq, lt } from "drizzle-orm";
-import type { Env } from "../env";
-import { createDb, withTransaction, type TxDb } from "../db/client";
-import { lockThreadsUser } from "../db/locks";
+import type { Env } from "../kernel/env";
+import { createDb, withTransaction, type TxDb } from "../kernel/db/client";
+import { lockThreadsUser } from "../kernel/db/locks";
 import { accounts, threadsConnections, threadsRevocations } from "../db/schema";
-import { createTokenCipher } from "../lib/crypto";
-import { threadsUserHmac } from "../lib/identifier-hash";
-import { logger } from "../lib/logger";
-import { ThreadsAuthError, type ThreadsClient } from "../lib/threads-client";
+import { createTokenCipher } from "../kernel/crypto";
+import { threadsUserHmac } from "../kernel/identifier-hash";
+import { logger } from "../kernel/logger";
+import { ThreadsAuthError, type ThreadsClient } from "../adapters/threads-api";
 
 /** アンインストール通知の中身。issuedAt は Meta が通知を発行した時刻（含まれていなければ undefined）。 */
 export type UninstallPayload = { userId: string; issuedAt?: Date };

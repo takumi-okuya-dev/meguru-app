@@ -4,12 +4,12 @@
 import { TEAM_EDITOR_LIMIT, TEAM_MEMBER_LIMIT, TEAMS_PER_ADMIN, type TeamRole } from "@threads-grower/shared";
 import { and, asc, count, eq, inArray, ne, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
-import type { Env } from "../env";
-import { billingModeOf, type BillingMode } from "../lib/config";
-import type { Db, TxDb } from "../db/client";
+import type { Env } from "../kernel/env";
+import { billingModeOf, type BillingMode } from "../kernel/config";
+import type { Db, TxDb } from "../kernel/db/client";
 import { accounts, memberships, teamAccounts, teamMembers, teams, users } from "../db/schema";
-import { lockAdminTeams } from "../db/locks";
-import { AppError } from "../lib/errors";
+import { lockAdminTeams } from "../kernel/db/locks";
+import { AppError } from "../kernel/errors";
 import { insertActivity } from "./activity-log";
 import {
   authorizeAssignment,

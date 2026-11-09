@@ -13,10 +13,10 @@ import {
 import { Hono, type MiddlewareHandler } from "hono";
 import type { AppEnv } from "../app";
 import { inArray } from "drizzle-orm";
-import { createDb, withTransaction, type Db } from "../db/client";
+import { createDb, withTransaction, type Db } from "../kernel/db/client";
 import { users } from "../db/schema";
-import { AppError } from "../lib/errors";
-import { parseBody } from "../lib/validate";
+import { AppError } from "../kernel/errors";
+import { parseBody } from "../kernel/validate";
 import { authorizeAccount, personName } from "../services/access";
 import { effectiveLimits } from "../services/limit-service";
 import {

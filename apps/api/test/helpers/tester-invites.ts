@@ -1,6 +1,6 @@
 // テスター招待・上限のテストの部品（specs/024-tester-invite-connect tasks.md）：申し込みの行・運営者の環境・設定の初期化
 import { neon } from "@neondatabase/serverless";
-import type { Env } from "../../src/env";
+import type { Env } from "../../src/kernel/env";
 import { call, createAccountVia, testEnv, type TestApp } from "./app";
 
 /** 運営者の Clerk のユーザーID（テストの偽の認証では "test:top"）。 */

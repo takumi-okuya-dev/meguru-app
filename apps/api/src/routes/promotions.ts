@@ -12,10 +12,10 @@ import {
 import { and, count, eq, sql } from "drizzle-orm";
 import { Hono, type MiddlewareHandler } from "hono";
 import type { AppEnv } from "../app";
-import { createDb, type Db, type TxDb } from "../db/client";
+import { createDb, type Db, type TxDb } from "../kernel/db/client";
 import { accounts, promotions } from "../db/schema";
-import { AppError, notFound } from "../lib/errors";
-import { parseBody } from "../lib/validate";
+import { AppError, notFound } from "../kernel/errors";
+import { parseBody } from "../kernel/validate";
 import { authorizeAccount } from "../services/access";
 import { recordActivity, updatedByOf, withActivityTx } from "../services/activity-log";
 import { touchMaterials } from "../services/materials";

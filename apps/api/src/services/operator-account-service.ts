@@ -9,7 +9,7 @@ import {
   type OperatorAccountsQuery,
 } from "@threads-grower/shared";
 import { sql, type SQL } from "drizzle-orm";
-import type { Db } from "../db/client";
+import type { Db } from "../kernel/db/client";
 
 /** 接続方法（つなぐ前は none。research.md R5）。 */
 const METHOD = sql`CASE WHEN a.connection_status = 'not_connected' THEN 'none' ELSE a.connection_method::text END`;

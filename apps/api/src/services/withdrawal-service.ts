@@ -3,9 +3,9 @@
 // の順にし、どの段も2回目に走っても結果が同じになるようにする。途中で止まれば、画面のもう一度の操作か日次の処理で続きから終わる。
 import { personName } from "./access";
 import { and, asc, eq, inArray, isNotNull, isNull, lt, sql } from "drizzle-orm";
-import type { Env } from "../env";
-import { createDb, withTransaction, type Db, type TxDb } from "../db/client";
-import { lockUserRow } from "../db/locks";
+import type { Env } from "../kernel/env";
+import { createDb, withTransaction, type Db, type TxDb } from "../kernel/db/client";
+import { lockUserRow } from "../kernel/db/locks";
 import {
   accounts,
   activityLogs,
@@ -17,10 +17,10 @@ import {
   users,
   withdrawnUsers,
 } from "../db/schema";
-import { billingModeOf } from "../lib/config";
-import { AppError } from "../lib/errors";
-import { logger } from "../lib/logger";
-import { createStripeClient, StripeError, type StripeClient } from "../lib/stripe-client";
+import { billingModeOf } from "../kernel/config";
+import { AppError } from "../kernel/errors";
+import { logger } from "../kernel/logger";
+import { createStripeClient, StripeError, type StripeClient } from "../adapters/stripe";
 import { beforeAccountDeleted, chooseSuccessor } from "./team-service";
 import { purgeForWithdrawal } from "./tester-application-service";
 

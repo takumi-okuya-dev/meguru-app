@@ -1,7 +1,7 @@
 // US4：暗号鍵のローテーション（research.md R5、quickstart.md の「鍵のローテーション」）
 import { beforeEach, describe, expect, it } from "vitest";
 import { threadsConnections } from "../../src/db/schema";
-import { createTokenCipher, KeyRingError } from "../../src/lib/crypto";
+import { createTokenCipher, KeyRingError } from "../../src/kernel/crypto";
 import { rotateTokenKeys } from "../../src/services/key-rotation";
 import { createApp } from "../../src/app";
 import { call, connectNew, createUserWithAccount, db, fake, fakeVerifier, makeApp, resetDb, testEnv } from "../helpers/app";

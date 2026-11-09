@@ -8,9 +8,9 @@ import {
 import { and, eq, sql } from "drizzle-orm";
 import { Hono, type MiddlewareHandler } from "hono";
 import type { AppEnv } from "../app";
-import { createDb } from "../db/client";
+import { createDb } from "../kernel/db/client";
 import { accounts } from "../db/schema";
-import { AppError, notFound } from "../lib/errors";
+import { AppError, notFound } from "../kernel/errors";
 import { effectiveLimits } from "../services/limit-service";
 import { authorizeAccount } from "../services/access";
 import { recordActivity, updatedByOf, withActivityTx } from "../services/activity-log";

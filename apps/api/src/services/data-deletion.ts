@@ -5,13 +5,13 @@
 // - 完了したら平文の threads_user_id を消し、tombstone 用の hmac は完了から15分以上経ったら日次Cronで消す
 // 時刻の列は、読み戻した値と一致させるため、必ず JavaScript の Date で書く（DBの now() は使わない）
 import { and, eq, inArray, isNotNull, lt, min, ne, sql } from "drizzle-orm";
-import type { Env } from "../env";
-import { createDb, withTransaction } from "../db/client";
-import { lockThreadsUser, lockUserRow } from "../db/locks";
+import type { Env } from "../kernel/env";
+import { createDb, withTransaction } from "../kernel/db/client";
+import { lockThreadsUser, lockUserRow } from "../kernel/db/locks";
 import { accounts, memberships, threadsDeletionRequests, users } from "../db/schema";
-import { sha256Hex, threadsUserHmac, toHex } from "../lib/identifier-hash";
-import { logger } from "../lib/logger";
-import { verifySignedRequest } from "../lib/signed-request";
+import { sha256Hex, threadsUserHmac, toHex } from "../kernel/identifier-hash";
+import { logger } from "../kernel/logger";
+import { verifySignedRequest } from "../adapters/threads-api";
 import { markQuantityDirty } from "./billing-service";
 import { beforeAccountDeleted } from "./team-service";
 import { withdrawForAccountDeletion } from "./tester-application-service";

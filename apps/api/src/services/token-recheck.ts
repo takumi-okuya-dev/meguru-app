@@ -3,11 +3,11 @@
 // 書き込みは読んだ時点の connection_generation を条件にし、その間に接続し直していれば結果を捨てる（001 R6）。
 import { TOKEN_RECHECK_BATCH, TOKEN_RECHECK_RETRY_MINUTES } from "@threads-grower/shared";
 import { and, asc, eq, isNotNull, lte, min, sql } from "drizzle-orm";
-import type { Db } from "../db/client";
+import type { Db } from "../kernel/db/client";
 import { accounts, threadsConnections } from "../db/schema";
-import type { Env } from "../env";
-import { logger } from "../lib/logger";
-import { ThreadsApiError, ThreadsAuthError, type ThreadsClient } from "../lib/threads-client";
+import type { Env } from "../kernel/env";
+import { logger } from "../kernel/logger";
+import { ThreadsApiError, ThreadsAuthError, type ThreadsClient } from "../adapters/threads-api";
 import { loadThreadsCredentials } from "./threads-credentials";
 
 const sameGeneration = (accountId: string, generation: number) =>

@@ -13,8 +13,8 @@ import {
 } from "@threads-grower/shared";
 import { Hono, type Context, type MiddlewareHandler } from "hono";
 import type { AppEnv } from "../app";
-import { createDb, withTransaction } from "../db/client";
-import { parseBody } from "../lib/validate";
+import { createDb, withTransaction } from "../kernel/db/client";
+import { parseBody } from "../kernel/validate";
 import { authorizeTeamAdmin, authorizeTeamMember, authorizeTeamStatus, isUuid, requireFeature, teamNotFound } from "../services/access";
 import {
   addTeamAccount,

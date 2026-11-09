@@ -1,6 +1,6 @@
 // Stripeとのやり取り（specs/013-billing research.md R5）。公式のSDKは使わず、使う7つの呼び出しだけを fetch で持つ。
 // 鍵とWebhookの秘密は、例外の文・ログに出さない。接続先は STRIPE_API_BASE_URL（テストと手元は偽のStripe）。
-import type { Env } from "../env";
+import type { Env } from "../../kernel/env";
 
 /** 固定するStripeのAPIのバージョン。期間の終わりは契約の項目（items）に置かれる版。 */
 export const STRIPE_API_VERSION = "2025-03-31.basil";
