@@ -2,19 +2,20 @@
 // 古いバージョンの行を、IVを新しく作って現在の鍵で暗号化し直す。
 // 各行の書き込みは、読んだ時点の key_version と accounts.connection_generation を条件にし、
 // その間に再接続などで書き換わった行は飛ばす（トークンの値は変わらないので世代番号は上げない）。
-// 組み立て（docs/module-map.md 2-5）に置く：共通（チームの招待のトークン）とThreads（接続のトークン）の両方の暗号を入れ替えるため（specs/027）。
+// 組み立て（docs/module-map.md 2-5）に置く：共通（チーム・テストのグループの招待のトークン）とThreads（接続のトークン）の両方の暗号を入れ替えるため（specs/027）。
 import { and, eq, ne, sql } from "drizzle-orm";
 import type { Env } from "../kernel/env";
 import { createDb } from "../kernel/db/client";
 import { threadsConnections } from "../apps/threads/schema";
-import { accounts, teams } from "../platform";
+import { accounts, teams, testGroups } from "../platform";
 import { createTokenCipher, KeyRingError } from "../kernel/crypto";
 
 /**
  * 暗号鍵のローテーション（research.md R5 の手順3・4）。古いバージョンの行を、新しいIVと現在の鍵で暗号化し直す。
  * 各行の書き込みは key_version と connection_generation を条件にし、その間に書き換わった行は飛ばす。
  * チームの招待リンクの暗号化した写し（teams。specs/011 data-model.md、仕組みは specs/008 research.md R4）も同じ鍵なので、
- * 不足の検査・暗号化し直し・残りの件数に含める。招待は、読んだ時点の照合用ハッシュと鍵のバージョンを条件にする（作り直された・先に入れ替えられた行は飛ばす）。
+ * 不足の検査・暗号化し直し・残りの件数に含める。テストのグループの招待リンク（test_groups。specs/016 research.md R8）も同じ鍵なので同じに扱う。
+ * 招待は、読んだ時点の照合用ハッシュと鍵のバージョンを条件にする（作り直された・先に入れ替えられた行は飛ばす）。
  * @param env - バインディング（鍵リング・現在のバージョン・DATABASE_URL）
  * @returns 暗号化し直した件数、飛ばした件数、旧バージョンの残りの件数
  * @throws KeyRingError 鍵が欠けているバージョンの行があるとき（開始しない）
@@ -28,6 +29,7 @@ export async function rotateTokenKeys(env: Env) {
   const versions = [
     ...(await db.selectDistinct({ v: threadsConnections.keyVersion }).from(threadsConnections)),
     ...(await db.selectDistinct({ v: teams.inviteKeyVersion }).from(teams)),
+    ...(await db.selectDistinct({ v: testGroups.inviteKeyVersion }).from(testGroups)),
   ];
   const missing = [...new Set(versions.map((r) => r.v))].filter((v) => v !== null && !(String(v) in ring));
   if (missing.length > 0) {
@@ -87,11 +89,35 @@ export async function rotateTokenKeys(env: Env) {
     else skipped += 1;
   }
 
+  // テストのグループの招待リンク（AAD は groupId。チームの招待と同じ作り。specs/016 research.md R8）
+  const groupInvites = await db.select().from(testGroups).where(ne(testGroups.inviteKeyVersion, cipher.currentVersion));
+  for (const group of groupInvites) {
+    const plaintext = await cipher.decrypt(
+      { ciphertext: group.inviteTokenCiphertext, iv: group.inviteTokenIv, keyVersion: group.inviteKeyVersion },
+      group.id,
+    );
+    const enc = await cipher.encrypt(plaintext, group.id);
+    const updated = await db
+      .update(testGroups)
+      .set({ inviteTokenCiphertext: enc.ciphertext, inviteTokenIv: enc.iv, inviteKeyVersion: enc.keyVersion })
+      .where(
+        and(
+          eq(testGroups.id, group.id),
+          eq(testGroups.inviteTokenHash, group.inviteTokenHash),
+          eq(testGroups.inviteKeyVersion, group.inviteKeyVersion),
+        ),
+      )
+      .returning({ id: testGroups.id });
+    if (updated.length > 0) rotated += 1;
+    else skipped += 1;
+  }
+
   const [remaining] = await db
     .select({
       n: sql<number>`(
         (SELECT count(*) FROM ${threadsConnections} WHERE ${threadsConnections.keyVersion} <> ${cipher.currentVersion})
         + (SELECT count(*) FROM ${teams} WHERE ${teams.inviteKeyVersion} <> ${cipher.currentVersion})
+        + (SELECT count(*) FROM ${testGroups} WHERE ${testGroups.inviteKeyVersion} <> ${cipher.currentVersion})
       )::int`,
     })
     .from(sql`(SELECT 1) AS one`);
