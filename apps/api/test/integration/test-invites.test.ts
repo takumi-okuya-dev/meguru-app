@@ -1,9 +1,8 @@
 // グループの招待の確認と参加（specs/016-test-groups US1、FR-003〜FR-005・FR-008、research.md R3・R7、T010）
 import { beforeEach, describe, expect, it } from "vitest";
-import { makeApp, resetDb, setBillingExempt } from "../helpers/app";
+import { makeApp, resetDb, setBillingExempt, testEnv } from "../helpers/app";
 import { OPERATOR, callOn, createGroup, join, userRow } from "../helpers/test-groups";
 import { neon } from "@neondatabase/serverless";
-import { testEnv } from "../helpers/app";
 
 const app = makeApp();
 

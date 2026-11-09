@@ -3,8 +3,8 @@
 // 最後に旧バージョンの行の件数を表示する。0件になったら、古い鍵を鍵リングから外してよい。
 import { neonConfig } from "@neondatabase/serverless";
 import ws from "ws";
-import type { Env } from "../src/env";
-import { rotateTokenKeys } from "../src/services/key-rotation";
+import type { Env } from "../src/kernel/env";
+import { rotateTokenKeys } from "../src/jobs/key-rotation";
 
 neonConfig.webSocketConstructor = ws;
 

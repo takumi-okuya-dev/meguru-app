@@ -1,7 +1,7 @@
 // 設定の確認（誤りがあれば項目名だけを返す。値は返さない）
 import { describe, expect, it } from "vitest";
-import { billingModeOf, connectMethodsOf, operatorIdsOf, testerInvitesEnabledOf, threadsAppIdOf, validateConfig } from "../../src/lib/config";
-import type { Env } from "../../src/env";
+import { billingModeOf, connectMethodsOf, operatorIdsOf, testerInvitesEnabledOf, threadsAppIdOf, validateConfig } from "../../src/kernel/config";
+import type { Env } from "../../src/kernel/env";
 import { testBindings } from "../env";
 
 const good = {

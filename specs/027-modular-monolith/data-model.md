@@ -101,13 +101,18 @@
 | 名前 | 出すところ | Threadsでの受け取り | トランザクション |
 |---|---|---|---|
 | `accountDeleting` | `deleteAccount` | `withdrawForAccountDeletion` | 同じ`tx` |
-| `userWithdrawing` | `withdrawal-service` | `purgeForWithdrawal`と、データ削除の要求の表の更新 | 同じ`tx` |
+| `userWithdrawing` | `withdrawal-service`（アカウントを消す前） | `purgeForWithdrawal` | 同じ`tx` |
+| `userAccountsDeleted` | `withdrawal-service`（アカウントを消したあと） | データ削除の要求の表の更新 | 同じ`tx` |
 | `limitsChanged` | `limit-service`の保存のあと | `notifyWake` | なし（今と同じく保存のあと） |
+| `accountOpened` | `POST /api/accounts/:id/open`（開いた記録のあと） | `verifyConnection` | なし |
+
+- 実装のときに、退会の処理はThreadsに関わる処理が消す前と消したあとの2か所にあるとわかったので、知らせを2つに分けた。アカウントを開く入口が接続の確かめを呼んでいることもわかったので、`accountOpened`を足した（docs/module-map.md 1-4が正本）。
 
 ## 4. 境界の例外（並べ替えのあとに残るもの）
 
 | 場所 | 内容 | 理由 | 解消の予定 |
 |---|---|---|---|
 | `accounts`・`operator_settings`の列 | 1-3のとおり | 表を分けると新しいマイグレーションになる | 2作目のときに見直す |
+| `platform/schema.ts` → `apps/threads/schema.ts` | `operator_events.application_id`の外部キーのためだけにThreadsの表を読む | 外部キーを外すと新しいマイグレーションになる | 運営の記録をアプリごとに分けるとき |
 
 - ESLintで止められる違反は0件にする（spec SC-002）。上の例外は列の書き換えの約束で、ESLintの対象ではない。

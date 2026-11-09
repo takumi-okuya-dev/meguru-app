@@ -37,7 +37,7 @@ export default tseslint.config(
   {
     files: ["apps/api/src/**/*.ts"],
     plugins: { local: { rules: { "module-boundaries": moduleBoundaries } } },
-    rules: { "local/module-boundaries": "error" },
+    rules: { "local/module-boundaries": ["error", { strictPlacement: true }] },
   },
   // ドキュメントコメント（JSDoc）。外部に公開している関数・クラス・型には説明を付ける。
   // TypeScript では型はコードに書くので、JSDoc には型（{string} など）を書かない。

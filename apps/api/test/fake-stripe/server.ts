@@ -3,7 +3,7 @@
 // - Checkoutの画面：/checkout/:id を開くと、すぐに契約を作って success_url へ戻す（設定されていればWebhookも送る）
 // - 制御用：/__control/*（初期化、受けた要求の一覧、契約の状態の変更、失敗の注入、Webhookの送り先と送信）
 import { Hono, type Context } from "hono";
-import { signWebhook } from "../../src/lib/stripe-client";
+import { signWebhook } from "../../src/adapters/stripe/stripe-client";
 
 type Session = {
   id: string;

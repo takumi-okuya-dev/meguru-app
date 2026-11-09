@@ -1,8 +1,8 @@
 // 定期処理：自動投稿（specs/005-auto-post contracts/auto-post-job.md、FR-005〜FR-012・FR-017、SC-001〜SC-003・SC-006・SC-008）
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { fake, makeApp, resetDb, testEnv } from "../helpers/app";
-import { createThreadsClient } from "../../src/lib/threads-client";
-import { runAutoPost } from "../../src/services/auto-post-runner";
+import { createThreadsClient } from "../../src/adapters/threads-api/threads-client";
+import { runAutoPost } from "../../src/apps/threads/publish/auto-post-runner";
 import {
   addMin,
   approvedDrafts,

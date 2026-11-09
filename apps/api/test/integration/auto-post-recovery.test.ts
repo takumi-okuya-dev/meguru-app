@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { createDb } from "../../src/db/client";
-import { createThreadsClient } from "../../src/lib/threads-client";
-import { claimSlot } from "../../src/services/publish-claim";
-import { executeAttempt } from "../../src/services/publish-executor";
+import { createDb } from "../../src/kernel/db/client";
+import { createThreadsClient } from "../../src/adapters/threads-api/threads-client";
+import { claimSlot } from "../../src/apps/threads/publish/publish-claim";
+import { executeAttempt } from "../../src/apps/threads/publish/publish-executor";
 import {
   authorizeAndCallback,
   call,

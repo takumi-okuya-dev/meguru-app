@@ -1,5 +1,5 @@
 // テスト用のグループのテストの部品（specs/016-test-groups tasks.md）：ONの環境、運営者の操作、招待の文字列
-import type { Env } from "../../src/env";
+import type { Env } from "../../src/kernel/env";
 import { call, db, testEnv, type TestApp } from "./app";
 import { neon } from "@neondatabase/serverless";
 

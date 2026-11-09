@@ -1,7 +1,7 @@
 // 自動投稿が使えないオーナーの定期処理（specs/019-feature-switches FR-008、research.md R12）。
 // 時刻の処理・公開の直前の確かめ・反応の取り込みのどれでも止め、承認済みの案は消さない。ONに戻すと次の時刻から投稿する。
 import { beforeEach, describe, expect, it } from "vitest";
-import { runAutoPost } from "../../src/services/auto-post-runner";
+import { runAutoPost } from "../../src/apps/threads/publish/auto-post-runner";
 import { fake, makeApp, resetDb, testEnv } from "../helpers/app";
 import {
   addMin,

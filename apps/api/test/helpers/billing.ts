@@ -1,6 +1,6 @@
 // 決済のテストの部品（specs/013-billing tasks.md）：決済ONの環境、偽のStripeの操作、署名つきのWebhook
-import type { Env } from "../../src/env";
-import { signWebhook } from "../../src/lib/stripe-client";
+import type { Env } from "../../src/kernel/env";
+import { signWebhook } from "../../src/adapters/stripe/stripe-client";
 import { TEST_STRIPE_WEBHOOK_SECRET } from "../env";
 import { call, testEnv, type TestApp } from "./app";
 

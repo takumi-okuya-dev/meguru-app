@@ -133,8 +133,8 @@ describe("ユーザー名だけが一致したとき（FR-023）", () => {
 
 describe("日次のトークン更新でユーザー名が変わるとき（PR #12 のCodexレビュー）", () => {
   it("更新の後に、新しい名前を別のアプリで追加しようとしても、照合で見つかる", async () => {
-    const { refreshExpiringTokens } = await import("../../src/services/token-refresh");
-    const { createThreadsClient } = await import("../../src/lib/threads-client");
+    const { refreshExpiringTokens } = await import("../../src/apps/threads/connection/token-refresh");
+    const { createThreadsClient } = await import("../../src/adapters/threads-api/threads-client");
     await add(await fake.issueToken({ user: "9003" }));
     await fake.addUser("9003", "cafe_new");
     await q()`UPDATE threads_connections SET expires_at = now() + interval '3 days', issued_at = now() - interval '2 days'`;
@@ -145,8 +145,8 @@ describe("日次のトークン更新でユーザー名が変わるとき（PR #
   });
 
   it("新しい名前が先に別のAccountで登録されていても、更新は止めない（警告だけ）", async () => {
-    const { refreshExpiringTokens } = await import("../../src/services/token-refresh");
-    const { createThreadsClient } = await import("../../src/lib/threads-client");
+    const { refreshExpiringTokens } = await import("../../src/apps/threads/connection/token-refresh");
+    const { createThreadsClient } = await import("../../src/adapters/threads-api/threads-client");
     await add(await fake.issueToken({ user: "9003" }));
     await fake.addUser("9007", "cafe_new");
     await add(await fake.issueToken({ user: "9007" }), "u2");

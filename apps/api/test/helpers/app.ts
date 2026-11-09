@@ -2,9 +2,9 @@
 import { env } from "cloudflare:test";
 import { neon } from "@neondatabase/serverless";
 import { createApp } from "../../src/app";
-import { createDb } from "../../src/db/client";
-import type { Env } from "../../src/env";
-import type { AuthVerifier } from "../../src/middleware/auth";
+import { createDb } from "../../src/kernel/db/client";
+import type { Env } from "../../src/kernel/env";
+import type { AuthVerifier } from "../../src/platform/identity/auth";
 
 export const testEnv = env as unknown as Env;
 

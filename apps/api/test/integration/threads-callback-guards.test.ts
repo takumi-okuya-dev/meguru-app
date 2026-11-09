@@ -2,7 +2,7 @@
 import { eq } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
 import { accounts, threadsDeletionRequests, threadsRevocations } from "../../src/db/schema";
-import { threadsUserHmac } from "../../src/lib/identifier-hash";
+import { threadsUserHmac } from "../../src/kernel/identifier-hash";
 import {
   authorizeAndCallback,
   call,
