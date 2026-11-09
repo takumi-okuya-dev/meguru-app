@@ -145,6 +145,14 @@ MVPのうちチーム運用と課金まわりの最後のfeatureとする。公�
   Free / Neon Free / Clerk Freeの前提を崩さない設計を優先する）。決済手数料は売上連動の変動費
   として別枠で扱う。
 - 実装言語はTypeScriptで統一する（フロントエンド・バックエンドとも）。
+- **APIのモジュール構成**（2026-11-10、specs/027）：APIはモジュラーモノリスとし、土台（kernel）・
+  窓口（adapters）・共通（platform）・アプリ（apps/<名前>）・組み立て（composition）に分ける。依存は
+  組み立て → アプリ → 共通 → 窓口 → 土台の一方向とし、アプリ同士は直接使わない。ほかのモジュールは
+  入口（`index.ts`）からだけ使う。表には持ち主のモジュールが1つあり、持ち主でないモジュールが
+  書き換えてよいのは`docs/module-map.md`に書いた例外の列だけとする。共通からアプリの処理を呼ぶ
+  ときは「知らせ」（共通が出し、アプリが受け取る）を使う。これらはESLintの規則
+  （`eslint-rules/module-boundaries.js`）で守る。2作目以降のアプリは、同じリポジトリにアプリの
+  モジュールとして足す（構造の全体は`docs/product-structure.md`）。
 
 ## 開発ワークフロー
 
@@ -173,4 +181,4 @@ MVPのうちチーム運用と課金まわりの最後のfeatureとする。公�
   実質的な拡張＝MINOR、文言修正・明確化＝PATCH。
 - 改定時は`/speckit-constitution`を再実行し、Sync Impact Reportを都度残す。
 
-**Version**: 4.4.0 | **Ratified**: 2026-10-01 | **Last Amended**: 2026-11-08
+**Version**: 4.5.0 | **Ratified**: 2026-10-01 | **Last Amended**: 2026-11-10
