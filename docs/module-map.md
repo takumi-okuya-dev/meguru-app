@@ -107,7 +107,7 @@ APIのコードを、どのモジュールが持つかを決めた地図。表�
 | `app.ts` | APIの入口の登録。初めに`registerThreads()`を呼ぶ |
 | `index.ts` | Workersの入口（`fetch`・`scheduled`）。定期処理の初めに`registerThreads()`を呼ぶ |
 | `jobs/daily-jobs.ts` | 毎日の処理（共通の退会のやり直しとThreadsのトークンの更新・片づけなど）。各モジュールの入口の関数を順に呼ぶだけ。初めに`registerThreads()`を呼ぶ |
-| `jobs/key-rotation.ts` | 暗号の鍵の入れ替え（`scripts/rotate-token-key.ts`から使う）。共通（チームの招待のトークン）とThreads（接続のトークン）の両方の表を書き換えるので、組み立てに置く |
+| `jobs/key-rotation.ts` | 暗号の鍵の入れ替え（`scripts/rotate-token-key.ts`から使う）。共通（チーム・テストのグループの招待のトークン）とThreads（接続のトークン）の両方の表を書き換えるので、組み立てに置く |
 | `db/schema.ts` | 共通とThreadsの`schema.ts`を読み直して出すだけ（drizzle-kitとテスト用） |
 
 ## 3. 例外：持ち主でないモジュールが書き換えてよい列

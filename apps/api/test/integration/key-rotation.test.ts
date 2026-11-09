@@ -5,6 +5,8 @@ import { createTokenCipher, KeyRingError } from "../../src/kernel/crypto";
 import { rotateTokenKeys } from "../../src/jobs/key-rotation";
 import { createApp } from "../../src/app";
 import { call, connectNew, createUserWithAccount, db, fake, fakeVerifier, makeApp, resetDb, testEnv } from "../helpers/app";
+import { OPERATOR, createGroup, groupsEnv } from "../helpers/test-groups";
+import { testGroups } from "../../src/db/schema";
 
 const app = makeApp();
 const KEY2 = btoa(String.fromCharCode(...new Uint8Array(32).fill(42)));
@@ -58,6 +60,29 @@ describe("rotateTokenKeys", () => {
     const newEnv = { ...testEnv, TOKEN_ENCRYPTION_KEYS: JSON.stringify({ "2": KEY2 }), TOKEN_ENCRYPTION_KEY_VERSION: "2" };
     const res = await onlyNew.request(`/api/teams/${teamId}/invite`, { headers: { Authorization: "Bearer test:a1" } }, newEnv);
     expect(((await res.json()) as { url: string }).url).toBe(before);
+  });
+
+  it("テストのグループの招待リンクの暗号化した写しも入れ替え、旧鍵を外しても同じリンクを表示できる（specs/016 research.md R8）", async () => {
+    const { id, token } = await createGroup(app);
+    const ring = { ...JSON.parse(testEnv.TOKEN_ENCRYPTION_KEYS), "2": KEY2 };
+    const env = { ...testEnv, TOKEN_ENCRYPTION_KEYS: JSON.stringify(ring), TOKEN_ENCRYPTION_KEY_VERSION: "2" };
+    expect(await rotateTokenKeys(env)).toEqual({ rotated: 1, skipped: 0, remainingOldVersionRows: 0 });
+    const [row] = await db().select().from(testGroups);
+    expect(row!.inviteKeyVersion).toBe(2);
+    // 旧鍵を外しても、入れ替えた写しから同じリンクを読める
+    const onlyNew = createApp({ verifyAuth: () => fakeVerifier });
+    const newEnv = groupsEnv({ TOKEN_ENCRYPTION_KEYS: JSON.stringify({ "2": KEY2 }), TOKEN_ENCRYPTION_KEY_VERSION: "2" });
+    const res = await onlyNew.request(`/api/operator/test-groups/${id}`, { headers: { Authorization: `Bearer test:${OPERATOR}` } }, newEnv);
+    expect(res.status).toBe(200);
+    expect(((await res.json()) as { inviteUrl: string }).inviteUrl.split("/test-invite/")[1]).toBe(token);
+  });
+
+  it("テストのグループの招待リンクに鍵が欠けているバージョンがあれば開始しない", async () => {
+    await createGroup(app);
+    const env = { ...testEnv, TOKEN_ENCRYPTION_KEYS: JSON.stringify({ "2": KEY2 }), TOKEN_ENCRYPTION_KEY_VERSION: "2" };
+    await expect(rotateTokenKeys(env)).rejects.toBeInstanceOf(KeyRingError);
+    const [row] = await db().select().from(testGroups);
+    expect(row!.inviteKeyVersion).toBe(1);
   });
 
   it("招待リンクに鍵が欠けているバージョンがあれば開始しない", async () => {

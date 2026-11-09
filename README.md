@@ -204,7 +204,7 @@ pnpm e2e
 # プランを手動で変える（課金 feature ができるまで）。接続先は DATABASE_URL_DIRECT（既定はローカル）
 pnpm --filter api admin:set-plan <accountId> multi-account
 
-# 暗号鍵のローテーション（research.md R5 の手順）
+# 暗号鍵のローテーション（research.md R5 の手順）。接続のトークンと、チーム・テストのグループの招待リンクの写しを、新しい鍵で暗号化し直す
 TOKEN_ENCRYPTION_KEYS='{"1":"…","2":"…"}' TOKEN_ENCRYPTION_KEY_VERSION=2 DATABASE_URL=… \
   pnpm --filter api admin:rotate-token-key
 ```
