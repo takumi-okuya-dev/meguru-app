@@ -1,17 +1,13 @@
-// APIの入口（メソッドとパス）の一覧が、027の並べ替えの前と同じであること（specs/027-modular-monolith research.md R7、T002）。
-// 入口を足す・変えるときは、`pnpm --filter api exec tsx scripts/dump-routes.ts > ../../specs/027-modular-monolith/routes-before.txt` で書き直す。
+// APIの入口（メソッドとパス）と、それぞれの処理の数・すべての入口にかかる関所の順番が、一覧（routes.snapshot.txt）と同じであること
+// （specs/027-modular-monolith research.md R7、T002）。入口を足す・変えたら `pnpm --filter api routes:snapshot` で一覧を書き直す。
 import { readFileSync } from "node:fs";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { routeLines } from "../../scripts/dump-routes";
+import { SNAPSHOT_PATH, routeLines } from "../../scripts/dump-routes";
 import { createApp } from "../../src/app";
 
-const BEFORE = join(dirname(fileURLToPath(import.meta.url)), "../../../../specs/027-modular-monolith/routes-before.txt");
-
 describe("APIの入口の一覧", () => {
-  it("routes-before.txt と同じ", () => {
-    const expected = readFileSync(BEFORE, { encoding: "utf8" }).trim().split("\n");
+  it("routes.snapshot.txt と同じ", () => {
+    const expected = readFileSync(SNAPSHOT_PATH, { encoding: "utf8" }).trim().split("\n");
     expect(routeLines(createApp())).toEqual(expected);
   });
 });

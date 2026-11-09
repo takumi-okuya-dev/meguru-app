@@ -24,7 +24,7 @@ APIのコードを、どのモジュールが持つかを決めた地図。表�
 
 ### 1-2. 入口
 
-- 入口（`index.ts`）は、**共通全体（`platform/index.ts`）・アプリごと（`apps/<名前>/index.ts`）・窓口ごと（`adapters/<名前>/index.ts`）**に1つ。
+- 入口（`index.ts`）は、**共通全体（`platform/index.ts`）・アプリごと（`apps/<名前>/index.ts`）・窓口ごと（`adapters/<名前>/index.ts`）**に1つ。モジュールの直下の`schema.ts`（表の定義）も入口として読んでよい（`db/schema.ts`が共通とThreadsの表を読み直して出すため）。
 - ほかのモジュールからは入口だけを読む（`../../platform`・`../../adapters/stripe`）。土台は入口なしで、ファイルを直接読んでよい。
 - 同じモジュールの中（`platform/`の小分け同士、`apps/threads/`の小分け同士）は自由に読んでよい。共通の中の区切りは、2作目で本当に共通だった部分を取り出すときに見直す。
 
@@ -43,11 +43,11 @@ APIのコードを、どのモジュールが持つかを決めた地図。表�
 | `accountDeleting` | アカウントを消す前（`deleteAccount`） | テスター招待の取り下げ（`withdrawForAccountDeletion`） |
 | `userWithdrawing` | 退会する前（`withdrawal-service`） | テスター招待の片づけ（`purgeForWithdrawal`）と、Metaのデータ削除の要求の表の更新 |
 | `limitsChanged` | 上限を保存したあと（`limit-service`） | 自動投稿を起こす（`notifyWake`） |
-| `accountSummaryExtras` | `/api/me`のアカウントの一覧づくり | 確かめ待ちの件数（`countOwnedAccountNeedsReview`） |
 
 ### 1-5. 自動のチェック
 
-- ESLintの規則`local/module-boundaries`（`eslint-rules/module-boundaries.js`）が、`apps/api/src`のすべてのファイルで次を止める：①ほかのモジュールの入口でないところ、②共通 → アプリ、③アプリ同士、④窓口・土台から上。
+- ESLintの規則`local/module-boundaries`（`eslint-rules/module-boundaries.js`）が、`apps/api/src`のすべてのファイルで次を止める：①ほかのモジュールの入口でないところ、②共通 → アプリ、③アプリ同士、④窓口・土台から上。`import type`・`export … from`・`import("…")`（型の中を含む）・`import x = require("…")`も対象。
+- 並べ替えのあとは`strictPlacement`を有効にし、組み立ての場所（`app.ts`・`index.ts`・`jobs/`・`db/schema.ts`）のほかに、どのモジュールにも入っていないファイルがあれば知らせる。
 - `pnpm lint`（CIの「lint・型チェック・共通とWeb」）で流れる。規則のテストは`node --test "eslint-rules/*.test.js"`。
 - 種類はパスの形で決まる。`src/apps/<名前>/`を作れば、設定を足さなくてもアプリとして当たる。テスト（`apps/api/test`）と`scripts/`にはかけない。
 
@@ -57,7 +57,7 @@ APIのコードを、どのモジュールが持つかを決めた地図。表�
 
 | 小分け | 表 | 処理（今の場所 → 行き先） | APIの入口（今の場所） |
 |---|---|---|---|
-| identity（利用者） | `users`・`withdrawn_users` | `middleware/auth.ts` | `routes/me.ts` |
+| identity（利用者） | `users`・`withdrawn_users` | `middleware/auth.ts` | `routes/me.ts`（`/me/needs-review-counts`はThreadsへ） |
 | access（権限） | — | `services/access.ts` | — |
 | accounts（運用するアカウントとメンバー） | `accounts`（3章の例外あり）・`memberships` | `services/account-service.ts`（作る・名前・消す・数える・上限・`openAccount`。接続の部分はThreadsへ） | `routes/accounts.ts`（接続の確かめの部分はThreadsへ） |
 | teams（チーム・招待） | `teams`・`team_members`・`team_accounts` | `services/team-service.ts`・`team-status.ts`・`invite-service.ts` | `routes/teams.ts`・`account-team.ts`・`invites.ts` |
@@ -78,7 +78,7 @@ APIのコードを、どのモジュールが持つかを決めた地図。表�
 |---|---|---|---|
 | connection（接続・トークン・Metaの要求） | `threads_connections`・`token_check_failures`・`oauth_states`・`threads_deletion_requests`・`threads_revocations` | `services/threads-oauth.ts`・`token-connect.ts`・`token-recheck.ts`・`token-refresh.ts`・`username-match.ts`・`threads-credentials.ts`・`revocation.ts`・`threads-check-service.ts`・`data-deletion.ts`・`key-rotation.ts`、`account-service.ts`の接続の部分（`completeConnection`・`verifyConnection`など） | `routes/threads-connect.ts`・`threads-webhooks.ts`・`threads-check.ts`・`data-deletion.ts`、`routes/accounts.ts`の接続の確かめ |
 | strategy（戦略・宣伝・リサーチ） | `strategy_designs`・`promotions`・`reference_posts`・`research_keywords` | `services/strategy-service.ts`・`profile-status.ts`・`materials.ts`・`item-service.ts` | `routes/strategy.ts`・`promotions.ts`・`research.ts` |
-| drafts（投稿の案・確かめる・投稿ルール） | `draft_batches`・`post_drafts`・`ng_words` | `services/draft-service.ts`・`review-service.ts`・`posting-rules-service.ts`・`account-review-counts.ts` | `routes/post-drafts.ts`・`posting-rules.ts` |
+| drafts（投稿の案・確かめる・投稿ルール） | `draft_batches`・`post_drafts`・`ng_words` | `services/draft-service.ts`・`review-service.ts`・`posting-rules-service.ts`・`account-review-counts.ts` | `routes/post-drafts.ts`・`posting-rules.ts`、`routes/me.ts`の`GET /api/me/needs-review-counts` |
 | publish（予約と自動投稿） | `posting_schedules`・`publish_attempts` | `services/posting-schedule-service.ts`・`auto-post-runner.ts`・`auto-post-gate.ts`・`auto-post-status.ts`・`publish-claim.ts`・`publish-executor.ts` | `routes/posting-schedule.ts`・`auto-post.ts` |
 | metrics（数字の取得・分析） | `post_metrics`・`post_metric_snapshots`・`follower_snapshots`・`analysis_settings`・`post_classifications` | `services/metrics-runner.ts`・`performance-service.ts`・`analysis-service.ts`・`prompt-service.ts` | `routes/performance.ts`・`analysis.ts`・`prompt.ts` |
 | mention（時間差のメンション） | `mention_settings`・`mention_people`・`post_mentions` | `services/mention-runner.ts`・`mention-service.ts`・`mention-view.ts` | `routes/mention.ts` |
@@ -137,7 +137,8 @@ ESLintで止められる違反は0件にする。今すぐ直せないものは�
 
 ## 5. 並べ替えで直すこと（027 PR2）
 
-- **逆向きの依存**：共通にすべき処理がThreadsを呼んでいる5か所（接続の処理・アカウントの削除・退会・上限・`/api/me`の件数）。接続の処理はThreadsへ移し、残りは1-4の知らせにする。
+- **逆向きの依存**：共通にすべき処理がThreadsを呼んでいる5か所（接続の処理・アカウントの削除・退会・上限・確かめ待ちの件数の入口）。接続の処理と確かめ待ちの件数の入口はThreadsへ移し、残りの3か所は1-4の知らせにする。
+- **境界の規則を厳しくする**：並べ替えの最後に`strictPlacement`を有効にする。
 - **Honoの型**：`AppEnv`（`app.ts`）と`AuthVariables`（`middleware/auth.ts`）は、共通とThreadsのAPIの入口の両方が使う。共通（`platform/`）に置き、`app.ts`はそれを読み直して使う（共通のAPIの入口が組み立ての`app.ts`を読むと、下から上への依存になるため）。
 
 ## 6. アプリのモジュールを足す手順

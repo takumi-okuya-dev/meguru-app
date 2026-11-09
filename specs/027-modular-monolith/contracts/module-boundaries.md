@@ -29,8 +29,8 @@
 
 | モジュール | 入口 | ほかのモジュールからの読み方 |
 |---|---|---|
-| 共通 | `platform/index.ts` | `../../platform`（入口のファイルだけ） |
-| アプリ | `apps/<名前>/index.ts` | 組み立てからだけ |
+| 共通 | `platform/index.ts`・`platform/schema.ts` | `../../platform`・`../../platform/schema`（表の定義） |
+| アプリ | `apps/<名前>/index.ts`・`apps/<名前>/schema.ts` | 組み立てからだけ（`db/schema.ts`が表の定義を読み直す） |
 | 窓口 | `adapters/<名前>/index.ts` | `../../adapters/stripe` など |
 | 土台 | （入口なし） | `kernel/`のファイルを直接 |
 
@@ -47,7 +47,6 @@ await runHook(name, payload)       // 共通の中で、今の呼び出しと同
 
 - 受け取る関数は、登録した順に1つずつ`await`する。例外は呼んだ側にそのまま返す（今の動きと同じ）。
 - 受け取るものがなければ何もしない。
-- 結果を返す知らせ（`accountSummaryExtras`）は、受け取ったものの結果を合わせて返す。
 
 ## 4. ESLintの規則（`module-boundaries`）
 
@@ -62,4 +61,5 @@ await runHook(name, payload)       // 共通の中で、今の呼び出しと同
 | 窓口・土台 → 上 | `adapters/`から`../../platform`、`kernel/`から`../adapters` | 「窓口（土台）は共通・アプリを使えません」 |
 
 - アプリの判定は`src/apps/<名前>/`の形で行うので、アプリを足しても設定は変えない（spec FR-016）。
-- `import type`も同じ規則にかける（型だけでも境界を越えるため）。
+- `import type`・`export … from`・`import("…")`（型の中の`import("…")`・`typeof import("…")`、式のないテンプレート文字列を含む）・`import x = require("…")`も同じ規則にかける（型だけでも境界を越えるため）。
+- `strictPlacement: true`（027の並べ替えのあとに有効にする）：組み立てと決めた場所（`app.ts`・`index.ts`・`jobs/`・`db/schema.ts`）のほかに、どのモジュールにも入っていないファイルがあれば知らせる。

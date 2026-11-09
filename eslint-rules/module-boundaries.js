@@ -2,6 +2,8 @@
 // apps/api/src を 土台（kernel）・窓口（adapters/<名前>）・共通（platform）・アプリ（apps/<名前>）・組み立て（それ以外）に分け、
 // 依存の向き（組み立て → アプリ → 共通 → 窓口 → 土台）と、ほかのモジュールは入口（index.ts）から読む決まりを確かめる。
 // アプリの判定はパスの形（apps/<名前>/）で行うので、アプリを足しても設定は要らない。
+// 入口は、モジュールの直下の index.ts と schema.ts（表の定義は、ほかのモジュールと組み立てに見せるもの）。
+// strictPlacement を true にすると、組み立てと決めた場所（app.ts・index.ts・jobs/・db/schema.ts）のほかにあるファイルを知らせる（027の並べ替えのあとに有効にする）。
 import path from "node:path";
 
 /** 種類の上下（大きいほど上。上から下へだけ読んでよい）。 */
@@ -23,12 +25,21 @@ export function moduleOf(rel) {
 }
 
 /**
- * 単位の入口か（`platform`・`platform/index`・`apps/x`・`apps/x/index` など）。
+ * 単位の入口か（`platform`・`platform/index`・`platform/schema`・`apps/x`・`apps/x/index`・`apps/x/schema` など）。
  * @param target - 読みこみ先のモジュール
  * @returns 入口なら true
  */
 function isEntry(target) {
-  return target.inner.length === 0 || (target.inner.length === 1 && target.inner[0] === "index");
+  return target.inner.length === 0 || (target.inner.length === 1 && (target.inner[0] === "index" || target.inner[0] === "schema"));
+}
+
+/**
+ * 組み立てと決めた場所か（strictPlacement のとき、ここのほかの組み立ては知らせる）。
+ * @param rel - src からの相対のパス（拡張子なし）
+ * @returns 組み立ての場所なら true
+ */
+export function isCompositionPlace(rel) {
+  return rel === "app" || rel === "index" || rel === "db/schema" || rel.startsWith("jobs/");
 }
 
 /**
@@ -48,11 +59,19 @@ export default {
   meta: {
     type: "problem",
     docs: { description: "APIのモジュールの境界（依存の向きと入口）を守る" },
-    schema: [{ type: "object", properties: { srcDir: { type: "string" } }, additionalProperties: false }],
+    schema: [
+      {
+        type: "object",
+        properties: { srcDir: { type: "string" }, strictPlacement: { type: "boolean" } },
+        additionalProperties: false,
+      },
+    ],
     messages: {
       notEntry: "{{unit}} は入口（{{unit}}/index.ts）から読んでください（docs/module-map.md）。",
       platformToApp: "共通（platform）はアプリ（{{unit}}）を使えません。知らせ（platform/hooks）を使ってください（docs/module-map.md）。",
       appToApp: "アプリ同士（{{from}} → {{unit}}）は直接使えません（docs/module-map.md）。",
+      unplaced:
+        "{{from}} はどのモジュールにも入っていません。kernel・adapters/<名前>・platform・apps/<名前> のどれかに置いてください（組み立ては app.ts・index.ts・jobs/・db/schema.ts だけ。docs/module-map.md）。",
       lowerToUpper: "{{fromKind}}（{{from}}）は {{toKind}}（{{unit}}）を使えません。依存は 組み立て → アプリ → 共通 → 窓口 → 土台 の向きだけです（docs/module-map.md）。",
     },
   },
@@ -66,6 +85,7 @@ export default {
     const fromRel = relFromSrc(srcDir, filename);
     if (fromRel === null) return {};
     const from = moduleOf(fromRel);
+    const strict = context.options[0]?.strictPlacement === true;
     const kindName = { kernel: "土台", adapter: "窓口", platform: "共通", app: "アプリ", composition: "組み立て" };
 
     /**
@@ -90,11 +110,35 @@ export default {
       }
     }
 
+    /**
+     * 文字列か、式のないテンプレート文字列なら、その値を返す。
+     * @param node - 読みこみ先の式
+     * @returns 値（決まらなければ undefined）
+     */
+    function literalValue(node) {
+      if (!node) return undefined;
+      if (node.type === "Literal") return node.value;
+      if (node.type === "TemplateLiteral" && node.expressions.length === 0) return node.quasis[0]?.value.cooked;
+      if (node.type === "TSLiteralType") return literalValue(node.literal);
+      return undefined;
+    }
+
     return {
+      Program: (node) => {
+        if (strict && from.kind === "composition" && !isCompositionPlace(fromRel)) {
+          context.report({ node, messageId: "unplaced", data: { from: fromRel } });
+        }
+      },
       ImportDeclaration: (node) => check(node.source, node.source.value),
       ExportNamedDeclaration: (node) => node.source && check(node.source, node.source.value),
       ExportAllDeclaration: (node) => check(node.source, node.source.value),
-      ImportExpression: (node) => node.source.type === "Literal" && check(node.source, node.source.value),
+      ImportExpression: (node) => check(node.source, literalValue(node.source)),
+      // 型の中の import("…")・typeof import("…")
+      TSImportType: (node) => check(node, literalValue(node.argument ?? node.source)),
+      // import x = require("…")
+      TSImportEqualsDeclaration: (node) =>
+        node.moduleReference.type === "TSExternalModuleReference" &&
+        check(node.moduleReference, literalValue(node.moduleReference.expression)),
     };
   },
 };

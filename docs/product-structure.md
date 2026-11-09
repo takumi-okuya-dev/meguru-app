@@ -40,7 +40,7 @@ PostgreSQL（Neon。1つのDB。表ごとに持ち主のモジュールが決ま
 
 - 依存は一方向：**組み立て → アプリ → 共通 → 窓口 → 土台**。共通からアプリを呼ぶときは「知らせ」（共通が出し、アプリが受け取る）を使う。
 - ほかのモジュールは**入口**（`index.ts`）からだけ使う。表を書き換えてよいのは持ち主のモジュールだけ（例外は module-map に列ごとに書く）。
-- これらはESLintの規則（`eslint-rules/module-boundaries.js`）で自動で止める。
+- これらはESLintの規則（`eslint-rules/module-boundaries.js`）で自動で止める。APIの入口の一覧（`apps/api/test/repo/routes.snapshot.txt`）もテストで見張る。
 
 ## 3. 共通（platform）とアプリの分担
 

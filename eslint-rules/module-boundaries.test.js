@@ -46,6 +46,13 @@ tester.run("module-boundaries", rule, {
     // 並べ替えの前の場所（組み立てとみなす）は、どこを読んでもよい
     at("services/account-service.ts", 'import { x } from "./tester-application-service";'),
     at("apps/threads/drafts/draft-service.ts", 'import { z } from "zod";'),
+    // 表の定義（schema.ts）は入口として読んでよい（db/schema.ts が共通とThreadsの表を読み直して出す）
+    at("db/schema.ts", 'export * from "../platform/schema";'),
+    at("db/schema.ts", 'export * from "../apps/threads/schema";'),
+    at("apps/threads/schema.ts", 'import { users } from "../../platform/schema";'),
+    // strictPlacement：組み立ての場所はよい
+    { ...at("jobs/daily-jobs.ts", 'import { x } from "../platform";'), options: [{ strictPlacement: true }] },
+    { ...at("app.ts", 'import { x } from "./platform";'), options: [{ strictPlacement: true }] },
   ],
   invalid: [
     bad("apps/threads/drafts/draft-service.ts", 'import { x } from "../../../platform/billing/billing-service";', "notEntry"),
@@ -61,5 +68,13 @@ tester.run("module-boundaries", rule, {
     bad("platform/index.ts", 'export { x } from "../apps/threads";', "platformToApp"),
     bad("platform/index.ts", 'export * from "../apps/threads";', "platformToApp"),
     bad("platform/accounts/account-service.ts", 'const m = await import("../../apps/threads");', "platformToApp"),
+    bad("platform/accounts/account-service.ts", "const m = await import(`../../apps/threads`);", "platformToApp"),
+    bad("platform/accounts/account-service.ts", 'type T = import("../../apps/threads").Foo;', "platformToApp"),
+    bad("platform/accounts/account-service.ts", 'type T = typeof import("../../apps/threads/drafts/draft-service");', "platformToApp"),
+    bad("platform/accounts/account-service.ts", 'import x = require("../../apps/threads");', "platformToApp"),
+    bad("apps/threads/drafts/draft-service.ts", 'type T = import("../../../platform/billing/billing-service").X;', "notEntry"),
+    // strictPlacement：どのモジュールにも入っていないファイル
+    { ...bad("services/foo.ts", 'export const x = 1;', "unplaced"), options: [{ strictPlacement: true }] },
+    { ...bad("lib/bar.ts", 'export const y = 1;', "unplaced"), options: [{ strictPlacement: true }] },
   ],
 });

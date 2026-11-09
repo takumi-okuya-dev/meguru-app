@@ -28,8 +28,8 @@ description: "Task list for feature 027 modular monolith"
 
 - [X] T001 APIの入口の一覧を書き出す仕組みを作り、基準を残す（research.md R7）。
   - `apps/api/scripts/dump-routes.ts`：`makeApp()`の`app.routes`から「メソッド パス」を1行ずつ、並べて書き出す（重複を除く）。
-  - 出力を`specs/027-modular-monolith/routes-before.txt`に残す。
-- [X] T002 `apps/api/test/repo/routes-snapshot.test.ts`を作る：今のアプリの入口の一覧が`specs/027-modular-monolith/routes-before.txt`と同じであること。並べ替えの前に通ることを確かめる。
+  - 出力を`apps/api/test/repo/routes.snapshot.txt`に残す（`pnpm --filter api routes:snapshot`で書き直す。入口ごとの処理の数と、すべての入口にかかる関所の順番を含む）。
+- [X] T002 `apps/api/test/repo/routes-snapshot.test.ts`を作る：今のアプリの入口の一覧が`apps/api/test/repo/routes.snapshot.txt`と同じであること。並べ替えの前に通ることを確かめる。
 
 ## Phase 2：Foundational（境界の規則）
 
@@ -90,15 +90,15 @@ description: "Task list for feature 027 modular monolith"
 
 ### 段階2：逆向きの依存の解消と共通（コミット2）
 
-- [ ] T012 [P] [US2] `apps/api/test/unit/platform-hooks.test.ts`を作る（contracts/module-boundaries.md 3）。先に書いて失敗を確かめる：登録した順に`await`する・例外は呼んだ側に返る・登録がなければ何もしない・結果を返す知らせは結果を合わせる・`resetHooks()`で消せる（テスト用）。
-- [ ] T013 [US2] `apps/api/src/platform/hooks.ts`を作る（T012を通す）。知らせの名前は`accountDeleting`・`userWithdrawing`・`limitsChanged`・`accountSummaryExtras`（data-model.md 3）で、それぞれの受け取る値の型を決める。
+- [ ] T012 [P] [US2] `apps/api/test/unit/platform-hooks.test.ts`を作る（contracts/module-boundaries.md 3）。先に書いて失敗を確かめる：登録した順に`await`する・例外は呼んだ側に返る・登録がなければ何もしない・`resetHooks()`で消せる（テスト用）。
+- [ ] T013 [US2] `apps/api/src/platform/hooks.ts`を作る（T012を通す）。知らせの名前は`accountDeleting`・`userWithdrawing`・`limitsChanged`（data-model.md 3）で、それぞれの受け取る値の型を決める。
 - [ ] T014 [US2] 共通の表の定義を分ける：`apps/api/src/platform/schema.ts`に共通の17表（data-model.md 1-1）と、列挙型・`timestamps`などの共通の定義を移す。`db/schema.ts`は、当面`platform/schema.ts`を読み直して出し、残りの表をそのまま持つ。
 - [ ] T015 [US2] 接続の処理を切り出す（research.md R4-1）：`services/account-service.ts`の`ConnectionRequest`・`requestFromState`・`completeConnection`・`verifyConnection`とその内部の関数（`openAccount`は最後に開いたアカウントの記録なので共通に残す）を、古い場所の新しいファイル`services/connection-service.ts`へ移す（中身は変えない。段階3でThreadsへ移す）。`routes/accounts.ts`の接続の確かめの入口も、`routes/account-connection.ts`へ分ける（URLは変えない）。テストの読みこみ先も直す。
-- [ ] T016 [US2] 4つの知らせに置き換える（research.md R4-2〜5。同じ場所・同じ順番・同じ`tx`で`await`する）。
+- [ ] T016 [US2] 3つの知らせに置き換え、確かめ待ちの件数の入口を分ける（research.md R4-2〜5。同じ場所・同じ順番・同じ`tx`で`await`する）。
   - `accountDeleting`：`deleteAccount`の`withdrawForAccountDeletion`
   - `userWithdrawing`：`withdrawal-service.ts`の`purgeForWithdrawal`と`threads_deletion_requests`の更新
   - `limitsChanged`：`limit-service.ts`の`notifyWake`の2か所
-  - `accountSummaryExtras`：`routes/me.ts`の`countOwnedAccountNeedsReview`（応答の形は変えない）
+  - `GET /api/me/needs-review-counts`（Threads専用。`countOwnedAccountNeedsReview`）は、知らせにせず`routes/me.ts`から古い場所の新しいファイル`routes/needs-review-counts.ts`へ分ける（段階3でThreadsへ移す。URLと応答は変えない。`app.ts`での登録の位置も、今の`routes/me.ts`のすぐ後にする）
   - 受け取る側は、古い場所の新しいファイル`services/threads-hooks.ts`の`registerThreads()`で登録する（2回呼んでも二重に登録しない）。`app.ts`の初めと`index.ts`の定期処理の初めで1回呼ぶ。
   - **直接呼ぶテスト**：アカウントの削除・退会・上限の保存・`/api/me`の一覧づくりを、アプリ（`makeApp()`）を通さず直接呼ぶテストを洗い出す。あれば、テストの共通の準備（`test/global-setup.ts`ではなく、各テストのプロセスで読む`setupFiles`か、ヘルパー）で`registerThreads()`を呼び、結果が変わらないようにする。
 - [ ] T017 [US2] `readOperatorSettings`を`tester-application-service.ts`から共通の運営の処理（`services/operator-settings.ts`。段階2の後半で`platform/operator/`へ移す）へ移し、テスター招待のサービスはそこから読む（research.md R4-4）。
@@ -112,7 +112,7 @@ description: "Task list for feature 027 modular monolith"
 - [ ] T022 [US2] `apps/api/src/apps/threads/index.ts`を作る：APIの入口を作る関数と`registerThreads()`を出す。`app.ts`・`index.ts`・テストの準備は、この入口の`registerThreads()`を呼ぶ。
 - [ ] T023 [US2] Threadsの表の定義を`apps/api/src/apps/threads/schema.ts`へ分ける（data-model.md 1-2の25表）。`db/schema.ts`は共通とThreadsの`schema.ts`を読み直して出すだけにする（research.md R6）。Threadsのファイルは自分の`schema.ts`と共通の入口から表を読む。
 - [ ] T024 [US2] Threadsのファイルの、共通・窓口への読みこみを入口に直す（`../../platform`・`../../adapters/<名前>`）。`app.ts`・`index.ts`・`jobs/`は各モジュールの入口から読む。
-- [ ] T025 [US2] `pnpm lint`で`module-boundaries`の違反が0件になるまで直す。直せないものがあれば、理由を`docs/module-map.md`の「境界の例外」に書く（5件以下）。
+- [ ] T025 [US2] `eslint.config.js`で規則に`{ strictPlacement: true }`を渡し（組み立ての場所のほかに残ったファイルを知らせる）、`pnpm lint`で`module-boundaries`の違反が0件になるまで直す。直せないものがあれば、理由を`docs/module-map.md`の「境界の例外」に書く（5件以下）。
 - [ ] T026 [US2] 段階3の確かめ：型の確認・ESLint・すべてのテストが通ること。ここで1つコミットする。
 
 **Checkpoint**：違反0件で、境界が規則で守られている。
@@ -125,7 +125,7 @@ description: "Task list for feature 027 modular monolith"
 
 - [ ] T027 [US3] `pnpm -r typecheck`・`pnpm lint`・`pnpm test`がすべて通り、テストの数が基準（共有512件・Web 751件・API 1,266件＋足したテスト）以上であることを確かめる。
 - [ ] T028 [US3] `pnpm --filter api db:generate`で新しいマイグレーションができないこと（No schema changes）を確かめる。できたら、表の定義の移し間違いを直す。
-- [ ] T029 [US3] `test/repo/routes-snapshot.test.ts`が通る（APIの入口の一覧が`routes-before.txt`と同じ）ことを確かめる。
+- [ ] T029 [US3] `test/repo/routes-snapshot.test.ts`が通る（APIの入口の一覧が`routes.snapshot.txt`と同じ）ことを確かめる。
 - [ ] T030 [US3] `apps/api/scripts/dump-routes.ts`・`rotate-token-key.ts`など`scripts/`が、新しい場所で動くことを確かめる（`pnpm --filter api exec tsx scripts/dump-routes.ts`）。
 
 ## Phase 6：User Story 4 - 2作目をThreadsと並ぶモジュールとして足せる（P2）

@@ -55,11 +55,11 @@
 | 2 | `account-service`の`deleteAccount` | テスター招待の取り下げ（`withdrawForAccountDeletion`） | 共通に「アカウントを消す前の知らせ」を作り、Threadsが受け取る（同じトランザクションの中で呼ぶ） |
 | 3 | `withdrawal-service`（退会） | テスター招待の片づけ（`purgeForWithdrawal`）、Threadsのデータ削除の要求の表の更新 | 共通に「退会する前の知らせ」を作り、Threadsが受け取る（同じトランザクション） |
 | 4 | `limit-service`（上限） | 自動投稿を起こす（`notifyWake`）、運営の設定を読む（`readOperatorSettings`、テスター招待のサービスにある） | 起こすのは「上限が変わった知らせ」に替え、Threadsが受け取る。`readOperatorSettings`は運営の設定の表の持ち主である共通へ移す |
-| 5 | `/api/me`（`routes/me.ts`） | 確かめ待ちの件数（`account-review-counts`、投稿の案の表） | 共通に「アカウントの一覧に添える値を出すもの」を登録する口を作り、Threadsが件数を出す |
+| 5 | `/api/me/needs-review-counts`（`routes/me.ts`の中） | 確かめ待ちの件数（`account-review-counts`、投稿の案の表） | Threads専用の入口なので、知らせにせず**入口ごとThreadsへ移す**（URLと応答は変えない。セルフレビューの指摘） |
 
 - **知らせの作り**：共通の中に、知らせの名前ごとに受け取る関数を並べる小さな登録の仕組みを置く。登録は組み立て（`app.ts`の初めと`index.ts`の定期処理の初め）で、Threadsの入口の`registerThreads()`を1回呼んで行う。
 - **動きを変えないこと**：知らせは、今の呼び出しと同じ場所・同じ順番・同じトランザクション（`tx`を渡す）で、`await`して呼ぶ。登録されていなければ何もしない（テストで共通だけを使うとき）。
-- **確かめ方**：今ある結合テスト（テスター招待の取り下げ・退会の片づけ・上限を変えたら起こす・`/api/me`の件数）がそのまま通ること。
+- **確かめ方**：今ある結合テスト（テスター招待の取り下げ・退会の片づけ・上限を変えたら起こす・確かめ待ちの件数）がそのまま通ること。
 - **ほかの案**：
   - 共通からThreadsの入口を直接呼ぶ：依存の向きの違反が残る。不採用。
   - 非同期のイベント（キューやoutbox）にする：トランザクションの範囲が変わり、動きが変わる。今回は不採用（構想ノートの「必要時に`EventPublisher`とoutbox」は、その時に）。
@@ -83,7 +83,7 @@
 
 ## R7. APIの入口が変わらないことの確かめ方
 
-- **決定**：Honoの`app.routes`（メソッドとパスの一覧）を並べ替えの前に書き出して`specs/027-modular-monolith/routes-before.txt`に残し、並べ替えのあとの一覧と比べるテストを足す（`test/repo/routes-snapshot.test.ts`）。テストは、今後も入口の一覧が変わったら知らせる（変えたときは一覧を書き直す）。
+- **決定**：Honoの`app.routes`から、①「メソッド パス ×処理の数」を並べたもの（入口ごとの関所（認証・運営者だけ・契約の確かめ）の数も見る）と、②すべての入口にかかる関所（メソッドが`ALL`）の登録した順番、を書き出して`apps/api/test/repo/routes.snapshot.txt`に残し、比べるテストを足す（`test/repo/routes-snapshot.test.ts`）。テストは027のあとも残し、入口を足す・変えたら`pnpm --filter api routes:snapshot`で書き直す（セルフレビューの指摘で、件数と順番を見るようにし、置き場所をテストの横にした）。
 - **理由**：APIのURLとメソッドを変えないこと（FR-011・SC-004）を、人の目でなく機械で確かめる。
 
 ## R8. PRの分け方

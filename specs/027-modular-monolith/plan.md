@@ -10,7 +10,7 @@ APIのコード（`apps/api/src`）を、土台・窓口・共通・アプリ（
 
 - **モジュール地図**：42表の持ち主（共通17・Threads25）、処理とAPIの入口の行き先、`accounts`・`operator_settings`の例外の列を、`docs/module-map.md`にまとめる（[data-model.md](./data-model.md)が下書き）。
 - **境界のチェック**：このリポジトリの中だけのESLintの規則`module-boundaries`で、入口の外・共通 → アプリ・アプリ同士・窓口と土台 → 上の4つを止める（[contracts/module-boundaries.md](./contracts/module-boundaries.md)）。
-- **逆向きの依存の解消**：共通からThreadsを呼んでいる5か所のうち、接続の処理はThreadsへ移し、残りの4か所は共通の「知らせ」にする（同じ場所・同じトランザクションで呼ぶ。[research.md](./research.md) R4）。
+- **逆向きの依存の解消**：共通からThreadsを呼んでいる5か所のうち、接続の処理と確かめ待ちの件数の入口はThreadsへ移し、残りの3か所は共通の「知らせ」にする（同じ場所・同じトランザクションで呼ぶ。[research.md](./research.md) R4）。
 - **動きを変えない確かめ**：今のテストを中身を変えずに通す、`db:generate`で変更なし、APIの入口の一覧のテスト（R7）。
 
 ## 技術コンテキスト（Technical Context）
@@ -25,7 +25,7 @@ APIのコード（`apps/api/src`）を、土台・窓口・共通・アプリ（
 - 今あるテスト（共有512件・Web 751件・API 1,266件）を、読みこみ先だけ直してそのまま通す。
 - 足すテスト：
   - ESLintの規則のテスト（`RuleTester`）：4つの違反の型と、通る例。新しいアプリのフォルダーにも当たること
-  - 知らせのテスト：登録した順に呼ぶ・例外を返す・登録がなければ何もしない・結果を合わせる
+  - 知らせのテスト：登録した順に呼ぶ・例外を返す・登録がなければ何もしない
   - APIの入口の一覧のテスト（`test/repo/routes-snapshot.test.ts`）
 - **E2E**：足さない。
 
@@ -73,7 +73,6 @@ specs/027-modular-monolith/
 ├── quickstart.md        # Phase 1
 ├── contracts/
 │   └── module-boundaries.md   # Phase 1
-├── routes-before.txt    # PR1で作る（APIの入口の一覧の基準）
 ├── checklists/requirements.md
 └── tasks.md             # /speckit-tasks で作る
 ```

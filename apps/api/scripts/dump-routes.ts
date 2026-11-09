@@ -1,16 +1,32 @@
 // APIの入口（メソッドとパス）の一覧を書き出す（specs/027-modular-monolith research.md R7）。
-// 並べ替えの前後で一覧が変わらないことを確かめるために使う。使い方：pnpm --filter api exec tsx scripts/dump-routes.ts > 出力先
+// 一覧は test/repo/routes.snapshot.txt に置き、test/repo/routes-snapshot.test.ts で変わっていないことを確かめる。
+// 入口を足す・変えたら `pnpm --filter api routes:snapshot` で書き直す（どこから流しても同じファイルに書く）。
+import { writeFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { createApp } from "../src/app";
 
+/** 一覧を置くファイル。 */
+export const SNAPSHOT_PATH = join(dirname(fileURLToPath(import.meta.url)), "../test/repo/routes.snapshot.txt");
+
+type RouteTable = { routes: { method: string; path: string }[] };
+
 /**
- * Hono のアプリから、入口の一覧（「メソッド パス」の重複なし・並べたもの）を作る。
+ * Hono のアプリから、入口の一覧を作る。
+ * 前半は「メソッド パス ×件数」を並べたもの（入口ごとの関所（認証・運営者だけ・契約の確かめ）の数が変わると知らせる）。
+ * 後半は、すべての入口にかかる関所（メソッドが ALL のもの）の、登録した順番（先に登録したものから効くため）。
  * @param app - Hono のアプリ
- * @returns 1行に1つの入口
+ * @returns 1行に1つの項目
  */
-export function routeLines(app: { routes: { method: string; path: string }[] }): string[] {
-  return [...new Set(app.routes.map((r) => `${r.method} ${r.path}`))].sort();
+export function routeLines(app: RouteTable): string[] {
+  const counts = new Map<string, number>();
+  for (const r of app.routes) counts.set(`${r.method} ${r.path}`, (counts.get(`${r.method} ${r.path}`) ?? 0) + 1);
+  const routes = [...counts.entries()].map(([k, n]) => `${k} ×${n}`).sort();
+  const middlewareOrder = app.routes.filter((r) => r.method === "ALL").map((r, i) => `#${i + 1} ALL ${r.path}`);
+  return ["# 入口と、それぞれの処理（関所を含む）の数", ...routes, "# すべての入口にかかる関所の順番", ...middlewareOrder];
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
-  process.stdout.write(`${routeLines(createApp()).join("\n")}\n`);
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  writeFileSync(SNAPSHOT_PATH, `${routeLines(createApp()).join("\n")}\n`);
+  process.stdout.write(`${SNAPSHOT_PATH} を書き直しました\n`);
 }

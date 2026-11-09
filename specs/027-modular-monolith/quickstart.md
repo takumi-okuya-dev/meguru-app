@@ -7,7 +7,7 @@
 ## 0. 並べ替えの前の基準（PR1で残す）
 
 - テストの数：共有512件・Web 751件・API 1,266件（2026-11-10、develop）。
-- APIの入口の一覧：`specs/027-modular-monolith/routes-before.txt`。
+- APIの入口の一覧：`apps/api/test/repo/routes.snapshot.txt`（入口ごとの処理の数と、すべての入口にかかる関所の順番を含む）。
 
 ## 1. 自動の確かめ（PR2のあと）
 
@@ -17,7 +17,7 @@
 2. `pnpm --filter api db:generate`
    - 期待：新しいマイグレーションができない（「No schema changes」）。
 3. `test/repo/routes-snapshot.test.ts`
-   - 期待：APIの入口の一覧が`routes-before.txt`と同じ。
+   - 期待：APIの入口の一覧が`routes.snapshot.txt`と同じ。
 
 ## 2. 境界のチェックが効くこと（SC-003）
 

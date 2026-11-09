@@ -103,7 +103,6 @@
 | `accountDeleting` | `deleteAccount` | `withdrawForAccountDeletion` | 同じ`tx` |
 | `userWithdrawing` | `withdrawal-service` | `purgeForWithdrawal`と、データ削除の要求の表の更新 | 同じ`tx` |
 | `limitsChanged` | `limit-service`の保存のあと | `notifyWake` | なし（今と同じく保存のあと） |
-| `accountSummaryExtras` | `/api/me`の一覧づくり | 確かめ待ちの件数（`countOwnedAccountNeedsReview`） | なし（読むだけ） |
 
 ## 4. 境界の例外（並べ替えのあとに残るもの）
 
