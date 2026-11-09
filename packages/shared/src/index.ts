@@ -12,6 +12,7 @@ export * from "./ng-words";
 export * from "./performance";
 export * from "./permissions";
 export * from "./normalize";
+export * from "./operator-accounts";
 export * from "./policy";
 export * from "./promotion-event";
 export * from "./promotions";

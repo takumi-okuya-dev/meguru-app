@@ -2,6 +2,7 @@
 import { z } from "zod";
 import { ERROR_CODES } from "./errors";
 import { FEATURE_EVENT_ACTIONS, FEATURES } from "./features";
+import { OPERATOR_ACCOUNT_METHODS, OPERATOR_ACCOUNT_TESTER_STATES, OPERATOR_ACCOUNTS_QUERY_MAX } from "./operator-accounts";
 import {
   ACCOUNT_NAME_MAX,
   PRIORITY_MAX,
@@ -2315,3 +2316,39 @@ export const connectionNoticeSchema = z.object({
 });
 /** 違うアカウントでつながった知らせ。 */
 export type ConnectionNotice = z.infer<typeof connectionNoticeSchema>;
+
+// ---- 運営者のアカウント一覧（specs/026-operator-accounts contracts/api.md） ----
+
+/** GET /api/operator/accounts のクエリ。q は前後の空白を除き、空なら検索しない（research.md R3）。 */
+export const operatorAccountsQuerySchema = z
+  .object({
+    method: z.enum(OPERATOR_ACCOUNT_METHODS).default("all"),
+    q: z.string().trim().max(OPERATOR_ACCOUNTS_QUERY_MAX).optional(),
+    cursor: z.string().uuid().optional(),
+  })
+  .transform(({ q, ...rest }) => ({ ...rest, q: q || undefined }));
+/** GET /api/operator/accounts のクエリ。 */
+export type OperatorAccountsQuery = z.infer<typeof operatorAccountsQuerySchema>;
+
+/** 運営者のアカウント一覧の1行（data-model.md 2）。 */
+export const operatorAccountSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  username: z.string().nullable(),
+  method: z.enum(["app", "token", "none"]),
+  status: connectionStatusSchema,
+  owner: z.object({ name: z.string().nullable(), email: z.string(), accountCount: z.number().int() }).nullable(),
+  tester: z.enum(OPERATOR_ACCOUNT_TESTER_STATES).nullable(),
+  createdAt: z.string(),
+});
+/** 運営者のアカウント一覧の1行。 */
+export type OperatorAccount = z.infer<typeof operatorAccountSchema>;
+
+/** GET /api/operator/accounts の応答（件数は検索に左右されない。data-model.md 3）。 */
+export const operatorAccountsSchema = z.object({
+  counts: z.object({ all: z.number().int(), app: z.number().int(), token: z.number().int(), none: z.number().int() }),
+  items: z.array(operatorAccountSchema),
+  nextCursor: z.string().nullable(),
+});
+/** GET /api/operator/accounts の応答。 */
+export type OperatorAccounts = z.infer<typeof operatorAccountsSchema>;

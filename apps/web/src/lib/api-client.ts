@@ -16,6 +16,7 @@ import {
   operatorLimitsSchema,
   operatorTesterApplicationSchema,
   operatorTesterApplicationsSchema,
+  operatorAccountsSchema,
   testerApplicationResponseSchema,
   connectionNoticeSchema,
   testerApplicationSchema,
@@ -425,6 +426,13 @@ export const api = {
   connectionNotice: (accountId: string) => request(`/api/accounts/${accountId}/connection-notice`, connectionNoticeSchema),
   dismissConnectionNotice: (accountId: string) =>
     request(`/api/accounts/${accountId}/connection-notice/dismiss`, null, { method: "POST" }),
+  // 運営者のアカウント一覧（specs/026-operator-accounts contracts/api.md）
+  operatorAccounts: ({ method, q, cursor }: { method: string; q: string; cursor?: string }) => {
+    const params = new URLSearchParams({ method });
+    if (q) params.set("q", q);
+    if (cursor) params.set("cursor", cursor);
+    return request(`/api/operator/accounts?${params.toString()}`, operatorAccountsSchema);
+  },
   operatorTesterApplications: (view: string) =>
     request(`/api/operator/tester-applications?view=${encodeURIComponent(view)}`, operatorTesterApplicationsSchema),
   operateTesterApplication: (id: string, action: "invite" | "decline" | "revert" | "removed", body: { force?: boolean; reason?: string } = {}) =>
