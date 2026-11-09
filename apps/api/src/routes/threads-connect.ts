@@ -13,7 +13,7 @@ import { connectMethodsOf } from "../kernel/config";
 import { AppError } from "../kernel/errors";
 import { logger } from "../kernel/logger";
 import { createThreadsClient, ThreadsApiError, ThreadsAuthError } from "../adapters/threads-api";
-import { completeConnection, requestFromState } from "../services/account-service";
+import { completeConnection, requestFromState } from "../services/connection-service";
 import { consumeState, startConnect } from "../services/threads-oauth";
 import { connectWithToken } from "../services/token-connect";
 import { refreshUsernameOnlyMatch } from "../services/username-match";

@@ -29,8 +29,8 @@ import {
 import { and, asc, desc, eq, inArray } from "drizzle-orm";
 import type { Db } from "../kernel/db/client";
 import { draftBatches, postDrafts, postMetrics, promotions, referencePosts } from "../db/schema";
-import { effectiveSlotMinutes } from "./limit-service";
-import type { AccountRow } from "./access";
+import { effectiveSlotMinutes } from "../platform";
+import type { AccountRow } from "../platform";
 import { listReviewedRows } from "./draft-service";
 import { trendsForAccountPrompt } from "./analysis-service";
 import { poorForPrompt } from "./performance-service";

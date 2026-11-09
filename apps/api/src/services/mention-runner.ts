@@ -24,8 +24,8 @@ import {
   ThreadsTransientError,
   type ThreadsClient,
 } from "../adapters/threads-api";
-import { loadOwnerEntitlement } from "./billing-service";
-import { ownerAutopostOn } from "./feature-sql";
+import { loadOwnerEntitlement } from "../platform";
+import { ownerAutopostOn } from "../platform";
 import { listNgWords } from "./posting-rules-service";
 import { loadThreadsCredentials, markNeedsReconnect } from "./threads-credentials";
 

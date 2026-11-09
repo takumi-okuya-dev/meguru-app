@@ -1,8 +1,8 @@
 // 投稿の設定（specs/005-auto-post research.md R1、contracts/api.md「GET・PUT /posting-schedule」）。
 // 自動投稿は全プランで使えるので、grower機能は判定しない（FR-004）。
-import { effectiveSlotMinutes } from "./limit-service";
-import type { AccountAccess } from "./access";
-import { recordActivity, updatedByOf, withActivityTx } from "./activity-log";
+import { effectiveSlotMinutes } from "../platform";
+import type { AccountAccess } from "../platform";
+import { recordActivity, updatedByOf, withActivityTx } from "../platform";
 import {
   DAILY_POST_LIMIT_MAX,
   minutesToTime,
@@ -19,7 +19,7 @@ import type { Env } from "../kernel/env";
 import { AppError, notFound, pgErrorCode } from "../kernel/errors";
 import { logger } from "../kernel/logger";
 import type { ThreadsClient } from "../adapters/threads-api";
-import type { AccountRow } from "./access";
+import type { AccountRow } from "../platform";
 import { checkThreadsPublish } from "./threads-check-service";
 
 /** posting_schedules の行。 */

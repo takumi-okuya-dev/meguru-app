@@ -6,10 +6,10 @@ import { lockAccountDrafts } from "../kernel/db/locks";
 import { accounts, ngWords, postDrafts } from "../db/schema";
 import type { Env } from "../kernel/env";
 import { AppError, itemNotFound, notFound, pgErrorCode } from "../kernel/errors";
-import type { AccountRow } from "./access";
+import type { AccountRow } from "../platform";
 import { CLEAR_QUEUE_FIELDS } from "./draft-service";
-import type { AccountAccess } from "./access";
-import { recordActivity, updatedByOf } from "./activity-log";
+import type { AccountAccess } from "../platform";
+import { recordActivity, updatedByOf } from "../platform";
 
 type NgWordRow = typeof ngWords.$inferSelect;
 

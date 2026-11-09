@@ -12,8 +12,8 @@ import { accounts, memberships, threadsDeletionRequests, users } from "../db/sch
 import { sha256Hex, threadsUserHmac, toHex } from "../kernel/identifier-hash";
 import { logger } from "../kernel/logger";
 import { verifySignedRequest } from "../adapters/threads-api";
-import { markQuantityDirty } from "./billing-service";
-import { beforeAccountDeleted } from "./team-service";
+import { markQuantityDirty } from "../platform";
+import { beforeAccountDeleted } from "../platform";
 import { withdrawForAccountDeletion } from "./tester-application-service";
 
 const LEASE_MS = 15 * 60_000;

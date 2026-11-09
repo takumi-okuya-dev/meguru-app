@@ -23,8 +23,8 @@ import {
 } from "../db/schema";
 import type { Env } from "../kernel/env";
 import { billingModeOf } from "../kernel/config";
-import { loadOwnerEntitlement } from "./billing-service";
-import { ownerAutopostOn } from "./feature-sql";
+import { loadOwnerEntitlement } from "../platform";
+import { ownerAutopostOn } from "../platform";
 import { logger } from "../kernel/logger";
 import {
   ThreadsApiError,

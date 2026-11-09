@@ -2,7 +2,7 @@
 // 招待リンクは本物と同じ形（ハッシュと暗号化した写し）で作るので、作ったチームでも招待のAPIを呼べる。
 import { neon } from "@neondatabase/serverless";
 import { createDb } from "../../src/kernel/db/client";
-import { newInviteToken, sealInviteToken } from "../../src/services/invite-service";
+import { newInviteToken, sealInviteToken } from "../../src/platform/teams/invite-service";
 import { createUserWithAccount, testEnv } from "./app";
 
 function sql() {

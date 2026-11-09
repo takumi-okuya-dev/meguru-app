@@ -5,7 +5,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { subscriptions, users } from "../../src/db/schema";
 import { readGate } from "../../src/services/auto-post-gate";
 import { runAutoPost } from "../../src/services/auto-post-runner";
-import { fullAccessSql, reconcileSubscriptions, syncCustomer } from "../../src/services/billing-service";
+import { fullAccessSql, reconcileSubscriptions, syncCustomer } from "../../src/platform/billing/billing-service";
 import { call, createUserWithAccount, db, fake, fakeClerk, insertSubscription, makeApp, resetDb, setBillingExempt, testEnv } from "../helpers/app";
 import { addMin, connectedAccount, jst, publishedDrafts, setSchedule, db as sqlDb } from "../helpers/auto-post";
 import { billingEnv, callBilling, fakeStripe } from "../helpers/billing";
@@ -241,7 +241,7 @@ describe("P1（3回目）：退会を受け付けた後は、Checkoutを作ら�
   it("退会の途中の利用者の「契約する」は 409 WITHDRAWAL_IN_PROGRESS で、セッションを作らない", async () => {
     const { userId } = await createUserWithAccount("u1");
     await db().update(users).set({ withdrawalRequestedAt: new Date() }).where(eq(users.id, userId));
-    const { startCheckout } = await import("../../src/services/billing-service");
+    const { startCheckout } = await import("../../src/platform/billing/billing-service");
     const err = await startCheckout(billingEnv(), { id: userId, email: "u1@example.com", billing: { enabled: true } }).catch((e: unknown) => e);
     expect(err).toMatchObject({ code: "WITHDRAWAL_IN_PROGRESS", status: 409 });
     expect(await fakeStripe.sessions()).toHaveLength(0);

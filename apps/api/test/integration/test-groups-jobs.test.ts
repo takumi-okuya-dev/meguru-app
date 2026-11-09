@@ -3,7 +3,7 @@ import { and, eq } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
 import { subscriptions, users } from "../../src/db/schema";
 import { runAutoPost } from "../../src/services/auto-post-runner";
-import { entitlementFromFacts, fullAccessSql, loadOwnerEntitlement } from "../../src/services/billing-service";
+import { entitlementFromFacts, fullAccessSql, loadOwnerEntitlement } from "../../src/platform/billing/billing-service";
 import { createUserWithAccount, db, fake, insertSubscription, makeApp, resetDb } from "../helpers/app";
 import { addMin, approvedDrafts, attempts, connectedAccount, db as sqlDb, draftRow, jst, setSchedule } from "../helpers/auto-post";
 import { OPERATOR, createGroup, groupsEnv, join } from "../helpers/test-groups";

@@ -4,6 +4,7 @@ import { runAutoPost } from "./services/auto-post-runner";
 import { validateConfig } from "./kernel/config";
 import { logger, setLogAppEnv } from "./kernel/logger";
 import { runDailyJobs } from "./services/daily-jobs";
+import { registerThreads } from "./services/threads-hooks";
 
 const app = createApp();
 
@@ -13,6 +14,8 @@ const AUTO_POST_CRON = "*/5 * * * *";
 export default {
   fetch: app.fetch,
   async scheduled(controller: ScheduledController, env: Env, ctx: ExecutionContext) {
+    // アプリの知らせの受け取りを登録する（specs/027。何度呼んでも1回だけ）
+    registerThreads();
     setLogAppEnv(env.APP_ENV);
     // 設定の関所は fetch 側のミドルウェアにしか無かったので、Cron はここで同じ検査をする。
     // 置き石や取り違えた鍵のまま、実際のThreadsアカウントへ投稿しないため（FR-063、

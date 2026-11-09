@@ -16,9 +16,9 @@ import { lockAccountDrafts } from "../kernel/db/locks";
 import { accounts, postDrafts, postingSchedules, publishAttempts } from "../db/schema";
 import type { Env } from "../kernel/env";
 import { billingModeOf, type BillingMode } from "../kernel/config";
-import { effectiveSlotMinutes, ownerDailyPostLimit } from "./limit-service";
-import { loadOwnerEntitlement } from "./billing-service";
-import { ownerAutopostOn } from "./feature-sql";
+import { effectiveSlotMinutes, ownerDailyPostLimit } from "../platform";
+import { loadOwnerEntitlement } from "../platform";
+import { ownerAutopostOn } from "../platform";
 import { CLEAR_QUEUE_FIELDS, listQueueRows } from "./draft-service";
 import { listNgWords } from "./posting-rules-service";
 

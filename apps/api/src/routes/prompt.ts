@@ -11,9 +11,9 @@ import type { AppEnv } from "../app";
 import { createDb } from "../kernel/db/client";
 import { accounts } from "../db/schema";
 import { AppError, notFound } from "../kernel/errors";
-import { effectiveLimits } from "../services/limit-service";
-import { authorizeAccount } from "../services/access";
-import { recordActivity, updatedByOf, withActivityTx } from "../services/activity-log";
+import { effectiveLimits } from "../platform";
+import { authorizeAccount } from "../platform";
+import { recordActivity, updatedByOf, withActivityTx } from "../platform";
 import { getPrompt, lengthSettingsOf } from "../services/prompt-service";
 
 /**

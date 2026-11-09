@@ -10,8 +10,8 @@ import type { AppEnv } from "../app";
 import { createDb } from "../kernel/db/client";
 import { createThreadsClient } from "../adapters/threads-api";
 import { parseBody } from "../kernel/validate";
-import { authorizeAccount } from "../services/access";
-import { effectiveLimits } from "../services/limit-service";
+import { authorizeAccount } from "../platform";
+import { effectiveLimits } from "../platform";
 import {
   notifyWake,
   readPostingSchedule,

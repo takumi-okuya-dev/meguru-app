@@ -4,7 +4,7 @@
 import { neonConfig } from "@neondatabase/serverless";
 import ws from "ws";
 import { createDb } from "../src/kernel/db/client";
-import { setBillingExemptByEmail } from "../src/services/billing-service";
+import { setBillingExemptByEmail } from "../src/platform/billing/billing-service";
 
 neonConfig.webSocketConstructor = ws;
 

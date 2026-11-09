@@ -1,7 +1,7 @@
 // 退会（specs/013-billing FR-050〜FR-056、SC-007、research.md R10、T047）。決済ON・偽のStripe・偽のClerk。
 import { emptyStrategyValues } from "@threads-grower/shared";
 import { beforeEach, describe, expect, it } from "vitest";
-import { resumeWithdrawals } from "../../src/services/withdrawal-service";
+import { resumeWithdrawals } from "../../src/platform/withdrawal/withdrawal-service";
 import { call, createUserWithAccount, fake, fakeClerk, makeApp, resetDb } from "../helpers/app";
 import { connectedAccount, db } from "../helpers/auto-post";
 import { billingEnv, callBilling, fakeStripe } from "../helpers/billing";

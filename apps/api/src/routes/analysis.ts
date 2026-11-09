@@ -10,7 +10,7 @@ import { Hono, type MiddlewareHandler } from "hono";
 import type { AppEnv } from "../app";
 import { createDb, withTransaction } from "../kernel/db/client";
 import { parseBody, parseQuery } from "../kernel/validate";
-import { authorizeAccount } from "../services/access";
+import { authorizeAccount } from "../platform";
 import {
   getAnalysis,
   listClassificationTargets,

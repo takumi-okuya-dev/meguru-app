@@ -22,8 +22,8 @@ import {
   toPostDraft,
 } from "./draft-service";
 import { listNgWords } from "./posting-rules-service";
-import type { AccountAccess } from "./access";
-import { recordActivity } from "./activity-log";
+import type { AccountAccess } from "../platform";
+import { recordActivity } from "../platform";
 import { pendingMentionTexts } from "./mention-service";
 import { loadMentions } from "./mention-view";
 import { notifyWake } from "./posting-schedule-service";

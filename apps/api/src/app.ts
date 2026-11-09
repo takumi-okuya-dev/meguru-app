@@ -11,22 +11,24 @@ import {
   optionalAuthMiddleware,
   clerkVerifier,
   type AuthVerifier,
-  type AuthVariables,
-} from "./middleware/auth";
-import { accountRoutes } from "./routes/accounts";
-import { billingRoutes } from "./routes/billing";
-import { stripeWebhookRoutes } from "./routes/stripe-webhook";
-import { accountTeamRoutes } from "./routes/account-team";
-import { inviteRoutes } from "./routes/invites";
-import { operatorFeatureRoutes } from "./routes/operator-features";
-import { operatorTestGroupRoutes } from "./routes/operator-test-groups";
-import { testInviteRoutes } from "./routes/test-invites";
-import { referralRoutes } from "./routes/referrals";
-import { teamsRoutes } from "./routes/teams";
-import { activityRoutes } from "./routes/activity";
+  type AppEnv,
+} from "./platform";
+import { accountRoutes } from "./platform";
+import { billingRoutes } from "./platform";
+import { stripeWebhookRoutes } from "./platform";
+import { accountTeamRoutes } from "./platform";
+import { inviteRoutes } from "./platform";
+import { operatorFeatureRoutes } from "./platform";
+import { operatorTestGroupRoutes } from "./platform";
+import { testInviteRoutes } from "./platform";
+import { referralRoutes } from "./platform";
+import { teamsRoutes } from "./platform";
+import { activityRoutes } from "./platform";
 import { dataDeletionRoutes } from "./routes/data-deletion";
 import { threadsWebhookRoutes } from "./routes/threads-webhooks";
-import { meRoutes } from "./routes/me";
+import { meRoutes } from "./platform";
+import { needsReviewCountRoutes } from "./routes/needs-review-counts";
+import { registerThreads } from "./services/threads-hooks";
 import { performanceRoutes } from "./routes/performance";
 import { postDraftRoutes } from "./routes/post-drafts";
 import { autoPostRoutes } from "./routes/auto-post";
@@ -44,8 +46,8 @@ import { threadsConnectRoutes } from "./routes/threads-connect";
 import { testerApplicationRoutes } from "./routes/tester-applications";
 import { operatorAccountRoutes } from "./routes/operator-accounts";
 import { operatorTesterInviteRoutes } from "./routes/operator-tester-invites";
-import { operatorLimitRoutes } from "./routes/operator-limits";
-import { clerkUserDeleter, type ClerkUserDeleter } from "./services/withdrawal-service";
+import { operatorLimitRoutes } from "./platform";
+import { clerkUserDeleter, type ClerkUserDeleter } from "./platform";
 
 /** アプリに差し込む依存。テストでは偽の認証を渡す。 */
 export type AppDeps = {
@@ -54,14 +56,15 @@ export type AppDeps = {
   deleteClerkUser?: (env: Env) => ClerkUserDeleter;
 };
 
+/** Hono のアプリの型引数（定義は共通の認証。027）。 */
+export type { AppEnv };
+
 /** 本番の依存。認証は Clerk で検証する。 */
 export const defaultDeps: AppDeps = {
   verifyAuth: (env) => clerkVerifier(env),
   deleteClerkUser: (env) => clerkUserDeleter(env),
 };
 
-/** Hono のアプリの型引数。バインディングと、認証済みのユーザー。 */
-export type AppEnv = { Bindings: Env; Variables: AuthVariables };
 
 /**
  * API の Hono アプリを組み立てる。CORS・設定の確認・エラーの形・各ルートをまとめる。
@@ -69,6 +72,8 @@ export type AppEnv = { Bindings: Env; Variables: AuthVariables };
  * @returns /api 以下のルートを持つアプリ
  */
 export function createApp(deps: AppDeps = defaultDeps) {
+  // アプリの知らせの受け取りを登録する（specs/027。何度呼んでも1回だけ）
+  registerThreads();
   const app = new Hono<AppEnv>();
 
   app.use("/api/*", async (c, next) => {
@@ -175,6 +180,7 @@ export function createApp(deps: AppDeps = defaultDeps) {
       return c.json(c.env.APP_ENV === "development" ? { ok: false, configErrors } : { ok: false });
     })
     .route("/", meRoutes(authed, deps.deleteClerkUser ?? ((env) => clerkUserDeleter(env))))
+    .route("/", needsReviewCountRoutes(authed))
     .route("/", accountRoutes(authed))
     .route("/", accountTeamRoutes(authed))
     .route("/", inviteRoutes(authed, maybeAuthed))

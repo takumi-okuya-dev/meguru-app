@@ -38,8 +38,8 @@ import {
 } from "../db/schema";
 import type { Env } from "../kernel/env";
 import { billingModeOf, type BillingMode } from "../kernel/config";
-import { entitlementFromFacts, fullAccessSql } from "./billing-service";
-import { featureOnSql } from "./feature-sql";
+import { entitlementFromFacts, fullAccessSql } from "../platform";
+import { featureOnSql } from "../platform";
 import { createTokenCipher } from "../kernel/crypto";
 import { logger } from "../kernel/logger";
 import {
@@ -51,7 +51,7 @@ import {
   type ThreadsMediaInsights,
 } from "../adapters/threads-api";
 import { markNeedsReconnect } from "./threads-credentials";
-import { billingExemptSql } from "./test-group-service";
+import { billingExemptSql } from "../platform";
 
 /** 反応数の段階の結果。 */
 export type MetricsStageResult = {

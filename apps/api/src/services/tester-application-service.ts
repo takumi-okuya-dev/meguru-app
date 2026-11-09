@@ -19,8 +19,9 @@ import { lockUserRow } from "../kernel/db/locks";
 import { accounts, operatorSettings, testerApplications, users } from "../db/schema";
 import { billingModeOf, testerInvitesEnabledOf, threadsAppIdOf } from "../kernel/config";
 import { AppError, pgErrorCode } from "../kernel/errors";
-import { authorizeAccount, isUuid } from "./access";
-import { countRecentApplyActions, recordOperatorEvent } from "./operator-events";
+import { authorizeAccount, isUuid } from "../platform";
+import { countRecentApplyActions, recordOperatorEvent } from "../platform";
+import { readOperatorSettings } from "../platform";
 
 type Row = typeof testerApplications.$inferSelect;
 
@@ -331,18 +332,6 @@ function viewOf(view: TesterApplicationView): { where: SQL | undefined; order: S
         order: [changed],
       };
   }
-}
-
-/**
- * 運営者が決める値（1行だけ）。
- * @param db - データベース（トランザクションの中でもよい）
- * @returns 行
- */
-export async function readOperatorSettings(db: Db | TxDb) {
-  const [row] = await db.select().from(operatorSettings).where(eq(operatorSettings.id, 1)).limit(1);
-  if (row) return row;
-  const [created] = await db.insert(operatorSettings).values({ id: 1 }).onConflictDoNothing().returning();
-  return created ?? (await db.select().from(operatorSettings).where(eq(operatorSettings.id, 1)).limit(1))[0]!;
 }
 
 /**

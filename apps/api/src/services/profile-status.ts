@@ -4,8 +4,8 @@ import { jstToday, trialDaysLeft } from "@threads-grower/shared";
 import { sql } from "drizzle-orm";
 import type { Db } from "../kernel/db/client";
 import type { BillingMode } from "../kernel/config";
-import type { AccountAccess } from "./access";
-import { loadEntitlement } from "./billing-service";
+import type { AccountAccess } from "../platform";
+import { loadEntitlement } from "../platform";
 import { getStrategy } from "./strategy-service";
 
 /**

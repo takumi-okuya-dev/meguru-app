@@ -90,21 +90,21 @@ description: "Task list for feature 027 modular monolith"
 
 ### 段階2：逆向きの依存の解消と共通（コミット2）
 
-- [ ] T012 [P] [US2] `apps/api/test/unit/platform-hooks.test.ts`を作る（contracts/module-boundaries.md 3）。先に書いて失敗を確かめる：登録した順に`await`する・例外は呼んだ側に返る・登録がなければ何もしない・`resetHooks()`で消せる（テスト用）。
-- [ ] T013 [US2] `apps/api/src/platform/hooks.ts`を作る（T012を通す）。知らせの名前は`accountDeleting`・`userWithdrawing`・`limitsChanged`（data-model.md 3）で、それぞれの受け取る値の型を決める。
-- [ ] T014 [US2] 共通の表の定義を分ける：`apps/api/src/platform/schema.ts`に共通の17表（data-model.md 1-1）と、列挙型・`timestamps`などの共通の定義を移す。`db/schema.ts`は、当面`platform/schema.ts`を読み直して出し、残りの表をそのまま持つ。
-- [ ] T015 [US2] 接続の処理を切り出す（research.md R4-1）：`services/account-service.ts`の`ConnectionRequest`・`requestFromState`・`completeConnection`・`verifyConnection`とその内部の関数（`openAccount`は最後に開いたアカウントの記録なので共通に残す）を、古い場所の新しいファイル`services/connection-service.ts`へ移す（中身は変えない。段階3でThreadsへ移す）。`routes/accounts.ts`の接続の確かめの入口も、`routes/account-connection.ts`へ分ける（URLは変えない）。テストの読みこみ先も直す。
-- [ ] T016 [US2] 3つの知らせに置き換え、確かめ待ちの件数の入口を分ける（research.md R4-2〜5。同じ場所・同じ順番・同じ`tx`で`await`する）。
+- [X] T012 [P] [US2] `apps/api/test/unit/platform-hooks.test.ts`を作る（contracts/module-boundaries.md 3）。先に書いて失敗を確かめる：登録した順に`await`する・例外は呼んだ側に返る・登録がなければ何もしない・`resetHooks()`で消せる（テスト用）。
+- [X] T013 [US2] `apps/api/src/platform/hooks.ts`を作る（T012を通す）。知らせの名前は`accountDeleting`・`userWithdrawing`・`limitsChanged`（data-model.md 3）で、それぞれの受け取る値の型を決める。
+- [X] T014 [US2] 共通の表の定義を分ける：`apps/api/src/platform/schema.ts`に共通の17表（data-model.md 1-1）と、列挙型・`timestamps`などの共通の定義を移す。`db/schema.ts`は、当面`platform/schema.ts`を読み直して出し、残りの表をそのまま持つ。
+- [X] T015 [US2] 接続の処理を切り出す（research.md R4-1）：`services/account-service.ts`の`ConnectionRequest`・`requestFromState`・`completeConnection`・`verifyConnection`とその内部の関数（`openAccount`は最後に開いたアカウントの記録なので共通に残す）を、古い場所の新しいファイル`services/connection-service.ts`へ移す（中身は変えない。段階3でThreadsへ移す）。`routes/accounts.ts`の接続の確かめの入口も、`routes/account-connection.ts`へ分ける（URLは変えない）。テストの読みこみ先も直す。
+- [X] T016 [US2] 3つの知らせに置き換え、確かめ待ちの件数の入口を分ける（research.md R4-2〜5。同じ場所・同じ順番・同じ`tx`で`await`する）。
   - `accountDeleting`：`deleteAccount`の`withdrawForAccountDeletion`
   - `userWithdrawing`：`withdrawal-service.ts`の`purgeForWithdrawal`と`threads_deletion_requests`の更新
   - `limitsChanged`：`limit-service.ts`の`notifyWake`の2か所
   - `GET /api/me/needs-review-counts`（Threads専用。`countOwnedAccountNeedsReview`）は、知らせにせず`routes/me.ts`から古い場所の新しいファイル`routes/needs-review-counts.ts`へ分ける（段階3でThreadsへ移す。URLと応答は変えない。`app.ts`での登録の位置も、今の`routes/me.ts`のすぐ後にする）
   - 受け取る側は、古い場所の新しいファイル`services/threads-hooks.ts`の`registerThreads()`で登録する（2回呼んでも二重に登録しない）。`app.ts`の初めと`index.ts`の定期処理の初めで1回呼ぶ。
   - **直接呼ぶテスト**：アカウントの削除・退会・上限の保存・`/api/me`の一覧づくりを、アプリ（`makeApp()`）を通さず直接呼ぶテストを洗い出す。あれば、テストの共通の準備（`test/global-setup.ts`ではなく、各テストのプロセスで読む`setupFiles`か、ヘルパー）で`registerThreads()`を呼び、結果が変わらないようにする。
-- [ ] T017 [US2] `readOperatorSettings`を`tester-application-service.ts`から共通の運営の処理（`services/operator-settings.ts`。段階2の後半で`platform/operator/`へ移す）へ移し、テスター招待のサービスはそこから読む（research.md R4-4）。
-- [ ] T018 [US2] 共通へ移す（data-model.md 2-3）：`middleware/auth.ts`・`operator-only.ts`、`services/access.ts`・`account-service.ts`・`team-service.ts`・`team-status.ts`・`invite-service.ts`・`billing-service.ts`・`feature-service.ts`・`feature-sql.ts`・`test-group-service.ts`・`limit-service.ts`・`operator-events.ts`・`operator-settings.ts`・`referral-service.ts`・`activity-log.ts`・`withdrawal-service.ts`と、対応する`routes/*.ts`を`platform/<小分け>/`へ。共通のファイルは`db/schema`ではなく`platform/schema.ts`から表を読む。Honoの型`AppEnv`（`app.ts`）と`AuthVariables`（`middleware/auth.ts`）は共通（`platform/http.ts`）に置き、`app.ts`はそれを読み直して使う（docs/module-map.md 5）。
-- [ ] T019 [US2] `apps/api/src/platform/index.ts`を作る：アプリと組み立てが使っているもの（権限の確かめ・活動の記録・契約の状態・機能のON/OFF・上限・運営の設定・表の定義・知らせの登録・APIの入口を作る関数など）を出す。古い場所のThreadsのファイルからの読みこみは、まだ中身を直接指していてよい（古い場所は組み立てとみなされるので、規則に当たらない）。
-- [ ] T020 [US2] 段階2の確かめ：型の確認・ESLint（`module-boundaries`を含む。共通からThreadsへの読みこみが0件）・APIのテストが通ること。ここで1つコミットする。
+- [X] T017 [US2] `readOperatorSettings`を`tester-application-service.ts`から共通の運営の処理（`services/operator-settings.ts`。段階2の後半で`platform/operator/`へ移す）へ移し、テスター招待のサービスはそこから読む（research.md R4-4）。
+- [X] T018 [US2] 共通へ移す（data-model.md 2-3）：`middleware/auth.ts`・`operator-only.ts`、`services/access.ts`・`account-service.ts`・`team-service.ts`・`team-status.ts`・`invite-service.ts`・`billing-service.ts`・`feature-service.ts`・`feature-sql.ts`・`test-group-service.ts`・`limit-service.ts`・`operator-events.ts`・`operator-settings.ts`・`referral-service.ts`・`activity-log.ts`・`withdrawal-service.ts`と、対応する`routes/*.ts`を`platform/<小分け>/`へ。共通のファイルは`db/schema`ではなく`platform/schema.ts`から表を読む。Honoの型`AppEnv`（`app.ts`）と`AuthVariables`（`middleware/auth.ts`）は共通（`platform/http.ts`）に置き、`app.ts`はそれを読み直して使う（docs/module-map.md 5）。
+- [X] T019 [US2] `apps/api/src/platform/index.ts`を作る：アプリと組み立てが使っているもの（権限の確かめ・活動の記録・契約の状態・機能のON/OFF・上限・運営の設定・表の定義・知らせの登録・APIの入口を作る関数など）を出す。古い場所のThreadsのファイルからの読みこみは、まだ中身を直接指していてよい（古い場所は組み立てとみなされるので、規則に当たらない）。
+- [X] T020 [US2] 段階2の確かめ：型の確認・ESLint（`module-boundaries`を含む。共通からThreadsへの読みこみが0件）・APIのテストが通ること。ここで1つコミットする。
 
 ### 段階3：Threads（コミット3）
 

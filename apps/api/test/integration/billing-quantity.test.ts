@@ -2,7 +2,7 @@
 import { eq } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
 import { subscriptions } from "../../src/db/schema";
-import { reconcileSubscriptions } from "../../src/services/billing-service";
+import { reconcileSubscriptions } from "../../src/platform/billing/billing-service";
 import { createUserWithAccount, db, makeApp, resetDb, testEnv } from "../helpers/app";
 import { billingEnv, callBilling, fakeStripe } from "../helpers/billing";
 

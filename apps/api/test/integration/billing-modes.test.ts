@@ -2,7 +2,7 @@
 import { neon } from "@neondatabase/serverless";
 import { beforeEach, describe, expect, it } from "vitest";
 import { subscriptions } from "../../src/db/schema";
-import { setBillingExemptByEmail } from "../../src/services/billing-service";
+import { setBillingExemptByEmail } from "../../src/platform/billing/billing-service";
 import { call, createUserWithAccount, db, endTrial, insertSubscription, makeApp, resetDb, testEnv } from "../helpers/app";
 import { callBilling } from "../helpers/billing";
 

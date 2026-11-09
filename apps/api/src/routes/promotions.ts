@@ -16,8 +16,8 @@ import { createDb, type Db, type TxDb } from "../kernel/db/client";
 import { accounts, promotions } from "../db/schema";
 import { AppError, notFound } from "../kernel/errors";
 import { parseBody } from "../kernel/validate";
-import { authorizeAccount } from "../services/access";
-import { recordActivity, updatedByOf, withActivityTx } from "../services/activity-log";
+import { authorizeAccount } from "../platform";
+import { recordActivity, updatedByOf, withActivityTx } from "../platform";
 import { touchMaterials } from "../services/materials";
 import { assertItemId, insertWithLimit, updateWithVersion } from "../services/item-service";
 

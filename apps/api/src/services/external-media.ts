@@ -15,8 +15,8 @@ import { and, eq, sql } from "drizzle-orm";
 import type { Db, TxDb } from "../kernel/db/client";
 import { mediaDefaults, promotionListings, promotions } from "../db/schema";
 import { AppError, itemNotFound } from "../kernel/errors";
-import type { AccountAccess } from "./access";
-import { recordActivity, updatedByOf } from "./activity-log";
+import type { AccountAccess } from "../platform";
+import { recordActivity, updatedByOf } from "../platform";
 
 /** promotions の行。 */
 export type PromotionRow = typeof promotions.$inferSelect;

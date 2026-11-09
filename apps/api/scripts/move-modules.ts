@@ -91,6 +91,8 @@ export function moveModules(moves: Move[], opts: { dryRun?: boolean } = {}): num
   for (const [file, out] of outputs) writeFileSync(file, out);
   for (const [from, to] of moved) {
     execFileSync("mkdir", ["-p", dirname(to)]);
+    // まだ git に入っていない（新しく作った）ファイルも git mv できるように、先に add する
+    execFileSync("git", ["add", from], { cwd: API_ROOT });
     execFileSync("git", ["mv", from, to], { cwd: API_ROOT });
   }
   return changed;

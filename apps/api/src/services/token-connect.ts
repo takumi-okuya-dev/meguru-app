@@ -28,8 +28,8 @@ import {
   type ThreadsProfile,
   type TokenDebugInfo,
 } from "../adapters/threads-api";
-import { authorizeAccount, type RequestUser } from "./access";
-import { completeConnection } from "./account-service";
+import { authorizeAccount, type RequestUser } from "../platform";
+import { completeConnection } from "./connection-service";
 import { notifyWake } from "./posting-schedule-service";
 import { refreshUsernameOnlyMatch } from "./username-match";
 

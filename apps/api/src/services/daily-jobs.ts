@@ -10,9 +10,10 @@ import { cleanupDeletionIdentifiers, retryDeletions } from "./data-deletion";
 import { cleanupRevocations } from "./revocation";
 import { refreshExpiringTokens } from "./token-refresh";
 import { purgeTokenCheckFailures } from "./token-connect";
-import { purgeOldActivity } from "./activity-log";
-import { reconcileSubscriptions } from "./billing-service";
-import { clerkUserDeleter, resumeWithdrawals } from "./withdrawal-service";
+import { purgeOldActivity } from "../platform";
+import { reconcileSubscriptions } from "../platform";
+import { clerkUserDeleter, resumeWithdrawals } from "../platform";
+import { registerThreads } from "./threads-hooks";
 
 /**
  * 日次の定期処理をまとめて行う（contracts/api.md「定期処理」）。1つの処理の失敗で全体を止めない。
@@ -20,6 +21,8 @@ import { clerkUserDeleter, resumeWithdrawals } from "./withdrawal-service";
  * @param now - 基準にする時刻（回の実際の開始時刻）
  */
 export async function runDailyJobs(env: Env, now: Date = new Date()) {
+  // 退会のやり直しなどで共通の処理が知らせを出すので、受け取りを登録しておく（specs/027。何度呼んでも1回だけ）
+  registerThreads();
   const steps: [string, () => Promise<unknown>][] = [
     ["token refresh", () => refreshExpiringTokens(env, createThreadsClient(env), now)],
     [

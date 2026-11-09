@@ -4,7 +4,7 @@ import { and, eq } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
 import { subscriptions, users } from "../../src/db/schema";
 import { billingModeOf } from "../../src/kernel/config";
-import { fullAccessSql, loadEntitlement } from "../../src/services/billing-service";
+import { fullAccessSql, loadEntitlement } from "../../src/platform/billing/billing-service";
 import { call, createUserWithAccount, db, makeApp, resetDb } from "../helpers/app";
 import { billingEnv } from "../helpers/billing";
 import { OPERATOR, groupsEnv } from "../helpers/test-groups";

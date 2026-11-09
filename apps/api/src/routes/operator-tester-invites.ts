@@ -11,7 +11,7 @@ import type { AppEnv } from "../app";
 import { createDb } from "../kernel/db/client";
 import { AppError } from "../kernel/errors";
 import { parseBody } from "../kernel/validate";
-import { operatorOnly } from "../middleware/operator-only";
+import { operatorOnly } from "../platform";
 import {
   decline,
   invite,

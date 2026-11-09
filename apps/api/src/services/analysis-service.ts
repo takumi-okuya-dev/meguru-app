@@ -21,8 +21,8 @@ import { alias } from "drizzle-orm/pg-core";
 import type { Db, TxDb } from "../kernel/db/client";
 import { analysisSettings, postClassifications, postDrafts, postMentions, postMetricSnapshots, postMetrics, promotions } from "../db/schema";
 import { AppError } from "../kernel/errors";
-import type { AccountAccess, AccountRow } from "./access";
-import { recordActivity } from "./activity-log";
+import type { AccountAccess, AccountRow } from "../platform";
+import { recordActivity } from "../platform";
 import { readPostingSchedule, toPostingSchedule } from "./posting-schedule-service";
 
 const DAY_MS = 86_400_000;

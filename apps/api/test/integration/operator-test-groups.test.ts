@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { neon } from "@neondatabase/serverless";
 import { call, makeApp, resetDb, testEnv } from "../helpers/app";
 import { OPERATOR, callOn, createGroup, join, userRow } from "../helpers/test-groups";
-import { setBillingExemptByEmail } from "../../src/services/billing-service";
+import { setBillingExemptByEmail } from "../../src/platform/billing/billing-service";
 import { db } from "../helpers/app";
 
 const app = makeApp();

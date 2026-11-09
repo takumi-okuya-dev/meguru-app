@@ -1,11 +1,11 @@
 // 機能のまとまりの判定（specs/019-feature-switches research.md R1、contracts/api.md「守るAPI」、FR-005・FR-011・FR-012）。
 // OFFの判定は authorizeAccount の中だけに置き、見るのはAccountのオーナーの設定。
 import { beforeEach, describe, expect, it } from "vitest";
-import { authorizeAccount } from "../../src/services/access";
+import { authorizeAccount } from "../../src/platform/access/access";
 import { createUserWithAccount, db, endTrial, resetDb } from "../helpers/app";
 import { closeGroupRow, disableFeatures, disableGroupFeatures, makeGroup } from "../helpers/features";
 import { assign, joinTeam, makeTeam, setRole } from "../helpers/team";
-import { authorizeTeamMember } from "../../src/services/access";
+import { authorizeTeamMember } from "../../src/platform/access/access";
 
 async function errorOf(p: Promise<unknown>) {
   try {
