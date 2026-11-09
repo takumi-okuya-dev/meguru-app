@@ -12,7 +12,7 @@
     "build": "pnpm -r build",
     "test": "pnpm -r --filter '!e2e' test",
     "typecheck": "pnpm -r typecheck",
-    "lint": "eslint .",
+    "lint": "node --test \"eslint-rules/*.test.js\" && eslint .",
     "e2e": "pnpm --filter e2e test",
     "team:open": "pnpm --filter e2e exec tsx scripts/team-open.ts",
     "team:demo": "docker compose up -d --wait && concurrently -k -s first -n servers,team -c gray,cyan \"pnpm dev:fake\" \"pnpm team:open --setup --wait\""
