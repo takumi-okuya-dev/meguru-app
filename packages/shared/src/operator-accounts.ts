@@ -40,3 +40,9 @@ export const OPERATOR_ACCOUNT_TESTER_LABELS: Record<OperatorAccountTesterState, 
 export const OPERATOR_ACCOUNTS_PAGE_SIZE = 50;
 /** 検索語の文字数の上限（research.md R3）。 */
 export const OPERATOR_ACCOUNTS_QUERY_MAX = 100;
+/**
+ * 続きの印の形：そのページの最後のアカウントの作った日時（UTC、マイクロ秒まで）と ID を「_」でつないだもの
+ * （例：2026-11-09T01:02:03.123456Z_<uuid>）。アカウントが消えても位置が変わらない（research.md R2、PR #74 のCodexレビュー）。
+ */
+export const OPERATOR_ACCOUNTS_CURSOR_RE =
+  /^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{6}Z)_([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/;

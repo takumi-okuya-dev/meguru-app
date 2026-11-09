@@ -27,12 +27,15 @@ describe("operatorAccountsQuerySchema", () => {
     expect(operatorAccountsQuerySchema.parse({ q: "   " })).toEqual({ method: "all" });
   });
 
-  it("合わない method・101文字の q・uuid でない cursor は通さない", () => {
+  it("合わない method・101文字の q・形の違う cursor は通さない", () => {
     expect(operatorAccountsQuerySchema.safeParse({ method: "other" }).success).toBe(false);
     expect(operatorAccountsQuerySchema.safeParse({ q: "a".repeat(101) }).success).toBe(false);
     expect(operatorAccountsQuerySchema.safeParse({ q: "a".repeat(100) }).success).toBe(true);
     expect(operatorAccountsQuerySchema.safeParse({ cursor: "x" }).success).toBe(false);
-    expect(operatorAccountsQuerySchema.safeParse({ cursor: "3f2b8c1e-8a3b-4c1d-9e2f-1a2b3c4d5e6f" }).success).toBe(true);
+    expect(operatorAccountsQuerySchema.safeParse({ cursor: "3f2b8c1e-8a3b-4c1d-9e2f-1a2b3c4d5e6f" }).success).toBe(false);
+    expect(
+      operatorAccountsQuerySchema.safeParse({ cursor: "2026-11-09T01:02:03.123456Z_3f2b8c1e-8a3b-4c1d-9e2f-1a2b3c4d5e6f" }).success,
+    ).toBe(true);
   });
 });
 

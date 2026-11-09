@@ -132,19 +132,32 @@ describe("GET /api/operator/accounts：行（US1）", () => {
     expect((await list()).items[0]!.owner).toMatchObject({ name: null, email: "u9@example.com" });
   });
 
-  it("作った日の新しい順に50件ずつ。nextCursor で続きを読み、消えたアカウントの cursor なら先頭から", async () => {
+  it("作った日の新しい順に50件ずつ。nextCursor で続きを読み、印のアカウントが消えても位置は変わらない（PR #74 のCodexレビュー）", async () => {
     const ids: string[] = [];
-    for (let i = 0; i < 51; i++) ids.push(await accountOf("u1", { createdAt: new Date(Date.UTC(2026, 9, 1, 0, i)) }));
+    for (let i = 0; i < 52; i++) ids.push(await accountOf("u1", { createdAt: new Date(Date.UTC(2026, 9, 1, 0, i)) }));
     const first = await list();
     expect(first.items).toHaveLength(50);
-    expect(first.items[0]!.id).toBe(ids[50]);
-    expect(first.nextCursor).toBe(ids[1]);
-    const second = await list(`?cursor=${first.nextCursor}`);
-    expect(second.items.map((i) => i.id)).toEqual([ids[0]]);
+    expect(first.items[0]!.id).toBe(ids[51]);
+    expect(first.nextCursor).toMatch(new RegExp(`_${ids[2]}$`));
+    // 境目のアカウントが消えても、続きは残りの2件だけ（先頭から返し直さない）
+    await q()`DELETE FROM accounts WHERE id = ${ids[2]!}`;
+    const second = await list(`?cursor=${encodeURIComponent(first.nextCursor!)}`);
+    expect(second.items.map((i) => i.id)).toEqual([ids[1], ids[0]]);
     expect(second.nextCursor).toBeNull();
-    await q()`DELETE FROM accounts WHERE id = ${ids[1]!}`;
-    const restarted = await list(`?cursor=${ids[1]}`);
-    expect(restarted.items[0]!.id).toBe(ids[50]);
+  });
+
+  it("作った日時がマイクロ秒だけ違っても、続きで行を落とさない", async () => {
+    await q()`
+      INSERT INTO accounts (name, connection_status, connection_method, created_at, updated_at)
+      VALUES ('a', 'not_connected', NULL, '2026-10-01 00:00:00.000001+00', now()), ('b', 'not_connected', NULL, '2026-10-01 00:00:00.000002+00', now())`;
+    // 印の日時と同じ b は ID で比べ、1マイクロ秒前の a も落とさない
+    const cursor = "2026-10-01T00:00:00.000002Z_ffffffff-ffff-4fff-bfff-ffffffffffff";
+    const res = await list(`?cursor=${encodeURIComponent(cursor)}`);
+    expect(res.items.map((i) => i.name)).toEqual(["b", "a"]);
+  });
+
+  it("cursor の形が違えば 400", async () => {
+    expect((await get("?cursor=3f2b8c1e-8a3b-4c1d-9e2f-1a2b3c4d5e6f")).status).toBe(400);
   });
 
   it("運営者でなければ 403 OPERATOR_ONLY。応答は no-store", async () => {

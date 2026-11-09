@@ -15,10 +15,10 @@
 |---|---|---|---|
 | `method` | `all` \| `app` \| `token` \| `none` | `all` | 接続方法の絞り込み |
 | `q` | string（前後の空白を除いて0〜100文字） | なし | 検索語（research.md R3）。空なら検索しない |
-| `cursor` | uuid | なし | 続きの印（前のページの`nextCursor`。research.md R2） |
+| `cursor` | string（`YYYY-MM-DDTHH:MM:SS.ffffffZ_<uuid>`） | なし | 続きの印（前のページの`nextCursor`をそのまま渡す。research.md R2） |
 
 - 値が合わなければ`400 VALIDATION_FAILED`（`details`に項目の名前）。
-- `cursor`のアカウントがもうなければ、先頭から返す。
+- `cursor`のアカウントが消えていても、その位置の続きを返す。
 
 **応答 200**（`operatorAccountsSchema`）
 

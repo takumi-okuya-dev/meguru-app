@@ -2,6 +2,7 @@
 // すべてのアカウントを、接続方法・接続の状態・オーナー・テスター招待の状態とともに読むだけ（書き込まない。FR-005）。
 // アカウントの中身（投稿・戦略・結果）は読まない（FR-006）。
 import {
+  OPERATOR_ACCOUNTS_CURSOR_RE,
   OPERATOR_ACCOUNTS_PAGE_SIZE,
   type OperatorAccount,
   type OperatorAccounts,
@@ -29,6 +30,7 @@ type Row = {
   method: OperatorAccount["method"];
   status: OperatorAccount["status"];
   created_at: string | Date;
+  cursor: string;
   owner_name: string | null;
   owner_email: string | null;
   owner_count: number | null;
@@ -48,15 +50,15 @@ export async function listOperatorAccounts(db: Db, query: OperatorAccountsQuery)
     const p = likePattern(query.q);
     where.push(sql`(a.name ILIKE ${p} OR a.username ILIKE ${p} OR u.display_name ILIKE ${p} OR u.email ILIKE ${p})`);
   }
-  // 続きの印のアカウントの位置より前（消えていれば条件にしない＝先頭から。research.md R2）
-  if (query.cursor) {
-    where.push(sql`NOT EXISTS (SELECT 1 FROM accounts c WHERE c.id = ${query.cursor} AND (a.created_at, a.id) >= (c.created_at, c.id))`);
-  }
+  // 続きの印（作った日時とID）より前。印のアカウントが消えていても、位置は変わらない（research.md R2、PR #74 のCodexレビュー）
+  const cursor = query.cursor ? OPERATOR_ACCOUNTS_CURSOR_RE.exec(query.cursor) : null;
+  if (cursor) where.push(sql`(a.created_at, a.id) < (${cursor[1]}::timestamptz, ${cursor[2]}::uuid)`);
   const filter = where.length ? sql`WHERE ${sql.join(where, sql` AND `)}` : sql``;
 
   const [rows, counts] = await Promise.all([
     db.execute<Row>(sql`
       SELECT a.id, a.name, a.username, ${METHOD} AS method, a.connection_status::text AS status, a.created_at,
+             to_char(a.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') || '_' || a.id::text AS cursor,
              u.display_name AS owner_name, u.email AS owner_email,
              (SELECT count(*)::int FROM memberships om WHERE om.user_id = m.user_id AND om.role = 'owner') AS owner_count,
              (SELECT CASE
@@ -98,6 +100,6 @@ export async function listOperatorAccounts(db: Db, query: OperatorAccountsQuery)
       tester: r.tester,
       createdAt: new Date(r.created_at).toISOString(),
     })),
-    nextCursor: rows.rows.length > OPERATOR_ACCOUNTS_PAGE_SIZE ? page[page.length - 1]!.id : null,
+    nextCursor: rows.rows.length > OPERATOR_ACCOUNTS_PAGE_SIZE ? page[page.length - 1]!.cursor : null,
   };
 }

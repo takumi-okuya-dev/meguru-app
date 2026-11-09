@@ -28,7 +28,7 @@ description: "Task list for feature 026 operator accounts"
   - `OPERATOR_ACCOUNT_TESTER_STATES = ["pending", "invited", "connected", "removable"]`と`OPERATOR_ACCOUNT_TESTER_LABELS`（申し込み中・招待済み・接続済み・外してよい）
   - `OPERATOR_ACCOUNTS_PAGE_SIZE = 50`、`OPERATOR_ACCOUNTS_QUERY_MAX = 100`
 - [X] T002 `packages/shared/src/schemas.ts`に足す（contracts/api.md）。テストは`packages/shared/test/operator-accounts.test.ts`。
-  - `operatorAccountsQuerySchema`：`method`（既定`all`）、`q`（前後の空白を除いて0〜100文字、空は無し扱い）、`cursor`（uuid、任意）
+  - `operatorAccountsQuerySchema`：`method`（既定`all`）、`q`（前後の空白を除いて0〜100文字、空は無し扱い）、`cursor`（`OPERATOR_ACCOUNTS_CURSOR_RE`の形、任意）
   - `operatorAccountSchema`：`id`・`name`・`username`（nullable）・`method`（`app`・`token`・`none`）・`status`・`owner`（`{ name: string | null; email: string; accountCount: number }`、nullable）・`tester`（nullable）・`createdAt`
   - `operatorAccountsSchema`：`counts`（`all`・`app`・`token`・`none`）・`items`・`nextCursor`（nullable）
 
@@ -48,7 +48,7 @@ description: "Task list for feature 026 operator accounts"
   - 「Threadsで許可する」（接続済みの申し込みあり）・トークンで要再接続（申し込みなし）・つなぐ前（申し込み中）の3件で、各行の`method`・`status`・`username`（つなぐ前はnull）・`owner`・`tester`が合う
   - 枠を使ったまま残った行（`holds_slot = true`・`removal_reason`あり）だけのアカウントは`tester = "removable"`、見送り・取り下げだけなら`null`
   - オーナーが2件持つとき、どちらの行も`owner.accountCount = 2`（つなぐ前を含む。絞り込み・検索で変わらない）
-  - 作った日の新しい順。51件で`nextCursor`が出て、それで残り1件が読める。消えたアカウントの`cursor`なら先頭から
+  - 作った日の新しい順。51件以上で`nextCursor`が出て、それで残りが読める。印のアカウントが消えても位置は変わらない（PR #74 のCodexレビュー）
   - 運営者でなければ`403 OPERATOR_ONLY`、応答は`Cache-Control: no-store`
   - 書き込みのメソッド（POST・PUT・PATCH・DELETE）は`404`
   - 行の項目は契約の8つだけ（投稿・戦略などの中身を返さない。FR-006）
@@ -62,7 +62,7 @@ description: "Task list for feature 026 operator accounts"
 ### Implementation
 
 - [X] T005 [US1] `apps/api/src/services/operator-account-service.ts`を作る（research.md R2・R4〜R6、T003を通す）。
-  - `listOperatorAccounts(db, { method, q, cursor })`：行（R5の`method`、R6のオーナーと`accountCount`、R4の`tester`）、50件、`(created_at, id)`の新しい順、`cursor`のアカウントの位置より前
+  - `listOperatorAccounts(db, { method, q, cursor })`：行（R5の`method`、R6のオーナーと`accountCount`、R4の`tester`）、50件、`(created_at, id)`の新しい順、`cursor`の日時とIDより前
   - 件数（`counts`）は検索なしの全体で数える
 - [X] T006 [US1] `apps/api/src/routes/operator-accounts.ts`を作り、`apps/api/src/app.ts`につなぐ（`authed`・`operatorOnly`、クエリが合わなければ`400 VALIDATION_FAILED`）。
 - [X] T007 [US1] Webの一覧を作る（T004を通す）。

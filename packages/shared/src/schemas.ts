@@ -2,7 +2,12 @@
 import { z } from "zod";
 import { ERROR_CODES } from "./errors";
 import { FEATURE_EVENT_ACTIONS, FEATURES } from "./features";
-import { OPERATOR_ACCOUNT_METHODS, OPERATOR_ACCOUNT_TESTER_STATES, OPERATOR_ACCOUNTS_QUERY_MAX } from "./operator-accounts";
+import {
+  OPERATOR_ACCOUNT_METHODS,
+  OPERATOR_ACCOUNT_TESTER_STATES,
+  OPERATOR_ACCOUNTS_CURSOR_RE,
+  OPERATOR_ACCOUNTS_QUERY_MAX,
+} from "./operator-accounts";
 import {
   ACCOUNT_NAME_MAX,
   PRIORITY_MAX,
@@ -2324,7 +2329,7 @@ export const operatorAccountsQuerySchema = z
   .object({
     method: z.enum(OPERATOR_ACCOUNT_METHODS).default("all"),
     q: z.string().trim().max(OPERATOR_ACCOUNTS_QUERY_MAX).optional(),
-    cursor: z.string().uuid().optional(),
+    cursor: z.string().regex(OPERATOR_ACCOUNTS_CURSOR_RE).optional(),
   })
   .transform(({ q, ...rest }) => ({ ...rest, q: q || undefined }));
 /** GET /api/operator/accounts のクエリ。 */
