@@ -1,4 +1,4 @@
-// 外部媒体展開の一覧（/accounts/:accountId/external-media。specs/021-external-media contracts/ui-routes.md 2、
+// 外部媒体展開の一覧（/threads/accounts/:accountId/external-media。specs/021-external-media contracts/ui-routes.md 2、
 // モック https://claude.ai/artifact/78VBSVeE19t3EqqvjckMRZ ）。イベントを選び、5つの媒体の状況を見て、入力の画面へ移る。
 // 使いながらシンプルにしていく（spec Clarifications）。
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -26,6 +26,7 @@ import { queryKeys } from "@/lib/query";
 import { saveErrorMessage } from "@/lib/save-error";
 import { cn } from "@/lib/utils";
 import { useCurrentAccount } from "@/apps/threads/pages/account-layout";
+import { accountPath } from "@/apps/threads/lib/paths";
 
 /** 状況の印の色（今ある色だけ）。 */
 const STATUS_STYLE: Record<ListingStatus, string> = {
@@ -208,7 +209,7 @@ export function ExternalMediaPage() {
           <div className="space-y-2 rounded-2xl border px-4 py-4 text-sm">
             <p>宣伝内容に、イベントの情報を入れると使えます。</p>
             <Button asChild variant="outline" className="rounded-full">
-              <Link to={`/threads/accounts/${account.id}/promotions`}>宣伝内容を開く</Link>
+              <Link to={accountPath(account.id, "promotions")}>宣伝内容を開く</Link>
             </Button>
           </div>
         ) : (
@@ -252,7 +253,7 @@ export function ExternalMediaPage() {
                       </span>
                       <ListingStatusBadge status={status} />
                       <Button asChild variant="outline" className="h-10 rounded-full md:h-9">
-                        <Link to={`/threads/accounts/${account.id}/external-media/${current!.id}/${m}`}>
+                        <Link to={`${accountPath(account.id)}/external-media/${current!.id}/${m}`}>
                           {l ? "開く" : "掲載内容を作る"}
                         </Link>
                       </Button>

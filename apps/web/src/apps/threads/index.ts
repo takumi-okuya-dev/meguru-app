@@ -4,19 +4,20 @@ import { ListIcon, MailPlusIcon } from "lucide-react";
 import type { AppModule } from "@/shell";
 import { OperatorAccountsPage } from "./pages/settings/operator-accounts";
 import { TesterInvitesPage } from "./pages/settings/tester-invites";
+import { THREADS_BASE } from "./lib/paths";
 import { threadsPublicRoutes, threadsReadingRoutes, threadsRoutes } from "./routes";
 
 /** Threadsのアプリ。 */
 export const threadsApp: AppModule = {
   id: "threads",
-  basePath: "/threads",
+  basePath: THREADS_BASE,
   routes: threadsRoutes,
   publicRoutes: threadsPublicRoutes,
   readingRoutes: threadsReadingRoutes,
   // 前のURL（/accounts/…・/teams/…）は /threads の下へ移す（specs/028 contracts/ui-routes.md 2）
   legacyRedirects: [
-    { from: "/accounts", to: "/threads/accounts" },
-    { from: "/teams", to: "/threads/teams" },
+    { from: "/accounts", to: `${THREADS_BASE}/accounts` },
+    { from: "/teams", to: `${THREADS_BASE}/teams` },
   ],
   settingsSections: [
     // テスター招待（specs/024 contracts/ui-routes.md 5）。運営の「グループ」の後

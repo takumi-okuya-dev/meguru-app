@@ -1,4 +1,4 @@
-// 運用状況（/teams/:teamId/status。specs/020-team-monitoring contracts/ui-routes.md 2、モック https://claude.ai/artifact/ESSqiqhGna9qZ56YFBUKg1 ）。
+// 運用状況（/threads/teams/:teamId/status。specs/020-team-monitoring contracts/ui-routes.md 2、モック https://claude.ai/artifact/ESSqiqhGna9qZ56YFBUKg1 ）。
 // 管理者はチームのすべて、編集者は担当のアカウントとそのオーナーだけ（範囲はAPIが決める。画面は出すだけで、数えない・判定しない）。
 // スマートフォンは行を縦に積み、パソコンは列にそろえる（横にスクロールさせない。FR-032）。
 import { useQuery } from "@tanstack/react-query";
@@ -16,6 +16,7 @@ import { ApiError, api } from "@/lib/api-client";
 import { formatDaysAgoJst } from "@/lib/format";
 import { queryKeys } from "@/lib/query";
 import { NotFound } from "@/shell";
+import { teamPath } from "@/apps/threads/lib/paths";
 
 const ROLE_NAMES = { admin: "管理者", member: "メンバー", editor: "編集者" } as const;
 
@@ -116,7 +117,7 @@ export function TeamStatusPage() {
       className="size-10 md:size-9"
       aria-label="チームの画面に戻る"
     >
-      <Link to={`/threads/teams/${teamId}`}>
+      <Link to={teamPath(teamId)}>
         <ArrowLeftIcon className="size-5" />
       </Link>
     </Button>

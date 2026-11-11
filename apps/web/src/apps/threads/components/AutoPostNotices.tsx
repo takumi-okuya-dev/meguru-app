@@ -8,6 +8,7 @@ import { useAccountAccess } from "@/apps/threads/lib/use-account-access";
 import { NotConnectedNotice } from "@/apps/threads/components/NotConnectedNotice";
 import { ReconnectButton } from "@/apps/threads/components/ReconnectButton";
 import { Button } from "@/components/ui/button";
+import { accountPath } from "@/apps/threads/lib/paths";
 
 /**
  * ホームと投稿ストックに出す自動投稿の知らせ。手伝う人には、権限のない操作を出さない
@@ -64,7 +65,7 @@ export function AutoPostNotices({ accountId, hideNotConnected = false }: { accou
               </p>
               <div className="flex gap-2">
                 <Button asChild variant="outline" size="sm">
-                  <Link to={`/threads/accounts/${accountId}/stock`}>確認する</Link>
+                  <Link to={accountPath(accountId, "stock")}>確認する</Link>
                 </Button>
                 {can("review") && (
                   <Button
@@ -129,7 +130,7 @@ export function AutoPostNotices({ accountId, hideNotConnected = false }: { accou
                 {notice.count}件の投稿に失敗しました（{PUBLISH_ERROR_LABELS[notice.latestError]}）
               </p>
               <Button asChild variant="outline" size="sm">
-                <Link to={`/threads/accounts/${accountId}/stock?tab=approved#publish-failed`}>
+                <Link to={accountPath(accountId, "stock?tab=approved#publish-failed")}>
                   確認する
                 </Link>
               </Button>

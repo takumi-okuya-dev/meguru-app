@@ -4,6 +4,7 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { WithEntryApp } from "./helpers/entry-app";
 
 let signedIn = false;
 vi.mock("@clerk/react", () => ({
@@ -33,7 +34,9 @@ function renderAt(code = CODE) {
   );
   render(
     <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
-      <RouterProvider router={router} />
+      <WithEntryApp>
+        <RouterProvider router={router} />
+      </WithEntryApp>
     </QueryClientProvider>,
   );
   return router;

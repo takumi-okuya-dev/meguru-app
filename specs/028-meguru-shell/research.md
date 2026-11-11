@@ -119,7 +119,7 @@
 
 ## R11. APIが作るWebのURL
 
-- **決定**：次の3か所を新しいURLにする（spec FR-004）。
+- **決定**：次の3か所を新しいURLにする（spec FR-004）。**PR3 で行う**：デプロイは API を Web より先に出すので、PR2 で変えると、Web が出るまでのあいだ古い Web の知らないURLへ送ってしまう。PR2 のあいだは、前のURLの転送が受ける（2026-11-12 のセルフレビュー）。
   - 設定の不備で接続を始められないとき：`/accounts/new?error=CONFIG_ERROR` → `/threads/accounts/new?error=CONFIG_ERROR`（`app.ts`）
   - 接続の完了・失敗の行き先：`/?error=…` → `/threads?error=…`、`/accounts/<番号>/settings…` → `/threads/accounts/<番号>/settings…`（`threads-connect-routes.ts`）
   - 決済から戻るURL（`/settings/billing…`）・データ削除の確認のURL・招待のURLは変えない。

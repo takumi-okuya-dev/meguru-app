@@ -69,20 +69,20 @@ describe("Threads から戻ってきたとき", () => {
   it("完了が断られたら、振り分けへ戻して理由を出す", async () => {
     vi.spyOn(api, "completeConnect").mockRejectedValue(new Error("nope"));
     renderAt("?state=s1&code=c1");
-    await waitFor(() => expect(navigate).toHaveBeenCalledWith("/?error=OAUTH_STATE_INVALID", { replace: true }));
+    await waitFor(() => expect(navigate).toHaveBeenCalledWith("/threads?error=OAUTH_STATE_INVALID", { replace: true }));
   });
 
   it("利用者が許可しなかったときは、POSTせずに理由を出す", async () => {
     const complete = vi.spyOn(api, "completeConnect");
     renderAt("?error=THREADS_AUTH_CANCELLED");
-    await waitFor(() => expect(navigate).toHaveBeenCalledWith("/?error=THREADS_AUTH_CANCELLED", { replace: true }));
+    await waitFor(() => expect(navigate).toHaveBeenCalledWith("/threads?error=THREADS_AUTH_CANCELLED", { replace: true }));
     expect(complete).not.toHaveBeenCalled();
   });
 
   it("state か code が無ければ、POSTせずに理由を出す", async () => {
     const complete = vi.spyOn(api, "completeConnect");
     renderAt("?state=s1");
-    await waitFor(() => expect(navigate).toHaveBeenCalledWith("/?error=THREADS_AUTH_FAILED", { replace: true }));
+    await waitFor(() => expect(navigate).toHaveBeenCalledWith("/threads?error=THREADS_AUTH_FAILED", { replace: true }));
     expect(complete).not.toHaveBeenCalled();
   });
 
@@ -90,7 +90,7 @@ describe("Threads から戻ってきたとき", () => {
     // サーバーは相対パスしか返さないが、万一にも外部へ飛ばさない
     vi.spyOn(api, "completeConnect").mockResolvedValue({ redirectTo: "//evil.example.com" } as never);
     renderAt("?state=s1&code=c1");
-    await waitFor(() => expect(navigate).toHaveBeenCalledWith("/", { replace: true }));
+    await waitFor(() => expect(navigate).toHaveBeenCalledWith("/threads", { replace: true }));
   });
 
   it("二重に送らない", async () => {

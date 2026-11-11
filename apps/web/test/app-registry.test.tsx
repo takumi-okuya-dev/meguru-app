@@ -35,9 +35,7 @@ const PUBLIC = [
   "/invite/:token",
   "/test-invite/:token",
   "/r/:code",
-  "/accounts",
   "/accounts/*",
-  "/teams",
   "/teams/*",
   "*",
 ];

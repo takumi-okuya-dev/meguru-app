@@ -3,13 +3,14 @@ import { CircleDashedIcon } from "lucide-react";
 import { Link } from "react-router";
 import { Button } from "@/components/ui/button";
 import { useAccountAccess } from "@/apps/threads/lib/use-account-access";
+import { accountPath } from "@/apps/threads/lib/paths";
 
 /**
  * 「Threadsとの接続」の区分へのパス。
  * @param accountId - アカウント
  * @returns パス
  */
-export const connectPath = (accountId: string) => `/threads/accounts/${accountId}/settings#threads`;
+export const connectPath = (accountId: string) => accountPath(accountId, "settings#threads");
 
 /**
  * 「Threadsにつなぐと使えます」の案内。オーナーには「Threadsとの接続」への入口を添える（つなぐのはオーナーだけ。FR-015）。

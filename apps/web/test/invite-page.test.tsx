@@ -189,6 +189,12 @@ describe("招待の確認", () => {
 });
 
 describe("ログインの戻り先（safeNext）", () => {
+  it("登録したアプリのホーム（紹介リンクから）はそのまま戻す。知らないパスは / にする（specs/028）", () => {
+    expect(safeNext("/threads", ["/threads"])).toBe("/threads");
+    expect(safeNext("/threads", [])).toBe("/");
+    expect(safeNext("/threads/accounts/a1", ["/threads"])).toBe("/");
+  });
+
   it("チームの招待リンク（t_）とグループの招待リンク（g_）だけを許し、ほかは / にする", () => {
     expect(safeNext(`/invite/${TOKEN}`)).toBe(`/invite/${TOKEN}`);
     const group = `/test-invite/g_${"a".repeat(43)}`;

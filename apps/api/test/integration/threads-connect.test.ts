@@ -110,7 +110,7 @@ describe("GET /api/threads/callback（mode = connect）", () => {
     expect(callbackRes!.status).toBe(302);
     const target = redirectTarget(callbackRes!);
     expect(target.origin).toBe(TEST_WEB_ORIGIN);
-    expect(target.pathname).toBe(`/threads/accounts/${accountId}/settings`);
+    expect(target.pathname).toBe(`/accounts/${accountId}/settings`);
     expect(target.searchParams.get("connected")).toBe("connect");
 
     const all = await db().select().from(accounts);
@@ -135,7 +135,7 @@ describe("GET /api/threads/callback（mode = connect）", () => {
   it("Threads側で拒否されたら THREADS_AUTH_CANCELLED で設定の画面へ戻り、未接続のまま（Edge Cases）", async () => {
     const { accountId, callbackRes } = await connectNew(app, "u1", "1001", "deny");
     const target = redirectTarget(callbackRes!);
-    expect(target.pathname).toBe(`/threads/accounts/${accountId}/settings`);
+    expect(target.pathname).toBe(`/accounts/${accountId}/settings`);
     expect(target.searchParams.get("error")).toBe("THREADS_AUTH_CANCELLED");
     const [account] = await db().select().from(accounts);
     expect(account!.connectionStatus).toBe("not_connected");
@@ -183,18 +183,18 @@ describe("GET /api/threads/callback（mode = connect）", () => {
       .values({ stateHash: await sha256Hex(state), userId: u!.id, mode: "new", targetAccountId: null, expiresAt: new Date(now + 600_000), createdAt: new Date(now) });
     const res = await call(app, "POST", "/api/threads/complete", { user: "u1", body: { state, code: "abc" } });
     const { redirectTo } = (await res.json()) as { redirectTo: string };
-    expect(redirectTo).toBe("/threads?error=OAUTH_STATE_INVALID");
+    expect(redirectTo).toBe("/?error=OAUTH_STATE_INVALID");
     expect(await db().select().from(accounts)).toHaveLength(0);
   });
 
-  it("許可の画面にいる間に対象のアカウントを消したら、/threads?error=ACCOUNT_NOT_FOUND で、何も作らない（U1）", async () => {
+  it("許可の画面にいる間に対象のアカウントを消したら、/?error=ACCOUNT_NOT_FOUND で、何も作らない（U1）", async () => {
     const { accountId } = await createAccountVia(app, "u1", "消すアカウント");
     const res = await call(app, "POST", "/api/threads/connect", { user: "u1", body: { mode: "connect", accountId } });
     const { authorizeUrl } = (await res.json()) as { authorizeUrl: string };
     await call(app, "DELETE", `/api/accounts/${accountId}`, { user: "u1", body: { confirmName: "消すアカウント" } });
     const cb = await authorizeAndCallback(app, authorizeUrl, { fakeUser: "1001" });
     const target = redirectTarget(cb);
-    expect(target.pathname).toBe("/threads");
+    expect(target.pathname).toBe("/");
     expect(target.searchParams.get("error")).toBe("ACCOUNT_NOT_FOUND");
     expect(await db().select().from(accounts)).toHaveLength(0);
     expect(await db().select().from(threadsConnections)).toHaveLength(0);

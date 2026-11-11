@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Link } from "react-router";
 import { Button } from "@/components/ui/button";
 import { readPreference, writePreference } from "@/apps/threads/lib/preferences";
+import { accountPath } from "@/apps/threads/lib/paths";
 
 const COLLAPSED_KEY = "threads-grower:create-steps-collapsed";
 
@@ -14,7 +15,7 @@ const COLLAPSED_KEY = "threads-grower:create-steps-collapsed";
  */
 export function CreateSteps({ accountId, strategy = true }: { accountId: string; strategy?: boolean }) {
   const [collapsed, setCollapsed] = useState(() => readPreference(COLLAPSED_KEY, false));
-  const base = `/threads/accounts/${accountId}`;
+  const base = accountPath(accountId);
   const toggle = () => {
     writePreference(COLLAPSED_KEY, !collapsed);
     setCollapsed(!collapsed);

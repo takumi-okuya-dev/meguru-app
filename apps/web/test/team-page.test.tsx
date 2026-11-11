@@ -100,7 +100,7 @@ function renderPage() {
       { path: "/threads/teams/:teamId/status", element: <p>運用状況の画面</p> },
       { path: "/threads/teams/:teamId/accounts/:accountId", element: <p>見せてもらっているアカウント</p> },
       { path: "/threads/accounts/:accountId", element: <p>Accountの画面</p> },
-      { path: "/", element: <p>最初の画面</p> },
+      { path: "/threads", element: <p>最初の画面</p> },
     ],
     { initialEntries: ["/threads/teams/t1"] },
   );
@@ -212,7 +212,7 @@ describe("チームの画面（管理者）", () => {
     await user.click(within(del).getByRole("button", { name: "チームを削除する" }));
     expect(mocks.deleteTeam).toHaveBeenCalledWith("t1");
     expect(await screen.findByText("最初の画面")).toBeInTheDocument();
-    expect(router.state.location.pathname).toBe("/");
+    expect(router.state.location.pathname).toBe("/threads");
   });
 
   it("「チームを抜ける」：引き継ぎ先を選ぶまで「引き継いで抜ける」は押せない（T035）", async () => {
@@ -323,7 +323,7 @@ describe("チームの画面（メンバー・編集者）", () => {
     await user.click(within(dialog).getByRole("button", { name: "抜ける" }));
     expect(mocks.leaveTeam).toHaveBeenCalledWith("t1", undefined);
     expect(await screen.findByText("最初の画面")).toBeInTheDocument();
-    expect(router.state.location.pathname).toBe("/");
+    expect(router.state.location.pathname).toBe("/threads");
   });
 
   it("チームの人でなければ「チームが見つかりません」", async () => {

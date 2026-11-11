@@ -67,6 +67,8 @@ describe("前のURLの転送（contracts/ui-routes.md 2）", () => {
     ["/accounts/12", "/threads/accounts/12"],
     ["/teams/3/assign", "/threads/teams/3/assign"],
     ["/teams/3/accounts/12", "/threads/teams/3/accounts/12"],
+    ["/accounts", "/threads/accounts"],
+    ["/Accounts/12/stock", "/threads/accounts/12/stock"],
   ])("%s は %s へ移る（パスの残り・クエリ・#を保つ）", async (from, to) => {
     renderAt([from]);
     expect(await screen.findByTestId("where")).toHaveTextContent(to);

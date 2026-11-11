@@ -23,7 +23,7 @@ export function loadEnvFile(path: string, keys?: string[]) {
   }
 }
 
-/** Clerk のキー（apps/api/.dev.vars）と、チーム運用の3人のメールアドレス（e2e/.env.local）を読む。 */
+/** Clerk のキー（apps/api/.dev.vars）と、ログインする人のメールアドレス（e2e/.env.local。E2E_CLERK_USER_EMAIL とチームの3人）を読む。 */
 export function loadLocalEnv() {
   loadEnvFile("apps/api/.dev.vars", ["CLERK_SECRET_KEY", "CLERK_PUBLISHABLE_KEY"]);
   loadEnvFile("e2e/.env.local");

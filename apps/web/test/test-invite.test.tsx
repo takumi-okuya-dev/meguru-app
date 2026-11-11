@@ -5,6 +5,7 @@ import userEvent from "@testing-library/user-event";
 import type { TestInvitePreview } from "@meguru/shared";
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { WithEntryApp } from "./helpers/entry-app";
 
 let signedIn = false;
 const signOut = vi.fn(async () => undefined);
@@ -40,7 +41,9 @@ function renderAt() {
   );
   render(
     <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
-      <RouterProvider router={router} />
+      <WithEntryApp>
+        <RouterProvider router={router} />
+      </WithEntryApp>
     </QueryClientProvider>,
   );
   return router;

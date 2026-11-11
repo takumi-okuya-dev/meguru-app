@@ -21,6 +21,7 @@ import { saveErrorMessage } from "@/lib/save-error";
 import { useUnsavedChanges } from "@/lib/use-unsaved-changes";
 import { STOCK_LIMIT_MESSAGE } from "./messages";
 import { flushPendingDeletes } from "./use-deferred-delete";
+import { accountPath } from "@/apps/threads/lib/paths";
 
 type Notice = { message: string; retry: boolean };
 type Registered = { result: DraftBatchResult; text: string };
@@ -216,7 +217,7 @@ function RegisteredNotice({
         {result.overLimitCount > 0 && (
           <p className="text-warning">そのうち{result.overLimitCount}件はThreadsの上限を超えています</p>
         )}
-        <Link to={`/threads/accounts/${accountId}/stock`} className="inline-block pt-0.5 text-ring underline">
+        <Link to={accountPath(accountId, "stock")} className="inline-block pt-0.5 text-ring underline">
           投稿ストックで確かめる
         </Link>
       </div>

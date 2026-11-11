@@ -53,7 +53,7 @@ describe("callback の拒否条件", () => {
     const target = redirectTarget(callbackRes!);
     expect(target.searchParams.get("error")).toBe("ACCOUNT_ALREADY_REGISTERED");
     expect(target.searchParams.get("account")).toBe(before!.id);
-    expect(target.pathname).toBe(`/threads/accounts/${accountId}/settings`);
+    expect(target.pathname).toBe(`/accounts/${accountId}/settings`);
     const [after] = await db().select().from(accounts).where(eq(accounts.id, before!.id));
     expect(after!.connectionGeneration).toBe(before!.connectionGeneration);
     const [mine] = await db().select().from(accounts).where(eq(accounts.id, accountId!));

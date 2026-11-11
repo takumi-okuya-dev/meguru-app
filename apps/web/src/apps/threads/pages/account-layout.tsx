@@ -1,10 +1,10 @@
 // Accountの画面（/threads/accounts/:accountId とその配下）の共通の親
-// - Accountが0件なら /accounts/new へ（規則3）
+// - Accountが0件なら /threads/accounts/new へ（規則3）
 // - 他人・存在しないAccountは404画面（規則4）
 // - 画面を開いたら open を呼び、接続状態とプロフィールを最新にする（規則5）
 // - needs_reconnect ならバナーを出す（FR-019）
 // - 担当しているAccountも開ける（specs/011。/api/me の accounts はオーナーと担当）
-// - 見せてもらっているAccountは、読むだけの画面（/teams/:teamId/accounts/:accountId）へ移す（specs/011 contracts/permissions.md）
+// - 見せてもらっているAccountは、読むだけの画面（/threads/teams/:teamId/accounts/:accountId）へ移す（specs/011 contracts/permissions.md）
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   NEEDS_RECONNECT_BANNER,
@@ -27,6 +27,7 @@ import { useAccountAccess, useAccountAccessErrors } from "@/apps/threads/lib/use
 import { NotFound } from "@/shell";
 import { ApiErrorScreen } from "@/components/ApiErrorScreen";
 import { LoadingSkeleton } from "@/components/LoadingSkeleton";
+import { accountPath, newAccountPath, sharedAccountPath } from "@/apps/threads/lib/paths";
 
 /** Account の画面の子に渡す値。 */
 export type AccountOutletContext = { account: AccountSummary };
@@ -82,7 +83,7 @@ export function AccountLayout() {
   if (me.isPending) return <LoadingSkeleton />;
   // 一度読めていれば、裏での取り直しの失敗では画面を差し替えず、手元の一覧で表示を続ける。
   if (me.isLoadingError) return <ApiErrorScreen error={me.error} onRetry={() => void me.refetch()} />;
-  if (me.data.accounts.length === 0) return <Navigate to="/threads/accounts/new" replace />;
+  if (me.data.accounts.length === 0) return <Navigate to={newAccountPath()} replace />;
   if (account.isError) {
     if (account.error instanceof ApiError && account.error.code === "ACCOUNT_NOT_FOUND") {
       return <NotFound message={errorMessage("ACCOUNT_NOT_FOUND").message} />;
@@ -92,7 +93,7 @@ export function AccountLayout() {
   if (!account.data) return <LoadingSkeleton />;
   if (account.data.role === "viewer") {
     if (!access) return <LoadingSkeleton />;
-    if (access.team) return <Navigate to={`/threads/teams/${access.team.id}/accounts/${account.data.id}`} replace />;
+    if (access.team) return <Navigate to={sharedAccountPath(access.team.id, account.data.id)} replace />;
   }
 
   // 再接続のバナーは、各画面の上部バーの下に出す（docs/ui-design.md「2. 画面の骨格」）
@@ -106,7 +107,7 @@ export function AccountLayout() {
           <>
             <AlertDescription className="text-foreground">{reconnectBannerText(account.data)}</AlertDescription>
             <Button asChild size="sm">
-              <Link to={`/threads/accounts/${account.data.id}/settings`}>再接続</Link>
+              <Link to={accountPath(account.data.id, "settings")}>再接続</Link>
             </Button>
           </>
         ) : (

@@ -79,10 +79,8 @@ function routesOf(apps: readonly AppModule[]): RouteObject[] {
     ...apps.flatMap((a) => a.publicRoutes ?? []),
     // 前のURLの転送。ログインの関所の外で移すので、ログインしていない人も新しいURLからログインへ進む（specs/028 contracts/ui-routes.md 2）
     ...apps.flatMap((a) =>
-      (a.legacyRedirects ?? []).flatMap(({ from, to }) => [
-        { path: from, element: <LegacyRedirect from={from} to={to} /> },
-        { path: `${from}/*`, element: <LegacyRedirect from={from} to={to} /> },
-      ]),
+      // `<頭>/*` は頭だけのURL（/accounts）にも合う
+      (a.legacyRedirects ?? []).map(({ from, to }) => ({ path: `${from}/*`, element: <LegacyRedirect to={to} /> })),
     ),
     // テスト用のグループの招待もログインなしで開ける。テスト版に入れない人も開ける（specs/016 contracts/ui-routes.md 1）
     { path: "/test-invite/:token", element: <TestInvitePage /> },

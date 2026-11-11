@@ -9,6 +9,7 @@ import { useEffect, useRef } from "react";
 import { useNavigate, useSearchParams } from "react-router";
 import { CenteredLayout } from "@/shell";
 import { api } from "@/lib/api-client";
+import { threadsHomePath } from "@/apps/threads/lib/paths";
 
 /**
  * サーバーが返した行き先が、このアプリの中の相対パスかを確かめる。
@@ -40,10 +41,10 @@ export function ThreadsComplete() {
         : api.completeConnect({ state: state!, code: code! }),
     onSuccess: ({ redirectTo }) => {
       // 履歴に残さない（戻るボタンで、使い終わった state と code の付いたURLに戻らないように）
-      navigate(isInsideApp(redirectTo) ? redirectTo : "/", { replace: true });
+      navigate(isInsideApp(redirectTo) ? redirectTo : threadsHomePath(), { replace: true });
     },
     onError: () => {
-      navigate(`/?${new URLSearchParams({ error: "OAUTH_STATE_INVALID" })}`, { replace: true });
+      navigate(`${threadsHomePath()}?${new URLSearchParams({ error: "OAUTH_STATE_INVALID" })}`, { replace: true });
     },
   });
 
@@ -53,11 +54,11 @@ export function ThreadsComplete() {
     // 許可しなかったとき：state があれば元の画面へ戻せるのでサーバーに聞く
     if (cancelled) {
       if (state) complete.mutate();
-      else navigate(`/?${new URLSearchParams({ error: cancelled })}`, { replace: true });
+      else navigate(`${threadsHomePath()}?${new URLSearchParams({ error: cancelled })}`, { replace: true });
       return;
     }
     if (!state || !code) {
-      navigate(`/?${new URLSearchParams({ error: "THREADS_AUTH_FAILED" })}`, { replace: true });
+      navigate(`${threadsHomePath()}?${new URLSearchParams({ error: "THREADS_AUTH_FAILED" })}`, { replace: true });
       return;
     }
     complete.mutate();

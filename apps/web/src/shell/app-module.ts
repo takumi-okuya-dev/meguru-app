@@ -53,3 +53,12 @@ export const AppRegistryProvider = AppRegistryContext.Provider;
 export function useAppRegistry(): readonly AppModule[] {
   return useContext(AppRegistryContext);
 }
+
+/**
+ * 紹介リンク・テスト用のグループの招待から入る人の行き先（登録の一覧の最初のアプリのホーム。今はThreads）。
+ * すべてのアプリの画面を挟まずにアプリへ進める（specs/028 contracts/ui-routes.md 3）。外枠はアプリのパスを直に書かない。
+ * @returns 行き先のパス（アプリがなければ入口の "/"）
+ */
+export function useEntryAppHome(): string {
+  return useAppRegistry()[0]?.basePath ?? "/";
+}

@@ -39,7 +39,7 @@ describe("二重登録の3通り（SC-003）", () => {
     const created = (await (await add(await fake.issueToken({ user: "9003" }), "u1", "トークンで")).json()) as { accountId: string };
     const { accountId, callbackRes } = await connectNew(app, "u1", "9003");
     const target = redirectTarget(callbackRes!);
-    expect([target.pathname, target.searchParams.get("error")]).toEqual([`/threads/accounts/${accountId}/settings`, "ACCOUNT_ALREADY_REGISTERED"]);
+    expect([target.pathname, target.searchParams.get("error")]).toEqual([`/accounts/${accountId}/settings`, "ACCOUNT_ALREADY_REGISTERED"]);
     expect(target.searchParams.get("connected")).toBeNull();
     expect(await accountCount()).toBe(1);
     // つないであったアカウントは、トークンのまま変わらない

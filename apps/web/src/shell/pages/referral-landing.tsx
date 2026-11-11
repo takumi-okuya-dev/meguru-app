@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { api } from "@/lib/api-client";
 import { queryKeys } from "@/lib/query";
 import { rememberReferral } from "@/lib/referral-store";
+import { useEntryAppHome } from "../app-module";
 
 /** アプリの紹介（contracts/ui-routes.md 1）。 */
 const FEATURES = [
@@ -27,6 +28,7 @@ export function ReferralLandingPage() {
   const { code = "" } = useParams<{ code: string }>();
   const { isLoaded, isSignedIn } = useAuth();
   const navigate = useNavigate();
+  const entryHome = useEntryAppHome();
   // テスト版なら注意を出す。読めなくても画面は出す（注意を出さないだけ）
   const page = useQuery({ queryKey: queryKeys.referralPage, queryFn: () => api.referralPage(), retry: false });
   const signedOut = isLoaded && !isSignedIn;
@@ -36,8 +38,8 @@ export function ReferralLandingPage() {
   }, [signedOut, code]);
 
   if (!isLoaded) return <LoadingSkeleton />;
-  // 紹介はThreadsへの入口なので、すべてのアプリの画面を挟まずThreadsへ（specs/028 contracts/ui-routes.md 3）
-  if (isSignedIn) return <Navigate to="/threads" replace />;
+  // 紹介はアプリへの入口なので、すべてのアプリの画面を挟まずアプリのホームへ（specs/028 contracts/ui-routes.md 3）
+  if (isSignedIn) return <Navigate to={entryHome} replace />;
 
   return (
     <CenteredLayout>
@@ -60,7 +62,7 @@ export function ReferralLandingPage() {
               テスト版は、招待された方だけが使えます。招待のリンクを受け取った方は、そちらから始めてください。
             </p>
           )}
-          <Button className="h-12 w-full rounded-full" onClick={() => void navigate(`/sign-in?next=${encodeURIComponent("/threads")}`)}>
+          <Button className="h-12 w-full rounded-full" onClick={() => void navigate(`/sign-in?next=${encodeURIComponent(entryHome)}`)}>
             Googleで始める
           </Button>
         </section>
