@@ -59,10 +59,12 @@ describe("GET /api/me の apps", () => {
 });
 
 describe("resolveMeApps", () => {
-  it("開けるアカウント（担当を含む）が1件以上ならThreadsを使っている", () => {
-    expect(resolveMeApps(0, null).using).toEqual([]);
-    expect(resolveMeApps(1, null).using).toEqual(["threads"]);
-    expect(resolveMeApps(2, "threads")).toEqual({ available: ["threads"], using: ["threads"], last: "threads", landing: "threads" });
+  it("開けるアカウント（担当を含む）が1件以上か、チームに入っていればThreadsを使っている", () => {
+    expect(resolveMeApps(0, 0, null).using).toEqual([]);
+    expect(resolveMeApps(1, 0, null).using).toEqual(["threads"]);
+    // チームにだけ入っている人も、Threadsを使っている（チームの画面はThreadsの中にある）
+    expect(resolveMeApps(0, 1, null).using).toEqual(["threads"]);
+    expect(resolveMeApps(2, 0, "threads")).toEqual({ available: ["threads"], using: ["threads"], last: "threads", landing: "threads" });
   });
 });
 

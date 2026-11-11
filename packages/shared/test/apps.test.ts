@@ -1,10 +1,10 @@
 // アプリの一覧（specs/028-meguru-shell data-model.md 2、T045）。
 import { describe, expect, it } from "vitest";
-import { APP_CATALOG, APP_IDS, BILLING_UNIT_PRICE_JPY, appById, isReleasedAppId, lastAppRequestSchema, releasedApps, resolveLandingApp } from "../src";
+import { APP_CATALOG, BILLING_UNIT_PRICE_JPY, appById, isReleasedAppId, lastAppRequestSchema, releasedApps, resolveLandingApp } from "../src";
 
 describe("アプリの一覧", () => {
   it("IDとパスが重ならない", () => {
-    expect(new Set(APP_IDS).size).toBe(APP_CATALOG.length);
+    expect(new Set(APP_CATALOG.map((a) => a.id)).size).toBe(APP_CATALOG.length);
     expect(new Set(APP_CATALOG.map((a) => a.basePath)).size).toBe(APP_CATALOG.length);
   });
 

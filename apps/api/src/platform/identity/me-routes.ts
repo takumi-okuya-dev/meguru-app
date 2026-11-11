@@ -50,15 +50,16 @@ export function resolveLandingAccountId(
 
 /**
  * /api/me の apps を決める（specs/028 contracts/api.md 1、research.md R6）。
- * Threadsを「使っている」のは、開けるアカウント（オーナーと担当）が1件以上あるとき。運用するアカウントの表は共通の持ち主（027）なので、
+ * Threadsを「使っている」のは、開けるアカウント（オーナーと担当）が1件以上あるか、チームに入っているとき（チームの画面と見せてもらっているアカウントはThreadsの中にある）。運用するアカウントの表は共通の持ち主（027）なので、
  * 共通の中で決める。2作目でアプリごとの利用権を足すときに、アプリごとの判定に置き換える。
  * @param visibleAccounts - 開けるアカウントの数
+ * @param teams - 入っているチームの数
  * @param lastAppId - users.last_app_id
  * @returns apps
  */
-export function resolveMeApps(visibleAccounts: number, lastAppId: string | null): MeApps {
+export function resolveMeApps(visibleAccounts: number, teams: number, lastAppId: string | null): MeApps {
   const available = releasedApps().map((a) => a.id);
-  const using = available.filter((id) => id === "threads" && visibleAccounts > 0);
+  const using = available.filter((id) => id === "threads" && (visibleAccounts > 0 || teams > 0));
   const last = lastAppId && available.includes(lastAppId) ? lastAppId : null;
   return { available, using, last, landing: resolveLandingApp(using, last) };
 }
@@ -136,7 +137,7 @@ export function meRoutes(authed: MiddlewareHandler<AppEnv>, deleteClerkUser: (en
       // 招待の管理がONか（つなぐ画面の申し込みの欄。specs/024 research.md R4）
       testerInvites: { enabled: testerInvitesEnabledOf(c.env) },
       // 出せるアプリ・使っているアプリ・最後に使ったアプリ・入口の行き先（specs/028 contracts/api.md 1）
-      apps: resolveMeApps(visible.length, user.lastAppId),
+      apps: resolveMeApps(visible.length, teams.length, user.lastAppId),
     });
   })
     // 最後に使ったアプリを覚える（specs/028 contracts/api.md 2）。外枠が、アプリの画面を開いたときに呼ぶ

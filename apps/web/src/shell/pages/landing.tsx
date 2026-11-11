@@ -20,6 +20,6 @@ export function ShellLanding() {
   const me = useQuery({ queryKey: queryKeys.me, queryFn: api.me, refetchOnMount: "always" });
   if (me.isPending || me.isFetching) return <LoadingSkeleton />;
   if (me.isLoadingError) return <ApiErrorScreen error={me.error} onRetry={() => void me.refetch()} />;
-  const landing = apps.find((a) => a.id === me.data.apps?.landing);
+  const landing = apps.find((a) => a.id === me.data.apps.landing);
   return <Navigate to={landing ? `${landing.basePath}${search}` : `/apps${search}`} replace />;
 }

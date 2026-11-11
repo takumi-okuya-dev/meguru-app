@@ -117,6 +117,13 @@ describe("アプリの切り替え（contracts/ui-routes.md 5）", () => {
     expect(screen.queryByRole("button", { name: "アプリを切り替える" })).toBeNull();
   });
 
+  it("開いているアプリを使い始めていなければ出さない（切り替えの一覧に、開いているアプリがないため）", async () => {
+    mocks.me.mockResolvedValue(meWith({ available: ["threads", "sample", "other"], using: ["sample", "other"], last: "sample", landing: "sample" }));
+    renderAt("/threads");
+    expect(await screen.findByText("Threadsの頭")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "アプリを切り替える" })).toBeNull();
+  });
+
   it("押すと使っているアプリと「すべてのアプリ」が出て、選んだアプリのホームへ移る", async () => {
     const user = userEvent.setup();
     mocks.me.mockResolvedValue(meWith(BOTH));

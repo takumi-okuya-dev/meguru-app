@@ -24,10 +24,11 @@ export function Sidebar({ sidebar, onCollapse, onNavigate }: { sidebar?: AppSide
   const apps = useAppRegistry();
   const current = useCurrentApp();
   const me = useQuery({ queryKey: queryKeys.me, queryFn: api.me });
-  const usingIds = me.data?.apps?.using ?? [];
+  const usingIds = me.data?.apps.using ?? [];
   const using = apps.filter((a) => usingIds.includes(a.id));
-  // アプリが1本以下の人には出さない（今のThreadsアプリと同じ見た目のまま。spec FR-005・FR-018）
-  const showSwitcher = Boolean(current) && using.length >= 2;
+  // アプリが1本以下の人には出さない（今のThreadsアプリと同じ見た目のまま。spec FR-005・FR-018）。
+  // 開いているアプリを使い始めていない（アカウントを作る画面など）ときも出さない（切り替えの一覧に、開いているアプリがないため）
+  const showSwitcher = Boolean(current) && using.length >= 2 && using.some((a) => a.id === current?.id);
   return (
     <div className="flex h-full flex-col">
       <div className="flex items-center gap-1 p-2">

@@ -1,11 +1,12 @@
 // すべてのアプリ（/apps。specs/028-meguru-shell contracts/ui-routes.md 4）。
 // サイドバーなしの1カラムに「使っているアプリ」と「足せるアプリ」を並べる。名前・説明・料金は @meguru/shared のアプリの一覧、
 // アイコンと「使い始める」の行き先は登録したアプリの入口から取る。登録していないアプリは出さない。
-import { appById, type AppCatalogEntry } from "@meguru/shared";
+import { appById, errorMessage, isErrorCode, type AppCatalogEntry } from "@meguru/shared";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowLeftIcon, ChevronDownIcon, ChevronUpIcon } from "lucide-react";
-import { useState } from "react";
-import { Link } from "react-router";
+import { ArrowLeftIcon, ChevronDownIcon, ChevronUpIcon, SettingsIcon } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { Link, useSearchParams } from "react-router";
+import { toast } from "sonner";
 import { ApiErrorScreen } from "@/components/ApiErrorScreen";
 import { LoadingSkeleton } from "@/components/LoadingSkeleton";
 import { Button } from "@/components/ui/button";
@@ -79,10 +80,18 @@ function AppRow({ row, using }: { row: Row; using: boolean }) {
 export function AppsPage() {
   const apps = useAppRegistry();
   const me = useQuery({ queryKey: queryKeys.me, queryFn: api.me });
+  // 入口（/）から ?error=… つきで移ってきたときは、エラーをトーストで出す（Threadsのホームと同じ）
+  const [params] = useSearchParams();
+  const error = params.get("error");
+  const shown = useRef(false);
+  useEffect(() => {
+    if (!error || shown.current) return;
+    shown.current = true;
+    toast.error(errorMessage(isErrorCode(error) ? error : "INTERNAL_ERROR").message);
+  }, [error]);
   if (me.isPending) return <LoadingSkeleton />;
   if (me.isLoadingError) return <ApiErrorScreen error={me.error} onRetry={() => void me.refetch()} />;
-  const available = me.data.apps?.available ?? [];
-  const usingIds = me.data.apps?.using ?? [];
+  const { available, using: usingIds } = me.data.apps;
   // 出せる（API）・登録している（Web）・一覧にある（共有）アプリだけを、一覧の順で並べる
   const rows: Row[] = available.flatMap((id) => {
     const app = apps.find((a) => a.id === id);
@@ -91,12 +100,20 @@ export function AppsPage() {
   });
   const using = rows.filter((r) => usingIds.includes(r.app.id));
   const addable = rows.filter((r) => !usingIds.includes(r.app.id));
+  // 戻る先：使っているアプリがあればそのホーム。0本の人は入口へ戻ってもここへ戻るだけなので、設定（ログアウト・退会がある）を出す
+  const home = apps.find((a) => a.id === me.data.apps.landing);
   return (
     <div className="min-h-svh">
       <div className="mx-auto w-full max-w-2xl space-y-6 px-4 py-6 md:py-10">
-        <Link to="/" className="inline-flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm hover:bg-accent">
-          <ArrowLeftIcon className="size-4" /> 戻る
-        </Link>
+        {home ? (
+          <Link to={home.basePath} className="inline-flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm hover:bg-accent">
+            <ArrowLeftIcon className="size-4" /> 戻る
+          </Link>
+        ) : (
+          <Link to="/settings" className="inline-flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm hover:bg-accent">
+            <SettingsIcon className="size-4" /> 設定
+          </Link>
+        )}
         <h1 className="text-xl font-semibold">すべてのアプリ</h1>
         {using.length > 0 && (
           <section aria-labelledby="apps-using" className="space-y-3">

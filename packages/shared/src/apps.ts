@@ -9,7 +9,7 @@ export type AppCatalogEntry = {
   id: string;
   /** すべてのアプリの画面とアプリの切り替えに出す名前 */
   name: string;
-  /** 画面のURLの頭 */
+  /** 画面のURLの頭（Web の AppModule.basePath と同じ。Web のテストで確かめる） */
   basePath: string;
   /** すべてのアプリの画面の1行の説明 */
   summary: string;
@@ -17,7 +17,7 @@ export type AppCatalogEntry = {
   details: readonly string[];
   /** 料金の文言 */
   priceLabel: string;
-  /** 利用者に出してよいか。false のアプリは API の available にも Web のルートにも出さない */
+  /** 利用者に出してよいか。false のアプリは API の available に入れず、Web の組み立て（app-registry.ts）も登録しない */
   released: boolean;
 };
 
@@ -41,9 +41,6 @@ export const APP_CATALOG = [
 
 /** アプリのID。 */
 export type AppId = (typeof APP_CATALOG)[number]["id"];
-
-/** アプリのIDの一覧。 */
-export const APP_IDS = APP_CATALOG.map((a) => a.id) as readonly AppId[];
 
 /**
  * 利用者に出してよいアプリの一覧（released のもの。一覧の順）。

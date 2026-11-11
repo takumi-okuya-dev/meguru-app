@@ -8,11 +8,13 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ME_BILLING_OFF } from "./helpers/billing";
 import { WithEntryApp } from "./helpers/entry-app";
 
-const mocks = vi.hoisted(() => ({ me: vi.fn() }));
+const mocks = vi.hoisted(() => ({ me: vi.fn(), toastError: vi.fn() }));
 vi.mock("@/lib/api-client", async (orig) => {
   const actual = await orig<typeof import("@/lib/api-client")>();
   return { ...actual, api: { ...actual.api, me: mocks.me } };
 });
+
+vi.mock("sonner", () => ({ toast: { error: mocks.toastError, success: vi.fn(), dismiss: vi.fn() } }));
 
 const { AppsPage } = await import("@/shell/pages/apps");
 
@@ -112,11 +114,33 @@ describe("すべてのアプリの画面", () => {
     expect(screen.getAllByRole("listitem").filter((li) => li.closest("section"))).toHaveLength(1);
   });
 
-  it("「戻る」で入口へ", async () => {
+  it("「戻る」で、使っているアプリ（入口の行き先）のホームへ", async () => {
     const user = userEvent.setup();
     mocks.me.mockResolvedValue(meWith({ available: ["threads"], using: ["threads"], last: "threads", landing: "threads" }));
     renderApps();
     await user.click(await screen.findByRole("link", { name: "戻る" }));
-    expect(await screen.findByText("入口")).toBeInTheDocument();
+    expect(await screen.findByText("Threadsのホーム")).toBeInTheDocument();
+  });
+
+  it("使っているアプリがなければ「戻る」は出さず（入口へ戻ってもここへ戻るだけ）、設定への道を出す", async () => {
+    mocks.me.mockResolvedValue(meWith({ available: ["threads"], using: [], last: null, landing: null }));
+    renderApps();
+    await screen.findByRole("heading", { name: "めぐる Threads" });
+    expect(screen.queryByRole("link", { name: "戻る" })).toBeNull();
+    expect(screen.getByRole("link", { name: "設定" })).toHaveAttribute("href", "/settings");
+  });
+
+  it("?error=… つきで開いたら、エラーをトーストで出す", async () => {
+    mocks.me.mockResolvedValue(meWith({ available: ["threads"], using: [], last: null, landing: null }));
+    const router = createMemoryRouter([{ path: "/apps", element: <AppsPage /> }], { initialEntries: ["/apps?error=OAUTH_STATE_INVALID"] });
+    render(
+      <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+        <WithEntryApp>
+          <RouterProvider router={router} />
+        </WithEntryApp>
+      </QueryClientProvider>,
+    );
+    await screen.findByRole("heading", { name: "めぐる Threads" });
+    expect(mocks.toastError).toHaveBeenCalledTimes(1);
   });
 });
