@@ -1,5 +1,6 @@
 // APIの入出力スキーマ（contracts/api.md「型」）。WebとAPIで共有する。
 import { z } from "zod";
+import { meAppsSchema } from "./apps";
 import { ERROR_CODES } from "./errors";
 import { FEATURE_EVENT_ACTIONS, FEATURES } from "./features";
 import {
@@ -227,6 +228,8 @@ export const meResponseSchema = z.object({
   dailyPostLimit: z.number().int().nullable(),
   /** 招待の管理（テスター招待の申し込み）がONか（specs/024 research.md R4） */
   testerInvites: z.object({ enabled: z.boolean() }),
+  /** 出せるアプリ・使っているアプリ・最後に使ったアプリ・入口の行き先（specs/028 contracts/api.md 1） */
+  apps: meAppsSchema,
 });
 /** GET /api/me のレスポンス。ログイン中のユーザー、Account一覧、ログイン後の遷移先、登録数上限。 */
 export type MeResponse = z.infer<typeof meResponseSchema>;

@@ -176,6 +176,13 @@
       "when": 1794153249512,
       "tag": "0024_tester_backfill_connected",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1794415227404,
+      "tag": "0025_last_app",
+      "breakpoints": true
     }
   ]
 }

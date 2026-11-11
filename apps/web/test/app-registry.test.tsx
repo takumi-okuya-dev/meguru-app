@@ -43,6 +43,7 @@ const PUBLIC = [
 /** ログインの要るルート（contracts/ui-routes.md 1-2）。Threadsの画面は /threads の下。 */
 const AUTH = [
   "/",
+  "/apps",
   "/threads",
   "/threads/accounts/new",
   "/threads/complete",

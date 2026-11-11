@@ -153,6 +153,19 @@ MVPのうちチーム運用と課金まわりの最後のfeatureとする。公�
   ときは「知らせ」（共通が出し、アプリが受け取る）を使う。これらはESLintの規則
   （`eslint-rules/module-boundaries.js`）で守る。2作目以降のアプリは、同じリポジトリにアプリの
   モジュールとして足す（構造の全体は`docs/product-structure.md`）。
+- **Webのモジュール構成**（2026-11-12、specs/028）：Webは、外枠（`apps/web/src/shell/`。めぐるの共通の
+  画面の枠・入口の振り分け・すべてのアプリ・共通の設定・関所）・アプリ（`apps/<名前>/`）・共通の部品
+  （`components/`・`lib/`）・組み立て（`main.tsx`・`router.tsx`・`app-registry.ts`）に分ける。依存は
+  組み立て → アプリ → 外枠の入口 → 共通の部品の向きとし、外枠はアプリを読まず、アプリ同士も読まない。
+  アプリは`AppModule`を1つ出し、組み立ての`app-registry.ts`に1行足すだけで外枠に乗る。アプリの画面は
+  自分のパスの下（Threadsは`/threads/…`）に置く。これらはESLintの規則
+  （`eslint-rules/web-module-boundaries.js`）で守る（地図は`docs/module-map.md`の7章）。
+- **モバイル化を見込んだ技術の選び方**（2026-11-12）：2作目以降のアプリは、将来モバイルアプリにする
+  ことを見込んで技術を選ぶ。業務の判断とデータのやりとりはAPIと共通のパッケージ（`@meguru/shared`）に
+  置き、Webの画面やブラウザだけで動く仕組みに閉じこめない（モバイルの画面からも同じAPIと判断を使える
+  ようにする）。入口の行き先・使っているアプリの判断も、APIが返す（`/api/me`の`apps`）。Threadsアプリは
+  今のままでよく、モバイル化のための作り直しはしない。PWAにするかネイティブにするかは、必要が見えて
+  から決める。
 
 ## 開発ワークフロー
 
@@ -181,4 +194,4 @@ MVPのうちチーム運用と課金まわりの最後のfeatureとする。公�
   実質的な拡張＝MINOR、文言修正・明確化＝PATCH。
 - 改定時は`/speckit-constitution`を再実行し、Sync Impact Reportを都度残す。
 
-**Version**: 4.5.0 | **Ratified**: 2026-10-01 | **Last Amended**: 2026-11-10
+**Version**: 4.6.0 | **Ratified**: 2026-10-01 | **Last Amended**: 2026-11-12

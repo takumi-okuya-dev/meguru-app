@@ -1,16 +1,18 @@
 // Threadsの入口（specs/028-meguru-shell data-model.md 4、contracts/web-module-boundaries.md 1）。外枠と組み立ては、Threadsをここからだけ読む。
 import { createElement } from "react";
-import { ListIcon, MailPlusIcon } from "lucide-react";
+import { AtSignIcon, ListIcon, MailPlusIcon } from "lucide-react";
 import type { AppModule } from "@/shell";
 import { OperatorAccountsPage } from "./pages/settings/operator-accounts";
 import { TesterInvitesPage } from "./pages/settings/tester-invites";
-import { THREADS_BASE } from "./lib/paths";
+import { newAccountPath, THREADS_BASE } from "./lib/paths";
 import { threadsPublicRoutes, threadsReadingRoutes, threadsRoutes } from "./routes";
 
 /** Threadsのアプリ。 */
 export const threadsApp: AppModule = {
   id: "threads",
   basePath: THREADS_BASE,
+  icon: AtSignIcon,
+  startPath: newAccountPath(),
   routes: threadsRoutes,
   publicRoutes: threadsPublicRoutes,
   readingRoutes: threadsReadingRoutes,

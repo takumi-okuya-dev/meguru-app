@@ -23,7 +23,7 @@ describe("設定に誤りがあるとき", () => {
     const res = await app.request("/api/threads/callback?state=x&code=y", {}, broken);
     expect(res.status).toBe(302);
     const loc = new URL(res.headers.get("Location")!);
-    expect(loc.pathname).toBe("/accounts/new");
+    expect(loc.pathname).toBe("/threads/accounts/new");
     expect(loc.searchParams.get("error")).toBe("CONFIG_ERROR");
   });
 

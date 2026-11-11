@@ -136,6 +136,7 @@ PUT /api/accounts/:accountId/prompt-settings ×2
 PUT /api/accounts/:accountId/reference-posts/:referencePostId ×2
 PUT /api/accounts/:accountId/research-keywords/:keywordId ×2
 PUT /api/accounts/:accountId/strategy ×2
+PUT /api/me/last-app ×2
 PUT /api/operator/feature-settings/:userId ×3
 PUT /api/operator/limits ×3
 PUT /api/operator/limits/users/:userId ×3

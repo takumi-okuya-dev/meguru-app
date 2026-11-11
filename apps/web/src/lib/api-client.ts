@@ -316,6 +316,8 @@ export const api = {
     setSubscriptionRequired(me.billing.state === "unsubscribed");
     return me;
   },
+  // 最後に使ったアプリを覚える（specs/028 contracts/api.md 2）
+  putLastApp: (app: string) => request("/api/me/last-app", null, { method: "PUT", body: JSON.stringify({ app }) }),
   // ---- 退会（specs/013 contracts/api.md「自分」）----
   withdrawalPreview: () => request("/api/me/withdrawal-preview", withdrawalPreviewSchema),
   withdraw: (confirmEmail: string) =>

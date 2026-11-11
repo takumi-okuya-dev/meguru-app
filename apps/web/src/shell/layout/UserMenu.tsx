@@ -1,7 +1,7 @@
-// サイドバー左下のユーザーメニュー。名前とメールアドレス、設定、ログアウト（FR-006）。
+// サイドバー左下のユーザーメニュー。名前とメールアドレス、設定、すべてのアプリ（specs/028）、ログアウト（FR-006）。
 // 本番以外では、名前の横に環境の印（「テスト版」など）を出す（specs/015 contracts/ui-routes.md 1）
 import { useUser } from "@clerk/react";
-import { ChevronsUpDownIcon, LogOutIcon, SettingsIcon } from "lucide-react";
+import { ChevronsUpDownIcon, LayoutGridIcon, LogOutIcon, SettingsIcon } from "lucide-react";
 import { Link } from "react-router";
 import {
   DropdownMenu,
@@ -15,7 +15,7 @@ import { useLogout } from "@/lib/use-logout";
 import { EnvBadge } from "./EnvBanner";
 
 /**
- * サイドバー左下のユーザーメニュー。名前とメールアドレス、設定、ログアウト（FR-006）。
+ * サイドバー左下のユーザーメニュー。名前とメールアドレス、設定、すべてのアプリ、ログアウト（FR-006）。
  * @returns ユーザーメニュー
  */
 export function UserMenu() {
@@ -42,6 +42,12 @@ export function UserMenu() {
         <DropdownMenuItem asChild>
           <Link to="/settings">
             <SettingsIcon className="size-4" /> 設定
+          </Link>
+        </DropdownMenuItem>
+        {/* すべてのアプリ（specs/028 contracts/ui-routes.md 4・5-1）。アプリが1本の人にも出す */}
+        <DropdownMenuItem asChild>
+          <Link to="/apps">
+            <LayoutGridIcon className="size-4" /> すべてのアプリ
           </Link>
         </DropdownMenuItem>
         <DropdownMenuSeparator />

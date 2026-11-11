@@ -109,7 +109,7 @@ description: "Task list for feature 028 meguru shell and web split"
 - [X] T029 [P] [US1] `web-test/legacy-redirects.test.tsx` を作る（**実装の結果**：T029〜T031は `web-test/shell-routes.test.tsx` にまとめた。ログインしていない人はログインのあと、分割の前と同じく入口へ戻る）：`/accounts/12/external-media?view=work#x` → `/threads/accounts/12/external-media?view=work#x`、`/accounts/new` → `/threads/accounts/new`、`/teams/3/assign` → `/threads/teams/3/assign`、`/teams/3/accounts/12` → `/threads/teams/3/accounts/12`、ログインしていなくても移ること（関所の外）、履歴を置き換えること（`createMemoryRouter` の履歴の数で確かめる）。先に失敗を確かめる。
 - [X] T030 [P] [US1] `web-test/threads-home.test.tsx` を作る：`/threads` が最後に使ったアカウント（`landingAccountId`）、なければ `/threads/accounts/new` へ移り、`?error=OAUTH_STATE_INVALID` のトーストを出すこと（今の `web-test/landing.test.tsx` の場面をURLだけ変えて写す）。`/threads/nothing` が「見つかりません」になること。
 - [X] T031 [P] [US1] `web-test/public-routes-unchanged.test.tsx` を作る：`/sign-in`・`/terms`・`/legal/commerce`・`/guide/threads-token`・`/invite/<token>`・`/test-invite/<token>`・`/r/<code>`・`/data-deletion/<code>`・`/threads/complete`・`/settings/billing` が、URLを変えずに今の画面を出すこと。
-- [ ] T032 [P] [US1] （**PR3 へ移した**：デプロイは API を Web より先に出すため。T041 と一緒に PR3 で行う）API のテストの期待値を直す：`api-test/` の `/api/threads/callback` の設定の不備の転送先を `/threads/accounts/new?error=CONFIG_ERROR` に、`POST /api/threads/complete` の `redirectTo` を `/threads?error=…`・`/threads/accounts/<番号>/settings?…` にする（contracts/api.md 3）。先に失敗を確かめる。
+- [X] T032 [P] [US1] （**PR3 へ移した。PR3 で行った**：デプロイは API を Web より先に出すため。T041 と一緒に PR3 で行う）API のテストの期待値を直す：`api-test/` の `/api/threads/callback` の設定の不備の転送先を `/threads/accounts/new?error=CONFIG_ERROR` に、`POST /api/threads/complete` の `redirectTo` を `/threads?error=…`・`/threads/accounts/<番号>/settings?…` にする（contracts/api.md 3）。先に失敗を確かめる。
 
 ### Implementation for User Story 1
 
@@ -121,7 +121,7 @@ description: "Task list for feature 028 meguru shell and web split"
 - [X] T038 [US1] Threadsから入る道を `/threads` へ向ける（contracts/ui-routes.md 3）：`web/shell/pages/referral-landing.tsx`（ログインしている人の `Navigate` と、ログインしていない人のログインの戻り先）、`web/shell/pages/test-invite.tsx` の「アプリを開く」、`web/apps/threads/pages/invite.tsx` の「アプリを開く」。`web/shell/pages/sign-in.tsx` の戻り先の許可に、`/threads` をちょうど一致で足す（今の招待の2つは変えない）。「参加しない」「トップへ」「見つかりませんの戻る」「設定の戻る」は `/` のまま。`web-test/referral-landing.test.tsx`・`test-invite.test.tsx`・`invite-page.test.tsx` の期待値を直す。
 - [X] T039 [US1] `web/lib/invite-return.ts`（招待から「アカウントを作る」へ進んだ人を、接続のあとに招待へ戻す）と `web/apps/threads/lib/callback-result.ts` の中のURLの形を確かめ、`/threads/accounts/…` で動くよう直す。`web-test/account-settings.test.tsx`・`threads-complete.test.tsx` が通ること。
 - [X] T040 [US1] `web/shell/guards/RequireAuth.tsx` の `SUBSCRIBE_ALLOWED_PATHS`（`/settings/billing`・`/settings/account`）が変わらないことを確かめる（URLを変えないため、直しは要らない見込み）。
-- [ ] T041 [P] [US1] （**PR3 へ移した**：PR2 の Web が出たあとに API を変える。それまでは前のURLの転送が受ける）APIが作るURLを直す（contracts/api.md 3）：`api/app.ts` の `${web}/accounts/new?…` → `${web}/threads/accounts/new?…`、`api/apps/threads/connection/threads-connect-routes.ts` の `withParams("/", …)` → `withParams("/threads", …)`、`/accounts/${…}/settings` → `/threads/accounts/${…}/settings`。T032が通ること。
+- [X] T041 [P] [US1] （**PR3 へ移した。PR3 で行った**：PR2 の Web が出たあとに API を変える。それまでは前のURLの転送が受ける）APIが作るURLを直す（contracts/api.md 3）：`api/app.ts` の `${web}/accounts/new?…` → `${web}/threads/accounts/new?…`、`api/apps/threads/connection/threads-connect-routes.ts` の `withParams("/", …)` → `withParams("/threads", …)`、`/accounts/${…}/settings` → `/threads/accounts/${…}/settings`。T032が通ること。
 - [X] T042 [US1] `apps/web/test/**` の残りのURLの期待値（`/accounts/…`・`/teams/…`）を新しいURLに直す（中身の場面は変えない）。`pnpm --filter web test` が通り、成功数が T001 より減らないこと。
 - [X] T043 [US1] E2Eを直す：`e2e/tests/` の `billing.spec.ts`・`create.spec.ts`・`onboarding.spec.ts`・`phone-width.spec.ts`・`reconnect-delete.spec.ts`・`research.spec.ts`・`strategy.spec.ts`・`team.spec.ts`・`token.spec.ts`・`team-flow.ts`・`helpers.ts` のURLを新しいURLにする。前のURLの転送を確かめる場面を `e2e/tests/onboarding.spec.ts` に1つ足す（`/accounts/<番号>/stock` を開くと `/threads/accounts/<番号>/stock`）。`pnpm e2e` が通ること。
 - [ ] T044 [US1] quickstart.md 3 の表を手元で確かめる。ステージングへ出したあと、T002と同じ画面のスクリーンショットを撮り、URLのほかに差がないことを見比べる（quickstart.md 4、spec SC-002）。
@@ -140,20 +140,20 @@ description: "Task list for feature 028 meguru shell and web split"
 
 ### Tests for User Story 3
 
-- [ ] T045 [P] [US3] `packages/shared/test/apps.test.ts`を作る：`APP_CATALOG` のIDが重ならないこと、Threadsの `priceLabel` が `BILLING_UNIT_PRICE_JPY` から作った「アカウント1件につき月1,000円」であること、`lastAppRequestSchema` が知らないIDを断ること。
-- [ ] T046 [P] [US3] `api-test/` に `/api/me` の `apps` のテストを足す（contracts/api.md 4）：登録した直後 → `{ available: ["threads"], using: [], last: null, landing: null }`、自分のアカウントあり → `using: ["threads"]`・`landing: "threads"`、担当だけ（チームのまとまりがON）→ `using: ["threads"]`、`last_app_id` が知らないID → `last: null`。先に失敗を確かめる。
-- [ ] T047 [P] [US3] `web-test/apps-page.test.tsx` を作る：`/apps` で、`using` が空なら「足せるアプリ」だけにめぐる Threads（名前・料金・「詳しく見る」・「使い始める」）が出ること、「詳しく見る」で説明が開き画面は移らないこと、「使い始める」で `/threads/accounts/new` へ移ること、`using: ["threads"]` なら「使っているアプリ」にThreadsが出て「開く」で `/threads` へ移ること、「戻る」で `/` へ移ること。
-- [ ] T048 [P] [US3] `web-test/landing.test.tsx` を外枠の振り分けに書き直す：`me.apps.landing` が `"threads"` なら `/threads`（クエリを保つ）、`null` なら `/apps`、`/api/me` を読めなければ今のエラーの画面。紹介リンクからログインした人は `/apps` を挟まず `/threads` へ進むこと（T038の戻り先で）。
-- [ ] T049 [P] [US3] `web-test/user-menu.test.tsx` を作る：ユーザーメニューに「設定」「すべてのアプリ」「ログアウト」がこの順で出て、「すべてのアプリ」で `/apps` へ移ること。
+- [X] T045 [P] [US3] `packages/shared/test/apps.test.ts`を作る：`APP_CATALOG` のIDが重ならないこと、Threadsの `priceLabel` が `BILLING_UNIT_PRICE_JPY` から作った「アカウント1件につき月1,000円」であること、`lastAppRequestSchema` が知らないIDを断ること。
+- [X] T046 [P] [US3] `api-test/` に `/api/me` の `apps` のテストを足す（contracts/api.md 4）：登録した直後 → `{ available: ["threads"], using: [], last: null, landing: null }`、自分のアカウントあり → `using: ["threads"]`・`landing: "threads"`、担当だけ（チームのまとまりがON）→ `using: ["threads"]`、`last_app_id` が知らないID → `last: null`。先に失敗を確かめる。
+- [X] T047 [P] [US3] `web-test/apps-page.test.tsx` を作る：`/apps` で、`using` が空なら「足せるアプリ」だけにめぐる Threads（名前・料金・「詳しく見る」・「使い始める」）が出ること、「詳しく見る」で説明が開き画面は移らないこと、「使い始める」で `/threads/accounts/new` へ移ること、`using: ["threads"]` なら「使っているアプリ」にThreadsが出て「開く」で `/threads` へ移ること、「戻る」で `/` へ移ること。
+- [X] T048 [P] [US3] （**実装の結果**：外枠の振り分けのテストは `web-test/shell-routes.test.tsx` に足した。`landing.test.tsx` はThreadsのホーム（`/threads`）のテストのまま）`web-test/landing.test.tsx` を外枠の振り分けに書き直す：`me.apps.landing` が `"threads"` なら `/threads`（クエリを保つ）、`null` なら `/apps`、`/api/me` を読めなければ今のエラーの画面。紹介リンクからログインした人は `/apps` を挟まず `/threads` へ進むこと（T038の戻り先で）。
+- [X] T049 [P] [US3] `web-test/user-menu.test.tsx` を作る：ユーザーメニューに「設定」「すべてのアプリ」「ログアウト」がこの順で出て、「すべてのアプリ」で `/apps` へ移ること。
 
 ### Implementation for User Story 3
 
-- [ ] T050 [US3] `shared/apps.ts` を作り、`shared/index.ts` から出す（data-model.md 2）：`APP_CATALOG`（Threads：`id: "threads"`・`name: "めぐる Threads"`・`basePath: "/threads"`・`summary`・`details`（3〜5行）・`priceLabel`・`released: true`）、`AppId` の型、`lastAppRequestSchema`（`{ app: AppId }`。`released` でないIDも断る）。T045が通ること。
-- [ ] T051 [US3] `api/platform/identity/me-routes.ts` に `apps` を足す（contracts/api.md 1）：`available` は `APP_CATALOG` の `released`、`using` は `visible.length > 0` なら `["threads"]`、`last` は `user.lastAppId`（`available` に入っていなければ `null`）、`landing` は `last` が `using` に入っていれば `last`、なければ `using[0] ?? null`。`landing` を決める純粋な関数 `resolveLandingApp(using, last)` を同じファイルに置き、`resolveLandingAccountId` と同じく単体でテストする。ここで使う `users.lastAppId` は T056 のマイグレーションで足すので、T056を先に行う。T046が通ること。
-- [ ] T052 [US3] `web/shell/pages/landing.tsx` を `me.apps.landing` で振り分けるようにする（contracts/ui-routes.md 3）：`landing` があれば `APP_CATALOG` のそのアプリの `basePath` へ（クエリを保つ・置き換え）、なければ `/apps`。開くたびに `/api/me` を読み直す（今の `refetchOnMount: "always"` を保つ）。T048が通ること。
-- [ ] T053 [US3] `web/shell/pages/apps.tsx` を作り、`web/router.tsx` の関所の中に `/apps` を足す（contracts/ui-routes.md 4、外枠モック）：サイドバーなしの1カラム・左上の「戻る」（`/`）・見出し「すべてのアプリ」・「使っているアプリ」（`me.apps.using`、0本なら区分ごと出さない）・「足せるアプリ」（`available` のうち `using` でないもの、0本なら出さない）。アプリの名前・説明・料金は `APP_CATALOG`、アイコンは `useAppRegistry()` の `icon`。「使い始める」はアプリの入口に持たせた開始の行き先（Threadsは `/threads/accounts/new`。`AppModule` に `startPath` を足す）。`APP_CATALOG` にあっても登録の一覧にないアプリは出さない。T047が通ること。
-- [ ] T054 [US3] `web/shell/layout/UserMenu.tsx` に「すべてのアプリ」を「設定」の下に足す（`/apps` へ）。ほかの項目は変えない。T049が通ること。
-- [ ] T055 [US3] `web/apps/threads/index.ts` の `threadsApp` に `icon`（Threadsのアイコン）と `startPath: "/threads/accounts/new"` を入れ、`web/shell/app-module.ts` の `AppModule` の型に `startPath` を足す。
+- [X] T050 [US3] `shared/apps.ts` を作り、`shared/index.ts` から出す（data-model.md 2）：`APP_CATALOG`（Threads：`id: "threads"`・`name: "めぐる Threads"`・`basePath: "/threads"`・`summary`・`details`（3〜5行）・`priceLabel`・`released: true`）、`AppId` の型、`lastAppRequestSchema`（`{ app: AppId }`。`released` でないIDも断る）。T045が通ること。
+- [X] T051 [US3] `api/platform/identity/me-routes.ts` に `apps` を足す（contracts/api.md 1）：`available` は `APP_CATALOG` の `released`、`using` は `visible.length > 0` なら `["threads"]`、`last` は `user.lastAppId`（`available` に入っていなければ `null`）、`landing` は `last` が `using` に入っていれば `last`、なければ `using[0] ?? null`。`landing` を決める純粋な関数 `resolveLandingApp(using, last)` を同じファイルに置き、`resolveLandingAccountId` と同じく単体でテストする。ここで使う `users.lastAppId` は T056 のマイグレーションで足すので、T056を先に行う。T046が通ること。
+- [X] T052 [US3] `web/shell/pages/landing.tsx` を `me.apps.landing` で振り分けるようにする（contracts/ui-routes.md 3）：`landing` があれば `APP_CATALOG` のそのアプリの `basePath` へ（クエリを保つ・置き換え）、なければ `/apps`。開くたびに `/api/me` を読み直す（今の `refetchOnMount: "always"` を保つ）。T048が通ること。
+- [X] T053 [US3] `web/shell/pages/apps.tsx` を作り、`web/router.tsx` の関所の中に `/apps` を足す（contracts/ui-routes.md 4、外枠モック）：サイドバーなしの1カラム・左上の「戻る」（`/`）・見出し「すべてのアプリ」・「使っているアプリ」（`me.apps.using`、0本なら区分ごと出さない）・「足せるアプリ」（`available` のうち `using` でないもの、0本なら出さない）。アプリの名前・説明・料金は `APP_CATALOG`、アイコンは `useAppRegistry()` の `icon`。「使い始める」はアプリの入口に持たせた開始の行き先（Threadsは `/threads/accounts/new`。`AppModule` に `startPath` を足す）。`APP_CATALOG` にあっても登録の一覧にないアプリは出さない。T047が通ること。
+- [X] T054 [US3] `web/shell/layout/UserMenu.tsx` に「すべてのアプリ」を「設定」の下に足す（`/apps` へ）。ほかの項目は変えない。T049が通ること。
+- [X] T055 [US3] `web/apps/threads/index.ts` の `threadsApp` に `icon`（Threadsのアイコン）と `startPath: "/threads/accounts/new"` を入れ、`web/shell/app-module.ts` の `AppModule` の型に `startPath` を足す。
 
 **Checkpoint**：登録した直後の人は `/apps` から始まり、Threadsを始められる。今の利用者の入口は `/threads` のまま。
 
@@ -167,18 +167,18 @@ description: "Task list for feature 028 meguru shell and web split"
 
 ### Tests for User Story 4
 
-- [ ] T056 [US4] マイグレーションを作る（data-model.md 1）：`api/platform/schema.ts` の `users` に `lastAppId: text("last_app_id")`（**`text`・null可・既定 `null`・CHECKの制約なし**）を足し、`pnpm --filter api db:generate` で `apps/api/drizzle/0025_*.sql` を作る。もう一度 `db:generate` して変更なしを確かめる。（T051より先に行う）
-- [ ] T057 [P] [US4] `api-test/` に `PUT /api/me/last-app` のテストを足す（contracts/api.md 2・4）：`{ app: "threads" }` で `204` と `users.last_app_id = 'threads'`、知らないIDで `400 VALIDATION_FAILED`（`details: ["app"]`）、`released` でないIDで `400`、ログインなしで `401`、使っていないアプリでも覚えること。APIの入口の一覧（`api-test/repo/routes.snapshot.txt`）に `PUT /api/me/last-app` を足す。先に失敗を確かめる。
-- [ ] T058 [P] [US4] `web-test/app-switcher.test.tsx` を作る（research.md R13）：テストの中だけで仮のアプリ `sample`（`AppModule`：`/sample` のホームと、サイドバーの頭・中身）を作り、`buildRoutes([threadsApp, sampleApp])` と `AppRegistryProvider` で組む。確かめること：`me.apps.using: ["threads", "sample"]` ならサイドバーのいちばん上にアプリの切り替えが出て、その下にThreadsのアカウントの切り替えが出る／`using: ["threads"]` なら出ない（今の並び）／切り替えを押すと使っているアプリと「すべてのアプリ」が出て、`sample` を選ぶと `/sample` へ移る／`landing: "sample"` なら `/` で `/sample` が開く／`/sample` を開くと `PUT /api/me/last-app` を `{ app: "sample" }` で1回だけ呼ぶ（`me.apps.last` がすでに `sample` なら呼ばない）／`/apps`・`/settings` では呼ばない／呼び出しが失敗しても画面にエラーを出さない／仮のアプリを足すのに `buildRoutes` に渡す一覧のほか、外枠のコードを直していない（SC-005）／引き出しのサイドバー（390px幅）でも同じ並び。先に失敗を確かめる。
-- [ ] T059 [P] [US4] `eslint-rules/web-module-boundaries.test.js` に、仮のアプリのフォルダー（`apps/sample/`）でも①〜⑥が同じに当たることを足す（spec US2 5。T003で書いていれば確かめるだけ）。
+- [X] T056 [US4] マイグレーションを作る（data-model.md 1）：`api/platform/schema.ts` の `users` に `lastAppId: text("last_app_id")`（**`text`・null可・既定 `null`・CHECKの制約なし**）を足し、`pnpm --filter api db:generate` で `apps/api/drizzle/0025_*.sql` を作る。もう一度 `db:generate` して変更なしを確かめる。（T051より先に行う）
+- [X] T057 [P] [US4] `api-test/` に `PUT /api/me/last-app` のテストを足す（contracts/api.md 2・4）：`{ app: "threads" }` で `204` と `users.last_app_id = 'threads'`、知らないIDで `400 VALIDATION_FAILED`（`details: ["app"]`）、`released` でないIDで `400`、ログインなしで `401`、使っていないアプリでも覚えること。APIの入口の一覧（`api-test/repo/routes.snapshot.txt`）に `PUT /api/me/last-app` を足す。先に失敗を確かめる。
+- [X] T058 [P] [US4] `web-test/app-switcher.test.tsx` を作る（research.md R13）：テストの中だけで仮のアプリ `sample`（`AppModule`：`/sample` のホームと、サイドバーの頭・中身）を作り、`buildRoutes([threadsApp, sampleApp])` と `AppRegistryProvider` で組む。確かめること：`me.apps.using: ["threads", "sample"]` ならサイドバーのいちばん上にアプリの切り替えが出て、その下にThreadsのアカウントの切り替えが出る／`using: ["threads"]` なら出ない（今の並び）／切り替えを押すと使っているアプリと「すべてのアプリ」が出て、`sample` を選ぶと `/sample` へ移る／`landing: "sample"` なら `/` で `/sample` が開く／`/sample` を開くと `PUT /api/me/last-app` を `{ app: "sample" }` で1回だけ呼ぶ（`me.apps.last` がすでに `sample` なら呼ばない）／`/apps`・`/settings` では呼ばない／呼び出しが失敗しても画面にエラーを出さない／仮のアプリを足すのに `buildRoutes` に渡す一覧のほか、外枠のコードを直していない（SC-005）／引き出しのサイドバー（390px幅）でも同じ並び。先に失敗を確かめる。
+- [X] T059 [P] [US4] `eslint-rules/web-module-boundaries.test.js` に、仮のアプリのフォルダー（`apps/sample/`）でも①〜⑥が同じに当たることを足す（spec US2 5。T003で書いていれば確かめるだけ）。
 
 ### Implementation for User Story 4
 
-- [ ] T060 [US4] `api/platform/identity/me-routes.ts` に `PUT /me/last-app` を足す（contracts/api.md 2）：`lastAppRequestSchema` で確かめ、だめなら `AppError("VALIDATION_FAILED", 400, …, undefined, ["app"])`。`users.last_app_id` と `updated_at` を書き、`204` を返す。T057が通ること。
-- [ ] T061 [US4] `web/lib/api-client.ts` に `putLastApp(app: AppId)` を足し、`me` の型に `apps` を足す（共通の呼び出し）。
-- [ ] T062 [US4] `web/shell/lib/use-last-app.ts` を作り、外枠の関所の中（`web/shell/guards/RequireAuth.tsx` の子の共通の枠、またはサイドバーを出す `AppShell`）で使う（contracts/ui-routes.md 6）：`useCurrentApp()` が変わり、`me.apps.last` がそのアプリでなければ `putLastApp` を1回呼び、成功したら `queryKeys.me` を読み直す。失敗は黙って捨てる。`/apps`・`/settings`・ログインのいらないページでは呼ばない。`useCurrentApp()` は、PR2で決めたURLの頭（`APP_CATALOG` の `basePath`）で判定するよう直す。
-- [ ] T063 [US4] `web/shell/layout/AppSwitcher.tsx` を作る（contracts/ui-routes.md 5-2、外枠モック）：開いているアプリのアイコンと名前（`APP_CATALOG.name`。「めぐる Threads」）と下向きの印、押すと使っているアプリの一覧（開いているアプリに印）・区切り線・「すべてのアプリ」（`/apps`）。アプリを選ぶとそのアプリの `basePath` へ移る。
-- [ ] T064 [US4] `web/shell/layout/Sidebar.tsx`（枠）に、`me.apps.using.length >= 2` のときだけ、いちばん上の行をアプリの切り替えにし、アプリの `sidebar.Header` をその下に出す並びを足す（research.md R8）。1本以下のときの並びは変えない。T058が通り、`web-test/solo-owner-unchanged.test.tsx`・`layout-responsive.test.tsx` が中身を変えずに通ること。
+- [X] T060 [US4] `api/platform/identity/me-routes.ts` に `PUT /me/last-app` を足す（contracts/api.md 2）：`lastAppRequestSchema` で確かめ、だめなら `AppError("VALIDATION_FAILED", 400, …, undefined, ["app"])`。`users.last_app_id` と `updated_at` を書き、`204` を返す。T057が通ること。
+- [X] T061 [US4] `web/lib/api-client.ts` に `putLastApp(app: AppId)` を足し、`me` の型に `apps` を足す（共通の呼び出し）。
+- [X] T062 [US4] （**実装の結果**：`useRememberLastApp` を、`buildRoutes` のログインの関所の中の入れ物（`RememberLastApp`）で使う）`web/shell/lib/use-last-app.ts` を作り、外枠の関所の中（`web/shell/guards/RequireAuth.tsx` の子の共通の枠、またはサイドバーを出す `AppShell`）で使う（contracts/ui-routes.md 6）：`useCurrentApp()` が変わり、`me.apps.last` がそのアプリでなければ `putLastApp` を1回呼び、成功したら `queryKeys.me` を読み直す。失敗は黙って捨てる。`/apps`・`/settings`・ログインのいらないページでは呼ばない。`useCurrentApp()` は、PR2で決めたURLの頭（`APP_CATALOG` の `basePath`）で判定するよう直す。
+- [X] T063 [US4] `web/shell/layout/AppSwitcher.tsx` を作る（contracts/ui-routes.md 5-2、外枠モック）：開いているアプリのアイコンと名前（`APP_CATALOG.name`。「めぐる Threads」）と下向きの印、押すと使っているアプリの一覧（開いているアプリに印）・区切り線・「すべてのアプリ」（`/apps`）。アプリを選ぶとそのアプリの `basePath` へ移る。
+- [X] T064 [US4] `web/shell/layout/Sidebar.tsx`（枠）に、`me.apps.using.length >= 2` のときだけ、いちばん上の行をアプリの切り替えにし、アプリの `sidebar.Header` をその下に出す並びを足す（research.md R8）。1本以下のときの並びは変えない。T058が通り、`web-test/solo-owner-unchanged.test.tsx`・`layout-responsive.test.tsx` が中身を変えずに通ること。
 
 **Checkpoint（PR3の機能の完了）**：仮のアプリで、アプリの切り替えと最後に使ったアプリからの開始が動く。本番の利用者には切り替えは出ない。
 
@@ -186,11 +186,11 @@ description: "Task list for feature 028 meguru shell and web split"
 
 ## Phase 7：Polish & Cross-Cutting Concerns（PR3）
 
-- [ ] T065 [P] `docs/module-map.md` にWebの章を足す（spec FR-010・FR-011・FR-021）：contracts/web-module-boundaries.md の種類・入口・依存の向き・規則のかけ方、data-model.md 6 の地図（実際に移した結果）、境界の例外の表（T025で止めたもの。場所・理由・解消の予定）、アプリを足す手順（contracts/web-module-boundaries.md 5）、Threadsの公開ページの3つのURLを例外として残すこと（research.md R5）、`/api/me` の `using` の判定を2作目の利用権で置き換える予定（R6）、`@meguru/shared` の2作目からの置き場所とThreads固有のものが移す候補であること（R12）。
-- [ ] T066 [P] `docs/architecture.md` に、Webの構成（外枠・アプリ・共通の部品・組み立て）と、URLのパス分け・前のURLの転送・`/api/me` の `apps` を書き足す。
-- [ ] T067 [P] `docs/product-structure.md` §6 の表のWebの行を「◎ 028で `shell/` と `apps/<名前>/` に分けた。アプリ同士・外枠とアプリの境界をESLintでかける」に直し、§7 の「Webとsharedのモジュール分割の細部」の行を、決めたこと（028で済み・sharedは2作目から）に直す。§5 の表と食い違いがないかを確かめる。
-- [ ] T068 [P] `docs/ui-design.md` に、アプリの切り替え（サイドバーのいちばん上・2本以上のときだけ）・すべてのアプリの画面・ユーザーメニューの「すべてのアプリ」を書き足す。
-- [ ] T069 `/speckit-constitution` の手順で Constitution を **4.6.0（MINOR）** に改める（spec FR-021、plan の Constitution Check）：技術スタック制約に「**Webのモジュール構成**（2026-11-12、specs/028）」（外枠・アプリ・共通の部品・組み立て、依存の向き、入口、ESLintの規則 `eslint-rules/web-module-boundaries.js`、アプリを足すときは登録の1か所）と「**モバイル化を見込んだ技術の選び方**（2026-11-12）」（2作目以降のアプリは、業務の判断とデータのやりとりをAPIと共通のパッケージに置き、Webの画面やブラウザだけで動く仕組みに閉じこめない。Threadsは今のままでよい）を足し、Sync Impact Report を残す。
+- [X] T065 [P] `docs/module-map.md` にWebの章を足す（spec FR-010・FR-011・FR-021）：contracts/web-module-boundaries.md の種類・入口・依存の向き・規則のかけ方、data-model.md 6 の地図（実際に移した結果）、境界の例外の表（T025で止めたもの。場所・理由・解消の予定）、アプリを足す手順（contracts/web-module-boundaries.md 5）、Threadsの公開ページの3つのURLを例外として残すこと（research.md R5）、`/api/me` の `using` の判定を2作目の利用権で置き換える予定（R6）、`@meguru/shared` の2作目からの置き場所とThreads固有のものが移す候補であること（R12）。
+- [X] T066 [P] `docs/architecture.md` に、Webの構成（外枠・アプリ・共通の部品・組み立て）と、URLのパス分け・前のURLの転送・`/api/me` の `apps` を書き足す。
+- [X] T067 [P] `docs/product-structure.md` §6 の表のWebの行を「◎ 028で `shell/` と `apps/<名前>/` に分けた。アプリ同士・外枠とアプリの境界をESLintでかける」に直し、§7 の「Webとsharedのモジュール分割の細部」の行を、決めたこと（028で済み・sharedは2作目から）に直す。§5 の表と食い違いがないかを確かめる。
+- [X] T068 [P] `docs/ui-design.md` に、アプリの切り替え（サイドバーのいちばん上・2本以上のときだけ）・すべてのアプリの画面・ユーザーメニューの「すべてのアプリ」を書き足す。
+- [X] T069 （**実装の結果**：技術スタック制約に2つの決まりを足し、4.6.0 にした。テンプレートには影響なし）`/speckit-constitution` の手順で Constitution を **4.6.0（MINOR）** に改める（spec FR-021、plan の Constitution Check）：技術スタック制約に「**Webのモジュール構成**（2026-11-12、specs/028）」（外枠・アプリ・共通の部品・組み立て、依存の向き、入口、ESLintの規則 `eslint-rules/web-module-boundaries.js`、アプリを足すときは登録の1か所）と「**モバイル化を見込んだ技術の選び方**（2026-11-12）」（2作目以降のアプリは、業務の判断とデータのやりとりをAPIと共通のパッケージに置き、Webの画面やブラウザだけで動く仕組みに閉じこめない。Threadsは今のままでよい）を足し、Sync Impact Report を残す。
 - [ ] T070 quickstart.md の 1〜7 をすべて流し、結果をPR3の説明に書く。`pnpm --filter api db:migrate` をステージングに当てたあと（デプロイの手順に従う）、新しい人で `/apps` から始まることと、今の人で `/threads/…` から始まることを確かめる。
 
 ---

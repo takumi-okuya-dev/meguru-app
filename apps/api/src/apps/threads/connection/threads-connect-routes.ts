@@ -141,18 +141,18 @@ export function threadsConnectRoutes(authed: MiddlewareHandler<AppEnv>) {
       try {
         request = requestFromState(state);
       } catch (err) {
-        if (err instanceof AppError) return c.json({ redirectTo: withParams("/", { error: err.code }) });
+        if (err instanceof AppError) return c.json({ redirectTo: withParams("/threads", { error: err.code }) });
         throw err;
       }
-      if (!request) return c.json({ redirectTo: withParams("/", { error: "OAUTH_STATE_INVALID" }) });
+      if (!request) return c.json({ redirectTo: withParams("/threads", { error: "OAUTH_STATE_INVALID" }) });
 
-      const settings = `/accounts/${request.targetAccountId}/settings`;
+      const settings = `/threads/accounts/${request.targetAccountId}/settings`;
       // 許可の画面にいる間に消された・オーナーでなくなったアカウントの画面へは戻さない
       const fail = (code: ErrorCode) =>
         c.json({
           redirectTo:
             code === "ACCOUNT_NOT_FOUND" || code === "ROLE_FORBIDDEN"
-              ? withParams("/", { error: code })
+              ? withParams("/threads", { error: code })
               : withParams(settings, { error: code }),
         });
 
@@ -192,7 +192,7 @@ export function threadsConnectRoutes(authed: MiddlewareHandler<AppEnv>) {
         });
         // はじめてつないだときも、接続し直したときも、設定の画面へ戻す（specs/012 US2-2）
         return c.json({
-          redirectTo: withParams(`/accounts/${result.accountId}/settings`, { connected: result.kind }),
+          redirectTo: withParams(`/threads/accounts/${result.accountId}/settings`, { connected: result.kind }),
         });
       } catch (err) {
         if (!(err instanceof AppError)) throw err;
