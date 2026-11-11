@@ -8,7 +8,7 @@ import {
   type ReviewRequest,
   type ReviewResponse,
   type SkipReason,
-} from "@threads-grower/shared";
+} from "@meguru/shared";
 import { useCallback } from "react";
 import { toast } from "sonner";
 import { ApiError, api } from "@/lib/api-client";

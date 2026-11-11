@@ -1,7 +1,7 @@
 // 紹介リンク（specs/017-referral-links research.md R1〜R6）。
 // 紹介の列（users.referral_code・referred_by_user_id・referred_at）は、このファイルと、行を作る認証のミドルウェアだけが書く。
 // 紹介の記録は、料金・使える状態・権限・テスト版に入れるかの判定に使わない（FR-008）。
-import { REFERRAL_CODE_PATTERN, type ReferralResponse } from "@threads-grower/shared";
+import { REFERRAL_CODE_PATTERN, type ReferralResponse } from "@meguru/shared";
 import { and, count, eq, isNull } from "drizzle-orm";
 import type { Env } from "../../kernel/env";
 import { createDb, type Db } from "../../kernel/db/client";

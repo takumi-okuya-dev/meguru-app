@@ -11,7 +11,7 @@ import {
   type PostMention,
   type PublishError,
   type RejectReasonCode,
-} from "@threads-grower/shared";
+} from "@meguru/shared";
 import { and, asc, count, desc, eq, inArray, sql } from "drizzle-orm";
 import { z } from "zod";
 import { withTransaction, type Db, type TxDb } from "../../../kernel/db/client";

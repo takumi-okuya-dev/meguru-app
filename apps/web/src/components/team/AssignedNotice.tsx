@@ -1,5 +1,5 @@
 // 担当になったアカウントのホームに1回だけ出す「（アカウント名）の担当になりました」（specs/011-team-revision FR-062、research.md R9）。
-import type { AccountSummary } from "@threads-grower/shared";
+import type { AccountSummary } from "@meguru/shared";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { UsersIcon, XIcon } from "lucide-react";
 import { api } from "@/lib/api-client";

@@ -12,7 +12,7 @@ import {
   NEEDS_RECONNECT_BANNER_TOKEN,
   errorMessage,
   type AccountSummary,
-} from "@threads-grower/shared";
+} from "@meguru/shared";
 import { Link, Navigate, Outlet, useOutletContext, useParams } from "react-router";
 import { ReadOnlyBanner } from "@/components/billing/ReadOnlyBanner";
 import { TrialEndingBanner } from "@/components/billing/TrialEndingBanner";

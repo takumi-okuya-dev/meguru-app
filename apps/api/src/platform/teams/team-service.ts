@@ -1,7 +1,7 @@
 // チームの書き込みと読み出し（specs/011-team-revision data-model.md、research.md R1・R7・R8・R9）。
 // team_members・team_accounts・担当（memberships の editor の行）は、このファイルと invite-service.ts 以外から書かない。
 // 権限の判定は access.ts を通す（contracts/permissions.md「チームのAPIの判定」）。
-import { TEAM_EDITOR_LIMIT, TEAM_MEMBER_LIMIT, TEAMS_PER_ADMIN, type TeamRole } from "@threads-grower/shared";
+import { TEAM_EDITOR_LIMIT, TEAM_MEMBER_LIMIT, TEAMS_PER_ADMIN, type TeamRole } from "@meguru/shared";
 import { and, asc, count, eq, inArray, ne, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import type { Env } from "../../kernel/env";

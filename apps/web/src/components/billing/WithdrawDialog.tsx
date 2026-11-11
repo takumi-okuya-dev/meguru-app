@@ -2,7 +2,7 @@
 // 消えるもの・チームの行き先・契約の扱いを出し、メールアドレスの入力で確定する。終わったらログアウトして入口へ移る。
 import { useClerk } from "@clerk/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { errorMessage, type WithdrawalPreview } from "@threads-grower/shared";
+import { errorMessage, type WithdrawalPreview } from "@meguru/shared";
 import { useState } from "react";
 import { useNavigate } from "react-router";
 import { Button } from "@/components/ui/button";

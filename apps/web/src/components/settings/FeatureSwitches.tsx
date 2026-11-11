@@ -1,6 +1,6 @@
 // 機能のまとまりの3つのスイッチと「保存」（specs/019-feature-switches contracts/ui-routes.md 4・5）。
 // 運営者の「使える機能」（人の設定）と、グループの詳しい画面（グループの設定）で使う。
-import { FEATURE_LABELS, FEATURES, type Feature, type FeatureSettingsRequest } from "@threads-grower/shared";
+import { FEATURE_LABELS, FEATURES, type Feature, type FeatureSettingsRequest } from "@meguru/shared";
 import { ChevronRightIcon } from "lucide-react";
 import { useId, useState, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";

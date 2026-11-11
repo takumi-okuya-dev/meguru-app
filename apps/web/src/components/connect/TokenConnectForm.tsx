@@ -1,7 +1,7 @@
 // トークンの貼り付け（specs/010-token-account-add contracts/ui-routes.md、FR-002・FR-003・FR-051）。
 // 「Threadsとの接続」（はじめてつなぐ。specs/012）と、接続し直しのダイアログで共用する。トークンの値はこの部品の中だけで持ち、保存しない。
 import { useMutation } from "@tanstack/react-query";
-import { cleanToken, errorMessage, isTokenShaped, type TokenConnectResponse } from "@threads-grower/shared";
+import { cleanToken, errorMessage, isTokenShaped, type TokenConnectResponse } from "@meguru/shared";
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { Link } from "react-router";
 import { Alert, AlertDescription } from "@/components/ui/alert";

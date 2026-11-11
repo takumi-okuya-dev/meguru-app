@@ -1,7 +1,7 @@
 // US3：AIと深掘りする（specs/014-strategy-guidance FR-030〜FR-035・FR-070、SC-004・SC-005・SC-008）
 import { screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { FINAL_BEGIN, FINAL_END } from "@threads-grower/shared";
+import { FINAL_BEGIN, FINAL_END } from "@meguru/shared";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderStrategyPage, strategyOf } from "./helpers/strategy-page";
 

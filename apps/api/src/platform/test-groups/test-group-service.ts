@@ -8,7 +8,7 @@ import {
   type TestGroupEventAction,
   type TestGroupSummary,
   type TestInvitePreview,
-} from "@threads-grower/shared";
+} from "@meguru/shared";
 import { and, asc, count, desc, eq, getTableName, inArray, isNull, sql, type AnyColumn, type SQL, type Table } from "drizzle-orm";
 import type { Env } from "../../kernel/env";
 import { billingModeOf, type BillingMode } from "../../kernel/config";

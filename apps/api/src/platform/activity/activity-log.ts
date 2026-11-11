@@ -7,7 +7,7 @@ import {
   ACTIVITY_PAGE_MAX,
   ACTIVITY_PAGE_SIZE,
   ACTIVITY_SUMMARY_CHARS,
-} from "@threads-grower/shared";
+} from "@meguru/shared";
 import { and, desc, eq, gte, inArray, lt, or, sql } from "drizzle-orm";
 import { withTransaction, type Db, type TxDb } from "../../kernel/db/client";
 import { activityLogs, users } from "../schema";

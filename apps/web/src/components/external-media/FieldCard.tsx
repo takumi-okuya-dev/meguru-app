@@ -1,6 +1,6 @@
 // 入力の画面の欄のカード（specs/021 FR-010・FR-011、contracts/ui-routes.md 3）。
 // 欄の名前・必須・登録後に変えられない・文字数・コピー・入力・媒体の画面での名前と説明・選ぶ欄の選択肢と理由・タイトルのほかの案。
-import { countChars, type MediaField } from "@threads-grower/shared";
+import { countChars, type MediaField } from "@meguru/shared";
 import { useId } from "react";
 import { cn } from "@/lib/utils";
 import { CopyValueButton } from "./CopyValueButton";

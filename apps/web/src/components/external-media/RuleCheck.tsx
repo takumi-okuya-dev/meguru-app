@@ -1,5 +1,5 @@
 // ルールのチェックの枠（specs/021 FR-020・FR-021、contracts/ui-routes.md 3）。赤・黄・参考の件数と項目、閉じたトグル「自動で直した内容」。
-import type { ListingCheck, ListingFix } from "@threads-grower/shared";
+import type { ListingCheck, ListingFix } from "@meguru/shared";
 import { ChevronRightIcon } from "lucide-react";
 import { useId, useState } from "react";
 import { cn } from "@/lib/utils";

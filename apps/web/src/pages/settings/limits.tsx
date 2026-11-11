@@ -6,7 +6,7 @@ import {
   DAILY_POST_LIMIT_MAX,
   type DefaultLimits,
   type OperatorLimitUser,
-} from "@threads-grower/shared";
+} from "@meguru/shared";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useId, useState, type FormEvent } from "react";
 import { Toggle } from "@/components/settings/FeatureSwitches";

@@ -1,6 +1,6 @@
 // 運営者のアカウント一覧（specs/026-operator-accounts contracts/api.md、US1〜US3、T003・T008・T012）
 import { neon } from "@neondatabase/serverless";
-import type { OperatorAccounts } from "@threads-grower/shared";
+import type { OperatorAccounts } from "@meguru/shared";
 import { beforeEach, describe, expect, it } from "vitest";
 import { makeApp, resetDb, testEnv } from "../helpers/app";
 import { TESTER_OPERATOR, callT, codeOf, resetOperatorSettings } from "../helpers/tester-invites";

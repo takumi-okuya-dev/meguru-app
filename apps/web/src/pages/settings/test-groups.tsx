@@ -7,7 +7,7 @@ import {
   TEST_GROUP_NAME_MAX,
   type TestGroupDetail,
   type TestGroupEventAction,
-} from "@threads-grower/shared";
+} from "@meguru/shared";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ChevronLeftIcon, ChevronRightIcon } from "lucide-react";
 import { useRef, useState, type FormEvent } from "react";

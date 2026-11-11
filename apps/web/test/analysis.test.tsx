@@ -9,7 +9,7 @@ import {
   type AnalysisPost,
   type AnalysisResponse,
   type ClassificationsResponse,
-} from "@threads-grower/shared";
+} from "@meguru/shared";
 import { createMemoryRouter, Outlet, RouterProvider } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 

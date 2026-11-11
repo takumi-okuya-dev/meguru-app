@@ -1,6 +1,6 @@
 // 要確認の下書きの類似度を、ブラウザで計算する（specs/004-review-approval FR-026・FR-030、research.md R8）。
 // 要確認が多いときは、画面の操作を止めないよう、アイドル時に分けて計算する。
-import { computeSimilarities, type PostDraft, type SimilarityResult } from "@threads-grower/shared";
+import { computeSimilarities, type PostDraft, type SimilarityResult } from "@meguru/shared";
 import { useEffect, useMemo, useState } from "react";
 
 /** これを超える件数は、分けて計算する。 */

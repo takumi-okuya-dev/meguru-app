@@ -25,7 +25,7 @@ import {
   type ReferencePlatform,
   type RejectReasonCode,
   type StrategyValues,
-} from "@threads-grower/shared";
+} from "@meguru/shared";
 import { and, asc, desc, eq, inArray } from "drizzle-orm";
 import type { Db } from "../../../kernel/db/client";
 import { draftBatches, postDrafts, postMetrics, promotions, referencePosts } from "../schema";

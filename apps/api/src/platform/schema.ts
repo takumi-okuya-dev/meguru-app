@@ -36,7 +36,7 @@ import {
   TESTER_SLOT_CAPACITY_DEFAULT,
   TESTER_SLOT_CAPACITY_MAX,
   TESTER_SLOT_CAPACITY_MIN,
-} from "@threads-grower/shared";
+} from "@meguru/shared";
 import { bytea, timestamps, inList } from "../kernel/db/columns";
 // 境界の例外（docs/module-map.md 4）：operator_events.application_id の外部キーのためだけに、Threadsの表を読む（参照は遅延で、読みこみの循環でも壊れない）
 // eslint-disable-next-line local/module-boundaries

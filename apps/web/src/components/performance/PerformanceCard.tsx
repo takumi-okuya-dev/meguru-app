@@ -1,5 +1,5 @@
 // 投稿のカード（specs/006-performance-feedback contracts/ui-routes.md「投稿のカード」、FR-016〜FR-018）。
-import { PERFORMANCE_MESSAGES, type Metrics, type PerformanceItem } from "@threads-grower/shared";
+import { PERFORMANCE_MESSAGES, type Metrics, type PerformanceItem } from "@meguru/shared";
 import { ExternalLinkIcon } from "lucide-react";
 import type { ReactNode } from "react";
 import { formatJstMonthDay, formatJstShort, formatJstWithWeekday } from "@/lib/format";

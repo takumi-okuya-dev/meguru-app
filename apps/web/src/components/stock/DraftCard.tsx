@@ -1,11 +1,11 @@
 // 下書き1件のカード（specs/004-review-approval contracts/ui-routes.md「下書きのカード」、docs/ui-design.md 型C）。
 // 上から：選択・本文・ラベルの行・長さの表示・タブごとの操作。
-import type { PostDraft, PublishCheck } from "@threads-grower/shared";
+import type { PostDraft, PublishCheck } from "@meguru/shared";
 import {
   blockedReasonLabel,
   PUBLISH_ERROR_LABELS,
   rejectReasonLabel,
-} from "@threads-grower/shared";
+} from "@meguru/shared";
 import { EllipsisIcon, LoaderCircleIcon } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";

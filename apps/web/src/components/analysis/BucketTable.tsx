@@ -1,6 +1,6 @@
 // 区切りの表（時間帯・曜日・文字数・書き出しの型・テーマ。specs/022 contracts/ui-routes.md 6〜9）。
 // パソコンは列にそろえ、スマートフォンは1行を縦に積む（横にスクロールさせない。FR-063）。
-import { ANALYSIS_MIN_BUCKET, type BucketRow } from "@threads-grower/shared";
+import { ANALYSIS_MIN_BUCKET, type BucketRow } from "@meguru/shared";
 import type { ReactNode } from "react";
 import { MarkChip } from "./MarkChip";
 import { num, pct } from "./format";

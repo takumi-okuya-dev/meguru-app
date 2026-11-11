@@ -14,7 +14,7 @@ import {
   type PostedDateMode,
   type ReferenceMetricKey,
   type ReferencePlatform,
-} from "@threads-grower/shared";
+} from "@meguru/shared";
 import { ChevronDownIcon } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import { FieldWithCounter } from "@/components/FieldWithCounter";

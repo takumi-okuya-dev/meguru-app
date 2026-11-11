@@ -6,7 +6,7 @@ import {
   type PostDraftStatus,
   type PublishCheck,
   type SimilarityResult,
-} from "@threads-grower/shared";
+} from "@meguru/shared";
 import { useId, useState, type ReactNode } from "react";
 import { cn } from "@/lib/utils";
 

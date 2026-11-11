@@ -10,7 +10,7 @@ import {
   validatePostingSchedule,
   type PostingSchedule,
   type ThreadsCheck,
-} from "@threads-grower/shared";
+} from "@meguru/shared";
 import { XIcon } from "lucide-react";
 import { useRef, useState } from "react";
 import { FormDialogFrame } from "@/components/items/FormDialogFrame";

@@ -1,7 +1,7 @@
 // リサーチの画面（specs/002 US3、contracts/ui-routes.md「リサーチの画面」、docs/ui-design.md 型B）。
 // 上部のタブで「参考投稿」と「キーワード」を切り替える（選択中のタブはクエリ ?tab= に持つ）。
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { ReferencePost, ResearchKeyword } from "@threads-grower/shared";
+import type { ReferencePost, ResearchKeyword } from "@meguru/shared";
 import { EllipsisIcon, ExternalLinkIcon, PlusIcon } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 import { useLocation, useSearchParams } from "react-router";

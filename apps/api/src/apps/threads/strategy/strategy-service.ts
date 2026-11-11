@@ -10,7 +10,7 @@ import {
   isBlank,
   type PutStrategyRequest,
   type StrategyValues,
-} from "@threads-grower/shared";
+} from "@meguru/shared";
 import { and, eq } from "drizzle-orm";
 import type { Db, TxDb } from "../../../kernel/db/client";
 import { strategyDesigns } from "../schema";

@@ -1,7 +1,7 @@
 // 解析（/accounts/:accountId/analysis。specs/022-algorithm-analysis contracts/ui-routes.md、モック https://claude.ai/artifact/5GK8yF32kwsAqPVU1SaT8A ）。
 // 計算はAPI（shared の analyzePosts）で行い、画面は出すだけ。説明は閉じたトグルに置く（FR-064）。
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { AnalysisResponse, AnalysisScope } from "@threads-grower/shared";
+import type { AnalysisResponse, AnalysisScope } from "@meguru/shared";
 import { useState } from "react";
 import { useSearchParams } from "react-router";
 import { toast } from "sonner";

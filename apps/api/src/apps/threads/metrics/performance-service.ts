@@ -15,7 +15,7 @@ import {
   type PerformanceTab,
   type PostExportRow,
   type SnapshotExportRow,
-} from "@threads-grower/shared";
+} from "@meguru/shared";
 import { alias } from "drizzle-orm/pg-core";
 import { and, asc, desc, eq, inArray, isNull, or, sql, type SQL } from "drizzle-orm";
 import type { Db, TxDb } from "../../../kernel/db/client";

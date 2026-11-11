@@ -1,7 +1,7 @@
 // 担当を決める（/teams/:teamId/assign。specs/011-team-revision contracts/ui-routes.md「担当を決める」、US2、FR-022〜FR-024）。
 // 行＝編集者と管理者（自分）、列＝チームのアカウント。自分のアカウントのセルは「自分」。管理者だけが開ける。
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { errorMessage, type TeamAssignments } from "@threads-grower/shared";
+import { errorMessage, type TeamAssignments } from "@meguru/shared";
 import { ArrowLeftIcon, CheckIcon } from "lucide-react";
 import { Link, useParams } from "react-router";
 import { toast } from "sonner";

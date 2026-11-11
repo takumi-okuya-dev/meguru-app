@@ -1,7 +1,7 @@
 // 「投稿をつくる」の画面（specs/014-strategy-guidance US15、FR-160〜FR-162・FR-165、contracts/ui-routes.md「投稿をつくる」）。
 // 上から：5つの手順 → プロンプトのカード → 貼り付け欄。投稿ストック（/stock）は一覧だけにし、作る流れはこの画面にまとめる。
 import { useQuery } from "@tanstack/react-query";
-import { PROMPT_COUNT_DEFAULT } from "@threads-grower/shared";
+import { PROMPT_COUNT_DEFAULT } from "@meguru/shared";
 import { useEffect, useState } from "react";
 import { useLocation } from "react-router";
 import { ApiErrorScreen } from "@/components/ApiErrorScreen";

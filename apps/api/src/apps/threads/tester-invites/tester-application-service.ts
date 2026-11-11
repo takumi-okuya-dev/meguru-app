@@ -11,7 +11,7 @@ import {
   type TesterApplication,
   type TesterApplicationView,
   type TesterRemovalReason,
-} from "@threads-grower/shared";
+} from "@meguru/shared";
 import { and, asc, desc, eq, inArray, isNotNull, isNull, ne, sql, type SQL } from "drizzle-orm";
 import type { Env } from "../../../kernel/env";
 import { createDb, withTransaction, type Db, type TxDb } from "../../../kernel/db/client";

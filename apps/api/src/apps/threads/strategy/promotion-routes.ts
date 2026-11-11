@@ -8,7 +8,7 @@ import {
   sortPromotions,
   updatePromotionRequestSchema,
   type PromotionInput,
-} from "@threads-grower/shared";
+} from "@meguru/shared";
 import { and, count, eq, sql } from "drizzle-orm";
 import { Hono, type MiddlewareHandler } from "hono";
 import type { AppEnv } from "../../../platform";

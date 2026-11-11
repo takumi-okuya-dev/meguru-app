@@ -1,5 +1,5 @@
 // 内容（書き出しの型・テーマ）の表（specs/022 contracts/ui-routes.md 9）。
-import type { AnalysisResponse } from "@threads-grower/shared";
+import type { AnalysisResponse } from "@meguru/shared";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";

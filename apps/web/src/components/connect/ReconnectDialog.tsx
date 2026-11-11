@@ -1,7 +1,7 @@
 // 「接続し直す」のダイアログ（specs/010-token-account-add contracts/ui-routes.md、US3・FR-031）。
 // このアプリで許可（001のOAuth）と、トークンの貼り付けの2つから選ぶ。オーナーだけが開ける（呼び出し側で出し分ける）。
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { ConnectionMethod, TokenConnectResponse } from "@threads-grower/shared";
+import type { ConnectionMethod, TokenConnectResponse } from "@meguru/shared";
 import { ChevronRightIcon, XIcon } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";

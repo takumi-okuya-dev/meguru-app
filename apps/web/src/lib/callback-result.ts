@@ -1,6 +1,6 @@
 // APIのcallbackからのリダイレクトのクエリ（connected・error・account）を読み、トーストで表示してからURLから消す
 // （contracts/ui-routes.md「callbackの結果表示」）。specs/012 で、画面の中に出すとき（silent）のために読んだ値を返すようにした。
-import { connectedMessage, errorMessage, isErrorCode, type ErrorCode } from "@threads-grower/shared";
+import { connectedMessage, errorMessage, isErrorCode, type ErrorCode } from "@meguru/shared";
 import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router";
 import { toast } from "sonner";

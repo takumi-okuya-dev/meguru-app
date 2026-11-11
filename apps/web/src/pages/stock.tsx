@@ -9,7 +9,7 @@ import {
   checkPublishable,
   type PostDraft,
   type PublishCheck,
-} from "@threads-grower/shared";
+} from "@meguru/shared";
 import { useMemo, useState } from "react";
 import { Link } from "react-router";
 import { toast } from "sonner";

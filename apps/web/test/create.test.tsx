@@ -2,7 +2,7 @@
 // プロンプトのカードと貼り付け欄のテストは、003・004の投稿ストックのテストから移した。
 import { act, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import type { DraftBatchResult } from "@threads-grower/shared";
+import type { DraftBatchResult } from "@meguru/shared";
 import { useState } from "react";
 import { Link, Outlet } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";

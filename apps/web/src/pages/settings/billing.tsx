@@ -1,7 +1,7 @@
 // 設定 > 契約と支払い（specs/013-billing contracts/ui-routes.md「契約と支払い」、FR-020〜FR-025・FR-033・FR-034）。
 // カードの入力・契約の確認・カードの変更・解約は、Stripeの画面（Checkout・カスタマーポータル）で行う。
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { errorMessage, type BillingSummary } from "@threads-grower/shared";
+import { errorMessage, type BillingSummary } from "@meguru/shared";
 import { useEffect, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router";
 import { toast } from "sonner";

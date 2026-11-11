@@ -1,7 +1,7 @@
 // 「再接続」のボタン（001 FR-019。specs/010 で接続の方法を選ぶダイアログを開く形にした）
 import { useState } from "react";
 import { useOutletContext } from "react-router";
-import type { AccountSummary } from "@threads-grower/shared";
+import type { AccountSummary } from "@meguru/shared";
 import { ReconnectDialog } from "@/components/connect/ReconnectDialog";
 import { Button } from "@/components/ui/button";
 

@@ -1,6 +1,6 @@
 // Accountでの役割と権限（specs/008-team-operations contracts/permissions.md「画面での出し分け」、contracts/ui-routes.md「共通の振る舞い」）。
 // 出し分けは見た目のためだけで、守りはAPIの判定にある（FR-003）。
-import { ACCOUNT_ACCESS_LOST_MESSAGE, type AccountAccessResponse, type Feature, type Permission } from "@threads-grower/shared";
+import { ACCOUNT_ACCESS_LOST_MESSAGE, type AccountAccessResponse, type Feature, type Permission } from "@meguru/shared";
 import { useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
 import { useEffect } from "react";
 import { useNavigate } from "react-router";

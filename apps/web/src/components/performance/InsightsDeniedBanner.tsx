@@ -1,5 +1,5 @@
 // 反応数を読む許可がないときの案内（specs/006-performance-feedback research.md R11）。
-import { PERFORMANCE_MESSAGES } from "@threads-grower/shared";
+import { PERFORMANCE_MESSAGES } from "@meguru/shared";
 import { TriangleAlertIcon } from "lucide-react";
 import { ReconnectButton } from "@/components/ReconnectButton";
 

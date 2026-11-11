@@ -1,6 +1,6 @@
 // ラベル・説明・未入力・文字数つきの入力欄（docs/ui-design.md 型A、specs/002 contracts/ui-routes.md 規則9）。
 // 各項目に出すのは、ラベル・1行の説明・入力欄（記入例は空の欄の中）・文字数だけにする。
-import { countChars, isBlank } from "@threads-grower/shared";
+import { countChars, isBlank } from "@meguru/shared";
 import type { ReactNode } from "react";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";

@@ -1,6 +1,6 @@
 // 使えない機能を直接開いたときの画面（specs/019-feature-switches contracts/ui-routes.md 3、FR-006）。
 // 理由や料金の案内は出さない（プランが決まってから足す）。
-import type { Feature } from "@threads-grower/shared";
+import type { Feature } from "@meguru/shared";
 import type { ReactNode } from "react";
 import { Link, useParams } from "react-router";
 import { LoadingSkeleton } from "@/components/guards";

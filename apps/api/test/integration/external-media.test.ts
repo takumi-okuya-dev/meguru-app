@@ -1,6 +1,6 @@
 // 外部媒体展開のAPI（specs/021-external-media contracts/api.md、tasks.md T007・T025・T044・T052）
 import { neon } from "@neondatabase/serverless";
-import type { ListingDetail } from "@threads-grower/shared";
+import type { ListingDetail } from "@meguru/shared";
 import { beforeEach, describe, expect, it } from "vitest";
 import { call, createUserWithAccount, endTrial, makeApp, resetDb, testEnv } from "../helpers/app";
 import { disableFeatures } from "../helpers/features";

@@ -1,6 +1,6 @@
 // /api/operator/users・/api/operator/feature-settings（specs/019-feature-switches contracts/api.md「運営者のAPI」）。
 // 運営者（OPERATOR_CLERK_USER_IDS）だけ。招待制（TEST_GROUPS_ENABLED）に関わらず、どの環境でも使える（research.md R5）。
-import { featureSettingsRequestSchema, operatorUserQuerySchema } from "@threads-grower/shared";
+import { featureSettingsRequestSchema, operatorUserQuerySchema } from "@meguru/shared";
 import { Hono, type MiddlewareHandler } from "hono";
 import type { AppEnv } from "../identity/auth";
 import { operatorOnly } from "../operator/operator-only";

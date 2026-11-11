@@ -1,5 +1,5 @@
 // /api/operator/limits（specs/024-tester-invite-connect contracts/api.md「運営者の上限」）。運営者だけ。どの環境でも使える。
-import { defaultLimitsRequestSchema, operatorUserQuerySchema, userLimitsRequestSchema } from "@threads-grower/shared";
+import { defaultLimitsRequestSchema, operatorUserQuerySchema, userLimitsRequestSchema } from "@meguru/shared";
 import { Hono, type MiddlewareHandler } from "hono";
 import type { AppEnv } from "../identity/auth";
 import { createDb } from "../../kernel/db/client";

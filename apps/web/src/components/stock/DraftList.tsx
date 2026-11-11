@@ -1,7 +1,7 @@
 // 状態のタブごとの下書きの一覧（specs/003 US2・US3、specs/004 FR-011・FR-012、contracts/ui-routes.md）。
 // 要確認：新しい登録が上、同じ登録の中は貼り付けた順（API の順のまま）。登録のまとまりごとに小見出しを挟む。
 // 承認済み・却下：承認・却下した日時の新しい順（API の順のまま）。
-import { REJECTED_LIST_MAX, type PostDraft } from "@threads-grower/shared";
+import { REJECTED_LIST_MAX, type PostDraft } from "@meguru/shared";
 import type { ReactNode } from "react";
 import { Link } from "react-router";
 import { Button } from "@/components/ui/button";

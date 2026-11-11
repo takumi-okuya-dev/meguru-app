@@ -1,5 +1,5 @@
 // 自動投稿の時刻の見直しの参考（specs/022 FR-040b）。時刻は自動では変えない。
-import type { AnalysisResponse } from "@threads-grower/shared";
+import type { AnalysisResponse } from "@meguru/shared";
 import { Link } from "react-router";
 import { formatSlotTime } from "@/lib/format";
 

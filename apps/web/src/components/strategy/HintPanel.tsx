@@ -1,7 +1,7 @@
 // 考えるヒント（specs/014-strategy-guidance FR-001〜FR-004、contracts/ui-routes.md「課題」）。
 // 「考えるヒント」のボタンで開閉し、コツ・悪い例と良い例・3つの問いを出す。開いたかどうかは保存しない。
 // Notionのトグルのように、開閉は先頭の矢印の向きで示し、文言は変えない（開いてもボタンの幅が変わらず、横のボタンが動かない。2026-11-02）。
-import type { StrategyHint } from "@threads-grower/shared";
+import type { StrategyHint } from "@meguru/shared";
 import { ChevronRightIcon } from "lucide-react";
 import { useId, useState, type ReactNode } from "react";
 import { cn } from "@/lib/utils";

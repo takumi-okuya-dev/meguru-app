@@ -1,5 +1,5 @@
 // US3：運営者の上限のAPI（specs/024-tester-invite-connect contracts/api.md「運営者の上限」、FR-016・FR-017、T043）
-import type { OperatorLimitUser, OperatorLimits } from "@threads-grower/shared";
+import type { OperatorLimitUser, OperatorLimits } from "@meguru/shared";
 import { beforeEach, describe, expect, it } from "vitest";
 import { makeApp, resetDb, testEnv } from "../helpers/app";
 import { TESTER_OPERATOR, callT, codeOf, operatorEventRows } from "../helpers/tester-invites";

@@ -1,7 +1,7 @@
 // 契約前の画面（specs/024-tester-invite-connect contracts/ui-routes.md 1、FR-029、モック1枚目）。
 // 無料体験はなく、契約するまではアプリを使えない。料金と「契約する」だけを出し、ログアウト・退会は下に離して置く。
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { BILLING_UNIT_PRICE_JPY } from "@threads-grower/shared";
+import { BILLING_UNIT_PRICE_JPY } from "@meguru/shared";
 import { useEffect } from "react";
 import { Link } from "react-router";
 import { CenteredLayout } from "@/components/layout/AppShell";

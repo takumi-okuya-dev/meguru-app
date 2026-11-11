@@ -8,7 +8,7 @@ import {
   isBlank,
   type NgWord,
   type PostDraft,
-} from "@threads-grower/shared";
+} from "@meguru/shared";
 import { FieldWithCounter } from "@/components/FieldWithCounter";
 import { DeletedElsewhereNotice, FormDialogFrame } from "@/components/items/FormDialogFrame";
 import { useItemForm, type FormErrors } from "@/components/items/use-item-form";

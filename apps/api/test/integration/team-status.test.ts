@@ -1,6 +1,6 @@
 // チームの運用状況（specs/020-team-monitoring、contracts/api.md、data-model.md、research.md R1〜R8）
 import { neon } from "@neondatabase/serverless";
-import type { TeamDetail, TeamStatus } from "@threads-grower/shared";
+import type { TeamDetail, TeamStatus } from "@meguru/shared";
 import { beforeEach, describe, expect, it } from "vitest";
 import { call, createUserWithAccount, makeApp, resetDb, setAccount, testEnv } from "../helpers/app";
 import { approvedDrafts, confirmedMetrics, publishedDrafts } from "../helpers/auto-post";

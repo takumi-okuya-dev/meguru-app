@@ -1,7 +1,7 @@
 // 定期処理の関所（specs/005-auto-post research.md R3、contracts/auto-post-job.md 手順0・7）。
 // 5分ごとの処理は、まずKVを見て、用がなければDBに触れずに終える（Neonを止める時間を作り、無料枠に収めるため）。
 // autopost:gate は定期処理だけが、autopost:wake はAPIだけが書く（書く側を1つに決め、同時に書いても値を失わない）。
-import { AUTOPOST_GATE_MAX_SLEEP_MINUTES } from "@threads-grower/shared";
+import { AUTOPOST_GATE_MAX_SLEEP_MINUTES } from "@meguru/shared";
 
 const GATE_KEY = "autopost:gate";
 const WAKE_KEY = "autopost:wake";

@@ -1,6 +1,6 @@
 // おすすめに乗った目安の投稿（specs/022 contracts/ui-routes.md 5、FR-020〜FR-023）。
 // パソコンは列にそろえ、スマートフォンは1件ずつ縦に積む（モック「解析（スマートフォン）」）。
-import type { AnalysisResponse } from "@threads-grower/shared";
+import type { AnalysisResponse } from "@meguru/shared";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { formatJstWithWeekday } from "@/lib/format";

@@ -4,7 +4,7 @@ import {
   connectRequestSchema,
   tokenConnectRequestSchema,
   type ErrorCode,
-} from "@threads-grower/shared";
+} from "@meguru/shared";
 import { Hono, type MiddlewareHandler } from "hono";
 import { bodyLimit } from "hono/body-limit";
 import type { AppEnv } from "../../../platform";

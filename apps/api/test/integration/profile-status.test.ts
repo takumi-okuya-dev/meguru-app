@@ -1,5 +1,5 @@
 // US4：ホームの入力状況（specs/002-strategy-profile FR-017・FR-024b、research.md R11・R14）
-import { emptyStrategyValues, jstToday } from "@threads-grower/shared";
+import { emptyStrategyValues, jstToday } from "@meguru/shared";
 import { beforeEach, describe, expect, it } from "vitest";
 import { AFTER_TRIAL, call, createUserWithAccount, insertSubscription, makeApp, resetDb, setAccount } from "../helpers/app";
 import { billingEnv } from "../helpers/billing";

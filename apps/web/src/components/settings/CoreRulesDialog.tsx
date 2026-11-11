@@ -1,6 +1,6 @@
 // 投稿ルール（CORE RULES）のダイアログ（specs/004-review-approval FR-019〜FR-021、contracts/ui-routes.md「投稿ルールのダイアログ」）。
 // 002の追加・編集のダイアログの枠と振る舞い（未保存の警告・他の場所での更新・grower機能の判定）を使う。
-import { CORE_RULES_MAX, countChars, type CoreRulesResponse } from "@threads-grower/shared";
+import { CORE_RULES_MAX, countChars, type CoreRulesResponse } from "@meguru/shared";
 import { FieldWithCounter } from "@/components/FieldWithCounter";
 import { FormDialogFrame } from "@/components/items/FormDialogFrame";
 import { useItemForm } from "@/components/items/use-item-form";

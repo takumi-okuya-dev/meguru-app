@@ -1,7 +1,7 @@
 // 期限を確かめられなかったトークンの、2時間後の確かめ直し（specs/010-token-account-add FR-012、research.md R8）。
 // 5分ごとの定期処理の中で動き、関所の「次に見る時刻」に最も早い recheck_at を足す。新しいCronは足さない。
 // 書き込みは読んだ時点の connection_generation を条件にし、その間に接続し直していれば結果を捨てる（001 R6）。
-import { TOKEN_RECHECK_BATCH, TOKEN_RECHECK_RETRY_MINUTES } from "@threads-grower/shared";
+import { TOKEN_RECHECK_BATCH, TOKEN_RECHECK_RETRY_MINUTES } from "@meguru/shared";
 import { and, asc, eq, isNotNull, lte, min, sql } from "drizzle-orm";
 import type { Db } from "../../../kernel/db/client";
 import { threadsConnections } from "../schema";

@@ -1,7 +1,7 @@
 // 参考投稿を追加（ためてまとめて登録。specs/014-strategy-guidance US7、FR-080〜FR-085、contracts/ui-routes.md「リサーチ」）。
 // 1件入れるたびに「ためる」で欄の上に並べ、最後に「〇件を登録する」で、ためた分と入力中の分を1回で登録する。
 import { useMutation } from "@tanstack/react-query";
-import { REFERENCE_BATCH_MAX, isBlank } from "@threads-grower/shared";
+import { REFERENCE_BATCH_MAX, isBlank } from "@meguru/shared";
 import { useState } from "react";
 import { UnsavedChangesDialog } from "@/components/UnsavedChangesDialog";
 import { BillingRequiredDialog } from "@/components/billing/BillingRequiredDialog";

@@ -1,6 +1,6 @@
 // /api/operator/test-groups（specs/016-test-groups contracts/api.md「運営者のAPI」）。
 // 運営者（OPERATOR_CLERK_USER_IDS）だけ。招待制がOFFの環境（本番）でも、機能の設定のために使う（specs/019 FR-017、research.md R11）。
-import { featureSettingsRequestSchema, testGroupCreateRequestSchema, testGroupUpdateRequestSchema } from "@threads-grower/shared";
+import { featureSettingsRequestSchema, testGroupCreateRequestSchema, testGroupUpdateRequestSchema } from "@meguru/shared";
 import { Hono, type MiddlewareHandler } from "hono";
 import type { z } from "zod";
 import type { AppEnv } from "../identity/auth";

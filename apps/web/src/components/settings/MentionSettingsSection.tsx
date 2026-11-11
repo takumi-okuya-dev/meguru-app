@@ -1,7 +1,7 @@
 // 時間差のメンションの設定（specs/023 contracts/ui-routes.md「このアカウントの設定」、モック「このアカウントの設定」）。
 // 時間差・ひとこと・メンションする人（いつも付ける）。変えるのは settings の権限の人だけ。説明は閉じたトグル（FR-034）。
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { MENTION_DELAY_OPTIONS, MENTION_MESSAGE_MAX, MENTION_PEOPLE_MAX, type MentionSettings } from "@threads-grower/shared";
+import { MENTION_DELAY_OPTIONS, MENTION_MESSAGE_MAX, MENTION_PEOPLE_MAX, type MentionSettings } from "@meguru/shared";
 import { XIcon } from "lucide-react";
 import { useId, useState } from "react";
 import { Link } from "react-router";

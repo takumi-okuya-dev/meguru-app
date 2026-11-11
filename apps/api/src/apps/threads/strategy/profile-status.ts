@@ -1,6 +1,6 @@
 // ホームの入力状況（specs/002-strategy-profile FR-017・FR-024b、research.md R11・R14）。
 // 無料体験の状態はオーナーの使える状態から出す（specs/013 research.md R12）。
-import { jstToday, trialDaysLeft } from "@threads-grower/shared";
+import { jstToday, trialDaysLeft } from "@meguru/shared";
 import { sql } from "drizzle-orm";
 import type { Db } from "../../../kernel/db/client";
 import type { BillingMode } from "../../../kernel/config";

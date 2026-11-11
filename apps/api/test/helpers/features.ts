@@ -1,5 +1,5 @@
 // 機能のまとまりのテストの部品（specs/019-feature-switches tasks.md）：OFFの行を直接入れる、運営者の環境
-import type { Feature } from "@threads-grower/shared";
+import type { Feature } from "@meguru/shared";
 import { neon } from "@neondatabase/serverless";
 import type { Env } from "../../src/kernel/env";
 import { call, db, testEnv, type TestApp } from "./app";

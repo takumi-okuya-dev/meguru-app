@@ -5,7 +5,7 @@ import {
   listingUpdateRequestSchema,
   mediaDefaultsUpdateSchema,
   type Listing,
-} from "@threads-grower/shared";
+} from "@meguru/shared";
 import { Hono, type MiddlewareHandler } from "hono";
 import type { AppEnv } from "../../../platform";
 import { createDb, withTransaction } from "../../../kernel/db/client";

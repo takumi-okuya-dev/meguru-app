@@ -1,5 +1,5 @@
 // 自動投稿の毎日の片づけ（contracts/api.md「定期処理」）。027で jobs/daily-jobs.ts から移した（表の持ち主はThreads）。
-import { AUTOPOST_ATTEMPT_RETENTION_DAYS, addDays, jstDateOf } from "@threads-grower/shared";
+import { AUTOPOST_ATTEMPT_RETENTION_DAYS, addDays, jstDateOf } from "@meguru/shared";
 import { and, eq, isNotNull, lt, notExists, notInArray } from "drizzle-orm";
 import type { Env } from "../../../kernel/env";
 import { createDb } from "../../../kernel/db/client";

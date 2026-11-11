@@ -11,7 +11,7 @@ import {
   type Entitlement,
   type MeBilling,
   type SubscriptionStatus,
-} from "@threads-grower/shared";
+} from "@meguru/shared";
 import { and, eq, inArray, isNull, lt, notInArray, or, sql, type SQL } from "drizzle-orm";
 import type { Env } from "../../kernel/env";
 import { createDb, withTransaction, type Db, type TxDb } from "../../kernel/db/client";

@@ -5,7 +5,7 @@ import {
   type PerformanceItem,
   type PerformancePage as PerformancePageData,
   type PerformanceTab,
-} from "@threads-grower/shared";
+} from "@meguru/shared";
 import { useQueryClient, type InfiniteData } from "@tanstack/react-query";
 import { CheckIcon, InfoIcon } from "lucide-react";
 import { ApiErrorScreen } from "@/components/ApiErrorScreen";

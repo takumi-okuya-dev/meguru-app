@@ -10,7 +10,7 @@ import {
   type ListingUpdateRequest,
   type ListingValues,
   type Media,
-} from "@threads-grower/shared";
+} from "@meguru/shared";
 import { and, eq, sql } from "drizzle-orm";
 import type { Db, TxDb } from "../../../kernel/db/client";
 import { mediaDefaults, promotionListings, promotions } from "../schema";

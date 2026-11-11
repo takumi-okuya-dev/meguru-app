@@ -1,6 +1,6 @@
 // 下書きの応答に付ける時間差のメンション（specs/023-delayed-mention contracts/api.md「下書きの応答」）。
 // 一覧ごとに1回の問い合わせで読み、draft-service と mention-service の両方から使う（互いを読み込まないよう、ここに分ける）。
-import { mentionDueAt, type MentionFailureReason, type MentionState, type PostMention } from "@threads-grower/shared";
+import { mentionDueAt, type MentionFailureReason, type MentionState, type PostMention } from "@meguru/shared";
 import { inArray } from "drizzle-orm";
 import type { Db, TxDb } from "../../../kernel/db/client";
 import { postMentions } from "../schema";

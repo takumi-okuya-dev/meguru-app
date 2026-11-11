@@ -1,5 +1,5 @@
 // 投稿のルール：NGワードと投稿ルール（CORE RULES）（specs/004-review-approval research.md R6・R11）。
-import { NG_WORD_LIMIT, findNgWords, normalizeNgWord } from "@threads-grower/shared";
+import { NG_WORD_LIMIT, findNgWords, normalizeNgWord } from "@meguru/shared";
 import { and, asc, eq, inArray, sql } from "drizzle-orm";
 import { withTransaction, type Db, type TxDb } from "../../../kernel/db/client";
 import { lockAccountDrafts } from "../../../kernel/db/locks";

@@ -1,6 +1,6 @@
 // 投稿ストックの状態のタブ（specs/004-review-approval FR-001、contracts/ui-routes.md「状態のタブ」）。
 // 選んだタブは URL のクエリ（?tab=approved など）に持ち、再読み込みしても保つ。
-import type { DraftCounts } from "@threads-grower/shared";
+import type { DraftCounts } from "@meguru/shared";
 import { useCallback } from "react";
 import { useSearchParams } from "react-router";
 import { TabsList, TabsTrigger } from "@/components/ui/tabs";

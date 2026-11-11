@@ -1,6 +1,6 @@
 // 判定のバッジ（specs/006-performance-feedback contracts/ui-routes.md「判定のアイコン」、FR-013・FR-014）。
 // 文字のラベルは出さず、アイコンと倍率で見せる。意味は title と読み上げ用の文字で伝える。
-import { formatRatio, type PerformanceItem } from "@threads-grower/shared";
+import { formatRatio, type PerformanceItem } from "@meguru/shared";
 import { ArrowRightIcon, BanIcon, ClockIcon, TrendingDownIcon, TrendingUpIcon, type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 

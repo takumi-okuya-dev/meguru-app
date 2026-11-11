@@ -1,7 +1,7 @@
 // Threads接続フローの開始と state の扱い（research.md R3・R4）。
 // state は32バイトの乱数。DBには SHA-256 だけを保存し、有効期限は10分、使えるのは1回だけ。
 import { eq, lt } from "drizzle-orm";
-import type { ConnectRequest } from "@threads-grower/shared";
+import type { ConnectRequest } from "@meguru/shared";
 import { createDb, type Db } from "../../../kernel/db/client";
 import type { Env } from "../../../kernel/env";
 import { oauthStates } from "../schema";

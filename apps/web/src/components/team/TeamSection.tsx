@@ -2,7 +2,7 @@
 // 個人運用（チームに入っていない）のオーナーに出すのは「チームに入っていません」と「チームを作る」の1行だけ
 // （Constitution 4.0.1 原則Vの例外の1区分）。このときは、チームの問い合わせもしない。
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { AccountAccessResponse, AccountTeam } from "@threads-grower/shared";
+import type { AccountAccessResponse, AccountTeam } from "@meguru/shared";
 import { ChevronDownIcon, ChevronRightIcon } from "lucide-react";
 import { useState } from "react";
 import { Link } from "react-router";

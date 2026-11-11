@@ -7,7 +7,7 @@ import {
   staleUpdateTitle,
   type FeedbackResponse,
   type PerformanceItem,
-} from "@threads-grower/shared";
+} from "@meguru/shared";
 import { useEffect, useId, useState } from "react";
 import { api } from "@/lib/api-client";
 import { isStale } from "@/lib/save-error";

@@ -1,14 +1,14 @@
 // 投稿ストックと「投稿をつくる」の画面のテストの見本と組み立て（api-client の差し替えは各テストのファイルで行う）。
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render } from "@testing-library/react";
-import { POST_LENGTH_DEFAULTS } from "@threads-grower/shared";
+import { POST_LENGTH_DEFAULTS } from "@meguru/shared";
 import type {
   AccountSummary,
   DraftBatchResult,
   PostDraft,
   PostDraftList,
   PromptResponse,
-} from "@threads-grower/shared";
+} from "@meguru/shared";
 import type { ReactNode } from "react";
 import { createMemoryRouter, Outlet, RouterProvider, type RouteObject } from "react-router";
 import { UnsavedChangesProvider } from "@/components/UnsavedChangesProvider";

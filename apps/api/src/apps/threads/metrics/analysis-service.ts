@@ -15,7 +15,7 @@ import {
   type OpeningType,
   type PostLengthSettings,
   type PromptTrend,
-} from "@threads-grower/shared";
+} from "@meguru/shared";
 import { and, desc, eq, gte, inArray, isNotNull, isNull, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import type { Db, TxDb } from "../../../kernel/db/client";

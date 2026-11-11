@@ -12,7 +12,7 @@ import {
   type Promotion,
   type PromotionEvent,
   type PromotionStatus,
-} from "@threads-grower/shared";
+} from "@meguru/shared";
 import { ChevronRightIcon } from "lucide-react";
 import { useState } from "react";
 import { FieldWithCounter } from "@/components/FieldWithCounter";

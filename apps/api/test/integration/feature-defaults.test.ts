@@ -1,6 +1,6 @@
 // 何もしなければ今までどおり（specs/019-feature-switches US2、FR-003・FR-011、SC-003）。
 // 機能の設定の行がない人は3つすべてONで、プロンプトは前と同じ。決済の制限はゆるまない。
-import { FEATURES } from "@threads-grower/shared";
+import { FEATURES } from "@meguru/shared";
 import { beforeEach, describe, expect, it } from "vitest";
 import { authorizeAccount } from "../../src/platform/access/access";
 import { getPrompt } from "../../src/apps/threads/metrics/prompt-service";

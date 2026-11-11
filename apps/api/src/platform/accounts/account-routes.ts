@@ -4,7 +4,7 @@ import {
   deleteAccountRequestSchema,
   openAccountRequestSchema,
   renameAccountRequestSchema,
-} from "@threads-grower/shared";
+} from "@meguru/shared";
 import { Hono, type MiddlewareHandler } from "hono";
 import type { AppEnv } from "../identity/auth";
 import { createDb } from "../../kernel/db/client";

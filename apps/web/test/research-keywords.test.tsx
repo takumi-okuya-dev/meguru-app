@@ -1,7 +1,7 @@
 // US9：検索するキーワードの案をAIに出してもらう（specs/014-strategy-guidance FR-090〜FR-093）
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import type { ResearchKeyword } from "@threads-grower/shared";
+import type { ResearchKeyword } from "@meguru/shared";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderResearchPage } from "./helpers/research";
 

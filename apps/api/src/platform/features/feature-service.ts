@@ -7,7 +7,7 @@ import {
   type FeatureSettingsList,
   type FeatureSettingsRequest,
   type OperatorUser,
-} from "@threads-grower/shared";
+} from "@meguru/shared";
 import { and, desc, eq, inArray, isNull, sql, type SQL } from "drizzle-orm";
 import { withTransaction, type Db, type TxDb } from "../../kernel/db/client";
 import { featureDisables, featureSettingEvents, groupFeatureDisables, testGroupMembers, testGroups, users } from "../schema";

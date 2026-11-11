@@ -1,5 +1,5 @@
 // /api/accounts/:accountId/strategy（specs/002-strategy-profile contracts/api.md）
-import { invalidFields, putStrategyRequestSchema } from "@threads-grower/shared";
+import { invalidFields, putStrategyRequestSchema } from "@meguru/shared";
 import { Hono, type MiddlewareHandler } from "hono";
 import type { AppEnv } from "../../../platform";
 import { createDb } from "../../../kernel/db/client";

@@ -1,6 +1,6 @@
 // ユーザー名だけが一致したAccountの、今のユーザー名の確かめ（specs/010-token-account-add FR-023、research.md R6）。
 // Threadsでは手放されたユーザー名を別の人が取れるので、名前だけの一致で二重登録と決めつけない。
-import { normalizeUsername } from "@threads-grower/shared";
+import { normalizeUsername } from "@meguru/shared";
 import { and, eq, ne, sql } from "drizzle-orm";
 import { createDb, withTransaction, type TxDb } from "../../../kernel/db/client";
 import { lockThreadsUsername } from "../../../kernel/db/locks";

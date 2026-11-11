@@ -11,7 +11,7 @@ import {
   sparringBeginLine,
   type SparringKey,
   type SparringSectionId,
-} from "@threads-grower/shared";
+} from "@meguru/shared";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderStrategyPage, strategyOf } from "./helpers/strategy-page";
 

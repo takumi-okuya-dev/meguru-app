@@ -20,7 +20,7 @@ import {
   updateResearchKeywordRequestSchema,
   type ReferencePost,
   type ReferencePostInput,
-} from "@threads-grower/shared";
+} from "@meguru/shared";
 import { and, count, desc, eq, inArray, sql } from "drizzle-orm";
 import { Hono, type MiddlewareHandler } from "hono";
 import type { AppEnv } from "../../../platform";

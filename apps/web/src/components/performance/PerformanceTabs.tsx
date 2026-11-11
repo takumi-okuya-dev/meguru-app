@@ -1,5 +1,5 @@
 // 判定で絞り込むタブ（specs/006-performance-feedback FR-015）。好調〜確定待ちはアイコンと件数で出す。
-import type { PerformanceSummary, PerformanceTab } from "@threads-grower/shared";
+import type { PerformanceSummary, PerformanceTab } from "@meguru/shared";
 import { TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { JudgmentDot } from "./JudgmentBadge";
 

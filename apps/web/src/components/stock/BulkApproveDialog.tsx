@@ -1,6 +1,6 @@
 // まとめて承認の前の確認（specs/004-review-approval FR-004b、contracts/ui-routes.md「まとめて承認」、Clarifications 2026-10-05）。
 // 投稿の内容は運用者の責任のもとで公開されることを伝える。規約に注意の確認（FR-040）も、この1回で済ませる。
-import { APPROVED_LIMIT } from "@threads-grower/shared";
+import { APPROVED_LIMIT } from "@meguru/shared";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,

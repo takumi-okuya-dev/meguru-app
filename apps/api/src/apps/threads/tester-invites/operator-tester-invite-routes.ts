@@ -5,7 +5,7 @@ import {
   testerDeclineRequestSchema,
   testerInviteRequestSchema,
   testerSettingsRequestSchema,
-} from "@threads-grower/shared";
+} from "@meguru/shared";
 import { Hono, type MiddlewareHandler } from "hono";
 import type { AppEnv } from "../../../platform";
 import { createDb } from "../../../kernel/db/client";

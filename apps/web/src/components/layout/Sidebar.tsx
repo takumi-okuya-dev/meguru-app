@@ -19,7 +19,7 @@ import {
   TargetIcon,
   type LucideIcon,
 } from "lucide-react";
-import type { Feature } from "@threads-grower/shared";
+import type { Feature } from "@meguru/shared";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { Link, NavLink, useMatch, useParams } from "react-router";

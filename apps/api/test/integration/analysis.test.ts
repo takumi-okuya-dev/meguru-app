@@ -1,6 +1,6 @@
 // アルゴリズムの解析のAPI（specs/022-algorithm-analysis contracts/api.md、tasks.md T007・T013・T021・T028・T035）
 import { neon } from "@neondatabase/serverless";
-import type { AnalysisResponse, ClassificationsResponse } from "@threads-grower/shared";
+import type { AnalysisResponse, ClassificationsResponse } from "@meguru/shared";
 import { beforeEach, describe, expect, it } from "vitest";
 import { call, createUserWithAccount, endTrial, makeApp, resetDb, testEnv } from "../helpers/app";
 import { publishedDrafts } from "../helpers/auto-post";

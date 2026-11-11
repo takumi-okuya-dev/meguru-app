@@ -2,7 +2,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { emptyStrategyValues, type AccountSummary, type Strategy } from "@threads-grower/shared";
+import { emptyStrategyValues, type AccountSummary, type Strategy } from "@meguru/shared";
 import { createMemoryRouter, Link, Outlet, RouterProvider } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 

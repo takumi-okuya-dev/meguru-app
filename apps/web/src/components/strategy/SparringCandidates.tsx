@@ -1,6 +1,6 @@
 // 壁打ちの答えから読み取った、反映の候補の一覧（specs/018-strategy-ai-sparring FR-015〜FR-018、contracts/ui-routes.md 5）。
 // 見た目は参考投稿の「まとめてAIに解説してもらう」の候補の一覧（ExplainBatchPanel）にそろえる。
-import { STRATEGY_TEXT_MAX, type SparringCandidate, type SparringKey } from "@threads-grower/shared";
+import { STRATEGY_TEXT_MAX, type SparringCandidate, type SparringKey } from "@meguru/shared";
 
 /**
  * 反映の候補の一覧。各行に、選ぶ印・今の入力・新しい案を縦に並べる。

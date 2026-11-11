@@ -1,6 +1,6 @@
 // まとまりで守るAPI（specs/019-feature-switches contracts/api.md「守るAPI」、FR-005・FR-009・FR-010、SC-002・SC-004）。
 // どのAPIも、権限の判定の前に入力を読まないので、本文は空でも判定の結果を確かめられる。
-import type { Feature } from "@threads-grower/shared";
+import type { Feature } from "@meguru/shared";
 import { beforeEach, describe, expect, it } from "vitest";
 import { call, createUserWithAccount, makeApp, resetDb } from "../helpers/app";
 import { disableFeatures, enableAll } from "../helpers/features";

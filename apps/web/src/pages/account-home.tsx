@@ -1,7 +1,7 @@
 // Accountのホーム（001 US1、specs/002 US4・FR-017・FR-024b、contracts/ui-routes.md「ホーム」、docs/ui-design.md「ホーム」）。
 // ChatGPTの最初の画面のように、中央に次にやることを1つだけ出し、その下に入力状況の3枚のカードを並べる。
 import { useQuery } from "@tanstack/react-query";
-import { accountLabel, type ProfileStatus } from "@threads-grower/shared";
+import { accountLabel, type ProfileStatus } from "@meguru/shared";
 import {
   ChevronRightIcon,
   MegaphoneIcon,

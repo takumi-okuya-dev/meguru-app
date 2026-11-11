@@ -1,6 +1,10 @@
-# ThreadsGrower App
+# めぐる（meguru-app）
 
-Threadsアカウントを「投稿ストック→承認→自動投稿→分析→改善」のループで育てるためのアプリ。
+**出会いと挑戦が、めぐる。** イベント・コミュニティの流れ（告知・集客→申込・集金→当日→人の記録→次回の告知）を支えるアプリを、共通のアカウント・契約で束ねるスイート。全体の形は[プロダクトの構造](docs/product-structure.md)。
+
+今入っているアプリは**めぐる Threads**（旧ThreadsGrower）。Threadsアカウントを「投稿ストック→承認→自動投稿→分析→改善」のループで育てる。
+
+- 2026-11-11、リポジトリ名を`threads-grower-app`から`meguru-app`に変えた。GitHubは古いURLを転送する。Cloudflare・Neonの名前（`threads-grower-api`・`threads-grower-web`など）とブラウザに保存する値の名前は、URLや保存した設定が変わらないよう、ドメインを移すときまで今のままにする。
 
 - 由来: Obsidian vault `Wiki/仕事/システム開発/アイデア/Threads自動投稿アプリ.md`
 - 既存の[threads-grower](https://github.com/takumi-okuya/threads-grower)リポジトリ（spec-kit導入済み・実装進行中）とは**別プロジェクト**として並走する（2026-10-01、ユーザー確認済み）。
@@ -164,7 +168,7 @@ pnpm team:demo
 ## テスト
 
 ```bash
-pnpm --filter @threads-grower/shared test   # 共通パッケージ
+pnpm --filter @meguru/shared test   # 共通パッケージ
 pnpm --filter api test                      # API：unit と integration（Workers ランタイム上、ローカルDB、偽のThreadsサーバー）
 pnpm --filter web test                      # Web：ガード・再試行・上限の案内
 pnpm lint

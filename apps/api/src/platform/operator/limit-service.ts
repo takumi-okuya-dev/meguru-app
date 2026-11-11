@@ -7,7 +7,7 @@ import {
   type OperatorLimitUser,
   type OperatorLimits,
   type UserLimitsRequest,
-} from "@threads-grower/shared";
+} from "@meguru/shared";
 import { and, asc, eq, inArray, isNotNull, or, sql } from "drizzle-orm";
 import type { Env } from "../../kernel/env";
 import { withTransaction, type Db, type TxDb } from "../../kernel/db/client";
