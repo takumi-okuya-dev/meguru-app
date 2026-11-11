@@ -21,6 +21,11 @@ feature/* ──PR──▶ develop ──自動──▶ ステージング（�
 
 - **PRは小さく**。1つのリリースに混ざる変更が少ないほど、壊れたときに原因を探しやすく、戻しやすい。
 - PRの説明の「チェック」の欄（[.github/pull_request_template.md](../.github/pull_request_template.md)）を埋める。
+- **レビューは「セルフレビュー → Codexレビュー」の順**（2026-11-12に決めた）。Codex（`chatgpt-codex-connector`）はPRを開くと自動でレビューを始めるので、先にセルフレビューで見つかるものを直してから回す。
+  1. PRは**下書き（draft）**で出す（`gh pr create --draft`）。下書きのあいだはCodexは動かない。
+  2. セルフレビュー（Claude Codeの`/code-review`など）をして、指摘を直してpushする。
+  3. **「Ready for review」**にする（`gh pr ready <番号>`）。ここでCodexのレビューが始まる。直したあとにもう一度見てもらうときは、PRに `@codex review` とコメントする。
+- **CIは、PRにラベル「run-ci」を付けると流れる**（付け直すと、もう一度流れる。[.github/workflows/ci.yml](../.github/workflows/ci.yml)）。付けないと流れない。
 - **大きな機能は、設定で止められるように作る**。`BILLING_ENABLED`・`THREADS_CONNECT_METHODS`と同じ形で、`apps/api/wrangler.toml`の環境ごとの`vars`で切り替える。
   1. 本番は「切」のまま出す。
   2. ステージングで「入」にして確かめる。
