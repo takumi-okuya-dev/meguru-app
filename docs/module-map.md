@@ -144,7 +144,7 @@ ESLintで止められる違反は0件にする。今すぐ直せないものは�
 
 ## 6. アプリのモジュールを足す手順
 
-2作目（例：`badminton`）を足すときの手順。
+2作目（例：`people`）を足すときの手順。
 
 1. `apps/api/src/apps/<名前>/`を作り、次を置く。
    - `schema.ts`：そのアプリの表。共通の表（`users`・`accounts`）は`../../platform/schema`から参照してよい。共通の部品は`../../kernel/db/columns`。
@@ -157,7 +157,7 @@ ESLintで止められる違反は0件にする。今すぐ直せないものは�
 6. この地図の2章に、表と処理を足す。
 
 - ESLintの規則は、`apps/<名前>/`の形から自動でアプリとして当たる（設定は要らない）。
-- `workspaces`・利用権（entitlement）などスイート向けの表は、2作目で本当に共通だった部分を取り出すときに考える（[docs/product-structure.md](./product-structure.md) 5）。
+- `workspaces`・利用権（entitlement）などスイート向けの表は、2作目で本当に共通だった部分を取り出すときに考える（[docs/product-structure.md](./product-structure.md) 7）。
 
 ## 7. この文書の更新
 
