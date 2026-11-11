@@ -76,6 +76,8 @@ tester.run("web-module-boundaries", rule, {
     { ...at("router.tsx", "export const x = 1;"), options: strict },
     { ...at("app-registry.ts", "export const x = 1;"), options: strict },
     { ...at("main.tsx", "export const x = 1;"), options: strict },
+    // 型の宣言のファイルは置き場所を問わない
+    { ...at("vite-env.d.ts", "export {};"), options: strict },
     // テストなど src の外にはかけない
     { filename: "/repo/apps/web/test/stock.test.tsx", code: 'import { DraftList } from "@/apps/threads/components/stock/DraftList";' },
   ],
@@ -106,5 +108,7 @@ tester.run("web-module-boundaries", rule, {
     // ⑦ 置き場所の外
     { ...bad("pages/foo.tsx", "export const x = 1;", "unplaced"), options: strict },
     { ...bad("hooks/use-x.ts", "export const x = 1;", "unplaced"), options: strict },
+    // apps の直下のファイルはアプリではない（入口として扱わない）
+    { ...bad("apps/index.ts", "export const x = 1;", "unplaced"), options: strict },
   ],
 });

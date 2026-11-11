@@ -34,7 +34,7 @@ vi.mock("@/lib/api-client", async (orig) => {
   return { ...actual, api: { ...actual.api, me: () => Promise.resolve(meResponse), getDraftCounts, accountAccess: async () => OWNER_ACCESS } };
 });
 
-const { ThreadsShell } = await import("@/apps/threads");
+const { ThreadsShell } = await import("@/apps/threads/sidebar");
 const { PageHeader } = await import("@/shell/layout/PageHeader");
 const { SettingsLayout, SettingsIndex } = await import("@/shell/settings/settings-layout");
 const { AppearanceSettings } = await import("@/shell/settings/appearance");

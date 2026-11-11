@@ -36,5 +36,3 @@ export const threadsApp: AppModule = {
     },
   ],
 };
-
-export { ThreadsShell, ThreadsSidebar } from "./sidebar";

@@ -26,7 +26,6 @@ import { useAccountOpen } from "@/apps/threads/lib/use-account-open";
 import { useAccountAccess, useAccountAccessErrors } from "@/apps/threads/lib/use-account-access";
 import { NotFound } from "@/shell";
 import { ApiErrorScreen } from "@/components/ApiErrorScreen";
-import { HomeLinkProvider } from "@/lib/home-link";
 import { LoadingSkeleton } from "@/components/LoadingSkeleton";
 
 /** Account の画面の子に渡す値。 */
@@ -126,13 +125,10 @@ export function AccountLayout() {
   );
 
   return (
-    // 使えない機能の案内の「ホームへ」は、このアカウントのホームへ（specs/028 research.md R1）
-    <HomeLinkProvider value={`/accounts/${account.data.id}`}>
-      <ThreadsShell banner={banner}>
-        <UnsavedChangesProvider>
-          <Outlet context={{ account: account.data } satisfies AccountOutletContext} />
-        </UnsavedChangesProvider>
-      </ThreadsShell>
-    </HomeLinkProvider>
+    <ThreadsShell banner={banner}>
+      <UnsavedChangesProvider>
+        <Outlet context={{ account: account.data } satisfies AccountOutletContext} />
+      </UnsavedChangesProvider>
+    </ThreadsShell>
   );
 }

@@ -8,7 +8,6 @@ import { useCallback, useEffect, useState } from "react";
 import { Link, Navigate, useNavigate, useParams, useSearchParams } from "react-router";
 import { toast } from "sonner";
 import { ApiErrorScreen } from "@/components/ApiErrorScreen";
-import { HomeLinkProvider } from "@/lib/home-link";
 import { AccountAvatar } from "@/apps/threads/components/AccountAvatar";
 import { LoadingSkeleton } from "@/components/LoadingSkeleton";
 import { Button } from "@/components/ui/button";
@@ -317,64 +316,61 @@ export function TeamSharedAccountPage() {
   ).filter(([, , feature]) => access.data.features.includes(feature));
   const shown = tabs.some(([key]) => key === tab) ? tab : tabs[0]?.[0];
 
-  // 使えない機能の案内の「ホームへ」は、分割の前と同じくこのアカウントのホームへ（specs/028 research.md R1）
   return (
-    <HomeLinkProvider value={`/accounts/${accountId}`}>
-      <div className="flex min-h-svh flex-col">
-        <div
-          role="status"
-          className="flex flex-wrap items-center gap-3 border-b bg-muted px-4 py-2.5 text-sm md:px-6"
-        >
-          <EyeIcon aria-hidden="true" className="size-[18px] shrink-0" />
-          <span className="min-w-0 flex-1">
-            {owner}さんのアカウントを見ています（読むだけ）{team.data ? ` · ${team.data.name}` : ""}
-          </span>
-          <Button asChild variant="outline" className="h-9 rounded-full bg-background">
-            <Link to={`/teams/${teamId}`}>チームに戻る</Link>
-          </Button>
-        </div>
-        <header className="mx-auto flex w-full max-w-3xl items-center gap-3 px-4 pt-5 md:px-6">
-          <AccountAvatar account={a} className="size-10" />
-          <span className="flex min-w-0 flex-col leading-tight">
-            <h1 className="truncate text-[17px] font-semibold">{a.name}</h1>
-            <span className="truncate text-xs text-muted-foreground">
-              {a.username ? `@${a.username}` : "未接続"} · オーナー {owner}
-            </span>
-          </span>
-        </header>
-        <nav
-          aria-label="見る内容"
-          className="mx-auto mt-3 flex w-full max-w-3xl gap-1 border-b px-4 md:px-6"
-        >
-          {tabs.map(([key, label]) => (
-            <button
-              key={key}
-              type="button"
-              aria-current={shown === key ? "page" : undefined}
-              onClick={() =>
-                setParams(key === "strategy" ? { tab: "strategy" } : {}, { replace: true })
-              }
-              className={cn(
-                "h-10 border-b-2 px-3.5 text-sm",
-                shown === key
-                  ? "border-foreground font-semibold"
-                  : "border-transparent text-muted-foreground",
-              )}
-            >
-              {label}
-            </button>
-          ))}
-        </nav>
-        <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-5 md:px-6">
-          {shown === "stock" ? (
-            <StockTab accountId={accountId} onLost={onLost} />
-          ) : shown === "strategy" ? (
-            <StrategyTab accountId={accountId} onLost={onLost} />
-          ) : (
-            <p className="text-sm text-muted-foreground">見られる内容はありません。</p>
-          )}
-        </main>
+    <div className="flex min-h-svh flex-col">
+      <div
+        role="status"
+        className="flex flex-wrap items-center gap-3 border-b bg-muted px-4 py-2.5 text-sm md:px-6"
+      >
+        <EyeIcon aria-hidden="true" className="size-[18px] shrink-0" />
+        <span className="min-w-0 flex-1">
+          {owner}さんのアカウントを見ています（読むだけ）{team.data ? ` · ${team.data.name}` : ""}
+        </span>
+        <Button asChild variant="outline" className="h-9 rounded-full bg-background">
+          <Link to={`/teams/${teamId}`}>チームに戻る</Link>
+        </Button>
       </div>
-    </HomeLinkProvider>
+      <header className="mx-auto flex w-full max-w-3xl items-center gap-3 px-4 pt-5 md:px-6">
+        <AccountAvatar account={a} className="size-10" />
+        <span className="flex min-w-0 flex-col leading-tight">
+          <h1 className="truncate text-[17px] font-semibold">{a.name}</h1>
+          <span className="truncate text-xs text-muted-foreground">
+            {a.username ? `@${a.username}` : "未接続"} · オーナー {owner}
+          </span>
+        </span>
+      </header>
+      <nav
+        aria-label="見る内容"
+        className="mx-auto mt-3 flex w-full max-w-3xl gap-1 border-b px-4 md:px-6"
+      >
+        {tabs.map(([key, label]) => (
+          <button
+            key={key}
+            type="button"
+            aria-current={shown === key ? "page" : undefined}
+            onClick={() =>
+              setParams(key === "strategy" ? { tab: "strategy" } : {}, { replace: true })
+            }
+            className={cn(
+              "h-10 border-b-2 px-3.5 text-sm",
+              shown === key
+                ? "border-foreground font-semibold"
+                : "border-transparent text-muted-foreground",
+            )}
+          >
+            {label}
+          </button>
+        ))}
+      </nav>
+      <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-5 md:px-6">
+        {shown === "stock" ? (
+          <StockTab accountId={accountId} onLost={onLost} />
+        ) : shown === "strategy" ? (
+          <StrategyTab accountId={accountId} onLost={onLost} />
+        ) : (
+          <p className="text-sm text-muted-foreground">見られる内容はありません。</p>
+        )}
+      </main>
+    </div>
   );
 }

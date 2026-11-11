@@ -5,17 +5,18 @@ import type { ReactNode } from "react";
 import { useParams } from "react-router";
 import { LoadingSkeleton } from "@/components/LoadingSkeleton";
 import { FeatureUnavailableNotice } from "@/components/FeatureUnavailableNotice";
+import { accountHomePath } from "@/apps/threads/lib/paths";
 import { featureOn, useAccountAccess } from "@/apps/threads/lib/use-account-access";
 
 /**
  * 「この機能は今は使えません」と、Threadsのアカウントのホームへ戻る道だけを出す。
- * @param props - accountId：ホームへ戻る先のアカウント（省略すると URL の :accountId）
+ * @param props - accountId：ホームへ戻る先のアカウント（省略すると URL の :accountId。それもなければ、ルートの段で渡した戻る先）
  * @returns 使えない機能の画面
  */
 export function FeatureUnavailable({ accountId }: { accountId?: string }) {
   const params = useParams<{ accountId: string }>();
   const id = accountId ?? params.accountId;
-  return <FeatureUnavailableNotice homeTo={id ? `/accounts/${id}` : "/"} />;
+  return <FeatureUnavailableNotice homeTo={id ? accountHomePath(id) : undefined} />;
 }
 
 /**

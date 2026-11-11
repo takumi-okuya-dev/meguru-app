@@ -17,7 +17,10 @@ export function webModuleOf(rel) {
   const parts = rel.split("/");
   if (parts[0] === "components" || parts[0] === "lib") return { kind: "common", unit: "common", inner: parts };
   if (parts[0] === "shell") return { kind: "shell", unit: "shell", inner: parts.slice(1) };
-  if (parts[0] === "apps" && parts.length >= 2) return { kind: "app", unit: `apps/${parts[1]}`, inner: parts.slice(2) };
+  // アプリは apps/<名前>/ の中（読みこみ先の `apps/<名前>` はそのフォルダーの入口）。apps/index.ts のような apps の直下のファイルは、どの種類にも入らない
+  if (parts[0] === "apps" && (parts.length >= 3 || (parts.length === 2 && parts[1] !== "index"))) {
+    return { kind: "app", unit: `apps/${parts[1]}`, inner: parts.slice(2) };
+  }
   if (parts.length === 1 && COMPOSITION.has(parts[0])) return { kind: "composition", unit: "composition", inner: parts };
   return { kind: "unplaced", unit: rel, inner: parts };
 }
@@ -40,7 +43,7 @@ function isEntry(target) {
 function relFromSrc(srcDir, abs) {
   const rel = path.relative(srcDir, abs).split(path.sep).join("/");
   if (rel.startsWith("..") || path.isAbsolute(rel)) return null;
-  return rel.replace(/\.(ts|tsx|js|jsx|mjs)$/, "");
+  return rel.replace(/\.d\.(ts|mts|cts)$/, "").replace(/\.(ts|tsx|mts|cts|js|jsx|mjs)$/, "");
 }
 
 /** @type {import("eslint").Rule.RuleModule} */
@@ -127,7 +130,9 @@ export default {
 
     return {
       Program: (node) => {
-        if (strict && from.kind === "unplaced") context.report({ node, messageId: "unplaced", data: { from: fromRel } });
+        // 型の宣言のファイル（vite-env.d.ts など）は、どこに置いてもよい
+        const declaration = /\.d\.(ts|mts|cts)$/.test(filename);
+        if (strict && from.kind === "unplaced" && !declaration) context.report({ node, messageId: "unplaced", data: { from: fromRel } });
       },
       ImportDeclaration: (node) => check(node.source, node.source.value),
       ExportNamedDeclaration: (node) => node.source && check(node.source, node.source.value),

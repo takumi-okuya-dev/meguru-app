@@ -1,7 +1,7 @@
 // 画面のルートを、外枠のルートとアプリの入口から組む（specs/028-meguru-shell research.md R3、contracts/ui-routes.md 1）。
 // 外枠はアプリのコードを読まない。アプリの一覧は組み立て（router.tsx・app-registry.ts）から受け取る。
-import type { RouteObject } from "react-router";
-import type { AppModule } from "./app-module";
+import { Outlet, type RouteObject } from "react-router";
+import { AppRegistryProvider, type AppModule } from "./app-module";
 import { RequireAuth } from "./guards/RequireAuth";
 import { LegalCommercePage } from "./pages/legal-commerce";
 import { NotFound } from "./pages/not-found";
@@ -16,15 +16,52 @@ import { BillingSettingsPage } from "./settings/billing";
 import { FeaturesPage } from "./settings/features";
 import { LimitsPage } from "./settings/limits";
 import { ReferralSettingsPage } from "./settings/referral";
+import { SHELL_SETTINGS_SLUGS } from "./settings/sections";
 import { SettingsIndex, SettingsLayout } from "./settings/settings-layout";
 import { TestGroupDetailPage, TestGroupsPage } from "./settings/test-groups";
 
 /**
  * 画面のルートを組む。認証が必要な画面は RequireAuth で包む。
+ * アプリの一覧は、ルートのいちばん外の入れ物で外枠に渡す（設定の項目の一覧とルートを、同じ一覧から作るため）。
+ * @param apps - 出せるアプリの入口
+ * @returns ルートの一覧
+ * @throws Error 設定の項目の slug が、外枠の項目やほかのアプリの項目とぶつかったとき
+ */
+export function buildRoutes(apps: readonly AppModule[]): RouteObject[] {
+  assertUniqueSettingsSlugs(apps);
+  return [
+    {
+      element: (
+        <AppRegistryProvider value={apps}>
+          <Outlet />
+        </AppRegistryProvider>
+      ),
+      children: routesOf(apps),
+    },
+  ];
+}
+
+/**
+ * 設定の項目の slug がぶつかっていないかを確かめる（同じパスのルートが2つあると、片方の画面が開けなくなる）。
+ * @param apps - 出せるアプリの入口
+ * @throws Error ぶつかっているとき
+ */
+function assertUniqueSettingsSlugs(apps: readonly AppModule[]): void {
+  const seen = new Set(SHELL_SETTINGS_SLUGS);
+  for (const app of apps) {
+    for (const { slug } of app.settingsSections ?? []) {
+      if (seen.has(slug)) throw new Error(`設定の項目「${slug}」がぶつかっています（${app.id}）。slug を変えてください`);
+      seen.add(slug);
+    }
+  }
+}
+
+/**
+ * 外枠とアプリのルート。
  * @param apps - 出せるアプリの入口
  * @returns ルートの一覧
  */
-export function buildRoutes(apps: readonly AppModule[]): RouteObject[] {
+function routesOf(apps: readonly AppModule[]): RouteObject[] {
   return [
     { path: "/sign-in/*", element: <SignInPage /> },
     // 利用規約・特定商取引法の表記・アプリの読みもの（トークンの作り方など）はログインなしで読める（specs/010 FR-052・FR-030）

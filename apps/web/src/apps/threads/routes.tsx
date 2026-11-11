@@ -1,5 +1,6 @@
 // Threadsのルート（contracts/ui-routes.md「ルート」「遷移の規則」、specs/028-meguru-shell contracts/ui-routes.md 1）。
 import type { RouteObject } from "react-router";
+import { AccountHomeLink } from "./components/AccountHomeLink";
 import { RequireFeature } from "./components/FeatureUnavailable";
 import { AccountHome } from "./pages/account-home";
 import { AccountLayout } from "./pages/account-layout";
@@ -26,6 +27,26 @@ import { TeamSharedAccountPage } from "./pages/team-shared-account";
 import { TeamStatusPage } from "./pages/team-status";
 import { ThreadsComplete } from "./pages/threads-complete";
 
+/** アカウントの画面（/accounts/:accountId）の子。 */
+const ACCOUNT_CHILDREN: RouteObject[] = [
+  { index: true, element: <AccountHome /> },
+  { path: "settings", element: <AccountSettings /> },
+  // 機能のまとまりがOFFなら「この機能は今は使えません」（specs/019 FR-006）
+  { path: "strategy", element: <RequireFeature feature="strategy"><StrategyPage /></RequireFeature> },
+  { path: "promotions", element: <RequireFeature feature="strategy"><PromotionsPage /></RequireFeature> },
+  // 外部媒体展開（specs/021 contracts/ui-routes.md）。作業の画面は ?view=work
+  { path: "external-media", element: <RequireFeature feature="strategy"><ExternalMediaPage /></RequireFeature> },
+  { path: "external-media/:promotionId/:media", element: <RequireFeature feature="strategy"><ExternalMediaListingPage /></RequireFeature> },
+  { path: "research", element: <RequireFeature feature="strategy"><ResearchPage /></RequireFeature> },
+  // 投稿をつくる（specs/014 US15）。投稿ストックは一覧だけにした
+  { path: "create", element: <RequireFeature feature="autopost"><CreatePage /></RequireFeature> },
+  { path: "stock", element: <RequireFeature feature="autopost"><StockPage /></RequireFeature> },
+  { path: "performance", element: <RequireFeature feature="autopost"><PerformancePage /></RequireFeature> },
+  { path: "analysis", element: <RequireFeature feature="autopost"><AnalysisPage /></RequireFeature> },
+  // 操作の記録（specs/008 FR-052）。オーナーと、担当の管理者だけ（specs/011 FR-002）
+  { path: "activity", element: <RequireFeature feature="team"><ActivityPage /></RequireFeature> },
+];
+
 /** ログインの要るルート。 */
 export const threadsRoutes: RouteObject[] = [
   { path: "/", element: <Landing /> },
@@ -43,28 +64,13 @@ export const threadsRoutes: RouteObject[] = [
       { path: "status", element: <TeamStatusPage /> },
     ],
   },
-  // 見せてもらっているアカウントは、読むだけの1カラムの画面（Accountのサイドバーには入らない）
-  { path: "/teams/:teamId/accounts/:accountId", element: <TeamSharedAccountPage /> },
+  // アカウントの画面では、使えない機能の案内の「ホームへ」をこのアカウントのホームにする（AccountHomeLink。specs/028 research.md R1）
   {
-    path: "/accounts/:accountId",
-    element: <AccountLayout />,
+    element: <AccountHomeLink />,
     children: [
-      { index: true, element: <AccountHome /> },
-      { path: "settings", element: <AccountSettings /> },
-      // 機能のまとまりがOFFなら「この機能は今は使えません」（specs/019 FR-006）
-      { path: "strategy", element: <RequireFeature feature="strategy"><StrategyPage /></RequireFeature> },
-      { path: "promotions", element: <RequireFeature feature="strategy"><PromotionsPage /></RequireFeature> },
-      // 外部媒体展開（specs/021 contracts/ui-routes.md）。作業の画面は ?view=work
-      { path: "external-media", element: <RequireFeature feature="strategy"><ExternalMediaPage /></RequireFeature> },
-      { path: "external-media/:promotionId/:media", element: <RequireFeature feature="strategy"><ExternalMediaListingPage /></RequireFeature> },
-      { path: "research", element: <RequireFeature feature="strategy"><ResearchPage /></RequireFeature> },
-      // 投稿をつくる（specs/014 US15）。投稿ストックは一覧だけにした
-      { path: "create", element: <RequireFeature feature="autopost"><CreatePage /></RequireFeature> },
-      { path: "stock", element: <RequireFeature feature="autopost"><StockPage /></RequireFeature> },
-      { path: "performance", element: <RequireFeature feature="autopost"><PerformancePage /></RequireFeature> },
-      { path: "analysis", element: <RequireFeature feature="autopost"><AnalysisPage /></RequireFeature> },
-      // 操作の記録（specs/008 FR-052）。オーナーと、担当の管理者だけ（specs/011 FR-002）
-      { path: "activity", element: <RequireFeature feature="team"><ActivityPage /></RequireFeature> },
+      // 見せてもらっているアカウントは、読むだけの1カラムの画面（Accountのサイドバーには入らない）
+      { path: "/teams/:teamId/accounts/:accountId", element: <TeamSharedAccountPage /> },
+      { path: "/accounts/:accountId", element: <AccountLayout />, children: ACCOUNT_CHILDREN },
     ],
   },
 ];

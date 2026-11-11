@@ -49,9 +49,15 @@ export function settingsGroupsFor(operator: boolean, contributions: readonly Set
     contributions.filter((c) => c.group === group).map(({ order, slug, label, Icon, keywords }) => ({ order, slug, label, Icon, keywords }));
   const ordered = (base: (SettingsSection & { order: number })[], group: SettingsSectionContribution["group"]) =>
     [...base, ...extra(group)].sort((a, b) => a.order - b.order).map(({ order: _order, ...section }) => section);
-  const personal = SETTINGS_GROUPS.map((g) => ({ ...g, sections: ordered(g.sections.map((sec, i) => ({ ...sec, order: (i + 1) * 10 })), "personal") }));
+  // アプリの「個人設定」の項目は、最初のグループ（個人設定）にだけ混ぜる
+  const personal = SETTINGS_GROUPS.map((g, gi) =>
+    gi === 0 ? { ...g, sections: ordered(g.sections.map((sec, i) => ({ ...sec, order: (i + 1) * 10 })), "personal") } : g,
+  );
   return operator ? [...personal, { label: "運営", sections: ordered(OPERATOR_SECTIONS, "operator") }] : personal;
 }
+
+/** 外枠が持つ設定の項目の slug（アプリの項目とぶつけないため。specs/028 セルフレビュー）。 */
+export const SHELL_SETTINGS_SLUGS: readonly string[] = [...SETTINGS_GROUPS.flatMap((g) => g.sections), ...OPERATOR_SECTIONS].map((s) => s.slug);
 
 /** /settings を開いたときに表示する項目。 */
 export const DEFAULT_SETTINGS_SLUG = "appearance";

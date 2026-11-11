@@ -37,7 +37,7 @@ vi.mock("@/lib/api-client", async (orig) => {
   return { ...actual, api: { ...actual.api, ...mocks } };
 });
 
-const { ThreadsShell } = await import("@/apps/threads");
+const { ThreadsShell } = await import("@/apps/threads/sidebar");
 const { PageHeader } = await import("@/shell/layout/PageHeader");
 const { AccountHome } = await import("@/apps/threads/pages/account-home");
 const { CreatePage } = await import("@/apps/threads/pages/create");

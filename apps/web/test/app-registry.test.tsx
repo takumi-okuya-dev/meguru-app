@@ -1,36 +1,35 @@
 // アプリの登録とルートの組み立て（specs/028-meguru-shell research.md R3、T010）。
 // PR1 では URL を変えない：分割の前のルートの一覧（checklists/routes-before.md）と同じであること。
+import { isValidElement } from "react";
 import type { RouteObject } from "react-router";
 import { describe, expect, it } from "vitest";
 
 const { threadsApp } = await import("@/apps/threads");
 const { buildRoutes } = await import("@/shell");
 const { settingsGroupsFor } = await import("@/shell/settings/sections");
+const { RequireAuth } = await import("@/shell/guards/RequireAuth");
 
 /**
- * ルートの木を、絶対パスの一覧にする（入れ物だけのルートは数えない）。
+ * ルートの木を、絶対パスの一覧にする（入れ物だけのルートは数えない）。ログイン（RequireAuth）の中のルートには「 [auth]」を付ける。
  * @param routes - ルート
  * @param base - 親のパス
+ * @param auth - ログインの関所の中か
  * @returns パスの一覧
  */
-function flatten(routes: readonly RouteObject[], base = ""): string[] {
+function flatten(routes: readonly RouteObject[], base = "", auth = false): string[] {
   return routes.flatMap((r) => {
+    const inAuth = auth || (isValidElement(r.element) && r.element.type === RequireAuth);
     const here = r.index ? `${base} (index)` : r.path === undefined ? base : r.path.startsWith("/") || r.path === "*" ? r.path : `${base}/${r.path}`;
-    const self = r.index || r.path !== undefined ? [here] : [];
-    return [...self, ...(r.children ? flatten(r.children, r.index ? base : here) : [])];
+    const self = r.index || r.path !== undefined ? [inAuth ? `${here} [auth]` : here] : [];
+    return [...self, ...(r.children ? flatten(r.children, r.index ? base : here, inAuth) : [])];
   });
 }
 
-/** 分割の前のルート（checklists/routes-before.md）。 */
-const BEFORE = [
-  "/sign-in/*",
-  "/data-deletion/:code",
-  "/terms",
-  "/legal/commerce",
-  "/guide/threads-token",
-  "/invite/:token",
-  "/test-invite/:token",
-  "/r/:code",
+/** 分割の前のログインのいらないルート（checklists/routes-before.md）。 */
+const BEFORE_PUBLIC = ["/sign-in/*", "/data-deletion/:code", "/terms", "/legal/commerce", "/guide/threads-token", "/invite/:token", "/test-invite/:token", "/r/:code", "*"];
+
+/** 分割の前のログインの要るルート（checklists/routes-before.md）。 */
+const BEFORE_AUTH = [
   "/",
   "/accounts/new",
   "/threads/complete",
@@ -47,19 +46,33 @@ const BEFORE = [
   ...["settings", "strategy", "promotions", "external-media", "external-media/:promotionId/:media", "research", "create", "stock", "performance", "analysis", "activity"].map(
     (p) => `/accounts/:accountId/${p}`,
   ),
-  "*",
 ];
 
+/** 分割の前のルート。ログインの要るものに「 [auth]」を付ける。 */
+const BEFORE = [...BEFORE_PUBLIC, ...BEFORE_AUTH.map((p) => `${p} [auth]`)];
+
 describe("ルートの組み立て", () => {
-  it("Threadsを登録すると、分割の前と同じルートになる（URLを変えない）", () => {
+  it("Threadsを登録すると、分割の前と同じルートになる（URLも、ログインが要るかどうかも変えない）", () => {
     expect(flatten(buildRoutes([threadsApp])).sort()).toEqual([...BEFORE].sort());
   });
 
   it("アプリを登録しなければ、Threadsの画面はない（外枠のルートだけ）", () => {
     const paths = flatten(buildRoutes([]));
-    expect(paths).not.toContain("/accounts/:accountId");
-    expect(paths).toContain("/settings/billing");
+    expect(paths).not.toContain("/accounts/:accountId [auth]");
+    expect(paths).toContain("/settings/billing [auth]");
     expect(paths).toContain("*");
+  });
+});
+
+describe("設定の項目のぶつかり", () => {
+  it("アプリの項目の slug が外枠の項目とぶつかると、ルートを組むときに知らせる", () => {
+    const clash = { ...threadsApp, settingsSections: [{ ...threadsApp.settingsSections![0]!, slug: "limits" }] };
+    expect(() => buildRoutes([clash])).toThrow("limits");
+  });
+
+  it("アプリ同士の項目の slug がぶつかっても知らせる", () => {
+    const other = { ...threadsApp, id: "sample", routes: [], publicRoutes: [], readingRoutes: [] };
+    expect(() => buildRoutes([threadsApp, other])).toThrow("tester-invites");
   });
 });
 

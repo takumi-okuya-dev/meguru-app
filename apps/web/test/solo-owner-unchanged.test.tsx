@@ -56,7 +56,7 @@ vi.mock("@/lib/api-client", async (orig) => {
   };
 });
 
-const { ThreadsSidebar } = await import("@/apps/threads");
+const { ThreadsSidebar } = await import("@/apps/threads/sidebar");
 const { AssignedNotice } = await import("@/apps/threads/components/team/AssignedNotice");
 const { TeamSection } = await import("@/apps/threads/components/team/TeamSection");
 const { AccountSwitcher } = await import("@/apps/threads/sidebar/AccountSwitcher");

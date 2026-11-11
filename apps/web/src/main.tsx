@@ -11,9 +11,7 @@ import { ClerkKeyMissingScreen } from "@/components/ErrorScreen";
 import { configureApiClient } from "@/lib/api-client";
 import { isUsablePublishableKey } from "@/lib/config-check";
 import { queryClient } from "@/lib/query";
-import { registeredApps } from "@/app-registry";
 import { router } from "@/router";
-import { AppRegistryProvider } from "@/shell";
 import "./index.css";
 
 const publishableKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY as string | undefined;
@@ -52,9 +50,7 @@ if (!isUsablePublishableKey(publishableKey)) {
       <ClerkProvider publishableKey={publishableKey} localization={jaJP} afterSignOutUrl="/sign-in">
         <QueryClientProvider client={queryClient}>
           <ApiClientBridge />
-          <AppRegistryProvider value={registeredApps}>
-            <RouterProvider router={router} />
-          </AppRegistryProvider>
+          <RouterProvider router={router} />
           <Toaster />
         </QueryClientProvider>
       </ClerkProvider>

@@ -40,7 +40,7 @@ vi.mock("@/lib/api-client", async (orig) => {
   };
 });
 
-const { ThreadsShell } = await import("@/apps/threads");
+const { ThreadsShell } = await import("@/apps/threads/sidebar");
 const { PageHeader } = await import("@/shell/layout/PageHeader");
 
 function me(teams: MeResponse["teams"]): MeResponse {
