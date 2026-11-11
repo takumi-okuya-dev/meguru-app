@@ -1,6 +1,6 @@
 // US1：名前だけでアカウントを作る（specs/012 FR-002〜FR-004、research.md R3、contracts/api.md「アカウント」）
 import { and, eq } from "drizzle-orm";
-import { PROMOTION_RATIO_DEFAULT, PROMPT_COUNT_DEFAULT } from "@threads-grower/shared";
+import { PROMOTION_RATIO_DEFAULT, PROMPT_COUNT_DEFAULT } from "@meguru/shared";
 import { beforeEach, describe, expect, it } from "vitest";
 import { accounts, memberships, threadsConnections, users } from "../../src/db/schema";
 import { call, db, makeApp, resetDb } from "../helpers/app";

@@ -1,6 +1,6 @@
 // 「AIと整える」のポップアップ（specs/021 FR-012a、research.md R3）。018の「AIと考える」と同じく、プロンプトをコピーし、答えを貼って反映する。
 // 反映したあとの自動の直しとルールのチェックは、画面と保存で通す。アプリの中ではAIを呼ばない（原則III）。
-import { MEDIA_LABELS, parsePolishAnswer, polishPrompt, type ListingSource, type ListingValues, type Media } from "@threads-grower/shared";
+import { MEDIA_LABELS, parsePolishAnswer, polishPrompt, type ListingSource, type ListingValues, type Media } from "@meguru/shared";
 import { useId, useState } from "react";
 import { CopyPromptStatus, CopyPromptTrigger, useCopyPrompt } from "@/components/CopyPromptButton";
 import { FormDialogFrame } from "@/components/items/FormDialogFrame";

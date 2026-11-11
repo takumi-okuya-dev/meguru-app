@@ -1,7 +1,7 @@
 // 無料体験の終わりの帯（specs/013 FR-046、contracts/ui-routes.md「無料体験の終わりの帯」）。
 // 契約がなく料金なしでもない利用者に、無料体験が終わる7日前から出す。閉じたら、その日（日本時間）は出さない。
 import { useQuery } from "@tanstack/react-query";
-import { TRIAL_ENDING_NOTICE_DAYS, jstToday, type MeBilling } from "@threads-grower/shared";
+import { TRIAL_ENDING_NOTICE_DAYS, jstToday, type MeBilling } from "@meguru/shared";
 import { XIcon } from "lucide-react";
 import { useState } from "react";
 import { Link } from "react-router";

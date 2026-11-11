@@ -1,5 +1,5 @@
 // 特定商取引法に基づく表記（specs/013-billing FR-071、contracts/ui-routes.md「特定商取引法に基づく表記」）。ログインなしで読める。
-import { BILLING_UNIT_PRICE_JPY } from "@threads-grower/shared";
+import { BILLING_UNIT_PRICE_JPY } from "@meguru/shared";
 import { Link } from "react-router";
 import { SELLER_INFO } from "@/lib/seller-info";
 

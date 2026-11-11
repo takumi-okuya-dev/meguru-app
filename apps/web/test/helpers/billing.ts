@@ -1,5 +1,5 @@
 // /api/me の決済の部分のテスト用の値（specs/013）。既定は決済OFF（001〜012の画面のテストは今のまま）。
-import { FEATURES, type MeBilling, type MeResponse } from "@threads-grower/shared";
+import { FEATURES, type MeBilling, type MeResponse } from "@meguru/shared";
 
 /** テスト用のグループがOFFの環境の /api/me の testGroups（specs/016）。 */
 export const ME_TEST_GROUPS_OFF: MeResponse["testGroups"] = { enabled: false, admitted: true, operator: false };

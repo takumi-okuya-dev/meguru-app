@@ -1,5 +1,5 @@
 // 投稿ストックの画面の文言（specs/003・004 contracts/ui-routes.md）。
-import { APPROVED_LIMIT, NEEDS_REVIEW_LIMIT, type SkipReason } from "@threads-grower/shared";
+import { APPROVED_LIMIT, NEEDS_REVIEW_LIMIT, type SkipReason } from "@meguru/shared";
 
 /** 要確認の下書きが上限に達したときの文言（一覧の上の案内と、登録の 409 ITEM_LIMIT_REACHED）。 */
 export const STOCK_LIMIT_MESSAGE = `要確認の下書きが上限（${NEEDS_REVIEW_LIMIT}件）に達しています。不要な下書きを削除してから登録してください。`;

@@ -8,7 +8,7 @@ import {
   type AccountSummary,
   type ErrorCode,
   type TokenConnectResponse,
-} from "@threads-grower/shared";
+} from "@meguru/shared";
 import { ChevronDownIcon } from "lucide-react";
 import { useState } from "react";
 import { Link } from "react-router";

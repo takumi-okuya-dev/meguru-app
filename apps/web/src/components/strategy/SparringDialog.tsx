@@ -13,7 +13,7 @@ import {
   type SparringSectionId,
   type StrategyCheck,
   type StrategyValues,
-} from "@threads-grower/shared";
+} from "@meguru/shared";
 import { useEffect, useId, useState } from "react";
 import { CopyPromptStatus, CopyPromptTrigger, useCopyPrompt } from "@/components/CopyPromptButton";
 import { FormDialogFrame } from "@/components/items/FormDialogFrame";

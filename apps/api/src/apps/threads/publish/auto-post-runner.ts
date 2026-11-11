@@ -12,7 +12,7 @@ import {
   plannedSlotTime,
   projectSchedule,
   type DueSlot,
-} from "@threads-grower/shared";
+} from "@meguru/shared";
 import {
   and,
   asc,

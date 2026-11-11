@@ -1,6 +1,6 @@
 // 「Threadsで許可する」を押す前の案内（specs/025-threads-account-guide contracts/ui-routes.md 1、US1・FR-001〜FR-003、モック1・2枚目）。
 // 許可の画面はブラウザで threads.com にログインしているアカウントを使い、アプリから切り替えられない（research.md R1）。
-import { THREADS_WEB_URL, accountGuideParts, accountSwitchSteps } from "@threads-grower/shared";
+import { THREADS_WEB_URL, accountGuideParts, accountSwitchSteps } from "@meguru/shared";
 import { ExternalLinkIcon } from "lucide-react";
 import { Toggle } from "@/components/settings/FeatureSwitches";
 import { Alert, AlertDescription } from "@/components/ui/alert";

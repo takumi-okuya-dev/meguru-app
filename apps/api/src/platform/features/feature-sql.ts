@@ -1,7 +1,7 @@
 // 使えない機能のまとまりの条件（specs/019-feature-switches data-model.md「判定」、research.md R10）。
 // 使えないまとまり＝人の設定のOFF ∪ 入っている閉じていないグループの設定のOFF（どちらかでOFFならOFF。FR-018）。
 // 判定の条件はここだけに置き、authorizeAccount・認証のミドルウェア・定期処理のすべてがこれを使う（Constitution原則V）。
-import { FEATURES, type Feature } from "@threads-grower/shared";
+import { FEATURES, type Feature } from "@meguru/shared";
 import { and, eq, sql, type SQL } from "drizzle-orm";
 import type { AnyPgColumn } from "drizzle-orm/pg-core";
 import type { Db, TxDb } from "../../kernel/db/client";

@@ -11,7 +11,7 @@ import {
   type Relation,
   type Role,
   type TeamRole,
-} from "@threads-grower/shared";
+} from "@meguru/shared";
 import { and, eq, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import type { Db, TxDb } from "../../kernel/db/client";

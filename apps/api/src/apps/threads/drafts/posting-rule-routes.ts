@@ -1,6 +1,6 @@
 // /api/accounts/:accountId/posting-rules・/ng-words（specs/004-review-approval contracts/api.md）。
 // NGワードは全プランで使える（FR-017）ので、grower機能は判定しない。投稿ルールの保存だけを判定する（FR-020）。
-import { addNgWordsRequestSchema, coreRulesRequestSchema } from "@threads-grower/shared";
+import { addNgWordsRequestSchema, coreRulesRequestSchema } from "@meguru/shared";
 import { Hono, type MiddlewareHandler } from "hono";
 import type { AppEnv } from "../../../platform";
 import { createDb } from "../../../kernel/db/client";

@@ -36,7 +36,7 @@ import {
   TESTER_REMOVAL_REASONS,
   type AnalysisTheme,
   type PromotionEvent,
-} from "@threads-grower/shared";
+} from "@meguru/shared";
 import { bytea, timestamps, versionColumn, inList } from "../../kernel/db/columns";
 import { users, accounts } from "../../platform/schema";
 

@@ -1,7 +1,7 @@
 // 関わり×APIの表のテスト（specs/011-team-revision contracts/permissions.md、SC-002・FR-060）。
 // すべてのAccountのAPIを、関わりごとに呼び、許される／403 ROLE_FORBIDDEN／404 ACCOUNT_NOT_FOUND を確かめる。
 // 各APIは「権限 → 入力の検証」の順で確かめるので、空の本文で呼ぶと、許された人は 400 VALIDATION_FAILED などになる。
-import { permissionsFor, type Relation } from "@threads-grower/shared";
+import { permissionsFor, type Relation } from "@meguru/shared";
 import { beforeAll, describe, expect, it } from "vitest";
 import { call, createUnconnectedAccount, createUserWithAccount, makeApp, resetDb } from "../helpers/app";
 import { ACCOUNT_ROUTES } from "../helpers/routes";

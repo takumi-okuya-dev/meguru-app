@@ -1,7 +1,7 @@
 // US2：自動チェックと進み具合（specs/014-strategy-guidance FR-012〜FR-018、SC-002・SC-003）
 import { act, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { HINTED_KEYS, STRATEGY_HINTS, emptyStrategyValues } from "@threads-grower/shared";
+import { HINTED_KEYS, STRATEGY_HINTS, emptyStrategyValues } from "@meguru/shared";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { renderStrategyPage, strategyOf } from "./helpers/strategy-page";
 

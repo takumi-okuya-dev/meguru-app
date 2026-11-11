@@ -3,7 +3,7 @@
 // 追加のダイアログなので、ほかの追加・編集と同じ枠（FormDialogFrame。docs/ui-design.md 型B）を使う。
 // スマートフォンでは全画面のシート（左上に✕、右上に「作る」）になり、中身に余白が付く（2026-11-03）。
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { TEAM_NAME_MAX, countChars } from "@threads-grower/shared";
+import { TEAM_NAME_MAX, countChars } from "@meguru/shared";
 import { useState } from "react";
 import { Link, useNavigate } from "react-router";
 import { AccountAvatar } from "@/components/AccountAvatar";

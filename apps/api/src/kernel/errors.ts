@@ -1,4 +1,4 @@
-import type { ErrorCode } from "@threads-grower/shared";
+import type { ErrorCode } from "@meguru/shared";
 
 /** API が返すエラー。message は開発者向けの英文で、秘密情報を含めない（contracts/api.md「エラーの形」）。 */
 export class AppError extends Error {

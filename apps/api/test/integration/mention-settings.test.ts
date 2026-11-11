@@ -1,6 +1,6 @@
 // 時間差のメンションの設定と守り（specs/023-delayed-mention contracts/api.md、tasks.md T005・T009）
 import { neon } from "@neondatabase/serverless";
-import type { MentionSettings } from "@threads-grower/shared";
+import type { MentionSettings } from "@meguru/shared";
 import { beforeEach, describe, expect, it } from "vitest";
 import { call, createUserWithAccount, endTrial, makeApp, resetDb, testEnv } from "../helpers/app";
 import { disableFeatures } from "../helpers/features";

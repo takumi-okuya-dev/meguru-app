@@ -22,7 +22,7 @@ import {
   type SparringSectionId,
   type StrategyValues,
   type TonePreset,
-} from "@threads-grower/shared";
+} from "@meguru/shared";
 import { EllipsisIcon, SparklesIcon } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 import { useLocation } from "react-router";

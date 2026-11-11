@@ -1,6 +1,6 @@
 // Threadsとの接続の確定と確かめ（specs/001・010・012・024）。027で account-service から切り出した（接続はThreadsのもの。docs/module-map.md 2-2）。
 import { and, eq, gte, inArray, isNull, ne, or, sql } from "drizzle-orm";
-import { normalizeUsername } from "@threads-grower/shared";
+import { normalizeUsername } from "@meguru/shared";
 import type { Env } from "../../../kernel/env";
 import { createDb, withTransaction, type TxDb } from "../../../kernel/db/client";
 import { lockThreadsUser, lockThreadsUsername, lockUserRow } from "../../../kernel/db/locks";

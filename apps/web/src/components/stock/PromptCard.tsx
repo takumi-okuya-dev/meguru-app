@@ -9,7 +9,7 @@ import {
   type PostDraftList,
   type PostLengthSettings,
   type PromptSummary,
-} from "@threads-grower/shared";
+} from "@meguru/shared";
 import { ChevronDownIcon, CopyIcon, LockIcon } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router";

@@ -9,7 +9,7 @@ import {
   reviewRequestSchema,
   prioritizeRequestSchema,
   updatePostDraftRequestSchema,
-} from "@threads-grower/shared";
+} from "@meguru/shared";
 import { Hono, type MiddlewareHandler } from "hono";
 import type { AppEnv } from "../../../platform";
 import { inArray } from "drizzle-orm";

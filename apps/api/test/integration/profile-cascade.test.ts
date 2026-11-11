@@ -1,6 +1,6 @@
 // Accountの削除で戦略プロファイルと投稿ストック・投稿のルールも消える（specs/002 FR-026、specs/003 FR-026、specs/004 FR-036）
 import { eq } from "drizzle-orm";
-import { emptyStrategyValues } from "@threads-grower/shared";
+import { emptyStrategyValues } from "@meguru/shared";
 import { beforeEach, describe, expect, it } from "vitest";
 import {
   accounts,

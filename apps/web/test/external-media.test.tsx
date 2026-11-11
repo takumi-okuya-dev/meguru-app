@@ -7,7 +7,7 @@ import {
   type AccountSummary,
   type ListingDetail,
   type Promotion,
-} from "@threads-grower/shared";
+} from "@meguru/shared";
 import { createMemoryRouter, Outlet, RouterProvider } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 

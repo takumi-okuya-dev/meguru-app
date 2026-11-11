@@ -4,7 +4,7 @@ import {
   PROMPT_COUNT_MIN,
   putPromptSettingsRequestSchema,
   type PostLengthSettings,
-} from "@threads-grower/shared";
+} from "@meguru/shared";
 import { and, eq, sql } from "drizzle-orm";
 import { Hono, type MiddlewareHandler } from "hono";
 import type { AppEnv } from "../../../platform";

@@ -14,7 +14,7 @@ import {
   threadsLength,
   toggleMentionInText,
   type MentionAttachRequest,
-} from "@threads-grower/shared";
+} from "@meguru/shared";
 import { and, asc, eq, inArray, ne, sql } from "drizzle-orm";
 import type { Db, TxDb } from "../../../kernel/db/client";
 import { lockAccountDrafts } from "../../../kernel/db/locks";

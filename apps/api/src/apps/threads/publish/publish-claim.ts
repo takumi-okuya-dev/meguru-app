@@ -9,7 +9,7 @@ import {
   jstMidnight,
   plannedSlotTime,
   type DueSlot,
-} from "@threads-grower/shared";
+} from "@meguru/shared";
 import { and, count, eq, gte, inArray, lt, sql } from "drizzle-orm";
 import { withTransaction, type TxDb } from "../../../kernel/db/client";
 import { lockAccountDrafts } from "../../../kernel/db/locks";

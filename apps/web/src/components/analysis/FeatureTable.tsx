@@ -1,5 +1,5 @@
 // 本文の特徴の表（あり・なしの件数と閲覧、差。specs/022 contracts/ui-routes.md 8）。
-import type { AnalysisResponse } from "@threads-grower/shared";
+import type { AnalysisResponse } from "@meguru/shared";
 import { MarkChip } from "./MarkChip";
 import { num, times } from "./format";
 

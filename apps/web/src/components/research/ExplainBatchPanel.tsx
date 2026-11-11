@@ -1,7 +1,7 @@
 // 解説がまだの参考投稿を、まとめてAIに解説してもらう（specs/014-strategy-guidance US8、FR-100〜FR-105）。
 // 最大10件分のプロンプトをコピーし、AIの答えを1回貼り付けると【ID】で参考投稿に結び付け、選んだ分を保存する。
 import { useMutation } from "@tanstack/react-query";
-import { EXPLAIN_BATCH_MAX, isBlank, parseExplanations, type ExplanationProblem, type ReferencePost } from "@threads-grower/shared";
+import { EXPLAIN_BATCH_MAX, isBlank, parseExplanations, type ExplanationProblem, type ReferencePost } from "@meguru/shared";
 import { useId, useState } from "react";
 import { toast } from "sonner";
 import { CopyPromptStatus, CopyPromptTrigger, useCopyPrompt } from "@/components/CopyPromptButton";

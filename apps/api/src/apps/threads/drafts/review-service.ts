@@ -8,7 +8,7 @@ import {
   type PublishCheck,
   type ReviewRequest,
   type SkipReason,
-} from "@threads-grower/shared";
+} from "@meguru/shared";
 import { and, eq, inArray, sql } from "drizzle-orm";
 import { withTransaction, type TxDb } from "../../../kernel/db/client";
 import { lockAccountDrafts } from "../../../kernel/db/locks";

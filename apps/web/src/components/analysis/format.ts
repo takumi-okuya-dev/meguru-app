@@ -1,5 +1,5 @@
 // 解析の画面の数の書き方（specs/022 contracts/ui-routes.md）。
-import { formatRatio } from "@threads-grower/shared";
+import { formatRatio } from "@meguru/shared";
 
 /**
  * 件数・閲覧などの数（小数は四捨五入、桁区切り）。

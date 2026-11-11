@@ -1,5 +1,5 @@
 // 基準値の欄（specs/006-performance-feedback contracts/ui-routes.md、FR-009・FR-012）。
-import type { PerformanceSummary } from "@threads-grower/shared";
+import type { PerformanceSummary } from "@meguru/shared";
 import { JudgmentDot } from "./JudgmentBadge";
 
 /**

@@ -8,7 +8,7 @@ import {
   errorMessage,
   isAccountSwitchError,
   type TokenConnectResponse,
-} from "@threads-grower/shared";
+} from "@meguru/shared";
 import { CheckCircle2Icon } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router";

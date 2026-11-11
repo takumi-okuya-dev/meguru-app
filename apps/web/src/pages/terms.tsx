@@ -1,7 +1,7 @@
 // 利用規約（specs/010-token-account-add FR-052、contracts/ui-routes.md「利用規約」）。ログインなしで読める。
 // 本featureでは最小限の下書き。運営者が公開の前に文面を確かめ、運営者の名前・連絡先を書き足す。
 // 料金・無料体験・解約・未払い・退会の節は specs/013-billing（FR-070）で足した。金額は共通の定数から出す。
-import { BILLING_UNIT_PRICE_JPY } from "@threads-grower/shared";
+import { BILLING_UNIT_PRICE_JPY } from "@meguru/shared";
 import type { ReactNode } from "react";
 import { Link } from "react-router";
 

@@ -9,7 +9,7 @@ import {
   findNgWords,
   mentionDueAt,
   type MentionFailureReason,
-} from "@threads-grower/shared";
+} from "@meguru/shared";
 import { and, eq, isNull, lt, ne, or, sql } from "drizzle-orm";
 import type { Db } from "../../../kernel/db/client";
 import { postDrafts, postMentions } from "../schema";

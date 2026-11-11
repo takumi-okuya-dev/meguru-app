@@ -1,6 +1,6 @@
 // 下書きの長さの表示（specs/003 FR-013、Clarifications Q3、contracts/ui-routes.md「各下書き」）。
 // Threadsの数え方（絵文字はUTF-8のバイト数）で、上限（500）までの使用量を細いバーで出す。
-import { THREADS_LINK_LIMIT, THREADS_TEXT_LIMIT, countLinks, threadsLength } from "@threads-grower/shared";
+import { THREADS_LINK_LIMIT, THREADS_TEXT_LIMIT, countLinks, threadsLength } from "@meguru/shared";
 import { cn } from "@/lib/utils";
 
 /** 使用量がこの割合を超えたら、バーを注意の色の手前の色にする */

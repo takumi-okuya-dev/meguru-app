@@ -1,6 +1,6 @@
 // US2：open の再試行と中止（規則5、research.md R10）
 import { renderHook } from "@testing-library/react";
-import type { AccountSummary } from "@threads-grower/shared";
+import type { AccountSummary } from "@meguru/shared";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { OPEN_RETRY_DELAYS_MS, useAccountOpen } from "@/lib/use-account-open";
 

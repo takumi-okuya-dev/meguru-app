@@ -13,7 +13,7 @@ import {
   type ClassifyItem,
   type ClassifyProblem,
   type OpeningType,
-} from "@threads-grower/shared";
+} from "@meguru/shared";
 import { PlusIcon, XIcon } from "lucide-react";
 import { useId, useState } from "react";
 import { toast } from "sonner";

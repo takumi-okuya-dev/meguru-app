@@ -5,7 +5,7 @@ import {
   KEYWORD_BATCH_MAX,
   parseKeywordIdeas,
   type KeywordIdeaProblem,
-} from "@threads-grower/shared";
+} from "@meguru/shared";
 import { useId, useState } from "react";
 import { toast } from "sonner";
 import { CopyPromptStatus, CopyPromptTrigger, useCopyPrompt } from "@/components/CopyPromptButton";

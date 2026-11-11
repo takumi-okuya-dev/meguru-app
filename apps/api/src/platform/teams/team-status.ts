@@ -10,7 +10,7 @@ import {
   TEAM_STATUS_STOPPED_DAYS,
   type TeamStatus,
   type TeamStatusGrowth,
-} from "@threads-grower/shared";
+} from "@meguru/shared";
 import { and, eq, inArray, sql, type SQL } from "drizzle-orm";
 import { alias, type AnyPgColumn } from "drizzle-orm/pg-core";
 import type { Db, TxDb } from "../../kernel/db/client";

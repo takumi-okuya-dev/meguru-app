@@ -1,6 +1,6 @@
 // 伸びた傾向（specs/022 contracts/ui-routes.md 4）。「プロンプトに入れる」の切り替えつき。
 // 時間帯・曜日の傾向は文章では変えられないので、プロンプトに入らず「時刻の参考」の印を付ける（research.md R7）。
-import type { AnalysisResponse } from "@threads-grower/shared";
+import type { AnalysisResponse } from "@meguru/shared";
 import { useId } from "react";
 import { Switch } from "@/components/ui/switch";
 import { num } from "./format";

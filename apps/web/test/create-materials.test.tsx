@@ -1,7 +1,7 @@
 // US11：プロンプトに入っている情報（specs/014-strategy-guidance FR-120〜FR-122、contracts/ui-routes.md「投稿をつくる」）
 import { screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { HINTED_KEYS, type PromptMaterials } from "@threads-grower/shared";
+import { HINTED_KEYS, type PromptMaterials } from "@meguru/shared";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { OWNER_ACCESS } from "./helpers/access";
 import { listResponse, promptResponse, renderAccountRoutes } from "./helpers/stock";

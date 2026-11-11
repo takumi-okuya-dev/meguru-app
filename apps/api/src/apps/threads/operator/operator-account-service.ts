@@ -7,7 +7,7 @@ import {
   type OperatorAccount,
   type OperatorAccounts,
   type OperatorAccountsQuery,
-} from "@threads-grower/shared";
+} from "@meguru/shared";
 import { sql, type SQL } from "drizzle-orm";
 import type { Db } from "../../../kernel/db/client";
 

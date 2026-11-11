@@ -1,7 +1,7 @@
 // 「このアカウントの設定」の「アカウントの名前」の区分（specs/012 FR-040、contracts/ui-routes.md「アカウントの名前」）。
 // 主に出す名前をオーナーが直す。保存すると、切り替えメニュー・ホームなどの表示がすぐ変わる。
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { ACCOUNT_NAME_MAX, countChars, type AccountSummary } from "@threads-grower/shared";
+import { ACCOUNT_NAME_MAX, countChars, type AccountSummary } from "@meguru/shared";
 import { useEffect, useState, type FormEvent } from "react";
 import { toast } from "sonner";
 import { FieldWithCounter } from "@/components/FieldWithCounter";

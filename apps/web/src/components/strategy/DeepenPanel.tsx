@@ -1,6 +1,6 @@
 // 「AIと深掘り」の欄（specs/014-strategy-guidance FR-031〜FR-035、contracts/ui-routes.md「課題」）。
 // プロンプトをコピーし、AIの答えを貼り付けて、反映する内容（目印の内側か全体）を入力欄に入れる。保存はしない。
-import { STRATEGY_TEXT_MAX, countChars, extractFinal, FINAL_BEGIN } from "@threads-grower/shared";
+import { STRATEGY_TEXT_MAX, countChars, extractFinal, FINAL_BEGIN } from "@meguru/shared";
 import { useEffect, useId, useState } from "react";
 import { CopyPromptButton } from "@/components/CopyPromptButton";
 import { Button } from "@/components/ui/button";

@@ -4,7 +4,7 @@
 // - 失敗したら指数バックオフで最大3回まで再試行し、それでも失敗したらウィンドウにフォーカスが戻ったときにもう一度呼ぶ
 // - 画面を離れたら、待機中・実行中の再試行を中止する
 // - ホバーなどの先読みでは呼ばない（このフックは画面を実際に開いたときだけ使う）
-import type { AccountSummary } from "@threads-grower/shared";
+import type { AccountSummary } from "@meguru/shared";
 import { useEffect, useRef } from "react";
 import { ApiError, api } from "./api-client";
 

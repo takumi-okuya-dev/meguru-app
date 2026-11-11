@@ -2,7 +2,7 @@
 // Authorization: Bearer <Clerkのセッショントークン> を検証し、失敗したら 401 AUTH_REQUIRED。
 // 成功したら clerk_user_id で users を探し、なければその場で作る（JIT作成）。
 import { createClerkClient, verifyToken } from "@clerk/backend";
-import type { Feature } from "@threads-grower/shared";
+import type { Feature } from "@meguru/shared";
 import { eq, sql } from "drizzle-orm";
 import { createMiddleware } from "hono/factory";
 import type { Env } from "../../kernel/env";

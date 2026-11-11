@@ -1,7 +1,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import type { AccountSummary, MeResponse, NeedsReviewCountsResponse } from "@threads-grower/shared";
+import type { AccountSummary, MeResponse, NeedsReviewCountsResponse } from "@meguru/shared";
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { PageHeader } from "@/components/layout/PageHeader";

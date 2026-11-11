@@ -1,6 +1,6 @@
 // 時間差のメンションを付ける・直す・外す・承認（specs/023-delayed-mention contracts/api.md、tasks.md T014・T015・T030）
 import { neon } from "@neondatabase/serverless";
-import type { PostDraft } from "@threads-grower/shared";
+import type { PostDraft } from "@meguru/shared";
 import { beforeEach, describe, expect, it } from "vitest";
 import { call, createUserWithAccount, makeApp, resetDb, testEnv } from "../helpers/app";
 import { activityRows, putInTeam } from "../helpers/team";

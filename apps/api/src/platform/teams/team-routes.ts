@@ -10,7 +10,7 @@ import {
   teamRenameRequestSchema,
   teamRoleUpdateSchema,
   teamShareUpdateSchema,
-} from "@threads-grower/shared";
+} from "@meguru/shared";
 import { Hono, type Context, type MiddlewareHandler } from "hono";
 import type { AppEnv } from "../identity/auth";
 import { createDb, withTransaction } from "../../kernel/db/client";

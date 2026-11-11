@@ -9,7 +9,7 @@ import {
   OPERATOR_ACCOUNT_TESTER_LABELS,
   type OperatorAccount,
   type OperatorAccountMethodFilter,
-} from "@threads-grower/shared";
+} from "@meguru/shared";
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { useEffect, useId, useState } from "react";
 import { Button } from "@/components/ui/button";

@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { blockedReasonLabel, PUBLISH_ERROR_LABELS } from "@threads-grower/shared";
+import { blockedReasonLabel, PUBLISH_ERROR_LABELS } from "@meguru/shared";
 import { Link } from "react-router";
 import { api, describeError } from "@/lib/api-client";
 import { formatRelativeJst } from "@/lib/format";

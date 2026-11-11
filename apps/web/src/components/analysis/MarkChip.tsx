@@ -1,5 +1,5 @@
 // 区切りの印（「件数が少ない」「試していない」）。今の灰色の小さい印と同じ見た目（docs/ui-design.md）。
-import type { BucketMark } from "@threads-grower/shared";
+import type { BucketMark } from "@meguru/shared";
 
 const LABELS = { few: "件数が少ない", untried: "試していない" } as const;
 

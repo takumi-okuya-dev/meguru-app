@@ -11,7 +11,7 @@ import {
   POST_LENGTH_TARGET_STEP,
   splitLengthMix,
   type PostLengthSettings,
-} from "@threads-grower/shared";
+} from "@meguru/shared";
 import { ChevronDownIcon } from "lucide-react";
 import { useEffect, useId, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";

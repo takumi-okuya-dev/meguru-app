@@ -1,7 +1,7 @@
 // チームの招待リンク（specs/011-team-revision contracts/api.md「招待の確認と参加」。仕組みは specs/008 research.md R4）。
 // 文字列は推測できない乱数。照合はハッシュ、再表示は暗号化した写しで行い、平文は保存しない。
 // team_members・team_accounts は、このファイルと team-service.ts 以外から書かない（tasks.md Notes）。
-import { TEAM_MEMBER_LIMIT } from "@threads-grower/shared";
+import { TEAM_MEMBER_LIMIT } from "@meguru/shared";
 import { and, asc, count, eq, inArray } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import type { Env } from "../../kernel/env";

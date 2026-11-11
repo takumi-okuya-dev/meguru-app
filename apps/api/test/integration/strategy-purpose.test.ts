@@ -1,5 +1,5 @@
 // 活動の目的・在り方の6項目（specs/014-strategy-guidance FR-050・FR-054・FR-055・FR-071、SC-006、research.md R3）。
-import { PURPOSE_KEYS, emptyStrategyValues } from "@threads-grower/shared";
+import { PURPOSE_KEYS, emptyStrategyValues } from "@meguru/shared";
 import { beforeEach, describe, expect, it } from "vitest";
 import { call, createUserWithAccount, endTrial, makeApp, resetDb } from "../helpers/app";
 import { callBilling } from "../helpers/billing";

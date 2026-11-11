@@ -1,6 +1,6 @@
 // 「プロンプトに入っている情報」（specs/014-strategy-guidance US11、FR-120〜FR-123、contracts/ui-routes.md「投稿をつくる」）。
 // 数はAPIがプロンプトを作るときの数え方のまま（materials）。画面では並べて、編集の画面へのリンクを作るだけ。
-import { STRATEGY_FIELDS, type PromptMaterials as Materials } from "@threads-grower/shared";
+import { STRATEGY_FIELDS, type PromptMaterials as Materials } from "@meguru/shared";
 import { ChevronDownIcon } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import { Link } from "react-router";

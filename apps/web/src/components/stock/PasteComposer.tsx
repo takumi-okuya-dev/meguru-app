@@ -9,7 +9,7 @@ import {
   findPasteProblem,
   splitDrafts,
   type DraftBatchResult,
-} from "@threads-grower/shared";
+} from "@meguru/shared";
 import { ArrowUpIcon, XIcon } from "lucide-react";
 import { useEffect, useId, useRef, useState } from "react";
 import { Link } from "react-router";

@@ -1,5 +1,5 @@
 // リクエストの本文の検証（specs/002-strategy-profile contracts/api.md「検証の失敗」）
-import { invalidFields } from "@threads-grower/shared";
+import { invalidFields } from "@meguru/shared";
 import type { z } from "zod";
 import { AppError } from "./errors";
 

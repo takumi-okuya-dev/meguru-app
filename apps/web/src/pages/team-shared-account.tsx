@@ -2,7 +2,7 @@
 // 「見せてもらっているアカウント」、US3、FR-031）。投稿ストックと戦略を読むだけで、操作のボタンは出さない。
 // パフォーマンス・設定・操作の記録へのリンクも出さない。開けなくなったら知らせてチームの画面へ移す。
 import { useQuery } from "@tanstack/react-query";
-import { STRATEGY_FIELDS, type PostDraft } from "@threads-grower/shared";
+import { STRATEGY_FIELDS, type PostDraft } from "@meguru/shared";
 import { EyeIcon } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { Link, Navigate, useNavigate, useParams, useSearchParams } from "react-router";

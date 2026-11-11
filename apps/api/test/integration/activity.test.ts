@@ -1,7 +1,7 @@
 // 操作の記録（specs/008-team-operations FR-050・FR-050a・FR-051・FR-052・FR-054、research.md R9。
 // specs/011 research.md R8：チームに入っているアカウントだけ書き、した人の役割は owner・admin・editor・member）
 import { neon } from "@neondatabase/serverless";
-import { emptyStrategyValues } from "@threads-grower/shared";
+import { emptyStrategyValues } from "@meguru/shared";
 import { beforeEach, describe, expect, it } from "vitest";
 import { runDailyJobs } from "../../src/jobs/daily-jobs";
 import { call, createUserWithAccount, makeApp, resetDb, testEnv } from "../helpers/app";

@@ -3,7 +3,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import type { AccountTeam, MeResponse } from "@threads-grower/shared";
+import type { AccountTeam, MeResponse } from "@meguru/shared";
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { EDITOR_ACCESS, OWNER_ACCESS } from "./helpers/access";

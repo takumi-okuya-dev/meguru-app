@@ -8,7 +8,7 @@ import {
   TESTER_SLOT_CAPACITY_MIN,
   type OperatorTesterApplication,
   type TesterApplicationView,
-} from "@threads-grower/shared";
+} from "@meguru/shared";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { CircleAlertIcon, ExternalLinkIcon } from "lucide-react";
 import { useId, useState } from "react";

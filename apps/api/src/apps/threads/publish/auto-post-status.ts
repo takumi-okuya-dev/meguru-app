@@ -7,7 +7,7 @@ import {
   projectSchedule,
   type AutoPostNotice,
   type AutoPostStatus,
-} from "@threads-grower/shared";
+} from "@meguru/shared";
 import { and, count, desc, eq, gt, gte, isNotNull, lt } from "drizzle-orm";
 import type { Db } from "../../../kernel/db/client";
 import { postDrafts, publishAttempts } from "../schema";

@@ -1,5 +1,5 @@
 // 関わりと権限の見本（specs/011-team-revision contracts/permissions.md）。API の accountAccess を差し替えるテストで使う。
-import { FEATURES, type AccountAccessResponse } from "@threads-grower/shared";
+import { FEATURES, type AccountAccessResponse } from "@meguru/shared";
 
 /** すべての機能のまとまりがON（運営者が何もOFFにしていない。specs/019）。 */
 export const ALL_FEATURES: AccountAccessResponse["features"] = [...FEATURES];

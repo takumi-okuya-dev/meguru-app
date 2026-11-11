@@ -21,7 +21,7 @@ import {
   type ReferencePlatform,
   type ReferencePost,
   type ReferencePostInputBody,
-} from "@threads-grower/shared";
+} from "@meguru/shared";
 import type { FormErrors } from "@/components/items/use-item-form";
 
 /** 参考投稿の入力欄の値。数字は入力のままの文字。 */

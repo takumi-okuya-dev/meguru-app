@@ -1,6 +1,6 @@
 // PR #16 のCodexレビューへの対応（specs/013-billing）。決済ON・偽のStripe。
 import { and, eq } from "drizzle-orm";
-import { entitlementOf, type SubscriptionStatus } from "@threads-grower/shared";
+import { entitlementOf, type SubscriptionStatus } from "@meguru/shared";
 import { beforeEach, describe, expect, it } from "vitest";
 import { subscriptions, users } from "../../src/db/schema";
 import { readGate } from "../../src/apps/threads/publish/auto-post-gate";

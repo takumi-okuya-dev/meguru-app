@@ -11,7 +11,7 @@ import {
   type CsvCell,
   type PostExportRow,
   type SnapshotExportRow,
-} from "@threads-grower/shared";
+} from "@meguru/shared";
 import { ChevronDownIcon, DownloadIcon } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";

@@ -2,7 +2,7 @@
 // api-client の差し替え（vi.mock）は、各テストのファイルで行う。
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render } from "@testing-library/react";
-import { emptyStrategyValues, type AccountSummary, type Strategy } from "@threads-grower/shared";
+import { emptyStrategyValues, type AccountSummary, type Strategy } from "@meguru/shared";
 import type { ComponentType, ReactNode } from "react";
 import { createMemoryRouter, Link, Outlet, RouterProvider } from "react-router";
 

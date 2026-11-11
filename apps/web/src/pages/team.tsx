@@ -2,7 +2,7 @@
 // 見ている人のロールで出し分ける：管理者はロールの切り替え・招待・担当・外す・引き継ぐ・名前・削除、
 // メンバー・編集者は自分のアカウントの「チームに見せる」と抜ける。出し分けは見た目のためだけで、守りはAPIの判定にある。
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { TEAM_NAME_MAX, countChars, errorMessage, type TeamDetail, type TeamMember } from "@threads-grower/shared";
+import { TEAM_NAME_MAX, countChars, errorMessage, type TeamDetail, type TeamMember } from "@meguru/shared";
 import { ChevronRightIcon, EllipsisIcon, PlusIcon, UsersIcon, XIcon } from "lucide-react";
 import { useId, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";

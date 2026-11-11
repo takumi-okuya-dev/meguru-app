@@ -1,6 +1,6 @@
 // 「チームを抜ける」のダイアログ（specs/011-team-revision FR-040・FR-042・FR-043、contracts/ui-routes.md「チームの画面」）。
 // 管理者は、引き継ぐ人を選ぶまで「引き継いで抜ける」を押せない。管理者しかいなければ、チームの削除を案内する。
-import type { TeamDetail } from "@threads-grower/shared";
+import type { TeamDetail } from "@meguru/shared";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";

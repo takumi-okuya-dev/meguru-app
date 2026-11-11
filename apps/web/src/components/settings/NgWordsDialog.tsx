@@ -1,7 +1,7 @@
 // NGワードのダイアログ（specs/004-review-approval FR-014・FR-016a、contracts/ui-routes.md「NGワードのダイアログ」）。
 // 追加・削除はその場で保存する。削除は確認を求めず、トーストの「元に戻す」で足し直せる。
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { NG_WORD_LIMIT, type NgWord } from "@threads-grower/shared";
+import { NG_WORD_LIMIT, type NgWord } from "@meguru/shared";
 import { XIcon } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";

@@ -11,7 +11,7 @@ import {
   addDays,
   jstDateOf,
   jstMidnight,
-} from "@threads-grower/shared";
+} from "@meguru/shared";
 import { and, eq, sql } from "drizzle-orm";
 import { withTransaction, type Db } from "../../../kernel/db/client";
 import { postDrafts, postMentions, postingSchedules, publishAttempts } from "../schema";

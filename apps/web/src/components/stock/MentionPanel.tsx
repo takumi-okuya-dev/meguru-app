@@ -13,7 +13,7 @@ import {
   type MentionSettings,
   type NgWordForMatch,
   type PostMention,
-} from "@threads-grower/shared";
+} from "@meguru/shared";
 import { AtSignIcon, CheckIcon } from "lucide-react";
 import { useId, useState } from "react";
 import { toast } from "sonner";

@@ -2,7 +2,7 @@
 // 「自動投稿」「戦略」は開いているAccountのオーナーの /access の features、「チーム」は自分の /api/me の features で出し分ける。
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen, within } from "@testing-library/react";
-import type { AccountAccessResponse, Feature, MeResponse, ProfileStatus } from "@threads-grower/shared";
+import type { AccountAccessResponse, Feature, MeResponse, ProfileStatus } from "@meguru/shared";
 import { createMemoryRouter, Outlet, RouterProvider } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ALL_FEATURES, OWNER_ACCESS, VIEWER_ACCESS } from "./helpers/access";

@@ -1,6 +1,6 @@
 import { ApiErrorScreen } from "@/components/ApiErrorScreen";
 import { Button } from "@/components/ui/button";
-import type { MentionSettings, NgWordForMatch } from "@threads-grower/shared";
+import type { MentionSettings, NgWordForMatch } from "@meguru/shared";
 import { MentionPanel } from "./MentionPanel";
 import { PublishedCard } from "./PublishedCard";
 import { usePublished } from "./use-published";

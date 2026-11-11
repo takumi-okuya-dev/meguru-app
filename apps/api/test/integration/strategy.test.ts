@@ -1,5 +1,5 @@
 // US1：課題（specs/002-strategy-profile FR-001〜FR-006・FR-020・FR-021・FR-023〜FR-025、research.md R1〜R3・R14）
-import { emptyStrategyValues } from "@threads-grower/shared";
+import { emptyStrategyValues } from "@meguru/shared";
 import { beforeEach, describe, expect, it } from "vitest";
 import { AFTER_TRIAL, call, createUserWithAccount, makeApp, resetDb, setAccount } from "../helpers/app";
 import { putInTeam } from "../helpers/team";

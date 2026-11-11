@@ -1,6 +1,6 @@
 // パフォーマンスの一覧の読み込み（specs/006-performance-feedback contracts/api.md、ui-routes.md）。タブごとに50件ずつ読む。
 import { useInfiniteQuery } from "@tanstack/react-query";
-import type { PerformanceTab } from "@threads-grower/shared";
+import type { PerformanceTab } from "@meguru/shared";
 import { useCallback } from "react";
 import { useSearchParams } from "react-router";
 import { api } from "@/lib/api-client";

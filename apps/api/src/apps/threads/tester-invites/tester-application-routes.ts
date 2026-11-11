@@ -1,6 +1,6 @@
 // /api/accounts/:accountId/tester-application（specs/024-tester-invite-connect contracts/api.md「利用者の申し込み」）。
 // そのアカウントのオーナーだけ。招待の管理がOFFなら 404（research.md R4）。
-import { testerApplyRequestSchema } from "@threads-grower/shared";
+import { testerApplyRequestSchema } from "@meguru/shared";
 import { Hono, type MiddlewareHandler } from "hono";
 import type { AppEnv } from "../../../platform";
 import { createDb } from "../../../kernel/db/client";

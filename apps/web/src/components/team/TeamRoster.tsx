@@ -1,6 +1,6 @@
 // カード「このアカウントの担当」（specs/011-team-revision FR-055。009のカードを改めた）。
 // チーム名・管理者と、このアカウントの担当の人を出す。見ている人の名前に「あなた」の印を付ける。
-import type { AccountTeam } from "@threads-grower/shared";
+import type { AccountTeam } from "@meguru/shared";
 import { cn } from "@/lib/utils";
 
 type Person = { userId: string; name: string; note: string };

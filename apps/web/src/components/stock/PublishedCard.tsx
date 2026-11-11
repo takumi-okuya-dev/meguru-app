@@ -1,4 +1,4 @@
-import type { PublishedPost } from "@threads-grower/shared";
+import type { PublishedPost } from "@meguru/shared";
 import type { ReactNode } from "react";
 import { formatRelativeJst } from "@/lib/format";
 

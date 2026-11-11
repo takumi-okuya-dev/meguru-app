@@ -6,7 +6,7 @@ import {
   countChars,
   isBlank,
   type RejectReasonCode,
-} from "@threads-grower/shared";
+} from "@meguru/shared";
 import { useState } from "react";
 import { FieldWithCounter } from "@/components/FieldWithCounter";
 import { FormDialogFrame } from "@/components/items/FormDialogFrame";

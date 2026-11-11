@@ -1,6 +1,6 @@
 // 「Threadsの規約への備え」のダイアログ（specs/004-review-approval FR-042・FR-043、contracts/ui-routes.md）。
 // アプリが用意しているルールと「規約に注意」の分類を、読むだけで出す。規約に触れないことを保証するものではない。
-import { POLICY_CAUTIONS, POLICY_LIST_VERSION, POLICY_PROMPT_RULES } from "@threads-grower/shared";
+import { POLICY_CAUTIONS, POLICY_LIST_VERSION, POLICY_PROMPT_RULES } from "@meguru/shared";
 import {
   Dialog,
   DialogContent,

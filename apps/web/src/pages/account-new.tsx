@@ -8,7 +8,7 @@ import {
   RECONNECT_FROM_SETTINGS_HINT,
   countChars,
   errorMessage,
-} from "@threads-grower/shared";
+} from "@meguru/shared";
 import { useEffect, useState, type FormEvent } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router";
 import { readOnlyMessage } from "@/components/billing/BillingRequiredDialog";

@@ -108,7 +108,7 @@ import {
   type OpenAccountRequest,
   type CreateAccountRequest,
   type RenameAccountRequest,
-} from "@threads-grower/shared";
+} from "@meguru/shared";
 import { z } from "zod";
 import { clearReferral, currentReferral } from "./referral-store";
 

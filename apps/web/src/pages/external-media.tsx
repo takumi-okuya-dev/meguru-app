@@ -12,7 +12,7 @@ import {
   type ExternalMediaList,
   type ListingStatus,
   type Media,
-} from "@threads-grower/shared";
+} from "@meguru/shared";
 import { ChevronRightIcon } from "lucide-react";
 import { useId, useState } from "react";
 import { Link, useSearchParams } from "react-router";

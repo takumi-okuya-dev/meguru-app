@@ -1,6 +1,6 @@
 // 宣伝内容の画面（specs/002 US2、contracts/ui-routes.md「宣伝内容の画面」、docs/ui-design.md 型B）
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { PROMOTION_LIMIT, type Promotion, type PromotionInput, type PromotionSettings } from "@threads-grower/shared";
+import { PROMOTION_LIMIT, type Promotion, type PromotionInput, type PromotionSettings } from "@meguru/shared";
 import { EllipsisIcon, ExternalLinkIcon, PlusIcon } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";

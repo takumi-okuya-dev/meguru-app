@@ -1,7 +1,7 @@
 // 紹介リンクを開いたことを、このブラウザに30日だけ覚える（specs/017-referral-links research.md R3、contracts/ui-routes.md 3）。
 // Googleのログインで別のサイトを行き来するので、登録まで URL では運べない。登録が終わる（me が成功する）と消す。
 // 覚えられない環境（プライベートブラウズなど）では何もしない（紹介の記録がつかないだけ）。
-import { REFERRAL_CODE_PATTERN, REFERRAL_REMEMBER_DAYS } from "@threads-grower/shared";
+import { REFERRAL_CODE_PATTERN, REFERRAL_REMEMBER_DAYS } from "@meguru/shared";
 
 const KEY = "tg.referral";
 const REMEMBER_MS = REFERRAL_REMEMBER_DAYS * 24 * 60 * 60 * 1000;

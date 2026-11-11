@@ -21,7 +21,7 @@ import {
   milestoneForElapsed,
   type MetricsKindValue,
   type MetricsMilestone,
-} from "@threads-grower/shared";
+} from "@meguru/shared";
 import { and, asc, eq, gte, inArray, isNull, lt, or, sql, type SQL } from "drizzle-orm";
 import type { BatchItem } from "drizzle-orm/batch";
 import type { Db } from "../../../kernel/db/client";

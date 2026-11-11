@@ -1,5 +1,5 @@
 // /api/operator/accounts（specs/026-operator-accounts contracts/api.md）。運営者（OPERATOR_CLERK_USER_IDS）だけ。見るだけ。
-import { operatorAccountsQuerySchema } from "@threads-grower/shared";
+import { operatorAccountsQuerySchema } from "@meguru/shared";
 import { Hono, type MiddlewareHandler } from "hono";
 import type { AppEnv } from "../../../platform";
 import { createDb } from "../../../kernel/db/client";

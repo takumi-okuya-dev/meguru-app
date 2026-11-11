@@ -1,5 +1,5 @@
 // 作業の画面のSTEP（specs/021 FR-030〜FR-032、contracts/ui-routes.md 4）。保存も状況の変更もしない。
-import { MEDIA_LABELS, type FilledWorkStep, type ListingCheck, type Media } from "@threads-grower/shared";
+import { MEDIA_LABELS, type FilledWorkStep, type ListingCheck, type Media } from "@meguru/shared";
 import { cn } from "@/lib/utils";
 import { CopyValueButton } from "./CopyValueButton";
 import { RuleCounts } from "./RuleCheck";

@@ -1,7 +1,7 @@
 // 操作の記録（specs/008-team-operations contracts/ui-routes.md「操作の記録」、US4・FR-052）。
 // オーナーと、担当の管理者だけ（specs/011 FR-002）。チームに入っているAccountの、90日分の操作を新しい順に出す。
 import { useInfiniteQuery } from "@tanstack/react-query";
-import type { ActivityItem } from "@threads-grower/shared";
+import type { ActivityItem } from "@meguru/shared";
 import { ChevronDownIcon } from "lucide-react";
 import { useState } from "react";
 import { Navigate } from "react-router";

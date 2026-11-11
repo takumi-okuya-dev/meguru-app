@@ -1,6 +1,6 @@
 // 課題の区分へ移るチップの並び（specs/014-strategy-guidance FR-017〜FR-019、research.md R5）。
 // 上部バーの下に固定し（PC・スマートフォンとも）、区分ごとの「十分」の数と、今見ている区分を出す。
-import { STRATEGY_SECTIONS, STRATEGY_TOTAL, type StrategyCheck, type StrategySectionId } from "@threads-grower/shared";
+import { STRATEGY_SECTIONS, STRATEGY_TOTAL, type StrategyCheck, type StrategySectionId } from "@meguru/shared";
 import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
 

@@ -1,4 +1,4 @@
-import type { ConnectionStatus } from "@threads-grower/shared";
+import type { ConnectionStatus } from "@meguru/shared";
 import { AlertTriangleIcon, CheckCircle2Icon, CircleDashedIcon } from "lucide-react";
 
 /**

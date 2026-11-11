@@ -1,7 +1,7 @@
 // リサーチの画面のテストの組み立て（specs/014。api-client の差し替えは各テストのファイルで行う）。
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render } from "@testing-library/react";
-import type { ReferencePost } from "@threads-grower/shared";
+import type { ReferencePost } from "@meguru/shared";
 import type { ComponentType } from "react";
 import { createMemoryRouter, Link, Outlet, RouterProvider } from "react-router";
 import { UnsavedChangesProvider } from "@/components/UnsavedChangesProvider";

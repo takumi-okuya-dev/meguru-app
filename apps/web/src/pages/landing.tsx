@@ -1,6 +1,6 @@
 // 「/」：中身を持たない振り分け用のルート（FR-004・FR-005、規則2）
 import { useQuery } from "@tanstack/react-query";
-import { errorMessage, isErrorCode } from "@threads-grower/shared";
+import { errorMessage, isErrorCode } from "@meguru/shared";
 import { useEffect, useRef } from "react";
 import { Navigate, useSearchParams } from "react-router";
 import { toast } from "sonner";

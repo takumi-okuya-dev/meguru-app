@@ -2,7 +2,7 @@
 // （許可の画面にいる間にアカウントが消された・state が使えない。contracts/api.md、PR #15 のCodexレビュー）。
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, render, screen, waitFor } from "@testing-library/react";
-import type { MeResponse } from "@threads-grower/shared";
+import type { MeResponse } from "@meguru/shared";
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ME_BILLING_OFF } from "./helpers/billing";

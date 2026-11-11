@@ -1,7 +1,7 @@
 // つなぐ画面の招待の申し込み（specs/024-tester-invite-connect contracts/ui-routes.md 2、モック2〜4枚目）。
 // 招待の管理がONのとき、「Threadsで許可する」の場所に出す。申し込み前・申し込み中・招待済み・見送りの4つ。
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { normalizeThreadsUsername } from "@threads-grower/shared";
+import { normalizeThreadsUsername } from "@meguru/shared";
 import { useId, useState, type FormEvent, type ReactNode } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";

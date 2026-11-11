@@ -1,7 +1,7 @@
 // US13：1投稿の文字数と、短文・中文・長文の割合（specs/014-strategy-guidance FR-140〜FR-142、SC-019）
 import { act, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { POST_LENGTH_DEFAULTS, type PostLengthSettings } from "@threads-grower/shared";
+import { POST_LENGTH_DEFAULTS, type PostLengthSettings } from "@meguru/shared";
 import { fireEvent } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { EDITOR_ACCESS, OWNER_ACCESS } from "./helpers/access";

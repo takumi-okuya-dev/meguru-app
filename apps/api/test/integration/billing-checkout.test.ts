@@ -1,5 +1,5 @@
 // 契約する（specs/013-billing FR-021〜FR-025、research.md R4、T025）。決済ON・偽のStripe。
-import { trialEndsAt } from "@threads-grower/shared";
+import { trialEndsAt } from "@meguru/shared";
 import { eq } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
 import { subscriptions, users } from "../../src/db/schema";

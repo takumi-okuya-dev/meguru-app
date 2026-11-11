@@ -1,6 +1,6 @@
 // US2：運営者の招待の管理（specs/024-tester-invite-connect contracts/api.md「運営者の招待の管理」、FR-008〜FR-014、SC-005、T022）
 import { neon } from "@neondatabase/serverless";
-import type { OperatorTesterApplication, OperatorTesterApplications } from "@threads-grower/shared";
+import type { OperatorTesterApplication, OperatorTesterApplications } from "@meguru/shared";
 import { beforeEach, describe, expect, it } from "vitest";
 import { call, connectExisting, fake, makeApp, resetDb, testEnv } from "../helpers/app";
 import {

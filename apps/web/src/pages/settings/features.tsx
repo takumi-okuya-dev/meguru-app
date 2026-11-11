@@ -1,7 +1,7 @@
 // 設定 > 運営 > 使える機能（specs/019-feature-switches contracts/ui-routes.md 4、US1・US4、FR-002・FR-013・FR-014）。
 // 運営者だけ。人を探して、まとまりごとにON/OFF（人の設定）。OFFの人の一覧と、最近の変更（人とグループ）。
 // 画面はモック（https://claude.ai/artifact/XbnRAoVcfS7HCprqHfrrqi 、2026-11-04 OK）のとおり。
-import { FEATURE_LABELS, type FeatureSettingsList, type OperatorUser } from "@threads-grower/shared";
+import { FEATURE_LABELS, type FeatureSettingsList, type OperatorUser } from "@meguru/shared";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState, type FormEvent } from "react";
 import { FeatureSwitches, Toggle } from "@/components/settings/FeatureSwitches";

@@ -26,7 +26,7 @@ import {
   type ListingValues,
   type Media,
   type Promotion,
-} from "@threads-grower/shared";
+} from "@meguru/shared";
 import { ArrowLeftIcon, ChevronRightIcon } from "lucide-react";
 import { useEffect, useId, useMemo, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router";

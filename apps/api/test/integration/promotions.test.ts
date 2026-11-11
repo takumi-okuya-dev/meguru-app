@@ -1,5 +1,5 @@
 // US2：宣伝内容と宣伝投稿の割合（specs/002-strategy-profile FR-007〜FR-011・FR-020〜FR-025、research.md R3・R4・R6・R7）
-import { jstToday } from "@threads-grower/shared";
+import { jstToday } from "@meguru/shared";
 import { neon } from "@neondatabase/serverless";
 import { beforeEach, describe, expect, it } from "vitest";
 import { call, createUserWithAccount, makeApp, resetDb, setAccount, testEnv } from "../helpers/app";

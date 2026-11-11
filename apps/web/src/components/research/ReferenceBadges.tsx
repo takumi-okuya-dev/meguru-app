@@ -1,5 +1,5 @@
 // 参考投稿の印：媒体・鮮度・解説の有無（specs/014-strategy-guidance US7-8、FR-082・FR-098）。
-import { FRESHNESS_LEVELS, REFERENCE_PLATFORMS, type Freshness, type ReferencePlatform } from "@threads-grower/shared";
+import { FRESHNESS_LEVELS, REFERENCE_PLATFORMS, type Freshness, type ReferencePlatform } from "@meguru/shared";
 import { cn } from "@/lib/utils";
 
 /**

@@ -1,6 +1,6 @@
 // 違うアカウントで許可して戻ったときの、切り替えの手順（specs/025-threads-account-guide contracts/ui-routes.md 2、US2・FR-005・FR-006、モック3枚目）。
 // エラーの枠の中で、エラーの文に続けて出す。その画面で次にする操作なので、手順は閉じずに出す。
-import { accountSwitchSteps } from "@threads-grower/shared";
+import { accountSwitchSteps } from "@meguru/shared";
 import { ThreadsWebLink } from "./ThreadsAccountGuide";
 
 /**

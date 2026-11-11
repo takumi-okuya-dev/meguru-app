@@ -2,7 +2,7 @@
 // 管理者はチームのすべて、編集者は担当のアカウントとそのオーナーだけ（範囲はAPIが決める。画面は出すだけで、数えない・判定しない）。
 // スマートフォンは行を縦に積み、パソコンは列にそろえる（横にスクロールさせない。FR-032）。
 import { useQuery } from "@tanstack/react-query";
-import { errorMessage, formatRatio, type TeamStatus } from "@threads-grower/shared";
+import { errorMessage, formatRatio, type TeamStatus } from "@meguru/shared";
 import { ArrowLeftIcon, TrendingDownIcon } from "lucide-react";
 import type { ReactNode } from "react";
 import { Link, useParams } from "react-router";

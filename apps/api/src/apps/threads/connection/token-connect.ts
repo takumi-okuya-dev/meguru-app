@@ -9,7 +9,7 @@ import {
   TOKEN_RECHECK_DELAY_MINUTES,
   cleanToken,
   isTokenShaped,
-} from "@threads-grower/shared";
+} from "@meguru/shared";
 import { and, desc, eq, lt } from "drizzle-orm";
 import type { Env } from "../../../kernel/env";
 import { createDb, withTransaction, type Db, type TxDb } from "../../../kernel/db/client";

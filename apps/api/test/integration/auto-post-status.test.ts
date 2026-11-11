@@ -1,5 +1,5 @@
 // 自動投稿の状態と知らせ（specs/005-auto-post FR-018・FR-022、research.md R8・R9、contracts/api.md「GET /auto-post」）
-import { AUTOPOST_LATE_WINDOW_MINUTES } from "@threads-grower/shared";
+import { AUTOPOST_LATE_WINDOW_MINUTES } from "@meguru/shared";
 import { beforeEach, describe, expect, it } from "vitest";
 import { call, createUserWithAccount, fake, makeApp, resetDb } from "../helpers/app";
 import { approvedDrafts, connectedAccount, db, setSchedule } from "../helpers/auto-post";

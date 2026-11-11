@@ -1,6 +1,6 @@
 // サイドバー左上のAccount切り替え。開くたびに所有Accountと要確認件数を読み直す。
 import { isCancelledError, useQuery, useQueryClient } from "@tanstack/react-query";
-import { accountLabel, type AccountSummary } from "@threads-grower/shared";
+import { accountLabel, type AccountSummary } from "@meguru/shared";
 import { CheckIcon, ChevronDownIcon, PlusIcon, TriangleAlertIcon } from "lucide-react";
 import { Fragment, useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router";

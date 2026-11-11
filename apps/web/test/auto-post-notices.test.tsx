@@ -1,7 +1,7 @@
 // 自動投稿の知らせ：手伝う人には権限のない操作を出さない（specs/008 contracts/permissions.md、PR #9 のCodexレビュー）
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen } from "@testing-library/react";
-import type { AccountAccessResponse, AutoPostStatus } from "@threads-grower/shared";
+import type { AccountAccessResponse, AutoPostStatus } from "@meguru/shared";
 import { MemoryRouter } from "react-router";
 import { describe, expect, it, vi } from "vitest";
 import { EDITOR_ACCESS, OWNER_ACCESS } from "./helpers/access";

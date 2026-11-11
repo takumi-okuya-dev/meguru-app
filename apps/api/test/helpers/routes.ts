@@ -1,6 +1,6 @@
 // AccountのAPIと要る権限の表（specs/011-team-revision contracts/permissions.md「ルートの権限の表」）。
 // permissions-matrix.test.ts と team-share.test.ts で使う。
-import type { Permission } from "@threads-grower/shared";
+import type { Permission } from "@meguru/shared";
 
 /** [メソッド, パス（Honoのルートの形）, 要る権限]。contracts/permissions.md「ルートの権限の表」 */
 export const ACCOUNT_ROUTES: [string, string, Permission][] = [

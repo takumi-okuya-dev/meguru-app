@@ -1,5 +1,5 @@
 // 項目の自動チェックの印（specs/014-strategy-guidance FR-010〜FR-012）。十分・短め・未入力。
-import type { CheckStatus } from "@threads-grower/shared";
+import type { CheckStatus } from "@meguru/shared";
 import { cn } from "@/lib/utils";
 
 const LABELS: Record<CheckStatus, string> = { ok: "十分", short: "短め", empty: "未入力" };

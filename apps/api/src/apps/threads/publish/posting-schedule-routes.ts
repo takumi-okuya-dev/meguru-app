@@ -4,7 +4,7 @@ import {
   AUTOPOST_JITTER_SECONDS,
   AUTOPOST_MIN_GAP_MINUTES,
   putPostingScheduleRequestSchema,
-} from "@threads-grower/shared";
+} from "@meguru/shared";
 import { Hono, type Context, type MiddlewareHandler } from "hono";
 import type { AppEnv } from "../../../platform";
 import { createDb } from "../../../kernel/db/client";

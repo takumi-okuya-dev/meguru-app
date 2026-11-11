@@ -8,7 +8,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { staleUpdateTitle } from "@threads-grower/shared";
+import { staleUpdateTitle } from "@meguru/shared";
 import { formatDateTime } from "@/lib/format";
 
 /**

@@ -7,7 +7,7 @@ import {
   type AccountSummary,
   type PostingSchedule,
   type ThreadsCheck,
-} from "@threads-grower/shared";
+} from "@meguru/shared";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Alert, AlertDescription } from "@/components/ui/alert";
