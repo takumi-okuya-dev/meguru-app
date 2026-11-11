@@ -60,8 +60,8 @@ beforeEach(() => {
 });
 
 function renderSwitcher() {
-  const router = createMemoryRouter([{ path: "/accounts/:accountId", element: <AccountSwitcher /> }], {
-    initialEntries: ["/accounts/a1"],
+  const router = createMemoryRouter([{ path: "/threads/accounts/:accountId", element: <AccountSwitcher /> }], {
+    initialEntries: ["/threads/accounts/a1"],
   });
   render(
     <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>

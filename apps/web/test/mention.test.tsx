@@ -63,11 +63,11 @@ const published = (over: Partial<PublishedPost> = {}): PublishedPost => ({
   ...over,
 });
 
-function renderPage(path = "/accounts/a1/stock") {
+function renderPage(path = "/threads/accounts/a1/stock") {
   const router = createMemoryRouter(
     [
       {
-        path: "/accounts/:accountId",
+        path: "/threads/accounts/:accountId",
         element: (
           <UnsavedChangesProvider>
             <Outlet context={{ account }} />
@@ -193,7 +193,7 @@ describe("投稿済みのカード（T025・T032）", () => {
       ],
       nextCursor: null,
     });
-    renderPage("/accounts/a1/stock?tab=published");
+    renderPage("/threads/accounts/a1/stock?tab=published");
     const a = await card("予定の投稿");
     expect(within(a).getByText("11/5 21:30 に返信予定")).toBeInTheDocument();
     await user.click(within(a).getByRole("button", { name: "メンションをやめる" }));
@@ -215,7 +215,7 @@ describe("投稿済みのカード（T025・T032）", () => {
       ],
       nextCursor: null,
     });
-    renderPage("/accounts/a1/stock?tab=published");
+    renderPage("/threads/accounts/a1/stock?tab=published");
     expect(within(await card("古い投稿")).queryByRole("button", { name: "メンションを付ける" })).not.toBeInTheDocument();
     const li = await card("新しい投稿");
     await user.click(await within(li).findByRole("button", { name: "メンションを付ける" }));

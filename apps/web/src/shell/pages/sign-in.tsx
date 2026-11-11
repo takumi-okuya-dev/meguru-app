@@ -46,10 +46,11 @@ export function SignInPage() {
 }
 
 /**
- * ログインの後に戻る先。チームの招待（/invite/t_…）とテスト用のグループの招待（/test-invite/g_…）だけを許し、それ以外は `/`。
+ * ログインの後に戻る先。チームの招待（/invite/t_…）・テスト用のグループの招待（/test-invite/g_…）・Threadsのホーム（/threads。紹介リンクから。specs/028）だけを許し、それ以外は `/`。
  * @param next - クエリの next
  * @returns 戻る先のパス
  */
 export function safeNext(next: string | null): string {
+  if (next === "/threads") return next;
   return isInvitePath(next) || isTestInvitePath(next) ? next : "/";
 }

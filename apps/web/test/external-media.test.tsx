@@ -110,7 +110,7 @@ function renderAt(path: string) {
   const router = createMemoryRouter(
     [
       {
-        path: "/accounts/:accountId",
+        path: "/threads/accounts/:accountId",
         element: (
           <UnsavedChangesProvider>
             <Outlet context={{ account }} />
@@ -158,7 +158,7 @@ beforeEach(() => {
 
 describe("一覧（contracts/ui-routes.md 2）", () => {
   it("イベントの選ぶ欄（開催日時のあるものだけ・［掲載済み：〇〇］つき）と、5つの媒体の行と状況", async () => {
-    renderAt("/accounts/a1/external-media");
+    renderAt("/threads/accounts/a1/external-media");
     const select = await screen.findByRole("combobox", { name: "イベント" });
     expect(
       within(select)
@@ -170,7 +170,7 @@ describe("一覧（contracts/ui-routes.md 2）", () => {
     expect(within(rows[0]!).getByText("未着手")).toBeInTheDocument();
     expect(within(rows[0]!).getByRole("link", { name: "掲載内容を作る" })).toHaveAttribute(
       "href",
-      "/accounts/a1/external-media/p1/kokuchpro",
+      "/threads/accounts/a1/external-media/p1/kokuchpro",
     );
     expect(within(rows[1]!).getByText("作成中")).toBeInTheDocument();
     expect(within(rows[1]!).getByRole("link", { name: "開く" })).toBeInTheDocument();
@@ -182,19 +182,19 @@ describe("一覧（contracts/ui-routes.md 2）", () => {
       promotions: [{ id: "p2", title: "x", version: 1, event: null, listings: [] }],
       canEdit: true,
     });
-    renderAt("/accounts/a1/external-media");
+    renderAt("/threads/accounts/a1/external-media");
     expect(
       await screen.findByText("宣伝内容に、イベントの情報を入れると使えます。"),
     ).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "宣伝内容を開く" })).toHaveAttribute(
       "href",
-      "/accounts/a1/promotions",
+      "/threads/accounts/a1/promotions",
     );
   });
 
   it("見せてもらっている人（ROLE_FORBIDDEN）には、オーナーと担当の人だけが使えると出す", async () => {
     mocks.externalMedia.mockRejectedValue(new ApiError("ROLE_FORBIDDEN", 403));
-    renderAt("/accounts/a1/external-media");
+    renderAt("/threads/accounts/a1/external-media");
     expect(
       await screen.findByText("この画面は、オーナーと担当の人だけが使えます。"),
     ).toBeInTheDocument();
@@ -215,7 +215,7 @@ describe("一覧（contracts/ui-routes.md 2）", () => {
       version: 1,
     });
     const user = userEvent.setup();
-    renderAt("/accounts/a1/external-media");
+    renderAt("/threads/accounts/a1/external-media");
     await user.click(await screen.findByRole("button", { name: /媒体の既定値/ }));
     const peatix = await screen.findByRole("region", { name: "Peatixの既定値" });
     await user.type(within(peatix).getByLabelText("緊急連絡用電話番号"), "03");
@@ -233,7 +233,7 @@ describe("一覧（contracts/ui-routes.md 2）", () => {
 
 describe("入力の画面（contracts/ui-routes.md 3）", () => {
   it("区切りの見出しと欄のカード（必須・文字数・コピー・説明・選ぶ欄の理由・ほかの案）と、宣伝内容の元の情報", async () => {
-    renderAt("/accounts/a1/external-media/p1/peatix");
+    renderAt("/threads/accounts/a1/external-media/p1/peatix");
     expect(await screen.findByRole("region", { name: "ステップ1｜基本情報" })).toBeInTheDocument();
     expect(screen.getByRole("textbox", { name: /^イベント名/ })).toHaveValue(
       "【11/25(水)20時〜】IT交流会 ゆるく繋がる飲み会｜御徒町",
@@ -252,7 +252,7 @@ describe("入力の画面（contracts/ui-routes.md 3）", () => {
   it("ルールのチェックの枠（件数と項目）。直すと出し直す。閉じたトグル「自動で直した内容」", async () => {
     mocks.listing.mockResolvedValue(detail({}, "tsunagate"));
     const user = userEvent.setup();
-    renderAt("/accounts/a1/external-media/p1/tsunagate");
+    renderAt("/threads/accounts/a1/external-media/p1/tsunagate");
     const box = await screen.findByRole("region", { name: "ルールのチェック" });
     expect(within(box).getByText(/人脈/)).toBeInTheDocument();
     const intro = screen.getByRole("textbox", { name: /^紹介文/ });
@@ -267,7 +267,7 @@ describe("入力の画面（contracts/ui-routes.md 3）", () => {
   it("欄を直して保存すると、欄・状況・掲載URL・画像の種類を送る", async () => {
     mocks.updateListing.mockResolvedValue(detail({ version: 2 }));
     const user = userEvent.setup();
-    renderAt("/accounts/a1/external-media/p1/peatix");
+    renderAt("/threads/accounts/a1/external-media/p1/peatix");
     const title = await screen.findByRole("textbox", { name: /^イベント名/ });
     await user.clear(title);
     await user.type(title, "新しいタイトル");
@@ -298,7 +298,7 @@ describe("入力の画面（contracts/ui-routes.md 3）", () => {
       )
       .mockResolvedValueOnce(detail({ version: 6 }));
     const user = userEvent.setup();
-    renderAt("/accounts/a1/external-media/p1/peatix");
+    renderAt("/threads/accounts/a1/external-media/p1/peatix");
     await user.type(await screen.findByRole("textbox", { name: /^イベント名/ }), "x");
     await user.click(screen.getByRole("button", { name: "保存" }));
     expect(await screen.findByText("田中さんが先に保存しました")).toBeInTheDocument();
@@ -326,7 +326,7 @@ describe("入力の画面（contracts/ui-routes.md 3）", () => {
     );
     mocks.generateListing.mockResolvedValue(detail());
     const user = userEvent.setup();
-    renderAt("/accounts/a1/external-media/p1/peatix");
+    renderAt("/threads/accounts/a1/external-media/p1/peatix");
     await user.click(await screen.findByRole("button", { name: "掲載内容を作る" }));
     await waitFor(() =>
       expect(mocks.generateListing).toHaveBeenCalledWith("a1", "p1", "peatix", null),
@@ -337,7 +337,7 @@ describe("入力の画面（contracts/ui-routes.md 3）", () => {
     mocks.listing.mockResolvedValue({ ...detail(), sourceChanged: true });
     mocks.generateListing.mockResolvedValue(detail());
     const user = userEvent.setup();
-    renderAt("/accounts/a1/external-media/p1/peatix");
+    renderAt("/threads/accounts/a1/external-media/p1/peatix");
     expect(await screen.findByText(/宣伝内容が変わりました/)).toBeInTheDocument();
     await user.click(screen.getAllByRole("button", { name: "作り直す" })[0]!);
     expect(screen.getByText("掲載内容を作り直しますか？")).toBeInTheDocument();
@@ -349,7 +349,7 @@ describe("入力の画面（contracts/ui-routes.md 3）", () => {
 
   it("まとめてコピー・画像のプロンプトのコピー", async () => {
     const user = userEvent.setup();
-    renderAt("/accounts/a1/external-media/p1/peatix");
+    renderAt("/threads/accounts/a1/external-media/p1/peatix");
     await user.click(await screen.findByRole("button", { name: "まとめてコピー" }));
     expect(await navigator.clipboard.readText()).toContain("【Peatixの掲載内容】");
     await user.click(screen.getByRole("button", { name: "画像のプロンプトをコピー" }));
@@ -358,7 +358,7 @@ describe("入力の画面（contracts/ui-routes.md 3）", () => {
 
   it("AIと整える：プロンプトをコピー → 答えを貼る → 反映するとタイトルと本文が入る", async () => {
     const user = userEvent.setup();
-    renderAt("/accounts/a1/external-media/p1/peatix");
+    renderAt("/threads/accounts/a1/external-media/p1/peatix");
     await user.click(await screen.findByRole("button", { name: "AIと整える" }));
     const dialog = await screen.findByRole("dialog");
     await user.click(within(dialog).getByRole("button", { name: "プロンプトをコピーする" }));
@@ -371,7 +371,7 @@ describe("入力の画面（contracts/ui-routes.md 3）", () => {
   });
 
   it("スマートフォンでも横にスクロールしない：表を使わない（FR-063）", async () => {
-    renderAt("/accounts/a1/external-media/p1/peatix");
+    renderAt("/threads/accounts/a1/external-media/p1/peatix");
     await screen.findByRole("region", { name: "ステップ1｜基本情報" });
     expect(document.querySelector("table")).toBeNull();
     expect(document.querySelector(".overflow-x-auto")).toBeNull();
@@ -381,7 +381,7 @@ describe("入力の画面（contracts/ui-routes.md 3）", () => {
 describe("作業の画面（contracts/ui-routes.md 4）", () => {
   it("STEPのカードと値ごとのコピー。保存も状況の変更もしない。入力の画面に戻れる", async () => {
     const user = userEvent.setup();
-    const router = renderAt("/accounts/a1/external-media/p1/peatix?view=work");
+    const router = renderAt("/threads/accounts/a1/external-media/p1/peatix?view=work");
     expect(
       await screen.findByText("上から順番にコピーして、Peatixに貼り付けてください。"),
     ).toBeInTheDocument();

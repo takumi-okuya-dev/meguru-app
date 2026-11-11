@@ -161,7 +161,7 @@ export function renderAccountRoutes(
   const router = createMemoryRouter(
     [
       {
-        path: "/accounts/:accountId",
+        path: "/threads/accounts/:accountId",
         element: layout ?? (
           <UnsavedChangesProvider>
             <Outlet context={{ account }} />

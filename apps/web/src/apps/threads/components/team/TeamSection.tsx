@@ -82,7 +82,7 @@ function InTeam({ accountId, access }: { accountId: string; access: AccountAcces
   return (
     <div className="space-y-5">
       <SettingCard>
-        <Link to={`/teams/${data.team.id}`} className="flex min-h-14 items-center gap-3 px-4 py-3 hover:bg-accent">
+        <Link to={`/threads/teams/${data.team.id}`} className="flex min-h-14 items-center gap-3 px-4 py-3 hover:bg-accent">
           <TeamMark name={data.team.name} className="size-8 text-sm" />
           <span className="flex min-w-0 flex-1 flex-col leading-tight">
             <span className="truncate font-medium">{data.team.name}</span>
@@ -105,7 +105,7 @@ function InTeam({ accountId, access }: { accountId: string; access: AccountAcces
         <div className="flex flex-wrap items-center justify-between gap-2">
           <p className="text-xs text-muted-foreground">担当は、チームの管理者が決めます。承認と設定は、オーナーだけが行います。</p>
           {access.permissions.includes("activity") && (
-            <Link className="text-sm text-foreground underline" to={`/accounts/${accountId}/activity`}>
+            <Link className="text-sm text-foreground underline" to={`/threads/accounts/${accountId}/activity`}>
               操作の記録を見る
             </Link>
           )}

@@ -208,7 +208,7 @@ export function ExternalMediaPage() {
           <div className="space-y-2 rounded-2xl border px-4 py-4 text-sm">
             <p>宣伝内容に、イベントの情報を入れると使えます。</p>
             <Button asChild variant="outline" className="rounded-full">
-              <Link to={`/accounts/${account.id}/promotions`}>宣伝内容を開く</Link>
+              <Link to={`/threads/accounts/${account.id}/promotions`}>宣伝内容を開く</Link>
             </Button>
           </div>
         ) : (
@@ -252,7 +252,7 @@ export function ExternalMediaPage() {
                       </span>
                       <ListingStatusBadge status={status} />
                       <Button asChild variant="outline" className="h-10 rounded-full md:h-9">
-                        <Link to={`/accounts/${account.id}/external-media/${current!.id}/${m}`}>
+                        <Link to={`/threads/accounts/${account.id}/external-media/${current!.id}/${m}`}>
                           {l ? "開く" : "掲載内容を作る"}
                         </Link>
                       </Button>

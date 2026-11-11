@@ -120,7 +120,7 @@ describe("POST /api/threads/complete は、state を作った人しか使えな�
     const res = await call(app, "POST", "/api/threads/complete", { user: "u1", body: { state, code } });
     expect(res.status).toBe(200);
     const { redirectTo } = (await res.json()) as { redirectTo: string };
-    expect(redirectTo).toBe(`/accounts/${accountId}/settings?connected=connect`);
+    expect(redirectTo).toBe(`/threads/accounts/${accountId}/settings?connected=connect`);
     const [row] = await db().select().from(accounts).where(eq(accounts.id, accountId));
     expect(row?.connectionStatus).toBe("connected");
     expect(row?.threadsUserId).toBe("1001");

@@ -13,6 +13,11 @@ export const threadsApp: AppModule = {
   routes: threadsRoutes,
   publicRoutes: threadsPublicRoutes,
   readingRoutes: threadsReadingRoutes,
+  // 前のURL（/accounts/…・/teams/…）は /threads の下へ移す（specs/028 contracts/ui-routes.md 2）
+  legacyRedirects: [
+    { from: "/accounts", to: "/threads/accounts" },
+    { from: "/teams", to: "/threads/teams" },
+  ],
   settingsSections: [
     // テスター招待（specs/024 contracts/ui-routes.md 5）。運営の「グループ」の後
     {

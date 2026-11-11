@@ -116,7 +116,7 @@ export function TeamStatusPage() {
       className="size-10 md:size-9"
       aria-label="チームの画面に戻る"
     >
-      <Link to={`/teams/${teamId}`}>
+      <Link to={`/threads/teams/${teamId}`}>
         <ArrowLeftIcon className="size-5" />
       </Link>
     </Button>

@@ -23,7 +23,7 @@ async function expectNoOverflow(page: Page, label: string) {
 test("375pxで、014で変えた画面が横にはみ出さない", async ({ page }) => {
   await signIn(page);
   const accountId = await createAccount(page, "スマートフォンのアカウント");
-  const base = `/accounts/${accountId}`;
+  const base = `/threads/accounts/${accountId}`;
 
   await page.goto(base);
   await expect(page.getByRole("region", { name: "はじめに読んでほしいこと" })).toBeVisible();
@@ -61,7 +61,7 @@ test("375pxで、014で変えた画面が横にはみ出さない", async ({ pag
 test("375pxで、環境の帯が上部バーの操作に重ならない", async ({ page }) => {
   await signIn(page);
   const accountId = await createAccount(page, "帯のアカウント");
-  await page.goto(`/accounts/${accountId}`);
+  await page.goto(`/threads/accounts/${accountId}`);
 
   // 手元で動かすので VITE_APP_ENV は development（apps/web/.env.local）
   const banner = page.getByText("開発環境です（手元）");

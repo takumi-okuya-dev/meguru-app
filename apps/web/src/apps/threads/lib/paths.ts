@@ -5,5 +5,5 @@
  * @returns URL
  */
 export function accountHomePath(accountId: string): string {
-  return `/accounts/${accountId}`;
+  return `/threads/accounts/${accountId}`;
 }

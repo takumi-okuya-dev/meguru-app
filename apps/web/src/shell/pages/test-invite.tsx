@@ -41,7 +41,7 @@ export function TestInvitePage() {
     onSuccess: async () => {
       setTestAccessRequired(false);
       await queryClient.invalidateQueries({ queryKey: queryKeys.me });
-      void navigate("/", { replace: true });
+      void navigate("/threads", { replace: true });
     },
     onError: () => void preview.refetch(),
   });
@@ -129,7 +129,7 @@ export function TestInvitePage() {
             <div className="space-y-3">
               <p className="text-sm">すでに{viewer.groupName}に入っています。</p>
               <Button asChild className="h-12 w-full rounded-full">
-                <Link to="/">アプリを開く</Link>
+                <Link to="/threads">アプリを開く</Link>
               </Button>
             </div>
           )}

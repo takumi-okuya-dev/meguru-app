@@ -173,7 +173,7 @@ export function AccountHome() {
                   <p className="text-[15px] text-muted-foreground">{step.body}</p>
                   {step.area === null && (
                     <Button asChild className="mt-3 h-11 rounded-full px-5 md:h-9">
-                      <Link to={`/accounts/${account.id}/create`}>投稿をつくる</Link>
+                      <Link to={`/threads/accounts/${account.id}/create`}>投稿をつくる</Link>
                     </Button>
                   )}
                 </>
@@ -195,7 +195,7 @@ export function AccountHome() {
               {cards.map(({ area, label, Icon, text }) => (
                 <Link
                   key={area}
-                  to={`/accounts/${account.id}/${area}`}
+                  to={`/threads/accounts/${account.id}/${area}`}
                   className={cn(
                     "flex items-center gap-3.5 rounded-2xl border bg-card px-4 py-3 hover:bg-accent md:flex-col md:items-start md:gap-1.5 md:py-4",
                     canEdit && !connectFirst && step?.area === area && "border-foreground",

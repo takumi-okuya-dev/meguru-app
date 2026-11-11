@@ -63,7 +63,7 @@ function EditLink({ to }: { to: string }) {
  */
 export function PromptMaterials({ accountId, materials }: { accountId: string; materials: Materials }) {
   const [open, setOpen] = useState(false);
-  const base = `/accounts/${accountId}`;
+  const base = `/threads/accounts/${accountId}`;
   const { strategy, drafts, promotions, research } = materials;
   const draftFilled = [drafts.profileBio, ...drafts.pinned];
 

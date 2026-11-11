@@ -3,6 +3,8 @@
 import { Outlet, type RouteObject } from "react-router";
 import { AppRegistryProvider, type AppModule } from "./app-module";
 import { RequireAuth } from "./guards/RequireAuth";
+import { ShellLanding } from "./pages/landing";
+import { LegacyRedirect } from "./pages/legacy-redirect";
 import { LegalCommercePage } from "./pages/legal-commerce";
 import { NotFound } from "./pages/not-found";
 import { PlainPage } from "./pages/plain-page";
@@ -75,6 +77,13 @@ function routesOf(apps: readonly AppModule[]): RouteObject[] {
     },
     // アプリのログインのいらないページ（Threadsならチームの招待・データ削除の確認）
     ...apps.flatMap((a) => a.publicRoutes ?? []),
+    // 前のURLの転送。ログインの関所の外で移すので、ログインしていない人も新しいURLからログインへ進む（specs/028 contracts/ui-routes.md 2）
+    ...apps.flatMap((a) =>
+      (a.legacyRedirects ?? []).flatMap(({ from, to }) => [
+        { path: from, element: <LegacyRedirect from={from} to={to} /> },
+        { path: `${from}/*`, element: <LegacyRedirect from={from} to={to} /> },
+      ]),
+    ),
     // テスト用のグループの招待もログインなしで開ける。テスト版に入れない人も開ける（specs/016 contracts/ui-routes.md 1）
     { path: "/test-invite/:token", element: <TestInvitePage /> },
     // 紹介リンクもログインなしで開ける（specs/017 contracts/ui-routes.md 1）
@@ -82,6 +91,8 @@ function routesOf(apps: readonly AppModule[]): RouteObject[] {
     {
       element: <RequireAuth />,
       children: [
+        // 入口の振り分け（specs/028 contracts/ui-routes.md 3）
+        { path: "/", element: <ShellLanding /> },
         ...apps.flatMap((a) => a.routes),
         {
           path: "/settings",

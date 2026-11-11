@@ -341,7 +341,7 @@ function PromptReadyCard({
             (summary.strategyFilledCount === 0 ? (
               <p className="text-[13px] text-muted-foreground">
                 <span>課題を入力すると、投稿の精度が上がります</span>{" "}
-                <Link to={`/accounts/${accountId}/strategy`} className="text-ring underline">
+                <Link to={`/threads/accounts/${accountId}/strategy`} className="text-ring underline">
                   課題を入力する
                 </Link>
               </p>

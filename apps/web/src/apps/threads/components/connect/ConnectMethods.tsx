@@ -46,7 +46,7 @@ function RegisteredAlert({
     <Alert variant="destructive">
       <AlertDescription className="space-y-1 text-foreground">
         <p>{message}</p>
-        <Link className="underline" to={`/accounts/${accountId}/settings`}>
+        <Link className="underline" to={`/threads/accounts/${accountId}/settings`}>
           {name ? `『${name}』を開く` : "そのアカウントの設定を開く"}
         </Link>
         {steps}

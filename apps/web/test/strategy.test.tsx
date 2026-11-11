@@ -47,10 +47,10 @@ function renderPage() {
   const router = createMemoryRouter(
     [
       {
-        path: "/accounts/:accountId",
+        path: "/threads/accounts/:accountId",
         element: (
           <>
-            <Link to="/accounts/a1">ホームへ</Link>
+            <Link to="/threads/accounts/a1">ホームへ</Link>
             <UnsavedChangesProvider>
               <Outlet context={{ account }} />
             </UnsavedChangesProvider>
@@ -62,7 +62,7 @@ function renderPage() {
         ],
       },
     ],
-    { initialEntries: ["/accounts/a1/strategy"] },
+    { initialEntries: ["/threads/accounts/a1/strategy"] },
   );
   render(
     <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
@@ -105,7 +105,7 @@ describe("課題の画面", () => {
       await userEvent.click(screen.getByRole("link", { name: "ホームへ" }));
       expect(await screen.findByText("保存していない変更があります")).toBeInTheDocument();
       await userEvent.click(screen.getByRole("button", { name: "編集に戻る" }));
-      expect(router.state.location.pathname).toBe("/accounts/a1/strategy");
+      expect(router.state.location.pathname).toBe("/threads/accounts/a1/strategy");
       expect(screen.getByLabelText(fieldLabel)).toHaveValue("保存済みの行動を追記");
     });
 
@@ -115,7 +115,7 @@ describe("課題の画面", () => {
       await userEvent.type(await screen.findByLabelText(fieldLabel), "x");
       await userEvent.click(screen.getByRole("link", { name: "ホームへ" }));
       await userEvent.click(await screen.findByRole("button", { name: "変更を破棄して移動" }));
-      await waitFor(() => expect(router.state.location.pathname).toBe("/accounts/a1"));
+      await waitFor(() => expect(router.state.location.pathname).toBe("/threads/accounts/a1"));
     });
 
     it("入力して元に戻した場合は、確認を出さずに移動する", async () => {
@@ -125,7 +125,7 @@ describe("課題の画面", () => {
       await userEvent.type(field, "x");
       await userEvent.type(field, "{backspace}");
       await userEvent.click(screen.getByRole("link", { name: "ホームへ" }));
-      await waitFor(() => expect(router.state.location.pathname).toBe("/accounts/a1"));
+      await waitFor(() => expect(router.state.location.pathname).toBe("/threads/accounts/a1"));
       expect(screen.queryByText("保存していない変更があります")).not.toBeInTheDocument();
     });
   });

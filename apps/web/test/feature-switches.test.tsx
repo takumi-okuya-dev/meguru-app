@@ -85,14 +85,14 @@ beforeEach(() => {
   mocks.getPrompt.mockResolvedValue(promptResponse());
 });
 
-function renderShell(path = "/accounts/a1") {
+function renderShell(path = "/threads/accounts/a1") {
   const shell = (
     <ThreadsShell>
       <PageHeader title="画面" />
       <p>中身</p>
     </ThreadsShell>
   );
-  const router = createMemoryRouter([{ path: "/accounts/:accountId/*", element: shell }], { initialEntries: [path] });
+  const router = createMemoryRouter([{ path: "/threads/accounts/:accountId/*", element: shell }], { initialEntries: [path] });
   render(
     <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
       <RouterProvider router={router} />
@@ -138,8 +138,8 @@ describe("サイドバー", () => {
 describe("ホーム", () => {
   function renderHome() {
     const router = createMemoryRouter(
-      [{ path: "/accounts/:accountId", element: <Outlet context={{ account: { ...account, id: "a1" } }} />, children: [{ index: true, element: <AccountHome /> }] }],
-      { initialEntries: ["/accounts/a1"] },
+      [{ path: "/threads/accounts/:accountId", element: <Outlet context={{ account: { ...account, id: "a1" } }} />, children: [{ index: true, element: <AccountHome /> }] }],
+      { initialEntries: ["/threads/accounts/a1"] },
     );
     render(
       <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
@@ -178,7 +178,7 @@ describe("投稿をつくる", () => {
   it("戦略を使えない（materials が null）なら、情報の欄・課題の案内・材料を埋める手順が出ない", async () => {
     access = ownerWithout("strategy");
     mocks.getPrompt.mockResolvedValue({ ...promptResponse(), materials: null });
-    renderAccountRoutes([{ path: "create", element: <CreatePage /> }], "/accounts/a1/create");
+    renderAccountRoutes([{ path: "create", element: <CreatePage /> }], "/threads/accounts/a1/create");
     expect(await screen.findByRole("region", { name: "プロンプト" })).toBeInTheDocument();
     expect(await screen.findByRole("heading", { name: "投稿ができるまでの4つの手順" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /プロンプトに入っている情報/ })).toBeNull();
@@ -190,10 +190,10 @@ describe("チームで見せてもらっている画面（オーナーの設定�
   function renderShared() {
     const router = createMemoryRouter(
       [
-        { path: "/teams/:teamId/accounts/:accountId", element: <TeamSharedAccountPage /> },
-        { path: "/teams/:teamId", element: <p>チームの画面</p> },
+        { path: "/threads/teams/:teamId/accounts/:accountId", element: <TeamSharedAccountPage /> },
+        { path: "/threads/teams/:teamId", element: <p>チームの画面</p> },
       ],
-      { initialEntries: ["/teams/team-1/accounts/acc-1?tab=strategy"] },
+      { initialEntries: ["/threads/teams/team-1/accounts/acc-1?tab=strategy"] },
     );
     render(
       <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
@@ -239,10 +239,10 @@ describe("使えない機能を直接開いたとき（FR-006）", () => {
         { path: "strategy", element: <RequireFeature feature="strategy"><StrategyPage /></RequireFeature> },
         { path: "stock", element: <RequireFeature feature="autopost"><StockPage /></RequireFeature> },
       ],
-      "/accounts/a1/stock",
+      "/threads/accounts/a1/stock",
     );
     expect(await screen.findByRole("heading", { name: "この機能は今は使えません" })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "ホームへ" })).toHaveAttribute("href", "/accounts/a1");
+    expect(screen.getByRole("link", { name: "ホームへ" })).toHaveAttribute("href", "/threads/accounts/a1");
     expect(mocks.listPostDrafts).not.toHaveBeenCalled();
   });
 
@@ -250,7 +250,7 @@ describe("使えない機能を直接開いたとき（FR-006）", () => {
     mocks.getStrategy.mockRejectedValue(new ApiError("FEATURE_DISABLED", 403, ["strategy"]));
     renderAccountRoutes(
       [{ path: "strategy", element: <RequireFeature feature="strategy"><StrategyPage /></RequireFeature> }],
-      "/accounts/a1/strategy",
+      "/threads/accounts/a1/strategy",
     );
     expect(await screen.findByRole("heading", { name: "この機能は今は使えません" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "再読み込み" })).toBeNull();

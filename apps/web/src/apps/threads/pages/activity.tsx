@@ -260,7 +260,7 @@ export function ActivityPage() {
     getNextPageParam: (last) => last.nextCursor ?? undefined,
     enabled: can("activity"),
   });
-  if (access && !can("activity")) return <Navigate to={`/accounts/${account.id}`} replace />;
+  if (access && !can("activity")) return <Navigate to={`/threads/accounts/${account.id}`} replace />;
 
   const items = list.data?.pages.flatMap((p) => p.items) ?? [];
   const actors = list.data?.pages[0]?.actors ?? [];

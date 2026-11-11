@@ -9,7 +9,7 @@ import { useAccountAccess } from "@/apps/threads/lib/use-account-access";
  * @param accountId - アカウント
  * @returns パス
  */
-export const connectPath = (accountId: string) => `/accounts/${accountId}/settings#threads`;
+export const connectPath = (accountId: string) => `/threads/accounts/${accountId}/settings#threads`;
 
 /**
  * 「Threadsにつなぐと使えます」の案内。オーナーには「Threadsとの接続」への入口を添える（つなぐのはオーナーだけ。FR-015）。

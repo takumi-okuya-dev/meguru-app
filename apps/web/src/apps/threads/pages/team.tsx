@@ -65,14 +65,14 @@ function AccountChip({ teamId, account, owner }: { teamId: string; account: Team
   if (account.relation === "owner") {
     return (
       <Link
-        to={`/accounts/${account.id}`}
+        to={`/threads/accounts/${account.id}`}
         className="inline-flex h-9 items-center gap-2 rounded-full border px-3.5 text-[13px] hover:bg-accent"
       >
         {label} · あなた
       </Link>
     );
   }
-  const to = account.relation === "assigned" ? `/accounts/${account.id}` : `/teams/${teamId}/accounts/${account.id}`;
+  const to = account.relation === "assigned" ? `/threads/accounts/${account.id}` : `/threads/teams/${teamId}/accounts/${account.id}`;
   return (
     <Link
       to={to}
@@ -353,7 +353,7 @@ export function TeamPage() {
           <span className="flex items-center gap-1">
             {t.statusVisible && (
               <Button asChild variant="outline" className="h-10 rounded-full md:h-9">
-                <Link to={`/teams/${teamId}/status`}>
+                <Link to={`/threads/teams/${teamId}/status`}>
                   運用状況
                   {/* 止まっている人とアカウントの数（FR-031の例外。2026-11-04 のモックで決めた） */}
                   {(status.data?.stoppedCount ?? 0) > 0 && (
@@ -367,7 +367,7 @@ export function TeamPage() {
             )}
             {isAdmin && (
               <Button asChild variant="outline" className="h-10 rounded-full md:h-9">
-                <Link to={`/teams/${teamId}/assign`}>担当を決める</Link>
+                <Link to={`/threads/teams/${teamId}/assign`}>担当を決める</Link>
               </Button>
             )}
             {isAdmin && (

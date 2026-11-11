@@ -265,7 +265,7 @@ export function ExternalMediaListingPage() {
       aria-label={work ? "入力の画面に戻る" : "外部媒体展開に戻る"}
     >
       <Link
-        to={work ? `?` : `/accounts/${account.id}/external-media?p=${promotionId}`}
+        to={work ? `?` : `/threads/accounts/${account.id}/external-media?p=${promotionId}`}
         onClick={
           work
             ? (e) => {

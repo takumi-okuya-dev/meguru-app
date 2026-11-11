@@ -49,13 +49,13 @@ const ROUTES = [
   { path: "stock", element: <p>投稿ストックの中身</p> },
 ];
 
-function renderPage(initial: string | { pathname: string; state?: unknown } = "/accounts/a1/create") {
+function renderPage(initial: string | { pathname: string; state?: unknown } = "/threads/accounts/a1/create") {
   return renderAccountRoutes(
     ROUTES,
     initial,
     <>
-      <Link to="/accounts/a1">ホームへ</Link>
-      <Link to="/accounts/a1/create">投稿をつくるへ</Link>
+      <Link to="/threads/accounts/a1">ホームへ</Link>
+      <Link to="/threads/accounts/a1/create">投稿をつくるへ</Link>
       <UnsavedChangesProvider>
         <Outlet context={{ account }} />
       </UnsavedChangesProvider>
@@ -289,7 +289,7 @@ describe("プロンプトのカード（US1）", () => {
     const router = renderPage();
     expect(await screen.findByText("課題を入力すると、投稿の精度が上がります")).toBeInTheDocument();
     await user.click(screen.getByRole("link", { name: "課題を入力する" }));
-    expect(router.state.location.pathname).toBe("/accounts/a1/strategy");
+    expect(router.state.location.pathname).toBe("/threads/accounts/a1/strategy");
   });
 
   it("プロンプトの取得に失敗したら、カードの中に原因と「再読み込み」を出す", async () => {
@@ -331,7 +331,7 @@ describe("貼り付け欄（003 US2、014 FR-162）", () => {
     expect(await screen.findByText("2件を投稿ストックに登録しました")).toBeInTheDocument();
     expect(createDraftBatch).toHaveBeenCalledWith("a1", { clientRequestId: expect.any(String), text: "1件目\n@@@\n2件目" });
     expect(composer()).toHaveValue("");
-    expect(screen.getByRole("link", { name: "投稿ストックで確かめる" })).toHaveAttribute("href", "/accounts/a1/stock");
+    expect(screen.getByRole("link", { name: "投稿ストックで確かめる" })).toHaveAttribute("href", "/threads/accounts/a1/stock");
 
     await user.click(screen.getByRole("button", { name: "取り消す" }));
     expect(deleteDraftBatch).toHaveBeenCalledWith("a1", "b1");
@@ -341,7 +341,7 @@ describe("貼り付け欄（003 US2、014 FR-162）", () => {
 
     await user.click(sendButton());
     await user.click(await screen.findByRole("link", { name: "投稿ストックで確かめる" }));
-    expect(router.state.location.pathname).toBe("/accounts/a1/stock");
+    expect(router.state.location.pathname).toBe("/threads/accounts/a1/stock");
   });
 
   it("次の送信が失敗しても、前回の登録の案内（「取り消す」）は残る（Codexレビュー）", async () => {
@@ -498,11 +498,11 @@ describe("開いたときの初めのフォーカス（004 Clarifications 2026-1
     const user = userEvent.setup();
     const router = renderPage();
     await screen.findByRole("button", { name: "コピー" });
-    await act(() => router.navigate("/accounts/a1"));
+    await act(() => router.navigate("/threads/accounts/a1"));
     await screen.findByText("ホームの中身");
     // キャッシュがある状態で、読み込み直しだけが失敗する
     getPrompt.mockRejectedValueOnce(new ApiError("API_UNREACHABLE", 0));
-    await act(() => router.navigate("/accounts/a1/create"));
+    await act(() => router.navigate("/threads/accounts/a1/create"));
     await user.click(await screen.findByRole("button", { name: "再読み込み" }));
     const copy = await screen.findByRole("button", { name: "コピー" });
     await waitFor(() => expect(copy).toHaveFocus());
@@ -518,7 +518,7 @@ describe("開いたときの初めのフォーカス（004 Clarifications 2026-1
     await user.type(composer(), "A");
     await user.click(sendButton());
     await waitFor(() => expect(composer()).toBeDisabled());
-    await act(() => router.navigate("/accounts/a1/create", { state: { again: true } }));
+    await act(() => router.navigate("/threads/accounts/a1/create", { state: { again: true } }));
     expect(composer()).not.toHaveFocus();
     await act(async () => finish(batchResult([draft({ id: "n1", body: "A" })])));
     await waitFor(() => expect(composer()).toHaveFocus());
@@ -542,7 +542,7 @@ describe("アカウントの切り替え（PR #5 のCodexレビュー）", () =>
         </UnsavedChangesProvider>
       );
     }
-    renderAccountRoutes(ROUTES, "/accounts/a1/create", <Layout />);
+    renderAccountRoutes(ROUTES, "/threads/accounts/a1/create", <Layout />);
     expect(await screen.findByText("今はAIプロンプトを作れません")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "切り替え" }));
     expect(await screen.findByRole("button", { name: "コピー" })).toBeInTheDocument();

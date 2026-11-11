@@ -22,18 +22,18 @@ test("契約してから使い始め、支払いの失敗で読むだけにな�
   // 契約したので、アカウントを作れる。2件目は1件1,000円の案内（specs/024 FR-030）
   await page.goto("/");
   const accountId = await createAccount(page, "1件目");
-  await page.goto("/accounts/new");
+  await page.goto("/threads/accounts/new");
   await expect(page.getByText("アカウント1件につき月1,000円です。次の請求から反映されます。")).toBeVisible();
   await page.getByLabel("アカウントの名前").fill("2件目");
   await page.getByRole("button", { name: "作る", exact: true }).click();
-  await page.waitForURL(/\/accounts\/[0-9a-f-]{36}$/);
+  await page.waitForURL(/\/threads\/accounts\/[0-9a-f-]{36}$/);
   expect(((await stripeControl("subscriptions")) as { subscriptions: { items: { data: { quantity: number }[] } }[] }).subscriptions[0]!.items.data[0]!.quantity).toBe(2);
 
   // 支払いの失敗（US3-4）：「契約と支払い」を開くと読み直して、読むだけになる
   await setStripeStatus("past_due");
   await page.goto("/settings/billing");
   await expect(page.getByText("支払いに失敗しました", { exact: true })).toBeVisible();
-  await page.goto(`/accounts/${accountId}/strategy`);
+  await page.goto(`/threads/accounts/${accountId}/strategy`);
   await expect(page.getByText("支払いに失敗しました。カードを更新してください。更新するまで読むだけです。")).toBeVisible();
   await expect(page.getByRole("button", { name: "保存" })).toHaveCount(0);
 
@@ -41,7 +41,7 @@ test("契約してから使い始め、支払いの失敗で読むだけにな�
   await setStripeStatus("active");
   await page.goto("/settings/billing");
   await expect(page.getByText("契約中", { exact: true })).toBeVisible();
-  await page.goto(`/accounts/${accountId}/strategy`);
+  await page.goto(`/threads/accounts/${accountId}/strategy`);
   await expect(page.getByText(/更新するまで読むだけです/)).toHaveCount(0);
   await expect(page.getByRole("button", { name: "保存" })).toBeVisible();
 });

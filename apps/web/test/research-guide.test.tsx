@@ -47,7 +47,7 @@ describe("伸びる投稿を見つけるリサーチ", () => {
   });
 
   it("キーワードのタブでも出る", async () => {
-    renderResearchPage(ResearchPage, "/accounts/a1/research?tab=keywords");
+    renderResearchPage(ResearchPage, "/threads/accounts/a1/research?tab=keywords");
     expect(await screen.findByRole("button", { name: /伸びる投稿を見つけるリサーチ/ })).toBeInTheDocument();
   });
 });

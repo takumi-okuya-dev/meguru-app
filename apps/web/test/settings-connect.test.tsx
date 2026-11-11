@@ -49,11 +49,11 @@ const unconnected: AccountSummary = {
 };
 const connected: AccountSummary = { ...unconnected, username: "cafe_b", displayName: "Cafe B", connectionStatus: "connected", connectionMethod: "app" };
 
-function renderSettings(account: AccountSummary, path = "/accounts/a1/settings") {
+function renderSettings(account: AccountSummary, path = "/threads/accounts/a1/settings") {
   const router = createMemoryRouter(
     [
       {
-        path: "/accounts/:accountId",
+        path: "/threads/accounts/:accountId",
         element: (
           <UnsavedChangesProvider>
             <Outlet context={{ account }} />
@@ -105,7 +105,7 @@ describe("このアカウントの設定の「Threadsとの接続」", () => {
   });
 
   it("許可の画面からつながって戻る（?connected=connect）と、「つながりました」と「自動投稿を始める」。トーストは出さない（US2-2）", async () => {
-    renderSettings(connected, "/accounts/a1/settings?connected=connect");
+    renderSettings(connected, "/threads/accounts/a1/settings?connected=connect");
     expect(await screen.findByText("カフェの公式をThreadsにつなぎました（@cafe_b）")).toBeInTheDocument();
     expect(screen.getByText(/自動投稿はオフのままです/)).toBeInTheDocument();
     expect(await screen.findByRole("button", { name: "自動投稿を始める" })).toBeInTheDocument();
@@ -113,13 +113,13 @@ describe("このアカウントの設定の「Threadsとの接続」", () => {
   });
 
   it("「自動投稿を始める」で、投稿のスケジュールの設定を開く（FR-014）", async () => {
-    renderSettings(connected, "/accounts/a1/settings?connected=connect");
+    renderSettings(connected, "/threads/accounts/a1/settings?connected=connect");
     await userEvent.click(await screen.findByRole("button", { name: "自動投稿を始める" }));
     expect(await screen.findByRole("dialog", { name: "投稿のスケジュール" })).toBeInTheDocument();
   });
 
   it("接続し直して戻ったとき（?connected=reconnect）は、今までどおりトースト", async () => {
-    renderSettings(connected, "/accounts/a1/settings?connected=reconnect");
+    renderSettings(connected, "/threads/accounts/a1/settings?connected=reconnect");
     await vi.waitFor(() => expect(toastSuccess).toHaveBeenCalledWith("カフェの公式を再接続しました"));
     expect(screen.queryByText(/をThreadsにつなぎました/)).not.toBeInTheDocument();
   });
@@ -137,7 +137,7 @@ describe("このアカウントの設定の「Threadsとの接続」", () => {
 
   it("招待のリンクから来た人は、つないだら招待の画面へ戻る（specs/011 T019、specs/012 research.md R7）", async () => {
     sessionStorage.setItem("tg.inviteReturn", INVITE);
-    const router = renderSettings(connected, "/accounts/a1/settings?connected=connect");
+    const router = renderSettings(connected, "/threads/accounts/a1/settings?connected=connect");
     expect(await screen.findByText("招待の画面")).toBeInTheDocument();
     expect(router.state.location.pathname).toBe(INVITE);
   });
@@ -207,7 +207,7 @@ describe("アカウントが変わったら、削除の確認を消す（PR #15 
     const router = createMemoryRouter(
       [
         {
-          path: "/accounts/:accountId",
+          path: "/threads/accounts/:accountId",
           element: (
             <UnsavedChangesProvider>
               <AccountOutlet />
@@ -216,7 +216,7 @@ describe("アカウントが変わったら、削除の確認を消す（PR #15 
           children: [{ path: "settings", element: <AccountSettings /> }],
         },
       ],
-      { initialEntries: ["/accounts/a1/settings"] },
+      { initialEntries: ["/threads/accounts/a1/settings"] },
     );
     render(
       <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
@@ -227,7 +227,7 @@ describe("アカウントが変わったら、削除の確認を消す（PR #15 
     await userEvent.type(await screen.findByLabelText("確認のためのアカウントの名前"), "カフェの公式");
     expect(screen.getByRole("button", { name: "削除する" })).toBeEnabled();
 
-    await act(() => router.navigate("/accounts/a2/settings"));
+    await act(() => router.navigate("/threads/accounts/a2/settings"));
     expect(screen.queryByRole("button", { name: "削除する" })).not.toBeInTheDocument();
     await userEvent.click(await screen.findByRole("button", { name: "Accountを削除" }));
     expect(await screen.findByLabelText("確認のためのアカウントの名前")).toHaveValue("");
@@ -239,7 +239,7 @@ describe("#threads で開くと「Threadsとの接続」まで動かす（PR #15
   it("区分までスクロールし、見出しにフォーカスを移す。ハッシュがなければ動かさない", async () => {
     const scroll = vi.fn();
     Element.prototype.scrollIntoView = scroll;
-    renderSettings(unconnected, "/accounts/a1/settings#threads");
+    renderSettings(unconnected, "/threads/accounts/a1/settings#threads");
     await vi.waitFor(() => expect(scroll).toHaveBeenCalled());
     expect(scroll.mock.instances[0]).toBe(document.getElementById("threads"));
     expect(await screen.findByRole("heading", { name: "Threadsとの接続" })).toHaveFocus();

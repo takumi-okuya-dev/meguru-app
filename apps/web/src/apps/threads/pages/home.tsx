@@ -32,6 +32,6 @@ export function Landing() {
   if (me.isPending || me.isFetching) return <LoadingSkeleton />;
   // 一度読めていれば、裏での取り直しの失敗では画面を差し替えず、手元の一覧で表示を続ける。
   if (me.isLoadingError) return <ApiErrorScreen error={me.error} onRetry={() => void me.refetch()} />;
-  const target = me.data.landingAccountId ? `/accounts/${me.data.landingAccountId}` : "/accounts/new";
+  const target = me.data.landingAccountId ? `/threads/accounts/${me.data.landingAccountId}` : "/threads/accounts/new";
   return <Navigate to={target} replace />;
 }

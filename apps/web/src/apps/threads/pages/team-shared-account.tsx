@@ -292,7 +292,7 @@ export function TeamSharedAccountPage() {
   useEffect(() => {
     if (!lost) return;
     toast.error(LOST_MESSAGE, { id: "shared-account-lost" });
-    void navigate(`/teams/${teamId}`, { replace: true });
+    void navigate(`/threads/teams/${teamId}`, { replace: true });
   }, [lost, navigate, teamId]);
 
   if (lost) return null;
@@ -303,7 +303,7 @@ export function TeamSharedAccountPage() {
     return <ApiErrorScreen error={account.error} onRetry={() => void account.refetch()} />;
   // オーナー・担当の人は、ふつうのAccountの画面で開く
   if (access.data.relation !== "shared_viewer")
-    return <Navigate to={`/accounts/${accountId}`} replace />;
+    return <Navigate to={`/threads/accounts/${accountId}`} replace />;
   const a = account.data;
   const owner = access.data.owner.name;
   // オーナーが使えないまとまりのタブは出さず、そのAPIも読まない（specs/019 FR-012・FR-004）。
@@ -327,7 +327,7 @@ export function TeamSharedAccountPage() {
           {owner}さんのアカウントを見ています（読むだけ）{team.data ? ` · ${team.data.name}` : ""}
         </span>
         <Button asChild variant="outline" className="h-9 rounded-full bg-background">
-          <Link to={`/teams/${teamId}`}>チームに戻る</Link>
+          <Link to={`/threads/teams/${teamId}`}>チームに戻る</Link>
         </Button>
       </div>
       <header className="mx-auto flex w-full max-w-3xl items-center gap-3 px-4 pt-5 md:px-6">

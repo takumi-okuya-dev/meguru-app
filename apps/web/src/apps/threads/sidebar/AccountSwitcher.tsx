@@ -182,7 +182,7 @@ export function AccountSwitcher({ onNavigate }: { onNavigate?: () => void }) {
                 asChild
                 className="min-h-11 gap-2.5 rounded-lg py-2"
               >
-                <Link to={`/accounts/${account.id}`} onClick={onNavigate}>
+                <Link to={`/threads/accounts/${account.id}`} onClick={onNavigate}>
                   <AccountAvatar account={account} className="size-7" />
                   <span className="flex min-w-0 flex-1 flex-col leading-tight">
                     <span className="truncate font-medium">{accountLabel(account).primary}</span>
@@ -234,7 +234,7 @@ export function AccountSwitcher({ onNavigate }: { onNavigate?: () => void }) {
             )}
             <DropdownMenuSeparator />
             <DropdownMenuItem asChild className="min-h-11 rounded-lg py-2">
-              <Link to="/accounts/new" onClick={onNavigate}>
+              <Link to="/threads/accounts/new" onClick={onNavigate}>
                 <PlusIcon className="size-4" aria-hidden="true" /> アカウントを作る
               </Link>
             </DropdownMenuItem>

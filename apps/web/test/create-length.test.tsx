@@ -34,7 +34,7 @@ function renderCreate() {
       { index: true, element: <p>ホームの中身</p> },
       { path: "create", element: <CreatePage /> },
     ],
-    "/accounts/a1/create",
+    "/threads/accounts/a1/create",
   );
 }
 
@@ -221,8 +221,8 @@ describe("文字数と長さの割合", () => {
     await user.clear(count);
     await user.type(count, "10");
     await waitFor(() => expect(count).toHaveValue(12), { timeout: 2000 });
-    await act(() => router.navigate("/accounts/a1"));
-    await act(() => router.navigate("/accounts/a1/create"));
+    await act(() => router.navigate("/threads/accounts/a1"));
+    await act(() => router.navigate("/threads/accounts/a1/create"));
     const again = await screen.findByRole("spinbutton", { name: "作る件数" });
     expect(again).toHaveValue(12);
     await user.clear(again);
@@ -304,9 +304,9 @@ describe("文字数と長さの割合", () => {
         { index: true, element: <p>ホームの中身</p> },
         { path: "create", element: <CreatePage /> },
       ],
-      "/accounts/a1/create",
+      "/threads/accounts/a1/create",
       <UnsavedChangesProvider>
-        <Link to="/accounts/a1">ホームへ</Link>
+        <Link to="/threads/accounts/a1">ホームへ</Link>
         <Outlet context={{ account }} />
       </UnsavedChangesProvider>,
     );

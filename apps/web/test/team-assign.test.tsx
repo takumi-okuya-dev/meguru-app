@@ -32,10 +32,10 @@ const table: TeamAssignments = {
 function renderPage() {
   const router = createMemoryRouter(
     [
-      { path: "/teams/:teamId/assign", element: <TeamAssignPage /> },
-      { path: "/teams/:teamId", element: <p>チームの画面</p> },
+      { path: "/threads/teams/:teamId/assign", element: <TeamAssignPage /> },
+      { path: "/threads/teams/:teamId", element: <p>チームの画面</p> },
     ],
-    { initialEntries: ["/teams/t1/assign"] },
+    { initialEntries: ["/threads/teams/t1/assign"] },
   );
   render(
     <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
@@ -65,7 +65,7 @@ describe("担当を決める", () => {
     expect(within(rows[2]!).getByText("自分")).toBeInTheDocument();
     expect(screen.getByRole("checkbox", { name: "佐藤 美咲をカフェ B店（@cafe_b）の担当にする" })).toHaveAttribute("aria-checked", "true");
     expect(screen.getByRole("checkbox", { name: "田中 健をカフェ B店（@cafe_b）の担当にする" })).toHaveAttribute("aria-checked", "false");
-    expect(screen.getByRole("link", { name: "チームの画面に戻る" })).toHaveAttribute("href", "/teams/t1");
+    expect(screen.getByRole("link", { name: "チームの画面に戻る" })).toHaveAttribute("href", "/threads/teams/t1");
   });
 
   it("押すとすぐ切り替え、失敗したら元に戻す（44pxの role=checkbox のボタン）", async () => {

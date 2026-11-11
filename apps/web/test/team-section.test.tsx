@@ -59,8 +59,8 @@ function renderSection(access = OWNER_ACCESS) {
   const router = createMemoryRouter(
     [
       { path: "/", element: <TeamSection accountId="a1" access={access} /> },
-      { path: "/teams/:teamId", element: <p>チームの画面</p> },
-      { path: "/accounts/:accountId/settings", element: <p>設定の画面</p> },
+      { path: "/threads/teams/:teamId", element: <p>チームの画面</p> },
+      { path: "/threads/accounts/:accountId/settings", element: <p>設定の画面</p> },
     ],
     { initialEntries: ["/"] },
   );
@@ -105,7 +105,7 @@ describe("TeamSection（チームに入っていないオーナー）", () => {
     await user.click(submit);
     expect(createTeam).toHaveBeenCalledWith({ name: "飲食チーム", accountIds: ["a1"] });
     expect(await screen.findByText("チームの画面")).toBeInTheDocument();
-    expect(router.state.location.pathname).toBe("/teams/t-new");
+    expect(router.state.location.pathname).toBe("/threads/teams/t-new");
   });
 
   it("未接続のアカウントだけなら「先にThreadsにつないでください」で、選べず作れない（specs/012 FR-050・FR-051）", async () => {
@@ -126,7 +126,7 @@ describe("TeamSection（チームに入っていないオーナー）", () => {
     for (const b of within(dialog).getAllByRole("button", { name: "作る" })) expect(b).toBeDisabled();
     // 「Threadsとの接続」へ進む入口を添える（PR #15 のCodexレビュー）
     const link = within(dialog).getByRole("link", { name: "「カフェの公式」をThreadsにつなぐ" });
-    expect(link).toHaveAttribute("href", "/accounts/a1/settings#threads");
+    expect(link).toHaveAttribute("href", "/threads/accounts/a1/settings#threads");
     await user.click(link);
     expect(screen.queryByRole("dialog", { name: "チームを作る" })).not.toBeInTheDocument();
   });
@@ -146,7 +146,7 @@ describe("TeamSection（チームに入っていないオーナー）", () => {
     const dialog = await screen.findByRole("dialog", { name: "チームを作る" });
     expect(await within(dialog).findByRole("link", { name: "「カフェの公式」をThreadsにつなぐ" })).toHaveAttribute(
       "href",
-      "/accounts/a1/settings#threads",
+      "/threads/accounts/a1/settings#threads",
     );
   });
 
@@ -165,7 +165,7 @@ describe("TeamSection（チームに入っている）", () => {
     accountTeam.mockResolvedValue(inTeam);
     renderSection(TEAM_ACCESS);
     const link = await screen.findByRole("link", { name: /飲食チーム/ });
-    expect(link).toHaveAttribute("href", "/teams/t1");
+    expect(link).toHaveAttribute("href", "/threads/teams/t1");
     expect(screen.getByText("管理者：田中 健")).toBeInTheDocument();
     expect(screen.getByRole("switch", { name: "このアカウントをチームに見せる" })).not.toBeChecked();
     expect(screen.getByText("チームの人には、名前だけが出ます")).toBeInTheDocument();

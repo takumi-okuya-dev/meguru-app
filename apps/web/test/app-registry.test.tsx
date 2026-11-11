@@ -1,5 +1,5 @@
 // アプリの登録とルートの組み立て（specs/028-meguru-shell research.md R3、T010）。
-// PR1 では URL を変えない：分割の前のルートの一覧（checklists/routes-before.md）と同じであること。
+// PR2 で Threads の画面を /threads の下へ移した（contracts/ui-routes.md 1）。公開ページのURLとログインの要否は、分割の前（checklists/routes-before.md）のまま。
 import { isValidElement } from "react";
 import type { RouteObject } from "react-router";
 import { describe, expect, it } from "vitest";
@@ -25,40 +25,55 @@ function flatten(routes: readonly RouteObject[], base = "", auth = false): strin
   });
 }
 
-/** 分割の前のログインのいらないルート（checklists/routes-before.md）。 */
-const BEFORE_PUBLIC = ["/sign-in/*", "/data-deletion/:code", "/terms", "/legal/commerce", "/guide/threads-token", "/invite/:token", "/test-invite/:token", "/r/:code", "*"];
+/** ログインのいらないルート（contracts/ui-routes.md 1-1）。公開ページのURLは分割の前と同じで、前のURLの転送を足した。 */
+const PUBLIC = [
+  "/sign-in/*",
+  "/data-deletion/:code",
+  "/terms",
+  "/legal/commerce",
+  "/guide/threads-token",
+  "/invite/:token",
+  "/test-invite/:token",
+  "/r/:code",
+  "/accounts",
+  "/accounts/*",
+  "/teams",
+  "/teams/*",
+  "*",
+];
 
-/** 分割の前のログインの要るルート（checklists/routes-before.md）。 */
-const BEFORE_AUTH = [
+/** ログインの要るルート（contracts/ui-routes.md 1-2）。Threadsの画面は /threads の下。 */
+const AUTH = [
   "/",
-  "/accounts/new",
+  "/threads",
+  "/threads/accounts/new",
   "/threads/complete",
   "/settings",
   "/settings (index)",
   ...["appearance", "account", "billing", "referral", "features", "test-groups", "test-groups/:groupId", "tester-invites", "operator-accounts", "limits"].map((p) => `/settings/${p}`),
-  "/teams/:teamId",
-  "/teams/:teamId (index)",
-  "/teams/:teamId/assign",
-  "/teams/:teamId/status",
-  "/teams/:teamId/accounts/:accountId",
-  "/accounts/:accountId",
-  "/accounts/:accountId (index)",
+  "/threads/teams/:teamId",
+  "/threads/teams/:teamId (index)",
+  "/threads/teams/:teamId/assign",
+  "/threads/teams/:teamId/status",
+  "/threads/teams/:teamId/accounts/:accountId",
+  "/threads/accounts/:accountId",
+  "/threads/accounts/:accountId (index)",
   ...["settings", "strategy", "promotions", "external-media", "external-media/:promotionId/:media", "research", "create", "stock", "performance", "analysis", "activity"].map(
-    (p) => `/accounts/:accountId/${p}`,
+    (p) => `/threads/accounts/:accountId/${p}`,
   ),
 ];
 
-/** 分割の前のルート。ログインの要るものに「 [auth]」を付ける。 */
-const BEFORE = [...BEFORE_PUBLIC, ...BEFORE_AUTH.map((p) => `${p} [auth]`)];
+/** ルートの一覧。ログインの要るものに「 [auth]」を付ける。 */
+const EXPECTED = [...PUBLIC, ...AUTH.map((p) => `${p} [auth]`)];
 
 describe("ルートの組み立て", () => {
-  it("Threadsを登録すると、分割の前と同じルートになる（URLも、ログインが要るかどうかも変えない）", () => {
-    expect(flatten(buildRoutes([threadsApp])).sort()).toEqual([...BEFORE].sort());
+  it("Threadsを登録すると、契約どおりのルートになる（Threadsは /threads の下、公開ページのURLとログインの要否は分割の前のまま）", () => {
+    expect(flatten(buildRoutes([threadsApp])).sort()).toEqual([...EXPECTED].sort());
   });
 
   it("アプリを登録しなければ、Threadsの画面はない（外枠のルートだけ）", () => {
     const paths = flatten(buildRoutes([]));
-    expect(paths).not.toContain("/accounts/:accountId [auth]");
+    expect(paths).not.toContain("/threads/accounts/:accountId [auth]");
     expect(paths).toContain("/settings/billing [auth]");
     expect(paths).toContain("*");
   });

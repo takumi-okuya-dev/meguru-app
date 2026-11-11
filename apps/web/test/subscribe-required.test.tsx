@@ -36,7 +36,7 @@ function renderAt(path: string) {
       {
         element: <RequireAuth />,
         children: [
-          { path: "/accounts", element: <p>アプリの中身</p> },
+          { path: "/threads/accounts", element: <p>アプリの中身</p> },
           { path: "/settings/billing", element: <p>契約と支払いの画面</p> },
         ],
       },
@@ -58,7 +58,7 @@ beforeEach(() => {
 describe("契約前の画面", () => {
   it("/api/me が unsubscribed なら、料金と「契約する」だけを出す。ログアウト・退会は下に", async () => {
     mocks.me.mockResolvedValue(ME("unsubscribed"));
-    renderAt("/accounts");
+    renderAt("/threads/accounts");
     await screen.findByText("アプリの中身");
     // me で契約前と分かると（api.me が印を立てる）、契約前の画面に替わる
     act(() => setSubscriptionRequired(true));
@@ -78,7 +78,7 @@ describe("契約前の画面", () => {
     const assign = vi.fn();
     vi.stubGlobal("location", { ...window.location, assign });
     act(() => setSubscriptionRequired(true));
-    renderAt("/accounts");
+    renderAt("/threads/accounts");
     const user = userEvent.setup();
     await user.click(await screen.findByRole("button", { name: "契約する" }));
     await waitFor(() => expect(assign).toHaveBeenCalledWith("https://checkout.example/cs_1"));
@@ -88,7 +88,7 @@ describe("契約前の画面", () => {
   it("API が SUBSCRIPTION_REQUIRED を返しても、契約前の画面になる", async () => {
     mocks.me.mockResolvedValue(ME("unsubscribed"));
     act(() => setSubscriptionRequired(true));
-    renderAt("/accounts");
+    renderAt("/threads/accounts");
     expect(await screen.findByRole("heading", { name: "契約してから使い始めます" })).toBeInTheDocument();
   });
 
@@ -102,7 +102,7 @@ describe("契約前の画面", () => {
   it("契約したら（active）元に戻る", async () => {
     mocks.me.mockResolvedValue(ME("active"));
     act(() => setSubscriptionRequired(true));
-    renderAt("/accounts");
+    renderAt("/threads/accounts");
     expect(await screen.findByText("アプリの中身")).toBeInTheDocument();
   });
 });

@@ -14,7 +14,7 @@ const COLLAPSED_KEY = "threads-grower:create-steps-collapsed";
  */
 export function CreateSteps({ accountId, strategy = true }: { accountId: string; strategy?: boolean }) {
   const [collapsed, setCollapsed] = useState(() => readPreference(COLLAPSED_KEY, false));
-  const base = `/accounts/${accountId}`;
+  const base = `/threads/accounts/${accountId}`;
   const toggle = () => {
     writePreference(COLLAPSED_KEY, !collapsed);
     setCollapsed(!collapsed);

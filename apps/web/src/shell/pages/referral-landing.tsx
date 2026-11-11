@@ -36,7 +36,8 @@ export function ReferralLandingPage() {
   }, [signedOut, code]);
 
   if (!isLoaded) return <LoadingSkeleton />;
-  if (isSignedIn) return <Navigate to="/" replace />;
+  // 紹介はThreadsへの入口なので、すべてのアプリの画面を挟まずThreadsへ（specs/028 contracts/ui-routes.md 3）
+  if (isSignedIn) return <Navigate to="/threads" replace />;
 
   return (
     <CenteredLayout>
@@ -59,7 +60,7 @@ export function ReferralLandingPage() {
               テスト版は、招待された方だけが使えます。招待のリンクを受け取った方は、そちらから始めてください。
             </p>
           )}
-          <Button className="h-12 w-full rounded-full" onClick={() => void navigate("/sign-in")}>
+          <Button className="h-12 w-full rounded-full" onClick={() => void navigate(`/sign-in?next=${encodeURIComponent("/threads")}`)}>
             Googleで始める
           </Button>
         </section>

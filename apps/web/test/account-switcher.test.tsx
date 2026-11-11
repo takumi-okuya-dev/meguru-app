@@ -70,14 +70,14 @@ const counts = (rows: [string, number][]): NeedsReviewCountsResponse => ({
 });
 
 function renderSwitcher(
-  initial = "/accounts/a1",
+  initial = "/threads/accounts/a1",
   onNavigate?: () => void,
   client = new QueryClient({ defaultOptions: { queries: { retry: false } } }),
 ) {
   const router = createMemoryRouter(
     [
-      { path: "/accounts/:accountId", element: <AccountSwitcher onNavigate={onNavigate} /> },
-      { path: "/accounts/new", element: <p>追加画面</p> },
+      { path: "/threads/accounts/:accountId", element: <AccountSwitcher onNavigate={onNavigate} /> },
+      { path: "/threads/accounts/new", element: <p>追加画面</p> },
     ],
     { initialEntries: [initial] },
   );
@@ -115,7 +115,7 @@ function renderAccountRoutes() {
   const router = createMemoryRouter(
     [
       {
-        path: "/accounts/:accountId",
+        path: "/threads/accounts/:accountId",
         element: <AccountLayout />,
         children: [
           { index: true, element: <HomeFixture /> },
@@ -123,9 +123,9 @@ function renderAccountRoutes() {
           { path: "settings", element: <SettingsFixture /> },
         ],
       },
-      { path: "/accounts/new", element: <p>追加画面</p> },
+      { path: "/threads/accounts/new", element: <p>追加画面</p> },
     ],
-    { initialEntries: ["/accounts/a1/stock"] },
+    { initialEntries: ["/threads/accounts/a1/stock"] },
   );
   render(
     <QueryClientProvider
@@ -171,7 +171,7 @@ describe("AccountSwitcherの横断要確認件数", () => {
     expect(within(menu).getByText("要確認 2件")).toBeInTheDocument();
     expect(within(menu).getByText("要確認 0件")).toBeInTheDocument();
     await userEvent.click(within(menu).getByRole("menuitem", { name: /Account a2/ }));
-    expect(router.state.location.pathname).toBe("/accounts/a2");
+    expect(router.state.location.pathname).toBe("/threads/accounts/a2");
     expect(mocks.me).toHaveBeenCalledTimes(2); // 初期表示と開いたときの再取得
     expect(mocks.needsReviewCounts).toHaveBeenCalledTimes(1);
   });
@@ -184,10 +184,10 @@ describe("AccountSwitcherの横断要確認件数", () => {
     expect(within(menu).getAllByText("取得できません")).toHaveLength(3);
     expect(within(menu).queryByText("要確認 0件")).not.toBeInTheDocument();
     await userEvent.click(within(menu).getByRole("menuitem", { name: /Account a2/ }));
-    expect(router.state.location.pathname).toBe("/accounts/a2");
+    expect(router.state.location.pathname).toBe("/threads/accounts/a2");
     const secondMenu = await openMenu();
     await userEvent.click(within(secondMenu).getByRole("menuitem", { name: /アカウントを作る/ }));
-    expect(router.state.location.pathname).toBe("/accounts/new");
+    expect(router.state.location.pathname).toBe("/threads/accounts/new");
   });
 
   it("読み込み中は前回の数を表示せず、失敗から再試行できる", async () => {
@@ -271,7 +271,7 @@ describe("AccountSwitcherの横断要確認件数", () => {
       )
       .mockResolvedValueOnce(me(accounts));
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-    renderSwitcher("/accounts/a1", undefined, client);
+    renderSwitcher("/threads/accounts/a1", undefined, client);
     const menu = await openMenu();
     expect(await within(menu).findByText("要確認 5件")).toBeInTheDocument();
     finishOld(me([...accounts, account("deleted")]));
@@ -309,7 +309,7 @@ describe("AccountSwitcherの横断要確認件数", () => {
       ]),
     );
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-    renderSwitcher("/accounts/a1", undefined, client);
+    renderSwitcher("/threads/accounts/a1", undefined, client);
     await waitFor(() => expect(client.getQueryData(queryKeys.me)).toBeDefined());
     const menu = await openMenu();
     await waitFor(() => expect(mocks.me).toHaveBeenCalledTimes(2));
@@ -346,7 +346,7 @@ describe("AccountSwitcherの横断要確認件数", () => {
           }),
       );
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-    renderSwitcher("/accounts/a1", undefined, client);
+    renderSwitcher("/threads/accounts/a1", undefined, client);
     await waitFor(() => expect(client.getQueryData(queryKeys.me)).toBeDefined());
     const menu = await openMenu();
     await waitFor(() => expect(mocks.me).toHaveBeenCalledTimes(2));
@@ -429,7 +429,7 @@ describe("AccountSwitcherの状態と操作", () => {
     expect(reconnect).toHaveTextContent("要再接続");
     expect(reconnect).toHaveTextContent("要確認 2件");
     await userEvent.click(reconnect);
-    expect(router.state.location.pathname).toBe("/accounts/a2");
+    expect(router.state.location.pathname).toBe("/threads/accounts/a2");
   });
 
   it("20件の末尾と追加操作がメニューにあり、スクロール可能な高さを持つ", async () => {
@@ -497,7 +497,7 @@ describe("AccountSwitcherの状態と操作", () => {
 
   it("ドロワーから行を選ぶとonNavigateを呼ぶ", async () => {
     const onNavigate = vi.fn();
-    renderSwitcher("/accounts/a1", onNavigate);
+    renderSwitcher("/threads/accounts/a1", onNavigate);
     const menu = await openMenu();
     await userEvent.click(await within(menu).findByRole("menuitem", { name: /Account a2/ }));
     expect(onNavigate).toHaveBeenCalledOnce();
@@ -521,19 +521,19 @@ describe("AccountSwitcherの状態と操作", () => {
     expect(await screen.findByText("投稿: Aの投稿")).toBeInTheDocument();
     const menu = await openMenu();
     await userEvent.click(await within(menu).findByRole("menuitem", { name: /Account a2/ }));
-    expect(router.state.location.pathname).toBe("/accounts/a2");
+    expect(router.state.location.pathname).toBe("/threads/accounts/a2");
     await waitFor(() => expect(mocks.account).toHaveBeenCalledWith("a2"));
     expect(await mocks.account.mock.results.at(-1)?.value).toMatchObject({
       connectionStatus: "needs_reconnect",
     });
     expect(await screen.findByRole("link", { name: "再接続" })).toHaveAttribute(
       "href",
-      "/accounts/a2/settings",
+      "/threads/accounts/a2/settings",
     );
-    await router.navigate("/accounts/a2/stock");
+    await router.navigate("/threads/accounts/a2/stock");
     expect(await screen.findByText("投稿: Bの投稿")).toBeInTheDocument();
     expect(screen.queryByText("投稿: Aの投稿")).not.toBeInTheDocument();
-    await router.navigate("/accounts/a2/settings");
+    await router.navigate("/threads/accounts/a2/settings");
     expect(await screen.findByText("設定: Bの設定")).toBeInTheDocument();
     expect(screen.queryByText("設定: Aの設定")).not.toBeInTheDocument();
   });

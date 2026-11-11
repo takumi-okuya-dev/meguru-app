@@ -51,11 +51,11 @@ function me(
   };
 }
 
-function renderAt(path = "/accounts/new") {
+function renderAt(path = "/threads/accounts/new") {
   const router = createMemoryRouter(
     [
-      { path: "/accounts/new", element: <AccountNew /> },
-      { path: "/accounts/:accountId", element: <p>ホームの画面</p> },
+      { path: "/threads/accounts/new", element: <AccountNew /> },
+      { path: "/threads/accounts/:accountId", element: <p>ホームの画面</p> },
     ],
     { initialEntries: [path] },
   );
@@ -103,7 +103,7 @@ describe("アカウントを作る画面", () => {
     await userEvent.click(screen.getByRole("button", { name: "作る" }));
     expect(mocks.createAccount).toHaveBeenCalledWith({ name: "カフェの公式" });
     expect(await screen.findByText("ホームの画面")).toBeInTheDocument();
-    expect(router.state.location.pathname).toBe("/accounts/acc-1");
+    expect(router.state.location.pathname).toBe("/threads/accounts/acc-1");
   });
 
   it("無料体験中で1件あれば、名前の欄の代わりに上限の案内と「契約する」（specs/013 US1-2）", async () => {
@@ -155,7 +155,7 @@ describe("アカウントを作る画面", () => {
 
   it("招待のリンクから来たら、その招待を覚えておく（011 T019、specs/012 research.md R7）", async () => {
     mocks.me.mockResolvedValue(me(1, 0));
-    renderAt(`/accounts/new?next=${encodeURIComponent(INVITE)}`);
+    renderAt(`/threads/accounts/new?next=${encodeURIComponent(INVITE)}`);
     await screen.findByLabelText("アカウントの名前");
     expect(takeInviteReturn()).toBe(INVITE);
   });

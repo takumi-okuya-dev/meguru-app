@@ -14,7 +14,7 @@ describe("FeatureUnavailable", () => {
       </MemoryRouter>,
     );
     expect(screen.getByRole("heading", { name: "この機能は今は使えません" })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "ホームへ" })).toHaveAttribute("href", "/accounts/acc-1");
+    expect(screen.getByRole("link", { name: "ホームへ" })).toHaveAttribute("href", "/threads/accounts/acc-1");
     expect(screen.queryByText(/料金|プラン|契約/)).toBeNull();
   });
 

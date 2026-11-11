@@ -43,12 +43,12 @@ const draft = (id: string, body: string, status: "approved" | "needs_review") =>
   updatedAt: "2026-10-13T00:00:00Z",
 });
 
-function renderPage(path = "/teams/team-1/accounts/acc-1") {
+function renderPage(path = "/threads/teams/team-1/accounts/acc-1") {
   const router = createMemoryRouter(
     [
-      { path: "/teams/:teamId/accounts/:accountId", element: <TeamSharedAccountPage /> },
-      { path: "/teams/:teamId", element: <p>チームの画面</p> },
-      { path: "/accounts/:accountId", element: <p>Accountの画面</p> },
+      { path: "/threads/teams/:teamId/accounts/:accountId", element: <TeamSharedAccountPage /> },
+      { path: "/threads/teams/:teamId", element: <p>チームの画面</p> },
+      { path: "/threads/accounts/:accountId", element: <p>Accountの画面</p> },
     ],
     { initialEntries: [path] },
   );
@@ -95,7 +95,7 @@ describe("見せてもらっているアカウント", () => {
   it("上部の帯（読むだけ・チーム名・チームに戻る）と、アカウント・オーナー。投稿ストックを読むだけで操作のボタンは出ない", async () => {
     renderPage();
     expect(await screen.findByRole("status")).toHaveTextContent("鈴木 花子さんのアカウントを見ています（読むだけ） · 飲食チーム");
-    expect(screen.getByRole("link", { name: "チームに戻る" })).toHaveAttribute("href", "/teams/team-1");
+    expect(screen.getByRole("link", { name: "チームに戻る" })).toHaveAttribute("href", "/threads/teams/team-1");
     expect(screen.getByRole("heading", { name: "さくらのパン日記" })).toBeInTheDocument();
     expect(screen.getByText("@sakura_pan · オーナー 鈴木 花子")).toBeInTheDocument();
     expect(await screen.findByText("朝いちばんの焼き上がりの話")).toBeInTheDocument();
@@ -123,7 +123,7 @@ describe("見せてもらっているアカウント", () => {
   });
 
   it("戦略のタブ：課題・宣伝内容・リサーチを読むだけ", async () => {
-    renderPage("/teams/team-1/accounts/acc-1?tab=strategy");
+    renderPage("/threads/teams/team-1/accounts/acc-1?tab=strategy");
     expect(await screen.findByText("来店してもらう")).toBeInTheDocument();
     expect(await screen.findByText("春の新作")).toBeInTheDocument();
     expect(await screen.findByText("パン屋")).toBeInTheDocument();
@@ -145,7 +145,7 @@ describe("見せてもらっているアカウント", () => {
   it("戦略のタブで宣伝内容・リサーチの読み込みに失敗したら、「まだありません」と出さずに失敗を出す（PR #14 のCodexレビュー）", async () => {
     mocks.listPromotions.mockRejectedValue(new ApiError("INTERNAL_ERROR", 500));
     mocks.listReferencePosts.mockRejectedValue(new ApiError("INTERNAL_ERROR", 500));
-    renderPage("/teams/team-1/accounts/acc-1?tab=strategy");
+    renderPage("/threads/teams/team-1/accounts/acc-1?tab=strategy");
     expect(await screen.findByText("来店してもらう")).toBeInTheDocument();
     expect(await screen.findAllByText("読み込めませんでした。")).toHaveLength(2);
     expect(screen.queryByText("まだありません。")).not.toBeInTheDocument();

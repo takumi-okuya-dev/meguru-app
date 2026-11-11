@@ -50,7 +50,7 @@ export function InvitePage() {
       ),
     onSuccess: async ({ teamId }) => {
       await queryClient.invalidateQueries({ queryKey: queryKeys.me });
-      void navigate(`/teams/${teamId}`, { replace: true });
+      void navigate(`/threads/teams/${teamId}`, { replace: true });
     },
     onError: () => void preview.refetch(),
   });
@@ -69,7 +69,7 @@ export function InvitePage() {
               : describeError(preview.error)}
           </p>
           <Button asChild variant="outline" className="rounded-full">
-            <Link to="/">アプリを開く</Link>
+            <Link to="/threads">アプリを開く</Link>
           </Button>
         </div>
       </CenteredLayout>
@@ -140,7 +140,7 @@ export function InvitePage() {
                 チームに入るには、Threadsにつないだ自分のアカウントが1つ以上要ります。つないだ後、このリンクに戻ってくると続きから参加できます。
               </p>
               <Button asChild className="h-10 rounded-full">
-                <Link to={`/accounts/new?next=${encodeURIComponent(here)}`}>アカウントを作る</Link>
+                <Link to={`/threads/accounts/new?next=${encodeURIComponent(here)}`}>アカウントを作る</Link>
               </Button>
             </div>
           )}
@@ -154,7 +154,7 @@ export function InvitePage() {
               </p>
               <Button asChild className="h-10 rounded-full">
                 <Link
-                  to={`/accounts/${p.viewer.accounts[0].id}/settings#threads`}
+                  to={`/threads/accounts/${p.viewer.accounts[0].id}/settings#threads`}
                   onClick={() => rememberInviteReturn(here)}
                 >
                   「{p.viewer.accounts[0].name}」をThreadsにつなぐ
@@ -241,7 +241,7 @@ export function InvitePage() {
             <div className="space-y-3 text-center">
               <p className="text-sm">すでにこのチームに入っています。</p>
               <Button asChild className="h-11 w-full rounded-full">
-                <Link to={p.viewer.teamId ? `/teams/${p.viewer.teamId}` : "/"}>チームを開く</Link>
+                <Link to={p.viewer.teamId ? `/threads/teams/${p.viewer.teamId}` : "/"}>チームを開く</Link>
               </Button>
             </div>
           )}

@@ -40,7 +40,7 @@ pnpm e2e           # PR2・PR3（URLを変えるもの）
 | `/` を開く | `/threads/accounts/<番号>`（最後に使ったアカウントのホーム）。サイドバーは今と同じで、アプリの切り替えは出ない |
 | `/accounts/<番号>/external-media?view=work` を開く | `/threads/accounts/<番号>/external-media?view=work` に移る。戻るボタンで前のURLに戻らない |
 | `/teams/<番号>/assign` を開く | `/threads/teams/<番号>/assign` |
-| ログアウトして `/accounts/<番号>/stock` を開く | `/threads/accounts/<番号>/stock` → ログインの画面 → ログインのあと `/threads/accounts/<番号>/stock` |
+| ログアウトして `/accounts/<番号>/stock` を開く | `/threads/accounts/<番号>/stock` → ログインの画面（ログインのあとは、分割の前と同じく入口 `/` から最後に使ったアカウントへ） |
 | `/terms`・`/guide/threads-token`・`/invite/<トークン>`・`/r/<コード>` を開く | URLは変わらず、今と同じ画面 |
 | アカウントの設定から接続する（`pnpm dev:fake`） | `/threads/complete` → `/threads/accounts/<番号>/settings?connected=…` |
 | `/threads/nothing` を開く | 見つかりません |

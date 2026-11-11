@@ -46,15 +46,15 @@ export function strategyOf(overrides: Partial<Strategy> = {}): Strategy {
 export function renderStrategyPage(
   Page: ComponentType,
   Provider: ComponentType<{ children: ReactNode }>,
-  initialEntry = "/accounts/a1/strategy",
+  initialEntry = "/threads/accounts/a1/strategy",
 ) {
   const router = createMemoryRouter(
     [
       {
-        path: "/accounts/:accountId",
+        path: "/threads/accounts/:accountId",
         element: (
           <>
-            <Link to="/accounts/a1">ホームへ</Link>
+            <Link to="/threads/accounts/a1">ホームへ</Link>
             <Provider>
               <Outlet context={{ account: testAccount }} />
             </Provider>

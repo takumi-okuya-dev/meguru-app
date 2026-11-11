@@ -64,7 +64,7 @@ export function AutoPostNotices({ accountId, hideNotConnected = false }: { accou
               </p>
               <div className="flex gap-2">
                 <Button asChild variant="outline" size="sm">
-                  <Link to={`/accounts/${accountId}/stock`}>確認する</Link>
+                  <Link to={`/threads/accounts/${accountId}/stock`}>確認する</Link>
                 </Button>
                 {can("review") && (
                   <Button
@@ -129,7 +129,7 @@ export function AutoPostNotices({ accountId, hideNotConnected = false }: { accou
                 {notice.count}件の投稿に失敗しました（{PUBLISH_ERROR_LABELS[notice.latestError]}）
               </p>
               <Button asChild variant="outline" size="sm">
-                <Link to={`/accounts/${accountId}/stock?tab=approved#publish-failed`}>
+                <Link to={`/threads/accounts/${accountId}/stock?tab=approved#publish-failed`}>
                   確認する
                 </Link>
               </Button>

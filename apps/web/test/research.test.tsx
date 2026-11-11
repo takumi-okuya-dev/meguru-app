@@ -38,11 +38,11 @@ const account: AccountSummary = {
 
 const meta = { version: 1, createdAt: "2026-10-03T00:00:00.000Z", updatedAt: "2026-10-03T00:00:00.000Z" };
 
-function renderPage(path = "/accounts/a1/research") {
+function renderPage(path = "/threads/accounts/a1/research") {
   const router = createMemoryRouter(
     [
       {
-        path: "/accounts/:accountId",
+        path: "/threads/accounts/:accountId",
         element: <Outlet context={{ account }} />,
         children: [{ path: "research", element: <ResearchPage /> }],
       },
@@ -87,7 +87,7 @@ describe("リサーチの画面", () => {
   });
 
   it("重複したキーワードを入力すると、保存する前に「同じキーワードがすでに登録されています」が出る（FR-014）", async () => {
-    renderPage("/accounts/a1/research?tab=keywords");
+    renderPage("/threads/accounts/a1/research?tab=keywords");
     await userEvent.click(await screen.findByRole("button", { name: /キーワードを追加/ }));
     await userEvent.type(await screen.findByRole("textbox", { name: "キーワード" }), "ＡＩ");
     expect(screen.getByText("同じキーワードがすでに登録されています")).toBeInTheDocument();

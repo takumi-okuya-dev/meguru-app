@@ -41,7 +41,7 @@ export function AccountNew() {
     mutationFn: () => api.createAccount({ name: name.trim() }),
     onSuccess: async (account) => {
       await queryClient.invalidateQueries({ queryKey: queryKeys.me });
-      void navigate(`/accounts/${account.id}`);
+      void navigate(`/threads/accounts/${account.id}`);
     },
   });
 

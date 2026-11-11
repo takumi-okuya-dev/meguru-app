@@ -20,7 +20,7 @@ const { CreatePage } = await import("@/apps/threads/pages/create");
 const STEPS_KEY = "threads-grower:create-steps-collapsed";
 
 function renderCreate() {
-  return renderAccountRoutes([{ path: "create", element: <CreatePage /> }], "/accounts/a1/create");
+  return renderAccountRoutes([{ path: "create", element: <CreatePage /> }], "/threads/accounts/a1/create");
 }
 
 beforeEach(() => {
@@ -36,10 +36,10 @@ describe("投稿ができるまでの5つの手順（FR-130）", () => {
     renderCreate();
     const steps = within(await screen.findByRole("region", { name: "投稿ができるまでの5つの手順" }));
     expect(steps.getAllByRole("listitem").map((li) => li.textContent?.slice(0, 1))).toEqual(["①", "②", "③", "④", "⑤"]);
-    expect(steps.getByRole("link", { name: "課題" })).toHaveAttribute("href", "/accounts/a1/strategy");
-    expect(steps.getByRole("link", { name: "宣伝内容" })).toHaveAttribute("href", "/accounts/a1/promotions");
-    expect(steps.getByRole("link", { name: "リサーチ" })).toHaveAttribute("href", "/accounts/a1/research");
-    expect(steps.getByRole("link", { name: "投稿ストック" })).toHaveAttribute("href", "/accounts/a1/stock");
+    expect(steps.getByRole("link", { name: "課題" })).toHaveAttribute("href", "/threads/accounts/a1/strategy");
+    expect(steps.getByRole("link", { name: "宣伝内容" })).toHaveAttribute("href", "/threads/accounts/a1/promotions");
+    expect(steps.getByRole("link", { name: "リサーチ" })).toHaveAttribute("href", "/threads/accounts/a1/research");
+    expect(steps.getByRole("link", { name: "投稿ストック" })).toHaveAttribute("href", "/threads/accounts/a1/stock");
     const prompt = await screen.findByRole("region", { name: "プロンプト" });
     expect(
       screen.getByRole("region", { name: "投稿ができるまでの5つの手順" }).compareDocumentPosition(prompt) &

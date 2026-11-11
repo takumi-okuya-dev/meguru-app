@@ -62,7 +62,7 @@ const { TeamSection } = await import("@/apps/threads/components/team/TeamSection
 const { AccountSwitcher } = await import("@/apps/threads/sidebar/AccountSwitcher");
 
 function renderAt(element: React.ReactNode) {
-  const router = createMemoryRouter([{ path: "/accounts/:accountId", element }], { initialEntries: ["/accounts/a1"] });
+  const router = createMemoryRouter([{ path: "/threads/accounts/:accountId", element }], { initialEntries: ["/threads/accounts/a1"] });
   render(
     <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
       <RouterProvider router={router} />
@@ -111,7 +111,7 @@ describe("担当の人", () => {
   it("自分を担当にした管理者には「チーム > 操作の記録」が出る", async () => {
     access = ADMIN_ACCESS;
     renderAt(<ThreadsSidebar />);
-    expect(await screen.findByRole("link", { name: /操作の記録/ })).toHaveAttribute("href", "/accounts/a1/activity");
+    expect(await screen.findByRole("link", { name: /操作の記録/ })).toHaveAttribute("href", "/threads/accounts/a1/activity");
     expect(screen.getByText("担当しています")).toBeInTheDocument();
   });
 });
@@ -125,7 +125,7 @@ describe("Threadsにつないだアカウントだけの人（specs/012 SC-007�
     await userEvent.click(trigger);
     const menu = await screen.findByRole("menu");
     expect(within(menu).queryByText("未接続")).not.toBeInTheDocument();
-    expect(within(menu).getByRole("menuitem", { name: /アカウントを作る/ })).toHaveAttribute("href", "/accounts/new");
+    expect(within(menu).getByRole("menuitem", { name: /アカウントを作る/ })).toHaveAttribute("href", "/threads/accounts/new");
   });
 });
 

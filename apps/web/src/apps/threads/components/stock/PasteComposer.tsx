@@ -216,7 +216,7 @@ function RegisteredNotice({
         {result.overLimitCount > 0 && (
           <p className="text-warning">そのうち{result.overLimitCount}件はThreadsの上限を超えています</p>
         )}
-        <Link to={`/accounts/${accountId}/stock`} className="inline-block pt-0.5 text-ring underline">
+        <Link to={`/threads/accounts/${accountId}/stock`} className="inline-block pt-0.5 text-ring underline">
           投稿ストックで確かめる
         </Link>
       </div>

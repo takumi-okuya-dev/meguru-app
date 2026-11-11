@@ -50,17 +50,17 @@ describe("Threads から戻ってきたとき", () => {
   it("state と code をログイン済みのPOSTで送り、サーバーが決めた行き先へ進む", async () => {
     const complete = vi
       .spyOn(api, "completeConnect")
-      .mockResolvedValue({ redirectTo: "/accounts/a1/settings?connected=connect" });
+      .mockResolvedValue({ redirectTo: "/threads/accounts/a1/settings?connected=connect" });
     renderAt("?state=s1&code=c1");
     expect(screen.getByRole("heading", { name: "Threadsにつないでいます" })).toBeInTheDocument();
     await waitFor(() => expect(complete).toHaveBeenCalledWith({ state: "s1", code: "c1" }));
     await waitFor(() =>
-      expect(navigate).toHaveBeenCalledWith("/accounts/a1/settings?connected=connect", { replace: true }),
+      expect(navigate).toHaveBeenCalledWith("/threads/accounts/a1/settings?connected=connect", { replace: true }),
     );
   });
 
   it("履歴に残さない（戻るボタンで、使い終わった state と code のURLに戻らない）", async () => {
-    vi.spyOn(api, "completeConnect").mockResolvedValue({ redirectTo: "/accounts/a1/settings?connected=connect" });
+    vi.spyOn(api, "completeConnect").mockResolvedValue({ redirectTo: "/threads/accounts/a1/settings?connected=connect" });
     renderAt("?state=s1&code=c1");
     await waitFor(() => expect(navigate).toHaveBeenCalled());
     expect(navigate.mock.calls[0]?.[1]).toEqual({ replace: true });
@@ -96,7 +96,7 @@ describe("Threads から戻ってきたとき", () => {
   it("二重に送らない", async () => {
     const complete = vi
       .spyOn(api, "completeConnect")
-      .mockResolvedValue({ redirectTo: "/accounts/a1/settings?connected=connect" });
+      .mockResolvedValue({ redirectTo: "/threads/accounts/a1/settings?connected=connect" });
     renderAt("?state=s1&code=c1");
     await waitFor(() => expect(complete).toHaveBeenCalled());
     expect(complete).toHaveBeenCalledTimes(1);

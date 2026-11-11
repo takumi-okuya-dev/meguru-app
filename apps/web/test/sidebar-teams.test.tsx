@@ -65,8 +65,8 @@ function renderAt(path: string) {
   );
   const router = createMemoryRouter(
     [
-      { path: "/accounts/:accountId/*", element: shell },
-      { path: "/teams/:teamId/*", element: shell },
+      { path: "/threads/accounts/:accountId/*", element: shell },
+      { path: "/threads/teams/:teamId/*", element: shell },
     ],
     { initialEntries: [path] },
   );
@@ -95,7 +95,7 @@ describe("サイドバーの「チーム」", () => {
       { id: "t2", name: "美容チーム", memberCount: 3, role: "editor" },
     ]);
     const user = userEvent.setup();
-    const router = renderAt("/accounts/a1");
+    const router = renderAt("/threads/accounts/a1");
     const nav = await screen.findByRole("navigation", { name: "このアカウント" });
     await within(nav).findByRole("link", { name: /美容チーム/ });
     const labels = within(nav)
@@ -107,7 +107,7 @@ describe("サイドバーの「チーム」", () => {
     // 管理者でなければ「チームを作る」は出さない（このアカウントの設定から作る）
     expect(within(nav).queryByRole("button", { name: /チームを作る/ })).not.toBeInTheDocument();
     await user.click(within(nav).getByRole("link", { name: /飲食チーム/ }));
-    expect(router.state.location.pathname).toBe("/teams/t1");
+    expect(router.state.location.pathname).toBe("/threads/teams/t1");
   });
 
   it("今開いているチームは選択の背景（aria-current）。チームの画面でも、機能は最後に使ったAccountへ移れる", async () => {
@@ -115,17 +115,17 @@ describe("サイドバーの「チーム」", () => {
       { id: "t1", name: "飲食チーム", memberCount: 5, role: "admin" },
       { id: "t2", name: "美容チーム", memberCount: 3, role: "member" },
     ]);
-    renderAt("/teams/t2");
+    renderAt("/threads/teams/t2");
     const nav = await screen.findByRole("navigation", { name: "このアカウント" });
     expect(await within(nav).findByRole("link", { name: /美容チーム/ })).toHaveAttribute("aria-current", "page");
     expect(within(nav).getByRole("link", { name: /飲食チーム/ })).not.toHaveAttribute("aria-current");
-    expect(within(nav).getByRole("link", { name: /投稿ストック/ })).toHaveAttribute("href", "/accounts/a1/stock");
+    expect(within(nav).getByRole("link", { name: /投稿ストック/ })).toHaveAttribute("href", "/threads/accounts/a1/stock");
   });
 
   it("どれかのチームの管理者には「チームを作る」を出し、押すとダイアログが開く", async () => {
     meResponse = me([{ id: "t1", name: "飲食チーム", memberCount: 5, role: "admin" }]);
     const user = userEvent.setup();
-    renderAt("/accounts/a1");
+    renderAt("/threads/accounts/a1");
     await user.click(await screen.findByRole("button", { name: /チームを作る/ }));
     expect(await screen.findByRole("dialog", { name: "チームを作る" })).toBeInTheDocument();
   });
@@ -133,19 +133,19 @@ describe("サイドバーの「チーム」", () => {
   it("チームの下に、今のAccountで操作の記録を見られる人には「操作の記録」", async () => {
     meResponse = me([{ id: "t1", name: "飲食チーム", memberCount: 5, role: "admin" }]);
     access = ADMIN_ACCESS;
-    renderAt("/accounts/a1");
-    expect(await screen.findByRole("link", { name: /操作の記録/ })).toHaveAttribute("href", "/accounts/a1/activity");
+    renderAt("/threads/accounts/a1");
+    expect(await screen.findByRole("link", { name: /操作の記録/ })).toHaveAttribute("href", "/threads/accounts/a1/activity");
   });
 
   it("チームの画面を開いていても、最後に使ったAccountの「操作の記録」は消さない（2026-10-31 スマートフォンで見つかった不具合）", async () => {
     meResponse = me([{ id: "t1", name: "飲食チーム", memberCount: 5, role: "admin" }]);
     access = ADMIN_ACCESS;
-    renderAt("/teams/t1");
-    expect(await screen.findByRole("link", { name: /操作の記録/ })).toHaveAttribute("href", "/accounts/a1/activity");
+    renderAt("/threads/teams/t1");
+    expect(await screen.findByRole("link", { name: /操作の記録/ })).toHaveAttribute("href", "/threads/accounts/a1/activity");
   });
 
   it("チームに入っていない人には、チームのものを何も出さない（原則V）", async () => {
-    renderAt("/accounts/a1");
+    renderAt("/threads/accounts/a1");
     const nav = await screen.findByRole("navigation", { name: "このアカウント" });
     await within(nav).findByRole("link", { name: /投稿ストック/ });
     expect(within(nav).queryByText("チーム")).not.toBeInTheDocument();
@@ -156,9 +156,9 @@ describe("サイドバーの「チーム」", () => {
     setViewport(375);
     meResponse = me([{ id: "t1", name: "飲食チーム", memberCount: 5, role: "member" }]);
     const user = userEvent.setup();
-    renderAt("/accounts/a1");
+    renderAt("/threads/accounts/a1");
     await user.click(await screen.findByRole("button", { name: "メニューを開く" }));
     const nav = await screen.findByRole("navigation", { name: "このアカウント" });
-    expect(await within(nav).findByRole("link", { name: /飲食チーム/ })).toHaveAttribute("href", "/teams/t1");
+    expect(await within(nav).findByRole("link", { name: /飲食チーム/ })).toHaveAttribute("href", "/threads/teams/t1");
   });
 });

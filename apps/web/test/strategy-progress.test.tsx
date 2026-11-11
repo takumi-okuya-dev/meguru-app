@@ -149,7 +149,7 @@ describe("自動チェックと進み具合", () => {
 describe("ほかの画面から項目へ移る（specs/014 FR-122）", () => {
   it("#field-<key> で開くと、その項目の入力欄にカーソルが入る", async () => {
     getStrategy.mockResolvedValue(strategyOf());
-    renderStrategyPage(StrategyPage, UnsavedChangesProvider, "/accounts/a1/strategy#field-targetPersona");
+    renderStrategyPage(StrategyPage, UnsavedChangesProvider, "/threads/accounts/a1/strategy#field-targetPersona");
     await screen.findByRole("heading", { name: "営業導線設計" });
     await vi.waitFor(() => expect(document.getElementById("strategy-targetPersona")).toHaveFocus());
   });

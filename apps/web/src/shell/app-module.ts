@@ -20,11 +20,14 @@ export type SettingsSectionContribution = {
   element: ReactElement;
 };
 
+/** 前のURLと新しいURLの対応（頭を置き換える。specs/028 contracts/ui-routes.md 2）。 */
+export type LegacyRedirect = { from: string; to: string };
+
 /** アプリの入口（外枠が使うのはこれだけ）。 */
 export type AppModule = {
   /** アプリのID（PR3 で @meguru/shared のアプリの一覧の ID とそろえる） */
   id: string;
-  /** 画面のURLの頭（例：/threads。PR2 で Threads の画面をこの下へ移す） */
+  /** 画面のURLの頭（例：/threads） */
   basePath: string;
   /** ログインの要るルート */
   routes: RouteObject[];
@@ -32,6 +35,8 @@ export type AppModule = {
   publicRoutes?: RouteObject[];
   /** ログインのいらない読みもののルート（環境の帯つきの入れ物に入れる） */
   readingRoutes?: RouteObject[];
+  /** 前のURLの転送（ログインの関所の外に作る） */
+  legacyRedirects?: LegacyRedirect[];
   /** 設定の画面に足す項目 */
   settingsSections?: SettingsSectionContribution[];
 };

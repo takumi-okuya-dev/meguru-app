@@ -61,7 +61,7 @@ function renderPage() {
   const router = createMemoryRouter(
     [
       {
-        path: "/accounts/:accountId",
+        path: "/threads/accounts/:accountId",
         element: <Outlet context={{ account }} />,
         children: [
           { index: true, element: <p>ホームの中身</p> },
@@ -69,7 +69,7 @@ function renderPage() {
         ],
       },
     ],
-    { initialEntries: ["/accounts/a1/activity"] },
+    { initialEntries: ["/threads/accounts/a1/activity"] },
   );
   render(
     <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
