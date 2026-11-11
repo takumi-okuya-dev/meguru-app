@@ -8,8 +8,8 @@ vi.mock("@clerk/react", () => ({
   useAuth: () => ({ isLoaded: true, isSignedIn: false }),
 }));
 
-const { LegalCommercePage } = await import("@/pages/legal-commerce");
-const { SignInPage } = await import("@/pages/sign-in");
+const { LegalCommercePage } = await import("@/shell/pages/legal-commerce");
+const { SignInPage } = await import("@/shell/pages/sign-in");
 const { routes } = await import("@/router");
 const { isPublicPath } = await import("./helpers/routes");
 

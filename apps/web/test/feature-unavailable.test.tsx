@@ -2,7 +2,7 @@
 import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { describe, expect, it } from "vitest";
-import { FeatureUnavailable } from "@/components/FeatureUnavailable";
+import { FeatureUnavailable } from "@/apps/threads/components/FeatureUnavailable";
 import { ApiError } from "@/lib/api-client";
 import { isFeatureDisabled } from "@/lib/save-error";
 

@@ -30,7 +30,7 @@ const toastSuccess = vi.fn();
 vi.mock("sonner", () => ({ toast: { success: toastSuccess, error: vi.fn(), warning: vi.fn(), dismiss: vi.fn() } }));
 
 const { UnsavedChangesProvider } = await import("@/components/UnsavedChangesProvider");
-const { AccountSettings } = await import("@/pages/account-settings");
+const { AccountSettings } = await import("@/apps/threads/pages/account-settings");
 
 const TOKEN = "THAAG" + "x".repeat(60);
 const INVITE = `/invite/t_${"b".repeat(43)}`;

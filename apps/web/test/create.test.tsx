@@ -40,7 +40,7 @@ vi.mock("sonner", () => ({
 
 const { ApiError } = await import("@/lib/api-client");
 const { UnsavedChangesProvider } = await import("@/components/UnsavedChangesProvider");
-const { CreatePage } = await import("@/pages/create");
+const { CreatePage } = await import("@/apps/threads/pages/create");
 
 const ROUTES = [
   { index: true, element: <p>ホームの中身</p> },

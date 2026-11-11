@@ -19,8 +19,8 @@ vi.mock("@/lib/api-client", async (importOriginal) => {
   return { ...original, api: { ...original.api, me: mocks.me, needsReviewCounts: mocks.needsReviewCounts } };
 });
 
-const { AccountSwitcher } = await import("@/components/layout/AccountSwitcher");
-const { AccountAvatar } = await import("@/components/AccountAvatar");
+const { AccountSwitcher } = await import("@/apps/threads/sidebar/AccountSwitcher");
+const { AccountAvatar } = await import("@/apps/threads/components/AccountAvatar");
 
 const unconnected: AccountSummary = {
   id: "a1",

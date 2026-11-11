@@ -16,7 +16,7 @@ vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
 const { ApiError } = await import("@/lib/api-client");
 const { UnsavedChangesProvider } = await import("@/components/UnsavedChangesProvider");
-const { StrategyPage } = await import("@/pages/strategy");
+const { StrategyPage } = await import("@/apps/threads/pages/strategy");
 
 const account: AccountSummary = {
   id: "a1",

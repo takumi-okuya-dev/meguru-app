@@ -28,7 +28,7 @@ describe("SwapLabel", () => {
 
 describe("CopyPromptButton の結果の文", () => {
   it("読み上げの知らせは先に置いておき、コピーできたら文だけを入れる", async () => {
-    const { CopyPromptButton } = await import("@/components/CopyPromptButton");
+    const { CopyPromptButton } = await import("@/apps/threads/components/CopyPromptButton");
     const { default: userEvent } = await import("@testing-library/user-event");
     const user = userEvent.setup();
     render(<CopyPromptButton getText={() => "プロンプト"} copiedMessage="コピーしました。送ってください" />);

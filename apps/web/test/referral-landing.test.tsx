@@ -16,7 +16,7 @@ vi.mock("@/lib/api-client", async (orig) => {
 });
 
 const { currentReferral } = await import("@/lib/referral-store");
-const { ReferralLandingPage } = await import("@/pages/referral-landing");
+const { ReferralLandingPage } = await import("@/shell/pages/referral-landing");
 
 const CODE = `r_${"a".repeat(22)}`;
 const NOTICE = "テスト版は、招待された方だけが使えます。招待のリンクを受け取った方は、そちらから始めてください。";

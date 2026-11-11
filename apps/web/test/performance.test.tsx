@@ -16,7 +16,7 @@ vi.mock("@/lib/api-client", async (orig) => {
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
 const { ApiError } = await import("@/lib/api-client");
-const { PerformancePage: Page } = await import("@/pages/performance");
+const { PerformancePage: Page } = await import("@/apps/threads/pages/performance");
 
 const account: AccountSummary = {
   id: "a1",

@@ -6,6 +6,7 @@ import type { OperatorLimitUser, OperatorLimits } from "@meguru/shared";
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ME_BILLING_OFF } from "./helpers/billing";
+import { WithApps } from "./helpers/apps";
 
 const mocks = vi.hoisted(() => ({
   me: vi.fn(),
@@ -20,8 +21,8 @@ vi.mock("@/lib/api-client", async (orig) => {
 });
 
 const { ApiError } = await import("@/lib/api-client");
-const { SettingsLayout } = await import("@/pages/settings/settings-layout");
-const { LimitsPage } = await import("@/pages/settings/limits");
+const { SettingsLayout } = await import("@/shell/settings/settings-layout");
+const { LimitsPage } = await import("@/shell/settings/limits");
 
 const ME = {
   user: { id: "u", email: "op@example.com", displayName: null },
@@ -66,7 +67,9 @@ function renderAt(path = "/settings/limits") {
   );
   render(
     <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
-      <RouterProvider router={router} />
+      <WithApps>
+        <RouterProvider router={router} />
+      </WithApps>
     </QueryClientProvider>,
   );
 }

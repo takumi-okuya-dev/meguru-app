@@ -15,7 +15,7 @@ vi.mock("@/lib/api-client", async (orig) => {
 });
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn(), info: vi.fn() } }));
 
-const { CreatePage } = await import("@/pages/create");
+const { CreatePage } = await import("@/apps/threads/pages/create");
 
 const STEPS_KEY = "threads-grower:create-steps-collapsed";
 

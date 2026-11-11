@@ -6,6 +6,7 @@ import type { OperatorAccount, OperatorAccounts } from "@meguru/shared";
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ME_BILLING_OFF } from "./helpers/billing";
+import { WithApps } from "./helpers/apps";
 
 const mocks = vi.hoisted(() => ({ me: vi.fn(), operatorAccounts: vi.fn() }));
 vi.mock("@/lib/api-client", async (orig) => {
@@ -14,8 +15,8 @@ vi.mock("@/lib/api-client", async (orig) => {
 });
 
 const { ApiError } = await import("@/lib/api-client");
-const { SettingsLayout } = await import("@/pages/settings/settings-layout");
-const { OperatorAccountsPage } = await import("@/pages/settings/operator-accounts");
+const { SettingsLayout } = await import("@/shell/settings/settings-layout");
+const { OperatorAccountsPage } = await import("@/apps/threads/pages/settings/operator-accounts");
 
 const ME = {
   user: { id: "u", email: "op@example.com", displayName: null },
@@ -67,7 +68,9 @@ function renderAt(path = "/settings/operator-accounts") {
   );
   render(
     <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
-      <RouterProvider router={router} />
+      <WithApps>
+        <RouterProvider router={router} />
+      </WithApps>
     </QueryClientProvider>,
   );
 }

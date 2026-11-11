@@ -15,7 +15,7 @@ vi.mock("@/lib/api-client", async (orig) => {
 const toastError = vi.fn();
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: toastError, dismiss: vi.fn() } }));
 
-const { Landing } = await import("@/pages/landing");
+const { Landing } = await import("@/apps/threads/pages/home");
 
 function me(landingAccountId: string | null): MeResponse {
   return {

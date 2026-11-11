@@ -17,8 +17,8 @@ vi.mock("@/lib/api-client", async (orig) => {
 });
 
 const { ApiError, api } = await import("@/lib/api-client");
-const { Landing } = await import("@/pages/landing");
-const { RequireAuth } = await import("@/components/guards");
+const { Landing } = await import("@/apps/threads/pages/home");
+const { RequireAuth } = await import("@/shell/guards/RequireAuth");
 
 function renderWithQuery(ui: React.ReactNode) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });

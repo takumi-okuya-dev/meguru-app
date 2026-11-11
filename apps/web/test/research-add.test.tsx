@@ -19,7 +19,7 @@ vi.mock("@/lib/api-client", async (orig) => {
 });
 vi.mock("sonner", () => ({ toast: { success: toastSuccess, error: vi.fn() } }));
 
-const { ResearchPage } = await import("@/pages/research");
+const { ResearchPage } = await import("@/apps/threads/pages/research");
 
 function posts(n: number, over = {}) {
   return Array.from({ length: n }, (_, i) =>

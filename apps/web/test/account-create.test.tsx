@@ -14,7 +14,7 @@ vi.mock("@/lib/api-client", async (orig) => {
 });
 vi.mock("@clerk/react", () => ({ useUser: () => ({ user: null }), useClerk: () => ({ signOut: vi.fn() }) }));
 
-const { AccountNew } = await import("@/pages/account-new");
+const { AccountNew } = await import("@/apps/threads/pages/account-new");
 const { takeInviteReturn } = await import("@/lib/invite-return");
 const INVITE = `/invite/t_${"a".repeat(43)}`;
 

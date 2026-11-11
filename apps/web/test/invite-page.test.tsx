@@ -21,8 +21,8 @@ vi.mock("@/lib/api-client", async (orig) => {
 });
 
 const { ApiError } = await import("@/lib/api-client");
-const { InvitePage } = await import("@/pages/invite");
-const { safeNext } = await import("@/pages/sign-in");
+const { InvitePage } = await import("@/apps/threads/pages/invite");
+const { safeNext } = await import("@/shell/pages/sign-in");
 const { isInvitePath } = await import("@/lib/invite-return");
 
 const TOKEN = "t_" + "a".repeat(43);

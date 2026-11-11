@@ -11,8 +11,8 @@ vi.mock("@/lib/api-client", async (orig) => {
   return { ...actual, api: { ...actual.api, referral } };
 });
 
-const { ReferralSettingsPage } = await import("@/pages/settings/referral");
-const { SETTINGS_GROUPS } = await import("@/pages/settings/sections");
+const { ReferralSettingsPage } = await import("@/shell/settings/referral");
+const { SETTINGS_GROUPS } = await import("@/shell/settings/sections");
 
 const URL = `https://app.test/r/r_${"a".repeat(22)}`;
 

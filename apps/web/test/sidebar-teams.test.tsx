@@ -40,8 +40,8 @@ vi.mock("@/lib/api-client", async (orig) => {
   };
 });
 
-const { AppShell } = await import("@/components/layout/AppShell");
-const { PageHeader } = await import("@/components/layout/PageHeader");
+const { ThreadsShell } = await import("@/apps/threads/sidebar");
+const { PageHeader } = await import("@/shell/layout/PageHeader");
 
 function me(teams: MeResponse["teams"]): MeResponse {
   return {
@@ -58,10 +58,10 @@ function me(teams: MeResponse["teams"]): MeResponse {
 
 function renderAt(path: string) {
   const shell = (
-    <AppShell>
+    <ThreadsShell>
       <PageHeader title="画面" />
       <p>中身</p>
-    </AppShell>
+    </ThreadsShell>
   );
   const router = createMemoryRouter(
     [

@@ -53,8 +53,8 @@ vi.mock("sonner", () => ({
 
 const { ApiError } = await import("@/lib/api-client");
 const { UnsavedChangesProvider } = await import("@/components/UnsavedChangesProvider");
-const { StockPage } = await import("@/pages/stock");
-const { CreatePage } = await import("@/pages/create");
+const { StockPage } = await import("@/apps/threads/pages/stock");
+const { CreatePage } = await import("@/apps/threads/pages/create");
 
 function renderPage(path = "/accounts/a1/stock") {
   const router = createMemoryRouter(

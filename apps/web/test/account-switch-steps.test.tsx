@@ -1,7 +1,7 @@
 // 違うアカウントで戻ったときの手順（specs/025-threads-account-guide contracts/ui-routes.md 2、US2・FR-005、T007）
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
-import { AccountSwitchSteps } from "@/components/connect/AccountSwitchSteps";
+import { AccountSwitchSteps } from "@/apps/threads/components/connect/AccountSwitchSteps";
 
 describe("AccountSwitchSteps", () => {
   it("番号つきの3つの手順（閉じずに出す）と、枠線の「threads.comを開く」（新しいタブ）", () => {

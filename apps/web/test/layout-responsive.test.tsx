@@ -34,10 +34,10 @@ vi.mock("@/lib/api-client", async (orig) => {
   return { ...actual, api: { ...actual.api, me: () => Promise.resolve(meResponse), getDraftCounts, accountAccess: async () => OWNER_ACCESS } };
 });
 
-const { AppShell } = await import("@/components/layout/AppShell");
-const { PageHeader } = await import("@/components/layout/PageHeader");
-const { SettingsLayout, SettingsIndex } = await import("@/pages/settings/settings-layout");
-const { AppearanceSettings } = await import("@/pages/settings/appearance");
+const { ThreadsShell } = await import("@/apps/threads/sidebar");
+const { PageHeader } = await import("@/shell/layout/PageHeader");
+const { SettingsLayout, SettingsIndex } = await import("@/shell/settings/settings-layout");
+const { AppearanceSettings } = await import("@/shell/settings/appearance");
 
 function renderShell() {
   const router = createMemoryRouter(
@@ -45,10 +45,10 @@ function renderShell() {
       {
         path: "/accounts/:accountId",
         element: (
-          <AppShell>
+          <ThreadsShell>
             <PageHeader title="ホーム" />
             <p>中身</p>
-          </AppShell>
+          </ThreadsShell>
         ),
       },
       { path: "/accounts/new", element: <p>アカウント追加画面</p> },

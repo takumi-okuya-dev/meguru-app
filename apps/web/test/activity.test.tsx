@@ -13,7 +13,7 @@ vi.mock("@/lib/api-client", async (orig) => {
   const actual = await orig<typeof import("@/lib/api-client")>();
   return { ...actual, api: { ...actual.api, listActivity, accountAccess: () => Promise.resolve(access) } };
 });
-const { ActivityPage, actionText } = await import("@/pages/activity");
+const { ActivityPage, actionText } = await import("@/apps/threads/pages/activity");
 
 const account: AccountSummary = {
   id: "a1",

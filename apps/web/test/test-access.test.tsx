@@ -15,7 +15,7 @@ vi.mock("@/lib/api-client", async (orig) => {
   return { ...actual, api: { ...actual.api, me } };
 });
 
-const { RequireAuth } = await import("@/components/guards");
+const { RequireAuth } = await import("@/shell/guards/RequireAuth");
 const { setTestAccessRequired } = await import("@/lib/api-client");
 
 const ME = {

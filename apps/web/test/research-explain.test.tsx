@@ -17,7 +17,7 @@ vi.mock("@/lib/api-client", async (orig) => {
 });
 vi.mock("sonner", () => ({ toast: { success: toastSuccess, error: vi.fn() } }));
 
-const { ResearchPage } = await import("@/pages/research");
+const { ResearchPage } = await import("@/apps/threads/pages/research");
 
 const A = refPost({ id: "aaaaaaaa-0000-4000-8000-000000000001", shortId: "aaaaaaaa", body: "空の投稿A" });
 const B = refPost({ id: "bbbbbbbb-0000-4000-8000-000000000002", shortId: "bbbbbbbb", body: "空の投稿B" });
@@ -224,7 +224,7 @@ describe("読むだけになった後の欄（PR #17 のCodexレビュー9回目
 
 describe("まとめての解説の欄の出し入れ（PR #17 のCodexレビュー8回目）", () => {
   it("貼り付けた答えがある間は、解説がまだの参考投稿が0件になっても欄を消さない", async () => {
-    const { ExplainBatchPanel } = await import("@/components/research/ExplainBatchPanel");
+    const { ExplainBatchPanel } = await import("@/apps/threads/components/research/ExplainBatchPanel");
     const user = userEvent.setup();
     const props = { accountId: "a1", onSaved: vi.fn(), onBillingRequired: vi.fn() };
     const { rerender } = render(

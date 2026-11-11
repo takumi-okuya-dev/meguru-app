@@ -19,7 +19,7 @@ vi.mock("@/lib/api-client", async (orig) => {
 });
 vi.mock("sonner", () => ({ toast: { success: toastSuccess, error: vi.fn(), info: vi.fn() } }));
 
-const { CreatePage } = await import("@/pages/create");
+const { CreatePage } = await import("@/apps/threads/pages/create");
 const { UnsavedChangesProvider } = await import("@/components/UnsavedChangesProvider");
 
 const CUSTOM: PostLengthSettings = { target: 200, shortLength: 70, mediumLength: 135, longLength: 180, shortRatio: 35, mediumRatio: 45, longRatio: 20 };

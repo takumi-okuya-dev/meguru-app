@@ -25,7 +25,7 @@ vi.mock("@/lib/api-client", async (orig) => {
   };
 });
 
-const { AutoPostNotices } = await import("@/components/AutoPostNotices");
+const { AutoPostNotices } = await import("@/apps/threads/components/AutoPostNotices");
 
 function renderNotices(a: AccountAccessResponse) {
   access = a;

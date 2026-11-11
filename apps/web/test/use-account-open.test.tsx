@@ -2,7 +2,7 @@
 import { renderHook } from "@testing-library/react";
 import type { AccountSummary } from "@meguru/shared";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { OPEN_RETRY_DELAYS_MS, useAccountOpen } from "@/lib/use-account-open";
+import { OPEN_RETRY_DELAYS_MS, useAccountOpen } from "@/apps/threads/lib/use-account-open";
 
 const sample: AccountSummary = {
   id: "a1",

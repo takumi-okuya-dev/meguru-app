@@ -18,7 +18,7 @@ vi.mock("@/lib/api-client", async (orig) => {
   };
 });
 
-const { ConnectMethods } = await import("@/components/connect/ConnectMethods");
+const { ConnectMethods } = await import("@/apps/threads/components/connect/ConnectMethods");
 const { ApiError } = await import("@/lib/api-client");
 
 const TOKEN = "THAAG" + "x".repeat(60);

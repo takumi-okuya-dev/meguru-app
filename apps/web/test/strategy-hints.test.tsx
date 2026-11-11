@@ -13,7 +13,7 @@ vi.mock("@/lib/api-client", async (orig) => {
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
 const { UnsavedChangesProvider } = await import("@/components/UnsavedChangesProvider");
-const { StrategyPage } = await import("@/pages/strategy");
+const { StrategyPage } = await import("@/apps/threads/pages/strategy");
 
 /** 項目（id="field-<key>"）の中を探す。 */
 async function field(key: string) {
