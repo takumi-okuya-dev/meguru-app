@@ -12,7 +12,7 @@ import {
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { CircleAlertIcon, ExternalLinkIcon } from "lucide-react";
 import { useId, useState } from "react";
-import { ConfirmDialog } from "@/components/team/ConfirmDialog";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";

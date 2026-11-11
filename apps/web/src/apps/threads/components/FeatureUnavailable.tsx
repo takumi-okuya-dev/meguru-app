@@ -2,27 +2,20 @@
 // 理由や料金の案内は出さない（プランが決まってから足す）。
 import type { Feature } from "@meguru/shared";
 import type { ReactNode } from "react";
-import { Link, useParams } from "react-router";
-import { LoadingSkeleton } from "@/components/guards";
-import { Button } from "@/components/ui/button";
-import { featureOn, useAccountAccess } from "@/lib/use-account-access";
+import { useParams } from "react-router";
+import { LoadingSkeleton } from "@/components/LoadingSkeleton";
+import { FeatureUnavailableNotice } from "@/components/FeatureUnavailableNotice";
+import { featureOn, useAccountAccess } from "@/apps/threads/lib/use-account-access";
 
 /**
- * 「この機能は今は使えません」と、ホームへ戻る道だけを出す。
+ * 「この機能は今は使えません」と、Threadsのアカウントのホームへ戻る道だけを出す。
  * @param props - accountId：ホームへ戻る先のアカウント（省略すると URL の :accountId）
  * @returns 使えない機能の画面
  */
 export function FeatureUnavailable({ accountId }: { accountId?: string }) {
   const params = useParams<{ accountId: string }>();
   const id = accountId ?? params.accountId;
-  return (
-    <div className="flex flex-col items-center gap-4 px-4 py-16 text-center" role="alert">
-      <h1 className="text-lg font-semibold">この機能は今は使えません</h1>
-      <Button asChild variant="outline" className="h-10 rounded-full md:h-9">
-        <Link to={id ? `/accounts/${id}` : "/"}>ホームへ</Link>
-      </Button>
-    </div>
-  );
+  return <FeatureUnavailableNotice homeTo={id ? `/accounts/${id}` : "/"} />;
 }
 
 /**

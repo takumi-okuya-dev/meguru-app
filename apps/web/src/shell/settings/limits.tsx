@@ -9,7 +9,7 @@ import {
 } from "@meguru/shared";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useId, useState, type FormEvent } from "react";
-import { Toggle } from "@/components/settings/FeatureSwitches";
+import { Toggle } from "@/components/FeatureSwitches";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ApiError, api, describeError } from "@/lib/api-client";

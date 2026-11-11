@@ -4,7 +4,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { UsersIcon, XIcon } from "lucide-react";
 import { api } from "@/lib/api-client";
 import { queryKeys } from "@/lib/query";
-import { useAccountAccess } from "@/lib/use-account-access";
+import { useAccountAccess } from "@/apps/threads/lib/use-account-access";
 
 /**
  * 担当の知らせ。閉じると出なくなる。担当の人で、閉じていないときだけ出す（オーナーには出さない）。

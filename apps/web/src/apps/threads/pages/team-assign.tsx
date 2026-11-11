@@ -6,13 +6,13 @@ import { ArrowLeftIcon, CheckIcon } from "lucide-react";
 import { Link, useParams } from "react-router";
 import { toast } from "sonner";
 import { ApiErrorScreen } from "@/components/ApiErrorScreen";
-import { LoadingSkeleton } from "@/components/guards";
-import { PageBody, PageHeader } from "@/components/layout/PageHeader";
+import { LoadingSkeleton } from "@/components/LoadingSkeleton";
+import { PageBody, PageHeader } from "@/shell";
 import { Button } from "@/components/ui/button";
 import { ApiError, api, describeError } from "@/lib/api-client";
 import { queryKeys } from "@/lib/query";
 import { cn } from "@/lib/utils";
-import { NotFound } from "@/pages/not-found";
+import { NotFound } from "@/shell";
 
 /**
  * 担当の表の画面。

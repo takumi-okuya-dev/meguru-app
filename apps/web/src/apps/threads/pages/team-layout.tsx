@@ -2,7 +2,7 @@
 // サイドバーの中に出す（今のサイドバーの構造のまま。サイドバーの機能は、最後に使ったAccountへ移る）。
 import { Outlet } from "react-router";
 import { TrialEndingBannerFromMe } from "@/components/billing/TrialEndingBanner";
-import { AppShell } from "@/components/layout/AppShell";
+import { ThreadsShell } from "../sidebar";
 import { UnsavedChangesProvider } from "@/components/UnsavedChangesProvider";
 
 /**
@@ -11,10 +11,10 @@ import { UnsavedChangesProvider } from "@/components/UnsavedChangesProvider";
  */
 export function TeamLayout() {
   return (
-    <AppShell banner={<TrialEndingBannerFromMe />}>
+    <ThreadsShell banner={<TrialEndingBannerFromMe />}>
       <UnsavedChangesProvider>
         <Outlet />
       </UnsavedChangesProvider>
-    </AppShell>
+    </ThreadsShell>
   );
 }

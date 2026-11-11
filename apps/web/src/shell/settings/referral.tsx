@@ -3,8 +3,8 @@
 import { useQuery } from "@tanstack/react-query";
 import { useRef, useState } from "react";
 import { ApiErrorScreen } from "@/components/ApiErrorScreen";
-import { LoadingSkeleton } from "@/components/guards";
-import { SettingCard } from "@/components/settings/SettingRow";
+import { LoadingSkeleton } from "@/components/LoadingSkeleton";
+import { SettingCard } from "@/components/SettingRow";
 import { SwapLabel } from "@/components/SwapLabel";
 import { Button } from "@/components/ui/button";
 import { api } from "@/lib/api-client";

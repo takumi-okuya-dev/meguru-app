@@ -4,9 +4,9 @@ import { Link } from "react-router";
 import { api, describeError } from "@/lib/api-client";
 import { formatRelativeJst } from "@/lib/format";
 import { queryKeys } from "@/lib/query";
-import { useAccountAccess } from "@/lib/use-account-access";
-import { NotConnectedNotice } from "@/components/NotConnectedNotice";
-import { ReconnectButton } from "@/components/ReconnectButton";
+import { useAccountAccess } from "@/apps/threads/lib/use-account-access";
+import { NotConnectedNotice } from "@/apps/threads/components/NotConnectedNotice";
+import { ReconnectButton } from "@/apps/threads/components/ReconnectButton";
 import { Button } from "@/components/ui/button";
 
 /**

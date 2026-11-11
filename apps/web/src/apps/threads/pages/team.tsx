@@ -8,13 +8,13 @@ import { useId, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
 import { toast } from "sonner";
 import { ApiErrorScreen } from "@/components/ApiErrorScreen";
-import { AccountAvatar } from "@/components/AccountAvatar";
-import { LoadingSkeleton } from "@/components/guards";
-import { PageBody, PageHeader } from "@/components/layout/PageHeader";
-import { ConfirmDialog } from "@/components/team/ConfirmDialog";
-import { HelpToggle } from "@/components/team/HelpToggle";
-import { InviteLinkDialog } from "@/components/team/InviteLinkDialog";
-import { LeaveTeamDialog } from "@/components/team/LeaveTeamDialog";
+import { AccountAvatar } from "@/apps/threads/components/AccountAvatar";
+import { LoadingSkeleton } from "@/components/LoadingSkeleton";
+import { PageBody, PageHeader } from "@/shell";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
+import { HelpToggle } from "@/components/HelpToggle";
+import { InviteLinkDialog } from "@/apps/threads/components/team/InviteLinkDialog";
+import { LeaveTeamDialog } from "@/apps/threads/components/team/LeaveTeamDialog";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import {
@@ -27,7 +27,7 @@ import { Switch } from "@/components/ui/switch";
 import { ApiError, api, describeError } from "@/lib/api-client";
 import { queryKeys } from "@/lib/query";
 import { cn } from "@/lib/utils";
-import { NotFound } from "@/pages/not-found";
+import { NotFound } from "@/shell";
 
 const ROLE_NAMES = { admin: "管理者", member: "メンバー", editor: "編集者" } as const;
 

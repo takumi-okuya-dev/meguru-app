@@ -13,8 +13,8 @@ import {
 } from "@meguru/shared";
 import { XIcon } from "lucide-react";
 import { useRef, useState } from "react";
-import { FormDialogFrame } from "@/components/items/FormDialogFrame";
-import { useItemForm } from "@/components/items/use-item-form";
+import { FormDialogFrame } from "@/apps/threads/components/items/FormDialogFrame";
+import { useItemForm } from "@/apps/threads/components/items/use-item-form";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";

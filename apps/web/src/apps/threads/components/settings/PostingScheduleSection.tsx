@@ -18,8 +18,8 @@ import { formatRelativeJst, formatSlotTime } from "@/lib/format";
 import { queryKeys } from "@/lib/query";
 import { cn } from "@/lib/utils";
 import { PostingScheduleDialog } from "./PostingScheduleDialog";
-import { SettingCard, SettingRow } from "./SettingRow";
-import { NotConnectedNotice } from "@/components/NotConnectedNotice";
+import { SettingCard, SettingRow } from "@/components/SettingRow";
+import { NotConnectedNotice } from "@/apps/threads/components/NotConnectedNotice";
 
 /**
  * 保存の後の通知の文言。オンにしたときは次の投稿の予定を添える（contracts/ui-routes.md）。

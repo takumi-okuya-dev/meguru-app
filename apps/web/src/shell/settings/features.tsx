@@ -4,8 +4,8 @@
 import { FEATURE_LABELS, type FeatureSettingsList, type OperatorUser } from "@meguru/shared";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState, type FormEvent } from "react";
-import { FeatureSwitches, Toggle } from "@/components/settings/FeatureSwitches";
-import { ConfirmDialog } from "@/components/team/ConfirmDialog";
+import { FeatureSwitches, Toggle } from "@/components/FeatureSwitches";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ApiError, api, describeError } from "@/lib/api-client";

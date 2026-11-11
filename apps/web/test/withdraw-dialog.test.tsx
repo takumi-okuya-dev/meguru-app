@@ -20,8 +20,8 @@ vi.mock("@/lib/api-client", async (orig) => {
 });
 
 const { ApiError, setWithdrawalInProgress } = await import("@/lib/api-client");
-const { AccountSettingsPage } = await import("@/pages/settings/account");
-const { RequireAuth } = await import("@/components/guards");
+const { AccountSettingsPage } = await import("@/shell/settings/account");
+const { RequireAuth } = await import("@/shell/guards/RequireAuth");
 
 const PREVIEW: WithdrawalPreview = {
   email: "t@example.com",

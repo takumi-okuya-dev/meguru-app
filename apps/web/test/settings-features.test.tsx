@@ -20,8 +20,8 @@ vi.mock("@/lib/api-client", async (orig) => {
 });
 
 const { ApiError } = await import("@/lib/api-client");
-const { SettingsLayout } = await import("@/pages/settings/settings-layout");
-const { FeaturesPage } = await import("@/pages/settings/features");
+const { SettingsLayout } = await import("@/shell/settings/settings-layout");
+const { FeaturesPage } = await import("@/shell/settings/features");
 
 const ME = {
   user: { id: "u", email: "op@example.com", displayName: null },

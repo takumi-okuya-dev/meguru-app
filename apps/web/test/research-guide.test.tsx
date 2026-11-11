@@ -17,7 +17,7 @@ vi.mock("@/lib/api-client", async (orig) => {
 });
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
-const { ResearchPage } = await import("@/pages/research");
+const { ResearchPage } = await import("@/apps/threads/pages/research");
 
 beforeEach(() => localStorage.clear());
 

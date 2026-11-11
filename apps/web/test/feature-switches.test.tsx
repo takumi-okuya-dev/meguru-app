@@ -37,14 +37,14 @@ vi.mock("@/lib/api-client", async (orig) => {
   return { ...actual, api: { ...actual.api, ...mocks } };
 });
 
-const { AppShell } = await import("@/components/layout/AppShell");
-const { PageHeader } = await import("@/components/layout/PageHeader");
-const { AccountHome } = await import("@/pages/account-home");
-const { CreatePage } = await import("@/pages/create");
-const { StrategyPage } = await import("@/pages/strategy");
-const { StockPage } = await import("@/pages/stock");
-const { TeamSharedAccountPage } = await import("@/pages/team-shared-account");
-const { RequireFeature } = await import("@/components/FeatureUnavailable");
+const { ThreadsShell } = await import("@/apps/threads");
+const { PageHeader } = await import("@/shell/layout/PageHeader");
+const { AccountHome } = await import("@/apps/threads/pages/account-home");
+const { CreatePage } = await import("@/apps/threads/pages/create");
+const { StrategyPage } = await import("@/apps/threads/pages/strategy");
+const { StockPage } = await import("@/apps/threads/pages/stock");
+const { TeamSharedAccountPage } = await import("@/apps/threads/pages/team-shared-account");
+const { RequireFeature } = await import("@/apps/threads/components/FeatureUnavailable");
 const { ApiError } = await import("@/lib/api-client");
 
 /** 指定したまとまりだけが使えない、オーナーの関わりと権限。 */
@@ -87,10 +87,10 @@ beforeEach(() => {
 
 function renderShell(path = "/accounts/a1") {
   const shell = (
-    <AppShell>
+    <ThreadsShell>
       <PageHeader title="画面" />
       <p>中身</p>
-    </AppShell>
+    </ThreadsShell>
   );
   const router = createMemoryRouter([{ path: "/accounts/:accountId/*", element: shell }], { initialEntries: [path] });
   render(

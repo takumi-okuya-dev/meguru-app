@@ -1,8 +1,8 @@
 // 参考投稿の編集のダイアログ（specs/002 US3、specs/014 FR-088）。追加は ReferencePostAddDialog（ためて登録）で行う。
 import { useState, type ReactNode } from "react";
 import type { ReferencePost } from "@meguru/shared";
-import { DeletedElsewhereNotice, FormDialogFrame } from "@/components/items/FormDialogFrame";
-import { useItemForm } from "@/components/items/use-item-form";
+import { DeletedElsewhereNotice, FormDialogFrame } from "@/apps/threads/components/items/FormDialogFrame";
+import { useItemForm } from "@/apps/threads/components/items/use-item-form";
 import { UnsavedChangesDialog } from "@/components/UnsavedChangesDialog";
 import { api } from "@/lib/api-client";
 import { ReferencePostFields } from "./ReferencePostFields";

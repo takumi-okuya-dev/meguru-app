@@ -7,9 +7,9 @@ import { toast } from "sonner";
 import { ApiErrorScreen } from "@/components/ApiErrorScreen";
 import { ConflictDialog } from "@/components/ConflictDialog";
 import { BillingRequiredDialog } from "@/components/billing/BillingRequiredDialog";
-import { ConfirmDeleteDialog } from "@/components/items/ConfirmDeleteDialog";
-import { PageBody, PageHeader } from "@/components/layout/PageHeader";
-import { PROMOTION_STATUS_LABELS, PromotionFormDialog } from "@/components/promotions/PromotionFormDialog";
+import { ConfirmDeleteDialog } from "@/apps/threads/components/items/ConfirmDeleteDialog";
+import { PageBody, PageHeader } from "@/shell";
+import { PROMOTION_STATUS_LABELS, PromotionFormDialog } from "@/apps/threads/components/promotions/PromotionFormDialog";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -24,7 +24,7 @@ import { queryKeys } from "@/lib/query";
 import { billingReasonOf, isBillingRequired, isStale, saveErrorMessage } from "@/lib/save-error";
 import { cn } from "@/lib/utils";
 import { useUnsavedChanges } from "@/lib/use-unsaved-changes";
-import { useCurrentAccount } from "@/pages/account-layout";
+import { useCurrentAccount } from "@/apps/threads/pages/account-layout";
 
 type DialogState = { mode: "add" } | { mode: "edit"; item: Promotion } | null;
 

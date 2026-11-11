@@ -20,7 +20,7 @@ vi.mock("@/lib/api-client", async (orig) => {
 const toastError = vi.fn();
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: toastError, dismiss: vi.fn() } }));
 
-const { TeamSection } = await import("@/components/team/TeamSection");
+const { TeamSection } = await import("@/apps/threads/components/team/TeamSection");
 
 const TEAM_ACCESS = { ...OWNER_ACCESS, hasTeam: true, team: { id: "t1", name: "飲食チーム", myRole: "member" as const } };
 const inTeam: AccountTeam = {

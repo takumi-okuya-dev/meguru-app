@@ -2,7 +2,7 @@
 import { useUser } from "@clerk/react";
 import { useState } from "react";
 import { WithdrawDialog } from "@/components/billing/WithdrawDialog";
-import { SettingCard, SettingRow } from "@/components/settings/SettingRow";
+import { SettingCard, SettingRow } from "@/components/SettingRow";
 import { Button } from "@/components/ui/button";
 import { useLogout } from "@/lib/use-logout";
 

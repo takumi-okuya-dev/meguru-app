@@ -4,7 +4,7 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { BILLING_UNIT_PRICE_JPY } from "@meguru/shared";
 import { useEffect } from "react";
 import { Link } from "react-router";
-import { CenteredLayout } from "@/components/layout/AppShell";
+import { CenteredLayout } from "@/shell/layout/AppShell";
 import { Button } from "@/components/ui/button";
 import { api, describeError, setSubscriptionRequired } from "@/lib/api-client";
 import { queryKeys } from "@/lib/query";

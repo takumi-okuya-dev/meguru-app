@@ -13,12 +13,12 @@ import {
 import { useMemo, useState } from "react";
 import { Link } from "react-router";
 import { toast } from "sonner";
-import { AutoPostNotices } from "@/components/AutoPostNotices";
-import { PublishedList } from "@/components/stock/PublishedList";
+import { AutoPostNotices } from "@/apps/threads/components/AutoPostNotices";
+import { PublishedList } from "@/apps/threads/components/stock/PublishedList";
 import { ApiErrorScreen } from "@/components/ApiErrorScreen";
-import { PageBody, PageHeader } from "@/components/layout/PageHeader";
-import { DraftCard } from "@/components/stock/DraftCard";
-import { DraftEditDialog } from "@/components/stock/DraftEditDialog";
+import { PageBody, PageHeader } from "@/shell";
+import { DraftCard } from "@/apps/threads/components/stock/DraftCard";
+import { DraftEditDialog } from "@/apps/threads/components/stock/DraftEditDialog";
 import {
   HighlightedBody,
   LabelRow,
@@ -26,19 +26,19 @@ import {
   PolicyCautionLabels,
   SimilarityLabel,
   highlightsOf,
-} from "@/components/stock/DraftLabels";
-import { DraftList } from "@/components/stock/DraftList";
-import { MentionPanel, mentionAvailable } from "@/components/stock/MentionPanel";
-import { SelectionBar } from "@/components/stock/SelectionBar";
-import { useAccountAccess } from "@/lib/use-account-access";
-import { RejectDialog } from "@/components/stock/RejectDialog";
-import { REOPENED_BY_EDIT } from "@/components/stock/messages";
-import { PolicyConfirmDialog } from "@/components/stock/PolicyConfirmDialog";
-import { BulkApproveDialog } from "@/components/stock/BulkApproveDialog";
-import { StatusTabs, useStatusTab, type StockTab } from "@/components/stock/StatusTabs";
-import { useDeferredDelete } from "@/components/stock/use-deferred-delete";
-import { useReview, type ReviewOptions } from "@/components/stock/use-review";
-import { useSimilarities } from "@/components/stock/use-similarities";
+} from "@/apps/threads/components/stock/DraftLabels";
+import { DraftList } from "@/apps/threads/components/stock/DraftList";
+import { MentionPanel, mentionAvailable } from "@/apps/threads/components/stock/MentionPanel";
+import { SelectionBar } from "@/apps/threads/components/stock/SelectionBar";
+import { useAccountAccess } from "@/apps/threads/lib/use-account-access";
+import { RejectDialog } from "@/apps/threads/components/stock/RejectDialog";
+import { REOPENED_BY_EDIT } from "@/apps/threads/components/stock/messages";
+import { PolicyConfirmDialog } from "@/apps/threads/components/stock/PolicyConfirmDialog";
+import { BulkApproveDialog } from "@/apps/threads/components/stock/BulkApproveDialog";
+import { StatusTabs, useStatusTab, type StockTab } from "@/apps/threads/components/stock/StatusTabs";
+import { useDeferredDelete } from "@/apps/threads/components/stock/use-deferred-delete";
+import { useReview, type ReviewOptions } from "@/apps/threads/components/stock/use-review";
+import { useSimilarities } from "@/apps/threads/components/stock/use-similarities";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent } from "@/components/ui/tabs";
 import {
@@ -51,7 +51,7 @@ import { ChevronDownIcon, SquarePenIcon } from "lucide-react";
 import { api, describeError } from "@/lib/api-client";
 import { formatRelativeJst } from "@/lib/format";
 import { queryKeys } from "@/lib/query";
-import { useCurrentAccount } from "@/pages/account-layout";
+import { useCurrentAccount } from "@/apps/threads/pages/account-layout";
 
 const TAB_VALUES: StockTab[] = ["needs_review", "approved", "rejected", "published"];
 

@@ -1,9 +1,9 @@
 // ログイン画面（FR-001）。Clerk側で Google だけを有効にしているので、「Googleで続ける」ボタンだけが出る
 import { SignIn, useAuth } from "@clerk/react";
 import { Link, Navigate, useSearchParams } from "react-router";
-import { CenteredLayout } from "@/components/layout/AppShell";
+import { CenteredLayout } from "@/shell/layout/AppShell";
 import { ClerkLoadFailedScreen } from "@/components/ErrorScreen";
-import { LoadingSkeleton, useLoadTimeout } from "@/components/guards";
+import { LoadingSkeleton, useLoadTimeout } from "@/components/LoadingSkeleton";
 import { isInvitePath, isTestInvitePath } from "@/lib/invite-return";
 
 /**

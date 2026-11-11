@@ -22,7 +22,7 @@ import {
   type ReferencePost,
   type ReferencePostInputBody,
 } from "@meguru/shared";
-import type { FormErrors } from "@/components/items/use-item-form";
+import type { FormErrors } from "@/apps/threads/components/items/use-item-form";
 
 /** 参考投稿の入力欄の値。数字は入力のままの文字。 */
 export type RefForm = {

@@ -8,16 +8,16 @@ import { useLocation, useSearchParams } from "react-router";
 import { toast } from "sonner";
 import { ApiErrorScreen } from "@/components/ApiErrorScreen";
 import { BillingRequiredDialog } from "@/components/billing/BillingRequiredDialog";
-import { ConfirmDeleteDialog } from "@/components/items/ConfirmDeleteDialog";
-import { PageBody, PageHeader } from "@/components/layout/PageHeader";
-import { KeywordFormDialog } from "@/components/research/KeywordFormDialog";
-import { ResearchGuide } from "@/components/guides/ResearchGuide";
-import { ExplainBatchPanel } from "@/components/research/ExplainBatchPanel";
-import { KeywordIdeasPanel } from "@/components/research/KeywordIdeasPanel";
-import { ExplainOne } from "@/components/research/ExplainOne";
-import { ReferenceBadges } from "@/components/research/ReferenceBadges";
-import { ReferencePostAddDialog } from "@/components/research/ReferencePostAddDialog";
-import { ReferencePostFormDialog } from "@/components/research/ReferencePostFormDialog";
+import { ConfirmDeleteDialog } from "@/apps/threads/components/items/ConfirmDeleteDialog";
+import { PageBody, PageHeader } from "@/shell";
+import { KeywordFormDialog } from "@/apps/threads/components/research/KeywordFormDialog";
+import { ResearchGuide } from "@/apps/threads/components/guides/ResearchGuide";
+import { ExplainBatchPanel } from "@/apps/threads/components/research/ExplainBatchPanel";
+import { KeywordIdeasPanel } from "@/apps/threads/components/research/KeywordIdeasPanel";
+import { ExplainOne } from "@/apps/threads/components/research/ExplainOne";
+import { ReferenceBadges } from "@/apps/threads/components/research/ReferenceBadges";
+import { ReferencePostAddDialog } from "@/apps/threads/components/research/ReferencePostAddDialog";
+import { ReferencePostFormDialog } from "@/apps/threads/components/research/ReferencePostFormDialog";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -31,7 +31,7 @@ import { formatDateTime } from "@/lib/format";
 import { queryKeys } from "@/lib/query";
 import { billingReasonOf, isBillingRequired, saveErrorMessage } from "@/lib/save-error";
 import { cn } from "@/lib/utils";
-import { useCurrentAccount } from "@/pages/account-layout";
+import { useCurrentAccount } from "@/apps/threads/pages/account-layout";
 
 type Tab = "posts" | "keywords";
 type Dialog =

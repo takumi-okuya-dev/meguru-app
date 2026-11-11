@@ -2,7 +2,7 @@
 import { useState } from "react";
 import { useOutletContext } from "react-router";
 import type { AccountSummary } from "@meguru/shared";
-import { ReconnectDialog } from "@/components/connect/ReconnectDialog";
+import { ReconnectDialog } from "@/apps/threads/components/connect/ReconnectDialog";
 import { Button } from "@/components/ui/button";
 
 /**

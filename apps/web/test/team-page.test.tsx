@@ -32,7 +32,7 @@ const toast = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn(), dismiss: vi.
 vi.mock("sonner", () => ({ toast }));
 
 const { ApiError } = await import("@/lib/api-client");
-const { TeamPage } = await import("@/pages/team");
+const { TeamPage } = await import("@/apps/threads/pages/team");
 
 const acc = (id: string, name: string, extra: Partial<TeamDetail["members"][number]["accounts"][number]> = {}) => ({
   id,

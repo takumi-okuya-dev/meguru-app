@@ -7,7 +7,7 @@ import { Link } from "react-router";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { TOKEN_WARNING_KIND } from "@/components/connect/TokenWarnings";
+import { TOKEN_WARNING_KIND } from "@/apps/threads/components/connect/TokenWarnings";
 import { ApiError, api, describeError } from "@/lib/api-client";
 
 /** 隠している間に欄に出す文字。 */

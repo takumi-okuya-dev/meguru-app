@@ -14,7 +14,7 @@ vi.mock("@/lib/api-client", async (orig) => {
 });
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn(), info: vi.fn() } }));
 
-const { CreatePage } = await import("@/pages/create");
+const { CreatePage } = await import("@/apps/threads/pages/create");
 
 function materials(over: Partial<PromptMaterials> = {}): PromptMaterials {
   const items: PromptMaterials["strategy"]["items"] = [

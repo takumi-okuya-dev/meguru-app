@@ -2,7 +2,7 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
-import { ThreadsAccountGuide } from "@/components/connect/ThreadsAccountGuide";
+import { ThreadsAccountGuide } from "@/apps/threads/components/connect/ThreadsAccountGuide";
 
 describe("ThreadsAccountGuide", () => {
   it("使うべきアカウントがあれば@名前を出す（太字）", () => {

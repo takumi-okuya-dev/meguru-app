@@ -15,7 +15,7 @@ vi.mock("@/lib/api-client", async (orig) => {
   return { ...actual, api: { ...actual.api, me: mocks.me, startCheckout: mocks.startCheckout } };
 });
 
-const { RequireAuth } = await import("@/components/guards");
+const { RequireAuth } = await import("@/shell/guards/RequireAuth");
 const { setSubscriptionRequired } = await import("@/lib/api-client");
 
 const ME = (state: MeResponse["billing"]["state"]): MeResponse => ({

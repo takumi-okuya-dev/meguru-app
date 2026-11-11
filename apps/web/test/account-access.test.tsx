@@ -6,7 +6,7 @@ import { EDITOR_ACCESS } from "./helpers/access";
 const toastError = vi.fn();
 vi.mock("sonner", () => ({ toast: { error: toastError, success: vi.fn(), dismiss: vi.fn() } }));
 
-const { canDo, makeAccountAccessErrorHandler } = await import("@/lib/use-account-access");
+const { canDo, makeAccountAccessErrorHandler } = await import("@/apps/threads/lib/use-account-access");
 const { queryKeys } = await import("@/lib/query");
 
 const ID = "11111111-1111-4111-8111-111111111111";

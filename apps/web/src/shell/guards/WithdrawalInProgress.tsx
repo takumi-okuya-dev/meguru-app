@@ -1,8 +1,8 @@
 // 退会の手続きの途中の画面（specs/013 contracts/ui-routes.md「退会」）。退会のAPIのほかは止まっているので、「退会する」だけを出す。
 import { useState } from "react";
-import { CenteredLayout } from "@/components/layout/AppShell";
+import { CenteredLayout } from "@/shell/layout/AppShell";
 import { Button } from "@/components/ui/button";
-import { WithdrawDialog } from "./WithdrawDialog";
+import { WithdrawDialog } from "@/components/billing/WithdrawDialog";
 
 /**
  * 退会の手続きの途中の画面。

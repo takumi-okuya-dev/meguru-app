@@ -4,7 +4,7 @@ import { api } from "@/lib/api-client";
 import { formatRelativeJst } from "@/lib/format";
 import { queryKeys } from "@/lib/query";
 import { Button } from "@/components/ui/button";
-import { ReconnectButton } from "@/components/ReconnectButton";
+import { ReconnectButton } from "@/apps/threads/components/ReconnectButton";
 
 /**
  * ホームに、次の投稿と準備できている件数を出す（005 FR-022）。

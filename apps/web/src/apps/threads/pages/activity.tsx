@@ -5,13 +5,13 @@ import type { ActivityItem } from "@meguru/shared";
 import { ChevronDownIcon } from "lucide-react";
 import { useState } from "react";
 import { Navigate } from "react-router";
-import { PageBody, PageHeader } from "@/components/layout/PageHeader";
+import { PageBody, PageHeader } from "@/shell";
 import { Button } from "@/components/ui/button";
 import { api } from "@/lib/api-client";
 import { queryKeys } from "@/lib/query";
-import { useAccountAccess } from "@/lib/use-account-access";
+import { useAccountAccess } from "@/apps/threads/lib/use-account-access";
 import { cn } from "@/lib/utils";
-import { useCurrentAccount } from "@/pages/account-layout";
+import { useCurrentAccount } from "@/apps/threads/pages/account-layout";
 
 /** 種類のチップ（FR-052）。 */
 const KINDS = [

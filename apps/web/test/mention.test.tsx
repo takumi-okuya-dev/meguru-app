@@ -25,7 +25,7 @@ vi.mock("@/lib/api-client", async (orig) => {
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn(), warning: vi.fn(), info: vi.fn(), dismiss: vi.fn() } }));
 
 const { UnsavedChangesProvider } = await import("@/components/UnsavedChangesProvider");
-const { StockPage } = await import("@/pages/stock");
+const { StockPage } = await import("@/apps/threads/pages/stock");
 
 const SETTINGS: MentionSettings = {
   message: "シェアお願いします",

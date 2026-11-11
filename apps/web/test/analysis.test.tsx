@@ -25,7 +25,7 @@ vi.mock("@/lib/api-client", async (orig) => {
 });
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
-const { AnalysisPage } = await import("@/pages/analysis");
+const { AnalysisPage } = await import("@/apps/threads/pages/analysis");
 
 const account = {
   id: "a1",

@@ -16,8 +16,8 @@ import {
 import { ChevronRightIcon } from "lucide-react";
 import { useState } from "react";
 import { FieldWithCounter } from "@/components/FieldWithCounter";
-import { DeletedElsewhereNotice, FormDialogFrame } from "@/components/items/FormDialogFrame";
-import { useItemForm, type FormErrors } from "@/components/items/use-item-form";
+import { DeletedElsewhereNotice, FormDialogFrame } from "@/apps/threads/components/items/FormDialogFrame";
+import { useItemForm, type FormErrors } from "@/apps/threads/components/items/use-item-form";
 import { api } from "@/lib/api-client";
 import { cn } from "@/lib/utils";
 

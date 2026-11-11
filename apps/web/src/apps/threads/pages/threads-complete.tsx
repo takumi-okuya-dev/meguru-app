@@ -7,7 +7,7 @@
 import { useMutation } from "@tanstack/react-query";
 import { useEffect, useRef } from "react";
 import { useNavigate, useSearchParams } from "react-router";
-import { CenteredLayout } from "@/components/layout/AppShell";
+import { CenteredLayout } from "@/shell";
 import { api } from "@/lib/api-client";
 
 /**

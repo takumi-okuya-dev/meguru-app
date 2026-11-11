@@ -1,7 +1,7 @@
 // Metaのデータ削除要求の状況表示（research.md R7）。failed は「処理中」として表示する
 import { useQuery } from "@tanstack/react-query";
 import { useParams } from "react-router";
-import { CenteredLayout } from "@/components/layout/AppShell";
+import { CenteredLayout } from "@/shell";
 import { api } from "@/lib/api-client";
 
 /**

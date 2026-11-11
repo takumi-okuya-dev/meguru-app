@@ -20,7 +20,7 @@ vi.mock("@/lib/api-client", async (orig) => {
 vi.mock("sonner", () => ({ toast: { success: toastSuccess, error: vi.fn() } }));
 
 const { ApiError } = await import("@/lib/api-client");
-const { ResearchPage } = await import("@/pages/research");
+const { ResearchPage } = await import("@/apps/threads/pages/research");
 
 const meta = { version: 1, createdAt: "2026-10-03T00:00:00.000Z", updatedAt: "2026-10-03T00:00:00.000Z" };
 const kw = (id: string, keyword: string, purpose = ""): ResearchKeyword => ({ id, keyword, purpose, ...meta });

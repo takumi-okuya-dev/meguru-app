@@ -6,15 +6,15 @@ import { XIcon } from "lucide-react";
 import { useId, useState } from "react";
 import { Link } from "react-router";
 import { toast } from "sonner";
-import { delayLabel } from "@/components/stock/MentionPanel";
-import { ConfirmDialog } from "@/components/team/ConfirmDialog";
-import { HelpToggle } from "@/components/team/HelpToggle";
+import { delayLabel } from "@/apps/threads/components/stock/MentionPanel";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
+import { HelpToggle } from "@/components/HelpToggle";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { api, describeError } from "@/lib/api-client";
 import { queryKeys } from "@/lib/query";
-import { SettingCard, SettingRow } from "./SettingRow";
+import { SettingCard, SettingRow } from "@/components/SettingRow";
 
 const HELP = [
   "承認すると、投稿と一緒に返信の文も承認されます",

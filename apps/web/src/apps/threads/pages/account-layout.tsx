@@ -16,17 +16,18 @@ import {
 import { Link, Navigate, Outlet, useOutletContext, useParams } from "react-router";
 import { ReadOnlyBanner } from "@/components/billing/ReadOnlyBanner";
 import { TrialEndingBanner } from "@/components/billing/TrialEndingBanner";
-import { AppShell } from "@/components/layout/AppShell";
+import { ThreadsShell } from "../sidebar";
 import { UnsavedChangesProvider } from "@/components/UnsavedChangesProvider";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { ApiError, api } from "@/lib/api-client";
 import { queryKeys } from "@/lib/query";
-import { useAccountOpen } from "@/lib/use-account-open";
-import { useAccountAccess, useAccountAccessErrors } from "@/lib/use-account-access";
-import { NotFound } from "@/pages/not-found";
+import { useAccountOpen } from "@/apps/threads/lib/use-account-open";
+import { useAccountAccess, useAccountAccessErrors } from "@/apps/threads/lib/use-account-access";
+import { NotFound } from "@/shell";
 import { ApiErrorScreen } from "@/components/ApiErrorScreen";
-import { LoadingSkeleton } from "@/components/guards";
+import { HomeLinkProvider } from "@/lib/home-link";
+import { LoadingSkeleton } from "@/components/LoadingSkeleton";
 
 /** Account の画面の子に渡す値。 */
 export type AccountOutletContext = { account: AccountSummary };
@@ -125,10 +126,13 @@ export function AccountLayout() {
   );
 
   return (
-    <AppShell banner={banner}>
-      <UnsavedChangesProvider>
-        <Outlet context={{ account: account.data } satisfies AccountOutletContext} />
-      </UnsavedChangesProvider>
-    </AppShell>
+    // 使えない機能の案内の「ホームへ」は、このアカウントのホームへ（specs/028 research.md R1）
+    <HomeLinkProvider value={`/accounts/${account.data.id}`}>
+      <ThreadsShell banner={banner}>
+        <UnsavedChangesProvider>
+          <Outlet context={{ account: account.data } satisfies AccountOutletContext} />
+        </UnsavedChangesProvider>
+      </ThreadsShell>
+    </HomeLinkProvider>
   );
 }

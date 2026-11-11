@@ -5,16 +5,16 @@ import { PROMPT_COUNT_DEFAULT } from "@meguru/shared";
 import { useEffect, useState } from "react";
 import { useLocation } from "react-router";
 import { ApiErrorScreen } from "@/components/ApiErrorScreen";
-import { CreateSteps } from "@/components/create/CreateSteps";
-import { PageBody, PageHeader } from "@/components/layout/PageHeader";
-import { PasteComposer } from "@/components/stock/PasteComposer";
-import { flushPendingDeletes } from "@/components/stock/use-deferred-delete";
-import { PromptCard } from "@/components/stock/PromptCard";
-import { STOCK_LIMIT_MESSAGE } from "@/components/stock/messages";
+import { CreateSteps } from "@/apps/threads/components/create/CreateSteps";
+import { PageBody, PageHeader } from "@/shell";
+import { PasteComposer } from "@/apps/threads/components/stock/PasteComposer";
+import { flushPendingDeletes } from "@/apps/threads/components/stock/use-deferred-delete";
+import { PromptCard } from "@/apps/threads/components/stock/PromptCard";
+import { STOCK_LIMIT_MESSAGE } from "@/apps/threads/components/stock/messages";
 import { api } from "@/lib/api-client";
 import { queryKeys } from "@/lib/query";
-import { featureOn, useAccountAccess } from "@/lib/use-account-access";
-import { useCurrentAccount } from "@/pages/account-layout";
+import { featureOn, useAccountAccess } from "@/apps/threads/lib/use-account-access";
+import { useCurrentAccount } from "@/apps/threads/pages/account-layout";
 
 /**
  * 「投稿をつくる」の画面。同じURLのままAccountを切り替えたときに、プロンプトのカードの状態（使えない表示など）を

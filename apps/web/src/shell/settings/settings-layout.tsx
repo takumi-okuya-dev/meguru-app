@@ -11,6 +11,7 @@ import { api } from "@/lib/api-client";
 import { queryKeys } from "@/lib/query";
 import { MD_QUERY, useMediaQuery } from "@/lib/use-media-query";
 import { cn } from "@/lib/utils";
+import { useAppRegistry } from "../app-module";
 import { DEFAULT_SETTINGS_SLUG, filterSettingsGroups, settingsGroupsFor, type SettingsGroup } from "./sections";
 
 function SearchBox({
@@ -109,7 +110,9 @@ export function SettingsLayout() {
   const [query, setQuery] = useState("");
   // 運営者には「運営」の区分を出す（specs/016 contracts/ui-routes.md 3）
   const me = useQuery({ queryKey: queryKeys.me, queryFn: api.me });
-  const allGroups = settingsGroupsFor(Boolean(me.data?.operator));
+  // アプリが足す項目（運営の「テスター招待」「アカウント一覧」など。specs/028 research.md R9）
+  const apps = useAppRegistry();
+  const allGroups = settingsGroupsFor(Boolean(me.data?.operator), apps.flatMap((a) => a.settingsSections ?? []));
   const groups = filterSettingsGroups(allGroups, query);
 
   if (!isWide) {

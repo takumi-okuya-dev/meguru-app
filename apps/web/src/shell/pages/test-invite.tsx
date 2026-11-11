@@ -3,8 +3,8 @@
 import { useAuth } from "@clerk/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate, useParams } from "react-router";
-import { CenteredLayout } from "@/components/layout/AppShell";
-import { LoadingSkeleton } from "@/components/guards";
+import { CenteredLayout } from "@/shell/layout/AppShell";
+import { LoadingSkeleton } from "@/components/LoadingSkeleton";
 import { Button } from "@/components/ui/button";
 import { ApiError, api, describeError, setTestAccessRequired } from "@/lib/api-client";
 import { queryKeys } from "@/lib/query";

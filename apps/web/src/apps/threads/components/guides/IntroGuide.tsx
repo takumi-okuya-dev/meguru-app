@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useId, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { api } from "@/lib/api-client";
-import { readPreference, writePreference } from "@/lib/preferences";
+import { readPreference, writePreference } from "@/apps/threads/lib/preferences";
 import { queryKeys } from "@/lib/query";
 
 const POINTS = [

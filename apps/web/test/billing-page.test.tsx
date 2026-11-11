@@ -19,7 +19,7 @@ const toastError = vi.fn();
 vi.mock("sonner", () => ({ toast: { success: toastSuccess, error: toastError, dismiss: vi.fn() } }));
 
 const { ApiError } = await import("@/lib/api-client");
-const { BillingSettingsPage } = await import("@/pages/settings/billing");
+const { BillingSettingsPage } = await import("@/shell/settings/billing");
 
 const PRICES = { perAccount: 1000 };
 function summary(over: Partial<BillingSummary> = {}): BillingSummary {

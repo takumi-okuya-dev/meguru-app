@@ -15,7 +15,7 @@ const toast = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn(), dismiss: vi.
 vi.mock("sonner", () => ({ toast }));
 
 const { ApiError } = await import("@/lib/api-client");
-const { TeamAssignPage } = await import("@/pages/team-assign");
+const { TeamAssignPage } = await import("@/apps/threads/pages/team-assign");
 
 const table: TeamAssignments = {
   accounts: [

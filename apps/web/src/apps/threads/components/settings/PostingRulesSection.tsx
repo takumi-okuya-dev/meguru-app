@@ -8,7 +8,7 @@ import { queryKeys } from "@/lib/query";
 import { CoreRulesDialog } from "./CoreRulesDialog";
 import { NgWordsDialog } from "./NgWordsDialog";
 import { PolicyInfoDialog } from "./PolicyInfoDialog";
-import { SettingCard, SettingRow } from "./SettingRow";
+import { SettingCard, SettingRow } from "@/components/SettingRow";
 
 type Open = "ng-words" | "core-rules" | "policy" | null;
 

@@ -4,9 +4,9 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { createMemoryRouter, Navigate, RouterProvider } from "react-router";
 import { beforeEach, describe, expect, it } from "vitest";
-import { AppearanceSettings } from "@/pages/settings/appearance";
-import { DEFAULT_SETTINGS_SLUG, SETTINGS_GROUPS, filterSettingsGroups } from "@/pages/settings/sections";
-import { SettingsLayout } from "@/pages/settings/settings-layout";
+import { AppearanceSettings } from "@/shell/settings/appearance";
+import { DEFAULT_SETTINGS_SLUG, SETTINGS_GROUPS, filterSettingsGroups } from "@/shell/settings/sections";
+import { SettingsLayout } from "@/shell/settings/settings-layout";
 
 function renderSettings(path: string) {
   const router = createMemoryRouter(

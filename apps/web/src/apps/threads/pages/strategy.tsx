@@ -30,16 +30,16 @@ import { toast } from "sonner";
 import { ApiErrorScreen } from "@/components/ApiErrorScreen";
 import { ConflictDialog } from "@/components/ConflictDialog";
 import { UnsavedChangesDialog } from "@/components/UnsavedChangesDialog";
-import { CopyPromptStatus, CopyPromptTrigger, useCopyPrompt } from "@/components/CopyPromptButton";
+import { CopyPromptStatus, CopyPromptTrigger, useCopyPrompt } from "@/apps/threads/components/CopyPromptButton";
 import { FieldWithCounter } from "@/components/FieldWithCounter";
-import { DeepenPanel } from "@/components/strategy/DeepenPanel";
-import { FieldCheckBadge } from "@/components/strategy/FieldCheckBadge";
-import { HintPanel } from "@/components/strategy/HintPanel";
-import { ProgressCard } from "@/components/strategy/ProgressCard";
-import { SparringDialog, sparringTitle } from "@/components/strategy/SparringDialog";
-import { SectionChips, sectionElementId } from "@/components/strategy/SectionChips";
+import { DeepenPanel } from "@/apps/threads/components/strategy/DeepenPanel";
+import { FieldCheckBadge } from "@/apps/threads/components/strategy/FieldCheckBadge";
+import { HintPanel } from "@/apps/threads/components/strategy/HintPanel";
+import { ProgressCard } from "@/apps/threads/components/strategy/ProgressCard";
+import { SparringDialog, sparringTitle } from "@/apps/threads/components/strategy/SparringDialog";
+import { SectionChips, sectionElementId } from "@/apps/threads/components/strategy/SectionChips";
 import { BillingRequiredDialog } from "@/components/billing/BillingRequiredDialog";
-import { PageBody, PageHeader } from "@/components/layout/PageHeader";
+import { PageBody, PageHeader } from "@/shell";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -53,7 +53,7 @@ import { queryKeys } from "@/lib/query";
 import { billingReasonOf, isBillingRequired, isStale, saveErrorMessage } from "@/lib/save-error";
 import { useUnsavedChanges } from "@/lib/use-unsaved-changes";
 import { cn } from "@/lib/utils";
-import { useCurrentAccount } from "@/pages/account-layout";
+import { useCurrentAccount } from "@/apps/threads/pages/account-layout";
 
 function pickValues(s: Strategy): StrategyValues {
   const values = Object.fromEntries(STRATEGY_TEXT_KEYS.map((k) => [k, s[k]])) as StrategyValues;

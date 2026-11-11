@@ -33,23 +33,23 @@ import { Link, useParams, useSearchParams } from "react-router";
 import { toast } from "sonner";
 import { ApiErrorScreen } from "@/components/ApiErrorScreen";
 import { ConflictDialog } from "@/components/ConflictDialog";
-import { CopyValueButton } from "@/components/external-media/CopyValueButton";
-import { FieldCard } from "@/components/external-media/FieldCard";
-import { PolishDialog } from "@/components/external-media/PolishDialog";
-import { RuleCheck } from "@/components/external-media/RuleCheck";
-import { WorkSteps } from "@/components/external-media/WorkSteps";
-import { LoadingSkeleton } from "@/components/guards";
-import { ConfirmDialog } from "@/components/team/ConfirmDialog";
-import { PageBody, PageHeader } from "@/components/layout/PageHeader";
+import { CopyValueButton } from "@/apps/threads/components/external-media/CopyValueButton";
+import { FieldCard } from "@/apps/threads/components/external-media/FieldCard";
+import { PolishDialog } from "@/apps/threads/components/external-media/PolishDialog";
+import { RuleCheck } from "@/apps/threads/components/external-media/RuleCheck";
+import { WorkSteps } from "@/apps/threads/components/external-media/WorkSteps";
+import { LoadingSkeleton } from "@/components/LoadingSkeleton";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
+import { PageBody, PageHeader } from "@/shell";
 import { Button } from "@/components/ui/button";
 import { ApiError, api } from "@/lib/api-client";
 import { queryKeys } from "@/lib/query";
 import { isStale, saveErrorMessage } from "@/lib/save-error";
 import { useUnsavedChanges } from "@/lib/use-unsaved-changes";
 import { cn } from "@/lib/utils";
-import { useCurrentAccount } from "@/pages/account-layout";
-import { ExternalMediaForbidden } from "@/pages/external-media";
-import { NotFound } from "@/pages/not-found";
+import { useCurrentAccount } from "@/apps/threads/pages/account-layout";
+import { ExternalMediaForbidden } from "@/apps/threads/pages/external-media";
+import { NotFound } from "@/shell";
 
 /**
  * 宣伝内容と既定値から、掲載内容を作る材料にする。

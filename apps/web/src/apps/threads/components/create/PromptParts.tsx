@@ -5,7 +5,7 @@ import { useEffect, useId, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { readPreference, writePreference } from "@/lib/preferences";
+import { readPreference, writePreference } from "@/apps/threads/lib/preferences";
 
 /** 送り方（1つにまとめて／2つに分けて）。 */
 export type SendMode = "single" | "split";

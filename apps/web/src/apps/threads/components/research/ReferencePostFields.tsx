@@ -18,7 +18,7 @@ import {
 import { ChevronDownIcon } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import { FieldWithCounter } from "@/components/FieldWithCounter";
-import type { FormErrors } from "@/components/items/use-item-form";
+import type { FormErrors } from "@/apps/threads/components/items/use-item-form";
 import { cn } from "@/lib/utils";
 import { freshnessOfForm, type RefForm } from "./reference-post-form";
 

@@ -1,6 +1,6 @@
 // 設定 > 外観：表示スタイルのモード（既定はライト。contracts/ui-routes.md）
 // ChatGPT の外観設定にならい、配色を見本の絵（OSに合わせる・ライト・ダーク）で選ぶ
-import { SettingCard } from "@/components/settings/SettingRow";
+import { SettingCard } from "@/components/SettingRow";
 import { useTheme, type Theme } from "@/lib/theme";
 import { cn } from "@/lib/utils";
 

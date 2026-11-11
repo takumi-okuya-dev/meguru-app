@@ -17,8 +17,8 @@ import {
 import { PlusIcon, XIcon } from "lucide-react";
 import { useId, useState } from "react";
 import { toast } from "sonner";
-import { CopyPromptStatus, CopyPromptTrigger, useCopyPrompt } from "@/components/CopyPromptButton";
-import { FormDialogFrame } from "@/components/items/FormDialogFrame";
+import { CopyPromptStatus, CopyPromptTrigger, useCopyPrompt } from "@/apps/threads/components/CopyPromptButton";
+import { FormDialogFrame } from "@/apps/threads/components/items/FormDialogFrame";
 import { Button } from "@/components/ui/button";
 import { api, describeError } from "@/lib/api-client";
 import { queryKeys } from "@/lib/query";

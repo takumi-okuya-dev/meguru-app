@@ -15,9 +15,9 @@ import {
   type StrategyValues,
 } from "@meguru/shared";
 import { useEffect, useId, useState } from "react";
-import { CopyPromptStatus, CopyPromptTrigger, useCopyPrompt } from "@/components/CopyPromptButton";
-import { FormDialogFrame } from "@/components/items/FormDialogFrame";
-import { SparringCandidates } from "@/components/strategy/SparringCandidates";
+import { CopyPromptStatus, CopyPromptTrigger, useCopyPrompt } from "@/apps/threads/components/CopyPromptButton";
+import { FormDialogFrame } from "@/apps/threads/components/items/FormDialogFrame";
+import { SparringCandidates } from "@/apps/threads/components/strategy/SparringCandidates";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { useUnsavedChanges } from "@/lib/use-unsaved-changes";

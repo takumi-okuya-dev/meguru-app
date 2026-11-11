@@ -1,7 +1,7 @@
 // 参考投稿の編集の画面の「AIに解説してもらう」（1件の解説。specs/014-strategy-guidance FR-086）。
 // 解説のプロンプトをコピーし、返ってきた解説を貼り付けて「なぜ良いか」の欄に入れる（保存は編集の「保存」で）。
 import { useEffect, useId, useState } from "react";
-import { CopyPromptButton } from "@/components/CopyPromptButton";
+import { CopyPromptButton } from "@/apps/threads/components/CopyPromptButton";
 import { Button } from "@/components/ui/button";
 import { api } from "@/lib/api-client";
 

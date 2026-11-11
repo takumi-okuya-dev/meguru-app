@@ -34,9 +34,9 @@ const toastError = vi.fn();
 vi.mock("sonner", () => ({ toast: { success: toastSuccess, error: toastError, warning: vi.fn(), dismiss: vi.fn() } }));
 
 const { UnsavedChangesProvider } = await import("@/components/UnsavedChangesProvider");
-const { AccountSettings } = await import("@/pages/account-settings");
-const { reconnectBannerText } = await import("@/pages/account-layout");
-const { ReconnectButton } = await import("@/components/ReconnectButton");
+const { AccountSettings } = await import("@/apps/threads/pages/account-settings");
+const { reconnectBannerText } = await import("@/apps/threads/pages/account-layout");
+const { ReconnectButton } = await import("@/apps/threads/components/ReconnectButton");
 
 const TOKEN = "THAAG" + "y".repeat(60);
 

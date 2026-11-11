@@ -13,7 +13,7 @@ vi.mock("@/lib/api-client", async (orig) => {
 });
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn(), info: vi.fn() } }));
 
-const { CreatePage } = await import("@/pages/create");
+const { CreatePage } = await import("@/apps/threads/pages/create");
 
 const MODE_KEY = "threads-grower:prompt-send-mode";
 const LONG = { ...promptResponse(), prompt: "全文", parts: ["1つ目の全文", "2つ目の全文"] as [string, string], length: 15000, splitRecommended: true };

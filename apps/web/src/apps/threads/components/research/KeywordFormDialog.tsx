@@ -1,8 +1,8 @@
 // キーワードの追加・編集のダイアログ（specs/002 contracts/ui-routes.md「リサーチの画面」、FR-014）
 import { SHORT_TEXT_MAX, countChars, isBlank, normalizeKeyword, type ResearchKeyword } from "@meguru/shared";
 import { FieldWithCounter } from "@/components/FieldWithCounter";
-import { DeletedElsewhereNotice, FormDialogFrame } from "@/components/items/FormDialogFrame";
-import { useItemForm, type FormErrors } from "@/components/items/use-item-form";
+import { DeletedElsewhereNotice, FormDialogFrame } from "@/apps/threads/components/items/FormDialogFrame";
+import { useItemForm, type FormErrors } from "@/apps/threads/components/items/use-item-form";
 import { api } from "@/lib/api-client";
 
 type Form = { keyword: string; purpose: string };

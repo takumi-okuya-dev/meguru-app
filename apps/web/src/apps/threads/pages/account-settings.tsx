@@ -13,15 +13,15 @@ import { CheckCircle2Icon } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router";
 import { toast } from "sonner";
-import { AccountSwitchSteps } from "@/components/connect/AccountSwitchSteps";
-import { ConnectionNotice } from "@/components/connect/ConnectionNotice";
-import { ConnectMethods } from "@/components/connect/ConnectMethods";
-import { AccountNameSection } from "@/components/settings/AccountNameSection";
-import { ConnectionBadge } from "@/components/ConnectionBadge";
-import { PageBody, PageHeader } from "@/components/layout/PageHeader";
-import { MentionSettingsSection } from "@/components/settings/MentionSettingsSection";
-import { PostingRulesSection } from "@/components/settings/PostingRulesSection";
-import { PostingScheduleSection } from "@/components/settings/PostingScheduleSection";
+import { AccountSwitchSteps } from "@/apps/threads/components/connect/AccountSwitchSteps";
+import { ConnectionNotice } from "@/apps/threads/components/connect/ConnectionNotice";
+import { ConnectMethods } from "@/apps/threads/components/connect/ConnectMethods";
+import { AccountNameSection } from "@/apps/threads/components/settings/AccountNameSection";
+import { ConnectionBadge } from "@/apps/threads/components/ConnectionBadge";
+import { PageBody, PageHeader } from "@/shell";
+import { MentionSettingsSection } from "@/apps/threads/components/settings/MentionSettingsSection";
+import { PostingRulesSection } from "@/apps/threads/components/settings/PostingRulesSection";
+import { PostingScheduleSection } from "@/apps/threads/components/settings/PostingScheduleSection";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
@@ -35,14 +35,14 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { api, describeError } from "@/lib/api-client";
-import { useCallbackResult } from "@/lib/callback-result";
+import { useCallbackResult } from "@/apps/threads/lib/callback-result";
 import { takeInviteReturn } from "@/lib/invite-return";
 import { queryKeys } from "@/lib/query";
-import { useCurrentAccount } from "@/pages/account-layout";
-import { TeamSection } from "@/components/team/TeamSection";
-import { ReconnectDialog } from "@/components/connect/ReconnectDialog";
-import { TOKEN_WARNING_KIND, TokenWarnings } from "@/components/connect/TokenWarnings";
-import { featureOn, useAccountAccess } from "@/lib/use-account-access";
+import { useCurrentAccount } from "@/apps/threads/pages/account-layout";
+import { TeamSection } from "@/apps/threads/components/team/TeamSection";
+import { ReconnectDialog } from "@/apps/threads/components/connect/ReconnectDialog";
+import { TOKEN_WARNING_KIND, TokenWarnings } from "@/apps/threads/components/connect/TokenWarnings";
+import { featureOn, useAccountAccess } from "@/apps/threads/lib/use-account-access";
 
 /**
  * Account の設定（FR-013・FR-019・FR-020・FR-022、規則9・10）。認可し直す操作と、確認つきの削除。

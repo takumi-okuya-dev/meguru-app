@@ -2,7 +2,7 @@
 // 許可の画面はブラウザで threads.com にログインしているアカウントを使い、アプリから切り替えられない（research.md R1）。
 import { THREADS_WEB_URL, accountGuideParts, accountSwitchSteps } from "@meguru/shared";
 import { ExternalLinkIcon } from "lucide-react";
-import { Toggle } from "@/components/settings/FeatureSwitches";
+import { Toggle } from "@/components/FeatureSwitches";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 

@@ -7,7 +7,7 @@ import { toast } from "sonner";
 import { api } from "@/lib/api-client";
 import { queryKeys } from "@/lib/query";
 import { ApiErrorScreen } from "@/components/ApiErrorScreen";
-import { LoadingSkeleton } from "@/components/guards";
+import { LoadingSkeleton } from "@/components/LoadingSkeleton";
 
 /**
  * 「/」の振り分け（FR-004・FR-005、規則2）。最後に使った Account か、「アカウントを作る」へ置き換え遷移する。

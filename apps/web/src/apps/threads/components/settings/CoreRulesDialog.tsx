@@ -2,8 +2,8 @@
 // 002の追加・編集のダイアログの枠と振る舞い（未保存の警告・他の場所での更新・grower機能の判定）を使う。
 import { CORE_RULES_MAX, countChars, type CoreRulesResponse } from "@meguru/shared";
 import { FieldWithCounter } from "@/components/FieldWithCounter";
-import { FormDialogFrame } from "@/components/items/FormDialogFrame";
-import { useItemForm } from "@/components/items/use-item-form";
+import { FormDialogFrame } from "@/apps/threads/components/items/FormDialogFrame";
+import { useItemForm } from "@/apps/threads/components/items/use-item-form";
 import { ApiError, api } from "@/lib/api-client";
 import { isStale } from "@/lib/save-error";
 

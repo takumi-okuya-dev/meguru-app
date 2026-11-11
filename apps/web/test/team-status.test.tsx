@@ -13,7 +13,7 @@ vi.mock("@/lib/api-client", async (orig) => {
 });
 
 const { ApiError } = await import("@/lib/api-client");
-const { TeamStatusPage } = await import("@/pages/team-status");
+const { TeamStatusPage } = await import("@/apps/threads/pages/team-status");
 
 const DAY = 24 * 60 * 60 * 1000;
 const ago = (days: number) => new Date(Date.now() - days * DAY).toISOString();

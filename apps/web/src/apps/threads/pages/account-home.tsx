@@ -10,24 +10,24 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { Link } from "react-router";
-import { NextPostCard } from "@/components/NextPostCard";
-import { ShareAppCard } from "@/components/ShareAppCard";
-import { AssignedNotice } from "@/components/team/AssignedNotice";
-import { TokenWarnings } from "@/components/connect/TokenWarnings";
-import { AutoPostNotices } from "@/components/AutoPostNotices";
-import { NotConnectedBanner, connectPath } from "@/components/NotConnectedNotice";
-import { featureOn, useAccountAccess } from "@/lib/use-account-access";
-import { AccountAvatar } from "@/components/AccountAvatar";
-import { IntroGuide } from "@/components/guides/IntroGuide";
+import { NextPostCard } from "@/apps/threads/components/NextPostCard";
+import { ShareAppCard } from "@/apps/threads/components/ShareAppCard";
+import { AssignedNotice } from "@/apps/threads/components/team/AssignedNotice";
+import { TokenWarnings } from "@/apps/threads/components/connect/TokenWarnings";
+import { AutoPostNotices } from "@/apps/threads/components/AutoPostNotices";
+import { NotConnectedBanner, connectPath } from "@/apps/threads/components/NotConnectedNotice";
+import { featureOn, useAccountAccess } from "@/apps/threads/lib/use-account-access";
+import { AccountAvatar } from "@/apps/threads/components/AccountAvatar";
+import { IntroGuide } from "@/apps/threads/components/guides/IntroGuide";
 import { ApiErrorScreen } from "@/components/ApiErrorScreen";
-import { ConnectionBadge } from "@/components/ConnectionBadge";
-import { PageBody, PageHeader } from "@/components/layout/PageHeader";
+import { ConnectionBadge } from "@/apps/threads/components/ConnectionBadge";
+import { PageBody, PageHeader } from "@/shell";
 import { Button } from "@/components/ui/button";
 import { api } from "@/lib/api-client";
 import { formatDate } from "@/lib/format";
 import { queryKeys } from "@/lib/query";
 import { cn } from "@/lib/utils";
-import { useCurrentAccount } from "@/pages/account-layout";
+import { useCurrentAccount } from "@/apps/threads/pages/account-layout";
 
 type Area = "strategy" | "promotions" | "research";
 

@@ -6,6 +6,7 @@ import { EnvBanner } from "./EnvBanner";
 import { LG_QUERY, useMediaQuery } from "@/lib/use-media-query";
 import { ShellContext, type ShellState } from "./shell-context";
 import { Sidebar } from "./Sidebar";
+import type { AppSidebar } from "./sidebar-parts";
 
 const COLLAPSED_KEY = "tg.sidebarCollapsed";
 
@@ -27,10 +28,10 @@ function writeCollapsed(value: boolean) {
 
 /**
  * 画面の骨格。左サイドバー＋右メインパネルで、メインパネルの中身は各画面の PageHeader とスクロール領域にする。
- * @param props - children：メインパネルの中身、banner：上部バーの下に出すバナー
+ * @param props - children：メインパネルの中身、banner：上部バーの下に出すバナー、sidebar：アプリのサイドバーの中身（specs/028 research.md R8）
  * @returns 画面の骨格
  */
-export function AppShell({ children, banner = null }: { children: ReactNode; banner?: ReactNode }) {
+export function AppShell({ children, banner = null, sidebar }: { children: ReactNode; banner?: ReactNode; sidebar?: AppSidebar }) {
   const isWide = useMediaQuery(LG_QUERY);
   const [collapsed, setCollapsed] = useState(readCollapsed);
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -58,12 +59,12 @@ export function AppShell({ children, banner = null }: { children: ReactNode; ban
         <div className="flex min-h-0 flex-1">
           {sidebarVisible && (
             <aside className="flex w-64 shrink-0 flex-col border-r bg-sidebar">
-              <Sidebar onCollapse={() => setCollapsedAndSave(true)} />
+              <Sidebar sidebar={sidebar} onCollapse={() => setCollapsedAndSave(true)} />
             </aside>
           )}
           <Sheet open={drawerOpen && !sidebarVisible} onOpenChange={setDrawerOpen}>
             <SheetContent className="w-[19rem] max-w-[85vw]">
-              <Sidebar onNavigate={() => setDrawerOpen(false)} />
+              <Sidebar sidebar={sidebar} onNavigate={() => setDrawerOpen(false)} />
             </SheetContent>
           </Sheet>
           <div className="flex min-w-0 flex-1 flex-col overflow-y-auto" data-main-scroll>

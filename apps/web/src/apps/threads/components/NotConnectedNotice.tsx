@@ -2,7 +2,7 @@
 import { CircleDashedIcon } from "lucide-react";
 import { Link } from "react-router";
 import { Button } from "@/components/ui/button";
-import { useAccountAccess } from "@/lib/use-account-access";
+import { useAccountAccess } from "@/apps/threads/lib/use-account-access";
 
 /**
  * 「Threadsとの接続」の区分へのパス。

@@ -14,8 +14,9 @@ import { Link, useNavigate, useSearchParams } from "react-router";
 import { readOnlyMessage } from "@/components/billing/BillingRequiredDialog";
 import { ApiErrorScreen } from "@/components/ApiErrorScreen";
 import { FieldWithCounter } from "@/components/FieldWithCounter";
-import { LoadingSkeleton } from "@/components/guards";
-import { AppShell, CenteredLayout } from "@/components/layout/AppShell";
+import { LoadingSkeleton } from "@/components/LoadingSkeleton";
+import { CenteredLayout } from "@/shell";
+import { ThreadsShell } from "../sidebar";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { ApiError, api, describeError } from "@/lib/api-client";
@@ -138,5 +139,5 @@ export function AccountNew() {
   );
 
   // Accountが0件のときはサイドバーなしの1カラム（contracts/ui-routes.md）
-  return used === 0 ? <CenteredLayout>{content}</CenteredLayout> : <AppShell>{content}</AppShell>;
+  return used === 0 ? <CenteredLayout>{content}</CenteredLayout> : <ThreadsShell>{content}</ThreadsShell>;
 }

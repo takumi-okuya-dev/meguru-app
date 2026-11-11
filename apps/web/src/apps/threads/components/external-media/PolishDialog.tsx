@@ -2,8 +2,8 @@
 // 反映したあとの自動の直しとルールのチェックは、画面と保存で通す。アプリの中ではAIを呼ばない（原則III）。
 import { MEDIA_LABELS, parsePolishAnswer, polishPrompt, type ListingSource, type ListingValues, type Media } from "@meguru/shared";
 import { useId, useState } from "react";
-import { CopyPromptStatus, CopyPromptTrigger, useCopyPrompt } from "@/components/CopyPromptButton";
-import { FormDialogFrame } from "@/components/items/FormDialogFrame";
+import { CopyPromptStatus, CopyPromptTrigger, useCopyPrompt } from "@/apps/threads/components/CopyPromptButton";
+import { FormDialogFrame } from "@/apps/threads/components/items/FormDialogFrame";
 
 const STEPS = ["プロンプトをコピーして、ChatGPTやClaudeに送る", "返ってきた答えを、下に丸ごと貼り付ける", "タイトルと本文の案を確かめて「反映する」"];
 

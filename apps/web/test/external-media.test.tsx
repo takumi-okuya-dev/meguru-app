@@ -27,8 +27,8 @@ vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
 const { ApiError } = await import("@/lib/api-client");
 const { UnsavedChangesProvider } = await import("@/components/UnsavedChangesProvider");
-const { ExternalMediaPage } = await import("@/pages/external-media");
-const { ExternalMediaListingPage } = await import("@/pages/external-media-listing");
+const { ExternalMediaPage } = await import("@/apps/threads/pages/external-media");
+const { ExternalMediaListingPage } = await import("@/apps/threads/pages/external-media-listing");
 
 const account = {
   id: "a1",

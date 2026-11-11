@@ -18,14 +18,14 @@ import { useId, useState } from "react";
 import { Link, useSearchParams } from "react-router";
 import { toast } from "sonner";
 import { ApiErrorScreen } from "@/components/ApiErrorScreen";
-import { LoadingSkeleton } from "@/components/guards";
-import { PageBody, PageHeader } from "@/components/layout/PageHeader";
+import { LoadingSkeleton } from "@/components/LoadingSkeleton";
+import { PageBody, PageHeader } from "@/shell";
 import { Button } from "@/components/ui/button";
 import { ApiError, api } from "@/lib/api-client";
 import { queryKeys } from "@/lib/query";
 import { saveErrorMessage } from "@/lib/save-error";
 import { cn } from "@/lib/utils";
-import { useCurrentAccount } from "@/pages/account-layout";
+import { useCurrentAccount } from "@/apps/threads/pages/account-layout";
 
 /** 状況の印の色（今ある色だけ）。 */
 const STATUS_STYLE: Record<ListingStatus, string> = {

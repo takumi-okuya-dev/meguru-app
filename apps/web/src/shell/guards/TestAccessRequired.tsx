@@ -2,7 +2,7 @@
 // 招待のリンク（/test-invite/:token）はこの画面にならない（認証のガードの外）。
 import { useQuery } from "@tanstack/react-query";
 import { useEffect } from "react";
-import { CenteredLayout } from "@/components/layout/AppShell";
+import { CenteredLayout } from "@/shell/layout/AppShell";
 import { Button } from "@/components/ui/button";
 import { api, setTestAccessRequired } from "@/lib/api-client";
 import { queryKeys } from "@/lib/query";

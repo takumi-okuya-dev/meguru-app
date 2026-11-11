@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Link } from "react-router";
 import { Button } from "@/components/ui/button";
-import { readPreference, writePreference } from "@/lib/preferences";
+import { readPreference, writePreference } from "@/apps/threads/lib/preferences";
 
 const COLLAPSED_KEY = "threads-grower:create-steps-collapsed";
 

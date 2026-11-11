@@ -4,13 +4,13 @@ import { render, screen } from "@testing-library/react";
 import { createMemoryRouter, MemoryRouter, Navigate, RouterProvider } from "react-router";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { EnvBadge, EnvBanner } from "@/components/layout/EnvBanner";
-import { UserMenu } from "@/components/layout/UserMenu";
+import { EnvBadge, EnvBanner } from "@/shell/layout/EnvBanner";
+import { UserMenu } from "@/shell/layout/UserMenu";
 import { ReadOnlyBanner } from "@/components/billing/ReadOnlyBanner";
-import { AppShell, CenteredLayout } from "@/components/layout/AppShell";
-import { DEFAULT_SETTINGS_SLUG } from "@/pages/settings/sections";
-import { SettingsLayout } from "@/pages/settings/settings-layout";
-import { PageHeader } from "@/components/layout/PageHeader";
+import { AppShell, CenteredLayout } from "@/shell/layout/AppShell";
+import { DEFAULT_SETTINGS_SLUG } from "@/shell/settings/sections";
+import { SettingsLayout } from "@/shell/settings/settings-layout";
+import { PageHeader } from "@/shell/layout/PageHeader";
 import { resetViewport, setViewport } from "./helpers/viewport";
 
 vi.mock("@clerk/react", () => ({

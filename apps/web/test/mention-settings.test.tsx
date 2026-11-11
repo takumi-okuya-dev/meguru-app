@@ -19,7 +19,7 @@ vi.mock("@/lib/api-client", async (orig) => {
 });
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
-const { MentionSettingsSection } = await import("@/components/settings/MentionSettingsSection");
+const { MentionSettingsSection } = await import("@/apps/threads/components/settings/MentionSettingsSection");
 
 const SETTINGS: MentionSettings = {
   message: "シェアお願いします",

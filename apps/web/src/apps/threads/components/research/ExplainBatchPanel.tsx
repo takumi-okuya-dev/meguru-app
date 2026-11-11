@@ -4,7 +4,7 @@ import { useMutation } from "@tanstack/react-query";
 import { EXPLAIN_BATCH_MAX, isBlank, parseExplanations, type ExplanationProblem, type ReferencePost } from "@meguru/shared";
 import { useId, useState } from "react";
 import { toast } from "sonner";
-import { CopyPromptStatus, CopyPromptTrigger, useCopyPrompt } from "@/components/CopyPromptButton";
+import { CopyPromptStatus, CopyPromptTrigger, useCopyPrompt } from "@/apps/threads/components/CopyPromptButton";
 import { Button } from "@/components/ui/button";
 import { api } from "@/lib/api-client";
 import { billingReasonOf, isBillingRequired, saveErrorMessage } from "@/lib/save-error";

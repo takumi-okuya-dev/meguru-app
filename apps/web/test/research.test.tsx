@@ -22,7 +22,7 @@ vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
 const { ApiError } = await import("@/lib/api-client");
 const { refPost } = await import("./helpers/research");
-const { ResearchPage } = await import("@/pages/research");
+const { ResearchPage } = await import("@/apps/threads/pages/research");
 
 const account: AccountSummary = {
   id: "a1",

@@ -39,7 +39,7 @@ vi.mock("@/lib/api-client", async (orig) => {
   };
 });
 
-const { AccountHome } = await import("@/pages/account-home");
+const { AccountHome } = await import("@/apps/threads/pages/account-home");
 
 function renderHome() {
   const router = createMemoryRouter(

@@ -6,19 +6,19 @@ import { useState } from "react";
 import { useSearchParams } from "react-router";
 import { toast } from "sonner";
 import { ApiErrorScreen } from "@/components/ApiErrorScreen";
-import { BucketTable } from "@/components/analysis/BucketTable";
-import { ClassifyDialog } from "@/components/analysis/ClassifyDialog";
-import { ContentCard } from "@/components/analysis/ContentCard";
-import { FeatureTable } from "@/components/analysis/FeatureTable";
-import { RecommendedCard } from "@/components/analysis/RecommendedCard";
-import { ScheduleHint } from "@/components/analysis/ScheduleHint";
-import { TrendCard } from "@/components/analysis/TrendCard";
-import { PageBody, PageHeader } from "@/components/layout/PageHeader";
-import { HelpToggle } from "@/components/team/HelpToggle";
+import { BucketTable } from "@/apps/threads/components/analysis/BucketTable";
+import { ClassifyDialog } from "@/apps/threads/components/analysis/ClassifyDialog";
+import { ContentCard } from "@/apps/threads/components/analysis/ContentCard";
+import { FeatureTable } from "@/apps/threads/components/analysis/FeatureTable";
+import { RecommendedCard } from "@/apps/threads/components/analysis/RecommendedCard";
+import { ScheduleHint } from "@/apps/threads/components/analysis/ScheduleHint";
+import { TrendCard } from "@/apps/threads/components/analysis/TrendCard";
+import { PageBody, PageHeader } from "@/shell";
+import { HelpToggle } from "@/components/HelpToggle";
 import { api, describeError } from "@/lib/api-client";
 import { queryKeys } from "@/lib/query";
 import { cn } from "@/lib/utils";
-import { useCurrentAccount } from "@/pages/account-layout";
+import { useCurrentAccount } from "@/apps/threads/pages/account-layout";
 
 const HELP = [
   "確定した投稿（投稿から約7日）だけで見ています",

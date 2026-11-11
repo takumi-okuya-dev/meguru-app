@@ -1,6 +1,6 @@
 import { Link } from "react-router";
 import { Button } from "@/components/ui/button";
-import { CenteredLayout } from "@/components/layout/AppShell";
+import { CenteredLayout } from "@/shell/layout/AppShell";
 
 /**
  * 404 画面。「自分のAccountへ戻る」リンクを置く。

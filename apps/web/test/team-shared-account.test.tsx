@@ -27,7 +27,7 @@ const toast = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn(), dismiss: vi.
 vi.mock("sonner", () => ({ toast }));
 
 const { ApiError } = await import("@/lib/api-client");
-const { TeamSharedAccountPage } = await import("@/pages/team-shared-account");
+const { TeamSharedAccountPage } = await import("@/apps/threads/pages/team-shared-account");
 
 const draft = (id: string, body: string, status: "approved" | "needs_review") => ({
   id,

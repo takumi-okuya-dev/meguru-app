@@ -45,7 +45,7 @@ vi.mock("sonner", () => ({
 
 const { ApiError } = await import("@/lib/api-client");
 const { UnsavedChangesProvider } = await import("@/components/UnsavedChangesProvider");
-const { AccountSettings } = await import("@/pages/account-settings");
+const { AccountSettings } = await import("@/apps/threads/pages/account-settings");
 
 const account: AccountSummary = {
   id: "a1",

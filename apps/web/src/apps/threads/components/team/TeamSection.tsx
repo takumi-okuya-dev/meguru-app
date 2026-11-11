@@ -7,7 +7,7 @@ import { ChevronDownIcon, ChevronRightIcon } from "lucide-react";
 import { useState } from "react";
 import { Link } from "react-router";
 import { toast } from "sonner";
-import { SettingCard, SettingRow } from "@/components/settings/SettingRow";
+import { SettingCard, SettingRow } from "@/components/SettingRow";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { api, describeError } from "@/lib/api-client";

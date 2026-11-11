@@ -9,7 +9,7 @@ import {
 } from "@meguru/shared";
 import { useState } from "react";
 import { FieldWithCounter } from "@/components/FieldWithCounter";
-import { FormDialogFrame } from "@/components/items/FormDialogFrame";
+import { FormDialogFrame } from "@/apps/threads/components/items/FormDialogFrame";
 import { useUnsavedChanges } from "@/lib/use-unsaved-changes";
 import { cn } from "@/lib/utils";
 

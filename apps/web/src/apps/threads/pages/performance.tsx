@@ -9,20 +9,20 @@ import {
 import { useQueryClient, type InfiniteData } from "@tanstack/react-query";
 import { CheckIcon, InfoIcon } from "lucide-react";
 import { ApiErrorScreen } from "@/components/ApiErrorScreen";
-import { PageBody, PageHeader } from "@/components/layout/PageHeader";
-import { BaselineCard } from "@/components/performance/BaselineCard";
-import { CsvExportMenu } from "@/components/performance/CsvExportMenu";
-import { FeedbackEditor } from "@/components/performance/FeedbackEditor";
-import { InsightsDeniedBanner } from "@/components/performance/InsightsDeniedBanner";
-import { PerformanceCard } from "@/components/performance/PerformanceCard";
-import { PerformanceTabs } from "@/components/performance/PerformanceTabs";
-import { usePerformance, usePerformanceTab } from "@/components/performance/use-performance";
+import { PageBody, PageHeader } from "@/shell";
+import { BaselineCard } from "@/apps/threads/components/performance/BaselineCard";
+import { CsvExportMenu } from "@/apps/threads/components/performance/CsvExportMenu";
+import { FeedbackEditor } from "@/apps/threads/components/performance/FeedbackEditor";
+import { InsightsDeniedBanner } from "@/apps/threads/components/performance/InsightsDeniedBanner";
+import { PerformanceCard } from "@/apps/threads/components/performance/PerformanceCard";
+import { PerformanceTabs } from "@/apps/threads/components/performance/PerformanceTabs";
+import { usePerformance, usePerformanceTab } from "@/apps/threads/components/performance/use-performance";
 import { Button } from "@/components/ui/button";
 import { Tabs } from "@/components/ui/tabs";
 import { formatJstShort } from "@/lib/format";
 import { queryKeys } from "@/lib/query";
-import { NotConnectedNotice } from "@/components/NotConnectedNotice";
-import { useCurrentAccount } from "@/pages/account-layout";
+import { NotConnectedNotice } from "@/apps/threads/components/NotConnectedNotice";
+import { useCurrentAccount } from "@/apps/threads/pages/account-layout";
 
 /**
  * パフォーマンスの画面。

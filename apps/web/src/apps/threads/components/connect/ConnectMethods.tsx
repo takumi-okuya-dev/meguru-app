@@ -12,7 +12,7 @@ import {
 import { ChevronDownIcon } from "lucide-react";
 import { useState } from "react";
 import { Link } from "react-router";
-import { ConnectionBadge } from "@/components/ConnectionBadge";
+import { ConnectionBadge } from "@/apps/threads/components/ConnectionBadge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { ApiError, api, describeError } from "@/lib/api-client";

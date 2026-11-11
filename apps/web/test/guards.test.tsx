@@ -22,7 +22,7 @@ vi.mock("@clerk/react", () => ({
     ),
 }));
 
-const { RequireAuth } = await import("@/components/guards");
+const { RequireAuth } = await import("@/shell/guards/RequireAuth");
 
 function renderAt(path: string) {
   const router = createMemoryRouter(

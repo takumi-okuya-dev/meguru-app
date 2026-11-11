@@ -20,7 +20,7 @@ vi.mock("@/lib/api-client", async (orig) => {
 });
 
 const { ApiError, getTestAccessRequired, setTestAccessRequired } = await import("@/lib/api-client");
-const { TestInvitePage } = await import("@/pages/test-invite");
+const { TestInvitePage } = await import("@/shell/pages/test-invite");
 
 const TOKEN = "g_" + "a".repeat(43);
 

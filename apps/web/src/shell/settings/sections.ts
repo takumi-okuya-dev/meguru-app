@@ -1,5 +1,6 @@
 // 設定画面の項目の一覧。項目を足すときは、ここに1行足して画面を作るだけにする
-import { CreditCardIcon, GaugeIcon, ListIcon, MailPlusIcon, PaletteIcon, Share2Icon, ToggleRightIcon, UserCircleIcon, UsersRoundIcon, type LucideIcon } from "lucide-react";
+import { CreditCardIcon, GaugeIcon, PaletteIcon, Share2Icon, ToggleRightIcon, UserCircleIcon, UsersRoundIcon, type LucideIcon } from "lucide-react";
+import type { SettingsSectionContribution } from "../app-module";
 
 /** 設定画面の項目。 */
 export type SettingsSection = {
@@ -29,27 +30,27 @@ export const SETTINGS_GROUPS: SettingsGroup[] = [
   },
 ];
 
-/** 運営者にだけ出す項目のグループ（specs/016 contracts/ui-routes.md 3、specs/019 contracts/ui-routes.md 4）。どの環境でも出す。 */
-export const OPERATOR_SETTINGS_GROUP: SettingsGroup = {
-  label: "運営",
-  sections: [
-    { slug: "features", label: "使える機能", Icon: ToggleRightIcon, keywords: ["機能", "ON", "OFF", "プラン", "戦略", "自動投稿", "チーム", "運営"] },
-    { slug: "test-groups", label: "グループ", Icon: UsersRoundIcon, keywords: ["テスト", "招待", "グループ", "組織", "運営", "上限"] },
-    // テスター招待・上限（specs/024 contracts/ui-routes.md 5・6）
-    { slug: "tester-invites", label: "テスター招待", Icon: MailPlusIcon, keywords: ["テスター", "招待", "Meta", "申し込み", "運営"] },
-    // アカウント一覧（specs/026 contracts/ui-routes.md 1）。「個人設定」の「アカウント」と分ける
-    { slug: "operator-accounts", label: "アカウント一覧", Icon: ListIcon, keywords: ["アカウント", "Threads", "接続", "トークン", "テスター", "運営"] },
-    { slug: "limits", label: "上限", Icon: GaugeIcon, keywords: ["上限", "アカウント", "投稿", "件数", "運営"] },
-  ],
-};
+/** 運営者にだけ出す、外枠の項目（specs/016 contracts/ui-routes.md 3、specs/019 contracts/ui-routes.md 4）。order はアプリの項目と混ぜて並べる順。 */
+const OPERATOR_SECTIONS: (SettingsSection & { order: number })[] = [
+  { order: 10, slug: "features", label: "使える機能", Icon: ToggleRightIcon, keywords: ["機能", "ON", "OFF", "プラン", "戦略", "自動投稿", "チーム", "運営"] },
+  { order: 20, slug: "test-groups", label: "グループ", Icon: UsersRoundIcon, keywords: ["テスト", "招待", "グループ", "組織", "運営", "上限"] },
+  // 上限（specs/024 contracts/ui-routes.md 6）。テスター招待（30）・アカウント一覧（40）はThreadsが足す（specs/028 research.md R9）
+  { order: 50, slug: "limits", label: "上限", Icon: GaugeIcon, keywords: ["上限", "アカウント", "投稿", "件数", "運営"] },
+];
 
 /**
- * その人に出す項目のグループ。運営者には「運営」の区分を足す。
+ * その人に出す項目のグループ。運営者には「運営」の区分を足す。アプリが足す項目は、区分ごとに order の順で混ぜる。
  * @param operator - 運営者か（/api/me の operator。招待制に関わらない。specs/019）
+ * @param contributions - アプリが足す項目（specs/028 research.md R9）
  * @returns 項目のグループ
  */
-export function settingsGroupsFor(operator: boolean): SettingsGroup[] {
-  return operator ? [...SETTINGS_GROUPS, OPERATOR_SETTINGS_GROUP] : SETTINGS_GROUPS;
+export function settingsGroupsFor(operator: boolean, contributions: readonly SettingsSectionContribution[] = []): SettingsGroup[] {
+  const extra = (group: SettingsSectionContribution["group"]) =>
+    contributions.filter((c) => c.group === group).map(({ order, slug, label, Icon, keywords }) => ({ order, slug, label, Icon, keywords }));
+  const ordered = (base: (SettingsSection & { order: number })[], group: SettingsSectionContribution["group"]) =>
+    [...base, ...extra(group)].sort((a, b) => a.order - b.order).map(({ order: _order, ...section }) => section);
+  const personal = SETTINGS_GROUPS.map((g) => ({ ...g, sections: ordered(g.sections.map((sec, i) => ({ ...sec, order: (i + 1) * 10 })), "personal") }));
+  return operator ? [...personal, { label: "運営", sections: ordered(OPERATOR_SECTIONS, "operator") }] : personal;
 }
 
 /** /settings を開いたときに表示する項目。 */

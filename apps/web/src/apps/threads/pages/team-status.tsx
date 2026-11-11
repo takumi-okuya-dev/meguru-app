@@ -6,16 +6,16 @@ import { errorMessage, formatRatio, type TeamStatus } from "@meguru/shared";
 import { ArrowLeftIcon, TrendingDownIcon } from "lucide-react";
 import type { ReactNode } from "react";
 import { Link, useParams } from "react-router";
-import { AccountAvatar } from "@/components/AccountAvatar";
+import { AccountAvatar } from "@/apps/threads/components/AccountAvatar";
 import { ApiErrorScreen } from "@/components/ApiErrorScreen";
-import { LoadingSkeleton } from "@/components/guards";
-import { PageBody, PageHeader } from "@/components/layout/PageHeader";
-import { HelpToggle } from "@/components/team/HelpToggle";
+import { LoadingSkeleton } from "@/components/LoadingSkeleton";
+import { PageBody, PageHeader } from "@/shell";
+import { HelpToggle } from "@/components/HelpToggle";
 import { Button } from "@/components/ui/button";
 import { ApiError, api } from "@/lib/api-client";
 import { formatDaysAgoJst } from "@/lib/format";
 import { queryKeys } from "@/lib/query";
-import { NotFound } from "@/pages/not-found";
+import { NotFound } from "@/shell";
 
 const ROLE_NAMES = { admin: "管理者", member: "メンバー", editor: "編集者" } as const;
 

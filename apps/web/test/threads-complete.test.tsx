@@ -8,7 +8,7 @@ import { render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { api } from "@/lib/api-client";
-import { ThreadsComplete } from "@/pages/threads-complete";
+import { ThreadsComplete } from "@/apps/threads/pages/threads-complete";
 
 const navigate = vi.fn();
 vi.mock("react-router", async () => {

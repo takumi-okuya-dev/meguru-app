@@ -4,7 +4,7 @@ import { accountLabel, type AccountSummary } from "@meguru/shared";
 import { CheckIcon, ChevronDownIcon, PlusIcon, TriangleAlertIcon } from "lucide-react";
 import { Fragment, useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router";
-import { AccountAvatar } from "@/components/AccountAvatar";
+import { AccountAvatar } from "@/apps/threads/components/AccountAvatar";
 import {
   DropdownMenu,
   DropdownMenuContent,

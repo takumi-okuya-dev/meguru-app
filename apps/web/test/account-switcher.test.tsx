@@ -4,7 +4,7 @@ import userEvent from "@testing-library/user-event";
 import type { AccountSummary, MeResponse, NeedsReviewCountsResponse } from "@meguru/shared";
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { PageHeader } from "@/components/layout/PageHeader";
+import { PageHeader } from "@/shell/layout/PageHeader";
 import { queryKeys } from "@/lib/query";
 import { ME_BILLING_OFF } from "./helpers/billing";
 
@@ -36,8 +36,8 @@ vi.mock("@/lib/api-client", async (importOriginal) => {
   };
 });
 
-const { AccountSwitcher, groupHeading } = await import("@/components/layout/AccountSwitcher");
-const { AccountLayout, useCurrentAccount } = await import("@/pages/account-layout");
+const { AccountSwitcher, groupHeading } = await import("@/apps/threads/sidebar/AccountSwitcher");
+const { AccountLayout, useCurrentAccount } = await import("@/apps/threads/pages/account-layout");
 
 const account = (
   id: string,

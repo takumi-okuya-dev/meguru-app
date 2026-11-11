@@ -6,7 +6,7 @@
 // - ホバーなどの先読みでは呼ばない（このフックは画面を実際に開いたときだけ使う）
 import type { AccountSummary } from "@meguru/shared";
 import { useEffect, useRef } from "react";
-import { ApiError, api } from "./api-client";
+import { ApiError, api } from "@/lib/api-client";
 
 const pageClientId = crypto.randomUUID();
 let pageOpenSeq = 0;

@@ -5,8 +5,8 @@ import { useQuery, useQueryClient, type QueryClient } from "@tanstack/react-quer
 import { useEffect } from "react";
 import { useNavigate } from "react-router";
 import { toast } from "sonner";
-import { api, setAccountAccessErrorListener, type AccountAccessErrorListener } from "./api-client";
-import { queryKeys } from "./query";
+import { api, setAccountAccessErrorListener, type AccountAccessErrorListener } from "@/lib/api-client";
+import { queryKeys } from "@/lib/query";
 
 /**
  * 表示中のAccountでの役割と権限を読む。

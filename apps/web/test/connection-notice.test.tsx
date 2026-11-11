@@ -10,7 +10,7 @@ vi.mock("@/lib/api-client", async (orig) => {
   return { ...actual, api: { ...actual.api, ...mocks } };
 });
 
-const { ConnectionNotice } = await import("@/components/connect/ConnectionNotice");
+const { ConnectionNotice } = await import("@/apps/threads/components/connect/ConnectionNotice");
 
 function renderIt() {
   render(
