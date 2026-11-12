@@ -12,10 +12,9 @@ import {
 } from "@meguru/shared";
 import { Hono, type MiddlewareHandler } from "hono";
 import type { AppEnv } from "../../../platform";
-import { inArray } from "drizzle-orm";
 import { createDb, withTransaction, type Db } from "../../../kernel/db/client";
-import { users } from "../../../platform";
-import { authorizeAccount, personName } from "../access/access";
+import { peopleNames } from "../../../platform";
+import { authorizeAccount } from "../access/access";
 import { AppError } from "../../../kernel/errors";
 import { parseBody } from "../../../kernel/validate";
 import {
@@ -157,6 +156,5 @@ export function postDraftRoutes(authed: MiddlewareHandler<AppEnv>) {
 async function peopleOf(db: Db, drafts: { createdBy: string | null; editedBy: string | null }[]) {
   const ids = [...new Set(drafts.flatMap((d) => [d.createdBy, d.editedBy]).filter((v): v is string => v !== null))];
   if (ids.length === 0) return {};
-  const rows = await db.select({ id: users.id, displayName: users.displayName, email: users.email }).from(users).where(inArray(users.id, ids));
-  return Object.fromEntries(rows.map((r) => [r.id, personName(r)]));
+  return Object.fromEntries(await peopleNames(db, ids));
 }

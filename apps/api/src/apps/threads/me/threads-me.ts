@@ -2,17 +2,16 @@
 // GET /api/threads/me と GET /api/threads/me/withdrawal-preview。中身は029の前の /api/me・/api/me/withdrawal-preview の
 // Threadsの部分と同じ。PR5 までは、共通の /api/me にも同じ中身を足す（registerMeSection。前の画面のため）。
 import { FEATURES, type Role } from "@meguru/shared";
-import { and, asc, desc, eq, inArray, isNull, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { Hono, type Context, type MiddlewareHandler } from "hono";
 import { connectMethodsOf, testerInvitesEnabledOf } from "../../../kernel/config";
 import { createDb, type Db } from "../../../kernel/db/client";
-import { appUsageOf, featureOnSql, personName, reportUsage, type AppEnv } from "../../../platform";
-import { users } from "../../../platform/schema";
+import { appUsageOf, loadAppEntitlements, peopleNames, reportUsage, type AppEnv } from "../../../platform";
 import { toAccountSummary, type AccountRow } from "../access/access";
 import { accountLimitFor } from "../accounts/account-service";
 import { THREADS_APP } from "../registry";
-import { accounts, memberships, teamMembers, teams } from "../schema";
+import { accounts, memberships, teamMembers, teams, threadsUserStates } from "../schema";
 import { chooseSuccessor, listMyTeams } from "../teams/team-service";
 
 /**
@@ -20,7 +19,7 @@ import { chooseSuccessor, listMyTeams } from "../teams/team-service";
  * last_account_id（開けるAccountなら）→ オーナーのAccountで last_used_at が最新 → created_at が最新
  * → 担当しているAccountの最初 → null の順。
  * @param owned - ownerとして保有するAccount
- * @param lastAccountId - users.last_account_id
+ * @param lastAccountId - 最後に開いたアカウント（threads_user_states.last_account_id）
  * @param helped - 担当しているAccount（並びは /api/me の順）
  * @returns 遷移先の Account の ID。開けるAccountが0件なら null
  */
@@ -47,39 +46,39 @@ export async function buildThreadsMe(c: Context<AppEnv>) {
   const user = c.get("user");
   const db = createDb(c.env.DATABASE_URL);
   const ownerM = alias(memberships, "owner_m");
-  const ownerU = alias(users, "owner_u");
   // 数える前の時刻（利用の値を伝えるときの countedAt。読んだあとの時刻にすると、その間に伝えられた新しい値を古い値で上書きしうる）
   const now = new Date();
+  // Threadsの表だけで、自分が持ち主か担当のアカウントと、そのオーナーの番号を読む（共通の表とJOINしない。specs/meguru/029 tasks.md T036）
   const rows = await db
-    .select({
-      account: accounts,
-      role: memberships.role,
-      ownerDisplayName: ownerU.displayName,
-      ownerEmail: ownerU.email,
-      // 担当しているAccountは、オーナーもチームを使えるときだけ出す（specs/019 FR-009）
-      ownerTeamOn: featureOnSql(ownerU.id, "team"),
-    })
+    .select({ account: accounts, role: memberships.role, ownerId: ownerM.userId })
     .from(accounts)
     .innerJoin(memberships, eq(memberships.accountId, accounts.id))
     .innerJoin(ownerM, and(eq(ownerM.accountId, accounts.id), eq(ownerM.role, "owner")))
-    .innerJoin(ownerU, eq(ownerU.id, ownerM.userId))
-    // オーナーが退会したアカウント（出来事が届いて片づけるまでの間）は出さない（authorizeAccount と同じ。PR #96 のセルフレビュー）
-    .where(and(eq(memberships.userId, user.id), inArray(memberships.role, ["owner", "editor"]), isNull(ownerU.withdrawalRequestedAt)))
+    .where(and(eq(memberships.userId, user.id), inArray(memberships.role, ["owner", "editor"])))
     .orderBy(
       sql`CASE WHEN ${memberships.role} = 'owner' THEN 0 ELSE 1 END`,
       sql`${accounts.lastUsedAt} DESC NULLS LAST`,
       desc(accounts.createdAt),
     );
-  // チームを使えない人には、担当しているAccountとチームを出さない（specs/019 research.md R13）
+  // オーナーの利用権（チームのON/OFF・退会・名前）は、共通の入口の関数でまとめて読む
+  // 自分の利用権（アカウントの数の上限）も同じ問い合わせで読む（accountLimitFor に渡し、重ねて読まない。PR #97 のセルフレビュー）
+  const owners = await loadAppEntitlements(db, user.billing, [user.id, ...rows.map((r) => r.ownerId)], THREADS_APP, now);
+  // チームを使えない人には、担当しているAccountとチームを出さない（specs/019 research.md R13）。担当しているAccountは、
+  // オーナーもチームを使えるときだけ出す（specs/019 FR-009）。オーナーが退会したアカウント（片づけが届くまで）は出さない
   const teamOn = user.features.has("team");
-  const visible = rows.filter((r) => r.role === "owner" || (teamOn && r.ownerTeamOn));
+  const visible = rows.filter((r) => {
+    const o = owners.get(r.ownerId);
+    if (!o || o.withdrawn) return false;
+    return r.role === "owner" || (teamOn && o.features.has("team"));
+  });
   const owned = visible.filter((r) => r.role === "owner").map((r) => r.account);
   const helped = visible.filter((r) => r.role !== "owner").map((r) => r.account);
   // 使える状態・上限は accountLimitFor が1回で読む（同じ問い合わせを重ねない。PR #71 のセルフレビュー）
-  const [myTeams, accountLimit, recorded] = await Promise.all([
+  const [myTeams, accountLimit, recorded, [state]] = await Promise.all([
     teamOn ? listMyTeams(db, user.id) : Promise.resolve([]),
-    accountLimitFor(db, user.id, user.billing, c.env, now),
+    accountLimitFor(db, user.id, user.billing, now, owners.get(user.id) ?? null),
     appUsageOf(db, user.id, THREADS_APP),
+    db.select({ lastAccountId: threadsUserStates.lastAccountId }).from(threadsUserStates).where(eq(threadsUserStates.userId, user.id)),
   ]);
   const { limits } = accountLimit;
   const ownedCount = rows.filter((r) => r.role === "owner").length;
@@ -94,10 +93,10 @@ export async function buildThreadsMe(c: Context<AppEnv>) {
       toAccountSummary(
         r.account,
         r.role as Role,
-        r.role === "owner" ? null : personName({ displayName: r.ownerDisplayName, email: r.ownerEmail }),
+        r.role === "owner" ? null : (owners.get(r.ownerId)?.name ?? ""),
       ),
     ),
-    landingAccountId: resolveLandingAccountId(owned, user.lastAccountId, helped),
+    landingAccountId: resolveLandingAccountId(owned, state?.lastAccountId ?? null, helped),
     // 上限は使える状態と運営者が決める上限の小さい方（null は上限なし。specs/024 FR-018）。未接続のアカウントも数える
     accountLimit: { max: accountLimit.max, used: owned.length },
     // Threads連携の公開範囲。Web はアカウント追加画面の案内の有無に使う（specs/002 FR-028）
@@ -140,13 +139,7 @@ export async function threadsWithdrawalPreview(db: Db, userId: string) {
     }
     // 引き継ぎ先は、アカウントの削除（011 FR-046）と同じ選び方
     const next = await chooseSuccessor(db, t.id, userId);
-    const nextName = next
-      ? await db
-          .select({ displayName: users.displayName, email: users.email })
-          .from(users)
-          .where(eq(users.id, next.userId))
-          .then((r) => (r[0] ? personName(r[0]) : null))
-      : null;
+    const nextName = next ? ((await peopleNames(db, [next.userId])).get(next.userId) ?? null) : null;
     teamRows.push({
       id: t.id,
       name: t.name,

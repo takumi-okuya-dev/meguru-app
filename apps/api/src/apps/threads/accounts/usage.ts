@@ -5,8 +5,7 @@ import { and, eq, inArray, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { createDb, type Db, type TxDb } from "../../../kernel/db/client";
 import { logger } from "../../../kernel/logger";
-import { featureOnSql, reportUsage, usersWithUsage } from "../../../platform";
-import { users } from "../../../platform/schema";
+import { loadAppFeatures, reportUsage, usersWithUsage } from "../../../platform";
 import { THREADS_APP } from "../registry";
 import { memberships, teamMembers } from "../schema";
 
@@ -21,22 +20,24 @@ export type ThreadsUsage = { quantity: number; using: boolean };
  */
 export async function countThreadsUsage(db: Db | TxDb, userId: string): Promise<ThreadsUsage> {
   const ownerM = alias(memberships, "owner_m");
-  const [[owned], [helped], [team], [me]] = await Promise.all([
+  const [[owned], helpedOwners, [team]] = await Promise.all([
     db
       .select({ n: sql<number>`count(*)::int` })
       .from(memberships)
       .where(and(eq(memberships.userId, userId), eq(memberships.role, "owner"))),
     db
-      .select({ n: sql<number>`count(*)::int` })
+      .select({ ownerUserId: ownerM.userId })
       .from(memberships)
       .innerJoin(ownerM, and(eq(ownerM.accountId, memberships.accountId), eq(ownerM.role, "owner")))
-      .where(and(eq(memberships.userId, userId), inArray(memberships.role, ["editor"]), featureOnSql(ownerM.userId, "team"))),
+      .where(and(eq(memberships.userId, userId), inArray(memberships.role, ["editor"]))),
     db.select({ n: sql<number>`count(*)::int` }).from(teamMembers).where(eq(teamMembers.userId, userId)),
-    db.select({ teamOn: featureOnSql(users.id, "team") }).from(users).where(eq(users.id, userId)),
   ]);
+  // チームのON/OFF（本人と、担当しているアカウントのオーナー）は、共通の入口の関数でまとめて読む（specs/meguru/029 tasks.md T036）
+  const features = await loadAppFeatures(db, [userId, ...helpedOwners.map((r) => r.ownerUserId)], THREADS_APP);
   const quantity = Number(owned?.n ?? 0);
-  const teamOn = me?.teamOn ?? false;
-  const using = quantity > 0 || (teamOn && (Number(helped?.n ?? 0) > 0 || Number(team?.n ?? 0) > 0));
+  const teamOn = features.get(userId)?.has("team") ?? false;
+  const helped = helpedOwners.some((r) => features.get(r.ownerUserId)?.has("team"));
+  const using = quantity > 0 || (teamOn && (helped || Number(team?.n ?? 0) > 0));
   return { quantity, using };
 }
 

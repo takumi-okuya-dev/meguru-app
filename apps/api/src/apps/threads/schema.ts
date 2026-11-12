@@ -33,6 +33,9 @@ import {
   DAILY_POST_LIMIT_MAX,
   DECLINE_REASON_MAX,
   TESTER_APPLICATION_STATUSES,
+  TESTER_SLOT_CAPACITY_DEFAULT,
+  TESTER_SLOT_CAPACITY_MAX,
+  TESTER_SLOT_CAPACITY_MIN,
   TESTER_REMOVAL_REASONS,
   type AnalysisTheme,
   type PromotionEvent,
@@ -1213,3 +1216,38 @@ export const threadsReceivedEvents = pgTable("threads_received_events", {
   eventId: uuid("event_id").primaryKey(),
   receivedAt: timestamp("received_at", { withTimezone: true, precision: 6 }).notNull().defaultNow(),
 });
+
+// ---- 利用者ごとの状態（specs/meguru/029-threads-pattern1 tasks.md T071、data-model.md 1-1） ----
+
+/**
+ * 利用者ごとの「最後に開いたアカウント」（以前は共通の users の5列）。共通の利用者の番号は値として持つ（外部キーなし）。
+ * 退会の出来事で、Threadsが自分で消す。PR3 でスキーマ threads の user_states へ移す。
+ */
+export const threadsUserStates = pgTable("threads_user_states", {
+  userId: uuid("user_id").primaryKey(),
+  lastAccountId: uuid("last_account_id").references((): AnyPgColumn => accounts.id, { onDelete: "set null" }),
+  lastAccountDeletedAt: timestamp("last_account_deleted_at", { withTimezone: true }),
+  lastAccountClientId: text("last_account_client_id"),
+  lastAccountOpenSeq: bigint("last_account_open_seq", { mode: "number" }),
+  lastAccountOpenReceivedAt: timestamp("last_account_open_received_at", { withTimezone: true, precision: 6 }),
+});
+
+// ---- Threadsの運営の設定（specs/meguru/029-threads-pattern1 tasks.md T024、data-model.md 3） ----
+
+/** Threadsの運営の設定（1行だけ）。以前は共通の operator_settings.tester_slot_capacity。PR3 でスキーマ threads の settings へ移す。 */
+export const threadsSettings = pgTable(
+  "threads_settings",
+  {
+    id: smallint("id").primaryKey(),
+    /** テスター招待の枠の数（specs/024） */
+    testerSlotCapacity: integer("tester_slot_capacity").notNull().default(TESTER_SLOT_CAPACITY_DEFAULT),
+    updatedAt: timestamp("updated_at", { withTimezone: true, precision: 6 }).notNull().defaultNow(),
+  },
+  (t) => [
+    check("threads_settings_singleton", sql`${t.id} = 1`),
+    check(
+      "threads_settings_tester_slot_capacity_range",
+      sql`${t.testerSlotCapacity} BETWEEN ${sql.raw(String(TESTER_SLOT_CAPACITY_MIN))} AND ${sql.raw(String(TESTER_SLOT_CAPACITY_MAX))}`,
+    ),
+  ],
+);

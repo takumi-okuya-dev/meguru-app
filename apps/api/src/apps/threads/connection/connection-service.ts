@@ -1,9 +1,10 @@
 // Threadsとの接続の確定と確かめ（specs/001・010・012・024）。027で account-service から切り出した（接続はThreadsのもの。docs/module-map.md 2-2）。
+import { lockThreadsMember } from "../access/locks";
 import { and, eq, gte, inArray, isNull, ne, or, sql } from "drizzle-orm";
 import { normalizeUsername } from "@meguru/shared";
 import type { Env } from "../../../kernel/env";
 import { createDb, withTransaction, type TxDb } from "../../../kernel/db/client";
-import { lockThreadsUser, lockThreadsUsername, lockUserRow } from "../../../kernel/db/locks";
+import { lockThreadsUser, lockThreadsUsername } from "../../../kernel/db/locks";
 import { postDrafts, postingSchedules, publishAttempts, threadsConnections, threadsDeletionRequests, threadsRevocations } from "../schema";
 import { accounts, memberships } from "../schema";
 import { authorizeAccount } from "../access/access";
@@ -97,10 +98,10 @@ export async function completeConnection(
   const state = input.request;
 
   return withTransaction(env.DATABASE_URL, async (tx) => {
-    // 1・2. ロックの順序は「Threadsユーザー → ユーザー名（specs/010 research.md R6）→ users の行ロック」
+    // 1・2. ロックの順序は「Threadsユーザー → ユーザー名（specs/010 research.md R6）→ 利用者のロック」
     await lockThreadsUser(tx, input.threadsUserId);
     await lockThreadsUsername(tx, normalizeUsername(input.profile.username));
-    await lockUserRow(tx, state.userId);
+    await lockThreadsMember(tx, state.userId);
 
     // 3. 認可の後に発行された取り消しがあれば拒否（callback の最中の連携解除）
     const [revoked] = await tx

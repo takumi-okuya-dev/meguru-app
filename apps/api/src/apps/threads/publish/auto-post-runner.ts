@@ -32,7 +32,8 @@ import {
 } from "drizzle-orm";
 import { createDb, type Db } from "../../../kernel/db/client";
 import { postDrafts, postingSchedules, publishAttempts } from "../schema";
-import { effectiveSlotMinutes, loadAppEntitlements } from "../../../platform";
+import { loadAppEntitlements } from "../../../platform";
+import { effectiveSlotMinutes } from "./slot-minutes";
 import { THREADS_APP } from "../registry";
 import { accounts, memberships } from "../schema";
 import type { Env } from "../../../kernel/env";

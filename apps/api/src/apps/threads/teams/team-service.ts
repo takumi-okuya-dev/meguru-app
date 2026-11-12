@@ -8,13 +8,13 @@ import type { Env } from "../../../kernel/env";
 import { billingModeOf, type BillingMode } from "../../../kernel/config";
 import type { Db, TxDb } from "../../../kernel/db/client";
 import { accounts, memberships, teamAccounts, teamMembers, teams } from "../schema";
-import { users } from "../../../platform/schema";
+import { peopleNames } from "../../../platform";
 import { lockAdminTeams } from "../../../kernel/db/locks";
+import { lockThreadsMember } from "../access/locks";
 import { AppError } from "../../../kernel/errors";
 import { insertActivity } from "../activity/activity-log";
 import {
   authorizeAssignment,
-  personName,
   statusScopeOf,
   teamNotFound,
   type AccountAccess,
@@ -65,8 +65,7 @@ async function recordTeam(
  * @returns 名前（見つからなければ空）
  */
 async function nameOf(db: Db | TxDb, userId: string): Promise<string> {
-  const [u] = await db.select({ displayName: users.displayName, email: users.email }).from(users).where(eq(users.id, userId));
-  return u ? personName(u) : "";
+  return (await peopleNames(db, [userId])).get(userId) ?? "";
 }
 
 /**
@@ -123,7 +122,7 @@ export async function listMyTeams(db: Db | TxDb, userId: string) {
  * @throws AppError TEAM_LIMIT_REACHED・TEAM_NEEDS_ACCOUNT・ACCOUNT_NOT_FOUND・ACCOUNT_IN_OTHER_TEAM
  */
 export async function createTeam(env: Env, tx: TxDb, user: { id: string }, input: { name: string; accountIds: string[] }) {
-  await tx.select({ id: users.id }).from(users).where(eq(users.id, user.id)).for("update");
+  await lockThreadsMember(tx, user.id);
   await assertOwnFreeAccounts(tx, user.id, input.accountIds, billingModeOf(env));
   // 管理者のチームの数のロックは、行ロックの後に取る（db/locks.ts の lockAdminTeams）
   await assertCanAdminMore(tx, user.id);
@@ -186,13 +185,12 @@ export async function getTeamDetail(db: Db | TxDb, teamAccess: TeamAccess) {
       role: teamMembers.role,
       joinedAt: teamMembers.joinedAt,
       dismissedAt: teamMembers.joinedNoticeDismissedAt,
-      displayName: users.displayName,
-      email: users.email,
     })
     .from(teamMembers)
-    .innerJoin(users, eq(users.id, teamMembers.userId))
     .where(eq(teamMembers.teamId, teamId))
     .orderBy(asc(teamMembers.joinedAt), asc(teamMembers.userId));
+  // 名前は共通の入口の関数で読む（共通の表とJOINしない。specs/meguru/029 tasks.md T036）
+  const names = await peopleNames(db, members.map((m) => m.userId));
   const ownerM = alias(memberships, "owner_m");
   const accountRows = await db
     .select({ account: accounts, shared: teamAccounts.shared, ownerUserId: ownerM.userId })
@@ -218,10 +216,10 @@ export async function getTeamDetail(db: Db | TxDb, teamAccess: TeamAccess) {
     id: teamId,
     name: teamAccess.team.name,
     myRole: teamAccess.member.role,
-    admin: { userId: admin?.userId ?? teamAccess.team.adminUserId, name: admin ? personName(admin) : "" },
+    admin: { userId: admin?.userId ?? teamAccess.team.adminUserId, name: admin ? (names.get(admin.userId) ?? "") : "" },
     members: members.map((m) => ({
       userId: m.userId,
-      name: personName(m),
+      name: names.get(m.userId) ?? "",
       role: m.role,
       isMe: m.userId === me,
       joinedAt: m.joinedAt.toISOString(),
@@ -331,13 +329,12 @@ export async function rotateTeamInvite(env: Env, tx: TxDb, teamAccess: TeamAcces
  */
 async function memberOf(db: Db | TxDb, teamId: string, userId: string) {
   const [m] = await db
-    .select({ role: teamMembers.role, displayName: users.displayName, email: users.email, joinedAt: teamMembers.joinedAt })
+    .select({ role: teamMembers.role, joinedAt: teamMembers.joinedAt })
     .from(teamMembers)
-    .innerJoin(users, eq(users.id, teamMembers.userId))
     .where(and(eq(teamMembers.teamId, teamId), eq(teamMembers.userId, userId)))
     .limit(1);
   if (!m) throw teamNotFound();
-  return { id: userId, role: m.role, name: personName(m), joinedAt: m.joinedAt };
+  return { id: userId, role: m.role, name: await nameOf(db, userId), joinedAt: m.joinedAt };
 }
 
 /**
@@ -405,19 +402,16 @@ export async function changeRole(tx: TxDb, teamAccess: TeamAccess, userId: strin
 export async function getAssignments(db: Db | TxDb, teamAccess: TeamAccess) {
   const teamId = teamAccess.team.id;
   const ownerM = alias(memberships, "owner_m");
-  const ownerU = alias(users, "owner_u");
   const cols = await db
-    .select({ account: accounts, ownerUserId: ownerU.id, ownerDisplayName: ownerU.displayName, ownerEmail: ownerU.email })
+    .select({ account: accounts, ownerUserId: ownerM.userId })
     .from(teamAccounts)
     .innerJoin(accounts, eq(accounts.id, teamAccounts.accountId))
     .innerJoin(ownerM, and(eq(ownerM.accountId, accounts.id), eq(ownerM.role, "owner")))
-    .innerJoin(ownerU, eq(ownerU.id, ownerM.userId))
     .where(eq(teamAccounts.teamId, teamId))
     .orderBy(asc(teamAccounts.addedAt), asc(accounts.id));
   const people = await db
-    .select({ userId: teamMembers.userId, role: teamMembers.role, displayName: users.displayName, email: users.email })
+    .select({ userId: teamMembers.userId, role: teamMembers.role })
     .from(teamMembers)
-    .innerJoin(users, eq(users.id, teamMembers.userId))
     .where(and(eq(teamMembers.teamId, teamId), ne(teamMembers.role, "member")))
     .orderBy(sql`CASE WHEN ${teamMembers.role} = 'admin' THEN 0 ELSE 1 END`, asc(teamMembers.joinedAt));
   const rows = await db
@@ -426,6 +420,7 @@ export async function getAssignments(db: Db | TxDb, teamAccess: TeamAccess) {
     .where(and(eq(memberships.teamId, teamId), eq(memberships.role, "editor")));
   const byPerson = new Map<string, string[]>();
   for (const r of rows) byPerson.set(r.userId, [...(byPerson.get(r.userId) ?? []), r.accountId]);
+  const names = await peopleNames(db, [...cols.map((c) => c.ownerUserId), ...people.map((p) => p.userId)]);
   return {
     accounts: cols.map((c) => ({
       id: c.account.id,
@@ -434,11 +429,11 @@ export async function getAssignments(db: Db | TxDb, teamAccess: TeamAccess) {
       displayName: c.account.displayName,
       profilePictureUrl: c.account.profilePictureUrl,
       ownerUserId: c.ownerUserId,
-      ownerName: personName({ displayName: c.ownerDisplayName, email: c.ownerEmail }),
+      ownerName: names.get(c.ownerUserId) ?? "",
     })),
     people: people.map((p) => ({
       userId: p.userId,
-      name: personName(p),
+      name: names.get(p.userId) ?? "",
       role: p.role,
       isMe: p.userId === teamAccess.member.id,
       accountIds: byPerson.get(p.userId) ?? [],
@@ -816,29 +811,27 @@ export async function getAccountTeam(db: Db | TxDb, access: AccountAccess) {
   let team: { id: string; name: string; admin: { userId: string; name: string }; shared: boolean } | null = null;
   let assignees: { userId: string; name: string; role: TeamRole }[] = [];
   if (access.team) {
-    const adminU = alias(users, "admin_u");
     const [row] = await db
-      .select({ adminUserId: adminU.id, displayName: adminU.displayName, email: adminU.email, shared: teamAccounts.shared })
+      .select({ adminUserId: teams.adminUserId, shared: teamAccounts.shared })
       .from(teamAccounts)
       .innerJoin(teams, eq(teams.id, teamAccounts.teamId))
-      .innerJoin(adminU, eq(adminU.id, teams.adminUserId))
       .where(eq(teamAccounts.accountId, accountId))
       .limit(1);
     if (row) {
       team = {
         id: access.team.id,
         name: access.team.name,
-        admin: { userId: row.adminUserId, name: personName(row) },
+        admin: { userId: row.adminUserId, name: await nameOf(db, row.adminUserId) },
         shared: row.shared,
       };
       const rows = await db
-        .select({ userId: users.id, displayName: users.displayName, email: users.email, role: teamMembers.role })
+        .select({ userId: memberships.userId, role: teamMembers.role })
         .from(memberships)
-        .innerJoin(users, eq(users.id, memberships.userId))
         .innerJoin(teamMembers, and(eq(teamMembers.teamId, access.team.id), eq(teamMembers.userId, memberships.userId)))
         .where(and(eq(memberships.accountId, accountId), eq(memberships.role, "editor"), eq(memberships.teamId, access.team.id)))
         .orderBy(asc(memberships.createdAt));
-      assignees = rows.map((r) => ({ userId: r.userId, name: personName(r), role: r.role }));
+      const names = await peopleNames(db, rows.map((r) => r.userId));
+      assignees = rows.map((r) => ({ userId: r.userId, name: names.get(r.userId) ?? "", role: r.role }));
     }
   }
   return {

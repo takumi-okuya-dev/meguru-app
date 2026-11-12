@@ -126,7 +126,7 @@ export async function attemptDeletion(
 
       await hooks.beforeDelete?.();
 
-      // 4. Accountを削除する。所有者の users 行をロックして last_account_deleted_at を記録する（research.md R13）。
+      // 4. Accountを削除する。持ち主のロック（lockThreadsMember）を取り、最後に消した時刻を記録する（research.md R13）。
       owners = await deleteAccountsOfThreadsUser(tx, threadsUserId, now);
 
       // 5. 完了を記録し、平文のIDを消す（hmac は完了の直前に始めた認可フローの照合に使うので残す）

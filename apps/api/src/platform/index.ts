@@ -26,4 +26,4 @@ export * from "./entitlement/entitlement";
 export { reportUsage, billingQuantityOf, usingAppsOf, appUsageOf, usersWithUsage, type AppUsageReport } from "./usage/usage";
 export { registerMeSection, registerWithdrawalPreviewSection, type MeSection } from "./identity/me-sections";
 export { registerAppFeatures, registerAppLimits, appFeatures, appLimits, registeredApps, type AppFeatureDef, type AppLimitDef } from "./registry/registry";
-export { currentUser, peopleNames, personName } from "./identity/people";
+export { currentUser, peopleNames, peopleProfiles, personName } from "./identity/people";

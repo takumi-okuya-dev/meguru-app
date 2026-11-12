@@ -69,6 +69,9 @@ description: "Task list for feature meguru/029 Threads pattern ①"
 > - **PR2b をさらに2つに分けた**（2026-11-12、PR2b の途中で決めた。変える範囲が広く、レビューと戻しを小さくするため）。
 >   - PR2b＝出来事への切り替えと利用権：T017・T019・T028・T030・T031・T032・T033（マイグレーション 0028 は `threads_received_events` だけ）
 >   - PR2c＝共通の表を読まない形にする：T021・T024 のうち `threads_settings`・T027・T036・T069・T070・T071・T037
+  - **PR2c もさらに2つに分けた**（2026-11-12、PR2c の途中で決めた）。
+    - PR2c＝Threadsの側：T024 のうち `threads_settings`・T036 のうちThreadsのコード・T071（マイグレーション 0029）。Threads の利用者ごとの直列化は、共通の `users` の行ロックをやめて Threads のアドバイザリーロック（`lockThreadsMember`）にした。名前は `peopleNames`・`peopleProfiles`、チームのON/OFFは新しい入口の関数 `loadAppFeatures` で読む。`effectiveSlotMinutes` は Threads（`publish/slot-minutes.ts`）へ移した。`tester_slot_capacity` は、Threads が共通の表を書けないので両方には書かず、新しい表だけに書く（古い列は PR5 で消す。前の版が読む値は、デプロイの間だけ古いままになる。テスト版だけの例外）。同じく、マイグレーション 0029 を当ててから新しい版に切り替わるまでの間に、前の版が古い列に書いた「最後に開いたアカウント」とテスター枠は、新しい表に入らない（テスト版だけの例外として受け入れる）。Threads のロックは、共通の上限・機能のON/OFFの変更とは直列にならない（モジュールをまたぐトランザクションを使わない決まりの結果。同じ瞬間の変更が一方の判定に間に合わないことがあるだけで、次の操作で正しくなる）。退会の片づけも Threads のロックを取り、最後に開いたアカウントの記録はロックの中で、まだそのアカウントに関わっているときだけ書く
+    - PR2d＝共通の側：T021・T027・T036 のうち共通の入口から表と SQL の部品を出さない・T069・T070・T037
 >   - 退会：共通は退会を記録して `user.withdrawn` を書き、すぐ届ける。`users` の行は、すべての届け先で片づけが済んだあとで消す（`deleteUserRowIfCleaned`。届かなければ5分ごとの届けと日次の続きでやり直す）。Threads の片づけは、担当とチームの人の行も自分で外す（PR3 で外部キーを外すため）
 >   - `platform/hooks.ts` は、呼び出しが0になったので `runHook` を消し、`registerModule` だけを残した。`apps/threads/threads-hooks.ts` は `register.ts` に名前を変え、`registerConsumer` で出来事の受け取りを登録する
 > - 見つかったこと：`users`（共通）に、Threadsの「最後に開いたアカウント」の列が5つある（`last_account_id`・`last_account_deleted_at`・`last_account_client_id`・`last_account_open_seq`・`last_account_open_received_at`）。PR2a では今のまま（`users.last_account_id`から`accounts`への外部キーは境界の例外）にし、PR2b の T071 で Threads 専用の表へ移す。
@@ -94,7 +97,7 @@ description: "Task list for feature meguru/029 Threads pattern ①"
 
 - [X] T022 [US1] 招待のトークンの部品（`newInviteToken`・`sealInviteToken`・`openInviteToken`・`inviteUrl`）を、`apps/api/src/platform/teams/invite-service.ts`から`apps/api/src/kernel/invite-token.ts`へ移し、テストのグループと紹介の読みこみ先を直す（research.md R1）。
 - [X] T023 [US1] `git mv`で、`apps/api/src/platform/accounts/`→`apps/api/src/apps/threads/accounts/`、`platform/access/`→`apps/threads/access/`、`platform/teams/`→`apps/threads/teams/`、`platform/activity/`→`apps/threads/activity/`。読みこみ先を直す（共通の部品は`../../platform`の入口から、Threadsの中は相対で）。表の定義（`accounts`・`memberships`・`teams`・`teamMembers`・`teamAccounts`・`activityLogs`）を、`platform/schema.ts`から`apps/threads/schema.ts`へ移す（まだ`public`のまま）。
-- [ ] T024 [US1] （PR2aで、末尾の「`app_usage`と上限の表の写し直し」をマイグレーション 0027 として済ませた。`threads_settings`へ移す部分はPR2b）`operator_settings.tester_slot_capacity`を、Threadsの`threads_settings`（まだ`public`。data-model.md 3）へ移すマイグレーションを作る（表を作り、値を写す。古い列はPR5まで残し、両方に書く）。`apps/threads/tester-invites/`の読み書きを新しい表に替える。
+- [X] T024 [US1] （PR2aで、末尾の「`app_usage`と上限の表の写し直し」をマイグレーション 0027 として済ませた。`threads_settings`へ移す部分は PR2c のマイグレーション 0029。古い列には書かない（上の PR2c の注））`operator_settings.tester_slot_capacity`を、Threadsの`threads_settings`（まだ`public`。data-model.md 3）へ移すマイグレーションを作る（表を作り、値を写す。古い列はPR5まで残し、両方に書く）。`apps/threads/tester-invites/`の読み書きを新しい表に替える。
   - 同じマイグレーションの末尾で、**`app_usage`を`memberships`とチームから数え直して写し直す**（PR1とPR2の間に作った・消したアカウントの分のずれを消す。料金の数を`app_usage`に切り替えるT025の前提。/speckit-analyze G1）。`user_app_limits`・`app_limit_defaults`も、古い列から写し直す（PR1のデプロイの間に前の版が古い列だけに書いた分。U4）。
   - マイグレーションのテスト（`apps/api/test/migration/`）：PR1のあとに`memberships`を足し・消しても、当てたあとに`app_usage`が今の数になる。
 
@@ -116,7 +119,7 @@ description: "Task list for feature meguru/029 Threads pattern ①"
 - [X] T035 [US3] `apps/api/src/apps/threads/me/`を作る：`GET /api/threads/me`・`GET /api/threads/me/withdrawal-preview`。`apps/api/src/apps/threads/index.ts`から出し、`app.ts`でつなぐ。T020を通す。`pnpm --filter api routes:snapshot`で一覧を書き直す（2本増える）。
 - [ ] T069 [US2] 運営の画面のための登録の一覧を返すAPI `GET /api/operator/app-registry`（共通。運営者だけ）を足す：登録されたアプリごとに、機能（名前・表示名・説明）と上限（名前・表示名・範囲）を返す。`registerAppFeatures`・`registerAppLimits`に表示名・説明を渡す形にする（contracts/platform-entry.md 5・api-routes.md 1）。テスト：`apps/api/test/integration/operator-app-registry.test.ts`（運営者でなければ403、今の3つの機能と2つの上限が今の表示名で返る）。
 - [ ] T070 [US2] 外枠の運営の画面（`apps/web/src/shell/settings/features.tsx`・`limits.tsx`）を、`FEATURE_LABELS`・「アカウントの数」・`ACCOUNT_LIMIT_MAX`などのThreadsの名前を直接書かず、T069のAPIの一覧で出す形にする。見た目と文言は今のまま（spec FR-012・FR-021、/speckit-analyze G2）。画面のテストを直す（期待する結果は変えない）。T021で`FEATURES`・`FEATURE_LABELS`をThreadsへ移すのは、このタスクのあと。
-- [ ] T071 [US1] `users`の「最後に開いたアカウント」の5列（`last_account_id`ほか）を、Threads専用の表（`threads_user_states`。まだ`public`。PR3でスキーマ`threads`へ）へ写すマイグレーションを作り、Threadsの読み書き（`openAccount`・`deleteAccount`・`buildThreadsMe`の`landingAccountId`）を新しい表に替える。古い列はPR5で消す（data-model.md 1-1）。
+- [X] T071 [US1] `users`の「最後に開いたアカウント」の5列（`last_account_id`ほか）を、Threads専用の表（`threads_user_states`。まだ`public`。PR3でスキーマ`threads`へ）へ写すマイグレーションを作り、Threadsの読み書き（`openAccount`・`deleteAccount`・`buildThreadsMe`の`landingAccountId`）を新しい表に替える。古い列はPR5で消す（data-model.md 1-1）。
 - [ ] T036 [US1] Threadsのコードの`platform/schema`の読みこみ（`users`・`subscriptions`・`memberships`・`operatorSettings`）が0か所になったことを確かめる（`grep`）。共通の`index.ts`から、表の定義とSQLの部品（`featureOnSql`など）を出すのをやめる。
 - [ ] T037 [US4] PR2の確かめ：`pnpm lint`・`pnpm typecheck`・`pnpm test`・`pnpm e2e`。知らせの呼び出し（`runHook`）が0か所（quickstart.md 1）。
 

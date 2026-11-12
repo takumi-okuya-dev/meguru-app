@@ -1,7 +1,7 @@
 // US4：Accountの削除（FR-022、research.md R13）
 import { eq } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
-import { accounts, memberships, threadsConnections, users } from "../../src/db/schema";
+import { accounts, memberships, threadsConnections, threadsUserStates, users } from "../../src/db/schema";
 import { authorizeAndCallback, call, connectNew, createAccountVia, db, fake, makeApp, redirectTarget, resetDb } from "../helpers/app";
 
 const app = makeApp();
@@ -42,9 +42,11 @@ describe("DELETE /api/accounts/:id", () => {
     expect(await db().select().from(accounts)).toHaveLength(0);
     expect(await db().select().from(memberships)).toHaveLength(0);
     expect(await db().select().from(threadsConnections)).toHaveLength(0);
-    const [u] = await db().select().from(users).where(eq(users.clerkUserId, "u1"));
-    expect(u!.lastAccountId).toBeNull();
-    expect(u!.lastAccountDeletedAt).not.toBeNull();
+    // 最後に開いたアカウントは Threads の threads_user_states に記録する（specs/meguru/029 tasks.md T071）
+    const [u] = await db().select({ id: users.id }).from(users).where(eq(users.clerkUserId, "u1"));
+    const [state] = await db().select().from(threadsUserStates).where(eq(threadsUserStates.userId, u!.id));
+    expect(state!.lastAccountId).toBeNull();
+    expect(state!.lastAccountDeletedAt).not.toBeNull();
   });
 
   it("認可の開始後にそのアカウントを削除すると、その callback は何も作らず /?error=ACCOUNT_NOT_FOUND（specs/012）", async () => {

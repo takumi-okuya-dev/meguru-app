@@ -17,7 +17,7 @@ import { and, count, eq, gte, inArray, lt, sql } from "drizzle-orm";
 import { withTransaction, type TxDb } from "../../../kernel/db/client";
 import { lockAccountDrafts } from "../../../kernel/db/locks";
 import { postDrafts, postingSchedules, publishAttempts } from "../schema";
-import { effectiveSlotMinutes } from "../../../platform";
+import { effectiveSlotMinutes } from "./slot-minutes";
 import { accounts } from "../schema";
 import type { Env } from "../../../kernel/env";
 import { billingModeOf } from "../../../kernel/config";

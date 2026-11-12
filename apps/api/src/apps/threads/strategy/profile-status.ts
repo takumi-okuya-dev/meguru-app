@@ -5,7 +5,8 @@ import { sql } from "drizzle-orm";
 import type { Db } from "../../../kernel/db/client";
 import type { BillingMode } from "../../../kernel/config";
 import type { AccountAccess } from "../access/access";
-import { loadEntitlement } from "../../../platform";
+import { loadAppEntitlement } from "../../../platform";
+import { THREADS_APP } from "../registry";
 import { getStrategy } from "./strategy-service";
 
 /**
@@ -31,7 +32,7 @@ export async function getProfileStatus(db: Db, access: AccountAccess, mode: Bill
         (SELECT count(*)::int FROM reference_posts WHERE account_id = ${account.id}) AS posts,
         (SELECT count(*)::int FROM research_keywords WHERE account_id = ${account.id}) AS keywords
     `),
-    loadEntitlement(db, access.owner.id, mode, now),
+    loadAppEntitlement(db, mode, access.owner.id, THREADS_APP, now).then((e) => e?.billing ?? null),
   ]);
   const inTrial = owner?.state === "trial" || owner?.state === "subscribed_trial";
   const row = counts.rows[0]!;

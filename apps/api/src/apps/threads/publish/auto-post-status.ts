@@ -11,7 +11,7 @@ import {
 import { and, count, desc, eq, gt, gte, isNotNull, lt } from "drizzle-orm";
 import type { Db } from "../../../kernel/db/client";
 import { postDrafts, publishAttempts } from "../schema";
-import { effectiveSlotMinutes } from "../../../platform";
+import { effectiveSlotMinutes } from "./slot-minutes";
 import type { AccountRow } from "../access/access";
 import { countDrafts, listQueueRows, listPublishFailedRows } from "../drafts/draft-service";
 import {

@@ -3,10 +3,12 @@
 // Threadsのトランザクションの中で呼ぶ（events/received-events.ts）。共通は、この片づけが届いたあとで users の行を消す。
 import { and, asc, eq, inArray, ne } from "drizzle-orm";
 import type { TxDb } from "../../../kernel/db/client";
+import { lockThreadsUser } from "../../../kernel/db/locks";
 import { WITHDRAWN_ACTOR_NAME } from "../../../platform";
-import { accounts, activityLogs, memberships, teamMembers, teams, threadsDeletionRequests } from "../schema";
+import { accounts, activityLogs, memberships, teamMembers, teams, threadsDeletionRequests, threadsUserStates } from "../schema";
 import { beforeAccountDeleted, chooseSuccessor } from "../teams/team-service";
 import { purgeForWithdrawal } from "../tester-invites/tester-application-service";
+import { lockThreadsMember } from "../access/locks";
 
 /**
  * 退会する人のThreadsのデータを片づける。持ち主のアカウントを消し（アカウントの削除と同じ。001 FR-022）、チームは抜ける
@@ -16,6 +18,16 @@ import { purgeForWithdrawal } from "../tester-invites/tester-application-service
  * @param now - 今の時刻
  */
 export async function cleanupForWithdrawal(tx: TxDb, userId: string, now: Date = new Date()): Promise<void> {
+  // ロックは、ほかの処理と同じ順番「Threadsユーザー → 利用者」で取る（specs/010 research.md R6）。Metaのデータ削除は
+  // Threadsユーザーのロック → 削除の求めの行 → 利用者のロックの順なので、先に利用者のロックを取ると互いに待ち合う（PR #97 のCodexレビュー）
+  const threadsUsers = await tx
+    .selectDistinct({ threadsUserId: accounts.threadsUserId })
+    .from(accounts)
+    .innerJoin(memberships, and(eq(memberships.accountId, accounts.id), eq(memberships.role, "owner")))
+    .where(eq(memberships.userId, userId));
+  for (const t of threadsUsers.flatMap((r) => (r.threadsUserId ? [r.threadsUserId] : [])).sort()) await lockThreadsUser(tx, t);
+  // その人のアカウントの作成・削除・接続の確定・最後に開いたアカウントの記録と直列にする（PR #97 のセルフレビュー）
+  await lockThreadsMember(tx, userId);
   // 招待の申し込みを片づける（枠を使っていない行は消し、使っている行はユーザー名だけを残す。specs/024 research.md R15）
   await purgeForWithdrawal(tx, userId);
   const owned = await tx
@@ -52,6 +64,8 @@ export async function cleanupForWithdrawal(tx: TxDb, userId: string, now: Date =
   // ほかの人のアカウントの担当と、チームの人から外す（今は users の行を消すと外部キーで消えるが、PR3 で外部キーを外すので自分で外す）
   await tx.delete(memberships).where(and(eq(memberships.userId, userId), ne(memberships.role, "owner")));
   await tx.delete(teamMembers).where(eq(teamMembers.userId, userId));
+  // 利用者ごとの状態（最後に開いたアカウント。specs/meguru/029 tasks.md T071）
+  await tx.delete(threadsUserStates).where(eq(threadsUserStates.userId, userId));
   // ほかの人のアカウントの操作の記録は残し、名前を「退会した人」にする（FR-053）
   await tx.update(activityLogs).set({ actorName: WITHDRAWN_ACTOR_NAME }).where(eq(activityLogs.actorUserId, userId));
 }

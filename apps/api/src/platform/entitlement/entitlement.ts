@@ -122,3 +122,27 @@ export async function loadAppEntitlement(
 ): Promise<AppEntitlement | null> {
   return (await loadAppEntitlements(db, mode, [userId], app, now)).get(userId) ?? null;
 }
+
+/**
+ * 利用者の番号をまとめて、アプリのONの機能だけを読む（契約の判定が要らないところ。問い合わせは1回）。
+ * 機能のOFF（人の設定と、閉じていないグループの設定）は loadAppEntitlements の features と同じ決め方。
+ * @param db - データベース（トランザクションの中でもよい）
+ * @param userIds - 利用者の番号（重複は1つにまとめる）
+ * @param app - アプリの番号
+ * @returns 利用者の番号ごとのONの機能（見つからない番号は入らない）
+ */
+export async function loadAppFeatures(db: Db | TxDb, userIds: readonly string[], app: string): Promise<Map<string, ReadonlySet<string>>> {
+  const ids = [...new Set(userIds)];
+  const out = new Map<string, ReadonlySet<string>>();
+  if (ids.length === 0) return out;
+  const rows = await db
+    .select({ id: users.id, disabled: disabledAppFeaturesSql(users.id, app) })
+    .from(users)
+    .where(inArray(users.id, ids));
+  const featureKeys = appFeatures(app).map((f) => f.key);
+  for (const r of rows) {
+    const off = new Set(r.disabled ?? []);
+    out.set(r.id, new Set(featureKeys.filter((k) => !off.has(k))));
+  }
+  return out;
+}

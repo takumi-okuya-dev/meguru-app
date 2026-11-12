@@ -3,16 +3,14 @@
 // team_members・team_accounts は、このファイルと team-service.ts 以外から書かない（tasks.md Notes）。
 import { TEAM_MEMBER_LIMIT } from "@meguru/shared";
 import { and, asc, count, eq, inArray } from "drizzle-orm";
-import { alias } from "drizzle-orm/pg-core";
 import type { Env } from "../../../kernel/env";
 import { billingModeOf, type BillingMode } from "../../../kernel/config";
-import { loadEntitlement } from "../../../platform";
+import { loadAppEntitlement, peopleNames } from "../../../platform";
+import { THREADS_APP } from "../registry";
 import { createDb, withTransaction, type Db, type TxDb } from "../../../kernel/db/client";
 import { accounts, memberships, teamAccounts, teamMembers, teams } from "../schema";
-import { users } from "../../../platform/schema";
 import { AppError } from "../../../kernel/errors";
 import { sha256Hex } from "../../../kernel/identifier-hash";
-import { personName } from "../access/access";
 import { insertActivity } from "../activity/activity-log";
 
 const TOKEN_FORM = /^t_[A-Za-z0-9_-]{43}$/;
@@ -74,17 +72,15 @@ export async function memberCount(db: Db | TxDb, teamId: string): Promise<number
 export async function previewTeamInvite(env: Env, token: string, viewer: Viewer) {
   if (!TOKEN_FORM.test(token)) throw inviteInvalid();
   const db = createDb(env.DATABASE_URL);
-  const adminU = alias(users, "admin_u");
   const [row] = await db
-    .select({ team: teams, adminDisplayName: adminU.displayName, adminEmail: adminU.email })
+    .select({ team: teams })
     .from(teams)
-    .innerJoin(adminU, eq(adminU.id, teams.adminUserId))
     .where(eq(teams.inviteTokenHash, await sha256Hex(token)))
     .limit(1);
   if (!row) throw inviteInvalid();
   const team = {
     name: row.team.name,
-    adminName: personName({ displayName: row.adminDisplayName, email: row.adminEmail }),
+    adminName: (await peopleNames(db, [row.team.adminUserId])).get(row.team.adminUserId) ?? "",
     memberCount: await memberCount(db, row.team.id),
   };
   if (!viewer) return { team, viewer: { status: "anonymous" as const, teamId: null, accounts: [] } };
@@ -116,7 +112,7 @@ export async function previewTeamInvite(env: Env, token: string, viewer: Viewer)
 export async function assertOwnFreeAccounts(tx: TxDb, userId: string, accountIds: string[], mode: BillingMode) {
   const ids = [...new Set(accountIds)];
   if (ids.length === 0) throw new AppError("TEAM_NEEDS_ACCOUNT", 409, "no account selected");
-  const entitlement = await loadEntitlement(tx, userId, mode);
+  const entitlement = (await loadAppEntitlement(tx, mode, userId, THREADS_APP))?.billing;
   if (entitlement && !entitlement.fullAccess) {
     throw new AppError("BILLING_REQUIRED", 403, "billing required", undefined, [entitlement.readOnlyReason ?? "trial_ended"]);
   }
@@ -189,8 +185,7 @@ export async function acceptTeamInvite(env: Env, user: { id: string }, token: st
     await tx.insert(teamAccounts).values(
       [...shared].map(([accountId, s]) => ({ teamId: team.id, accountId, addedByUserId: user.id, shared: s, addedAt: now, updatedAt: now })),
     );
-    const [me] = await tx.select({ displayName: users.displayName, email: users.email }).from(users).where(eq(users.id, user.id));
-    const name = me ? personName(me) : "";
+    const name = (await peopleNames(tx, [user.id])).get(user.id) ?? "";
     for (const accountId of shared.keys()) {
       await insertActivity(tx, {
         accountId,

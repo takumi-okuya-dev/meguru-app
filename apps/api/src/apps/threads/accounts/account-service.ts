@@ -1,19 +1,19 @@
 // Accountの作成・更新・上限（FR-008〜FR-017、research.md R8・R9）。Threadsとの接続は connection-service（specs/027）。
+import { DAILY_POST_LIMIT_MAX } from "@meguru/shared";
+import { lockThreadsMember } from "../access/locks";
 import { and, eq, isNull, lt, ne, or, sql } from "drizzle-orm";
 import type { Env } from "../../../kernel/env";
 import { createDb, withTransaction, type Db, type TxDb } from "../../../kernel/db/client";
-import { lockUserRow } from "../../../kernel/db/locks";
-import { accounts, memberships } from "../schema";
-import { users } from "../../../platform/schema";
+import { accounts, memberships, threadsUserStates } from "../schema";
 import { billingModeOf, type BillingMode } from "../../../kernel/config";
 import { AppError } from "../../../kernel/errors";
 import { authorizeAccount } from "../access/access";
-import { loadEntitlement, syncQuantity } from "../../../platform";
+import { loadAppEntitlement, syncQuantity, type AppEntitlement } from "../../../platform";
+import { THREADS_APP } from "../registry";
 import { withdrawForAccountDeletion } from "../tester-invites/tester-application-service";
 import { trySyncThreadsUsage } from "./usage";
 import { recordActivity } from "../activity/activity-log";
 import { beforeAccountDeleted } from "../teams/team-service";
-import { effectiveLimits } from "../../../platform";
 
 // ---- 登録数の上限（specs/013 research.md R9。001 FR-015〜FR-017 を置き換えた） ----
 
@@ -35,9 +35,9 @@ export async function countOwnedAccounts(db: Db | TxDb, userId: string): Promise
  * ユーザーの登録数の上限と使用数を求める。
  * @param db - データベース（トランザクションの中でもよい）
  * @param userId - users.id
- * @param mode - 決済のモード
- * @param env - Workers のバインディング（運営者の判定。specs/024）
+ * @param mode - 決済のモード（運営者の一覧を含む）
  * @param now - 今の時刻
+ * @param preloaded - もう読んだその人の利用権（/api/threads/me で同じ問い合わせを重ねないため。undefined なら読む）
  * @returns 上限（max。null は上限なし、0 は作れない）、使用数（used）、使える状態、前からの無料体験の上限が効いているか（trialBound）、
  *   運営者が決める上限（limits）
  */
@@ -45,18 +45,25 @@ export async function accountLimitFor(
   db: Db | TxDb,
   userId: string,
   mode: BillingMode,
-  env: Pick<Env, "OPERATOR_CLERK_USER_IDS">,
   now: Date = new Date(),
+  preloaded?: AppEntitlement | null,
 ) {
-  const [entitlement, used, limits] = await Promise.all([
-    loadEntitlement(db, userId, mode, now),
+  // 使える状態と運営者が決める上限は、共通の入口の関数で読む（specs/meguru/029 contracts/platform-entry.md 2）
+  const [ent, used] = await Promise.all([
+    preloaded !== undefined ? Promise.resolve(preloaded) : loadAppEntitlement(db, mode, userId, THREADS_APP, now),
     countOwnedAccounts(db, userId),
-    effectiveLimits(db, env, userId),
   ]);
+  const entitlement = ent?.billing ?? null;
+  const limits = {
+    accountLimit: ent ? (ent.limits.accounts ?? null) : null,
+    dailyPostLimit: ent?.limits.daily_posts ?? DAILY_POST_LIMIT_MAX,
+    operator: ent?.operator ?? false,
+  };
   // 使える状態の上限（前からの無料体験なら1。読むだけ・契約前なら0）と、運営者が決める上限の小さい方（specs/024 FR-018）
   const byState = entitlement ? entitlement.accountLimit : 0;
   const byOperator = limits.accountLimit;
-  const max = byState === null ? byOperator : byOperator === null ? byState : Math.min(byState, byOperator);
+  const max =
+    byState === null ? byOperator : byOperator === null ? byState : Math.min(byState, byOperator);
   // 前からの無料体験の上限が効いているか（エラーの文で契約を案内する）
   const trialBound = entitlement?.state === "trial" && max === byState;
   return { max, used, entitlement, trialBound, limits };
@@ -68,23 +75,44 @@ export async function accountLimitFor(
  * 上限を超えて持っている（このfeatureの前に作った）アカウントは消さない（FR-014）。
  * @param db - データベース（トランザクションの中でもよい）
  * @param userId - users.id
- * @param mode - 決済のモード
- * @param env - Workers のバインディング（運営者の判定。specs/024）
+ * @param mode - 決済のモード（運営者の一覧を含む）
  * @returns 上限・使用数
  * @throws AppError BILLING_REQUIRED・ACCOUNT_LIMIT_REACHED
  */
-export async function assertCanAddAccount(db: Db | TxDb, userId: string, mode: BillingMode, env: Pick<Env, "OPERATOR_CLERK_USER_IDS">) {
-  const limit = await accountLimitFor(db, userId, mode, env);
+export async function assertCanAddAccount(db: Db | TxDb, userId: string, mode: BillingMode) {
+  const limit = await accountLimitFor(db, userId, mode);
   const e = limit.entitlement;
   if (e && !e.fullAccess) {
-    throw new AppError("BILLING_REQUIRED", 403, "billing required", undefined, [e.readOnlyReason ?? "trial_ended"]);
+    throw new AppError("BILLING_REQUIRED", 403, "billing required", undefined, [
+      e.readOnlyReason ?? "trial_ended",
+    ]);
   }
   if (limit.max !== null && limit.used >= limit.max) {
-    throw new AppError("ACCOUNT_LIMIT_REACHED", 409, "account limit reached", undefined, limit.trialBound ? ["trial"] : undefined, {
-      max: limit.max,
-    });
+    throw new AppError(
+      "ACCOUNT_LIMIT_REACHED",
+      409,
+      "account limit reached",
+      undefined,
+      limit.trialBound ? ["trial"] : undefined,
+      {
+        max: limit.max,
+      },
+    );
   }
   return limit;
+}
+
+/**
+ * 最後にアカウントを消した時刻を記録する（Threadsの threads_user_states。specs/meguru/029 tasks.md T071）。
+ * @param tx - トランザクション
+ * @param userId - 利用者の番号
+ * @param now - 消した時刻
+ */
+async function markAccountDeleted(tx: TxDb, userId: string, now: Date): Promise<void> {
+  await tx
+    .insert(threadsUserStates)
+    .values({ userId, lastAccountDeletedAt: now })
+    .onConflictDoUpdate({ target: threadsUserStates.userId, set: { lastAccountDeletedAt: now } });
 }
 
 // ---- アカウントを作る（specs/012 research.md R3） ----
@@ -101,8 +129,8 @@ export async function assertCanAddAccount(db: Db | TxDb, userId: string, mode: B
  */
 export async function createAccount(env: Env, userId: string, name: string) {
   const created = await withTransaction(env.DATABASE_URL, async (tx) => {
-    await lockUserRow(tx, userId);
-    await assertCanAddAccount(tx, userId, billingModeOf(env), env);
+    await lockThreadsMember(tx, userId);
+    await assertCanAddAccount(tx, userId, billingModeOf(env));
     const [account] = await tx
       .insert(accounts)
       .values({
@@ -143,34 +171,49 @@ export async function openAccount(
   /** オーナーのときだけ accounts.last_used_at を変える（手伝う人の操作でオーナーの並びを動かさない。specs/008 research.md R11） */
   touchAccount = true,
 ): Promise<boolean> {
-  const db = createDb(env.DATABASE_URL);
-  const updated = await db
-    .update(users)
-    .set({
-      lastAccountId: accountId,
-      lastAccountClientId: req.clientId,
-      lastAccountOpenSeq: req.openSeq,
-      lastAccountOpenReceivedAt: receivedAt,
-      updatedAt: new Date(),
-    })
-    .where(
-      and(
-        eq(users.id, userId),
-        or(
-          isNull(users.lastAccountOpenReceivedAt),
-          lt(users.lastAccountOpenReceivedAt, receivedAt),
+  // 行がなければ作り、あれば条件付きで書き換える（Threadsの threads_user_states。specs/meguru/029 tasks.md T071）。
+  // 利用者のロックの中で、まだそのアカウントに関わっているときだけ書く（退会の片づけのあとに行を作り直さない。PR #97 のセルフレビュー）
+  const values = {
+    lastAccountId: accountId,
+    lastAccountClientId: req.clientId,
+    lastAccountOpenSeq: req.openSeq,
+    lastAccountOpenReceivedAt: receivedAt,
+  };
+  const updated = await withTransaction(env.DATABASE_URL, async (tx) => {
+    await lockThreadsMember(tx, userId);
+    const [member] = await tx
+      .select({ id: memberships.id })
+      .from(memberships)
+      .where(and(eq(memberships.userId, userId), eq(memberships.accountId, accountId)))
+      .limit(1);
+    if (!member) return [];
+    return tx
+      .insert(threadsUserStates)
+      .values({ userId, ...values })
+      .onConflictDoUpdate({
+        target: threadsUserStates.userId,
+        set: values,
+        setWhere: and(
+          or(
+            isNull(threadsUserStates.lastAccountOpenReceivedAt),
+            lt(threadsUserStates.lastAccountOpenReceivedAt, receivedAt),
+          ),
+          or(
+            isNull(threadsUserStates.lastAccountClientId),
+            ne(threadsUserStates.lastAccountClientId, req.clientId),
+            isNull(threadsUserStates.lastAccountOpenSeq),
+            lt(threadsUserStates.lastAccountOpenSeq, req.openSeq),
+          ),
         ),
-        or(
-          isNull(users.lastAccountClientId),
-          ne(users.lastAccountClientId, req.clientId),
-          isNull(users.lastAccountOpenSeq),
-          lt(users.lastAccountOpenSeq, req.openSeq),
-        ),
-      ),
-    )
-    .returning({ id: users.id });
+      })
+      .returning({ userId: threadsUserStates.userId });
+  });
   if (updated.length === 0) return false;
-  if (touchAccount) await db.update(accounts).set({ lastUsedAt: receivedAt }).where(eq(accounts.id, accountId));
+  if (touchAccount)
+    await createDb(env.DATABASE_URL)
+      .update(accounts)
+      .set({ lastUsedAt: receivedAt })
+      .where(eq(accounts.id, accountId));
   return true;
 }
 
@@ -187,7 +230,12 @@ export async function openAccount(
  */
 export async function renameAccount(env: Env, userId: string, accountId: string, name: string) {
   return withTransaction(env.DATABASE_URL, async (tx) => {
-    const access = await authorizeAccount(tx, { id: userId, billing: billingModeOf(env) }, accountId, "owner");
+    const access = await authorizeAccount(
+      tx,
+      { id: userId, billing: billingModeOf(env) },
+      accountId,
+      "owner",
+    );
     const from = access.account.name;
     const [row] = await tx
       .update(accounts)
@@ -195,7 +243,11 @@ export async function renameAccount(env: Env, userId: string, accountId: string,
       .where(eq(accounts.id, access.account.id))
       .returning();
     if (from !== name) {
-      await recordActivity(tx, access, { kind: "settings", action: "account_renamed", details: { from, to: name } });
+      await recordActivity(tx, access, {
+        kind: "settings",
+        action: "account_renamed",
+        details: { from, to: name },
+      });
     }
     return row!;
   });
@@ -205,7 +257,7 @@ export async function renameAccount(env: Env, userId: string, accountId: string,
 
 /**
  * Account を削除する（FR-022、research.md R13）。
- * 1つのトランザクションで users の行をロックし、last_account_deleted_at を記録してから削除する。
+ * 1つのトランザクションで利用者のロック（lockThreadsMember）を取り、最後に消した時刻（threads_user_states）を記録してから削除する。
  * @param env - Workers のバインディング
  * @param userId - users.id
  * @param accountId - 削除する Account の ID
@@ -219,8 +271,13 @@ export async function deleteAccount(
   confirmName: string,
 ) {
   await withTransaction(env.DATABASE_URL, async (tx) => {
-    await lockUserRow(tx, userId);
-    const { account } = await authorizeAccount(tx, { id: userId, billing: billingModeOf(env) }, accountId, "remove");
+    await lockThreadsMember(tx, userId);
+    const { account } = await authorizeAccount(
+      tx,
+      { id: userId, billing: billingModeOf(env) },
+      accountId,
+      "remove",
+    );
     if (!confirmName.trim() || confirmName.trim() !== account.name) {
       throw new AppError("CONFIRMATION_MISMATCH", 422, "confirmation does not match");
     }
@@ -228,11 +285,7 @@ export async function deleteAccount(
     await beforeAccountDeleted(tx, account.id, userId);
     // テスター招待の申し込みを取り下げ、枠を使っていれば「外してよい」にする（specs/024 data-model.md 5）
     await withdrawForAccountDeletion(tx, account.id);
-    const now = new Date();
-    await tx
-      .update(users)
-      .set({ lastAccountDeletedAt: now, updatedAt: now })
-      .where(eq(users.id, userId));
+    await markAccountDeleted(tx, userId, new Date());
     await tx.delete(accounts).where(eq(accounts.id, account.id));
   });
   // 利用の数を共通へ伝え、次の請求から数を減らす（日割りの返金はしない。specs/013 FR-030）。失敗しても削除は成功のまま
@@ -242,26 +295,33 @@ export async function deleteAccount(
 
 /**
  * Threadsのユーザーで、そのアカウントをすべて消す（Metaからのデータ削除の求め。specs/001 research.md R13）。
- * 持ち主ごとに users の行をロックし、チームの片づけ・アプリの片づけ（知らせ）・最後に消した日時・数の合わせ直しの印をしてから消す。
+ * 持ち主ごとに利用者のロックを取り、チームの片づけ・テスター招待の取り下げ・最後に消した日時を記録してから消す。
  * 029 で Threads の持ち物にした。トランザクションの中で呼び、返した持ち主について、トランザクションのあとで利用の数を伝える。
  * @param tx - トランザクション
  * @param threadsUserId - accounts.threads_user_id
  * @param now - 削除の時刻
  * @returns 消したアカウントの持ち主の users.id
  */
-export async function deleteAccountsOfThreadsUser(tx: TxDb, threadsUserId: string, now: Date): Promise<string[]> {
+export async function deleteAccountsOfThreadsUser(
+  tx: TxDb,
+  threadsUserId: string,
+  now: Date,
+): Promise<string[]> {
   const owners = await tx
     .select({ userId: memberships.userId, accountId: accounts.id })
     .from(accounts)
-    .innerJoin(memberships, and(eq(memberships.accountId, accounts.id), eq(memberships.role, "owner")))
+    .innerJoin(
+      memberships,
+      and(eq(memberships.accountId, accounts.id), eq(memberships.role, "owner")),
+    )
     .where(eq(accounts.threadsUserId, threadsUserId));
   for (const o of owners) {
-    await lockUserRow(tx, o.userId);
+    await lockThreadsMember(tx, o.userId);
     // チームの最後のアカウントなら、チームを抜けたものとする（specs/011 FR-046。アカウントの削除と同じ）
     await beforeAccountDeleted(tx, o.accountId, o.userId);
     // テスター招待の取り下げ（specs/024 data-model.md 5、PR #71 のCodexレビュー）
     await withdrawForAccountDeletion(tx, o.accountId);
-    await tx.update(users).set({ lastAccountDeletedAt: now, updatedAt: now }).where(eq(users.id, o.userId));
+    await markAccountDeleted(tx, o.userId, now);
   }
   await tx.delete(accounts).where(eq(accounts.threadsUserId, threadsUserId));
   // 持ち主（トランザクションのあとで、呼んだ側が利用の数を共通へ伝える。specs/meguru/029 research.md R6）

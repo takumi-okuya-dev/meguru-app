@@ -32,6 +32,26 @@ export async function peopleNames(db: Db | TxDb, userIds: readonly string[]): Pr
 }
 
 /**
+ * 利用者の表示名とメールアドレスをまとめて読む（運営者の画面など、名前とメールアドレスを分けて出すところ。
+ * specs/meguru/029-threads-pattern1 contracts/platform-entry.md 2「利用者の情報」）。
+ * @param db - データベース（トランザクションの中でもよい）
+ * @param userIds - 利用者の番号（重複は1つにまとめる）
+ * @returns 利用者の番号ごとの表示名とメールアドレス（見つからない番号は入らない）
+ */
+export async function peopleProfiles(
+  db: Db | TxDb,
+  userIds: readonly string[],
+): Promise<Map<string, { displayName: string | null; email: string }>> {
+  const ids = [...new Set(userIds)];
+  if (ids.length === 0) return new Map();
+  const rows = await db
+    .select({ id: users.id, displayName: users.displayName, email: users.email })
+    .from(users)
+    .where(inArray(users.id, ids));
+  return new Map(rows.map((r) => [r.id, { displayName: r.displayName, email: r.email }]));
+}
+
+/**
  * ログインしている人（認証のミドルウェアが入れたもの）。
  * @param c - Hono の文脈
  * @returns ログインしている人
