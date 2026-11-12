@@ -164,3 +164,47 @@ describe("0030_threads_schema", () => {
     expect(Number(rows[0]!.seq)).toBe(2);
   });
 });
+
+describe("0030_threads_schema：退会の途中の人", () => {
+  let c2: pg.Client;
+  let drop2: () => Promise<void>;
+  const u: Record<string, string> = {};
+
+  beforeAll(async () => {
+    ({ client: c2, drop: drop2 } = await createScratchDb());
+    await applyMigrations(c2, 0, migrationIndex("0030") - 1);
+    const user = async (name: string, withdrawing: boolean) =>
+      (
+        await c2.query<{ id: string }>(
+          `INSERT INTO users (clerk_user_id, email, withdrawal_requested_at) VALUES ($1, $2, ${withdrawing ? "now()" : "NULL"}) RETURNING id`,
+          [name, `${name}@example.com`],
+        )
+      ).rows[0]!.id;
+    u.owner = await user("owner", false);
+    u.leaving = await user("leaving", true); // Threadsの片づけは済み（出来事を受け取った）、users の行はまだ
+    u.waiting = await user("waiting", true); // 出来事をまだ受け取っていない
+    u.account = (await c2.query<{ id: string }>(`INSERT INTO accounts (name, connection_status, connection_method) VALUES ('店', 'not_connected', NULL) RETURNING id`))
+      .rows[0]!.id;
+    await c2.query(`INSERT INTO memberships (user_id, account_id, role) VALUES ($1, $2, 'owner')`, [u.owner, u.account]);
+    for (const who of [u.leaving, u.waiting]) {
+      const ev = await c2.query<{ id: string }>(`INSERT INTO platform_events (type, payload) VALUES ('user.withdrawn', $1) RETURNING id`, [JSON.stringify({ userId: who })]);
+      if (who === u.leaving) await c2.query(`INSERT INTO threads_received_events (event_id) VALUES ($1)`, [ev.rows[0]!.id]);
+      await c2.query(`INSERT INTO token_check_failures (user_id, failed_at, reason) VALUES ($1, now(), 'invalid')`, [who]);
+    }
+    await c2.query(`UPDATE accounts SET promotion_ratio_updated_by_user_id = $1, core_rules_updated_by_user_id = $2 WHERE id = $3`, [u.leaving, u.waiting, u.account]);
+    await applyMigrations(c2, migrationIndex("0030"), migrationIndex("0030"));
+  });
+
+  afterAll(async () => {
+    await drop2?.();
+  });
+
+  it("片づけが済んだ人の残り（外部キーで消える・空になるはずだった行）を片づけ、まだの人には触れない", async () => {
+    const failures = await c2.query<{ user_id: string }>(`SELECT user_id FROM threads.token_check_failures`);
+    expect(failures.rows.map((r) => r.user_id)).toEqual([u.waiting]);
+    const acc = await c2.query(`SELECT promotion_ratio_updated_by_user_id AS p, core_rules_updated_by_user_id AS c FROM threads.accounts WHERE id = $1`, [u.account]);
+    expect(acc.rows[0]).toEqual({ p: null, c: u.waiting });
+    const owners = await c2.query(`SELECT count(*)::int AS n FROM threads.memberships WHERE user_id = $1`, [u.owner]);
+    expect(owners.rows[0].n).toBe(1);
+  });
+});

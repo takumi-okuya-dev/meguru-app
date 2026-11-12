@@ -176,8 +176,8 @@ async function withdrawalEventIds(db: Db | TxDb, userId: string): Promise<string
 
 /**
  * 退会を記録し、出来事（user.withdrawn）を書く（1つのトランザクション）。2回目に走っても出来事は1回だけ書く
- * （その人の出来事がまだないときだけ）。users の行はここでは消さない：PR3 で外部キーを外すまでは、
- * 先に消すとアプリの行（担当・チームの人）が外部キーで消え、アプリが片づけられなくなるため（029 tasks.md PR2 の頭）。
+ * （その人の出来事がまだないときだけ）。users の行はここでは消さない：アプリが出来事を受け取って片づけ終わるまで、
+ * 利用者の番号を引ける形で残す（029 tasks.md PR2 の頭。アプリの表への外部キーは PR3 で外した）。
  * @param tx - トランザクション
  * @param user - 退会する人
  */
@@ -191,8 +191,9 @@ async function recordWithdrawal(tx: TxDb, user: { id: string; clerkUserId: strin
 }
 
 /**
- * その人の退会の出来事が、すべての届け先で済んでいれば、users の行を消す（担当・チームの人・契約・利用の数の行は
- * ON DELETE CASCADE で消える）。済んでいなければ何もしない（次の届けのあと、日次の続きでもう一度試す）。
+ * その人の退会の出来事が、すべての届け先で済んでいれば、users の行を消す（共通の表の契約・利用の数などの行は
+ * ON DELETE CASCADE で消える。アプリの行は、アプリが出来事を受け取って自分で片づけ済み）。済んでいなければ何もしない
+ * （次の届けのあと、日次の続きでもう一度試す）。
  * @param env - Workers のバインディング
  * @param userId - users.id
  * @returns 消したなら true

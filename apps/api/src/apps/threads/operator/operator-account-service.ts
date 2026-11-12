@@ -10,6 +10,7 @@ import {
 } from "@meguru/shared";
 import { sql, type SQL } from "drizzle-orm";
 import type { Db } from "../../../kernel/db/client";
+import { peopleProfiles, searchPeople } from "../../../platform";
 
 /** 接続方法（つなぐ前は none。research.md R5）。 */
 const METHOD = sql`CASE WHEN a.connection_status = 'not_connected' THEN 'none' ELSE a.connection_method::text END`;
@@ -23,6 +24,17 @@ function likePattern(q: string): string {
   return `%${q.replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
 }
 
+/**
+ * 行のオーナー（オーナーがいない・利用者が見つからないときは null）。
+ * @param r - 行
+ * @param profiles - 利用者の番号ごとの表示名とメールアドレス
+ * @returns オーナー
+ */
+function ownerOf(r: Row, profiles: Map<string, { displayName: string | null; email: string }>): OperatorAccount["owner"] {
+  const p = r.owner_id ? profiles.get(r.owner_id) : undefined;
+  return p ? { name: p.displayName, email: p.email, accountCount: Number(r.owner_count ?? 0) } : null;
+}
+
 type Row = {
   id: string;
   name: string;
@@ -31,8 +43,7 @@ type Row = {
   status: OperatorAccount["status"];
   created_at: string | Date;
   cursor: string;
-  owner_name: string | null;
-  owner_email: string | null;
+  owner_id: string | null;
   owner_count: number | null;
   tester: OperatorAccount["tester"];
 };
@@ -48,7 +59,10 @@ export async function listOperatorAccounts(db: Db, query: OperatorAccountsQuery)
   if (query.method !== "all") where.push(sql`${METHOD} = ${query.method}`);
   if (query.q) {
     const p = likePattern(query.q);
-    where.push(sql`(a.name ILIKE ${p} OR a.username ILIKE ${p} OR u.display_name ILIKE ${p} OR u.email ILIKE ${p})`);
+    // オーナーの名前とメールアドレスは、共通の入口の関数で探す（共通の users を読まない。PR #99 のセルフレビュー）
+    const owners = await searchPeople(db, p);
+    const ownerMatch = owners.length ? sql` OR m.user_id IN (${sql.join(owners.map((id) => sql`${id}::uuid`), sql`, `)})` : sql``;
+    where.push(sql`(a.name ILIKE ${p} OR a.username ILIKE ${p}${ownerMatch})`);
   }
   // 続きの印（作った日時とID）より前。印のアカウントが消えていても、位置は変わらない（research.md R2、PR #74 のCodexレビュー）
   const cursor = query.cursor ? OPERATOR_ACCOUNTS_CURSOR_RE.exec(query.cursor) : null;
@@ -59,7 +73,7 @@ export async function listOperatorAccounts(db: Db, query: OperatorAccountsQuery)
     db.execute<Row>(sql`
       SELECT a.id, a.name, a.username, ${METHOD} AS method, a.connection_status::text AS status, a.created_at,
              to_char(a.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') || '_' || a.id::text AS cursor,
-             u.display_name AS owner_name, u.email AS owner_email,
+             m.user_id AS owner_id,
              (SELECT count(*)::int FROM threads.memberships om WHERE om.user_id = m.user_id AND om.role = 'owner') AS owner_count,
              (SELECT CASE
                        WHEN t.status IN ('pending', 'invited', 'connected') THEN t.status
@@ -72,7 +86,6 @@ export async function listOperatorAccounts(db: Db, query: OperatorAccountsQuery)
                LIMIT 1) AS tester
         FROM threads.accounts a
         LEFT JOIN threads.memberships m ON m.account_id = a.id AND m.role = 'owner'
-        LEFT JOIN users u ON u.id = m.user_id
         ${filter}
        ORDER BY a.created_at DESC, a.id DESC
        LIMIT ${OPERATOR_ACCOUNTS_PAGE_SIZE + 1}
@@ -88,6 +101,10 @@ export async function listOperatorAccounts(db: Db, query: OperatorAccountsQuery)
 
   const page = rows.rows.slice(0, OPERATOR_ACCOUNTS_PAGE_SIZE);
   const c = counts.rows[0]!;
+  const profiles = await peopleProfiles(
+    db,
+    page.flatMap((r) => (r.owner_id ? [r.owner_id] : [])),
+  );
   return {
     counts: { all: Number(c.all), app: Number(c.app), token: Number(c.token), none: Number(c.none) },
     items: page.map((r) => ({
@@ -96,7 +113,7 @@ export async function listOperatorAccounts(db: Db, query: OperatorAccountsQuery)
       username: r.username,
       method: r.method,
       status: r.status,
-      owner: r.owner_email === null ? null : { name: r.owner_name, email: r.owner_email, accountCount: Number(r.owner_count ?? 0) },
+      owner: ownerOf(r, profiles),
       tester: r.tester,
       createdAt: new Date(r.created_at).toISOString(),
     })),

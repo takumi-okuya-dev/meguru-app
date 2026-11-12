@@ -1,6 +1,8 @@
 // 退会を出来事（user.withdrawn）で伝える（specs/meguru/029-threads-pattern1 tasks.md T017、spec US2-1・US2-2・SC-004）。
 // 共通は退会を記録して出来事を書き、Threadsが受け取って片づける。users の行は、片づけが届いたあとで消す（029 tasks.md PR2 の頭）。
 import { beforeEach, describe, expect, it } from "vitest";
+import { getTableName } from "drizzle-orm";
+import { EDITOR_COLUMNS } from "../../src/apps/threads/accounts/withdrawal-cleanup";
 import { withTransaction } from "../../src/kernel/db/client";
 import { deliverPendingEvents } from "../../src/platform";
 import { emitEvent } from "../../src/platform/events/events";
@@ -62,6 +64,26 @@ describe("退会の出来事（user.withdrawn）", () => {
     expect(await count("threads.token_check_failures", `user_id = '${userId}'`)).toBe(0);
     expect(await count("threads.oauth_states", `user_id = '${userId}'`)).toBe(0);
     expect(await count("users", `id = '${userId}'`)).toBe(0);
+  });
+
+  it("Threadsの利用者の番号の列は、すべて退会の片づけで扱う（列を足したときの入れ忘れを知らせる）", async () => {
+    // 退会の片づけが行ごと消すか、ほかの処理で扱う列（withdrawal-cleanup.ts・tester-application-service.ts の purgeForWithdrawal）
+    const handled = [
+      "activity_logs.actor_user_id",
+      "memberships.user_id",
+      "oauth_states.user_id",
+      "team_members.user_id",
+      "teams.admin_user_id",
+      "tester_applications.user_id",
+      "token_check_failures.user_id",
+      "user_states.user_id",
+    ];
+    const editors = EDITOR_COLUMNS.flatMap(({ table, columns }) => columns.map((c) => `${getTableName(table)}.${c.name}`));
+    const found = await rows<{ c: string }>(
+      `SELECT table_name || '.' || column_name AS c FROM information_schema.columns
+       WHERE table_schema = 'threads' AND data_type = 'uuid' AND column_name LIKE '%user_id' ORDER BY 1`,
+    );
+    expect(found.map((r) => r.c)).toEqual([...handled, ...editors].sort());
   });
 
   it("出来事が届くまでは利用者の行を消さず、届いたあとに消す", async () => {

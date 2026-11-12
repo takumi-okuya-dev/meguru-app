@@ -158,6 +158,11 @@ description: "Task list for feature meguru/029 Threads pattern ①"
 - 外部キーは27本外した（Threads → `users`の25本と、`users.last_account_id`・`operator_events.application_id`）。Threadsの中の37本は残る。
 - **外部キーが自動でしていたことを、退会の片づけ（`withdrawal-cleanup.ts`）に足した**（research.md R3）：`token_check_failures`・`oauth_states`の行を消す、作った人・直した人の欄（18列）と`activity_logs.actor_user_id`・`tester_applications.user_id`を空にする。これらの列に索引はないが、退会は年に数回なので、表を読み通しても困らない。
 - 列挙型（`membership_role`など）は`public`のまま（表ではないので外部キーにならない。移すと手間が増えるだけ）。
+- 0030 は、外部キーを外す前に、退会の途中の人（Threadsの片づけは済み・`users`の行はまだ）の残りを片づける（外部キーがしていたこと）。片づけがまだの人は、新しい退会の片づけが行う。
+- 運営のアカウント一覧が、手で書いたSQLで共通の`users`を読んでいたので、共通の入口の関数（`searchPeople`・`peopleProfiles`）に変えた（ESLintは読みこみしか見ないので、手で書いたSQLは止められない）。
+- **受け入れたこと（PR #99 のセルフレビュー）**：
+  - 退会の片づけが済んだ直後（同じ瞬間）に書かれた行（チームの管理者が担当を付けた・接続の途中の記録）は残る。以前は`users`の行を消すときに外部キーが消していた。起きるのは退会と同じ瞬間の操作だけで、残っても誰もその人としてログインできない。テスター招待の行に消えた人の番号が残ると、運営者の操作の記録（`operator_events.subject_user_id`は`users`への外部キーのまま）が失敗するが、同じ瞬間の申し込みのときだけ。
+  - 共通の`users.last_account_id`は、外部キーを外したあと、消えたアカウントの番号が残ることがある。もう誰も読まず、PR5で列ごと消す。
 
 - [ ] T047 [US4] テスト環境：PR3のマージの前に件数とマージの直前の時刻（UTC）を控え、マージのあとに件数の一致・外部キー0本・主な流れを確かめ、結果をPR3の説明に書く（quickstart.md 3。ユーザーと一緒に行う）。
 

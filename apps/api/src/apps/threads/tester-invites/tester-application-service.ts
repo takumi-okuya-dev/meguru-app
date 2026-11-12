@@ -511,11 +511,11 @@ async function operate(
     const [row] = await tx.select().from(testerApplications).where(eq(testerApplications.id, id)).for("update").limit(1);
     if (!row) throw new AppError("ITEM_NOT_FOUND", 404, "application not found");
     const { action, detail } = await fn(tx, row);
-    const stillThere = action !== "removed" || row.userId !== null;
     await recordOperatorEvent(tx, {
       actorUserId: operator.id,
       subjectUserId: row.userId,
-      applicationId: stillThere ? row.id : null,
+      // 行を消したときも番号を残す（029 の PR3 で外部キーを外したので、消えた行の番号も書ける。PR #99 のセルフレビュー）
+      applicationId: row.id,
       action,
       detail,
     });

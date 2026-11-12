@@ -157,7 +157,8 @@ describe("招待した・見送る・戻す・外した", () => {
     await q()`UPDATE threads.tester_applications SET status = 'withdrawn', holds_slot = true, removal_reason = 'user_withdrawn', user_id = NULL WHERE id = ${b.id}`;
     expect((await op(b.id, "removed")).status).toBe(200);
     expect(await applicationRow(b.id)).toBeUndefined();
-    expect((await operatorEventRows()).at(-1)).toMatchObject({ action: "removed", application_id: null });
+    // 消した行の番号も記録に残す（以前は外部キーのため空にしていた。029 の PR3 で外部キーを外した。PR #99 のセルフレビュー）
+    expect((await operatorEventRows()).at(-1)).toMatchObject({ action: "removed", application_id: b.id });
   });
 
   it("状態が合わない操作は TESTER_APPLICATION_NOT_PENDING", async () => {
