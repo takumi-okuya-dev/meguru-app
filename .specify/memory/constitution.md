@@ -185,6 +185,11 @@ MVPのうちチーム運用と課金まわりの最後のfeatureとする。公�
   - マージすると自動で出る（`develop`→ステージング、`main`→本番。
     `.github/workflows/deploy.yml`）。環境ごとの違いはコードの分岐にせず、設定だけに置く。
   - 詳しくは[specs/015-deploy-environments/contracts/deploy.md](../../specs/015-deploy-environments/contracts/deploy.md)。
+- **仕様のフォルダと番号**（2026-11-12）：アプリを並行して作れるよう、新しい仕様は
+  `specs/<アプリ>/NNN-<短い名前>/`に置き、番号はアプリのフォルダごとに振る（外枠・共通は`meguru`。
+  `threads`と`meguru`は`029`から、新しいアプリは`001`から）。ブランチは`feature/<アプリ>-NNN-…`。
+  `specs/001`〜`028`は動かさず、`specs/`の直下には新しい仕様を作らない（詳しくは
+  `docs/product-structure.md`の6）。
 
 ## Governance
 
@@ -194,4 +199,4 @@ MVPのうちチーム運用と課金まわりの最後のfeatureとする。公�
   実質的な拡張＝MINOR、文言修正・明確化＝PATCH。
 - 改定時は`/speckit-constitution`を再実行し、Sync Impact Reportを都度残す。
 
-**Version**: 4.6.0 | **Ratified**: 2026-10-01 | **Last Amended**: 2026-11-12
+**Version**: 4.7.0 | **Ratified**: 2026-10-01 | **Last Amended**: 2026-11-12

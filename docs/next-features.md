@@ -2,7 +2,7 @@
 
 **最終更新**：2026-11-04
 
-**位置づけ**：ユーザーと話して決めたこと・まだ決めていないことを、`/speckit-specify`の前に残すメモ。各機能の仕様（`specs/NNN-…/spec.md`）を作るときの入力にし、移したらこのメモからは消す。決済のメモは[specs/013-billing/notes.md](../specs/013-billing/notes.md)。
+**位置づけ**：ユーザーと話して決めたこと・まだ決めていないことを、`/speckit-specify`の前に残すメモ。各機能の仕様（`specs/<アプリ>/NNN-…/spec.md`。[product-structure.md](./product-structure.md)の6）を作るときの入力にし、移したらこのメモからは消す。決済のメモは[specs/013-billing/notes.md](../specs/013-billing/notes.md)。
 
 ## 順番（2026-10-12 決定）
 
