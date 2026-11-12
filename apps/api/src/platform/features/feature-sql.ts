@@ -2,10 +2,9 @@
 // 使えないまとまり＝人の設定のOFF ∪ 入っている閉じていないグループの設定のOFF（どちらかでOFFならOFF。FR-018）。
 // 判定の条件はここだけに置き、authorizeAccount・認証のミドルウェア・定期処理のすべてがこれを使う（Constitution原則V）。
 import { FEATURES, type Feature } from "@meguru/shared";
-import { and, eq, sql, type SQL } from "drizzle-orm";
+import { sql, type SQL } from "drizzle-orm";
 import type { AnyPgColumn } from "drizzle-orm/pg-core";
-import type { Db, TxDb } from "../../kernel/db/client";
-import { featureDisables, groupFeatureDisables, memberships, testGroupMembers, testGroups } from "../schema";
+import { featureDisables, groupFeatureDisables, testGroupMembers, testGroups } from "../schema";
 
 /**
  * その人の、まとまりごとのOFFの行（人の設定とグループの設定）を返す副問い合わせ。判定の条件はここだけに置く。
@@ -63,17 +62,3 @@ export function featuresFrom(disabled: readonly string[] | null | undefined): Re
   return new Set(FEATURES.filter((f) => !off.has(f)));
 }
 
-/**
- * アカウントのオーナーが自動投稿を使えるか（公開の直前の確かめ。research.md R12）。
- * @param db - データベース（トランザクションの中でもよい）
- * @param accountId - accounts.id
- * @returns 使えるなら true（オーナーがいなければ true。ほかの確かめに任せる）
- */
-export async function ownerAutopostOn(db: Db | TxDb, accountId: string): Promise<boolean> {
-  const [row] = await db
-    .select({ on: featureOnSql(memberships.userId, "autopost") })
-    .from(memberships)
-    .where(and(eq(memberships.accountId, accountId), eq(memberships.role, "owner")))
-    .limit(1);
-  return row?.on ?? true;
-}

@@ -17,16 +17,9 @@ import type { Env } from "../../../kernel/env";
 import { createDb, withTransaction, type Db, type TxDb } from "../../../kernel/db/client";
 import { lockUserRow } from "../../../kernel/db/locks";
 import { testerApplications } from "../schema";
-import {
-  accounts,
-  operatorSettings,
-  users,
-  authorizeAccount,
-  isUuid,
-  countRecentApplyActions,
-  recordOperatorEvent,
-  readOperatorSettings,
-} from "../../../platform";
+import { operatorSettings, users, countRecentApplyActions, recordOperatorEvent, readOperatorSettings } from "../../../platform";
+import { accounts } from "../schema";
+import { authorizeAccount, isUuid } from "../access/access";
 import { billingModeOf, testerInvitesEnabledOf, threadsAppIdOf } from "../../../kernel/config";
 import { AppError, pgErrorCode } from "../../../kernel/errors";
 

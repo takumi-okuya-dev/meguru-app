@@ -1,6 +1,7 @@
 // 取り出し（specs/005-auto-post contracts/auto-post-job.md 手順2の4・手順3、research.md R6・R7）。
 // 来ている時刻の試みの行を作り、同じトランザクションで、公開する下書きを選んで publishing にする。
 // 004 の承認・NGワードの追加と同じ「Account × 下書き」のロックの中で、その時点のNGワードで確かめる（Constitution原則I）。
+import { loadOwnerEntitlement, ownerAutopostOn, ownerDailyPostLimit } from "../access/owner";
 import {
   AUTOPOST_DAILY_API_LIMIT,
   AUTOPOST_LEASE_SECONDS,
@@ -14,13 +15,8 @@ import { and, count, eq, gte, inArray, lt, sql } from "drizzle-orm";
 import { withTransaction, type TxDb } from "../../../kernel/db/client";
 import { lockAccountDrafts } from "../../../kernel/db/locks";
 import { postDrafts, postingSchedules, publishAttempts } from "../schema";
-import {
-  accounts,
-  effectiveSlotMinutes,
-  ownerDailyPostLimit,
-  loadOwnerEntitlement,
-  ownerAutopostOn,
-} from "../../../platform";
+import { effectiveSlotMinutes } from "../../../platform";
+import { accounts } from "../schema";
 import type { Env } from "../../../kernel/env";
 import { billingModeOf, type BillingMode } from "../../../kernel/config";
 import { CLEAR_QUEUE_FIELDS, listQueueRows } from "../drafts/draft-service";

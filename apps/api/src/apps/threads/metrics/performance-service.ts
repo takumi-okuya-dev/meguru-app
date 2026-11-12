@@ -21,8 +21,8 @@ import { and, asc, desc, eq, inArray, isNull, or, sql, type SQL } from "drizzle-
 import type { Db, TxDb } from "../../../kernel/db/client";
 import { draftBatches, postDrafts, postMetricSnapshots, postMetrics } from "../schema";
 import { AppError, itemNotFound } from "../../../kernel/errors";
-import type { AccountAccess, AccountRow } from "../../../platform";
-import { recordActivity, updatedByOf } from "../../../platform";
+import type { AccountAccess, AccountRow } from "../access/access";
+import { recordActivity, updatedByOf } from "../activity/activity-log";
 import { decodeCursor, encodeCursor } from "../drafts/draft-service";
 import { assertItemId } from "../strategy/item-service";
 

@@ -61,6 +61,13 @@ description: "Task list for feature meguru/029 Threads pattern ①"
 
 # PR2：持ち主の移動（コード）
 
+> **PR2 は2つに分けた**（2026-11-12、実装の途中で決めた）。PR2 の時点では表どうしの外部キーがまだ残っている（外すのは PR3）ので、
+> 退会で共通が先に利用者の行を消すと、メンバーの行が一緒に消えて Threads が片づけられず、チームの管理者の外部キー（RESTRICT）で退会も失敗する。
+> そこで、**PR2a＝持ち主の移動（動きは変えない）**、**PR2b＝出来事への切り替え（利用者の行を消すのは Threads の片づけが届いたあと）** にした。
+> - PR2a：T018（アカウントの作成・削除・Metaのデータ削除で伝える。チームの出入りは /api/me と毎日の数え直しで直す）・T020・T022・T023・T024 のうち利用の数と上限の写し直し（マイグレーション 0027）・T025・T026・T029・T034・T035
+> - PR2b：T017・T019・T021・T024 のうち `threads_settings`・T027・T028・T030〜T033・T036・T037・T069・T070・T071
+> - 見つかったこと：`users`（共通）に、Threadsの「最後に開いたアカウント」の列が5つある（`last_account_id`・`last_account_deleted_at`・`last_account_client_id`・`last_account_open_seq`・`last_account_open_received_at`）。PR2a では今のまま（`users.last_account_id`から`accounts`への外部キーは境界の例外）にし、PR2b の T071 で Threads 専用の表へ移す。
+
 ## Phase 3：Threadsの持ち物にして、共通とのやりとりを入口と出来事にする（PR2）
 
 **Goal**：アカウント・メンバー・チーム・権限・活動の記録の処理をThreadsへ移し、知らせ5種類をなくし、定期処理のJOINをやめ、料金の数を`app_usage`にする。表の置き場所はまだ`public`。
@@ -70,9 +77,9 @@ description: "Task list for feature meguru/029 Threads pattern ①"
 ### テスト（先に書いて失敗を確かめる）
 
 - [ ] T017 [P] [US2] `apps/api/test/integration/withdrawal-events.test.ts`：退会がすぐ終わり、`user.withdrawn`が書かれる。届けると、その人が持ち主のアカウント（テスター招待の片づけ・Metaのデータ削除の要求の完了を含む）が消え、メンバー・チームから外れ、作った人の欄が空になり、`app_usage`が0・使っていないになる。同じ出来事を2回届けても結果が同じ（spec US2-1・US2-2、SC-004）。
-- [ ] T018 [P] [US2] `apps/api/test/integration/threads-usage.test.ts`：アカウントを作る・消す・Metaのデータ削除・チームに入る・抜けるたびに、応答を返す前に`app_usage`が今の数と状態になる。料金の数（Stripeへ送る数）が`app_usage`から決まり、今と同じ金額。毎日の数え直しで、ずれた数が直る（spec FR-011、T002と同じ結果）。
+- [X] T018 [P] [US2] `apps/api/test/integration/threads-usage.test.ts`：アカウントを作る・消す・Metaのデータ削除・チームに入る・抜けるたびに、応答を返す前に`app_usage`が今の数と状態になる。料金の数（Stripeへ送る数）が`app_usage`から決まり、今と同じ金額。毎日の数え直しで、ずれた数が直る（spec FR-011、T002と同じ結果）。
 - [ ] T019 [P] [US2] `apps/api/test/integration/limits-changed-event.test.ts`：運営者が上限を保存すると`limits.changed`が書かれ、届けると自動投稿が起こされる（今の`limitsChanged`のテストの期待する結果と同じ）。
-- [ ] T020 [P] [US3] `apps/api/test/integration/threads-me.test.ts`：`GET /api/threads/me`が、同じデータで今の`/api/me`のThreadsの部分（`accounts`・`landingAccountId`・`accountLimit`・`threadsAccessMode`・`threadsConnectMethods`・`teams`・`features`・`dailyPostLimit`・`testerInvites`）と同じ値を返す。`GET /api/threads/me/withdrawal-preview`が、今の`/api/me/withdrawal-preview`の消えるアカウントの部分と同じ値を返す（contracts/api-routes.md 2）。
+- [X] T020 [P] [US3] `apps/api/test/integration/threads-me.test.ts`：`GET /api/threads/me`が、同じデータで今の`/api/me`のThreadsの部分（`accounts`・`landingAccountId`・`accountLimit`・`threadsAccessMode`・`threadsConnectMethods`・`teams`・`features`・`dailyPostLimit`・`testerInvites`）と同じ値を返す。`GET /api/threads/me/withdrawal-preview`が、今の`/api/me/withdrawal-preview`の消えるアカウントの部分と同じ値を返す（contracts/api-routes.md 2）。
 
 ### 共有の型
 
@@ -80,19 +87,19 @@ description: "Task list for feature meguru/029 Threads pattern ①"
 
 ### 移動（中身は変えない）
 
-- [ ] T022 [US1] 招待のトークンの部品（`newInviteToken`・`sealInviteToken`・`openInviteToken`・`inviteUrl`）を、`apps/api/src/platform/teams/invite-service.ts`から`apps/api/src/kernel/invite-token.ts`へ移し、テストのグループと紹介の読みこみ先を直す（research.md R1）。
-- [ ] T023 [US1] `git mv`で、`apps/api/src/platform/accounts/`→`apps/api/src/apps/threads/accounts/`、`platform/access/`→`apps/threads/access/`、`platform/teams/`→`apps/threads/teams/`、`platform/activity/`→`apps/threads/activity/`。読みこみ先を直す（共通の部品は`../../platform`の入口から、Threadsの中は相対で）。表の定義（`accounts`・`memberships`・`teams`・`teamMembers`・`teamAccounts`・`activityLogs`）を、`platform/schema.ts`から`apps/threads/schema.ts`へ移す（まだ`public`のまま）。
-- [ ] T024 [US1] `operator_settings.tester_slot_capacity`を、Threadsの`threads_settings`（まだ`public`。data-model.md 3）へ移すマイグレーションを作る（表を作り、値を写す。古い列はPR5まで残し、両方に書く）。`apps/threads/tester-invites/`の読み書きを新しい表に替える。
+- [X] T022 [US1] 招待のトークンの部品（`newInviteToken`・`sealInviteToken`・`openInviteToken`・`inviteUrl`）を、`apps/api/src/platform/teams/invite-service.ts`から`apps/api/src/kernel/invite-token.ts`へ移し、テストのグループと紹介の読みこみ先を直す（research.md R1）。
+- [X] T023 [US1] `git mv`で、`apps/api/src/platform/accounts/`→`apps/api/src/apps/threads/accounts/`、`platform/access/`→`apps/threads/access/`、`platform/teams/`→`apps/threads/teams/`、`platform/activity/`→`apps/threads/activity/`。読みこみ先を直す（共通の部品は`../../platform`の入口から、Threadsの中は相対で）。表の定義（`accounts`・`memberships`・`teams`・`teamMembers`・`teamAccounts`・`activityLogs`）を、`platform/schema.ts`から`apps/threads/schema.ts`へ移す（まだ`public`のまま）。
+- [ ] T024 [US1] （PR2aで、末尾の「`app_usage`と上限の表の写し直し」をマイグレーション 0027 として済ませた。`threads_settings`へ移す部分はPR2b）`operator_settings.tester_slot_capacity`を、Threadsの`threads_settings`（まだ`public`。data-model.md 3）へ移すマイグレーションを作る（表を作り、値を写す。古い列はPR5まで残し、両方に書く）。`apps/threads/tester-invites/`の読み書きを新しい表に替える。
   - 同じマイグレーションの末尾で、**`app_usage`を`memberships`とチームから数え直して写し直す**（PR1とPR2の間に作った・消したアカウントの分のずれを消す。料金の数を`app_usage`に切り替えるT025の前提。/speckit-analyze G1）。`user_app_limits`・`app_limit_defaults`も、古い列から写し直す（PR1のデプロイの間に前の版が古い列だけに書いた分。U4）。
   - マイグレーションのテスト（`apps/api/test/migration/`）：PR1のあとに`memberships`を足し・消しても、当てたあとに`app_usage`が今の数になる。
 
 ### 共通の側（Threadsを読まない形にする）
 
-- [ ] T025 [US2] `apps/api/src/platform/billing/billing-service.ts`の料金の数（`countOwned`）を、`app_usage`の`threads`の`quantity`に替える。契約を始めるとき（Checkout）も同じ。T018の料金の部分を通す。
-- [ ] T026 [US2] `apps/api/src/platform/operator/limit-service.ts`の、持ち主のアカウントの数を数える部分（運営者の利用者の一覧など）を、`app_usage`に替える。アカウントの数の上限の判定（作れるか）は、Threadsへ移す（`apps/threads/accounts/`）。
+- [X] T025 [US2] `apps/api/src/platform/billing/billing-service.ts`の料金の数（`countOwned`）を、`app_usage`の`threads`の`quantity`に替える。契約を始めるとき（Checkout）も同じ。T018の料金の部分を通す。
+- [X] T026 [US2] `apps/api/src/platform/operator/limit-service.ts`の、持ち主のアカウントの数を数える部分（運営者の利用者の一覧など）を、`app_usage`に替える。アカウントの数の上限の判定（作れるか）は、Threadsへ移す（`apps/threads/accounts/`）。
 - [ ] T027 [US2] 機能のOFFを読む・消す処理（`feature-sql.ts`の`disabledFeaturesSql`・`featureOnSql`、`feature-service.ts`の`readUser`・`saveFeatureSettings`の削除・`saveGroupFeatures`・`groupDisabledFeatures`）を、すべてアプリの番号で絞る形にする（PR1のセルフレビューの指摘。2本目のアプリが同じ名前の機能を使っても混ざらないように）。`apps/api/src/platform/features/feature-sql.ts`の、`memberships`をJOINする部分（アカウントの持ち主の機能）を消し、Threadsの側で`loadEntitlement`を使う形にする。共通のコードからThreadsの機能の名前（`autopost`など）を消し、登録の一覧を使う（spec FR-012）。
 - [ ] T028 [US2] `apps/api/src/platform/withdrawal/withdrawal-service.ts`を、契約の解約・利用者の退会の記録・`emitEvent(tx, "user.withdrawn", { userId })`までにする（Threadsのアカウントを消す部分をなくす）。
-- [ ] T029 [US2] `apps/api/src/platform/identity/me-routes.ts`：`apps.using`を`app_usage.using`から決める。`/api/me`のThreadsの部分は、PR5まで今の形で返すため、組み立て（`apps/api/src/app.ts`）からThreadsの「`/api/me`に足す中身を作る関数」を渡して呼ぶ（共通はThreadsを読まない）。`/api/me/withdrawal-preview`も同じ（PR5で共通の分だけにする）。
+- [X] T029 [US2] `apps/api/src/platform/identity/me-routes.ts`：`apps.using`を`app_usage.using`から決める。`/api/me`のThreadsの部分は、PR5まで今の形で返すため、組み立て（`apps/api/src/app.ts`）からThreadsの「`/api/me`に足す中身を作る関数」を渡して呼ぶ（共通はThreadsを読まない）。`/api/me/withdrawal-preview`も同じ（PR5で共通の分だけにする）。
 
 ### Threadsの側（共通の入口だけを使う形にする）
 
@@ -100,10 +107,11 @@ description: "Task list for feature meguru/029 Threads pattern ①"
 - [ ] T031 [US2] `apps/api/src/apps/threads/publish/auto-post-runner.ts`・`metrics/metrics-runner.ts`・`mention/mention-runner.ts`の、`users`・`subscriptions`・`memberships`とのJOINと`featureOnSql`系をやめ、Threadsの表だけで候補を読んでから`loadEntitlements`で持ち主をまとめて調べる形にする（research.md R4）。1件ずつ判定している`publish/publish-claim.ts`・`publish-executor.ts`・`auto-post-routes.ts`・`posting-schedule-routes.ts`（`loadOwnerEntitlement`・`ownerAutopostOn`・`effectiveLimits`）は、`loadEntitlement`に替える。今の定期処理と投稿のテストを、期待する結果を変えずに通す。
 - [ ] T032 [US2] `apps/api/src/apps/threads/events/`を作る：`markReceived`（`threads_received_events`。まだ`public`）・`onUserWithdrawn`・`onLimitsChanged`（contracts/platform-entry.md 3）。`received_events`の表を作るマイグレーションを、T024と同じPRで足す。T017・T019を通す。
 - [ ] T033 [US2] 知らせをなくす：`accountDeleting`・`accountOpened`はThreadsの中の処理に（アカウントを消す関数・開くAPIの中で直接呼ぶ）、`userWithdrawing`・`userAccountsDeleted`は`onUserWithdrawn`に、`limitsChanged`は`onLimitsChanged`に（research.md R8）。`apps/api/src/apps/threads/threads-hooks.ts`を消し、`apps/api/src/app.ts`で`registerAppFeatures`・`registerAppLimits`・`registerConsumer`を呼ぶ（contracts/module-boundaries.md 4）。`platform/hooks.ts`はPR5で消す（この時点で呼び出しが0になる）。
-- [ ] T034 [US2] Threadsが利用の数を伝える：アカウントを作る・消す（Metaのデータ削除の`deleteAccountsOfThreadsUser`を含む）・持ち主が変わる・チームに入る・抜ける処理で、トランザクションのあと・応答の前に`reportUsage`を呼ぶ。毎日のまとめ処理（`jobs/daily-jobs.ts`からThreadsの関数を呼ぶ）で全員を数え直す。T018を通す。
-- [ ] T035 [US3] `apps/api/src/apps/threads/me/`を作る：`GET /api/threads/me`・`GET /api/threads/me/withdrawal-preview`。`apps/api/src/apps/threads/index.ts`から出し、`app.ts`でつなぐ。T020を通す。`pnpm --filter api routes:snapshot`で一覧を書き直す（2本増える）。
+- [X] T034 [US2] Threadsが利用の数を伝える：アカウントを作る・消す（Metaのデータ削除の`deleteAccountsOfThreadsUser`を含む）・持ち主が変わる・チームに入る・抜ける処理で、トランザクションのあと・応答の前に`reportUsage`を呼ぶ。毎日のまとめ処理（`jobs/daily-jobs.ts`からThreadsの関数を呼ぶ）で全員を数え直す。T018を通す。
+- [X] T035 [US3] `apps/api/src/apps/threads/me/`を作る：`GET /api/threads/me`・`GET /api/threads/me/withdrawal-preview`。`apps/api/src/apps/threads/index.ts`から出し、`app.ts`でつなぐ。T020を通す。`pnpm --filter api routes:snapshot`で一覧を書き直す（2本増える）。
 - [ ] T069 [US2] 運営の画面のための登録の一覧を返すAPI `GET /api/operator/app-registry`（共通。運営者だけ）を足す：登録されたアプリごとに、機能（名前・表示名・説明）と上限（名前・表示名・範囲）を返す。`registerAppFeatures`・`registerAppLimits`に表示名・説明を渡す形にする（contracts/platform-entry.md 5・api-routes.md 1）。テスト：`apps/api/test/integration/operator-app-registry.test.ts`（運営者でなければ403、今の3つの機能と2つの上限が今の表示名で返る）。
 - [ ] T070 [US2] 外枠の運営の画面（`apps/web/src/shell/settings/features.tsx`・`limits.tsx`）を、`FEATURE_LABELS`・「アカウントの数」・`ACCOUNT_LIMIT_MAX`などのThreadsの名前を直接書かず、T069のAPIの一覧で出す形にする。見た目と文言は今のまま（spec FR-012・FR-021、/speckit-analyze G2）。画面のテストを直す（期待する結果は変えない）。T021で`FEATURES`・`FEATURE_LABELS`をThreadsへ移すのは、このタスクのあと。
+- [ ] T071 [US1] `users`の「最後に開いたアカウント」の5列（`last_account_id`ほか）を、Threads専用の表（`threads_user_states`。まだ`public`。PR3でスキーマ`threads`へ）へ写すマイグレーションを作り、Threadsの読み書き（`openAccount`・`deleteAccount`・`buildThreadsMe`の`landingAccountId`）を新しい表に替える。古い列はPR5で消す（data-model.md 1-1）。
 - [ ] T036 [US1] Threadsのコードの`platform/schema`の読みこみ（`users`・`subscriptions`・`memberships`・`operatorSettings`）が0か所になったことを確かめる（`grep`）。共通の`index.ts`から、表の定義とSQLの部品（`featureOnSql`など）を出すのをやめる。
 - [ ] T037 [US4] PR2の確かめ：`pnpm lint`・`pnpm typecheck`・`pnpm test`・`pnpm e2e`。知らせの呼び出し（`runHook`）が0か所（quickstart.md 1）。
 

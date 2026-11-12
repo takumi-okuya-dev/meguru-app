@@ -28,7 +28,7 @@ import {
   type ThreadsProfile,
   type TokenDebugInfo,
 } from "../../../adapters/threads-api";
-import { authorizeAccount, type RequestUser } from "../../../platform";
+import { authorizeAccount, type RequestUser } from "../access/access";
 import { completeConnection } from "./connection-service";
 import { notifyWake } from "../publish/posting-schedule-service";
 import { refreshUsernameOnlyMatch } from "./username-match";

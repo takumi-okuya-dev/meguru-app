@@ -12,7 +12,7 @@ import { and, count, desc, eq, gt, gte, isNotNull, lt } from "drizzle-orm";
 import type { Db } from "../../../kernel/db/client";
 import { postDrafts, publishAttempts } from "../schema";
 import { effectiveSlotMinutes } from "../../../platform";
-import type { AccountRow } from "../../../platform";
+import type { AccountRow } from "../access/access";
 import { countDrafts, listQueueRows, listPublishFailedRows } from "../drafts/draft-service";
 import {
   readPostingSchedule,

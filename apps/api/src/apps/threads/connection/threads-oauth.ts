@@ -8,7 +8,7 @@ import { oauthStates } from "../schema";
 import { sha256Hex } from "../../../kernel/identifier-hash";
 import type { ThreadsClient } from "../../../adapters/threads-api";
 import { AppError } from "../../../kernel/errors";
-import { authorizeAccount, type RequestUser } from "../../../platform";
+import { authorizeAccount, type RequestUser } from "../access/access";
 
 const STATE_TTL_MS = 10 * 60 * 1000;
 

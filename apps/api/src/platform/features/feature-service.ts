@@ -13,7 +13,8 @@ import { withTransaction, type Db, type TxDb } from "../../kernel/db/client";
 import { featureDisables, featureSettingEvents, groupFeatureDisables, testGroupMembers, testGroups, users } from "../schema";
 import type { Env } from "../../kernel/env";
 import { AppError } from "../../kernel/errors";
-import { isUuid, personName } from "../access/access";
+import { isUuid } from "../../kernel/validate";
+import { personName } from "../identity/people";
 
 /** 運営者（認証のミドルウェアが入れる users の行の一部）。 */
 type Operator = { id: string; displayName: string | null; email: string };

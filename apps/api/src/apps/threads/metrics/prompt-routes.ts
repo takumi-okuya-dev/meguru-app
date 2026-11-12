@@ -9,14 +9,10 @@ import { and, eq, sql } from "drizzle-orm";
 import { Hono, type MiddlewareHandler } from "hono";
 import type { AppEnv } from "../../../platform";
 import { createDb } from "../../../kernel/db/client";
-import {
-  accounts,
-  effectiveLimits,
-  authorizeAccount,
-  recordActivity,
-  updatedByOf,
-  withActivityTx,
-} from "../../../platform";
+import { effectiveLimits } from "../../../platform";
+import { accounts } from "../schema";
+import { authorizeAccount } from "../access/access";
+import { recordActivity, updatedByOf, withActivityTx } from "../activity/activity-log";
 import { AppError, notFound } from "../../../kernel/errors";
 import { getPrompt, lengthSettingsOf } from "./prompt-service";
 

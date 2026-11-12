@@ -9,9 +9,10 @@ import {
   ACTIVITY_SUMMARY_CHARS,
 } from "@meguru/shared";
 import { and, desc, eq, gte, inArray, lt, or, sql } from "drizzle-orm";
-import { withTransaction, type Db, type TxDb } from "../../kernel/db/client";
-import { activityLogs, users } from "../schema";
-import { AppError } from "../../kernel/errors";
+import { withTransaction, type Db, type TxDb } from "../../../kernel/db/client";
+import { activityLogs } from "../schema";
+import { users } from "../../../platform/schema";
+import { AppError } from "../../../kernel/errors";
 import { isUuid, personName, type AccountAccess, type ActorRole } from "../access/access";
 
 /** 操作の記録の種類（画面の絞り込みの単位）。 */

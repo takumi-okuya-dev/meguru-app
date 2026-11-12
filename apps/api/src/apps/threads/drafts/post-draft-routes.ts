@@ -14,7 +14,8 @@ import { Hono, type MiddlewareHandler } from "hono";
 import type { AppEnv } from "../../../platform";
 import { inArray } from "drizzle-orm";
 import { createDb, withTransaction, type Db } from "../../../kernel/db/client";
-import { users, authorizeAccount, personName, effectiveLimits } from "../../../platform";
+import { users, effectiveLimits } from "../../../platform";
+import { authorizeAccount, personName } from "../access/access";
 import { AppError } from "../../../kernel/errors";
 import { parseBody } from "../../../kernel/validate";
 import {

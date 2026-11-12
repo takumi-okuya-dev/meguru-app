@@ -2,7 +2,7 @@
 // 宣伝内容・リサーチの追加・変更・削除の後に呼ぶ。分析のための記録なので、失敗しても元の操作は失敗にしない（ログに出す）。
 import { eq } from "drizzle-orm";
 import type { Db } from "../../../kernel/db/client";
-import { accounts } from "../../../platform";
+import { accounts } from "../schema";
 import { logger } from "../../../kernel/logger";
 
 /**

@@ -7,7 +7,7 @@ import type { Env } from "../../kernel/env";
 import { createDb, type Db } from "../../kernel/db/client";
 import { users } from "../schema";
 import { pgErrorCode } from "../../kernel/errors";
-import { inviteUrl, newInviteToken } from "../teams/invite-service";
+import { inviteUrl, newInviteToken } from "../../kernel/invite-token";
 
 /**
  * 紹介の文字列を作る。16バイトの暗号学的乱数の base64url（22文字）に「r_」を付ける（research.md R2）。

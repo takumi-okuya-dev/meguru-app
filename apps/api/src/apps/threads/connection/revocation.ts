@@ -4,7 +4,7 @@ import type { Env } from "../../../kernel/env";
 import { createDb, withTransaction, type TxDb } from "../../../kernel/db/client";
 import { lockThreadsUser } from "../../../kernel/db/locks";
 import { threadsConnections, threadsRevocations } from "../schema";
-import { accounts } from "../../../platform";
+import { accounts } from "../schema";
 import { createTokenCipher } from "../../../kernel/crypto";
 import { threadsUserHmac } from "../../../kernel/identifier-hash";
 import { logger } from "../../../kernel/logger";

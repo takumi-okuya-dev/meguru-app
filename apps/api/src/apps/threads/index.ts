@@ -27,3 +27,12 @@ export { strategyRoutes } from "./strategy/strategy-routes";
 export { operatorTesterInviteRoutes } from "./tester-invites/operator-tester-invite-routes";
 export { testerApplicationRoutes } from "./tester-invites/tester-application-routes";
 export { registerThreads } from "./threads-hooks";
+// 029 で共通から移したもの：アカウント・権限・チーム・活動の記録（specs/meguru/029-threads-pattern1 research.md R1）
+export { accountRoutes } from "./accounts/account-routes";
+export { accountTeamRoutes } from "./teams/account-team-routes";
+export { inviteRoutes } from "./teams/invite-routes";
+export { teamsRoutes } from "./teams/team-routes";
+export { activityRoutes } from "./activity/activity-routes";
+export { purgeOldActivity } from "./activity/activity-log";
+export { threadsMeRoutes } from "./me/threads-me";
+export { recountThreadsUsage, syncThreadsUsage } from "./accounts/usage";

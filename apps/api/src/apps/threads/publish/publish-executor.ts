@@ -1,6 +1,7 @@
 // 公開まで進める（specs/005-auto-post contracts/auto-post-job.md 手順4、research.md R6・R7）。
 // 二重の公開を防ぐため、公開を送る前にコンテナーのIDと publish_requested_at を保存する。
 // publish_requested_at があり結果がわからない間は、新しいコンテナーを作らない（1つのコンテナーは1回しか公開できない）。
+import { loadOwnerEntitlement, ownerAutopostOn } from "../access/owner";
 import {
   AUTOPOST_FIND_PUBLISHED_HOURS,
   AUTOPOST_RECHECK_MAX_MINUTES,
@@ -15,7 +16,8 @@ import {
 import { and, eq, sql } from "drizzle-orm";
 import { withTransaction, type Db } from "../../../kernel/db/client";
 import { postDrafts, postMentions, postingSchedules, publishAttempts } from "../schema";
-import { accounts, loadOwnerEntitlement, ownerAutopostOn } from "../../../platform";
+
+import { accounts } from "../schema";
 import type { Env } from "../../../kernel/env";
 import { billingModeOf } from "../../../kernel/config";
 import { logger } from "../../../kernel/logger";

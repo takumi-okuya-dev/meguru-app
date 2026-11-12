@@ -4,12 +4,13 @@
 import { TEAM_EDITOR_LIMIT, TEAM_MEMBER_LIMIT, TEAMS_PER_ADMIN, type TeamRole } from "@meguru/shared";
 import { and, asc, count, eq, inArray, ne, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
-import type { Env } from "../../kernel/env";
-import { billingModeOf, type BillingMode } from "../../kernel/config";
-import type { Db, TxDb } from "../../kernel/db/client";
-import { accounts, memberships, teamAccounts, teamMembers, teams, users } from "../schema";
-import { lockAdminTeams } from "../../kernel/db/locks";
-import { AppError } from "../../kernel/errors";
+import type { Env } from "../../../kernel/env";
+import { billingModeOf, type BillingMode } from "../../../kernel/config";
+import type { Db, TxDb } from "../../../kernel/db/client";
+import { accounts, memberships, teamAccounts, teamMembers, teams } from "../schema";
+import { users } from "../../../platform/schema";
+import { lockAdminTeams } from "../../../kernel/db/locks";
+import { AppError } from "../../../kernel/errors";
 import { insertActivity } from "../activity/activity-log";
 import {
   authorizeAssignment,
@@ -20,7 +21,8 @@ import {
   type ActorRole,
   type TeamAccess,
 } from "../access/access";
-import { assertOwnFreeAccounts, inviteUrl, newInviteToken, openInviteToken, sealInviteToken } from "./invite-service";
+import { inviteUrl, newInviteToken, openInviteToken, sealInviteToken } from "../../../kernel/invite-token";
+import { assertOwnFreeAccounts } from "./invite-service";
 
 // ---- 記録 ----
 

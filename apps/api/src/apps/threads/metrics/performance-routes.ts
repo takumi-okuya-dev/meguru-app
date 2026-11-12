@@ -4,7 +4,8 @@ import { exportQuerySchema, feedbackRequestSchema, invalidFields, performanceQue
 import { Hono, type MiddlewareHandler } from "hono";
 import type { AppEnv } from "../../../platform";
 import { createDb } from "../../../kernel/db/client";
-import { withActivityTx, authorizeAccount } from "../../../platform";
+import { withActivityTx } from "../activity/activity-log";
+import { authorizeAccount } from "../access/access";
 import { AppError } from "../../../kernel/errors";
 import { getPerformanceSummary, listExportRows, listPerformancePage, updateFeedback } from "./performance-service";
 

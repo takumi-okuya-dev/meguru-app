@@ -6,8 +6,8 @@
 import { and, eq, ne, sql } from "drizzle-orm";
 import type { Env } from "../kernel/env";
 import { createDb } from "../kernel/db/client";
-import { threadsConnections } from "../apps/threads/schema";
-import { accounts, teams, testGroups } from "../platform";
+import { accounts, teams, threadsConnections } from "../apps/threads/schema";
+import { testGroups } from "../platform";
 import { createTokenCipher, KeyRingError } from "../kernel/crypto";
 
 /**

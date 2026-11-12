@@ -4,7 +4,7 @@ import { jstToday, trialDaysLeft } from "@meguru/shared";
 import { sql } from "drizzle-orm";
 import type { Db } from "../../../kernel/db/client";
 import type { BillingMode } from "../../../kernel/config";
-import type { AccountAccess } from "../../../platform";
+import type { AccountAccess } from "../access/access";
 import { loadEntitlement } from "../../../platform";
 import { getStrategy } from "./strategy-service";
 

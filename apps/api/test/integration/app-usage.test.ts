@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { subscriptions } from "../../src/platform/schema";
 import { billingQuantityOf, reportUsage, usingAppsOf } from "../../src/platform/usage/usage";
 import { createUserWithAccount, db, insertSubscription, resetDb } from "../helpers/app";
+import { ensureUser } from "../helpers/team";
 
 beforeEach(async () => {
   await resetDb();
@@ -21,7 +22,7 @@ async function dirty(userId: string) {
 
 describe("reportUsage", () => {
   it("行がない人は、数0・使っていないとみなす", async () => {
-    const { userId } = await createUserWithAccount("u1");
+    const userId = await ensureUser("u1");
     expect(await billingQuantityOf(db(), userId)).toBe(0);
     expect(await usingAppsOf(db(), userId)).toEqual([]);
   });

@@ -12,9 +12,9 @@ import {
   teamShareUpdateSchema,
 } from "@meguru/shared";
 import { Hono, type Context, type MiddlewareHandler } from "hono";
-import type { AppEnv } from "../identity/auth";
-import { createDb, withTransaction } from "../../kernel/db/client";
-import { parseBody } from "../../kernel/validate";
+import type { AppEnv } from "../../../platform";
+import { createDb, withTransaction } from "../../../kernel/db/client";
+import { parseBody } from "../../../kernel/validate";
 import { authorizeTeamAdmin, authorizeTeamMember, authorizeTeamStatus, isUuid, requireFeature, teamNotFound } from "../access/access";
 import {
   addTeamAccount,

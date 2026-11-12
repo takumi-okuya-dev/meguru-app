@@ -2,7 +2,7 @@
 import { eq } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
 import { accounts, users } from "../../src/db/schema";
-import { openAccount } from "../../src/platform/accounts/account-service";
+import { openAccount } from "../../src/apps/threads/accounts/account-service";
 import { call, connectNew, db, fake, makeApp, resetDb, testEnv } from "../helpers/app";
 
 const app = makeApp();

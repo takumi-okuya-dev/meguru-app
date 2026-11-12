@@ -17,7 +17,8 @@ import type { Env } from "../../kernel/env";
 import { createDb, withTransaction, type Db, type TxDb } from "../../kernel/db/client";
 import { lockUserRow } from "../../kernel/db/locks";
 import { billingExemptSql, testAccessSql } from "../test-groups/test-group-service";
-import { memberships, subscriptions, testGroupMembers, users } from "../schema";
+import { subscriptions, testGroupMembers, users } from "../schema";
+import { billingQuantityOf } from "../usage/usage";
 import { billingModeOf, type BillingMode } from "../../kernel/config";
 import { AppError } from "../../kernel/errors";
 import { logger } from "../../kernel/logger";
@@ -201,17 +202,14 @@ export async function billingSummary(db: Db, user: { id: string; billing: Billin
 }
 
 /**
- * オーナーのアカウントの数（未接続のものも数える。FR-013）。
+ * その人の料金の数の元（アプリから伝えられた利用の数の合計。specs/meguru/029-threads-pattern1 research.md R6）。
+ * 029 の前は、持ち主としてのアカウントの数（memberships）を数えていた。
  * @param db - データベース（トランザクションの中でもよい）
  * @param userId - users.id
  * @returns 数
  */
 async function countOwned(db: Db | TxDb, userId: string): Promise<number> {
-  const [row] = await db
-    .select({ n: sql<number>`count(*)::int` })
-    .from(memberships)
-    .where(and(eq(memberships.userId, userId), eq(memberships.role, "owner")));
-  return Number(row?.n ?? 0);
+  return billingQuantityOf(db, userId);
 }
 
 // ---- 契約する（research.md R4） ----
@@ -442,18 +440,6 @@ export async function openPortal(env: Env, userId: string, stripe: StripeClient 
 // ---- アカウントの数の反映（research.md R6） ----
 
 /**
- * アカウントを作る・削除するトランザクションの中で、数の合わせ直しの印を付ける（契約がなければ何もしない）。
- * @param tx - トランザクション
- * @param userId - オーナーの users.id
- */
-export async function markQuantityDirty(tx: Db | TxDb, userId: string): Promise<void> {
-  await tx
-    .update(subscriptions)
-    .set({ quantitySyncNeeded: true })
-    .where(and(eq(subscriptions.userId, userId), sql`${subscriptions.stripeSubscriptionId} IS NOT NULL`));
-}
-
-/**
  * Stripeの契約の数を、今のアカウントの数（max(n,1)）に合わせる。日割りの請求・返金はしない。
  * 終わった契約・決済OFFでは何もしない。合ったら印を消す。
  * @param env - Workers のバインディング
@@ -526,27 +512,6 @@ export async function reconcileSubscriptions(env: Env, stripe: StripeClient = cr
     }
   }
   return { synced, failed };
-}
-
-/**
- * アカウントのオーナーの使える状態を読む（定期処理が使う。specs/013 research.md R8）。
- * @param db - データベース（トランザクションの中でもよい）
- * @param accountId - accounts.id
- * @param mode - 決済のモード
- * @param now - 今の時刻
- * @returns 使える状態。オーナーがいなければ null
- */
-export async function loadOwnerEntitlement(db: Db | TxDb, accountId: string, mode: BillingMode, now: Date = new Date()) {
-  // 決済もテスト用のグループもOFFなら、オーナーを読むまでもなく全権（specs/016 research.md R4）
-  if (!mode.enabled && !mode.testGroups) {
-    return entitlementFromFacts(mode, { createdAt: now, legacyTrial: false, billingExempt: false, status: null, cancelAtPeriodEnd: null }, now);
-  }
-  const [owner] = await db
-    .select({ userId: memberships.userId })
-    .from(memberships)
-    .where(and(eq(memberships.accountId, accountId), eq(memberships.role, "owner")))
-    .limit(1);
-  return owner ? loadEntitlement(db, owner.userId, mode, now) : null;
 }
 
 /** 料金なしの印を付け・外した結果。 */

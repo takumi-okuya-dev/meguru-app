@@ -30,7 +30,7 @@ import { and, asc, desc, eq, inArray } from "drizzle-orm";
 import type { Db } from "../../../kernel/db/client";
 import { draftBatches, postDrafts, postMetrics, promotions, referencePosts } from "../schema";
 import { effectiveSlotMinutes } from "../../../platform";
-import type { AccountRow } from "../../../platform";
+import type { AccountRow } from "../access/access";
 import { listReviewedRows } from "../drafts/draft-service";
 import { trendsForAccountPrompt } from "./analysis-service";
 import { poorForPrompt } from "./performance-service";

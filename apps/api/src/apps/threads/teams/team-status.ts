@@ -13,10 +13,11 @@ import {
 } from "@meguru/shared";
 import { and, eq, inArray, sql, type SQL } from "drizzle-orm";
 import { alias, type AnyPgColumn } from "drizzle-orm/pg-core";
-import type { Db, TxDb } from "../../kernel/db/client";
-import { accounts, memberships, teamAccounts, teamMembers, users } from "../schema";
+import type { Db, TxDb } from "../../../kernel/db/client";
+import { accounts, memberships, teamAccounts, teamMembers } from "../schema";
+import { users } from "../../../platform/schema";
 import { personName, type TeamAccess, type TeamStatusScope } from "../access/access";
-import { featureOnSql } from "../features/feature-sql";
+import { featureOnSql } from "../../../platform";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 

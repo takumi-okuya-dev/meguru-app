@@ -1,26 +1,15 @@
 // 退会（specs/013-billing FR-050〜FR-056、research.md R10）。
 // 外部（Stripe・Clerk）とDBを1つのトランザクションにできないので、「受け付け → 契約を止める → データを消す → ログインの情報を消す」
 // の順にし、どの段も2回目に走っても結果が同じになるようにする。途中で止まれば、画面のもう一度の操作か日次の処理で続きから終わる。
-import { personName } from "../access/access";
-import { and, asc, eq, isNotNull, isNull, lt, sql } from "drizzle-orm";
+import { and, eq, isNotNull, isNull, lt, sql } from "drizzle-orm";
 import type { Env } from "../../kernel/env";
 import { createDb, withTransaction, type Db, type TxDb } from "../../kernel/db/client";
 import { lockUserRow } from "../../kernel/db/locks";
-import {
-  accounts,
-  activityLogs,
-  memberships,
-  subscriptions,
-  teamMembers,
-  teams,
-  users,
-  withdrawnUsers,
-} from "../schema";
+import { subscriptions, users, withdrawnUsers } from "../schema";
 import { billingModeOf } from "../../kernel/config";
 import { AppError } from "../../kernel/errors";
 import { logger } from "../../kernel/logger";
 import { createStripeClient, StripeError, type StripeClient } from "../../adapters/stripe";
-import { beforeAccountDeleted, chooseSuccessor } from "../teams/team-service";
 import { runHook } from "../hooks";
 
 /** 退会した人を記録に出すときの名前（FR-053）。 */
@@ -40,50 +29,14 @@ const LIVE_STATUSES = ["trialing", "active", "past_due", "unpaid", "paused", "in
  * 退会の確認の画面に出す内容（contracts/api.md「退会の確認の内容」）。
  * @param db - データベース
  * @param userId - users.id
- * @returns メールアドレス・消えるアカウント・外れるチーム・契約中か
+ * @returns メールアドレス・契約中か
  */
 export async function withdrawalPreview(db: Db, userId: string) {
+  // アプリの中身（消えるアカウント・外れるチーム）は、アプリが registerWithdrawalPreviewSection で足す（specs/meguru/029）
   const [user] = await db.select({ email: users.email }).from(users).where(eq(users.id, userId));
-  const owned = await db
-    .select({ id: accounts.id, name: accounts.name })
-    .from(accounts)
-    .innerJoin(memberships, and(eq(memberships.accountId, accounts.id), eq(memberships.role, "owner")))
-    .where(eq(memberships.userId, userId))
-    .orderBy(asc(accounts.createdAt), asc(accounts.id));
-  const myTeams = await db
-    .select({ id: teams.id, name: teams.name, role: teamMembers.role })
-    .from(teamMembers)
-    .innerJoin(teams, eq(teams.id, teamMembers.teamId))
-    .where(eq(teamMembers.userId, userId))
-    .orderBy(asc(teamMembers.joinedAt), asc(teams.id));
-  const teamRows = [];
-  for (const t of myTeams) {
-    if (t.role !== "admin") {
-      teamRows.push({ id: t.id, name: t.name, isAdmin: false, outcome: "leave" as const, nextAdminName: null });
-      continue;
-    }
-    // 引き継ぎ先は、アカウントの削除（011 FR-046）と同じ選び方
-    const next = await chooseSuccessor(db, t.id, userId);
-    const nextName = next
-      ? await db
-          .select({ displayName: users.displayName, email: users.email })
-          .from(users)
-          .where(eq(users.id, next.userId))
-          .then((r) => (r[0] ? personName(r[0]) : null))
-      : null;
-    teamRows.push({
-      id: t.id,
-      name: t.name,
-      isAdmin: true,
-      outcome: next ? ("transfer" as const) : ("delete" as const),
-      nextAdminName: nextName,
-    });
-  }
   const [sub] = await db.select({ status: subscriptions.status }).from(subscriptions).where(eq(subscriptions.userId, userId));
   return {
     email: user?.email ?? "",
-    ownedAccounts: owned,
-    teams: teamRows,
     hasActiveSubscription: Boolean(sub?.status && LIVE_STATUSES.includes(sub.status)),
   };
 }
@@ -194,8 +147,7 @@ async function stopBilling(env: Env, userId: string, stripe: StripeClient) {
 }
 
 /**
- * 利用者のデータを消す（1つのトランザクション）。アカウントはアカウントの削除（001 FR-022）と同じく消し、チームは
- * 011 FR-046 と同じく抜ける（管理者なら引き継ぐか、チームを消す）。ほかの人のアカウントの記録の名前は「退会した人」にする。
+ * 利用者のデータを消す（1つのトランザクション）。アプリのデータは知らせ（userWithdrawing）でアプリが片づける。
  * @param tx - トランザクション
  * @param user - 退会する人
  */
@@ -204,38 +156,9 @@ async function deleteUserData(tx: TxDb, user: { id: string; clerkUserId: string 
   const [exists] = await tx.select({ id: users.id }).from(users).where(eq(users.id, user.id));
   const now = new Date();
   if (exists) {
-    // アプリの片づけ（Threads：招待の申し込み。枠を使っていない行は消し、使っている行はユーザー名だけを残す。specs/024 research.md R15）。
-    // 知らせで呼ぶ（specs/027 research.md R4）
+    // アプリの片づけ（Threads：招待の申し込み・持ち主のアカウント・チームの引き継ぎ・記録の名前）。
+    // 知らせで呼ぶ（specs/027 research.md R4。029 の PR2b で出来事に替える）
     await runHook("userWithdrawing", { tx, userId: user.id });
-    const owned = await tx
-      .select({ id: accounts.id, threadsUserId: accounts.threadsUserId })
-      .from(accounts)
-      .innerJoin(memberships, and(eq(memberships.accountId, accounts.id), eq(memberships.role, "owner")))
-      .where(eq(memberships.userId, user.id))
-      .orderBy(asc(accounts.id));
-    for (const a of owned) {
-      await beforeAccountDeleted(tx, a.id, user.id);
-      // アプリの片づけ（知らせ。アカウントの削除と同じ。Threadsのテスター招待は userWithdrawing で片づけ済みなので、ここでは何もしない）
-      await runHook("accountDeleting", { tx, accountId: a.id });
-      await tx.delete(accounts).where(eq(accounts.id, a.id));
-    }
-    // アプリの片づけ（Threads：データ削除の求めが処理中なら、退会で消したので完了にする。spec Edge Cases）。知らせで呼ぶ（specs/027）
-    const threadsIds = owned.flatMap((a) => (a.threadsUserId ? [a.threadsUserId] : []));
-    await runHook("userAccountsDeleted", { tx, userId: user.id, threadsUserIds: threadsIds, now });
-    // 念のため、まだ管理者のチームがあれば同じく引き継ぐ（teams.admin_user_id は ON DELETE RESTRICT）
-    const adminOf = await tx.select({ id: teams.id }).from(teams).where(eq(teams.adminUserId, user.id)).for("update");
-    for (const t of adminOf) {
-      const next = await chooseSuccessor(tx, t.id, user.id, { lock: true });
-      if (!next) {
-        await tx.delete(teams).where(eq(teams.id, t.id));
-        continue;
-      }
-      await tx.update(teamMembers).set({ role: "member" }).where(and(eq(teamMembers.teamId, t.id), eq(teamMembers.userId, user.id)));
-      await tx.update(teamMembers).set({ role: "admin" }).where(and(eq(teamMembers.teamId, t.id), eq(teamMembers.userId, next.userId)));
-      await tx.update(teams).set({ adminUserId: next.userId, updatedAt: now }).where(eq(teams.id, t.id));
-    }
-    // ほかの人のアカウントの操作の記録は残し、名前を「退会した人」にする（FR-053）
-    await tx.update(activityLogs).set({ actorName: WITHDRAWN_ACTOR_NAME }).where(eq(activityLogs.actorUserId, user.id));
     // ログインの情報を消した後に残るセッションで、users の行が作り直されないように記録する
     await tx.insert(withdrawnUsers).values({ clerkUserId: user.clerkUserId, withdrawnAt: now }).onConflictDoNothing();
     // 担当・チームの人・契約の行は ON DELETE CASCADE で消える

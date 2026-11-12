@@ -5,7 +5,7 @@ import { TOKEN_RECHECK_BATCH, TOKEN_RECHECK_RETRY_MINUTES } from "@meguru/shared
 import { and, asc, eq, isNotNull, lte, min, sql } from "drizzle-orm";
 import type { Db } from "../../../kernel/db/client";
 import { threadsConnections } from "../schema";
-import { accounts } from "../../../platform";
+import { accounts } from "../schema";
 import type { Env } from "../../../kernel/env";
 import { logger } from "../../../kernel/logger";
 import { ThreadsApiError, ThreadsAuthError, type ThreadsClient } from "../../../adapters/threads-api";

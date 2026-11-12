@@ -68,6 +68,8 @@ GET /api/teams/:teamId/invite ×3
 GET /api/teams/:teamId/status ×3
 GET /api/test-invites/:token ×2
 GET /api/threads/callback ×1
+GET /api/threads/me ×2
+GET /api/threads/me/withdrawal-preview ×2
 PATCH /api/accounts/:accountId ×2
 PATCH /api/accounts/:accountId/analysis/settings ×2
 PATCH /api/accounts/:accountId/mention-people/:personId ×2

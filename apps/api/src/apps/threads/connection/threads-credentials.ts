@@ -3,7 +3,7 @@
 import { and, eq } from "drizzle-orm";
 import type { Db } from "../../../kernel/db/client";
 import { threadsConnections } from "../schema";
-import { accounts } from "../../../platform";
+import { accounts } from "../schema";
 import type { Env } from "../../../kernel/env";
 import { createTokenCipher } from "../../../kernel/crypto";
 import { logger } from "../../../kernel/logger";
