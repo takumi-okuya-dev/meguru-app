@@ -1,6 +1,6 @@
 // APIの入出力スキーマ（contracts/api.md「型」）。WebとAPIで共有する。
 import { z } from "zod";
-import { meAppsSchema } from "./apps/catalog";
+import { APP_ACCESS_MODES, meAppsSchema } from "./apps/catalog";
 import { ERROR_CODES } from "./errors";
 import { FEATURES } from "./apps/threads/features";
 import { FEATURE_EVENT_ACTIONS } from "./features";
@@ -1757,6 +1757,8 @@ export const testGroupListSchema = z.object({ groups: z.array(testGroupSummarySc
 export const testGroupDetailSchema = testGroupSummarySchema.extend({
   /** グループの設定でOFFのまとまり（specs/019 FR-017。名前はアプリが登録したもの。specs/meguru/029 T070） */
   disabled: z.array(z.string().regex(/^[a-z_]{1,30}$/)), // appKeySchema と同じ形（定義の順のため、ここでは書き下す）
+  /** このグループに開いている「運営者が開いた人だけ」のアプリ（specs/meguru/030-app-access FR-005。登録の順） */
+  appAccess: z.array(z.string()),
   /** 入っている人（入った順） */
   members: z.array(z.object({ userId: z.string(), name: z.string(), email: z.string(), joinedAt: z.string() })),
   /** 記録（新しい順に TEST_GROUP_EVENTS_LIMIT 件） */
@@ -1814,14 +1816,18 @@ const featureSchema = appKeySchema;
 /** GET /api/operator/users?email= のクエリ（完全一致。前後の空白を除き、大文字・小文字を区別しない）。 */
 export const operatorUserQuerySchema = z.object({ email: z.string().trim().toLowerCase().pipe(z.email()) });
 
-/** 運営者の画面の、見つかった人と今の設定（disabled は人の設定、group.disabled はグループの設定。登録の順）。 */
+/**
+ * 運営者の画面の、見つかった人と今の設定（disabled は人の設定、group.disabled はグループの設定。登録の順）。
+ * appAccess は人ごとに開いているアプリ、group.appAccess はグループに開いているアプリ（specs/meguru/030-app-access FR-005。登録の順）。
+ */
 export const operatorUserSchema = z.object({
   userId: z.string(),
   name: z.string(),
   email: z.string(),
   disabled: z.array(featureSchema),
+  appAccess: z.array(z.string()),
   /** 入っている閉じていないグループ（入っていなければ null） */
-  group: z.object({ id: z.string(), name: z.string(), disabled: z.array(featureSchema) }).nullable(),
+  group: z.object({ id: z.string(), name: z.string(), disabled: z.array(featureSchema), appAccess: z.array(z.string()) }).nullable(),
 });
 /** 運営者の画面の、見つかった人と今の設定。 */
 export type OperatorUser = z.infer<typeof operatorUserSchema>;
@@ -1844,6 +1850,8 @@ export const operatorAppRegistrySchema = z.object({
   apps: z.array(
     z.object({
       app: z.string(),
+      /** 利用の決まり（open：だれでも使える、granted：運営者が開いた人だけ。specs/meguru/030-app-access FR-001） */
+      access: z.enum(APP_ACCESS_MODES),
       /** 機能のON/OFF（運営の「使える機能」の画面）を持つアプリか（今は1つだけ） */
       featureSwitches: z.boolean(),
       /** 運営の上限の画面が扱うアプリか（今は1つだけ） */
@@ -1870,10 +1878,27 @@ export const operatorAppRegistrySchema = z.object({
 /** 登録されたアプリの機能と上限の一覧の型。 */
 export type OperatorAppRegistry = z.infer<typeof operatorAppRegistrySchema>;
 
+// ---- アプリの利用の許可（specs/meguru/030-app-access FR-005）----
+
+/**
+ * PUT /api/operator/app-access/users/:userId・/groups/:groupId のリクエスト（アプリ → 開く・閉じる。書いたアプリだけを変える）。
+ * 「運営者が開いた人だけ」で登録したアプリの名前かは、API が登録の一覧で確かめる。
+ */
+export const appAccessRequestSchema = z.object({
+  apps: z.record(z.string(), z.boolean()),
+});
+/** アプリの利用の許可の保存の値。 */
+export type AppAccessRequest = z.infer<typeof appAccessRequestSchema>;
+
+/** PUT /api/operator/app-access/… の応答（保存した後に、その人・グループに開いているアプリ。登録の順）。 */
+export const appAccessResponseSchema = z.object({ granted: z.array(z.string()) });
+/** アプリの利用の許可の保存の応答。 */
+export type AppAccessResponse = z.infer<typeof appAccessResponseSchema>;
+
 /** GET /api/operator/feature-settings の応答（FR-013・FR-014）。 */
 export const featureSettingsListSchema = z.object({
   /** OFFのまとまりがある人。updatedAt は、その人の設定を最後に変えた日時（ONに戻した変更も含む）の新しい順 */
-  users: z.array(operatorUserSchema.omit({ group: true }).extend({ updatedAt: z.string() })),
+  users: z.array(operatorUserSchema.omit({ group: true, appAccess: true }).extend({ updatedAt: z.string() })),
   /** 最近の変更（新しい順に FEATURE_EVENTS_LIMIT 件まで） */
   events: z.array(
     z.object({

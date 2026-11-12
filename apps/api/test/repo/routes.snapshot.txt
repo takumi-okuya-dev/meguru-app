@@ -126,6 +126,8 @@ POST /api/threads/token-connect ×3
 POST /api/threads/webhooks/data-deletion ×2
 POST /api/threads/webhooks/uninstall ×2
 PUT /api/me/last-app ×2
+PUT /api/operator/app-access/groups/:groupId ×3
+PUT /api/operator/app-access/users/:userId ×3
 PUT /api/operator/feature-settings/:userId ×3
 PUT /api/operator/limits ×3
 PUT /api/operator/limits/users/:userId ×3

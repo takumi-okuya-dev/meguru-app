@@ -1,8 +1,11 @@
 // アプリの機能と上限の登録（specs/meguru/029-threads-pattern1 contracts/platform-entry.md 5、T006）。
 import { afterEach, describe, expect, it } from "vitest";
 import {
+  appAccessMode,
   appFeatures,
   appLimits,
+  grantedApps,
+  registerAppAccess,
   requireFeatureSettingsApp,
   isAppFeature,
   operatorLimitsApp,
@@ -91,5 +94,33 @@ describe("登録", () => {
     expect([isAppFeature("sample", "notes"), isAppFeature("sample", "x"), isAppFeature("other", "notes")]).toEqual([true, false, false]);
     expect([0, 1, 100, 101, 1.5].map((v) => isValidAppLimit("sample", "people", v))).toEqual([false, true, true, false, false]);
     expect(isValidAppLimit("sample", "unknown", 1)).toBe(false);
+  });
+});
+
+describe("アプリの利用の決まり（specs/meguru/030-app-access FR-001）", () => {
+  it("登録しないアプリは open。granted で登録したアプリは登録の順に grantedApps に出て、登録したアプリの一覧にも出る", () => {
+    expect(appAccessMode("sample")).toBe("open");
+    registerAppFeatures("sample", [{ key: "notes", label: "メモ" }]);
+    registerAppAccess("gated_b", "granted");
+    registerAppAccess("open_app", "open");
+    registerAppAccess("gated_a", "granted");
+    expect([appAccessMode("gated_b"), appAccessMode("open_app"), appAccessMode("sample")]).toEqual(["granted", "open", "open"]);
+    expect(grantedApps()).toEqual(["gated_b", "gated_a"]);
+    expect(registeredApps()).toEqual(["sample", "gated_b", "open_app", "gated_a"]);
+  });
+
+  it("同じ決まりの2回目は何もしない。違う決まりと、名前の形の誤りは登録のときに止める", () => {
+    registerAppAccess("sample", "granted");
+    registerAppAccess("sample", "granted");
+    expect(grantedApps()).toEqual(["sample"]);
+    expect(() => registerAppAccess("sample", "open")).toThrow(/sample/);
+    expect(() => registerAppAccess("Sample", "granted")).toThrow(/Sample/);
+    expect(() => registerAppAccess("a".repeat(31), "granted")).toThrow(/a{31}/);
+  });
+
+  it("登録を消すと、決まりも消える（テスト用）", () => {
+    registerAppAccess("sample", "granted");
+    resetRegistry();
+    expect([appAccessMode("sample"), grantedApps()]).toEqual(["open", []]);
   });
 });

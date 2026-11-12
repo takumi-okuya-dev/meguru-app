@@ -5,6 +5,7 @@ export const THREADS_REGISTRY: OperatorAppRegistry = {
   apps: [
     {
       app: "threads",
+      access: "open",
       featureSwitches: true,
       operatorLimits: true,
       features: [

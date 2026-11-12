@@ -34,6 +34,8 @@ description: "Task list for collect 001 event-day collection"
 
 **⚠️ PR1より先に`develop`に入っていること。仕様は029に足すか、`specs/meguru/NNN-app-entitlements`を作る。集金管理のセッションでは作らず、決まった方のセッションで作る。**
 
+**2026-11-13 追記**：PR0は[specs/meguru/030-app-access](../../meguru/030-app-access/spec.md)で入れた。**機能のON/OFF（019）に項目を足すのではなく、共通に「アプリの利用の許可」を作った**（029のあと、機能のON/OFFはThreadsだけが持つ仕組みになったため）。集金管理は、PR1で`APP_CATALOG`に`collect`を足し、組み立てで`registerAppAccess("collect", "granted")`を呼び、道筋に`requireAppAccess("collect")`を付ける。運営者は、設定 > 運営の「使える機能」（人）と「グループ」の「アプリの利用」で開く・閉じる。T001・T002は030で別の形で済んだ。T003のうち`available`・`last`・`landing`の絞り込みと`PUT /api/me/last-app`の400は030で済み、`APP_CATALOG`への`collect`の追加と`registerAppAccess`はPR1でする。
+
 - [ ] T001 共通の機能のON/OFF（`api/platform/features/`、029のあとは029が決めた置き場所）に、**既定でOFF**の項目を持てるようにするテストを先に書く：運営者が人ごと・テストのグループごとにONにした人だけが「使える」、ほかの人は「使えない」、今の項目（自動投稿・戦略・チーム。既定でON）の結果は変わらない（research.md R3）。
 - [ ] T002 T001を通す：既定でOFFの項目「集金管理」（キーは`collect`）を足し、運営の画面（機能のON/OFF）に出す。名前と意味はアプリ側が決める形（029 FR-012）。共通の入口の関数の利用権が、この項目を見て`collect`の使える・使えないを返す。
 - [ ] T003 `/api/me`の`available`を人ごとにする：`shared/apps.ts`の`APP_CATALOG`に`collect`（名前「めぐる 集金」・`basePath: "/collect"`・説明・料金の文言「テスト版（料金なし）」・`released: true`）を足し、`api/platform/identity/me-routes.ts`の`available`を「出してよいアプリ」かつ「その人に利用権がある」で絞る。テスト：利用権のない人の`available`に`collect`が出ない、ONにした人には出る、`PUT /api/me/last-app`は利用権のないアプリを400にする、Threadsだけの人の画面と応答は変わらない。

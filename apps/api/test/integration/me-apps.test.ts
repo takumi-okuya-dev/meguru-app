@@ -59,11 +59,19 @@ describe("GET /api/me の apps", () => {
 });
 
 describe("resolveMeApps", () => {
+  const all = new Set(["threads"]);
+
   it("アプリから伝えられた利用の状態（使っているアプリ）で決める。出せないアプリは除く", () => {
-    expect(resolveMeApps([], null).using).toEqual([]);
-    expect(resolveMeApps(["threads"], null).using).toEqual(["threads"]);
-    expect(resolveMeApps(["threads", "unknown"], null).using).toEqual(["threads"]);
-    expect(resolveMeApps(["threads"], "threads")).toEqual({ available: ["threads"], using: ["threads"], last: "threads", landing: "threads" });
+    expect(resolveMeApps([], null, all).using).toEqual([]);
+    expect(resolveMeApps(["threads"], null, all).using).toEqual(["threads"]);
+    expect(resolveMeApps(["threads", "unknown"], null, all).using).toEqual(["threads"]);
+    expect(resolveMeApps(["threads"], "threads", all)).toEqual({ available: ["threads"], using: ["threads"], last: "threads", landing: "threads" });
+  });
+
+  it("使えないアプリは、出せるアプリ・使っているアプリ・最後に使ったアプリ・入口の行き先から除く（specs/meguru/030 FR-004）", () => {
+    expect(resolveMeApps(["threads"], "threads", new Set())).toEqual({ available: [], using: [], last: null, landing: null });
+    // 使えるアプリの集合に、アプリの一覧で出していないアプリがあっても出さない（released のものだけ）
+    expect(resolveMeApps([], null, new Set(["threads", "demo_granted"])).available).toEqual(["threads"]);
   });
 });
 

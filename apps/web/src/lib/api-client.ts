@@ -1,6 +1,7 @@
 // APIクライアント。Clerkのセッショントークンを付け、レスポンスを共通スキーマで検証する。
 // 401 を受けたら、セッション切れとして案内してから /sign-in へ遷移する（contracts/ui-routes.md の規則7）。
 import {
+  appAccessResponseSchema,
   operatorAppRegistrySchema,
   billingRedirectSchema,
   withdrawalPreviewSchema,
@@ -274,6 +275,17 @@ export const api = {
     }),
   resetFeatureSettings: (userId: string) =>
     request(`/api/operator/feature-settings/${encodeURIComponent(userId)}`, operatorUserSchema, { method: "DELETE" }),
+  // アプリの利用の許可（specs/meguru/030-app-access FR-005。書いたアプリだけを開く・閉じる）
+  putUserAppAccess: (userId: string, apps: Record<string, boolean>) =>
+    request(`/api/operator/app-access/users/${encodeURIComponent(userId)}`, appAccessResponseSchema, {
+      method: "PUT",
+      body: JSON.stringify({ apps }),
+    }),
+  putGroupAppAccess: (groupId: string, apps: Record<string, boolean>) =>
+    request(`/api/operator/app-access/groups/${encodeURIComponent(groupId)}`, appAccessResponseSchema, {
+      method: "PUT",
+      body: JSON.stringify({ apps }),
+    }),
   // 上限（specs/024 contracts/api.md「運営者の上限」）
   operatorLimits: () => request("/api/operator/limits", operatorLimitsSchema),
   // 上限は「名前 → 値」（名前はアプリが登録したもの。specs/meguru/029 T070）

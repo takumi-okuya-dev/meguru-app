@@ -91,7 +91,7 @@ flowchart TB
 | 小分け | 表 | 処理とAPIの入口 |
 |---|---|---|
 | `identity/`（利用者） | `users`・`withdrawn_users` | `auth.ts`（認証のミドルウェア・`AppEnv`の型）・`me-routes.ts`（`/api/me`・退会） |
-| `access/`（権限） | — | `access.ts`（`authorizeAccount`：誰がどのアカウントで何をできるか） |
+| `access/`（アプリの利用の許可。specs/meguru/030） | `app_access_grants`・`group_app_access_grants` | `app-access.ts`（使えるかの判定はここだけ：`accessibleApps`・`canUseApp`・道筋の関所`requireAppAccess`）・`app-access-service.ts`（運営者が開く・閉じる）・`operator-app-access-routes.ts`（`PUT /api/operator/app-access/users/:userId`・`/groups/:groupId`） |
 | `accounts/`（運用するアカウントとメンバー） | `accounts`（3章の例外あり）・`memberships` | `account-service.ts`（作る・名前・消す・数える・上限・最後に開いたアカウント・Metaからのデータ削除でのアカウントの削除`deleteAccountsOfThreadsUser`）・`account-routes.ts` |
 | `teams/`（チーム・招待） | `teams`・`team_members`・`team_accounts` | `team-service.ts`・`team-status.ts`・`invite-service.ts`・`team-routes.ts`・`account-team-routes.ts`・`invite-routes.ts` |
 | `billing/`（契約と決済） | `subscriptions` | `billing-service.ts`・`billing-routes.ts`・`stripe-webhook-routes.ts` |
@@ -181,7 +181,7 @@ ESLintで止められる違反は0件にする。今すぐ直せないものは�
    - `schema.ts`：そのアプリの表。`pgSchema("<名前>")`でアプリ専用のスキーマに置き、共通の表（`platform/schema`）は参照しない。利用者のIDは`user_id`に値として持つ（外部キーなし。[docs/app-separation.md](./app-separation.md) 4）。共通の部品は`../../kernel/db/columns`。
    - 小分けのフォルダー（処理と`*-routes.ts`）。
    - `index.ts`：組み立てが使うもの（APIの入口を作る関数、知らせを受け取るなら`registerXxx()`）だけを出す。
-2. 共通は`../../platform`（入口）の関数からだけ使う（今の利用者・利用権など。共通の表は読まない）。共通で起きたこと（退会など）は、同じトランザクションの知らせではなく、出来事としてあとから受け取る。Threadsのモジュールは使わない（ESLintが止める）。
+2. 共通は`../../platform`（入口）の関数からだけ使う（今の利用者・利用権など。共通の表は読まない）。運営者が開いた人だけに使わせるアプリは、組み立てで`registerAppAccess("<名前>", "granted")`を呼び、アプリの道筋に`requireAppAccess("<名前>")`を付ける（使えない人は403 `APP_NOT_AVAILABLE`。`loadAppEntitlement(s)`も`access: "none"`を返す。specs/meguru/030-app-access）。登録しないアプリはだれでも使える。共通で起きたこと（退会など）は、同じトランザクションの知らせではなく、出来事としてあとから受け取る。Threadsのモジュールは使わない（ESLintが止める）。
 3. `apps/api/src/db/schema.ts`に`export * from "../apps/<名前>/schema";`を足し、`pnpm --filter api db:generate`でマイグレーションを作る。
 4. `apps/api/src/app.ts`で、入口のAPIの関数を`.route("/", …)`でつなぐ。APIの道筋は`/api/<名前>/…`にする。知らせを受け取るなら、`registerThreads()`と同じ場所で`registerXxx()`を呼ぶ。
 5. 入口を足したら`pnpm --filter api routes:snapshot`で一覧を書き直す。
