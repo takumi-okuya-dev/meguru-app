@@ -1,6 +1,7 @@
 // 設定 > 運営 > グループ（specs/016-test-groups contracts/ui-routes.md 3、US2、FR-009〜FR-011・FR-013）。
 // 運営者だけ。一覧（作る）と、グループの詳しい画面（名前と上限・使える機能・招待リンク・人を外す・閉じる・記録）。
 // 2026-11-04（specs/019）：本番でも組織の単位として使うので、項目名を「グループ」にし、「使える機能」を足した。
+// 2026-11-13（specs/meguru/030-app-access）：「アプリの利用」（運営者が開いた人だけのアプリ）を足した。そのアプリがあるときだけ出す。
 import {
   TEST_GROUP_CAPACITY_MAX,
   TEST_GROUP_CAPACITY_MIN,
@@ -12,6 +13,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ChevronLeftIcon, ChevronRightIcon } from "lucide-react";
 import { useRef, useState, type FormEvent } from "react";
 import { Link, useNavigate, useParams } from "react-router";
+import { AppAccessSwitches } from "@/components/AppAccessSwitches";
 import { FeatureSwitches } from "@/components/FeatureSwitches";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { SwapLabel } from "@/components/SwapLabel";
@@ -299,6 +301,17 @@ export function TestGroupDetailPage() {
             onSave={async (values) => {
               queryClient.setQueryData(queryKeys.testGroup(g.id), await api.putTestGroupFeatures(g.id, values));
               await queryClient.invalidateQueries({ queryKey: queryKeys.featureSettings });
+            }}
+          />
+          {/* 運営者が開いた人だけのアプリ（specs/meguru/030-app-access FR-006。なければ出さない） */}
+          <AppAccessSwitches
+            key={`apps-${g.id}`}
+            title="アプリの利用"
+            label={`${g.name}のアプリの利用`}
+            granted={g.appAccess}
+            onChange={async (app, granted) => {
+              const saved = await api.putGroupAppAccess(g.id, { [app]: granted });
+              queryClient.setQueryData<TestGroupDetail>(queryKeys.testGroup(g.id), (prev) => (prev ? { ...prev, appAccess: saved.granted } : prev));
             }}
           />
         </section>

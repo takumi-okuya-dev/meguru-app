@@ -74,6 +74,8 @@ export const ERROR_CODES = [
   "TESTER_SLOTS_FULL",
   "POSTING_SLOT_LIMIT",
   "RATE_LIMITED",
+  // アプリの利用の許可（specs/meguru/030-app-access FR-003）
+  "APP_NOT_AVAILABLE",
 ] as const;
 
 /** エラーコード。 */
@@ -273,6 +275,8 @@ export function errorMessage(code: ErrorCode, ctx: ErrorMessageContext = {}): Er
       return { message: `1日に投稿できるのは${ctx.max ?? 1}件までです。`, action: "none" };
     case "RATE_LIMITED":
       return { message: "少し時間をおいてから、もう一度お試しください。", action: "retry-later" };
+    case "APP_NOT_AVAILABLE":
+      return { message: "このアプリは今は使えません。", action: "none" };
     case "INVITE_INVALID":
       return {
         message: "このリンクは使えません。作り直されたか、チームが削除されました。管理者に、新しいリンクを頼んでください。",

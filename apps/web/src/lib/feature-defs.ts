@@ -19,6 +19,15 @@ export function featureDefsOf(registry: OperatorAppRegistry): FeatureDef[] {
 }
 
 /**
+ * 登録の一覧から、「運営者が開いた人だけ」（granted）のアプリを取り出す（specs/meguru/030-app-access FR-006。登録の順）。
+ * @param registry - 登録の一覧
+ * @returns アプリの番号
+ */
+export function grantedAppsOf(registry: OperatorAppRegistry): string[] {
+  return registry.apps.filter((a) => a.access === "granted").map((a) => a.app);
+}
+
+/**
  * 登録の一覧を読む（運営者だけが呼べる。機能と上限の画面が同じクエリを使う）。
  * @returns TanStack Query の結果
  */

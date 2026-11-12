@@ -225,6 +225,13 @@
       "when": 1794501436422,
       "tag": "0031_drop_old_limit_columns",
       "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1794509509764,
+      "tag": "0032_app_access_grants",
+      "breakpoints": true
     }
   ]
 }

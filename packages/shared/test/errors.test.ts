@@ -163,3 +163,10 @@ describe("テスター招待・上限・契約前のエラー文言（specs/024 
     expect(errorMessage("BILLING_REQUIRED", { details: ["not_subscribed"] })).toEqual({ message: "契約してから使い始めます。", action: "subscribe" });
   });
 });
+
+describe("アプリの利用の許可のエラー文言（specs/meguru/030-app-access FR-003）", () => {
+  it("新しいコードはエラーコードとして扱え、文言がある", () => {
+    expect(isErrorCode("APP_NOT_AVAILABLE")).toBe(true);
+    expect(errorMessage("APP_NOT_AVAILABLE")).toEqual({ message: "このアプリは今は使えません。", action: "none" });
+  });
+});

@@ -18,6 +18,7 @@ import { AppError } from "../../kernel/errors";
 import { sha256Hex } from "../../kernel/identifier-hash";
 import { personName } from "../identity/people";
 import { groupDisabledFeatures, saveGroupFeatures } from "../features/feature-service";
+import { groupAppAccess } from "../access/app-access-service";
 import { inviteUrl, newInviteToken, openInviteToken, sealInviteToken } from "../../kernel/invite-token";
 
 /** users の表か、その別名（alias(users, …)）。 */
@@ -339,6 +340,8 @@ export async function testGroupDetail(env: Env, groupId: string): Promise<TestGr
   return {
     ...(await toSummary(env, g, members.length)),
     disabled: await groupDisabledFeatures(db, g.id),
+    // グループに開いているアプリ（specs/meguru/030-app-access FR-005）
+    appAccess: await groupAppAccess(db, g.id),
     members: members.map((m) => ({ userId: m.userId, name: personName(m), email: m.email, joinedAt: m.joinedAt.toISOString() })),
     events: events.map((e) => ({
       action: e.action as TestGroupEventAction,

@@ -56,6 +56,7 @@ const DETAIL: TestGroupDetail = {
   closedAt: null,
   createdAt: "2026-10-31T00:00:00.000Z",
   disabled: [],
+  appAccess: [],
   members: [
     { userId: "m1", name: "鈴木", email: "suzuki@example.com", joinedAt: "2026-10-31T01:00:00.000Z" },
     { userId: "m2", name: "佐藤", email: "sato@example.com", joinedAt: "2026-10-31T02:00:00.000Z" },

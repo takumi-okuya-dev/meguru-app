@@ -2,10 +2,11 @@
 // 共通で起きたことを、表の変更と同じトランザクションで送り出しの表に書き、あとでアプリの受け取りに届ける。
 // 届けるのは、書いた直後（応答のあと）と5分ごとの定期処理。失敗したら間をあけてやり直し、10回で止める。
 // 受け取りは、同じ出来事が2回届いても結果が変わらないように作る（アプリの側で番号を記録する）。
-import { and, asc, eq, gte, inArray, lt, lte, sql } from "drizzle-orm";
+import { and, asc, eq, gte, inArray, lt, lte, min, sql } from "drizzle-orm";
 import { createDb, type Db, type TxDb } from "../../kernel/db/client";
 import type { Env } from "../../kernel/env";
 import { logger } from "../../kernel/logger";
+import { wakeEventDelivery } from "./delivery-gate";
 import { platformEventDeliveries, platformEvents } from "../schema";
 
 /** 出来事の種類と中身。中身に入れるのは番号だけ（メールアドレス・名前・本文は入れない）。 */
@@ -113,6 +114,8 @@ function errorSummary(err: unknown): string {
 /**
  * 時刻の来た出来事を、届け先ごとに古い順に届ける。届け先ごとに「借りる」（次に試す時刻を先へ進める）ので、
  * 書いた直後の届けと定期処理が重なっても、同じ届け先に同時に2回は届けない。
+ * 出来事を書いたら、トランザクションのあとで必ず eventIds つきで呼ぶ（書いた直後の届け）。届け残しがあれば、5分ごとの届けを起こす
+ * （5分ごとの届けは、用がなければKVの関所で眠っているため。delivery-gate.ts）。
  * @param env - Workers のバインディング
  * @param now - 今の時刻
  * @param opts - eventIds：この出来事だけを届ける（書いた直後に、ほかの出来事まで待たずに届けるため。PR #96 のセルフレビュー）
@@ -124,7 +127,32 @@ export async function deliverPendingEvents(
   opts: { eventIds?: readonly string[] } = {},
 ): Promise<{ delivered: number; failed: number }> {
   if (opts.eventIds && opts.eventIds.length === 0) return { delivered: 0, failed: 0 };
-  const only = opts.eventIds ? inArray(platformEventDeliveries.eventId, [...opts.eventIds]) : undefined;
+  if (!opts.eventIds) return (await deliverDue(env, now)).result;
+  // 書いた直後の届け：届け残し（失敗・ほかの処理が借りている）か、途中の失敗があれば、5分ごとの届けを起こす。
+  // 知らせはトランザクションのあとに書くので、知らせより前に始まった5分ごとの回がDBを見落としても、次の回が必ずDBを見る
+  try {
+    const { result, leftover } = await deliverDue(env, now, opts.eventIds);
+    if (leftover) await wakeEventDelivery(env.AUTOPOST_KV);
+    return result;
+  } catch (err) {
+    await wakeEventDelivery(env.AUTOPOST_KV);
+    throw err;
+  }
+}
+
+/**
+ * 時刻の来た届けを、受け取りに渡す（deliverPendingEvents の中身）。
+ * @param env - Workers のバインディング
+ * @param now - 今の時刻
+ * @param eventIds - この出来事だけを届ける（省けば、時刻の来たものすべて）
+ * @returns 届けた数と失敗した数、届け残しがあるか
+ */
+async function deliverDue(
+  env: Env,
+  now: Date,
+  eventIds?: readonly string[],
+): Promise<{ result: { delivered: number; failed: number }; leftover: boolean }> {
+  const only = eventIds ? inArray(platformEventDeliveries.eventId, [...eventIds]) : undefined;
   const db = createDb(env.DATABASE_URL);
   // 試した回数が上限に達したまま pending の行（受け取りの途中で止まり続けた）は、受け取りを呼ばずに failed にする（PR #92 のCodexレビュー）
   const exhausted = await db
@@ -155,6 +183,7 @@ export async function deliverPendingEvents(
     .orderBy(asc(platformEvents.createdAt))
     .limit(DELIVERY_BATCH);
   let delivered = 0;
+  let leftover = false;
   let failed = exhausted.length;
   for (const d of due) {
     const where = and(eq(platformEventDeliveries.eventId, d.eventId), eq(platformEventDeliveries.consumer, d.consumer));
@@ -173,7 +202,10 @@ export async function deliverPendingEvents(
         ),
       )
       .returning({ attempts: platformEventDeliveries.attempts });
-    if (!claimed) continue;
+    if (!claimed) {
+      leftover = true;
+      continue;
+    }
     const handler = consumers.get(d.consumer)?.get(d.type as PlatformEventType);
     const attempts = claimed.attempts;
     try {
@@ -197,7 +229,20 @@ export async function deliverPendingEvents(
       failed += 1;
     }
   }
-  return { delivered, failed };
+  return { result: { delivered, failed }, leftover: leftover || failed > 0 };
+}
+
+/**
+ * まだ届いていない届けのうち、いちばん早い「次に試す時刻」（5分ごとの届けの関所が、次に見る時刻に使う）。
+ * @param db - データベース
+ * @returns 時刻（届いていない届けがなければ null）
+ */
+export async function nextPendingAttemptAt(db: Db): Promise<Date | null> {
+  const [row] = await db
+    .select({ at: min(platformEventDeliveries.nextAttemptAt) })
+    .from(platformEventDeliveries)
+    .where(eq(platformEventDeliveries.status, "pending"));
+  return row?.at ? new Date(row.at) : null;
 }
 
 /**

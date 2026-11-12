@@ -1,19 +1,21 @@
 // アプリ向けの利用権（specs/meguru/029-threads-pattern1 research.md R4、contracts/platform-entry.md 2）。
 // 契約（使える状態）・料金なし・運営者・機能のON/OFF・上限を、1つにまとめて返す。アプリは共通の表を読まず、これだけを使う。
 // 判定の中身は今の関数（entitlementFromFacts・billingExemptSql・testAccessSql・機能のOFF）をそのまま使い、結果を変えない。
+// 「運営者が開いた人だけ」のアプリで許可のない人は access: "none"（specs/meguru/030-app-access FR-003。判定は access/app-access.ts）。
 import type { Entitlement } from "@meguru/shared";
 import { eq, inArray, sql } from "drizzle-orm";
 import type { BillingMode } from "../../kernel/config";
 import type { Db, TxDb } from "../../kernel/db/client";
 import { billingFactsColumns, entitlementFromFacts } from "../billing/billing-service";
 import { disabledAppFeaturesSql } from "../features/feature-sql";
-import { appFeatures, appLimits } from "../registry/registry";
+import { appAccessMode, appFeatures, appLimits } from "../registry/registry";
+import { appGrantedSql } from "../access/app-access";
 import { personName } from "../identity/people";
 import { appLimitDefaults, subscriptions, userAppLimits, users } from "../schema";
 
 /** アプリ向けの利用権。 */
 export type AppEntitlement = {
-  /** full：すべて使える。read_only：読むだけ（未払いなど）。none：使えない（契約前・見つからない） */
+  /** full：すべて使える。read_only：読むだけ（未払いなど）。none：使えない（契約前・見つからない・アプリの利用の許可がない） */
   access: "full" | "read_only" | "none";
   /** 契約の使える状態（今の Entitlement。画面の帯・読むだけの理由に使う） */
   billing: Entitlement;
@@ -60,7 +62,9 @@ export async function loadAppEntitlements(
   const ids = [...new Set(userIds)];
   const out = new Map<string, AppEntitlement>();
   if (ids.length === 0) return out;
-  // 問い合わせは1回（利用者の行・契約・機能のOFF・人ごとの上限・既定の上限）。APIのたびに通る判定なので、同時の接続を増やさない
+  // 「運営者が開いた人だけ」のアプリは、許可があるかも同じ問い合わせで読む（open のアプリは読まない。specs/meguru/030-app-access）
+  const gated = appAccessMode(app) === "granted";
+  // 問い合わせは1回（利用者の行・契約・機能のOFF・人ごとの上限・既定の上限・利用の許可）。APIのたびに通る判定なので、同時の接続を増やさない
   const rows = await db
     .select({
       ...billingFactsColumns(mode),
@@ -74,6 +78,7 @@ export async function loadAppEntitlements(
         FROM ${userAppLimits} l WHERE l."user_id" = ${users.id} AND l."app" = ${app}), '[]'::json)`,
       defaultLimits: sql<{ key: string; value: number }[]>`coalesce((SELECT json_agg(json_build_object('key', d."key", 'value', d."value"))
         FROM ${appLimitDefaults} d WHERE d."app" = ${app}), '[]'::json)`,
+      granted: gated ? appGrantedSql(users.id, app) : sql<boolean>`true`,
     })
     .from(users)
     .leftJoin(subscriptions, eq(subscriptions.userId, users.id))
@@ -91,7 +96,8 @@ export async function loadAppEntitlements(
       limits[key] = operator ? def.operatorValue : (own.get(key) ?? defaultOf.get(key) ?? def.max);
     }
     out.set(r.id, {
-      access: accessOf(billing),
+      // 許可のない人は、契約の状態によらず使えない（運営者は許可がなくても使える。FR-002）
+      access: operator || r.granted ? accessOf(billing) : "none",
       billing,
       billingExempt: r.billingExempt,
       operator,

@@ -1,5 +1,7 @@
 // アプリが共通に登録する、機能のまとまりと上限の名前（specs/meguru/029-threads-pattern1 research.md R7、contracts/platform-entry.md 5）。
 // 名前・表示名・範囲はアプリが決め、組み立て（app.ts）で登録する。共通のコードにはアプリの名前を書かない。
+// アプリの利用の決まり（だれでも使える・運営者が開いた人だけ）も、ここで登録する（specs/meguru/030-app-access FR-001）。
+import type { AppAccessMode } from "@meguru/shared";
 
 /** 機能のまとまりの定義。 */
 export type AppFeatureDef = {
@@ -36,6 +38,13 @@ const FEATURE_KEY_RE = /^[a-z_]{1,30}$/;
 const limits = new Map<string, Readonly<Record<string, AppLimitDef>>>();
 /** 運営の上限の画面が扱うアプリ。登録のときにアプリが宣言する（機能のON/OFFと同じ決まり） */
 let limitsOwner: string | undefined;
+/** アプリの利用の決まり（登録の順。登録しないアプリは open） */
+const accessModes = new Map<string, AppAccessMode>();
+/**
+ * 利用の許可の表に書けるアプリの名前の形（英小文字で始まり、英小文字・数字・- の31文字まで。アプリの番号の形で、機能の ON/OFF の表の
+ * app の列と、許可の表の CHECK（platform/schema.ts）に合わせる。specs/meguru/030-app-access plan.md「表」）
+ */
+const ACCESS_APP_RE = /^[a-z][a-z0-9-]{0,30}$/;
 
 /**
  * アプリの機能のまとまりを登録する。同じアプリは1回だけ（2回目からは何もしない）。
@@ -115,6 +124,37 @@ export function registerAppLimits(
 }
 
 /**
+ * アプリの利用の決まりを登録する（specs/meguru/030-app-access FR-001）。登録しないアプリは open（だれでも使える）。
+ * 同じアプリを違う決まりで2回登録したら、起動のときに止める（黙って片方を使わない）。
+ * @param app - アプリの番号
+ * @param mode - open：だれでも使える。granted：運営者・人ごとの許可・閉じていないテストのグループの許可がある人だけ
+ * @throws Error 名前の形が違う、または同じアプリを違う決まりで登録しようとしたとき
+ */
+export function registerAppAccess(app: string, mode: AppAccessMode): void {
+  if (!ACCESS_APP_RE.test(app)) throw new Error(`アプリの名前「${app}」の形が違います（英小文字で始まり、英小文字・数字・- の31文字まで）`);
+  const before = accessModes.get(app);
+  if (before && before !== mode) throw new Error(`アプリ「${app}」の利用の決まりは、もう「${before}」で登録しています`);
+  accessModes.set(app, mode);
+}
+
+/**
+ * アプリの利用の決まり（登録していなければ open）。
+ * @param app - アプリの番号
+ * @returns open か granted
+ */
+export function appAccessMode(app: string): AppAccessMode {
+  return accessModes.get(app) ?? "open";
+}
+
+/**
+ * 「運営者が開いた人だけ」（granted）で登録したアプリ（登録の順）。
+ * @returns アプリの番号
+ */
+export function grantedApps(): string[] {
+  return [...accessModes].filter(([, mode]) => mode === "granted").map(([app]) => app);
+}
+
+/**
  * 運営の上限の画面が扱うアプリ（registerAppLimits で operatorScreen を宣言したアプリ）。
  * @returns アプリの番号（宣言がなければ undefined）
  */
@@ -141,11 +181,11 @@ export function appLimits(app: string): Readonly<Record<string, AppLimitDef>> {
 }
 
 /**
- * 機能か上限を登録したアプリの番号（登録した順）。
+ * 機能・上限・利用の決まりのどれかを登録したアプリの番号（登録した順）。
  * @returns アプリの番号
  */
 export function registeredApps(): string[] {
-  return [...new Set([...features.keys(), ...limits.keys()])];
+  return [...new Set([...features.keys(), ...limits.keys(), ...accessModes.keys()])];
 }
 
 /**
@@ -174,6 +214,7 @@ export function isValidAppLimit(app: string, key: string, value: number): boolea
 export function resetRegistry(): void {
   features.clear();
   limits.clear();
+  accessModes.clear();
   switchesOwner = undefined;
   limitsOwner = undefined;
 }
