@@ -3,12 +3,12 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import type { AccountSummary, MeResponse } from "@meguru/shared";
+import type { AccountSummary } from "@meguru/shared";
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { ME_BILLING_OFF } from "./helpers/billing";
+import { ME_BILLING_OFF, type MeWithThreads } from "./helpers/billing";
 
-let meResponse: MeResponse;
+let meResponse: MeWithThreads;
 const mocks = vi.hoisted(() => ({ tokenConnect: vi.fn(), connect: vi.fn(), assign: vi.fn() }));
 vi.mock("@/lib/api-client", async (orig) => {
   const actual = await orig<typeof import("@/lib/api-client")>();

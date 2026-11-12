@@ -4,7 +4,7 @@ import { call, createUserWithAccount, fake, makeApp, resetDb } from "../helpers/
 import { addMin, approvedDrafts, connectedAccount, db, draftRow, jst, run, setSchedule } from "../helpers/auto-post";
 
 const app = makeApp();
-const base = (accountId: string) => `/api/accounts/${accountId}`;
+const base = (accountId: string) => `/api/threads/accounts/${accountId}`;
 
 beforeEach(async () => {
   await resetDb();

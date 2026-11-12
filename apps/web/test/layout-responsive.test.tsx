@@ -2,11 +2,10 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import type { MeResponse } from "@meguru/shared";
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { resetViewport, setViewport } from "./helpers/viewport";
-import { ME_BILLING_OFF } from "./helpers/billing";
+import { ME_BILLING_OFF, type MeWithThreads } from "./helpers/billing";
 
 vi.mock("@clerk/react", () => ({
   useUser: () => ({ user: { fullName: "Takumi", primaryEmailAddress: { emailAddress: "t@example.com" } } }),
@@ -16,7 +15,7 @@ vi.mock("@clerk/react", () => ({
 function account(id: string, username: string, connectionStatus: "connected" | "needs_reconnect" = "connected") {
   return { id, name: username, username, displayName: username, profilePictureUrl: null, connectionStatus, lastUsedAt: null, role: "owner" as const, ownerName: null };
 }
-const meResponse: MeResponse = {
+const meResponse: MeWithThreads = {
   user: { id: "u", email: "t@example.com", displayName: "Takumi" },
   accounts: [account("a1", "takumi"), account("a2", "aibu", "needs_reconnect")],
   landingAccountId: "a1",

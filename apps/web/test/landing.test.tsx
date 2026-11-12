@@ -2,10 +2,9 @@
 // （許可の画面にいる間にアカウントが消された・state が使えない。contracts/api.md、PR #15 のCodexレビュー）。
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, render, screen, waitFor } from "@testing-library/react";
-import type { MeResponse } from "@meguru/shared";
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { ME_BILLING_OFF } from "./helpers/billing";
+import { ME_BILLING_OFF, type MeWithThreads } from "./helpers/billing";
 
 const mocks = vi.hoisted(() => ({ me: vi.fn() }));
 vi.mock("@/lib/api-client", async (orig) => {
@@ -21,7 +20,7 @@ vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: toastError, dismiss
 
 const { Landing } = await import("@/apps/threads/pages/home");
 
-function me(landingAccountId: string | null): MeResponse {
+function me(landingAccountId: string | null): MeWithThreads {
   return {
     user: { id: "u", email: "u@example.com", displayName: null },
     accounts: [],
@@ -35,7 +34,7 @@ function me(landingAccountId: string | null): MeResponse {
 }
 
 /** 一覧に入れる Account（行き先の判定に使う分だけ）。 */
-function account(id: string): MeResponse["accounts"][number] {
+function account(id: string): MeWithThreads["accounts"][number] {
   return {
     id,
     name: "アカウント",
@@ -49,7 +48,7 @@ function account(id: string): MeResponse["accounts"][number] {
   };
 }
 
-function renderAt(path: string, cached?: MeResponse) {
+function renderAt(path: string, cached?: MeWithThreads) {
   const router = createMemoryRouter(
     [
       { path: "/", element: <Landing /> },
@@ -103,8 +102,8 @@ describe("古い一覧で行き先を決めない（消したアカウントへ�
   it("取り直している間は移らず、新しい一覧が届いてから決める", async () => {
     // 前に読んだ一覧には、もう消したアカウントが残っている
     const stale = { ...me("a-deleted"), accounts: [account("a-deleted")] };
-    let finish: (v: MeResponse) => void = () => {};
-    mocks.me.mockImplementation(() => new Promise<MeResponse>((r) => (finish = r)));
+    let finish: (v: MeWithThreads) => void = () => {};
+    mocks.me.mockImplementation(() => new Promise<MeWithThreads>((r) => (finish = r)));
     const router = renderAt("/", stale);
     // 取り直しが終わるまで、消したアカウントへは移らない
     await new Promise((r) => setTimeout(r, 50));

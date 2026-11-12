@@ -12,7 +12,7 @@ beforeEach(async () => {
   await resetDb();
 });
 
-const base = (accountId: string) => `/api/accounts/${accountId}`;
+const base = (accountId: string) => `/api/threads/accounts/${accountId}`;
 
 type PostDraft = { id: string; batchId: string; position: number; body: string; status: string; version: number };
 type BatchResult = { batchId: string; draftCount: number; delimiterFound: boolean; overLimitCount: number; drafts: PostDraft[] };
@@ -608,13 +608,13 @@ describe("編集者の削除（チーム運用）", () => {
   it("編集者は要確認の案だけを消せ、却下の案は消さずに飛ばす", async () => {
     const { accountId } = await createUserWithAccount("o1");
     await putInTeam(accountId, "o1", { editor: "e1" });
-    const reg = await call(app, "POST", `/api/accounts/${accountId}/draft-batches`, {
+    const reg = await call(app, "POST", `/api/threads/accounts/${accountId}/draft-batches`, {
       user: "e1",
       body: { clientRequestId: crypto.randomUUID(), text: "残す案\n@@@\n却下する案" },
     });
     expect(reg.status).toBe(201);
     const [keep, rejected] = ((await reg.json()) as { drafts: { id: string; version: number }[] }).drafts;
-    const rej = await call(app, "POST", `/api/accounts/${accountId}/post-drafts/review`, {
+    const rej = await call(app, "POST", `/api/threads/accounts/${accountId}/post-drafts/review`, {
       user: "o1",
       body: {
         requestId: crypto.randomUUID(),
@@ -624,7 +624,7 @@ describe("編集者の削除（チーム運用）", () => {
       },
     });
     expect(rej.status).toBe(200);
-    const del = await call(app, "POST", `/api/accounts/${accountId}/post-drafts/delete`, {
+    const del = await call(app, "POST", `/api/threads/accounts/${accountId}/post-drafts/delete`, {
       user: "e1",
       body: { ids: [keep!.id, rejected!.id] },
     });

@@ -29,7 +29,7 @@ describe("投稿のプロンプトの参考投稿", () => {
     await insert("不明の新しい投稿", "unknown", null, 10);
     for (let i = 0; i < 6; i++) await insert(`埋める投稿${i}`, "unknown", null, 100 + i);
 
-    const res = await call(app, "GET", `/api/accounts/${accountId}/prompt?count=10`, { user: "u1" });
+    const res = await call(app, "GET", `/api/threads/accounts/${accountId}/prompt?count=10`, { user: "u1" });
     expect(res.status).toBe(200);
     const { prompt, summary } = (await res.json()) as { prompt: string; summary: { referencePostCount: number } };
     expect(summary.referencePostCount).toBe(10);

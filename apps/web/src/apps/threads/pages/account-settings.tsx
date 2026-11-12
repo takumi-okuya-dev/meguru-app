@@ -38,7 +38,6 @@ import { describeError } from "@/lib/api-client";
 import { threadsApi } from "@/apps/threads/lib/api";
 import { useCallbackResult } from "@/apps/threads/lib/callback-result";
 import { takeInviteReturn } from "@/lib/invite-return";
-import { queryKeys } from "@/lib/query";
 import { threadsQueryKeys } from "@/apps/threads/lib/query-keys";
 import { useCurrentAccount } from "@/apps/threads/pages/account-layout";
 import { TeamSection } from "@/apps/threads/components/team/TeamSection";
@@ -130,7 +129,7 @@ function AccountSettingsContent() {
     setTokenWarnings(warnings);
     setJustConnected(true);
     await Promise.all([
-      queryClient.invalidateQueries({ queryKey: queryKeys.me }),
+      queryClient.invalidateQueries({ queryKey: threadsQueryKeys.me }),
       queryClient.invalidateQueries({ queryKey: threadsQueryKeys.account(account.id) }),
     ]);
   };

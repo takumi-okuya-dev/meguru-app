@@ -68,14 +68,14 @@ async function applicationOf(accountId: string, values: { status: string; holdsS
     VALUES (${accountId}, ${`app_${++seq}`}, ${values.status}, ${values.holdsSlot ?? false}, ${values.removalReason ?? null})`;
 }
 
-const get = (query = "", user = OP) => callT(app, "GET", `/api/operator/accounts${query}`, { user });
+const get = (query = "", user = OP) => callT(app, "GET", `/api/threads/operator/accounts${query}`, { user });
 const list = async (query = "") => {
   const res = await get(query);
   expect(res.status).toBe(200);
   return (await res.json()) as OperatorAccounts;
 };
 
-describe("GET /api/operator/accounts：行（US1）", () => {
+describe("GET /api/threads/operator/accounts：行（US1）", () => {
   it("接続方法・接続の状態・@ユーザー名・オーナー・テスター招待の状態を返す", async () => {
     const app1 = await accountOf("u1", { name: "AI部", username: "taku.it.ai" });
     await applicationOf(app1, { status: "connected", holdsSlot: true });
@@ -169,12 +169,12 @@ describe("GET /api/operator/accounts：行（US1）", () => {
 
   it("書き込むメソッドはない（404）", async () => {
     for (const method of ["POST", "PUT", "PATCH", "DELETE"]) {
-      expect((await callT(app, method, "/api/operator/accounts", { user: OP, body: {} })).status).toBe(404);
+      expect((await callT(app, method, "/api/threads/operator/accounts", { user: OP, body: {} })).status).toBe(404);
     }
   });
 });
 
-describe("GET /api/operator/accounts：絞り込みと件数（US2）", () => {
+describe("GET /api/threads/operator/accounts：絞り込みと件数（US2）", () => {
   it("件数は接続方法で数え、要再接続はその方法の側。method で絞っても件数は変わらない", async () => {
     await accountOf("u1");
     await accountOf("u1");
@@ -197,7 +197,7 @@ describe("GET /api/operator/accounts：絞り込みと件数（US2）", () => {
   });
 });
 
-describe("GET /api/operator/accounts：検索（US3）", () => {
+describe("GET /api/threads/operator/accounts：検索（US3）", () => {
   it("アカウントの名前・@ユーザー名・オーナーの名前・メールアドレスの一部（大文字・小文字を問わない）", async () => {
     await userOf("owner_a", { name: "山田 太郎", email: "Taro.Yamada@example.com" });
     const a = await accountOf("owner_a", { name: "AI部", username: "taku.it.ai" });

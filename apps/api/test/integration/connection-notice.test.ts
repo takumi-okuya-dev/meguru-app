@@ -8,7 +8,7 @@ const app = makeApp();
 const q = () => neon(testEnv.DATABASE_URL);
 type Notice = { otherAccount: null | { appliedUsername: string; connectedUsername: string } };
 const notice = async (accountId: string, user = "u1", env = testEnv) =>
-  call(app, "GET", `/api/accounts/${accountId}/connection-notice`, { user, env });
+  call(app, "GET", `/api/threads/accounts/${accountId}/connection-notice`, { user, env });
 
 beforeEach(async () => {
   await resetDb();
@@ -29,7 +29,7 @@ async function invitedAndConnected(fakeUser: string, applied = "shop_tokyo") {
   return accountId;
 }
 
-describe("GET /api/accounts/:id/connection-notice", () => {
+describe("GET /api/threads/accounts/:id/connection-notice", () => {
   it("招待済みで違う名前でつながると、申し込んだ名前とつながった名前を返す", async () => {
     const accountId = await invitedAndConnected("9002");
     const res = await notice(accountId);
@@ -73,13 +73,13 @@ describe("GET /api/accounts/:id/connection-notice", () => {
   });
 });
 
-describe("POST /api/accounts/:id/connection-notice/dismiss", () => {
+describe("POST /api/threads/accounts/:id/connection-notice/dismiss", () => {
   it("閉じると 204 で、そのあとは出ない。行がなくても 204", async () => {
     const accountId = await invitedAndConnected("9002");
-    const res = await call(app, "POST", `/api/accounts/${accountId}/connection-notice/dismiss`, { user: "u1" });
+    const res = await call(app, "POST", `/api/threads/accounts/${accountId}/connection-notice/dismiss`, { user: "u1" });
     expect(res.status).toBe(204);
     expect(((await (await notice(accountId)).json()) as Notice).otherAccount).toBeNull();
     const plain = await unconnectedAccountOf(app, "u1", "ふつう");
-    expect((await call(app, "POST", `/api/accounts/${plain}/connection-notice/dismiss`, { user: "u1" })).status).toBe(204);
+    expect((await call(app, "POST", `/api/threads/accounts/${plain}/connection-notice/dismiss`, { user: "u1" })).status).toBe(204);
   });
 });

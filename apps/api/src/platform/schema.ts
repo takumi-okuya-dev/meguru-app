@@ -2,7 +2,6 @@
 // Accountに紐づくテーブルはすべて ON DELETE CASCADE とする（後続featureも守る規約。specs/001 research.md R13）。
 import { sql } from "drizzle-orm";
 import {
-  bigint,
   boolean,
   check,
   primaryKey,
@@ -23,13 +22,6 @@ import {
   TEST_GROUP_CAPACITY_MIN,
   TEST_GROUP_EVENT_ACTIONS,
   TEST_GROUP_NAME_MAX,
-  ACCOUNT_LIMIT_MAX,
-  DAILY_POST_LIMIT_MAX,
-  DEFAULT_ACCOUNT_LIMIT,
-  DEFAULT_DAILY_POST_LIMIT,
-  TESTER_SLOT_CAPACITY_DEFAULT,
-  TESTER_SLOT_CAPACITY_MAX,
-  TESTER_SLOT_CAPACITY_MIN,
 } from "@meguru/shared";
 import { bytea, timestamps, inList } from "../kernel/db/columns";
 
@@ -39,12 +31,6 @@ export const users = pgTable("users", {
   clerkUserId: text("clerk_user_id").notNull().unique(),
   email: text("email").notNull(),
   displayName: text("display_name"),
-  // 029 の PR2c で Threads の threads.user_states へ移した。PR3 で外部キーを外した。列は PR5 で消す
-  lastAccountId: uuid("last_account_id"),
-  lastAccountDeletedAt: timestamp("last_account_deleted_at", { withTimezone: true }),
-  lastAccountClientId: text("last_account_client_id"),
-  lastAccountOpenSeq: bigint("last_account_open_seq", { mode: "number" }),
-  lastAccountOpenReceivedAt: timestamp("last_account_open_received_at", { withTimezone: true, precision: 6 }),
   /** 最後に使ったアプリ（@meguru/shared の APP_CATALOG の ID。PUT /api/me/last-app だけが書く。specs/028 data-model.md 1） */
   lastAppId: text("last_app_id"),
   // 料金なしの印（specs/013 data-model.md）。運用のスクリプトだけが変える
@@ -60,9 +46,6 @@ export const users = pgTable("users", {
   // この人を紹介した人。行を作るとき（JIT作成）だけ入れ、あとから変えない。紹介した人が退会したら NULL
   referredByUserId: uuid("referred_by_user_id").references((): AnyPgColumn => users.id, { onDelete: "set null" }),
   referredAt: timestamp("referred_at", { withTimezone: true }),
-  // この人だけのアカウントの数・1日の投稿数の上限。NULLなら既定値（operator_settings。specs/024 data-model.md 2-1）
-  accountLimit: integer("account_limit"),
-  dailyPostLimit: integer("daily_post_limit"),
   // 024の前からいた人（無料体験を使える。specs/024 research.md R8）。既定は true にして、列を足してから新しいAPIに
   // 替わるまでの間に古いAPIが作った人も締め出さない。新しいAPIは作るときに必ず false を渡す（016 の signed_up_open と同じ）
   legacyTrial: boolean("legacy_trial").notNull().default(true),
@@ -70,8 +53,6 @@ export const users = pgTable("users", {
 }, (t) => [
   index("users_referred_by_idx").on(t.referredByUserId),
   check("users_not_self_referred", sql`${t.referredByUserId} <> ${t.id}`),
-  check("users_account_limit_range", sql`${t.accountLimit} IS NULL OR ${t.accountLimit} BETWEEN 1 AND ${sql.raw(String(ACCOUNT_LIMIT_MAX))}`),
-  check("users_daily_post_limit_range", sql`${t.dailyPostLimit} IS NULL OR ${t.dailyPostLimit} BETWEEN 1 AND ${sql.raw(String(DAILY_POST_LIMIT_MAX))}`),
 ]);
 
 /** 契約（specs/013-billing data-model.md の subscriptions）。利用者に1行まで。はじめて「契約する」を押したときに作る。 */
@@ -248,33 +229,6 @@ export const featureSettingEvents = pgTable(
 );
 
 // ---- テスター招待・上限（specs/024-tester-invite-connect data-model.md）----
-
-/** 運営者が決める値（1行だけ。data-model.md 1-2、research.md R6）。 */
-export const operatorSettings = pgTable(
-  "operator_settings",
-  {
-    id: smallint("id").primaryKey(),
-    defaultAccountLimit: integer("default_account_limit").notNull().default(DEFAULT_ACCOUNT_LIMIT),
-    defaultDailyPostLimit: integer("default_daily_post_limit").notNull().default(DEFAULT_DAILY_POST_LIMIT),
-    testerSlotCapacity: integer("tester_slot_capacity").notNull().default(TESTER_SLOT_CAPACITY_DEFAULT),
-    updatedAt: timestamp("updated_at", { withTimezone: true, precision: 6 }).notNull().defaultNow(),
-  },
-  (t) => [
-    check("operator_settings_singleton", sql`${t.id} = 1`),
-    check(
-      "operator_settings_account_limit_range",
-      sql`${t.defaultAccountLimit} BETWEEN 1 AND ${sql.raw(String(ACCOUNT_LIMIT_MAX))}`,
-    ),
-    check(
-      "operator_settings_daily_post_limit_range",
-      sql`${t.defaultDailyPostLimit} BETWEEN 1 AND ${sql.raw(String(DAILY_POST_LIMIT_MAX))}`,
-    ),
-    check(
-      "operator_settings_slot_capacity_range",
-      sql`${t.testerSlotCapacity} BETWEEN ${sql.raw(String(TESTER_SLOT_CAPACITY_MIN))} AND ${sql.raw(String(TESTER_SLOT_CAPACITY_MAX))}`,
-    ),
-  ],
-);
 
 /**
  * 招待の管理と上限の記録（data-model.md 1-3、research.md R14・R15）。detail には Threads のユーザー名・名前・メールアドレスを入れない。

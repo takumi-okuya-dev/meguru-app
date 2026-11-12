@@ -17,7 +17,7 @@ beforeEach(async () => {
   await resetDb();
 });
 
-const base = (accountId: string) => `/api/accounts/${accountId}`;
+const base = (accountId: string) => `/api/threads/accounts/${accountId}`;
 
 type PostDraft = {
   id: string;

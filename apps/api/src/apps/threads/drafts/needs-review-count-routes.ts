@@ -1,4 +1,4 @@
-// GET /api/me/needs-review-counts（Threads：オーナーのアカウントごとの確かめ待ちの件数）。
+// GET /api/threads/me/needs-review-counts（Threads：オーナーのアカウントごとの確かめ待ちの件数）。
 // 027で routes/me.ts から分けた（投稿の案の数を数えるThreads専用の入口。docs/module-map.md 2-2）。
 import { Hono, type MiddlewareHandler } from "hono";
 import type { AppEnv } from "../../../platform";

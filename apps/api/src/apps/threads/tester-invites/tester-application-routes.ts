@@ -1,4 +1,4 @@
-// /api/accounts/:accountId/tester-application（specs/024-tester-invite-connect contracts/api.md「利用者の申し込み」）。
+// /api/threads/accounts/:accountId/tester-application（specs/024-tester-invite-connect contracts/api.md「利用者の申し込み」）。
 // そのアカウントのオーナーだけ。招待の管理がOFFなら 404（research.md R4）。
 import { testerApplyRequestSchema } from "@meguru/shared";
 import { Hono, type MiddlewareHandler } from "hono";

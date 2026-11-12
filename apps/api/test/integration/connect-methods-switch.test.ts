@@ -54,12 +54,12 @@ describe("出していない方法は、サーバー側でも断る", () => {
 
 describe("GET /api/me は、出す方法を返す", () => {
   it("既定は両方", async () => {
-    const res = await call(app, "GET", "/api/me", { user: "u1" });
+    const res = await call(app, "GET", "/api/threads/me", { user: "u1" });
     expect(((await res.json()) as { threadsConnectMethods: string[] }).threadsConnectMethods).toEqual(["app", "token"]);
   });
 
   it("token だけに絞れる", async () => {
-    const res = await call(app, "GET", "/api/me", { user: "u1", env: onlyToken });
+    const res = await call(app, "GET", "/api/threads/me", { user: "u1", env: onlyToken });
     expect(((await res.json()) as { threadsConnectMethods: string[] }).threadsConnectMethods).toEqual(["token"]);
   });
 });

@@ -127,7 +127,7 @@ describe("申し込みのないまま「Threadsで許可する」でつながっ
 
   it("招待の管理がOFFの環境では作らない", async () => {
     const env = publicEnv();
-    const created = await call(app, "POST", "/api/accounts", { user: "u1", body: { name: "お店" }, env });
+    const created = await call(app, "POST", "/api/threads/accounts", { user: "u1", body: { name: "お店" }, env });
     const { id: accountId } = (await created.json()) as { id: string };
     const res = await call(app, "POST", "/api/threads/connect", { user: "u1", body: { mode: "connect", accountId }, env });
     const { authorizeUrl } = (await res.json()) as { authorizeUrl: string };
@@ -158,7 +158,7 @@ describe("アカウントを消したとき", () => {
     const { accountId, id } = await applied("u1", "shop_tokyo", { invited: true });
     await connectExisting(app, "u1", accountId, "9001");
     const [acc] = (await q()`SELECT name FROM threads.accounts WHERE id = ${accountId}`) as { name: string }[];
-    const res = await call(app, "DELETE", `/api/accounts/${accountId}`, { user: "u1", body: { confirmName: acc!.name } });
+    const res = await call(app, "DELETE", `/api/threads/accounts/${accountId}`, { user: "u1", body: { confirmName: acc!.name } });
     expect(res.status).toBe(204);
     expect(await applicationRow(id)).toMatchObject({
       status: "withdrawn",

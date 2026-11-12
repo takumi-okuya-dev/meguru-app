@@ -1,4 +1,4 @@
-// /api/accounts/:accountId/analysis（specs/022-algorithm-analysis contracts/api.md）。
+// /api/threads/accounts/:accountId/analysis（specs/022-algorithm-analysis contracts/api.md）。
 // 読むのは view（オーナーと担当の人）、書くのは content。どれも機能のまとまり「自動投稿」（019）。見せてもらっている人には出さない（research.md R10）。
 import {
   analysisQuerySchema,

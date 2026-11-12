@@ -2,12 +2,12 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import type { AccountAccessResponse, MeResponse } from "@meguru/shared";
+import type { AccountAccessResponse } from "@meguru/shared";
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { OWNER_ACCESS } from "./helpers/access";
 import { resetViewport, setViewport } from "./helpers/viewport";
-import { ME_BILLING_OFF } from "./helpers/billing";
+import { ME_BILLING_OFF, type MeWithThreads } from "./helpers/billing";
 
 vi.mock("@clerk/react", () => ({
   useUser: () => ({ user: { fullName: "Takumi", primaryEmailAddress: { emailAddress: "t@example.com" } } }),
@@ -25,7 +25,7 @@ const account = {
   role: "owner" as const,
   ownerName: null,
 };
-let meResponse: MeResponse;
+let meResponse: MeWithThreads;
 let access: AccountAccessResponse = OWNER_ACCESS;
 vi.mock("@/lib/api-client", async (orig) => {
   const actual = await orig<typeof import("@/lib/api-client")>();
@@ -49,7 +49,7 @@ vi.mock("@/apps/threads/lib/api", async (orig) => {
 const { ThreadsShell } = await import("@/apps/threads/sidebar");
 const { PageHeader } = await import("@/shell/layout/PageHeader");
 
-function me(teams: MeResponse["teams"]): MeResponse {
+function me(teams: MeWithThreads["teams"]): MeWithThreads {
   return {
     user: { id: "u", email: "t@example.com", displayName: "Takumi" },
     accounts: [account],

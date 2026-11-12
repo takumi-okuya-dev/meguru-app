@@ -1,6 +1,6 @@
 // Threadsの利用の数・利用の状態を数えて、共通へ伝える（specs/meguru/029-threads-pattern1 research.md R6、contracts/platform-entry.md 4）。
 // 利用の数＝持ち主としてのアカウントの数（料金の数）。使っているか＝開けるアカウントがあるか、チームに入っているか
-// （/api/me の「使っているアプリ」の判定。specs/028 research.md R6）。
+// （共通の /api/me の「使っているアプリ」は、この値で決まる。specs/028 research.md R6）。
 import { and, eq, inArray, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { createDb, type Db, type TxDb } from "../../../kernel/db/client";
@@ -43,7 +43,8 @@ export async function countThreadsUsage(db: Db | TxDb, userId: string): Promise<
 
 /**
  * その人のThreadsの利用の値を数えて、共通へ伝える。アカウントを作る・消す・Metaのデータ削除のトランザクションが
- * 終わったあと、応答を返す前に呼ぶ（チームの出入りは、PR2a では /api/me と毎日の数え直しで直す。029 tasks.md PR2 の頭）。
+ * 終わったあと、応答を返す前に呼ぶ（チームの出入りでは「使っているか」は変わらない：チームに入るには自分のアカウントが要り、最後のアカウントを消すとチームからも外れる。
+ * ずれは /api/threads/me と毎日の数え直しで直す。029 tasks.md PR5a の頭）。
  * 数える前の時刻を伝えるので、同時に伝えても古い値で上書きしない。失敗は例外のまま返す（呼ぶ側は trySyncThreadsUsage を使う）。
  * @param db - データベース
  * @param userId - 利用者の番号
@@ -56,7 +57,7 @@ export async function syncThreadsUsage(db: Db | TxDb, userId: string): Promise<v
 
 /**
  * syncThreadsUsage を呼び、失敗してもログに残すだけにする。トランザクションのあとで呼ぶので、ここで失敗しても
- * アカウントの作成・削除は成功のまま（ずれは /api/me と毎日の数え直しで直す。research.md R6）。
+ * アカウントの作成・削除は成功のまま（ずれは /api/threads/me と毎日の数え直しで直す。research.md R6）。
  * @param db - データベース
  * @param userId - 利用者の番号
  * @returns 伝えられたら true

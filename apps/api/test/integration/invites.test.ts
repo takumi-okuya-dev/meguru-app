@@ -28,10 +28,10 @@ async function team() {
   return makeTeam("a1", [accountId], { name: "飲食チーム" });
 }
 
-describe("GET /api/invites/:token（招待の確認）", () => {
+describe("GET /api/threads/invites/:token（招待の確認）", () => {
   it("ログイン前は anonymous で、チーム名・管理者・人数だけ", async () => {
     const { token } = await team();
-    const res = await json<Preview>(await call(app, "GET", `/api/invites/${token}`));
+    const res = await json<Preview>(await call(app, "GET", `/api/threads/invites/${token}`));
     expect(res).toEqual({
       team: { name: "飲食チーム", adminName: "a1", memberCount: 1 },
       viewer: { status: "anonymous", teamId: null, accounts: [] },
@@ -41,11 +41,11 @@ describe("GET /api/invites/:token（招待の確認）", () => {
   it("自分のアカウントがなければ needs_account。あれば ready で、ほかのチームに入っているものはそのチーム名", async () => {
     const { token } = await team();
     await ensureUser("u1");
-    expect((await json<Preview>(await call(app, "GET", `/api/invites/${token}`, { user: "u1" }))).viewer.status).toBe("needs_account");
+    expect((await json<Preview>(await call(app, "GET", `/api/threads/invites/${token}`, { user: "u1" }))).viewer.status).toBe("needs_account");
     const { accountId: free } = await createUserWithAccount("u1");
     const { accountId: busy } = await createUserWithAccount("u1");
     await makeTeam("u1", [busy], { name: "美容チーム" });
-    const ready = await json<Preview>(await call(app, "GET", `/api/invites/${token}`, { user: "u1" }));
+    const ready = await json<Preview>(await call(app, "GET", `/api/threads/invites/${token}`, { user: "u1" }));
     expect(ready.viewer.status).toBe("ready");
     expect(ready.viewer.accounts.map((a) => [a.id, a.inOtherTeam])).toEqual([
       [free, null],
@@ -55,25 +55,25 @@ describe("GET /api/invites/:token（招待の確認）", () => {
 
   it("すでにチームの人なら already_member とチームのID", async () => {
     const { teamId, token } = await team();
-    const res = await json<Preview>(await call(app, "GET", `/api/invites/${token}`, { user: "a1" }));
+    const res = await json<Preview>(await call(app, "GET", `/api/threads/invites/${token}`, { user: "a1" }));
     expect(res.viewer).toEqual({ status: "already_member", teamId, accounts: [] });
   });
 
   it("形が違う・見つからない文字列は INVITE_INVALID", async () => {
     for (const token of ["x", `t_${"A".repeat(43)}`, `p_${"A".repeat(43)}`]) {
-      const res = await call(app, "GET", `/api/invites/${token}`);
+      const res = await call(app, "GET", `/api/threads/invites/${token}`);
       expect([res.status, (await errorOf(res)).code], token).toEqual([404, "INVITE_INVALID"]);
     }
   });
 });
 
-describe("POST /api/invites/:token/accept（参加）", () => {
+describe("POST /api/threads/invites/:token/accept（参加）", () => {
   it("選んだアカウントを入れてメンバーとして入る。見せる設定はアカウントごと。記録 team_member_joined", async () => {
     const { teamId, token } = await team();
     const { accountId: a } = await createUserWithAccount("u1");
     const { accountId: b } = await createUserWithAccount("u1");
     const res = await json<{ teamId: string }>(
-      await call(app, "POST", `/api/invites/${token}/accept`, { user: "u1", body: { accounts: [{ id: a, shared: true }, { id: b, shared: false }] } }),
+      await call(app, "POST", `/api/threads/invites/${token}/accept`, { user: "u1", body: { accounts: [{ id: a, shared: true }, { id: b, shared: false }] } }),
     );
     expect(res.teamId).toBe(teamId);
     expect(await teamMemberRows(teamId)).toEqual([
@@ -87,8 +87,8 @@ describe("POST /api/invites/:token/accept（参加）", () => {
     expect(Object.fromEntries(rows.map((r) => [r.account_id, r.shared]))).toEqual({ [a]: true, [b]: false });
     expect((await activityRows(a)).map((r) => [r.action, r.actor_role, r.summary])).toEqual([["team_member_joined", "owner", "u1"]]);
     // 見せたアカウントは、管理者が読むだけで開ける
-    expect((await call(app, "GET", `/api/accounts/${a}/strategy`, { user: "a1" })).status).toBe(200);
-    expect((await call(app, "GET", `/api/accounts/${b}/strategy`, { user: "a1" })).status).toBe(404);
+    expect((await call(app, "GET", `/api/threads/accounts/${a}/strategy`, { user: "a1" })).status).toBe(200);
+    expect((await call(app, "GET", `/api/threads/accounts/${b}/strategy`, { user: "a1" })).status).toBe(404);
   });
 
   it("0件は TEAM_NEEDS_ACCOUNT、ほかのチームのアカウントは ACCOUNT_IN_OTHER_TEAM、他人のアカウントは ACCOUNT_NOT_FOUND", async () => {
@@ -97,12 +97,12 @@ describe("POST /api/invites/:token/accept（参加）", () => {
     await makeTeam("u1", [busy]);
     const { accountId: free } = await createUserWithAccount("u2");
     const { accountId: others } = await createUserWithAccount("u3");
-    const none = await call(app, "POST", `/api/invites/${token}/accept`, { user: "u2", body: { accounts: [] } });
+    const none = await call(app, "POST", `/api/threads/invites/${token}/accept`, { user: "u2", body: { accounts: [] } });
     expect([none.status, (await errorOf(none)).code]).toEqual([409, "TEAM_NEEDS_ACCOUNT"]);
-    const inOther = await call(app, "POST", `/api/invites/${token}/accept`, { user: "u1", body: { accounts: [{ id: busy, shared: false }] } });
+    const inOther = await call(app, "POST", `/api/threads/invites/${token}/accept`, { user: "u1", body: { accounts: [{ id: busy, shared: false }] } });
     const err = await errorOf(inOther);
     expect([inOther.status, err.code, err.details]).toEqual([409, "ACCOUNT_IN_OTHER_TEAM", [busy]]);
-    const notMine = await call(app, "POST", `/api/invites/${token}/accept`, {
+    const notMine = await call(app, "POST", `/api/threads/invites/${token}/accept`, {
       user: "u2",
       body: { accounts: [{ id: free, shared: false }, { id: others, shared: false }] },
     });
@@ -116,11 +116,11 @@ describe("POST /api/invites/:token/accept（参加）", () => {
     const { accountId } = await createUserWithAccount("u1");
     const body = { accounts: [{ id: accountId, shared: false }] };
     const results = await Promise.all([
-      call(app, "POST", `/api/invites/${token}/accept`, { user: "u1", body }),
-      call(app, "POST", `/api/invites/${token}/accept`, { user: "u1", body }),
+      call(app, "POST", `/api/threads/invites/${token}/accept`, { user: "u1", body }),
+      call(app, "POST", `/api/threads/invites/${token}/accept`, { user: "u1", body }),
     ]);
     expect(results.map((r) => r.status).sort()).toEqual([200, 409]);
-    const again = await call(app, "POST", `/api/invites/${token}/accept`, { user: "u1", body });
+    const again = await call(app, "POST", `/api/threads/invites/${token}/accept`, { user: "u1", body });
     expect([again.status, (await errorOf(again)).code]).toEqual([409, "INVITE_ALREADY_MEMBER"]);
     expect((await teamMemberRows(teamId)).filter((m) => m.user === "u1")).toHaveLength(1);
   });
@@ -132,23 +132,23 @@ describe("POST /api/invites/:token/accept（参加）", () => {
       await joinTeam(teamId, `m${i}`, [accountId]);
     }
     const { accountId } = await createUserWithAccount("u1");
-    const full = await call(app, "POST", `/api/invites/${token}/accept`, { user: "u1", body: { accounts: [{ id: accountId, shared: false }] } });
+    const full = await call(app, "POST", `/api/threads/invites/${token}/accept`, { user: "u1", body: { accounts: [{ id: accountId, shared: false }] } });
     const err = await errorOf(full);
     expect([full.status, err.code, err.details]).toEqual([409, "TEAM_FULL", ["members"]]);
 
     const { teamId: t2, token: old } = await team();
-    await call(app, "POST", `/api/teams/${t2}/invite/rotate`, { user: "a1" });
-    const rotated = await call(app, "POST", `/api/invites/${old}/accept`, { user: "u1", body: { accounts: [{ id: accountId, shared: false }] } });
+    await call(app, "POST", `/api/threads/teams/${t2}/invite/rotate`, { user: "a1" });
+    const rotated = await call(app, "POST", `/api/threads/invites/${old}/accept`, { user: "u1", body: { accounts: [{ id: accountId, shared: false }] } });
     expect([rotated.status, (await errorOf(rotated)).code]).toEqual([404, "INVITE_INVALID"]);
 
     const { teamId: t3, token: deleted } = await team();
-    expect((await call(app, "DELETE", `/api/teams/${t3}`, { user: "a1" })).status).toBe(204);
-    const gone = await call(app, "POST", `/api/invites/${deleted}/accept`, { user: "u1", body: { accounts: [{ id: accountId, shared: false }] } });
+    expect((await call(app, "DELETE", `/api/threads/teams/${t3}`, { user: "a1" })).status).toBe(204);
+    const gone = await call(app, "POST", `/api/threads/invites/${deleted}/accept`, { user: "u1", body: { accounts: [{ id: accountId, shared: false }] } });
     expect([gone.status, (await errorOf(gone)).code]).toEqual([404, "INVITE_INVALID"]);
   });
 
   it("ログインしていなければ 401", async () => {
     const { token } = await team();
-    expect((await call(app, "POST", `/api/invites/${token}/accept`, { body: { accounts: [] } })).status).toBe(401);
+    expect((await call(app, "POST", `/api/threads/invites/${token}/accept`, { body: { accounts: [] } })).status).toBe(401);
   });
 });

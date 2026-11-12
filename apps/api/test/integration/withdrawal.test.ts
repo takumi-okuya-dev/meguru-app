@@ -38,7 +38,7 @@ async function teamSetup() {
   await joinTeam(teamId, "m2", [m2.accountId]);
   await assign(teamId, "o1", m1.accountId);
   // o1 が担当として B の戦略を保存する（B の操作の記録に o1 の名前が残る）
-  const res = await call(app, "PUT", `/api/accounts/${m1.accountId}/strategy`, {
+  const res = await call(app, "PUT", `/api/threads/accounts/${m1.accountId}/strategy`, {
     user: "o1",
     body: { ...emptyStrategyValues(), finalAction: "来店", expectedVersion: 0 },
   });
@@ -50,14 +50,15 @@ describe("退会の確認の内容", () => {
   it("消えるアカウント・チームの行き先・契約中かを返す", async () => {
     const { teamId } = await teamSetup();
     await subscribe("o1");
+    // 共通の分は /api/me/withdrawal-preview、Threadsの分は /api/threads/me/withdrawal-preview（029 の PR5c）
     const res = await callBilling(app, "GET", "/api/me/withdrawal-preview", { user: "o1" });
-    expect(await res.json()).toEqual({
-      email: "o1@example.com",
+    expect(await res.json()).toEqual({ email: "o1@example.com", hasActiveSubscription: true });
+    const threads = await callBilling(app, "GET", "/api/threads/me/withdrawal-preview", { user: "o1" });
+    expect(await threads.json()).toEqual({
       ownedAccounts: [{ id: expect.any(String), name: "A" }],
       teams: [{ id: teamId, name: "o1のチーム", isAdmin: true, outcome: "transfer", nextAdminName: "m1" }],
-      hasActiveSubscription: true,
     });
-    const member = (await (await callBilling(app, "GET", "/api/me/withdrawal-preview", { user: "m1" })).json()) as { teams: unknown[] };
+    const member = (await (await callBilling(app, "GET", "/api/threads/me/withdrawal-preview", { user: "m1" })).json()) as { teams: unknown[] };
     expect(member.teams).toEqual([{ id: teamId, name: "o1のチーム", isAdmin: false, outcome: "leave", nextAdminName: null }]);
   });
 });
@@ -124,7 +125,7 @@ describe("POST /api/me/withdraw", () => {
     expect(((await res.json()) as { error: { code: string } }).error.code).toBe("BILLING_UNAVAILABLE");
     expect(await count("threads.accounts", `id = '${accountId}'`)).toBe(1);
     expect(await count("users", "clerk_user_id = 'o1' AND withdrawal_requested_at IS NOT NULL")).toBe(1);
-    const blocked = await callBilling(app, "GET", `/api/accounts/${accountId}`, { user: "o1" });
+    const blocked = await callBilling(app, "GET", `/api/threads/accounts/${accountId}`, { user: "o1" });
     expect(blocked.status).toBe(409);
     expect(((await blocked.json()) as { error: { code: string } }).error.code).toBe("WITHDRAWAL_IN_PROGRESS");
     const me = (await (await callBilling(app, "GET", "/api/me", { user: "o1" })).json()) as { withdrawalInProgress: boolean };

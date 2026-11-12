@@ -1,12 +1,12 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import type { AccountSummary, MeResponse, NeedsReviewCountsResponse } from "@meguru/shared";
+import type { AccountSummary, NeedsReviewCountsResponse } from "@meguru/shared";
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { PageHeader } from "@/shell/layout/PageHeader";
 import { threadsQueryKeys } from "@/apps/threads/lib/query-keys";
-import { ME_BILLING_OFF } from "./helpers/billing";
+import { ME_BILLING_OFF, type MeWithThreads } from "./helpers/billing";
 
 const mocks = vi.hoisted(() => ({
   me: vi.fn(),
@@ -61,7 +61,7 @@ const account = (
 });
 
 const accounts = [account("a1"), account("a2"), account("a3")];
-const me = (rows: AccountSummary[]): MeResponse => ({
+const me = (rows: AccountSummary[]): MeWithThreads => ({
   user: { id: "user", email: "user@example.com", displayName: "User" },
   accounts: rows,
   landingAccountId: rows[0]?.id ?? null,
@@ -267,11 +267,11 @@ describe("AccountSwitcherの横断要確認件数", () => {
   });
 
   it("先に始まった一覧の取得が後から終わっても、キャッシュを古い一覧に戻さない", async () => {
-    let finishOld: (value: MeResponse) => void = () => {};
+    let finishOld: (value: MeWithThreads) => void = () => {};
     mocks.me
       .mockImplementationOnce(
         () =>
-          new Promise<MeResponse>((resolve) => {
+          new Promise<MeWithThreads>((resolve) => {
             finishOld = resolve;
           }),
       )
@@ -282,7 +282,7 @@ describe("AccountSwitcherの横断要確認件数", () => {
     expect(await within(menu).findByText("要確認 5件")).toBeInTheDocument();
     finishOld(me([...accounts, account("deleted")]));
     await new Promise((resolve) => setTimeout(resolve, 0));
-    expect(client.getQueryData<MeResponse>(threadsQueryKeys.me)?.accounts.map((a) => a.id)).toEqual([
+    expect(client.getQueryData<MeWithThreads>(threadsQueryKeys.me)?.accounts.map((a) => a.id)).toEqual([
       "a1",
       "a2",
       "a3",
@@ -290,19 +290,19 @@ describe("AccountSwitcherの横断要確認件数", () => {
   });
 
   it("一覧の取り直し中に後から始まった取得があれば、メニューとキャッシュはその新しい一覧を使う", async () => {
-    let finishMenu: (value: MeResponse) => void = () => {};
-    let finishTracked: (value: MeResponse) => void = () => {};
+    let finishMenu: (value: MeWithThreads) => void = () => {};
+    let finishTracked: (value: MeWithThreads) => void = () => {};
     mocks.me
       .mockResolvedValueOnce(me(accounts))
       .mockImplementationOnce(
         () =>
-          new Promise<MeResponse>((resolve) => {
+          new Promise<MeWithThreads>((resolve) => {
             finishMenu = resolve;
           }),
       )
       .mockImplementationOnce(
         () =>
-          new Promise<MeResponse>((resolve) => {
+          new Promise<MeWithThreads>((resolve) => {
             finishTracked = resolve;
           }),
       );
@@ -326,7 +326,7 @@ describe("AccountSwitcherの横断要確認件数", () => {
     expect(
       await within(menu).findByRole("menuitem", { name: /Account added/ }),
     ).toHaveTextContent("要確認 1件");
-    expect(client.getQueryData<MeResponse>(threadsQueryKeys.me)?.accounts.map((a) => a.id)).toEqual([
+    expect(client.getQueryData<MeWithThreads>(threadsQueryKeys.me)?.accounts.map((a) => a.id)).toEqual([
       "a1",
       "a2",
       "a3",
@@ -336,18 +336,18 @@ describe("AccountSwitcherの横断要確認件数", () => {
 
   it("先に始まった取り直しが失敗しても、後から始まった取得を取り消さずにその一覧を表示する", async () => {
     let failMenu: (error: Error) => void = () => {};
-    let finishTracked: (value: MeResponse) => void = () => {};
+    let finishTracked: (value: MeWithThreads) => void = () => {};
     mocks.me
       .mockResolvedValueOnce(me(accounts))
       .mockImplementationOnce(
         () =>
-          new Promise<MeResponse>((_, reject) => {
+          new Promise<MeWithThreads>((_, reject) => {
             failMenu = reject;
           }),
       )
       .mockImplementationOnce(
         () =>
-          new Promise<MeResponse>((resolve) => {
+          new Promise<MeWithThreads>((resolve) => {
             finishTracked = resolve;
           }),
       );

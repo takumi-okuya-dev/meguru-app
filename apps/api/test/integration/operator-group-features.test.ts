@@ -31,11 +31,11 @@ describe("PUT /api/operator/test-groups/:groupId/features", () => {
     expect(saved).toMatchObject({ id: group, disabled: ["strategy"] });
     expect((await json(await op("GET", `/api/operator/test-groups/${group}`))).disabled).toEqual(["strategy"]);
 
-    const blocked = await call(app, "GET", `/api/accounts/${accountId}/strategy`, { user: "u1" });
+    const blocked = await call(app, "GET", `/api/threads/accounts/${accountId}/strategy`, { user: "u1" });
     expect(blocked.status).toBe(403);
 
     await op("PUT", `/api/operator/test-groups/${group}/features`, { features: ALL_ON });
-    expect((await call(app, "GET", `/api/accounts/${accountId}/strategy`, { user: "u1" })).status).toBe(200);
+    expect((await call(app, "GET", `/api/threads/accounts/${accountId}/strategy`, { user: "u1" })).status).toBe(200);
   });
 
   it("グループから外すと、その人の設定だけに戻る", async () => {
@@ -43,7 +43,7 @@ describe("PUT /api/operator/test-groups/:groupId/features", () => {
     const group = await groupWith("u1");
     await op("PUT", `/api/operator/test-groups/${group}/features`, { features: { ...ALL_ON, strategy: false } });
     await op("DELETE", `/api/operator/test-groups/${group}/members/${userId}`);
-    expect((await call(app, "GET", `/api/accounts/${accountId}/strategy`, { user: "u1" })).status).toBe(200);
+    expect((await call(app, "GET", `/api/threads/accounts/${accountId}/strategy`, { user: "u1" })).status).toBe(200);
   });
 
   it("閉じたグループは 409 TEST_GROUP_CLOSED、運営者でなければ 403 OPERATOR_ONLY、3つ揃っていなければ 400", async () => {

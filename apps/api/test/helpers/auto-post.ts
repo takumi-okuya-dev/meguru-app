@@ -118,7 +118,7 @@ export const db = sql;
 
 /** 投稿のスケジュールのAPIを呼ぶ（テスト用の短縮）。 */
 export function putSchedule(app: TestApp, accountId: string, body: unknown, user = "u1") {
-  return call(app, "PUT", `/api/accounts/${accountId}/posting-schedule`, { user, body });
+  return call(app, "PUT", `/api/threads/accounts/${accountId}/posting-schedule`, { user, body });
 }
 
 // ---- 反応数（specs/006-performance-feedback）----

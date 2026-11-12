@@ -11,7 +11,7 @@ beforeEach(async () => {
   await resetDb();
 });
 
-const path = (accountId: string) => `/api/accounts/${accountId}/strategy`;
+const path = (accountId: string) => `/api/threads/accounts/${accountId}/strategy`;
 
 type StrategyBody = Record<string, unknown> & { version: number; filledCount: number };
 

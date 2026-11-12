@@ -21,7 +21,7 @@ const errorOf = async (res: Response) =>
   ((await res.json()) as { error: { code: string; details?: string[] } }).error;
 
 const status = (teamId: string, user: string) =>
-  call(app, "GET", `/api/teams/${teamId}/status`, { user });
+  call(app, "GET", `/api/threads/teams/${teamId}/status`, { user });
 
 /**
  * 管理者 a1、オーナー o1、編集者 e1（o1 のアカウントの担当）、メンバー m1 のチーム。
@@ -133,10 +133,10 @@ describe("見られる人（FR-001、research.md R5）", () => {
     ]).toEqual([403, "FEATURE_DISABLED", ["team"]]);
   });
 
-  it("GET /api/teams/:teamId の statusVisible：管理者と担当のある編集者は真、担当のない編集者とメンバーは偽", async () => {
+  it("GET /api/threads/teams/:teamId の statusVisible：管理者と担当のある編集者は真、担当のない編集者とメンバーは偽", async () => {
     const { teamId, ownerAcc, e1 } = await setup();
     const visible = async (user: string) =>
-      (await json<TeamDetail>(await call(app, "GET", `/api/teams/${teamId}`, { user })))
+      (await json<TeamDetail>(await call(app, "GET", `/api/threads/teams/${teamId}`, { user })))
         .statusVisible;
     expect([
       await visible("a1"),
@@ -427,7 +427,7 @@ describe("編集者の範囲（FR-002a、research.md R5・R6）", () => {
     const none = await status(teamId, "e1");
     expect([none.status, (await errorOf(none)).code]).toEqual([403, "ROLE_FORBIDDEN"]);
     expect(
-      (await json<TeamDetail>(await call(app, "GET", `/api/teams/${teamId}`, { user: "e1" })))
+      (await json<TeamDetail>(await call(app, "GET", `/api/threads/teams/${teamId}`, { user: "e1" })))
         .statusVisible,
     ).toBe(false);
   });

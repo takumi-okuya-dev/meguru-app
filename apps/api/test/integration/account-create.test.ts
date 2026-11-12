@@ -13,15 +13,15 @@ beforeEach(async () => {
   await resetDb();
 });
 
-const create = (user: string, name: unknown) => call(app, "POST", "/api/accounts", { user, body: { name } });
+const create = (user: string, name: unknown) => call(app, "POST", "/api/threads/accounts", { user, body: { name } });
 // 決済ONの環境（無料体験中は1件まで。specs/013 research.md R9）
-const createOn = (user: string, name: unknown) => callBilling(app, "POST", "/api/accounts", { user, body: { name } });
+const createOn = (user: string, name: unknown) => callBilling(app, "POST", "/api/threads/accounts", { user, body: { name } });
 
 async function errorCode(res: Response) {
   return ((await res.json()) as { error: { code: string; details?: string[] } }).error;
 }
 
-describe("POST /api/accounts", () => {
+describe("POST /api/threads/accounts", () => {
   it("名前だけで未接続のアカウントを作り、作った人がオーナーになる", async () => {
     const res = await create("u1", "  カフェの公式  ");
     expect(res.status).toBe(201);
@@ -92,7 +92,7 @@ describe("POST /api/accounts", () => {
 
   it("作ったアカウントは /api/me に出て、最後に使ったアカウントがなければ着地先になる", async () => {
     const created = (await (await create("u1", "カフェの公式")).json()) as { id: string };
-    const me = (await (await call(app, "GET", "/api/me", { user: "u1" })).json()) as {
+    const me = (await (await call(app, "GET", "/api/threads/me", { user: "u1" })).json()) as {
       accounts: { id: string; name: string; connectionStatus: string }[];
       landingAccountId: string | null;
       accountLimit: { used: number };
@@ -103,7 +103,7 @@ describe("POST /api/accounts", () => {
   });
 
   it("ログインしていなければ 401", async () => {
-    const res = await call(app, "POST", "/api/accounts", { body: { name: "x" } });
+    const res = await call(app, "POST", "/api/threads/accounts", { body: { name: "x" } });
     expect(res.status).toBe(401);
   });
 });

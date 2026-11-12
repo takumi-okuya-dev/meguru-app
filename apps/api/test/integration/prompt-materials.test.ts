@@ -9,7 +9,7 @@ beforeEach(async () => {
   await resetDb();
 });
 
-const base = (accountId: string) => `/api/accounts/${accountId}`;
+const base = (accountId: string) => `/api/threads/accounts/${accountId}`;
 type PromptBody = { prompt: string; length: number; summary: { length: number } };
 
 /** 今日（日本時間）から days 日後の日付。 */

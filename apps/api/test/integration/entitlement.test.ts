@@ -1,5 +1,5 @@
 // アプリ向けの利用権（specs/meguru/029-threads-pattern1 contracts/platform-entry.md 2・6、T001・T004）。
-// 新しい loadAppEntitlement(s) が、今の判定（loadEntitlement・機能のOFF・effectiveLimits・運営者）と同じ結果になることを、
+// 新しい loadAppEntitlement(s) が、今の判定（loadEntitlement・機能のOFF・運営者）と同じ結果になることを、
 // 状態ごとに同じデータで比べる。まとめて読んでも1人ずつと同じこと、見つからない番号は入らないことも確かめる。
 import { FEATURES } from "@meguru/shared";
 import { eq } from "drizzle-orm";
@@ -9,7 +9,7 @@ import { registerThreads } from "../../src/apps/threads";
 import { loadEntitlement } from "../../src/platform/billing/billing-service";
 import { loadAppEntitlement, loadAppEntitlements } from "../../src/platform/entitlement/entitlement";
 import { disabledAppFeaturesSql, featuresFrom } from "../../src/platform/features/feature-sql";
-import { effectiveLimits, isOperator, setDefaults, setUserLimits } from "../../src/platform/operator/limit-service";
+import { isOperator, setDefaults, setUserLimits } from "../../src/platform/operator/limit-service";
 import { users } from "../../src/platform/schema";
 import {
   AFTER_TRIAL,
@@ -46,11 +46,10 @@ async function current(userId: string, mode: BillingMode) {
     .select({ disabled: disabledAppFeaturesSql(users.id, "threads"), clerk: users.clerkUserId })
     .from(users)
     .where(eq(users.id, userId));
-  const limits = await effectiveLimits(db(), env, userId);
+  // 上限は、古い列（PR5 で消した）と比べられないので、各テストで値を確かめる
   return {
     billing,
     features: [...featuresFrom(row!.disabled, FEATURES)].sort(),
-    limits: { accounts: limits.accountLimit, daily_posts: limits.dailyPostLimit },
     operator: isOperator(env, row!.clerk),
   };
 }
@@ -68,7 +67,6 @@ async function expectSame(userId: string, mode: BillingMode) {
   expect(next).not.toBeNull();
   expect({ ...next!.billing, trialEndsAt: undefined }).toEqual({ ...before.billing!, trialEndsAt: undefined });
   expect([...next!.features].sort()).toEqual(before.features);
-  expect(next!.limits).toEqual(before.limits);
   expect(next!.operator).toBe(before.operator);
   return next!;
 }
@@ -78,6 +76,8 @@ describe("今の判定と同じ結果になる（状態ごと）", () => {
     const { userId } = await createUserWithAccount("u1");
     const e = await expectSame(userId, OFF);
     expect(e.access).toBe("full");
+    // 上限は既定の値（app_limit_defaults）
+    expect(e.limits).toEqual({ accounts: 3, daily_posts: 10 });
   });
 
   it("契約中：すべて使える", async () => {
@@ -138,7 +138,7 @@ describe("今の判定と同じ結果になる（状態ごと）", () => {
     expect([...(await expectSame(userId, OFF)).features]).toEqual(["autopost"]);
   });
 
-  it("上限：運営者が変えた既定の値と、人ごとの値（両方の表に書かれる）", async () => {
+  it("上限：運営者が変えた既定の値と、人ごとの値", async () => {
     const { userId } = await createUserWithAccount("u1");
     const { userId: other } = await createUserWithAccount("u2");
     await setDefaults(env, { id: other }, { accounts: 7, daily_posts: 15 });

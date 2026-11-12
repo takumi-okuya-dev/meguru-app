@@ -68,7 +68,7 @@ describe("トークンで追加する（US1）", () => {
     const [m] = (await q()`SELECT role FROM threads.memberships WHERE account_id = ${body.accountId}`) as { role: string }[];
     expect(m!.role).toBe("owner");
     // 投稿の権限の確認（005）も通る
-    const check = await call(app, "POST", `/api/accounts/${body.accountId}/threads-check`, { user: "u1" });
+    const check = await call(app, "POST", `/api/threads/accounts/${body.accountId}/threads-check`, { user: "u1" });
     expect(((await check.json()) as { status: string }).status).toBe("ok");
   });
 

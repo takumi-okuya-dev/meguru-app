@@ -30,9 +30,8 @@ export function callT(app: TestApp, method: string, path: string, opts: { user?:
   return call(app, method, path, { ...opts, env: opts.env ?? testerOperatorEnv() });
 }
 
-/** 運営者が決める値（operator_settings）を初めの値に戻す。TRUNCATE では戻らないため。 */
+/** 運営者が決める値（上限の既定の値・テスター招待の枠）を初めの値に戻す。TRUNCATE では戻らないため。 */
 export async function resetOperatorSettings() {
-  await q()`UPDATE operator_settings SET default_account_limit = 3, default_daily_post_limit = 10, tester_slot_capacity = 25`;
   await q()`INSERT INTO app_limit_defaults (app, key, value) VALUES ('threads', 'accounts', 3), ('threads', 'daily_posts', 10)
     ON CONFLICT (app, key) DO UPDATE SET value = EXCLUDED.value`;
   await q()`INSERT INTO threads.settings (id, tester_slot_capacity) VALUES (1, 25) ON CONFLICT (id) DO UPDATE SET tester_slot_capacity = 25`;
@@ -52,11 +51,11 @@ export async function unconnectedAccountOf(app: TestApp, user: string, name = "�
 }
 
 /**
- * 申し込む（POST /api/accounts/:id/tester-application）。
+ * 申し込む（POST /api/threads/accounts/:id/tester-application）。
  * @returns 応答
  */
 export function applyFor(app: TestApp, user: string, accountId: string, threadsUsername: string, env?: Env) {
-  return callT(app, "POST", `/api/accounts/${accountId}/tester-application`, { user, body: { threadsUsername }, env });
+  return callT(app, "POST", `/api/threads/accounts/${accountId}/tester-application`, { user, body: { threadsUsername }, env });
 }
 
 /**

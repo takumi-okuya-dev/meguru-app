@@ -28,7 +28,7 @@ describe("/api/me の operator", () => {
     await endTrial(userId);
     const body = await me(FEATURE_OPERATOR, env);
     expect(body.testGroups).toMatchObject({ enabled: false, operator: false });
-    const res = await call(app, "POST", `/api/accounts/${accountId}/promotions`, {
+    const res = await call(app, "POST", `/api/threads/accounts/${accountId}/promotions`, {
       user: FEATURE_OPERATOR,
       env,
       body: { title: "宣伝", body: "本文" },
@@ -47,7 +47,7 @@ describe("/access の features", () => {
   it("オーナーの設定でONのまとまりが入る", async () => {
     const { userId, accountId } = await createUserWithAccount("o1");
     const access = async () =>
-      ((await (await call(app, "GET", `/api/accounts/${accountId}/access`, { user: "o1" })).json()) as { features: string[] }).features;
+      ((await (await call(app, "GET", `/api/threads/accounts/${accountId}/access`, { user: "o1" })).json()) as { features: string[] }).features;
     expect(await access()).toEqual(["autopost", "strategy", "team"]);
     await disableFeatures(userId, "strategy", "team");
     expect(await access()).toEqual(["autopost"]);
@@ -56,7 +56,7 @@ describe("/access の features", () => {
 
 describe("/api/me の features と、チームが使えない人（research.md R13）", () => {
   type Me = { features: string[]; teams: unknown[]; accounts: { id: string; role: string }[] };
-  const meOf = async (user: string) => (await (await call(app, "GET", "/api/me", { user })).json()) as Me;
+  const meOf = async (user: string) => (await (await call(app, "GET", "/api/threads/me", { user })).json()) as Me;
 
   it("人 ∪ グループの使えるまとまり", async () => {
     const { userId } = await createUserWithAccount("u1");

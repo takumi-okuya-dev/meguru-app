@@ -49,7 +49,7 @@ type Row = {
 };
 
 /**
- * 運営者のアカウント一覧（GET /api/operator/accounts）。
+ * 運営者のアカウント一覧（GET /api/threads/operator/accounts）。
  * @param db - データベース
  * @param query - 接続方法の絞り込み・検索語・続きの印
  * @returns 接続方法ごとの件数（検索に左右されない）と、作った日の新しい順の1ページ分の行

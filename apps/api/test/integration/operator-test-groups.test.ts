@@ -96,7 +96,7 @@ describe("外す・閉じる", () => {
     const d = await json(await op("DELETE", `/api/operator/test-groups/${id}/members/${u1.id}`));
     expect(d.memberCount).toBe(0);
     expect((await userRow("u1"))!.billing_exempt).toBe(false);
-    expect((await callOn(app, "GET", "/api/me/needs-review-counts", { user: "u1" })).status).toBe(403);
+    expect((await callOn(app, "GET", "/api/threads/me/needs-review-counts", { user: "u1" })).status).toBe(403);
     expect((d.events as { action: string; subjectName: string | null }[])[0]).toMatchObject({ action: "member_removed", subjectName: "u1" });
   });
 

@@ -26,7 +26,7 @@ import {
 } from "../helpers/app";
 
 const app = makeApp();
-const base = (id: string) => `/api/accounts/${id}`;
+const base = (id: string) => `/api/threads/accounts/${id}`;
 
 beforeEach(async () => {
   await resetDb();

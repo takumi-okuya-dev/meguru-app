@@ -5,7 +5,7 @@ import { connectedAccount, db } from "../helpers/auto-post";
 
 const app = makeApp();
 const check = (accountId: string, user = "u1") =>
-  call(app, "POST", `/api/accounts/${accountId}/threads-check`, { user });
+  call(app, "POST", `/api/threads/accounts/${accountId}/threads-check`, { user });
 
 beforeEach(async () => {
   await resetDb();

@@ -14,10 +14,10 @@ beforeEach(async () => {
 const errorOf = async (res: Response) => ((await res.clone().json()) as { error?: { code: string; details?: string[] } }).error;
 
 describe("チームが使えない人", () => {
-  it("チームを作れない（POST /api/teams が 403 FEATURE_DISABLED）", async () => {
+  it("チームを作れない（POST /api/threads/teams が 403 FEATURE_DISABLED）", async () => {
     const { userId, accountId } = await createUserWithAccount("u1");
     await disableFeatures(userId, "team");
-    const res = await call(app, "POST", "/api/teams", { user: "u1", body: { name: "新しいチーム", accountIds: [accountId] } });
+    const res = await call(app, "POST", "/api/threads/teams", { user: "u1", body: { name: "新しいチーム", accountIds: [accountId] } });
     expect(res.status).toBe(403);
     expect(await errorOf(res)).toMatchObject({ code: "FEATURE_DISABLED", details: ["team"] });
   });
@@ -27,7 +27,7 @@ describe("チームが使えない人", () => {
     const { token } = await makeTeam("a1", [adminAcc]);
     const { userId, accountId } = await createUserWithAccount("u1");
     await disableFeatures(userId, "team");
-    const res = await call(app, "POST", `/api/invites/${token}/accept`, { user: "u1", body: { accounts: [{ id: accountId, shared: false }] } });
+    const res = await call(app, "POST", `/api/threads/invites/${token}/accept`, { user: "u1", body: { accounts: [{ id: accountId, shared: false }] } });
     expect(res.status).toBe(403);
     expect((await errorOf(res))?.code).toBe("FEATURE_DISABLED");
   });
@@ -43,23 +43,23 @@ describe("チームが使えない人", () => {
     await assign(teamId, "e1", accountId);
 
     await disableFeatures(admin, "team");
-    for (const path of [`/api/teams/${teamId}`, `/api/teams/${teamId}/assignments`, `/api/teams/${teamId}/invite`]) {
+    for (const path of [`/api/threads/teams/${teamId}`, `/api/threads/teams/${teamId}/assignments`, `/api/threads/teams/${teamId}/invite`]) {
       const res = await call(app, "GET", path, { user: "a1" });
       expect(res.status, path).toBe(403);
       expect((await errorOf(res))?.code, path).toBe("FEATURE_DISABLED");
     }
     // ほかの人は今までどおり
-    expect((await call(app, "GET", `/api/teams/${teamId}`, { user: "e1" })).status).toBe(200);
+    expect((await call(app, "GET", `/api/threads/teams/${teamId}`, { user: "e1" })).status).toBe(200);
 
     await enableAll(admin);
-    const back = await call(app, "GET", `/api/teams/${teamId}/assignments`, { user: "a1" });
+    const back = await call(app, "GET", `/api/threads/teams/${teamId}/assignments`, { user: "a1" });
     expect(back.status).toBe(200);
   });
 
   it("自分がオーナーのAccountのチームの区分と操作の記録は、チームが使えなければ使えない", async () => {
     const { userId, accountId } = await createUserWithAccount("o1");
     await disableFeatures(userId, "team");
-    for (const path of [`/api/accounts/${accountId}/team`, `/api/accounts/${accountId}/activity`]) {
+    for (const path of [`/api/threads/accounts/${accountId}/team`, `/api/threads/accounts/${accountId}/activity`]) {
       const res = await call(app, "GET", path, { user: "o1" });
       expect(res.status, path).toBe(403);
       expect((await errorOf(res))?.code).toBe("FEATURE_DISABLED");

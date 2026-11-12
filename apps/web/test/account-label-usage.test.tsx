@@ -4,10 +4,10 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import type { AccountSummary, MeResponse } from "@meguru/shared";
+import type { AccountSummary } from "@meguru/shared";
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { ME_BILLING_OFF } from "./helpers/billing";
+import { ME_BILLING_OFF, type MeWithThreads } from "./helpers/billing";
 
 const mocks = vi.hoisted(() => ({ me: vi.fn(), needsReviewCounts: vi.fn() }));
 vi.mock("@clerk/react", () => ({
@@ -47,7 +47,7 @@ const connected: AccountSummary = {
   connectionStatus: "connected",
   connectionMethod: "app",
 };
-const me: MeResponse = {
+const me: MeWithThreads = {
   user: { id: "user", email: "user@example.com", displayName: "User" },
   accounts: [unconnected, connected],
   landingAccountId: "a1",

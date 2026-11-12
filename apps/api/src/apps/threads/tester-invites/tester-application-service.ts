@@ -637,7 +637,7 @@ function mismatchNoticeWhere(accountId: string) {
 }
 
 /**
- * 違うアカウントでつながった知らせ（GET /api/accounts/:id/connection-notice）。
+ * 違うアカウントでつながった知らせ（GET /api/threads/accounts/:id/connection-notice）。
  * @param db - データベース
  * @param accountId - accounts.id
  * @returns 申し込んだ名前とつながった名前。出さなければ null

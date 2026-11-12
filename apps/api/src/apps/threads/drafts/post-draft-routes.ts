@@ -1,4 +1,4 @@
-// /api/accounts/:accountId/post-drafts と /draft-batches（specs/003-prompt-bulk-register contracts/api.md）。
+// /api/threads/accounts/:accountId/post-drafts と /draft-batches（specs/003-prompt-bulk-register contracts/api.md）。
 // 下書きの操作は全プランで使えるので、grower機能は判定しない（research.md R10）。
 import {
   APPROVED_LIMIT,

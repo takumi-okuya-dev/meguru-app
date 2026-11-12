@@ -9,7 +9,7 @@ import { activityRows, putInTeam } from "../helpers/team";
 
 const app = makeApp();
 const sql = () => neon(testEnv.DATABASE_URL);
-const base = (accountId: string) => `/api/accounts/${accountId}`;
+const base = (accountId: string) => `/api/threads/accounts/${accountId}`;
 
 async function json<T>(res: Response, status = 200): Promise<T> {
   expect(res.status, await res.clone().text()).toBe(status);

@@ -11,7 +11,7 @@ beforeEach(async () => {
   await resetDb();
 });
 
-const base = (id: string) => `/api/accounts/${id}`;
+const base = (id: string) => `/api/threads/accounts/${id}`;
 const UUID = "00000000-0000-4000-8000-000000000000";
 
 /** まとまりごとの、守るAPI（contracts/api.md の表のとおり。オーナーの設定で判定する）。 */

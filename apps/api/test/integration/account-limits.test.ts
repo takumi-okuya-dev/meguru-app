@@ -5,10 +5,10 @@ import { billingEnv } from "../helpers/billing";
 import { accounts } from "../../src/db/schema";
 
 const app = makeApp();
-const create = (user: string, name: string, env = testEnv) => call(app, "POST", "/api/accounts", { user, body: { name }, env });
+const create = (user: string, name: string, env = testEnv) => call(app, "POST", "/api/threads/accounts", { user, body: { name }, env });
 const errorOf = async (res: Response) => ((await res.json()) as { error: { code: string; max?: number; details?: string[] } }).error;
 const meLimit = async (user: string, env = testEnv) =>
-  ((await (await call(app, "GET", "/api/me", { user, env })).json()) as { accountLimit: { max: number | null; used: number } }).accountLimit;
+  ((await (await call(app, "GET", "/api/threads/me", { user, env })).json()) as { accountLimit: { max: number | null; used: number } }).accountLimit;
 
 beforeEach(async () => {
   await resetDb();

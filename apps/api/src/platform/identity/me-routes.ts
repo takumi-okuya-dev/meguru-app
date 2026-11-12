@@ -1,11 +1,10 @@
 // GET /api/me（FR-004・FR-005、research.md R10。specs/008 research.md R11 で役割つきに広げ、
-// specs/011 research.md R5 で入っているチームを足した）。029 から、共通の情報だけを作り、アプリの中身は
-// アプリが登録した関数で足す（specs/meguru/029-threads-pattern1 contracts/api-routes.md 2）。
+// specs/011 research.md R5 で入っているチームを足した）。029 から、共通の情報だけを返す。アプリの中身は各アプリの道筋
+// （Threadsなら /api/threads/me）が返す（specs/meguru/029-threads-pattern1 contracts/api-routes.md 2）。
 import { type MeApps, lastAppRequestSchema, releasedApps, resolveLandingApp, withdrawRequestSchema } from "@meguru/shared";
 import { eq } from "drizzle-orm";
 import { Hono, type MiddlewareHandler } from "hono";
 import type { AppEnv } from "./auth";
-import { collectSections } from "./me-sections";
 import { createDb } from "../../kernel/db/client";
 import { users } from "../schema";
 import { loadEntitlement, toMeBilling } from "../billing/billing-service";
@@ -39,13 +38,11 @@ export function meRoutes(authed: MiddlewareHandler<AppEnv>, deleteClerkUser: (en
     const user = c.get("user");
     const db = createDb(c.env.DATABASE_URL);
     const now = new Date();
-    // アプリの中身と使える状態は並べて読む。使っているアプリは、アプリの中身のあとで読む（アプリが利用の状態を伝え直すことがあるため）
-    const [sections, entitlement] = await Promise.all([collectSections(c, "me"), loadEntitlement(db, user.id, user.billing, now)]);
-    const using = await usingAppsOf(db, user.id);
+    // 共通の中身だけを返す（アプリの中身は各アプリの道筋。Threadsなら /api/threads/me。specs/meguru/029 contracts/api-routes.md 2）
+    const [entitlement, using] = await Promise.all([loadEntitlement(db, user.id, user.billing, now), usingAppsOf(db, user.id)]);
     // Account切り替えメニューは開くたびに一覧を読み直すため、ブラウザに保存させない。
     c.header("Cache-Control", "no-store");
     return c.json({
-      ...sections,
       user: { id: user.id, email: user.email, displayName: user.displayName },
       billing: toMeBilling(user.billing, entitlement!, now),
       withdrawalInProgress: user.withdrawalRequestedAt !== null,
@@ -67,9 +64,8 @@ export function meRoutes(authed: MiddlewareHandler<AppEnv>, deleteClerkUser: (en
     // 退会（specs/013 contracts/api.md「自分」、research.md R10）
     .get("/me/withdrawal-preview", authed, async (c) => {
       c.header("Cache-Control", "no-store");
-      // アプリの中身（消えるアカウントなど）は、アプリが登録した関数で足す（PR5 まで。前の画面のため）
-      const [own, sections] = await Promise.all([withdrawalPreview(createDb(c.env.DATABASE_URL), c.get("user").id), collectSections(c, "preview")]);
-      return c.json({ ...sections, ...own });
+      // 共通の分だけ（アプリの分は各アプリの道筋。Threadsなら /api/threads/me/withdrawal-preview）
+      return c.json(await withdrawalPreview(createDb(c.env.DATABASE_URL), c.get("user").id));
     })
     .post("/me/withdraw", authed, async (c) => {
       const parsed = withdrawRequestSchema.safeParse(await c.req.json().catch(() => null));

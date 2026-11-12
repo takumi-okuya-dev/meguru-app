@@ -5,7 +5,7 @@ import userEvent from "@testing-library/user-event";
 import type { AccountSummary, MeResponse } from "@meguru/shared";
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { ME_BILLING_OFF, meBilling } from "./helpers/billing";
+import { ME_BILLING_OFF, meBilling, type MeWithThreads } from "./helpers/billing";
 
 const mocks = vi.hoisted(() => ({ me: vi.fn(), createAccount: vi.fn() }));
 vi.mock("@/lib/api-client", async (orig) => {
@@ -49,7 +49,7 @@ function me(
   used: number,
   threadsAccessMode: "testers" | "public" = "testers",
   billing: MeResponse["billing"] = ME_BILLING_OFF.billing,
-): MeResponse {
+): MeWithThreads {
   return {
     user: { id: "u", email: "u@example.com", displayName: null },
     accounts: Array.from({ length: used }, (_, i) => account(`a${i}`)),

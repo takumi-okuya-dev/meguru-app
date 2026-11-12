@@ -30,7 +30,7 @@ async function json<T>(res: Response, status = 200): Promise<T> {
 const errorOf = async (res: Response) =>
   ((await res.json()) as { error: { code: string; details?: string[] } }).error;
 
-const base = (accountId: string) => `/api/accounts/${accountId}`;
+const base = (accountId: string) => `/api/threads/accounts/${accountId}`;
 const listingPath = (accountId: string, promotionId: string, media = "peatix") =>
   `${base(accountId)}/external-media/${promotionId}/${media}`;
 

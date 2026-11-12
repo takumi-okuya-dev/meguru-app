@@ -1,4 +1,4 @@
-// /api/accounts/:accountId/auto-post（自動投稿の状態と知らせ。specs/005-auto-post FR-018・FR-022、contracts/api.md）。
+// /api/threads/accounts/:accountId/auto-post（自動投稿の状態と知らせ。specs/005-auto-post FR-018・FR-022、contracts/api.md）。
 import { sql } from "drizzle-orm";
 import { Hono, type MiddlewareHandler } from "hono";
 import type { AppEnv } from "../../../platform";

@@ -9,7 +9,7 @@ const app = makeApp();
 // 時刻の直後（例：12:00の枠の12:22）に流しても落ちないよう、その幅を含めて確かめる
 const notBeforeLateWindow = () => Date.now() - AUTOPOST_LATE_WINDOW_MINUTES * 60_000;
 const status = (accountId: string, user = "u1") =>
-  call(app, "GET", `/api/accounts/${accountId}/auto-post`, { user });
+  call(app, "GET", `/api/threads/accounts/${accountId}/auto-post`, { user });
 
 beforeEach(async () => {
   await resetDb();
@@ -70,7 +70,7 @@ describe("US2：直前のチェックの知らせ", () => {
     const res = await call(
       app,
       "POST",
-      `/api/accounts/${accountId}/auto-post/notices/blocked/dismiss`,
+      `/api/threads/accounts/${accountId}/auto-post/notices/blocked/dismiss`,
       { user: "u1" },
     );
     expect(res.status).toBe(204);
@@ -87,7 +87,7 @@ describe("US2：直前のチェックの知らせ", () => {
   it("設定なしでも閉じられ、他人のAccountでは404", async () => {
     const { accountId } = await connectedAccount("u1", app);
     await createUserWithAccount("u2");
-    const path = `/api/accounts/${accountId}/auto-post/notices/blocked/dismiss`;
+    const path = `/api/threads/accounts/${accountId}/auto-post/notices/blocked/dismiss`;
     expect((await call(app, "POST", path, { user: "u2" })).status).toBe(404);
     expect((await call(app, "POST", path, { user: "u1" })).status).toBe(204);
     expect(

@@ -2,7 +2,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import type { WithdrawalPreview } from "@meguru/shared";
+import type { ThreadsWithdrawalPreview, WithdrawalPreview } from "@meguru/shared";
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -31,7 +31,7 @@ const { RequireAuth } = await import("@/shell/guards/RequireAuth");
 const { AppRegistryProvider } = await import("@/shell/app-module");
 const { threadsApp } = await import("@/apps/threads");
 
-const PREVIEW: WithdrawalPreview = {
+const PREVIEW: WithdrawalPreview & ThreadsWithdrawalPreview = {
   email: "t@example.com",
   ownedAccounts: [
     { id: "a1", name: "カフェの公式" },

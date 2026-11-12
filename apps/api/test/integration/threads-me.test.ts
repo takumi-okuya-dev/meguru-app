@@ -38,7 +38,7 @@ async function usageOf(userId: string) {
 }
 
 describe("GET /api/threads/me", () => {
-  it("/api/me のThreadsの部分と同じ値を返す", async () => {
+  it("Threadsの中身を返し、共通の /api/me には Threads の中身がない（PR5c で消した）", async () => {
     const { accountId } = await createUserWithAccount("u1");
     const me = (await (await call(app, "GET", "/api/me", { user: "u1" })).json()) as Record<string, unknown>;
     const res = await call(app, "GET", "/api/threads/me", { user: "u1" });
@@ -46,7 +46,7 @@ describe("GET /api/threads/me", () => {
     expect(res.headers.get("Cache-Control")).toBe("no-store");
     const threads = (await res.json()) as Record<string, unknown>;
     expect(Object.keys(threads).sort()).toEqual([...THREADS_KEYS].sort());
-    for (const k of THREADS_KEYS) expect(threads[k]).toEqual(me[k]);
+    for (const k of THREADS_KEYS) expect(me).not.toHaveProperty(k);
     // 形は共通の threadsMeResponseSchema（specs/meguru/029 tasks.md T021）
     expect(threadsMeResponseSchema.safeParse(threads).success).toBe(true);
     expect((threads.accounts as { id: string }[]).map((a) => a.id)).toEqual([accountId]);
@@ -56,12 +56,12 @@ describe("GET /api/threads/me", () => {
     expect((await call(app, "GET", "/api/threads/me")).status).toBe(401);
   });
 
-  it("退会の確かめ：/api/threads/me/withdrawal-preview は消えるアカウントと外れるチーム。/api/me/withdrawal-preview にも同じ中身が入る", async () => {
+  it("退会の確かめ：/api/threads/me/withdrawal-preview は消えるアカウントと外れるチーム。共通の /api/me/withdrawal-preview は共通の分だけ", async () => {
     const { accountId } = await createUserWithAccount("u1");
     const threads = (await (await call(app, "GET", "/api/threads/me/withdrawal-preview", { user: "u1" })).json()) as Record<string, unknown>;
     expect(threads).toEqual({ ownedAccounts: [{ id: accountId, name: expect.any(String) }], teams: [] });
     const all = (await (await call(app, "GET", "/api/me/withdrawal-preview", { user: "u1" })).json()) as Record<string, unknown>;
-    expect(all).toMatchObject({ ...threads, email: "u1@example.com", hasActiveSubscription: false });
+    expect(all).toEqual({ email: "u1@example.com", hasActiveSubscription: false });
   });
 });
 
@@ -71,24 +71,27 @@ describe("利用の数を共通へ伝える", () => {
     const { accountId } = await createAccountVia(app, "u1", "店");
     const { userId } = await createUserWithAccount("u1");
     expect(await usageOf(userId)).toEqual({ quantity: 2, using: true });
-    const res = await call(app, "DELETE", `/api/accounts/${accountId}`, { user: "u1", body: { confirmName: "店" } });
+    const res = await call(app, "DELETE", `/api/threads/accounts/${accountId}`, { user: "u1", body: { confirmName: "店" } });
     expect(res.status).toBe(204);
     expect(await usageOf(userId)).toEqual({ quantity: 1, using: true });
   });
 
-  it("チームにだけ入っている人は、数0・使っている（/api/me を開くと記録が直る）", async () => {
+  it("チームにだけ入っている人は、数0・使っている（/api/threads/me を開くと記録が直る）", async () => {
     const { accountId: adminAcc } = await createUserWithAccount("a1");
     const { teamId } = await makeTeam("a1", [adminAcc]);
     const member = await ensureUser("m1");
     await joinTeam(teamId, "m1", []);
+    // 共通の /api/me は Threads を数えない（PR5）。Threads の「自分」を開くと数え直して伝える
+    await call(app, "GET", "/api/threads/me", { user: "m1" });
     const me = (await (await call(app, "GET", "/api/me", { user: "m1" })).json()) as { apps: { using: string[] } };
     expect(me.apps.using).toEqual(["threads"]);
     expect(await usageOf(member)).toEqual({ quantity: 0, using: true });
   });
 
-  it("記録がずれても、/api/me を開くと直り、使っているアプリも正しい", async () => {
+  it("記録がずれても、/api/threads/me を開くと直り、使っているアプリも正しい", async () => {
     const { userId } = await createUserWithAccount("u1");
     await db().update(appUsage).set({ quantity: 0, inUse: false }).where(eq(appUsage.userId, userId));
+    await call(app, "GET", "/api/threads/me", { user: "u1" });
     const me = (await (await call(app, "GET", "/api/me", { user: "u1" })).json()) as { apps: { using: string[] } };
     expect(me.apps.using).toEqual(["threads"]);
     expect(await usageOf(userId)).toEqual({ quantity: 1, using: true });
