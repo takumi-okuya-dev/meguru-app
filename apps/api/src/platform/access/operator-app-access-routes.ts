@@ -5,7 +5,7 @@ import { Hono, type MiddlewareHandler } from "hono";
 import type { AppEnv } from "../identity/auth";
 import { operatorOnly } from "../operator/operator-only";
 import { parseBody } from "../../kernel/validate";
-import { assertAppAccessValues, setGroupAppAccess, setUserAppAccess } from "./app-access-service";
+import { setGroupAppAccess, setUserAppAccess } from "./app-access-service";
 
 /**
  * 運営者のアプリの利用の許可のルート。
@@ -16,12 +16,10 @@ export function operatorAppAccessRoutes(authed: MiddlewareHandler<AppEnv>) {
   return new Hono<AppEnv>()
     .put("/operator/app-access/users/:userId", authed, operatorOnly, async (c) => {
       const { apps } = await parseBody(appAccessRequestSchema, c.req.json());
-      assertAppAccessValues(apps);
       return c.json(await setUserAppAccess(c.env, c.get("user"), c.req.param("userId"), apps));
     })
     .put("/operator/app-access/groups/:groupId", authed, operatorOnly, async (c) => {
       const { apps } = await parseBody(appAccessRequestSchema, c.req.json());
-      assertAppAccessValues(apps);
       return c.json(await setGroupAppAccess(c.env, c.get("user"), c.req.param("groupId"), apps));
     });
 }

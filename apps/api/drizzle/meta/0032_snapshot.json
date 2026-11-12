@@ -1,5 +1,5 @@
 {
-  "id": "8114f658-9fc8-46f5-8bb7-534507a5bc01",
+  "id": "021f40c6-5da9-44c5-a81e-1b9a6ef0c3d3",
   "prevId": "f1ac658b-5abb-4309-b382-86d718ff0e99",
   "version": "7",
   "dialect": "postgresql",
@@ -67,8 +67,8 @@
         "app_access_grants_pkey": {
           "name": "app_access_grants_pkey",
           "columns": [
-            "app",
-            "user_id"
+            "user_id",
+            "app"
           ]
         }
       },
@@ -522,8 +522,8 @@
         "group_app_access_grants_pkey": {
           "name": "group_app_access_grants_pkey",
           "columns": [
-            "app",
-            "group_id"
+            "group_id",
+            "app"
           ]
         }
       },

@@ -362,7 +362,7 @@ export const appAccessGrants = pgTable(
     grantedAt: timestamp("granted_at", { withTimezone: true, precision: 6 }).notNull().defaultNow(),
   },
   (t) => [
-    primaryKey({ name: "app_access_grants_pkey", columns: [t.app, t.userId] }),
+    primaryKey({ name: "app_access_grants_pkey", columns: [t.userId, t.app] }), // 人ごとに引くので、人を先に
     check("app_access_grants_app_valid", sql`${t.app} ~ '^[a-z][a-z0-9-]{0,30}$'`),
   ],
 );
@@ -379,7 +379,7 @@ export const groupAppAccessGrants = pgTable(
     grantedAt: timestamp("granted_at", { withTimezone: true, precision: 6 }).notNull().defaultNow(),
   },
   (t) => [
-    primaryKey({ name: "group_app_access_grants_pkey", columns: [t.app, t.groupId] }),
+    primaryKey({ name: "group_app_access_grants_pkey", columns: [t.groupId, t.app] }), // グループごとに引くので、グループを先に
     check("group_app_access_grants_app_valid", sql`${t.app} ~ '^[a-z][a-z0-9-]{0,30}$'`),
   ],
 );

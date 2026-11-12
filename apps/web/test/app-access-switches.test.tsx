@@ -126,7 +126,7 @@ describe("人（使える機能）", () => {
     const group = within(await screen.findByRole("group", { name: "山田 花子のアプリの利用" }));
     const toggle = group.getByRole("switch", { name: DEMO });
     expect(toggle).not.toBeChecked();
-    expect(group.getByText("グループで開いています")).toBeInTheDocument();
+    expect(group.getByText("グループで開いています（このスイッチをOFFにしても、グループの設定で使えます）")).toBeInTheDocument();
     await user.click(toggle);
     expect(mocks.putUserAppAccess).toHaveBeenCalledWith("u-hanako", { [DEMO]: true });
     expect(await group.findByText("保存しました")).toBeInTheDocument();

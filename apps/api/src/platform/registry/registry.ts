@@ -65,7 +65,7 @@ export function registerAppFeatures(app: string, defs: readonly AppFeatureDef[],
     return;
   }
   const bad = defs.find((d) => !FEATURE_KEY_RE.test(d.key));
-  if (bad) throw new Error(`機能の名前「${bad.key}」の形が違います（英小文字で始まり、英小文字・数字・- の31文字まで）`);
+  if (bad) throw new Error(`機能の名前「${bad.key}」の形が違います（英小文字と _ の1〜30文字だけ）`);
   // 機能の名前は重ねない（同じアプリの中でも、アプリをまたいでも。ログインした人の features は1つの集合で持つため。specs/meguru/029 tasks.md T027）
   const keys = defs.map((d) => d.key);
   const inside = keys.find((k, i) => keys.indexOf(k) !== i);
@@ -118,7 +118,7 @@ export function registerAppLimits(
     return;
   }
   const bad = Object.keys(defs).find((k) => !FEATURE_KEY_RE.test(k));
-  if (bad) throw new Error(`上限の名前「${bad}」の形が違います（英小文字で始まり、英小文字・数字・- の31文字まで）`);
+  if (bad) throw new Error(`上限の名前「${bad}」の形が違います（英小文字と _ の1〜30文字だけ）`);
   limits.set(app, defs);
   if (opts.operatorScreen) limitsOwner = app;
 }

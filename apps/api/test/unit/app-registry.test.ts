@@ -101,12 +101,12 @@ describe("アプリの利用の決まり（specs/meguru/030-app-access FR-001）
   it("登録しないアプリは open。granted で登録したアプリは登録の順に grantedApps に出て、登録したアプリの一覧にも出る", () => {
     expect(appAccessMode("sample")).toBe("open");
     registerAppFeatures("sample", [{ key: "notes", label: "メモ" }]);
-    registerAppAccess("gated_b", "granted");
-    registerAppAccess("open_app", "open");
-    registerAppAccess("gated_a", "granted");
-    expect([appAccessMode("gated_b"), appAccessMode("open_app"), appAccessMode("sample")]).toEqual(["granted", "open", "open"]);
-    expect(grantedApps()).toEqual(["gated_b", "gated_a"]);
-    expect(registeredApps()).toEqual(["sample", "gated_b", "open_app", "gated_a"]);
+    registerAppAccess("gated-b", "granted");
+    registerAppAccess("open-app", "open");
+    registerAppAccess("gated-a", "granted");
+    expect([appAccessMode("gated-b"), appAccessMode("open-app"), appAccessMode("sample")]).toEqual(["granted", "open", "open"]);
+    expect(grantedApps()).toEqual(["gated-b", "gated-a"]);
+    expect(registeredApps()).toEqual(["sample", "gated-b", "open-app", "gated-a"]);
   });
 
   it("同じ決まりの2回目は何もしない。違う決まりと、名前の形の誤りは登録のときに止める", () => {
@@ -115,7 +115,8 @@ describe("アプリの利用の決まり（specs/meguru/030-app-access FR-001）
     expect(grantedApps()).toEqual(["sample"]);
     expect(() => registerAppAccess("sample", "open")).toThrow(/sample/);
     expect(() => registerAppAccess("Sample", "granted")).toThrow(/Sample/);
-    expect(() => registerAppAccess("a".repeat(31), "granted")).toThrow(/a{31}/);
+    expect(() => registerAppAccess("a".repeat(32), "granted")).toThrow(/a{32}/);
+    expect(() => registerAppAccess("demo_x", "granted")).toThrow(/demo_x/);
   });
 
   it("登録を消すと、決まりも消える（テスト用）", () => {

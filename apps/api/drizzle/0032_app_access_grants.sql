@@ -3,7 +3,7 @@ CREATE TABLE "app_access_grants" (
 	"user_id" uuid NOT NULL,
 	"granted_by" uuid,
 	"granted_at" timestamp (6) with time zone DEFAULT now() NOT NULL,
-	CONSTRAINT "app_access_grants_pkey" PRIMARY KEY("app","user_id"),
+	CONSTRAINT "app_access_grants_pkey" PRIMARY KEY("user_id","app"),
 	CONSTRAINT "app_access_grants_app_valid" CHECK ("app_access_grants"."app" ~ '^[a-z][a-z0-9-]{0,30}$')
 );
 --> statement-breakpoint
@@ -12,7 +12,7 @@ CREATE TABLE "group_app_access_grants" (
 	"group_id" uuid NOT NULL,
 	"granted_by" uuid,
 	"granted_at" timestamp (6) with time zone DEFAULT now() NOT NULL,
-	CONSTRAINT "group_app_access_grants_pkey" PRIMARY KEY("app","group_id"),
+	CONSTRAINT "group_app_access_grants_pkey" PRIMARY KEY("group_id","app"),
 	CONSTRAINT "group_app_access_grants_app_valid" CHECK ("group_app_access_grants"."app" ~ '^[a-z][a-z0-9-]{0,30}$')
 );
 --> statement-breakpoint

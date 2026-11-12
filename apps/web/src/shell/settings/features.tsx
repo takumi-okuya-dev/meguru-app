@@ -128,7 +128,7 @@ export function FeaturesPage() {
               title="アプリの利用"
               label={`${found.name}のアプリの利用`}
               granted={found.appAccess}
-              notes={Object.fromEntries((found.group?.appAccess ?? []).map((a) => [a, "グループで開いています"]))}
+              notes={Object.fromEntries((found.group?.appAccess ?? []).map((a) => [a, "グループで開いています（このスイッチをOFFにしても、グループの設定で使えます）"]))}
               onChange={async (app, granted) => {
                 const saved = await api.putUserAppAccess(found.userId, { [app]: granted });
                 setFound((prev) => (prev?.userId === found.userId ? { ...prev, appAccess: saved.granted } : prev));

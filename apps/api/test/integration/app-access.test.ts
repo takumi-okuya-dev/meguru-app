@@ -128,7 +128,7 @@ describe("道筋の関所（requireAppAccess）と判定", () => {
     expect(await useDemo("u3")).toEqual([403, "APP_NOT_AVAILABLE"]);
     expect((await loadAppEntitlement(db(), mode(), outsider, DEMO))?.access).toBe("none");
     const events = (await operatorEventRows()).filter((e) => e.action === "app_access");
-    expect(events.map((e) => [e.subject_user_id, e.detail])).toEqual([[null, { app: DEMO, granted: true, groupId }]]);
+    expect(events.map((e) => [e.subject_user_id, e.detail])).toEqual([[null, { app: DEMO, granted: true, groupId, groupName: "飲食の会" }]]);
 
     // 人ごとにも開いた人は、グループを閉じても使える
     await callOp("PUT", `/api/operator/app-access/users/${u2}`, { user: OP, body: { apps: { [DEMO]: true } } });

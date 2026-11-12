@@ -138,7 +138,7 @@ export async function setGroupAppAccess(env: Env, operator: { id: string }, grou
   assertAppAccessValues(apps);
   if (!isUuid(groupId)) throw new AppError("ITEM_NOT_FOUND", 404, "test group not found");
   return withTransaction(env.DATABASE_URL, async (tx) => {
-    const [g] = await tx.select({ id: testGroups.id, closedAt: testGroups.closedAt }).from(testGroups).where(eq(testGroups.id, groupId)).for("update");
+    const [g] = await tx.select({ id: testGroups.id, name: testGroups.name, closedAt: testGroups.closedAt }).from(testGroups).where(eq(testGroups.id, groupId)).for("update");
     if (!g) throw new AppError("ITEM_NOT_FOUND", 404, "test group not found");
     if (g.closedAt) throw new AppError("TEST_GROUP_CLOSED", 409, "test group closed");
     const before = await groupAppAccess(tx, groupId);
@@ -153,7 +153,7 @@ export async function setGroupAppAccess(env: Env, operator: { id: string }, grou
       await tx.delete(groupAppAccessGrants).where(and(eq(groupAppAccessGrants.groupId, groupId), inArray(groupAppAccessGrants.app, toRevoke)));
     }
     for (const [app, granted] of [...toGrant.map((a) => [a, true] as const), ...toRevoke.map((a) => [a, false] as const)]) {
-      await recordOperatorEvent(tx, { actorUserId: operator.id, action: "app_access", detail: { app, granted, groupId } });
+      await recordOperatorEvent(tx, { actorUserId: operator.id, action: "app_access", detail: { app, granted, groupId, groupName: g.name } });
     }
     return { granted: await groupAppAccess(tx, groupId) };
   });
