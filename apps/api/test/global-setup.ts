@@ -4,9 +4,12 @@ import { drizzle } from "drizzle-orm/node-postgres";
 import { migrate } from "drizzle-orm/node-postgres/migrator";
 import pg from "pg";
 import type { TestProject } from "vitest/node";
+import { loadWorktreeEnv } from "../scripts/worktree-env";
 import { createFakeStripe } from "./fake-stripe/server";
 import { createFakeThreads } from "./fake-threads/server";
 
+// 作業場所を分けているときは、その作業場所のDBを使う（scripts/worktree-env.ts）
+loadWorktreeEnv();
 const DIRECT_URL = process.env.TEST_DATABASE_URL_DIRECT ?? "postgres://postgres:postgres@localhost:5432/threads_grower";
 // Workers からは local-neon-http-proxy 経由で接続する
 const PROXY_URL = process.env.TEST_DATABASE_URL ?? "postgres://postgres:postgres@db.localtest.me:5432/threads_grower";

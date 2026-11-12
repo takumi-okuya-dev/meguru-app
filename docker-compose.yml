@@ -1,5 +1,8 @@
 # ローカル開発・テスト用のDB（research.md R12）
 # Postgres 17 と、Neonのサーバーレスドライバーで接続するための local-neon-http-proxy
+# 名前を決めておき、どの作業場所（git worktree）で docker compose を動かしても、同じ1つのDBのコンテナを使う。
+# 作業場所ごとのDBは、このPostgresの中に別の名前で作る（pnpm worktree:new。README「手元で同時に進める」）
+name: meguru-app
 services:
   postgres:
     image: postgres:17
