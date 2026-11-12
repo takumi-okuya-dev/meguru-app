@@ -27,5 +27,7 @@ ON CONFLICT ("id") DO UPDATE SET "tester_slot_capacity" = EXCLUDED."tester_slot_
 INSERT INTO "threads_user_states" ("user_id", "last_account_id", "last_account_deleted_at", "last_account_client_id", "last_account_open_seq", "last_account_open_received_at")
 SELECT "id", "last_account_id", "last_account_deleted_at", "last_account_client_id", "last_account_open_seq", "last_account_open_received_at"
 FROM "users"
-WHERE "last_account_id" IS NOT NULL OR "last_account_deleted_at" IS NOT NULL OR "last_account_open_received_at" IS NOT NULL
+-- 退会を受け付けた人は写さない（Threadsの片づけがもう済んでいることがあり、写すと消す人がいなくなる。PR #97 のセルフレビュー）
+WHERE "withdrawal_requested_at" IS NULL
+  AND ("last_account_id" IS NOT NULL OR "last_account_deleted_at" IS NOT NULL OR "last_account_open_received_at" IS NOT NULL)
 ON CONFLICT ("user_id") DO NOTHING;

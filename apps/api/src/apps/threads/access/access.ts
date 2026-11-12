@@ -65,8 +65,6 @@ export type AccountAccess = {
 import { isUuid } from "../../../kernel/validate";
 export { isUuid };
 
-import { personName } from "../../../platform";
-export { personName };
 
 /**
  * 関わりとチームのロールから、操作の記録に写す役割を決める（research.md R8）。

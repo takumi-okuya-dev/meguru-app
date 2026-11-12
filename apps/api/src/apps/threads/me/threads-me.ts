@@ -19,7 +19,7 @@ import { chooseSuccessor, listMyTeams } from "../teams/team-service";
  * last_account_id（開けるAccountなら）→ オーナーのAccountで last_used_at が最新 → created_at が最新
  * → 担当しているAccountの最初 → null の順。
  * @param owned - ownerとして保有するAccount
- * @param lastAccountId - users.last_account_id
+ * @param lastAccountId - 最後に開いたアカウント（threads_user_states.last_account_id）
  * @param helped - 担当しているAccount（並びは /api/me の順）
  * @returns 遷移先の Account の ID。開けるAccountが0件なら null
  */
@@ -61,7 +61,8 @@ export async function buildThreadsMe(c: Context<AppEnv>) {
       desc(accounts.createdAt),
     );
   // オーナーの利用権（チームのON/OFF・退会・名前）は、共通の入口の関数でまとめて読む
-  const owners = await loadAppEntitlements(db, user.billing, rows.map((r) => r.ownerId), THREADS_APP, now);
+  // 自分の利用権（アカウントの数の上限）も同じ問い合わせで読む（accountLimitFor に渡し、重ねて読まない。PR #97 のセルフレビュー）
+  const owners = await loadAppEntitlements(db, user.billing, [user.id, ...rows.map((r) => r.ownerId)], THREADS_APP, now);
   // チームを使えない人には、担当しているAccountとチームを出さない（specs/019 research.md R13）。担当しているAccountは、
   // オーナーもチームを使えるときだけ出す（specs/019 FR-009）。オーナーが退会したアカウント（片づけが届くまで）は出さない
   const teamOn = user.features.has("team");
@@ -75,7 +76,7 @@ export async function buildThreadsMe(c: Context<AppEnv>) {
   // 使える状態・上限は accountLimitFor が1回で読む（同じ問い合わせを重ねない。PR #71 のセルフレビュー）
   const [myTeams, accountLimit, recorded, [state]] = await Promise.all([
     teamOn ? listMyTeams(db, user.id) : Promise.resolve([]),
-    accountLimitFor(db, user.id, user.billing, c.env, now),
+    accountLimitFor(db, user.id, user.billing, now, owners.get(user.id) ?? null),
     appUsageOf(db, user.id, THREADS_APP),
     db.select({ lastAccountId: threadsUserStates.lastAccountId }).from(threadsUserStates).where(eq(threadsUserStates.userId, user.id)),
   ]);

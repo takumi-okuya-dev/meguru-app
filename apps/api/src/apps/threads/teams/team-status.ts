@@ -208,7 +208,7 @@ export async function getTeamStatus(
       needsReviewCount: r.needsReviewCount,
       stopped: origin < stoppedBefore.getTime(),
       growth: growthOf(
-        ownerFeatures.get(r.ownerUserId)?.has("autopost") ?? true,
+        ownerFeatures.get(r.ownerUserId)?.has("autopost") ?? false,
         { median: r.recentMedian === null ? null : Number(r.recentMedian), count: r.recentCount },
         {
           median: r.previousMedian === null ? null : Number(r.previousMedian),

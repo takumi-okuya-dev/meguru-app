@@ -7,6 +7,7 @@ import { WITHDRAWN_ACTOR_NAME } from "../../../platform";
 import { accounts, activityLogs, memberships, teamMembers, teams, threadsDeletionRequests, threadsUserStates } from "../schema";
 import { beforeAccountDeleted, chooseSuccessor } from "../teams/team-service";
 import { purgeForWithdrawal } from "../tester-invites/tester-application-service";
+import { lockThreadsMember } from "../access/locks";
 
 /**
  * 退会する人のThreadsのデータを片づける。持ち主のアカウントを消し（アカウントの削除と同じ。001 FR-022）、チームは抜ける
@@ -16,6 +17,8 @@ import { purgeForWithdrawal } from "../tester-invites/tester-application-service
  * @param now - 今の時刻
  */
 export async function cleanupForWithdrawal(tx: TxDb, userId: string, now: Date = new Date()): Promise<void> {
+  // その人のアカウントの作成・削除・接続の確定・最後に開いたアカウントの記録と直列にする（PR #97 のセルフレビュー）
+  await lockThreadsMember(tx, userId);
   // 招待の申し込みを片づける（枠を使っていない行は消し、使っている行はユーザー名だけを残す。specs/024 research.md R15）
   await purgeForWithdrawal(tx, userId);
   const owned = await tx
