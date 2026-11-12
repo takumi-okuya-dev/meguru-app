@@ -36,9 +36,9 @@ async function applied(user: string, username: string) {
   return { id, accountId };
 }
 const list = async (view = "pending", env = testerOperatorEnv()) =>
-  (await (await callT(app, "GET", `/api/operator/tester-applications?view=${view}`, { user: OP, env })).json()) as OperatorTesterApplications;
+  (await (await callT(app, "GET", `/api/threads/operator/tester-applications?view=${view}`, { user: OP, env })).json()) as OperatorTesterApplications;
 const op = (id: string, action: string, body?: unknown, env?: ReturnType<typeof testerOperatorEnv>) =>
-  callT(app, "POST", `/api/operator/tester-applications/${id}/${action}`, { user: OP, body: body ?? {}, env });
+  callT(app, "POST", `/api/threads/operator/tester-applications/${id}/${action}`, { user: OP, body: body ?? {}, env });
 
 describe("一覧", () => {
   it("申し込み中は古い順。件数・枠・申し込んだ人・アプリIDを返す", async () => {
@@ -91,8 +91,8 @@ describe("一覧", () => {
   });
 
   it("view が違えば VALIDATION_FAILED、運営者でなければ OPERATOR_ONLY", async () => {
-    expect((await callT(app, "GET", "/api/operator/tester-applications?view=all", { user: OP })).status).toBe(400);
-    const res = await callT(app, "GET", "/api/operator/tester-applications", { user: "u1" });
+    expect((await callT(app, "GET", "/api/threads/operator/tester-applications?view=all", { user: OP })).status).toBe(400);
+    const res = await callT(app, "GET", "/api/threads/operator/tester-applications", { user: "u1" });
     expect(res.status).toBe(403);
     expect(await codeOf(res)).toBe("OPERATOR_ONLY");
   });
@@ -107,7 +107,7 @@ describe("招待した・見送る・戻す・外した", () => {
     expect(await applicationRow(a.id)).toMatchObject({ status: "invited", holds_slot: true });
     expect((await operatorEventRows()).map((e) => e.action)).toEqual(["apply", "invite"]);
     // 利用者の画面に届く
-    const mine = await callT(app, "GET", `/api/accounts/${a.accountId}/tester-application`, { user: "u1" });
+    const mine = await callT(app, "GET", `/api/threads/accounts/${a.accountId}/tester-application`, { user: "u1" });
     expect(((await mine.json()) as { application: { status: string } }).application.status).toBe("invited");
   });
 
@@ -130,7 +130,7 @@ describe("招待した・見送る・戻す・外した", () => {
     const a = await applied("u1", "shop");
     expect((await op(a.id, "decline", { reason: "あ".repeat(201) })).status).toBe(400);
     expect((await op(a.id, "decline", { reason: "  今は枠がありません " })).status).toBe(200);
-    const mine = await callT(app, "GET", `/api/accounts/${a.accountId}/tester-application`, { user: "u1" });
+    const mine = await callT(app, "GET", `/api/threads/accounts/${a.accountId}/tester-application`, { user: "u1" });
     expect(((await mine.json()) as { application: unknown }).application).toMatchObject({ status: "declined", declineReason: "今は枠がありません" });
   });
 
@@ -147,7 +147,7 @@ describe("招待した・見送る・戻す・外した", () => {
     await op(a.id, "invite");
     await connectExisting(app, "u1", a.accountId, "9001");
     const [acc] = (await q()`SELECT name FROM threads.accounts WHERE id = ${a.accountId}`) as { name: string }[];
-    await call(app, "DELETE", `/api/accounts/${a.accountId}`, { user: "u1", body: { confirmName: acc!.name } });
+    await call(app, "DELETE", `/api/threads/accounts/${a.accountId}`, { user: "u1", body: { confirmName: acc!.name } });
     expect((await list("removable")).items).toHaveLength(1);
     expect((await op(a.id, "removed")).status).toBe(200);
     expect(await applicationRow(a.id)).toMatchObject({ holds_slot: false });
@@ -172,16 +172,16 @@ describe("招待した・見送る・戻す・外した", () => {
 
   it("運営者でなければ OPERATOR_ONLY", async () => {
     const a = await applied("u1", "shop");
-    const res = await callT(app, "POST", `/api/operator/tester-applications/${a.id}/invite`, { user: "u1", body: {} });
+    const res = await callT(app, "POST", `/api/threads/operator/tester-applications/${a.id}/invite`, { user: "u1", body: {} });
     expect(await codeOf(res)).toBe("OPERATOR_ONLY");
   });
 });
 
 describe("テスター枠の数", () => {
   it("1〜10000 で変えられ、記録が残る", async () => {
-    expect((await callT(app, "PUT", "/api/operator/tester-settings", { user: OP, body: { slotCapacity: 0 } })).status).toBe(400);
-    expect((await callT(app, "PUT", "/api/operator/tester-settings", { user: OP, body: { slotCapacity: 10001 } })).status).toBe(400);
-    const res = await callT(app, "PUT", "/api/operator/tester-settings", { user: OP, body: { slotCapacity: 40 } });
+    expect((await callT(app, "PUT", "/api/threads/operator/tester-settings", { user: OP, body: { slotCapacity: 0 } })).status).toBe(400);
+    expect((await callT(app, "PUT", "/api/threads/operator/tester-settings", { user: OP, body: { slotCapacity: 10001 } })).status).toBe(400);
+    const res = await callT(app, "PUT", "/api/threads/operator/tester-settings", { user: OP, body: { slotCapacity: 40 } });
     expect(await res.json()).toEqual({ used: 0, capacity: 40 });
     expect((await list()).slots.capacity).toBe(40);
     expect((await operatorEventRows()).map((e) => [e.action, e.detail])).toEqual([["slot_capacity", { before: 25, after: 40 }]]);
@@ -199,7 +199,7 @@ describe("招待の管理がOFFの環境（US5・FR-027）", () => {
       expect((await op(a.id, action, {}, publicEnv())).status).toBe(404);
     }
     // 枠の数を変える操作も 404（PR #71 のセルフレビュー）
-    const cap = await callT(app, "PUT", "/api/operator/tester-settings", { user: OP, body: { slotCapacity: 40 }, env: publicEnv() });
+    const cap = await callT(app, "PUT", "/api/threads/operator/tester-settings", { user: OP, body: { slotCapacity: 40 }, env: publicEnv() });
     expect(cap.status).toBe(404);
     // UUID の形でない ID は 404（500 にしない）
     expect((await op("-".repeat(36), "invite")).status).toBe(404);

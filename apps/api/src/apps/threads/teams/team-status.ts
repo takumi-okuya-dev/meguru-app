@@ -76,7 +76,7 @@ function growthOf(
 }
 
 /**
- * チームの運用状況を数える（contracts/api.md「GET /api/teams/:teamId/status」）。
+ * チームの運用状況を数える（contracts/api.md「GET /api/threads/teams/:teamId/status」）。
  * @param db - データベース
  * @param teamAccess - authorizeTeamStatus の結果
  * @param scope - 見る範囲

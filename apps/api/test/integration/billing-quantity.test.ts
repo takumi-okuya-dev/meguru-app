@@ -26,7 +26,7 @@ const stripeQuantity = async () => (await fakeStripe.subscriptions())[0]!.items.
 const quantityUpdates = async () =>
   (await fakeStripe.requests()).filter((r) => r.method === "POST" && r.path.startsWith("/v1/subscriptions/"));
 const rowOf = async (userId: string) => (await db().select().from(subscriptions).where(eq(subscriptions.userId, userId)))[0]!;
-const create = (user: string, name: string) => callBilling(app, "POST", "/api/accounts", { user, body: { name } });
+const create = (user: string, name: string) => callBilling(app, "POST", "/api/threads/accounts", { user, body: { name } });
 
 describe("アカウントを作る・削除する", () => {
   it("作ると数が増え、削除すると減る。日割りの請求・返金はしない。0件でも数は1", async () => {
@@ -40,10 +40,10 @@ describe("アカウントを作る・削除する", () => {
     expect(await rowOf(userId)).toMatchObject({ quantity: 2, quantitySyncNeeded: false });
 
     const second = ((await res.json()) as { id: string; name: string }).id;
-    await callBilling(app, "DELETE", `/api/accounts/${second}`, { user: "u1", body: { confirmName: "2件目" } });
+    await callBilling(app, "DELETE", `/api/threads/accounts/${second}`, { user: "u1", body: { confirmName: "2件目" } });
     expect(await stripeQuantity()).toBe(1);
-    const name = ((await (await callBilling(app, "GET", `/api/accounts/${accountId}`, { user: "u1" })).json()) as { name: string }).name;
-    await callBilling(app, "DELETE", `/api/accounts/${accountId}`, { user: "u1", body: { confirmName: name } });
+    const name = ((await (await callBilling(app, "GET", `/api/threads/accounts/${accountId}`, { user: "u1" })).json()) as { name: string }).name;
+    await callBilling(app, "DELETE", `/api/threads/accounts/${accountId}`, { user: "u1", body: { confirmName: name } });
     expect(await stripeQuantity()).toBe(1);
   });
 
@@ -62,8 +62,8 @@ describe("アカウントを作る・削除する", () => {
     await createUserWithAccount("u1");
     // 無料体験中は1件までなので、料金なしでない利用者で、作るのと削除を確かめる
     const { accountId } = await createUserWithAccount("u2");
-    const name = ((await (await callBilling(app, "GET", `/api/accounts/${accountId}`, { user: "u2" })).json()) as { name: string }).name;
-    await callBilling(app, "DELETE", `/api/accounts/${accountId}`, { user: "u2", body: { confirmName: name } });
+    const name = ((await (await callBilling(app, "GET", `/api/threads/accounts/${accountId}`, { user: "u2" })).json()) as { name: string }).name;
+    await callBilling(app, "DELETE", `/api/threads/accounts/${accountId}`, { user: "u2", body: { confirmName: name } });
     expect((await create("u2", "x")).status).toBe(201);
     expect(await fakeStripe.requests()).toHaveLength(0);
   });

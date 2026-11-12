@@ -86,7 +86,7 @@ describe("紹介の記録（新しく登録した人だけ）", () => {
   it("チームの招待から始めても、紹介の記録が残り、チームの招待はそのまま使える", async () => {
     const code = await codeOf("a");
     const { token } = await makeTeam("admin", []);
-    const res = await withCode("GET", `/api/invites/${token}`, "b", code);
+    const res = await withCode("GET", `/api/threads/invites/${token}`, "b", code);
     expect(res.status).toBe(200);
     expect((await referralRow("b"))?.referred_by).toBe("a");
   });

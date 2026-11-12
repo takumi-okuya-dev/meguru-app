@@ -1,4 +1,4 @@
-// /api/operator/tester-applications・/api/operator/tester-settings（specs/024-tester-invite-connect contracts/api.md「運営者の招待の管理」）。
+// /api/threads/operator/tester-applications・/api/threads/operator/tester-settings（specs/024-tester-invite-connect contracts/api.md「運営者の招待の管理」）。
 // 運営者（OPERATOR_CLERK_USER_IDS）だけ。招待の管理がOFFでも一覧は読める（操作は 404。FR-027）。
 import {
   testerApplicationViewSchema,

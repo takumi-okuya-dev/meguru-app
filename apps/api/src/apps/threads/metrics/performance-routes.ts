@@ -1,4 +1,4 @@
-// /api/accounts/:accountId/performance（specs/006-performance-feedback contracts/api.md）。
+// /api/threads/accounts/:accountId/performance（specs/006-performance-feedback contracts/api.md）。
 // 書き込みは権限の判定（authorizeAccount）で守る。読むだけのオーナーのアカウントでも、見ることはできる（specs/013 FR-040）。
 import { exportQuerySchema, feedbackRequestSchema, invalidFields, performanceQuerySchema } from "@meguru/shared";
 import { Hono, type MiddlewareHandler } from "hono";

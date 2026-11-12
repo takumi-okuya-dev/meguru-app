@@ -10,10 +10,10 @@ import { AccountAvatar } from "@/apps/threads/components/AccountAvatar";
 import { FormDialogFrame } from "@/apps/threads/components/items/FormDialogFrame";
 import { ApiError, describeError } from "@/lib/api-client";
 import { threadsApi } from "@/apps/threads/lib/api";
-import { queryKeys } from "@/lib/query";
 import { cn } from "@/lib/utils";
 import { accountPath, teamPath } from "@/apps/threads/lib/paths";
 import { useThreadsMe } from "@/apps/threads/lib/use-threads-me";
+import { threadsQueryKeys } from "@/apps/threads/lib/query-keys";
 
 /**
  * チームを作るダイアログ。
@@ -49,7 +49,7 @@ export function CreateTeamDialog({
   const create = useMutation({
     mutationFn: () => threadsApi.createTeam({ name, accountIds: chosen }),
     onSuccess: async ({ teamId }) => {
-      await queryClient.invalidateQueries({ queryKey: queryKeys.me });
+      await queryClient.invalidateQueries({ queryKey: threadsQueryKeys.me });
       onClose();
       onCreated?.();
       void navigate(teamPath(teamId));

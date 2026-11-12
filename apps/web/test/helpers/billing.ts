@@ -1,5 +1,11 @@
 // /api/me の決済の部分のテスト用の値（specs/013）。既定は決済OFF（001〜012の画面のテストは今のまま）。
-import { FEATURES, type MeBilling, type MeResponse } from "@meguru/shared";
+import { FEATURES, type MeBilling, type MeResponse, type ThreadsMeResponse } from "@meguru/shared";
+
+/**
+ * テストの「自分」：共通の /api/me と、Threadsの /api/threads/me の中身を1つにしたもの（同じ値を両方の置き換えに渡す。
+ * specs/meguru/029 PR5 で /api/me から Threads の中身を消した）。
+ */
+export type MeWithThreads = MeResponse & ThreadsMeResponse;
 
 /** テスト用のグループがOFFの環境の /api/me の testGroups（specs/016）。 */
 export const ME_TEST_GROUPS_OFF: MeResponse["testGroups"] = { enabled: false, admitted: true, operator: false };
@@ -10,9 +16,9 @@ export const ME_BILLING_OFF: {
   withdrawalInProgress: boolean;
   testGroups: MeResponse["testGroups"];
   operator: boolean;
-  features: MeResponse["features"];
-  dailyPostLimit: MeResponse["dailyPostLimit"];
-  testerInvites: MeResponse["testerInvites"];
+  features: ThreadsMeResponse["features"];
+  dailyPostLimit: ThreadsMeResponse["dailyPostLimit"];
+  testerInvites: ThreadsMeResponse["testerInvites"];
   apps: MeResponse["apps"];
 } = {
   billing: {

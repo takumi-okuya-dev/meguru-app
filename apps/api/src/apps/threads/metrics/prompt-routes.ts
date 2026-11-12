@@ -1,4 +1,4 @@
-// /api/accounts/:accountId/prompt と /prompt-settings（specs/003-prompt-bulk-register contracts/api.md）
+// /api/threads/accounts/:accountId/prompt と /prompt-settings（specs/003-prompt-bulk-register contracts/api.md）
 import {
   PROMPT_COUNT_MAX,
   PROMPT_COUNT_MIN,

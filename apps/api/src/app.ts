@@ -174,9 +174,8 @@ export function createApp(deps: AppDeps = defaultDeps) {
   const authed = authMiddleware(deps.verifyAuth);
   const maybeAuthed = optionalAuthMiddleware(deps.verifyAuth) as unknown as typeof authed;
 
-  // Threadsの道筋（specs/meguru/029-threads-pattern1 contracts/api-routes.md 1）。新しい /api/threads/… と、古い道筋の両方につなぐ
-  // （API が画面より先にデプロイされるため。古い道筋は PR5 で消す。3章）。Metaに登録した /api/threads/… の6本と
-  // /api/data-deletion は、ここに入れず今のまま。
+  // Threadsの道筋（/api/threads/…。specs/meguru/029-threads-pattern1 contracts/api-routes.md 1）。古い道筋（/api/threads/accounts/… など）は
+  // PR5 で消した。Metaに登録した /api/threads/… の6本と /api/data-deletion は、ここに入れず今のまま。
   const threadsApi = new Hono<AppEnv>()
     .route("/", needsReviewCountRoutes(authed))
     .route("/", accountRoutes(authed))
@@ -225,7 +224,6 @@ export function createApp(deps: AppDeps = defaultDeps) {
     // 上限（specs/024 contracts/api.md）
     .route("/", operatorLimitRoutes(authed))
     .route("/threads", threadsApi)
-    .route("/", threadsApi)
     .route("/", threadsConnectRoutes(authed))
     .route("/", billingRoutes(authed))
     .route("/", stripeWebhookRoutes())

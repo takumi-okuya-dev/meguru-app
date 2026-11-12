@@ -22,14 +22,14 @@ beforeEach(async () => {
   await resetDb();
 });
 
-const create = (user: string, name = "アカウント") => callBilling(app, "POST", "/api/accounts", { user, body: { name } });
+const create = (user: string, name = "アカウント") => callBilling(app, "POST", "/api/threads/accounts", { user, body: { name } });
 
 async function errorOf(res: Response) {
   return ((await res.json()) as { error: { code: string; details?: string[]; max?: number } }).error;
 }
 
 async function meLimit(user: string) {
-  const res = await callBilling(app, "GET", "/api/me", { user });
+  const res = await callBilling(app, "GET", "/api/threads/me", { user });
   return ((await res.json()) as { accountLimit: { max: number | null; used: number } }).accountLimit;
 }
 
@@ -60,7 +60,7 @@ describe("無料体験中（契約なし）", () => {
     const a = await createUserWithAccount("u1");
     await createUserWithAccount("u1");
     expect((await create("u1")).status).toBe(409);
-    const write = await callBilling(app, "POST", `/api/accounts/${a.accountId}/research-keywords`, { user: "u1", body: { keyword: "x" } });
+    const write = await callBilling(app, "POST", `/api/threads/accounts/${a.accountId}/research-keywords`, { user: "u1", body: { keyword: "x" } });
     expect(write.status).toBe(201);
   });
 
@@ -99,8 +99,8 @@ describe("契約中・料金なし・決済OFF", () => {
 
   it("決済OFFなら上限なし", async () => {
     await createUserWithAccount("u1");
-    expect((await call(app, "POST", "/api/accounts", { user: "u1", body: { name: "2" } })).status).toBe(201);
-    expect((await call(app, "POST", "/api/accounts", { user: "u1", body: { name: "3" } })).status).toBe(201);
+    expect((await call(app, "POST", "/api/threads/accounts", { user: "u1", body: { name: "2" } })).status).toBe(201);
+    expect((await call(app, "POST", "/api/threads/accounts", { user: "u1", body: { name: "3" } })).status).toBe(201);
   });
 });
 

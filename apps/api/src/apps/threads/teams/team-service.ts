@@ -171,7 +171,7 @@ async function assertCanAdminMore(tx: TxDb, userId: string) {
 }
 
 /**
- * チームの詳細（contracts/api.md「GET /api/teams/:teamId の応答」）。開けないアカウントは名前だけ。
+ * チームの詳細（contracts/api.md「GET /api/threads/teams/:teamId の応答」）。開けないアカウントは名前だけ。
  * @param db - データベース
  * @param teamAccess - authorizeTeamMember の結果
  * @returns チームの詳細
@@ -394,7 +394,7 @@ export async function changeRole(tx: TxDb, teamAccess: TeamAccess, userId: strin
 }
 
 /**
- * 担当の表（contracts/api.md「GET /api/teams/:teamId/assignments」）。行は編集者と管理者、列はチームのアカウント。
+ * 担当の表（contracts/api.md「GET /api/threads/teams/:teamId/assignments」）。行は編集者と管理者、列はチームのアカウント。
  * @param db - データベース
  * @param teamAccess - authorizeTeamAdmin の結果
  * @returns 担当の表
@@ -801,7 +801,7 @@ export async function assignedNoticeVisible(db: Db | TxDb, access: AccountAccess
 // ---- このアカウントのチーム（009のカード）----
 
 /**
- * このアカウントのチーム（contracts/api.md「GET /api/accounts/:accountId/team」、FR-055）。
+ * このアカウントのチーム（contracts/api.md「GET /api/threads/accounts/:accountId/team」、FR-055）。
  * @param db - データベース
  * @param access - 判定の結果（read で読める）
  * @returns チーム・オーナー・担当の人

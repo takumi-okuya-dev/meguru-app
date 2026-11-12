@@ -90,7 +90,7 @@ describe("オーナーが読むだけ", () => {
     await setSchedule(accountId, { slotMinutes: [720] });
     await endTrial(await ownerIdOf(accountId));
     const { callBilling } = await import("../helpers/billing");
-    const list = (await (await callBilling(app, "GET", `/api/accounts/${accountId}/post-drafts`, { user: "u1" })).json()) as {
+    const list = (await (await callBilling(app, "GET", `/api/threads/accounts/${accountId}/post-drafts`, { user: "u1" })).json()) as {
       autoPost: { stoppedReason: string | null };
       schedule: Record<string, string>;
     };

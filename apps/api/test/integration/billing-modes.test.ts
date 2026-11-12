@@ -23,8 +23,8 @@ describe("決済OFF", () => {
       expect((await call(app, "POST", path, { user: "u1" })).status, path).toBe(404);
     }
     expect((await app.request("/api/stripe/webhook", { method: "POST", body: "{}" }, testEnv)).status).toBe(404);
-    expect((await call(app, "POST", `/api/accounts/${accountId}/research-keywords`, { user: "u1", body: { keyword: "x" } })).status).toBe(201);
-    expect((await call(app, "POST", "/api/accounts", { user: "u1", body: { name: "2" } })).status).toBe(201);
+    expect((await call(app, "POST", `/api/threads/accounts/${accountId}/research-keywords`, { user: "u1", body: { keyword: "x" } })).status).toBe(201);
+    expect((await call(app, "POST", "/api/threads/accounts", { user: "u1", body: { name: "2" } })).status).toBe(201);
     expect(await db().select().from(subscriptions)).toHaveLength(1);
   });
 });
@@ -43,9 +43,9 @@ describe("料金なしの印（決済ON）", () => {
       id: userId,
       clerkUserId: "u1",
     });
-    expect((await callBilling(app, "POST", "/api/accounts", { user: "u1", body: { name: "2" } })).status).toBe(201);
-    expect((await callBilling(app, "POST", "/api/accounts", { user: "u1", body: { name: "3" } })).status).toBe(201);
-    const write = () => callBilling(app, "POST", `/api/accounts/${accountId}/research-keywords`, { user: "u1", body: { keyword: crypto.randomUUID() } });
+    expect((await callBilling(app, "POST", "/api/threads/accounts", { user: "u1", body: { name: "2" } })).status).toBe(201);
+    expect((await callBilling(app, "POST", "/api/threads/accounts", { user: "u1", body: { name: "3" } })).status).toBe(201);
+    const write = () => callBilling(app, "POST", `/api/threads/accounts/${accountId}/research-keywords`, { user: "u1", body: { keyword: crypto.randomUUID() } });
     expect((await write()).status).toBe(201);
     await setBillingExemptByEmail(d, "u1@example.com", false);
     expect((await write()).status).toBe(403);

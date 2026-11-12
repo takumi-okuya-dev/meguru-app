@@ -11,7 +11,7 @@ beforeEach(async () => {
   await resetDb();
 });
 
-const base = (accountId: string) => `/api/accounts/${accountId}/reference-posts`;
+const base = (accountId: string) => `/api/threads/accounts/${accountId}/reference-posts`;
 type Prompt = { prompt: string; items: { id: string; shortId: string }[]; pendingCount: number };
 
 async function insert(accountId: string, body: string, whyGood: string | null, minutesAgo = 0, mode = "unknown") {

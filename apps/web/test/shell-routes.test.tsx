@@ -7,7 +7,7 @@ import { useSyncExternalStore } from "react";
 import { createMemoryRouter, RouterProvider, useLocation } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { AppModule } from "@/shell";
-import { ME_BILLING_OFF } from "./helpers/billing";
+import { ME_BILLING_OFF, type MeWithThreads } from "./helpers/billing";
 import { isPublicPath } from "./helpers/routes";
 
 let auth = { isLoaded: true, isSignedIn: true };
@@ -34,7 +34,7 @@ vi.mock("@/lib/api-client", async (orig) => {
  * @param apps - apps
  * @returns 応答
  */
-function meWith(apps: MeResponse["apps"]): MeResponse {
+function meWith(apps: MeResponse["apps"]): MeWithThreads {
   return { ...ME_BILLING_OFF, user: { id: "u1", email: "a@example.com", displayName: null }, accounts: [], landingAccountId: null, accountLimit: { max: 3, used: 0 }, threadsAccessMode: "public", threadsConnectMethods: ["app", "token"], teams: [], apps };
 }
 

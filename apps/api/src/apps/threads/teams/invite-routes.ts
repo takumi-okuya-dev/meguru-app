@@ -1,4 +1,4 @@
-// /api/invites/:token（specs/011-team-revision contracts/api.md「招待の確認と参加」）。
+// /api/threads/invites/:token（specs/011-team-revision contracts/api.md「招待の確認と参加」）。
 // 確認はログイン不要（ログインしていれば、その人が参加できるかと、選べるアカウントも返す）。参加はログイン必須。
 import { inviteAcceptRequestSchema } from "@meguru/shared";
 import { Hono, type MiddlewareHandler } from "hono";

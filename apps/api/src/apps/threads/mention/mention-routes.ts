@@ -1,4 +1,4 @@
-// /api/accounts/:accountId/mention-*・…/post-drafts/:draftId/mention（specs/023-delayed-mention contracts/api.md）。
+// /api/threads/accounts/:accountId/mention-*・…/post-drafts/:draftId/mention（specs/023-delayed-mention contracts/api.md）。
 // 設定を読むのは view、変えるのは settings、付ける・外す・やめる・返信するのは review。どれも機能のまとまり「自動投稿」（019）。
 import {
   mentionAttachRequestSchema,

@@ -8,7 +8,6 @@ import { FieldWithCounter } from "@/components/FieldWithCounter";
 import { Button } from "@/components/ui/button";
 import { describeError } from "@/lib/api-client";
 import { threadsApi } from "@/apps/threads/lib/api";
-import { queryKeys } from "@/lib/query";
 import { threadsQueryKeys } from "@/apps/threads/lib/query-keys";
 
 /**
@@ -26,7 +25,7 @@ export function AccountNameSection({ account }: { account: AccountSummary }) {
     onSuccess: async () => {
       toast.success("名前を保存しました");
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: queryKeys.me }),
+        queryClient.invalidateQueries({ queryKey: threadsQueryKeys.me }),
         queryClient.invalidateQueries({ queryKey: threadsQueryKeys.account(account.id) }),
       ]);
     },

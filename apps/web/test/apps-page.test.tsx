@@ -5,7 +5,7 @@ import userEvent from "@testing-library/user-event";
 import type { MeResponse } from "@meguru/shared";
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { ME_BILLING_OFF } from "./helpers/billing";
+import { ME_BILLING_OFF, type MeWithThreads } from "./helpers/billing";
 import { WithEntryApp } from "./helpers/entry-app";
 
 const mocks = vi.hoisted(() => ({ me: vi.fn(), toastError: vi.fn() }));
@@ -23,7 +23,7 @@ const { AppsPage } = await import("@/shell/pages/apps");
  * @param apps - apps
  * @returns 応答
  */
-function meWith(apps: MeResponse["apps"]): MeResponse {
+function meWith(apps: MeResponse["apps"]): MeWithThreads {
   return {
     ...ME_BILLING_OFF,
     user: { id: "u1", email: "a@example.com", displayName: null },

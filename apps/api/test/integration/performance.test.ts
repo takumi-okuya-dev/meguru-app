@@ -30,7 +30,7 @@ async function setJudgment(draftId: string, judgment: "good" | "normal" | "poor"
  * @returns 応答
  */
 function getPerformance(accountId: string, query = "", user = "u1") {
-  return call(app, "GET", `/api/accounts/${accountId}/performance${query}`, { user });
+  return call(app, "GET", `/api/threads/accounts/${accountId}/performance${query}`, { user });
 }
 
 describe("GET /performance", () => {
@@ -198,7 +198,7 @@ describe("PATCH /performance/:draftId/feedback（FR-021〜FR-024、SC-003）", (
     return posts;
   }
   const patch = (accountId: string, draftId: string, body: unknown, user = "u1") =>
-    call(app, "PATCH", `/api/accounts/${accountId}/performance/${draftId}/feedback`, { user, body });
+    call(app, "PATCH", `/api/threads/accounts/${accountId}/performance/${draftId}/feedback`, { user, body });
 
   it("メモを保存し（前後の空白を除く・空なら null）、切り替えると次の投稿が繰り上がる", async () => {
     const { accountId } = await createUserWithAccount("u1");
@@ -256,7 +256,7 @@ describe("PATCH /performance/:draftId/feedback（FR-021〜FR-024、SC-003）", (
 
 describe("GET /performance/export（FR-028〜FR-030、SC-005）", () => {
   const exportPage = (accountId: string, query: string, user = "u1") =>
-    call(app, "GET", `/api/accounts/${accountId}/performance/export${query}`, { user });
+    call(app, "GET", `/api/threads/accounts/${accountId}/performance/export${query}`, { user });
 
   it("投稿ごと：全件・200件ずつ・各列の材料", async () => {
     const { accountId } = await createUserWithAccount("u1");

@@ -11,7 +11,7 @@ beforeEach(async () => {
   await resetDb();
 });
 
-const base = (accountId: string) => `/api/accounts/${accountId}/research-keywords`;
+const base = (accountId: string) => `/api/threads/accounts/${accountId}/research-keywords`;
 type ErrorBody = { error: { code: string; details?: unknown; remaining?: number } };
 
 async function keywords(accountId: string) {

@@ -22,7 +22,6 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { ApiError } from "@/lib/api-client";
 import { threadsApi } from "@/apps/threads/lib/api";
-import { queryKeys } from "@/lib/query";
 import { threadsQueryKeys } from "@/apps/threads/lib/query-keys";
 import { useAccountOpen } from "@/apps/threads/lib/use-account-open";
 import { useAccountAccess, useAccountAccessErrors } from "@/apps/threads/lib/use-account-access";
@@ -81,7 +80,7 @@ export function AccountLayout() {
   useAccountOpen(unlisted ? undefined : accountId, (latest) => {
     queryClient.setQueryData(threadsQueryKeys.account(latest.id), latest);
     // 一覧の接続状態・並び順も最新にする
-    void queryClient.invalidateQueries({ queryKey: queryKeys.me });
+    void queryClient.invalidateQueries({ queryKey: threadsQueryKeys.me });
   });
 
   if (me.isPending) return <LoadingSkeleton />;

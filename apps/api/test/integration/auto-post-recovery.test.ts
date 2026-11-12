@@ -95,7 +95,7 @@ it("US2：NGワードの追加と取り出しを同時に実行しても、未�
   const [id] = await approvedDrafts(accountId, ["禁止語を含む本文"]);
   await setSchedule(accountId, { slotMinutes: [720] });
   const [added] = await Promise.all([
-    call(app, "POST", `/api/accounts/${accountId}/ng-words`, {
+    call(app, "POST", `/api/threads/accounts/${accountId}/ng-words`, {
       user: "u1",
       body: { words: ["禁止語"] },
     }),

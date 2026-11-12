@@ -11,7 +11,7 @@ beforeEach(async () => {
   await resetDb();
 });
 
-const batch = (accountId: string) => `/api/accounts/${accountId}/reference-posts/batch`;
+const batch = (accountId: string) => `/api/threads/accounts/${accountId}/reference-posts/batch`;
 type ErrorBody = { error: { code: string; details?: unknown } };
 
 async function count(accountId: string) {

@@ -68,7 +68,7 @@ export default {
     ],
     messages: {
       notEntry: "{{unit}} は入口（{{unit}}/index.ts）から読んでください（docs/module-map.md）。",
-      platformToApp: "共通（platform）はアプリ（{{unit}}）を使えません。知らせ（platform/hooks）を使ってください（docs/module-map.md）。",
+      platformToApp: "共通（platform）はアプリ（{{unit}}）を使えません。共通で起きたことは出来事（platform/events）で受け取ってください（docs/module-map.md）。",
       appToApp: "アプリ同士（{{from}} → {{unit}}）は直接使えません（docs/module-map.md）。",
       appToPlatformSchema:
         "アプリ（{{from}}）は共通の表の定義（platform/schema）を読めません。共通の入口の関数（platform/index.ts）を使ってください（specs/meguru/029-threads-pattern1 contracts/module-boundaries.md 3）。",

@@ -15,6 +15,7 @@ import { ThreadsAccountGuide } from "./ThreadsAccountGuide";
 import { TokenConnectForm } from "./TokenConnectForm";
 import { TOKEN_WARNING_KIND, TokenWarnings } from "./TokenWarnings";
 import { useThreadsMe } from "@/apps/threads/lib/use-threads-me";
+import { threadsQueryKeys } from "@/apps/threads/lib/query-keys";
 
 /** 接続し直すAccount。 */
 export type ReconnectTarget = {
@@ -131,7 +132,7 @@ export function ReconnectDialog({
               username={account.username ?? ""}
               onSuccess={(result) => {
                 toast.success("接続し直しました");
-                void queryClient.invalidateQueries({ queryKey: ["me"] });
+                void queryClient.invalidateQueries({ queryKey: threadsQueryKeys.me });
                 void queryClient.invalidateQueries({ queryKey: ["account", account.id] });
                 if (onTokenSuccess) {
                   onTokenSuccess(result);

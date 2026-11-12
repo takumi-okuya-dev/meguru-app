@@ -1,4 +1,4 @@
-// /api/accounts/:accountId/threads-check（「接続を確かめる」。specs/005-auto-post FR-002b、research.md R15）。
+// /api/threads/accounts/:accountId/threads-check（「接続を確かめる」。specs/005-auto-post FR-002b、research.md R15）。
 import { Hono, type MiddlewareHandler } from "hono";
 import type { AppEnv } from "../../../platform";
 import { createDb } from "../../../kernel/db/client";

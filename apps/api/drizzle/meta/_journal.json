@@ -218,6 +218,13 @@
       "when": 1794482406529,
       "tag": "0030_threads_schema",
       "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "7",
+      "when": 1794501436422,
+      "tag": "0031_drop_old_limit_columns",
+      "breakpoints": true
     }
   ]
 }

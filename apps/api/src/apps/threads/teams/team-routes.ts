@@ -1,4 +1,4 @@
-// /api/teams/*（specs/011-team-revision contracts/api.md「チーム」）。
+// /api/threads/teams/*（specs/011-team-revision contracts/api.md「チーム」）。
 // すべて access.ts の authorizeTeamMember／authorizeTeamAdmin を通す（Constitution原則V、research.md R4）。
 // 書き込みはチームの行に鍵をかけてから行い、ロール・担当・抜ける・外す・引き継ぐを直列にする（research.md R7）。
 // 001〜010と同じく「権限 → 入力の検証」の順で確かめる（鍵をかける前に、鍵なしで一度判定する）。

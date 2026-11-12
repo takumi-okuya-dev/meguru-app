@@ -1,4 +1,4 @@
-// /api/accounts/*（contracts/api.md）
+// /api/threads/accounts/*（contracts/api.md）
 import {
   createAccountRequestSchema,
   deleteAccountRequestSchema,
@@ -36,7 +36,7 @@ function summaryOf(access: AccountAccess) {
 }
 
 /**
- * /api/accounts/* のルート。取得・open（記録と接続の確認）・削除。
+ * /api/threads/accounts/* のルート。取得・open（記録と接続の確認）・削除。
  * いずれも「権限 → 入力の検証」の順で確かめる（specs/008 contracts/permissions.md）。
  * @param authed - 認証のミドルウェア
  * @returns Hono のルート

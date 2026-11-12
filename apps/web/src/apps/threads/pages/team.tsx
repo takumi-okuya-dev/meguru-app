@@ -26,7 +26,6 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { ApiError, describeError } from "@/lib/api-client";
 import { threadsApi } from "@/apps/threads/lib/api";
-import { queryKeys } from "@/lib/query";
 import { threadsQueryKeys } from "@/apps/threads/lib/query-keys";
 import { cn } from "@/lib/utils";
 import { NotFound } from "@/shell";
@@ -264,7 +263,7 @@ export function TeamPage() {
   const refresh = () =>
     Promise.all([
       queryClient.invalidateQueries({ queryKey: threadsQueryKeys.team(teamId) }),
-      queryClient.invalidateQueries({ queryKey: queryKeys.me }),
+      queryClient.invalidateQueries({ queryKey: threadsQueryKeys.me }),
     ]);
   const close = () => {
     setPending(null);
@@ -301,7 +300,7 @@ export function TeamPage() {
     onSuccess: async () => {
       close();
       queryClient.removeQueries({ queryKey: threadsQueryKeys.team(teamId) });
-      await queryClient.invalidateQueries({ queryKey: queryKeys.me });
+      await queryClient.invalidateQueries({ queryKey: threadsQueryKeys.me });
       toast.success("チームを抜けました");
       void navigate(threadsHomePath(), { replace: true });
     },
@@ -312,7 +311,7 @@ export function TeamPage() {
     onSuccess: async () => {
       close();
       queryClient.removeQueries({ queryKey: threadsQueryKeys.team(teamId) });
-      await queryClient.invalidateQueries({ queryKey: queryKeys.me });
+      await queryClient.invalidateQueries({ queryKey: threadsQueryKeys.me });
       toast.success("チームを削除しました");
       void navigate(threadsHomePath(), { replace: true });
     },
