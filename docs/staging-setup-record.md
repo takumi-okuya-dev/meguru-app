@@ -6,17 +6,17 @@
 - 秘密の値はここに書きません。**どこに置いたか**だけを書きます。
 - 本番を立てるときは、7章の「本番で違うところ」から読みます。
 
-## 1. いまの状態
+## 1. いまの状態（2026-11-12に見直した）
 
 | | URL |
 |---|---|
 | Web | https://develop.threads-grower-web.pages.dev |
 | API | https://threads-grower-api-staging.marron-taku.workers.dev |
 
-- `develop`へのマージで自動でデプロイされる（`.github/workflows/deploy.yml`）。
+- `develop`へのマージで自動でデプロイされる（`.github/workflows/deploy.yml`）。文書・仕様・AIのスキル・E2Eだけの変更では、デプロイしない（2026-11-12から）。
 - ログインの画面のいちばん上に「テスト環境です」の帯が出る。ログインしたあとのアプリの画面では、左下のユーザー名の横に「テスト版」と出る（2026-10-31に変更）。ログインはGoogle（Clerkの開発用インスタンス）。
 - 決済はON。Stripeのテスト環境なので、お金は動かない。テストユーザーには料金なしの印を付ける（10-7）。
-- Threadsへの接続は**トークンを貼る方法だけ**（`THREADS_CONNECT_METHODS = "token"`）。Metaの審査が通るまでの運用で、審査後もこの方法は残す。
+- Threadsへのつなぎ方は**両方**（「Threadsで許可する」とトークンの貼り付け。`THREADS_CONNECT_METHODS`は書かない）。Metaの審査の前なので`THREADS_ACCESS_MODE = "testers"`で、「Threadsで許可する」はテスター招待（申し込み → 運営者が招待 → 承認）のあとに使える（2026-11-08、specs/024。それまではトークンだけだった）。
 - ClerkのAllowlistは**付けていない**。テストユーザーにバグを探してもらう段階のため（2026-10-31に決めた）。URLを知っていれば誰でもログインできる。広く招く前か本番の前に、見直す。
 
 ## 2. 作ったものの一覧
@@ -33,13 +33,13 @@
 | Cloudflare | Worker（API） | `threads-grower-api-staging`。定期実行は毎日18:00 UTCと5分ごと |
 | Cloudflare | Pages（Web） | `threads-grower-web`（本番のブランチは`main`。ステージングは`develop`の別名） |
 | Cloudflare | KV | ステージング`8721878c58494198ae62714a771f8829`、本番`e5fd38abb2a847b9a02588d9f2842d0b`（本番は箱だけ） |
-| Neon | プロジェクト | `threads-grower-staging`（ID `autumn-salad-26780833`）。組織`org-bold-sky-22246902`。AWSシンガポール・Postgres 17。マイグレーション16件適用済み |
+| Neon | プロジェクト | `threads-grower-staging`（ID `autumn-salad-26780833`）。組織`org-bold-sky-22246902`。AWSシンガポール・Postgres 17。マイグレーションはデプロイのたびに当たる（2026-11-12の時点で`0025`まで） |
 | Stripe | サンドボックス | 「アプリ開発サンドボックス」（`acct_1UWQTi450ulOJK91`） |
-| Stripe | 料金 | `price_1UWWzr450ulOJK91LcANS5Ae`（毎月・JPY・段階制1,000円／2件目から500円・税込み） |
+| Stripe | 料金 | `price_1UWWzr450ulOJK91LcANS5Ae`（毎月・JPY・税込み）。作ったときは段階制（1,000円／2件目から500円）。specs/024で「アカウント1件につき1,000円」に作り直すことにしたが、**まだ作り直していない**（`apps/api/wrangler.toml`の`[env.staging.vars]`のコメント。作り直すまでは古い料金のまま請求される。手順は[外部サービスの準備手順](./external-services-setup.md) 10-2） |
 | Stripe | Webhook | `we_1UWX0b450ulOJK91aGfaumOL`（ステージングのAPIの`/api/stripe/webhook`へ8種類の知らせ） |
 | Stripe | カスタマーポータル | `bpc_1UWX10450ulOJK91y7GJpDox`（サンドボックスの既定） |
 | Clerk | インスタンス | 開発用インスタンス（`patient-lynx-8972`）。手元の開発・E2Eと同じもの |
-| Meta | アプリ | ステージングでは使っていない（トークンを貼る方法だけのため） |
+| Meta | アプリ | テスト版のMetaアプリ「ThreadsAutomation」（アプリIDは`apps/api/wrangler.toml`の`[env.staging.vars]`）。2026-11-08から、テスター招待のあとの「Threadsで許可する」で使う（specs/024） |
 
 ## 3. 秘密の値の置き場所
 
@@ -52,7 +52,7 @@
 | `STRIPE_WEBHOOK_SECRET` | Cloudflareのシークレット | Webhookを作ったときの応答から、表示せずに入れた |
 | `CLOUDFLARE_API_TOKEN` | GitHubの`staging`のSecret | Cloudflareのトークン`threads-grower-deploy`（Workers Scripts・Cloudflare Pages・Workers KV Storageの編集）。運営者が「パスワード」アプリにも控えた |
 | `THREADS_APP_SECRET` | Cloudflareのシークレット（`--env staging`） | Metaアプリ「ThreadsAutomation」のシークレット。2026-11-08に入れた（specs/024。テスト版も「Threadsで許可する」を出すため要る） |
-| `OPERATOR_CLERK_USER_IDS` | Cloudflareのシークレット（**016をマージするときに入れる**） | 運営者のClerkのユーザーID（`user_…`）。グループを作る・管理し、機能のまとまりをON/OFFする人（specs/016・019） |
+| `OPERATOR_CLERK_USER_IDS` | Cloudflareのシークレット（016から要る） | 運営者のClerkのユーザーID（`user_…`）。グループを作る・管理し、機能のまとまりをON/OFFする人（specs/016・019） |
 
 GitHubの`staging`の変数は、`CLOUDFLARE_ACCOUNT_ID`・`VITE_API_BASE_URL`（APIのURL、`/api`なし）・`VITE_CLERK_PUBLISHABLE_KEY`・`VITE_APP_ENV`（`staging`）の4つです。
 
@@ -161,7 +161,7 @@ cd apps/api && pnpm exec wrangler pages deploy ../web/dist --project-name thread
 
 本番を立てるときは、9章を上から通します。ステージングと違うのは次の点です。
 
-- **ドメイン**を買う（Clerkの本番インスタンスに要る）。名前に「Threads」を入れない（商標のため）。2026-10-31の時点では`postgrower.com`が空いていた。
+- **ドメイン**を買う（Clerkの本番インスタンスに要る）。名前に「Threads」を入れない（商標のため）。サービスの名前は「めぐる」に決めた（2026-11-11）が、ドメインはまだ決めていない。
 - **Neon**：`threads-grower-production`を作る。無料のプランでは、**DBを戻せるのは6時間前まで**（[リリースの手順書](./release-runbook.md) 6-3）。足りるかを決める。
 - **鍵**：`TOKEN_ENCRYPTION_KEYS`・`IDENTIFIER_HASH_KEY`は、本番用に新しく作る（ステージングと分ける）。控えをキーチェーンなどに残す。
 - **Clerk**：本番インスタンス（`pk_live_`・`sk_live_`）。アプリ名を「My Application」から直す。
@@ -169,4 +169,4 @@ cd apps/api && pnpm exec wrangler pages deploy ../web/dist --project-name thread
 - **GitHub**：Environment`production`に同じ6つの値を入れる（`CLOUDFLARE_API_TOKEN`は同じものを使える）。
 - **`main`へ出す前に**、`develop`→`main`のリリースのPRで、ここまでの設定を`main`に追いつかせる（`main`の`wrangler.toml`は見本の値のまま）。
 - **テスト用のグループ**：本番は`TEST_GROUPS_ENABLED = "false"`（誰でも登録できる。specs/016）。本番でもグループは作れるが、機能の設定にだけ使う（誰でも登録でき、入っても料金なしにならない。specs/019）。`OPERATOR_CLERK_USER_IDS`は、本番でグループや機能のまとまりのON/OFFを使うときだけ入れる。本番では、運営者になっても料金なしにはならない。
-- **Threads**：審査前は`THREADS_CONNECT_METHODS = "token"`。審査が通ったら`app,token`にし、MetaアプリのID・シークレット・戻り先URLを入れ、Metaにコールバックの3つのURLを登録する（3-3・9-8）。
+- **Threads**：本番用のMetaアプリを作り、ID・シークレット・戻り先URLを入れ、Metaにコールバックの3つのURLを登録する（[外部サービスの準備手順](./external-services-setup.md) 9-8）。つなぐ方法は両方。審査の前は`THREADS_ACCESS_MODE = "testers"`（テスター招待）で、審査が通ったら`public`にする（[環境ごとのスイッチ](./environment-switches.md)）。

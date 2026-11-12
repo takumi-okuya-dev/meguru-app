@@ -1,6 +1,6 @@
-# ThreadsGrower 技術ドキュメント
+# めぐる Threads 技術ドキュメント
 
-**更新**：2026-11-04
+**更新**：2026-11-12（旧名 ThreadsGrower。2026-11-11からスイート「めぐる」の最初のアプリ）
 
 Threadsの運用を「投稿ストック → 承認 → 自動投稿 → 分析 → 改善」のループで回すWebアプリを、個人開発で1か月（2026年10月）かけて作りました。Cloudflare・Neon・Clerkの無料枠で固定費0円から運用できる構成にし、実装の大半は仕様駆動でAI（Claude Code・Codex）が書いています。
 
@@ -47,7 +47,7 @@ flowchart LR
 | データベース | Neon（Postgres 17）+ Drizzle ORM | 問い合わせがないと5分で止まり、止まっている間は費用0。履歴から時刻を指定して戻せる |
 | 小さな記録 | Cloudflare KV | 自動投稿の「関所」。用のない回はDBを起こさずに終える |
 | ログイン | Clerk（Googleだけ） | ログインだけを任せる。チームはClerkではなくアプリのDBで持つ |
-| 決済 | Stripe（Billing + Checkout） | 月額の契約・無料体験・支払いの失敗を任せられる |
+| 決済 | Stripe（Billing + Checkout） | 月額の契約・支払いの失敗を任せられる（無料体験は2026-11-08にやめた） |
 | 外部API | Threads API | 投稿（作成 → 公開の2段階）と、反応・フォロワー数の取り込み |
 | 共通コード | `packages/shared` | 入出力のスキーマ、エラーコードと日本語の文言、料金と上限を、画面とAPIで共有する |
 | テスト | Vitest、Testing Library、Playwright | 単体・結合・画面・E2Eを同じ言語で書ける |
@@ -98,7 +98,7 @@ flowchart LR
 
 ```mermaid
 flowchart LR
-  feat["feature/*・fix/*"] -- "PR・CI必須" --> develop["develop"]
+  feat["feature/*・fix/*"] -- "PR必須・コードを変えたらCI" --> develop["develop"]
   develop -- "リリースのPR" --> main["main"]
   feat -. "手元で動かす" .-> local["手元の開発<br/>DockerのPostgres<br/>偽のThreadsでも動く"]
   develop -- "マージで自動" --> staging["テスト版（ステージング）<br/>テストユーザー・料金なし<br/>決済はStripeのテスト用"]
@@ -122,13 +122,13 @@ flowchart TB
     direction LR
     brief["Product Brief<br/>誰の何の課題か"] --> prd["PRD<br/>機能と範囲"] --> ui["UI全体設計<br/>画面の骨格"] --> con["憲法<br/>守る原則6つ"]
   end
-  subgraph lane2["機能ごと（15回）：Spec Kit"]
+  subgraph lane2["機能ごと（001〜028）：Spec Kit"]
     direction LR
     specify["specify<br/>仕様を書く"] --> clarify["clarify<br/>曖昧さを質問"] --> plan["plan<br/>設計と契約"] --> tasks["tasks<br/>作業の順番"] --> implement["implement<br/>テストと実装"]
   end
   subgraph lane3["マージまで（PRごと）"]
     direction LR
-    pr["PR<br/>developへ"] --> review["AIレビュー<br/>指摘を直す（任意）"] --> ci["CI<br/>lint・型・テスト"] --> merge["マージ<br/>人が決める"] --> deploy["自動デプロイ<br/>テスト版へ"]
+    pr["PR（下書き）<br/>developへ"] --> review["セルフレビュー<br/>→ Codexのレビュー"] --> ci["CI<br/>コードを変えたPRだけ"] --> merge["マージ<br/>人が決める"] --> deploy["自動デプロイ<br/>テスト版へ"]
   end
   con --> specify
   implement --> pr
@@ -147,9 +147,9 @@ flowchart TB
 | 名前 | 何に使ったか |
 | --- | --- |
 | Claude Code | 実装・テスト・レビューの指摘への対応・環境構築の大半。会話をまたいだ決定事項はメモリに残す |
-| Codex | PRの自動レビュー（いまは止めている）。Claude Codeが利用制限になったときの引き継ぎ先 |
+| Codex | PRのレビュー（セルフレビューのあと、Ready for reviewにしたときに動く。[リリースの手順書](release-runbook.md) 2）。Claude Codeが利用制限になったときの引き継ぎ先 |
 | [BMAD-METHOD](https://github.com/bmad-code-org/BMAD-METHOD)（30スキル） | 計画の段階だけで使用。Product Brief・PRDと設計の叩き台 |
-| [Spec Kit](https://github.com/github/spec-kit)（10スキル） | 実装の段階。憲法 → 仕様 → 計画 → タスク → 実装を、機能ごとに15回 |
+| [Spec Kit](https://github.com/github/spec-kit)（10スキル） | 実装の段階。憲法 → 仕様 → 計画 → タスク → 実装を、機能ごとに（001〜028） |
 | security-audit（スキル） | 公開前のセキュリティ監査 |
 | Playwright | E2Eテスト、画面の確認、外部サービスの管理画面の操作 |
 | GitHub Actions | CI（マージの前にラベル「run-ci」を付けたときだけ）と、マージでの自動デプロイ |
@@ -159,10 +159,10 @@ BMADとSpec Kitは並行して使わず、「計画はBMAD、実装はSpec Kit�
 
 ## 品質の守り
 
-AIが書いたコードでも、テストとCIを通らなければマージできないようにしています。
+AIが書いたコードでも、テストとCIを通らなければマージできないようにしています（文書だけの変更はCIを流さずにマージします）。
 
-- **テスト**：単体・結合・画面のテストが176ファイル（画面だけで542件）、E2Eが9ファイル。APIの結合テストは本物のPostgres 17で動かします。E2Eは偽のThreadsサーバーを立て、はじめかた・戦略・投稿づくり・チーム・決済・再接続・スマートフォンの幅を通します。
-- **CI**：lint・型チェック・テスト・画面のビルド。コミットのたびには流さず、マージすると決めたときにPRへラベル「run-ci」を付けて流します（Actionsの持ち時間を節約するため。2026-11-05）。`main`と`develop`は、CIの成功とPRをルールセットで必須にしています。
+- **テスト**：単体・結合・画面のテストが278ファイル、E2Eが9ファイル（2026-11-12）。APIの結合テストは本物のPostgres 17で動かします。E2Eは偽のThreadsサーバーを立て、はじめかた・戦略・投稿づくり・チーム・決済・再接続・スマートフォンの幅を通します。
+- **CI**：lint・型チェック・テスト・画面のビルド。コミットのたびには流さず、コードを変えたPRで、マージすると決めたときにラベル「run-ci」を付けて流します（Actionsは従量課金のため。2026-11-05、2026-11-12）。`main`と`develop`は、CIの成功とPRをルールセットで必須にしています。文書だけのPRは、管理者がCIを待たずにマージします。文書だけの変更では、デプロイも動きません。
 - **不具合の直し方**：先にテストで同じ現象を再現し、直したあとに通ることを確かめてから、新しいPRで直します。
 - **デプロイ**：マイグレーション → API → 画面の順に出し、どれかが失敗したらそこで止めます。戻し方は[リリースの手順書](release-runbook.md)にあります。
 - **文書**：機能ごとに仕様・計画・タスク・契約（APIと画面の取り決め）を残し、コードのコメントからそこへたどれるようにしています。

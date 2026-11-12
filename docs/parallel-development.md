@@ -118,3 +118,13 @@ cd ../meguru-app-people && claude       # その作業場所で Claude Code を�
 - もとのクローンの手元の設定ファイルを変えても、作業場所には写らない。作り直すか、作業場所の側も手で直す。
 - セッションをまたいで守る決まりは、Claude Codeのメモリーではなくリポジトリの文書に書く（どのセッションからも同じものが読めるように）。
 - 作業場所を消すと、その中のコミットしていない変更も消える。
+
+## 10. 作業場所の仕組み
+
+- 作業場所は、もとのクローンの隣（`../meguru-app-<名前>`）にできる。
+- **DB**：同じPostgres（`docker compose`のコンテナは1つ。`docker-compose.yml`の`name`で決めてある）の中に、`threads_grower_<名前>`を作ってマイグレーションを当てる。結合テストとE2Eは、その作業場所のDBだけを空にする。
+- **ポート**：決まったポートに100ずつ足す（1つ目の作業場所はWeb `5273`・API `8887`・偽のThreads `8890`・デバッガー `9329`）。`pnpm dev`・`pnpm dev:fake`・`pnpm e2e`・`pnpm team:open`が合わせて動く。Webの開発サーバーは、ポートが使われていたら別のポートに逃げずに止まる。
+- **値の置き場所**：作業場所のルートの`.env.worktree`（コミットしない）に、`MEGURU_DB_NAME`と`MEGURU_PORT_OFFSET`の2つだけを置く。API・Web・E2Eがこれを読む（`apps/api/scripts/worktree-env.ts`・`apps/web/vite.config.ts`・`e2e/env.ts`）。もとのクローンにはこのファイルがないので、今までどおり`threads_grower`と決まったポートで動く。
+- **手元の設定ファイル**（`apps/api/.dev.vars`・`apps/web/.env.local`・`e2e/.env.local`）は、もとのクローンから写し、DBとポートの行（`DATABASE_URL`・`WEB_ORIGIN`・`VITE_API_BASE_URL`）だけを書き換える。
+- **結合テストとE2Eの順番待ち**：Workersからつなぐ`local-neon-http-proxy`は1つで、2つの作業場所で同時に流すと認証の問い合わせが追いつかずに落ちる。そこで、Postgresの`postgres`のDBのアドバイザリーロックで順番を待つ（`apps/api/test/global-setup.ts`・`e2e/global-setup.ts`）。テストを止めれば、接続が切れてロックは外れる。
+

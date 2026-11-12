@@ -1,4 +1,6 @@
-# ThreadsGrower App Constitution
+# めぐる（meguru-app）Constitution
+
+（旧名 ThreadsGrower App Constitution。2026-11-11からスイート「めぐる」のリポジトリ。最初のアプリは「めぐる Threads」）
 
 ## Core Principles
 
@@ -188,9 +190,11 @@ MVPのうちチーム運用と課金まわりの最後のfeatureとする。公�
   - リリースは`develop`→`main`のPR（タイトルは「リリース：…」）。
   - 本番の急ぎの修正は`main`から`fix/*`を分け、`main`へのPRでマージしたあと、同じ変更を
     `develop`にも戻す（`git log --oneline main ^develop`が空になること）。
-  - `main`・`develop`への直接のpushは禁止（PR必須・CIの成功を必須）。
+  - `main`・`develop`への直接のpushは禁止（PR必須）。コードを変えたPRは、ラベル`run-ci`で
+    流したCIの成功を待ってマージする。文書だけのPRは、CIを流さずに管理者がマージする
+    （どの変更でCIを流すかは`docs/release-runbook.md`の2）。
   - マージすると自動で出る（`develop`→ステージング、`main`→本番。
-    `.github/workflows/deploy.yml`）。環境ごとの違いはコードの分岐にせず、設定だけに置く。
+    `.github/workflows/deploy.yml`。文書・仕様・AIのスキル・E2Eだけの変更では出さない）。環境ごとの違いはコードの分岐にせず、設定だけに置く。
   - 詳しくは[specs/015-deploy-environments/contracts/deploy.md](../../specs/015-deploy-environments/contracts/deploy.md)。
 - **仕様のフォルダと番号**（2026-11-12）：アプリを並行して作れるよう、新しい仕様は
   `specs/<アプリ>/NNN-<短い名前>/`に置き、番号はアプリのフォルダごとに振る（外枠・共通は`meguru`。
@@ -206,4 +210,4 @@ MVPのうちチーム運用と課金まわりの最後のfeatureとする。公�
   実質的な拡張＝MINOR、文言修正・明確化＝PATCH。
 - 改定時は`/speckit-constitution`を再実行し、Sync Impact Reportを都度残す。
 
-**Version**: 4.8.0 | **Ratified**: 2026-10-01 | **Last Amended**: 2026-11-12
+**Version**: 4.8.1 | **Ratified**: 2026-10-01 | **Last Amended**: 2026-11-12

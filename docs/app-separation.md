@@ -18,11 +18,11 @@
 |---|---|
 | **ほかのアプリ** | コードもDBも、一切さわらない（読む・書く・外部キー・JOIN・トランザクションのどれも） |
 | **共通**（ログイン・利用者・利用権・料金・チーム） | DBは直接さわらない。**利用者のIDを値として持つだけ**で、外部キーは張らない。名前・利用権などが要るときは、共通の入口の関数を呼ぶ（切り出したあとは、そこがAPIの呼び出しに変わる） |
-| **自分** | 自分の表だけを持つ。表はPostgresの中の**アプリ専用のスキーマ**（例：`memo`）に置く |
+| **自分** | 自分の表だけを持つ。表はPostgresの中の**アプリ専用のスキーマ**（例：`people`）に置く |
 
 - **共通をまたぐトランザクションは使わない**。共通で起きたこと（退会など）は、共通が「出来事」を出し、アプリがあとから受け取って自分のデータを直す（3章）。
 - **出来事の受け取りは、何度届いても同じ結果になるように作る**（同じ出来事が2回届くことがある）。失敗したら、やり直せるようにする。
-- **アプリのAPIの道筋は、アプリの名前の下に置く**（例：`/api/memo/…`）。切り出すとき、道筋だけで振り分けられる。
+- **アプリのAPIの道筋は、アプリの名前の下に置く**（例：`/api/people/…`）。切り出すとき、道筋だけで振り分けられる。
 - **アプリをまたぐ集計は、DBをJOINせず、それぞれのAPIから集める**。
 - **DBのサーバーは、最初は分けない**。同じNeonのPostgresの中で、スキーマを分ける。表とトランザクションを共有しなければ、パターン①の考え方は守れる。サーバーを分けるのは、切り出すとき。
 - **画面（Web・将来のモバイル）は、アプリのAPIだけを使う**（[product-structure.md](./product-structure.md) 6「モバイル化を見込んで技術を選ぶ」）。
@@ -38,14 +38,14 @@ flowchart LR
   subgraph code["コード（API の Worker）"]
     direction TB
     th["Threads<br/>パターン②"]
-    mm["2作目（memo）<br/>パターン①"]
+    mm["2作目（people）<br/>パターン①"]
     pfe["共通の入口の関数<br/>platform/index.ts"]
     pfi["共通の中身<br/>（表をさわるのはここだけ）"]
   end
   subgraph db["DB（Postgres 1台）"]
     direction TB
     pub[("public スキーマ<br/>共通の表・Threadsの表")]
-    ms[("memo スキーマ<br/>2作目の表だけ")]
+    ms[("people スキーマ<br/>2作目の表だけ")]
   end
 
   th -- "入口から" --> pfe
@@ -84,7 +84,7 @@ flowchart LR
 
 ### 2-2. 全体の構成
 
-今のめぐると、2作目（例：人物メモ `memo`）を足したあとの形。Workerは1つのまま、中で分ける。
+今のめぐると、2作目（例：人物管理 `people`）を足したあとの形。Workerは1つのまま、中で分ける。
 
 ```mermaid
 flowchart TB
@@ -100,15 +100,15 @@ flowchart TB
     subgraph threads["Threads（apps/threads）<br/>パターン②のまま"]
       tcode["Threadsの処理"]
     end
-    subgraph memo["2作目（apps/memo）<br/>パターン①"]
-      mcode["人物メモの処理<br/>/api/memo/…"]
+    subgraph people["2作目（apps/people）<br/>パターン①"]
+      mcode["人物管理の処理<br/>/api/people/…"]
       mconsumer["出来事の受け取り<br/>何度届いても同じ結果"]
     end
   end
   queue["Cloudflare Queues<br/>出来事の列"]
   subgraph neon["Neon（Postgres 1台）"]
     pub[("public スキーマ<br/>共通の表＋Threadsの表")]
-    mschema[("memo スキーマ<br/>人物メモの表だけ<br/>利用者のIDは値で持つ")]
+    mschema[("people スキーマ<br/>人物管理の表だけ<br/>利用者のIDは値で持つ")]
   end
 
   web --> compose
@@ -141,15 +141,15 @@ sequenceDiagram
   participant W as 画面
   participant C as 組み立て
   participant P as 共通の入口
-  participant M as 2作目（memo）
-  participant DB as memo スキーマ
+  participant M as 2作目（people）
+  participant DB as people スキーマ
 
-  U->>W: 人物メモを開く
-  W->>C: GET /api/memo/people（Clerkのトークン付き）
+  U->>W: 人物管理を開く
+  W->>C: GET /api/people/people（Clerkのトークン付き）
   C->>P: ログインを確かめる
   P-->>C: 今の利用者（利用者のID）
   C->>M: 利用者のIDを渡して呼ぶ
-  M->>P: 利用権を確かめる（利用者のID・memo）
+  M->>P: 利用権を確かめる（利用者のID・people）
   P-->>M: 使える
   M->>DB: 利用者のIDで自分の表を読む
   DB-->>M: 人物の一覧
@@ -172,7 +172,7 @@ sequenceDiagram
   participant O as 出来事の送り出し
   participant Q as Cloudflare Queues
   participant M as 2作目の受け取り
-  participant MDB as memo スキーマ
+  participant MDB as people スキーマ
 
   U->>P: 退会する
   rect rgb(240, 240, 240)
@@ -204,14 +204,14 @@ flowchart LR
   subgraph core["めぐるのWorker"]
     platform2["共通<br/>＋Threads"]
   end
-  subgraph memoWorker["人物メモのWorker"]
+  subgraph memoWorker["人物管理のWorker"]
     memo2["2作目"]
   end
   queue2["Cloudflare Queues"]
   db1[("Neon：めぐる<br/>共通＋Threads")]
-  db2[("Neon：人物メモ")]
+  db2[("Neon：人物管理")]
 
-  web -- "/api/memo/…" --> memoWorker
+  web -- "/api/people/…" --> memoWorker
   web -- "それ以外" --> core
   memo2 -- "共通のAPI（Service Bindings）" --> platform2
   platform2 --> db1
