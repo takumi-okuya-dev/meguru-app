@@ -1202,3 +1202,14 @@ export const postMentions = pgTable(
     check("post_mentions_text_length", sql`char_length(${t.text}) BETWEEN 1 AND 500`),
   ],
 );
+
+// ---- 受け取った出来事（specs/meguru/029-threads-pattern1 contracts/platform-entry.md 3、tasks.md T032） ----
+
+/**
+ * Threadsが受け取った共通の出来事の番号。受け取りのトランザクションの中で書き、もうあれば何もしない
+ * （同じ出来事が2回届いても結果を変えない）。PR3 でスキーマ threads の received_events へ移す。
+ */
+export const threadsReceivedEvents = pgTable("threads_received_events", {
+  eventId: uuid("event_id").primaryKey(),
+  receivedAt: timestamp("received_at", { withTimezone: true, precision: 6 }).notNull().defaultNow(),
+});

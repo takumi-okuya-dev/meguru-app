@@ -1,7 +1,7 @@
 // 退会したときの、Threadsの片づけ（specs/013-billing research.md R10、specs/011 FR-046、specs/024 research.md R15）。
-// 029 で共通の退会の処理から移した（specs/meguru/029-threads-pattern1 research.md R8）。PR2a では共通の知らせ（userWithdrawing）で、
-// 退会と同じトランザクションの中で呼ぶ。PR2b で出来事（user.withdrawn）の受け取りに替える。
-import { and, asc, eq, inArray } from "drizzle-orm";
+// 029 で共通の退会の処理から移した（specs/meguru/029-threads-pattern1 research.md R8）。出来事（user.withdrawn）の受け取りから、
+// Threadsのトランザクションの中で呼ぶ（events/received-events.ts）。共通は、この片づけが届いたあとで users の行を消す。
+import { and, asc, eq, inArray, ne } from "drizzle-orm";
 import type { TxDb } from "../../../kernel/db/client";
 import { WITHDRAWN_ACTOR_NAME } from "../../../platform";
 import { accounts, activityLogs, memberships, teamMembers, teams, threadsDeletionRequests } from "../schema";
@@ -49,6 +49,9 @@ export async function cleanupForWithdrawal(tx: TxDb, userId: string, now: Date =
     await tx.update(teamMembers).set({ role: "admin" }).where(and(eq(teamMembers.teamId, t.id), eq(teamMembers.userId, next.userId)));
     await tx.update(teams).set({ adminUserId: next.userId, updatedAt: now }).where(eq(teams.id, t.id));
   }
+  // ほかの人のアカウントの担当と、チームの人から外す（今は users の行を消すと外部キーで消えるが、PR3 で外部キーを外すので自分で外す）
+  await tx.delete(memberships).where(and(eq(memberships.userId, userId), ne(memberships.role, "owner")));
+  await tx.delete(teamMembers).where(eq(teamMembers.userId, userId));
   // ほかの人のアカウントの操作の記録は残し、名前を「退会した人」にする（FR-053）
   await tx.update(activityLogs).set({ actorName: WITHDRAWN_ACTOR_NAME }).where(eq(activityLogs.actorUserId, userId));
 }

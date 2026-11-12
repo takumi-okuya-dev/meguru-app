@@ -66,6 +66,11 @@ description: "Task list for feature meguru/029 Threads pattern ①"
 > そこで、**PR2a＝持ち主の移動（動きは変えない）**、**PR2b＝出来事への切り替え（利用者の行を消すのは Threads の片づけが届いたあと）** にした。
 > - PR2a：T018（アカウントの作成・削除・Metaのデータ削除で伝える。チームの出入りは /api/me と毎日の数え直しで直す）・T020・T022・T023・T024 のうち利用の数と上限の写し直し（マイグレーション 0027）・T025・T026・T029・T034・T035
 > - PR2b：T017・T019・T021・T024 のうち `threads_settings`・T027・T028・T030〜T033・T036・T037・T069・T070・T071
+> - **PR2b をさらに2つに分けた**（2026-11-12、PR2b の途中で決めた。変える範囲が広く、レビューと戻しを小さくするため）。
+>   - PR2b＝出来事への切り替えと利用権：T017・T019・T028・T030・T031・T032・T033（マイグレーション 0028 は `threads_received_events` だけ）
+>   - PR2c＝共通の表を読まない形にする：T021・T024 のうち `threads_settings`・T027・T036・T069・T070・T071・T037
+>   - 退会：共通は退会を記録して `user.withdrawn` を書き、すぐ届ける。`users` の行は、すべての届け先で片づけが済んだあとで消す（`deleteUserRowIfCleaned`。届かなければ5分ごとの届けと日次の続きでやり直す）。Threads の片づけは、担当とチームの人の行も自分で外す（PR3 で外部キーを外すため）
+>   - `platform/hooks.ts` は、呼び出しが0になったので `runHook` を消し、`registerModule` だけを残した。`apps/threads/threads-hooks.ts` は `register.ts` に名前を変え、`registerConsumer` で出来事の受け取りを登録する
 > - 見つかったこと：`users`（共通）に、Threadsの「最後に開いたアカウント」の列が5つある（`last_account_id`・`last_account_deleted_at`・`last_account_client_id`・`last_account_open_seq`・`last_account_open_received_at`）。PR2a では今のまま（`users.last_account_id`から`accounts`への外部キーは境界の例外）にし、PR2b の T071 で Threads 専用の表へ移す。
 
 ## Phase 3：Threadsの持ち物にして、共通とのやりとりを入口と出来事にする（PR2）
@@ -76,9 +81,9 @@ description: "Task list for feature meguru/029 Threads pattern ①"
 
 ### テスト（先に書いて失敗を確かめる）
 
-- [ ] T017 [P] [US2] `apps/api/test/integration/withdrawal-events.test.ts`：退会がすぐ終わり、`user.withdrawn`が書かれる。届けると、その人が持ち主のアカウント（テスター招待の片づけ・Metaのデータ削除の要求の完了を含む）が消え、メンバー・チームから外れ、作った人の欄が空になり、`app_usage`が0・使っていないになる。同じ出来事を2回届けても結果が同じ（spec US2-1・US2-2、SC-004）。
+- [X] T017 [P] [US2] `apps/api/test/integration/withdrawal-events.test.ts`：退会がすぐ終わり、`user.withdrawn`が書かれる。届けると、その人が持ち主のアカウント（テスター招待の片づけ・Metaのデータ削除の要求の完了を含む）が消え、メンバー・チームから外れ、作った人の欄が空になり、`app_usage`が0・使っていないになる。同じ出来事を2回届けても結果が同じ（spec US2-1・US2-2、SC-004）。
 - [X] T018 [P] [US2] `apps/api/test/integration/threads-usage.test.ts`：アカウントを作る・消す・Metaのデータ削除・チームに入る・抜けるたびに、応答を返す前に`app_usage`が今の数と状態になる。料金の数（Stripeへ送る数）が`app_usage`から決まり、今と同じ金額。毎日の数え直しで、ずれた数が直る（spec FR-011、T002と同じ結果）。
-- [ ] T019 [P] [US2] `apps/api/test/integration/limits-changed-event.test.ts`：運営者が上限を保存すると`limits.changed`が書かれ、届けると自動投稿が起こされる（今の`limitsChanged`のテストの期待する結果と同じ）。
+- [X] T019 [P] [US2] `apps/api/test/integration/limits-changed-event.test.ts`：運営者が上限を保存すると`limits.changed`が書かれ、届けると自動投稿が起こされる（今の`limitsChanged`のテストの期待する結果と同じ）。
 - [X] T020 [P] [US3] `apps/api/test/integration/threads-me.test.ts`：`GET /api/threads/me`が、同じデータで今の`/api/me`のThreadsの部分（`accounts`・`landingAccountId`・`accountLimit`・`threadsAccessMode`・`threadsConnectMethods`・`teams`・`features`・`dailyPostLimit`・`testerInvites`）と同じ値を返す。`GET /api/threads/me/withdrawal-preview`が、今の`/api/me/withdrawal-preview`の消えるアカウントの部分と同じ値を返す（contracts/api-routes.md 2）。
 
 ### 共有の型
@@ -98,15 +103,15 @@ description: "Task list for feature meguru/029 Threads pattern ①"
 - [X] T025 [US2] `apps/api/src/platform/billing/billing-service.ts`の料金の数（`countOwned`）を、`app_usage`の`threads`の`quantity`に替える。契約を始めるとき（Checkout）も同じ。T018の料金の部分を通す。
 - [X] T026 [US2] `apps/api/src/platform/operator/limit-service.ts`の、持ち主のアカウントの数を数える部分（運営者の利用者の一覧など）を、`app_usage`に替える。アカウントの数の上限の判定（作れるか）は、Threadsへ移す（`apps/threads/accounts/`）。
 - [ ] T027 [US2] 機能のOFFを読む・消す処理（`feature-sql.ts`の`disabledFeaturesSql`・`featureOnSql`、`feature-service.ts`の`readUser`・`saveFeatureSettings`の削除・`saveGroupFeatures`・`groupDisabledFeatures`）を、すべてアプリの番号で絞る形にする（PR1のセルフレビューの指摘。2本目のアプリが同じ名前の機能を使っても混ざらないように）。`apps/api/src/platform/features/feature-sql.ts`の、`memberships`をJOINする部分（アカウントの持ち主の機能）を消し、Threadsの側で`loadEntitlement`を使う形にする。共通のコードからThreadsの機能の名前（`autopost`など）を消し、登録の一覧を使う（spec FR-012）。
-- [ ] T028 [US2] `apps/api/src/platform/withdrawal/withdrawal-service.ts`を、契約の解約・利用者の退会の記録・`emitEvent(tx, "user.withdrawn", { userId })`までにする（Threadsのアカウントを消す部分をなくす）。
+- [X] T028 [US2] `apps/api/src/platform/withdrawal/withdrawal-service.ts`を、契約の解約・利用者の退会の記録・`emitEvent(tx, "user.withdrawn", { userId })`までにする（Threadsのアカウントを消す部分をなくす）。
 - [X] T029 [US2] `apps/api/src/platform/identity/me-routes.ts`：`apps.using`を`app_usage.using`から決める。`/api/me`のThreadsの部分は、PR5まで今の形で返すため、組み立て（`apps/api/src/app.ts`）からThreadsの「`/api/me`に足す中身を作る関数」を渡して呼ぶ（共通はThreadsを読まない）。`/api/me/withdrawal-preview`も同じ（PR5で共通の分だけにする）。
 
 ### Threadsの側（共通の入口だけを使う形にする）
 
 - [ ] T030 [US2] `apps/api/src/apps/threads/access/access.ts`（`authorizeAccount`）を、持ち主の利用権を`loadEntitlement`で読む形にする（`users`・`subscriptions`を読まない）。**持ち主が退会した（利用権が`none`で、退会の記録がある）アカウントは、出来事が届いて消えるまでの間も、チームのほかの人を含めて誰にも見せない**（今は退会で即座に消えるので、見えない。spec 境目のケース、/speckit-analyze U1）。T017に、退会のあと出来事が届く前に、チームのほかの人がそのアカウントを開けない場面を足す。
 - [ ] T031 [US2] `apps/api/src/apps/threads/publish/auto-post-runner.ts`・`metrics/metrics-runner.ts`・`mention/mention-runner.ts`の、`users`・`subscriptions`・`memberships`とのJOINと`featureOnSql`系をやめ、Threadsの表だけで候補を読んでから`loadEntitlements`で持ち主をまとめて調べる形にする（research.md R4）。1件ずつ判定している`publish/publish-claim.ts`・`publish-executor.ts`・`auto-post-routes.ts`・`posting-schedule-routes.ts`（`loadOwnerEntitlement`・`ownerAutopostOn`・`effectiveLimits`）は、`loadEntitlement`に替える。今の定期処理と投稿のテストを、期待する結果を変えずに通す。
-- [ ] T032 [US2] `apps/api/src/apps/threads/events/`を作る：`markReceived`（`threads_received_events`。まだ`public`）・`onUserWithdrawn`・`onLimitsChanged`（contracts/platform-entry.md 3）。`received_events`の表を作るマイグレーションを、T024と同じPRで足す。T017・T019を通す。
-- [ ] T033 [US2] 知らせをなくす：`accountDeleting`・`accountOpened`はThreadsの中の処理に（アカウントを消す関数・開くAPIの中で直接呼ぶ）、`userWithdrawing`・`userAccountsDeleted`は`onUserWithdrawn`に、`limitsChanged`は`onLimitsChanged`に（research.md R8）。`apps/api/src/apps/threads/threads-hooks.ts`を消し、`apps/api/src/app.ts`で`registerAppFeatures`・`registerAppLimits`・`registerConsumer`を呼ぶ（contracts/module-boundaries.md 4）。`platform/hooks.ts`はPR5で消す（この時点で呼び出しが0になる）。
+- [X] T032 [US2] `apps/api/src/apps/threads/events/`を作る：`markReceived`（`threads_received_events`。まだ`public`）・`onUserWithdrawn`・`onLimitsChanged`（contracts/platform-entry.md 3）。`received_events`の表を作るマイグレーションを、T024と同じPRで足す。T017・T019を通す。
+- [X] T033 [US2] 知らせをなくす：`accountDeleting`・`accountOpened`はThreadsの中の処理に（アカウントを消す関数・開くAPIの中で直接呼ぶ）、`userWithdrawing`・`userAccountsDeleted`は`onUserWithdrawn`に、`limitsChanged`は`onLimitsChanged`に（research.md R8）。`apps/api/src/apps/threads/threads-hooks.ts`を消し、`apps/api/src/app.ts`で`registerAppFeatures`・`registerAppLimits`・`registerConsumer`を呼ぶ（contracts/module-boundaries.md 4）。`platform/hooks.ts`はPR5で消す（この時点で呼び出しが0になる）。
 - [X] T034 [US2] Threadsが利用の数を伝える：アカウントを作る・消す（Metaのデータ削除の`deleteAccountsOfThreadsUser`を含む）・持ち主が変わる・チームに入る・抜ける処理で、トランザクションのあと・応答の前に`reportUsage`を呼ぶ。毎日のまとめ処理（`jobs/daily-jobs.ts`からThreadsの関数を呼ぶ）で全員を数え直す。T018を通す。
 - [X] T035 [US3] `apps/api/src/apps/threads/me/`を作る：`GET /api/threads/me`・`GET /api/threads/me/withdrawal-preview`。`apps/api/src/apps/threads/index.ts`から出し、`app.ts`でつなぐ。T020を通す。`pnpm --filter api routes:snapshot`で一覧を書き直す（2本増える）。
 - [ ] T069 [US2] 運営の画面のための登録の一覧を返すAPI `GET /api/operator/app-registry`（共通。運営者だけ）を足す：登録されたアプリごとに、機能（名前・表示名・説明）と上限（名前・表示名・範囲）を返す。`registerAppFeatures`・`registerAppLimits`に表示名・説明を渡す形にする（contracts/platform-entry.md 5・api-routes.md 1）。テスト：`apps/api/test/integration/operator-app-registry.test.ts`（運営者でなければ403、今の3つの機能と2つの上限が今の表示名で返る）。
