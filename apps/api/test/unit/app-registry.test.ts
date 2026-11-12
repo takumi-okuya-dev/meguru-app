@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import {
   appFeatures,
   appLimits,
-  featureSettingsApp,
+  requireFeatureSettingsApp,
   isAppFeature,
   isValidAppLimit,
   registerAppFeatures,
@@ -37,11 +37,21 @@ describe("登録", () => {
     expect(registeredApps()).toEqual(["sample"]);
   });
 
-  it("featureSettingsApp は、機能を登録した最初のアプリ", () => {
-    expect(featureSettingsApp()).toBeUndefined();
-    registerAppLimits("limits-only", { people: { label: "人数", min: 1, max: 100, operatorValue: null } });
+  it("機能の名前は、同じアプリの中でも重ねられない", () => {
+    expect(() => registerAppFeatures("sample", [{ key: "notes", label: "メモ" }, { key: "notes", label: "メモ2" }])).toThrow(/notes/);
+    expect(registeredApps()).toEqual([]);
+  });
+
+  it("requireFeatureSettingsApp は、機能の名前が運営の画面の形（FEATURES）と同じアプリ。登録の順番によらない。なければ例外", () => {
+    expect(() => requireFeatureSettingsApp()).toThrow();
     registerAppFeatures("sample", [{ key: "notes", label: "メモ" }]);
-    expect(featureSettingsApp()).toBe("sample");
+    expect(() => requireFeatureSettingsApp()).toThrow();
+    registerAppFeatures("threads", [
+      { key: "autopost", label: "自動投稿" },
+      { key: "strategy", label: "戦略" },
+      { key: "team", label: "チーム" },
+    ]);
+    expect(requireFeatureSettingsApp()).toBe("threads");
   });
 
   it("登録していないアプリは空", () => {

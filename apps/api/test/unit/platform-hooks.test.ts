@@ -20,4 +20,18 @@ describe("platform/hooks", () => {
     });
     expect(count).toBe(2);
   });
+
+  it("登録の途中で例外になったら、登録済みにしない（次の呼び出しでもう一度試す）", () => {
+    let calls = 0;
+    expect(() =>
+      registerModule("threads", () => {
+        calls += 1;
+        throw new Error("失敗");
+      }),
+    ).toThrow("失敗");
+    registerModule("threads", () => {
+      calls += 1;
+    });
+    expect(calls).toBe(2);
+  });
 });

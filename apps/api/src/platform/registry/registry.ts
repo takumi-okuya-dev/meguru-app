@@ -1,5 +1,6 @@
 // アプリが共通に登録する、機能のまとまりと上限の名前（specs/meguru/029-threads-pattern1 research.md R7、contracts/platform-entry.md 5）。
 // 名前・表示名・範囲はアプリが決め、組み立て（app.ts）で登録する。共通のコードにはアプリの名前を書かない。
+import { FEATURES } from "@meguru/shared";
 
 /** 機能のまとまりの定義。 */
 export type AppFeatureDef = {
@@ -32,7 +33,10 @@ const limits = new Map<string, Readonly<Record<string, AppLimitDef>>>();
  */
 export function registerAppFeatures(app: string, defs: readonly AppFeatureDef[]): void {
   if (features.has(app)) return;
-  // 機能の名前はアプリをまたいで重ねない（ログインした人の features は1つの集合で持つため。specs/meguru/029 tasks.md T027）
+  // 機能の名前は重ねない（同じアプリの中でも、アプリをまたいでも。ログインした人の features は1つの集合で持つため。specs/meguru/029 tasks.md T027）
+  const keys = defs.map((d) => d.key);
+  const inside = keys.find((k, i) => keys.indexOf(k) !== i);
+  if (inside) throw new Error(`機能の名前「${inside}」が、アプリ「${app}」の中で重なっています`);
   for (const [other, list] of features) {
     const dup = defs.find((d) => list.some((o) => o.key === d.key));
     if (dup) throw new Error(`機能の名前「${dup.key}」は、アプリ「${other}」がもう登録しています`);
@@ -41,12 +45,17 @@ export function registerAppFeatures(app: string, defs: readonly AppFeatureDef[])
 }
 
 /**
- * 機能のON/OFFの運営の画面と、ログインした人の features が扱うアプリ（機能を登録した最初のアプリ）。
+ * 機能のON/OFFの運営の画面と、ログインした人の features が扱うアプリ。登録した機能の名前が、運営の画面の決まった形
+ * （@meguru/shared の FEATURES）と同じアプリにする（登録の順番では決めない。PR #98 のセルフレビュー）。
  * 運営の画面を登録の一覧で出す形にするまで（PR4 の T069・T070）、ON/OFFは1つのアプリのものとして扱う。
- * @returns アプリの番号（登録がなければ undefined）
+ * @returns アプリの番号
+ * @throws Error 当てはまるアプリがないとき（組み立ての登録漏れ。黙って全部ONにしないため）
  */
-export function featureSettingsApp(): string | undefined {
-  return [...features.entries()].find(([, list]) => list.length > 0)?.[0];
+export function requireFeatureSettingsApp(): string {
+  for (const [app, list] of features) {
+    if (list.length === FEATURES.length && FEATURES.every((f) => list.some((d) => d.key === f))) return app;
+  }
+  throw new Error("機能のON/OFFを扱うアプリが登録されていません（組み立てで registerAppFeatures を呼んでください）");
 }
 
 /**
