@@ -12,41 +12,22 @@
 
 Claude CodeとCodexで開発スキルを共用する手順と、利用制限時の引き継ぎ方法は[AIスキルの共用](docs/ai-skills.md)を参照。
 
-## 説明の文書
+## 文書
 
-人に見せるための文書。元はこのリポジトリに置き、ほかの文書と同じくPRで直す。
+**どの文書に何が書いてあるかは[文書の一覧](docs/README.md)**。迷ったらそこから探す。
 
-| 文書 | 読む人 |
-|---|---|
-| [ご利用ガイド](docs/user-guide.md) | ユーザー |
-| [開発のご報告](docs/project-report.md) | 開発の依頼主 |
-| [技術ドキュメント](docs/architecture.md) | 開発者（構成・設計の意図・AI駆動開発の流れ） |
-| [アプリを分けて作る決まり](docs/app-separation.md) | 開発者（2作目からのDBの分け方・マイクロサービスへの道のり。図あり） |
+人に見せる文書（[ご利用ガイド](docs/user-guide.md)・[開発のご報告](docs/project-report.md)・[技術ドキュメント](docs/architecture.md)）も、元はこのリポジトリに置き、ほかの文書と同じくPRで直す。
 
 - リポジトリは非公開なので、外の人に見せるときはClaude Docsに反映して、そのリンクを共有する。反映は自動ではなく、共有したいときにClaude Codeへ「共有用を更新して」と頼む。
 - 図はMermaidで書く（GitHubでもClaude Docsでもそのまま表示される）。
 - 外の人に見せる前提なので、アカウントのID・テスト版のURL・秘密の値は書かない。
+- テスト版と本番で切り替えるスイッチを足す・値を変えるときは、同じPRで[環境ごとのスイッチ](docs/environment-switches.md)の表も直す。
 
-勉強用にまとめた文書は [docs/study/](docs/study/README.md) に置く（使っている技術の仕組みなど）。
+## 今の状況
 
-テスト版と本番で切り替えるスイッチ（環境の設定）の一覧は [docs/environment-switches.md](docs/environment-switches.md)。スイッチを足す・値を変えるときは、同じPRでこの表も直す。
-
-## 現在のフェーズ
-
-- [x] リポジトリ作成・ローカルクローン
-- [x] BMAD-METHODによるPRD/設計の叩き台作成
-- [x] spec-kit導入・Constitutionの制定
-- [x] feature 001「ログインとThreadsアカウント登録」：仕様・計画・タスク・実装（[specs/001-login-account-setup/](specs/001-login-account-setup/)）
-- [ ] 本物のGoogle・Threadsでの手動確認（[quickstart.md](specs/001-login-account-setup/quickstart.md)「手動での確認」）
-- [x] UI全体設計（ChatGPT風。[docs/ui-design.md](docs/ui-design.md)）
-- [x] feature 002「戦略プロファイル（課題・宣伝内容・リサーチ）」：仕様・計画・タスク・実装（[specs/002-strategy-profile/](specs/002-strategy-profile/)）
-- [x] feature 003〜009：プロンプト生成と一括登録・承認とNGワード・自動投稿・パフォーマンスと改善・複数アカウント・チーム運用・このアカウントのチーム（[specs/](specs/)）
-- [x] feature 010「自分のMetaアプリのトークンでアカウントを追加」（[specs/010-token-account-add/](specs/010-token-account-add/)）
-- [x] feature 011「チームの見直し」（[specs/011-team-revision/](specs/011-team-revision/)）
-- [x] feature 012〜014：アカウントを先に作る・退会 → 決済 → 課題の入力の手助け（[specs/](specs/)）
-- [ ] feature 015「公開のためのブランチと環境」（[specs/015-deploy-environments/](specs/015-deploy-environments/)。
-  コードと文書は実装済み。外部サービスの設定は[docs/external-services-setup.md](docs/external-services-setup.md)「9. 公開のための準備」）
-- [ ] 次：公開の判断（MetaのApp Review・事業者としての手続き。メモは[docs/next-features.md](docs/next-features.md)）
+- 機能：`specs/001`〜`028`を実装し、`develop`に入れた（ステージングに出ている）。2026-11-12からは、Threadsの改善と新しいアプリ（人物管理・集金管理）を並行して進める（[並行開発の手順](docs/parallel-development.md)）。
+- 本番：まだ立ち上げていない。本番に出す前の準備は[リリースの手順書](docs/release-runbook.md) 4・4-1。
+- 公開の判断（MetaのApp Review・事業者としての手続き）のメモは[次の機能のメモ](docs/next-features.md)。
 
 ## ブランチとデプロイ
 
@@ -61,9 +42,9 @@ Claude CodeとCodexで開発スキルを共用する手順と、利用制限時�
 - ふだんのPRは`feature/*`→`develop`に向ける。
 - リリースは`develop`→`main`のPR（タイトルは「リリース：…」）。
 - 本番の急ぎの修正は`main`から`fix/*`を分け、`main`へマージしたあと、同じ変更を`develop`にも戻す（`git log --oneline main ^develop`が空になること）。
-- `main`・`develop`への直接のpushは禁止（PR必須・CIの成功が必須）。
+- `main`・`develop`への直接のpushは禁止（PR必須）。CIは、コードを変えたPRにラベル`run-ci`を付けたときだけ流し、その成功を待ってマージする。文書だけのPRはCIを流さずにマージする（[リリースの手順書](docs/release-runbook.md) 2）。
 - デプロイは[.github/workflows/deploy.yml](.github/workflows/deploy.yml)が自動で行う（**マイグレーション → API → Web**の順。1つでも失敗したらそこで止まる）。文書・仕様・AIのスキル・E2Eだけの変更では動かない（[手順書](docs/release-runbook.md)の2）。やり直しはActionsの画面から手で動かせる。
-- 環境の違いは**コードの分岐にせず、設定だけに置く**（`APP_ENV`・`VITE_APP_ENV`）。本番以外の画面には、いちばん上に環境の帯が出る。
+- 環境の違いは**コードの分岐にせず、設定だけに置く**（`APP_ENV`・`VITE_APP_ENV`）。本番以外では、ログインの画面のいちばん上に環境の帯が、アプリの画面では左下のユーザー名の横に「テスト版」「開発版」の印が出る。
 - 機能を足すときの決まり（マイグレーションの書き方・リリースの前に確かめること・困ったときの戻し方）は[リリースの手順書](docs/release-runbook.md)。
 - ステージング（<https://develop.threads-grower-web.pages.dev>）で実際に作ったもの・秘密の値の置き場所・確かめ方は[ステージングの構築記録](docs/staging-setup-record.md)。
 - 非公開のリポジトリなので、Environmentの秘密の値とブランチの保護を使うには、GitHubの有料のプランが要る。Organization`takumi-okuya-dev`の**Team**のプランで使っている（[外部サービスの準備手順](docs/external-services-setup.md) 9-0）。
@@ -168,24 +149,18 @@ pnpm team:demo
 
 ### 手元で同時に進める（作業場所を分ける）
 
-Threadsの改善と別のアプリなど、2つのブランチを手元で同時に進めるときは、`git worktree`で作業場所を分け、それぞれでClaude Codeを動かす。始めから終わりまでの手順は[docs/parallel-development.md](docs/parallel-development.md)、決まりは[docs/product-structure.md](docs/product-structure.md) 6。作業場所ごとに、ローカルのDBとポートが分かれるので、両方で`pnpm dev`を同時に動かせ、テストのデータも混ざらない。
+Threadsの改善と別のアプリを手元で同時に進めるときは、`git worktree`で作業場所を分け、それぞれでClaude Codeを動かす。作業場所ごとにローカルのDBとポートが分かれる。**手順と仕組みは[並行開発の手順](docs/parallel-development.md)**。
 
 ```bash
-pnpm worktree:new memo feature/memo-001-contacts   # 作業場所を作る（ブランチを省くと feature/<名前>。なければ develop の最新から作る）
-cd ../meguru-app-memo && claude                     # その作業場所で Claude Code を開く
-pnpm worktree:list                                  # 作業場所の一覧（DBの名前とポート）
-pnpm worktree:remove memo                           # 片付ける（作業場所とそのDBを消す。ブランチは残す）
-pnpm worktree:reset-db --yes                        # 今いる作業場所のDBを作り直す（マイグレーションを作り直したあと）
+pnpm worktree:new people              # 作業場所 ../meguru-app-people を作る（ブランチを省くと feature/<名前>。develop の最新から）
+cd ../meguru-app-people && claude     # その作業場所で Claude Code を開く
+pnpm worktree:list                    # 作業場所の一覧（DBの名前とポート）
+pnpm worktree:remove people           # 片付ける（作業場所とそのDBを消す。ブランチは残す）
+pnpm worktree:reset-db --yes          # 今いる作業場所のDBを作り直す（マイグレーションを作り直したあと）
 ```
 
-- 作業場所は、もとのクローンの隣（`../meguru-app-<名前>`）にできる。
-- **DB**：同じPostgres（`docker compose`のコンテナは1つ）の中に、`threads_grower_<名前>`を作ってマイグレーションを当てる。結合テストとE2Eは、その作業場所のDBだけを空にする。
-- **ポート**：決まったポートに100ずつ足す（1つ目の作業場所はWeb `5273`・API `8887`・偽のThreads `8890`）。`pnpm dev`・`pnpm dev:fake`・`pnpm e2e`・`pnpm team:open`が合わせて動く。
-- **結合テスト（`pnpm --filter api test`）とE2E（`pnpm e2e`）は、作業場所をまたいで1つずつ流れる**。ほかの作業場所で流れているときは「終わるまで待ちます…」と出て、終わってから始まる。Workersからつなぐ`local-neon-http-proxy`は1つで、同時に流すと落ちるため（Postgresのロックで待つ。テストを止めればロックは外れる）。共通とWebのテスト（`pnpm --filter web test`など）は待たない。
-- 値は作業場所のルートの`.env.worktree`（コミットしない）にあり、API・Web・E2Eがそれを読む（`apps/api/scripts/worktree-env.ts`）。もとのクローンにはこのファイルがないので、今までどおり`threads_grower`と決まったポートで動く。
-- 手元の設定ファイル（`apps/api/.dev.vars`・`apps/web/.env.local`・`e2e/.env.local`）は、もとのクローンから写し、DBとポートの行だけを書き換える。もとの値を変えたら、作り直すか手で直す。
-- 本物のThreads（Meta）の接続は、Metaに登録した戻り先（Cloudflare Tunnel → `localhost:8787`）がもとのクローンを向いているので、もとのクローンで試す。作業場所では偽のThreads（`pnpm dev:fake`）を使う。
-- 作業場所を消すと、その中の変更も消える。`pnpm worktree:remove`は、コミットしていない変更があると止まる（`git worktree remove`のまま）。
+- 結合テストとE2Eは、作業場所をまたいで1つずつ流れる（ほかで流れていると「終わるまで待ちます…」と出る）。
+- 本物のThreads（Meta）の接続は、もとのクローンで試す。作業場所では偽のThreads（`pnpm dev:fake`）を使う。
 
 ## テスト
 
@@ -212,7 +187,7 @@ pnpm e2e
 
 - ログインする人のメールアドレス（`E2E_CLERK_USER_EMAIL`、チームの3人）は`e2e/.env.local`に書く。環境変数（`export E2E_CLERK_USER_EMAIL=…`）にあれば、そちらを使う。
 
-- Playwrightが偽のThreadsサーバー（:8790）・API（Threadsを偽サーバーに向けた設定）・Webを起動する（`pnpm dev:fake`で起動中なら、それを使う）。DBはテストごとに空にする。ローカルの開発用のDBと同じなので、手で作ったデータも消える。
+- Playwrightが偽のThreadsサーバー（:8790）・API（Threadsを偽サーバーに向けた設定）・Webを起動する（`pnpm dev:fake`で起動中なら、それを使う）。DBはテストごとに空にする。ローカルの開発用のDB（作業場所を分けているときは、その作業場所のDB）と同じなので、手で作ったデータも消える。
 - チーム（`pnpm e2e -- team`）は、管理者・オーナー（メンバー）・編集者の3人を別々のブラウザ（Cookieが別）でログインさせる。3人には、Clerk の開発用インスタンスに一度Googleでログインしたことのあるアカウントを使い、メールアドレスを`e2e/.env.local`の`E2E_PARTNER_EMAIL`（管理者）・`E2E_OWNER_EMAIL`・`E2E_EDITOR_EMAIL`に書く（`e2e/.env.example`をコピー。名前は008のまま）。`@clerk/testing`がメールアドレスからユーザーを探し、ログイン用のチケットで入るので、Googleのパスワードは使わない（Googleだけでログインする設定では、APIで作ったユーザーはチケットでログインできないため）。
 - Clerk のキーは、環境変数になければ`apps/api/.dev.vars`から読む。画面を見ながら流すときは`pnpm e2e -- team --headed`。
 - `pnpm team:open`（`e2e/scripts/team-open.ts`）は、同じ3人でログインしたブラウザを左から並べて開き、そのまま手で操作できる（右下に役割の印）。`--setup`でDBを空にして、3人の接続・チームの作成・参加・編集者と担当まで済ませてから開く。付けなければ今のデータのまま開く。`pnpm dev:fake`の起動が前提。`pnpm team:demo`は、DB・サーバーの起動と`--setup`をまとめて1回で行う。
@@ -227,8 +202,8 @@ pnpm e2e
 ## 運営者用のスクリプト
 
 ```bash
-# プランを手動で変える（課金 feature ができるまで）。接続先は DATABASE_URL_DIRECT（既定はローカル）
-pnpm --filter api admin:set-plan <accountId> multi-account
+# 料金なしの印を付ける・外す（開発者・テストユーザーなど。docs/external-services-setup.md 10-7）
+DATABASE_URL=… pnpm --filter api admin:set-billing-exempt <メールアドレス> on|off
 
 # 暗号鍵のローテーション（research.md R5 の手順）。接続のトークンと、チーム・テストのグループの招待リンクの写しを、新しい鍵で暗号化し直す
 TOKEN_ENCRYPTION_KEYS='{"1":"…","2":"…"}' TOKEN_ENCRYPTION_KEY_VERSION=2 DATABASE_URL=… \

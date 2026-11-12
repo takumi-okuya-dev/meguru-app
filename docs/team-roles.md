@@ -52,7 +52,7 @@ flowchart LR
 - 別のチームの人には、見せる設定にかかわらず、アカウントは見えません。
 - 誰が何をしたかは「操作の記録」に90日残ります（チームに入っているアカウントだけ）。
 - 「運用状況」では、管理者と担当の編集者が、手が止まっている人・アカウントと、伸びていないアカウントを見られます。見えるのは投稿の数・伸び・最後に動いた日などの数と日付だけで、投稿の本文や戦略は見えません。「チームに見せる」に関わらず見えるので、招待の確認の画面でもそう伝えます（[specs/020](../specs/020-team-monitoring/spec.md)）。
-- 判定はAPIの1か所（`apps/api/src/services/access.ts`）で行います。画面の出し分けは見た目のためだけです（詳しくは[contracts/permissions.md](../specs/011-team-revision/contracts/permissions.md)）。
+- 判定はAPIの1か所（`apps/api/src/platform/access/access.ts`）で行います。画面の出し分けは見た目のためだけです（詳しくは[contracts/permissions.md](../specs/011-team-revision/contracts/permissions.md)）。
 
 ## よくある組み合わせ
 

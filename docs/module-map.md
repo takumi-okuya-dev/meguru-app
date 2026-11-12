@@ -26,7 +26,7 @@ flowchart TB
   subgraph apps["アプリ（apps/）"]
     direction LR
     th["threads"]
-    mm["2作目（例：memo）"]
+    mm["2作目（例：people）"]
   end
   pf["共通（platform/）<br/>入口：platform/index.ts"]
   ad["窓口（adapters/）<br/>Stripe・ThreadsのAPI・Meta"]

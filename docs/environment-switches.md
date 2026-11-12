@@ -8,7 +8,7 @@
 |---|---|---|---|---|---|
 | `APP_ENV` | 環境の名前。ログの印と、設定の誤りを詳しく返すか（手元だけ） | `development` | `staging` | `production` | `wrangler.toml`・`.dev.vars` |
 | `VITE_APP_ENV` | 画面の環境の帯（本番以外で「テスト版」などと出す）、検索に載せない指定 | `development` | `staging` | `production` | GitHub の Environment の変数・`apps/web/.env.local` |
-| `BILLING_ENABLED` | 決済（無料体験・契約・料金の画面・読むだけ）。OFFなら全員がすべての機能を使える | `false` | `true` | `true` | `wrangler.toml`・`.dev.vars` |
+| `BILLING_ENABLED` | 決済（契約・料金の画面・読むだけ）。OFFなら全員がすべての機能を使える | `false` | `true` | `true` | `wrangler.toml`・`.dev.vars` |
 | `TEST_GROUPS_ENABLED` | 招待制。ONなら、グループの招待リンクから入った人だけが使え、入った人は料金なしになる。OFFでもグループは作れるが、機能の設定にだけ使う（誰でも登録でき、料金なしにならない。specs/019） | `false` | `true` | `false` | `wrangler.toml`・`.dev.vars` |
 | `OPERATOR_CLERK_USER_IDS` | 運営者（Clerk のユーザーIDのカンマ区切り）。運営者は、設定の「運営 › 使える機能・グループ・テスター招待・上限」をどの環境でも使い、**どの環境でも料金なし（契約前・読むだけもない）で、アカウントの数と1日の投稿数の上限もかからない**（specs/024）。テスト版に入れる判定に運営者を含めるのは、`TEST_GROUPS_ENABLED` がONのときだけ | 空 | 開発者 | 開発者の本番のID（本番を作ったら入れる） | Secret（`wrangler secret put`） |
 | `THREADS_CONNECT_METHODS` | Threads につなぐ方法（`token`＝トークンを貼る、`app`＝Meta の画面で許可）。空なら両方 | 両方 | 両方 | 両方 | `wrangler.toml`・`.dev.vars` |
@@ -18,7 +18,7 @@
 
 | 決済 | 招待制 | 誰が料金なしか | 画面 |
 |---|---|---|---|
-| OFF | — | 全員（決済がない） | 無料体験・料金の表示は出ない |
+| OFF | — | 全員（決済がない） | 料金の表示は出ない |
 | ON | OFF（本番） | 料金なしの印を手で付けた人と、運営者 | 新しく登録した人は契約前（契約するまで使えない。無料体験なし。specs/024）。024の前に始めた無料体験は終わる日まで使える |
 | ON | ON（テスト版） | 料金なしの印の人と、運営者。グループに入った人には印が自動で付く | テストユーザーと運営者には、契約の表示が出ない。グループを通らずに前からいる人は、本番と同じ |
 

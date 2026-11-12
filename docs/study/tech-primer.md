@@ -1,6 +1,6 @@
 # 技術の入門：このアプリを支えるサービスと仕組み
 
-このアプリ（ThreadsGrower）で使っている外部のサービスについて、それぞれが何をしていて、どう組み合わさっているかをまとめた勉強用の文書です。設計の判断と理由は [architecture.md](../architecture.md)、料金の見積もりは [cost-estimate.md](../cost-estimate.md) にあります。
+このアプリ（めぐる Threads。旧名 ThreadsGrower）で使っている外部のサービスについて、それぞれが何をしていて、どう組み合わさっているかをまとめた勉強用の文書です。設計の判断と理由は [architecture.md](../architecture.md)、料金の見積もりは [cost-estimate.md](../cost-estimate.md) にあります。
 
 無料枠や料金の数字は、2026年11月1日に各サービスの公式のページで確かめたものです（出典は最後の章）。変わることがあるので、使う前にもう一度確かめてください。
 
@@ -30,7 +30,7 @@ flowchart LR
 | Cloudflare KV | 小さな値を置いておく | 定期処理の「関所」。DB を起こすかどうかを決めるメモ |
 | Neon | データベース（Postgres） | 利用者・アカウント・下書き・予定・契約など、すべてのデータ |
 | Clerk | ログイン | Google でのログインと、ログインの証明（トークン）の発行 |
-| Stripe | 決済 | 月額の契約、無料体験、支払いの失敗、カードの変更画面 |
+| Stripe | 決済 | 月額の契約、支払いの失敗、カードの変更画面 |
 
 ---
 
@@ -95,7 +95,7 @@ export default {
 - **リクエストをまたいで記憶を持てません。**
   - 同じプログラムが別の拠点や別のアイソレートで同時に動くので、変数に入れた値は次のリクエストでは消えているものと考えます。
   - データは DB（Neon）か KV に置きます。
-  - DB への接続も、リクエストごとに作って捨てます（`apps/api/src/db/client.ts`）。
+  - DB への接続も、リクエストごとに作って捨てます（`apps/api/src/kernel/db/client.ts`）。
 - **環境ごとの設定は `wrangler.toml` と Secret に分けます。**
   - 公開してよい値（環境の名前、ON/OFF の切り替えなど）は `wrangler.toml` の `[vars]` に書きます。
   - 秘密の値（DB の接続文字列、Clerk や Stripe の秘密鍵など）は、`wrangler secret put` で Cloudflare に預けます。リポジトリには書きません。
@@ -202,7 +202,7 @@ KV の性質は次のとおりです。
 
 ### 4-3. 関所の流れ
 
-コードは `apps/api/src/services/auto-post-gate.ts` と `auto-post-runner.ts` です。
+コードは `apps/api/src/apps/threads/publish/auto-post-gate.ts` と、同じフォルダの `auto-post-runner.ts` です。
 
 ```mermaid
 flowchart TD
@@ -293,7 +293,7 @@ sequenceDiagram
   - ブラウザは、Clerk から受け取った「ログインの証明」（JWT という形の、署名付きの短い文字列）を、API を呼ぶたびに付けます。
   - トークンの期限は短く、Clerk の部品が自動で取り直します。
 - **API での確かめ**
-  - API は、トークンの署名が Clerk のものか、期限が切れていないかを確かめます（`apps/api/src/middleware/auth.ts`）。
+  - API は、トークンの署名が Clerk のものか、期限が切れていないかを確かめます（`apps/api/src/platform/identity/auth.ts`）。
   - 確かめられなければ、401（ログインが要る）を返します。
 - **利用者の行**
   - 確かめられたら、Clerk の利用者 ID（`clerk_user_id`）で、アプリの DB の利用者を探します。
@@ -323,7 +323,7 @@ Stripe は、カードでの支払いと月額の契約（サブスクリプシ�
 | --- | --- |
 | Customer | Stripe の側の「お客さん」。アプリの利用者1人に1つ作る |
 | Checkout | Stripe が用意した支払いの画面。契約を始めるときに、ここへ移ってカードを入れてもらう |
-| Subscription | 月額の契約。無料体験、毎月の請求、支払いの失敗、解約を Stripe が管理する |
+| Subscription | 月額の契約。毎月の請求、支払いの失敗、解約を Stripe が管理する（このアプリは無料体験を2026-11-08にやめた） |
 | Customer Portal（billing_portal） | 利用者が自分でカードの変更や解約をする画面。これも Stripe が用意する |
 | Webhook | Stripe からアプリへの知らせ。「支払いが済んだ」「失敗した」「解約された」などを、`/stripe/webhook` に送ってくる |
 
