@@ -9,7 +9,16 @@
 // 作業場所ごとに、ローカルのDB（同じ Postgres の中の threads_grower_<名前>）とポート（決まったポートに100ずつ足す）を分ける。
 // 値はその作業場所のルートの .env.worktree に置き、API・Web・E2E がそれを読む（apps/api/scripts/worktree-env.ts）。
 import { execFileSync } from "node:child_process";
-import { copyFileSync, existsSync, readFileSync, writeFileSync } from "node:fs";
+import {
+  closeSync,
+  copyFileSync,
+  existsSync,
+  openSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from "node:fs";
 import { basename, dirname, join } from "node:path";
 
 const PORT_STEP = 100;
@@ -95,6 +104,44 @@ function psql(main, sql) {
 }
 
 /**
+ * 作業場所づくりのロックを取る。2つのセッションが同時に pnpm worktree:new を動かしても、同じポートのずらし幅を選ばないよう、
+ * ずらし幅を選んで .env.worktree を書くまでを1つずつにする。ロックは git の共通のフォルダ（.git）に置くファイル。
+ * @param {string} main - もとの作業場所
+ * @returns {() => void} ロックを外す関数
+ */
+function lockAllocation(main) {
+  const common = run("git", ["rev-parse", "--path-format=absolute", "--git-common-dir"], {
+    cwd: main,
+    capture: true,
+  });
+  const file = join(common, "meguru-worktree.lock");
+  const deadline = Date.now() + 120_000;
+  for (;;) {
+    try {
+      const fd = openSync(file, "wx");
+      writeFileSync(fd, `${process.pid} ${new Date().toISOString()}\n`);
+      closeSync(fd);
+      return () => rmSync(file, { force: true });
+    } catch (err) {
+      if (!(err instanceof Error) || /** @type {NodeJS.ErrnoException} */ (err).code !== "EEXIST")
+        throw err;
+      // 10分より古いロックは、止まったスクリプトの残りとみなして消す
+      try {
+        if (Date.now() - statSync(file).mtimeMs > 10 * 60_000) rmSync(file, { force: true });
+      } catch {
+        // 消えていれば、そのまま取り直す
+      }
+      if (Date.now() > deadline)
+        throw new Error(
+          `ほかの pnpm worktree:new が終わりません（${file}）。動いていなければ、このファイルを消してください`,
+          { cause: err },
+        );
+      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 500);
+    }
+  }
+}
+
+/**
  * 作業場所を作る。
  * @param {string} name - 名前
  * @param {string | undefined} branchArg - ブランチ（省略すると feature/<名前>）
@@ -106,6 +153,36 @@ function create(name, branchArg) {
   if (existsSync(path)) throw new Error(`${path} はもうあります`);
   const branch = branchArg ?? `feature/${name}`;
 
+  // ずらし幅を選んで .env.worktree を書くまでは、ほかの pnpm worktree:new と重ならないようにする
+  const unlock = lockAllocation(main);
+  /** @type {number} */
+  let portOffset;
+  const dbName = `threads_grower_${name.replace(/-/g, "_")}`;
+  try {
+    // ロックを取ってから一覧を読み直す（待っている間に、ほかの作業場所ができていることがある）
+    portOffset = allocate(worktrees());
+    createWorktree(main, path, branch);
+    writeFileSync(
+      join(path, ".env.worktree"),
+      [
+        "# この作業場所（git worktree）だけの値。pnpm worktree:new が作った（コミットしない）",
+        `MEGURU_DB_NAME=${dbName}`,
+        `MEGURU_PORT_OFFSET=${portOffset}`,
+        "",
+      ].join("\n"),
+    );
+  } finally {
+    unlock();
+  }
+  setUp(main, path, branch, dbName, portOffset);
+}
+
+/**
+ * 空いているポートのずらし幅を選ぶ。
+ * @param {{ path: string }[]} list - 作業場所の一覧
+ * @returns {number} ずらし幅
+ */
+function allocate(list) {
   const used = new Set(list.map((w) => readWorktreeEnv(w.path).portOffset));
   let portOffset = 0;
   for (let k = 1; k <= MAX_WORKTREES; k++) {
@@ -118,9 +195,16 @@ function create(name, branchArg) {
     throw new Error(
       `作業場所は${MAX_WORKTREES}個までです。使わないものを pnpm worktree:remove で片付けてください`,
     );
-  const dbName = `threads_grower_${name.replace(/-/g, "_")}`;
+  return portOffset;
+}
 
-  // 1. 作業場所（ブランチがなければ、develop の最新から作る）
+/**
+ * git の作業場所を作る（ブランチがなければ、develop の最新から作る）。
+ * @param {string} main - もとの作業場所
+ * @param {string} path - 作る場所
+ * @param {string} branch - ブランチ
+ */
+function createWorktree(main, path, branch) {
   const exists = run("git", ["branch", "--list", branch], { cwd: main, capture: true }) !== "";
   if (exists) {
     run("git", ["worktree", "add", path, branch], { cwd: main });
@@ -128,19 +212,18 @@ function create(name, branchArg) {
     run("git", ["fetch", "origin", "develop"], { cwd: main });
     run("git", ["worktree", "add", "-b", branch, path, "origin/develop"], { cwd: main });
   }
+}
 
-  // 2. 作業場所ごとの値
-  writeFileSync(
-    join(path, ".env.worktree"),
-    [
-      "# この作業場所（git worktree）だけの値。pnpm worktree:new が作った（コミットしない）",
-      `MEGURU_DB_NAME=${dbName}`,
-      `MEGURU_PORT_OFFSET=${portOffset}`,
-      "",
-    ].join("\n"),
-  );
-
-  // 3. 手元の設定ファイル（コミットしないもの）を、もとの作業場所から写し、DBとポートを書き換える
+/**
+ * 作った作業場所の中身を用意する（設定ファイル・DB・依存・マイグレーション）。
+ * @param {string} main - もとの作業場所
+ * @param {string} path - 作業場所
+ * @param {string} branch - ブランチ
+ * @param {string} dbName - DBの名前
+ * @param {number} portOffset - ポートのずらし幅
+ */
+function setUp(main, path, branch, dbName, portOffset) {
+  // 手元の設定ファイル（コミットしないもの）を、もとの作業場所から写し、DBとポートを書き換える
   const api = 8787 + portOffset;
   const web = 5173 + portOffset;
   const copies = [
