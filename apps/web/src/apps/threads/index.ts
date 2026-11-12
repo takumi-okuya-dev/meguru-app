@@ -1,7 +1,7 @@
 // Threadsの入口（specs/028-meguru-shell data-model.md 4、contracts/web-module-boundaries.md 1）。外枠と組み立ては、Threadsをここからだけ読む。
 import { createElement } from "react";
 import { AtSignIcon, ListIcon, MailPlusIcon } from "lucide-react";
-import type { AppModule } from "@/shell";
+import { defineWithdrawalPreview, type AppModule } from "@/shell";
 import { ThreadsWithdrawalPreviewSection } from "./components/withdrawal/WithdrawalPreviewSection";
 import { threadsApi } from "./lib/api";
 import { threadsQueryKeys } from "./lib/query-keys";
@@ -25,10 +25,10 @@ export const threadsApp: AppModule = {
     { from: "/teams", to: `${THREADS_BASE}/teams` },
   ],
   // 退会の確かめで、消えるアカウントとチームの行き先を出す（specs/meguru/029 contracts/module-boundaries.md 5）
-  withdrawalPreview: {
+  withdrawalPreview: defineWithdrawalPreview({
     query: { queryKey: threadsQueryKeys.withdrawalPreview, queryFn: threadsApi.withdrawalPreview },
     Section: ThreadsWithdrawalPreviewSection,
-  },
+  }),
   settingsSections: [
     // テスター招待（specs/024 contracts/ui-routes.md 5）。運営の「グループ」の後
     {

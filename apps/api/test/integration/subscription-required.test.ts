@@ -31,6 +31,7 @@ describe("新しく登録した人（契約前）", () => {
     for (const [method, path] of [
       ["GET", "/api/me"],
       ["GET", "/api/me/withdrawal-preview"],
+      ["GET", "/api/threads/me/withdrawal-preview"],
       ["GET", "/api/billing"],
     ] as const) {
       const res = await callBilling(app, method, path, { user: "n1" });

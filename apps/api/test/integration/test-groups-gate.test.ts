@@ -39,6 +39,7 @@ describe("入れない人", () => {
 
   it("退会のプレビューは通る（自分で退会できる）", async () => {
     expect((await callOn(app, "GET", "/api/me/withdrawal-preview", { user: "stranger" })).status).toBe(200);
+    expect((await callOn(app, "GET", "/api/threads/me/withdrawal-preview", { user: "stranger" })).status).toBe(200);
   });
 
   it.each(BLOCKED)("%s %s は 403 TEST_ACCESS_REQUIRED（画面だけに頼らない。SC-001）", async (method, path) => {

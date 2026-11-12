@@ -33,10 +33,10 @@ export function WithdrawDialog({ open, onOpenChange }: { open: boolean; onOpenCh
   const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const preview = useQuery({ queryKey: queryKeys.withdrawalPreview, queryFn: api.withdrawalPreview, enabled: open, staleTime: 0 });
-  // アプリが渡す中身（登録の順に並べる）
-  const apps = useAppRegistry().filter((a) => a.withdrawalPreview);
+  // アプリが渡す中身（登録の順に並べる）。1つでも読めなければ、消えるものを見せずに退会させないよう、全体を読めなかった扱いにする
+  const contributions = useAppRegistry().flatMap((a) => (a.withdrawalPreview ? [{ id: a.id, ...a.withdrawalPreview }] : []));
   const appPreviews = useQueries({
-    queries: apps.map((a) => ({ ...a.withdrawalPreview!.query, enabled: open, staleTime: 0 })),
+    queries: contributions.map((c) => ({ ...c.query, enabled: open, staleTime: 0 })),
   });
   const withdraw = useMutation({
     mutationFn: () => api.withdraw(email),
@@ -66,10 +66,9 @@ export function WithdrawDialog({ open, onOpenChange }: { open: boolean; onOpenCh
           </p>
         ) : (
           <div className="space-y-4 text-sm">
-            {apps.map((a, n) => {
-              const Section = a.withdrawalPreview!.Section;
-              return <Section key={a.id} data={appPreviews[n]!.data} />;
-            })}
+            {contributions.map(({ id, Section }, n) => (
+              <Section key={id} data={appPreviews[n]?.data} />
+            ))}
             {p.hasActiveSubscription && <p>契約はすぐに止まり、残りの期間の返金はありません。</p>}
             <div className="space-y-1.5">
               <label htmlFor="withdraw-email" className="block">

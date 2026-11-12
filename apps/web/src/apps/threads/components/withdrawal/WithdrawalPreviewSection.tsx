@@ -18,8 +18,7 @@ function teamLine(t: ThreadsWithdrawalPreview["teams"][number]): string {
  * @param props - data：GET /api/threads/me/withdrawal-preview の中身
  * @returns 退会のダイアログに出す部分
  */
-export function ThreadsWithdrawalPreviewSection({ data }: { data: unknown }) {
-  const p = data as ThreadsWithdrawalPreview;
+export function ThreadsWithdrawalPreviewSection({ data: p }: { data: ThreadsWithdrawalPreview }) {
   return (
     <>
       <section className="space-y-1">

@@ -13,6 +13,7 @@ vi.mock("@clerk/react", () => ({
   useUser: () => ({ user: { fullName: "たくみ", primaryEmailAddress: { emailAddress: "t@example.com" } } }),
 }));
 const withdrawalPreview = vi.fn();
+const threadsWithdrawalPreview = vi.fn();
 const withdraw = vi.fn();
 vi.mock("@/lib/api-client", async (orig) => {
   const actual = await orig<typeof import("@/lib/api-client")>();
@@ -21,7 +22,7 @@ vi.mock("@/lib/api-client", async (orig) => {
 // 消えるアカウントとチームの行き先は、Threadsが AppModule の withdrawalPreview で渡す（specs/meguru/029 T052）
 vi.mock("@/apps/threads/lib/api", async (orig) => {
   const actual = await orig<typeof import("@/apps/threads/lib/api")>();
-  return { ...actual, threadsApi: { ...actual.threadsApi, withdrawalPreview } };
+  return { ...actual, threadsApi: { ...actual.threadsApi, withdrawalPreview: threadsWithdrawalPreview } };
 });
 
 const { ApiError, setWithdrawalInProgress } = await import("@/lib/api-client");
@@ -69,6 +70,8 @@ async function openDialog() {
 
 beforeEach(() => {
   withdrawalPreview.mockReset().mockResolvedValue(PREVIEW);
+  // Threadsの分（/api/threads/me/withdrawal-preview）は、消えるアカウントとチームの行き先だけ
+  threadsWithdrawalPreview.mockReset().mockResolvedValue({ ownedAccounts: PREVIEW.ownedAccounts, teams: PREVIEW.teams });
   withdraw.mockReset();
   signOut.mockClear();
   setWithdrawalInProgress(false);
@@ -132,7 +135,9 @@ describe("退会の途中（T052）", () => {
     });
     render(
       <QueryClientProvider client={new QueryClient()}>
-        <RouterProvider router={router} />
+        <AppRegistryProvider value={[threadsApp]}>
+          <RouterProvider router={router} />
+        </AppRegistryProvider>
       </QueryClientProvider>,
     );
     expect(await screen.findByText("ホーム")).toBeInTheDocument();
@@ -140,5 +145,17 @@ describe("退会の途中（T052）", () => {
     expect(await screen.findByRole("heading", { name: "退会の手続きの途中です" })).toBeInTheDocument();
     expect(screen.queryByText("ホーム")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "退会する" })).toBeInTheDocument();
+    // 退会の途中でも、ダイアログはThreadsの分を読んで出し、確かめの欄まで出る（PR #104 のセルフレビュー）
+    await userEvent.click(screen.getByRole("button", { name: "退会する" }));
+    expect(await screen.findByText("あなたのアカウント（2件）：カフェの公式、店長")).toBeInTheDocument();
+    expect(screen.getByLabelText(/確認のため、メールアドレス/)).toBeInTheDocument();
+  });
+
+  it("アプリの分が読めなければ、消えるものを見せずに退会させない（読み込めなかったと出す）", async () => {
+    threadsWithdrawalPreview.mockReset().mockRejectedValue(new ApiError("INTERNAL_ERROR", 500));
+    renderSettings();
+    await openDialog();
+    expect(await screen.findByRole("alert")).toHaveTextContent("退会の内容を読み込めませんでした");
+    expect(screen.queryByLabelText(/確認のため、メールアドレス/)).not.toBeInTheDocument();
   });
 });

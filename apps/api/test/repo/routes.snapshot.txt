@@ -114,7 +114,7 @@ GET /api/threads/callback ×1
 GET /api/threads/invites/:token ×3
 GET /api/threads/me ×2
 GET /api/threads/me/needs-review-counts ×2
-GET /api/threads/me/withdrawal-preview ×2
+GET /api/threads/me/withdrawal-preview ×3
 GET /api/threads/operator/accounts ×3
 GET /api/threads/operator/tester-applications ×3
 GET /api/threads/teams/:teamId ×3

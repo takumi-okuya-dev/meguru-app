@@ -180,7 +180,7 @@ description: "Task list for feature meguru/029 Threads pattern ①"
 >   - PR4b-3＝T052（退会の確かめのThreadsの分を、AppModule の withdrawalPreview として外枠に渡す。退会のダイアログは外枠だけが使うので `shell/settings/` へ移した（共通の部品は外枠を読めないため））
 >   - PR4c＝T070・T021 のうち `FEATURES` の移動。**運営の機能のON/OFFのリクエストの型（`featureSettingsRequestSchema` など）が Threads の3つの名前で固定**なので、画面の名前を登録の一覧に替えるだけでは足りない。共通の型を「名前 → ON/OFF」の一般の形にし、運営の画面（使える機能・上限・グループ）と共通の `FeatureSwitches` を登録の一覧で出す形にする。そのあと `FEATURES`・`FEATURE_LABELS` を Threads へ移す
 >   - T056（画面が新しい道筋だけを呼んでいるかのブラウザでの確かめ）は、PR4b-1 のマージのあとからできる。PR5 の前にユーザーと行う
->   - **PR5 に回したこと（PR #103 のセルフレビュー）**：Threads の画面は、PR5 まで `/api/me` と `/api/threads/me` の両方を読む（サーバーで Threads の中身を2回作る）。PR5 で `/api/me` から Threads の中身を消すときに、Threads の中身だけが変わったところ（アカウントを開く・名前を変える・チーム）の取り直しを `["me"]` から `threadsQueryKeys.me` に替える
+>   - **PR5 に回したこと（PR #103 のセルフレビュー）**：Threads の画面は、PR5 まで `/api/me` と `/api/threads/me` の両方を読む（サーバーで Threads の中身を2回作る）。PR5 で `/api/me` から Threads の中身を消すときに、Threads の中身だけが変わったところ（アカウントを開く・名前を変える・チーム）の取り直しを `["me"]` から `threadsQueryKeys.me` に替える。退会のダイアログも同じで、PR5 まで `/api/me/withdrawal-preview` と `/api/threads/me/withdrawal-preview` の両方が Threads の分を作る（PR5 で共通の側から Threads の分を消す。PR #104 のセルフレビュー）
 
 **Goal**：ThreadsのAPIをThreadsの道筋の下にそろえ、Webの呼び出しとキー、`/api/me`のThreadsの部分の読み方をThreadsのフォルダへ移す。古い道筋は残す。
 
