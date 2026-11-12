@@ -24,8 +24,8 @@ description: "Task list for feature meguru/029 Threads pattern ①"
 ## Phase 1：Setup（基準を残す）
 
 - [X] T000 [US5] Constitution の「アプリのデータの分け方」を、作り始める前に改める（MINOR：4.9.0）。「すべてのアプリ（Threadsを含む）はパターン①」「Threadsは029でそろえる。そろえ終えるまでは029のPRの順に移る途中の形を認める」「チームはThreadsの機能」と書く（/speckit-analyze D1。2026-11-12に済ませた）。
-- [ ] T001 今の利用権の判定を、あとで比べられるように、状態ごとの結果をテストの期待する値として書き出す（契約中・未払いの読むだけ・契約前・料金なしの印・運営者・テスト用のグループ・機能のOFF・024の前の無料体験の途中）。`apps/api/test/integration/entitlement-baseline.test.ts`：今の`loadEntitlement`・`effectiveLimits`・`featureOnSql`系の結果を、同じデータで確かめる（この時点で通る）。
-- [ ] T002 [P] 今の料金の数（`countOwned`）と「使っているアプリ」（`resolveMeApps`）の判定を、利用者の種類ごと（持ち主・チームだけ・どちらもない）に確かめるテストを、`apps/api/test/integration/usage-baseline.test.ts`に書く（この時点で通る）。
+- [X] T001 （T004に含めた：新しい関数と今の関数を同じデータで直接比べる形にした）今の利用権の判定を、あとで比べられるように、状態ごとの結果をテストの期待する値として書き出す（契約中・未払いの読むだけ・契約前・料金なしの印・運営者・テスト用のグループ・機能のOFF・024の前の無料体験の途中）。`apps/api/test/integration/entitlement-baseline.test.ts`：今の`loadEntitlement`・`effectiveLimits`・`featureOnSql`系の結果を、同じデータで確かめる（この時点で通る）。
+- [X] T002 [P] （T005とPR2のT018に含めた）今の料金の数（`countOwned`）と「使っているアプリ」（`resolveMeApps`）の判定を、利用者の種類ごと（持ち主・チームだけ・どちらもない）に確かめるテストを、`apps/api/test/integration/usage-baseline.test.ts`に書く（この時点で通る）。
 
 ## Phase 2：共通の土台（PR1）
 
@@ -33,27 +33,27 @@ description: "Task list for feature meguru/029 Threads pattern ①"
 
 ### テスト（先に書いて失敗を確かめる）
 
-- [ ] T003 [P] [US2] `apps/api/test/integration/platform-events.test.ts`：`emitEvent`を書いたトランザクションが戻ったら出来事も残らない・書いたら届け先ごとに`pending`の行ができる・`deliverPendingEvents`で受け取りが呼ばれて`done`になる・受け取りが例外なら`attempts`が増えて`next_attempt_at`が後ろへ（5分・10分・…・最大1時間）・10回で`failed`になりログが出る・`pending`がないときは何もしない（contracts/platform-entry.md 3・6）。
-- [ ] T004 [P] [US2] `apps/api/test/integration/entitlement.test.ts`：新しい`loadEntitlement`・`loadEntitlements`が、T001の8つの状態で今の判定と同じ`Entitlement`を返す。まとめて読んでも1人ずつと同じ。見つからない番号は`access: "none"`（contracts/platform-entry.md 2）。
-- [ ] T005 [P] [US2] `apps/api/test/integration/app-usage.test.ts`：`reportUsage`が`app_usage`を書く・数が変わったら`subscriptions.quantity_sync_needed`が付く・同じ数なら付かない・行がない人は数0・使っていないとみなす（contracts/platform-entry.md 4）。
-- [ ] T006 [P] [US2] `apps/api/test/unit/app-registry.test.ts`：`registerAppFeatures`・`registerAppLimits`の登録・何度呼んでも1回だけ・登録していない名前は確かめで落ちる・上限の範囲を確かめる（contracts/platform-entry.md 5）。
+- [X] T003 [P] [US2] `apps/api/test/integration/platform-events.test.ts`：`emitEvent`を書いたトランザクションが戻ったら出来事も残らない・書いたら届け先ごとに`pending`の行ができる・`deliverPendingEvents`で受け取りが呼ばれて`done`になる・受け取りが例外なら`attempts`が増えて`next_attempt_at`が後ろへ（5分・10分・…・最大1時間）・10回で`failed`になりログが出る・`pending`がないときは何もしない（contracts/platform-entry.md 3・6）。
+- [X] T004 [P] [US2] `apps/api/test/integration/entitlement.test.ts`：新しい`loadEntitlement`・`loadEntitlements`が、T001の8つの状態で今の判定と同じ`Entitlement`を返す。まとめて読んでも1人ずつと同じ。見つからない番号は`access: "none"`（contracts/platform-entry.md 2）。
+- [X] T005 [P] [US2] `apps/api/test/integration/app-usage.test.ts`：`reportUsage`が`app_usage`を書く・数が変わったら`subscriptions.quantity_sync_needed`が付く・同じ数なら付かない・行がない人は数0・使っていないとみなす（contracts/platform-entry.md 4）。
+- [X] T006 [P] [US2] `apps/api/test/unit/app-registry.test.ts`：`registerAppFeatures`・`registerAppLimits`の登録・何度呼んでも1回だけ・登録していない名前は確かめで落ちる・上限の範囲を確かめる（contracts/platform-entry.md 5）。
 
 ### マイグレーション
 
-- [ ] T007 [US2] `apps/api/src/platform/schema.ts`に、`platformEvents`・`platformEventDeliveries`・`appUsage`・`userAppLimits`・`appLimitDefaults`を足し、`featureDisables`・`groupFeatureDisables`・`featureSettingEvents`に`app`（`NOT NULL DEFAULT 'threads'`）を足して主キーと`CHECK`を替える（data-model.md 1-1・2）。`pnpm --filter api db:generate`でマイグレーションを作り、SQLを読む。
+- [X] T007 [US2] `apps/api/src/platform/schema.ts`に、`platformEvents`・`platformEventDeliveries`・`appUsage`・`userAppLimits`・`appLimitDefaults`を足し、`featureDisables`・`groupFeatureDisables`・`featureSettingEvents`に`app`（`NOT NULL DEFAULT 'threads'`）を足して主キーと`CHECK`を替える（data-model.md 1-1・2）。`pnpm --filter api db:generate`でマイグレーションを作り、SQLを読む。
   - SQLの末尾に、今のデータの写しを足す（`--> statement-breakpoint`で区切る）：`app_usage`は`memberships`（持ち主の数）とチームに入っているかから全員分、`user_app_limits`は`users.account_limit`・`daily_post_limit`の値がある人、`app_limit_defaults`は`operator_settings`の2つの既定の値。
-- [ ] T008 [US2] `apps/api/test/migration/migration-00NN.test.ts`（T007の番号）：前の番号まで当ててデータを入れ、当てたあとに`app_usage`・上限の表の値が元の列と一致し、機能のON/OFFの行が`app = 'threads'`で残ることを確かめる。
+- [X] T008 [US2] `apps/api/test/migration/migration-00NN.test.ts`（T007の番号）：前の番号まで当ててデータを入れ、当てたあとに`app_usage`・上限の表の値が元の列と一致し、機能のON/OFFの行が`app = 'threads'`で残ることを確かめる。
 
 ### 実装
 
-- [ ] T009 [US2] `apps/api/src/platform/events/`を作る：`emitEvent(tx, type, payload)`・`registerConsumer(consumer, type, handler)`（何度呼んでも1回だけ）・`deliverPendingEvents(env)`（届け先ごとに`pending`で時刻の来たものを古い順に、1回の上限つきで届ける）。T003を通す。
-- [ ] T010 [US2] `apps/api/src/index.ts`の5分ごとの定期処理の最初に`deliverPendingEvents`を足す。`apps/api/src/jobs/daily-jobs.ts`に、届け先がすべて`done`で30日たった出来事を消す処理を足す。
-- [ ] T011 [US2] `apps/api/src/platform/entitlement/`を作る：`loadEntitlement`・`loadEntitlements`（billing・features・operator・test-groupsの今の判定を呼んでまとめる。共通の中なので、共通の表をJOINしてよい）。T004を通す。
-- [ ] T012 [US2] `apps/api/src/platform/usage/`を作る：`reportUsage`と、`app_usage`を読む関数。T005を通す。料金の数は、まだ今の`countOwned`のまま（PR2で切り替える）。
-- [ ] T013 [US2] `apps/api/src/platform/registry/`を作る：`registerAppFeatures`・`registerAppLimits`と、登録の一覧を読む関数。T006を通す。
-- [ ] T014 [US2] 機能のON/OFFと上限の処理（`platform/features/`・`platform/operator/limit-service.ts`・`operator-limit-routes.ts`・`operator-feature-routes.ts`）を、`app`の列と新しい上限の表を読む形にする。書き込みは、古い列（`users.account_limit`など）にも同じ値を書く（PR5で古い列を消すまで）。値の確かめは登録の一覧で行う（共通のコードからThreadsの名前を消すのはPR2）。
-- [ ] T015 [US2] `apps/api/src/platform/index.ts`から、新しい入口の関数（`emitEvent`は共通の中だけ。アプリには`registerConsumer`の型・`loadEntitlement(s)`・`reportUsage`・`peopleNames`・`Entitlement`型）を出す。`personName`をまとめて読む`peopleNames`と、ログインしている人を返す`currentUser(c)`（今の認証のミドルウェアが入れる`AuthUser`を読むだけ）を足す。
-- [ ] T016 [US4] PR1の確かめ：`pnpm lint`・`pnpm typecheck`・`pnpm test`・`pnpm e2e`が通る。道筋の一覧（`routes.snapshot.txt`）が変わらない（quickstart.md 1）。
+- [X] T009 [US2] `apps/api/src/platform/events/`を作る：`emitEvent(tx, type, payload)`・`registerConsumer(consumer, type, handler)`（何度呼んでも1回だけ）・`deliverPendingEvents(env)`（届け先ごとに`pending`で時刻の来たものを古い順に、1回の上限つきで届ける）。T003を通す。
+- [X] T010 [US2] `apps/api/src/index.ts`の5分ごとの定期処理の最初に`deliverPendingEvents`を足す。`apps/api/src/jobs/daily-jobs.ts`に、届け先がすべて`done`で30日たった出来事を消す処理を足す。
+- [X] T011 [US2] `apps/api/src/platform/entitlement/`を作る：`loadEntitlement`・`loadEntitlements`（billing・features・operator・test-groupsの今の判定を呼んでまとめる。共通の中なので、共通の表をJOINしてよい）。T004を通す。
+- [X] T012 [US2] `apps/api/src/platform/usage/`を作る：`reportUsage`と、`app_usage`を読む関数。T005を通す。料金の数は、まだ今の`countOwned`のまま（PR2で切り替える）。
+- [X] T013 [US2] `apps/api/src/platform/registry/`を作る：`registerAppFeatures`・`registerAppLimits`と、登録の一覧を読む関数。T006を通す。
+- [X] T014 [US2] （PR1では、上限の書き込みを古い列と新しい表の両方にし、新しい`loadAppEntitlement`だけが新しい表を読む形にした。今の判定の読み方を新しい表に替えるのはPR2）機能のON/OFFと上限の処理（`platform/features/`・`platform/operator/limit-service.ts`・`operator-limit-routes.ts`・`operator-feature-routes.ts`）を、`app`の列と新しい上限の表を読む形にする。書き込みは、古い列（`users.account_limit`など）にも同じ値を書く（PR5で古い列を消すまで）。値の確かめは登録の一覧で行う（共通のコードからThreadsの名前を消すのはPR2）。
+- [X] T015 [US2] `apps/api/src/platform/index.ts`から、新しい入口の関数（`emitEvent`は共通の中だけ。アプリには`registerConsumer`の型・`loadEntitlement(s)`・`reportUsage`・`peopleNames`・`Entitlement`型）を出す。`personName`をまとめて読む`peopleNames`と、ログインしている人を返す`currentUser(c)`（今の認証のミドルウェアが入れる`AuthUser`を読むだけ）を足す。
+- [X] T016 [US4] PR1の確かめ：`pnpm lint`・`pnpm typecheck`・`pnpm test`・`pnpm e2e`が通る。道筋の一覧（`routes.snapshot.txt`）が変わらない（quickstart.md 1）。
 
 **Checkpoint**：共通の土台ができた。Threadsはまだ使っていないので、動きは変わらない。→ PR1を出す。
 

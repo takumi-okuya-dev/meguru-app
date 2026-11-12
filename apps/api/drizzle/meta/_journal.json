@@ -183,6 +183,13 @@
       "when": 1794415227404,
       "tag": "0025_last_app",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1794463685447,
+      "tag": "0026_app_foundation",
+      "breakpoints": true
     }
   ]
 }

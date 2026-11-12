@@ -1,6 +1,7 @@
 import { createApp } from "./app";
 import type { Env } from "./kernel/env";
 import { runAutoPost, registerThreads } from "./apps/threads";
+import { deliverPendingEvents } from "./platform";
 import { validateConfig } from "./kernel/config";
 import { logger, setLogAppEnv } from "./kernel/logger";
 import { runDailyJobs } from "./jobs/daily-jobs";
@@ -9,6 +10,20 @@ const app = createApp();
 
 /** 自動投稿の Cron（specs/005-auto-post contracts/api.md「定期処理」）。それ以外は日次の処理。 */
 const AUTO_POST_CRON = "*/5 * * * *";
+
+/**
+ * 5分ごとの最初に、届いていない出来事を届ける（specs/meguru/029 research.md R5）。失敗しても自動投稿は止めない。
+ * @param env - Workers のバインディング
+ * @param at - 回の開始時刻
+ */
+async function deliverEvents(env: Env, at: Date): Promise<void> {
+  try {
+    const result = await deliverPendingEvents(env, at);
+    if (result.delivered > 0 || result.failed > 0) logger.info("platform events delivered", result);
+  } catch (err) {
+    logger.error("platform events: delivery run failed", { err });
+  }
+}
 
 export default {
   fetch: app.fetch,
@@ -28,7 +43,7 @@ export default {
     const at = new Date();
     ctx.waitUntil(
       controller.cron === AUTO_POST_CRON
-        ? runAutoPost(env, at).then(() => undefined)
+        ? deliverEvents(env, at).then(() => runAutoPost(env, at)).then(() => undefined)
         : runDailyJobs(env, at),
     );
   },

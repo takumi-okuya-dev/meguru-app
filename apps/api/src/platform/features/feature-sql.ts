@@ -31,6 +31,24 @@ export function disabledFeaturesSql(userId: AnyPgColumn | SQL): SQL<string[]> {
 }
 
 /**
+ * その人の、あるアプリの使えない機能の名前の配列（なければ空の配列。specs/meguru/029 research.md R7）。
+ * @param userId - users.id の列か値
+ * @param app - アプリの番号
+ * @returns text[] の式
+ */
+export function disabledAppFeaturesSql(userId: AnyPgColumn | SQL, app: string): SQL<string[]> {
+  return sql<string[]>`coalesce((SELECT array_agg(f.feature) FROM (
+    SELECT ${featureDisables.feature} AS feature FROM ${featureDisables}
+      WHERE ${featureDisables.userId} = ${userId} AND ${featureDisables.app} = ${app}
+    UNION
+    SELECT ${groupFeatureDisables.feature} FROM ${testGroupMembers}
+      JOIN ${testGroups} ON ${testGroups.id} = ${testGroupMembers.groupId} AND ${testGroups.closedAt} IS NULL
+      JOIN ${groupFeatureDisables} ON ${groupFeatureDisables.groupId} = ${testGroupMembers.groupId} AND ${groupFeatureDisables.app} = ${app}
+    WHERE ${testGroupMembers.userId} = ${userId}
+  ) f), '{}')`;
+}
+
+/**
  * その人がまとまりを使えるか（定期処理の WHERE に足す）。
  * @param userId - users.id の列
  * @param feature - まとまり

@@ -31,3 +31,9 @@ export * from "./test-groups/operator-test-group-routes";
 export * from "./test-groups/test-group-service";
 export * from "./test-groups/test-invite-routes";
 export * from "./withdrawal/withdrawal-service";
+// アプリを分けるための共通の土台（specs/meguru/029-threads-pattern1 contracts/platform-entry.md）
+export { registerConsumer, deliverPendingEvents, purgeDeliveredEvents, type EventConsumer, type PlatformEvent, type PlatformEventType } from "./events/events";
+export * from "./entitlement/entitlement";
+export { reportUsage, billingQuantityOf, usingAppsOf, type AppUsageReport } from "./usage/usage";
+export { registerAppFeatures, registerAppLimits, appFeatures, appLimits, registeredApps, type AppFeatureDef, type AppLimitDef } from "./registry/registry";
+export { currentUser, peopleNames } from "./identity/people";

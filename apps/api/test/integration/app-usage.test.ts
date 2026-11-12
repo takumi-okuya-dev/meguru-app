@@ -1,0 +1,64 @@
+// 利用の数・利用の状態（specs/meguru/029-threads-pattern1 research.md R6、contracts/platform-entry.md 4・6、T002・T005）。
+import { eq } from "drizzle-orm";
+import { beforeEach, describe, expect, it } from "vitest";
+import { subscriptions } from "../../src/platform/schema";
+import { billingQuantityOf, reportUsage, usingAppsOf } from "../../src/platform/usage/usage";
+import { createUserWithAccount, db, insertSubscription, resetDb } from "../helpers/app";
+
+beforeEach(async () => {
+  await resetDb();
+});
+
+/**
+ * Stripeへ数を合わせる印を読む。
+ * @param userId - users.id
+ * @returns 印
+ */
+async function dirty(userId: string) {
+  const [row] = await db().select({ d: subscriptions.quantitySyncNeeded }).from(subscriptions).where(eq(subscriptions.userId, userId));
+  return row?.d;
+}
+
+describe("reportUsage", () => {
+  it("行がない人は、数0・使っていないとみなす", async () => {
+    const { userId } = await createUserWithAccount("u1");
+    expect(await billingQuantityOf(db(), userId)).toBe(0);
+    expect(await usingAppsOf(db(), userId)).toEqual([]);
+  });
+
+  it("書いて、数と使っているアプリを返す。書き直すと置き換わる", async () => {
+    const { userId } = await createUserWithAccount("u1");
+    await reportUsage(db(), userId, "threads", { quantity: 2, using: true });
+    expect(await billingQuantityOf(db(), userId)).toBe(2);
+    expect(await usingAppsOf(db(), userId)).toEqual(["threads"]);
+    await reportUsage(db(), userId, "threads", { quantity: 0, using: false });
+    expect(await billingQuantityOf(db(), userId)).toBe(0);
+    expect(await usingAppsOf(db(), userId)).toEqual([]);
+  });
+
+  it("料金の数は全アプリの合計", async () => {
+    const { userId } = await createUserWithAccount("u1");
+    await reportUsage(db(), userId, "threads", { quantity: 2, using: true });
+    await reportUsage(db(), userId, "people", { quantity: 1, using: true });
+    expect(await billingQuantityOf(db(), userId)).toBe(3);
+    expect((await usingAppsOf(db(), userId)).sort()).toEqual(["people", "threads"]);
+  });
+
+  it("数が変わったら、Stripeへ数を合わせる印を付ける。同じ数なら付けない", async () => {
+    const { userId } = await createUserWithAccount("u1");
+    await insertSubscription(userId, { status: "active" });
+    await reportUsage(db(), userId, "threads", { quantity: 1, using: true });
+    expect(await dirty(userId)).toBe(true);
+    await db().update(subscriptions).set({ quantitySyncNeeded: false }).where(eq(subscriptions.userId, userId));
+    await reportUsage(db(), userId, "threads", { quantity: 1, using: false });
+    expect(await dirty(userId)).toBe(false);
+    await reportUsage(db(), userId, "threads", { quantity: 3, using: true });
+    expect(await dirty(userId)).toBe(true);
+  });
+
+  it("負の数・小数は受け付けない", async () => {
+    const { userId } = await createUserWithAccount("u1");
+    await expect(reportUsage(db(), userId, "threads", { quantity: -1, using: false })).rejects.toThrow();
+    await expect(reportUsage(db(), userId, "threads", { quantity: 1.5, using: true })).rejects.toThrow();
+  });
+});

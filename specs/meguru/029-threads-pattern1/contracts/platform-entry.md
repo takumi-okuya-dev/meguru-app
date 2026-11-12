@@ -13,18 +13,20 @@
 | 関数 | 入力 | 返すもの | 使うところ（Threads） |
 |---|---|---|---|
 | `currentUser(c)` | Honoの文脈 | `{ id, email, displayName }`（認証のミドルウェアが入れたもの。今の`AuthUser`） | すべてのAPI |
-| `loadEntitlement(db, userId, app)` | 利用者の番号・アプリの番号 | `Entitlement`（下） | 権限の判定（アカウントを開く・書く） |
-| `loadEntitlements(db, userIds, app)` | 利用者の番号の配列（重複は1つにまとめる）・アプリの番号 | `Map<userId, Entitlement>`（見つからない番号は「使えない」） | 自動投稿・数字の取得・メンションの定期処理（持ち主をまとめて調べる） |
+| `loadAppEntitlement(db, mode, userId, app)` | 決済のモード・利用者の番号・アプリの番号 | `AppEntitlement`（下）。いなければ null | 権限の判定（アカウントを開く・書く） |
+| `loadAppEntitlements(db, mode, userIds, app)` | 決済のモード・利用者の番号の配列（重複は1つにまとめる）・アプリの番号 | `Map<userId, AppEntitlement>`（見つからない番号は入らない） | 自動投稿・数字の取得・メンションの定期処理（持ち主をまとめて調べる） |
 | `peopleNames(db, userIds)` | 利用者の番号の配列 | `Map<userId, string>`（画面に出す名前。今の`personName`の決め方） | チームの人の一覧・活動の記録・運営者のアカウント一覧 |
 | `reportUsage(db, userId, app, usage)` | `usage = { quantity: number, using: boolean }` | なし | アカウントを作る・消す・持ち主が変わる・チームに入る・抜ける・毎日の数え直し |
 | `operatorOnly` | — | 運営者だけを通す関所（今のまま） | 運営者のアカウント一覧・テスター招待 |
 
-### `Entitlement`
+### `AppEntitlement`
 
 ```ts
-type Entitlement = {
+type AppEntitlement = {
   /** full：すべて使える。read_only：読むだけ（未払いなど）。none：使えない（契約前・退会・テスト版に入れない） */
   access: "full" | "read_only" | "none";
+  /** 契約の使える状態（今の Entitlement。画面の帯・読むだけの理由に使う） */
+  billing: Entitlement;
   /** 料金なし（運営者・料金なしの印・テスト用のグループ） */
   billingExempt: boolean;
   /** 運営者か */
@@ -112,6 +114,6 @@ registerAppLimits("threads", {
 
 ## 6. テスト
 
-- `loadEntitlement(s)`：今の判定と同じ結果になること（契約中・未払い・契約前・料金なし・運営者・テスト用のグループ・機能のOFF・024の前の無料体験）。まとめて読んでも1人ずつと同じこと。
+- `loadAppEntitlement(s)`：今の判定と同じ結果になること（契約中・未払い・契約前・料金なし・運営者・テスト用のグループ・機能のOFF・024の前の無料体験）。まとめて読んでも1人ずつと同じこと。
 - 出来事：書いたトランザクションが戻ったら出来事も残らないこと。すぐに届くこと。失敗したらやり直すこと。10回で`failed`になること。同じ出来事を2回届けても結果が同じこと（受け取りの側）。
 - `reportUsage`：数が変わったら`quantity_sync_needed`が付くこと。同じ数なら付かないこと。行がない人は数0・使っていないとみなすこと。

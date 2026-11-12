@@ -79,7 +79,7 @@ Threadsは31表＋新しい2表＝33表。
 | `user_id` | uuid（`users`への外部キー、消したら一緒に消す） | |
 | `app` | text | アプリの番号（`threads`） |
 | `quantity` | integer（0以上） | 料金の数（Threadsでは、持ち主としてのアカウントの数） |
-| `using` | boolean | 使っているか（Threadsでは、自分のアカウントがあるか、チームに入っているか） |
+| `in_use` | boolean | 使っているか（Threadsでは、自分のアカウントがあるか、チームに入っているか）。`using`はPostgresの予約語なので、列の名前は`in_use` |
 | `updated_at` | timestamptz | 伝えられた日時 |
 
 - 主キーは（`user_id`・`app`）。行がなければ、数0・使っていない、とみなす。
