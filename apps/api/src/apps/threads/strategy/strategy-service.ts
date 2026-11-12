@@ -1,7 +1,7 @@
 // 課題の読み書き（specs/002-strategy-profile research.md R1〜R3）。
 // 全項目をまとめて置き換え、version が一致する場合だけ保存する。
-import type { AccountAccess } from "../../../platform";
-import { recordActivity, updatedByOf } from "../../../platform";
+import type { AccountAccess } from "../access/access";
+import { recordActivity, updatedByOf } from "../activity/activity-log";
 import {
   STRATEGY_TEXT_KEYS,
   STRATEGY_TOTAL,

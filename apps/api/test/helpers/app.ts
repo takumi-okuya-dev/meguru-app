@@ -1,4 +1,5 @@
 // 結合テストの共通部品：偽の認証で動くアプリ、DBの初期化、偽のThreadsサーバーの操作、認可〜callbackの一連の流れ
+import { syncThreadsUsage } from "../../src/apps/threads/accounts/usage";
 import { env } from "cloudflare:test";
 import { neon } from "@neondatabase/serverless";
 import { createApp } from "../../src/app";
@@ -299,6 +300,8 @@ export async function createUserWithAccount(
     VALUES (${opts.name ?? username}, ${threadsUserId}, ${username})
     RETURNING id`) as [{ id: string }];
   await sql`INSERT INTO memberships (user_id, account_id, role) VALUES (${u.id}, ${a.id}, 'owner')`;
+  // 本物のアカウントの作成と同じく、利用の数を共通へ伝える（specs/meguru/029 research.md R6）
+  await syncThreadsUsage(createDb(testEnv.DATABASE_URL), u.id);
   return { userId: u.id, accountId: a.id };
 }
 
@@ -324,6 +327,8 @@ export async function createUnconnectedAccount(
     VALUES (${opts.name ?? "未接続のアカウント"}, 'not_connected', NULL)
     RETURNING id`) as [{ id: string }];
   await sql`INSERT INTO memberships (user_id, account_id, role) VALUES (${u.id}, ${a.id}, 'owner')`;
+  // 本物のアカウントの作成と同じく、利用の数を共通へ伝える（specs/meguru/029 research.md R6）
+  await syncThreadsUsage(createDb(testEnv.DATABASE_URL), u.id);
   return { userId: u.id, accountId: a.id };
 }
 

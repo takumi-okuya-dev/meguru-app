@@ -22,27 +22,27 @@ describe("platform/hooks", () => {
 
   it("受け取った値をそのまま渡す", async () => {
     const got: unknown[] = [];
-    registerHook("userAccountsDeleted", (p) => {
-      got.push(p.threadsUserIds);
+    registerHook("userWithdrawing", (p) => {
+      got.push(p.userId);
     });
-    await runHook("userAccountsDeleted", { tx: {} as never, userId: "u1", threadsUserIds: ["9001"], now: new Date() });
-    expect(got).toEqual([["9001"]]);
+    await runHook("userWithdrawing", { tx: {} as never, userId: "u1" });
+    expect(got).toEqual(["u1"]);
   });
 
   it("例外は呼んだ側にそのまま返り、あとの受け取りは呼ばない", async () => {
     let called = false;
-    registerHook("accountDeleting", () => {
+    registerHook("userWithdrawing", () => {
       throw new Error("失敗");
     });
-    registerHook("accountDeleting", () => {
+    registerHook("userWithdrawing", () => {
       called = true;
     });
-    await expect(runHook("accountDeleting", { tx: {} as never, accountId: "a1" })).rejects.toThrow("失敗");
+    await expect(runHook("userWithdrawing", { tx: {} as never, userId: "u1" })).rejects.toThrow("失敗");
     expect(called).toBe(false);
   });
 
   it("受け取りが登録されていなければ例外にする（片づけを黙って飛ばさない。PR #76 のセルフレビュー）", async () => {
-    await expect(runHook("userWithdrawing", { tx: {} as never, userId: "u1" })).rejects.toThrow("受け取りが登録されていません");
+    await expect(runHook("limitsChanged", { env: {} as never })).rejects.toThrow("受け取りが登録されていません");
   });
 
   it("registerModule は同じ名前で1回だけ登録し、resetHooks のあとはまた登録できる", async () => {

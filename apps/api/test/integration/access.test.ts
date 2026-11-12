@@ -1,6 +1,6 @@
 // 判定の本体（specs/011-team-revision contracts/permissions.md、research.md R3・R4）。
 import { beforeEach, describe, expect, it } from "vitest";
-import { authorizeAccount, authorizeAssignment, authorizeTeamAdmin, authorizeTeamMember } from "../../src/platform/access/access";
+import { authorizeAccount, authorizeAssignment, authorizeTeamAdmin, authorizeTeamMember } from "../../src/apps/threads/access/access";
 import { createUserWithAccount, db, resetDb } from "../helpers/app";
 import { assign, ensureUser, joinTeam, makeTeam, setRole, setShared } from "../helpers/team";
 

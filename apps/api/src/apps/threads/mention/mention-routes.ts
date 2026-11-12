@@ -12,7 +12,7 @@ import { Hono, type MiddlewareHandler } from "hono";
 import type { AppEnv } from "../../../platform";
 import { createDb, withTransaction } from "../../../kernel/db/client";
 import { parseBody } from "../../../kernel/validate";
-import { authorizeAccount } from "../../../platform";
+import { authorizeAccount } from "../access/access";
 import { assertItemId } from "../strategy/item-service";
 import {
   addMentionPerson,

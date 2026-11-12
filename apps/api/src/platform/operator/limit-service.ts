@@ -8,13 +8,14 @@ import {
   type OperatorLimits,
   type UserLimitsRequest,
 } from "@meguru/shared";
-import { and, asc, eq, inArray, isNotNull, or, sql } from "drizzle-orm";
+import { and, asc, eq, isNotNull, or, sql } from "drizzle-orm";
 import type { Env } from "../../kernel/env";
 import { withTransaction, type Db, type TxDb } from "../../kernel/db/client";
-import { appLimitDefaults, memberships, operatorSettings, userAppLimits, users } from "../schema";
+import { appLimitDefaults, operatorSettings, userAppLimits, users } from "../schema";
+import { billingQuantityOf } from "../usage/usage";
 import { operatorIdsOf } from "../../kernel/config";
 import { AppError } from "../../kernel/errors";
-import { isUuid } from "../access/access";
+import { isUuid } from "../../kernel/validate";
 import { listOperatorEvents, recordOperatorEvent } from "./operator-events";
 import { runHook } from "../hooks";
 import { isOperatorSql } from "../test-groups/test-group-service";
@@ -85,23 +86,6 @@ export function dailyPostLimitSql(
 ) {
   const def = sql`(SELECT ${operatorSettings.defaultDailyPostLimit} FROM ${operatorSettings} WHERE ${operatorSettings.id} = 1)`;
   return sql<number>`(CASE WHEN ${isOperatorSql(ownerClerkUserId, operators)} THEN ${DAILY_POST_LIMIT_MAX} ELSE coalesce(${ownerDailyPostLimit}, ${def}, ${DAILY_POST_LIMIT_MAX}) END)::int`;
-}
-
-/**
- * アカウントのオーナーの1日の投稿数の上限（投稿の直前の確認で使う。specs/024 research.md R7）。
- * @param db - データベース（トランザクションの中でもよい）
- * @param accountId - accounts.id
- * @param operators - 運営者の clerk_user_id
- * @returns 上限（オーナーがいなければ Threads の上限）
- */
-export async function ownerDailyPostLimit(db: Db | TxDb, accountId: string, operators: readonly string[]): Promise<number> {
-  const [row] = await db
-    .select({ limit: dailyPostLimitSql(users.clerkUserId, users.dailyPostLimit, operators) })
-    .from(memberships)
-    .innerJoin(users, eq(users.id, memberships.userId))
-    .where(and(eq(memberships.accountId, accountId), eq(memberships.role, "owner")))
-    .limit(1);
-  return row?.limit ?? DAILY_POST_LIMIT_MAX;
 }
 
 /**
@@ -229,10 +213,8 @@ export async function findLimitUser(db: Db, env: Pick<Env, "OPERATOR_CLERK_USER_
  * @returns 見つかった人と上限
  */
 async function toLimitUser(db: Db | TxDb, env: Pick<Env, "OPERATOR_CLERK_USER_IDS">, u: typeof users.$inferSelect): Promise<OperatorLimitUser> {
-  const [owned] = await db
-    .select({ n: sql<number>`count(*)::int` })
-    .from(memberships)
-    .where(and(eq(memberships.userId, u.id), inArray(memberships.role, ["owner"])));
+  // 持ち主としてのアカウントの数は、アプリから伝えられた利用の数（specs/meguru/029 research.md R6）
+  const owned = await billingQuantityOf(db, u.id);
   return {
     userId: u.id,
     name: u.displayName,
@@ -240,7 +222,7 @@ async function toLimitUser(db: Db | TxDb, env: Pick<Env, "OPERATOR_CLERK_USER_ID
     operator: isOperator(env, u.clerkUserId),
     accountLimit: u.accountLimit,
     dailyPostLimit: u.dailyPostLimit,
-    ownedAccountCount: Number(owned?.n ?? 0),
+    ownedAccountCount: owned,
   };
 }
 

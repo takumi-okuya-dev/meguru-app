@@ -6,7 +6,7 @@ import { and, eq, gt, lt } from "drizzle-orm";
 import type { Env } from "../../../kernel/env";
 import { createDb, withTransaction } from "../../../kernel/db/client";
 import { threadsConnections } from "../schema";
-import { accounts } from "../../../platform";
+import { accounts } from "../schema";
 import { createTokenCipher } from "../../../kernel/crypto";
 import { logger } from "../../../kernel/logger";
 import { ThreadsAuthError, type ThreadsClient } from "../../../adapters/threads-api";

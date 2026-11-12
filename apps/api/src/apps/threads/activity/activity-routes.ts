@@ -1,9 +1,9 @@
 // GET /api/accounts/:accountId/activity（specs/008-team-operations contracts/api.md「操作の記録」、FR-052）。
 import { activityQuerySchema, invalidFields } from "@meguru/shared";
 import { Hono, type MiddlewareHandler } from "hono";
-import type { AppEnv } from "../identity/auth";
-import { createDb } from "../../kernel/db/client";
-import { AppError } from "../../kernel/errors";
+import type { AppEnv } from "../../../platform";
+import { createDb } from "../../../kernel/db/client";
+import { AppError } from "../../../kernel/errors";
 import { authorizeAccount } from "../access/access";
 import { listActivity } from "./activity-log";
 

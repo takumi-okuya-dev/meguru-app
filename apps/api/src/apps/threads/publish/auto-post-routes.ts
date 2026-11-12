@@ -4,7 +4,8 @@ import { Hono, type MiddlewareHandler } from "hono";
 import type { AppEnv } from "../../../platform";
 import { createDb } from "../../../kernel/db/client";
 import { postingSchedules } from "../schema";
-import { authorizeAccount, effectiveLimits } from "../../../platform";
+import { effectiveLimits } from "../../../platform";
+import { authorizeAccount } from "../access/access";
 import { getAutoPostStatus } from "./auto-post-status";
 
 /**

@@ -4,7 +4,8 @@ import { addNgWordsRequestSchema, coreRulesRequestSchema } from "@meguru/shared"
 import { Hono, type MiddlewareHandler } from "hono";
 import type { AppEnv } from "../../../platform";
 import { createDb } from "../../../kernel/db/client";
-import { withActivityTx, authorizeAccount } from "../../../platform";
+import { withActivityTx } from "../activity/activity-log";
+import { authorizeAccount } from "../access/access";
 import { parseBody } from "../../../kernel/validate";
 import { assertItemId } from "../strategy/item-service";
 import { addNgWords, deleteNgWord, getPostingRules, saveCoreRules } from "./posting-rules-service";

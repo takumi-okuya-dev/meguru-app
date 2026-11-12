@@ -3,7 +3,8 @@ import { Hono, type MiddlewareHandler } from "hono";
 import type { AppEnv } from "../../../platform";
 import { createDb } from "../../../kernel/db/client";
 import { createThreadsClient } from "../../../adapters/threads-api";
-import { authorizeAccount, recordActivity } from "../../../platform";
+import { authorizeAccount } from "../access/access";
+import { recordActivity } from "../activity/activity-log";
 import { checkThreadsPublish } from "./threads-check-service";
 
 /**

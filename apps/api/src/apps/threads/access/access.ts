@@ -14,13 +14,14 @@ import {
 } from "@meguru/shared";
 import { and, eq, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
-import type { Db, TxDb } from "../../kernel/db/client";
-import { accounts, memberships, subscriptions, teamAccounts, teamMembers, teams, users } from "../schema";
-import type { BillingMode } from "../../kernel/config";
-import { AppError, notFound } from "../../kernel/errors";
-import { entitlementFromFacts } from "../billing/billing-service";
-import { disabledFeaturesSql, featureOnSql, featuresFrom } from "../features/feature-sql";
-import { billingExemptSql, testAccessSql } from "../test-groups/test-group-service";
+import type { Db, TxDb } from "../../../kernel/db/client";
+import { accounts, memberships, teamAccounts, teamMembers, teams } from "../schema";
+import { subscriptions, users } from "../../../platform/schema";
+import type { BillingMode } from "../../../kernel/config";
+import { AppError, notFound } from "../../../kernel/errors";
+import { entitlementFromFacts } from "../../../platform";
+import { disabledFeaturesSql, featureOnSql, featuresFrom } from "../../../platform";
+import { billingExemptSql, testAccessSql } from "../../../platform";
 
 /** accounts の行。 */
 export type AccountRow = typeof accounts.$inferSelect;
@@ -60,18 +61,10 @@ export type AccountAccess = {
   features: ReadonlySet<Feature>;
 };
 
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+import { isUuid } from "../../../kernel/validate";
+export { isUuid };
 
-/**
- * UUIDの形かを確かめる（DBに渡す前に。形が違えば「見つからない」にする）。
- * @param value - 確かめる値
- * @returns UUIDの形なら true
- */
-export function isUuid(value: string): boolean {
-  return UUID.test(value);
-}
-
-import { personName } from "../identity/people";
+import { personName } from "../../../platform";
 export { personName };
 
 /**
@@ -107,7 +100,7 @@ export async function authorizeAccount(
   permission: Permission,
   opts: { feature?: Feature } = {},
 ): Promise<AccountAccess> {
-  if (!UUID.test(accountId)) throw notFound();
+  if (!isUuid(accountId)) throw notFound();
   const own = alias(memberships, "own_m");
   const ownerM = alias(memberships, "owner_m");
   const ownerU = alias(users, "owner_u");
@@ -225,7 +218,7 @@ export async function authorizeTeamMember(
   teamId: string,
   opts: { lock?: boolean } = {},
 ): Promise<TeamAccess> {
-  if (!UUID.test(teamId)) throw teamNotFound();
+  if (!isUuid(teamId)) throw teamNotFound();
   if (opts.lock) {
     // 先にチームの行だけに鍵をかけ、待った後の最新のチームの人とロールを次の文で読む
     // （結合したまま FOR UPDATE で待つと、待つ前のロールのまま判定してしまう。同時の引き継ぎなど）
@@ -340,7 +333,7 @@ export async function authorizeAssignment(
   personUserId: string,
   accountId: string,
 ): Promise<AssignmentTarget> {
-  if (!UUID.test(personUserId) || !UUID.test(accountId)) throw teamNotFound();
+  if (!isUuid(personUserId) || !isUuid(accountId)) throw teamNotFound();
   const [person] = await db
     .select({ role: teamMembers.role })
     .from(teamMembers)

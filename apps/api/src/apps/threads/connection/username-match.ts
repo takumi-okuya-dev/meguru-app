@@ -4,7 +4,7 @@ import { normalizeUsername } from "@meguru/shared";
 import { and, eq, ne, sql } from "drizzle-orm";
 import { createDb, withTransaction, type TxDb } from "../../../kernel/db/client";
 import { lockThreadsUsername } from "../../../kernel/db/locks";
-import { accounts } from "../../../platform";
+import { accounts } from "../schema";
 import type { Env } from "../../../kernel/env";
 import { logger } from "../../../kernel/logger";
 import type { ThreadsClient, ThreadsProfile } from "../../../adapters/threads-api";

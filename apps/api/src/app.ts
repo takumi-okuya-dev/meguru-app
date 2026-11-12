@@ -12,17 +12,12 @@ import {
   clerkVerifier,
   type AuthVerifier,
   type AppEnv,
-  accountRoutes,
   billingRoutes,
   stripeWebhookRoutes,
-  accountTeamRoutes,
-  inviteRoutes,
   operatorFeatureRoutes,
   operatorTestGroupRoutes,
   testInviteRoutes,
   referralRoutes,
-  teamsRoutes,
-  activityRoutes,
   meRoutes,
   operatorLimitRoutes,
   clerkUserDeleter,
@@ -50,6 +45,12 @@ import {
   testerApplicationRoutes,
   operatorAccountRoutes,
   operatorTesterInviteRoutes,
+  accountRoutes,
+  accountTeamRoutes,
+  inviteRoutes,
+  teamsRoutes,
+  activityRoutes,
+  threadsMeRoutes,
 } from "./apps/threads";
 
 /** アプリに差し込む依存。テストでは偽の認証を渡す。 */
@@ -184,6 +185,8 @@ export function createApp(deps: AppDeps = defaultDeps) {
     })
     .route("/", meRoutes(authed, deps.deleteClerkUser ?? ((env) => clerkUserDeleter(env))))
     .route("/", needsReviewCountRoutes(authed))
+    // Threadsの「自分」（specs/meguru/029 contracts/api-routes.md 2）
+    .route("/", threadsMeRoutes(authed))
     .route("/", accountRoutes(authed))
     .route("/", accountTeamRoutes(authed))
     .route("/", inviteRoutes(authed, maybeAuthed))

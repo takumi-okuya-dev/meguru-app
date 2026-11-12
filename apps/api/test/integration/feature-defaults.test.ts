@@ -2,7 +2,7 @@
 // 機能の設定の行がない人は3つすべてONで、プロンプトは前と同じ。決済の制限はゆるまない。
 import { FEATURES } from "@meguru/shared";
 import { beforeEach, describe, expect, it } from "vitest";
-import { authorizeAccount } from "../../src/platform/access/access";
+import { authorizeAccount } from "../../src/apps/threads/access/access";
 import { getPrompt } from "../../src/apps/threads/metrics/prompt-service";
 import { call, createAccountVia, createUserWithAccount, db, endTrial, makeApp, resetDb } from "../helpers/app";
 import { billingEnv } from "../helpers/billing";

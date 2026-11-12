@@ -9,7 +9,8 @@ import type { Env } from "../../../kernel/env";
 import { createDb, withTransaction } from "../../../kernel/db/client";
 import { lockThreadsUser } from "../../../kernel/db/locks";
 import { threadsDeletionRequests } from "../schema";
-import { deleteAccountsOfThreadsUser } from "../../../platform";
+import { deleteAccountsOfThreadsUser } from "../accounts/account-service";
+import { syncThreadsUsage } from "../accounts/usage";
 import { sha256Hex, threadsUserHmac, toHex } from "../../../kernel/identifier-hash";
 import { logger } from "../../../kernel/logger";
 import { verifySignedRequest } from "../../../adapters/threads-api";
@@ -86,8 +87,10 @@ export async function attemptDeletion(
   if (!snapshot || snapshot.status === "completed" || !snapshot.threadsUserId) return "skipped";
   const threadsUserId = snapshot.threadsUserId;
 
+  // 消したアカウントの持ち主（トランザクションのあとで、利用の数を共通へ伝える。specs/meguru/029 research.md R6）
+  let owners: string[] = [];
   try {
-    return await withTransaction(env.DATABASE_URL, async (tx) => {
+    const result = await withTransaction(env.DATABASE_URL, async (tx) => {
       // 1. ロック（callback と同じキー）
       await lockThreadsUser(tx, threadsUserId);
       // 2. 読み直して確かめる
@@ -123,8 +126,7 @@ export async function attemptDeletion(
       await hooks.beforeDelete?.();
 
       // 4. Accountを削除する。所有者の users 行をロックして last_account_deleted_at を記録する（research.md R13）。
-      //    accounts・users の持ち主は共通なので、共通の処理に頼む（specs/027）
-      await deleteAccountsOfThreadsUser(tx, threadsUserId, now);
+      owners = await deleteAccountsOfThreadsUser(tx, threadsUserId, now);
 
       // 5. 完了を記録し、平文のIDを消す（hmac は完了の直前に始めた認可フローの照合に使うので残す）
       await tx
@@ -133,6 +135,8 @@ export async function attemptDeletion(
         .where(eq(threadsDeletionRequests.confirmationCode, code));
       return "completed" as const;
     });
+    for (const userId of owners) await syncThreadsUsage(db, userId);
+    return result;
   } catch (err) {
     logger.error("data deletion attempt failed", { code, err });
     // claim の更新もロールバックされているので、ここで試行を記録し直す

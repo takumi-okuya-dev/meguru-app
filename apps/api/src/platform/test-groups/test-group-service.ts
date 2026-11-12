@@ -16,9 +16,9 @@ import { createDb, withTransaction, type Db, type TxDb } from "../../kernel/db/c
 import { testGroupEvents, testGroupMembers, testGroups, users } from "../schema";
 import { AppError } from "../../kernel/errors";
 import { sha256Hex } from "../../kernel/identifier-hash";
-import { personName } from "../access/access";
+import { personName } from "../identity/people";
 import { groupDisabledFeatures, saveGroupFeatures } from "../features/feature-service";
-import { inviteUrl, newInviteToken, openInviteToken, sealInviteToken } from "../teams/invite-service";
+import { inviteUrl, newInviteToken, openInviteToken, sealInviteToken } from "../../kernel/invite-token";
 
 /** users の表か、その別名（alias(users, …)）。 */
 type UsersLike = Table & { id: AnyColumn; signedUpOpen: AnyColumn; clerkUserId: AnyColumn };

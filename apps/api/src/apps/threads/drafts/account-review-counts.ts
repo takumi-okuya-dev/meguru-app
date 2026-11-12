@@ -1,7 +1,7 @@
 import { and, count, eq, inArray } from "drizzle-orm";
 import type { Db } from "../../../kernel/db/client";
 import { postDrafts } from "../schema";
-import { accounts, memberships } from "../../../platform";
+import { accounts, memberships } from "../schema";
 
 /**
  * ログイン中のユーザーが関わる全Account（オーナーと担当。specs/011 T008）の要確認件数を1回で読む。

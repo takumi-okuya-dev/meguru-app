@@ -26,3 +26,14 @@ export function parseQuery<S extends z.ZodTypeAny>(schema: S, query: unknown): z
   if (!parsed.success) throw new AppError("VALIDATION_FAILED", 400, "invalid query", undefined, invalidFields(parsed.error));
   return parsed.data;
 }
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * UUIDの形かを確かめる（DBに渡す前に。形が違えば「見つからない」にする）。
+ * @param value - 確かめる値
+ * @returns UUIDの形なら true
+ */
+export function isUuid(value: string): boolean {
+  return UUID.test(value);
+}

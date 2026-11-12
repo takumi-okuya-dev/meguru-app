@@ -6,13 +6,14 @@ import {
   renameAccountRequestSchema,
 } from "@meguru/shared";
 import { Hono, type MiddlewareHandler } from "hono";
-import type { AppEnv } from "../identity/auth";
-import { createDb } from "../../kernel/db/client";
-import { AppError } from "../../kernel/errors";
+import type { AppEnv } from "../../../platform";
+import { createDb } from "../../../kernel/db/client";
+import { AppError } from "../../../kernel/errors";
 import { authorizeAccount, summaryRoleOf, toAccountSummary, type AccountAccess } from "../access/access";
 import { createAccount, deleteAccount, openAccount, renameAccount } from "./account-service";
-import { runHook } from "../hooks";
-import { parseBody } from "../../kernel/validate";
+import { createThreadsClient } from "../../../adapters/threads-api";
+import { verifyConnection } from "../connection/connection-service";
+import { parseBody } from "../../../kernel/validate";
 
 /**
  * 判定の結果を、ログインした人から見た AccountSummary にする（specs/011 contracts/permissions.md）。
@@ -62,8 +63,8 @@ export function accountRoutes(authed: MiddlewareHandler<AppEnv>) {
       const parsed = openAccountRequestSchema.safeParse(await c.req.json().catch(() => null));
       if (!parsed.success) throw new AppError("VALIDATION_FAILED", 400, "invalid open request");
       await openAccount(c.env, user.id, access.account.id, parsed.data, receivedAt, access.relation === "owner");
-      // アプリに知らせる（Threads：保存しているトークンで接続を確かめる。specs/027 research.md R4）
-      await runHook("accountOpened", { env: c.env, accountId: access.account.id });
+      // 保存しているトークンで接続を確かめる（specs/001 FR-018）
+      await verifyConnection(c.env, access.account.id, createThreadsClient(c.env));
       return c.json(summaryOf(await authorizeAccount(db, user, access.account.id, "view")));
     })
     .patch("/accounts/:accountId", authed, async (c) => {

@@ -1,6 +1,7 @@
 // メンションの返信の段階（specs/023-delayed-mention contracts/mention-job.md 7-1〜7-4、research.md R2〜R6）。
 // 005の runAutoPost の最後に呼ぶ。承認した返信の文は書き換えずに出し、出せないときは出さない（原則II）。
 // 二重に出さないため、005の公開と同じく、公開を送る前にコンテナーのIDと publish_requested_at を保存する。
+import { loadOwnerEntitlement, ownerAutopostOn } from "../access/owner";
 import {
   MENTION_EXPIRE_HOURS,
   MENTION_MAX_ATTEMPTS,
@@ -13,7 +14,8 @@ import {
 import { and, eq, isNull, lt, ne, or, sql } from "drizzle-orm";
 import type { Db } from "../../../kernel/db/client";
 import { postDrafts, postMentions } from "../schema";
-import { accounts, loadOwnerEntitlement, ownerAutopostOn } from "../../../platform";
+
+import { accounts } from "../schema";
 import type { Env } from "../../../kernel/env";
 import { billingModeOf } from "../../../kernel/config";
 import { logger } from "../../../kernel/logger";

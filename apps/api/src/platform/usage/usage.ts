@@ -80,3 +80,32 @@ export async function usingAppsOf(db: Db | TxDb, userId: string): Promise<string
     .where(and(eq(appUsage.userId, userId), eq(appUsage.inUse, true)));
   return rows.map((r) => r.app);
 }
+
+/**
+ * その人の、あるアプリの利用の値（行がなければ null）。アプリが、伝え直すかを決めるのに使う。
+ * @param db - データベース
+ * @param userId - 利用者の番号
+ * @param app - アプリの番号
+ * @returns 数と使っているか
+ */
+export async function appUsageOf(db: Db | TxDb, userId: string, app: string): Promise<{ quantity: number; using: boolean } | null> {
+  const [row] = await db
+    .select({ quantity: appUsage.quantity, using: appUsage.inUse })
+    .from(appUsage)
+    .where(and(eq(appUsage.userId, userId), eq(appUsage.app, app)));
+  return row ?? null;
+}
+
+/**
+ * あるアプリの利用の記録がある人（数が1以上か、使っている人）。アプリの毎日の数え直しに使う。
+ * @param db - データベース
+ * @param app - アプリの番号
+ * @returns 利用者の番号
+ */
+export async function usersWithUsage(db: Db | TxDb, app: string): Promise<string[]> {
+  const rows = await db
+    .select({ userId: appUsage.userId })
+    .from(appUsage)
+    .where(and(eq(appUsage.app, app), sql`(${appUsage.quantity} > 0 OR ${appUsage.inUse})`));
+  return rows.map((r) => r.userId);
+}

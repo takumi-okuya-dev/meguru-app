@@ -7,16 +7,10 @@ import type { Env } from "../kernel/env";
 
 /** 知らせの名前と、受け取る値（docs/module-map.md 1-4）。 */
 export type HookPayloads = {
-  /** アカウントを消す前（同じトランザクションの中）。 */
-  accountDeleting: { tx: TxDb; accountId: string };
-  /** 退会で、持っているアカウントを消す前（同じトランザクションの中）。 */
+  /** 退会で、利用者の行を消す前（同じトランザクションの中）。029 の PR2b で出来事（user.withdrawn）に替える。 */
   userWithdrawing: { tx: TxDb; userId: string };
-  /** 退会で、持っているアカウントを消したあと（同じトランザクションの中）。threadsUserIds は消したアカウントのThreadsのユーザーID、now は退会の処理の時刻。 */
-  userAccountsDeleted: { tx: TxDb; userId: string; threadsUserIds: string[]; now: Date };
-  /** 上限（全員の既定値・人ごと）を保存したあと。 */
+  /** 上限（全員の既定値・人ごと）を保存したあと。029 の PR2b で出来事（limits.changed）に替える。 */
   limitsChanged: { env: Pick<Env, "AUTOPOST_KV"> };
-  /** アカウントを開いた（最後に開いたアカウントを記録した）あと、応答を返す前。 */
-  accountOpened: { env: Env; accountId: string };
 };
 
 /** 知らせの名前。 */

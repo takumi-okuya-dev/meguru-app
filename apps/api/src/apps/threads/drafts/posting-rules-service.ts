@@ -4,10 +4,11 @@ import { and, asc, eq, inArray, sql } from "drizzle-orm";
 import { withTransaction, type Db, type TxDb } from "../../../kernel/db/client";
 import { lockAccountDrafts } from "../../../kernel/db/locks";
 import { ngWords, postDrafts } from "../schema";
-import { accounts, recordActivity, updatedByOf } from "../../../platform";
+import { accounts } from "../schema";
+import { recordActivity, updatedByOf } from "../activity/activity-log";
 import type { Env } from "../../../kernel/env";
 import { AppError, itemNotFound, notFound, pgErrorCode } from "../../../kernel/errors";
-import type { AccountRow, AccountAccess } from "../../../platform";
+import type { AccountRow, AccountAccess } from "../access/access";
 import { CLEAR_QUEUE_FIELDS } from "./draft-service";
 
 type NgWordRow = typeof ngWords.$inferSelect;

@@ -1,4 +1,4 @@
-// 共通（platform）の表の定義：17表＋029の5表（docs/module-map.md 2-1、specs/027-modular-monolith research.md R6）。
+// 共通（platform）の表の定義：11表＋029の5表（accounts・memberships・チームの3表・activity_logs は029でThreadsへ移した）（docs/module-map.md 2-1、specs/027-modular-monolith research.md R6）。
 // Accountに紐づくテーブルはすべて ON DELETE CASCADE とする（後続featureも守る規約。specs/001 research.md R13）。
 import { sql } from "drizzle-orm";
 import {
@@ -9,20 +9,15 @@ import {
   index,
   integer,
   jsonb,
-  pgEnum,
   pgTable,
   smallint,
   text,
   timestamp,
-  uniqueIndex,
   uuid,
   type AnyPgColumn,
 } from "drizzle-orm/pg-core";
 import {
   FEATURE_EVENT_ACTIONS,
-  POST_LENGTH_DEFAULTS,
-  PROMOTION_RATIO_DEFAULT,
-  PROMPT_COUNT_DEFAULT,
   SUBSCRIPTION_STATUSES,
   TEST_GROUP_CAPACITY_MAX,
   TEST_GROUP_CAPACITY_MIN,
@@ -37,27 +32,10 @@ import {
   TESTER_SLOT_CAPACITY_MIN,
 } from "@meguru/shared";
 import { bytea, timestamps, inList } from "../kernel/db/columns";
-// 境界の例外（docs/module-map.md 4）：operator_events.application_id の外部キーのためだけに、Threadsの表を読む（参照は遅延で、読みこみの循環でも壊れない）
+// 境界の例外（docs/module-map.md 4）：operator_events.application_id と、users.last_account_id（最後に開いたアカウント）の外部キーのためだけに、
+// Threadsの表を読む（参照は遅延で、読みこみの循環でも壊れない）。029 の PR2b・PR3 でなくす（specs/meguru/029-threads-pattern1 data-model.md）
 // eslint-disable-next-line local/module-boundaries
-import { testerApplications } from "../apps/threads/schema";
-
-/**
- * Membershipのロールの列挙型（membership_role。Constitution原則IV）。
- * partner・editor は specs/008-team-operations で足した。member は旧プラン4の名残で使わない（列挙型から値は消せないので残す）。
- */
-export const membershipRole = pgEnum("membership_role", ["owner", "member", "partner", "editor", "admin"]);
-
-/** チームでのロール（specs/011 data-model.md の team_role）。 */
-export const teamRole = pgEnum("team_role", ["admin", "member", "editor"]);
-
-/** Threads接続の状態の列挙型（connection_status）。not_connected は一度もつないでいない（specs/012 data-model.md）。 */
-export const connectionStatus = pgEnum("connection_status", ["connected", "needs_reconnect", "not_connected"]);
-
-/** 今の接続の方法（specs/010-token-account-add data-model.md）。app は001のOAuth、token は利用者のMetaアプリのトークン。 */
-export const connectionMethod = pgEnum("connection_method", ["app", "token"]);
-
-/** 操作の記録の種類の列挙型（activity_kind。FR-052の絞り込みの単位）。 */
-export const activityKind = pgEnum("activity_kind", ["review", "draft", "content", "settings", "member"]);
+import { accounts, testerApplications } from "../apps/threads/schema";
 
 /** アプリを使う個人。Clerk のユーザーと1対1で対応する（data-model.md の users）。 */
 export const users = pgTable("users", {
@@ -98,214 +76,6 @@ export const users = pgTable("users", {
   check("users_account_limit_range", sql`${t.accountLimit} IS NULL OR ${t.accountLimit} BETWEEN 1 AND ${sql.raw(String(ACCOUNT_LIMIT_MAX))}`),
   check("users_daily_post_limit_range", sql`${t.dailyPostLimit} IS NULL OR ${t.dailyPostLimit} BETWEEN 1 AND ${sql.raw(String(DAILY_POST_LIMIT_MAX))}`),
 ]);
-
-/**
- * Threadsアカウント1件に対応する運用単位（data-model.md の accounts）。
- * 名前だけで作り、Threadsには後でつなぐ。未接続の間は threads_user_id・username・connection_method が NULL（specs/012 data-model.md）。
- */
-export const accounts = pgTable("accounts", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  // アカウントの名前（specs/012 research.md R2）。主に出す名前
-  name: text("name").notNull(),
-  threadsUserId: text("threads_user_id").unique(),
-  username: text("username"),
-  displayName: text("display_name"),
-  profilePictureUrl: text("profile_picture_url"),
-  connectionStatus: connectionStatus("connection_status").notNull().default("connected"),
-  lastUsedAt: timestamp("last_used_at", { withTimezone: true, precision: 6 }),
-  connectionGeneration: bigint("connection_generation", { mode: "number" }).notNull().default(0),
-  // 宣伝投稿の割合（specs/002-strategy-profile data-model.md、research.md R7）
-  promotionRatioPercent: smallint("promotion_ratio_percent").notNull().default(PROMOTION_RATIO_DEFAULT),
-  // プロンプトで作る件数（specs/003-prompt-bulk-register data-model.md、research.md R11）
-  promptPostCount: smallint("prompt_post_count").notNull().default(PROMPT_COUNT_DEFAULT),
-  // 投稿ルール（CORE RULES。specs/004-review-approval data-model.md、research.md R11）
-  coreRules: text("core_rules").notNull().default(""),
-  coreRulesVersion: integer("core_rules_version").notNull().default(1),
-  // プロンプトの材料を最後に変えた日時（specs/006-performance-feedback research.md R9。削除も含む）
-  promotionsChangedAt: timestamp("promotions_changed_at", { withTimezone: true, precision: 6 }),
-  researchChangedAt: timestamp("research_changed_at", { withTimezone: true, precision: 6 }),
-  coreRulesChangedAt: timestamp("core_rules_changed_at", { withTimezone: true, precision: 6 }),
-  // 投稿のルールを最後に保存した人（specs/008 research.md R8）
-  coreRulesUpdatedByUserId: uuid("core_rules_updated_by_user_id").references((): AnyPgColumn => users.id, {
-    onDelete: "set null",
-  }),
-  // 宣伝投稿の割合・プロンプトで作る件数の版と、最後に保存した人（同時の保存を知らせる。specs/008 FR-007、PR #9 のCodexレビュー）
-  promotionRatioVersion: integer("promotion_ratio_version").notNull().default(1),
-  promotionRatioUpdatedByUserId: uuid("promotion_ratio_updated_by_user_id").references((): AnyPgColumn => users.id, {
-    onDelete: "set null",
-  }),
-  promptPostCountVersion: integer("prompt_post_count_version").notNull().default(1),
-  promptPostCountUpdatedByUserId: uuid("prompt_post_count_updated_by_user_id").references((): AnyPgColumn => users.id, {
-    onDelete: "set null",
-  }),
-  // 1投稿の文字数の目標と、短文・中文・長文の文字数と割合（specs/014 data-model.md、research.md R11）。
-  // 版と最後に保存した人は、作る件数のもの（prompt_post_count_version）を共有する
-  postLengthTarget: smallint("post_length_target").notNull().default(POST_LENGTH_DEFAULTS.target),
-  shortLength: smallint("short_length").notNull().default(POST_LENGTH_DEFAULTS.shortLength),
-  mediumLength: smallint("medium_length").notNull().default(POST_LENGTH_DEFAULTS.mediumLength),
-  longLength: smallint("long_length").notNull().default(POST_LENGTH_DEFAULTS.longLength),
-  shortRatio: smallint("short_ratio").notNull().default(POST_LENGTH_DEFAULTS.shortRatio),
-  mediumRatio: smallint("medium_ratio").notNull().default(POST_LENGTH_DEFAULTS.mediumRatio),
-  longRatio: smallint("long_ratio").notNull().default(POST_LENGTH_DEFAULTS.longRatio),
-  // 反応数を読む権限がないと分かった日時（006 research.md R11）。再接続で消す
-  insightsDeniedAt: timestamp("insights_denied_at", { withTimezone: true, precision: 6 }),
-  // 返信の権限がないと分かった時刻（specs/023 research.md R1）。つなぎ直すとNULL
-  repliesDeniedAt: timestamp("replies_denied_at", { withTimezone: true, precision: 6 }),
-  // 今の接続の方法と、要再接続の理由の補い（specs/010 data-model.md。hint は short_lived_token だけ）
-  connectionMethod: connectionMethod("connection_method").default("app"),
-  reconnectHint: text("reconnect_hint"),
-  ...timestamps,
-}, (t) => [
-  // ユーザー名での照合（specs/010 research.md R6）。古い名前が残る間は重なりうるので一意にしない
-  index("accounts_username_lower_idx").on(sql`lower(${t.username})`),
-  check("accounts_promotion_ratio_range", sql`${t.promotionRatioPercent} BETWEEN 0 AND 100`),
-  check("accounts_prompt_post_count_range", sql`${t.promptPostCount} BETWEEN 1 AND 50`),
-  check("accounts_core_rules_length", sql`char_length(${t.coreRules}) <= 2000`),
-  check("accounts_post_length_target_range", sql`${t.postLengthTarget} BETWEEN 50 AND 500`),
-  check(
-    "accounts_post_kind_length_range",
-    sql`${t.shortLength} BETWEEN 10 AND ${t.postLengthTarget} AND ${t.mediumLength} BETWEEN 10 AND ${t.postLengthTarget} AND ${t.longLength} BETWEEN 10 AND ${t.postLengthTarget}`,
-  ),
-  check(
-    "accounts_post_kind_ratio_range",
-    sql`${t.shortRatio} BETWEEN 0 AND 100 AND ${t.mediumRatio} BETWEEN 0 AND 100 AND ${t.longRatio} BETWEEN 0 AND 100 AND ${t.shortRatio} + ${t.mediumRatio} + ${t.longRatio} = 100`,
-  ),
-  // アカウントの名前は前後の空白を除いて1〜50文字（specs/012 data-model.md）。空白は JavaScript の trim() と同じもの
-  // （タブ・改行・NBSP・全角スペースなど。PR #15 のCodexレビュー）。0013 の名前の埋め方も同じ文字の集まりを使う
-  check(
-    "accounts_name_length",
-    sql`char_length(${t.name}) BETWEEN 1 AND 50 AND ${t.name} !~ '^[\\t\\n\\u000b\\f\\r \\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000\\ufeff]' AND ${t.name} !~ '[\\t\\n\\u000b\\f\\r \\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000\\ufeff]$'`,
-  ),
-  // 未接続 ⇔ Threadsのユーザー・ユーザー名・接続の方法がそろって NULL（同じマイグレーションで足した値を使えないので ::text で比べる）
-  check(
-    "accounts_connection_consistency",
-    sql`(${t.connectionStatus}::text = 'not_connected' AND ${t.threadsUserId} IS NULL AND ${t.username} IS NULL AND ${t.connectionMethod} IS NULL)
-      OR (${t.connectionStatus}::text <> 'not_connected' AND ${t.threadsUserId} IS NOT NULL AND ${t.username} IS NOT NULL AND ${t.connectionMethod} IS NOT NULL)`,
-  ),
-]);
-
-/** User と Account の関係（data-model.md の memberships）。1つのAccountに owner は1人だけ。 */
-export const memberships = pgTable(
-  "memberships",
-  {
-    id: uuid("id").primaryKey().defaultRandom(),
-    userId: uuid("user_id")
-      .notNull()
-      .references(() => users.id, { onDelete: "cascade" }),
-    accountId: uuid("account_id")
-      .notNull()
-      .references(() => accounts.id, { onDelete: "cascade" }),
-    role: membershipRole("role").notNull(),
-    // editor（担当）の行が経由するチーム（specs/011 data-model.md）。owner はNULL
-    teamId: uuid("team_id").references((): AnyPgColumn => teams.id, { onDelete: "cascade" }),
-    // 担当の知らせを閉じた日時（specs/011 research.md R9）。editor の行だけで使う
-    assignedNoticeDismissedAt: timestamp("assigned_notice_dismissed_at", { withTimezone: true, precision: 6 }),
-    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-  },
-  (t) => [
-    uniqueIndex("memberships_user_account_unique").on(t.userId, t.accountId),
-    // 1つのAccountにownerは1人だけ
-    uniqueIndex("memberships_one_owner_per_account").on(t.accountId).where(sql`${t.role} = 'owner'`),
-    // owner だけがチームなし（新しい列挙型の値はマイグレーションの中で書けないので owner だけで書く）
-    check("memberships_team_matches_role", sql`(${t.role} = 'owner') = (${t.teamId} IS NULL)`),
-    index("memberships_team_role_idx").on(t.teamId, t.role),
-  ],
-);
-
-/** チーム（specs/011 data-model.md の teams）。管理者が作り、招待リンクを1本持つ。 */
-export const teams = pgTable(
-  "teams",
-  {
-    id: uuid("id").primaryKey().defaultRandom(),
-    name: text("name").notNull(),
-    // 管理者。team_members の admin の行と同じ値を同じトランザクションで書く。
-    // 利用者の削除（退会）は011の次のfeatureで作り、users の行を消す前にチームから外す（data-model.md）
-    adminUserId: uuid("admin_user_id")
-      .notNull()
-      .references(() => users.id, { onDelete: "restrict" }),
-    // 招待リンク（specs/008 research.md R4 と同じ仕組み）。照合はハッシュ、表示は暗号化した写し
-    inviteTokenHash: text("invite_token_hash").notNull().unique(),
-    inviteTokenCiphertext: bytea("invite_token_ciphertext").notNull(),
-    inviteTokenIv: bytea("invite_token_iv").notNull(),
-    inviteKeyVersion: smallint("invite_key_version").notNull(),
-    inviteRotatedAt: timestamp("invite_rotated_at", { withTimezone: true, precision: 6 }),
-    ...timestamps,
-  },
-  (t) => [
-    check("teams_name_length", sql`char_length(${t.name}) BETWEEN 1 AND 50`),
-    index("teams_admin_idx").on(t.adminUserId),
-  ],
-);
-
-/** チームの人（specs/011 data-model.md の team_members）。1チーム50人、編集者10人まで。 */
-export const teamMembers = pgTable(
-  "team_members",
-  {
-    teamId: uuid("team_id")
-      .notNull()
-      .references(() => teams.id, { onDelete: "cascade" }),
-    userId: uuid("user_id")
-      .notNull()
-      .references(() => users.id, { onDelete: "cascade" }),
-    role: teamRole("role").notNull(),
-    joinedAt: timestamp("joined_at", { withTimezone: true, precision: 6 }).notNull().defaultNow(),
-    // 管理者がこの人の参加の知らせを閉じた日時（research.md R9）
-    joinedNoticeDismissedAt: timestamp("joined_notice_dismissed_at", { withTimezone: true, precision: 6 }),
-  },
-  (t) => [
-    primaryKey({ columns: [t.teamId, t.userId] }),
-    // 1チームに管理者は1人
-    uniqueIndex("team_members_one_admin").on(t.teamId).where(sql`${t.role} = 'admin'`),
-    index("team_members_user_idx").on(t.userId),
-  ],
-);
-
-/** チームに入っているアカウント（specs/011 data-model.md の team_accounts）。shared は「チームに見せる」。 */
-export const teamAccounts = pgTable(
-  "team_accounts",
-  {
-    teamId: uuid("team_id")
-      .notNull()
-      .references(() => teams.id, { onDelete: "cascade" }),
-    accountId: uuid("account_id")
-      .notNull()
-      .references(() => accounts.id, { onDelete: "cascade" }),
-    addedByUserId: uuid("added_by_user_id").references(() => users.id, { onDelete: "set null" }),
-    shared: boolean("shared").notNull().default(false),
-    addedAt: timestamp("added_at", { withTimezone: true, precision: 6 }).notNull().defaultNow(),
-    updatedAt: timestamp("updated_at", { withTimezone: true, precision: 6 }).notNull().defaultNow(),
-  },
-  (t) => [
-    primaryKey({ columns: [t.teamId, t.accountId] }),
-    // 1つのアカウントは1つのチームにだけ入る（複数に広げるときはこの索引を外す。spec Clarifications）
-    uniqueIndex("team_accounts_one_team_per_account").on(t.accountId),
-  ],
-);
-
-/** 操作の記録（data-model.md の activity_logs）。チームがあるAccountだけ。90日で消す。 */
-export const activityLogs = pgTable(
-  "activity_logs",
-  {
-    id: uuid("id").primaryKey().defaultRandom(),
-    accountId: uuid("account_id")
-      .notNull()
-      .references(() => accounts.id, { onDelete: "cascade" }),
-    actorUserId: uuid("actor_user_id").references(() => users.id, { onDelete: "set null" }),
-    actorName: text("actor_name").notNull(),
-    actorRole: membershipRole("actor_role").notNull(),
-    kind: activityKind("kind").notNull(),
-    action: text("action").notNull(),
-    itemCount: integer("item_count").notNull().default(1),
-    summary: text("summary"),
-    details: jsonb("details"),
-    createdAt: timestamp("created_at", { withTimezone: true, precision: 6 }).notNull().defaultNow(),
-  },
-  (t) => [
-    index("activity_logs_account_created_idx").on(t.accountId, t.createdAt.desc()),
-    index("activity_logs_account_actor_idx").on(t.accountId, t.actorUserId, t.createdAt.desc()),
-    index("activity_logs_created_idx").on(t.createdAt),
-  ],
-);
 
 /** 契約（specs/013-billing data-model.md の subscriptions）。利用者に1行まで。はじめて「契約する」を押したときに作る。 */
 export const subscriptions = pgTable(

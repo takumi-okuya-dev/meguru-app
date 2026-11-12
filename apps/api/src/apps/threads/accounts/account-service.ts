@@ -1,17 +1,19 @@
 // Accountの作成・更新・上限（FR-008〜FR-017、research.md R8・R9）。Threadsとの接続は connection-service（specs/027）。
 import { and, eq, isNull, lt, ne, or, sql } from "drizzle-orm";
-import type { Env } from "../../kernel/env";
-import { createDb, withTransaction, type Db, type TxDb } from "../../kernel/db/client";
-import { lockUserRow } from "../../kernel/db/locks";
-import { accounts, memberships, users } from "../schema";
-import { billingModeOf, type BillingMode } from "../../kernel/config";
-import { AppError } from "../../kernel/errors";
+import type { Env } from "../../../kernel/env";
+import { createDb, withTransaction, type Db, type TxDb } from "../../../kernel/db/client";
+import { lockUserRow } from "../../../kernel/db/locks";
+import { accounts, memberships } from "../schema";
+import { users } from "../../../platform/schema";
+import { billingModeOf, type BillingMode } from "../../../kernel/config";
+import { AppError } from "../../../kernel/errors";
 import { authorizeAccount } from "../access/access";
-import { loadEntitlement, markQuantityDirty, syncQuantity } from "../billing/billing-service";
+import { loadEntitlement, syncQuantity } from "../../../platform";
+import { withdrawForAccountDeletion } from "../tester-invites/tester-application-service";
+import { syncThreadsUsage } from "./usage";
 import { recordActivity } from "../activity/activity-log";
 import { beforeAccountDeleted } from "../teams/team-service";
-import { runHook } from "../hooks";
-import { effectiveLimits } from "../operator/limit-service";
+import { effectiveLimits } from "../../../platform";
 
 // ---- 登録数の上限（specs/013 research.md R9。001 FR-015〜FR-017 を置き換えた） ----
 
@@ -110,11 +112,11 @@ export async function createAccount(env: Env, userId: string, name: string) {
       })
       .returning();
     await tx.insert(memberships).values({ userId, accountId: account!.id, role: "owner" });
-    // 契約があれば、数の合わせ直しの印を付ける（specs/013 research.md R6）
-    await markQuantityDirty(tx, userId);
     return account!;
   });
-  // トランザクションの後でStripeの数を合わせる。失敗しても作成は成功のまま（印が残り、日次で合わせる）
+  // トランザクションの後で、利用の数を共通へ伝え（料金の数が変われば印が付く）、Stripeの数を合わせる。
+  // 失敗しても作成は成功のまま（印が残り、日次で合わせる。specs/meguru/029 research.md R6）
+  await syncThreadsUsage(createDb(env.DATABASE_URL), userId);
   await syncQuantity(env, userId);
   return created;
 }
@@ -224,30 +226,30 @@ export async function deleteAccount(
     }
     // チームの最後のアカウントなら、同じトランザクションでチームを抜けたものとする（specs/011 FR-046、research.md R7）
     await beforeAccountDeleted(tx, account.id, userId);
-    // アプリの片づけ（Threads：テスター招待の申し込みを取り下げ、枠を使っていれば「外してよい」にする。specs/024 data-model.md 5）。
-    // 知らせで呼ぶ（specs/027 research.md R4）
-    await runHook("accountDeleting", { tx, accountId: account.id });
+    // テスター招待の申し込みを取り下げ、枠を使っていれば「外してよい」にする（specs/024 data-model.md 5）
+    await withdrawForAccountDeletion(tx, account.id);
     const now = new Date();
     await tx
       .update(users)
       .set({ lastAccountDeletedAt: now, updatedAt: now })
       .where(eq(users.id, userId));
     await tx.delete(accounts).where(eq(accounts.id, account.id));
-    await markQuantityDirty(tx, userId);
   });
-  // 次の請求から数を減らす（日割りの返金はしない。specs/013 FR-030）
+  // 利用の数を共通へ伝え、次の請求から数を減らす（日割りの返金はしない。specs/013 FR-030）
+  await syncThreadsUsage(createDb(env.DATABASE_URL), userId);
   await syncQuantity(env, userId);
 }
 
 /**
  * Threadsのユーザーで、そのアカウントをすべて消す（Metaからのデータ削除の求め。specs/001 research.md R13）。
  * 持ち主ごとに users の行をロックし、チームの片づけ・アプリの片づけ（知らせ）・最後に消した日時・数の合わせ直しの印をしてから消す。
- * 027で apps/threads/connection/data-deletion.ts から移した（accounts・users の持ち主は共通）。トランザクションの中で呼ぶ。
+ * 029 で Threads の持ち物にした。トランザクションの中で呼び、返した持ち主について、トランザクションのあとで利用の数を伝える。
  * @param tx - トランザクション
  * @param threadsUserId - accounts.threads_user_id
  * @param now - 削除の時刻
+ * @returns 消したアカウントの持ち主の users.id
  */
-export async function deleteAccountsOfThreadsUser(tx: TxDb, threadsUserId: string, now: Date): Promise<void> {
+export async function deleteAccountsOfThreadsUser(tx: TxDb, threadsUserId: string, now: Date): Promise<string[]> {
   const owners = await tx
     .select({ userId: memberships.userId, accountId: accounts.id })
     .from(accounts)
@@ -257,11 +259,11 @@ export async function deleteAccountsOfThreadsUser(tx: TxDb, threadsUserId: strin
     await lockUserRow(tx, o.userId);
     // チームの最後のアカウントなら、チームを抜けたものとする（specs/011 FR-046。アカウントの削除と同じ）
     await beforeAccountDeleted(tx, o.accountId, o.userId);
-    // アプリの片づけ（Threads：テスター招待の取り下げ。specs/024 data-model.md 5、PR #71 のCodexレビュー）。知らせで呼ぶ（specs/027）
-    await runHook("accountDeleting", { tx, accountId: o.accountId });
+    // テスター招待の取り下げ（specs/024 data-model.md 5、PR #71 のCodexレビュー）
+    await withdrawForAccountDeletion(tx, o.accountId);
     await tx.update(users).set({ lastAccountDeletedAt: now, updatedAt: now }).where(eq(users.id, o.userId));
-    // 契約があれば、数の合わせ直しの印（日次の処理で合わせる。specs/013 research.md R6）
-    await markQuantityDirty(tx, o.userId);
   }
   await tx.delete(accounts).where(eq(accounts.threadsUserId, threadsUserId));
+  // 持ち主（トランザクションのあとで、呼んだ側が利用の数を共通へ伝える。specs/meguru/029 research.md R6）
+  return [...new Set(owners.map((o) => o.userId))];
 }

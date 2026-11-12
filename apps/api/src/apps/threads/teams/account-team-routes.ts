@@ -1,8 +1,8 @@
 // /api/accounts/:accountId のチーム（specs/011-team-revision contracts/api.md「Account（変わる）」）。
 import { FEATURES } from "@meguru/shared";
 import { Hono, type MiddlewareHandler } from "hono";
-import type { AppEnv } from "../identity/auth";
-import { createDb } from "../../kernel/db/client";
+import type { AppEnv } from "../../../platform";
+import { createDb } from "../../../kernel/db/client";
 import { authorizeAccount } from "../access/access";
 import { assignedNoticeVisible, dismissAssignedNotice, getAccountTeam } from "./team-service";
 
