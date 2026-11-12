@@ -1,42 +1,54 @@
-// 機能のまとまりの3つのスイッチと「保存」（specs/019-feature-switches contracts/ui-routes.md 4・5）。
+// 機能のまとまりのスイッチと「保存」（specs/019-feature-switches contracts/ui-routes.md 4・5）。
 // 運営者の「使える機能」（人の設定）と、グループの詳しい画面（グループの設定）で使う。
-import { FEATURE_LABELS, FEATURES, type Feature, type FeatureSettingsRequest } from "@meguru/shared";
+// まとまりの名前と表示名は、アプリが登録したもの（登録の一覧。specs/meguru/029 tasks.md T070）。
+import type { FeatureSettingsRequest } from "@meguru/shared";
 import { ChevronRightIcon } from "lucide-react";
 import { useId, useState, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { describeError } from "@/lib/api-client";
+import { useFeatureDefs, type FeatureDef } from "@/lib/feature-defs";
 import { cn } from "@/lib/utils";
 
 type Values = FeatureSettingsRequest["features"];
 
 /**
- * OFFのまとまりから、3つすべての値を作る。
+ * OFFのまとまりから、登録したまとまりすべての値を作る。
+ * @param keys - 登録したまとまりの名前
  * @param disabled - OFFのまとまり
  * @returns まとまりごとの値（true ならON）
  */
-export function valuesFrom(disabled: readonly Feature[]): Values {
-  return { autopost: !disabled.includes("autopost"), strategy: !disabled.includes("strategy"), team: !disabled.includes("team") };
+export function valuesFrom(keys: readonly string[], disabled: readonly string[]): Values {
+  return Object.fromEntries(keys.map((k) => [k, !disabled.includes(k)]));
 }
 
+type Props = {
+  disabled: readonly string[];
+  notes?: Partial<Record<string, string>>;
+  label: string;
+  onSave: (values: Values) => Promise<unknown>;
+};
+
 /**
- * 3つのスイッチと「保存」。保存したら「保存しました」（ボタンの外の文。押してもボタンの文言を変えない。docs/ui-design.md §6）。
+ * まとまりのスイッチと「保存」。保存したら「保存しました」（ボタンの外の文。押してもボタンの文言を変えない。docs/ui-design.md §6）。
+ * まとまりの一覧（登録の一覧）を読むまでは、読み込み中と出す。
  * @param props - disabled：今のOFF、notes：まとまりごとに名前の下に出す短い文（「グループでOFF」など）、
  *   label：スイッチの組の名前（読み上げ用）、onSave：保存
  * @returns スイッチの組
  */
-export function FeatureSwitches({
-  disabled,
-  notes = {},
-  label,
-  onSave,
-}: {
-  disabled: readonly Feature[];
-  notes?: Partial<Record<Feature, string>>;
-  label: string;
-  onSave: (values: Values) => Promise<unknown>;
-}) {
-  const [values, setValues] = useState<Values>(() => valuesFrom(disabled));
+export function FeatureSwitches(props: Props) {
+  const defs = useFeatureDefs();
+  if (!defs) return <p className="text-sm text-muted-foreground">読み込んでいます…</p>;
+  return <Switches {...props} defs={defs} />;
+}
+
+/**
+ * まとまりの一覧を読んだあとのスイッチの組。
+ * @param props - FeatureSwitches と同じものと、defs：まとまりの一覧
+ * @returns スイッチの組
+ */
+function Switches({ disabled, notes = {}, label, onSave, defs }: Props & { defs: readonly FeatureDef[] }) {
+  const [values, setValues] = useState<Values>(() => valuesFrom(defs.map((d) => d.key), disabled));
   const [status, setStatus] = useState<{ kind: "saved" } | { kind: "error"; message: string } | null>(null);
   const [pending, setPending] = useState(false);
   const idBase = useId();
@@ -55,15 +67,15 @@ export function FeatureSwitches({
   return (
     <div role="group" aria-label={label} className="space-y-3">
       <ul className="divide-y">
-        {FEATURES.map((f) => (
+        {defs.map(({ key: f, label: name }) => (
           <li key={f} className="flex min-h-12 items-center gap-3 py-1.5 text-sm">
             <span className="flex min-w-0 flex-1 flex-col leading-snug">
-              <span id={`${idBase}-${f}`}>{FEATURE_LABELS[f]}</span>
+              <span id={`${idBase}-${f}`}>{name}</span>
               {notes[f] && <span className="text-xs text-muted-foreground">{notes[f]}</span>}
             </span>
             <Switch
               aria-labelledby={`${idBase}-${f}`}
-              checked={values[f]}
+              checked={values[f] ?? true}
               onCheckedChange={(v) => {
                 setValues((prev) => ({ ...prev, [f]: v }));
                 setStatus(null);

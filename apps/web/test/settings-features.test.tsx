@@ -16,7 +16,8 @@ const mocks = vi.hoisted(() => ({
 }));
 vi.mock("@/lib/api-client", async (orig) => {
   const actual = await orig<typeof import("@/lib/api-client")>();
-  return { ...actual, api: { ...actual.api, ...mocks } };
+  const { THREADS_REGISTRY } = await import("./helpers/app-registry");
+  return { ...actual, api: { ...actual.api, ...mocks, appRegistry: async () => THREADS_REGISTRY } };
 });
 vi.mock("@/apps/threads/lib/api", async (orig) => {
   const actual = await orig<typeof import("@/apps/threads/lib/api")>();

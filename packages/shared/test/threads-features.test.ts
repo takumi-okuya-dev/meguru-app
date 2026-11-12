@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { FEATURE_LABELS, FEATURES, isFeature } from "../src/features";
+import { FEATURE_LABELS, FEATURES, isFeature } from "../src/apps/threads/features";
 
 describe("機能のまとまり（specs/019 data-model.md）", () => {
   it("3つで、この順", () => {

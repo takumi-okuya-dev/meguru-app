@@ -2,6 +2,8 @@
 import type { z } from "zod";
 import { meResponseSchema, withdrawalPreviewSchema } from "../../schemas";
 
+export * from "./features";
+
 /**
  * GET /api/threads/me のレスポンス（Threadsの「自分」）。今の GET /api/me のThreadsの部分と同じ形。
  * PR5 で /api/me からThreadsの項目を消すときに、ここへ定義を移す（それまでは同じ定義から取り出し、ずれないようにする）。

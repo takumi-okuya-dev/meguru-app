@@ -42,16 +42,13 @@ describe("登録", () => {
     expect(registeredApps()).toEqual([]);
   });
 
-  it("requireFeatureSettingsApp は、機能の名前が運営の画面の形（FEATURES）と同じアプリ。登録の順番によらない。なければ例外", () => {
-    expect(() => requireFeatureSettingsApp()).toThrow();
+  it("requireFeatureSettingsApp は、機能を登録したただ1つのアプリ。なければ・2つ以上なら例外（共通はアプリの名前を知らない。T070）", () => {
+    expect(() => requireFeatureSettingsApp()).toThrow(/登録されていません/);
+    registerAppLimits("limits-only", { people: { label: "人数", min: 1, max: 100, operatorValue: null } });
     registerAppFeatures("sample", [{ key: "notes", label: "メモ" }]);
-    expect(() => requireFeatureSettingsApp()).toThrow();
-    registerAppFeatures("threads", [
-      { key: "autopost", label: "自動投稿" },
-      { key: "strategy", label: "戦略" },
-      { key: "team", label: "チーム" },
-    ]);
-    expect(requireFeatureSettingsApp()).toBe("threads");
+    expect(requireFeatureSettingsApp()).toBe("sample");
+    registerAppFeatures("other", [{ key: "photos", label: "写真" }]);
+    expect(() => requireFeatureSettingsApp()).toThrow(/2つ以上/);
   });
 
   it("登録していないアプリは空", () => {

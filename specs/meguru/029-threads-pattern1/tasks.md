@@ -92,7 +92,7 @@ description: "Task list for feature meguru/029 Threads pattern ①"
 
 ### 共有の型
 
-- [ ] T021 [US3] `packages/shared/src/apps/threads/`を作り、`threadsMeResponseSchema`（今の`meResponseSchema`のThreadsの部分を写す）と`FEATURES`（`packages/shared/src/features.ts`から移す）を置く。`packages/shared/src/index.ts`から出す。今の`meResponseSchema`はPR5まで変えない。
+- [X] T021 [US3] `packages/shared/src/apps/threads/`を作り、`threadsMeResponseSchema`（今の`meResponseSchema`のThreadsの部分を写す）と`FEATURES`（`packages/shared/src/features.ts`から移す）を置く。`packages/shared/src/index.ts`から出す。今の`meResponseSchema`はPR5まで変えない。
 
 ### 移動（中身は変えない）
 
@@ -178,7 +178,8 @@ description: "Task list for feature meguru/029 Threads pattern ①"
 >   - PR4b-1＝T050・T053・T054（APIの呼び出し106本とキー38個を `apps/threads/lib/` へ移し、Threadsの呼び出しは `/api/threads/…` を呼ぶ。テストのモックを `@/apps/threads/lib/api` に分けた。期待する結果は変えていない）
 >   - PR4b-2＝T051・T021 のうち `threadsMeResponseSchema`（Threadsの画面は、アカウント・チーム・使える機能などを `useThreadsMe()`（`/api/threads/me`）から読む。キーは `["me", "threads"]` で、共通の自分を取り直すと一緒に取り直す）
 >   - PR4b-3＝T052（退会の確かめのThreadsの分を、AppModule の withdrawalPreview として外枠に渡す。退会のダイアログは外枠だけが使うので `shell/settings/` へ移した（共通の部品は外枠を読めないため））
->   - PR4c＝T070・T021 のうち `FEATURES` の移動。**運営の機能のON/OFFのリクエストの型（`featureSettingsRequestSchema` など）が Threads の3つの名前で固定**なので、画面の名前を登録の一覧に替えるだけでは足りない。共通の型を「名前 → ON/OFF」の一般の形にし、運営の画面（使える機能・上限・グループ）と共通の `FeatureSwitches` を登録の一覧で出す形にする。そのあと `FEATURES`・`FEATURE_LABELS` を Threads へ移す
+>   - PR4c＝T070 のうち機能のON/OFF・T021 のうち `FEATURES` の移動：運営の機能のON/OFFのリクエストの型を「名前 → ON/OFF」の一般の形にし（名前が登録とそろっているかは API が確かめる）、共通の `FeatureSwitches` と運営の「使える機能」の画面を、登録の一覧（`GET /api/operator/app-registry`）の名前・表示名・説明で出す形にした。機能のON/OFFを扱うアプリは「機能を登録したただ1つのアプリ」（2つ以上なら止める）。`FEATURES`・`FEATURE_LABELS`・`isFeature` を `@meguru/shared` の `apps/threads/features.ts` へ移した（共通の側には記録の種類と件数だけが残る）
+>   - PR4d＝T070 のうち上限の画面：運営の上限の API の形（`accountLimit`・`dailyPostLimit`、見つかった人の Threads のアカウントの数）も Threads の名前で固定なので、一般の形（名前 → 値）にし、上限の画面を登録の一覧（名前・表示名・範囲）で出す形にする
 >   - T056（画面が新しい道筋だけを呼んでいるかのブラウザでの確かめ）は、PR4b-1 のマージのあとからできる。PR5 の前にユーザーと行う
 >   - **PR5 に回したこと（PR #103 のセルフレビュー）**：Threads の画面は、PR5 まで `/api/me` と `/api/threads/me` の両方を読む（サーバーで Threads の中身を2回作る）。PR5 で `/api/me` から Threads の中身を消すときに、Threads の中身だけが変わったところ（アカウントを開く・名前を変える・チーム）の取り直しを `["me"]` から `threadsQueryKeys.me` に替える。退会のダイアログも同じで、PR5 まで `/api/me/withdrawal-preview` と `/api/threads/me/withdrawal-preview` の両方が Threads の分を作る（PR5 で共通の側から Threads の分を消す。PR #104 のセルフレビュー）
 

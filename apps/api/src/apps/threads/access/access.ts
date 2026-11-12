@@ -329,7 +329,7 @@ export const featureDisabled = (feature: Feature) => new AppError("FEATURE_DISAB
  * @param feature - まとまり
  * @throws AppError FEATURE_DISABLED
  */
-export function requireFeature(user: { features: ReadonlySet<Feature> }, feature: Feature): void {
+export function requireFeature(user: { features: ReadonlySet<string> }, feature: Feature): void {
   if (!user.features.has(feature)) throw featureDisabled(feature);
 }
 

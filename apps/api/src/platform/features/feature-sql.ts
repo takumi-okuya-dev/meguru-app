@@ -1,7 +1,6 @@
 // 使えない機能のまとまりの条件（specs/019-feature-switches data-model.md「判定」、research.md R10）。
 // 使えないまとまり＝人の設定のOFF ∪ 入っている閉じていないグループの設定のOFF（どちらかでOFFならOFF。FR-018）。
 // 判定の条件はここだけに置き、利用権（entitlement）と認証のミドルウェアがこれを使う（Constitution原則V）。
-import { FEATURES, type Feature } from "@meguru/shared";
 import { sql, type SQL } from "drizzle-orm";
 import type { AnyPgColumn } from "drizzle-orm/pg-core";
 import { featureDisables, groupFeatureDisables, testGroupMembers, testGroups } from "../schema";
@@ -36,10 +35,11 @@ export function disabledAppFeaturesSql(userId: AnyPgColumn | SQL, app: string): 
 /**
  * 使えないまとまりの配列から、使えるまとまりの集合を作る。
  * @param disabled - 使えないまとまり（DBから読んだ配列）
- * @returns 使えるまとまり（FEATURES の順）
+ * @param keys - アプリが登録したまとまりの名前（登録の順）
+ * @returns 使えるまとまり（登録の順）
  */
-export function featuresFrom(disabled: readonly string[] | null | undefined): ReadonlySet<Feature> {
+export function featuresFrom(disabled: readonly string[] | null | undefined, keys: readonly string[]): ReadonlySet<string> {
   const off = new Set(disabled ?? []);
-  return new Set(FEATURES.filter((f) => !off.has(f)));
+  return new Set(keys.filter((f) => !off.has(f)));
 }
 

@@ -20,6 +20,7 @@ vi.mock("@/lib/api-client", async (orig) => {
     ...actual,
     api: {
       ...actual.api,
+      appRegistry: async () => (await import("./helpers/app-registry")).THREADS_REGISTRY,
       me,
       testGroups,
       createTestGroup,

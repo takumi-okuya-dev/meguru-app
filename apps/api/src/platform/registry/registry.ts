@@ -1,6 +1,5 @@
 // アプリが共通に登録する、機能のまとまりと上限の名前（specs/meguru/029-threads-pattern1 research.md R7、contracts/platform-entry.md 5）。
 // 名前・表示名・範囲はアプリが決め、組み立て（app.ts）で登録する。共通のコードにはアプリの名前を書かない。
-import { FEATURES } from "@meguru/shared";
 
 /** 機能のまとまりの定義。 */
 export type AppFeatureDef = {
@@ -45,17 +44,16 @@ export function registerAppFeatures(app: string, defs: readonly AppFeatureDef[])
 }
 
 /**
- * 機能のON/OFFの運営の画面と、ログインした人の features が扱うアプリ。登録した機能の名前が、運営の画面の決まった形
- * （@meguru/shared の FEATURES）と同じアプリにする（登録の順番では決めない。PR #98 のセルフレビュー）。
- * 運営の画面を登録の一覧で出す形にするまで（PR4 の T069・T070）、ON/OFFは1つのアプリのものとして扱う。
+ * 機能のON/OFFの運営の画面と、ログインした人の features が扱うアプリ（機能を登録した、ただ1つのアプリ。登録の順番では決めない）。
+ * 運営の画面をアプリごとに分けるまで、ON/OFFは1つのアプリのものとして扱う（specs/meguru/029 tasks.md T070）。
  * @returns アプリの番号
- * @throws Error 当てはまるアプリがないとき（組み立ての登録漏れ。黙って全部ONにしないため）
+ * @throws Error 機能を登録したアプリがない（組み立ての登録漏れ。黙って全部ONにしないため）か、2つ以上あるとき
  */
 export function requireFeatureSettingsApp(): string {
-  for (const [app, list] of features) {
-    if (list.length === FEATURES.length && FEATURES.every((f) => list.some((d) => d.key === f))) return app;
-  }
-  throw new Error("機能のON/OFFを扱うアプリが登録されていません（組み立てで registerAppFeatures を呼んでください）");
+  const apps = [...features].filter(([, list]) => list.length > 0).map(([app]) => app);
+  if (apps.length === 1) return apps[0]!;
+  if (apps.length === 0) throw new Error("機能のON/OFFを扱うアプリが登録されていません（組み立てで registerAppFeatures を呼んでください）");
+  throw new Error(`機能を登録したアプリが2つ以上あります（${apps.join("・")}）。運営の画面をアプリごとに分けるまで、1つにしてください`);
 }
 
 /**

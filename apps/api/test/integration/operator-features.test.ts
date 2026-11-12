@@ -106,6 +106,10 @@ describe("PUT /api/operator/feature-settings/:userId", () => {
     const bad = await op("PUT", `/api/operator/feature-settings/${userId}`, { features: { strategy: false } });
     expect(bad.status).toBe(400);
     expect((await json(bad)).error?.code).toBe("VALIDATION_FAILED");
+    // 登録していない名前も受け付けない（名前は登録の一覧で確かめる。specs/meguru/029 T070）
+    const unknown = await op("PUT", `/api/operator/feature-settings/${userId}`, { features: { ...ALL_ON, photos: true } });
+    expect(unknown.status).toBe(400);
+    expect((await json(unknown)).error?.code).toBe("VALIDATION_FAILED");
   });
 
   it("運営者が自分をOFFにしても、運営者のAPIは使える", async () => {
