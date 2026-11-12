@@ -21,6 +21,7 @@ import {
   referralRoutes,
   meRoutes,
   operatorLimitRoutes,
+  operatorAppAccessRoutes,
   clerkUserDeleter,
   type ClerkUserDeleter,
 } from "./platform";
@@ -223,6 +224,8 @@ export function createApp(deps: AppDeps = defaultDeps) {
     .route("/", operatorAppRegistryRoutes(authed))
     // 上限（specs/024 contracts/api.md）
     .route("/", operatorLimitRoutes(authed))
+    // アプリの利用の許可（specs/meguru/030-app-access FR-005）
+    .route("/", operatorAppAccessRoutes(authed))
     .route("/threads", threadsApi)
     .route("/", threadsConnectRoutes(authed))
     .route("/", billingRoutes(authed))

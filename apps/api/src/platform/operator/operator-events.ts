@@ -15,6 +15,8 @@ export const OPERATOR_EVENT_ACTIONS = [
   "slot_capacity",
   "default_limits",
   "user_limits",
+  // アプリの利用の許可を開いた・閉じた（specs/meguru/030-app-access FR-005。detail：app・granted・グループなら groupId）
+  "app_access",
 ] as const;
 /** 記録の種類。 */
 export type OperatorEventAction = (typeof OPERATOR_EVENT_ACTIONS)[number];

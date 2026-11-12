@@ -25,6 +25,8 @@ describe("GET /api/operator/app-registry", () => {
       apps: [
         {
           app: "threads",
+          // 登録しないアプリはだれでも使える（specs/meguru/030-app-access FR-001・FR-007）
+          access: "open",
           featureSwitches: true,
           operatorLimits: true,
           features: [

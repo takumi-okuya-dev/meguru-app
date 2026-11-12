@@ -55,7 +55,7 @@ describe("GET /api/operator/users?email=", () => {
     const { userId } = await createUserWithAccount("hanako");
     await disableFeatures(userId, "team", "strategy");
     const body = await json(await op("GET", `/api/operator/users?email=${encodeURIComponent("  HANAKO@Example.com ")}`));
-    expect(body).toEqual({ userId, name: "hanako", email: "hanako@example.com", disabled: ["strategy", "team"], group: null });
+    expect(body).toEqual({ userId, name: "hanako", email: "hanako@example.com", disabled: ["strategy", "team"], appAccess: [], group: null });
   });
 
   it("部分一致では見つからない（404 USER_NOT_FOUND）", async () => {
@@ -225,7 +225,7 @@ describe("グループ（FR-017・FR-018）", () => {
     const group = await makeGroup("飲食の会", [userId]);
     await disableGroupFeatures(group, "team");
     const body = await json(await op("GET", "/api/operator/users?email=hanako@example.com"));
-    expect(body.group).toEqual({ id: group, name: "飲食の会", disabled: ["team"] });
+    expect(body.group).toEqual({ id: group, name: "飲食の会", disabled: ["team"], appAccess: [] });
     await closeGroupRow(group);
     expect((await json(await op("GET", "/api/operator/users?email=hanako@example.com"))).group).toBeNull();
   });

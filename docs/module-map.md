@@ -96,6 +96,7 @@ flowchart TB
 |---|---|---|
 | `identity/`（利用者） | `users`・`withdrawn_users` | `auth.ts`（認証のミドルウェア・`AppEnv`の型・`allowBeforeSubscribe`・`allowSelfService`）・`me-routes.ts`（`/api/me`・`/api/me/withdrawal-preview`・退会・最後に使ったアプリ。共通の情報だけを返す）・`people.ts`（`currentUser`・`peopleNames`・`peopleProfiles`・`searchPeople`） |
 | `entitlement/`（利用権） | — | `entitlement.ts`（`loadAppEntitlement`・`loadAppEntitlements`・`loadAppFeatures`：契約・料金なし・運営者・機能のON/OFF・上限をまとめて返す） |
+| `access/`（アプリの利用の許可。specs/meguru/030） | `app_access_grants`・`group_app_access_grants` | `app-access.ts`（使えるかの判定はここだけ：`accessibleApps`・`canUseApp`・道筋の関所`requireAppAccess`）・`app-access-service.ts`（運営者が開く・閉じる）・`operator-app-access-routes.ts`（`PUT /api/operator/app-access/users/:userId`・`/groups/:groupId`） |
 | `billing/`（契約と決済） | `subscriptions` | `billing-service.ts`・`billing-routes.ts`・`stripe-webhook-routes.ts` |
 | `usage/`（利用の数） | `app_usage` | `usage.ts`（`reportUsage`：アプリが伝える利用の数と使っているか。料金の数と`/api/me`の「使っているアプリ」に使う） |
 | `features/`（機能のON/OFF） | `feature_disables`・`group_feature_disables`・`feature_setting_events` | `feature-service.ts`・`feature-sql.ts`・`operator-feature-routes.ts` |
@@ -105,7 +106,7 @@ flowchart TB
 | `events/`（出来事） | `platform_events`・`platform_event_deliveries` | `events.ts`（`emitEvent`・`registerConsumer`・`deliverPendingEvents`） |
 | `referrals/`（紹介） | — | `referral-service.ts`・`referral-routes.ts` |
 | `withdrawal/`（退会） | — | `withdrawal-service.ts`（退会の記録と`user.withdrawn`。届いたあとで`users`の行を消す） |
-| （直下） | — | `index.ts`（入口。入口の関数と型だけを出し、表の定義とSQLの部品は出さない）・`schema.ts`（15表。スキーマ`public`） |
+| （直下） | — | `index.ts`（入口。入口の関数と型だけを出し、表の定義とSQLの部品は出さない）・`schema.ts`（17表。スキーマ`public`） |
 
 ### 2-2. Threads（apps/threads）
 
@@ -128,7 +129,7 @@ flowchart TB
 | `events/`（出来事の受け取り） | `received_events` | `received-events.ts`（`user.withdrawn`・`limits.changed`の受け取り。1-4） |
 | （直下） | — | `index.ts`（入口）・`schema.ts`（34表。スキーマ`threads`）・`register.ts`（`registerThreads()`：機能・上限・出来事の受け取りの登録）・`registry.ts`（アプリの番号・機能と上限の名前） |
 
-共通15表（`public`）＋Threads34表（`threads`）＝49表（`db/schema.ts`がまとめて出す）。共通とThreadsの間の外部キーは0本。
+共通17表（`public`）＋Threads34表（`threads`）＝51表（`db/schema.ts`がまとめて出す）。共通とThreadsの間の外部キーは0本。
 
 ### 2-3. 窓口（adapters）
 
@@ -186,7 +187,7 @@ ESLintで止められる違反は0件にする。今すぐ直せないものは�
    - `registry.ts`：アプリの番号と、機能・上限の名前・表示名・範囲（Threads：`apps/threads/registry.ts`）。
    - `register.ts`：`registerXxx()`。`registerModule("<名前>", …)`の中で、`registerAppFeatures`・`registerAppLimits`・`registerConsumer`を呼ぶ（Threads：`apps/threads/register.ts`の`registerThreads()`）。
    - `index.ts`：組み立てが使うもの（APIの入口を作る関数・`registerXxx()`・定期処理の関数）だけを出す。
-2. 共通は`../../platform`（入口）の関数からだけ使う（`currentUser`・`loadAppEntitlement(s)`・`loadAppFeatures`・`peopleNames`など。共通の表の定義は読まない。ESLintが止める）。Threadsのモジュールは使わない（ESLintが止める）。
+2. 共通は`../../platform`（入口）の関数からだけ使う（`currentUser`・`loadAppEntitlement(s)`・`loadAppFeatures`・`peopleNames`など。共通の表の定義は読まない。ESLintが止める）。運営者が開いた人だけに使わせるアプリは、組み立てで`registerAppAccess("<名前>", "granted")`を呼び、アプリの道筋に`requireAppAccess("<名前>")`を付ける（使えない人は403 `APP_NOT_AVAILABLE`。`loadAppEntitlement(s)`も`access: "none"`を返す。specs/meguru/030-app-access）。登録しないアプリはだれでも使える。Threadsのモジュールは使わない（ESLintが止める）。
 3. 共通の出来事（少なくとも退会の`user.withdrawn`）を受け取る。受け取りは、自分のトランザクションの中で出来事のIDを`received_events`に記録し、もうあれば何もしない。退会なら、その人のデータを消す（Threads：`apps/threads/events/received-events.ts`・`accounts/withdrawal-cleanup.ts`）。
 4. 料金の数・使っているかが変わるたびに、自分のトランザクションのあとで`reportUsage`を呼ぶ。ずれに備えて、毎日の処理でも数え直して伝える（Threads：`apps/threads/accounts/usage.ts`と、`jobs/daily-jobs.ts`の`recountThreadsUsage`）。
 5. `apps/api/src/db/schema.ts`に`export * from "../apps/<名前>/schema";`を足し、`pnpm --filter api db:generate`でマイグレーションを作る。できたSQLを読み、スキーマを作る文があることを確かめる。

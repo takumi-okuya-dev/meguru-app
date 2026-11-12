@@ -14,6 +14,7 @@ import { AppError } from "../../kernel/errors";
 import { isUuid } from "../../kernel/validate";
 import { personName } from "../identity/people";
 import { appFeatures, featureSettings, requireFeatureSettingsApp } from "../registry/registry";
+import { groupGrantsSql, orderedGrants, userGrantsSql } from "../access/app-access-service";
 
 /** 運営者（認証のミドルウェアが入れる users の行の一部）。 */
 type Operator = { id: string; displayName: string | null; email: string };
@@ -74,6 +75,9 @@ async function readUser(db: Db | TxDb, app: string, where: SQL): Promise<Operato
       displayName: users.displayName,
       email: users.email,
       disabled: sql<string[]>`coalesce((SELECT array_agg(${featureDisables.feature}) FROM ${featureDisables} WHERE ${featureDisables.userId} = ${users.id} AND ${featureDisables.app} = ${app}), '{}')`,
+      // アプリの利用の許可（人ごと・グループ。specs/meguru/030-app-access FR-005）
+      appAccess: userGrantsSql(users.id),
+      groupAppAccess: groupGrantsSql(testGroups.id),
       groupId: testGroups.id,
       groupName: testGroups.name,
       groupDisabled: sql<string[]>`coalesce((SELECT array_agg(${groupFeatureDisables.feature}) FROM ${groupFeatureDisables} WHERE ${groupFeatureDisables.groupId} = ${testGroups.id} AND ${groupFeatureDisables.app} = ${app}), '{}')`,
@@ -90,7 +94,11 @@ async function readUser(db: Db | TxDb, app: string, where: SQL): Promise<Operato
     name: personName(u),
     email: u.email,
     disabled: ordered(app, u.disabled),
-    group: u.groupId && u.groupName !== null ? { id: u.groupId, name: u.groupName, disabled: ordered(app, u.groupDisabled) } : null,
+    appAccess: orderedGrants(u.appAccess),
+    group:
+      u.groupId && u.groupName !== null
+        ? { id: u.groupId, name: u.groupName, disabled: ordered(app, u.groupDisabled), appAccess: orderedGrants(u.groupAppAccess) }
+        : null,
   };
 }
 

@@ -44,7 +44,8 @@ const HANAKO: OperatorUser = {
   name: "山田 花子",
   email: "hanako@example.com",
   disabled: ["strategy"],
-  group: { id: "g1", name: "飲食の会", disabled: ["team"] },
+  appAccess: [],
+  group: { id: "g1", name: "飲食の会", disabled: ["team"], appAccess: [] },
 };
 
 const LIST: FeatureSettingsList = {

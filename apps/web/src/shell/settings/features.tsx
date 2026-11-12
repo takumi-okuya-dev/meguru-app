@@ -1,9 +1,11 @@
 // 設定 > 運営 > 使える機能（specs/019-feature-switches contracts/ui-routes.md 4、US1・US4、FR-002・FR-013・FR-014）。
 // 運営者だけ。人を探して、まとまりごとにON/OFF（人の設定）。OFFの人の一覧と、最近の変更（人とグループ）。
 // 画面はモック（https://claude.ai/artifact/XbnRAoVcfS7HCprqHfrrqi 、2026-11-04 OK）のとおり。
+// 見つかった人には「アプリの利用」（運営者が開いた人だけのアプリを開く・閉じる）も出す（specs/meguru/030-app-access。そのアプリがあるときだけ）。
 import type { FeatureSettingsList, OperatorUser } from "@meguru/shared";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState, type FormEvent } from "react";
+import { AppAccessSwitches } from "@/components/AppAccessSwitches";
 import { FeatureSwitches, Toggle } from "@/components/FeatureSwitches";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { Button } from "@/components/ui/button";
@@ -118,6 +120,18 @@ export function FeaturesPage() {
               onSave={async (values) => {
                 setFound(await api.putFeatureSettings(found.userId, values));
                 await refresh();
+              }}
+            />
+            {/* 運営者が開いた人だけのアプリ（specs/meguru/030-app-access FR-006。なければ出さない） */}
+            <AppAccessSwitches
+              key={`apps-${found.userId}`}
+              title="アプリの利用"
+              label={`${found.name}のアプリの利用`}
+              granted={found.appAccess}
+              notes={Object.fromEntries((found.group?.appAccess ?? []).map((a) => [a, "グループで開いています（このスイッチをOFFにしても、グループの設定で使えます）"]))}
+              onChange={async (app, granted) => {
+                const saved = await api.putUserAppAccess(found.userId, { [app]: granted });
+                setFound((prev) => (prev?.userId === found.userId ? { ...prev, appAccess: saved.granted } : prev));
               }}
             />
           </div>

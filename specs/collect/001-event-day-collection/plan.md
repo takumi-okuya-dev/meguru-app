@@ -12,6 +12,7 @@
 
 - **置き場所**：API`apps/api/src/apps/collect/`（道筋`/api/collect/…`）、Web`apps/web/src/apps/collect/`（`/collect/…`、手伝う人は`publicRoutes`の`/collect/r/:token`）、共通のパッケージ`packages/shared/src/collect/`、Postgresのスキーマ`collect`（[research.md](./research.md) R1・R2）。
 - **だれが使えるか**：共通の機能のON/OFFに「既定でOFF」の項目を足し、運営者がONにした人だけ（料金なし）。`/api/me`の`available`を人ごとにする。共通の変更なので、先に小さなPR（PR0）で入れる（R3）。
+  - **2026-11-13 追記**：PR0は[specs/meguru/030-app-access](../../meguru/030-app-access/spec.md)で入れた。**機能のON/OFF（019）に項目を足すのではなく、共通に「アプリの利用の許可」を作った**（029のあと、機能のON/OFFはThreadsだけが持つ仕組みになったため）。集金管理は、PR1で`APP_CATALOG`に`collect`を足し、組み立てで`registerAppAccess("collect", "granted")`を呼び、道筋に`requireAppAccess("collect")`を付ける。運営者は、設定 > 運営の「使える機能」（人）と「グループ」の「アプリの利用」で開く・閉じる。
 - **会場の共有**：記録の正本はPostgres。保存のあと、イベントごとのDurable Objectが、つないでいる画面にWebSocketで知らせを配る（休止の仕組みで無料枠に収める）。抜けたら全体を読み直す（R4・R5、[contracts/realtime.md](./contracts/realtime.md)）。
 - **二重にしない**：受付の記録は名簿の人1人に1行（主キー）。`clientRequestId`で送り直しも二重にしない（R6）。
 - **手伝う人**：ログインのいらない受付用リンク（合言葉なし・期限・止める・出し直し）。名前を入れると端末の印を返し、同じ端末は続きから、別の端末の同じ名前は「同じ人ですか？」で合わせる（R7）。

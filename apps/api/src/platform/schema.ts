@@ -1,4 +1,4 @@
-// 共通（platform）の表の定義：11表＋029の5表（accounts・memberships・チームの3表・activity_logs は029でThreadsへ移した）（docs/module-map.md 2-1、specs/027-modular-monolith research.md R6）。
+// 共通（platform）の表の定義：11表＋029の5表＋030の2表（accounts・memberships・チームの3表・activity_logs は029でThreadsへ移した）（docs/module-map.md 2-1、specs/027-modular-monolith research.md R6）。
 // Accountに紐づくテーブルはすべて ON DELETE CASCADE とする（後続featureも守る規約。specs/001 research.md R13）。
 import { sql } from "drizzle-orm";
 import {
@@ -342,6 +342,45 @@ export const appLimitDefaults = pgTable(
   (t) => [
     primaryKey({ name: "app_limit_defaults_pkey", columns: [t.app, t.key] }),
     check("app_limit_defaults_value_range", sql`${t.value} >= 0`),
+  ],
+);
+
+// ---- アプリの利用の許可（specs/meguru/030-app-access plan.md「表」）----
+
+/**
+ * 人ごとのアプリの利用の許可。「運営者が開いた人だけ」（granted）で登録したアプリを、行のある人が使える。
+ * 行がなければ使えない（運営者を除く）。人が退会したら消す。閉じてもアプリのデータは消さない。
+ */
+export const appAccessGrants = pgTable(
+  "app_access_grants",
+  {
+    app: text("app").notNull(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    grantedBy: uuid("granted_by").references(() => users.id, { onDelete: "set null" }),
+    grantedAt: timestamp("granted_at", { withTimezone: true, precision: 6 }).notNull().defaultNow(),
+  },
+  (t) => [
+    primaryKey({ name: "app_access_grants_pkey", columns: [t.userId, t.app] }), // 人ごとに引くので、人を先に
+    check("app_access_grants_app_valid", sql`${t.app} ~ '^[a-z][a-z0-9-]{0,30}$'`),
+  ],
+);
+
+/** テストのグループごとのアプリの利用の許可。閉じていないグループに入っている人が使える（閉じたグループの行は残すが、判定では使わない）。 */
+export const groupAppAccessGrants = pgTable(
+  "group_app_access_grants",
+  {
+    app: text("app").notNull(),
+    groupId: uuid("group_id")
+      .notNull()
+      .references(() => testGroups.id, { onDelete: "cascade" }),
+    grantedBy: uuid("granted_by").references(() => users.id, { onDelete: "set null" }),
+    grantedAt: timestamp("granted_at", { withTimezone: true, precision: 6 }).notNull().defaultNow(),
+  },
+  (t) => [
+    primaryKey({ name: "group_app_access_grants_pkey", columns: [t.groupId, t.app] }), // グループごとに引くので、グループを先に
+    check("group_app_access_grants_app_valid", sql`${t.app} ~ '^[a-z][a-z0-9-]{0,30}$'`),
   ],
 );
 

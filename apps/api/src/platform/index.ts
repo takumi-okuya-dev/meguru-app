@@ -9,6 +9,7 @@ export { stripeWebhookRoutes } from "./billing/stripe-webhook-routes";
 export { reconcileSubscriptions, syncQuantity } from "./billing/billing-service";
 export { operatorFeatureRoutes } from "./features/operator-feature-routes";
 export { operatorLimitRoutes } from "./operator/operator-limit-routes";
+export { operatorAppAccessRoutes } from "./access/operator-app-access-routes";
 export { operatorTestGroupRoutes } from "./test-groups/operator-test-group-routes";
 export { testInviteRoutes } from "./test-groups/test-invite-routes";
 export { referralRoutes } from "./referrals/referral-routes";
@@ -22,6 +23,17 @@ export { registerConsumer, deliverPendingEvents, nextPendingAttemptAt, purgeDeli
 export { readEventGate, shouldDeliver, nextEventCheckAt, writeEventGate } from "./events/delivery-gate";
 export { loadAppEntitlement, loadAppEntitlements, loadAppFeatures, type AppEntitlement } from "./entitlement/entitlement";
 export { reportUsage, billingQuantityOf, usingAppsOf, appUsageOf, usersWithUsage, type AppUsageReport } from "./usage/usage";
-export { registerAppFeatures, registerAppLimits, appFeatures, appLimits, registeredApps, type AppFeatureDef, type AppLimitDef } from "./registry/registry";
+export {
+  registerAppFeatures,
+  registerAppLimits,
+  registerAppAccess,
+  appFeatures,
+  appLimits,
+  registeredApps,
+  type AppFeatureDef,
+  type AppLimitDef,
+} from "./registry/registry";
+// アプリの利用の許可（specs/meguru/030-app-access）：アプリの道筋の関所
+export { requireAppAccess } from "./access/app-access";
 export { operatorAppRegistryRoutes } from "./registry/registry-routes";
 export { currentUser, peopleNames, peopleProfiles, personName, searchPeople } from "./identity/people";

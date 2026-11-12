@@ -43,6 +43,14 @@ export const APP_CATALOG = [
 export type AppId = (typeof APP_CATALOG)[number]["id"];
 
 /**
+ * アプリの利用の決まり（specs/meguru/030-app-access FR-001）。open：だれでも使える。granted：運営者・人ごとの許可がある人・
+ * 閉じていないテストのグループの許可がある人だけが使える。アプリは API の組み立てで登録し、登録しないアプリは open。
+ */
+export const APP_ACCESS_MODES = ["open", "granted"] as const;
+/** アプリの利用の決まり。 */
+export type AppAccessMode = (typeof APP_ACCESS_MODES)[number];
+
+/**
  * 利用者に出してよいアプリの一覧（released のもの。一覧の順）。
  * @returns アプリの一覧
  */
