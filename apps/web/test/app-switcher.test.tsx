@@ -9,6 +9,7 @@ import { AtSignIcon, BoxIcon } from "lucide-react";
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { AppModule, AppSidebar } from "@/shell";
+import { queryKeys } from "@/lib/query";
 import { ME_BILLING_OFF } from "./helpers/billing";
 
 vi.mock("@clerk/react", () => ({
@@ -80,12 +81,13 @@ function meWith(apps: MeResponse["apps"]): MeResponse {
 /**
  * 仮のアプリを足した一覧で、ルーターを組んで描く。
  * @param path - 開くURL
+ * @param client - クエリの置き場（テストの中で読み直すときに渡す）
  * @returns ルーター
  */
-function renderAt(path: string) {
+function renderAt(path: string, client = new QueryClient({ defaultOptions: { queries: { retry: false } } })) {
   const router = createMemoryRouter(buildRoutes([threads, sample]), { initialEntries: [path] });
   render(
-    <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+    <QueryClientProvider client={client}>
       <RouterProvider router={router} />
     </QueryClientProvider>,
   );
@@ -195,5 +197,17 @@ describe("最後に使ったアプリ（contracts/ui-routes.md 3・6）", () => 
     rejectSample(new Error("network"));
     await waitFor(() => expect(mocks.putLastApp).toHaveBeenCalledWith("threads"));
     expect(mocks.putLastApp).toHaveBeenCalledTimes(2);
+  });
+
+  it("覚えたあと、別のタブで別のアプリが最後になり、読み直して戻ったら、もう一度覚え直す", async () => {
+    mocks.me.mockResolvedValue(meWith({ ...BOTH, last: "sample", landing: "sample" }));
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    renderAt("/threads", client);
+    await waitFor(() => expect(mocks.putLastApp).toHaveBeenCalledWith("threads"));
+    await waitFor(() => expect(client.getQueryData<MeResponse>(queryKeys.me)?.apps.last).toBe("threads"));
+    // 別のタブでサンプルを開いた：読み直すと apps.last がサンプルに戻る
+    await client.refetchQueries({ queryKey: queryKeys.me });
+    await waitFor(() => expect(mocks.putLastApp).toHaveBeenCalledTimes(2));
+    expect(mocks.putLastApp).toHaveBeenLastCalledWith("threads");
   });
 });

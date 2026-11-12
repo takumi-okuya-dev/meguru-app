@@ -19,7 +19,8 @@ export function useRememberLastApp(): void {
   const me = useQuery({ queryKey: queryKeys.me, queryFn: api.me, enabled: Boolean(app) });
   // 送っている最中は重ねて送らない
   const inFlight = useRef(false);
-  // 送り終えた組（アプリと、そのときの apps.last）。失敗しても、同じ組では送り直さない（送り続けないため）
+  // 失敗した組（アプリと、そのときの apps.last）。同じ組では送り直さない（送り続けないため）。成功したら消す
+  // （そのあと別のタブで apps.last が変わり、読み直して元の値に戻ったときに、もう一度覚え直すため）
   const attempted = useRef<string | null>(null);
   // 送り終えたら数を進めて、もう一度確かめる（送っている間に別のアプリへ移っていたら、失敗しても今のアプリを覚えるため）
   const [settled, setSettled] = useState(0);
@@ -33,11 +34,12 @@ export function useRememberLastApp(): void {
     attempted.current = key;
     api
       .putLastApp(app.id)
-      .then(() =>
+      .then(() => {
+        attempted.current = null;
         queryClient.setQueryData<MeResponse>(queryKeys.me, (d) =>
           d ? { ...d, apps: { ...d.apps, last: app.id, landing: resolveLandingApp(d.apps.using, app.id) } } : d,
-        ),
-      )
+        );
+      })
       .catch(() => {
         // 覚えられなくても画面は止めない
       })
