@@ -1,5 +1,5 @@
 {
-  "id": "98361439-8a75-41be-8fc7-49c8b23dbebc",
+  "id": "6975e10f-ab96-421c-82fd-4c6572612eda",
   "prevId": "8dd31cca-5cf9-4821-8556-88bcc0ec231a",
   "version": "7",
   "dialect": "postgresql",
@@ -824,6 +824,22 @@
             }
           ],
           "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "platform_events_withdrawn_user_idx": {
+          "name": "platform_events_withdrawn_user_idx",
+          "columns": [
+            {
+              "expression": "(\"payload\"->>'userId')",
+              "asc": true,
+              "isExpression": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "where": "\"platform_events\".\"type\" = 'user.withdrawn'",
           "concurrently": false,
           "method": "btree",
           "with": {}

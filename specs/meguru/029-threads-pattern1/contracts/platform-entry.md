@@ -37,6 +37,8 @@ type AppEntitlement = {
   limits: Readonly<Record<string, number | null>>;
   /** 退会を受け付けた人か（PR2b で足した）。アプリは、退会の出来事が届いて片づけるまでの間、その人の持ち物を誰にも見せず、自動の処理も止める */
   withdrawn: boolean;
+  /** 画面と記録に出す名前（PR2b で足した。peopleNames と同じ決め方。利用権と一緒に読めば、名前を別に読まずに済む） */
+  name: string;
 };
 ```
 
@@ -52,7 +54,7 @@ await emitEvent(tx, "user.withdrawn", { userId });
 ```
 
 - `tx`は共通のトランザクション。表の変更と同じトランザクションで書く。
-- 退会（PR2b）：共通は `withdrawn_users` に書いたトランザクションで `user.withdrawn` を書き、すぐ届ける。`users` の行は、その出来事がすべての届け先で済んだあとで消す（`deleteUserRowIfCleaned`。PR3 で外部キーを外すまでは、先に消すとアプリの行が外部キーで消えて片づけられないため）。届かなければ、5分ごとの届けと日次の退会の続きでやり直す。
+- 退会（PR2b）：共通は `withdrawn_users` に書いたトランザクションで `user.withdrawn` を書き、その出来事だけをすぐ届ける（`deliverPendingEvents(env, now, { eventIds })`）。日次の続きでは、契約を止め直さず、失敗で止まった届けを戻してから届け直す（`rearmFailedDeliveries`）。`withdrawn_users` の行は、`users` の行が消えたあとにだけ片づける。`users` の行は、その出来事がすべての届け先で済んだあとで消す（`deleteUserRowIfCleaned`。PR3 で外部キーを外すまでは、先に消すとアプリの行が外部キーで消えて片づけられないため）。届かなければ、5分ごとの届けと日次の退会の続きでやり直す。
 - 書いたあと、応答を返してから`ctx.waitUntil(deliverPendingEvents(env))`ですぐに届ける。届かなかった分は、5分ごとの定期処理（`*/5 * * * *`の最初）でやり直す。
 
 ### 受け取る（アプリ）
@@ -82,7 +84,7 @@ async function onUserWithdrawn(event: PlatformEvent<"user.withdrawn">, env: Env)
 
 | 種類 | 中身 | いつ書く | Threadsの受け取り |
 |---|---|---|---|
-| `user.withdrawn` | `{ userId }` | 退会の処理（`platform/withdrawal`）が、利用者を退会にしたのと同じトランザクション | 持ち主のアカウントを消す（テスター招待の片づけ・Metaのデータ削除の要求の完了を含む）・メンバーとチームから外す・作った人の欄を空にする・`reportUsage(0, false)` |
+| `user.withdrawn` | `{ userId }` | 退会の処理（`platform/withdrawal`）が、利用者を退会にしたのと同じトランザクション（その人の出来事がまだないときだけ。1人に1回） | 持ち主のアカウントを消す（テスター招待の片づけ・Metaのデータ削除の要求の完了を含む）・メンバーとチームから外す・作った人の欄を空にする。利用の数は伝えない（共通が、届いたあとで `users` の行と一緒に利用の数の行も消す。PR2b） |
 | `limits.changed` | `{ app, userId? }`（`userId`がなければ既定の値の変更） | 運営者が上限を保存したのと同じトランザクション | 自動投稿を起こす（`notifyWake`） |
 
 - 新しい種類を足すときは、この表と`platform_events.type`の`CHECK`の形に合うことを確かめる。中身に入れるのは番号だけ（メールアドレス・名前・本文は入れない）。

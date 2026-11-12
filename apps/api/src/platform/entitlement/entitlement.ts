@@ -8,6 +8,7 @@ import type { Db, TxDb } from "../../kernel/db/client";
 import { billingFactsColumns, entitlementFromFacts } from "../billing/billing-service";
 import { disabledAppFeaturesSql } from "../features/feature-sql";
 import { appFeatures, appLimits } from "../registry/registry";
+import { personName } from "../identity/people";
 import { appLimitDefaults, subscriptions, userAppLimits, users } from "../schema";
 
 /** アプリ向けの利用権。 */
@@ -26,6 +27,8 @@ export type AppEntitlement = {
   limits: Readonly<Record<string, number | null>>;
   /** 退会を受け付けた人か（アプリは、出来事が届いて片づけるまでの間、その人の持ち物を誰にも見せない。029 research.md R8） */
   withdrawn: boolean;
+  /** 画面と記録に出す名前（peopleNames と同じ決め方。利用権と一緒に読めば、名前を別に読まずに済む） */
+  name: string;
 };
 
 /**
@@ -64,6 +67,8 @@ export async function loadAppEntitlements(
       id: users.id,
       clerkUserId: users.clerkUserId,
       withdrawalRequestedAt: users.withdrawalRequestedAt,
+      displayName: users.displayName,
+      email: users.email,
       disabled: disabledAppFeaturesSql(users.id, app),
       ownLimits: sql<{ key: string; value: number }[]>`coalesce((SELECT json_agg(json_build_object('key', l."key", 'value', l."value"))
         FROM ${userAppLimits} l WHERE l."user_id" = ${users.id} AND l."app" = ${app}), '[]'::json)`,
@@ -93,6 +98,7 @@ export async function loadAppEntitlements(
       features: new Set(featureKeys.filter((k) => !off.has(k))),
       limits,
       withdrawn: r.withdrawalRequestedAt !== null,
+      name: personName({ displayName: r.displayName, email: r.email }),
     });
   }
   return out;

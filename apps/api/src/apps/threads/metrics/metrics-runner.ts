@@ -291,7 +291,8 @@ function isConfirming(w: Work): boolean {
 
 /**
  * 反応を取り込んでよいオーナー（すべて使える・自動投稿を使える・退会の途中でない）の番号。接続済みのアカウントの
- * オーナーだけを、共通の入口の関数（loadAppEntitlements）でまとめて調べる。
+ * オーナーだけを、共通の入口の関数（loadAppEntitlements）でまとめて調べる。オーナーの数だけ問い合わせの値が増えるが、
+ * 今の規模（テスト版で数十人）では問題にならない（specs/meguru/029 research.md R4。増えたら、利用権の写しを持つ形を考える）。
  * @param db - データベース
  * @param mode - 決済のモード
  * @param now - 今

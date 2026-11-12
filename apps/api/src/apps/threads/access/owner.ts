@@ -1,7 +1,7 @@
 // アカウントの持ち主（オーナー）の判定（029 で共通から移した。specs/meguru/029-threads-pattern1 research.md R1・R4）。
 // 公開の直前・時刻の処理・メンションで、そのアカウントのオーナーが使えるかを確かめる。オーナーの利用権は、
 // 共通の入口の関数（loadAppEntitlement）で読む（共通の表は読まない）。
-import { DAILY_POST_LIMIT_MAX, type Entitlement } from "@meguru/shared";
+import type { Entitlement } from "@meguru/shared";
 import { and, eq } from "drizzle-orm";
 import type { BillingMode } from "../../../kernel/config";
 import type { Db, TxDb } from "../../../kernel/db/client";
@@ -42,18 +42,6 @@ export function ownerBlockReason(owner: AppEntitlement | null): "billing_inactiv
   if (!owner.billing.fullAccess || owner.withdrawn) return "billing_inactive";
   if (!owner.features.has("autopost")) return "auto_post_off";
   return null;
-}
-
-/**
- * アカウントのオーナーの1日の投稿数の上限（投稿の直前の確認で使う。specs/024 research.md R7。運営者は最大）。
- * @param db - データベース（トランザクションの中でもよい）
- * @param accountId - accounts.id
- * @param mode - 決済のモード（運営者の一覧を含む）
- * @returns 上限（オーナーがいなければ Threads の上限）
- */
-export async function ownerDailyPostLimit(db: Db | TxDb, accountId: string, mode: BillingMode): Promise<number> {
-  const owner = await loadOwnerAppEntitlement(db, accountId, mode);
-  return owner?.limits.daily_posts ?? DAILY_POST_LIMIT_MAX;
 }
 
 /**

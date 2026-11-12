@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { withTransaction } from "../../src/kernel/db/client";
 import { deliverPendingEvents } from "../../src/platform";
 import { emitEvent } from "../../src/platform/events/events";
-import { deleteUserRowIfCleaned } from "../../src/platform/withdrawal/withdrawal-service";
+import { deleteUserRowIfCleaned, resumeWithdrawals } from "../../src/platform/withdrawal/withdrawal-service";
 import { call, createUserWithAccount, fake, fakeClerk, makeApp, resetDb, testEnv } from "../helpers/app";
 import { db } from "../helpers/auto-post";
 import { billingEnv, callBilling, fakeStripe } from "../helpers/billing";
@@ -86,5 +86,31 @@ describe("退会の出来事（user.withdrawn）", () => {
     expect(await deliverPendingEvents(billingEnv())).toEqual({ delivered: 1, failed: 0 });
     expect(await count("threads_received_events", `event_id = '${eventId}'`)).toBe(1);
     expect(await count("accounts", `id = '${other.accountId}'`)).toBe(1);
+  });
+
+  it("届けが失敗で止まっても、日次の続きでやり直し、片づいたら利用者の行を消す（契約は止め直さない）", async () => {
+    const o1 = await createUserWithAccount("o1", { name: "A" });
+    const userId = (await rows<{ id: string }>(`SELECT id FROM users WHERE clerk_user_id = 'o1'`))[0]!.id;
+    await db().query(`UPDATE users SET withdrawal_requested_at = now() - interval '2 hours' WHERE id = $1`, [userId]);
+    await db().query(`INSERT INTO withdrawn_users (clerk_user_id, withdrawn_at) VALUES ('o1', now())`);
+    const eventId = await withTransaction(testEnv.DATABASE_URL, (tx) => emitEvent(tx, "user.withdrawn", { userId }));
+    await db().query(`UPDATE platform_event_deliveries SET status = 'failed', attempts = 10 WHERE event_id = $1`, [eventId]);
+
+    await resumeWithdrawals(billingEnv(), (id) => fakeClerk.delete(id));
+
+    expect(await count("platform_event_deliveries", `event_id = '${eventId}' AND status = 'done'`)).toBe(1);
+    expect(await count("accounts", `id = '${o1.accountId}'`)).toBe(0);
+    expect(await count("users", `id = '${userId}'`)).toBe(0);
+    // 出来事は書き足していない（1つのまま）
+    expect(await count("platform_events", `type = 'user.withdrawn'`)).toBe(1);
+    // 契約は止め直していない（偽のStripeを呼んでいない）
+    expect(await fakeStripe.subscriptions()).toEqual([]);
+  });
+
+  it("利用者の行が残っている間は、withdrawn_users の記録を消さない（出来事を書き直さない）", async () => {
+    await createUserWithAccount("o1", { name: "A" });
+    await db().query(`INSERT INTO withdrawn_users (clerk_user_id, withdrawn_at, clerk_deleted_at) VALUES ('o1', now() - interval '3 days', now() - interval '2 days')`);
+    await resumeWithdrawals(billingEnv(), (id) => fakeClerk.delete(id));
+    expect(await count("withdrawn_users", `clerk_user_id = 'o1'`)).toBe(1);
   });
 });

@@ -20,7 +20,7 @@ import { accounts, memberships, teamAccounts, teamMembers, teams } from "../sche
 import { users } from "../../../platform/schema";
 import type { BillingMode } from "../../../kernel/config";
 import { AppError, notFound } from "../../../kernel/errors";
-import { loadAppEntitlements, peopleNames } from "../../../platform";
+import { loadAppEntitlements } from "../../../platform";
 import { THREADS_APP } from "../registry";
 import { featureOnSql } from "../../../platform";
 
@@ -127,11 +127,8 @@ export async function authorizeAccount(
     .where(eq(accounts.id, accountId))
     .limit(1);
   if (!row) throw notFound();
-  // オーナーと見る人の利用権（契約・料金なし・テスト版・機能のOFF）と名前は、共通の入口の関数でまとめて読む
-  const [ents, names] = await Promise.all([
-    loadAppEntitlements(db, user.billing, [row.ownerId, user.id], THREADS_APP),
-    peopleNames(db, [row.ownerId, user.id]),
-  ]);
+  // オーナーと見る人の利用権（契約・料金なし・テスト版・機能のOFF・名前）は、共通の入口の関数で1回で読む
+  const ents = await loadAppEntitlements(db, user.billing, [row.ownerId, user.id], THREADS_APP);
   const ownerEnt = ents.get(row.ownerId);
   const meEnt = ents.get(user.id);
   // オーナーが退会した（出来事が届いて片づけるまでの間）Accountは、チームの人を含めて誰にも見せない（029 research.md R8）
@@ -167,8 +164,8 @@ export async function authorizeAccount(
     account: row.account,
     relation,
     permissions,
-    owner: { id: row.ownerId, name: names.get(row.ownerId) ?? "" },
-    actor: { id: user.id, name: names.get(user.id) ?? "", role: actorRoleOf(relation, row.myTeamRole) },
+    owner: { id: row.ownerId, name: ownerEnt.name },
+    actor: { id: user.id, name: meEnt.name, role: actorRoleOf(relation, row.myTeamRole) },
     team: row.teamId !== null && row.teamName !== null ? { id: row.teamId, name: row.teamName, myRole: row.myTeamRole ?? "member" } : null,
     isTeamAdmin,
     hasTeam: row.teamId !== null,

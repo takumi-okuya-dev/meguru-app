@@ -178,11 +178,15 @@ function limitsApp(): string | undefined {
 }
 
 /**
- * 書いた出来事をすぐ届ける（失敗しても保存は成功のまま。5分ごとの届けでやり直す）。
+ * 書いた出来事だけをすぐ届ける（ほかの出来事の届けを待たない。失敗しても保存は成功のまま。5分ごとの届けでやり直す）。
  * @param env - Workers のバインディング
+ * @param eventId - 書いた出来事の番号（なければ何もしない）
  */
-async function deliverSoon(env: Env): Promise<void> {
-  await deliverPendingEvents(env).catch((err: unknown) => logger.error("limits: event delivery failed", { err: String(err) }));
+async function deliverSoon(env: Env, eventId: string | null): Promise<void> {
+  if (!eventId) return;
+  await deliverPendingEvents(env, new Date(), { eventIds: [eventId] }).catch((err: unknown) =>
+    logger.error("limits: event delivery failed", { err: String(err) }),
+  );
 }
 
 /**
@@ -203,10 +207,10 @@ export async function setDefaults(env: Env, operator: { id: string }, v: Default
     await recordOperatorEvent(tx, { actorUserId: operator.id, action: "default_limits", detail: { before, after: v } });
     // 上限が上がると、次に見る時刻が早まることがある。アプリに出来事で知らせる（Threads：自動投稿を起こす。PR #71 のCodexレビュー）
     const app = limitsApp();
-    if (app) await emitEvent(tx, "limits.changed", { app });
-    return v;
-  }).then(async (saved) => {
-    await deliverSoon(env);
+    const eventId = app ? await emitEvent(tx, "limits.changed", { app }) : null;
+    return { saved: v, eventId };
+  }).then(async ({ saved, eventId }) => {
+    await deliverSoon(env, eventId);
     return saved;
   });
 }
@@ -278,10 +282,10 @@ export async function setUserLimits(env: Env, operator: { id: string }, userId: 
       },
     });
     const app = limitsApp();
-    if (app) await emitEvent(tx, "limits.changed", { app, userId });
-    return toLimitUser(tx, env, after!);
-  }).then(async (saved) => {
-    await deliverSoon(env);
+    const eventId = app ? await emitEvent(tx, "limits.changed", { app, userId }) : null;
+    return { saved: await toLimitUser(tx, env, after!), eventId };
+  }).then(async ({ saved, eventId }) => {
+    await deliverSoon(env, eventId);
     return saved;
   });
 }
