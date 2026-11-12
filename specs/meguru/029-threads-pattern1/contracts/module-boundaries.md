@@ -1,6 +1,6 @@
 # 取り決め：モジュールの境界の変更（029）
 
-**対象**：APIのESLintの規則`module-boundaries`（`eslint-rules/module-boundaries.js`）と、Webの規則`web-module-boundaries`、[docs/module-map.md](../../../docs/module-map.md)。判断は[research.md](../research.md) R1・R10・R11。027の取り決め（[specs/027 contracts/module-boundaries.md](../../027-modular-monolith/contracts/module-boundaries.md)）の上に足す。
+**対象**：APIのESLintの規則`module-boundaries`（`eslint-rules/module-boundaries.js`）と、Webの規則`web-module-boundaries`、[docs/module-map.md](../../../../docs/module-map.md)。判断は[research.md](../research.md) R1・R10・R11。027の取り決め（[specs/027 contracts/module-boundaries.md](../../../027-modular-monolith/contracts/module-boundaries.md)）の上に足す。
 
 ## 1. 依存の向き（変えない）
 
@@ -29,7 +29,7 @@
 | 共通 → アプリの表の定義 | `platform/…`から`../apps/threads/schema`・`../db/schema` | 「共通はアプリの表を読めません。出来事でアプリに伝えてください」 |
 
 - `db/schema.ts`（組み立て）は、drizzle-kitとテストのために、共通とThreadsの表を読み直して出す（今のまま）。共通・アプリのコードが`db/schema.ts`を経由して、ほかのモジュールの表を読むことも止める。
-- 027の例外（`platform/schema.ts`がThreadsの`tester_applications`を読む1か所の`eslint-disable-next-line`）は、外部キーを外すので消す（[module-map.md](../../../docs/module-map.md) 4章）。
+- 027の例外（`platform/schema.ts`がThreadsの`tester_applications`を読む1か所の`eslint-disable-next-line`）は、外部キーを外すので消す（[module-map.md](../../../../docs/module-map.md) 4章）。
 - 規則のテスト（`eslint-rules/module-boundaries.test.js`）に、上の2つの型と、通る例（アプリ → `platform/index.ts`の入口の関数）を足す。
 
 ## 4. 出来事の登録（組み立て）
