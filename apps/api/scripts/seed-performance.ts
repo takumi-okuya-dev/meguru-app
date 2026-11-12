@@ -4,12 +4,15 @@
 //   件数を指定すると、その件数の確定した投稿済みを作る（表示の速さの確認用。例：500）。
 // 接続先: DATABASE_URL_DIRECT（既定はローカルの docker compose）。localhost 以外には書き込まない。
 import pg from "pg";
+import { loadWorktreeEnv } from "./worktree-env";
 
 const [accountId, countArg] = process.argv.slice(2);
 if (!accountId) {
   console.error("使い方: seed:performance <accountId> [件数]");
   process.exit(1);
 }
+// 作業場所を分けているときは、その作業場所のDB（scripts/worktree-env.ts）
+loadWorktreeEnv();
 const url = process.env.DATABASE_URL_DIRECT ?? "postgres://postgres:postgres@localhost:5432/threads_grower";
 const host = new URL(url).hostname;
 if (!["localhost", "127.0.0.1", "db.localtest.me"].includes(host)) {

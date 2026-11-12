@@ -1,8 +1,10 @@
 // E2E・ローカル確認用に偽のThreadsサーバーを起動する（既定のポートは 8790）
 import { serve } from "@hono/node-server";
+import { loadWorktreeEnv } from "../../scripts/worktree-env";
 import { createFakeThreads } from "./server";
 
-const port = Number(process.env.FAKE_THREADS_PORT ?? 8790);
+// 作業場所を分けているときは、ずらし幅を足す（scripts/worktree-env.ts）
+const port = Number(process.env.FAKE_THREADS_PORT ?? 8790 + loadWorktreeEnv().portOffset);
 const app = createFakeThreads();
 serve({ fetch: app.fetch, port });
 // E2E・ローカル確認用のユーザーを登録しておく。最初の1人が「許可する」の既定。

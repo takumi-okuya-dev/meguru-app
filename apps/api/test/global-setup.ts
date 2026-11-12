@@ -4,9 +4,12 @@ import { drizzle } from "drizzle-orm/node-postgres";
 import { migrate } from "drizzle-orm/node-postgres/migrator";
 import pg from "pg";
 import type { TestProject } from "vitest/node";
+import { loadWorktreeEnv } from "../scripts/worktree-env";
 import { createFakeStripe } from "./fake-stripe/server";
 import { createFakeThreads } from "./fake-threads/server";
 
+// 作業場所を分けているときは、その作業場所のDBを使う（scripts/worktree-env.ts）
+loadWorktreeEnv();
 const DIRECT_URL = process.env.TEST_DATABASE_URL_DIRECT ?? "postgres://postgres:postgres@localhost:5432/threads_grower";
 // Workers からは local-neon-http-proxy 経由で接続する
 const PROXY_URL = process.env.TEST_DATABASE_URL ?? "postgres://postgres:postgres@db.localtest.me:5432/threads_grower";
@@ -19,6 +22,32 @@ declare module "vitest" {
   }
 }
 
+// 作業場所（git worktree）をまたいで、結合テストとE2Eを1つずつ流すためのロックの番号（e2e/global-setup.ts と同じ値）。
+// DBは作業場所ごとに分かれているが、Workers からつなぐ local-neon-http-proxy は1つで、2つを同時に流すと
+// 認証の問い合わせが追いつかず「Control plane request failed」で落ちるため（README「手元で同時に進める」）
+const CROSS_WORKTREE_LOCK = 72_013_001;
+
+/**
+ * ほかの作業場所の結合テスト・E2Eが終わるまで待ち、ロックを取る。ロックはこの接続を閉じると外れる
+ * （テストが途中で止まっても、接続が切れて外れる）。
+ * @returns ロックを外す関数
+ */
+async function waitForOtherWorktrees(): Promise<() => Promise<void>> {
+  // アドバイザリーロックはDBごとなので、どの作業場所にもある postgres のDBで取る
+  const url = new URL(DIRECT_URL);
+  url.pathname = "/postgres";
+  const client = new pg.Client({ connectionString: url.toString() });
+  await client.connect();
+  const got = await client.query<{ ok: boolean }>("select pg_try_advisory_lock($1) as ok", [CROSS_WORKTREE_LOCK]);
+  if (!got.rows[0]?.ok) {
+    console.log("ほかの作業場所で結合テストかE2Eが流れています。終わるまで待ちます…");
+    await client.query("select pg_advisory_lock($1)", [CROSS_WORKTREE_LOCK]);
+  }
+  return async () => {
+    await client.end();
+  };
+}
+
 export default async function setup(project: TestProject) {
   const pool = new pg.Pool({ connectionString: DIRECT_URL });
   try {
@@ -29,8 +58,21 @@ export default async function setup(project: TestProject) {
       { cause: err },
     );
   }
-  await migrate(drizzle(pool), { migrationsFolder: new URL("../drizzle", import.meta.url).pathname });
   await pool.end();
+  const unlock = await waitForOtherWorktrees();
+  // ここから先で失敗したら、ロックを外してから止める（Vitest は準備が成功したときだけ片づけを呼ぶので、
+  // 外さないと、ほかの作業場所の結合テストとE2Eが、この実行が終わるまで待ち続ける）
+  try {
+    const migrating = new pg.Pool({ connectionString: DIRECT_URL });
+    try {
+      await migrate(drizzle(migrating), { migrationsFolder: new URL("../drizzle", import.meta.url).pathname });
+    } finally {
+      await migrating.end();
+    }
+  } catch (err) {
+    await unlock();
+    throw err;
+  }
 
   const app = createFakeThreads();
   const server = serve({ fetch: app.fetch, port: 0 });
@@ -51,5 +93,6 @@ export default async function setup(project: TestProject) {
   return async () => {
     await new Promise<void>((resolve) => server.close(() => resolve()));
     await new Promise<void>((resolve) => stripe.close(() => resolve()));
+    await unlock();
   };
 }

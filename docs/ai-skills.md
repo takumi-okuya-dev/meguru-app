@@ -30,7 +30,7 @@ Spec Kitの`$ARGUMENTS`がホストによって置換されない場合は、ス
 
 | # | やること | スキル | ユーザーがすること |
 |---|---|---|---|
-| 0 | developから`feature/<アプリ>-NNN-…`のブランチを作る（Spec Kitのgitフックは入れていないので、先に手で作る）。仕様の出し先`specs/<アプリ>/NNN-…`と番号の決め方は[product-structure.md](./product-structure.md)の6 | なし | どのアプリの仕様か伝える |
+| 0 | developから`feature/<アプリ>-NNN-…`のブランチを作る（Spec Kitのgitフックは入れていないので、先に手で作る）。仕様の出し先`specs/<アプリ>/NNN-…`と番号の決め方は[product-structure.md](./product-structure.md)の6。セッションを分けて同時に進めるときは[parallel-development.md](./parallel-development.md) | なし | どのアプリの仕様か伝える |
 | 1 | やりたいことから仕様を書く | `/speckit-specify` | やりたいこと・決めていることを伝える |
 | 2 | あいまいな点を決める（最大5問） | `/speckit-clarify` | 質問に答える |
 | 3 | 技術の方針・データ・画面の取り決めを書く | `/speckit-plan` | なし |

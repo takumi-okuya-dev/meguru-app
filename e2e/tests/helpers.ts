@@ -2,9 +2,12 @@
 import { clerk, setupClerkTestingToken } from "@clerk/testing/playwright";
 import type { Page } from "@playwright/test";
 import pg from "pg";
+import { portOffset, worktreeDbName } from "../env";
 
-export const FAKE_THREADS = process.env.FAKE_THREADS_URL ?? "http://localhost:8790";
-const DIRECT_DB = process.env.E2E_DATABASE_URL_DIRECT ?? "postgres://postgres:postgres@localhost:5432/threads_grower";
+// 作業場所を分けているときは、ずらし幅を足す（../env.ts の portOffset）
+export const FAKE_THREADS = process.env.FAKE_THREADS_URL ?? `http://localhost:${8790 + portOffset()}`;
+// 作業場所を分けているときは、その作業場所のDB（API の apps/api/.dev.vars の DATABASE_URL と同じ名前）
+const DIRECT_DB = process.env.E2E_DATABASE_URL_DIRECT ?? `postgres://postgres:postgres@localhost:5432/${worktreeDbName()}`;
 
 /** Clerk の開発用インスタンスに用意したテスト用ユーザーのメールアドレス */
 export function testUserEmail(): string {
@@ -160,7 +163,7 @@ export async function connectWithToken(page: Page, accountId: string, token: str
 
 // ---- 決済（specs/013-billing T060）----
 
-export const FAKE_STRIPE = process.env.FAKE_STRIPE_URL ?? "http://localhost:8791";
+export const FAKE_STRIPE = process.env.FAKE_STRIPE_URL ?? `http://localhost:${8791 + portOffset()}`;
 
 /**
  * 偽のStripeを操作する。
