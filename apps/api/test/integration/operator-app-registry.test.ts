@@ -1,5 +1,6 @@
 // GET /api/operator/app-registry（specs/meguru/029-threads-pattern1 tasks.md T069）：登録されたアプリの機能と上限の一覧。運営者だけ。
 import { ACCOUNT_LIMIT_MAX, DAILY_POST_LIMIT_MAX, FEATURE_LABELS } from "@meguru/shared";
+import { THREADS_FEATURES } from "../../src/apps/threads/registry";
 import { beforeEach, describe, expect, it } from "vitest";
 import { createUserWithAccount, makeApp, resetDb } from "../helpers/app";
 import { callOp, FEATURE_OPERATOR } from "../helpers/features";
@@ -25,7 +26,7 @@ describe("GET /api/operator/app-registry", () => {
         {
           app: "threads",
           features: [
-            { key: "autopost", label: FEATURE_LABELS.autopost, description: "自動投稿は、投稿をつくる・投稿ストック・パフォーマンスのまとまりです" },
+            { key: "autopost", label: FEATURE_LABELS.autopost, description: THREADS_FEATURES[0]!.description },
             { key: "strategy", label: FEATURE_LABELS.strategy },
             { key: "team", label: FEATURE_LABELS.team },
           ],

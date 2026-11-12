@@ -99,7 +99,7 @@ describe("関わり×APIの表（SC-002）", () => {
       app.routes
         .filter((r) => ["GET", "POST", "PUT", "PATCH", "DELETE"].includes(r.method))
         // 新しい道筋（/api/threads/…）は古い道筋と同じ処理をつないでいる（threads-routes-alias.test.ts）ので、古い道筋の名前で比べる
-        .map((r) => ({ method: r.method, path: r.path.replace(/^\/api\/threads\/(accounts|teams)\//, "/api/$1/") }))
+        .map((r) => ({ method: r.method, path: r.path.replace(/^\/api\/threads\/(accounts|teams)(?=\/|$)/, "/api/$1") }))
         .filter((r) => r.path.includes("/accounts/:accountId") || r.path.startsWith("/api/teams") || r.path.startsWith("/api/team/"))
         .map((r) => `${r.method} ${r.path}`),
     );

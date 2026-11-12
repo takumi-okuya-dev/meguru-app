@@ -61,7 +61,7 @@ GET /api/accounts/:accountId/tester-application ×2
 GET /api/billing ×2
 GET /api/data-deletion/:confirmationCode ×1
 GET /api/health ×1
-GET /api/invites/:token ×2
+GET /api/invites/:token ×3
 GET /api/me ×2
 GET /api/me/needs-review-counts ×2
 GET /api/me/referral ×2
@@ -111,7 +111,7 @@ GET /api/threads/accounts/:accountId/strategy ×2
 GET /api/threads/accounts/:accountId/team ×2
 GET /api/threads/accounts/:accountId/tester-application ×2
 GET /api/threads/callback ×1
-GET /api/threads/invites/:token ×2
+GET /api/threads/invites/:token ×3
 GET /api/threads/me ×2
 GET /api/threads/me/needs-review-counts ×2
 GET /api/threads/me/withdrawal-preview ×2
