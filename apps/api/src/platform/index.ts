@@ -19,7 +19,8 @@ export { recordOperatorEvent, countRecentApplyActions } from "./operator/operato
 // アプリを分けるための共通の土台（contracts/platform-entry.md）
 export { registerModule } from "./registry/modules";
 export { registerMeSection, registerWithdrawalPreviewSection, type MeSection } from "./identity/me-sections";
-export { registerConsumer, deliverPendingEvents, eventsDue, purgeDeliveredEvents, type EventConsumer, type PlatformEvent, type PlatformEventType } from "./events/events";
+export { registerConsumer, deliverPendingEvents, nextPendingAttemptAt, purgeDeliveredEvents, type EventConsumer, type PlatformEvent, type PlatformEventType } from "./events/events";
+export { readEventGate, shouldDeliver, nextEventCheckAt, writeEventGate, wakeEventDelivery } from "./events/delivery-gate";
 export { loadAppEntitlement, loadAppEntitlements, loadAppFeatures, type AppEntitlement } from "./entitlement/entitlement";
 export { reportUsage, billingQuantityOf, usingAppsOf, appUsageOf, usersWithUsage, type AppUsageReport } from "./usage/usage";
 export { registerAppFeatures, registerAppLimits, appFeatures, appLimits, registeredApps, type AppFeatureDef, type AppLimitDef } from "./registry/registry";

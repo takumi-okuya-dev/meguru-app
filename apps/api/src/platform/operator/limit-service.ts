@@ -18,6 +18,7 @@ import { AppError } from "../../kernel/errors";
 import { isUuid } from "../../kernel/validate";
 import { listOperatorEvents, recordOperatorEvent } from "./operator-events";
 import { deliverPendingEvents, emitEvent } from "../events/events";
+import { wakeEventDelivery } from "../events/delivery-gate";
 import { logger } from "../../kernel/logger";
 
 /** 上限の判定に要る、利用者の値。 */
@@ -190,6 +191,8 @@ async function deliverSoon(env: Env, eventId: string | null): Promise<void> {
 export async function setDefaults(env: Env, operator: { id: string }, v: DefaultLimitsRequest["limits"]): Promise<DefaultLimitsRequest> {
   assertLimitValues(v, false);
   const app = limitsApp();
+  // 出来事を書く前に、5分ごとの届けを起こす（すぐの届けが途中で止まっても、5分ごとの届けが拾う。delivery-gate.ts）
+  await wakeEventDelivery(env.AUTOPOST_KV);
   return withTransaction(env.DATABASE_URL, async (tx) => {
     const before = await namedDefaults(tx, app);
     await saveDefaultRows(tx, app, v);
@@ -256,6 +259,8 @@ export async function setUserLimits(
   assertLimitValues(v, true);
   if (!isUuid(userId)) throw new AppError("USER_NOT_FOUND", 404, "user not found");
   const app = limitsApp();
+  // 出来事を書く前に、5分ごとの届けを起こす（すぐの届けが途中で止まっても、5分ごとの届けが拾う。delivery-gate.ts）
+  await wakeEventDelivery(env.AUTOPOST_KV);
   return withTransaction(env.DATABASE_URL, async (tx) => {
     const [before] = await tx.select().from(users).where(eq(users.id, userId)).for("update").limit(1); // 同じ人の保存を順に並べる
     if (!before) throw new AppError("USER_NOT_FOUND", 404, "user not found");

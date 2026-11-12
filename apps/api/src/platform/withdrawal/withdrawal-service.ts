@@ -11,6 +11,7 @@ import { AppError } from "../../kernel/errors";
 import { logger } from "../../kernel/logger";
 import { createStripeClient, StripeError, type StripeClient } from "../../adapters/stripe";
 import { deliverPendingEvents, emitEvent, rearmFailedDeliveries } from "../events/events";
+import { wakeEventDelivery } from "../events/delivery-gate";
 
 /** 退会した人を記録に出すときの名前（FR-053）。 */
 export const WITHDRAWN_ACTOR_NAME = "退会した人";
@@ -97,6 +98,8 @@ async function finishWithdrawal(
   stripe: StripeClient,
 ) {
   const db = createDb(env.DATABASE_URL);
+  // 出来事を書く・届けを戻す前に、5分ごとの届けを起こす（すぐの届けが途中で止まっても、5分ごとの届けが拾う。delivery-gate.ts）
+  await wakeEventDelivery(env.AUTOPOST_KV);
   let eventIds = await withdrawalEventIds(db, user.id);
   if (eventIds.length === 0) {
     // 2. 契約を止める。消した後に契約が残って請求が続くことを防ぐため、データより先に止める

@@ -1,7 +1,8 @@
 import { createApp } from "./app";
 import type { Env } from "./kernel/env";
 import { runAutoPost, registerThreads } from "./apps/threads";
-import { deliverPendingEvents, eventsDue } from "./platform";
+import { createDb } from "./kernel/db/client";
+import { deliverPendingEvents, nextEventCheckAt, nextPendingAttemptAt, readEventGate, shouldDeliver, writeEventGate } from "./platform";
 import { validateConfig } from "./kernel/config";
 import { logger, setLogAppEnv } from "./kernel/logger";
 import { runDailyJobs } from "./jobs/daily-jobs";
@@ -13,15 +14,18 @@ const AUTO_POST_CRON = "*/5 * * * *";
 
 /**
  * 5分ごとの最初に、届いていない出来事を届ける（specs/meguru/029 research.md R5）。失敗しても自動投稿は止めない。
+ * 用のない回はDBを起こさない（KVの関所。platform/events/delivery-gate.ts）。関所を書くのはここだけ。
  * @param env - Workers のバインディング
  * @param at - 回の開始時刻
  */
 async function deliverEvents(env: Env, at: Date): Promise<void> {
   try {
-    // 届ける用のない回はDBを起こさない（費用のため。docs/architecture.md「固定費0円から始める」）
-    if (!(await eventsDue(env.AUTOPOST_KV, at))) return;
+    if (!shouldDeliver(await readEventGate(env.AUTOPOST_KV), at)) return;
     const result = await deliverPendingEvents(env, at);
     if (result.delivered > 0 || result.failed > 0) logger.info("platform events delivered", result);
+    // 届けが終わったあとの、いちばん早い次に試す時刻まで眠る（届けが失敗で止まったら関所を書かず、次の回もDBを見る）
+    const next = await nextPendingAttemptAt(createDb(env.DATABASE_URL));
+    await writeEventGate(env.AUTOPOST_KV, { nextCheckAt: nextEventCheckAt(at, next).toISOString(), runStartedAt: at.toISOString() });
   } catch (err) {
     logger.error("platform events: delivery run failed", { err });
   }
