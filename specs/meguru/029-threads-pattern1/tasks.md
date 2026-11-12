@@ -178,6 +178,7 @@ description: "Task list for feature meguru/029 Threads pattern ①"
 >   - PR4b-1＝T050・T053・T054（APIの呼び出し106本とキー38個を `apps/threads/lib/` へ移し、Threadsの呼び出しは `/api/threads/…` を呼ぶ。テストのモックを `@/apps/threads/lib/api` に分けた。期待する結果は変えていない）
 >   - PR4b-2＝T051・T021 のうち `threadsMeResponseSchema`（Threadsの画面は、アカウント・チーム・使える機能などを `useThreadsMe()`（`/api/threads/me`）から読む。キーは `["me", "threads"]` で、共通の自分を取り直すと一緒に取り直す）
 >   - PR4b-3＝T052・T070・T021 のうち `FEATURES` の移動・T056
+>   - **PR5 に回したこと（PR #103 のセルフレビュー）**：Threads の画面は、PR5 まで `/api/me` と `/api/threads/me` の両方を読む（サーバーで Threads の中身を2回作る）。PR5 で `/api/me` から Threads の中身を消すときに、Threads の中身だけが変わったところ（アカウントを開く・名前を変える・チーム）の取り直しを `["me"]` から `threadsQueryKeys.me` に替える
 
 **Goal**：ThreadsのAPIをThreadsの道筋の下にそろえ、Webの呼び出しとキー、`/api/me`のThreadsの部分の読み方をThreadsのフォルダへ移す。古い道筋は残す。
 
