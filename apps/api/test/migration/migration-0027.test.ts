@@ -40,6 +40,23 @@ beforeAll(async () => {
     ids.u2,
   ]);
   await client.query(`UPDATE operator_settings SET default_account_limit = 6 WHERE id = 1`);
+  // 使っているか（countThreadsUsage と同じ決め方。PR #95 のセルフレビュー）：
+  // u3 はチームに入っているがチームの機能がOFF、u4 はチームに入っていてON、u5 は担当だが持ち主（u1）のチームがOFF
+  const person = async (key: string) => {
+    const r = await client.query<{ id: string }>(`INSERT INTO users (clerk_user_id, email) VALUES ($1, $2) RETURNING id`, [key, `${key}@example.com`]);
+    ids[key] = r.rows[0]!.id;
+    return r.rows[0]!.id;
+  };
+  const u3 = await person("u3");
+  const u4 = await person("u4");
+  const u5 = await person("u5");
+  const team = await client.query<{ id: string }>(`INSERT INTO teams (name, admin_user_id, invite_token_hash, invite_token_ciphertext, invite_token_iv, invite_key_version)
+     VALUES ('チーム', $1, 'h-0027', '\\x00', '\\x00', 1) RETURNING id`,
+    [u4]);
+  await client.query(`INSERT INTO team_members (team_id, user_id, role) VALUES ($1, $2, 'admin'), ($1, $3, 'member')`, [team.rows[0]!.id, u4, u3]);
+  await client.query(`INSERT INTO feature_disables (user_id, app, feature) VALUES ($1, 'threads', 'team'), ($2, 'threads', 'team')`, [u3, ids.u1]);
+  const [helpedAccount] = (await client.query<{ account_id: string }>(`SELECT account_id FROM memberships WHERE user_id = $1 LIMIT 1`, [ids.u1])).rows;
+  await client.query(`INSERT INTO memberships (user_id, account_id, role, team_id) VALUES ($1, $2, 'editor', $3)`, [u5, helpedAccount!.account_id, team.rows[0]!.id]);
   await applyMigrations(client, migrationIndex("0027"), migrationIndex("0027"));
 });
 
@@ -53,6 +70,14 @@ describe("0027_recopy_usage", () => {
     const by = Object.fromEntries(rows.map((r) => [r.user_id, [r.quantity, r.in_use]]));
     expect(by[ids.u1!]).toEqual([2, true]);
     expect(by[ids.u2!]).toEqual([0, false]);
+  });
+
+  it("使っているかを、チームの機能のOFFを見て決める（countThreadsUsage と同じ）", async () => {
+    const { rows } = await client.query(`SELECT user_id, in_use FROM app_usage WHERE app = 'threads'`);
+    const by = Object.fromEntries(rows.map((r) => [r.user_id, r.in_use]));
+    expect(by[ids.u3!]).toBe(false);
+    expect(by[ids.u4!]).toBe(true);
+    expect(by[ids.u5!]).toBe(false);
   });
 
   it("上限を古い列の値で写し直す（古い列が null なら新しい表の行を消す）", async () => {

@@ -39,9 +39,3 @@ export async function collectSections(c: Context<AppEnv>, kind: "me" | "preview"
   const parts = await Promise.all(list.map((f) => f(c)));
   return Object.assign({}, ...parts);
 }
-
-/** 登録をすべて消す（テスト用）。 */
-export function resetMeSections(): void {
-  meSections.clear();
-  previewSections.clear();
-}

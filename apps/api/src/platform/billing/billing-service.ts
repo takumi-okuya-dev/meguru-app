@@ -440,18 +440,6 @@ export async function openPortal(env: Env, userId: string, stripe: StripeClient 
 // ---- アカウントの数の反映（research.md R6） ----
 
 /**
- * アカウントを作る・削除するトランザクションの中で、数の合わせ直しの印を付ける（契約がなければ何もしない）。
- * @param tx - トランザクション
- * @param userId - オーナーの users.id
- */
-export async function markQuantityDirty(tx: Db | TxDb, userId: string): Promise<void> {
-  await tx
-    .update(subscriptions)
-    .set({ quantitySyncNeeded: true })
-    .where(and(eq(subscriptions.userId, userId), sql`${subscriptions.stripeSubscriptionId} IS NOT NULL`));
-}
-
-/**
  * Stripeの契約の数を、今のアカウントの数（max(n,1)）に合わせる。日割りの請求・返金はしない。
  * 終わった契約・決済OFFでは何もしない。合ったら印を消す。
  * @param env - Workers のバインディング

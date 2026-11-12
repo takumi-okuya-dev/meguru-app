@@ -48,6 +48,8 @@ export async function buildThreadsMe(c: Context<AppEnv>) {
   const db = createDb(c.env.DATABASE_URL);
   const ownerM = alias(memberships, "owner_m");
   const ownerU = alias(users, "owner_u");
+  // 数える前の時刻（利用の値を伝えるときの countedAt。読んだあとの時刻にすると、その間に伝えられた新しい値を古い値で上書きしうる）
+  const now = new Date();
   const rows = await db
     .select({
       account: accounts,
@@ -72,7 +74,6 @@ export async function buildThreadsMe(c: Context<AppEnv>) {
   const visible = rows.filter((r) => r.role === "owner" || (teamOn && r.ownerTeamOn));
   const owned = visible.filter((r) => r.role === "owner").map((r) => r.account);
   const helped = visible.filter((r) => r.role !== "owner").map((r) => r.account);
-  const now = new Date();
   // 使える状態・上限は accountLimitFor が1回で読む（同じ問い合わせを重ねない。PR #71 のセルフレビュー）
   const [myTeams, accountLimit, recorded] = await Promise.all([
     teamOn ? listMyTeams(db, user.id) : Promise.resolve([]),
@@ -81,6 +82,8 @@ export async function buildThreadsMe(c: Context<AppEnv>) {
   ]);
   const { limits } = accountLimit;
   const ownedCount = rows.filter((r) => r.role === "owner").length;
+  // 「使っているか」の決め方は countThreadsUsage（accounts/usage.ts）・マイグレーション 0027 と同じにする
+  // （持ち主のアカウントがあるか、チームを使える人が担当しているアカウントかチームを持つか）
   const using = visible.length > 0 || myTeams.length > 0;
   if (!recorded || recorded.quantity !== ownedCount || recorded.using !== using) {
     await reportUsage(db, user.id, THREADS_APP, { quantity: ownedCount, using, countedAt: now });

@@ -10,7 +10,7 @@ import { createDb, withTransaction } from "../../../kernel/db/client";
 import { lockThreadsUser } from "../../../kernel/db/locks";
 import { threadsDeletionRequests } from "../schema";
 import { deleteAccountsOfThreadsUser } from "../accounts/account-service";
-import { syncThreadsUsage } from "../accounts/usage";
+import { trySyncThreadsUsage } from "../accounts/usage";
 import { sha256Hex, threadsUserHmac, toHex } from "../../../kernel/identifier-hash";
 import { logger } from "../../../kernel/logger";
 import { verifySignedRequest } from "../../../adapters/threads-api";
@@ -89,8 +89,9 @@ export async function attemptDeletion(
 
   // 消したアカウントの持ち主（トランザクションのあとで、利用の数を共通へ伝える。specs/meguru/029 research.md R6）
   let owners: string[] = [];
+  let result: "completed" | "skipped";
   try {
-    const result = await withTransaction(env.DATABASE_URL, async (tx) => {
+    result = await withTransaction(env.DATABASE_URL, async (tx) => {
       // 1. ロック（callback と同じキー）
       await lockThreadsUser(tx, threadsUserId);
       // 2. 読み直して確かめる
@@ -135,8 +136,6 @@ export async function attemptDeletion(
         .where(eq(threadsDeletionRequests.confirmationCode, code));
       return "completed" as const;
     });
-    for (const userId of owners) await syncThreadsUsage(db, userId);
-    return result;
   } catch (err) {
     logger.error("data deletion attempt failed", { code, err });
     // claim の更新もロールバックされているので、ここで試行を記録し直す
@@ -146,6 +145,9 @@ export async function attemptDeletion(
       .where(and(eq(threadsDeletionRequests.confirmationCode, code), ne(threadsDeletionRequests.status, "completed")));
     return "failed";
   }
+  // 削除はもう確定している。利用の数を伝えるのに失敗しても「完了」のまま（ログに残し、毎日の数え直しで直す）
+  for (const userId of owners) await trySyncThreadsUsage(db, userId);
+  return result;
 }
 
 /**

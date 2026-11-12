@@ -39,9 +39,9 @@ export function meRoutes(authed: MiddlewareHandler<AppEnv>, deleteClerkUser: (en
     const user = c.get("user");
     const db = createDb(c.env.DATABASE_URL);
     const now = new Date();
-    // アプリの中身を先に作る（アプリが利用の状態を伝え直すことがあるので、使っているアプリはそのあとで読む）
-    const sections = await collectSections(c, "me");
-    const [entitlement, using] = await Promise.all([loadEntitlement(db, user.id, user.billing, now), usingAppsOf(db, user.id)]);
+    // アプリの中身と使える状態は並べて読む。使っているアプリは、アプリの中身のあとで読む（アプリが利用の状態を伝え直すことがあるため）
+    const [sections, entitlement] = await Promise.all([collectSections(c, "me"), loadEntitlement(db, user.id, user.billing, now)]);
+    const using = await usingAppsOf(db, user.id);
     // Account切り替えメニューは開くたびに一覧を読み直すため、ブラウザに保存させない。
     c.header("Cache-Control", "no-store");
     return c.json({

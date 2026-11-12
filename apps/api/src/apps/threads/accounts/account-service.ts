@@ -10,7 +10,7 @@ import { AppError } from "../../../kernel/errors";
 import { authorizeAccount } from "../access/access";
 import { loadEntitlement, syncQuantity } from "../../../platform";
 import { withdrawForAccountDeletion } from "../tester-invites/tester-application-service";
-import { syncThreadsUsage } from "./usage";
+import { trySyncThreadsUsage } from "./usage";
 import { recordActivity } from "../activity/activity-log";
 import { beforeAccountDeleted } from "../teams/team-service";
 import { effectiveLimits } from "../../../platform";
@@ -115,8 +115,8 @@ export async function createAccount(env: Env, userId: string, name: string) {
     return account!;
   });
   // トランザクションの後で、利用の数を共通へ伝え（料金の数が変われば印が付く）、Stripeの数を合わせる。
-  // 失敗しても作成は成功のまま（印が残り、日次で合わせる。specs/meguru/029 research.md R6）
-  await syncThreadsUsage(createDb(env.DATABASE_URL), userId);
+  // 失敗しても作成は成功のまま（ログに残し、/api/me と日次の数え直しで合わせる。specs/meguru/029 research.md R6）
+  await trySyncThreadsUsage(createDb(env.DATABASE_URL), userId);
   await syncQuantity(env, userId);
   return created;
 }
@@ -235,8 +235,8 @@ export async function deleteAccount(
       .where(eq(users.id, userId));
     await tx.delete(accounts).where(eq(accounts.id, account.id));
   });
-  // 利用の数を共通へ伝え、次の請求から数を減らす（日割りの返金はしない。specs/013 FR-030）
-  await syncThreadsUsage(createDb(env.DATABASE_URL), userId);
+  // 利用の数を共通へ伝え、次の請求から数を減らす（日割りの返金はしない。specs/013 FR-030）。失敗しても削除は成功のまま
+  await trySyncThreadsUsage(createDb(env.DATABASE_URL), userId);
   await syncQuantity(env, userId);
 }
 

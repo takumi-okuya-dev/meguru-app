@@ -12,7 +12,8 @@ import { and, asc, eq, isNotNull, or, sql } from "drizzle-orm";
 import type { Env } from "../../kernel/env";
 import { withTransaction, type Db, type TxDb } from "../../kernel/db/client";
 import { appLimitDefaults, operatorSettings, userAppLimits, users } from "../schema";
-import { billingQuantityOf } from "../usage/usage";
+import { appUsageOf } from "../usage/usage";
+import { appLimits, registeredApps } from "../registry/registry";
 import { operatorIdsOf } from "../../kernel/config";
 import { AppError } from "../../kernel/errors";
 import { isUuid } from "../../kernel/validate";
@@ -213,8 +214,10 @@ export async function findLimitUser(db: Db, env: Pick<Env, "OPERATOR_CLERK_USER_
  * @returns 見つかった人と上限
  */
 async function toLimitUser(db: Db | TxDb, env: Pick<Env, "OPERATOR_CLERK_USER_IDS">, u: typeof users.$inferSelect): Promise<OperatorLimitUser> {
-  // 持ち主としてのアカウントの数は、アプリから伝えられた利用の数（specs/meguru/029 research.md R6）
-  const owned = await billingQuantityOf(db, u.id);
+  // 持ち主としてのアカウントの数は、アカウントの数の上限を登録したアプリから伝えられた利用の数（specs/meguru/029 research.md R6）。
+  // 全アプリの合計（料金の数）ではなく、そのアプリの数だけを出す。運営の画面を登録の一覧で出す形にするのは PR2b（T069・T070）
+  const app = registeredApps().find((a) => "accounts" in appLimits(a));
+  const owned = app ? ((await appUsageOf(db, u.id, app))?.quantity ?? 0) : 0;
   return {
     userId: u.id,
     name: u.displayName,

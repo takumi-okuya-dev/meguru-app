@@ -4,6 +4,7 @@
 import { and, eq, inArray, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { createDb, type Db, type TxDb } from "../../../kernel/db/client";
+import { logger } from "../../../kernel/logger";
 import { featureOnSql, reportUsage, usersWithUsage } from "../../../platform";
 import { users } from "../../../platform/schema";
 import { THREADS_APP } from "../registry";
@@ -40,8 +41,9 @@ export async function countThreadsUsage(db: Db | TxDb, userId: string): Promise<
 }
 
 /**
- * その人のThreadsの利用の値を数えて、共通へ伝える。アカウントを作る・消す・チームに入る・抜けるなどのトランザクションが
- * 終わったあと、応答を返す前に呼ぶ。数える前の時刻を伝えるので、同時に伝えても古い値で上書きしない。
+ * その人のThreadsの利用の値を数えて、共通へ伝える。アカウントを作る・消す・Metaのデータ削除のトランザクションが
+ * 終わったあと、応答を返す前に呼ぶ（チームの出入りは、PR2a では /api/me と毎日の数え直しで直す。029 tasks.md PR2 の頭）。
+ * 数える前の時刻を伝えるので、同時に伝えても古い値で上書きしない。失敗は例外のまま返す（呼ぶ側は trySyncThreadsUsage を使う）。
  * @param db - データベース
  * @param userId - 利用者の番号
  */
@@ -52,10 +54,27 @@ export async function syncThreadsUsage(db: Db | TxDb, userId: string): Promise<v
 }
 
 /**
+ * syncThreadsUsage を呼び、失敗してもログに残すだけにする。トランザクションのあとで呼ぶので、ここで失敗しても
+ * アカウントの作成・削除は成功のまま（ずれは /api/me と毎日の数え直しで直す。research.md R6）。
+ * @param db - データベース
+ * @param userId - 利用者の番号
+ * @returns 伝えられたら true
+ */
+export async function trySyncThreadsUsage(db: Db | TxDb, userId: string): Promise<boolean> {
+  try {
+    await syncThreadsUsage(db, userId);
+    return true;
+  } catch (err) {
+    logger.error("threads usage: sync failed", { userId, err: String(err) });
+    return false;
+  }
+}
+
+/**
  * 毎日のまとめ処理：Threadsを使っている（使っていた）人全員の利用の値を数え直して伝える。
  * 伝えるのに失敗した分や、記録のずれを1日以内に直す（specs/meguru/029 research.md R6）。
  * @param env - Workers のバインディング（DATABASE_URL）
- * @returns 数え直した人数
+ * @returns 数え直した人数（1人の失敗で、ほかの人を止めない）
  */
 export async function recountThreadsUsage(env: { DATABASE_URL: string }): Promise<number> {
   const db = createDb(env.DATABASE_URL);
@@ -66,6 +85,6 @@ export async function recountThreadsUsage(env: { DATABASE_URL: string }): Promis
     usersWithUsage(db, THREADS_APP),
   ]);
   const ids = [...new Set([...members.map((r) => r.userId), ...teamPeople.map((r) => r.userId), ...recorded])];
-  for (const id of ids) await syncThreadsUsage(db, id);
+  for (const id of ids) await trySyncThreadsUsage(db, id);
   return ids.length;
 }
