@@ -176,5 +176,24 @@ describe("最後に使ったアプリ（contracts/ui-routes.md 3・6）", () => 
     expect(await screen.findByRole("heading", { name: "サンプルのホーム" })).toBeInTheDocument();
     await waitFor(() => expect(mocks.putLastApp).toHaveBeenCalled());
     expect(screen.queryByRole("alert")).toBeNull();
+    // 失敗しても、同じアプリのまま送り続けない
+    await new Promise((r) => setTimeout(r, 50));
+    expect(mocks.putLastApp).toHaveBeenCalledTimes(1);
+  });
+
+  it("送っている間に別のアプリへ移り、前の送信が失敗しても、移った先のアプリを覚える", async () => {
+    mocks.me.mockResolvedValue(meWith({ ...BOTH, last: null }));
+    let rejectSample: (e: Error) => void = () => {};
+    mocks.putLastApp.mockImplementation((id: string) =>
+      id === "sample" ? new Promise<void>((_, reject) => (rejectSample = reject)) : Promise.resolve(),
+    );
+    const router = renderAt("/sample");
+    await waitFor(() => expect(mocks.putLastApp).toHaveBeenCalledWith("sample"));
+    await router.navigate("/threads");
+    await screen.findByRole("heading", { name: "Threadsのホーム" });
+    expect(mocks.putLastApp).not.toHaveBeenCalledWith("threads");
+    rejectSample(new Error("network"));
+    await waitFor(() => expect(mocks.putLastApp).toHaveBeenCalledWith("threads"));
+    expect(mocks.putLastApp).toHaveBeenCalledTimes(2);
   });
 });

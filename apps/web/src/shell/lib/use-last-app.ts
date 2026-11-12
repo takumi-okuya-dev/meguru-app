@@ -4,7 +4,7 @@
 // 失敗しても画面には何も出さない（次の入口で、使っているアプリの最初になるだけ）。
 import { resolveLandingApp, type MeResponse } from "@meguru/shared";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { api } from "@/lib/api-client";
 import { queryKeys } from "@/lib/query";
 import { useCurrentApp } from "../app-module";
@@ -19,11 +19,18 @@ export function useRememberLastApp(): void {
   const me = useQuery({ queryKey: queryKeys.me, queryFn: api.me, enabled: Boolean(app) });
   // 送っている最中は重ねて送らない
   const inFlight = useRef(false);
+  // 送り終えた組（アプリと、そのときの apps.last）。失敗しても、同じ組では送り直さない（送り続けないため）
+  const attempted = useRef<string | null>(null);
+  // 送り終えたら数を進めて、もう一度確かめる（送っている間に別のアプリへ移っていたら、失敗しても今のアプリを覚えるため）
+  const [settled, setSettled] = useState(0);
   const loaded = Boolean(me.data);
   const last = me.data?.apps.last ?? null;
   useEffect(() => {
     if (!app || !loaded || last === app.id || inFlight.current) return;
+    const key = `${app.id}|${last ?? ""}`;
+    if (attempted.current === key) return;
     inFlight.current = true;
+    attempted.current = key;
     api
       .putLastApp(app.id)
       .then(() =>
@@ -36,6 +43,7 @@ export function useRememberLastApp(): void {
       })
       .finally(() => {
         inFlight.current = false;
+        setSettled((n) => n + 1);
       });
-  }, [app, loaded, last, queryClient]);
+  }, [app, loaded, last, queryClient, settled]);
 }
