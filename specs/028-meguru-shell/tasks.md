@@ -29,7 +29,7 @@ description: "Task list for feature 028 meguru shell and web split"
 ## Phase 1：Setup（分割の前の基準）
 
 - [X] T001 分割の前の基準を残す：`pnpm --filter web test`・`pnpm --filter shared test`・`pnpm --filter api test` の成功数を数え、PR1の説明に書く（spec SC-003：減らさないことの基準）。あわせて、今のルートの一覧（`web/router.tsx` の `routes` のパス）を `specs/028-meguru-shell/checklists/routes-before.md` に書き出す（PR2の転送の確かめに使う）。
-- [ ] T002 [P] ステージングで、Threadsだけを使っている人の主な画面（ホーム・投稿をつくる・投稿ストック・このアカウントの設定・チーム・設定の外観）のスクリーンショットを、1280px幅と390px幅で撮り、`specs/028-meguru-shell/checklists/screenshots-before/` に置く（quickstart.md 4、spec SC-002）。
+- [X] T002 [P] ステージングで、Threadsだけを使っている人の主な画面（ホーム・投稿をつくる・投稿ストック・このアカウントの設定・チーム・設定の外観）のスクリーンショットを、1280px幅と390px幅で撮り、`specs/028-meguru-shell/checklists/screenshots-before/` に置く（quickstart.md 4、spec SC-002）。（2026-11-12、PR2 のマージの前に撮った。スクリーンショットは手元に置き、リポジトリには入れていない）
 
 ## Phase 2：Foundational（境界の規則と、アプリの入口の形）
 
@@ -124,7 +124,7 @@ description: "Task list for feature 028 meguru shell and web split"
 - [X] T041 [P] [US1] （**PR3 へ移した。PR3 で行った**：PR2 の Web が出たあとに API を変える。それまでは前のURLの転送が受ける）APIが作るURLを直す（contracts/api.md 3）：`api/app.ts` の `${web}/accounts/new?…` → `${web}/threads/accounts/new?…`、`api/apps/threads/connection/threads-connect-routes.ts` の `withParams("/", …)` → `withParams("/threads", …)`、`/accounts/${…}/settings` → `/threads/accounts/${…}/settings`。T032が通ること。
 - [X] T042 [US1] `apps/web/test/**` の残りのURLの期待値（`/accounts/…`・`/teams/…`）を新しいURLに直す（中身の場面は変えない）。`pnpm --filter web test` が通り、成功数が T001 より減らないこと。
 - [X] T043 [US1] E2Eを直す：`e2e/tests/` の `billing.spec.ts`・`create.spec.ts`・`onboarding.spec.ts`・`phone-width.spec.ts`・`reconnect-delete.spec.ts`・`research.spec.ts`・`strategy.spec.ts`・`team.spec.ts`・`token.spec.ts`・`team-flow.ts`・`helpers.ts` のURLを新しいURLにする。前のURLの転送を確かめる場面を `e2e/tests/onboarding.spec.ts` に1つ足す（`/accounts/<番号>/stock` を開くと `/threads/accounts/<番号>/stock`）。`pnpm e2e` が通ること。
-- [ ] T044 [US1] quickstart.md 3 の表を手元で確かめる。ステージングへ出したあと、T002と同じ画面のスクリーンショットを撮り、URLのほかに差がないことを見比べる（quickstart.md 4、spec SC-002）。
+- [X] T044 [US1] quickstart.md 3 の表を手元で確かめる。ステージングへ出したあと、T002と同じ画面のスクリーンショットを撮り、URLのほかに差がないことを見比べる（quickstart.md 4、spec SC-002）。（2026-11-12、ステージングで確かめた）
 
 **Checkpoint（PR2の完了）**：Threadsの画面が `/threads/…` で開き、前のURLは移る。今の利用者から見える違いはURLだけ。PR2を `develop` へ出す。
 
@@ -191,7 +191,7 @@ description: "Task list for feature 028 meguru shell and web split"
 - [X] T067 [P] `docs/product-structure.md` §6 の表のWebの行を「◎ 028で `shell/` と `apps/<名前>/` に分けた。アプリ同士・外枠とアプリの境界をESLintでかける」に直し、§7 の「Webとsharedのモジュール分割の細部」の行を、決めたこと（028で済み・sharedは2作目から）に直す。§5 の表と食い違いがないかを確かめる。
 - [X] T068 [P] `docs/ui-design.md` に、アプリの切り替え（サイドバーのいちばん上・2本以上のときだけ）・すべてのアプリの画面・ユーザーメニューの「すべてのアプリ」を書き足す。
 - [X] T069 （**実装の結果**：技術スタック制約に2つの決まりを足し、4.6.0 にした。テンプレートには影響なし）`/speckit-constitution` の手順で Constitution を **4.6.0（MINOR）** に改める（spec FR-021、plan の Constitution Check）：技術スタック制約に「**Webのモジュール構成**（2026-11-12、specs/028）」（外枠・アプリ・共通の部品・組み立て、依存の向き、入口、ESLintの規則 `eslint-rules/web-module-boundaries.js`、アプリを足すときは登録の1か所）と「**モバイル化を見込んだ技術の選び方**（2026-11-12）」（2作目以降のアプリは、業務の判断とデータのやりとりをAPIと共通のパッケージに置き、Webの画面やブラウザだけで動く仕組みに閉じこめない。Threadsは今のままでよい）を足し、Sync Impact Report を残す。
-- [ ] T070 quickstart.md の 1〜7 をすべて流し、結果をPR3の説明に書く。`pnpm --filter api db:migrate` をステージングに当てたあと（デプロイの手順に従う）、新しい人で `/apps` から始まることと、今の人で `/threads/…` から始まることを確かめる。
+- [X] T070 quickstart.md の 1〜7 をすべて流し、結果をPR3の説明に書く。`pnpm --filter api db:migrate` をステージングに当てたあと（デプロイの手順に従う）、新しい人で `/apps` から始まることと、今の人で `/threads/…` から始まることを確かめる。（2026-11-12、ステージングで確かめた。マイグレーション 0025 はデプロイで当たった。結果は #83 の説明に書いた）
 
 ---
 
