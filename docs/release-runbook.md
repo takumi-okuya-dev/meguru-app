@@ -26,7 +26,7 @@ feature/* ──PR──▶ develop ──自動──▶ ステージング（�
   2. セルフレビュー（Claude Codeの`/code-review`など）をして、指摘を直してpushする。
   3. **「Ready for review」**にする（`gh pr ready <番号>`）。ここでCodexのレビューが始まる。直したあとにもう一度見てもらうときは、PRに `@codex review` とコメントする。
 - **CIは、PRにラベル「run-ci」を付けると流れる**（付け直すと、もう一度流れる。[.github/workflows/ci.yml](../.github/workflows/ci.yml)）。付けないと流れない。
-  - **ラベルを付けるのは、コードを変えたPRだけ**。GitHubのCIは従量課金なので、結果が変わらないPRでは流さない（2026-11-12に確かめた。決まり自体は2026-10-31に[external-services-setup.md](external-services-setup.md) 9-12で決めたもの）。
+  - **ラベルを付けるのは、コードを変えたPRだけ**。GitHubのCIは従量課金なので、結果が変わらないPRでは流さない（2026-10-31に[external-services-setup.md](external-services-setup.md) 9-12で決めた決まりを、2026-11-12にここへ書いた）。
   - 流す：lint・型チェック・テストの結果が変わりうる変更。`apps/`・`packages/`・`e2e/`・`eslint-rules/`のコード、`package.json`・`pnpm-lock.yaml`、TypeScript・ESLint・Vitestの設定、`.github/workflows/`。
   - 流さない：文書（`docs/`・`specs/`・`*.md`）・`.specify/`・スキルの本文だけのPR。CIの成功が要るブランチの規則は、管理者がPRから`gh pr merge --admin`でマージして通す（マージしてよいかは、いつもどおりユーザーが決める）。
   - 迷ったら流す。
