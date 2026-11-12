@@ -32,7 +32,21 @@ const limits = new Map<string, Readonly<Record<string, AppLimitDef>>>();
  */
 export function registerAppFeatures(app: string, defs: readonly AppFeatureDef[]): void {
   if (features.has(app)) return;
+  // 機能の名前はアプリをまたいで重ねない（ログインした人の features は1つの集合で持つため。specs/meguru/029 tasks.md T027）
+  for (const [other, list] of features) {
+    const dup = defs.find((d) => list.some((o) => o.key === d.key));
+    if (dup) throw new Error(`機能の名前「${dup.key}」は、アプリ「${other}」がもう登録しています`);
+  }
   features.set(app, defs);
+}
+
+/**
+ * 機能のON/OFFの運営の画面と、ログインした人の features が扱うアプリ（機能を登録した最初のアプリ）。
+ * 運営の画面を登録の一覧で出す形にするまで（PR4 の T069・T070）、ON/OFFは1つのアプリのものとして扱う。
+ * @returns アプリの番号（登録がなければ undefined）
+ */
+export function featureSettingsApp(): string | undefined {
+  return [...features.entries()].find(([, list]) => list.length > 0)?.[0];
 }
 
 /**

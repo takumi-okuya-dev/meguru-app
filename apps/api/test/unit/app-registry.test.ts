@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import {
   appFeatures,
   appLimits,
+  featureSettingsApp,
   isAppFeature,
   isValidAppLimit,
   registerAppFeatures,
@@ -28,6 +29,19 @@ describe("登録", () => {
     registerAppFeatures("sample", [{ key: "notes", label: "メモ" }]);
     registerAppFeatures("sample", [{ key: "other", label: "別" }]);
     expect(appFeatures("sample").map((f) => f.key)).toEqual(["notes"]);
+  });
+
+  it("機能の名前は、ほかのアプリと重ねられない（ログインした人の features を1つの集合で持つため。T027）", () => {
+    registerAppFeatures("sample", [{ key: "notes", label: "メモ" }]);
+    expect(() => registerAppFeatures("other", [{ key: "notes", label: "別のメモ" }])).toThrow(/notes/);
+    expect(registeredApps()).toEqual(["sample"]);
+  });
+
+  it("featureSettingsApp は、機能を登録した最初のアプリ", () => {
+    expect(featureSettingsApp()).toBeUndefined();
+    registerAppLimits("limits-only", { people: { label: "人数", min: 1, max: 100, operatorValue: null } });
+    registerAppFeatures("sample", [{ key: "notes", label: "メモ" }]);
+    expect(featureSettingsApp()).toBe("sample");
   });
 
   it("登録していないアプリは空", () => {
