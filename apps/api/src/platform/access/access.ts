@@ -71,14 +71,8 @@ export function isUuid(value: string): boolean {
   return UUID.test(value);
 }
 
-/**
- * 画面・記録に出す人の名前。Googleの名前がなければ、メールの@より前（contracts/ui-routes.md）。
- * @param u - users の表示名とメール
- * @returns 名前
- */
-export function personName(u: { displayName: string | null; email: string }): string {
-  return u.displayName?.trim() || u.email.split("@")[0] || u.email;
-}
+import { personName } from "../identity/people";
+export { personName };
 
 /**
  * 関わりとチームのロールから、操作の記録に写す役割を決める（research.md R8）。

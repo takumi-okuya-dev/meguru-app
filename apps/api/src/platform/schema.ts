@@ -1,4 +1,4 @@
-// 共通（platform）の表の定義：17表（docs/module-map.md 2-1、specs/027-modular-monolith research.md R6）。
+// 共通（platform）の表の定義：17表＋029の5表（docs/module-map.md 2-1、specs/027-modular-monolith research.md R6）。
 // Accountに紐づくテーブルはすべて ON DELETE CASCADE とする（後続featureも守る規約。specs/001 research.md R13）。
 import { sql } from "drizzle-orm";
 import {
@@ -20,7 +20,6 @@ import {
 } from "drizzle-orm/pg-core";
 import {
   FEATURE_EVENT_ACTIONS,
-  FEATURES,
   POST_LENGTH_DEFAULTS,
   PROMOTION_RATIO_DEFAULT,
   PROMPT_COUNT_DEFAULT,
@@ -424,13 +423,16 @@ export const featureDisables = pgTable(
     userId: uuid("user_id")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
+    // アプリの番号（specs/meguru/029 research.md R7）。名前（feature）の意味はアプリが決める
+    app: text("app").notNull().default("threads"),
     feature: text("feature").notNull(),
     disabledAt: timestamp("disabled_at", { withTimezone: true, precision: 6 }).notNull().defaultNow(),
     disabledByUserId: uuid("disabled_by_user_id").references(() => users.id, { onDelete: "set null" }),
   },
   (t) => [
-    primaryKey({ name: "feature_disables_pkey", columns: [t.userId, t.feature] }),
-    check("feature_disables_feature_valid", sql`${t.feature} IN (${inList(FEATURES)})`),
+    primaryKey({ name: "feature_disables_pkey", columns: [t.userId, t.app, t.feature] }),
+    check("feature_disables_feature_valid", sql`${t.feature} ~ '^[a-z_]{1,30}$'`),
+    check("feature_disables_app_valid", sql`${t.app} ~ '^[a-z][a-z0-9-]{0,30}$'`),
   ],
 );
 
@@ -441,13 +443,15 @@ export const groupFeatureDisables = pgTable(
     groupId: uuid("group_id")
       .notNull()
       .references(() => testGroups.id, { onDelete: "cascade" }),
+    app: text("app").notNull().default("threads"),
     feature: text("feature").notNull(),
     disabledAt: timestamp("disabled_at", { withTimezone: true, precision: 6 }).notNull().defaultNow(),
     disabledByUserId: uuid("disabled_by_user_id").references(() => users.id, { onDelete: "set null" }),
   },
   (t) => [
-    primaryKey({ name: "group_feature_disables_pkey", columns: [t.groupId, t.feature] }),
-    check("group_feature_disables_feature_valid", sql`${t.feature} IN (${inList(FEATURES)})`),
+    primaryKey({ name: "group_feature_disables_pkey", columns: [t.groupId, t.app, t.feature] }),
+    check("group_feature_disables_feature_valid", sql`${t.feature} ~ '^[a-z_]{1,30}$'`),
+    check("group_feature_disables_app_valid", sql`${t.app} ~ '^[a-z][a-z0-9-]{0,30}$'`),
   ],
 );
 
@@ -458,6 +462,7 @@ export const featureSettingEvents = pgTable(
     id: uuid("id").primaryKey().defaultRandom(),
     subjectUserId: uuid("subject_user_id").references(() => users.id, { onDelete: "cascade" }),
     subjectGroupId: uuid("subject_group_id").references(() => testGroups.id, { onDelete: "cascade" }),
+    app: text("app").notNull().default("threads"),
     feature: text("feature").notNull(),
     action: text("action").notNull(),
     actorUserId: uuid("actor_user_id").references(() => users.id, { onDelete: "set null" }),
@@ -466,7 +471,8 @@ export const featureSettingEvents = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true, precision: 6 }).notNull().defaultNow(),
   },
   (t) => [
-    check("feature_setting_events_feature_valid", sql`${t.feature} IN (${inList(FEATURES)})`),
+    check("feature_setting_events_feature_valid", sql`${t.feature} ~ '^[a-z_]{1,30}$'`),
+    check("feature_setting_events_app_valid", sql`${t.app} ~ '^[a-z][a-z0-9-]{0,30}$'`),
     check("feature_setting_events_action_valid", sql`${t.action} IN (${inList(FEATURE_EVENT_ACTIONS)})`),
     check("feature_setting_events_one_subject", sql`(${t.subjectUserId} IS NULL) <> (${t.subjectGroupId} IS NULL)`),
     index("feature_setting_events_created_idx").on(t.createdAt.desc()),
@@ -521,6 +527,95 @@ export const operatorEvents = pgTable(
   (t) => [
     index("operator_events_actor_action_idx").on(t.actorUserId, t.action, t.createdAt),
     index("operator_events_created_idx").on(t.createdAt.desc()),
+  ],
+);
+
+// ---- アプリを分けるための共通の土台（specs/meguru/029-threads-pattern1 data-model.md 2）----
+
+/** 出来事（共通で起きたことを、あとからアプリに伝える。research.md R5）。中身に入れるのは番号だけ。 */
+export const platformEvents = pgTable(
+  "platform_events",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    type: text("type").notNull(),
+    payload: jsonb("payload").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true, precision: 6 }).notNull().defaultNow(),
+  },
+  (t) => [
+    check("platform_events_type_valid", sql`${t.type} ~ '^[a-z][a-z0-9_]*([.][a-z][a-z0-9_]*)+$'`),
+    index("platform_events_created_idx").on(t.createdAt),
+  ],
+);
+
+/** 出来事の届け先ごとの状態（research.md R5）。 */
+export const platformEventDeliveries = pgTable(
+  "platform_event_deliveries",
+  {
+    eventId: uuid("event_id")
+      .notNull()
+      .references(() => platformEvents.id, { onDelete: "cascade" }),
+    consumer: text("consumer").notNull(),
+    status: text("status").notNull().default("pending"),
+    attempts: integer("attempts").notNull().default(0),
+    nextAttemptAt: timestamp("next_attempt_at", { withTimezone: true, precision: 6 }).notNull().defaultNow(),
+    lastError: text("last_error"),
+    deliveredAt: timestamp("delivered_at", { withTimezone: true, precision: 6 }),
+  },
+  (t) => [
+    primaryKey({ name: "platform_event_deliveries_pkey", columns: [t.eventId, t.consumer] }),
+    check("platform_event_deliveries_status_valid", sql`${t.status} IN ('pending', 'done', 'failed')`),
+    check("platform_event_deliveries_attempts_range", sql`${t.attempts} >= 0`),
+    index("platform_event_deliveries_due_idx").on(t.nextAttemptAt).where(sql`${t.status} = 'pending'`),
+  ],
+);
+
+/** 利用の数・利用の状態（アプリが伝える。料金と「使っているアプリ」に使う。research.md R6）。 */
+export const appUsage = pgTable(
+  "app_usage",
+  {
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    app: text("app").notNull(),
+    quantity: integer("quantity").notNull().default(0),
+    // 使っているか（using は Postgres の予約語なので列の名前は in_use）
+    inUse: boolean("in_use").notNull().default(false),
+    updatedAt: timestamp("updated_at", { withTimezone: true, precision: 6 }).notNull().defaultNow(),
+  },
+  (t) => [
+    primaryKey({ name: "app_usage_pkey", columns: [t.userId, t.app] }),
+    check("app_usage_quantity_range", sql`${t.quantity} >= 0`),
+  ],
+);
+
+/** 利用者ごとの上限（アプリ・名前。research.md R7）。行がなければ既定の値。 */
+export const userAppLimits = pgTable(
+  "user_app_limits",
+  {
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    app: text("app").notNull(),
+    key: text("key").notNull(),
+    value: integer("value").notNull(),
+  },
+  (t) => [
+    primaryKey({ name: "user_app_limits_pkey", columns: [t.userId, t.app, t.key] }),
+    check("user_app_limits_value_range", sql`${t.value} >= 0`),
+  ],
+);
+
+/** 上限の既定の値（アプリ・名前。research.md R7）。 */
+export const appLimitDefaults = pgTable(
+  "app_limit_defaults",
+  {
+    app: text("app").notNull(),
+    key: text("key").notNull(),
+    value: integer("value").notNull(),
+  },
+  (t) => [
+    primaryKey({ name: "app_limit_defaults_pkey", columns: [t.app, t.key] }),
+    check("app_limit_defaults_value_range", sql`${t.value} >= 0`),
   ],
 );
 

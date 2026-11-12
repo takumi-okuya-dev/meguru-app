@@ -63,9 +63,12 @@ export function call(
 export async function resetDb() {
   const sql = neon(testEnv.DATABASE_URL);
   createDb(testEnv.DATABASE_URL); // ローカルプロキシの設定を有効にする
-  await sql`TRUNCATE users, accounts, memberships, threads_connections, oauth_states, threads_deletion_requests, threads_revocations, strategy_designs, promotions, reference_posts, research_keywords, draft_batches, post_drafts, ng_words, posting_schedules, publish_attempts, teams, team_members, team_accounts, activity_logs, token_check_failures, subscriptions, withdrawn_users CASCADE`;
+  await sql`TRUNCATE users, accounts, memberships, threads_connections, oauth_states, threads_deletion_requests, threads_revocations, strategy_designs, promotions, reference_posts, research_keywords, draft_batches, post_drafts, ng_words, posting_schedules, publish_attempts, teams, team_members, team_accounts, activity_logs, token_check_failures, subscriptions, withdrawn_users, platform_events, app_usage, user_app_limits CASCADE`;
   // 運営者が決める値（1行だけ。TRUNCATE では消さない）を初めの値に戻す（specs/024）
   await sql`UPDATE operator_settings SET default_account_limit = 3, default_daily_post_limit = 10, tester_slot_capacity = 25`;
+  // 新しい上限の表の既定の値も同じ値に戻す（specs/meguru/029 research.md R7）
+  await sql`INSERT INTO app_limit_defaults (app, key, value) VALUES ('threads', 'accounts', 3), ('threads', 'daily_posts', 10)
+    ON CONFLICT (app, key) DO UPDATE SET value = EXCLUDED.value`;
 }
 
 export function db() {

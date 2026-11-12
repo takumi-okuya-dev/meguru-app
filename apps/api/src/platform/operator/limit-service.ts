@@ -11,7 +11,7 @@ import {
 import { and, asc, eq, inArray, isNotNull, or, sql } from "drizzle-orm";
 import type { Env } from "../../kernel/env";
 import { withTransaction, type Db, type TxDb } from "../../kernel/db/client";
-import { memberships, operatorSettings, users } from "../schema";
+import { appLimitDefaults, memberships, operatorSettings, userAppLimits, users } from "../schema";
 import { operatorIdsOf } from "../../kernel/config";
 import { AppError } from "../../kernel/errors";
 import { isUuid } from "../access/access";
@@ -143,6 +143,45 @@ export async function listLimits(db: Db): Promise<OperatorLimits> {
   return { defaults, overrides, events };
 }
 
+// ---- 新しい上限の表へ同じ値を書く（specs/meguru/029-threads-pattern1 research.md R7、T014）----
+// PR1〜PR4 の間は、古い列（operator_settings・users）と新しい表（app_limit_defaults・user_app_limits）の両方に書く。
+// 読むのはまだ古い列（今の判定を変えない）。PR2 で読む側を新しい表に替え、PR5 で古い列とこの写しを消す。
+const MIRROR_APP = "threads";
+const MIRROR_KEYS = { accountLimit: "accounts", dailyPostLimit: "daily_posts" } as const;
+
+/**
+ * 既定の上限を、新しい表にも書く。
+ * @param tx - トランザクション
+ * @param v - 既定値
+ */
+async function mirrorDefaults(tx: TxDb, v: DefaultLimits): Promise<void> {
+  for (const [field, key] of Object.entries(MIRROR_KEYS) as [keyof DefaultLimits, string][]) {
+    await tx
+      .insert(appLimitDefaults)
+      .values({ app: MIRROR_APP, key, value: v[field] })
+      .onConflictDoUpdate({ target: [appLimitDefaults.app, appLimitDefaults.key], set: { value: v[field] } });
+  }
+}
+
+/**
+ * 利用者ごとの上限を、新しい表にも書く（null は行を消して既定値に戻す）。
+ * @param tx - トランザクション
+ * @param userId - 利用者の番号
+ * @param v - 値
+ */
+async function mirrorUserLimits(tx: TxDb, userId: string, v: UserLimitsRequest): Promise<void> {
+  for (const [field, key] of Object.entries(MIRROR_KEYS) as [keyof UserLimitsRequest, string][]) {
+    const value = v[field];
+    const where = and(eq(userAppLimits.userId, userId), eq(userAppLimits.app, MIRROR_APP), eq(userAppLimits.key, key));
+    if (value === null) await tx.delete(userAppLimits).where(where);
+    else
+      await tx
+        .insert(userAppLimits)
+        .values({ userId, app: MIRROR_APP, key, value })
+        .onConflictDoUpdate({ target: [userAppLimits.userId, userAppLimits.app, userAppLimits.key], set: { value } });
+  }
+}
+
 /**
  * 既定値を保存する（FR-016）。
  * @param env - Workers のバインディング
@@ -157,6 +196,7 @@ export async function setDefaults(env: Env, operator: { id: string }, v: Default
       .update(operatorSettings)
       .set({ defaultAccountLimit: v.accountLimit, defaultDailyPostLimit: v.dailyPostLimit, updatedAt: new Date() })
       .where(eq(operatorSettings.id, 1));
+    await mirrorDefaults(tx, v);
     await recordOperatorEvent(tx, { actorUserId: operator.id, action: "default_limits", detail: { before, after: v } });
     return v;
   }).then(async (saved) => {
@@ -223,6 +263,7 @@ export async function setUserLimits(env: Env, operator: { id: string }, userId: 
       .set({ accountLimit: v.accountLimit, dailyPostLimit: v.dailyPostLimit, updatedAt: new Date() })
       .where(eq(users.id, userId))
       .returning();
+    await mirrorUserLimits(tx, userId, v);
     await recordOperatorEvent(tx, {
       actorUserId: operator.id,
       subjectUserId: userId,

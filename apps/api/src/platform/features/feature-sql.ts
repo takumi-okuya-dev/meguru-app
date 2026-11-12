@@ -8,16 +8,19 @@ import type { Db, TxDb } from "../../kernel/db/client";
 import { featureDisables, groupFeatureDisables, memberships, testGroupMembers, testGroups } from "../schema";
 
 /**
- * その人の、まとまりごとのOFFの行（人の設定とグループの設定）を返す副問い合わせ。
- * @param userId - users.id の列（外側の問い合わせの列）
+ * その人の、まとまりごとのOFFの行（人の設定とグループの設定）を返す副問い合わせ。判定の条件はここだけに置く。
+ * @param userId - users.id の列（外側の問い合わせの列）か値
+ * @param app - アプリの番号（渡すとそのアプリの行だけ。specs/meguru/029 research.md R7）
  * @returns feature の1列を返す副問い合わせ
  */
-function disabledRows(userId: AnyPgColumn | SQL): SQL {
-  return sql`SELECT ${featureDisables.feature} AS feature FROM ${featureDisables} WHERE ${featureDisables.userId} = ${userId}
+function disabledRows(userId: AnyPgColumn | SQL, app?: string): SQL {
+  const own = app === undefined ? sql`` : sql` AND ${featureDisables.app} = ${app}`;
+  const group = app === undefined ? sql`` : sql` AND ${groupFeatureDisables.app} = ${app}`;
+  return sql`SELECT ${featureDisables.feature} AS feature FROM ${featureDisables} WHERE ${featureDisables.userId} = ${userId}${own}
     UNION
     SELECT ${groupFeatureDisables.feature} FROM ${testGroupMembers}
       JOIN ${testGroups} ON ${testGroups.id} = ${testGroupMembers.groupId} AND ${testGroups.closedAt} IS NULL
-      JOIN ${groupFeatureDisables} ON ${groupFeatureDisables.groupId} = ${testGroupMembers.groupId}
+      JOIN ${groupFeatureDisables} ON ${groupFeatureDisables.groupId} = ${testGroupMembers.groupId}${group}
     WHERE ${testGroupMembers.userId} = ${userId}`;
 }
 
@@ -28,6 +31,16 @@ function disabledRows(userId: AnyPgColumn | SQL): SQL {
  */
 export function disabledFeaturesSql(userId: AnyPgColumn | SQL): SQL<string[]> {
   return sql<string[]>`coalesce((SELECT array_agg(f.feature) FROM (${disabledRows(userId)}) f), '{}')`;
+}
+
+/**
+ * その人の、あるアプリの使えない機能の名前の配列（なければ空の配列。specs/meguru/029 research.md R7）。
+ * @param userId - users.id の列か値
+ * @param app - アプリの番号
+ * @returns text[] の式
+ */
+export function disabledAppFeaturesSql(userId: AnyPgColumn | SQL, app: string): SQL<string[]> {
+  return sql<string[]>`coalesce((SELECT array_agg(f.feature) FROM (${disabledRows(userId, app)}) f), '{}')`;
 }
 
 /**

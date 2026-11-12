@@ -322,6 +322,11 @@ function resetDb(yes) {
   run("docker", ["compose", "-f", join(main, "docker-compose.yml"), "up", "-d", "--wait"]);
   psql(main, `DROP DATABASE IF EXISTS "${dbName}" WITH (FORCE)`);
   psql(main, `CREATE DATABASE "${dbName}"`);
+  // もとのDB（threads_grower）には local-neon-http-proxy が起動のときに作る表（neon_control_plane）があるので、
+  // 作り直したら代理を起動し直して作り直させる（しないと結合テストが「Control plane request failed」で落ちる）
+  if (dbName === "threads_grower") {
+    run("docker", ["compose", "-f", join(main, "docker-compose.yml"), "restart", "neon-proxy"]);
+  }
   run("pnpm", ["--filter", "api", "db:migrate"], { cwd: here });
   console.log(`DB ${dbName} を作り直し、マイグレーションを当てました。`);
 }

@@ -90,6 +90,24 @@ export function fullAccessSql(mode: BillingMode, now: Date): SQL | undefined {
 }
 
 /**
+ * 使える状態の判定に読む列（users と subscriptions を結合した問い合わせで使う）。判定に使う値を足すときは、ここだけを直す
+ * （loadEntitlement とアプリ向けの利用権 loadAppEntitlements が同じ列を読む。specs/meguru/029 research.md R4）。
+ * @param mode - 決済のモード
+ * @returns select に渡す列
+ */
+export function billingFactsColumns(mode: BillingMode) {
+  return {
+    createdAt: users.createdAt,
+    billingExempt: billingExemptSql(users, mode),
+    legacyTrial: users.legacyTrial,
+    status: subscriptions.status,
+    cancelAtPeriodEnd: subscriptions.cancelAtPeriodEnd,
+    // OFFの環境では読まない（問い合わせを今と同じにする。specs/016 plan.md「性能の目標」）
+    testAccess: mode.testGroups ? testAccessSql(users, mode.operators) : sql<boolean>`true`,
+  };
+}
+
+/**
  * 利用者の使える状態を読む（users と subscriptions を読んで entitlementOf する）。
  * @param db - データベース（トランザクションの中でもよい）
  * @param userId - users.id
@@ -99,15 +117,7 @@ export function fullAccessSql(mode: BillingMode, now: Date): SQL | undefined {
  */
 export async function loadEntitlement(db: Db | TxDb, userId: string, mode: BillingMode, now: Date = new Date()) {
   const [row] = await db
-    .select({
-      createdAt: users.createdAt,
-      billingExempt: billingExemptSql(users, mode),
-      legacyTrial: users.legacyTrial,
-      status: subscriptions.status,
-      cancelAtPeriodEnd: subscriptions.cancelAtPeriodEnd,
-      // OFFの環境では読まない（問い合わせを今と同じにする。specs/016 plan.md「性能の目標」）
-      testAccess: mode.testGroups ? testAccessSql(users, mode.operators) : sql<boolean>`true`,
-    })
+    .select(billingFactsColumns(mode))
     .from(users)
     .leftJoin(subscriptions, eq(subscriptions.userId, users.id))
     .where(eq(users.id, userId))
