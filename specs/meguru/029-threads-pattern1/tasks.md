@@ -230,11 +230,11 @@ description: "Task list for feature meguru/029 Threads pattern ①"
 
 **Goal**：2作目の開発者が、Threadsを実例にしてパターン①をなぞれるようにする（spec US5・FR-023）。
 
-- [ ] T062 [P] [US5] `docs/app-separation.md`：Threadsをパターン①にそろえたことを書く（5章「Threadsの扱い」を書き直す、2-1の図のThreadsをパターン①の色に、3-4の道のりの「今」を更新）。実例として、Threadsの`schema.ts`・`events/`・`reportUsage`の呼び出し・`/api/threads/me`の場所を指す。
-- [ ] T063 [P] [US5] `docs/module-map.md`：2章（共通16表・Threads34表・処理の行き先）、3章（持ち主でない列の例外がなくなる）、1-4（知らせ → 出来事）、4章（`operator_events`の例外がなくなる）、6章（アプリを足す手順を、Threadsを実例にしたパターン①の手順に）、7章（Webの`apps/threads/lib/`・`withdrawalPreview`）、1-1の図（contracts/module-boundaries.md 6）。
-- [ ] T064 [P] [US5] `docs/product-structure.md` 6・7（共通の表の行・Threadsの扱い・まだ決めていないこと）、`docs/architecture.md`（設計の判断の表の「Threadsはパターン②のまま」を直す）、`docs/parallel-development.md`（Threadsの改善の再開と、2作目が実装を始めてよいこと）、`docs/README.md`（文書の一覧の説明の更新）。
-- [ ] T065 [US5] Constitution の「アプリのデータの分け方」の、T000で書いた「そろえる・途中の形を認める」を、「Threadsもパターン①にそろえた（029）」に直す（PATCH：4.9.1）。`/speckit-constitution`の手順で、版と改めた日を直す。
-- [ ] T066 [US5] 古い記述が残っていないことを確かめる：`grep`で「パターン②のまま」「`accounts`（共通）」「同じトランザクションの知らせ」「`runHook`」「`/api/accounts/`」を文書とコードのコメントから探し、今の形に直す（spec US5-2）。
+- [X] T062 [P] [US5] `docs/app-separation.md`：Threadsをパターン①にそろえたことを書く（5章「Threadsの扱い」を書き直す、2-1の図のThreadsをパターン①の色に、3-4の道のりの「今」を更新）。実例として、Threadsの`schema.ts`・`events/`・`reportUsage`の呼び出し・`/api/threads/me`の場所を指す。
+- [X] T063 [P] [US5] `docs/module-map.md`：2章（共通15表・Threads34表・処理の行き先）、3章（持ち主でない列の例外がなくなる）、1-4（知らせ → 出来事）、4章（`operator_events`の例外がなくなる）、6章（アプリを足す手順を、Threadsを実例にしたパターン①の手順に）、7章（Webの`apps/threads/lib/`・`withdrawalPreview`）、1-1の図（contracts/module-boundaries.md 6）。
+- [X] T064 [P] [US5] `docs/product-structure.md` 6・7（共通の表の行・Threadsの扱い・まだ決めていないこと）、`docs/architecture.md`（設計の判断の表の「Threadsはパターン②のまま」を直す）、`docs/parallel-development.md`（Threadsの改善の再開と、2作目が実装を始めてよいこと）、`docs/README.md`（文書の一覧の説明の更新）。
+- [X] T065 [US5] Constitution の「アプリのデータの分け方」の、T000で書いた「そろえる・途中の形を認める」を、「Threadsもパターン①にそろえた（029）」に直す（PATCH：4.9.1）。`/speckit-constitution`の手順で、版と改めた日を直す。
+- [X] T066 [US5] 古い記述が残っていないことを確かめる：`grep`で「パターン②のまま」「`accounts`（共通）」「同じトランザクションの知らせ」「`runHook`」「`/api/accounts/`」を文書とコードのコメントから探し、今の形に直す（spec US5-2）。
 
 **Checkpoint**：→ PR5を出す。
 
