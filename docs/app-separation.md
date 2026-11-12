@@ -29,6 +29,61 @@
 
 ## 2. 全体の形
 
+### 2-1. モジュールの境界（コードとDB）
+
+どのモジュールが、どこまでさわってよいか。Threads（パターン②）と2作目（パターン①）の違いは、**共通の表を直接さわるかどうか**。
+
+```mermaid
+flowchart LR
+  subgraph code["コード（API の Worker）"]
+    direction TB
+    th["Threads<br/>パターン②"]
+    mm["2作目（memo）<br/>パターン①"]
+    pfe["共通の入口の関数<br/>platform/index.ts"]
+    pfi["共通の中身<br/>（表をさわるのはここだけ）"]
+  end
+  subgraph db["DB（Postgres 1台）"]
+    direction TB
+    pub[("public スキーマ<br/>共通の表・Threadsの表")]
+    ms[("memo スキーマ<br/>2作目の表だけ")]
+  end
+
+  th -- "入口から" --> pfe
+  mm -- "入口の関数だけ" --> pfe
+  pfe --> pfi
+  pfi --> pub
+  th -- "直接読む・外部キー（②の例外）" --> pub
+  mm -- "自分の表だけ" --> ms
+
+  mm -. "✕ 読まない・外部キーも張らない" .-x pub
+  mm -. "✕ 使わない" .-x th
+  th -. "✕ 使わない" .-x mm
+  th -. "✕ さわらない" .-x ms
+
+  classDef p2 fill:#fff7e6,stroke:#d97706
+  classDef p1 fill:#ecfdf5,stroke:#059669
+  classDef common fill:#eef6ff,stroke:#3b82f6
+  class th,pub p2
+  class mm,ms p1
+  class pfe,pfi common
+```
+
+| 線 | 意味 |
+|---|---|
+| 実線の矢印 | 使ってよい向き |
+| 点線の ✕ | 使ってはいけない向き |
+| 橙 | パターン②（Threads。共通の表を直接読み、同じトランザクションで動く） |
+| 緑 | パターン①（2作目から。自分のスキーマと、共通の入口の関数だけ） |
+| 青 | 共通。共通の表をさわるのは共通の中身だけで、アプリには入口の関数で見せる |
+
+| 境界 | 守り方 |
+|---|---|
+| アプリ同士（コード） | ESLint の規則が止める（[module-map.md](./module-map.md) 1-5） |
+| 2作目 → 共通の表（コード） | 2作目を足すときに ESLint の規則を足す（4章「自動のチェック」） |
+| 2作目 → ほかのスキーマ（DB） | 2作目の表は自分のスキーマにだけ置き、外部キーを張らない。切り出すときは、DB の利用者（ロール）をスキーマごとに分けて、ほかのスキーマを読めないようにする |
+
+### 2-2. 全体の構成
+
 今のめぐると、2作目（例：人物メモ `memo`）を足したあとの形。Workerは1つのまま、中で分ける。
 
 ```mermaid

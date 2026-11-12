@@ -20,6 +20,36 @@ APIのコード（1〜6章）とWebのコード（7章）を、どのモジュ�
 組み立て → アプリ → 共通 → 窓口 → 土台   （上から下へだけ。飛ばしてもよい）
 ```
 
+```mermaid
+flowchart TB
+  comp["組み立て<br/>app.ts・index.ts・jobs/・db/schema.ts"]
+  subgraph apps["アプリ（apps/）"]
+    direction LR
+    th["threads"]
+    mm["2作目（例：memo）"]
+  end
+  pf["共通（platform/）<br/>入口：platform/index.ts"]
+  ad["窓口（adapters/）<br/>Stripe・ThreadsのAPI・Meta"]
+  kn["土台（kernel/）<br/>設定・エラー・ログ・DBの接続"]
+
+  comp --> apps
+  comp --> pf
+  th -- "入口から" --> pf
+  mm -- "入口から" --> pf
+  apps -- "入口から" --> ad
+  pf -- "入口から" --> ad
+  ad --> kn
+  th -. "使わない" .-x mm
+  pf -. "使わない（呼ぶときは知らせ。1-4）" .-x apps
+  kn -. "使わない" .-x ad
+
+  classDef ok fill:#eef6ff,stroke:#3b82f6
+  class comp,th,mm,pf,ad,kn ok
+```
+
+- 実線の矢印は、使ってよい向き（上から下へ。間を飛ばして、土台を直接使うのもよい）。点線の ✕ は、使ってはいけない向き。ESLint の規則が止める（1-5）。
+- 2作目以降のアプリは、これに加えて DB の境界も守る（共通の表を読まない。[docs/app-separation.md](./app-separation.md) 2-1）。
+
 ### 1-2. 入口
 
 - 入口（`index.ts`）は、**共通全体（`platform/index.ts`）・アプリごと（`apps/<名前>/index.ts`）・窓口ごと（`adapters/<名前>/index.ts`）**に1つ。モジュールの直下の`schema.ts`（表の定義）も入口として読んでよい（`db/schema.ts`が共通とThreadsの表を読み直して出すため）。
