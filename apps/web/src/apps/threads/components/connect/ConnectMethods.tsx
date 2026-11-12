@@ -133,7 +133,7 @@ export function ConnectMethods({
   const showToken = methods.includes("token");
   // OAuth を出さないときは、トークンの手順を最初から開いておく（唯一の方法なので畳まない）
   const tokenExpanded = tokenOpen || !showApp;
-  // 招待の管理（specs/024 research.md R4）。/api/me を読むまでは出さない
+  // 招待の管理（specs/024 research.md R4）。/api/threads/me を読むまでは出さない
   const invites = me.data?.testerInvites.enabled ?? false;
   const allow = (
     <>

@@ -47,7 +47,7 @@ export function AccountSwitcher({ onNavigate }: { onNavigate?: () => void }) {
   );
 
   /**
-   * Account一覧を取り直す。/api/me のクエリを通して取り、キャッシュと表示を同じ結果にそろえる。
+   * Account一覧を取り直す。Threadsの「自分」（/api/threads/me）のクエリを通して取り、キャッシュと表示を同じ結果にそろえる。
    * 開く前に始まった取得だけを取り消し、後から始まった取得に置き換えられたらその結果を待つ。
    * @param version - この読み込みの番号
    * @returns 取り直したAccount一覧。新しい読み込みに追い越されたら null

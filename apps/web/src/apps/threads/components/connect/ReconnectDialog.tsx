@@ -53,7 +53,7 @@ export function ReconnectDialog({
   });
 
   // 出していない方法はAPIが404で断るので、ここでも出さない（押せるのに必ず失敗する選択肢を見せない。
-  // PR #20 のCodexレビュー）。me が返るまでは既定（両方）
+  // PR #20 のCodexレビュー）。/api/threads/me が返るまでは既定（両方）
   const me = useThreadsMe();
   const offered = me.data?.threadsConnectMethods ?? ["app", "token"];
   const options = (

@@ -3,7 +3,7 @@
 // - 他人・存在しないAccountは404画面（規則4）
 // - 画面を開いたら open を呼び、接続状態とプロフィールを最新にする（規則5）
 // - needs_reconnect ならバナーを出す（FR-019）
-// - 担当しているAccountも開ける（specs/011。/api/me の accounts はオーナーと担当）
+// - 担当しているAccountも開ける（specs/011。/api/threads/me の accounts はオーナーと担当）
 // - 見せてもらっているAccountは、読むだけの画面（/threads/teams/:teamId/accounts/:accountId）へ移す（specs/011 contracts/permissions.md）
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -15,12 +15,12 @@ import {
 } from "@meguru/shared";
 import { Link, Navigate, Outlet, useOutletContext, useParams } from "react-router";
 import { ReadOnlyBanner } from "@/components/billing/ReadOnlyBanner";
-import { TrialEndingBanner } from "@/components/billing/TrialEndingBanner";
+import { TrialEndingBannerFromMe } from "@/components/billing/TrialEndingBanner";
 import { ThreadsShell } from "../sidebar";
 import { UnsavedChangesProvider } from "@/components/UnsavedChangesProvider";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { ApiError, api } from "@/lib/api-client";
+import { ApiError } from "@/lib/api-client";
 import { threadsApi } from "@/apps/threads/lib/api";
 import { queryKeys } from "@/lib/query";
 import { threadsQueryKeys } from "@/apps/threads/lib/query-keys";
@@ -62,9 +62,8 @@ export function reconnectBannerText(account: Pick<AccountSummary, "role" | "conn
 export function AccountLayout() {
   const { accountId } = useParams<{ accountId: string }>();
   const queryClient = useQueryClient();
-  // Threadsの「自分」（アカウントの一覧）と、共通の「自分」（契約の状態）
+  // Threadsの「自分」（アカウントの一覧）。契約の帯は、共通の「自分」を自分で読む部品（TrialEndingBannerFromMe）に任せる
   const me = useThreadsMe();
-  const shared = useQuery({ queryKey: queryKeys.me, queryFn: api.me });
   const account = useQuery({
     queryKey: threadsQueryKeys.account(accountId ?? ""),
     queryFn: () => threadsApi.account(accountId!),
@@ -74,7 +73,7 @@ export function AccountLayout() {
   // 権限がなくなった・開けなくなったときの扱い（specs/008 contracts/ui-routes.md「共通の振る舞い」2・3）
   useAccountAccessErrors(accountId);
 
-  // 開く記録（open）は、切り替えメニューに出るAccount（オーナー・担当）だけ。/api/me を読む前は今までどおりすぐ始め、
+  // 開く記録（open）は、切り替えメニューに出るAccount（オーナー・担当）だけ。/api/threads/me を読む前は今までどおりすぐ始め、
   // 読んだ後に一覧にない（見せてもらっている）と分かったら止める
   const unlisted = Boolean(me.data && !me.data.accounts.some((a) => a.id === accountId));
   // 関わりと権限。見せてもらっているAccountの移動と、読むだけの帯（specs/013 FR-045）に使う
@@ -85,10 +84,9 @@ export function AccountLayout() {
     void queryClient.invalidateQueries({ queryKey: queryKeys.me });
   });
 
-  if (me.isPending || shared.isPending) return <LoadingSkeleton />;
+  if (me.isPending) return <LoadingSkeleton />;
   // 一度読めていれば、裏での取り直しの失敗では画面を差し替えず、手元の一覧で表示を続ける。
   if (me.isLoadingError) return <ApiErrorScreen error={me.error} onRetry={() => void me.refetch()} />;
-  if (shared.isLoadingError) return <ApiErrorScreen error={shared.error} onRetry={() => void shared.refetch()} />;
   if (me.data.accounts.length === 0) return <Navigate to={newAccountPath()} replace />;
   if (account.isError) {
     if (account.error instanceof ApiError && account.error.code === "ACCOUNT_NOT_FOUND") {
@@ -125,7 +123,7 @@ export function AccountLayout() {
   // 帯の並び：無料体験の終わり → 読むだけ → 要再接続（specs/013 contracts/ui-routes.md「帯」）
   const banner = (
     <>
-      <TrialEndingBanner billing={shared.data.billing} />
+      <TrialEndingBannerFromMe />
       {access?.readOnly && <ReadOnlyBanner reason={access.readOnly.reason} />}
       {reconnectBanner}
     </>

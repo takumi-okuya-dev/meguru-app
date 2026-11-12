@@ -1,7 +1,7 @@
 // スイート「めぐる」のアプリの一覧（specs/028-meguru-shell data-model.md 2、research.md R7）。
 // 名前・パス・説明・料金を1か所に置き、API・Web・将来のモバイルの画面で食い違わないようにする。
 import { z } from "zod";
-import { BILLING_UNIT_PRICE_JPY } from "./billing";
+import { BILLING_UNIT_PRICE_JPY } from "../billing";
 
 /** アプリの一覧の1行。 */
 export type AppCatalogEntry = {
