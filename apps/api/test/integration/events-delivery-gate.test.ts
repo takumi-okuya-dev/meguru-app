@@ -1,13 +1,12 @@
 // 出来事の届けの関所（KV）。5分ごとの届けは、用がない回はDBを起こさない（費用のため。docs/architecture.md「定期処理は用がないときDBを起こさない」）。
-// 関所は5分ごとの届けだけが書き、起こす知らせは出来事を書く側だけが書く（自動投稿の関所と同じ形。PR #109 のセルフレビュー）。
+// 関所は5分ごとの届けだけが書き、起こす知らせは書いた直後の届けだけが（届け残しがあるときに）書く（自動投稿の関所と同じ形。PR #109 のセルフレビュー）。
 import { createExecutionContext, createScheduledController, waitOnExecutionContext } from "cloudflare:test";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import worker from "../../src/index";
 import { withTransaction } from "../../src/kernel/db/client";
 import { nextEventCheckAt, readEventGate, shouldDeliver, wakeEventDelivery, type EventGateState } from "../../src/platform/events/delivery-gate";
-import { deliveriesOf, emitEvent, registerConsumer, resetConsumers, retryDelayMs } from "../../src/platform/events/events";
-import { db, makeApp, resetDb, testEnv } from "../helpers/app";
-import { TESTER_OPERATOR, callT } from "../helpers/tester-invites";
+import { deliverPendingEvents, deliveriesOf, emitEvent, registerConsumer, resetConsumers, retryDelayMs } from "../../src/platform/events/events";
+import { db, resetDb, testEnv } from "../helpers/app";
 
 const USER = "00000000-0000-4000-8000-000000000001";
 const GATE = "platform-events:gate";
@@ -60,10 +59,19 @@ describe("関所の判定", () => {
     expect(shouldDeliver(state(gate), new Date(at(20 * 60_000)))).toBe(true);
   });
 
-  it("起こす知らせが前回の開始時刻より後（2分前まで）なら届ける。それより前の知らせでは届けない", () => {
+  it("起こす知らせが前回の開始時刻より後なら届ける。前の知らせでは届けない", () => {
     const gate = { nextCheckAt: at(20 * 60_000), runStartedAt: at(5 * 60_000) };
-    expect(shouldDeliver(state(gate, at(4 * 60_000)), now)).toBe(true);
-    expect(shouldDeliver(state(gate, at(2 * 60_000)), now)).toBe(false);
+    expect(shouldDeliver(state(gate, at(6 * 60_000)), now)).toBe(true);
+    expect(shouldDeliver(state(gate, at(4 * 60_000)), now)).toBe(false);
+  });
+
+  it("壊れた知らせは、ないものとして扱う（毎回DBを見続けない）", async () => {
+    const n = new Date();
+    await testEnv.AUTOPOST_KV.put(GATE, JSON.stringify({ nextCheckAt: new Date(n.getTime() + 3600_000).toISOString(), runStartedAt: n.toISOString() }));
+    await testEnv.AUTOPOST_KV.put(WAKE, "{壊れた");
+    const read = await readEventGate(testEnv.AUTOPOST_KV);
+    expect(read).toMatchObject({ readable: true, wakeAt: null });
+    expect(shouldDeliver(read, n)).toBe(false);
   });
 
   it("次に見る時刻：届けがなければ24時間後、過去なら今、未来ならその時刻", () => {
@@ -110,13 +118,30 @@ describe("5分ごとの届け", () => {
   });
 });
 
-describe("起こす知らせを書く側", () => {
-  it("運営者が上限の既定値を保存すると、起こす知らせを書く", async () => {
-    registerConsumer("people", "limits.changed", async () => {});
-    const before = Date.now();
-    const res = await callT(makeApp(), "PUT", "/api/operator/limits", { user: TESTER_OPERATOR, body: { limits: { accounts: 5, daily_posts: 8 } } });
-    expect(res.status).toBe(200);
-    const { wakeAt } = await readEventGate(testEnv.AUTOPOST_KV);
-    expect(Date.parse(wakeAt!)).toBeGreaterThanOrEqual(before);
+describe("書いた直後の届け", () => {
+  it("すべて届けば、起こす知らせを書かない", async () => {
+    const id = await emitOne();
+    await deliverPendingEvents(testEnv, new Date(), { eventIds: [id] });
+    expect(await statusOf(id)).toBe("done");
+    expect((await readEventGate(testEnv.AUTOPOST_KV)).wakeAt).toBeNull();
+  });
+
+  it("届け残しがあれば、トランザクションのあとに起こす知らせを書き、眠っている5分ごとの届けが次の回にDBを見る", async () => {
+    await runCron(); // 関所を書く（届けるものなし。24時間眠る）
+    failing = true;
+    const id = await emitOne();
+    await deliverPendingEvents(testEnv, new Date(), { eventIds: [id] });
+    const { gate, wakeAt } = await readEventGate(testEnv.AUTOPOST_KV);
+    expect(Date.parse(wakeAt!)).toBeGreaterThan(Date.parse(gate!.runStartedAt));
+    await runCron();
+    // 5分ごとの届けがDBを見て、やり直しの時刻を次に見る時刻にした
+    const after = (await readEventGate(testEnv.AUTOPOST_KV)).gate!;
+    expect(Date.parse(after.nextCheckAt)).toBeLessThan(Date.parse(after.runStartedAt) + 86_400_000);
+  });
+
+  it("DBにつながらずに途中で止まっても、起こす知らせを書く", async () => {
+    const id = await emitOne();
+    await expect(deliverPendingEvents({ ...testEnv, DATABASE_URL: "postgres://nobody@127.0.0.1:1/none" }, new Date(), { eventIds: [id] })).rejects.toThrow();
+    expect((await readEventGate(testEnv.AUTOPOST_KV)).wakeAt).not.toBeNull();
   });
 });

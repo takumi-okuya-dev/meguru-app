@@ -16,7 +16,7 @@ import {
   purgeOldActivity,
   recountThreadsUsage,
 } from "../apps/threads";
-import { deliverPendingEvents, wakeEventDelivery, purgeDeliveredEvents, reconcileSubscriptions, clerkUserDeleter, resumeWithdrawals } from "../platform";
+import { purgeDeliveredEvents, reconcileSubscriptions, clerkUserDeleter, resumeWithdrawals } from "../platform";
 
 /**
  * 日次の定期処理をまとめて行う（contracts/api.md「定期処理」）。1つの処理の失敗で全体を止めない。
@@ -45,12 +45,6 @@ export async function runDailyJobs(env: Env, now: Date = new Date()) {
     ["publish attempts cleanup", () => cleanupPublishAttempts(env, now)],
     // 過ぎた停止を消す（contracts/api.md「定期処理」。設定の版は変えない。data-model.md）
     ["expired publish pauses", () => clearExpiredPauses(env, now)],
-    // 出来事の届けを1日1回、関所に関わらず行う（5分ごとの届けがKVの関所で眠っている間の取りこぼしを拾う）。
-    // 残った届けの次に試す時刻を5分ごとの届けが覚え直すよう、起こしておく（platform/events/delivery-gate.ts）
-    ["platform events delivery", async () => {
-      await deliverPendingEvents(env, now);
-      await wakeEventDelivery(env.AUTOPOST_KV, now);
-    }],
     // 届け先がすべて済んで30日たった出来事を消す（specs/meguru/029 research.md R5）
     ["delivered events cleanup", () => purgeDeliveredEvents(createDb(env.DATABASE_URL), now)],
   ];

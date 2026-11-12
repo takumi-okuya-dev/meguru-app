@@ -1,6 +1,6 @@
 // 出来事の届けの関所（費用のため。docs/architecture.md「定期処理は用がないときDBを起こさない」）。
 // 5分ごとの届けは、まずKVを見て、用がなければDBに触れずに終える。自動投稿の関所（apps/threads/publish/auto-post-gate.ts）と同じ形：
-// platform-events:gate は5分ごとの届けだけが書き、platform-events:wake は出来事を書く側（API・日次の処理）だけが書く。
+// platform-events:gate は5分ごとの届けだけが書き、platform-events:wake は書いた直後の届け（deliverPendingEvents に eventIds を渡した回）だけが書く。
 // 書く側を分けるので、同時に書いても新しい値を古い値で上書きしない（PR #109 のセルフレビュー）。
 import { logger } from "../../kernel/logger";
 
@@ -8,11 +8,6 @@ const GATE_KEY = "platform-events:gate";
 const WAKE_KEY = "platform-events:wake";
 /** 何もなければ、この時間ごとに念のためDBを見る（自動投稿の関所の上限と同じ24時間） */
 const MAX_SLEEP_MS = 24 * 60 * 60_000;
-/**
- * 起こす知らせの時刻が、前回の開始時刻よりこの長さだけ前でも、もう1回DBを見る。
- * 知らせは出来事を書くトランザクションの前に書くので、5分ごとの届けが「知らせのあと・書き終わる前」にDBを見ても、次の回で拾うため。
- */
-const WAKE_MARGIN_MS = 2 * 60_000;
 
 /** 関所の値。 */
 export type EventGate = { nextCheckAt: string; runStartedAt: string };
@@ -23,6 +18,19 @@ export type EventGateState = { readable: boolean; gate: EventGate | null; wakeAt
 const isIso = (v: unknown): v is string => typeof v === "string" && !Number.isNaN(Date.parse(v));
 
 /**
+ * JSONを読む（読めなければ null）。
+ * @param raw - 文字列
+ * @returns 値
+ */
+function parseJson<T>(raw: string): T | null {
+  try {
+    return JSON.parse(raw) as T;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * 関所を読む。
  * @param kv - AUTOPOST_KV
  * @returns 関所の状態
@@ -31,17 +39,17 @@ export async function readEventGate(kv: KVNamespace): Promise<EventGateState> {
   try {
     const [gateRaw, wakeRaw] = await Promise.all([kv.get(GATE_KEY), kv.get(WAKE_KEY)]);
     const gate = gateRaw === null ? null : (JSON.parse(gateRaw) as Partial<EventGate>);
-    const wake = wakeRaw === null ? null : (JSON.parse(wakeRaw) as { at?: unknown });
+    const wake = wakeRaw === null ? null : parseJson<{ at?: unknown }>(wakeRaw);
     if (gate && (!isIso(gate.nextCheckAt) || !isIso(gate.runStartedAt))) return { readable: false, gate: null, wakeAt: null };
-    if (wake && !isIso(wake.at)) return { readable: false, gate: null, wakeAt: null };
-    return { readable: true, gate: gate as EventGate | null, wakeAt: (wake?.at as string | undefined) ?? null };
+    // 壊れた知らせは、ないものとして扱う（5分ごとの届けは知らせを書き直さないので、読めない扱いにすると毎回DBを見続ける）
+    return { readable: true, gate: gate as EventGate | null, wakeAt: wake && isIso(wake.at) ? wake.at : null };
   } catch {
     return { readable: false, gate: null, wakeAt: null };
   }
 }
 
 /**
- * DBを見て届けるか。関所がない・読めない・次に見る時刻を過ぎた・起こす知らせが前回の開始時刻（から少し前）より後、のどれか。
+ * DBを見て届けるか。関所がない・読めない・次に見る時刻を過ぎた・起こす知らせが前回の開始時刻より後、のどれか。
  * @param state - 関所の状態
  * @param now - 今の時刻
  * @returns 届けるなら true
@@ -49,7 +57,7 @@ export async function readEventGate(kv: KVNamespace): Promise<EventGateState> {
 export function shouldDeliver(state: EventGateState, now: Date): boolean {
   if (!state.readable || !state.gate) return true;
   if (now.getTime() >= Date.parse(state.gate.nextCheckAt)) return true;
-  return state.wakeAt !== null && Date.parse(state.wakeAt) > Date.parse(state.gate.runStartedAt) - WAKE_MARGIN_MS;
+  return state.wakeAt !== null && Date.parse(state.wakeAt) > Date.parse(state.gate.runStartedAt);
 }
 
 /**
@@ -78,8 +86,8 @@ export async function writeEventGate(kv: KVNamespace, value: EventGate): Promise
 }
 
 /**
- * 5分ごとの届けを起こす（出来事を書く・届けを戻す前に呼ぶ。5分ごとの届けは書かない）。
- * 書けなくても止めない（取りこぼしは日次の届けが拾う）。
+ * 5分ごとの届けを起こす（書いた直後の届けで届け残しがあったときに、deliverPendingEvents が呼ぶ。5分ごとの届けは書かない）。
+ * 書けなくても止めない（届け残しは、関所の24時間ごとの見直しで拾う）。
  * @param kv - AUTOPOST_KV
  * @param now - 今の時刻
  */
