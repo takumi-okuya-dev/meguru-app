@@ -5,10 +5,10 @@ import { withTransaction } from "../../src/kernel/db/client";
 import { deliverPendingEvents } from "../../src/platform";
 import { emitEvent } from "../../src/platform/events/events";
 import { deleteUserRowIfCleaned } from "../../src/platform/withdrawal/withdrawal-service";
-import { createUserWithAccount, fake, fakeClerk, makeApp, resetDb, testEnv } from "../helpers/app";
+import { call, createUserWithAccount, fake, fakeClerk, makeApp, resetDb, testEnv } from "../helpers/app";
 import { db } from "../helpers/auto-post";
 import { billingEnv, callBilling, fakeStripe } from "../helpers/billing";
-import { joinTeam, makeTeam } from "../helpers/team";
+import { assign, joinTeam, makeTeam } from "../helpers/team";
 
 const app = makeApp();
 
@@ -59,6 +59,19 @@ describe("退会の出来事（user.withdrawn）", () => {
     expect(await count("accounts", `id = '${o1.accountId}'`)).toBe(0);
     expect(await deleteUserRowIfCleaned(billingEnv(), userId)).toBe(true);
     expect(await count("users", `id = '${userId}'`)).toBe(0);
+  });
+
+  it("持ち主が退会したアカウントは、出来事が届く前でも、担当のチームの人に見せない（T030）", async () => {
+    const o1 = await createUserWithAccount("o1", { name: "A" });
+    const { teamId } = await makeTeam("o1", [o1.accountId]);
+    await createUserWithAccount("m1", { name: "B" });
+    await joinTeam(teamId, "m1", []);
+    await assign(teamId, "m1", o1.accountId);
+    expect((await call(app, "GET", `/api/accounts/${o1.accountId}`, { user: "m1" })).status).toBe(200);
+    const userId = (await rows<{ id: string }>(`SELECT id FROM users WHERE clerk_user_id = 'o1'`))[0]!.id;
+    await db().query(`UPDATE users SET withdrawal_requested_at = now() WHERE id = $1`, [userId]);
+    await withTransaction(testEnv.DATABASE_URL, (tx) => emitEvent(tx, "user.withdrawn", { userId }));
+    expect((await call(app, "GET", `/api/accounts/${o1.accountId}`, { user: "m1" })).status).toBe(404);
   });
 
   it("同じ出来事を2回届けても、結果は同じ（2回目は何もしない）", async () => {

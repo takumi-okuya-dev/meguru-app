@@ -24,6 +24,8 @@ export type AppEntitlement = {
   features: ReadonlySet<string>;
   /** 上限（アプリが登録した名前。null は上限なし） */
   limits: Readonly<Record<string, number | null>>;
+  /** 退会を受け付けた人か（アプリは、出来事が届いて片づけるまでの間、その人の持ち物を誰にも見せない。029 research.md R8） */
+  withdrawn: boolean;
 };
 
 /**
@@ -61,6 +63,7 @@ export async function loadAppEntitlements(
         ...billingFactsColumns(mode),
         id: users.id,
         clerkUserId: users.clerkUserId,
+        withdrawalRequestedAt: users.withdrawalRequestedAt,
         disabled: disabledAppFeaturesSql(users.id, app),
       })
       .from(users)
@@ -91,6 +94,7 @@ export async function loadAppEntitlements(
       operator,
       features: new Set(featureKeys.filter((k) => !off.has(k))),
       limits,
+      withdrawn: r.withdrawalRequestedAt !== null,
     });
   }
   return out;

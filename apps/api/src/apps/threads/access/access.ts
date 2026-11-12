@@ -12,16 +12,16 @@ import {
   type Role,
   type TeamRole,
 } from "@meguru/shared";
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import type { Db, TxDb } from "../../../kernel/db/client";
 import { accounts, memberships, teamAccounts, teamMembers, teams } from "../schema";
-import { subscriptions, users } from "../../../platform/schema";
+import { users } from "../../../platform/schema";
 import type { BillingMode } from "../../../kernel/config";
 import { AppError, notFound } from "../../../kernel/errors";
-import { entitlementFromFacts } from "../../../platform";
-import { disabledFeaturesSql, featureOnSql, featuresFrom } from "../../../platform";
-import { billingExemptSql, testAccessSql } from "../../../platform";
+import { loadAppEntitlements, peopleNames } from "../../../platform";
+import { THREADS_APP } from "../registry";
+import { featureOnSql } from "../../../platform";
 
 /** accounts の行。 */
 export type AccountRow = typeof accounts.$inferSelect;
@@ -45,8 +45,8 @@ export type AccountAccess = {
   account: AccountRow;
   relation: Relation;
   permissions: ReadonlySet<Permission>;
-  /** Accountのオーナー。grower機能（無料体験）はオーナーの登録日時で判定する（specs/002 research.md R3） */
-  owner: { id: string; name: string; createdAt: Date };
+  /** Accountのオーナー（番号と、画面・記録に出す名前） */
+  owner: { id: string; name: string };
   /** 判定したユーザーの名前と、操作の記録に写す役割 */
   actor: { id: string; name: string; role: ActorRole };
   /** このAccountが入っているチームと、判定したユーザーのそのチームでのロール。入っていなければNULL */
@@ -103,29 +103,13 @@ export async function authorizeAccount(
   if (!isUuid(accountId)) throw notFound();
   const own = alias(memberships, "own_m");
   const ownerM = alias(memberships, "owner_m");
-  const ownerU = alias(users, "owner_u");
-  const meU = alias(users, "me_u");
+  // Threadsの表だけで、Account・自分の関わり・オーナーの番号・チームを読む（共通の表は読まない。specs/meguru/029 research.md R4）
   const [row] = await db
     .select({
       account: accounts,
       ownRole: own.role,
       ownTeamId: own.teamId,
-      ownerId: ownerU.id,
-      ownerDisplayName: ownerU.displayName,
-      ownerEmail: ownerU.email,
-      ownerCreatedAt: ownerU.createdAt,
-      ownerLegacyTrial: ownerU.legacyTrial,
-      ownerBillingExempt: billingExemptSql(ownerU, user.billing),
-      // オーナーがテスト版に入れるか（specs/016 research.md R4）。OFFの環境では読まない
-      ownerTestAccess: user.billing.testGroups ? testAccessSql(ownerU, user.billing.operators) : sql<boolean>`true`,
-      // オーナーの使えないまとまり（人 ∪ グループ。行がなければすべてON。specs/019 research.md R10）
-      ownerDisabled: disabledFeaturesSql(ownerU.id),
-      // チーム経由の関わりは、見る人もチームを使えるときだけ（specs/019 FR-009）
-      meTeamOn: featureOnSql(meU.id, "team"),
-      subStatus: subscriptions.status,
-      subCancelAtPeriodEnd: subscriptions.cancelAtPeriodEnd,
-      meDisplayName: meU.displayName,
-      meEmail: meU.email,
+      ownerId: ownerM.userId,
       teamId: teamAccounts.teamId,
       shared: teamAccounts.shared,
       teamName: teams.name,
@@ -133,10 +117,6 @@ export async function authorizeAccount(
     })
     .from(accounts)
     .innerJoin(ownerM, and(eq(ownerM.accountId, accounts.id), eq(ownerM.role, "owner")))
-    .innerJoin(ownerU, eq(ownerU.id, ownerM.userId))
-    .innerJoin(meU, eq(meU.id, user.id))
-    // オーナーの契約（specs/013 research.md R2。決済による制限はこの判定に足す。Constitution原則V）
-    .leftJoin(subscriptions, eq(subscriptions.userId, ownerU.id))
     .leftJoin(own, and(eq(own.accountId, accounts.id), eq(own.userId, user.id)))
     .leftJoin(teamAccounts, eq(teamAccounts.accountId, accounts.id))
     .leftJoin(teams, eq(teams.id, teamAccounts.teamId))
@@ -144,6 +124,15 @@ export async function authorizeAccount(
     .where(eq(accounts.id, accountId))
     .limit(1);
   if (!row) throw notFound();
+  // オーナーと見る人の利用権（契約・料金なし・テスト版・機能のOFF）と名前は、共通の入口の関数でまとめて読む
+  const [ents, names] = await Promise.all([
+    loadAppEntitlements(db, user.billing, [row.ownerId, user.id], THREADS_APP),
+    peopleNames(db, [row.ownerId, user.id]),
+  ]);
+  const ownerEnt = ents.get(row.ownerId);
+  const meEnt = ents.get(user.id);
+  // オーナーが退会した（出来事が届いて片づけるまでの間）Accountは、チームの人を含めて誰にも見せない（029 research.md R8）
+  if (!ownerEnt || !meEnt || ownerEnt.withdrawn) throw notFound();
   const inTeam = row.teamId !== null && row.myTeamRole !== null;
   let relation: Relation;
   if (row.ownRole === "owner") relation = "owner";
@@ -152,9 +141,9 @@ export async function authorizeAccount(
   else if (inTeam && row.shared) relation = "shared_viewer";
   else throw notFound();
   // まとまりの判定は、関わりを決めたあと（404 を先に返し、Accountの有無を漏らさない）、ロール・決済の前（contracts/api.md）
-  const features = featuresFrom(row.ownerDisabled);
+  const features = ownerEnt.features as ReadonlySet<Feature>;
   // オーナーか見る人がチームを使えなければ、チーム経由の関わりはないのと同じ（チームを抜けたのと同じに見せる。FR-009・FR-012）
-  if (relation !== "owner" && (!features.has("team") || !row.meTeamOn)) throw notFound();
+  if (relation !== "owner" && (!features.has("team") || !meEnt.features.has("team"))) throw notFound();
   if (opts.feature && !features.has(opts.feature)) throw featureDisabled(opts.feature);
   const isTeamAdmin = row.myTeamRole === "admin";
   const byRelation = permissionsFor(relation, { isTeamAdmin });
@@ -162,14 +151,7 @@ export async function authorizeAccount(
     throw new AppError("ROLE_FORBIDDEN", 403, "role forbidden", undefined, [permission]);
   }
   // オーナーが読むだけなら、だれの操作でも読む・見る・記録・削除だけにする（specs/013 FR-040・FR-042）
-  const owner = entitlementFromFacts(user.billing, {
-    createdAt: row.ownerCreatedAt,
-    legacyTrial: row.ownerLegacyTrial,
-    billingExempt: row.ownerBillingExempt,
-    status: row.subStatus,
-    cancelAtPeriodEnd: row.subCancelAtPeriodEnd,
-    testAccess: row.ownerTestAccess,
-  });
+  const owner = ownerEnt.billing;
   const readOnly =
     owner.fullAccess || owner.readOnlyReason === null
       ? null
@@ -182,16 +164,8 @@ export async function authorizeAccount(
     account: row.account,
     relation,
     permissions,
-    owner: {
-      id: row.ownerId,
-      name: personName({ displayName: row.ownerDisplayName, email: row.ownerEmail }),
-      createdAt: row.ownerCreatedAt,
-    },
-    actor: {
-      id: user.id,
-      name: personName({ displayName: row.meDisplayName, email: row.meEmail }),
-      role: actorRoleOf(relation, row.myTeamRole),
-    },
+    owner: { id: row.ownerId, name: names.get(row.ownerId) ?? "" },
+    actor: { id: user.id, name: names.get(user.id) ?? "", role: actorRoleOf(relation, row.myTeamRole) },
     team: row.teamId !== null && row.teamName !== null ? { id: row.teamId, name: row.teamName, myRole: row.myTeamRole ?? "member" } : null,
     isTeamAdmin,
     hasTeam: row.teamId !== null,
