@@ -1,7 +1,7 @@
 // アプリが外枠に渡すもの（specs/028-meguru-shell data-model.md 4、research.md R3）。
 // 外枠はアプリのコードを読まない。各アプリが apps/<名前>/index.ts で AppModule を出し、組み立て（app-registry.ts）が一覧にして外枠に渡す。
 import type { LucideIcon } from "lucide-react";
-import { createContext, useContext, type ReactElement } from "react";
+import { createContext, useContext, type ComponentType, type ReactElement } from "react";
 import { useLocation, type RouteObject } from "react-router";
 
 /** 設定の画面（/settings）に、アプリが足す項目。 */
@@ -43,6 +43,13 @@ export type AppModule = {
   legacyRedirects?: LegacyRedirect[];
   /** 設定の画面に足す項目 */
   settingsSections?: SettingsSectionContribution[];
+  /** 退会の確かめで、このアプリについて見せる中身（なければ出さない。specs/meguru/029 contracts/module-boundaries.md 5） */
+  withdrawalPreview?: {
+    /** 中身を読む（TanStack Query の queryKey と queryFn） */
+    query: { queryKey: readonly unknown[]; queryFn: () => Promise<unknown> };
+    /** 読んだ中身を出す部品 */
+    Section: ComponentType<{ data: unknown }>;
+  };
 };
 
 const AppRegistryContext = createContext<readonly AppModule[]>([]);

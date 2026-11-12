@@ -1,6 +1,6 @@
 // Threadsの共通の型（specs/meguru/029-threads-pattern1 tasks.md T021、contracts/api-routes.md 2）。
 import type { z } from "zod";
-import { meResponseSchema } from "../../schemas";
+import { meResponseSchema, withdrawalPreviewSchema } from "../../schemas";
 
 /**
  * GET /api/threads/me のレスポンス（Threadsの「自分」）。今の GET /api/me のThreadsの部分と同じ形。
@@ -19,3 +19,11 @@ export const threadsMeResponseSchema = meResponseSchema.pick({
 });
 /** GET /api/threads/me のレスポンス。 */
 export type ThreadsMeResponse = z.infer<typeof threadsMeResponseSchema>;
+
+/**
+ * GET /api/threads/me/withdrawal-preview のレスポンス（退会で消えるアカウントと、チームの行き先）。
+ * 今の GET /api/me/withdrawal-preview のThreadsの部分と同じ形（PR5 で、共通の側からThreadsの項目を消すときに定義を移す）。
+ */
+export const threadsWithdrawalPreviewSchema = withdrawalPreviewSchema.pick({ ownedAccounts: true, teams: true });
+/** GET /api/threads/me/withdrawal-preview のレスポンス。 */
+export type ThreadsWithdrawalPreview = z.infer<typeof threadsWithdrawalPreviewSchema>;

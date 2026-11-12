@@ -1,7 +1,7 @@
 // 設定 > アカウント：ログイン中のGoogleアカウントとログアウト（FR-001・FR-006）、退会（specs/013 FR-050）
 import { useUser } from "@clerk/react";
 import { useState } from "react";
-import { WithdrawDialog } from "@/components/billing/WithdrawDialog";
+import { WithdrawDialog } from "@/shell/settings/WithdrawDialog";
 import { SettingCard, SettingRow } from "@/components/SettingRow";
 import { Button } from "@/components/ui/button";
 import { useLogout } from "@/lib/use-logout";

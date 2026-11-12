@@ -18,10 +18,17 @@ vi.mock("@/lib/api-client", async (orig) => {
   const actual = await orig<typeof import("@/lib/api-client")>();
   return { ...actual, api: { ...actual.api, withdrawalPreview, withdraw } };
 });
+// 消えるアカウントとチームの行き先は、Threadsが AppModule の withdrawalPreview で渡す（specs/meguru/029 T052）
+vi.mock("@/apps/threads/lib/api", async (orig) => {
+  const actual = await orig<typeof import("@/apps/threads/lib/api")>();
+  return { ...actual, threadsApi: { ...actual.threadsApi, withdrawalPreview } };
+});
 
 const { ApiError, setWithdrawalInProgress } = await import("@/lib/api-client");
 const { AccountSettingsPage } = await import("@/shell/settings/account");
 const { RequireAuth } = await import("@/shell/guards/RequireAuth");
+const { AppRegistryProvider } = await import("@/shell/app-module");
+const { threadsApp } = await import("@/apps/threads");
 
 const PREVIEW: WithdrawalPreview = {
   email: "t@example.com",
@@ -47,7 +54,9 @@ function renderSettings() {
   );
   render(
     <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
-      <RouterProvider router={router} />
+      <AppRegistryProvider value={[threadsApp]}>
+        <RouterProvider router={router} />
+      </AppRegistryProvider>
     </QueryClientProvider>,
   );
   return router;

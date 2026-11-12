@@ -177,7 +177,9 @@ description: "Task list for feature meguru/029 Threads pattern ①"
 > - PR4b＝Webの側。さらに2つに分けた：
 >   - PR4b-1＝T050・T053・T054（APIの呼び出し106本とキー38個を `apps/threads/lib/` へ移し、Threadsの呼び出しは `/api/threads/…` を呼ぶ。テストのモックを `@/apps/threads/lib/api` に分けた。期待する結果は変えていない）
 >   - PR4b-2＝T051・T021 のうち `threadsMeResponseSchema`（Threadsの画面は、アカウント・チーム・使える機能などを `useThreadsMe()`（`/api/threads/me`）から読む。キーは `["me", "threads"]` で、共通の自分を取り直すと一緒に取り直す）
->   - PR4b-3＝T052・T070・T021 のうち `FEATURES` の移動・T056
+>   - PR4b-3＝T052（退会の確かめのThreadsの分を、AppModule の withdrawalPreview として外枠に渡す。退会のダイアログは外枠だけが使うので `shell/settings/` へ移した（共通の部品は外枠を読めないため））
+>   - PR4c＝T070・T021 のうち `FEATURES` の移動。**運営の機能のON/OFFのリクエストの型（`featureSettingsRequestSchema` など）が Threads の3つの名前で固定**なので、画面の名前を登録の一覧に替えるだけでは足りない。共通の型を「名前 → ON/OFF」の一般の形にし、運営の画面（使える機能・上限・グループ）と共通の `FeatureSwitches` を登録の一覧で出す形にする。そのあと `FEATURES`・`FEATURE_LABELS` を Threads へ移す
+>   - T056（画面が新しい道筋だけを呼んでいるかのブラウザでの確かめ）は、PR4b-1 のマージのあとからできる。PR5 の前にユーザーと行う
 >   - **PR5 に回したこと（PR #103 のセルフレビュー）**：Threads の画面は、PR5 まで `/api/me` と `/api/threads/me` の両方を読む（サーバーで Threads の中身を2回作る）。PR5 で `/api/me` から Threads の中身を消すときに、Threads の中身だけが変わったところ（アカウントを開く・名前を変える・チーム）の取り直しを `["me"]` から `threadsQueryKeys.me` に替える
 
 **Goal**：ThreadsのAPIをThreadsの道筋の下にそろえ、Webの呼び出しとキー、`/api/me`のThreadsの部分の読み方をThreadsのフォルダへ移す。古い道筋は残す。
@@ -193,7 +195,7 @@ description: "Task list for feature meguru/029 Threads pattern ①"
 
 - [X] T050 [US3] `apps/web/src/apps/threads/lib/api.ts`を作り、`apps/web/src/lib/api-client.ts`からThreadsのAPIの呼び出しを移す（呼ぶ道筋は`/api/threads/…`）。共通の`request`・`ApiError`は共通の部品から使う。`apps/web/src/apps/threads/lib/query-keys.ts`を作り、`apps/web/src/lib/query.ts`からThreadsのキーを移す（contracts/api-routes.md 4）。
 - [X] T051 [US3] `apps/web/src/apps/threads/lib/use-threads-me.ts`（`/api/threads/me`）を作り、Threadsのデータを`/api/me`から読んでいるファイル（`apps/threads/sidebar/index.tsx`・`components/connect/ReconnectDialog.tsx`・`components/connect/ConnectMethods.tsx`・`pages/home.tsx`・`pages/account-new.tsx`・`pages/account-layout.tsx`・`pages/team-shared-account.tsx`ほか）を替える。外枠（入口の振り分け・すべてのアプリ・アプリの切り替え）は今どおり`/api/me`の`apps`を読む。
-- [ ] T052 [US3] `apps/web/src/shell/app-module.ts`に`withdrawalPreview`を足し（contracts/module-boundaries.md 5）、Threadsの`AppModule`で渡す。`apps/web/src/components/billing/WithdrawDialog.tsx`が、`/api/me/withdrawal-preview`と、登録されたアプリの`withdrawalPreview`を並べて出す形にする（見た目と文言は変えない）。
+- [X] T052 [US3] `apps/web/src/shell/app-module.ts`に`withdrawalPreview`を足し（contracts/module-boundaries.md 5）、Threadsの`AppModule`で渡す。`apps/web/src/components/billing/WithdrawDialog.tsx`が、`/api/me/withdrawal-preview`と、登録されたアプリの`withdrawalPreview`を並べて出す形にする（見た目と文言は変えない）。
 - [X] T053 [US3] Webのテストのモックを直す：Threadsの呼び出しを`@/lib/api-client`でモックしているテスト（約60ファイル）を、`@/apps/threads/lib/api`のモックに替える。`/api/me`の中のThreadsのデータを使うテストの手助け（`apps/web/test/helpers/`）は、`useThreadsMe`の値を入れる形にする。期待する結果は変えない（spec FR-022）。
 - [X] T054 [P] [US3] `apps/web/test/api-client-common.test.ts`：共通の`api-client.ts`に、Threadsの道筋（`/api/threads/`・`/api/accounts/`・`/api/teams/`）を呼ぶ関数がないことを確かめる（contracts/module-boundaries.md 5）。
 - [ ] T055 [US4] PR4の確かめ：`pnpm lint`・`pnpm typecheck`・`pnpm test`・`pnpm e2e`（quickstart.md 1）。
