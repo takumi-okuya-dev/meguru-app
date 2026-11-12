@@ -3,6 +3,8 @@
 //   pnpm worktree:new <名前> [ブランチ]   作業場所を作る（例：pnpm worktree:new memo feature/memo-001-contacts）
 //   pnpm worktree:list                    作業場所の一覧（DBの名前とポート）
 //   pnpm worktree:remove <名前>           作業場所を片付ける（作業場所とそのDBを消す。ブランチは残す）
+//   pnpm worktree:reset-db --yes          今いる作業場所のDBを空から作り直し、マイグレーションを当て直す
+//                                         （マイグレーションを作り直したあとなど。docs/parallel-development.md 6）
 //
 // 作業場所ごとに、ローカルのDB（同じ Postgres の中の threads_grower_<名前>）とポート（決まったポートに100ずつ足す）を分ける。
 // 値はその作業場所のルートの .env.worktree に置き、API・Web・E2E がそれを読む（apps/api/scripts/worktree-env.ts）。
@@ -219,9 +221,32 @@ function remove(name) {
   );
 }
 
+/**
+ * 今いる作業場所のDBを消して作り直し、マイグレーションを当て直す。中のデータはすべて消える。
+ * @param {boolean} yes - --yes が付いているか（付いていなければ、消すDBを出して止める）
+ */
+function resetDb(yes) {
+  const all = worktrees();
+  const main = all[0].path;
+  const here = run("git", ["rev-parse", "--show-toplevel"], { capture: true });
+  const { dbName } = readWorktreeEnv(here);
+  if (!yes) {
+    console.error(
+      `DB ${dbName}（${here}）を消して作り直します。中のデータはすべて消えます。よければ --yes を付けて実行してください`,
+    );
+    process.exit(1);
+  }
+  run("docker", ["compose", "-f", join(main, "docker-compose.yml"), "up", "-d", "--wait"]);
+  psql(main, `DROP DATABASE IF EXISTS "${dbName}" WITH (FORCE)`);
+  psql(main, `CREATE DATABASE "${dbName}"`);
+  run("pnpm", ["--filter", "api", "db:migrate"], { cwd: here });
+  console.log(`DB ${dbName} を作り直し、マイグレーションを当てました。`);
+}
+
 const [command, name, branch] = process.argv.slice(2);
 try {
   if (command === "list") list();
+  else if (command === "reset-db") resetDb(name === "--yes");
   else if (
     (command === "new" || command === "remove") &&
     name &&
@@ -231,7 +256,7 @@ try {
     else remove(name);
   } else {
     console.error(
-      "使い方:\n  pnpm worktree:new <名前> [ブランチ]\n  pnpm worktree:list\n  pnpm worktree:remove <名前>\n（名前は英小文字・数字・ハイフン。例：memo）",
+      "使い方:\n  pnpm worktree:new <名前> [ブランチ]\n  pnpm worktree:list\n  pnpm worktree:remove <名前>\n  pnpm worktree:reset-db --yes\n（名前は英小文字・数字・ハイフン。例：memo）",
     );
     process.exit(1);
   }

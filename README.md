@@ -167,18 +167,20 @@ pnpm team:demo
 
 ### 手元で同時に進める（作業場所を分ける）
 
-Threadsの改善と別のアプリなど、2つのブランチを手元で同時に進めるときは、`git worktree`で作業場所を分け、それぞれでClaude Codeを動かす（[docs/product-structure.md](docs/product-structure.md) 6）。作業場所ごとに、ローカルのDBとポートが分かれるので、両方で`pnpm dev`・テスト・E2Eを同時に動かしてもぶつからない。
+Threadsの改善と別のアプリなど、2つのブランチを手元で同時に進めるときは、`git worktree`で作業場所を分け、それぞれでClaude Codeを動かす。始めから終わりまでの手順は[docs/parallel-development.md](docs/parallel-development.md)、決まりは[docs/product-structure.md](docs/product-structure.md) 6。作業場所ごとに、ローカルのDBとポートが分かれるので、両方で`pnpm dev`を同時に動かせ、テストのデータも混ざらない。
 
 ```bash
 pnpm worktree:new memo feature/memo-001-contacts   # 作業場所を作る（ブランチを省くと feature/<名前>。なければ develop の最新から作る）
 cd ../meguru-app-memo && claude                     # その作業場所で Claude Code を開く
 pnpm worktree:list                                  # 作業場所の一覧（DBの名前とポート）
 pnpm worktree:remove memo                           # 片付ける（作業場所とそのDBを消す。ブランチは残す）
+pnpm worktree:reset-db --yes                        # 今いる作業場所のDBを作り直す（マイグレーションを作り直したあと）
 ```
 
 - 作業場所は、もとのクローンの隣（`../meguru-app-<名前>`）にできる。
 - **DB**：同じPostgres（`docker compose`のコンテナは1つ）の中に、`threads_grower_<名前>`を作ってマイグレーションを当てる。結合テストとE2Eは、その作業場所のDBだけを空にする。
 - **ポート**：決まったポートに100ずつ足す（1つ目の作業場所はWeb `5273`・API `8887`・偽のThreads `8890`）。`pnpm dev`・`pnpm dev:fake`・`pnpm e2e`・`pnpm team:open`が合わせて動く。
+- **結合テスト（`pnpm --filter api test`）とE2E（`pnpm e2e`）は、作業場所をまたいで1つずつ流れる**。ほかの作業場所で流れているときは「終わるまで待ちます…」と出て、終わってから始まる。Workersからつなぐ`local-neon-http-proxy`は1つで、同時に流すと落ちるため（Postgresのロックで待つ。テストを止めればロックは外れる）。共通とWebのテスト（`pnpm --filter web test`など）は待たない。
 - 値は作業場所のルートの`.env.worktree`（コミットしない）にあり、API・Web・E2Eがそれを読む（`apps/api/scripts/worktree-env.ts`）。もとのクローンにはこのファイルがないので、今までどおり`threads_grower`と決まったポートで動く。
 - 手元の設定ファイル（`apps/api/.dev.vars`・`apps/web/.env.local`・`e2e/.env.local`）は、もとのクローンから写し、DBとポートの行だけを書き換える。もとの値を変えたら、作り直すか手で直す。
 - 本物のThreads（Meta）の接続は、Metaに登録した戻り先（Cloudflare Tunnel → `localhost:8787`）がもとのクローンを向いているので、もとのクローンで試す。作業場所では偽のThreads（`pnpm dev:fake`）を使う。

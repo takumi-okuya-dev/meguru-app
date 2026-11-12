@@ -18,6 +18,7 @@
     "worktree:new": "node scripts/worktree.mjs new",
     "worktree:list": "node scripts/worktree.mjs list",
     "worktree:remove": "node scripts/worktree.mjs remove",
+    "worktree:reset-db": "node scripts/worktree.mjs reset-db",
     "team:demo": "docker compose up -d --wait && concurrently -k -s first -n servers,team -c gray,cyan \"pnpm dev:fake\" \"pnpm team:open --setup --wait\""
   },
   "devDependencies": {
