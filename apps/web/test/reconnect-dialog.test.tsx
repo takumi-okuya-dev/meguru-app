@@ -20,7 +20,20 @@ vi.mock("@/lib/api-client", async (orig) => {
 });
 vi.mock("@/apps/threads/lib/api", async (orig) => {
   const actual = await orig<typeof import("@/apps/threads/lib/api")>();
-  return { ...actual, threadsApi: { ...actual.threadsApi, accountAccess, tokenConnect, connect, getPostingRules: vi.fn(() => new Promise(() => {})), getPostingSchedule: vi.fn(() => new Promise(() => {})), getAutoPost: vi.fn(() => new Promise(() => {})), accountTeam: vi.fn(() => new Promise(() => {})), connectionNotice: vi.fn(() => Promise.resolve({ otherAccount: null })) } };
+  return {
+    ...actual,
+    threadsApi: {
+      ...actual.threadsApi,
+      accountAccess,
+      tokenConnect,
+      connect,
+      getPostingRules: vi.fn(() => new Promise(() => {})),
+      getPostingSchedule: vi.fn(() => new Promise(() => {})),
+      getAutoPost: vi.fn(() => new Promise(() => {})),
+      accountTeam: vi.fn(() => new Promise(() => {})),
+      connectionNotice: vi.fn(() => Promise.resolve({ otherAccount: null })),
+    },
+  };
 });
 const toastSuccess = vi.fn();
 const toastError = vi.fn();

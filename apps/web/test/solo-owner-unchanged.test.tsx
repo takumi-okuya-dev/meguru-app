@@ -50,7 +50,16 @@ vi.mock("@/lib/api-client", async (orig) => {
 });
 vi.mock("@/apps/threads/lib/api", async (orig) => {
   const actual = await orig<typeof import("@/apps/threads/lib/api")>();
-  return { ...actual, threadsApi: { ...actual.threadsApi, getDraftCounts: () => Promise.resolve({ needsReview: 0, approved: 0 }), needsReviewCounts: () => Promise.resolve({ counts: [{ accountId: "a1", needsReview: 0 }] }), accountAccess: () => Promise.resolve(access), accountTeam } };
+  return {
+    ...actual,
+    threadsApi: {
+      ...actual.threadsApi,
+      getDraftCounts: () => Promise.resolve({ needsReview: 0, approved: 0 }),
+      needsReviewCounts: () => Promise.resolve({ counts: [{ accountId: "a1", needsReview: 0 }] }),
+      accountAccess: () => Promise.resolve(access),
+      accountTeam,
+    },
+  };
 });
 
 const { ThreadsSidebar } = await import("@/apps/threads/sidebar");

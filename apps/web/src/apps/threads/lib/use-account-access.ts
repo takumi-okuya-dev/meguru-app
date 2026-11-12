@@ -5,7 +5,7 @@ import { useQuery, useQueryClient, type QueryClient } from "@tanstack/react-quer
 import { useEffect } from "react";
 import { useNavigate } from "react-router";
 import { toast } from "sonner";
-import { setAccountAccessErrorListener, type AccountAccessErrorListener } from "@/lib/api-client";
+import { setAccountAccessErrorListener, type AccountAccessErrorListener } from "@/apps/threads/lib/api";
 import { threadsApi } from "@/apps/threads/lib/api";
 import { queryKeys } from "@/lib/query";
 import { threadsQueryKeys } from "@/apps/threads/lib/query-keys";

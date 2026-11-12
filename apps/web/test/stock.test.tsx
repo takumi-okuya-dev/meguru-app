@@ -21,16 +21,27 @@ const getAutoPost = vi.fn();
 const dismissBlockedNotice = vi.fn();
 const prioritizeDraft = vi.fn();
 const accountAccess = vi.fn(async () => OWNER_ACCESS);
-vi.mock("@/lib/api-client", async (orig) => {
-  const actual = await orig<typeof import("@/lib/api-client")>();
-  return {
-    ...actual,
-    api: { ...actual.api },
-  };
-});
 vi.mock("@/apps/threads/lib/api", async (orig) => {
   const actual = await orig<typeof import("@/apps/threads/lib/api")>();
-  return { ...actual, threadsApi: { ...actual.threadsApi, accountAccess, listPostDrafts, getPrompt, putPromptSettings, createDraftBatch, deleteDraftBatch, updatePostDraft, deletePostDrafts, reviewPostDrafts, listPublished, getAutoPost, dismissBlockedNotice, prioritizeDraft } };
+  return {
+    ...actual,
+    threadsApi: {
+      ...actual.threadsApi,
+      accountAccess,
+      listPostDrafts,
+      getPrompt,
+      putPromptSettings,
+      createDraftBatch,
+      deleteDraftBatch,
+      updatePostDraft,
+      deletePostDrafts,
+      reviewPostDrafts,
+      listPublished,
+      getAutoPost,
+      dismissBlockedNotice,
+      prioritizeDraft,
+    },
+  };
 });
 const toastSuccess = vi.fn();
 const toastError = vi.fn();

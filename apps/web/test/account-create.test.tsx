@@ -14,7 +14,14 @@ vi.mock("@/lib/api-client", async (orig) => {
 });
 vi.mock("@/apps/threads/lib/api", async (orig) => {
   const actual = await orig<typeof import("@/apps/threads/lib/api")>();
-  return { ...actual, threadsApi: { ...actual.threadsApi, createAccount: mocks.createAccount, needsReviewCounts: vi.fn(() => new Promise(() => {})) } };
+  return {
+    ...actual,
+    threadsApi: {
+      ...actual.threadsApi,
+      createAccount: mocks.createAccount,
+      needsReviewCounts: vi.fn(() => new Promise(() => {})),
+    },
+  };
 });
 vi.mock("@clerk/react", () => ({ useUser: () => ({ user: null }), useClerk: () => ({ signOut: vi.fn() }) }));
 

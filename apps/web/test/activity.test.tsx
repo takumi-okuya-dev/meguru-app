@@ -9,10 +9,6 @@ import { ADMIN_ACCESS, EDITOR_ACCESS } from "./helpers/access";
 
 const listActivity = vi.fn();
 let access: AccountAccessResponse;
-vi.mock("@/lib/api-client", async (orig) => {
-  const actual = await orig<typeof import("@/lib/api-client")>();
-  return { ...actual, api: { ...actual.api } };
-});
 vi.mock("@/apps/threads/lib/api", async (orig) => {
   const actual = await orig<typeof import("@/apps/threads/lib/api")>();
   return { ...actual, threadsApi: { ...actual.threadsApi, listActivity, accountAccess: () => Promise.resolve(access) } };

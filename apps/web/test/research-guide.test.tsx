@@ -4,16 +4,16 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderResearchPage } from "./helpers/research";
 
-vi.mock("@/lib/api-client", async (orig) => {
-  const actual = await orig<typeof import("@/lib/api-client")>();
-  return {
-    ...actual,
-    api: { ...actual.api },
-  };
-});
 vi.mock("@/apps/threads/lib/api", async (orig) => {
   const actual = await orig<typeof import("@/apps/threads/lib/api")>();
-  return { ...actual, threadsApi: { ...actual.threadsApi, listReferencePosts: async () => ({ items: [], limit: 200, canEdit: true }), listResearchKeywords: async () => ({ items: [], limit: 100, canEdit: true }) } };
+  return {
+    ...actual,
+    threadsApi: {
+      ...actual.threadsApi,
+      listReferencePosts: async () => ({ items: [], limit: 200, canEdit: true }),
+      listResearchKeywords: async () => ({ items: [], limit: 100, canEdit: true }),
+    },
+  };
 });
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 

@@ -14,26 +14,38 @@ vi.mock("@/lib/api-client", async (orig) => {
   const actual = await orig<typeof import("@/lib/api-client")>();
   return {
     ...actual,
-    api: { ...actual.api, me: async (): Promise<MeResponse> => ({
-        user: { id: userId, email: "t@example.com", displayName: "Takumi" },
-        accounts: [account],
-        landingAccountId: "a1",
-        accountLimit: { max: 5, used: 1 },
-        ...ME_BILLING_OFF,
-        threadsAccessMode: "testers",
-        threadsConnectMethods: ["app", "token"] as const,
-        teams: [],
-      }) },
+    api: {
+      ...actual.api,
+      me: async (): Promise<MeResponse> => ({
+          user: { id: userId, email: "t@example.com", displayName: "Takumi" },
+          accounts: [account],
+          landingAccountId: "a1",
+          accountLimit: { max: 5, used: 1 },
+          ...ME_BILLING_OFF,
+          threadsAccessMode: "testers",
+          threadsConnectMethods: ["app", "token"] as const,
+          teams: [],
+      }),
+    },
   };
 });
 vi.mock("@/apps/threads/lib/api", async (orig) => {
   const actual = await orig<typeof import("@/apps/threads/lib/api")>();
-  return { ...actual, threadsApi: { ...actual.threadsApi, getAutoPost: async () => ({ autoPost: { enabled: false, slotCount: 0, stoppedReason: null }, next: null, approvedCount: 0, daysLeft: null, notices: [] }), getDraftCounts: async () => ({ needsReview: 0, approved: 0, rejected: 0, published: 0, publishFailed: 0 }), accountAccess: async () => OWNER_ACCESS, getProfileStatus: async (): Promise<ProfileStatus> => ({
-        strategy: { filledCount: 0, totalCount: 16 },
-        promotions: { targetableCount: 0, totalCount: 0 },
-        research: { referencePostCount: 0, keywordCount: 0 },
-        access: { canEdit: true, inTrial: false, trialEndsAt: null, trialDaysLeft: null },
-      }) } };
+  return {
+    ...actual,
+    threadsApi: {
+      ...actual.threadsApi,
+      getAutoPost: async () => ({ autoPost: { enabled: false, slotCount: 0, stoppedReason: null }, next: null, approvedCount: 0, daysLeft: null, notices: [] }),
+      getDraftCounts: async () => ({ needsReview: 0, approved: 0, rejected: 0, published: 0, publishFailed: 0 }),
+      accountAccess: async () => OWNER_ACCESS,
+      getProfileStatus: async (): Promise<ProfileStatus> => ({
+          strategy: { filledCount: 0, totalCount: 16 },
+          promotions: { targetableCount: 0, totalCount: 0 },
+          research: { referencePostCount: 0, keywordCount: 0 },
+          access: { canEdit: true, inTrial: false, trialEndsAt: null, trialDaysLeft: null },
+      }),
+    },
+  };
 });
 
 const { AccountHome } = await import("@/apps/threads/pages/account-home");

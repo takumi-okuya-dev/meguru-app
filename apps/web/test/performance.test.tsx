@@ -9,10 +9,6 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const getPerformance = vi.fn();
 const updateFeedback = vi.fn();
 const exportPerformance = vi.fn();
-vi.mock("@/lib/api-client", async (orig) => {
-  const actual = await orig<typeof import("@/lib/api-client")>();
-  return { ...actual, api: { ...actual.api } };
-});
 vi.mock("@/apps/threads/lib/api", async (orig) => {
   const actual = await orig<typeof import("@/apps/threads/lib/api")>();
   return { ...actual, threadsApi: { ...actual.threadsApi, getPerformance, updateFeedback, exportPerformance } };

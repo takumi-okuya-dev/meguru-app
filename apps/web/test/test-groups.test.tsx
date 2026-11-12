@@ -18,7 +18,16 @@ vi.mock("@/lib/api-client", async (orig) => {
   const actual = await orig<typeof import("@/lib/api-client")>();
   return {
     ...actual,
-    api: { ...actual.api, me, testGroups, createTestGroup, testGroup, removeTestGroupMember, closeTestGroup, putTestGroupFeatures },
+    api: {
+      ...actual.api,
+      me,
+      testGroups,
+      createTestGroup,
+      testGroup,
+      removeTestGroupMember,
+      closeTestGroup,
+      putTestGroupFeatures,
+    },
   };
 });
 

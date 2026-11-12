@@ -7,7 +7,7 @@ type Person = { userId: string; name: string; note: string };
 
 /**
  * カードの行（オーナー・管理者・担当の人）。チームに入っていなければ空。
- * @param team - GET /api/accounts/:id/team の応答
+ * @param team - GET /api/threads/accounts/:id/team の応答
  * @returns 行
  */
 export function rosterPeople(team: AccountTeam): { label: string; people: Person[] }[] {

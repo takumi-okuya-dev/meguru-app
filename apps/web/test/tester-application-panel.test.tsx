@@ -19,7 +19,16 @@ vi.mock("@/lib/api-client", async (orig) => {
 });
 vi.mock("@/apps/threads/lib/api", async (orig) => {
   const actual = await orig<typeof import("@/apps/threads/lib/api")>();
-  return { ...actual, threadsApi: { ...actual.threadsApi, testerApplication: () => Promise.resolve(appResponse), applyTester: mocks.apply, cancelTesterApplication: mocks.cancel, connect: mocks.connect } };
+  return {
+    ...actual,
+    threadsApi: {
+      ...actual.threadsApi,
+      testerApplication: () => Promise.resolve(appResponse),
+      applyTester: mocks.apply,
+      cancelTesterApplication: mocks.cancel,
+      connect: mocks.connect,
+    },
+  };
 });
 
 const { ConnectMethods } = await import("@/apps/threads/components/connect/ConnectMethods");

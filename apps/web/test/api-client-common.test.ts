@@ -27,6 +27,9 @@ describe("共通の部品にThreadsがない", () => {
     const called = [...src.matchAll(/["`](\/api\/[^"`$?]*)/g)].map((m) => m[1]!);
     expect(called.length).toBeGreaterThan(0);
     expect(called.filter((p) => THREADS_PATHS.some((t) => p.startsWith(t)))).toEqual([]);
+    // 変数で組み立てた道筋も見逃さないよう、コード（コメントを除く）に threads の文字がないことも確かめる
+    const code = src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "");
+    expect(code).not.toMatch(/threads/i);
   });
 
   it("apps/threads/lib/api.ts は、新しい道筋（/api/threads/…）か、Metaに渡した道筋だけを呼ぶ", () => {
@@ -35,8 +38,12 @@ describe("共通の部品にThreadsがない", () => {
     expect(called.filter((p) => !p.startsWith("/api/threads/") && !p.startsWith("/api/data-deletion"))).toEqual([]);
   });
 
-  it("lib/query.ts のキーに、Account・チーム・招待のキーがない", () => {
+  it("lib/query.ts のキーは、共通の分だけ（Threadsのキーは apps/threads/lib/query-keys.ts）", () => {
     const src = read("src/lib/query.ts");
-    expect(src).not.toMatch(/\["(account|team|invite|operator-accounts|operator-tester-applications)"/);
+    const body = src.slice(src.indexOf("export const queryKeys = {"));
+    const keys = [...body.matchAll(/^ {2}([A-Za-z0-9_]+):/gm)].map((m) => m[1]);
+    expect(keys.sort()).toEqual(
+      ["billing", "featureSettings", "me", "operatorLimits", "referral", "referralPage", "testGroup", "testGroups", "testInvite", "withdrawalPreview"].sort(),
+    );
   });
 });

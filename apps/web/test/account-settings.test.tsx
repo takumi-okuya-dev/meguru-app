@@ -17,16 +17,24 @@ const checkThreads = vi.fn();
 const getAutoPost = vi.fn();
 const connect = vi.fn();
 const accountAccess = vi.fn(async () => OWNER_ACCESS);
-vi.mock("@/lib/api-client", async (orig) => {
-  const actual = await orig<typeof import("@/lib/api-client")>();
-  return {
-    ...actual,
-    api: { ...actual.api },
-  };
-});
 vi.mock("@/apps/threads/lib/api", async (orig) => {
   const actual = await orig<typeof import("@/apps/threads/lib/api")>();
-  return { ...actual, threadsApi: { ...actual.threadsApi, accountAccess, getPostingRules, addNgWords, deleteNgWord, putCoreRules, getPostingSchedule, putPostingSchedule, checkThreads, getAutoPost, connect } };
+  return {
+    ...actual,
+    threadsApi: {
+      ...actual.threadsApi,
+      accountAccess,
+      getPostingRules,
+      addNgWords,
+      deleteNgWord,
+      putCoreRules,
+      getPostingSchedule,
+      putPostingSchedule,
+      checkThreads,
+      getAutoPost,
+      connect,
+    },
+  };
 });
 const toastSuccess = vi.fn();
 const toastError = vi.fn();

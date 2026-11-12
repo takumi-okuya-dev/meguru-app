@@ -13,10 +13,6 @@ const getPrompt = vi.fn();
 const putPromptSettings = vi.fn();
 const accountAccess = vi.fn(async () => OWNER_ACCESS);
 const toastSuccess = vi.fn();
-vi.mock("@/lib/api-client", async (orig) => {
-  const actual = await orig<typeof import("@/lib/api-client")>();
-  return { ...actual, api: { ...actual.api } };
-});
 vi.mock("@/apps/threads/lib/api", async (orig) => {
   const actual = await orig<typeof import("@/apps/threads/lib/api")>();
   return { ...actual, threadsApi: { ...actual.threadsApi, accountAccess, listPostDrafts, getPrompt, putPromptSettings } };

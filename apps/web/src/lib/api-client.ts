@@ -147,20 +147,6 @@ export function subscribeSubscriptionRequired(listener: () => void): () => void 
   return () => subscriptionListeners.delete(listener);
 }
 
-/** Accountの API が権限・存在のエラーを返したときの受け取り口（specs/008 contracts/ui-routes.md「共通の振る舞い」2・3）。 */
-export type AccountAccessErrorListener = (code: "ROLE_FORBIDDEN" | "ACCOUNT_NOT_FOUND", accountId: string) => void;
-let onAccountAccessError: AccountAccessErrorListener | null = null;
-
-/**
- * Accountの API の 403 ROLE_FORBIDDEN・404 ACCOUNT_NOT_FOUND を受け取る関数を登録する。Accountの画面の親が登録する。
- * @param listener - 受け取る関数（NULLで解除）
- */
-export function setAccountAccessErrorListener(listener: AccountAccessErrorListener | null) {
-  onAccountAccessError = listener;
-}
-
-const ACCOUNT_PATH = /^\/api\/(?:threads\/)?accounts\/([0-9a-f-]{36})(?:\/|$)/i;
-
 /**
  * API クライアントに、Clerk のトークンの取り方とセッション切れの扱いを渡す。ClerkProvider の中で一度だけ呼ぶ。
  * @param opts - getToken：セッショントークンを返す関数、onSessionExpired：401 を受けたときの処理
@@ -175,13 +161,13 @@ export function configureApiClient(opts: { getToken: TokenGetter; onSessionExpir
  * （apps/<名前>/lib/api.ts）からも使う（specs/meguru/029-threads-pattern1 contracts/api-routes.md 4）。
  * @param path - /api から始まる道筋
  * @param schema - レスポンスのスキーマ（中身がなければ null）
- * @param init - fetch の設定（auth: false でトークンを付けない）
+ * @param init - fetch の設定（auth: false でトークンを付けない。onError は ApiError を投げる前に呼ぶ。アプリが自分のエラーを扱うため）
  * @returns 検証したレスポンス
  */
 export async function request<T>(
   path: string,
   schema: z.ZodType<T> | null,
-  init: RequestInit & { auth?: boolean } = {},
+  init: RequestInit & { auth?: boolean; onError?: (err: ApiError) => void } = {},
 ): Promise<T> {
   const headers = new Headers(init.headers);
   if (init.body !== undefined) headers.set("Content-Type", "application/json");
@@ -207,15 +193,15 @@ export async function request<T>(
     if (code === "WITHDRAWAL_IN_PROGRESS") setWithdrawalInProgress(true);
     if (code === "TEST_ACCESS_REQUIRED") setTestAccessRequired(true);
     if (code === "SUBSCRIPTION_REQUIRED") setSubscriptionRequired(true);
-    const accountId = ACCOUNT_PATH.exec(path)?.[1];
-    if (accountId && (code === "ROLE_FORBIDDEN" || code === "ACCOUNT_NOT_FOUND")) onAccountAccessError?.(code, accountId);
-    throw new ApiError(
+    const err = new ApiError(
       code,
       res.status,
       parsed.success ? (parsed.data.error.details ?? []) : [],
       parsed.success ? parsed.data.latest : undefined,
       parsed.success ? (parsed.data.updatedBy ?? null) : null,
     );
+    init.onError?.(err);
+    throw err;
   }
   if (schema === null || res.status === 204) return undefined as T;
   return schema.parse(await res.json());
@@ -296,7 +282,7 @@ export const api = {
       method: "PUT",
       body: JSON.stringify(v),
     }),
-};;
+};
 
 /**
  * エラーを、画面に出す日本語の文言にする。
