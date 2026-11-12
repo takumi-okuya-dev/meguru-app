@@ -15,6 +15,7 @@ import {
   billingRoutes,
   stripeWebhookRoutes,
   operatorFeatureRoutes,
+  operatorAppRegistryRoutes,
   operatorTestGroupRoutes,
   testInviteRoutes,
   referralRoutes,
@@ -173,33 +174,18 @@ export function createApp(deps: AppDeps = defaultDeps) {
   const authed = authMiddleware(deps.verifyAuth);
   const maybeAuthed = optionalAuthMiddleware(deps.verifyAuth) as unknown as typeof authed;
 
-  const routes = app
-    .basePath("/api")
-    .get("/health", (c) => {
-      // この経路は無認証で、設定が壊れている間も答え続ける（関所が免除している）。
-      // 誤っている項目名は手元の開発のときだけ返す。公開された環境では、
-      // 資格情報を持たない相手に「どの秘密が未設定か」を渡さない（セキュリティ監査 run-1）
-      const configErrors = validateConfig(c.env);
-      if (configErrors.length === 0) return c.json({ ok: true });
-      return c.json(c.env.APP_ENV === "development" ? { ok: false, configErrors } : { ok: false });
-    })
-    .route("/", meRoutes(authed, deps.deleteClerkUser ?? ((env) => clerkUserDeleter(env))))
+  // Threadsの道筋（specs/meguru/029-threads-pattern1 contracts/api-routes.md 1）。新しい /api/threads/… と、古い道筋の両方につなぐ
+  // （API が画面より先にデプロイされるため。古い道筋は PR5 で消す。3章）。Metaに登録した /api/threads/… の6本と
+  // /api/data-deletion は、ここに入れず今のまま。
+  const threadsApi = new Hono<AppEnv>()
     .route("/", needsReviewCountRoutes(authed))
-    // Threadsの「自分」（specs/meguru/029 contracts/api-routes.md 2）
-    .route("/", threadsMeRoutes(authed))
     .route("/", accountRoutes(authed))
     .route("/", accountTeamRoutes(authed))
     .route("/", inviteRoutes(authed, maybeAuthed))
-    // テスト用のグループ（specs/016 contracts/api.md）
-    .route("/", testInviteRoutes(authed, maybeAuthed))
-    .route("/", referralRoutes(authed))
-    .route("/", operatorTestGroupRoutes(authed))
-    .route("/", operatorFeatureRoutes(authed))
-    // テスター招待・上限（specs/024 contracts/api.md）
+    // テスター招待（specs/024 contracts/api.md）
     .route("/", testerApplicationRoutes(authed))
     .route("/", operatorTesterInviteRoutes(authed))
     .route("/", operatorAccountRoutes(authed))
-    .route("/", operatorLimitRoutes(authed))
     .route("/", teamsRoutes(authed))
     .route("/", activityRoutes(authed))
     .route("/", strategyRoutes(authed))
@@ -214,7 +200,32 @@ export function createApp(deps: AppDeps = defaultDeps) {
     .route("/", postingScheduleRoutes(authed))
     .route("/", threadsCheckRoutes(authed))
     .route("/", autoPostRoutes(authed))
-    .route("/", performanceRoutes(authed))
+    .route("/", performanceRoutes(authed));
+
+  const routes = app
+    .basePath("/api")
+    .get("/health", (c) => {
+      // この経路は無認証で、設定が壊れている間も答え続ける（関所が免除している）。
+      // 誤っている項目名は手元の開発のときだけ返す。公開された環境では、
+      // 資格情報を持たない相手に「どの秘密が未設定か」を渡さない（セキュリティ監査 run-1）
+      const configErrors = validateConfig(c.env);
+      if (configErrors.length === 0) return c.json({ ok: true });
+      return c.json(c.env.APP_ENV === "development" ? { ok: false, configErrors } : { ok: false });
+    })
+    .route("/", meRoutes(authed, deps.deleteClerkUser ?? ((env) => clerkUserDeleter(env))))
+    // Threadsの「自分」（specs/meguru/029 contracts/api-routes.md 2）
+    .route("/", threadsMeRoutes(authed))
+    // テスト用のグループ（specs/016 contracts/api.md）
+    .route("/", testInviteRoutes(authed, maybeAuthed))
+    .route("/", referralRoutes(authed))
+    .route("/", operatorTestGroupRoutes(authed))
+    .route("/", operatorFeatureRoutes(authed))
+    // 登録されたアプリの機能と上限の一覧（運営の画面のため。specs/meguru/029 tasks.md T069）
+    .route("/", operatorAppRegistryRoutes(authed))
+    // 上限（specs/024 contracts/api.md）
+    .route("/", operatorLimitRoutes(authed))
+    .route("/threads", threadsApi)
+    .route("/", threadsApi)
     .route("/", threadsConnectRoutes(authed))
     .route("/", billingRoutes(authed))
     .route("/", stripeWebhookRoutes())

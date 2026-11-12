@@ -23,4 +23,5 @@ export { loadAppEntitlement, loadAppEntitlements, loadAppFeatures, type AppEntit
 export { reportUsage, billingQuantityOf, usingAppsOf, appUsageOf, usersWithUsage, type AppUsageReport } from "./usage/usage";
 export { registerMeSection, registerWithdrawalPreviewSection, type MeSection } from "./identity/me-sections";
 export { registerAppFeatures, registerAppLimits, appFeatures, appLimits, registeredApps, type AppFeatureDef, type AppLimitDef } from "./registry/registry";
+export { operatorAppRegistryRoutes } from "./registry/registry-routes";
 export { currentUser, peopleNames, peopleProfiles, personName, searchPeople } from "./identity/people";
