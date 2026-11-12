@@ -13,7 +13,7 @@ beforeEach(async () => {
 });
 
 async function connectionStatus(accountId: string) {
-  const [r] = (await db()`SELECT connection_status FROM accounts WHERE id = ${accountId}`) as [
+  const [r] = (await db()`SELECT connection_status FROM threads.accounts WHERE id = ${accountId}`) as [
     { connection_status: string },
   ];
   return r.connection_status;

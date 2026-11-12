@@ -59,16 +59,16 @@ async function seed(accountId: string, n: number, over: (i: number) => Seed = ()
     const id = drafts[k]!.id;
     const state = it.state ?? "confirmed";
     if (state === "unmeasurable") {
-      await sql()`INSERT INTO post_metrics (draft_id, account_id, state, unmeasurable_reason) VALUES (${id}, ${accountId}, 'unmeasurable', 'no_media_id')`;
+      await sql()`INSERT INTO threads.post_metrics (draft_id, account_id, state, unmeasurable_reason) VALUES (${id}, ${accountId}, 'unmeasurable', 'no_media_id')`;
       continue;
     }
     const confirmed = state === "confirmed" || state === "late_confirmed";
-    await sql()`INSERT INTO post_metrics (draft_id, account_id, state, views, likes, replies, reposts, quotes, shares,
+    await sql()`INSERT INTO threads.post_metrics (draft_id, account_id, state, views, likes, replies, reposts, quotes, shares,
         last_fetched_at, last_elapsed_minutes, last_kind, confirmed_at)
       VALUES (${id}, ${accountId}, ${state}, ${it.views}, 5, ${it.replies ?? 1}, 0, 0, 0, now(), 10080,
         ${state === "confirmed" ? "d7" : state === "late_confirmed" ? "late" : "h24"}, ${confirmed ? new Date().toISOString() : null})`;
     if (it.h24 !== null)
-      await sql()`INSERT INTO post_metric_snapshots (draft_id, account_id, kind, method, fetched_at, elapsed_minutes, views)
+      await sql()`INSERT INTO threads.post_metric_snapshots (draft_id, account_id, kind, method, fetched_at, elapsed_minutes, views)
         VALUES (${id}, ${accountId}, 'h24', 'slot', ${new Date(it.publishedAt.getTime() + DAY).toISOString()}, 1440, ${it.h24})`;
   }
   return drafts.map((d) => d.id);
@@ -81,7 +81,7 @@ async function seed(accountId: string, n: number, over: (i: number) => Seed = ()
  * @param at - 記録した日時
  */
 async function followers(accountId: string, count: number, at: Date) {
-  await sql()`INSERT INTO follower_snapshots (account_id, snapshot_date, followers_count, captured_at)
+  await sql()`INSERT INTO threads.follower_snapshots (account_id, snapshot_date, followers_count, captured_at)
     VALUES (${accountId}, ${at.toISOString().slice(0, 10)}, ${count}, ${at.toISOString()})`;
 }
 
@@ -248,7 +248,7 @@ describe("内容の分類（T035）", () => {
     );
     expect(saved).toEqual({ saved: 1, skipped: [ids[1], otherId] });
     await put({ source: "manual", items: [{ draftId: ids[0], openingType: "question", themeId: null }] });
-    const [row] = (await sql()`SELECT opening_type, source FROM post_classifications WHERE draft_id = ${ids[0]}`) as { opening_type: string; source: string }[];
+    const [row] = (await sql()`SELECT opening_type, source FROM threads.post_classifications WHERE draft_id = ${ids[0]}`) as { opening_type: string; source: string }[];
     expect(row).toEqual({ opening_type: "question", source: "manual" });
     const classified = await json<ClassificationsResponse>(
       await call(app, "GET", `${base(accountId)}/analysis/classifications?mode=classified`, { user: "u1" }),
@@ -275,7 +275,7 @@ describe("内容の分類（T035）", () => {
       await patchSettings(accountId, { expectedVersion: 1, themes: [{ id: t2!.id, name: "働き方改革" }] }),
     );
     expect(kept.settings.themes).toEqual([{ id: t2!.id, name: "働き方改革" }]);
-    const [row] = (await sql()`SELECT theme_id FROM post_classifications WHERE draft_id = ${id}`) as { theme_id: string | null }[];
+    const [row] = (await sql()`SELECT theme_id FROM threads.post_classifications WHERE draft_id = ${id}`) as { theme_id: string | null }[];
     expect(row!.theme_id).toBeNull();
   });
 
@@ -286,8 +286,8 @@ describe("内容の分類（T035）", () => {
       user: "u1",
       body: { source: "ai", items: [{ draftId: id, openingType: "story", themeId: null }] },
     });
-    await sql()`DELETE FROM post_drafts WHERE id = ${id}`;
-    expect(((await sql()`SELECT 1 FROM post_classifications`) as unknown[]).length).toBe(0);
+    await sql()`DELETE FROM threads.post_drafts WHERE id = ${id}`;
+    expect(((await sql()`SELECT 1 FROM threads.post_classifications`) as unknown[]).length).toBe(0);
   });
 });
 
@@ -295,8 +295,8 @@ describe("時間差のメンションの返信を返信率から除く（specs/0
   it("反応数の取り込みより前に出した自分の返信のぶん、返信の数から1を引く", async () => {
     const { accountId } = await createUserWithAccount("u1");
     const ids = await seed(accountId, 20, () => ({ replies: 1 }));
-    await sql()`INSERT INTO post_mentions (draft_id, account_id, usernames, text, delay_minutes, state, sent_at)
-      SELECT id, account_id, ARRAY['a'], '@a', 30, 'sent', now() - interval '1 day' FROM post_drafts WHERE id = ANY(${ids})`;
+    await sql()`INSERT INTO threads.post_mentions (draft_id, account_id, usernames, text, delay_minutes, state, sent_at)
+      SELECT id, account_id, ARRAY['a'], '@a', 30, 'sent', now() - interval '1 day' FROM threads.post_drafts WHERE id = ANY(${ids})`;
     const r = await getAnalysis(accountId);
     expect(r.time.every((b) => b.replyRate === null || b.replyRate === 0)).toBe(true);
   });

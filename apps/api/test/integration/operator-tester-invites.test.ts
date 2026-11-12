@@ -43,7 +43,7 @@ const op = (id: string, action: string, body?: unknown, env?: ReturnType<typeof 
 describe("一覧", () => {
   it("申し込み中は古い順。件数・枠・申し込んだ人・アプリIDを返す", async () => {
     const a = await applied("u1", "shop_a");
-    await q()`UPDATE tester_applications SET created_at = now() - interval '1 hour' WHERE id = ${a.id}`;
+    await q()`UPDATE threads.tester_applications SET created_at = now() - interval '1 hour' WHERE id = ${a.id}`;
     const b = await applied("u2", "shop_b");
     const res = await list();
     expect(res.enabled).toBe(true);
@@ -59,7 +59,7 @@ describe("一覧", () => {
     await applied("u2", "shop_tokyo");
     const c = await applied("u3", "connected_one");
     const other = await unconnectedAccountOf(app, "u4");
-    await q()`UPDATE accounts SET connection_status = 'connected', connection_method = 'token', threads_user_id = 'tu9', username = 'Connected_One' WHERE id = ${other}`;
+    await q()`UPDATE threads.accounts SET connection_status = 'connected', connection_method = 'token', threads_user_id = 'tu9', username = 'Connected_One' WHERE id = ${other}`;
     const items = (await list()).items;
     expect(items.find((i) => i.id === a.id)!.duplicate).toBe(true);
     expect(items.find((i) => i.id === c.id)).toMatchObject({ duplicate: false, alreadyConnected: true });
@@ -70,10 +70,10 @@ describe("一覧", () => {
     const con = await applied("u2", "con");
     const rem = await applied("u3", "rem");
     const dec = await applied("u4", "dec");
-    await q()`UPDATE tester_applications SET status = 'invited', holds_slot = true WHERE id = ${inv.id}`;
-    await q()`UPDATE tester_applications SET status = 'connected', holds_slot = true WHERE id = ${con.id}`;
-    await q()`UPDATE tester_applications SET status = 'withdrawn', holds_slot = true, removal_reason = 'account_deleted' WHERE id = ${rem.id}`;
-    await q()`UPDATE tester_applications SET status = 'declined' WHERE id = ${dec.id}`;
+    await q()`UPDATE threads.tester_applications SET status = 'invited', holds_slot = true WHERE id = ${inv.id}`;
+    await q()`UPDATE threads.tester_applications SET status = 'connected', holds_slot = true WHERE id = ${con.id}`;
+    await q()`UPDATE threads.tester_applications SET status = 'withdrawn', holds_slot = true, removal_reason = 'account_deleted' WHERE id = ${rem.id}`;
+    await q()`UPDATE threads.tester_applications SET status = 'declined' WHERE id = ${dec.id}`;
     expect((await list("invited")).items.map((i) => i.id)).toEqual([inv.id]);
     expect((await list("connected")).items.map((i) => i.id)).toEqual([con.id]);
     const removable = (await list("removable")).items;
@@ -86,7 +86,7 @@ describe("一覧", () => {
 
   it("退会した人の行は applicant が null", async () => {
     const a = await applied("u1", "shop_tokyo");
-    await q()`UPDATE tester_applications SET status = 'withdrawn', holds_slot = true, removal_reason = 'user_withdrawn', user_id = NULL WHERE id = ${a.id}`;
+    await q()`UPDATE threads.tester_applications SET status = 'withdrawn', holds_slot = true, removal_reason = 'user_withdrawn', user_id = NULL WHERE id = ${a.id}`;
     expect((await list("removable")).items[0]!.applicant).toBeNull();
   });
 
@@ -112,7 +112,7 @@ describe("招待した・見送る・戻す・外した", () => {
   });
 
   it("枠がいっぱいなら TESTER_SLOTS_FULL（使用数・枠の数）。force なら進む", async () => {
-    await q()`UPDATE threads_settings SET tester_slot_capacity = 1 WHERE id = 1`;
+    await q()`UPDATE threads.settings SET tester_slot_capacity = 1 WHERE id = 1`;
     const a = await applied("u1", "shop_a");
     const b = await applied("u2", "shop_b");
     expect((await op(a.id, "invite")).status).toBe(200);
@@ -146,7 +146,7 @@ describe("招待した・見送る・戻す・外した", () => {
     const a = await applied("u1", "shop_tokyo");
     await op(a.id, "invite");
     await connectExisting(app, "u1", a.accountId, "9001");
-    const [acc] = (await q()`SELECT name FROM accounts WHERE id = ${a.accountId}`) as { name: string }[];
+    const [acc] = (await q()`SELECT name FROM threads.accounts WHERE id = ${a.accountId}`) as { name: string }[];
     await call(app, "DELETE", `/api/accounts/${a.accountId}`, { user: "u1", body: { confirmName: acc!.name } });
     expect((await list("removable")).items).toHaveLength(1);
     expect((await op(a.id, "removed")).status).toBe(200);
@@ -154,10 +154,11 @@ describe("招待した・見送る・戻す・外した", () => {
     expect((await list()).slots.used).toBe(0);
 
     const b = await applied("u2", "shop_b");
-    await q()`UPDATE tester_applications SET status = 'withdrawn', holds_slot = true, removal_reason = 'user_withdrawn', user_id = NULL WHERE id = ${b.id}`;
+    await q()`UPDATE threads.tester_applications SET status = 'withdrawn', holds_slot = true, removal_reason = 'user_withdrawn', user_id = NULL WHERE id = ${b.id}`;
     expect((await op(b.id, "removed")).status).toBe(200);
     expect(await applicationRow(b.id)).toBeUndefined();
-    expect((await operatorEventRows()).at(-1)).toMatchObject({ action: "removed", application_id: null });
+    // 消した行の番号も記録に残す（以前は外部キーのため空にしていた。029 の PR3 で外部キーを外した。PR #99 のセルフレビュー）
+    expect((await operatorEventRows()).at(-1)).toMatchObject({ action: "removed", application_id: b.id });
   });
 
   it("状態が合わない操作は TESTER_APPLICATION_NOT_PENDING", async () => {

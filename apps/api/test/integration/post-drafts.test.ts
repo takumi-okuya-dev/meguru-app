@@ -39,17 +39,17 @@ async function seedDrafts(accountId: string, n: number) {
   for (let done = 0; done < n; done += 49) {
     const size = Math.min(49, n - done);
     const [b] = (await sql`
-      INSERT INTO draft_batches (account_id, client_request_id, draft_count, delimiter_found)
+      INSERT INTO threads.draft_batches (account_id, client_request_id, draft_count, delimiter_found)
       VALUES (${accountId}, gen_random_uuid(), ${size}, true) RETURNING id`) as [{ id: string }];
     await sql`
-      INSERT INTO post_drafts (account_id, batch_id, position, body)
+      INSERT INTO threads.post_drafts (account_id, batch_id, position, body)
       SELECT ${accountId}, ${b.id}, g, 'seed ' || g FROM generate_series(0, ${size - 1}) AS g`;
   }
 }
 
 async function countRows(accountId: string) {
   const sql = neon(testEnv.DATABASE_URL);
-  const [r] = (await sql`SELECT count(*)::int AS n FROM post_drafts WHERE account_id = ${accountId}`) as [{ n: number }];
+  const [r] = (await sql`SELECT count(*)::int AS n FROM threads.post_drafts WHERE account_id = ${accountId}`) as [{ n: number }];
   return r.n;
 }
 
@@ -300,10 +300,10 @@ describe("承認済み・却下の下書き（specs/004-review-approval FR-007�
     // position は1つのまとまりで50未満なので、まとまりを分けて501件作る
     for (let i = 0; i < 501; i += 49) {
       const [bb] = (await sql`
-        INSERT INTO draft_batches (account_id, client_request_id, draft_count, delimiter_found)
+        INSERT INTO threads.draft_batches (account_id, client_request_id, draft_count, delimiter_found)
         VALUES (${accountId}, gen_random_uuid(), 49, true) RETURNING id`) as [{ id: string }];
       await sql`
-        INSERT INTO post_drafts (account_id, batch_id, position, body, status, reviewed_at, reject_reasons)
+        INSERT INTO threads.post_drafts (account_id, batch_id, position, body, status, reviewed_at, reject_reasons)
         SELECT ${accountId}, ${bb.id}, g, 'r ' || g, 'rejected', now(), '{tone}'
         FROM generate_series(0, ${Math.min(48, 500 - i)}) AS g`;
     }
@@ -369,9 +369,9 @@ describe("005：一覧の形（research.md R10）", () => {
     const ds = (await register(accountId, "A\n@@@\nB\n@@@\nC\n@@@\nD")).drafts;
     for (const d of ds) await approve(accountId, d.id);
     const sql = neon(testEnv.DATABASE_URL);
-    await sql`UPDATE post_drafts SET prioritized_at = now() - interval '1 minute' WHERE id = ${ds[2]!.id}`;
-    await sql`UPDATE post_drafts SET prioritized_at = now() WHERE id = ${ds[3]!.id}`;
-    await sql`UPDATE post_drafts SET status = 'publishing' WHERE id = ${ds[1]!.id}`;
+    await sql`UPDATE threads.post_drafts SET prioritized_at = now() - interval '1 minute' WHERE id = ${ds[2]!.id}`;
+    await sql`UPDATE threads.post_drafts SET prioritized_at = now() WHERE id = ${ds[3]!.id}`;
+    await sql`UPDATE threads.post_drafts SET status = 'publishing' WHERE id = ${ds[1]!.id}`;
     const res = await call(app, "GET", `${base(accountId)}/post-drafts`, { user: "u1" });
     const body = (await res.json()) as Record<string, unknown> & { approved: PostDraft[]; counts: Record<string, number> };
     expect(body.approved.map((d) => d.body)).toEqual(["B", "D", "C", "A"]);
@@ -387,8 +387,8 @@ describe("005：一覧の形（research.md R10）", () => {
     const ds = (await register(accountId, "A\n@@@\nB\n@@@\nC")).drafts;
     for (const d of ds) await approve(accountId, d.id);
     const sql = neon(testEnv.DATABASE_URL);
-    await sql`UPDATE post_drafts SET status = 'published', published_at = now(), threads_media_id = 'm1' WHERE id = ${ds[0]!.id}`;
-    await sql`UPDATE post_drafts SET status = 'publish_failed', publish_failed_at = now(), publish_error = 'network' WHERE id = ${ds[1]!.id}`;
+    await sql`UPDATE threads.post_drafts SET status = 'published', published_at = now(), threads_media_id = 'm1' WHERE id = ${ds[0]!.id}`;
+    await sql`UPDATE threads.post_drafts SET status = 'publish_failed', publish_failed_at = now(), publish_error = 'network' WHERE id = ${ds[1]!.id}`;
     const res = await call(app, "GET", `${base(accountId)}/post-drafts`, { user: "u1" });
     const body = (await res.json()) as { approved: PostDraft[]; publishFailed: (PostDraft & Record<string, unknown>)[]; counts: unknown };
     expect(body.counts).toEqual({ needsReview: 0, approved: 1, rejected: 0, published: 1, publishFailed: 1 });
@@ -411,21 +411,21 @@ describe("005：既存の操作で新しい列が消える（CHECK制約の違�
   /** 要確認の下書きに、投稿の直前のチェックの記録を入れる。 */
   async function block(id: string) {
     const sql = neon(testEnv.DATABASE_URL);
-    await sql`UPDATE post_drafts SET blocked_at = now(), blocked_reason = 'ng_word', blocked_words = '{絶対}' WHERE id = ${id}`;
+    await sql`UPDATE threads.post_drafts SET blocked_at = now(), blocked_reason = 'ng_word', blocked_words = '{絶対}' WHERE id = ${id}`;
   }
 
   /** 承認済みの下書きに、「次に投稿する」と持ち越しの記録を入れる。 */
   async function prioritizeAndCarry(accountId: string, id: string) {
     const sql = neon(testEnv.DATABASE_URL);
     const [a] = (await sql`
-      INSERT INTO publish_attempts (account_id, slot_at, slot_date, slot_minute, state)
+      INSERT INTO threads.publish_attempts (account_id, slot_at, slot_date, slot_minute, state)
       VALUES (${accountId}, now(), current_date, 0, 'carried_over') RETURNING id`) as [{ id: string }];
-    await sql`UPDATE post_drafts SET prioritized_at = now(), carryover_attempt_id = ${a.id} WHERE id = ${id}`;
+    await sql`UPDATE threads.post_drafts SET prioritized_at = now(), carryover_attempt_id = ${a.id} WHERE id = ${id}`;
   }
 
   async function row(id: string) {
     const sql = neon(testEnv.DATABASE_URL);
-    const [r] = (await sql`SELECT * FROM post_drafts WHERE id = ${id}`) as [Record<string, unknown>];
+    const [r] = (await sql`SELECT * FROM threads.post_drafts WHERE id = ${id}`) as [Record<string, unknown>];
     return r;
   }
 
@@ -486,7 +486,7 @@ describe("005：処理中・投稿済みの下書き（FR-008・FR-020）と、�
     const [d] = (await register(accountId, "A")).drafts;
     await review(accountId, { requestId: crypto.randomUUID(), action: "approve", items: [{ id: d!.id, expectedVersion: 1 }] });
     const sql = neon(testEnv.DATABASE_URL);
-    await sql`UPDATE post_drafts SET status = 'publishing' WHERE id = ${d!.id}`;
+    await sql`UPDATE threads.post_drafts SET status = 'publishing' WHERE id = ${d!.id}`;
 
     const edit = await call(app, "PUT", `${base(accountId)}/post-drafts/${d!.id}`, { user: "u1", body: { body: "B", expectedVersion: 2 } });
     expect(edit.status).toBe(409);
@@ -501,7 +501,7 @@ describe("005：処理中・投稿済みの下書き（FR-008・FR-020）と、�
     const [d] = (await register(accountId, "A")).drafts;
     await review(accountId, { requestId: crypto.randomUUID(), action: "approve", items: [{ id: d!.id, expectedVersion: 1 }] });
     const sql = neon(testEnv.DATABASE_URL);
-    await sql`UPDATE post_drafts SET status = 'published', published_at = now() WHERE id = ${d!.id}`;
+    await sql`UPDATE threads.post_drafts SET status = 'published', published_at = now() WHERE id = ${d!.id}`;
 
     expect((await call(app, "PUT", `${base(accountId)}/post-drafts/${d!.id}`, { user: "u1", body: { body: "B", expectedVersion: 2 } })).status).toBe(404);
     const del = await call(app, "POST", `${base(accountId)}/post-drafts/delete`, { user: "u1", body: { ids: [d!.id] } });
@@ -515,11 +515,11 @@ describe("005：処理中・投稿済みの下書き（FR-008・FR-020）と、�
     const sql = neon(testEnv.DATABASE_URL);
     for (let i = 0; i < 120; i += 40) {
       const [bb] = (await sql`
-        INSERT INTO draft_batches (account_id, client_request_id, draft_count, delimiter_found)
+        INSERT INTO threads.draft_batches (account_id, client_request_id, draft_count, delimiter_found)
         VALUES (${accountId}, gen_random_uuid(), 40, true) RETURNING id`) as [{ id: string }];
       // 2件ずつ同じ投稿日時にして、同じ日時の並び（id の順）も確かめる
       await sql`
-        INSERT INTO post_drafts (account_id, batch_id, position, body, status, reviewed_at, published_at, threads_media_id, threads_permalink)
+        INSERT INTO threads.post_drafts (account_id, batch_id, position, body, status, reviewed_at, published_at, threads_media_id, threads_permalink)
         SELECT ${accountId}, ${bb.id}, g, 'p' || (${i} + g), 'published', now(),
           timestamp '2030-01-01 00:00:00+00' + make_interval(mins => (${i} + g) / 2), 'm' || (${i} + g), 'https://t/' || (${i} + g)
         FROM generate_series(0, 39) AS g`;
@@ -584,9 +584,9 @@ describe("005：予定と次に投稿する操作", () => {
     expect(await res.json()).toMatchObject({ draft: { id: ids[2], version: 2 } });
     body = await read();
     expect(body.approved.map(d => d.id)).toEqual([ids[2], ids[0], ids[1]]);
-    await db()`UPDATE post_drafts SET status = 'publishing' WHERE id = ${ids[2]!}`;
+    await db()`UPDATE threads.post_drafts SET status = 'publishing' WHERE id = ${ids[2]!}`;
     expect(Object.keys((await read()).schedule)).toEqual([ids[0], ids[1]]);
-    await db()`UPDATE posting_schedules SET enabled = false WHERE account_id = ${accountId}`;
+    await db()`UPDATE threads.posting_schedules SET enabled = false WHERE account_id = ${accountId}`;
     expect((await read()).schedule).toEqual({});
   });
   it("古い版・処理中・対象外・他人のAccountを拒む", async () => {
@@ -596,9 +596,9 @@ describe("005：予定と次に投稿する操作", () => {
     const request = (version: number, user = "u1") => call(app, "POST", `${base(accountId)}/post-drafts/${id}/prioritize`, { user, body: { expectedVersion: version } });
     expect((await request(0, "u2")).status).toBe(404);
     expect((await request(2)).status).toBe(409);
-    await db()`UPDATE post_drafts SET status = 'publishing' WHERE id = ${id!}`;
+    await db()`UPDATE threads.post_drafts SET status = 'publishing' WHERE id = ${id!}`;
     expect(await (await request(1)).json()).toMatchObject({ error: { code: "DRAFT_PUBLISHING" } });
-    await db()`UPDATE post_drafts SET status = 'needs_review', reviewed_at = NULL WHERE id = ${id!}`;
+    await db()`UPDATE threads.post_drafts SET status = 'needs_review', reviewed_at = NULL WHERE id = ${id!}`;
     expect((await request(1)).status).toBe(404);
   });
 });
@@ -630,7 +630,7 @@ describe("編集者の削除（チーム運用）", () => {
     });
     expect(del.status).toBe(200);
     expect(await del.json()).toEqual({ deletedCount: 1 });
-    const left = (await neon(testEnv.DATABASE_URL)`SELECT id FROM post_drafts WHERE account_id = ${accountId}`) as { id: string }[];
+    const left = (await neon(testEnv.DATABASE_URL)`SELECT id FROM threads.post_drafts WHERE account_id = ${accountId}`) as { id: string }[];
     expect(left.map((r) => r.id)).toEqual([rejected!.id]);
   });
 });

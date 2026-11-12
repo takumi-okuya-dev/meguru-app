@@ -95,7 +95,7 @@ describe("利用の数を共通へ伝える", () => {
     const { userId: a } = await createUserWithAccount("u1");
     const { userId: b, accountId } = await createUserWithAccount("u2");
     await db().update(appUsage).set({ quantity: 5 }).where(eq(appUsage.userId, a));
-    await db().execute(`DELETE FROM accounts WHERE id = '${accountId}'` as never);
+    await db().execute(`DELETE FROM threads.accounts WHERE id = '${accountId}'` as never);
     expect(await recountThreadsUsage(testEnv)).toBeGreaterThanOrEqual(2);
     expect(await usageOf(a)).toEqual({ quantity: 1, using: true });
     expect(await usageOf(b)).toEqual({ quantity: 0, using: false });

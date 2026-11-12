@@ -72,9 +72,9 @@ describe("US1：時刻になったら、投稿の順の先頭の1件だけを公
 
     const empty = await connectedAccount("u2", app);
     const ids = await approvedDrafts(empty.accountId, ["N", "R", "F"]);
-    await db()`UPDATE post_drafts SET status = 'needs_review', reviewed_at = NULL WHERE id = ${ids[0]!}`;
-    await db()`UPDATE post_drafts SET status = 'rejected', reject_note = 'x' WHERE id = ${ids[1]!}`;
-    await db()`UPDATE post_drafts SET status = 'publish_failed', publish_failed_at = now(), publish_error = 'network' WHERE id = ${ids[2]!}`;
+    await db()`UPDATE threads.post_drafts SET status = 'needs_review', reviewed_at = NULL WHERE id = ${ids[0]!}`;
+    await db()`UPDATE threads.post_drafts SET status = 'rejected', reject_note = 'x' WHERE id = ${ids[1]!}`;
+    await db()`UPDATE threads.post_drafts SET status = 'publish_failed', publish_failed_at = now(), publish_error = 'network' WHERE id = ${ids[2]!}`;
     await setSchedule(empty.accountId, { slotMinutes: [720] });
 
     await run(addMin(NOON, 1));
@@ -117,7 +117,7 @@ describe("US1：時刻になったら、投稿の順の先頭の1件だけを公
     const { accountId } = await connectedAccount("u1", app);
     const ids = await approvedDrafts(accountId, ["P1", "P2", "A"]);
     for (const [i, id] of ids.slice(0, 2).entries()) {
-      await db()`UPDATE post_drafts SET status = 'published', published_at = ${addMin(NOON, -120 + i).toISOString()} WHERE id = ${id}`;
+      await db()`UPDATE threads.post_drafts SET status = 'published', published_at = ${addMin(NOON, -120 + i).toISOString()} WHERE id = ${id}`;
     }
     // その日のうちに、時刻を2つにした（13:00 を足した）
     await setSchedule(accountId, { slotMinutes: [600, 780] });
@@ -172,7 +172,7 @@ describe("US1：時刻になったら、投稿の順の先頭の1件だけを公
   it("原則I：公開の直前に、その時点のNGワードを含む先頭の下書きは要確認に戻り、次の下書きが公開される", async () => {
     const { accountId } = await connectedAccount("u1", app);
     const ids = await approvedDrafts(accountId, ["絶対に伸びる", "ふつうの投稿"]);
-    await db()`INSERT INTO ng_words (account_id, word, normalized) VALUES (${accountId}, '絶対', '絶対')`;
+    await db()`INSERT INTO threads.ng_words (account_id, word, normalized) VALUES (${accountId}, '絶対', '絶対')`;
     await setSchedule(accountId, { slotMinutes: [720] });
     await run(addMin(NOON, 1));
     expect((await fake.posts()).map((p) => p.text)).toEqual(["ふつうの投稿"]);
@@ -192,7 +192,7 @@ describe("US2：公開の直前のチェック", () => {
       "禁止語入り",
       "副業のコツを紹介",
     ]);
-    await db()`INSERT INTO ng_words (account_id, word, normalized) VALUES (${accountId}, '禁止語', '禁止語')`;
+    await db()`INSERT INTO threads.ng_words (account_id, word, normalized) VALUES (${accountId}, '禁止語', '禁止語')`;
     await setSchedule(accountId, { slotMinutes: [720] });
     await run(addMin(NOON, 1));
     expect(await draftRow(ids[0]!)).toMatchObject({
@@ -273,7 +273,7 @@ describe("US3：失敗とやり直し", () => {
     await run(addMin(NOON, 60));
     expect(await draftRow(ids[1]!)).toMatchObject({ status: "approved" });
     expect(
-      await db()`SELECT connection_status FROM accounts WHERE id = ${accountId}`,
+      await db()`SELECT connection_status FROM threads.accounts WHERE id = ${accountId}`,
     ).toMatchObject([{ connection_status: "needs_reconnect" }]);
     expect(await attempts(accountId)).toMatchObject([
       { state: "failed" },
@@ -287,7 +287,7 @@ describe("US3：失敗とやり直し", () => {
     await fake.publishFail("createContainer", "rate_limit", 1);
     await run(NOON);
     const [pause] =
-      await db()`SELECT paused_until FROM posting_schedules WHERE account_id = ${accountId}`;
+      await db()`SELECT paused_until FROM threads.posting_schedules WHERE account_id = ${accountId}`;
     expect(new Date(pause!.paused_until as string).toISOString()).toBe("2030-01-10T15:00:00.000Z");
     await run(addMin(NOON, 60));
     expect(await fake.posts()).toHaveLength(0);
@@ -326,7 +326,7 @@ describe("US3：公開の結果の確認", () => {
   });
   it("コンテナーだけが記録されていれば同じコンテナーで公開する", async () => {
     const { now, id, attempt } = await pendingPublish();
-    await db()`UPDATE publish_attempts SET publish_requested_at = NULL WHERE id = ${attempt.id as string}`;
+    await db()`UPDATE threads.publish_attempts SET publish_requested_at = NULL WHERE id = ${attempt.id as string}`;
     await run(addMin(now, 5));
     expect(await draftRow(id)).toMatchObject({ status: "published" });
     expect(await fake.containers()).toHaveLength(1);
@@ -359,7 +359,7 @@ describe("US3：公開の結果の確認", () => {
     await run(addMin(now, 5));
     expect(await draftRow(id)).toMatchObject({ status: "publishing" });
     expect(
-      await db()`SELECT connection_status FROM accounts WHERE id = ${accountId}`,
+      await db()`SELECT connection_status FROM threads.accounts WHERE id = ${accountId}`,
     ).toMatchObject([{ connection_status: "needs_reconnect" }]);
     expect(await fake.posts()).toHaveLength(1);
   });
@@ -395,6 +395,6 @@ describe("反応数の段階との関係（specs/006 plan.md「Phase 1の設計�
     const r = await runAutoPost(testEnv, at, threads, () => at);
     expect(r.published).toBe(1);
     expect((await fake.posts()).map((p) => p.text)).toEqual(["A"]);
-    expect(await db()`SELECT * FROM post_metrics`).toEqual([]);
+    expect(await db()`SELECT * FROM threads.post_metrics`).toEqual([]);
   });
 });

@@ -42,7 +42,7 @@ describe("DELETE /api/accounts/:id", () => {
     expect(await db().select().from(accounts)).toHaveLength(0);
     expect(await db().select().from(memberships)).toHaveLength(0);
     expect(await db().select().from(threadsConnections)).toHaveLength(0);
-    // 最後に開いたアカウントは Threads の threads_user_states に記録する（specs/meguru/029 tasks.md T071）
+    // 最後に開いたアカウントは Threads の threads.user_states に記録する（specs/meguru/029 tasks.md T071）
     const [u] = await db().select({ id: users.id }).from(users).where(eq(users.clerkUserId, "u1"));
     const [state] = await db().select().from(threadsUserStates).where(eq(threadsUserStates.userId, u!.id));
     expect(state!.lastAccountId).toBeNull();

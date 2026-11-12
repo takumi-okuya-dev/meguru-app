@@ -38,12 +38,12 @@ export async function makeTeam(admin: string, accountIds: string[], opts: { name
   const token = newInviteToken();
   const sealed = await sealInviteToken(testEnv, token, teamId);
   const q = sql();
-  await q`INSERT INTO teams (id, name, admin_user_id, invite_token_hash, invite_token_ciphertext, invite_token_iv, invite_key_version)
+  await q`INSERT INTO threads.teams (id, name, admin_user_id, invite_token_hash, invite_token_ciphertext, invite_token_iv, invite_key_version)
     VALUES (${teamId}, ${opts.name ?? `${admin}のチーム`}, ${adminUserId}, ${sealed.hash},
       ${`\\x${Buffer.from(sealed.ciphertext).toString("hex")}`}, ${`\\x${Buffer.from(sealed.iv).toString("hex")}`}, ${sealed.keyVersion})`;
-  await q`INSERT INTO team_members (team_id, user_id, role) VALUES (${teamId}, ${adminUserId}, 'admin')`;
+  await q`INSERT INTO threads.team_members (team_id, user_id, role) VALUES (${teamId}, ${adminUserId}, 'admin')`;
   for (const accountId of accountIds) {
-    await q`INSERT INTO team_accounts (team_id, account_id, added_by_user_id, shared)
+    await q`INSERT INTO threads.team_accounts (team_id, account_id, added_by_user_id, shared)
       VALUES (${teamId}, ${accountId}, ${adminUserId}, ${opts.shared ?? false})`;
   }
   return { teamId, adminUserId, token };
@@ -60,9 +60,9 @@ export async function makeTeam(admin: string, accountIds: string[], opts: { name
 export async function joinTeam(teamId: string, user: string, accountIds: string[], opts: { shared?: boolean } = {}) {
   const userId = await ensureUser(user);
   const q = sql();
-  await q`INSERT INTO team_members (team_id, user_id, role) VALUES (${teamId}, ${userId}, 'member')`;
+  await q`INSERT INTO threads.team_members (team_id, user_id, role) VALUES (${teamId}, ${userId}, 'member')`;
   for (const accountId of accountIds) {
-    await q`INSERT INTO team_accounts (team_id, account_id, added_by_user_id, shared)
+    await q`INSERT INTO threads.team_accounts (team_id, account_id, added_by_user_id, shared)
       VALUES (${teamId}, ${accountId}, ${userId}, ${opts.shared ?? false})`;
   }
   return userId;
@@ -76,7 +76,7 @@ export async function joinTeam(teamId: string, user: string, accountIds: string[
  */
 export async function setRole(teamId: string, user: string, role: "member" | "editor") {
   const userId = await ensureUser(user);
-  await sql()`UPDATE team_members SET role = ${role} WHERE team_id = ${teamId} AND user_id = ${userId}`;
+  await sql()`UPDATE threads.team_members SET role = ${role} WHERE team_id = ${teamId} AND user_id = ${userId}`;
 }
 
 /**
@@ -88,7 +88,7 @@ export async function setRole(teamId: string, user: string, role: "member" | "ed
  */
 export async function assign(teamId: string, user: string, accountId: string) {
   const userId = await ensureUser(user);
-  await sql()`INSERT INTO memberships (user_id, account_id, role, team_id) VALUES (${userId}, ${accountId}, 'editor', ${teamId})`;
+  await sql()`INSERT INTO threads.memberships (user_id, account_id, role, team_id) VALUES (${userId}, ${accountId}, 'editor', ${teamId})`;
   return userId;
 }
 
@@ -99,7 +99,7 @@ export async function assign(teamId: string, user: string, accountId: string) {
  * @param shared - 見せるか
  */
 export async function setShared(teamId: string, accountId: string, shared: boolean) {
-  await sql()`UPDATE team_accounts SET shared = ${shared} WHERE team_id = ${teamId} AND account_id = ${accountId}`;
+  await sql()`UPDATE threads.team_accounts SET shared = ${shared} WHERE team_id = ${teamId} AND account_id = ${accountId}`;
 }
 
 /**
@@ -131,7 +131,7 @@ export async function putInTeam(
 
 /** 操作の記録を読む（新しい順）。 */
 export async function activityRows(accountId: string) {
-  return (await sql()`SELECT * FROM activity_logs WHERE account_id = ${accountId} ORDER BY created_at DESC`) as {
+  return (await sql()`SELECT * FROM threads.activity_logs WHERE account_id = ${accountId} ORDER BY created_at DESC`) as {
     action: string;
     kind: string;
     actor_role: string;
@@ -144,6 +144,6 @@ export async function activityRows(accountId: string) {
 
 /** チームの人とロール（参加の順）。 */
 export async function teamMemberRows(teamId: string) {
-  return (await sql()`SELECT u.clerk_user_id AS user, m.role FROM team_members m JOIN users u ON u.id = m.user_id
+  return (await sql()`SELECT u.clerk_user_id AS user, m.role FROM threads.team_members m JOIN users u ON u.id = m.user_id
     WHERE m.team_id = ${teamId} ORDER BY m.joined_at, u.clerk_user_id`) as { user: string; role: string }[];
 }

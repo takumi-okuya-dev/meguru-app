@@ -172,7 +172,7 @@ describe("担当の人ができること（FR-005・FR-023・FR-060）", () => {
     });
     const body = await json<{ skipped: { id: string; reason: string }[] }>(review);
     expect(body.skipped).toEqual([expect.objectContaining({ id: reg.drafts[0]!.id, reason: "NG_WORD" })]);
-    const [row] = (await sql()`SELECT status FROM post_drafts WHERE id = ${reg.drafts[0]!.id}`) as { status: string }[];
+    const [row] = (await sql()`SELECT status FROM threads.post_drafts WHERE id = ${reg.drafts[0]!.id}`) as { status: string }[];
     expect(row!.status).toBe("needs_review");
   });
 

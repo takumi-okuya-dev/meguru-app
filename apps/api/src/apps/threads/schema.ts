@@ -1,4 +1,5 @@
-// Threads（apps/threads）の表の定義：25表（docs/module-map.md 2-2、specs/027-modular-monolith research.md R6）。
+// Threads（apps/threads）の表の定義：34表（docs/module-map.md 2-2、specs/027-modular-monolith research.md R6）。029 の PR3 でスキーマ threads に移し、
+// 共通の表（users など）への外部キーを外した。利用者の番号は値として持ち、退会の片づけは出来事（user.withdrawn）で Threads が行う（research.md R3）。
 // Accountに紐づくテーブルはすべて ON DELETE CASCADE とする（後続featureも守る規約。specs/001 research.md R13）。
 import { sql } from "drizzle-orm";
 import {
@@ -12,7 +13,7 @@ import {
   integer,
   jsonb,
   pgEnum,
-  pgTable,
+  pgSchema,
   smallint,
   text,
   timestamp,
@@ -44,9 +45,11 @@ import {
   PROMPT_COUNT_DEFAULT,
 } from "@meguru/shared";
 import { bytea, timestamps, versionColumn, inList } from "../../kernel/db/columns";
-import { users } from "../../platform/schema";
 
 // ---- 029で共通から移した表：アカウント・メンバー・チーム・活動の記録（specs/meguru/029-threads-pattern1 research.md R1）----
+
+/** Threadsの表の置き場所（Postgresのスキーマ threads。specs/meguru/029-threads-pattern1 research.md R2、tasks.md T040）。 */
+export const threadsSchema = pgSchema("threads");
 
 /**
  * Membershipのロールの列挙型（membership_role。Constitution原則IV）。
@@ -70,7 +73,7 @@ export const activityKind = pgEnum("activity_kind", ["review", "draft", "content
  * Threadsアカウント1件に対応する運用単位（data-model.md の accounts）。
  * 名前だけで作り、Threadsには後でつなぐ。未接続の間は threads_user_id・username・connection_method が NULL（specs/012 data-model.md）。
  */
-export const accounts = pgTable("accounts", {
+export const accounts = threadsSchema.table("accounts", {
   id: uuid("id").primaryKey().defaultRandom(),
   // アカウントの名前（specs/012 research.md R2）。主に出す名前
   name: text("name").notNull(),
@@ -93,18 +96,12 @@ export const accounts = pgTable("accounts", {
   researchChangedAt: timestamp("research_changed_at", { withTimezone: true, precision: 6 }),
   coreRulesChangedAt: timestamp("core_rules_changed_at", { withTimezone: true, precision: 6 }),
   // 投稿のルールを最後に保存した人（specs/008 research.md R8）
-  coreRulesUpdatedByUserId: uuid("core_rules_updated_by_user_id").references((): AnyPgColumn => users.id, {
-    onDelete: "set null",
-  }),
+  coreRulesUpdatedByUserId: uuid("core_rules_updated_by_user_id"),
   // 宣伝投稿の割合・プロンプトで作る件数の版と、最後に保存した人（同時の保存を知らせる。specs/008 FR-007、PR #9 のCodexレビュー）
   promotionRatioVersion: integer("promotion_ratio_version").notNull().default(1),
-  promotionRatioUpdatedByUserId: uuid("promotion_ratio_updated_by_user_id").references((): AnyPgColumn => users.id, {
-    onDelete: "set null",
-  }),
+  promotionRatioUpdatedByUserId: uuid("promotion_ratio_updated_by_user_id"),
   promptPostCountVersion: integer("prompt_post_count_version").notNull().default(1),
-  promptPostCountUpdatedByUserId: uuid("prompt_post_count_updated_by_user_id").references((): AnyPgColumn => users.id, {
-    onDelete: "set null",
-  }),
+  promptPostCountUpdatedByUserId: uuid("prompt_post_count_updated_by_user_id"),
   // 1投稿の文字数の目標と、短文・中文・長文の文字数と割合（specs/014 data-model.md、research.md R11）。
   // 版と最後に保存した人は、作る件数のもの（prompt_post_count_version）を共有する
   postLengthTarget: smallint("post_length_target").notNull().default(POST_LENGTH_DEFAULTS.target),
@@ -152,13 +149,11 @@ export const accounts = pgTable("accounts", {
 ]);
 
 /** User と Account の関係（data-model.md の memberships）。1つのAccountに owner は1人だけ。 */
-export const memberships = pgTable(
+export const memberships = threadsSchema.table(
   "memberships",
   {
     id: uuid("id").primaryKey().defaultRandom(),
-    userId: uuid("user_id")
-      .notNull()
-      .references(() => users.id, { onDelete: "cascade" }),
+    userId: uuid("user_id").notNull(),
     accountId: uuid("account_id")
       .notNull()
       .references(() => accounts.id, { onDelete: "cascade" }),
@@ -180,16 +175,14 @@ export const memberships = pgTable(
 );
 
 /** チーム（specs/011 data-model.md の teams）。管理者が作り、招待リンクを1本持つ。 */
-export const teams = pgTable(
+export const teams = threadsSchema.table(
   "teams",
   {
     id: uuid("id").primaryKey().defaultRandom(),
     name: text("name").notNull(),
     // 管理者。team_members の admin の行と同じ値を同じトランザクションで書く。
     // 利用者の削除（退会）は011の次のfeatureで作り、users の行を消す前にチームから外す（data-model.md）
-    adminUserId: uuid("admin_user_id")
-      .notNull()
-      .references(() => users.id, { onDelete: "restrict" }),
+    adminUserId: uuid("admin_user_id").notNull(),
     // 招待リンク（specs/008 research.md R4 と同じ仕組み）。照合はハッシュ、表示は暗号化した写し
     inviteTokenHash: text("invite_token_hash").notNull().unique(),
     inviteTokenCiphertext: bytea("invite_token_ciphertext").notNull(),
@@ -205,15 +198,13 @@ export const teams = pgTable(
 );
 
 /** チームの人（specs/011 data-model.md の team_members）。1チーム50人、編集者10人まで。 */
-export const teamMembers = pgTable(
+export const teamMembers = threadsSchema.table(
   "team_members",
   {
     teamId: uuid("team_id")
       .notNull()
       .references(() => teams.id, { onDelete: "cascade" }),
-    userId: uuid("user_id")
-      .notNull()
-      .references(() => users.id, { onDelete: "cascade" }),
+    userId: uuid("user_id").notNull(),
     role: teamRole("role").notNull(),
     joinedAt: timestamp("joined_at", { withTimezone: true, precision: 6 }).notNull().defaultNow(),
     // 管理者がこの人の参加の知らせを閉じた日時（research.md R9）
@@ -228,7 +219,7 @@ export const teamMembers = pgTable(
 );
 
 /** チームに入っているアカウント（specs/011 data-model.md の team_accounts）。shared は「チームに見せる」。 */
-export const teamAccounts = pgTable(
+export const teamAccounts = threadsSchema.table(
   "team_accounts",
   {
     teamId: uuid("team_id")
@@ -237,7 +228,7 @@ export const teamAccounts = pgTable(
     accountId: uuid("account_id")
       .notNull()
       .references(() => accounts.id, { onDelete: "cascade" }),
-    addedByUserId: uuid("added_by_user_id").references(() => users.id, { onDelete: "set null" }),
+    addedByUserId: uuid("added_by_user_id"),
     shared: boolean("shared").notNull().default(false),
     addedAt: timestamp("added_at", { withTimezone: true, precision: 6 }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true, precision: 6 }).notNull().defaultNow(),
@@ -250,14 +241,14 @@ export const teamAccounts = pgTable(
 );
 
 /** 操作の記録（data-model.md の activity_logs）。チームがあるAccountだけ。90日で消す。 */
-export const activityLogs = pgTable(
+export const activityLogs = threadsSchema.table(
   "activity_logs",
   {
     id: uuid("id").primaryKey().defaultRandom(),
     accountId: uuid("account_id")
       .notNull()
       .references(() => accounts.id, { onDelete: "cascade" }),
-    actorUserId: uuid("actor_user_id").references(() => users.id, { onDelete: "set null" }),
+    actorUserId: uuid("actor_user_id"),
     actorName: text("actor_name").notNull(),
     actorRole: membershipRole("actor_role").notNull(),
     kind: activityKind("kind").notNull(),
@@ -285,7 +276,7 @@ export const oauthMode = pgEnum("oauth_mode", ["new", "reconnect", "connect"]);
 export const deletionStatus = pgEnum("deletion_status", ["pending", "completed", "failed"]);
 
 /** AccountがThreadsにアクセスするための認証情報（data-model.md の threads_connections）。トークンは暗号化して保存する。 */
-export const threadsConnections = pgTable("threads_connections", {
+export const threadsConnections = threadsSchema.table("threads_connections", {
   accountId: uuid("account_id")
     .primaryKey()
     .references(() => accounts.id, { onDelete: "cascade" }),
@@ -306,13 +297,11 @@ export const threadsConnections = pgTable("threads_connections", {
 ]);
 
 /** トークンの確認の失敗の時刻（specs/010 data-model.md、FR-015）。トークンの値は持たない。 */
-export const tokenCheckFailures = pgTable(
+export const tokenCheckFailures = threadsSchema.table(
   "token_check_failures",
   {
     id: uuid("id").primaryKey().defaultRandom(),
-    userId: uuid("user_id")
-      .notNull()
-      .references(() => users.id, { onDelete: "cascade" }),
+    userId: uuid("user_id").notNull(),
     failedAt: timestamp("failed_at", { withTimezone: true }).notNull(),
     // invalid_format・invalid・short_lived・account_mismatch
     reason: text("reason").notNull(),
@@ -321,13 +310,11 @@ export const tokenCheckFailures = pgTable(
 );
 
 /** Threads接続フローの使い捨ての state（data-model.md の oauth_states）。平文は保存しない。 */
-export const oauthStates = pgTable(
+export const oauthStates = threadsSchema.table(
   "oauth_states",
   {
     stateHash: text("state_hash").primaryKey(),
-    userId: uuid("user_id")
-      .notNull()
-      .references(() => users.id, { onDelete: "cascade" }),
+    userId: uuid("user_id").notNull(),
     mode: oauthMode("mode").notNull(),
     // 許可の画面にいる間に対象が消されたら NULL にし、callback で「見つからない」と分かるようにする（specs/012 contracts/api.md）
     targetAccountId: uuid("target_account_id").references(() => accounts.id, { onDelete: "set null" }),
@@ -341,7 +328,7 @@ export const oauthStates = pgTable(
 );
 
 /** Metaのデータ削除要求の受付記録・進み具合・tombstone（data-model.md の threads_deletion_requests）。 */
-export const threadsDeletionRequests = pgTable(
+export const threadsDeletionRequests = threadsSchema.table(
   "threads_deletion_requests",
   {
     confirmationCode: text("confirmation_code").primaryKey(),
@@ -366,7 +353,7 @@ export const threadsDeletionRequests = pgTable(
 );
 
 /** Metaのアンインストール通知（連携の取り消し）の短期記録（data-model.md の threads_revocations）。 */
-export const threadsRevocations = pgTable(
+export const threadsRevocations = threadsSchema.table(
   "threads_revocations",
   {
     id: uuid("id").primaryKey().defaultRandom(),
@@ -397,7 +384,7 @@ export const tonePreset = pgEnum("tone_preset", [
 export const promotionStatus = pgEnum("promotion_status", ["active", "paused", "ended"]);
 
 /** 課題（data-model.md の strategy_designs）。Account と1対1で、最初の保存で作る。 */
-export const strategyDesigns = pgTable(
+export const strategyDesigns = threadsSchema.table(
   "strategy_designs",
   {
     accountId: uuid("account_id")
@@ -432,7 +419,7 @@ export const strategyDesigns = pgTable(
     activityAxis: text("activity_axis"),
     version: versionColumn(),
     // 最後に保存した人（specs/008 research.md R8。保存の衝突で名前を出す）
-    updatedByUserId: uuid("updated_by_user_id").references((): AnyPgColumn => users.id, { onDelete: "set null" }),
+    updatedByUserId: uuid("updated_by_user_id"),
     ...timestamps,
   },
   (t) =>
@@ -462,7 +449,7 @@ export const strategyDesigns = pgTable(
 );
 
 /** 宣伝内容（data-model.md の promotions）。 */
-export const promotions = pgTable(
+export const promotions = threadsSchema.table(
   "promotions",
   {
     id: uuid("id").primaryKey().defaultRandom(),
@@ -483,7 +470,7 @@ export const promotions = pgTable(
     event: jsonb("event").$type<PromotionEvent>(),
     version: versionColumn(),
     // 最後に保存した人（specs/008 research.md R8。保存の衝突で名前を出す）
-    updatedByUserId: uuid("updated_by_user_id").references((): AnyPgColumn => users.id, { onDelete: "set null" }),
+    updatedByUserId: uuid("updated_by_user_id"),
     ...timestamps,
   },
   (t) => [
@@ -500,7 +487,7 @@ export const promotions = pgTable(
 );
 
 /** 参考投稿（data-model.md の reference_posts）。 */
-export const referencePosts = pgTable(
+export const referencePosts = threadsSchema.table(
   "reference_posts",
   {
     id: uuid("id").primaryKey().defaultRandom(),
@@ -525,7 +512,7 @@ export const referencePosts = pgTable(
     memo: text("memo"),
     version: versionColumn(),
     // 最後に保存した人（specs/008 research.md R8。保存の衝突で名前を出す）
-    updatedByUserId: uuid("updated_by_user_id").references((): AnyPgColumn => users.id, { onDelete: "set null" }),
+    updatedByUserId: uuid("updated_by_user_id"),
     ...timestamps,
   },
   (t) => [
@@ -553,7 +540,7 @@ export const referencePosts = pgTable(
 );
 
 /** リサーチキーワード（data-model.md の research_keywords）。 */
-export const researchKeywords = pgTable(
+export const researchKeywords = threadsSchema.table(
   "research_keywords",
   {
     id: uuid("id").primaryKey().defaultRandom(),
@@ -566,7 +553,7 @@ export const researchKeywords = pgTable(
     purpose: text("purpose"),
     version: versionColumn(),
     // 最後に保存した人（specs/008 research.md R8。保存の衝突で名前を出す）
-    updatedByUserId: uuid("updated_by_user_id").references((): AnyPgColumn => users.id, { onDelete: "set null" }),
+    updatedByUserId: uuid("updated_by_user_id"),
     ...timestamps,
   },
   (t) => [
@@ -610,7 +597,7 @@ const SKIP_REASONS = ["no_drafts", "needs_reconnect", "rate_limited", "daily_lim
 const BLOCKED_REASONS = ["ng_word", "over_threads_limit"] as const;
 
 /** 登録のまとまり（data-model.md の draft_batches）。貼り付けの1回の送信。 */
-export const draftBatches = pgTable(
+export const draftBatches = threadsSchema.table(
   "draft_batches",
   {
     id: uuid("id").primaryKey().defaultRandom(),
@@ -635,7 +622,7 @@ export const draftBatches = pgTable(
 );
 
 /** 下書き（data-model.md の post_drafts）。 */
-export const postDrafts = pgTable(
+export const postDrafts = threadsSchema.table(
   "post_drafts",
   {
     id: uuid("id").primaryKey().defaultRandom(),
@@ -675,8 +662,8 @@ export const postDrafts = pgTable(
     bodyEditTracked: boolean("body_edit_tracked").notNull().default(true),
     bodyEditedAt: timestamp("body_edited_at", { withTimezone: true, precision: 6 }),
     // 登録した人と、最後に本文を直した人（specs/008 FR-053、research.md R10）。008より前の行はNULL
-    createdByUserId: uuid("created_by_user_id").references((): AnyPgColumn => users.id, { onDelete: "set null" }),
-    editedByUserId: uuid("edited_by_user_id").references((): AnyPgColumn => users.id, { onDelete: "set null" }),
+    createdByUserId: uuid("created_by_user_id"),
+    editedByUserId: uuid("edited_by_user_id"),
     // 公開した時点の情報。publish_attempts は保存期間を過ぎると消えるので写しておく
     publishedSlotMinute: smallint("published_slot_minute"),
     publishedCarryover: boolean("published_carryover"),
@@ -748,7 +735,7 @@ export const postDrafts = pgTable(
 // ---- 自動投稿（specs/005-auto-post/data-model.md）----
 
 /** 投稿の設定（data-model.md の posting_schedules）。Account と1対1で、最初の保存で作る。 */
-export const postingSchedules = pgTable(
+export const postingSchedules = threadsSchema.table(
   "posting_schedules",
   {
     accountId: uuid("account_id")
@@ -766,7 +753,7 @@ export const postingSchedules = pgTable(
     blockedNoticeSeenAt: timestamp("blocked_notice_seen_at", { withTimezone: true, precision: 6 }),
     version: versionColumn(),
     // 最後に保存した人（specs/008 research.md R8。保存の衝突で名前を出す）
-    updatedByUserId: uuid("updated_by_user_id").references((): AnyPgColumn => users.id, { onDelete: "set null" }),
+    updatedByUserId: uuid("updated_by_user_id"),
     ...timestamps,
   },
   (t) => [
@@ -779,7 +766,7 @@ export const postingSchedules = pgTable(
 );
 
 /** 投稿の試み（data-model.md の publish_attempts）。1つの時刻での、1つのAccountの投稿の処理を1行で表す。 */
-export const publishAttempts = pgTable(
+export const publishAttempts = threadsSchema.table(
   "publish_attempts",
   {
     id: uuid("id").primaryKey().defaultRandom(),
@@ -833,7 +820,7 @@ export const publishAttempts = pgTable(
 );
 
 /** NGワード（specs/004-review-approval data-model.md の ng_words）。 */
-export const ngWords = pgTable(
+export const ngWords = threadsSchema.table(
   "ng_words",
   {
     id: uuid("id").primaryKey().defaultRandom(),
@@ -879,7 +866,7 @@ const metricColumns = {
 };
 
 /** 反応数の記録（post_metrics）。投稿済みの下書きに0か1行。最初に取り込んだとき（または計測できないと分かったとき）に作る。 */
-export const postMetrics = pgTable(
+export const postMetrics = threadsSchema.table(
   "post_metrics",
   {
     draftId: uuid("draft_id")
@@ -906,9 +893,7 @@ export const postMetrics = pgTable(
     feedbackUpdatedAt: timestamp("feedback_updated_at", { withTimezone: true, precision: 6 }),
     // 改善メモの保存の衝突を見つける版と、最後に変えた人（specs/008 research.md R8）
     feedbackVersion: integer("feedback_version").notNull().default(1),
-    feedbackUpdatedByUserId: uuid("feedback_updated_by_user_id").references((): AnyPgColumn => users.id, {
-      onDelete: "set null",
-    }),
+    feedbackUpdatedByUserId: uuid("feedback_updated_by_user_id"),
     createdAt: timestamp("created_at", { withTimezone: true, precision: 6 }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true, precision: 6 }).notNull().defaultNow(),
   },
@@ -938,7 +923,7 @@ export const postMetrics = pgTable(
 );
 
 /** 取り込みの履歴（post_metric_snapshots）。1回の取り込みで1行。上書きしない（FR-002b）。 */
-export const postMetricSnapshots = pgTable(
+export const postMetricSnapshots = threadsSchema.table(
   "post_metric_snapshots",
   {
     id: uuid("id").primaryKey().defaultRandom(),
@@ -962,7 +947,7 @@ export const postMetricSnapshots = pgTable(
 );
 
 /** フォロワー数の記録（follower_snapshots）。Accountに1日（日本時間）1行（FR-002c）。 */
-export const followerSnapshots = pgTable(
+export const followerSnapshots = threadsSchema.table(
   "follower_snapshots",
   {
     accountId: uuid("account_id")
@@ -984,11 +969,11 @@ export const followerSnapshots = pgTable(
  * テスター招待の申し込み（data-model.md 1-1、research.md R1・R2・R15）。生きている申し込み（申し込み中・招待済み・接続済み）は
  * アカウント1件に1つまで。退会・アカウントの削除では行を消さず、枠を使っている行を「外してよい」にする（運営者が「外した」で消す）。
  */
-export const testerApplications = pgTable(
+export const testerApplications = threadsSchema.table(
   "tester_applications",
   {
     id: uuid("id").primaryKey().defaultRandom(),
-    userId: uuid("user_id").references(() => users.id, { onDelete: "set null" }),
+    userId: uuid("user_id"),
     accountId: uuid("account_id").references(() => accounts.id, { onDelete: "set null" }),
     threadsUsername: text("threads_username").notNull(),
     status: text("status").notNull().default("pending"),
@@ -1026,7 +1011,7 @@ export const testerApplications = pgTable(
 );
 
 /** 宣伝内容×媒体の掲載内容と状況。宣伝内容を消したら消す。 */
-export const promotionListings = pgTable(
+export const promotionListings = threadsSchema.table(
   "promotion_listings",
   {
     promotionId: uuid("promotion_id")
@@ -1047,7 +1032,7 @@ export const promotionListings = pgTable(
     sourceVersion: integer("source_version"),
     generatedAt: timestamp("generated_at", { withTimezone: true, precision: 6 }),
     version: versionColumn(),
-    updatedByUserId: uuid("updated_by_user_id").references((): AnyPgColumn => users.id, { onDelete: "set null" }),
+    updatedByUserId: uuid("updated_by_user_id"),
     ...timestamps,
   },
   (t) => [
@@ -1064,7 +1049,7 @@ export const promotionListings = pgTable(
 );
 
 /** Account×媒体の既定値（事務局名・連絡先など。spec FR-002）。Accountを消したら消す。 */
-export const mediaDefaults = pgTable(
+export const mediaDefaults = threadsSchema.table(
   "media_defaults",
   {
     accountId: uuid("account_id")
@@ -1073,7 +1058,7 @@ export const mediaDefaults = pgTable(
     media: text("media").notNull(),
     values: jsonb("values").$type<Record<string, string>>().notNull().default({}),
     version: versionColumn(),
-    updatedByUserId: uuid("updated_by_user_id").references((): AnyPgColumn => users.id, { onDelete: "set null" }),
+    updatedByUserId: uuid("updated_by_user_id"),
     updatedAt: timestamp("updated_at", { withTimezone: true, precision: 6 }).notNull().defaultNow(),
   },
   (t) => [
@@ -1085,7 +1070,7 @@ export const mediaDefaults = pgTable(
 // ---- アルゴリズムの解析（specs/022-algorithm-analysis data-model.md）----
 
 /** Accountの解析の設定。行がなければ初めの値（傾向をプロンプトに入れる・テーマなし）。 */
-export const analysisSettings = pgTable("analysis_settings", {
+export const analysisSettings = threadsSchema.table("analysis_settings", {
   accountId: uuid("account_id")
     .primaryKey()
     .references(() => accounts.id, { onDelete: "cascade" }),
@@ -1093,14 +1078,14 @@ export const analysisSettings = pgTable("analysis_settings", {
   /** テーマの一覧（中身は shared の analysisThemesSchema で確かめる） */
   themes: jsonb("themes").$type<AnalysisTheme[]>().notNull().default([]),
   version: versionColumn(),
-  updatedByUserId: uuid("updated_by_user_id").references((): AnyPgColumn => users.id, { onDelete: "set null" }),
+  updatedByUserId: uuid("updated_by_user_id"),
   updatedAt: timestamp("updated_at", { withTimezone: true, precision: 6 }).notNull().defaultNow(),
 });
 
 const CLASSIFICATION_SOURCES = ["ai", "manual"] as const;
 
 /** 投稿の内容の分類（書き出しの型・テーマ）。投稿を消したら消す。 */
-export const postClassifications = pgTable(
+export const postClassifications = threadsSchema.table(
   "post_classifications",
   {
     draftId: uuid("draft_id")
@@ -1113,7 +1098,7 @@ export const postClassifications = pgTable(
     /** analysis_settings.themes の id。NULL＝テーマなし */
     themeId: text("theme_id"),
     source: text("source").notNull(),
-    updatedByUserId: uuid("updated_by_user_id").references((): AnyPgColumn => users.id, { onDelete: "set null" }),
+    updatedByUserId: uuid("updated_by_user_id"),
     updatedAt: timestamp("updated_at", { withTimezone: true, precision: 6 }).notNull().defaultNow(),
   },
   (t) => [
@@ -1127,7 +1112,7 @@ export const postClassifications = pgTable(
 // ---- 時間差のメンション（specs/023-delayed-mention data-model.md）----
 
 /** Accountのひとことと時間差。行がなければ初めの値（ひとことは空・30分）。 */
-export const mentionSettings = pgTable(
+export const mentionSettings = threadsSchema.table(
   "mention_settings",
   {
     accountId: uuid("account_id")
@@ -1136,7 +1121,7 @@ export const mentionSettings = pgTable(
     message: text("message").notNull().default(""),
     delayMinutes: integer("delay_minutes").notNull().default(MENTION_DELAY_DEFAULT),
     version: versionColumn(),
-    updatedByUserId: uuid("updated_by_user_id").references((): AnyPgColumn => users.id, { onDelete: "set null" }),
+    updatedByUserId: uuid("updated_by_user_id"),
     updatedAt: timestamp("updated_at", { withTimezone: true, precision: 6 }).notNull().defaultNow(),
   },
   (t) => [
@@ -1146,7 +1131,7 @@ export const mentionSettings = pgTable(
 );
 
 /** メンションする人。Accountに20人まで（サービスで確かめる）。 */
-export const mentionPeople = pgTable(
+export const mentionPeople = threadsSchema.table(
   "mention_people",
   {
     id: uuid("id").primaryKey().defaultRandom(),
@@ -1166,7 +1151,7 @@ export const mentionPeople = pgTable(
 );
 
 /** 時間差のメンション。下書きに0か1行。下書きを消したら消す。 */
-export const postMentions = pgTable(
+export const postMentions = threadsSchema.table(
   "post_mentions",
   {
     draftId: uuid("draft_id")
@@ -1190,7 +1175,7 @@ export const postMentions = pgTable(
     nextAttemptAt: timestamp("next_attempt_at", { withTimezone: true, precision: 6 }),
     leaseToken: uuid("lease_token"),
     leaseUntil: timestamp("lease_until", { withTimezone: true, precision: 6 }),
-    createdByUserId: uuid("created_by_user_id").references((): AnyPgColumn => users.id, { onDelete: "set null" }),
+    createdByUserId: uuid("created_by_user_id"),
     updatedAt: timestamp("updated_at", { withTimezone: true, precision: 6 }).notNull().defaultNow(),
   },
   (t) => [
@@ -1212,7 +1197,7 @@ export const postMentions = pgTable(
  * Threadsが受け取った共通の出来事の番号。受け取りのトランザクションの中で書き、もうあれば何もしない
  * （同じ出来事が2回届いても結果を変えない）。PR3 でスキーマ threads の received_events へ移す。
  */
-export const threadsReceivedEvents = pgTable("threads_received_events", {
+export const threadsReceivedEvents = threadsSchema.table("received_events", {
   eventId: uuid("event_id").primaryKey(),
   receivedAt: timestamp("received_at", { withTimezone: true, precision: 6 }).notNull().defaultNow(),
 });
@@ -1223,7 +1208,7 @@ export const threadsReceivedEvents = pgTable("threads_received_events", {
  * 利用者ごとの「最後に開いたアカウント」（以前は共通の users の5列）。共通の利用者の番号は値として持つ（外部キーなし）。
  * 退会の出来事で、Threadsが自分で消す。PR3 でスキーマ threads の user_states へ移す。
  */
-export const threadsUserStates = pgTable("threads_user_states", {
+export const threadsUserStates = threadsSchema.table("user_states", {
   userId: uuid("user_id").primaryKey(),
   lastAccountId: uuid("last_account_id").references((): AnyPgColumn => accounts.id, { onDelete: "set null" }),
   lastAccountDeletedAt: timestamp("last_account_deleted_at", { withTimezone: true }),
@@ -1235,8 +1220,8 @@ export const threadsUserStates = pgTable("threads_user_states", {
 // ---- Threadsの運営の設定（specs/meguru/029-threads-pattern1 tasks.md T024、data-model.md 3） ----
 
 /** Threadsの運営の設定（1行だけ）。以前は共通の operator_settings.tester_slot_capacity。PR3 でスキーマ threads の settings へ移す。 */
-export const threadsSettings = pgTable(
-  "threads_settings",
+export const threadsSettings = threadsSchema.table(
+  "settings",
   {
     id: smallint("id").primaryKey(),
     /** テスター招待の枠の数（specs/024） */

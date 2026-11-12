@@ -91,7 +91,7 @@ describe("申し込みのないまま「Threadsで許可する」でつながっ
     const accountId = await unconnectedAccountOf(app, "u1");
     await connectExisting(app, "u1", accountId, "9001");
     // 024の前からつながっていた（記録がない）状態にする
-    await q()`DELETE FROM tester_applications WHERE account_id = ${accountId}`;
+    await q()`DELETE FROM threads.tester_applications WHERE account_id = ${accountId}`;
     const reconnect = async () => {
       const res = await call(app, "POST", "/api/threads/connect", { user: "u1", body: { mode: "reconnect", accountId } });
       const { authorizeUrl } = (await res.json()) as { authorizeUrl: string };
@@ -157,7 +157,7 @@ describe("アカウントを消したとき", () => {
   it("接続済みは取り下げ（account_deleted）で外してよい。行は残り、account_id は空になる", async () => {
     const { accountId, id } = await applied("u1", "shop_tokyo", { invited: true });
     await connectExisting(app, "u1", accountId, "9001");
-    const [acc] = (await q()`SELECT name FROM accounts WHERE id = ${accountId}`) as { name: string }[];
+    const [acc] = (await q()`SELECT name FROM threads.accounts WHERE id = ${accountId}`) as { name: string }[];
     const res = await call(app, "DELETE", `/api/accounts/${accountId}`, { user: "u1", body: { confirmName: acc!.name } });
     expect(res.status).toBe(204);
     expect(await applicationRow(id)).toMatchObject({
@@ -187,7 +187,7 @@ describe("退会したとき（research.md R15）", () => {
     await setDefaultLimit("accounts", 10); // アカウントを4件作る
     const pending = await applied("u1", "pending_one");
     const declined = await applied("u1", "declined_one");
-    await q()`UPDATE tester_applications SET status = 'declined', decline_reason = '見送り' WHERE id = ${declined.id}`;
+    await q()`UPDATE threads.tester_applications SET status = 'declined', decline_reason = '見送り' WHERE id = ${declined.id}`;
     const invited = await applied("u1", "shop_tokyo", { invited: true });
     await connectExisting(app, "u1", invited.accountId, "9001");
     // 違うアカウントでつながった申し込み（connected_username が入る）も、退会でそのユーザー名を残さない

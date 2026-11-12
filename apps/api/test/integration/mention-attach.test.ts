@@ -31,7 +31,7 @@ async function setup(user = "u1") {
     await call(app, "POST", `${base(accountId)}/mention-people`, { user, body: { username: u, label: u, always } });
   return accountId;
 }
-const versionOf = async (id: string) => ((await sql()`SELECT version FROM post_drafts WHERE id = ${id}`) as [{ version: number }])[0].version;
+const versionOf = async (id: string) => ((await sql()`SELECT version FROM threads.post_drafts WHERE id = ${id}`) as [{ version: number }])[0].version;
 const attach = async (accountId: string, id: string, body: Record<string, unknown>, user = "u1") =>
   call(app, "PUT", `${base(accountId)}/post-drafts/${id}/mention`, { user, body: { expectedVersion: await versionOf(id), ...body } });
 const review = async (accountId: string, action: "approve" | "reject", id: string) =>
@@ -61,7 +61,7 @@ describe("付ける（T014）", () => {
       user: "u1",
       body: { expectedVersion: 1, message: "x", delayMinutes: 60 },
     });
-    const [row] = (await sql()`SELECT delay_minutes FROM post_mentions WHERE draft_id = ${id}`) as [{ delay_minutes: number }];
+    const [row] = (await sql()`SELECT delay_minutes FROM threads.post_mentions WHERE draft_id = ${id}`) as [{ delay_minutes: number }];
     expect(row.delay_minutes).toBe(30);
     expect((await activityRows(accountId)).map((a) => a.action)).not.toContain("never");
   });
@@ -91,7 +91,7 @@ describe("付ける（T014）", () => {
     await json(await attach(accountId, d1, { usernames: ["a"] }));
     const hit = await attach(accountId, d2, { usernames: ["a"] });
     expect([hit.status, (await errorOf(hit)).details]).toEqual([400, ["a"]]);
-    await sql()`UPDATE post_mentions SET state = 'sent', sent_at = now() WHERE draft_id = ${d1}`;
+    await sql()`UPDATE threads.post_mentions SET state = 'sent', sent_at = now() WHERE draft_id = ${d1}`;
     const r = await json<{ blocked: { username: string; reason: string }[] }>(await attach(accountId, d3, { usernames: ["b"] }));
     expect(r.blocked).toEqual([{ username: "a", reason: "recent" }]);
     expect((await attach(accountId, d2, { usernames: ["a"] })).status).toBe(400);
@@ -146,7 +146,7 @@ describe("承認（T015）", () => {
     expect(res.updated).toEqual([]);
     expect(res.skipped[0]!.reason).toBe("NG_WORD");
     await json(await review(accountId, "reject", id));
-    expect(((await sql()`SELECT 1 FROM post_mentions WHERE draft_id = ${id}`) as unknown[]).length).toBe(0);
+    expect(((await sql()`SELECT 1 FROM threads.post_mentions WHERE draft_id = ${id}`) as unknown[]).length).toBe(0);
   });
 
   it("承認すると返信の文も承認され、関所を起こす", async () => {
@@ -172,16 +172,16 @@ describe("投稿済みの投稿にあとから（T030）", () => {
     expect(r.draft.mention!.dueAt).not.toBeNull();
     expect((await attach(accountId, id, { usernames: ["b"] })).status).toBe(400); // 1つまで
     const old = await draftOf(accountId, "published");
-    await sql()`UPDATE post_drafts SET published_at = now() - interval '8 days' WHERE id = ${old}`;
+    await sql()`UPDATE threads.post_drafts SET published_at = now() - interval '8 days' WHERE id = ${old}`;
     expect((await attach(accountId, old, { usernames: ["b"] })).status).toBe(400);
     const manual = await draftOf(accountId, "published");
-    await sql()`UPDATE post_drafts SET threads_media_id = NULL, threads_permalink = NULL WHERE id = ${manual}`;
+    await sql()`UPDATE threads.post_drafts SET threads_media_id = NULL, threads_permalink = NULL WHERE id = ${manual}`;
     expect((await attach(accountId, manual, { usernames: ["b"] })).status).toBe(400);
     const denied = await draftOf(accountId, "published");
-    await sql()`UPDATE accounts SET replies_denied_at = now() WHERE id = ${accountId}`;
+    await sql()`UPDATE threads.accounts SET replies_denied_at = now() WHERE id = ${accountId}`;
     expect((await attach(accountId, denied, { usernames: ["b"] })).status).toBe(400);
     await json(await call(app, "DELETE", `${base(accountId)}/post-drafts/${id}/mention`, { user: "u1", body: {} }));
-    const [row] = (await sql()`SELECT state FROM post_mentions WHERE draft_id = ${id}`) as [{ state: string }];
+    const [row] = (await sql()`SELECT state FROM threads.post_mentions WHERE draft_id = ${id}`) as [{ state: string }];
     expect(row.state).toBe("canceled");
   });
 

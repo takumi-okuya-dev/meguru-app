@@ -1,6 +1,6 @@
 // 利用者の名前と、ログインしている人（specs/meguru/029-threads-pattern1 contracts/platform-entry.md 2）。
 // アプリは users の表を読まず、ここから受け取る。
-import { inArray } from "drizzle-orm";
+import { ilike, inArray, or } from "drizzle-orm";
 import type { Context } from "hono";
 import type { Db, TxDb } from "../../kernel/db/client";
 import { users } from "../schema";
@@ -49,6 +49,20 @@ export async function peopleProfiles(
     .from(users)
     .where(inArray(users.id, ids));
   return new Map(rows.map((r) => [r.id, { displayName: r.displayName, email: r.email }]));
+}
+
+/**
+ * 表示名かメールアドレスに検索語を含む利用者の番号（運営者の画面の検索。specs/meguru/029-threads-pattern1 contracts/platform-entry.md 2）。
+ * @param db - データベース
+ * @param pattern - ILIKE のパターン（呼ぶ側で \ % _ を逃がし、前後に % を付けたもの）
+ * @returns 当てはまる利用者の番号
+ */
+export async function searchPeople(db: Db | TxDb, pattern: string): Promise<string[]> {
+  const rows = await db
+    .select({ id: users.id })
+    .from(users)
+    .where(or(ilike(users.displayName, pattern), ilike(users.email, pattern)));
+  return rows.map((r) => r.id);
 }
 
 /**

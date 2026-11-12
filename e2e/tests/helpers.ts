@@ -55,9 +55,10 @@ export async function resetAll() {
   const client = new pg.Client({ connectionString: DIRECT_DB });
   await client.connect();
   try {
-    // 表を足しても漏れないよう、public のすべての表を空にする（マイグレーションの記録は drizzle スキーマにあるので残る）
+    // 表を足しても漏れないよう、public（共通）と threads（Threads。specs/meguru/029 PR3）のすべての表を空にする
+    // （マイグレーションの記録は drizzle スキーマにあるので残る）
     const { rows } = await client.query<{ name: string }>(
-      "SELECT quote_ident(tablename) AS name FROM pg_tables WHERE schemaname = 'public'",
+      "SELECT quote_ident(schemaname) || '.' || quote_ident(tablename) AS name FROM pg_tables WHERE schemaname IN ('public', 'threads')",
     );
     if (rows.length > 0) await client.query(`TRUNCATE ${rows.map((r) => r.name).join(", ")} CASCADE`);
   } finally {

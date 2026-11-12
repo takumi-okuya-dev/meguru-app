@@ -49,12 +49,17 @@ tester.run("module-boundaries", rule, {
     // 表の定義（schema.ts）は入口として読んでよい（db/schema.ts が共通とThreadsの表を読み直して出す）
     at("db/schema.ts", 'export * from "../platform/schema";'),
     at("db/schema.ts", 'export * from "../apps/threads/schema";'),
-    at("apps/threads/schema.ts", 'import { users } from "../../platform/schema";'),
     // strictPlacement：組み立ての場所はよい
     { ...at("jobs/daily-jobs.ts", 'import { x } from "../platform";'), options: [{ strictPlacement: true }] },
     { ...at("app.ts", 'import { x } from "./platform";'), options: [{ strictPlacement: true }] },
   ],
   invalid: [
+    // アプリは共通の表の定義を読めない（入口の関数だけを使う。specs/meguru/029-threads-pattern1 contracts/module-boundaries.md 3、T038）
+    bad("apps/threads/drafts/draft-service.ts", 'import { users } from "../../../platform/schema";', "appToPlatformSchema"),
+    bad("apps/threads/schema.ts", 'import { users } from "../../platform/schema";', "appToPlatformSchema"),
+    bad("apps/threads/drafts/draft-service.ts", 'import { users } from "../../../db/schema";', "lowerToUpper"),
+    bad("platform/billing/billing-service.ts", 'import { accounts } from "../../apps/threads/schema";', "platformToApp"),
+    bad("platform/billing/billing-service.ts", 'import { accounts } from "../../db/schema";', "lowerToUpper"),
     bad("apps/threads/drafts/draft-service.ts", 'import { x } from "../../../platform/billing/billing-service";', "notEntry"),
     bad("apps/threads/drafts/draft-service.ts", 'import { x } from "../../../adapters/stripe/stripe-client";', "notEntry"),
     bad("app.ts", 'import { x } from "./apps/threads/drafts/draft-service";', "notEntry"),

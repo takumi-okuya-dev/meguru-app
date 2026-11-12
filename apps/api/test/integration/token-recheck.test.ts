@@ -23,8 +23,8 @@ async function addWithoutDebug(user = "u1") {
 }
 const row = async () =>
   ((await q()`SELECT a.connection_status, a.reconnect_hint, a.connection_generation, c.recheck_at, c.expires_at
-    FROM accounts a JOIN threads_connections c ON c.account_id = a.id`) as Record<string, unknown>[])[0]!;
-const due = () => q()`UPDATE threads_connections SET recheck_at = now() - interval '1 minute'`;
+    FROM threads.accounts a JOIN threads.threads_connections c ON c.account_id = a.id`) as Record<string, unknown>[])[0]!;
+const due = () => q()`UPDATE threads.threads_connections SET recheck_at = now() - interval '1 minute'`;
 const recheck = () => runTokenRecheck(testEnv, createDb(testEnv.DATABASE_URL), createThreadsClient(testEnv), new Date());
 
 describe("確かめ直し", () => {
@@ -64,7 +64,7 @@ describe("確かめ直し", () => {
     const threads = createThreadsClient(testEnv);
     const original = threads.getProfile.bind(threads);
     threads.getProfile = async (t) => {
-      await q()`UPDATE accounts SET connection_generation = connection_generation + 1`;
+      await q()`UPDATE threads.accounts SET connection_generation = connection_generation + 1`;
       return original(t);
     };
     await runTokenRecheck(testEnv, db, threads, new Date());
@@ -82,12 +82,12 @@ describe("日次の延長（SC-006、FR-040）", () => {
   it("トークンの接続も、期限まで7日を切れば延長され、アプリのユーザーIDのまま", async () => {
     const { refreshExpiringTokens } = await import("../../src/apps/threads/connection/token-refresh");
     await tokenConnectNew(app, "u1", await fake.issueToken({ user: "9003" }));
-    await q()`UPDATE threads_connections SET expires_at = now() + interval '3 days', issued_at = now() - interval '2 days'`;
+    await q()`UPDATE threads.threads_connections SET expires_at = now() + interval '3 days', issued_at = now() - interval '2 days'`;
     const result = await refreshExpiringTokens(testEnv, createThreadsClient(testEnv), new Date());
     expect(result.refreshed).toBe(1);
     const r = await row();
     expect(new Date(r.expires_at as string).getTime()).toBeGreaterThan(Date.now() + 59 * DAY);
-    const [a] = (await q()`SELECT threads_user_id, connection_method FROM accounts`) as Record<string, string>[];
+    const [a] = (await q()`SELECT threads_user_id, connection_method FROM threads.accounts`) as Record<string, string>[];
     expect(a).toEqual({ threads_user_id: "9003-myapp", connection_method: "token" });
   });
 });

@@ -45,13 +45,13 @@ async function setup() {
 /** チームの全員とアカウントの、入った日時を days 日前へずらす（入った順は保つ）。 */
 async function joinedAgo(teamId: string, days: number) {
   const secs = days * 24 * 60 * 60;
-  await sql()`UPDATE team_members SET joined_at = joined_at - make_interval(secs => ${secs}) WHERE team_id = ${teamId}`;
-  await sql()`UPDATE team_accounts SET added_at = added_at - make_interval(secs => ${secs}) WHERE team_id = ${teamId}`;
+  await sql()`UPDATE threads.team_members SET joined_at = joined_at - make_interval(secs => ${secs}) WHERE team_id = ${teamId}`;
+  await sql()`UPDATE threads.team_accounts SET added_at = added_at - make_interval(secs => ${secs}) WHERE team_id = ${teamId}`;
 }
 
 /** 人の入った日時をずらす。 */
 async function memberJoinedAgo(teamId: string, userId: string, days: number) {
-  await sql()`UPDATE team_members SET joined_at = ${ago(days).toISOString()} WHERE team_id = ${teamId} AND user_id = ${userId}`;
+  await sql()`UPDATE threads.team_members SET joined_at = ${ago(days).toISOString()} WHERE team_id = ${teamId} AND user_id = ${userId}`;
 }
 
 /** 操作の記録を直接入れる。 */
@@ -62,17 +62,17 @@ async function activity(
   daysAgo: number,
   kind = "draft",
 ) {
-  await sql()`INSERT INTO activity_logs (account_id, actor_user_id, actor_name, actor_role, kind, action, created_at)
+  await sql()`INSERT INTO threads.activity_logs (account_id, actor_user_id, actor_name, actor_role, kind, action, created_at)
     VALUES (${accountId}, ${actorUserId}, 'x', 'owner', ${kind}, ${action}, ${ago(daysAgo).toISOString()})`;
 }
 
 /** 要確認の下書きを入れる。 */
 async function needsReview(accountId: string, count: number, body = "要確認の本文") {
   const [b] =
-    (await sql()`INSERT INTO draft_batches (account_id, client_request_id, draft_count, delimiter_found)
+    (await sql()`INSERT INTO threads.draft_batches (account_id, client_request_id, draft_count, delimiter_found)
     VALUES (${accountId}, gen_random_uuid(), ${count}, true) RETURNING id`) as [{ id: string }];
   for (let i = 0; i < count; i++) {
-    await sql()`INSERT INTO post_drafts (account_id, batch_id, position, body) VALUES (${accountId}, ${b.id}, ${i}, ${body})`;
+    await sql()`INSERT INTO threads.post_drafts (account_id, batch_id, position, body) VALUES (${accountId}, ${b.id}, ${i}, ${body})`;
   }
 }
 
@@ -104,7 +104,7 @@ describe("見られる人（FR-001、research.md R5）", () => {
     const { teamId, ownerAcc, e1 } = await setup();
     const member = await status(teamId, "m1");
     expect([member.status, (await errorOf(member)).code]).toEqual([403, "ROLE_FORBIDDEN"]);
-    await sql()`DELETE FROM memberships WHERE user_id = ${e1} AND account_id = ${ownerAcc}`;
+    await sql()`DELETE FROM threads.memberships WHERE user_id = ${e1} AND account_id = ${ownerAcc}`;
     const editor = await status(teamId, "e1");
     expect([editor.status, (await errorOf(editor)).code]).toEqual([403, "ROLE_FORBIDDEN"]);
   });
@@ -144,7 +144,7 @@ describe("見られる人（FR-001、research.md R5）", () => {
       await visible("m1"),
       await visible("o1"),
     ]).toEqual([true, true, false, false]);
-    await sql()`DELETE FROM memberships WHERE user_id = ${e1} AND account_id = ${ownerAcc}`;
+    await sql()`DELETE FROM threads.memberships WHERE user_id = ${e1} AND account_id = ${ownerAcc}`;
     expect(await visible("e1")).toBe(false);
   });
 });
@@ -197,15 +197,15 @@ describe("人の運用状況（FR-010、research.md R1〜R3）", () => {
   it("担当を外される前に、そのアカウントで承認した動きも数える", async () => {
     const { teamId, ownerAcc, e1 } = await setup();
     await activity(ownerAcc, e1, "drafts_approved", 1, "review");
-    await sql()`DELETE FROM memberships WHERE user_id = ${e1} AND account_id = ${ownerAcc}`;
+    await sql()`DELETE FROM threads.memberships WHERE user_id = ${e1} AND account_id = ${ownerAcc}`;
     const res = await json<TeamStatus>(await status(teamId, "a1"));
     expect(res.people.find((p) => p.userId === e1)!.activeCount7d).toBe(1);
   });
 
   it("チームを抜けた人と、その人が入れていたアカウントは出ない", async () => {
     const { teamId, memberAcc, m1 } = await setup();
-    await sql()`DELETE FROM team_accounts WHERE team_id = ${teamId} AND account_id = ${memberAcc}`;
-    await sql()`DELETE FROM team_members WHERE team_id = ${teamId} AND user_id = ${m1}`;
+    await sql()`DELETE FROM threads.team_accounts WHERE team_id = ${teamId} AND account_id = ${memberAcc}`;
+    await sql()`DELETE FROM threads.team_members WHERE team_id = ${teamId} AND user_id = ${m1}`;
     const res = await json<TeamStatus>(await status(teamId, "a1"));
     expect(res.people.some((p) => p.userId === m1)).toBe(false);
     expect(res.accounts.some((a) => a.accountId === memberAcc)).toBe(false);
@@ -265,7 +265,7 @@ describe("アカウントの運用状況（FR-011）", () => {
     await activity(editorAcc, e1, "drafts_registered", 1);
     const res = await json<TeamStatus>(await status(teamId, "a1"));
     expect(res.people.map((p) => p.name)).toEqual(["m1", "o1", "a1", "e1"]);
-    await sql()`UPDATE team_accounts SET added_at = ${ago(30).toISOString()} WHERE account_id = ${memberAcc}`;
+    await sql()`UPDATE threads.team_accounts SET added_at = ${ago(30).toISOString()} WHERE account_id = ${memberAcc}`;
     const again = await json<TeamStatus>(await status(teamId, "a1"));
     expect(again.accounts.map((a) => a.accountId)).toEqual([
       memberAcc,
@@ -345,8 +345,8 @@ describe("伸び（FR-020〜FR-022、research.md R4・R7）", () => {
       { publishedAt: ago(2) },
       { publishedAt: ago(2) },
     ]);
-    await sql()`INSERT INTO post_metrics (draft_id, account_id, state, views) VALUES (${updating!.id}, ${ownerAcc}, 'updating', 10)`;
-    await sql()`INSERT INTO post_metrics (draft_id, account_id, state, unmeasurable_reason)
+    await sql()`INSERT INTO threads.post_metrics (draft_id, account_id, state, views) VALUES (${updating!.id}, ${ownerAcc}, 'updating', 10)`;
+    await sql()`INSERT INTO threads.post_metrics (draft_id, account_id, state, unmeasurable_reason)
       VALUES (${unmeasurable!.id}, ${ownerAcc}, 'unmeasurable', 'not_found')`;
     const res = await json<TeamStatus>(await status(teamId, "a1"));
     expect(res.accounts.find((x) => x.accountId === ownerAcc)!.growth).toEqual({
@@ -369,7 +369,7 @@ describe("伸び（FR-020〜FR-022、research.md R4・R7）", () => {
 
   it("並び：止まっているアカウントの次に poor", async () => {
     const { teamId, adminAcc, ownerAcc, editorAcc, memberAcc } = await setup();
-    await sql()`UPDATE team_accounts SET added_at = ${ago(30).toISOString()} WHERE account_id = ${memberAcc}`;
+    await sql()`UPDATE threads.team_accounts SET added_at = ${ago(30).toISOString()} WHERE account_id = ${memberAcc}`;
     await publishedDrafts(adminAcc, [{ publishedAt: ago(1) }]);
     await publishedDrafts(editorAcc, [{ publishedAt: ago(1) }]);
     await confirmedPosts(ownerAcc, [
@@ -397,7 +397,7 @@ describe("編集者の範囲（FR-002a、research.md R5・R6）", () => {
   it("オーナーの行の動きは、担当のアカウントでの動きだけを数える", async () => {
     const { teamId, ownerAcc, o1 } = await setup();
     const { accountId: second } = await createUserWithAccount("o1");
-    await sql()`INSERT INTO team_accounts (team_id, account_id, added_by_user_id) VALUES (${teamId}, ${second}, ${o1})`;
+    await sql()`INSERT INTO threads.team_accounts (team_id, account_id, added_by_user_id) VALUES (${teamId}, ${second}, ${o1})`;
     await activity(ownerAcc, o1, "drafts_approved", 1, "review");
     await activity(second, o1, "drafts_approved", 0.5, "review");
     await activity(second, o1, "drafts_approved", 0.6, "review");
@@ -423,7 +423,7 @@ describe("編集者の範囲（FR-002a、research.md R5・R6）", () => {
     await disableFeatures(o1, "team");
     const res = await json<TeamStatus>(await status(teamId, "e1"));
     expect(res.accounts.map((a) => a.accountId)).toEqual([memberAcc]);
-    await sql()`DELETE FROM memberships WHERE account_id = ${memberAcc} AND role = 'editor'`;
+    await sql()`DELETE FROM threads.memberships WHERE account_id = ${memberAcc} AND role = 'editor'`;
     const none = await status(teamId, "e1");
     expect([none.status, (await errorOf(none)).code]).toEqual([403, "ROLE_FORBIDDEN"]);
     expect(
@@ -436,7 +436,7 @@ describe("編集者の範囲（FR-002a、research.md R5・R6）", () => {
     const { teamId, ownerAcc, memberAcc, e1 } = await setup();
     await assign(teamId, "e1", memberAcc);
     expect((await json<TeamStatus>(await status(teamId, "e1"))).accounts).toHaveLength(2);
-    await sql()`DELETE FROM memberships WHERE user_id = ${e1} AND account_id = ${ownerAcc}`;
+    await sql()`DELETE FROM threads.memberships WHERE user_id = ${e1} AND account_id = ${ownerAcc}`;
     expect(
       (await json<TeamStatus>(await status(teamId, "e1"))).accounts.map((a) => a.accountId),
     ).toEqual([memberAcc]);

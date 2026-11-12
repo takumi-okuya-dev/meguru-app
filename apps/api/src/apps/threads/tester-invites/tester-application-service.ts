@@ -294,6 +294,8 @@ export async function purgeForWithdrawal(tx: TxDb, userId: string): Promise<void
     .update(testerApplications)
     .set({
       status: "withdrawn",
+      // 利用者の番号も残さない（以前は users の外部キーの set null。029 の PR3 で外部キーを外したので自分で空にする。research.md R3）
+      userId: null,
       removalReason: sql`coalesce(${testerApplications.removalReason}, 'user_withdrawn')`,
       declineReason: null,
       // 違うアカウントでつながったときのユーザー名も残さない（外すのに要るのは申し込んだユーザー名だけ。PR #71 のCodexレビュー）
@@ -509,11 +511,11 @@ async function operate(
     const [row] = await tx.select().from(testerApplications).where(eq(testerApplications.id, id)).for("update").limit(1);
     if (!row) throw new AppError("ITEM_NOT_FOUND", 404, "application not found");
     const { action, detail } = await fn(tx, row);
-    const stillThere = action !== "removed" || row.userId !== null;
     await recordOperatorEvent(tx, {
       actorUserId: operator.id,
       subjectUserId: row.userId,
-      applicationId: stillThere ? row.id : null,
+      // 行を消したときも番号を残す（029 の PR3 で外部キーを外したので、消えた行の番号も書ける。PR #99 のセルフレビュー）
+      applicationId: row.id,
       action,
       detail,
     });

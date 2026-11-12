@@ -85,7 +85,7 @@ export async function loadAnalysisPosts(db: Db | TxDb, accountId: string, now: D
         reposts: postMetrics.reposts,
         quotes: postMetrics.quotes,
         // 投稿した日時より前で最も新しいフォロワー数（006 FR-002c。パフォーマンスのCSVと同じ）
-        followersAtPost: sql<number | null>`(SELECT f.followers_count FROM follower_snapshots f
+        followersAtPost: sql<number | null>`(SELECT f.followers_count FROM threads.follower_snapshots f
           WHERE f.account_id = ${postDrafts.accountId} AND f.captured_at <= ${postDrafts.publishedAt}
           ORDER BY f.captured_at DESC LIMIT 1)`,
         h24Views: s24.views,

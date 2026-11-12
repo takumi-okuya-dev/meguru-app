@@ -76,7 +76,7 @@ describe("秘密情報", () => {
     for (const path of ["/api/me", `/api/accounts/${accountId}`, `/api/accounts/${accountId}/activity`, `/api/accounts/${accountId}/performance/export`]) {
       bodies.push(await (await call(app, "GET", path, { user: "u1" })).text());
     }
-    const rows = await q()`SELECT * FROM activity_logs`;
+    const rows = await q()`SELECT * FROM threads.activity_logs`;
     const haystack = [...bodies, ...logs, JSON.stringify(rows)].join("\n");
     for (const t of [revoked, short, good]) expect(haystack).not.toContain(t);
   });

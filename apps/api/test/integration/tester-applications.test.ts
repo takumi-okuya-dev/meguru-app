@@ -46,7 +46,7 @@ describe("GET /api/accounts/:id/tester-application", () => {
   it("見送りは理由とともに返す", async () => {
     const acc = await unconnectedAccountOf(app, "u1");
     const { id } = (await (await applyFor(app, "u1", acc, "shop")).json()) as { id: string };
-    await q()`UPDATE tester_applications SET status = 'declined', decline_reason = '枠がいっぱいです' WHERE id = ${id}`;
+    await q()`UPDATE threads.tester_applications SET status = 'declined', decline_reason = '枠がいっぱいです' WHERE id = ${id}`;
     const res = await callT(app, "GET", `/api/accounts/${acc}/tester-application`, { user: "u1" });
     expect(((await res.json()) as Res).application).toMatchObject({ status: "declined", declineReason: "枠がいっぱいです" });
   });
@@ -83,14 +83,14 @@ describe("POST /api/accounts/:id/tester-application", () => {
     expect(await codeOf(dup)).toBe("TESTER_APPLICATION_EXISTS");
     await markInvited(first.id);
     expect(await codeOf(await applyFor(app, "u1", acc, "shop2"))).toBe("TESTER_APPLICATION_EXISTS");
-    await q()`UPDATE tester_applications SET status = 'declined', holds_slot = false WHERE id = ${first.id}`;
+    await q()`UPDATE threads.tester_applications SET status = 'declined', holds_slot = false WHERE id = ${first.id}`;
     expect((await applyFor(app, "u1", acc, "shop2")).status).toBe(201);
     expect(await applicationsOf(acc)).toHaveLength(2);
   });
 
   it("つながっているアカウントには申し込めない（VALIDATION_FAILED）", async () => {
     const acc = await unconnectedAccountOf(app, "u1");
-    await q()`UPDATE accounts SET connection_status = 'connected', connection_method = 'token', threads_user_id = 'tu1', username = 'shop' WHERE id = ${acc}`;
+    await q()`UPDATE threads.accounts SET connection_status = 'connected', connection_method = 'token', threads_user_id = 'tu1', username = 'shop' WHERE id = ${acc}`;
     const res = await applyFor(app, "u1", acc, "shop");
     expect(res.status).toBe(400);
     expect(await codeOf(res)).toBe("VALIDATION_FAILED");
@@ -129,7 +129,7 @@ describe("DELETE /api/accounts/:id/tester-application", () => {
       "TESTER_APPLICATION_NOT_PENDING",
     );
     const { id } = (await (await applyFor(app, "u1", acc, "shop")).json()) as { id: string };
-    await q()`UPDATE tester_applications SET status = 'connected', holds_slot = true WHERE id = ${id}`;
+    await q()`UPDATE threads.tester_applications SET status = 'connected', holds_slot = true WHERE id = ${id}`;
     const res = await callT(app, "DELETE", `/api/accounts/${acc}/tester-application`, { user: "u1" });
     expect(res.status).toBe(409);
     expect(await codeOf(res)).toBe("TESTER_APPLICATION_NOT_PENDING");

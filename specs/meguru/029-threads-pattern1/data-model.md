@@ -36,7 +36,7 @@
 | **新** `received_events` | — | 受け取った出来事の番号（2回届いても同じ結果にする。R5） |
 | **新** `user_states` | `users`の5列 | 利用者ごとの「最後に開いたアカウント」（PR2bで`threads_user_states`として作り、PR3でスキーマ`threads`へ） |
 
-Threadsは31表＋新しい2表＝33表。
+Threadsは31表＋新しい3表（`settings`・`received_events`・`user_states`）＝34表。
 
 ### 1-3. 外部キー（あと）
 
@@ -161,7 +161,7 @@ Threads：user.withdrawn を受け取る（received_events に書く・同じト
 | PR1 | `platform_events`・`platform_event_deliveries`・`app_usage`・`user_app_limits`・`app_limit_defaults`を作る。今のデータから`app_usage`・上限の表を写す。機能のON/OFFの表に`app`（既定`threads`）を足し、主キーと`CHECK`を替える | 壊れない（足すだけ。`app`は既定の値つき） |
 | PR2a | `app_usage`と上限の表を写し直す（0027。料金の数を`app_usage`に切り替える前に） | 壊れない（写すだけ） |
 | PR2b | `threads_settings`・`threads_received_events`・`threads_user_states`（まだ`public`）を作り、`tester_slot_capacity`を写す。`app_usage`を`memberships`とチームから数え直して写し直し、上限の表も古い列から写し直す（PR1とPR2の間のずれを消す） | 壊れない（足す・写すだけ） |
-| PR3 | スキーマ`threads`を作る。Threadsの31表と`threads_settings`・`received_events`を移す（`ALTER TABLE … SET SCHEMA`、`threads_settings`は`settings`に名前を変える）。共通との外部キーを外す | **壊れる**（前の版は`public`の表を見る）。テスト環境だけで受け入れる例外（spec FR-019）。デプロイの間の数分 |
+| PR3 | スキーマ`threads`を作る。Threadsの31表と`threads_settings`・`threads_received_events`・`threads_user_states`を移す（`ALTER TABLE … SET SCHEMA`。3表は`settings`・`received_events`・`user_states`に名前を変える）。共通との外部キー27本を外す（0030） | **壊れる**（前の版は`public`の表を見る）。テスト環境だけで受け入れる例外（spec FR-019）。デプロイの間の数分 |
 | PR5 | `users.account_limit`・`users.daily_post_limit`・`operator_settings`の3列を消す | **壊れる**（前の版はこの列を読む）。テスト環境だけの例外。PR4までの版はもう新しい表を読むので、PR4に戻すなら壊れない |
 
 - どのマイグレーションも、`drizzle-kit generate`で作り、できたSQLを読んでからコミットする。PR3の置き場所の移動は、`DROP TABLE`・`CREATE TABLE`になっていないことを必ず確かめる（R2）。

@@ -18,7 +18,7 @@ beforeEach(async () => {
 });
 
 async function ownerIdOf(accountId: string) {
-  const [r] = (await sqlDb()`SELECT user_id FROM memberships WHERE account_id = ${accountId} AND role = 'owner'`) as [{ user_id: string }];
+  const [r] = (await sqlDb()`SELECT user_id FROM threads.memberships WHERE account_id = ${accountId} AND role = 'owner'`) as [{ user_id: string }];
   return r.user_id;
 }
 

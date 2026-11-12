@@ -134,7 +134,7 @@ describe("GET /accounts/:id/activity", () => {
     const { accountId } = await createUserWithAccount("o1");
     await teamFor(accountId);
     await register(accountId, "a1", ["新しい案"]);
-    await sql()`INSERT INTO activity_logs (account_id, actor_name, actor_role, kind, action, created_at)
+    await sql()`INSERT INTO threads.activity_logs (account_id, actor_name, actor_role, kind, action, created_at)
       VALUES (${accountId}, 'o1', 'owner', 'review', 'drafts_approved', now() - interval '91 days')`;
     const list = await json<{ items: unknown[] }>(await call(app, "GET", `/api/accounts/${accountId}/activity`, { user: "o1" }));
     expect(list.items).toHaveLength(1);
@@ -177,19 +177,19 @@ describe("記録と保存の一体性（PR #9 のCodexレビュー2回目）", (
     await teamFor(accountId);
     // 記録の書き込みだけを失敗させる
     await sql()`CREATE FUNCTION fail_activity() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'activity down'; END $$`;
-    await sql()`CREATE TRIGGER fail_activity BEFORE INSERT ON activity_logs FOR EACH ROW EXECUTE FUNCTION fail_activity()`;
+    await sql()`CREATE TRIGGER fail_activity BEFORE INSERT ON threads.activity_logs FOR EACH ROW EXECUTE FUNCTION fail_activity()`;
     try {
       const failed = await call(app, "PUT", `/api/accounts/${accountId}/strategy`, { user: "a1", body: strategy("x", 0) });
       expect(failed.status).toBe(500);
-      const saved = (await sql()`SELECT count(*)::int AS n FROM strategy_designs WHERE account_id = ${accountId}`) as { n: number }[];
+      const saved = (await sql()`SELECT count(*)::int AS n FROM threads.strategy_designs WHERE account_id = ${accountId}`) as { n: number }[];
       expect(saved[0]!.n).toBe(0);
       // 宣伝投稿の割合は設定なので、オーナーが保存する（PR #14 のCodexレビュー）
       const promo = await call(app, "PUT", `/api/accounts/${accountId}/promotion-settings`, { user: "o1", body: { ratioPercent: 30, expectedVersion: 1 } });
       expect(promo.status).toBe(500);
-      const ratio = (await sql()`SELECT promotion_ratio_percent AS r FROM accounts WHERE id = ${accountId}`) as { r: number }[];
+      const ratio = (await sql()`SELECT promotion_ratio_percent AS r FROM threads.accounts WHERE id = ${accountId}`) as { r: number }[];
       expect(ratio[0]!.r).not.toBe(30);
     } finally {
-      await sql()`DROP TRIGGER fail_activity ON activity_logs`;
+      await sql()`DROP TRIGGER fail_activity ON threads.activity_logs`;
       await sql()`DROP FUNCTION fail_activity()`;
     }
     await json(await call(app, "PUT", `/api/accounts/${accountId}/strategy`, { user: "a1", body: strategy("x", 0) }));

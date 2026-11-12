@@ -34,10 +34,10 @@ describe("トークンで接続したAccountの自動投稿（FR-042）", () => 
   it("NGワードを含む承認済みの案は直前の確認で戻され、要確認の案は投稿されない（原則I・II）", async () => {
     const accountId = await tokenAccount();
     const [ng] = await approvedDrafts(accountId, ["絶対に伸びる方法"]);
-    await q()`INSERT INTO ng_words (account_id, word, normalized) VALUES (${accountId}, '絶対', '絶対')`;
+    await q()`INSERT INTO threads.ng_words (account_id, word, normalized) VALUES (${accountId}, '絶対', '絶対')`;
     await q()`
-      INSERT INTO post_drafts (account_id, batch_id, position, body, status)
-      SELECT ${accountId}, batch_id, 1, '要確認の案', 'needs_review' FROM post_drafts WHERE id = ${ng!}`;
+      INSERT INTO threads.post_drafts (account_id, batch_id, position, body, status)
+      SELECT ${accountId}, batch_id, 1, '要確認の案', 'needs_review' FROM threads.post_drafts WHERE id = ${ng!}`;
     await setSchedule(accountId, { slotMinutes: [720] });
     await run(addMin(NOON, 1));
     expect(await fake.posts()).toEqual([]);

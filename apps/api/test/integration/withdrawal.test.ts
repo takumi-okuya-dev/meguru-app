@@ -78,13 +78,13 @@ describe("POST /api/me/withdraw", () => {
     const res = await withdraw("o1", "  O1@Example.com ");
     expect(res.status).toBe(204);
     expect((await fakeStripe.subscriptions()).map((s) => s.status)).toEqual(["canceled"]);
-    expect(await count("accounts", `id = '${o1.accountId}'`)).toBe(0);
+    expect(await count("threads.accounts", `id = '${o1.accountId}'`)).toBe(0);
     expect(await count("users", "clerk_user_id = 'o1'")).toBe(0);
     expect(await count("subscriptions")).toBe(0);
-    expect(await count("memberships", `user_id = '${o1.userId}'`)).toBe(0);
-    const team = await one<{ admin_user_id: string }>(db()`SELECT admin_user_id FROM teams WHERE id = ${teamId}`);
+    expect(await count("threads.memberships", `user_id = '${o1.userId}'`)).toBe(0);
+    const team = await one<{ admin_user_id: string }>(db()`SELECT admin_user_id FROM threads.teams WHERE id = ${teamId}`);
     expect(team?.admin_user_id).toBe(m1.userId);
-    const logs = (await db()`SELECT actor_name, actor_user_id FROM activity_logs WHERE account_id = ${m1.accountId}`) as {
+    const logs = (await db()`SELECT actor_name, actor_user_id FROM threads.activity_logs WHERE account_id = ${m1.accountId}`) as {
       actor_name: string;
       actor_user_id: string | null;
     }[];
@@ -99,18 +99,18 @@ describe("POST /api/me/withdraw", () => {
     const o1 = await createUserWithAccount("o1");
     const { teamId } = await makeTeam("o1", [o1.accountId]);
     expect((await withdraw("o1", "o1@example.com")).status).toBe(204);
-    expect(await count("teams", `id = '${teamId}'`)).toBe(0);
+    expect(await count("threads.teams", `id = '${teamId}'`)).toBe(0);
   });
 
   it("Threadsのトークンが消え、処理中のデータ削除の求めは完了になる", async () => {
     const { accountId, threadsUserId } = await connectedAccount("o1", app);
-    await db()`INSERT INTO threads_deletion_requests (confirmation_code, request_fingerprint, threads_user_id, status, received_at, last_attempted_at)
+    await db()`INSERT INTO threads.threads_deletion_requests (confirmation_code, request_fingerprint, threads_user_id, status, received_at, last_attempted_at)
       VALUES ('code1', 'fp1', ${threadsUserId}, 'pending', now(), now())`;
-    expect(await count("threads_connections", `account_id = '${accountId}'`)).toBe(1);
+    expect(await count("threads.threads_connections", `account_id = '${accountId}'`)).toBe(1);
     expect((await withdraw("o1", "o1@example.com")).status).toBe(204);
-    expect(await count("threads_connections")).toBe(0);
+    expect(await count("threads.threads_connections")).toBe(0);
     const req = await one<{ status: string; threads_user_id: string | null }>(
-      db()`SELECT status, threads_user_id FROM threads_deletion_requests WHERE confirmation_code = 'code1'`,
+      db()`SELECT status, threads_user_id FROM threads.threads_deletion_requests WHERE confirmation_code = 'code1'`,
     );
     expect(req).toEqual({ status: "completed", threads_user_id: null });
   });
@@ -122,7 +122,7 @@ describe("POST /api/me/withdraw", () => {
     const res = await withdraw("o1", "o1@example.com");
     expect(res.status).toBe(503);
     expect(((await res.json()) as { error: { code: string } }).error.code).toBe("BILLING_UNAVAILABLE");
-    expect(await count("accounts", `id = '${accountId}'`)).toBe(1);
+    expect(await count("threads.accounts", `id = '${accountId}'`)).toBe(1);
     expect(await count("users", "clerk_user_id = 'o1' AND withdrawal_requested_at IS NOT NULL")).toBe(1);
     const blocked = await callBilling(app, "GET", `/api/accounts/${accountId}`, { user: "o1" });
     expect(blocked.status).toBe(409);

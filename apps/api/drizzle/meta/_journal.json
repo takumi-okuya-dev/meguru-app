@@ -211,6 +211,13 @@
       "when": 1794477280560,
       "tag": "0029_threads_settings_user_states",
       "breakpoints": true
+    },
+    {
+      "idx": 30,
+      "version": "7",
+      "when": 1794482406529,
+      "tag": "0030_threads_schema",
+      "breakpoints": true
     }
   ]
 }

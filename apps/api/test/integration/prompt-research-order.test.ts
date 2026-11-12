@@ -19,7 +19,7 @@ describe("投稿のプロンプトの参考投稿", () => {
     const { accountId } = await createUserWithAccount("u1");
     const q = neon(testEnv.DATABASE_URL);
     const insert = (body: string, mode: string, date: string | null, minutesAgo: number) =>
-      q`INSERT INTO reference_posts (account_id, body, posted_date_mode, posted_date, created_at)
+      q`INSERT INTO threads.reference_posts (account_id, body, posted_date_mode, posted_date, created_at)
         VALUES (${accountId}, ${body}, ${mode}, ${date}, now() - make_interval(mins => ${minutesAgo}))`;
     await insert("アーカイブの投稿", "exact", daysAgo(200), 1);
     await insert("不明の古い投稿", "unknown", null, 30);

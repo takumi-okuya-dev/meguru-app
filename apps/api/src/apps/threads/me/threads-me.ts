@@ -19,7 +19,7 @@ import { chooseSuccessor, listMyTeams } from "../teams/team-service";
  * last_account_id（開けるAccountなら）→ オーナーのAccountで last_used_at が最新 → created_at が最新
  * → 担当しているAccountの最初 → null の順。
  * @param owned - ownerとして保有するAccount
- * @param lastAccountId - 最後に開いたアカウント（threads_user_states.last_account_id）
+ * @param lastAccountId - 最後に開いたアカウント（threads.user_states.last_account_id）
  * @param helped - 担当しているAccount（並びは /api/me の順）
  * @returns 遷移先の Account の ID。開けるAccountが0件なら null
  */
