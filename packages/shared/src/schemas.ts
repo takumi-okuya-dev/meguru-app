@@ -1852,6 +1852,24 @@ export const featureSettingsRequestSchema = z.object({
 /** 機能の設定の保存の値。 */
 export type FeatureSettingsRequest = z.infer<typeof featureSettingsRequestSchema>;
 
+/**
+ * 登録されたアプリの機能と上限の一覧（GET /api/operator/app-registry。運営者だけ）。運営の画面が、アプリの名前を
+ * 直接書かずに出すため（specs/meguru/029-threads-pattern1 tasks.md T069、contracts/api-routes.md 1）。
+ */
+export const operatorAppRegistrySchema = z.object({
+  apps: z.array(
+    z.object({
+      app: z.string(),
+      features: z.array(z.object({ key: z.string(), label: z.string(), description: z.string().optional() })),
+      limits: z.array(
+        z.object({ key: z.string(), label: z.string(), min: z.number().int(), max: z.number().int(), operatorValue: z.number().int().nullable() }),
+      ),
+    }),
+  ),
+});
+/** 登録されたアプリの機能と上限の一覧の型。 */
+export type OperatorAppRegistry = z.infer<typeof operatorAppRegistrySchema>;
+
 /** GET /api/operator/feature-settings の応答（FR-013・FR-014）。 */
 export const featureSettingsListSchema = z.object({
   /** OFFのまとまりがある人。updatedAt は、その人の設定を最後に変えた日時（ONに戻した変更も含む）の新しい順 */

@@ -24,8 +24,8 @@ const SELF_SERVICE_ALLOWED = new Set(["GET /api/me", "GET /api/me/withdrawal-pre
 /** テスト版に入れない人には、ほかに招待から参加する経路も許す（specs/016 research.md R5）。 */
 const TEST_INVITE_PATH = /^\/api\/test-invites\//;
 /**
- * 契約前の人（specs/024 research.md R9）に許す経路：自分の情報・退会、契約と支払い、テスト版の招待（入れば料金なし）、
- * チームの招待の確認（参加は止める）。
+ * 契約前の人（specs/024 research.md R9）に許す経路：自分の情報・退会、契約と支払い、テスト版の招待（入れば料金なし）。
+ * アプリの経路（チームの招待の確認など）は、道筋の文字列ではなく、その経路に付けた印（allowBeforeSubscribe）で許す。
  */
 const SUBSCRIBE_ALLOWED = new Set([
   ...SELF_SERVICE_ALLOWED,
@@ -34,16 +34,16 @@ const SUBSCRIBE_ALLOWED = new Set([
   "POST /api/billing/sync",
   "POST /api/billing/portal",
 ]);
-const TEAM_INVITE_PREVIEW = /^\/api\/invites\/[^/]+$/;
 
 /**
  * 契約前の人に許す経路か。
  * @param method - HTTPのメソッド
  * @param path - パス
+ * @param marked - 経路に「契約前でも呼べる」の印が付いているか（allowBeforeSubscribe）
  * @returns 許すなら true
  */
-function subscribeAllowed(method: string, path: string): boolean {
-  return SUBSCRIBE_ALLOWED.has(`${method} ${path}`) || TEST_INVITE_PATH.test(path) || (method === "GET" && TEAM_INVITE_PREVIEW.test(path));
+function subscribeAllowed(method: string, path: string, marked: boolean): boolean {
+  return SUBSCRIBE_ALLOWED.has(`${method} ${path}`) || TEST_INVITE_PATH.test(path) || marked;
 }
 
 /** セッショントークンから確かめた本人。 */
@@ -78,7 +78,11 @@ export type CurrentUser = typeof users.$inferSelect & {
   features: ReadonlySet<Feature>;
 };
 /** 認証済みのリクエストで Hono のコンテキストに置く値。 */
-export type AuthVariables = { user: CurrentUser };
+export type AuthVariables = {
+  user: CurrentUser;
+  /** 契約前の人でも呼べる経路の印（allowBeforeSubscribe が付ける） */
+  allowBeforeSubscribe?: boolean;
+};
 
 /** Hono のアプリの型（Bindings と Variables）。共通とアプリのAPIの入口が使う（027で app.ts から移した）。 */
 export type AppEnv = { Bindings: Env; Variables: AuthVariables };
@@ -228,7 +232,7 @@ export function authMiddleware(makeVerifier: (env: Env) => AuthVerifier) {
       throw new AppError("TEST_ACCESS_REQUIRED", 403, "test access required");
     }
     // 契約前の人は、許す経路のほかを止める（specs/024 FR-029、research.md R9）。判定の順は 退会の途中 → テスト版 → 契約前
-    if (mode.enabled && facts && !subscribeAllowed(c.req.method, c.req.path)) {
+    if (mode.enabled && facts && !subscribeAllowed(c.req.method, c.req.path, c.get("allowBeforeSubscribe") === true)) {
       const e = entitlementFromFacts(mode, {
         createdAt: user.createdAt,
         legacyTrial: user.legacyTrial,
@@ -248,6 +252,15 @@ export function authMiddleware(makeVerifier: (env: Env) => AuthVerifier) {
     await next();
   });
 }
+
+/**
+ * 契約前の人でも呼べる経路の印を付けるミドルウェア（認証のミドルウェアより前に付ける）。共通のコードがアプリの道筋の文字列を
+ * 知らずに済むようにする（specs/meguru/029-threads-pattern1、PR #100 のセルフレビュー）。例：チームの招待の確認。
+ */
+export const allowBeforeSubscribe = createMiddleware<AppEnv>(async (c, next) => {
+  c.set("allowBeforeSubscribe", true);
+  await next();
+});
 
 /**
  * ログインが任意の認証のミドルウェアを作る（specs/008 招待の確認。research.md R7）。

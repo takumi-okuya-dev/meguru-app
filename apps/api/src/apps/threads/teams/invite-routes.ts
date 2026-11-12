@@ -2,7 +2,7 @@
 // 確認はログイン不要（ログインしていれば、その人が参加できるかと、選べるアカウントも返す）。参加はログイン必須。
 import { inviteAcceptRequestSchema } from "@meguru/shared";
 import { Hono, type MiddlewareHandler } from "hono";
-import type { AppEnv } from "../../../platform";
+import { allowBeforeSubscribe, type AppEnv } from "../../../platform";
 import { parseBody } from "../../../kernel/validate";
 import { requireFeature } from "../access/access";
 import { acceptTeamInvite, previewTeamInvite } from "./invite-service";
@@ -15,7 +15,8 @@ import { acceptTeamInvite, previewTeamInvite } from "./invite-service";
  */
 export function inviteRoutes(authed: MiddlewareHandler<AppEnv>, maybeAuthed: MiddlewareHandler<AppEnv>) {
   return new Hono<AppEnv>()
-    .get("/invites/:token", maybeAuthed, async (c) => {
+    // 招待の確認は、契約前の人でも見られる（参加は止める。specs/024 research.md R9）
+    .get("/invites/:token", allowBeforeSubscribe, maybeAuthed, async (c) => {
       const user = c.get("user") as { id: string } | undefined;
       c.header("Cache-Control", "no-store");
       return c.json(await previewTeamInvite(c.env, c.req.param("token"), user ?? null));

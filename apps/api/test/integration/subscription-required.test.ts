@@ -39,6 +39,8 @@ describe("新しく登録した人（契約前）", () => {
     // 招待の文字列が違うだけで、契約前で止められてはいない
     expect(await codeOf(await callBilling(app, "GET", "/api/test-invites/g_x", { user: "n1" }))).not.toBe("SUBSCRIPTION_REQUIRED");
     expect(await codeOf(await callBilling(app, "GET", "/api/invites/t_x", { user: "n1" }))).not.toBe("SUBSCRIPTION_REQUIRED");
+    // 新しい道筋でも同じ（specs/meguru/029 contracts/api-routes.md 3。PR #100 のセルフレビュー）
+    expect(await codeOf(await callBilling(app, "GET", "/api/threads/invites/t_x", { user: "n1" }))).not.toBe("SUBSCRIPTION_REQUIRED");
     expect(await codeOf(await callBilling(app, "POST", "/api/billing/checkout", { user: "n1" }))).not.toBe("SUBSCRIPTION_REQUIRED");
   });
 
@@ -48,6 +50,8 @@ describe("新しく登録した人（契約前）", () => {
       ["POST", "/api/accounts", { name: "店" }],
       ["POST", "/api/teams", { name: "チーム", accountIds: [] }],
       ["POST", "/api/invites/t_x/accept", { accounts: [] }],
+      ["POST", "/api/threads/invites/t_x/accept", { accounts: [] }],
+      ["POST", "/api/threads/accounts", { name: "店" }],
       ["GET", "/api/me/referral", undefined],
       ["GET", "/api/me/needs-review-counts", undefined],
     ] as const) {

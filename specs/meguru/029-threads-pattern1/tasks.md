@@ -118,7 +118,7 @@ description: "Task list for feature meguru/029 Threads pattern ①"
 - [X] T033 [US2] 知らせをなくす：`accountDeleting`・`accountOpened`はThreadsの中の処理に（アカウントを消す関数・開くAPIの中で直接呼ぶ）、`userWithdrawing`・`userAccountsDeleted`は`onUserWithdrawn`に、`limitsChanged`は`onLimitsChanged`に（research.md R8）。`apps/api/src/apps/threads/threads-hooks.ts`を消し、`apps/api/src/app.ts`で`registerAppFeatures`・`registerAppLimits`・`registerConsumer`を呼ぶ（contracts/module-boundaries.md 4）。`platform/hooks.ts`はPR5で消す（この時点で呼び出しが0になる）。
 - [X] T034 [US2] Threadsが利用の数を伝える：アカウントを作る・消す（Metaのデータ削除の`deleteAccountsOfThreadsUser`を含む）・持ち主が変わる・チームに入る・抜ける処理で、トランザクションのあと・応答の前に`reportUsage`を呼ぶ。毎日のまとめ処理（`jobs/daily-jobs.ts`からThreadsの関数を呼ぶ）で全員を数え直す。T018を通す。
 - [X] T035 [US3] `apps/api/src/apps/threads/me/`を作る：`GET /api/threads/me`・`GET /api/threads/me/withdrawal-preview`。`apps/api/src/apps/threads/index.ts`から出し、`app.ts`でつなぐ。T020を通す。`pnpm --filter api routes:snapshot`で一覧を書き直す（2本増える）。
-- [ ] T069 [US2] 運営の画面のための登録の一覧を返すAPI `GET /api/operator/app-registry`（共通。運営者だけ）を足す：登録されたアプリごとに、機能（名前・表示名・説明）と上限（名前・表示名・範囲）を返す。`registerAppFeatures`・`registerAppLimits`に表示名・説明を渡す形にする（contracts/platform-entry.md 5・api-routes.md 1）。テスト：`apps/api/test/integration/operator-app-registry.test.ts`（運営者でなければ403、今の3つの機能と2つの上限が今の表示名で返る）。
+- [X] T069 [US2] 運営の画面のための登録の一覧を返すAPI `GET /api/operator/app-registry`（共通。運営者だけ）を足す：登録されたアプリごとに、機能（名前・表示名・説明）と上限（名前・表示名・範囲）を返す。`registerAppFeatures`・`registerAppLimits`に表示名・説明を渡す形にする（contracts/platform-entry.md 5・api-routes.md 1）。テスト：`apps/api/test/integration/operator-app-registry.test.ts`（運営者でなければ403、今の3つの機能と2つの上限が今の表示名で返る）。
 - [ ] T070 [US2] 外枠の運営の画面（`apps/web/src/shell/settings/features.tsx`・`limits.tsx`）を、`FEATURE_LABELS`・「アカウントの数」・`ACCOUNT_LIMIT_MAX`などのThreadsの名前を直接書かず、T069のAPIの一覧で出す形にする。見た目と文言は今のまま（spec FR-012・FR-021、/speckit-analyze G2）。画面のテストを直す（期待する結果は変えない）。T021で`FEATURES`・`FEATURE_LABELS`をThreadsへ移すのは、このタスクのあと。
 - [X] T071 [US1] `users`の「最後に開いたアカウント」の5列（`last_account_id`ほか）を、Threads専用の表（`threads_user_states`。まだ`public`。PR3でスキーマ`threads`へ）へ写すマイグレーションを作り、Threadsの読み書き（`openAccount`・`deleteAccount`・`buildThreadsMe`の`landingAccountId`）を新しい表に替える。古い列はPR5で消す（data-model.md 1-1）。
 - [X] T036 [US1] Threadsのコードの`platform/schema`の読みこみ（`users`・`subscriptions`・`memberships`・`operatorSettings`）が0か所になったことを確かめる（`grep`）。共通の`index.ts`から、表の定義とSQLの部品（`featureOnSql`など）を出すのをやめる。
@@ -172,14 +172,18 @@ description: "Task list for feature meguru/029 Threads pattern ①"
 
 ## Phase 5：APIの道筋を`/api/threads/…`に、Webの呼び出しを`apps/threads/`に（PR4）
 
+> **PR4は2つに分けた**（Webのテストのモックの書き換えが約60ファイルと大きいため）：
+> - PR4a＝APIの側：T048・T049・T069（新しい道筋は、Threadsの道筋をまとめた1つの部品を `/` と `/threads` の両方につなぐ形。道筋の一覧で、新しい105本が古い道筋と同じ数の処理を持つことを確かめた）
+> - PR4b＝Webの側：T050〜T054・T070・T021・T056
+
 **Goal**：ThreadsのAPIをThreadsの道筋の下にそろえ、Webの呼び出しとキー、`/api/me`のThreadsの部分の読み方をThreadsのフォルダへ移す。古い道筋は残す。
 
 **Independent Test**：道筋の一覧に新しい道筋が足され、古い道筋も残る。Webの共通の部品にThreadsの道筋がない。Webのテストと E2E が、期待する結果を変えずに通る。
 
 ### API
 
-- [ ] T048 [US3] ThreadsのAPIの入口を、`/api/threads/accounts/…`・`/api/threads/teams/…`・`/api/threads/invites/…`・`/api/threads/me/needs-review-counts`・`/api/threads/operator/{accounts,tester-applications,tester-settings}`にもつなぐ（contracts/api-routes.md 1）。古い道筋にも同じ処理をつないだまま残す。`/api/threads/…`の今の6本（接続・Metaの通知）と`/api/data-deletion`は変えない。
-- [ ] T049 [US3] `pnpm --filter api routes:snapshot`で一覧を書き直し、新しい道筋が足され、古い道筋が残り、Metaの戻り先・通知先とStripeの通知先が変わっていないことを確かめる。古い道筋と新しい道筋で、同じ応答になることを、代表のAPI（アカウントの一覧・投稿の案の一覧・チームの一覧）でテストする（`apps/api/test/integration/threads-routes-alias.test.ts`）。
+- [X] T048 [US3] ThreadsのAPIの入口を、`/api/threads/accounts/…`・`/api/threads/teams/…`・`/api/threads/invites/…`・`/api/threads/me/needs-review-counts`・`/api/threads/operator/{accounts,tester-applications,tester-settings}`にもつなぐ（contracts/api-routes.md 1）。古い道筋にも同じ処理をつないだまま残す。`/api/threads/…`の今の6本（接続・Metaの通知）と`/api/data-deletion`は変えない。
+- [X] T049 [US3] `pnpm --filter api routes:snapshot`で一覧を書き直し、新しい道筋が足され、古い道筋が残り、Metaの戻り先・通知先とStripeの通知先が変わっていないことを確かめる。古い道筋と新しい道筋で、同じ応答になることを、代表のAPI（アカウントの一覧・投稿の案の一覧・チームの一覧）でテストする（`apps/api/test/integration/threads-routes-alias.test.ts`）。
 
 ### Web
 

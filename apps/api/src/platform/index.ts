@@ -2,7 +2,7 @@
 // 表の定義（schema.ts）と SQL の部品（featureOnSql など）は出さない。アプリは入口の関数だけを使う
 // （specs/meguru/029-threads-pattern1 contracts/platform-entry.md 1、tasks.md T036）。
 // 組み立て：認証・APIの道筋・定期処理
-export { authMiddleware, optionalAuthMiddleware, clerkVerifier, type AuthVerifier, type AppEnv } from "./identity/auth";
+export { allowBeforeSubscribe, authMiddleware, optionalAuthMiddleware, clerkVerifier, type AuthVerifier, type AppEnv } from "./identity/auth";
 export { meRoutes } from "./identity/me-routes";
 export { billingRoutes } from "./billing/billing-routes";
 export { stripeWebhookRoutes } from "./billing/stripe-webhook-routes";
@@ -23,4 +23,5 @@ export { loadAppEntitlement, loadAppEntitlements, loadAppFeatures, type AppEntit
 export { reportUsage, billingQuantityOf, usingAppsOf, appUsageOf, usersWithUsage, type AppUsageReport } from "./usage/usage";
 export { registerMeSection, registerWithdrawalPreviewSection, type MeSection } from "./identity/me-sections";
 export { registerAppFeatures, registerAppLimits, appFeatures, appLimits, registeredApps, type AppFeatureDef, type AppLimitDef } from "./registry/registry";
+export { operatorAppRegistryRoutes } from "./registry/registry-routes";
 export { currentUser, peopleNames, peopleProfiles, personName, searchPeople } from "./identity/people";
