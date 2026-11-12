@@ -220,7 +220,8 @@ description: "Task list for feature meguru/029 Threads pattern ①"
 **Goal**：古い道筋・`/api/me`のThreadsの部分・上限の古い列・知らせの仕組みを消す。
 
 - [X] T057 [US3] 古い道筋（`/api/accounts/…`・`/api/teams/…`・`/api/invites/…`・`/api/me/needs-review-counts`・`/api/operator/{accounts,tester-applications,tester-settings}`）を消す。`routes:snapshot`を書き直し、`threads-routes-alias.test.ts`を新しい道筋だけのテストにする。
-- [ ] T058 [US3] `/api/me`からThreadsの部分を消す：`packages/shared/src/schemas.ts`の`meResponseSchema`を共通の分だけにし、`apps/api/src/app.ts`の「`/api/me`に足す中身」を消す。`/api/me/withdrawal-preview`も共通の分だけにする。Webの型の誤りが0件（Threadsは`useThreadsMe`を読んでいる）。テストを直す（期待する結果は変えない）。
+- [X] T058 [US3] `/api/me`からThreadsの部分を消す：`packages/shared/src/schemas.ts`の`meResponseSchema`を共通の分だけにし、`apps/api/src/app.ts`の「`/api/me`に足す中身」を消す。`/api/me/withdrawal-preview`も共通の分だけにする。Webの型の誤りが0件（Threadsは`useThreadsMe`を読んでいる）。テストを直す（期待する結果は変えない）。
+  - **実際の変更（PR5c）**：`/api/me` の Threads の中身は `apps/threads/register.ts` の登録（`registerMeSection`・`registerWithdrawalPreviewSection`）と共通の `me-sections` で足していたので、それを消した。テストは「`/api/me` に Threads の中身がある」から「ない」に変えた（期待する結果を変えた。Threads の中身は `/api/threads/me` で確かめる）
 - [X] T059 [US2] `apps/api/src/platform/hooks.ts`と、そのテストを消す。
 - [X] T060 [US2] 上限の古い列（`users.account_limit`・`users.daily_post_limit`・`operator_settings.default_account_limit`・`default_daily_post_limit`・`tester_slot_capacity`）を消す：表の定義から消し、両方に書いていた処理を新しい表だけにして、`db:generate`でマイグレーションを作り、SQLを読む。`apps/api/test/migration/`にテストを足す（新しい表の値が残る）。
 - [ ] T061 [US4] PR5の確かめ：`pnpm lint`・`pnpm typecheck`・`pnpm test`・`pnpm e2e`。`/api/me`にThreadsのデータがない。PR5の説明に、古い列を消すマイグレーションが前の版のAPIを壊す例外（テスト環境だけ。spec FR-019）を書く。
@@ -229,11 +230,11 @@ description: "Task list for feature meguru/029 Threads pattern ①"
 
 **Goal**：2作目の開発者が、Threadsを実例にしてパターン①をなぞれるようにする（spec US5・FR-023）。
 
-- [ ] T062 [P] [US5] `docs/app-separation.md`：Threadsをパターン①にそろえたことを書く（5章「Threadsの扱い」を書き直す、2-1の図のThreadsをパターン①の色に、3-4の道のりの「今」を更新）。実例として、Threadsの`schema.ts`・`events/`・`reportUsage`の呼び出し・`/api/threads/me`の場所を指す。
-- [ ] T063 [P] [US5] `docs/module-map.md`：2章（共通16表・Threads34表・処理の行き先）、3章（持ち主でない列の例外がなくなる）、1-4（知らせ → 出来事）、4章（`operator_events`の例外がなくなる）、6章（アプリを足す手順を、Threadsを実例にしたパターン①の手順に）、7章（Webの`apps/threads/lib/`・`withdrawalPreview`）、1-1の図（contracts/module-boundaries.md 6）。
-- [ ] T064 [P] [US5] `docs/product-structure.md` 6・7（共通の表の行・Threadsの扱い・まだ決めていないこと）、`docs/architecture.md`（設計の判断の表の「Threadsはパターン②のまま」を直す）、`docs/parallel-development.md`（Threadsの改善の再開と、2作目が実装を始めてよいこと）、`docs/README.md`（文書の一覧の説明の更新）。
-- [ ] T065 [US5] Constitution の「アプリのデータの分け方」の、T000で書いた「そろえる・途中の形を認める」を、「Threadsもパターン①にそろえた（029）」に直す（PATCH：4.9.1）。`/speckit-constitution`の手順で、版と改めた日を直す。
-- [ ] T066 [US5] 古い記述が残っていないことを確かめる：`grep`で「パターン②のまま」「`accounts`（共通）」「同じトランザクションの知らせ」「`runHook`」「`/api/accounts/`」を文書とコードのコメントから探し、今の形に直す（spec US5-2）。
+- [X] T062 [P] [US5] `docs/app-separation.md`：Threadsをパターン①にそろえたことを書く（5章「Threadsの扱い」を書き直す、2-1の図のThreadsをパターン①の色に、3-4の道のりの「今」を更新）。実例として、Threadsの`schema.ts`・`events/`・`reportUsage`の呼び出し・`/api/threads/me`の場所を指す。
+- [X] T063 [P] [US5] `docs/module-map.md`：2章（共通15表・Threads34表・処理の行き先）、3章（持ち主でない列の例外がなくなる）、1-4（知らせ → 出来事）、4章（`operator_events`の例外がなくなる）、6章（アプリを足す手順を、Threadsを実例にしたパターン①の手順に）、7章（Webの`apps/threads/lib/`・`withdrawalPreview`）、1-1の図（contracts/module-boundaries.md 6）。
+- [X] T064 [P] [US5] `docs/product-structure.md` 6・7（共通の表の行・Threadsの扱い・まだ決めていないこと）、`docs/architecture.md`（設計の判断の表の「Threadsはパターン②のまま」を直す）、`docs/parallel-development.md`（Threadsの改善の再開と、2作目が実装を始めてよいこと）、`docs/README.md`（文書の一覧の説明の更新）。
+- [X] T065 [US5] Constitution の「アプリのデータの分け方」の、T000で書いた「そろえる・途中の形を認める」を、「Threadsもパターン①にそろえた（029）」に直す（PATCH：4.9.1）。`/speckit-constitution`の手順で、版と改めた日を直す。
+- [X] T066 [US5] 古い記述が残っていないことを確かめる：`grep`で「パターン②のまま」「`accounts`（共通）」「同じトランザクションの知らせ」「`runHook`」「`/api/accounts/`」を文書とコードのコメントから探し、今の形に直す（spec US5-2）。
 
 **Checkpoint**：→ PR5を出す。
 
