@@ -24,7 +24,7 @@ import { deliverPendingEvents, wakeEventDelivery, purgeDeliveredEvents, reconcil
  * @param now - 基準にする時刻（回の実際の開始時刻）
  */
 export async function runDailyJobs(env: Env, now: Date = new Date()) {
-  // 退会のやり直しなどで共通の処理が知らせを出すので、受け取りを登録しておく（specs/027。何度呼んでも1回だけ）
+  // 退会のやり直しなどで共通の処理が出来事を出すので、アプリの受け取りを登録しておく（何度呼んでも1回だけ。specs/meguru/029）
   registerThreads();
   const steps: [string, () => Promise<unknown>][] = [
     ["token refresh", () => refreshExpiringTokens(env, createThreadsClient(env), now)],

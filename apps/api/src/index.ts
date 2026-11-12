@@ -34,7 +34,7 @@ async function deliverEvents(env: Env, at: Date): Promise<void> {
 export default {
   fetch: app.fetch,
   async scheduled(controller: ScheduledController, env: Env, ctx: ExecutionContext) {
-    // アプリの知らせの受け取りを登録する（specs/027。何度呼んでも1回だけ）
+    // アプリの登録（機能・上限・出来事の受け取り）をする（何度呼んでも1回だけ。specs/meguru/029）
     registerThreads();
     setLogAppEnv(env.APP_ENV);
     // 設定の関所は fetch 側のミドルウェアにしか無かったので、Cron はここで同じ検査をする。

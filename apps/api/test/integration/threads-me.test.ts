@@ -38,7 +38,7 @@ async function usageOf(userId: string) {
 }
 
 describe("GET /api/threads/me", () => {
-  it("/api/me のThreadsの部分と同じ値を返す（/api/me の Threads の部分は、前の版の画面のため PR5c まで残す）", async () => {
+  it("Threadsの中身を返し、共通の /api/me には Threads の中身がない（PR5c で消した）", async () => {
     const { accountId } = await createUserWithAccount("u1");
     const me = (await (await call(app, "GET", "/api/me", { user: "u1" })).json()) as Record<string, unknown>;
     const res = await call(app, "GET", "/api/threads/me", { user: "u1" });
@@ -46,7 +46,7 @@ describe("GET /api/threads/me", () => {
     expect(res.headers.get("Cache-Control")).toBe("no-store");
     const threads = (await res.json()) as Record<string, unknown>;
     expect(Object.keys(threads).sort()).toEqual([...THREADS_KEYS].sort());
-    for (const k of THREADS_KEYS) expect(threads[k]).toEqual(me[k]);
+    for (const k of THREADS_KEYS) expect(me).not.toHaveProperty(k);
     // 形は共通の threadsMeResponseSchema（specs/meguru/029 tasks.md T021）
     expect(threadsMeResponseSchema.safeParse(threads).success).toBe(true);
     expect((threads.accounts as { id: string }[]).map((a) => a.id)).toEqual([accountId]);
@@ -56,12 +56,12 @@ describe("GET /api/threads/me", () => {
     expect((await call(app, "GET", "/api/threads/me")).status).toBe(401);
   });
 
-  it("退会の確かめ：/api/threads/me/withdrawal-preview は消えるアカウントと外れるチーム。/api/me/withdrawal-preview にも同じ中身が入る（PR5c まで）", async () => {
+  it("退会の確かめ：/api/threads/me/withdrawal-preview は消えるアカウントと外れるチーム。共通の /api/me/withdrawal-preview は共通の分だけ", async () => {
     const { accountId } = await createUserWithAccount("u1");
     const threads = (await (await call(app, "GET", "/api/threads/me/withdrawal-preview", { user: "u1" })).json()) as Record<string, unknown>;
     expect(threads).toEqual({ ownedAccounts: [{ id: accountId, name: expect.any(String) }], teams: [] });
     const all = (await (await call(app, "GET", "/api/me/withdrawal-preview", { user: "u1" })).json()) as Record<string, unknown>;
-    expect(all).toMatchObject({ ...threads, email: "u1@example.com", hasActiveSubscription: false });
+    expect(all).toEqual({ email: "u1@example.com", hasActiveSubscription: false });
   });
 });
 

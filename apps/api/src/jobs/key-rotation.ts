@@ -2,7 +2,7 @@
 // 古いバージョンの行を、IVを新しく作って現在の鍵で暗号化し直す。
 // 各行の書き込みは、読んだ時点の key_version と accounts.connection_generation を条件にし、
 // その間に再接続などで書き換わった行は飛ばす（トークンの値は変わらないので世代番号は上げない）。
-// 組み立て（docs/module-map.md 2-5）に置く：共通（チーム・テストのグループの招待のトークン）とThreads（接続のトークン）の両方の暗号を入れ替えるため（specs/027）。
+// 組み立て（docs/module-map.md 2-5）に置く：共通（テストのグループの招待のトークン）とThreads（チームの招待のトークン・接続のトークン）の両方の暗号を入れ替えるため（specs/027・specs/meguru/029）。
 import { and, eq, ne, sql } from "drizzle-orm";
 import type { Env } from "../kernel/env";
 import { createDb } from "../kernel/db/client";

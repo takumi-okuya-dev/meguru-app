@@ -15,6 +15,7 @@
 - `<アプリ>`はアプリのID（`@meguru/shared`の`APP_CATALOG`の`id`）。新しいアプリのIDとスキーマ名は、そのアプリの最初の仕様で決める。共通の料金の機能（`platform/billing`）と紛らわしい名前は避ける。
 - 外枠や共通（どのアプリにも属さないもの）の仕様は`specs/meguru/NNN-…`（029から）。
 - ポートは、作った順に100ずつずれる。`pnpm worktree:list`で確かめられる。
+- **029のあとの進め方**（2026-11-13）：029（Threadsをパターン①にそろえる。`specs/meguru/029-threads-pattern1`）の間は、Threadsの改善を止め、人物管理・集金管理は仕様と計画（文書）までにしていた。029を終えたので、Threadsの改善を再開してよく、人物管理・集金管理も実装を始めてよい。新しいアプリは、Threadsを実例にしてパターン①で作る（[app-separation.md](./app-separation.md) 5章・[module-map.md](./module-map.md) 6章）。
 
 ```mermaid
 flowchart LR
