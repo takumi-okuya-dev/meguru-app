@@ -151,6 +151,18 @@ describe("退会の途中（T052）", () => {
     expect(screen.getByLabelText(/確認のため、メールアドレス/)).toBeInTheDocument();
   });
 
+  it("メールアドレスを入れたあと開き直して、アプリの分が読めなければ「退会する」は押せない", async () => {
+    renderSettings();
+    await openDialog();
+    await screen.findByText("あなたのアカウント（2件）：カフェの公式、店長");
+    await userEvent.type(screen.getByLabelText(/確認のため、メールアドレス/), "t@example.com");
+    await userEvent.click(screen.getByRole("button", { name: "キャンセル" }));
+    threadsWithdrawalPreview.mockReset().mockRejectedValue(new ApiError("INTERNAL_ERROR", 500));
+    await openDialog();
+    expect(await screen.findByRole("alert")).toHaveTextContent("退会の内容を読み込めませんでした");
+    expect(screen.getAllByRole("button", { name: "退会する" }).at(-1)).toBeDisabled();
+  });
+
   it("アプリの分が読めなければ、消えるものを見せずに退会させない（読み込めなかったと出す）", async () => {
     threadsWithdrawalPreview.mockReset().mockRejectedValue(new ApiError("INTERNAL_ERROR", 500));
     renderSettings();

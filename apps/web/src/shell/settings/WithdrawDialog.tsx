@@ -48,7 +48,9 @@ export function WithdrawDialog({ open, onOpenChange }: { open: boolean; onOpenCh
     },
   });
   const code = withdraw.error instanceof ApiError ? withdraw.error.code : withdraw.error ? "INTERNAL_ERROR" : null;
-  const matches = Boolean(preview.data) && normalize(email) !== "" && normalize(email) === normalize(preview.data!.email);
+  // 退会できるのは、共通の分とアプリの分がすべて読めていて、メールアドレスが合うときだけ（読めずにエラーを出している間は押せない。PR #104 のCodexレビュー）
+  const ready = Boolean(preview.data) && appPreviews.every((q) => q.isSuccess);
+  const matches = ready && normalize(email) !== "" && normalize(email) === normalize(preview.data!.email);
   const p = preview.data;
 
   return (
