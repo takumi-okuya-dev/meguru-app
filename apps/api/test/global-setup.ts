@@ -60,9 +60,19 @@ export default async function setup(project: TestProject) {
   }
   await pool.end();
   const unlock = await waitForOtherWorktrees();
-  const migrating = new pg.Pool({ connectionString: DIRECT_URL });
-  await migrate(drizzle(migrating), { migrationsFolder: new URL("../drizzle", import.meta.url).pathname });
-  await migrating.end();
+  // ここから先で失敗したら、ロックを外してから止める（Vitest は準備が成功したときだけ片づけを呼ぶので、
+  // 外さないと、ほかの作業場所の結合テストとE2Eが、この実行が終わるまで待ち続ける）
+  try {
+    const migrating = new pg.Pool({ connectionString: DIRECT_URL });
+    try {
+      await migrate(drizzle(migrating), { migrationsFolder: new URL("../drizzle", import.meta.url).pathname });
+    } finally {
+      await migrating.end();
+    }
+  } catch (err) {
+    await unlock();
+    throw err;
+  }
 
   const app = createFakeThreads();
   const server = serve({ fetch: app.fetch, port: 0 });

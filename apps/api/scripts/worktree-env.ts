@@ -4,6 +4,7 @@
 // マイグレーション（drizzle.config.ts）・結合テスト（test/global-setup.ts）・マイグレーションのテスト（test/helpers/migrate.ts）・
 // 開発サーバー（scripts/dev.ts）が、ほかより先にこれを呼ぶ。
 import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 
 /** 作業場所ごとの値。 */
 export type WorktreeEnv = {
@@ -21,7 +22,11 @@ export type WorktreeEnv = {
 export function loadWorktreeEnv(): WorktreeEnv {
   const values: Record<string, string> = {};
   try {
-    const text = readFileSync(new URL("../../../.env.worktree", import.meta.url).pathname, "utf8");
+    // pathname は空白や日本語を %20 などのまま返すので、fileURLToPath でファイルのパスに直す
+    const text = readFileSync(
+      fileURLToPath(new URL("../../../.env.worktree", import.meta.url).href),
+      "utf8",
+    );
     for (const line of text.split("\n")) {
       const m = /^\s*([A-Z0-9_]+)\s*=\s*(.*?)\s*$/.exec(line);
       if (m) values[m[1]!] = m[2]!;
