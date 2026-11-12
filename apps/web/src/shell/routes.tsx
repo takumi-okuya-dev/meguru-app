@@ -3,6 +3,8 @@
 import { Outlet, type RouteObject } from "react-router";
 import { AppRegistryProvider, type AppModule } from "./app-module";
 import { RequireAuth } from "./guards/RequireAuth";
+import { useRememberLastApp } from "./lib/use-last-app";
+import { AppsPage } from "./pages/apps";
 import { ShellLanding } from "./pages/landing";
 import { LegacyRedirect } from "./pages/legacy-redirect";
 import { LegalCommercePage } from "./pages/legal-commerce";
@@ -41,6 +43,15 @@ export function buildRoutes(apps: readonly AppModule[]): RouteObject[] {
       children: routesOf(apps),
     },
   ];
+}
+
+/**
+ * ログインしたあとの画面の入れ物。アプリの画面を開いたら、最後に使ったアプリとして覚える。
+ * @returns 中の画面
+ */
+function RememberLastApp() {
+  useRememberLastApp();
+  return <Outlet />;
 }
 
 /**
@@ -89,25 +100,35 @@ function routesOf(apps: readonly AppModule[]): RouteObject[] {
     {
       element: <RequireAuth />,
       children: [
-        // 入口の振り分け（specs/028 contracts/ui-routes.md 3）
-        { path: "/", element: <ShellLanding /> },
-        ...apps.flatMap((a) => a.routes),
         {
-          path: "/settings",
-          element: <SettingsLayout />,
+          // ログインしたあとの画面。アプリの画面を開いたら、最後に使ったアプリとして覚える（specs/028 contracts/ui-routes.md 6）
+          element: <RememberLastApp />,
           children: [
-            { index: true, element: <SettingsIndex /> },
-            { path: "appearance", element: <AppearanceSettings /> },
-            { path: "account", element: <AccountSettingsPage /> },
-            { path: "billing", element: <BillingSettingsPage /> },
-            { path: "referral", element: <ReferralSettingsPage /> },
-            // 運営者だけ（specs/016 contracts/ui-routes.md 3）。運営者でなければ画面の中で断る
-            { path: "features", element: <FeaturesPage /> },
-            { path: "test-groups", element: <TestGroupsPage /> },
-            { path: "test-groups/:groupId", element: <TestGroupDetailPage /> },
-            { path: "limits", element: <LimitsPage /> },
-            // アプリが足す項目（Threadsならテスター招待・アカウント一覧。specs/028 research.md R9）
-            ...apps.flatMap((a) => (a.settingsSections ?? []).map((s) => ({ path: s.slug, element: s.element }))),
+            // 入口の振り分け（specs/028 contracts/ui-routes.md 3）
+            { path: "/", element: <ShellLanding /> },
+            // すべてのアプリ（specs/028 contracts/ui-routes.md 4）
+            { path: "/apps", element: <AppsPage /> },
+            ...apps.flatMap((a) => a.routes),
+            {
+              path: "/settings",
+              element: <SettingsLayout />,
+              children: [
+                { index: true, element: <SettingsIndex /> },
+                { path: "appearance", element: <AppearanceSettings /> },
+                { path: "account", element: <AccountSettingsPage /> },
+                { path: "billing", element: <BillingSettingsPage /> },
+                { path: "referral", element: <ReferralSettingsPage /> },
+                // 運営者だけ（specs/016 contracts/ui-routes.md 3）。運営者でなければ画面の中で断る
+                { path: "features", element: <FeaturesPage /> },
+                { path: "test-groups", element: <TestGroupsPage /> },
+                { path: "test-groups/:groupId", element: <TestGroupDetailPage /> },
+                { path: "limits", element: <LimitsPage /> },
+                // アプリが足す項目（Threadsならテスター招待・アカウント一覧。specs/028 research.md R9）
+                ...apps.flatMap((a) =>
+                  (a.settingsSections ?? []).map((s) => ({ path: s.slug, element: s.element })),
+                ),
+              ],
+            },
           ],
         },
       ],

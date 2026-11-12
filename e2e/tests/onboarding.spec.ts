@@ -10,7 +10,11 @@ test.beforeEach(async () => {
 
 test("名前だけで作り、つながずに課題・案の登録・承認まで進め、設定でトークンでつなぐ", async ({ page }) => {
   await signIn(page);
+  // 028：アプリをまだ使っていない人は、すべてのアプリの画面から始め、Threadsの「使い始める」でアカウントを作る画面へ
   await page.goto("/");
+  await expect(page).toHaveURL(/\/apps$/);
+  await expect(page.getByRole("heading", { name: "すべてのアプリ" })).toBeVisible();
+  await page.getByRole("region", { name: "足せるアプリ" }).getByRole("link", { name: "使い始める" }).click();
   await expect(page).toHaveURL(/\/threads\/accounts\/new$/);
   await expect(page.getByRole("heading", { name: "アカウントを作る" })).toBeVisible();
   // Threadsへの接続の操作は、この画面に出さない（FR-001）

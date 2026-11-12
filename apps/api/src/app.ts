@@ -122,7 +122,7 @@ export function createApp(deps: AppDeps = defaultDeps) {
       try {
         const web = new URL(c.env.WEB_ORIGIN).origin;
         return c.redirect(
-          `${web}/accounts/new?${new URLSearchParams({ error: "CONFIG_ERROR" })}`,
+          `${web}/threads/accounts/new?${new URLSearchParams({ error: "CONFIG_ERROR" })}`,
           302,
         );
       } catch {

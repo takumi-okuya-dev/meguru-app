@@ -1,8 +1,8 @@
-# モジュール地図（API）
+# モジュール地図（API・Web）
 
-**作成**：2026-11-10（specs/027-modular-monolith） | **対象**：`apps/api/src`
+**作成**：2026-11-10（specs/027-modular-monolith） | **Webの章**：2026-11-12（specs/028-meguru-shell） | **対象**：`apps/api/src`・`apps/web/src`
 
-APIのコードを、どのモジュールが持つかを決めた地図。表の持ち主・入口・依存の向き・例外を、ここを正本として管理する。プロダクト全体の形は[docs/product-structure.md](./product-structure.md)、構想の正本は personal-knowledge-base の`Wiki/仕事/システム開発/アイデア/個人開発版Google Workspace構想（スイート型SaaS）.md`。
+APIのコード（1〜6章）とWebのコード（7章）を、どのモジュールが持つかを決めた地図。表の持ち主・入口・依存の向き・例外を、ここを正本として管理する。プロダクト全体の形は[docs/product-structure.md](./product-structure.md)、構想の正本は personal-knowledge-base の`Wiki/仕事/システム開発/アイデア/個人開発版Google Workspace構想（スイート型SaaS）.md`。
 
 ## 1. 決まり
 
@@ -159,7 +159,66 @@ ESLintで止められる違反は0件にする。今すぐ直せないものは�
 - ESLintの規則は、`apps/<名前>/`の形から自動でアプリとして当たる（設定は要らない）。
 - `workspaces`・利用権（entitlement）などスイート向けの表は、2作目で本当に共通だった部分を取り出すときに考える（[docs/product-structure.md](./product-structure.md) 7）。
 
-## 7. この文書の更新
+## 7. Webの境界（specs/028）
+
+Webのコード（`apps/web/src`）を、外枠（めぐるの共通の画面の枠）とアプリに分けた。APIの1〜6章と同じ考え方で、種類・入口・依存の向きをESLintで守る。
+
+### 7-1. 4つの種類と依存の向き
+
+| 種類 | 置き場所 | 中身 | 使ってよい相手 |
+|---|---|---|---|
+| 組み立て | `main.tsx`・`router.tsx`・`app-registry.ts` | 出せるアプリの一覧（`registeredApps`）を作り、外枠の`buildRoutes`に渡してルーターを組む | すべて（外枠とアプリは入口から） |
+| アプリ | `apps/<名前>/`（今は`threads`） | アプリの画面・ルート・サイドバーの中身・アプリでだけ使う部品 | 外枠の入口（`shell/index.ts`）・共通の部品。**アプリ同士は使わない** |
+| 外枠 | `shell/` | 画面の骨格（サイドバーの枠・アプリの切り替え・ユーザーメニュー・上部バー）・入口の振り分け（`/`）・すべてのアプリ（`/apps`）・共通の設定（`/settings`）・ログインのいらない共通のページ・関所（ログイン・契約・退会・テスト版） | 共通の部品。**アプリは使わない**（アプリの一覧は組み立てから受け取る） |
+| 共通の部品 | `components/`・`lib/` | 見た目の部品（`components/ui`）・APIの呼び出し（`lib/api-client.ts`）・書式・保存のエラー・確認のダイアログ・契約の帯など | 共通の部品だけ |
+
+```text
+組み立て → アプリ → 外枠の入口 → 共通の部品
+組み立て → 外枠 ─────────────→ 共通の部品
+```
+
+- 外枠からアプリへは読まない。アプリが外枠に渡すものは`AppModule`（`shell/app-module.ts`）にまとめ、組み立てが一覧にして`buildRoutes(apps)`に渡す。外枠はルートのいちばん外の`AppRegistryProvider`で一覧を配る。
+- アプリのサイドバーの中身（頭・中身・下の項目＝`AppSidebar`）は、アプリの画面の枠が`AppShell`の`sidebar`に渡す（Threadsは`ThreadsShell`）。
+- 同じ種類の中（外枠の中、同じアプリの中、共通の部品の中）は自由に読んでよい。
+
+### 7-2. 自動のチェック
+
+- ESLintの規則`local/web-module-boundaries`（`eslint-rules/web-module-boundaries.js`）が、`apps/web/src`のすべてのファイルで次を止める：①アプリ同士、②外枠 → アプリ（入口も）、③アプリ → 外枠の入口でないところ、④共通の部品 → 外枠・アプリ・組み立て、⑤外枠・アプリ → 組み立て、⑥組み立て → 入口でないところ、⑦どの種類にも入らない場所のファイル（`strictPlacement`）。
+- 読みこみ先は、別名（`@/…`）と相対パスの両方を`src`からのパスに直して判定する。型の宣言（`.d.ts`）は置き場所を問わない。
+- 種類はパスの形で決まる。`apps/<名前>/`を作れば、設定を足さなくてもアプリとして当たる。テスト（`apps/web/test`）にはかけない。
+
+### 7-3. 主な置き場所
+
+| モジュール | 主な中身 |
+|---|---|
+| `shell/` | `app-module.ts`（`AppModule`・`AppRegistryProvider`・`useCurrentApp`・`useEntryAppHome`）・`routes.tsx`（`buildRoutes`）・`layout/`（`AppShell`・サイドバーの枠・`AppSwitcher`・`UserMenu`・`PageHeader`・`EnvBanner`）・`pages/`（入口の振り分け・すべてのアプリ・前のURLの転送・ログイン・利用規約・特定商取引法の表記・テスト用のグループの招待・紹介・見つかりません）・`settings/`（共通の設定）・`guards/`（関所）・`lib/`（`seller-info`・`use-last-app`） |
+| `apps/threads/` | `index.ts`（`threadsApp`）・`routes.tsx`・`sidebar/`（アカウントの切り替え・機能の一覧・チーム・`ThreadsShell`）・`pages/`（アカウント・チーム・接続から戻る画面・チームの招待・トークンの作り方・データ削除の確認・運営の「テスター招待」「アカウント一覧」）・`components/`・`lib/`（`paths.ts`・`use-account-access` など） |
+| `components/`・`lib/` | `components/ui`・`ApiErrorScreen`・`LoadingSkeleton`・`FeatureUnavailableNotice`・`ConfirmDialog`・`billing/`・`lib/api-client.ts`・`query.ts`・`home-link.ts`・`invite-return.ts`・`referral-store.ts`・`use-logout.ts` など |
+
+### 7-4. URLの決まり
+
+- アプリの画面は、自分のパスの下に置く（Threadsは`/threads/…`）。パスは`@meguru/shared`のアプリの一覧（`APP_CATALOG`）の`basePath`とそろえる。
+- 前のURL（`/accounts/…`・`/teams/…`）は、アプリの`legacyRedirects`で`/threads/…`へ転送する（ログインの関所の外。少なくとも次の外枠のfeatureまで残す）。
+- ログインのいらないページも、2作目からはアプリのパスの下に置く。
+
+### 7-5. 境界の例外とこれから
+
+- ESLintで止める違反の例外は0件。
+- **Threadsの例外（URL）**：Metaに登録した・外部に配ったURL（`/invite/:token`・`/guide/threads-token`・`/data-deletion/:code`）は、Threadsのパスの外に今のまま置く。
+- **移す候補**：`lib/api-client.ts`と`lib/query.ts`にThreadsの呼び出しとキーが入っている（Webのテストが`@/lib/api-client`をまるごとモックしているため、028では分けなかった）。2作目の呼び出しは`apps/<名前>/lib/api.ts`に置く。
+- **使っているアプリの判定**：`/api/me`の`apps.using`は、共通（`platform/identity/me-routes.ts`）が「開けるアカウントが1件以上ならThreadsを使っている」で決めている。2作目でアプリごとの利用権を足すときに、アプリごとの判定に置き換える。
+- **共通のパッケージ**：`@meguru/shared`の中身は分けていない。2作目のものは`packages/shared/src/apps/<名前>/`に置き、`@meguru/shared/<名前>`で読む（`package.json`の`exports`に足す）。今のThreads固有のもの（投稿・戦略・分析など）は移す候補。
+
+### 7-6. Webにアプリを足す手順
+
+1. `packages/shared/src/apps.ts`の`APP_CATALOG`に1行足す（ID・名前・パス・説明・料金・`released: false`）。
+2. `apps/web/src/apps/<名前>/`を作り、`index.ts`で`AppModule`を出す（`id`・`basePath`・`icon`・`startPath`・`routes`。ルートは`/<名前>/…`の下）。画面の枠は`AppShell`に自分のサイドバーの中身（`AppSidebar`）を渡す。
+3. `apps/web/src/app-registry.ts`の一覧に1行足す（**外枠のほかの場所は直さない**）。
+4. APIは6章の手順で`apps/api/src/apps/<名前>/`に足し、`/api/me`の`apps.using`の判定を足す（2作目では利用権と一緒に決め直す）。
+5. 業務の判断とデータのやりとりは、APIと`@meguru/shared`に置く。Webの画面やブラウザだけで動く仕組みに閉じこめない（モバイル化を見込んだ決まり。Constitutionの技術スタック制約）。
+6. 出してよくなったら`released: true`にする。
+
+## 8. この文書の更新
 
 - モジュール・表・処理を足す・移すときは、同じPRでこの地図を直す。
 - 種類・依存の向き・共通とアプリの分担を変えたら、[docs/product-structure.md](./product-structure.md)も直す。

@@ -71,6 +71,8 @@ export const users = pgTable("users", {
   lastAccountClientId: text("last_account_client_id"),
   lastAccountOpenSeq: bigint("last_account_open_seq", { mode: "number" }),
   lastAccountOpenReceivedAt: timestamp("last_account_open_received_at", { withTimezone: true, precision: 6 }),
+  /** 最後に使ったアプリ（@meguru/shared の APP_CATALOG の ID。PUT /api/me/last-app だけが書く。specs/028 data-model.md 1） */
+  lastAppId: text("last_app_id"),
   // 料金なしの印（specs/013 data-model.md）。運用のスクリプトだけが変える
   billingExempt: boolean("billing_exempt").notNull().default(false),
   // 退会を受け付けた時刻。退会が終わると行ごと消えるので、残っていれば「途中」（specs/013 research.md R10）

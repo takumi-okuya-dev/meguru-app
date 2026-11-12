@@ -73,6 +73,7 @@ flowchart LR
 | マイグレーションは「足してから消す」（expand / contract）で書く | 古いAPIと新しいDBが並んでも壊れず、APIだけを戻せる |
 | 既存のツールを使わず、一から作る | n8nは再販に制約のあるライセンス、PostizはAGPL-3.0で、SaaSとして売りにくい |
 | APIはモジュラーモノリスにする。土台・窓口・共通・アプリ・組み立ての5つに分け、依存は一方向（組み立て → アプリ → 共通 → 窓口 → 土台）。ほかのモジュールは入口（`index.ts`）からだけ使い、表には持ち主のモジュールが1つある。共通からアプリを呼ぶときは「知らせ」を使う。ESLintの規則で自動で守る（027、[docs/module-map.md](./module-map.md)） | このアプリを起点に、共通のアカウント・契約で複数のアプリを束ねるスイートを育てるため（[docs/product-structure.md](./product-structure.md)）。2作目を同じリポジトリにアプリとして足せ、必要になったアプリだけを後から切り出せる |
+| Webは、めぐるの外枠（`shell/`）・アプリ（`apps/<名前>/`。今はThreads）・共通の部品（`components/`・`lib/`）・組み立て（`main.tsx`・`router.tsx`・`app-registry.ts`）に分ける。外枠はアプリを読まず、アプリが出す`AppModule`を組み立てが一覧にして渡す。アプリの画面は自分のパスの下（Threadsは`/threads/…`）に置き、前のURL（`/accounts/…`・`/teams/…`）は転送する。入口（`/`）は`/api/me`の`apps.landing`（最後に使ったアプリ）で振り分け、0本の人は「すべてのアプリ」（`/apps`）から始める。ESLintの規則で境界を守る（028、[docs/module-map.md](./module-map.md) 7） | Threadsの改善と2作目のアプリを並行して作れるようにするため（[docs/product-structure.md](./product-structure.md) 6）。行き先・使っているアプリの判断はAPIに置き、将来のモバイルの画面からも同じ判断を使えるようにする |
 
 ## 安全とデータの守り
 

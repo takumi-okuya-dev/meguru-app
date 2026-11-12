@@ -2,7 +2,7 @@
 // 外枠はアプリのコードを読まない。各アプリが apps/<名前>/index.ts で AppModule を出し、組み立て（app-registry.ts）が一覧にして外枠に渡す。
 import type { LucideIcon } from "lucide-react";
 import { createContext, useContext, type ReactElement } from "react";
-import type { RouteObject } from "react-router";
+import { useLocation, type RouteObject } from "react-router";
 
 /** 設定の画面（/settings）に、アプリが足す項目。 */
 export type SettingsSectionContribution = {
@@ -27,8 +27,12 @@ export type LegacyRedirect = { from: string; to: string };
 export type AppModule = {
   /** アプリのID（PR3 で @meguru/shared のアプリの一覧の ID とそろえる） */
   id: string;
-  /** 画面のURLの頭（例：/threads） */
+  /** 画面のURLの頭（例：/threads。@meguru/shared の APP_CATALOG の basePath とそろえる） */
   basePath: string;
+  /** アプリのアイコン（アプリの切り替え・すべてのアプリの画面） */
+  icon: LucideIcon;
+  /** すべてのアプリの画面の「使い始める」の行き先（Threadsならアカウントを作る画面） */
+  startPath: string;
   /** ログインの要るルート */
   routes: RouteObject[];
   /** ログインのいらないルート（サイドバーの外） */
@@ -52,6 +56,25 @@ export const AppRegistryProvider = AppRegistryContext.Provider;
  */
 export function useAppRegistry(): readonly AppModule[] {
   return useContext(AppRegistryContext);
+}
+
+/**
+ * URLから、今開いているアプリを決める（URLの頭が basePath と一致するアプリ）。
+ * @param apps - 出せるアプリの入口
+ * @param pathname - 今のURLのパス
+ * @returns 開いているアプリ（どのアプリのパスでもなければ undefined）
+ */
+export function findCurrentApp(apps: readonly AppModule[], pathname: string): AppModule | undefined {
+  const lower = pathname.toLowerCase();
+  return apps.find((a) => lower === a.basePath || lower.startsWith(`${a.basePath}/`));
+}
+
+/**
+ * 今開いているアプリを受け取る。
+ * @returns 開いているアプリ（どのアプリのパスでもなければ undefined）
+ */
+export function useCurrentApp(): AppModule | undefined {
+  return findCurrentApp(useAppRegistry(), useLocation().pathname);
 }
 
 /**

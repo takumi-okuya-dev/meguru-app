@@ -43,6 +43,7 @@ const PUBLIC = [
 /** ログインの要るルート（contracts/ui-routes.md 1-2）。Threadsの画面は /threads の下。 */
 const AUTH = [
   "/",
+  "/apps",
   "/threads",
   "/threads/accounts/new",
   "/threads/complete",
@@ -74,6 +75,20 @@ describe("ルートの組み立て", () => {
     expect(paths).not.toContain("/threads/accounts/:accountId [auth]");
     expect(paths).toContain("/settings/billing [auth]");
     expect(paths).toContain("*");
+  });
+});
+
+describe("アプリの一覧とのそろえ", () => {
+  it("Threadsの入口のIDとパスは、@meguru/shared のアプリの一覧とそろっている", async () => {
+    const { appById } = await import("@meguru/shared");
+    expect(appById(threadsApp.id)?.basePath).toBe(threadsApp.basePath);
+  });
+
+  it("組み立ては、出してよいアプリ（released）だけを登録する", async () => {
+    const { registeredApps } = await import("@/app-registry");
+    const { appById } = await import("@meguru/shared");
+    expect(registeredApps.map((a) => a.id)).toEqual(["threads"]);
+    expect(registeredApps.every((a) => appById(a.id)?.released)).toBe(true);
   });
 });
 

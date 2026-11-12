@@ -1,6 +1,14 @@
 // GET /api/me（FR-004・FR-005、research.md R10。specs/008 research.md R11 で役割つきに広げ、
 // specs/011 research.md R5 で入っているチームを足した）
-import { FEATURES, type Role, withdrawRequestSchema } from "@meguru/shared";
+import {
+  FEATURES,
+  type MeApps,
+  type Role,
+  lastAppRequestSchema,
+  releasedApps,
+  resolveLandingApp,
+  withdrawRequestSchema,
+} from "@meguru/shared";
 import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { Hono, type MiddlewareHandler } from "hono";
@@ -38,6 +46,22 @@ export function resolveLandingAccountId(
   if (byUsed[0]) return byUsed[0].id;
   const byCreated = [...owned].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
   return byCreated[0]?.id ?? helped[0]?.id ?? null;
+}
+
+/**
+ * /api/me の apps を決める（specs/028 contracts/api.md 1、research.md R6）。
+ * Threadsを「使っている」のは、開けるアカウント（オーナーと担当）が1件以上あるか、チームに入っているとき（チームの画面と見せてもらっているアカウントはThreadsの中にある）。運用するアカウントの表は共通の持ち主（027）なので、
+ * 共通の中で決める。2作目でアプリごとの利用権を足すときに、アプリごとの判定に置き換える。
+ * @param visibleAccounts - 開けるアカウントの数
+ * @param teams - 入っているチームの数
+ * @param lastAppId - users.last_app_id
+ * @returns apps
+ */
+export function resolveMeApps(visibleAccounts: number, teams: number, lastAppId: string | null): MeApps {
+  const available = releasedApps().map((a) => a.id);
+  const using = available.filter((id) => id === "threads" && (visibleAccounts > 0 || teams > 0));
+  const last = lastAppId && available.includes(lastAppId) ? lastAppId : null;
+  return { available, using, last, landing: resolveLandingApp(using, last) };
 }
 
 /**
@@ -112,8 +136,18 @@ export function meRoutes(authed: MiddlewareHandler<AppEnv>, deleteClerkUser: (en
       dailyPostLimit: limits.operator ? null : limits.dailyPostLimit,
       // 招待の管理がONか（つなぐ画面の申し込みの欄。specs/024 research.md R4）
       testerInvites: { enabled: testerInvitesEnabledOf(c.env) },
+      // 出せるアプリ・使っているアプリ・最後に使ったアプリ・入口の行き先（specs/028 contracts/api.md 1）
+      apps: resolveMeApps(visible.length, teams.length, user.lastAppId),
     });
   })
+    // 最後に使ったアプリを覚える（specs/028 contracts/api.md 2）。外枠が、アプリの画面を開いたときに呼ぶ
+    .put("/me/last-app", authed, async (c) => {
+      const parsed = lastAppRequestSchema.safeParse(await c.req.json().catch(() => null));
+      if (!parsed.success) throw new AppError("VALIDATION_FAILED", 400, "invalid last app", undefined, ["app"]);
+      const db = createDb(c.env.DATABASE_URL);
+      await db.update(users).set({ lastAppId: parsed.data.app, updatedAt: new Date() }).where(eq(users.id, c.get("user").id));
+      return c.body(null, 204);
+    })
     // 退会（specs/013 contracts/api.md「自分」、research.md R10）
     .get("/me/withdrawal-preview", authed, async (c) => {
       c.header("Cache-Control", "no-store");
