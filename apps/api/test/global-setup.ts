@@ -22,6 +22,32 @@ declare module "vitest" {
   }
 }
 
+// 作業場所（git worktree）をまたいで、結合テストとE2Eを1つずつ流すためのロックの番号（e2e/global-setup.ts と同じ値）。
+// DBは作業場所ごとに分かれているが、Workers からつなぐ local-neon-http-proxy は1つで、2つを同時に流すと
+// 認証の問い合わせが追いつかず「Control plane request failed」で落ちるため（README「手元で同時に進める」）
+const CROSS_WORKTREE_LOCK = 72_013_001;
+
+/**
+ * ほかの作業場所の結合テスト・E2Eが終わるまで待ち、ロックを取る。ロックはこの接続を閉じると外れる
+ * （テストが途中で止まっても、接続が切れて外れる）。
+ * @returns ロックを外す関数
+ */
+async function waitForOtherWorktrees(): Promise<() => Promise<void>> {
+  // アドバイザリーロックはDBごとなので、どの作業場所にもある postgres のDBで取る
+  const url = new URL(DIRECT_URL);
+  url.pathname = "/postgres";
+  const client = new pg.Client({ connectionString: url.toString() });
+  await client.connect();
+  const got = await client.query<{ ok: boolean }>("select pg_try_advisory_lock($1) as ok", [CROSS_WORKTREE_LOCK]);
+  if (!got.rows[0]?.ok) {
+    console.log("ほかの作業場所で結合テストかE2Eが流れています。終わるまで待ちます…");
+    await client.query("select pg_advisory_lock($1)", [CROSS_WORKTREE_LOCK]);
+  }
+  return async () => {
+    await client.end();
+  };
+}
+
 export default async function setup(project: TestProject) {
   const pool = new pg.Pool({ connectionString: DIRECT_URL });
   try {
@@ -32,8 +58,11 @@ export default async function setup(project: TestProject) {
       { cause: err },
     );
   }
-  await migrate(drizzle(pool), { migrationsFolder: new URL("../drizzle", import.meta.url).pathname });
   await pool.end();
+  const unlock = await waitForOtherWorktrees();
+  const migrating = new pg.Pool({ connectionString: DIRECT_URL });
+  await migrate(drizzle(migrating), { migrationsFolder: new URL("../drizzle", import.meta.url).pathname });
+  await migrating.end();
 
   const app = createFakeThreads();
   const server = serve({ fetch: app.fetch, port: 0 });
@@ -54,5 +83,6 @@ export default async function setup(project: TestProject) {
   return async () => {
     await new Promise<void>((resolve) => server.close(() => resolve()));
     await new Promise<void>((resolve) => stripe.close(() => resolve()));
+    await unlock();
   };
 }
