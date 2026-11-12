@@ -1781,7 +1781,7 @@ export const testGroupListSchema = z.object({ groups: z.array(testGroupSummarySc
 /** 運営者の画面のグループの詳しい内容。 */
 export const testGroupDetailSchema = testGroupSummarySchema.extend({
   /** グループの設定でOFFのまとまり（specs/019 FR-017。名前はアプリが登録したもの。specs/meguru/029 T070） */
-  disabled: z.array(z.string().regex(/^[a-z_]{1,30}$/)),
+  disabled: z.array(z.string().regex(/^[a-z_]{1,30}$/)), // appKeySchema と同じ形（定義の順のため、ここでは書き下す）
   /** 入っている人（入った順） */
   members: z.array(z.object({ userId: z.string(), name: z.string(), email: z.string(), joinedAt: z.string() })),
   /** 記録（新しい順に TEST_GROUP_EVENTS_LIMIT 件） */
@@ -1828,8 +1828,13 @@ export type ReferralPage = z.infer<typeof referralPageSchema>;
 
 // ---- 機能のまとまりごとのON/OFF（specs/019-feature-switches contracts/api.md「運営者のAPI」） ----
 
-/** 機能のまとまりの名前（アプリが登録したもの。共通はアプリの名前を知らない。形は DB の CHECK と同じ。specs/meguru/029 tasks.md T070）。 */
-const featureSchema = z.string().regex(/^[a-z_]{1,30}$/);
+/**
+ * アプリが登録する機能・上限の名前の形（英小文字と _ の1〜30文字。機能の表の CHECK と、API の登録の確かめと同じ。
+ * 共通はアプリの名前を知らない。specs/meguru/029 tasks.md T070）。
+ */
+export const appKeySchema = z.string().regex(/^[a-z_]{1,30}$/);
+/** 機能のまとまりの名前。 */
+const featureSchema = appKeySchema;
 
 /** GET /api/operator/users?email= のクエリ（完全一致。前後の空白を除き、大文字・小文字を区別しない）。 */
 export const operatorUserQuerySchema = z.object({ email: z.string().trim().toLowerCase().pipe(z.email()) });
@@ -2306,10 +2311,10 @@ export const testerSettingsRequestSchema = z.object({
 // 運営者の上限は「名前 → 値」の形（名前と範囲はアプリが登録したもの。共通はアプリの名前を知らない。specs/meguru/029 tasks.md T070）。
 // 名前が登録とそろっているか・範囲に入っているかは、API が登録の一覧で確かめる。
 
-/** 上限の名前（DB の CHECK と同じ形）。 */
-const limitKeySchema = z.string().regex(/^[a-z_]{1,30}$/);
-/** 上限の値（1以上の整数。上の範囲は API が登録の一覧で確かめる）。 */
-const limitValueSchema = z.number().int().min(1);
+/** 上限の名前。 */
+const limitKeySchema = appKeySchema;
+/** 上限の値（0以上の整数。DB の CHECK と同じ。アプリが登録した範囲は API が登録の一覧で確かめる）。 */
+const limitValueSchema = z.number().int().min(0);
 
 /** PUT /api/operator/limits のリクエスト（全員共通の既定値。登録した上限すべての値）。 */
 export const defaultLimitsRequestSchema = z.object({ limits: z.record(limitKeySchema, limitValueSchema) });

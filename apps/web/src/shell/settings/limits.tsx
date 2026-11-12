@@ -33,15 +33,15 @@ const mdhm = (iso: string) => {
 };
 
 /**
- * 数の欄の値を読む（空なら null）。
+ * 数の欄の値を読む（空なら null）。範囲はアプリが登録したもの。
  * @param raw - 入力
- * @param max - 最大
- * @returns 1〜max の整数。違えば undefined、空なら null
+ * @param d - 上限（min・max）
+ * @returns min〜max の整数。違えば undefined、空なら null
  */
-const parseLimit = (raw: string, max: number): number | null | undefined => {
+const parseLimit = (raw: string, d: { min: number; max: number }): number | null | undefined => {
   if (raw.trim() === "") return null;
   const n = Number(raw);
-  return Number.isInteger(n) && n >= 1 && n <= max ? n : undefined;
+  return Number.isInteger(n) && n >= d.min && n <= d.max ? n : undefined;
 };
 
 /**
@@ -113,6 +113,11 @@ export function LimitsPage() {
             {searchError}
           </p>
         )}
+        {found && registry.isError && (
+          <p role="alert" className="text-sm text-muted-foreground">
+            {describeError(registry.error)}
+          </p>
+        )}
         {found && q.data && defs && (
           <UserLimitsCard
             key={`${found.userId}-${JSON.stringify(found.limits)}`}
@@ -131,7 +136,11 @@ export function LimitsPage() {
         <h2 id="limits-overrides-title" className="font-medium">
           既定値と違う人
         </h2>
-        {q.data && defs && q.data.overrides.length === 0 ? (
+        {registry.isError ? (
+          <p role="alert" className="text-sm text-muted-foreground">
+            {describeError(registry.error)}
+          </p>
+        ) : q.data && defs && q.data.overrides.length === 0 ? (
           <p className="text-sm text-muted-foreground">いません</p>
         ) : q.data && defs ? (
           <ul className="divide-y rounded-2xl border bg-card px-4">
@@ -191,7 +200,7 @@ export function LimitsPage() {
 
 /**
  * 数の欄（ラベルと「件」）。
- * @param props - label：項目名、note：下の小さな文、value・onChange：値、max：最大
+ * @param props - label：項目名、note：下の小さな文、value・onChange：値、min・max：範囲（アプリが登録したもの）
  * @returns 行
  */
 function LimitField({
@@ -199,6 +208,7 @@ function LimitField({
   note,
   value,
   onChange,
+  min,
   max,
   placeholder,
 }: {
@@ -206,6 +216,7 @@ function LimitField({
   note?: string;
   value: string;
   onChange: (v: string) => void;
+  min: number;
   max: number;
   placeholder?: string;
 }) {
@@ -221,7 +232,7 @@ function LimitField({
           id={id}
           type="number"
           inputMode="numeric"
-          min={1}
+          min={min}
           max={max}
           value={value}
           placeholder={placeholder}
@@ -243,8 +254,9 @@ function DefaultsForm({ defs, defaults, onSaved }: { defs: readonly LimitDef[]; 
   const [raw, setRaw] = useState<Record<string, string>>(() => Object.fromEntries(defs.map((d) => [d.key, String(defaults[d.key] ?? "")])));
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
-  const parsed = Object.fromEntries(defs.map((d) => [d.key, parseLimit(raw[d.key] ?? "", d.max)]));
-  const valid = defs.every((d) => typeof parsed[d.key] === "number");
+  const parsed = Object.fromEntries(defs.map((d) => [d.key, parseLimit(raw[d.key] ?? "", d)]));
+  // 上限が1つもなければ保存しない（運営の上限の画面を持つアプリが登録されていない）
+  const valid = defs.length > 0 && defs.every((d) => typeof parsed[d.key] === "number");
   return (
     <div className="space-y-2.5">
       <div className="divide-y rounded-2xl border bg-card px-4">
@@ -254,6 +266,7 @@ function DefaultsForm({ defs, defaults, onSaved }: { defs: readonly LimitDef[]; 
             label={d.note ? `${d.label}（${d.note}）` : d.label}
             value={raw[d.key] ?? ""}
             onChange={(v) => setRaw((prev) => ({ ...prev, [d.key]: v }))}
+            min={d.min}
             max={d.max}
           />
         ))}
@@ -308,8 +321,8 @@ function UserLimitsCard({
   );
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
-  const parsed = Object.fromEntries(defs.map((d) => [d.key, parseLimit(raw[d.key] ?? "", d.max)]));
-  const valid = defs.every((d) => parsed[d.key] !== undefined);
+  const parsed = Object.fromEntries(defs.map((d) => [d.key, parseLimit(raw[d.key] ?? "", d)]));
+  const valid = defs.length > 0 && defs.every((d) => parsed[d.key] !== undefined);
   const usageDef = defs.find((d) => d.countsUsage);
   const save = async (v: Record<string, number | null>) => {
     setPending(true);
@@ -338,6 +351,7 @@ function UserLimitsCard({
             note={parsed[d.key] === null ? `既定値（${defaults[d.key]}件）` : "この人だけ"}
             value={raw[d.key] ?? ""}
             onChange={(v) => setRaw((prev) => ({ ...prev, [d.key]: v }))}
+            min={d.min}
             max={d.max}
             placeholder={String(defaults[d.key] ?? "")}
           />

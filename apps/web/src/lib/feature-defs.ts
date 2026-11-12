@@ -19,11 +19,19 @@ export function featureDefsOf(registry: OperatorAppRegistry): FeatureDef[] {
 }
 
 /**
+ * 登録の一覧を読む（運営者だけが呼べる。機能と上限の画面が同じクエリを使う）。
+ * @returns TanStack Query の結果
+ */
+export function useOperatorRegistry() {
+  return useQuery({ queryKey: queryKeys.appRegistry, queryFn: api.appRegistry, staleTime: Infinity });
+}
+
+/**
  * 機能のまとまりの一覧を読む（運営者だけが呼べる）。
  * @returns TanStack Query の結果と、取り出したまとまり（読めるまでは undefined）
  */
 export function useFeatureDefs() {
-  const registry = useQuery({ queryKey: queryKeys.appRegistry, queryFn: api.appRegistry, staleTime: Infinity });
+  const registry = useOperatorRegistry();
   return { query: registry, defs: registry.data ? featureDefsOf(registry.data) : undefined };
 }
 

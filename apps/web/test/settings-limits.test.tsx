@@ -14,12 +14,12 @@ const mocks = vi.hoisted(() => ({
   putDefaultLimits: vi.fn(),
   findLimitUser: vi.fn(),
   putUserLimits: vi.fn(),
+  appRegistry: vi.fn(),
 }));
 vi.mock("@/lib/api-client", async (orig) => {
   const actual = await orig<typeof import("@/lib/api-client")>();
-  // 上限の名前・表示名・範囲は、登録の一覧から出す（specs/meguru/029 T070）
-  const { THREADS_REGISTRY } = await import("./helpers/app-registry");
-  return { ...actual, api: { ...actual.api, ...mocks, appRegistry: async () => THREADS_REGISTRY } };
+  // 上限の名前・表示名・範囲は、登録の一覧（appRegistry）から出す（specs/meguru/029 T070）
+  return { ...actual, api: { ...actual.api, ...mocks } };
 });
 vi.mock("@/apps/threads/lib/api", async (orig) => {
   const actual = await orig<typeof import("@/apps/threads/lib/api")>();
@@ -29,6 +29,7 @@ vi.mock("@/apps/threads/lib/api", async (orig) => {
 const { ApiError } = await import("@/lib/api-client");
 const { SettingsLayout } = await import("@/shell/settings/settings-layout");
 const { LimitsPage } = await import("@/shell/settings/limits");
+const { THREADS_REGISTRY } = await import("./helpers/app-registry");
 
 const ME = {
   user: { id: "u", email: "op@example.com", displayName: null },
@@ -81,6 +82,7 @@ function renderAt(path = "/settings/limits") {
 
 beforeEach(() => {
   for (const fn of Object.values(mocks)) fn.mockReset();
+  mocks.appRegistry.mockResolvedValue(THREADS_REGISTRY);
   mocks.me.mockResolvedValue({ ...ME, operator: true });
   mocks.operatorLimits.mockResolvedValue(LIMITS);
 });
@@ -165,5 +167,17 @@ describe("既定値と違う人・記録", () => {
     const user = userEvent.setup();
     await user.click(screen.getByRole("button", { name: /変更の記録/ }));
     expect(await screen.findByText(/人ごとの上限を変えた（拓海）/)).toBeInTheDocument();
+  });
+});
+
+describe("登録の一覧が読めないとき（PR #106 のセルフレビュー）", () => {
+  it("既定値と既定値と違う人に理由を出し、保存できる形にしない", async () => {
+    mocks.appRegistry.mockRejectedValue(new ApiError("INTERNAL_ERROR", 500));
+    renderAt();
+    const defaults = (await screen.findByRole("heading", { name: "全員の既定値" })).closest("section")!;
+    expect(await within(defaults).findByRole("alert")).toBeInTheDocument();
+    expect(within(defaults).queryByRole("button", { name: "保存" })).not.toBeInTheDocument();
+    const overrides = screen.getByRole("heading", { name: "既定値と違う人" }).closest("section")!;
+    expect(within(overrides).getByRole("alert")).toBeInTheDocument();
   });
 });

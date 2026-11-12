@@ -8,7 +8,7 @@ import {
   type OperatorLimits,
   type UserLimitsRequest,
 } from "@meguru/shared";
-import { and, asc, eq, isNotNull, or, sql } from "drizzle-orm";
+import { and, asc, eq, inArray, sql } from "drizzle-orm";
 import type { Env } from "../../kernel/env";
 import { withTransaction, type Db, type TxDb } from "../../kernel/db/client";
 import { appLimitDefaults, operatorSettings, userAppLimits, users } from "../schema";
@@ -101,40 +101,37 @@ export function dailyPostLimitSql(
  * @returns 既定値・既定値と違う人・記録
  */
 export async function listLimits(db: Db): Promise<OperatorLimits> {
-  const [defaults, overrides, events] = await Promise.all([
-    getDefaults(db),
-    db
-      .select({
-        userId: users.id,
-        name: users.displayName,
-        email: users.email,
-        accountLimit: users.accountLimit,
-        dailyPostLimit: users.dailyPostLimit,
-      })
-      .from(users)
-      .where(or(isNotNull(users.accountLimit), isNotNull(users.dailyPostLimit)))
-      .orderBy(asc(users.email))
-      .limit(500),
+  const app = limitsApp();
+  const [defaults, perUser, events] = await Promise.all([
+    namedDefaults(db, app),
+    namedUserLimits(db, app),
     listOperatorEvents(db, { actions: ["default_limits", "user_limits"], limit: LIMIT_EVENTS_LIMIT }),
   ]);
+  const ids = [...perUser.keys()];
+  const people = ids.length
+    ? await db
+        .select({ userId: users.id, name: users.displayName, email: users.email })
+        .from(users)
+        .where(inArray(users.id, ids))
+        .orderBy(asc(users.email))
+        .limit(500)
+    : [];
   return {
-    defaults: toNamed(defaults),
-    overrides: overrides.map((o) => ({ userId: o.userId, name: o.name, email: o.email, limits: toNamed(o) })),
+    defaults,
+    overrides: people.map((p) => ({ ...p, limits: perUser.get(p.userId)! })),
     events,
   };
 }
 
 // ---- 運営者の上限の、名前 → 値 の形と、古い列の対応（specs/meguru/029-threads-pattern1 research.md R7、tasks.md T070）----
-// 運営の API は「名前 → 値」の形で受け渡す（名前と範囲はアプリが登録したもの）。PR5 で古い列（operator_settings・users の
-// account_limit・daily_post_limit）を消すまでは、古い列と新しい表（app_limit_defaults・user_app_limits）の両方に書き、
-// 判定は古い列から読む。この対応は、その間だけの仕組み（PR5 で消す）。
-const OLD_COLUMNS = { accounts: "accountLimit", daily_posts: "dailyPostLimit" } as const;
-type OldKey = keyof typeof OLD_COLUMNS;
+// 運営の API は「名前 → 値」の形で受け渡す（名前と範囲はアプリが登録したもの）。値は新しい表（app_limit_defaults・
+// user_app_limits）から読み書きする。PR5 で古い列（operator_settings・users の account_limit・daily_post_limit）を消すまでは、
+// 判定がまだ古い列を読むので、古い列にある名前（accounts・daily_posts）だけは古い列にも書く。この対応はその間だけの仕組み（PR5 で消す）。
 
 /**
  * 運営の上限の画面が扱うアプリ（Threadsが registerAppLimits で宣言する）。
  * @returns アプリの番号
- * @throws Error 宣言したアプリがないとき（組み立ての登録漏れ）
+ * @throws Error 宣言したアプリがないとき（組み立ての登録漏れ。機能のON/OFFと同じく、黙って続けない）
  */
 function limitsApp(): string {
   const app = operatorLimitsApp();
@@ -143,12 +140,15 @@ function limitsApp(): string {
 }
 
 /**
- * 古い列の形の値を、名前 → 値 の形にする。
- * @param v - 古い列の形の値
- * @returns 名前 → 値
+ * 古い列に書く値（古い列にある名前だけ。ない名前は書かない）。
+ * @param v - 名前 → 値
+ * @returns 古い列の値（undefined の列は書かない）
  */
-function toNamed<T>(v: { accountLimit: T; dailyPostLimit: T }): Record<string, T> {
-  return Object.fromEntries((Object.entries(OLD_COLUMNS) as [OldKey, keyof typeof v][]).map(([key, field]) => [key, v[field]]));
+function oldColumns<T>(v: Record<string, T>): { accountLimit?: T; dailyPostLimit?: T } {
+  return {
+    ...("accounts" in v ? { accountLimit: v.accounts } : {}),
+    ...("daily_posts" in v ? { dailyPostLimit: v.daily_posts } : {}),
+  };
 }
 
 /**
@@ -170,6 +170,41 @@ export function assertLimitValues(values: Record<string, number | null>, allowNu
     ...Object.keys(values).filter((k) => !keys.includes(k)),
   ];
   if (wrong.length > 0) throw new AppError("VALIDATION_FAILED", 400, "limits must list every registered limit", undefined, wrong.map((k) => `limits.${k}`));
+}
+
+/**
+ * アプリの既定の上限（名前 → 値。新しい表から読む）。
+ * @param db - データベース（トランザクションの中でもよい）
+ * @param app - アプリの番号
+ * @returns 名前 → 既定値
+ */
+async function namedDefaults(db: Db | TxDb, app: string): Promise<Record<string, number>> {
+  const rows = await db.select({ key: appLimitDefaults.key, value: appLimitDefaults.value }).from(appLimitDefaults).where(eq(appLimitDefaults.app, app));
+  return Object.fromEntries(rows.map((r) => [r.key, r.value]));
+}
+
+/**
+ * 利用者ごとの上限（利用者の番号 → 名前 → 値。登録した名前はすべて入り、行がなければ null。新しい表から読む）。
+ * @param db - データベース（トランザクションの中でもよい）
+ * @param app - アプリの番号
+ * @param userIds - 利用者の番号（省けば、行のある人すべて）
+ * @returns 利用者の番号 → 名前 → 値
+ */
+async function namedUserLimits(db: Db | TxDb, app: string, userIds?: readonly string[]): Promise<Map<string, Record<string, number | null>>> {
+  if (userIds && userIds.length === 0) return new Map();
+  const keys = Object.keys(appLimits(app));
+  const rows = await db
+    .select({ userId: userAppLimits.userId, key: userAppLimits.key, value: userAppLimits.value })
+    .from(userAppLimits)
+    .where(and(eq(userAppLimits.app, app), userIds ? inArray(userAppLimits.userId, [...userIds]) : undefined));
+  const out = new Map<string, Record<string, number | null>>();
+  for (const id of userIds ?? []) out.set(id, Object.fromEntries(keys.map((k) => [k, null])));
+  for (const r of rows) {
+    const limits = out.get(r.userId) ?? Object.fromEntries(keys.map((k) => [k, null]));
+    if (keys.includes(r.key)) limits[r.key] = r.value;
+    out.set(r.userId, limits);
+  }
+  return out;
 }
 
 /**
@@ -230,11 +265,14 @@ export async function setDefaults(env: Env, operator: { id: string }, v: Default
   assertLimitValues(v, false);
   const app = limitsApp();
   return withTransaction(env.DATABASE_URL, async (tx) => {
-    const before = toNamed(await getDefaults(tx));
-    await tx
-      .update(operatorSettings)
-      .set({ defaultAccountLimit: v.accounts!, defaultDailyPostLimit: v.daily_posts!, updatedAt: new Date() })
-      .where(eq(operatorSettings.id, 1));
+    const before = await namedDefaults(tx, app);
+    const old = oldColumns(v);
+    if (old.accountLimit !== undefined || old.dailyPostLimit !== undefined) {
+      await tx
+        .update(operatorSettings)
+        .set({ defaultAccountLimit: old.accountLimit, defaultDailyPostLimit: old.dailyPostLimit, updatedAt: new Date() })
+        .where(eq(operatorSettings.id, 1));
+    }
     await mirrorDefaults(tx, app, v);
     await recordOperatorEvent(tx, { actorUserId: operator.id, action: "default_limits", detail: { before, after: v } });
     // 上限が上がると、次に見る時刻が早まることがある。アプリに出来事で知らせる（Threads：自動投稿を起こす。PR #71 のCodexレビュー）
@@ -276,7 +314,7 @@ async function toLimitUser(db: Db | TxDb, env: Pick<Env, "OPERATOR_CLERK_USER_ID
     name: u.displayName,
     email: u.email,
     operator: isOperator(env, u.clerkUserId),
-    limits: toNamed(u),
+    limits: (await namedUserLimits(db, app, [u.id])).get(u.id)!,
     usage,
   };
 }
@@ -302,9 +340,10 @@ export async function setUserLimits(
   return withTransaction(env.DATABASE_URL, async (tx) => {
     const [before] = await tx.select().from(users).where(eq(users.id, userId)).for("update").limit(1);
     if (!before) throw new AppError("USER_NOT_FOUND", 404, "user not found");
+    const beforeLimits = (await namedUserLimits(tx, app, [userId])).get(userId)!;
     const [after] = await tx
       .update(users)
-      .set({ accountLimit: v.accounts ?? null, dailyPostLimit: v.daily_posts ?? null, updatedAt: new Date() })
+      .set({ ...oldColumns(v), updatedAt: new Date() })
       .where(eq(users.id, userId))
       .returning();
     await mirrorUserLimits(tx, app, userId, v);
@@ -312,7 +351,7 @@ export async function setUserLimits(
       actorUserId: operator.id,
       subjectUserId: userId,
       action: "user_limits",
-      detail: { before: toNamed(before), after: v },
+      detail: { before: beforeLimits, after: v },
     });
     const eventId = await emitEvent(tx, "limits.changed", { app, userId });
     return { saved: await toLimitUser(tx, env, after!), eventId };
