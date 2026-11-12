@@ -40,6 +40,7 @@ vi.mock("@/apps/threads/lib/api", async (orig) => {
     ...actual,
     threadsApi: {
       ...actual.threadsApi,
+      me: () => Promise.resolve(meResponse),
       getDraftCounts: () => Promise.resolve({ needsReview: 0, approved: 0 }),
       accountAccess: () => Promise.resolve(access),
     },

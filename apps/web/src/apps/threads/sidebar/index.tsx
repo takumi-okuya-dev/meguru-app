@@ -23,9 +23,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useState, type ReactNode } from "react";
 import { Link, NavLink, useMatch, useParams } from "react-router";
 import { AppShell, Sidebar, type AppSidebar, type SidebarPartProps } from "@/shell";
-import { api } from "@/lib/api-client";
 import { threadsApi } from "@/apps/threads/lib/api";
-import { queryKeys } from "@/lib/query";
 import { threadsQueryKeys } from "@/apps/threads/lib/query-keys";
 import { cn } from "@/lib/utils";
 import { CreateTeamDialog } from "../components/team/CreateTeamDialog";
@@ -33,6 +31,7 @@ import { TeamMark } from "../components/team/TeamMark";
 import { featureOn, useAccountAccess } from "../lib/use-account-access";
 import { AccountSwitcher } from "./AccountSwitcher";
 import { THREADS_BASE, accountPath, teamPath, threadsHomePath } from "@/apps/threads/lib/paths";
+import { useThreadsMe } from "@/apps/threads/lib/use-threads-me";
 
 type NavItem = { path: string; label: string; Icon: LucideIcon; end?: boolean; badge?: "needsReview"; needsAccount?: boolean };
 /** feature：区分ごとON/OFFする機能のまとまり。OFFなら見出しごと出さない（specs/019 FR-004） */
@@ -77,7 +76,7 @@ const itemClass = ({ isActive }: { isActive: boolean }) =>
  */
 function useSidebarAccount() {
   const params = useParams<{ accountId: string }>();
-  const me = useQuery({ queryKey: queryKeys.me, queryFn: api.me });
+  const me = useThreadsMe();
   const accountId = params.accountId ?? me.data?.landingAccountId ?? undefined;
   const base = accountId ? accountPath(accountId) : threadsHomePath();
   return { me, params, accountId, base };

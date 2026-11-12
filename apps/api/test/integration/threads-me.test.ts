@@ -1,6 +1,7 @@
 // Threadsの「自分」と利用の数（specs/meguru/029-threads-pattern1 contracts/api-routes.md 2、research.md R6、T018・T020）。
 // GET /api/threads/me は、/api/me のThreadsの部分と同じ値を返す（PR5 までは /api/me にも同じ中身が入る）。
 // アカウントを作る・消すと、応答の前に利用の数が共通へ伝わる。記録がずれても /api/me・毎日の数え直しで直る。
+import { threadsMeResponseSchema } from "@meguru/shared";
 import { eq } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
 import { recountThreadsUsage } from "../../src/apps/threads/accounts/usage";
@@ -46,6 +47,8 @@ describe("GET /api/threads/me", () => {
     const threads = (await res.json()) as Record<string, unknown>;
     expect(Object.keys(threads).sort()).toEqual([...THREADS_KEYS].sort());
     for (const k of THREADS_KEYS) expect(threads[k]).toEqual(me[k]);
+    // 形は共通の threadsMeResponseSchema（specs/meguru/029 tasks.md T021）
+    expect(threadsMeResponseSchema.safeParse(threads).success).toBe(true);
     expect((threads.accounts as { id: string }[]).map((a) => a.id)).toEqual([accountId]);
   });
 

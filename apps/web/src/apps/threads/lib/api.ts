@@ -1,6 +1,7 @@
 // ThreadsのAPIの呼び出し（specs/meguru/029-threads-pattern1 contracts/api-routes.md 4）。道筋は /api/threads/…（Metaに登録した道筋と
 // /api/data-deletion は今のまま）。APIの基本のURL・認証のトークン・エラーの扱いは、共通の部品（lib/api-client.ts の request）を使う。
 import {
+  threadsMeResponseSchema,
   accountAccessResponseSchema,
   accountTeamSchema,
   inviteAcceptResponseSchema,
@@ -131,6 +132,8 @@ function call<T>(path: string, schema: z.ZodType<T> | null, init: Parameters<typ
 
 /** ThreadsのAPIの呼び出し。レスポンスは共通のスキーマで検証する。 */
 export const threadsApi = {
+  // Threadsの「自分」（アカウント・チーム・使える機能など。specs/meguru/029 contracts/api-routes.md 2）
+  me: () => call("/api/threads/me", threadsMeResponseSchema),
   needsReviewCounts: () => call("/api/threads/me/needs-review-counts", needsReviewCountsResponseSchema),
   account: (accountId: string) => call(`/api/threads/accounts/${accountId}`, accountSummarySchema),
   // ---- チーム（specs/011-team-revision contracts/api.md）----

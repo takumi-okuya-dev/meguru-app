@@ -1,6 +1,6 @@
 // APIの入出力スキーマ（contracts/api.md「型」）。WebとAPIで共有する。
 import { z } from "zod";
-import { meAppsSchema } from "./apps";
+import { meAppsSchema } from "./apps/catalog";
 import { ERROR_CODES } from "./errors";
 import { FEATURE_EVENT_ACTIONS, FEATURES } from "./features";
 import {

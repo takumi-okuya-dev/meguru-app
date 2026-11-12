@@ -1,7 +1,7 @@
 // Threadsの「自分」（specs/meguru/029-threads-pattern1 contracts/api-routes.md 2）。
 // GET /api/threads/me と GET /api/threads/me/withdrawal-preview。中身は029の前の /api/me・/api/me/withdrawal-preview の
 // Threadsの部分と同じ。PR5 までは、共通の /api/me にも同じ中身を足す（registerMeSection。前の画面のため）。
-import { FEATURES, type Role } from "@meguru/shared";
+import { FEATURES, type Role, type ThreadsMeResponse } from "@meguru/shared";
 import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { Hono, type Context, type MiddlewareHandler } from "hono";
@@ -42,7 +42,7 @@ export function resolveLandingAccountId(
  * @param c - Hono の文脈（ログインしている人）
  * @returns 中身（threadsMeResponseSchema の形）
  */
-export async function buildThreadsMe(c: Context<AppEnv>) {
+export async function buildThreadsMe(c: Context<AppEnv>): Promise<ThreadsMeResponse> {
   const user = c.get("user");
   const db = createDb(c.env.DATABASE_URL);
   const ownerM = alias(memberships, "owner_m");

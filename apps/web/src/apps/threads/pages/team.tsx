@@ -24,13 +24,14 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Switch } from "@/components/ui/switch";
-import { ApiError, api, describeError } from "@/lib/api-client";
+import { ApiError, describeError } from "@/lib/api-client";
 import { threadsApi } from "@/apps/threads/lib/api";
 import { queryKeys } from "@/lib/query";
 import { threadsQueryKeys } from "@/apps/threads/lib/query-keys";
 import { cn } from "@/lib/utils";
 import { NotFound } from "@/shell";
 import { accountPath, sharedAccountPath, teamPath, threadsHomePath } from "@/apps/threads/lib/paths";
+import { useThreadsMe } from "@/apps/threads/lib/use-threads-me";
 
 const ROLE_NAMES = { admin: "管理者", member: "メンバー", editor: "編集者" } as const;
 
@@ -243,7 +244,7 @@ export function TeamPage() {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const team = useQuery({ queryKey: threadsQueryKeys.team(teamId), queryFn: () => threadsApi.getTeam(teamId) });
-  const me = useQuery({ queryKey: queryKeys.me, queryFn: api.me });
+  const me = useThreadsMe();
   const isAdmin = team.data?.myRole === "admin";
   // 運用状況を開ける人だけ、ボタンの件数の印のために読む（運用状況の画面と同じキー。specs/020 research.md R8）
   const status = useQuery({

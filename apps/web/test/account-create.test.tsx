@@ -18,6 +18,7 @@ vi.mock("@/apps/threads/lib/api", async (orig) => {
     ...actual,
     threadsApi: {
       ...actual.threadsApi,
+      me: mocks.me,
       createAccount: mocks.createAccount,
       needsReviewCounts: vi.fn(() => new Promise(() => {})),
     },

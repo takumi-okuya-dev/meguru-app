@@ -45,6 +45,7 @@ import { TeamSection } from "@/apps/threads/components/team/TeamSection";
 import { ReconnectDialog } from "@/apps/threads/components/connect/ReconnectDialog";
 import { TOKEN_WARNING_KIND, TokenWarnings } from "@/apps/threads/components/connect/TokenWarnings";
 import { featureOn, useAccountAccess } from "@/apps/threads/lib/use-account-access";
+import { threadsHomePath } from "@/apps/threads/lib/paths";
 
 /**
  * Account の設定（FR-013・FR-019・FR-020・FR-022、規則9・10）。認可し直す操作と、確認つきの削除。
@@ -141,7 +142,9 @@ function AccountSettingsContent() {
       setOpen(false);
       queryClient.removeQueries({ queryKey: ["account", account.id] });
       await queryClient.invalidateQueries({ queryKey: ["me"] });
-      void navigate("/", { replace: true });
+      // Threadsのホームへ移す（残りのアカウントか、なければアカウントを作る画面へ進む）。入口（/）へ移すと、
+      // 最後のアカウントを消したときに「使っているアプリ」から外れて、すべてのアプリの画面へ行ってしまう（specs/meguru/029 PR4b-2）
+      void navigate(threadsHomePath(), { replace: true });
     },
   });
 
