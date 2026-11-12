@@ -192,8 +192,8 @@ describe("参考投稿を追加（ためて登録）", () => {
       );
     }
     const router = createMemoryRouter(
-      [{ path: "/accounts/:accountId", element: <Layout />, children: [{ path: "research", element: <ResearchPage /> }] }],
-      { initialEntries: ["/accounts/a1/research"] },
+      [{ path: "/threads/accounts/:accountId", element: <Layout />, children: [{ path: "research", element: <ResearchPage /> }] }],
+      { initialEntries: ["/threads/accounts/a1/research"] },
     );
     render(
       <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>

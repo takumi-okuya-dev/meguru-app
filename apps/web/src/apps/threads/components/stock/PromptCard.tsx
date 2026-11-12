@@ -23,6 +23,7 @@ import { api, describeError } from "@/lib/api-client";
 import { queryKeys } from "@/lib/query";
 import { isBillingRequired, isStale, saveErrorMessage } from "@/lib/save-error";
 import { cn } from "@/lib/utils";
+import { accountPath } from "@/apps/threads/lib/paths";
 
 /**
  * 投稿ルール・NGワード・却下の反映の要約（specs/004 FR-025）。0件の項目は出さない。
@@ -341,7 +342,7 @@ function PromptReadyCard({
             (summary.strategyFilledCount === 0 ? (
               <p className="text-[13px] text-muted-foreground">
                 <span>課題を入力すると、投稿の精度が上がります</span>{" "}
-                <Link to={`/accounts/${accountId}/strategy`} className="text-ring underline">
+                <Link to={accountPath(accountId, "strategy")} className="text-ring underline">
                   課題を入力する
                 </Link>
               </p>

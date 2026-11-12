@@ -66,11 +66,11 @@ function renderIt(opts: { enabled?: boolean; initialError?: { code: ErrorCode; a
   const router = createMemoryRouter(
     [
       {
-        path: "/accounts/:id/settings",
+        path: "/threads/accounts/:id/settings",
         element: <ConnectMethods account={account} canConnect initialError={opts.initialError ?? null} onConnected={vi.fn()} />,
       },
     ],
-    { initialEntries: ["/accounts/a1/settings"] },
+    { initialEntries: ["/threads/accounts/a1/settings"] },
   );
   render(
     <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>

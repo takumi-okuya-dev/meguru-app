@@ -1,4 +1,4 @@
-// 見せてもらっているアカウント（/teams/:teamId/accounts/:accountId。specs/011-team-revision contracts/ui-routes.md
+// 見せてもらっているアカウント（/threads/teams/:teamId/accounts/:accountId。specs/011-team-revision contracts/ui-routes.md
 // 「見せてもらっているアカウント」、US3、FR-031）。投稿ストックと戦略を読むだけで、操作のボタンは出さない。
 // パフォーマンス・設定・操作の記録へのリンクも出さない。開けなくなったら知らせてチームの画面へ移す。
 import { useQuery } from "@tanstack/react-query";
@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import { ApiError, api } from "@/lib/api-client";
 import { queryKeys } from "@/lib/query";
 import { cn } from "@/lib/utils";
+import { accountPath, teamPath } from "@/apps/threads/lib/paths";
 
 type StockFilter = "approved" | "published" | "needsReview";
 const FILTERS: { key: StockFilter; label: string }[] = [
@@ -292,7 +293,7 @@ export function TeamSharedAccountPage() {
   useEffect(() => {
     if (!lost) return;
     toast.error(LOST_MESSAGE, { id: "shared-account-lost" });
-    void navigate(`/teams/${teamId}`, { replace: true });
+    void navigate(teamPath(teamId), { replace: true });
   }, [lost, navigate, teamId]);
 
   if (lost) return null;
@@ -303,7 +304,7 @@ export function TeamSharedAccountPage() {
     return <ApiErrorScreen error={account.error} onRetry={() => void account.refetch()} />;
   // オーナー・担当の人は、ふつうのAccountの画面で開く
   if (access.data.relation !== "shared_viewer")
-    return <Navigate to={`/accounts/${accountId}`} replace />;
+    return <Navigate to={accountPath(accountId)} replace />;
   const a = account.data;
   const owner = access.data.owner.name;
   // オーナーが使えないまとまりのタブは出さず、そのAPIも読まない（specs/019 FR-012・FR-004）。
@@ -327,7 +328,7 @@ export function TeamSharedAccountPage() {
           {owner}さんのアカウントを見ています（読むだけ）{team.data ? ` · ${team.data.name}` : ""}
         </span>
         <Button asChild variant="outline" className="h-9 rounded-full bg-background">
-          <Link to={`/teams/${teamId}`}>チームに戻る</Link>
+          <Link to={teamPath(teamId)}>チームに戻る</Link>
         </Button>
       </div>
       <header className="mx-auto flex w-full max-w-3xl items-center gap-3 px-4 pt-5 md:px-6">

@@ -65,8 +65,8 @@ function renderAt(path: string) {
   );
   const router = createMemoryRouter(
     [
-      { path: "/accounts/:accountId/*", element: shell },
-      { path: "/teams/:teamId/*", element: shell },
+      { path: "/threads/accounts/:accountId/*", element: shell },
+      { path: "/threads/teams/:teamId/*", element: shell },
     ],
     { initialEntries: [path] },
   );
@@ -91,7 +91,7 @@ afterEach(() => {
 describe("サイドバーの「投稿をつくる」", () => {
   it("ホームの次に並ぶ。押すと「投稿をつくる」の画面（/create）へ移る", async () => {
     const user = userEvent.setup();
-    const router = renderAt("/accounts/a1");
+    const router = renderAt("/threads/accounts/a1");
     const nav = await screen.findByRole("navigation", { name: "このアカウント" });
     const labels = within(nav)
       .getAllByRole("link")
@@ -99,21 +99,21 @@ describe("サイドバーの「投稿をつくる」", () => {
     // 2026-11-04（specs/019）：パフォーマンスは「自動投稿」の見出しの下（投稿ストックの次）
     expect(labels).toEqual(["ホーム", "投稿をつくる", "投稿ストック", "パフォーマンス", "解析", "課題", "宣伝内容", "外部媒体展開", "リサーチ"]);
     const create = within(nav).getByRole("link", { name: "投稿をつくる" });
-    expect(create).toHaveAttribute("href", "/accounts/a1/create");
+    expect(create).toHaveAttribute("href", "/threads/accounts/a1/create");
     expect(create).not.toHaveAttribute("aria-current");
     await user.click(create);
-    expect(router.state.location.pathname).toBe("/accounts/a1/create");
+    expect(router.state.location.pathname).toBe("/threads/accounts/a1/create");
   });
 
   it("「投稿をつくる」の画面では「投稿をつくる」が選ばれた見た目で、投稿ストックは選ばれない", async () => {
-    renderAt("/accounts/a1/create");
+    renderAt("/threads/accounts/a1/create");
     const nav = await screen.findByRole("navigation", { name: "このアカウント" });
     expect(within(nav).getByRole("link", { name: "投稿をつくる" })).toHaveAttribute("aria-current", "page");
     expect(within(nav).getByRole("link", { name: /投稿ストック/ })).not.toHaveAttribute("aria-current");
   });
 
   it("投稿ストックの画面では、投稿ストックが選ばれた見た目で、「投稿をつくる」は選ばれない", async () => {
-    renderAt("/accounts/a1/stock");
+    renderAt("/threads/accounts/a1/stock");
     const nav = await screen.findByRole("navigation", { name: "このアカウント" });
     expect(within(nav).getByRole("link", { name: /投稿ストック/ })).toHaveAttribute("aria-current", "page");
     expect(within(nav).getByRole("link", { name: "投稿をつくる" })).not.toHaveAttribute("aria-current");

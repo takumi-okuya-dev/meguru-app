@@ -4,6 +4,7 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { WithEntryApp } from "./helpers/entry-app";
 
 let signedIn = false;
 vi.mock("@clerk/react", () => ({
@@ -27,12 +28,15 @@ function renderAt(code = CODE) {
       { path: "/r/:code", element: <ReferralLandingPage /> },
       { path: "/sign-in", element: <p>ログイン画面</p> },
       { path: "/", element: <p>最初の画面</p> },
+      { path: "/threads", element: <p>Threadsのホーム</p> },
     ],
     { initialEntries: [`/r/${code}`] },
   );
   render(
     <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
-      <RouterProvider router={router} />
+      <WithEntryApp>
+        <RouterProvider router={router} />
+      </WithEntryApp>
     </QueryClientProvider>,
   );
   return router;
@@ -56,7 +60,8 @@ describe("紹介リンクの画面", () => {
     expect(currentReferral()).toBe(CODE);
     await user.click(screen.getByRole("button", { name: "Googleで始める" }));
     expect(router.state.location.pathname).toBe("/sign-in");
-    expect(router.state.location.search).toBe("");
+    // ログインのあとはThreadsのホームへ戻る（specs/028 contracts/ui-routes.md 3）
+    expect(router.state.location.search).toBe(`?next=${encodeURIComponent("/threads")}`);
   });
 
   it("紹介した人を問い合わせない（名前を出さない）", async () => {
@@ -65,10 +70,10 @@ describe("紹介リンクの画面", () => {
     expect(referralPage).toHaveBeenCalledWith();
   });
 
-  it("ログインしている人は、覚えずに最初の画面へ移る", async () => {
+  it("ログインしている人は、覚えずにThreadsのホームへ移る（すべてのアプリの画面を挟まない。specs/028）", async () => {
     signedIn = true;
     renderAt();
-    expect(await screen.findByText("最初の画面")).toBeInTheDocument();
+    expect(await screen.findByText("Threadsのホーム")).toBeInTheDocument();
     expect(currentReferral()).toBeNull();
   });
 

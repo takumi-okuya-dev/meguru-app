@@ -5,6 +5,7 @@ import { formatRelativeJst } from "@/lib/format";
 import { queryKeys } from "@/lib/query";
 import { Button } from "@/components/ui/button";
 import { ReconnectButton } from "@/apps/threads/components/ReconnectButton";
+import { accountPath } from "@/apps/threads/lib/paths";
 
 /**
  * ホームに、次の投稿と準備できている件数を出す（005 FR-022）。
@@ -22,7 +23,7 @@ export function NextPostCard({ accountId }: { accountId: string }) {
       <div className="h-32 w-full animate-pulse rounded-2xl bg-muted" aria-busy="true" />
     );
   const rateNotice = data.notices.find((n) => n.kind === "rate_limited");
-  const stock = `/accounts/${accountId}/stock?tab=approved`;
+  const stock = accountPath(accountId, "stock?tab=approved");
   return (
     <section className="w-full space-y-2 rounded-2xl border bg-card p-4 md:p-5">
       <h2 className="font-semibold">{data.autoPost.enabled ? "次の投稿" : "自動投稿はオフです"}</h2>
@@ -32,7 +33,7 @@ export function NextPostCard({ accountId }: { accountId: string }) {
             承認済みの下書きを、決めた時刻に自動で投稿できます
           </p>
           <Button asChild variant="outline">
-            <Link to={`/accounts/${accountId}/settings`}>投稿のスケジュールを設定する</Link>
+            <Link to={accountPath(accountId, "settings")}>投稿のスケジュールを設定する</Link>
           </Button>
         </>
       ) : data.autoPost.stoppedReason === "billing_inactive" ? (

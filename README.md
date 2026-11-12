@@ -183,12 +183,12 @@ pnpm typecheck
 Clerkの開発用インスタンスのキー（`apps/api/.dev.vars`と`apps/web/.env.local`）と、そのインスタンスに作ったテスト用ユーザーが必要。
 
 ```bash
-export CLERK_PUBLISHABLE_KEY=pk_test_...   # @clerk/testing が使う
-export CLERK_SECRET_KEY=sk_test_...
-export E2E_CLERK_USER_EMAIL=e2e@example.com
+cp e2e/.env.example e2e/.env.local   # 初回のみ。ログインする人のメールアドレスを書き換える（E2E_CLERK_USER_EMAIL など）
 pnpm --filter e2e exec playwright install chromium   # 初回のみ
 pnpm e2e
 ```
+
+- ログインする人のメールアドレス（`E2E_CLERK_USER_EMAIL`、チームの3人）は`e2e/.env.local`に書く。環境変数（`export E2E_CLERK_USER_EMAIL=…`）にあれば、そちらを使う。
 
 - Playwrightが偽のThreadsサーバー（:8790）・API（Threadsを偽サーバーに向けた設定）・Webを起動する（`pnpm dev:fake`で起動中なら、それを使う）。DBはテストごとに空にする。ローカルの開発用のDBと同じなので、手で作ったデータも消える。
 - チーム（`pnpm e2e -- team`）は、管理者・オーナー（メンバー）・編集者の3人を別々のブラウザ（Cookieが別）でログインさせる。3人には、Clerk の開発用インスタンスに一度Googleでログインしたことのあるアカウントを使い、メールアドレスを`e2e/.env.local`の`E2E_PARTNER_EMAIL`（管理者）・`E2E_OWNER_EMAIL`・`E2E_EDITOR_EMAIL`に書く（`e2e/.env.example`をコピー。名前は008のまま）。`@clerk/testing`がメールアドレスからユーザーを探し、ログイン用のチケットで入るので、Googleのパスワードは使わない（Googleだけでログインする設定では、APIで作ったユーザーはチケットでログインできないため）。

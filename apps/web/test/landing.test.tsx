@@ -49,8 +49,8 @@ function renderAt(path: string, cached?: MeResponse) {
   const router = createMemoryRouter(
     [
       { path: "/", element: <Landing /> },
-      { path: "/accounts/new", element: <p>作る画面</p> },
-      { path: "/accounts/:id", element: <p>ホームの画面</p> },
+      { path: "/threads/accounts/new", element: <p>作る画面</p> },
+      { path: "/threads/accounts/:id", element: <p>ホームの画面</p> },
     ],
     { initialEntries: [path] },
   );
@@ -75,7 +75,7 @@ describe("「/」の振り分け", () => {
     mocks.me.mockResolvedValue(me("a1"));
     const router = renderAt("/?error=ACCOUNT_NOT_FOUND");
     expect(await screen.findByText("ホームの画面")).toBeInTheDocument();
-    expect(router.state.location.pathname).toBe("/accounts/a1");
+    expect(router.state.location.pathname).toBe("/threads/accounts/a1");
     expect(toastError).toHaveBeenCalledTimes(1);
     expect(toastError).toHaveBeenCalledWith(expect.stringContaining("見つかりません"));
   });

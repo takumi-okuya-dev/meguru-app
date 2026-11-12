@@ -89,11 +89,11 @@ function response(list: AnalysisPost[], over: Partial<AnalysisResponse> = {}): A
   };
 }
 
-function renderAt(path = "/accounts/a1/analysis") {
+function renderAt(path = "/threads/accounts/a1/analysis") {
   const router = createMemoryRouter(
     [
       {
-        path: "/accounts/:accountId",
+        path: "/threads/accounts/:accountId",
         element: <Outlet context={{ account }} />,
         children: [
           { path: "analysis", element: <AnalysisPage /> },
@@ -212,7 +212,7 @@ describe("投稿づくりに活かす（US3）", () => {
     expect(await screen.findByText("今の時刻：7:30・21:00")).toBeInTheDocument();
     expect(screen.getByText("伸びやすい：夜（20〜23時）")).toBeInTheDocument();
     await user.click(screen.getByRole("link", { name: "投稿の時刻を開く" }));
-    expect(router.state.location.pathname).toBe("/accounts/a1/settings");
+    expect(router.state.location.pathname).toBe("/threads/accounts/a1/settings");
   });
 });
 

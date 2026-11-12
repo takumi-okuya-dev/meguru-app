@@ -12,6 +12,7 @@ import { queryKeys } from "@/lib/query";
 import { useAccountAccess } from "@/apps/threads/lib/use-account-access";
 import { cn } from "@/lib/utils";
 import { useCurrentAccount } from "@/apps/threads/pages/account-layout";
+import { accountPath } from "@/apps/threads/lib/paths";
 
 /** 種類のチップ（FR-052）。 */
 const KINDS = [
@@ -260,7 +261,7 @@ export function ActivityPage() {
     getNextPageParam: (last) => last.nextCursor ?? undefined,
     enabled: can("activity"),
   });
-  if (access && !can("activity")) return <Navigate to={`/accounts/${account.id}`} replace />;
+  if (access && !can("activity")) return <Navigate to={accountPath(account.id)} replace />;
 
   const items = list.data?.pages.flatMap((p) => p.items) ?? [];
   const actors = list.data?.pages[0]?.actors ?? [];

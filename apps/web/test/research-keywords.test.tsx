@@ -26,7 +26,7 @@ const meta = { version: 1, createdAt: "2026-10-03T00:00:00.000Z", updatedAt: "20
 const kw = (id: string, keyword: string, purpose = ""): ResearchKeyword => ({ id, keyword, purpose, ...meta });
 
 function renderKeywords() {
-  return renderResearchPage(ResearchPage, "/accounts/a1/research?tab=keywords");
+  return renderResearchPage(ResearchPage, "/threads/accounts/a1/research?tab=keywords");
 }
 
 beforeEach(() => {

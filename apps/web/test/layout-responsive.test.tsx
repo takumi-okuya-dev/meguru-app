@@ -43,7 +43,7 @@ function renderShell() {
   const router = createMemoryRouter(
     [
       {
-        path: "/accounts/:accountId",
+        path: "/threads/accounts/:accountId",
         element: (
           <ThreadsShell>
             <PageHeader title="ホーム" />
@@ -51,9 +51,9 @@ function renderShell() {
           </ThreadsShell>
         ),
       },
-      { path: "/accounts/new", element: <p>アカウント追加画面</p> },
+      { path: "/threads/accounts/new", element: <p>アカウント追加画面</p> },
     ],
-    { initialEntries: ["/accounts/a1"] },
+    { initialEntries: ["/threads/accounts/a1"] },
   );
   render(
     <QueryClientProvider client={new QueryClient()}>

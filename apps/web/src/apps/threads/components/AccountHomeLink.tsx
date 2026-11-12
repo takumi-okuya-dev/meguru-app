@@ -3,7 +3,7 @@
 // 画面より外側のルートの入れ物で URL の :accountId から決める。
 import { Outlet, useParams } from "react-router";
 import { HomeLinkProvider } from "@/lib/home-link";
-import { accountHomePath } from "../lib/paths";
+import { accountHomePath, threadsHomePath } from "../lib/paths";
 
 /**
  * URL の :accountId から「ホームへ」の戻る先を決めて、中の画面に渡す。
@@ -12,7 +12,7 @@ import { accountHomePath } from "../lib/paths";
 export function AccountHomeLink() {
   const { accountId } = useParams<{ accountId: string }>();
   return (
-    <HomeLinkProvider value={accountId ? accountHomePath(accountId) : "/"}>
+    <HomeLinkProvider value={accountId ? accountHomePath(accountId) : threadsHomePath()}>
       <Outlet />
     </HomeLinkProvider>
   );

@@ -42,12 +42,12 @@ describe("makeAccountAccessErrorHandler", () => {
     expect(toastError).not.toHaveBeenCalled();
   });
 
-  it("ACCOUNT_NOT_FOUND：「このアカウントを開けなくなりました」と出して / へ移る", () => {
+  it("ACCOUNT_NOT_FOUND：「このアカウントを開けなくなりました」と出して Threadsのホーム（/threads）へ移る", () => {
     const { invalidate, navigate, handle } = setup();
     handle("ACCOUNT_NOT_FOUND", ID);
     expect(toastError).toHaveBeenCalledWith("このアカウントを開けなくなりました", { id: "account-access-lost" });
     expect(invalidate).toHaveBeenCalledWith({ queryKey: queryKeys.me });
-    expect(navigate).toHaveBeenCalledWith("/");
+    expect(navigate).toHaveBeenCalledWith("/threads");
   });
 
   it("別のAccountのエラーは扱わない", () => {

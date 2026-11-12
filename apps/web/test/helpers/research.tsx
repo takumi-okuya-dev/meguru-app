@@ -40,15 +40,15 @@ export function refPost(over: Partial<ReferencePost> = {}): ReferencePost {
  * @param path - 開くURL
  * @returns ルーター
  */
-export function renderResearchPage(Page: ComponentType, path = "/accounts/a1/research") {
+export function renderResearchPage(Page: ComponentType, path = "/threads/accounts/a1/research") {
   const router = createMemoryRouter(
     [
       {
-        path: "/accounts/:accountId",
+        path: "/threads/accounts/:accountId",
         // 未保存の変更の確認を確かめられるように、ホームへのリンクと登録先を置く（specs/014 PR #17 のCodexレビュー）
         element: (
           <UnsavedChangesProvider>
-            <Link to="/accounts/a1">ホームへ</Link>
+            <Link to="/threads/accounts/a1">ホームへ</Link>
             <Outlet context={{ account: testAccount }} />
           </UnsavedChangesProvider>
         ),

@@ -119,10 +119,10 @@ function adminStatus(): TeamStatus {
 function renderPage() {
   const router = createMemoryRouter(
     [
-      { path: "/teams/:teamId/status", element: <TeamStatusPage /> },
-      { path: "/teams/:teamId", element: <p>チームの画面</p> },
+      { path: "/threads/teams/:teamId/status", element: <TeamStatusPage /> },
+      { path: "/threads/teams/:teamId", element: <p>チームの画面</p> },
     ],
-    { initialEntries: ["/teams/t1/status"] },
+    { initialEntries: ["/threads/teams/t1/status"] },
   );
   render(
     <QueryClientProvider
@@ -231,6 +231,6 @@ describe("運用状況（編集者・見られない人）", () => {
       await screen.findByText("この画面は、管理者と担当の編集者だけが見られます。"),
     ).toBeInTheDocument();
     await user.click(screen.getByRole("link", { name: "チームの画面に戻る" }));
-    expect(router.state.location.pathname).toBe("/teams/t1");
+    expect(router.state.location.pathname).toBe("/threads/teams/t1");
   });
 });

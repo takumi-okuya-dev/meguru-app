@@ -52,6 +52,7 @@ import { api, describeError } from "@/lib/api-client";
 import { formatRelativeJst } from "@/lib/format";
 import { queryKeys } from "@/lib/query";
 import { useCurrentAccount } from "@/apps/threads/pages/account-layout";
+import { accountPath } from "@/apps/threads/lib/paths";
 
 const TAB_VALUES: StockTab[] = ["needs_review", "approved", "rejected", "published"];
 
@@ -420,7 +421,7 @@ function StockPageContent() {
             asChild
             className="h-9 rounded-full max-md:size-11 max-md:bg-transparent max-md:p-0 max-md:text-foreground md:pr-4 md:pl-3"
           >
-            <Link to={`/accounts/${account.id}/create`} aria-label="投稿をつくる">
+            <Link to={accountPath(account.id, "create")} aria-label="投稿をつくる">
               <SquarePenIcon className="size-5 md:size-4" />
               <span className="hidden md:inline">投稿をつくる</span>
             </Link>
@@ -501,7 +502,7 @@ function StockPageContent() {
                   tab={value}
                   items={lists[value]}
                   limit={data.limits.needsReview}
-                  createPath={`/accounts/${account.id}/create`}
+                  createPath={accountPath(account.id, "create")}
                   total={value === "rejected" ? (counts?.rejected ?? 0) : lists[value].length}
                   renderCard={renderCard}
                   failed={value === "approved" ? data.publishFailed : undefined}
@@ -519,7 +520,7 @@ function StockPageContent() {
                         自動投稿はオフです。{" "}
                         <Link
                           className="text-ring underline"
-                          to={`/accounts/${account.id}/settings`}
+                          to={accountPath(account.id, "settings")}
                         >
                           投稿のスケジュールを設定する
                         </Link>

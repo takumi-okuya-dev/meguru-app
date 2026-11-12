@@ -1,4 +1,4 @@
-// 外部媒体展開の入力の画面と作業の画面（/accounts/:accountId/external-media/:promotionId/:media、作業は ?view=work。
+// 外部媒体展開の入力の画面と作業の画面（/threads/accounts/:accountId/external-media/:promotionId/:media、作業は ?view=work。
 // specs/021-external-media contracts/ui-routes.md 3・4、モック https://claude.ai/artifact/78VBSVeE19t3EqqvjckMRZ ）。
 // 媒体の決まり（組み立て・ルールのチェック・STEP・プロンプト）は shared の media を呼ぶだけで、画面では決めない。作業の画面は保存しない。
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -50,6 +50,7 @@ import { cn } from "@/lib/utils";
 import { useCurrentAccount } from "@/apps/threads/pages/account-layout";
 import { ExternalMediaForbidden } from "@/apps/threads/pages/external-media";
 import { NotFound } from "@/shell";
+import { accountPath } from "@/apps/threads/lib/paths";
 
 /**
  * 宣伝内容と既定値から、掲載内容を作る材料にする。
@@ -265,7 +266,7 @@ export function ExternalMediaListingPage() {
       aria-label={work ? "入力の画面に戻る" : "外部媒体展開に戻る"}
     >
       <Link
-        to={work ? `?` : `/accounts/${account.id}/external-media?p=${promotionId}`}
+        to={work ? `?` : `${accountPath(account.id)}/external-media?p=${promotionId}`}
         onClick={
           work
             ? (e) => {

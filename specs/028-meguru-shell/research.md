@@ -42,7 +42,7 @@
 
 - **決定**：
   - Threadsの画面を`/threads`の下に移す（対応は contracts/ui-routes.md 1）。前のURLの形は`/accounts/*`と`/teams/*`の2つだけで、どちらも頭に`/threads`を足すだけで対応がつく。
-  - 転送は**画面の側（ルーター）**で行う。前のURLのルートを、ログインの関所（`RequireAuth`）の**外**に置き、`/threads`を頭に足したURLへ、クエリと`#…`を保って、履歴を置き換えて移す。ログインの関所の外に置くので、ログインしていない人も、まず新しいURLへ移ってからログインの画面へ行き、ログインのあとは新しいURLへ戻る（spec の Edge Cases）。
+  - 転送は**画面の側（ルーター）**で行う。前のURLのルートを、ログインの関所（`RequireAuth`）の**外**に置き、`/threads`を頭に足したURLへ、クエリと`#…`を保って、履歴を置き換えて移す。ログインの関所の外に置くので、ログインしていない人も、まず新しいURLへ移ってからログインの画面へ行く。ログインのあとの行き先は分割の前と同じ（入口 `/`。ログインの画面は、招待とThreadsのホームのほかの戻り先を覚えない）。
   - 前のURLの対応は、アプリの入口（`AppModule.legacyRedirects`）に書く。外枠は対応を読んでルートを作るだけにする。
 - **理由**：手元の開発（Vite）・Webのテスト・E2E・ステージング・本番で同じに動き、テストで確かめられる。
 - **ほかの案**：Cloudflare Pagesの`_redirects`でサーバーが転送する：JavaScriptを読む前に移れるが、手元の開発とWebのテストでは動かず、クエリの扱いもPagesの動きに頼る。環境ごとの違いを増やさない（Constitution 開発ワークフロー）。不採用。
@@ -119,7 +119,7 @@
 
 ## R11. APIが作るWebのURL
 
-- **決定**：次の3か所を新しいURLにする（spec FR-004）。
+- **決定**：次の3か所を新しいURLにする（spec FR-004）。**PR3 で行う**：デプロイは API を Web より先に出すので、PR2 で変えると、Web が出るまでのあいだ古い Web の知らないURLへ送ってしまう。PR2 のあいだは、前のURLの転送が受ける（2026-11-12 のセルフレビュー）。
   - 設定の不備で接続を始められないとき：`/accounts/new?error=CONFIG_ERROR` → `/threads/accounts/new?error=CONFIG_ERROR`（`app.ts`）
   - 接続の完了・失敗の行き先：`/?error=…` → `/threads?error=…`、`/accounts/<番号>/settings…` → `/threads/accounts/<番号>/settings…`（`threads-connect-routes.ts`）
   - 決済から戻るURL（`/settings/billing…`）・データ削除の確認のURL・招待のURLは変えない。

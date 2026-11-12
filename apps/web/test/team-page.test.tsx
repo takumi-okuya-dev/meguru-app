@@ -95,14 +95,14 @@ const meData: MeResponse = {
 function renderPage() {
   const router = createMemoryRouter(
     [
-      { path: "/teams/:teamId", element: <TeamPage /> },
-      { path: "/teams/:teamId/assign", element: <p>担当の表</p> },
-      { path: "/teams/:teamId/status", element: <p>運用状況の画面</p> },
-      { path: "/teams/:teamId/accounts/:accountId", element: <p>見せてもらっているアカウント</p> },
-      { path: "/accounts/:accountId", element: <p>Accountの画面</p> },
-      { path: "/", element: <p>最初の画面</p> },
+      { path: "/threads/teams/:teamId", element: <TeamPage /> },
+      { path: "/threads/teams/:teamId/assign", element: <p>担当の表</p> },
+      { path: "/threads/teams/:teamId/status", element: <p>運用状況の画面</p> },
+      { path: "/threads/teams/:teamId/accounts/:accountId", element: <p>見せてもらっているアカウント</p> },
+      { path: "/threads/accounts/:accountId", element: <p>Accountの画面</p> },
+      { path: "/threads", element: <p>最初の画面</p> },
     ],
-    { initialEntries: ["/teams/t1"] },
+    { initialEntries: ["/threads/teams/t1"] },
   );
   render(
     <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
@@ -128,12 +128,12 @@ describe("チームの画面（管理者）", () => {
     expect(await screen.findByRole("heading", { name: "飲食チーム" })).toBeInTheDocument();
     expect(screen.getByText(/メンバー 4人 · 管理者：田中 健/)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "メンバーを招待" })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "担当を決める" })).toHaveAttribute("href", "/teams/t1/assign");
+    expect(screen.getByRole("link", { name: "担当を決める" })).toHaveAttribute("href", "/threads/teams/t1/assign");
     const list = screen.getByRole("list", { name: "メンバーの一覧" });
     const rows = within(list).getAllByRole("listitem");
     expect(within(rows[0]!).getByText("あなた")).toBeInTheDocument();
     expect(within(rows[0]!).getByText("管理者（あなた）")).toBeInTheDocument();
-    expect(within(rows[1]!).getByRole("link", { name: "鈴木 花子さんのカフェ B店を見る" })).toHaveAttribute("href", "/teams/t1/accounts/a-s");
+    expect(within(rows[1]!).getByRole("link", { name: "鈴木 花子さんのカフェ B店を見る" })).toHaveAttribute("href", "/threads/teams/t1/accounts/a-s");
     expect(within(rows[2]!).getByText("ベーカリー E · 見せていません")).toBeInTheDocument();
   });
 
@@ -212,7 +212,7 @@ describe("チームの画面（管理者）", () => {
     await user.click(within(del).getByRole("button", { name: "チームを削除する" }));
     expect(mocks.deleteTeam).toHaveBeenCalledWith("t1");
     expect(await screen.findByText("最初の画面")).toBeInTheDocument();
-    expect(router.state.location.pathname).toBe("/");
+    expect(router.state.location.pathname).toBe("/threads");
   });
 
   it("「チームを抜ける」：引き継ぎ先を選ぶまで「引き継いで抜ける」は押せない（T035）", async () => {
@@ -323,7 +323,7 @@ describe("チームの画面（メンバー・編集者）", () => {
     await user.click(within(dialog).getByRole("button", { name: "抜ける" }));
     expect(mocks.leaveTeam).toHaveBeenCalledWith("t1", undefined);
     expect(await screen.findByText("最初の画面")).toBeInTheDocument();
-    expect(router.state.location.pathname).toBe("/");
+    expect(router.state.location.pathname).toBe("/threads");
   });
 
   it("チームの人でなければ「チームが見つかりません」", async () => {
@@ -339,12 +339,12 @@ describe("運用状況のボタンと見える範囲（specs/020 T014・T023・T
     const user = userEvent.setup();
     const router = renderPage();
     const link = await screen.findByRole("link", { name: /運用状況/ });
-    expect(link).toHaveAttribute("href", "/teams/t1/status");
+    expect(link).toHaveAttribute("href", "/threads/teams/t1/status");
     expect(await within(link).findByText("3")).toBeInTheDocument();
     const links = screen.getAllByRole("link").map((l) => l.textContent);
     expect(links.findIndex((t) => t?.includes("運用状況"))).toBeLessThan(links.indexOf("担当を決める"));
     await user.click(link);
-    expect(router.state.location.pathname).toBe("/teams/t1/status");
+    expect(router.state.location.pathname).toBe("/threads/teams/t1/status");
   });
 
   it("止まっている数が0なら印を付けない", async () => {

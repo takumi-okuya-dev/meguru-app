@@ -45,9 +45,9 @@ function renderAt() {
     [
       { path: "/invite/:token", element: <InvitePage /> },
       { path: "/sign-in", element: <p>ログイン画面</p> },
-      { path: "/accounts/new", element: <p>アカウント追加</p> },
-      { path: "/accounts/:id/settings", element: <p>設定の画面</p> },
-      { path: "/teams/:teamId", element: <p>チームの画面</p> },
+      { path: "/threads/accounts/new", element: <p>アカウント追加</p> },
+      { path: "/threads/accounts/:id/settings", element: <p>設定の画面</p> },
+      { path: "/threads/teams/:teamId", element: <p>チームの画面</p> },
       { path: "/", element: <p>最初の画面</p> },
     ],
     { initialEntries: [`/invite/${TOKEN}`] },
@@ -91,7 +91,7 @@ describe("招待の確認", () => {
     expect(await screen.findByText("先に、自分のアカウントを作り、Threadsにつないでください")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "アカウントを作る" })).toHaveAttribute(
       "href",
-      `/accounts/new?next=${encodeURIComponent(`/invite/${TOKEN}`)}`,
+      `/threads/accounts/new?next=${encodeURIComponent(`/invite/${TOKEN}`)}`,
     );
   });
 
@@ -106,7 +106,7 @@ describe("招待の確認", () => {
     renderAt();
     expect(await screen.findByText("先に、自分のアカウントをThreadsにつないでください")).toBeInTheDocument();
     const link = screen.getByRole("link", { name: "「カフェの公式」をThreadsにつなぐ" });
-    expect(link).toHaveAttribute("href", "/accounts/acc-9/settings#threads");
+    expect(link).toHaveAttribute("href", "/threads/accounts/acc-9/settings#threads");
     await userEvent.click(link);
     expect(sessionStorage.getItem("tg.inviteReturn")).toBe(`/invite/${TOKEN}`);
   });
@@ -150,7 +150,7 @@ describe("招待の確認", () => {
       { id: "acc-2", shared: false },
     ]);
     expect(await screen.findByText("チームの画面")).toBeInTheDocument();
-    expect(router.state.location.pathname).toBe("/teams/t1");
+    expect(router.state.location.pathname).toBe("/threads/teams/t1");
   });
 
   it("already_member：「すでにこのチームに入っています」と「チームを開く」", async () => {
@@ -158,7 +158,7 @@ describe("招待の確認", () => {
     previewInvite.mockResolvedValue(preview({ status: "already_member", teamId: "t1" }));
     renderAt();
     expect(await screen.findByText("すでにこのチームに入っています。")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "チームを開く" })).toHaveAttribute("href", "/teams/t1");
+    expect(screen.getByRole("link", { name: "チームを開く" })).toHaveAttribute("href", "/threads/teams/t1");
   });
 
   it("無効なリンク（作り直した後の古いリンク・チームの削除の後）：「このリンクは使えません」", async () => {
@@ -189,13 +189,19 @@ describe("招待の確認", () => {
 });
 
 describe("ログインの戻り先（safeNext）", () => {
+  it("登録したアプリのホーム（紹介リンクから）はそのまま戻す。知らないパスは / にする（specs/028）", () => {
+    expect(safeNext("/threads", ["/threads"])).toBe("/threads");
+    expect(safeNext("/threads", [])).toBe("/");
+    expect(safeNext("/threads/accounts/a1", ["/threads"])).toBe("/");
+  });
+
   it("チームの招待リンク（t_）とグループの招待リンク（g_）だけを許し、ほかは / にする", () => {
     expect(safeNext(`/invite/${TOKEN}`)).toBe(`/invite/${TOKEN}`);
     const group = `/test-invite/g_${"a".repeat(43)}`;
     expect(safeNext(group)).toBe(group);
     for (const bad of [
       null,
-      "/accounts/x",
+      "/threads/accounts/x",
       "https://evil.example.com",
       `/invite/p_${"a".repeat(43)}`,
       `/invite/${TOKEN}/x`,

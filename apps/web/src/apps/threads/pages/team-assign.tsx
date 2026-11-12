@@ -1,4 +1,4 @@
-// 担当を決める（/teams/:teamId/assign。specs/011-team-revision contracts/ui-routes.md「担当を決める」、US2、FR-022〜FR-024）。
+// 担当を決める（/threads/teams/:teamId/assign。specs/011-team-revision contracts/ui-routes.md「担当を決める」、US2、FR-022〜FR-024）。
 // 行＝編集者と管理者（自分）、列＝チームのアカウント。自分のアカウントのセルは「自分」。管理者だけが開ける。
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { errorMessage, type TeamAssignments } from "@meguru/shared";
@@ -13,6 +13,7 @@ import { ApiError, api, describeError } from "@/lib/api-client";
 import { queryKeys } from "@/lib/query";
 import { cn } from "@/lib/utils";
 import { NotFound } from "@/shell";
+import { teamPath } from "@/apps/threads/lib/paths";
 
 /**
  * 担当の表の画面。
@@ -64,7 +65,7 @@ export function TeamAssignPage() {
   }
   const back = (
     <Button asChild variant="ghost" size="icon" className="size-10 md:size-9" aria-label="チームの画面に戻る">
-      <Link to={`/teams/${teamId}`}>
+      <Link to={teamPath(teamId)}>
         <ArrowLeftIcon className="size-5" />
       </Link>
     </Button>

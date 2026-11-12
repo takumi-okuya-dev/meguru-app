@@ -5,6 +5,7 @@ import userEvent from "@testing-library/user-event";
 import type { TestInvitePreview } from "@meguru/shared";
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { WithEntryApp } from "./helpers/entry-app";
 
 let signedIn = false;
 const signOut = vi.fn(async () => undefined);
@@ -34,12 +35,15 @@ function renderAt() {
       { path: "/test-invite/:token", element: <TestInvitePage /> },
       { path: "/sign-in", element: <p>ログイン画面</p> },
       { path: "/", element: <p>最初の画面</p> },
+      { path: "/threads", element: <p>Threadsのホーム</p> },
     ],
     { initialEntries: [`/test-invite/${TOKEN}`] },
   );
   render(
     <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
-      <RouterProvider router={router} />
+      <WithEntryApp>
+        <RouterProvider router={router} />
+      </WithEntryApp>
     </QueryClientProvider>,
   );
   return router;
@@ -82,7 +86,7 @@ describe("グループの招待", () => {
     expect(screen.queryByRole("button", { name: "Googleで始める" })).not.toBeInTheDocument();
   });
 
-  it("ログイン後：「参加する」を押すまで入らない。押したら入り、入れない印を下ろして最初の画面へ", async () => {
+  it("ログイン後：「参加する」を押すまで入らない。押したら入り、入れない印を下ろしてThreadsのホームへ（specs/028）", async () => {
     signedIn = true;
     setTestAccessRequired(true);
     previewTestInvite.mockResolvedValue(preview({ viewer: { state: "can_join" } }));
@@ -91,8 +95,8 @@ describe("グループの招待", () => {
     const router = renderAt();
     await user.click(await screen.findByRole("button", { name: "参加する" }));
     expect(joinTestGroup).toHaveBeenCalledWith(TOKEN);
-    expect(await screen.findByText("最初の画面")).toBeInTheDocument();
-    expect(router.state.location.pathname).toBe("/");
+    expect(await screen.findByText("Threadsのホーム")).toBeInTheDocument();
+    expect(router.state.location.pathname).toBe("/threads");
     expect(getTestAccessRequired()).toBe(false);
   });
 
@@ -119,7 +123,7 @@ describe("グループの招待", () => {
     previewTestInvite.mockResolvedValue(preview({ viewer: { state: "already_member", groupName: "美容の会" } }));
     renderAt();
     expect(await screen.findByText("すでに美容の会に入っています。")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "アプリを開く" })).toHaveAttribute("href", "/");
+    expect(screen.getByRole("link", { name: "アプリを開く" })).toHaveAttribute("href", "/threads");
   });
 
   it("使えないリンクは「このリンクは使えません」", async () => {

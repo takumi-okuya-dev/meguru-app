@@ -20,7 +20,7 @@ const LONG = { ...promptResponse(), prompt: "全文", parts: ["1つ目の全文"
 const SHORT = { ...promptResponse(), prompt: "全文", parts: ["1つ目の全文", "2つ目の全文"] as [string, string], length: 8000, splitRecommended: false };
 
 function renderCreate() {
-  return renderAccountRoutes([{ path: "create", element: <CreatePage /> }], "/accounts/a1/create");
+  return renderAccountRoutes([{ path: "create", element: <CreatePage /> }], "/threads/accounts/a1/create");
 }
 
 beforeEach(() => {

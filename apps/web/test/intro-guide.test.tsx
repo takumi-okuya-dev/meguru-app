@@ -43,8 +43,8 @@ const { AccountHome } = await import("@/apps/threads/pages/account-home");
 
 function renderHome() {
   const router = createMemoryRouter(
-    [{ path: "/accounts/:accountId", element: <Outlet context={{ account }} />, children: [{ index: true, element: <AccountHome /> }] }],
-    { initialEntries: ["/accounts/a1"] },
+    [{ path: "/threads/accounts/:accountId", element: <Outlet context={{ account }} />, children: [{ index: true, element: <AccountHome /> }] }],
+    { initialEntries: ["/threads/accounts/a1"] },
   );
   render(
     <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>

@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { TOKEN_WARNING_KIND } from "@/apps/threads/components/connect/TokenWarnings";
 import { ApiError, api, describeError } from "@/lib/api-client";
+import { accountPath } from "@/apps/threads/lib/paths";
 
 /** 隠している間に欄に出す文字。 */
 const MASK = "•";
@@ -177,7 +178,7 @@ export function TokenConnectForm(props: Props) {
           <AlertDescription className="space-y-1 text-foreground">
             <p>{message}</p>
             {registeredId && (
-              <Link className="underline" to={`/accounts/${registeredId}/settings`}>
+              <Link className="underline" to={accountPath(registeredId, "settings")}>
                 そのアカウントの設定を開く
               </Link>
             )}

@@ -56,15 +56,15 @@ const { UnsavedChangesProvider } = await import("@/components/UnsavedChangesProv
 const { StockPage } = await import("@/apps/threads/pages/stock");
 const { CreatePage } = await import("@/apps/threads/pages/create");
 
-function renderPage(path = "/accounts/a1/stock") {
+function renderPage(path = "/threads/accounts/a1/stock") {
   const router = createMemoryRouter(
     [
       {
-        path: "/accounts/:accountId",
+        path: "/threads/accounts/:accountId",
         element: (
           <>
-            <Link to="/accounts/a1">ホームへ</Link>
-            <Link to="/accounts/a1/stock">投稿ストックへ</Link>
+            <Link to="/threads/accounts/a1">ホームへ</Link>
+            <Link to="/threads/accounts/a1/stock">投稿ストックへ</Link>
             <UnsavedChangesProvider>
               <Outlet context={{ account }} />
             </UnsavedChangesProvider>
@@ -124,7 +124,7 @@ describe("待っている削除は、画面を移っても確定してから登�
         { path: "stock", element: <StockPage /> },
         { path: "create", element: <CreatePage /> },
       ],
-      "/accounts/a1/stock",
+      "/threads/accounts/a1/stock",
     );
   }
 
@@ -146,7 +146,7 @@ describe("待っている削除は、画面を移っても確定してから登�
     const router = renderBoth();
     expect(await screen.findByText(/要確認の下書きが上限（500件）に達しています/)).toBeInTheDocument();
     await deleteFirst(user);
-    await act(() => router.navigate("/accounts/a1/create"));
+    await act(() => router.navigate("/threads/accounts/a1/create"));
     await waitFor(() => expect(deletePostDrafts).toHaveBeenCalledWith("a1", ["d1"]));
     // 取り直した一覧では上限に達していないので、登録できる
     await waitFor(() => expect(screen.getByRole("button", { name: "投稿ストックに登録する" })).toBeInTheDocument());
@@ -168,7 +168,7 @@ describe("待っている削除は、画面を移っても確定してから登�
     await user.click(await screen.findByRole("button", { name: "「2件目」の操作" }));
     await user.click(await screen.findByRole("menuitem", { name: "削除" }));
     await waitFor(() => expect(deletePostDrafts).toHaveBeenCalledWith("a1", ["d1"]));
-    await act(() => router.navigate("/accounts/a1/create"));
+    await act(() => router.navigate("/threads/accounts/a1/create"));
     const box = await screen.findByRole("textbox", { name: "AIの返信を貼り付ける欄" });
     await user.click(box);
     await user.paste("新しい");
@@ -188,7 +188,7 @@ describe("待っている削除は、画面を移っても確定してから登�
     createDraftBatch.mockResolvedValue(batchResult([draft({ id: "d3", body: "新しい" })]));
     const router = renderBoth();
     await deleteFirst(user);
-    await act(() => router.navigate("/accounts/a1/create"));
+    await act(() => router.navigate("/threads/accounts/a1/create"));
     const box = await screen.findByRole("textbox", { name: "AIの返信を貼り付ける欄" });
     await user.click(box);
     await user.paste("新しい");
@@ -207,7 +207,7 @@ describe("投稿ストックは一覧だけ（specs/014 US15、FR-163、SC-023�
     renderPage();
     await screen.findByText("下書きの本文");
     expect(screen.getByRole("heading", { level: 1, name: "投稿ストック" })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "投稿をつくる" })).toHaveAttribute("href", "/accounts/a1/create");
+    expect(screen.getByRole("link", { name: "投稿をつくる" })).toHaveAttribute("href", "/threads/accounts/a1/create");
     expect(screen.queryByRole("region", { name: "プロンプト" })).not.toBeInTheDocument();
     expect(screen.queryByRole("textbox", { name: "AIの返信を貼り付ける欄" })).not.toBeInTheDocument();
     expect(getPrompt).not.toHaveBeenCalled();
@@ -221,7 +221,7 @@ describe("投稿ストックは一覧だけ（specs/014 US15、FR-163、SC-023�
     ).toBeInTheDocument();
     const links = screen.getAllByRole("link", { name: "投稿をつくる" });
     expect(links).toHaveLength(2);
-    for (const l of links) expect(l).toHaveAttribute("href", "/accounts/a1/create");
+    for (const l of links) expect(l).toHaveAttribute("href", "/threads/accounts/a1/create");
   });
 
   it("下書きを選ぶと、画面の下に選択のバーが出る", async () => {
@@ -456,7 +456,7 @@ describe("承認・却下（004 US1）", () => {
   });
 
   it("4つのタブに件数が出て、?tab=approved で承認済みのタブが開く（FR-001）", async () => {
-    renderPage("/accounts/a1/stock?tab=approved");
+    renderPage("/threads/accounts/a1/stock?tab=approved");
     expect(await screen.findByRole("tab", { name: "要確認 3" })).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: "却下 1" })).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: "承認済み 1" })).toHaveAttribute(
@@ -520,7 +520,7 @@ describe("承認・却下（004 US1）", () => {
   });
 
   it("却下のタブに却下理由が出る（FR-012）", async () => {
-    renderPage("/accounts/a1/stock?tab=rejected");
+    renderPage("/threads/accounts/a1/stock?tab=rejected");
     expect(await screen.findByText("却下理由：トーンが違う / 語尾がきつい")).toBeInTheDocument();
   });
 
@@ -555,7 +555,7 @@ describe("承認・却下（004 US1）", () => {
 
   it("選択のバーの中身はタブごとに変わる", async () => {
     const user = userEvent.setup();
-    renderPage("/accounts/a1/stock?tab=approved");
+    renderPage("/threads/accounts/a1/stock?tab=approved");
     await user.click(await screen.findByRole("checkbox", { name: "「承認した投稿」を選択" }));
     let bar = screen.getByRole("toolbar", { name: "選んだ下書きの操作" });
     expect(within(bar).getByRole("button", { name: "要確認に戻す" })).toBeInTheDocument();
@@ -583,7 +583,7 @@ describe("承認・却下（004 US1）", () => {
       draft: reviewed(approvedDraft, "needs_review"),
       reopened: true,
     });
-    renderPage("/accounts/a1/stock?tab=approved");
+    renderPage("/threads/accounts/a1/stock?tab=approved");
     await user.click(await screen.findByRole("button", { name: "「承認した投稿」の操作" }));
     await user.click(await screen.findByRole("menuitem", { name: "編集" }));
     const dialog = await screen.findByRole("dialog", { name: "下書きを編集" });
@@ -852,7 +852,7 @@ describe("規約に注意（004 US5、FR-039・FR-040・FR-043）", () => {
 
   it("承認済みの規約に注意の下書きには、要確認に戻すことを勧め、押すと reopen を送る", async () => {
     const user = userEvent.setup();
-    renderPage("/accounts/a1/stock?tab=approved");
+    renderPage("/threads/accounts/a1/stock?tab=approved");
     expect(
       await screen.findByText(
         "規約に注意の表現があります。要確認に戻して確かめることをおすすめします",
@@ -1237,7 +1237,7 @@ describe("005：投稿済みの一覧と自動投稿の知らせ", () => {
   });
 
   it("?tab=published を直接開け、空の状態を表示する", async () => {
-    renderPage("/accounts/a1/stock?tab=published");
+    renderPage("/threads/accounts/a1/stock?tab=published");
     expect(await screen.findByText("まだ投稿はありません。承認した下書きは、投稿のスケジュールに沿って投稿されます")).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: "投稿済み 0" })).toHaveAttribute("data-state", "active");
   });
@@ -1273,7 +1273,7 @@ describe("US3：失敗・持ち越し・処理中", () => {
     const failed = draft({ status: "publish_failed", publishError: "network", publishFailedAt: "2026-10-06T03:00:00Z" });
     listPostDrafts.mockResolvedValue(listResponse({ publishFailed: [failed] }));
     reviewPostDrafts.mockResolvedValue({ updated: [{ ...failed, status: "approved" }], skipped: [], counts: { needsReview: 0, approved: 1, rejected: 0, published: 0, publishFailed: 0 } });
-    renderPage("/accounts/a1/stock?tab=approved");
+    renderPage("/threads/accounts/a1/stock?tab=approved");
     expect(await screen.findByText("投稿に失敗（1件）")).toBeInTheDocument();
     expect(screen.getByText(/に失敗：Threadsとの通信に失敗しました/)).toBeInTheDocument();
     expect(screen.queryByRole("checkbox")).not.toBeInTheDocument();
@@ -1282,7 +1282,7 @@ describe("US3：失敗・持ち越し・処理中", () => {
   });
   it("処理中の操作を無効にし、持ち越しの理由を出す", async () => {
     listPostDrafts.mockResolvedValue(listResponse({ approved: [draft({ id: "busy", status: "publishing" }), draft({ id: "carry", status: "approved", carryover: true })] }));
-    renderPage("/accounts/a1/stock?tab=approved");
+    renderPage("/threads/accounts/a1/stock?tab=approved");
     expect(await screen.findByText("投稿の処理中")).toBeInTheDocument();
     expect(within(document.getElementById("draft-busy")!).getByRole("checkbox")).toBeDisabled();
     expect(within(document.getElementById("draft-busy")!).getByRole("button", { name: /の操作/ })).toBeDisabled();
@@ -1296,7 +1296,7 @@ describe("US3：失敗・持ち越し・処理中", () => {
     expect(await screen.findByRole("button", { name: "再接続" })).toBeInTheDocument();
     expect(screen.getByText(/Threadsの投稿数の上限に達したため/)).toBeInTheDocument();
     expect(screen.getByText("2件の投稿に失敗しました（Threadsとの通信に失敗しました）")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "確認する" })).toHaveAttribute("href", "/accounts/a1/stock?tab=approved#publish-failed");
+    expect(screen.getByRole("link", { name: "確認する" })).toHaveAttribute("href", "/threads/accounts/a1/stock?tab=approved#publish-failed");
   });
 });
 
@@ -1308,7 +1308,7 @@ describe("US4：予定と投稿の順", () => {
     const initial = listResponse({ approved: [a, b], schedule: { a: "2026-10-08T03:00:00Z", b: "2026-10-08T12:00:00Z" }, autoPost: { enabled: true, slotCount: 2, stoppedReason: null } });
     listPostDrafts.mockResolvedValue(initial);
     prioritizeDraft.mockImplementation(async () => { listPostDrafts.mockResolvedValue({ ...initial, approved: [b, a], schedule: { b: "2026-10-08T03:00:00Z", a: "2026-10-08T12:00:00Z" } }); return { ...b, version: 2 }; });
-    renderPage("/accounts/a1/stock?tab=approved");
+    renderPage("/threads/accounts/a1/stock?tab=approved");
     expect(await screen.findByText(/12:00に投稿予定/)).toBeInTheDocument();
     await userEvent.click(within(document.getElementById("draft-a")!).getByRole("button", { name: /の操作/ }));
     expect(screen.queryByRole("menuitem", { name: "次に投稿する" })).not.toBeInTheDocument();
@@ -1319,9 +1319,9 @@ describe("US4：予定と投稿の順", () => {
     await waitFor(() => expect(toastSuccess).toHaveBeenCalledWith(expect.stringMatching(/次の投稿にしました.*12:00/)));
   });
   it("オフでは設定への案内を出す", async () => {
-    renderPage("/accounts/a1/stock?tab=approved");
+    renderPage("/threads/accounts/a1/stock?tab=approved");
     expect(await screen.findByText("自動投稿はオフです。")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "投稿のスケジュールを設定する" })).toHaveAttribute("href", "/accounts/a1/settings");
+    expect(screen.getByRole("link", { name: "投稿のスケジュールを設定する" })).toHaveAttribute("href", "/threads/accounts/a1/settings");
   });
 });
 
@@ -1329,7 +1329,7 @@ describe("005：画面を開いた後に投稿の処理が始まる", () => {
   it("編集の保存がDRAFT_PUBLISHINGなら、知らせて一覧を読み直す", async () => {
     listPostDrafts.mockResolvedValue(listResponse({ approved: [draft({ status: "approved" })] }));
     updatePostDraft.mockRejectedValue(new ApiError("DRAFT_PUBLISHING", 409));
-    renderPage("/accounts/a1/stock?tab=approved");
+    renderPage("/threads/accounts/a1/stock?tab=approved");
     await userEvent.click(await screen.findByRole("button", { name: "「下書きの本文」の操作" }));
     await userEvent.click(screen.getByRole("menuitem", { name: "編集" }));
     const dialog = await screen.findByRole("dialog", { name: "下書きを編集" });
@@ -1342,7 +1342,7 @@ describe("005：画面を開いた後に投稿の処理が始まる", () => {
     const d = draft({ status: "approved" });
     listPostDrafts.mockResolvedValue(listResponse({ approved: [d] }));
     reviewPostDrafts.mockResolvedValue({ updated: [], skipped: [{ id: d.id, reason: "PUBLISHING" }], counts: { needsReview: 0, approved: 1, rejected: 0, published: 0, publishFailed: 0 } });
-    renderPage("/accounts/a1/stock?tab=approved");
+    renderPage("/threads/accounts/a1/stock?tab=approved");
     await userEvent.click(await screen.findByRole("button", { name: "「下書きの本文」の操作" }));
     await userEvent.click(screen.getByRole("menuitem", { name: "要確認に戻す" }));
     await waitFor(() => expect(toastError).toHaveBeenCalledWith("投稿の処理中です。少し待ってからもう一度お試しください。"));
@@ -1379,7 +1379,7 @@ describe("投稿ストック（承認の権限がない人）", () => {
       }),
     );
     const user = userEvent.setup();
-    renderPage("/accounts/a1/stock?tab=approved");
+    renderPage("/threads/accounts/a1/stock?tab=approved");
     await user.click(await screen.findByRole("button", { name: "「承認済み2」の操作" }));
     expect(await screen.findByRole("menuitem", { name: "編集" })).toBeInTheDocument();
     expect(screen.queryByRole("menuitem", { name: "次に投稿する" })).not.toBeInTheDocument();

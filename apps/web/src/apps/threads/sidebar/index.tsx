@@ -30,12 +30,13 @@ import { CreateTeamDialog } from "../components/team/CreateTeamDialog";
 import { TeamMark } from "../components/team/TeamMark";
 import { featureOn, useAccountAccess } from "../lib/use-account-access";
 import { AccountSwitcher } from "./AccountSwitcher";
+import { THREADS_BASE, accountPath, teamPath, threadsHomePath } from "@/apps/threads/lib/paths";
 
 type NavItem = { path: string; label: string; Icon: LucideIcon; end?: boolean; badge?: "needsReview"; needsAccount?: boolean };
 /** feature：区分ごとON/OFFする機能のまとまり。OFFなら見出しごと出さない（specs/019 FR-004） */
 type NavGroup = { label?: string; items: NavItem[]; feature?: Feature };
 
-/** 機能の移動。path は /accounts/:id からの相対パス。 */
+/** 機能の移動。path は /threads/accounts/:id からの相対パス。 */
 // 並びは ホーム → 自動投稿 → 戦略 → チーム（specs/019 FR-004。2026-11-04に「分析」の見出しをなくし、パフォーマンスを自動投稿に入れた）
 const NAV_GROUPS: NavGroup[] = [
   { items: [{ path: "", label: "ホーム", Icon: HouseIcon, end: true }] },
@@ -69,14 +70,14 @@ const itemClass = ({ isActive }: { isActive: boolean }) =>
   );
 
 /**
- * サイドバーで扱うアカウント。チームの画面（/teams/*）では、最後に使ったAccountの機能へ移れるようにする。
+ * サイドバーで扱うアカウント。チームの画面（/threads/teams/*）では、最後に使ったAccountの機能へ移れるようにする。
  * @returns 表示中（なければ最後に使った）アカウントのIDと、その画面のURLの頭
  */
 function useSidebarAccount() {
   const params = useParams<{ accountId: string }>();
   const me = useQuery({ queryKey: queryKeys.me, queryFn: api.me });
   const accountId = params.accountId ?? me.data?.landingAccountId ?? undefined;
-  const base = accountId ? `/accounts/${accountId}` : "/";
+  const base = accountId ? accountPath(accountId) : threadsHomePath();
   return { me, params, accountId, base };
 }
 
@@ -97,7 +98,7 @@ function Header({ onNavigate }: SidebarPartProps) {
 function Body({ onNavigate }: SidebarPartProps) {
   const { me, params, accountId, base } = useSidebarAccount();
   const teams = me.data?.teams ?? [];
-  const openTeam = useMatch("/teams/:teamId/*")?.params.teamId;
+  const openTeam = useMatch(`${THREADS_BASE}/teams/:teamId/*`)?.params.teamId;
   const [creating, setCreating] = useState(false);
   // 投稿ストックの右に出す要確認の件数（specs/004 FR-013）。本文を含まない軽いAPIで読む
   // 機能の移動と同じく、チームの画面では最後に使ったAccountで読む（でないと「操作の記録」が消える）
@@ -146,7 +147,7 @@ function Body({ onNavigate }: SidebarPartProps) {
             {teams.map((t) => (
               <Link
                 key={t.id}
-                to={`/teams/${t.id}`}
+                to={teamPath(t.id)}
                 aria-current={openTeam === t.id ? "page" : undefined}
                 className={itemClass({ isActive: openTeam === t.id })}
                 onClick={onNavigate}

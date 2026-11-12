@@ -2,6 +2,7 @@
 import type { AnalysisResponse } from "@meguru/shared";
 import { Link } from "react-router";
 import { formatSlotTime } from "@/lib/format";
+import { accountPath } from "@/apps/threads/lib/paths";
 
 /**
  * 時刻の参考。
@@ -27,7 +28,7 @@ export function ScheduleHint({
       <span className="text-muted-foreground">
         伸びやすい：{timing.length > 0 ? timing.map((t) => t.text.replace(/に出した投稿が伸びやすい$/, "")).join("・") : "まだ分かりません"}
       </span>
-      <Link to={`/accounts/${accountId}/settings`} className="inline-flex min-h-8 items-center underline-offset-4 hover:underline md:ml-auto">
+      <Link to={accountPath(accountId, "settings")} className="inline-flex min-h-8 items-center underline-offset-4 hover:underline md:ml-auto">
         投稿の時刻を開く
       </Link>
     </div>

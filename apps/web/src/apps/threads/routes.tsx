@@ -26,8 +26,9 @@ import { TeamLayout } from "./pages/team-layout";
 import { TeamSharedAccountPage } from "./pages/team-shared-account";
 import { TeamStatusPage } from "./pages/team-status";
 import { ThreadsComplete } from "./pages/threads-complete";
+import { THREADS_BASE } from "./lib/paths";
 
-/** アカウントの画面（/accounts/:accountId）の子。 */
+/** アカウントの画面（/threads/accounts/:accountId）の子。 */
 const ACCOUNT_CHILDREN: RouteObject[] = [
   { index: true, element: <AccountHome /> },
   { path: "settings", element: <AccountSettings /> },
@@ -49,14 +50,14 @@ const ACCOUNT_CHILDREN: RouteObject[] = [
 
 /** ログインの要るルート。 */
 export const threadsRoutes: RouteObject[] = [
-  { path: "/", element: <Landing /> },
-  { path: "/accounts/new", element: <AccountNew /> },
+  { path: `${THREADS_BASE}`, element: <Landing /> },
+  { path: `${THREADS_BASE}/accounts/new`, element: <AccountNew /> },
   // Threads から戻ってきた人の受け口。接続の完了はログイン済みでしか行えない
   // （state を作った人と呼び出し元の一致を要求する。セキュリティ監査 run-1）
-  { path: "/threads/complete", element: <ThreadsComplete /> },
+  { path: `${THREADS_BASE}/complete`, element: <ThreadsComplete /> },
   // チーム（specs/011 contracts/ui-routes.md「ルート」）。チームの画面と担当の表はサイドバーの中に出す
   {
-    path: "/teams/:teamId",
+    path: `${THREADS_BASE}/teams/:teamId`,
     element: <TeamLayout />,
     children: [
       { index: true, element: <TeamPage /> },
@@ -69,8 +70,8 @@ export const threadsRoutes: RouteObject[] = [
     element: <AccountHomeLink />,
     children: [
       // 見せてもらっているアカウントは、読むだけの1カラムの画面（Accountのサイドバーには入らない）
-      { path: "/teams/:teamId/accounts/:accountId", element: <TeamSharedAccountPage /> },
-      { path: "/accounts/:accountId", element: <AccountLayout />, children: ACCOUNT_CHILDREN },
+      { path: `${THREADS_BASE}/teams/:teamId/accounts/:accountId`, element: <TeamSharedAccountPage /> },
+      { path: `${THREADS_BASE}/accounts/:accountId`, element: <AccountLayout />, children: ACCOUNT_CHILDREN },
     ],
   },
 ];

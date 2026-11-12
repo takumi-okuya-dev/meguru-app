@@ -7,6 +7,7 @@ import { useNavigate } from "react-router";
 import { toast } from "sonner";
 import { api, setAccountAccessErrorListener, type AccountAccessErrorListener } from "@/lib/api-client";
 import { queryKeys } from "@/lib/query";
+import { threadsHomePath } from "@/apps/threads/lib/paths";
 
 /**
  * 表示中のAccountでの役割と権限を読む。
@@ -63,7 +64,7 @@ export function makeAccountAccessErrorHandler(ctx: {
     }
     toast.error(ACCOUNT_ACCESS_LOST_MESSAGE, { id: "account-access-lost" });
     void ctx.queryClient.invalidateQueries({ queryKey: queryKeys.me });
-    ctx.navigate("/");
+    ctx.navigate(threadsHomePath());
   };
 }
 

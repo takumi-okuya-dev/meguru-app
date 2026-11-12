@@ -57,11 +57,11 @@ function makeAccount(overrides: Partial<AccountSummary> = {}): AccountSummary {
   };
 }
 
-function renderSettings(account: AccountSummary, path = "/accounts/a1/settings") {
+function renderSettings(account: AccountSummary, path = "/threads/accounts/a1/settings") {
   const router = createMemoryRouter(
     [
       {
-        path: "/accounts/:accountId",
+        path: "/threads/accounts/:accountId",
         element: (
           <UnsavedChangesProvider>
             <Outlet context={{ account }} />
@@ -181,7 +181,7 @@ describe("ReconnectButton（PR #12 のCodexレビュー）", () => {
     const router = createMemoryRouter(
       [
         {
-          path: "/accounts/:accountId",
+          path: "/threads/accounts/:accountId",
           element: <Outlet context={{ account }} />,
           children: [
             {
@@ -196,7 +196,7 @@ describe("ReconnectButton（PR #12 のCodexレビュー）", () => {
           ],
         },
       ],
-      { initialEntries: [`/accounts/${account.id}`] },
+      { initialEntries: [`/threads/accounts/${account.id}`] },
     );
     render(
       <QueryClientProvider client={new QueryClient()}>
@@ -265,7 +265,7 @@ describe("接続し直しで、出していない方法を見せない", () => {
 
 describe("つながっているアカウントで、接続し直しから戻ったときのエラー（specs/025 US2・FR-011・research.md R2）", () => {
   it("違うアカウント（RECONNECT_ACCOUNT_MISMATCH）なら、エラーの文に続けて、今の@名前と「接続し直す」を使った手順を出す", async () => {
-    renderSettings(makeAccount(), "/accounts/a1/settings?error=RECONNECT_ACCOUNT_MISMATCH");
+    renderSettings(makeAccount(), "/threads/accounts/a1/settings?error=RECONNECT_ACCOUNT_MISMATCH");
     expect(await screen.findByText("再接続には、元の@cafe_bで認可してください。別のアカウントで認可されました。")).toBeInTheDocument();
     expect(screen.getByText("@cafe_b でログインし直す")).toBeInTheDocument();
     expect(screen.getByText("このページに戻って、もう一度「接続し直す」を押す")).toBeInTheDocument();
@@ -276,21 +276,21 @@ describe("つながっているアカウントで、接続し直しから戻っ�
   });
 
   it("ほかのエラー（キャンセル）は、文だけを出す", async () => {
-    renderSettings(makeAccount(), "/accounts/a1/settings?error=THREADS_AUTH_CANCELLED");
+    renderSettings(makeAccount(), "/threads/accounts/a1/settings?error=THREADS_AUTH_CANCELLED");
     expect(await screen.findByText("Threadsとの接続がキャンセルされました。")).toBeInTheDocument();
     expect(screen.queryByText(/今のアカウントからログアウトする/)).not.toBeInTheDocument();
     expect(toastError).not.toHaveBeenCalled();
   });
 
   it("要再接続のときは、手順のボタンの名前も「再接続」にする（/code-review 3）", async () => {
-    renderSettings(makeAccount({ connectionStatus: "needs_reconnect" }), "/accounts/a1/settings?error=RECONNECT_ACCOUNT_MISMATCH");
+    renderSettings(makeAccount({ connectionStatus: "needs_reconnect" }), "/threads/accounts/a1/settings?error=RECONNECT_ACCOUNT_MISMATCH");
     expect(await screen.findByText("このページに戻って、もう一度「再接続」を押す")).toBeInTheDocument();
     expect(screen.getAllByRole("button", { name: "再接続" }).length).toBeGreaterThan(0);
   });
 
   it("接続し直しを始めたら（ダイアログを開いたら）、戻ってきたエラーを消す（/code-review 2）", async () => {
     const user = userEvent.setup();
-    renderSettings(makeAccount(), "/accounts/a1/settings?error=RECONNECT_ACCOUNT_MISMATCH");
+    renderSettings(makeAccount(), "/threads/accounts/a1/settings?error=RECONNECT_ACCOUNT_MISMATCH");
     await screen.findByText("@cafe_b でログインし直す");
     await user.click(screen.getByRole("button", { name: "接続し直す" }));
     expect(screen.queryByText("再接続には、元の@cafe_bで認可してください。別のアカウントで認可されました。")).not.toBeInTheDocument();

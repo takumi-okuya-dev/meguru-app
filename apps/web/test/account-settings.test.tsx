@@ -88,7 +88,7 @@ function renderPage() {
   const router = createMemoryRouter(
     [
       {
-        path: "/accounts/:accountId",
+        path: "/threads/accounts/:accountId",
         element: (
           <UnsavedChangesProvider>
             <Outlet context={{ account }} />
@@ -97,7 +97,7 @@ function renderPage() {
         children: [{ path: "settings", element: <AccountSettings /> }],
       },
     ],
-    { initialEntries: ["/accounts/a1/settings"] },
+    { initialEntries: ["/threads/accounts/a1/settings"] },
   );
   render(
     <QueryClientProvider

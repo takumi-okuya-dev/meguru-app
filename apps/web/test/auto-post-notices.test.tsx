@@ -58,7 +58,7 @@ describe("未接続の知らせ（specs/012 FR-033）", () => {
     status.notices = [{ kind: "not_connected" }];
     renderNotices(OWNER_ACCESS);
     expect(await screen.findByText("承認した案は、Threadsにつないで自動投稿をオンにすると投稿されます")).toBeInTheDocument();
-    expect(await screen.findByRole("link", { name: "Threadsとの接続" })).toHaveAttribute("href", "/accounts/a1/settings#threads");
+    expect(await screen.findByRole("link", { name: "Threadsとの接続" })).toHaveAttribute("href", "/threads/accounts/a1/settings#threads");
   });
 
   it("オーナーでなければ入口を出さない", async () => {

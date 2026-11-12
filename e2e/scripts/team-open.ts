@@ -118,9 +118,9 @@ async function main() {
     await joinByLink(pages.editor, link, FAKE_ACCOUNTS.editor.name);
     await makeEditor(pages.admin, teamId, FAKE_ACCOUNTS.editor.name);
     await assignEditor(pages.admin, teamId, FAKE_ACCOUNTS.owner.name);
-    await pages.admin.goto(`/teams/${teamId}`);
-    await pages.owner.goto(`/teams/${teamId}`);
-    await pages.editor.goto(`/accounts/${ids.owner}`);
+    await pages.admin.goto(`/threads/teams/${teamId}`);
+    await pages.owner.goto(`/threads/teams/${teamId}`);
+    await pages.editor.goto(`/threads/accounts/${ids.owner}`);
   } else {
     for (const page of Object.values(pages)) await page.goto("/");
   }

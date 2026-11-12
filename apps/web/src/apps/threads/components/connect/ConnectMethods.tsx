@@ -22,6 +22,7 @@ import { AccountSwitchSteps } from "./AccountSwitchSteps";
 import { TesterApplicationPanel } from "./TesterApplicationPanel";
 import { ThreadsAccountGuide } from "./ThreadsAccountGuide";
 import { TokenConnectForm } from "./TokenConnectForm";
+import { accountPath } from "@/apps/threads/lib/paths";
 
 /** 許可の画面から戻ってきたときのエラー（?error=…&account=…）。 */
 export type ConnectError = { code: ErrorCode; account: string | null };
@@ -46,7 +47,7 @@ function RegisteredAlert({
     <Alert variant="destructive">
       <AlertDescription className="space-y-1 text-foreground">
         <p>{message}</p>
-        <Link className="underline" to={`/accounts/${accountId}/settings`}>
+        <Link className="underline" to={accountPath(accountId, "settings")}>
           {name ? `『${name}』を開く` : "そのアカウントの設定を開く"}
         </Link>
         {steps}

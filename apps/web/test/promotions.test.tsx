@@ -60,10 +60,10 @@ function renderPage() {
   const router = createMemoryRouter(
     [
       {
-        path: "/accounts/:accountId",
+        path: "/threads/accounts/:accountId",
         element: (
           <>
-            <Link to="/accounts/a1">ホームへ</Link>
+            <Link to="/threads/accounts/a1">ホームへ</Link>
             <UnsavedChangesProvider>
               <Outlet context={{ account }} />
             </UnsavedChangesProvider>
@@ -75,7 +75,7 @@ function renderPage() {
         ],
       },
     ],
-    { initialEntries: ["/accounts/a1/promotions"] },
+    { initialEntries: ["/threads/accounts/a1/promotions"] },
   );
   render(
     <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
@@ -199,7 +199,7 @@ describe("宣伝内容の画面", () => {
     await userEvent.click(screen.getByRole("link", { name: "ホームへ" }));
     expect(await screen.findByText("保存していない変更があります")).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "編集に戻る" }));
-    expect(router.state.location.pathname).toBe("/accounts/a1/promotions");
+    expect(router.state.location.pathname).toBe("/threads/accounts/a1/promotions");
     expect(screen.getByLabelText("宣伝投稿の割合")).toHaveValue(30);
   });
 });

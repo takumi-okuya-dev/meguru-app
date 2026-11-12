@@ -22,6 +22,7 @@ import { Button } from "@/components/ui/button";
 import { ApiError, api, describeError } from "@/lib/api-client";
 import { isInvitePath, rememberInviteReturn } from "@/lib/invite-return";
 import { queryKeys } from "@/lib/query";
+import { accountPath } from "@/apps/threads/lib/paths";
 
 /**
  * アカウントを作る画面。名前の入力欄1つと「作る」。上限に達していれば、入力欄の代わりに上限の案内を出す。
@@ -41,7 +42,7 @@ export function AccountNew() {
     mutationFn: () => api.createAccount({ name: name.trim() }),
     onSuccess: async (account) => {
       await queryClient.invalidateQueries({ queryKey: queryKeys.me });
-      void navigate(`/accounts/${account.id}`);
+      void navigate(accountPath(account.id));
     },
   });
 

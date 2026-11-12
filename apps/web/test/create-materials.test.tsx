@@ -33,7 +33,7 @@ function materials(over: Partial<PromptMaterials> = {}): PromptMaterials {
 }
 
 function renderCreate() {
-  return renderAccountRoutes([{ path: "create", element: <CreatePage /> }], "/accounts/a1/create");
+  return renderAccountRoutes([{ path: "create", element: <CreatePage /> }], "/threads/accounts/a1/create");
 }
 
 beforeEach(() => {
@@ -79,22 +79,22 @@ describe("プロンプトに入っている情報", () => {
     const strategy = within(screen.getByRole("region", { name: "課題" }));
     expect(within(strategy.getByRole("listitem", { name: "最終的に読者に取ってほしい行動" })).getByRole("link", { name: "編集" })).toHaveAttribute(
       "href",
-      "/accounts/a1/strategy#field-finalAction",
+      "/threads/accounts/a1/strategy#field-finalAction",
     );
     const drafts = within(screen.getByRole("region", { name: "プロフィール・固定投稿（下書き）" }));
     expect(within(drafts.getByRole("listitem", { name: "固定投稿②" })).getByRole("link", { name: "編集" })).toHaveAttribute(
       "href",
-      "/accounts/a1/strategy#field-pinnedPostDraft2",
+      "/threads/accounts/a1/strategy#field-pinnedPostDraft2",
     );
     expect(within(screen.getByRole("region", { name: "宣伝内容" })).getByRole("link", { name: "編集" })).toHaveAttribute(
       "href",
-      "/accounts/a1/promotions",
+      "/threads/accounts/a1/promotions",
     );
     const research = within(screen.getByRole("region", { name: "リサーチ" }));
-    expect(research.getByRole("link", { name: "編集" })).toHaveAttribute("href", "/accounts/a1/research");
+    expect(research.getByRole("link", { name: "編集" })).toHaveAttribute("href", "/threads/accounts/a1/research");
     expect(research.getByRole("link", { name: "解説がまだ8件 → まとめてAIに解説してもらう" })).toHaveAttribute(
       "href",
-      "/accounts/a1/research#explain",
+      "/threads/accounts/a1/research#explain",
     );
   });
 

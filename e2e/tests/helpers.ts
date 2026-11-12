@@ -101,7 +101,7 @@ export async function signOut(page: Page) {
 // ---- アカウントを作ってからつなぐ（specs/012-accounts-before-connect）----
 
 /** アカウントの画面のURL（IDを取り出す）。 */
-export const ACCOUNT_URL = /\/accounts\/([0-9a-f-]{36})(?:\/|\?|#|$)/;
+export const ACCOUNT_URL = /\/threads\/accounts\/([0-9a-f-]{36})(?:\/|\?|#|$)/;
 
 /**
  * 「アカウントを作る」で名前だけのアカウントを作り、そのホームへ移るのを待つ。
@@ -110,10 +110,10 @@ export const ACCOUNT_URL = /\/accounts\/([0-9a-f-]{36})(?:\/|\?|#|$)/;
  * @returns 作ったアカウントのID
  */
 export async function createAccount(page: Page, name: string): Promise<string> {
-  await page.goto("/accounts/new");
+  await page.goto("/threads/accounts/new");
   await page.getByLabel("アカウントの名前").fill(name);
   await page.getByRole("button", { name: "作る", exact: true }).click();
-  await page.waitForURL(/\/accounts\/[0-9a-f-]{36}$/);
+  await page.waitForURL(/\/threads\/accounts\/[0-9a-f-]{36}$/);
   return ACCOUNT_URL.exec(page.url())![1]!;
 }
 
@@ -124,10 +124,10 @@ export async function createAccount(page: Page, name: string): Promise<string> {
  * @param allow - 認可画面のボタン（既定は最初のユーザーの「許可する」。ほかは「#allow-<id>」）
  */
 export async function connectWithApp(page: Page, accountId: string, allow = "#allow") {
-  await page.goto(`/accounts/${accountId}/settings`);
+  await page.goto(`/threads/accounts/${accountId}/settings`);
   await page.getByRole("button", { name: "Threadsで許可する" }).click();
   await page.locator(allow).click();
-  await page.waitForURL(new RegExp(`/accounts/${accountId}/settings`));
+  await page.waitForURL(new RegExp(`/threads/accounts/${accountId}/settings`));
 }
 
 /**
@@ -152,7 +152,7 @@ export async function makeToken(page: Page, user: string, appScope = "myapp"): P
  * @param token - トークン
  */
 export async function connectWithToken(page: Page, accountId: string, token: string) {
-  await page.goto(`/accounts/${accountId}/settings`);
+  await page.goto(`/threads/accounts/${accountId}/settings`);
   await page.getByRole("button", { name: "自分のMetaアプリのトークンでつなぐ" }).click();
   await page.getByLabel("アクセストークン").fill(token);
   await page.getByRole("button", { name: "つなぐ", exact: true }).click();

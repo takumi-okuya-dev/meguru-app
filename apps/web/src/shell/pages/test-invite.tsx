@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { ApiError, api, describeError, setTestAccessRequired } from "@/lib/api-client";
 import { queryKeys } from "@/lib/query";
 import { useLogout } from "@/lib/use-logout";
+import { useEntryAppHome } from "../app-module";
 
 /** 参加する前に確かめてもらうこと（contracts/ui-routes.md 1）。 */
 const NOTES = [
@@ -27,6 +28,8 @@ export function TestInvitePage() {
   const { token = "" } = useParams<{ token: string }>();
   const { isLoaded, isSignedIn } = useAuth();
   const navigate = useNavigate();
+  // 参加したあと・「アプリを開く」は、すべてのアプリの画面を挟まずアプリのホームへ（specs/028 contracts/ui-routes.md 3）
+  const entryHome = useEntryAppHome();
   const queryClient = useQueryClient();
   const logout = useLogout();
   const preview = useQuery({
@@ -41,7 +44,7 @@ export function TestInvitePage() {
     onSuccess: async () => {
       setTestAccessRequired(false);
       await queryClient.invalidateQueries({ queryKey: queryKeys.me });
-      void navigate("/", { replace: true });
+      void navigate(entryHome, { replace: true });
     },
     onError: () => void preview.refetch(),
   });
@@ -129,7 +132,7 @@ export function TestInvitePage() {
             <div className="space-y-3">
               <p className="text-sm">すでに{viewer.groupName}に入っています。</p>
               <Button asChild className="h-12 w-full rounded-full">
-                <Link to="/">アプリを開く</Link>
+                <Link to={entryHome}>アプリを開く</Link>
               </Button>
             </div>
           )}

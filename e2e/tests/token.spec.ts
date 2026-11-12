@@ -29,7 +29,7 @@ test("名前で作ったアカウントに、トークンを貼り付けてつ�
   await expect(page.getByText(/今の接続：自分のMetaアプリのトークン/)).toBeVisible();
 
   // 案は「投稿をつくる」で登録し、投稿ストックで確かめる（specs/014 US15）
-  await page.goto(`/accounts/${accountId}/create`);
+  await page.goto(`/threads/accounts/${accountId}/create`);
   await page.getByPlaceholder("AIの返信をここに貼り付け…").fill("トークンの案1\n@@@\nトークンの案2");
   await page.getByRole("button", { name: "投稿ストックに登録する" }).click();
   await page.getByRole("link", { name: "投稿ストックで確かめる" }).click();
@@ -42,30 +42,30 @@ test("自分の別のアカウントを、同じThreadsアカウントにつな�
   await connectWithToken(page, second, await makeToken("another"));
   await expect(page.getByText("@cafe_bは、あなたのアカウント『カフェ本店』につながっています。")).toBeVisible();
   await page.getByRole("link", { name: "『カフェ本店』を開く" }).click();
-  await expect(page).toHaveURL(new RegExp(`/accounts/${accountId}/settings$`));
+  await expect(page).toHaveURL(new RegExp(`/threads/accounts/${accountId}/settings$`));
   // 2つ目は未接続のまま残る
-  await page.goto(`/accounts/${second}/settings`);
+  await page.goto(`/threads/accounts/${second}/settings`);
   await expect(page.getByRole("button", { name: "Threadsで許可する" })).toBeVisible();
 });
 
 test("接続し直しで「Threadsで許可する」に切り替えても、投稿ストックが残る（US3）", async () => {
-  await page.goto(`/accounts/${accountId}/settings`);
+  await page.goto(`/threads/accounts/${accountId}/settings`);
   await page.getByRole("button", { name: "接続し直す", exact: true }).click();
   const dialog = page.getByRole("dialog", { name: "Threadsとの接続し直し" });
   await expect(dialog.getByRole("button", { name: /トークンを貼り付ける/ })).toContainText("今の接続");
   await dialog.getByRole("button", { name: /Threadsで許可する/ }).click();
   await page.locator("#allow-9003").click();
-  await page.waitForURL(new RegExp(`/accounts/${accountId}/settings`));
+  await page.waitForURL(new RegExp(`/threads/accounts/${accountId}/settings`));
   await expect(page.getByText(/今の接続：このアプリで許可/)).toBeVisible();
 
-  await page.goto(`/accounts/${accountId}/stock`);
+  await page.goto(`/threads/accounts/${accountId}/stock`);
   await expect(page.getByText("トークンの案1")).toBeVisible();
   await expect(page.getByText("トークンの案2")).toBeVisible();
 });
 
 test("トークンを貼り付けて接続し直すと、今の接続がトークンに戻る（US3）", async () => {
   const token = await makeToken("myapp");
-  await page.goto(`/accounts/${accountId}/settings`);
+  await page.goto(`/threads/accounts/${accountId}/settings`);
   await page.getByRole("button", { name: "接続し直す", exact: true }).click();
   const dialog = page.getByRole("dialog", { name: "Threadsとの接続し直し" });
   await dialog.getByRole("button", { name: /トークンを貼り付ける/ }).click();

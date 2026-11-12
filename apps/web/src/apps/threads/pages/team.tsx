@@ -1,4 +1,4 @@
-// チームの画面（/teams/:teamId。specs/011-team-revision contracts/ui-routes.md「チームの画面」、US1・US2・US3・US5）。
+// チームの画面（/threads/teams/:teamId。specs/011-team-revision contracts/ui-routes.md「チームの画面」、US1・US2・US3・US5）。
 // 見ている人のロールで出し分ける：管理者はロールの切り替え・招待・担当・外す・引き継ぐ・名前・削除、
 // メンバー・編集者は自分のアカウントの「チームに見せる」と抜ける。出し分けは見た目のためだけで、守りはAPIの判定にある。
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -28,6 +28,7 @@ import { ApiError, api, describeError } from "@/lib/api-client";
 import { queryKeys } from "@/lib/query";
 import { cn } from "@/lib/utils";
 import { NotFound } from "@/shell";
+import { accountPath, sharedAccountPath, teamPath, threadsHomePath } from "@/apps/threads/lib/paths";
 
 const ROLE_NAMES = { admin: "管理者", member: "メンバー", editor: "編集者" } as const;
 
@@ -65,14 +66,14 @@ function AccountChip({ teamId, account, owner }: { teamId: string; account: Team
   if (account.relation === "owner") {
     return (
       <Link
-        to={`/accounts/${account.id}`}
+        to={accountPath(account.id)}
         className="inline-flex h-9 items-center gap-2 rounded-full border px-3.5 text-[13px] hover:bg-accent"
       >
         {label} · あなた
       </Link>
     );
   }
-  const to = account.relation === "assigned" ? `/accounts/${account.id}` : `/teams/${teamId}/accounts/${account.id}`;
+  const to = account.relation === "assigned" ? accountPath(account.id) : sharedAccountPath(teamId, account.id);
   return (
     <Link
       to={to}
@@ -299,7 +300,7 @@ export function TeamPage() {
       queryClient.removeQueries({ queryKey: queryKeys.team(teamId) });
       await queryClient.invalidateQueries({ queryKey: queryKeys.me });
       toast.success("チームを抜けました");
-      void navigate("/", { replace: true });
+      void navigate(threadsHomePath(), { replace: true });
     },
     onError: (err) => setError(describeError(err)),
   });
@@ -310,7 +311,7 @@ export function TeamPage() {
       queryClient.removeQueries({ queryKey: queryKeys.team(teamId) });
       await queryClient.invalidateQueries({ queryKey: queryKeys.me });
       toast.success("チームを削除しました");
-      void navigate("/", { replace: true });
+      void navigate(threadsHomePath(), { replace: true });
     },
     onError: (err) => setError(describeError(err)),
   });
@@ -353,7 +354,7 @@ export function TeamPage() {
           <span className="flex items-center gap-1">
             {t.statusVisible && (
               <Button asChild variant="outline" className="h-10 rounded-full md:h-9">
-                <Link to={`/teams/${teamId}/status`}>
+                <Link to={teamPath(teamId, "status")}>
                   運用状況
                   {/* 止まっている人とアカウントの数（FR-031の例外。2026-11-04 のモックで決めた） */}
                   {(status.data?.stoppedCount ?? 0) > 0 && (
@@ -367,7 +368,7 @@ export function TeamPage() {
             )}
             {isAdmin && (
               <Button asChild variant="outline" className="h-10 rounded-full md:h-9">
-                <Link to={`/teams/${teamId}/assign`}>担当を決める</Link>
+                <Link to={teamPath(teamId, "assign")}>担当を決める</Link>
               </Button>
             )}
             {isAdmin && (

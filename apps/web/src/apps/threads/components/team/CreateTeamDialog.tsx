@@ -11,6 +11,7 @@ import { FormDialogFrame } from "@/apps/threads/components/items/FormDialogFrame
 import { ApiError, api, describeError } from "@/lib/api-client";
 import { queryKeys } from "@/lib/query";
 import { cn } from "@/lib/utils";
+import { accountPath, teamPath } from "@/apps/threads/lib/paths";
 
 /**
  * チームを作るダイアログ。
@@ -49,7 +50,7 @@ export function CreateTeamDialog({
       await queryClient.invalidateQueries({ queryKey: queryKeys.me });
       onClose();
       onCreated?.();
-      void navigate(`/teams/${teamId}`);
+      void navigate(teamPath(teamId));
     },
     onError: (err) => {
       if (err instanceof ApiError && err.code === "ACCOUNT_IN_OTHER_TEAM") {
@@ -110,7 +111,7 @@ export function CreateTeamDialog({
               {connectTarget && (
                 <Link
                   className="font-medium underline underline-offset-4"
-                  to={`/accounts/${connectTarget.id}/settings#threads`}
+                  to={accountPath(connectTarget.id, "settings#threads")}
                   onClick={onClose}
                 >
                   「{connectTarget.name}」をThreadsにつなぐ

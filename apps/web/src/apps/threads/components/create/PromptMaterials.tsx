@@ -5,6 +5,7 @@ import { ChevronDownIcon } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import { Link } from "react-router";
 import { cn } from "@/lib/utils";
+import { accountPath } from "@/apps/threads/lib/paths";
 
 /** 目的の5問は見出しが長いので、一覧では短い名前にする。 */
 const SHORT_LABELS: Record<string, string> = {
@@ -63,7 +64,7 @@ function EditLink({ to }: { to: string }) {
  */
 export function PromptMaterials({ accountId, materials }: { accountId: string; materials: Materials }) {
   const [open, setOpen] = useState(false);
-  const base = `/accounts/${accountId}`;
+  const base = accountPath(accountId);
   const { strategy, drafts, promotions, research } = materials;
   const draftFilled = [drafts.profileBio, ...drafts.pinned];
 
