@@ -1,12 +1,10 @@
 // US3：アカウントの数の上限（specs/024-tester-invite-connect research.md R6・R7、data-model.md 4、FR-018・FR-021・FR-024、T040・T056）
-import { neon } from "@neondatabase/serverless";
 import { beforeEach, describe, expect, it } from "vitest";
-import { call, createUserWithAccount, db, insertSubscription, makeApp, resetDb, setBillingExempt, testEnv } from "../helpers/app";
+import { call, createUserWithAccount, db, insertSubscription, makeApp, resetDb, setBillingExempt, testEnv, setUserLimit, setDefaultLimit } from "../helpers/app";
 import { billingEnv } from "../helpers/billing";
 import { accounts } from "../../src/db/schema";
 
 const app = makeApp();
-const q = () => neon(testEnv.DATABASE_URL);
 const create = (user: string, name: string, env = testEnv) => call(app, "POST", "/api/accounts", { user, body: { name }, env });
 const errorOf = async (res: Response) => ((await res.json()) as { error: { code: string; max?: number; details?: string[] } }).error;
 const meLimit = async (user: string, env = testEnv) =>
@@ -27,9 +25,9 @@ describe("アカウントの数の上限", () => {
 
   it("利用者ごとの値が既定値より優先される", async () => {
     await create("u1", "1");
-    await q()`UPDATE users SET account_limit = 1 WHERE clerk_user_id = 'u1'`;
+    await setUserLimit({ clerkUserId: "u1" }, "accounts", 1);
     expect((await create("u1", "2")).status).toBe(409);
-    await q()`UPDATE users SET account_limit = 5 WHERE clerk_user_id = 'u1'`;
+    await setUserLimit({ clerkUserId: "u1" }, "accounts", 5);
     for (const n of ["2", "3", "4", "5"]) expect((await create("u1", n)).status).toBe(201);
     expect(await meLimit("u1")).toEqual({ max: 5, used: 5 });
   });
@@ -43,13 +41,13 @@ describe("アカウントの数の上限", () => {
   it("料金なしの印の人・契約中の人にもかかる（上限はMetaアプリを守るためで、料金とは別）", async () => {
     const { userId } = await createUserWithAccount("ex");
     await setBillingExempt(userId, true);
-    await q()`UPDATE users SET account_limit = 2 WHERE id = ${userId}`;
+    await setUserLimit({ userId }, "accounts", 2);
     expect((await create("ex", "2", billingEnv())).status).toBe(201);
     expect((await create("ex", "3", billingEnv())).status).toBe(409);
 
     const sub = await createUserWithAccount("sub");
     await insertSubscription(sub.userId, { status: "active" });
-    await q()`UPDATE users SET account_limit = 1 WHERE id = ${sub.userId}`;
+    await setUserLimit({ userId: sub.userId }, "accounts", 1);
     expect(await errorOf(await create("sub", "2", billingEnv()))).toMatchObject({ code: "ACCOUNT_LIMIT_REACHED", max: 1 });
   });
 
@@ -68,7 +66,7 @@ describe("アカウントの数の上限", () => {
 
   it("上限を下げても、今あるアカウントは残る（FR-021）", async () => {
     for (const n of ["1", "2", "3"]) await create("u1", n);
-    await q()`UPDATE operator_settings SET default_account_limit = 1`;
+    await setDefaultLimit("accounts", 1);
     expect(await db().select().from(accounts)).toHaveLength(3);
     expect(await meLimit("u1")).toEqual({ max: 1, used: 3 });
     expect((await create("u1", "4")).status).toBe(409);

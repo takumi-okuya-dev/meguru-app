@@ -1,7 +1,7 @@
 // メンションの返信の段階（specs/023-delayed-mention contracts/mention-job.md 7-1〜7-4、research.md R2〜R6）。
 // 005の runAutoPost の最後に呼ぶ。承認した返信の文は書き換えずに出し、出せないときは出さない（原則II）。
 // 二重に出さないため、005の公開と同じく、公開を送る前にコンテナーのIDと publish_requested_at を保存する。
-import { loadOwnerEntitlement, ownerAutopostOn } from "../access/owner";
+import { loadOwnerAppEntitlement, ownerBlockReason } from "../access/owner";
 import {
   MENTION_EXPIRE_HOURS,
   MENTION_MAX_ATTEMPTS,
@@ -171,8 +171,7 @@ async function handleOne(
     return "waiting";
   }
   if (!m.publishRequestedAt) {
-    const owner = await loadOwnerEntitlement(db, m.accountId, billingModeOf(env), now);
-    if ((owner && !owner.fullAccess) || !(await ownerAutopostOn(db, m.accountId))) {
+    if (ownerBlockReason(await loadOwnerAppEntitlement(db, m.accountId, billingModeOf(env), now))) {
       await release(db, m.draftId, leaseToken);
       return "waiting";
     }

@@ -1,7 +1,7 @@
 // 取り出し（specs/005-auto-post contracts/auto-post-job.md 手順2の4・手順3、research.md R6・R7）。
 // 来ている時刻の試みの行を作り、同じトランザクションで、公開する下書きを選んで publishing にする。
 // 004 の承認・NGワードの追加と同じ「Account × 下書き」のロックの中で、その時点のNGワードで確かめる（Constitution原則I）。
-import { loadOwnerEntitlement, ownerAutopostOn, ownerDailyPostLimit } from "../access/owner";
+import { loadOwnerAppEntitlement, ownerBlockReason, ownerDailyPostLimit } from "../access/owner";
 import {
   AUTOPOST_DAILY_API_LIMIT,
   AUTOPOST_LEASE_SECONDS,
@@ -81,11 +81,9 @@ async function skipReasonOf(
     .where(eq(accounts.id, accountId));
   if (!schedule?.enabled) return "auto_post_off";
   if (account?.connectionStatus !== "connected") return "needs_reconnect";
-  // 一覧を読んだ後にオーナーが読むだけになった（specs/013 research.md R8）
-  const owner = await loadOwnerEntitlement(tx, accountId, mode, now);
-  if (owner && !owner.fullAccess) return "billing_inactive";
-  // 一覧を読んだ後に、オーナーが自動投稿を使えなくなった（specs/019 FR-008）
-  if (!(await ownerAutopostOn(tx, accountId))) return "auto_post_off";
+  // 一覧を読んだ後にオーナーが読むだけ・退会の途中になった、または自動投稿を使えなくなった（specs/013 research.md R8、specs/019 FR-008）
+  const blocked = ownerBlockReason(await loadOwnerAppEntitlement(tx, accountId, mode, now));
+  if (blocked) return blocked;
   if (schedule.pausedUntil && schedule.pausedUntil.getTime() > now.getTime()) return "rate_limited";
   const published = (from: Date, to: Date) =>
     tx
@@ -154,7 +152,7 @@ export async function claimSlot(
       .where(eq(postingSchedules.accountId, accountId))
       .for("share");
     // オーナーの1日の投稿数の上限は、設定と同じトランザクションで読み直す（一覧を読んだ後に下がっても超えない）
-    const dailyPostLimit = await ownerDailyPostLimit(tx, accountId, billingModeOf(env).operators ?? []);
+    const dailyPostLimit = await ownerDailyPostLimit(tx, accountId, billingModeOf(env));
     if (schedule?.enabled && !isCurrentSlot(accountId, slot, schedule, dailyPostLimit))
       return { kind: "stale" } as const;
 

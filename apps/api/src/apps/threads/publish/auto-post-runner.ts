@@ -6,6 +6,7 @@ import {
   AUTOPOST_LEASE_SECONDS,
   AUTOPOST_MAX_PER_TICK,
   AUTOPOST_PERMALINK_RETRY_MINUTES,
+  DAILY_POST_LIMIT_MAX,
   addDays,
   findDueSlot,
   jstDateOf,
@@ -31,10 +32,11 @@ import {
 } from "drizzle-orm";
 import { createDb, type Db } from "../../../kernel/db/client";
 import { postDrafts, postingSchedules, publishAttempts } from "../schema";
-import { subscriptions, users, entitlementFromFacts, dailyPostLimitSql, effectiveSlotMinutes, featureOnSql, billingExemptSql, testAccessSql } from "../../../platform";
+import { effectiveSlotMinutes, loadAppEntitlements } from "../../../platform";
+import { THREADS_APP } from "../registry";
 import { accounts, memberships } from "../schema";
 import type { Env } from "../../../kernel/env";
-import { billingModeOf, operatorIdsOf } from "../../../kernel/config";
+import { billingModeOf } from "../../../kernel/config";
 import { logger } from "../../../kernel/logger";
 import { createThreadsClient, type ThreadsClient } from "../../../adapters/threads-api";
 import { computeNextCheckAt, readGate, shouldRun, writeCatchupDate, writeGate } from "./auto-post-gate";
@@ -179,45 +181,26 @@ export async function runAutoPost(
 
   // 2. 時刻の処理（来ている時刻の試みを作り、公開する）
   const mode = billingModeOf(env);
-  const scheduleRows = await db
-    .select({
-      schedule: postingSchedules,
-      ownerCreatedAt: users.createdAt,
-      ownerLegacyTrial: users.legacyTrial,
-      ownerBillingExempt: billingExemptSql(users, mode),
-      // オーナーがテスト版に入れるか（specs/016 research.md R4）。OFFの環境では読まない
-      ownerTestAccess: mode.testGroups ? testAccessSql(users, mode.operators) : sql<boolean>`true`,
-      subStatus: subscriptions.status,
-      subCancelAtPeriodEnd: subscriptions.cancelAtPeriodEnd,
-      // オーナーが自動投稿を使えるか（specs/019 FR-008）
-      ownerAutopostOn: featureOnSql(users.id, "autopost"),
-      // オーナーの1日の投稿数の上限（specs/024 research.md R7）。早い時刻から上限の数までだけ使う
-      dailyPostLimit: dailyPostLimitSql(users.clerkUserId, users.dailyPostLimit, operatorIdsOf(env)),
-    })
+  // Threadsの表だけで予定とオーナーの番号を読み、オーナーの利用権はまとめて読む（共通の表とJOINしない。specs/meguru/029 research.md R4）
+  const scheduleOwners = await db
+    .select({ schedule: postingSchedules, ownerId: memberships.userId })
     .from(postingSchedules)
     .innerJoin(accounts, eq(accounts.id, postingSchedules.accountId))
     .innerJoin(memberships, and(eq(memberships.accountId, accounts.id), eq(memberships.role, "owner")))
-    .innerJoin(users, eq(users.id, memberships.userId))
-    .leftJoin(subscriptions, eq(subscriptions.userId, users.id))
     // 未接続のアカウントは見ない（オンにはできないが、試み（飛ばした記録）も作らない。specs/012 FR-035）
     .where(and(eq(postingSchedules.enabled, true), ne(accounts.connectionStatus, "not_connected")));
+  const ents = await loadAppEntitlements(db, mode, scheduleOwners.map((r) => r.ownerId), THREADS_APP, now);
+  const scheduleRows = scheduleOwners.flatMap((r) => {
+    const ent = ents.get(r.ownerId);
+    if (!ent) return [];
+    // オーナーの1日の投稿数の上限（specs/024 research.md R7。運営者は最大）。早い時刻から上限の数までだけ使う
+    const dailyPostLimit = ent.limits.daily_posts ?? DAILY_POST_LIMIT_MAX;
+    // オーナーが自動投稿を使えて、すべて使える（読むだけ・退会の途中でない）か（specs/019 FR-008、specs/013 research.md R8）
+    const active = ent.features.has("autopost") && ent.billing.fullAccess && !ent.withdrawn;
+    return [{ schedule: r.schedule, dailyPostLimit, active }];
+  });
   // オーナーが読むだけのアカウントも、自動投稿を使えないアカウントも見ない（試みも作らない。specs/013 research.md R8、specs/019 FR-008）
-  const schedules = scheduleRows.filter(
-    (r) =>
-      r.ownerAutopostOn &&
-      entitlementFromFacts(
-        mode,
-        {
-          createdAt: r.ownerCreatedAt,
-          legacyTrial: r.ownerLegacyTrial,
-          billingExempt: r.ownerBillingExempt,
-          status: r.subStatus,
-          cancelAtPeriodEnd: r.subCancelAtPeriodEnd,
-          testAccess: r.ownerTestAccess,
-        },
-        now,
-      ).fullAccess,
-  );
+  const schedules = scheduleRows.filter((r) => r.active);
   const accountIds = schedules.map((s) => s.schedule.accountId);
   const recent = accountIds.length
     ? await db

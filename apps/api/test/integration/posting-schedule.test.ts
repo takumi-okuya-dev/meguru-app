@@ -1,14 +1,6 @@
 // 投稿のスケジュールのAPI（specs/005-auto-post FR-001〜FR-004・FR-002a・FR-012、contracts/api.md「GET・PUT /posting-schedule」）
 import { beforeEach, describe, expect, it } from "vitest";
-import {
-  AFTER_TRIAL,
-  call,
-  createUserWithAccount,
-  fake,
-  makeApp,
-  resetDb,
-  testEnv,
-} from "../helpers/app";
+import { AFTER_TRIAL, call, createUserWithAccount, fake, makeApp, resetDb, testEnv, setUserLimit, setDefaultLimit } from "../helpers/app";
 import { connectedAccount, db, putSchedule } from "../helpers/auto-post";
 
 const app = makeApp();
@@ -221,11 +213,11 @@ describe("PUT /posting-schedule", () => {
 // 1日の投稿数の上限（specs/024-tester-invite-connect FR-019・FR-020、contracts/api.md「投稿のスケジュール」、T041）
 describe("1日の投稿数の上限", () => {
   const times = (n: number) => Array.from({ length: n }, (_, i) => `${String(i).padStart(2, "0")}:00`);
-  const setUserLimit = (user: string, n: number | null) => db()`UPDATE users SET daily_post_limit = ${n} WHERE clerk_user_id = ${user}`;
+  const setDailyLimit = (user: string, n: number | null) => setUserLimit({ clerkUserId: user }, "daily_posts", n);
 
   it("GET の limits.slots はオーナーの上限。上限を超える保存は 409 POSTING_SLOT_LIMIT（details に上限）", async () => {
     const { accountId } = await connectedAccount("u1", app);
-    await setUserLimit("u1", 3);
+    await setDailyLimit("u1", 3);
     expect(((await (await call(app, "GET", path(accountId), { user: "u1" })).json()) as { limits: { slots: number } }).limits.slots).toBe(3);
     const res = await putSchedule(app, accountId, on(times(4), 0, false));
     expect(res.status).toBe(409);
@@ -236,7 +228,7 @@ describe("1日の投稿数の上限", () => {
   it("上限が下がって超えていても、時刻を減らす保存は通る。overLimit で知らせる", async () => {
     const { accountId } = await connectedAccount("u1", app);
     expect((await putSchedule(app, accountId, on(times(8), 0, false))).status).toBe(200);
-    await setUserLimit("u1", 5);
+    await setDailyLimit("u1", 5);
     const got = (await (await call(app, "GET", path(accountId), { user: "u1" })).json()) as { overLimit: boolean };
     expect(got.overLimit).toBe(true);
     expect((await putSchedule(app, accountId, on(times(9), 1, false))).status).toBe(409);
@@ -246,7 +238,7 @@ describe("1日の投稿数の上限", () => {
   it("運営者は Threads の上限（250件）まで。既定値を下げても運営者にはかからない", async () => {
     const env = { ...testEnv, OPERATOR_CLERK_USER_IDS: "op1" };
     const { accountId } = await connectedAccount("op1", app);
-    await db()`UPDATE operator_settings SET default_daily_post_limit = 2`;
+    await setDefaultLimit("daily_posts", 2);
     const get = await call(app, "GET", path(accountId), { user: "op1", env });
     expect(((await get.json()) as { limits: { slots: number } }).limits.slots).toBe(250);
     const res = await call(app, "PUT", path(accountId), { user: "op1", env, body: on(times(12), 0, false) });

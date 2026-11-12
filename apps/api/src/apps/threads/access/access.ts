@@ -3,6 +3,7 @@
 // Accountに関わっていない人には、存在の有無を漏らさないよう 404 ACCOUNT_NOT_FOUND を返す（001から同じ）。
 // 機能のまとまりのON/OFFの判定もここだけに置く（specs/019-feature-switches research.md R1、Constitution原則V 4.2.0）。
 import {
+  DAILY_POST_LIMIT_MAX,
   narrowForReadOnly,
   permissionsFor,
   type Permission,
@@ -59,6 +60,8 @@ export type AccountAccess = {
   readOnly: { reason: AccessReadOnlyReason } | null;
   /** オーナーの設定でONの機能のまとまり。チームの人もオーナーの設定に従う（specs/019 FR-012） */
   features: ReadonlySet<Feature>;
+  /** オーナーの1日の投稿数の上限（運営者は最大。specs/024 research.md R7） */
+  ownerDailyPostLimit: number;
 };
 
 import { isUuid } from "../../../kernel/validate";
@@ -171,6 +174,7 @@ export async function authorizeAccount(
     hasTeam: row.teamId !== null,
     readOnly,
     features,
+    ownerDailyPostLimit: ownerEnt.limits.daily_posts ?? DAILY_POST_LIMIT_MAX,
   };
 }
 

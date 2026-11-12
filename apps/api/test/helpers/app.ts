@@ -64,7 +64,7 @@ export function call(
 export async function resetDb() {
   const sql = neon(testEnv.DATABASE_URL);
   createDb(testEnv.DATABASE_URL); // ローカルプロキシの設定を有効にする
-  await sql`TRUNCATE users, accounts, memberships, threads_connections, oauth_states, threads_deletion_requests, threads_revocations, strategy_designs, promotions, reference_posts, research_keywords, draft_batches, post_drafts, ng_words, posting_schedules, publish_attempts, teams, team_members, team_accounts, activity_logs, token_check_failures, subscriptions, withdrawn_users, platform_events, app_usage, user_app_limits CASCADE`;
+  await sql`TRUNCATE users, accounts, memberships, threads_connections, oauth_states, threads_deletion_requests, threads_revocations, strategy_designs, promotions, reference_posts, research_keywords, draft_batches, post_drafts, ng_words, posting_schedules, publish_attempts, teams, team_members, team_accounts, activity_logs, token_check_failures, subscriptions, withdrawn_users, platform_events, app_usage, user_app_limits, threads_received_events CASCADE`;
   // 運営者が決める値（1行だけ。TRUNCATE では消さない）を初めの値に戻す（specs/024）
   await sql`UPDATE operator_settings SET default_account_limit = 3, default_daily_post_limit = 10, tester_slot_capacity = 25`;
   // 新しい上限の表の既定の値も同じ値に戻す（specs/meguru/029 research.md R7）
@@ -399,4 +399,40 @@ export async function endTrial(userId: string) {
   createDb(testEnv.DATABASE_URL);
   // 無料体験が終わるのは、024の前からいた人だけ（specs/024 research.md R8）
   await sql`UPDATE users SET created_at = ${AFTER_TRIAL().toISOString()}, legacy_trial = true WHERE id = ${userId}`;
+}
+
+// ---- 上限（運営者が決める値）をテストで直接変える ----
+
+/**
+ * 人ごとの上限を、古い列（users）と新しい表（user_app_limits）の両方に書く（運営の画面と同じ。specs/meguru/029 research.md R7）。
+ * @param who - clerkUserId か userId
+ * @param key - accounts（アカウントの数）か daily_posts（1日の投稿数）
+ * @param n - 値（null は既定の値に戻す）
+ */
+export async function setUserLimit(who: { clerkUserId: string } | { userId: string }, key: "accounts" | "daily_posts", n: number | null) {
+  const sql = neon(testEnv.DATABASE_URL);
+  createDb(testEnv.DATABASE_URL);
+  const [row] = (
+    "userId" in who ? await sql`SELECT id FROM users WHERE id = ${who.userId}` : await sql`SELECT id FROM users WHERE clerk_user_id = ${who.clerkUserId}`
+  ) as { id: string }[];
+  if (!row) throw new Error("user not found");
+  if (key === "accounts") await sql`UPDATE users SET account_limit = ${n} WHERE id = ${row.id}`;
+  else await sql`UPDATE users SET daily_post_limit = ${n} WHERE id = ${row.id}`;
+  if (n === null) await sql`DELETE FROM user_app_limits WHERE user_id = ${row.id} AND app = 'threads' AND key = ${key}`;
+  else
+    await sql`INSERT INTO user_app_limits (user_id, app, key, value) VALUES (${row.id}, 'threads', ${key}, ${n})
+      ON CONFLICT (user_id, app, key) DO UPDATE SET value = EXCLUDED.value`;
+}
+
+/**
+ * 既定の上限を、古い列（operator_settings）と新しい表（app_limit_defaults）の両方に書く。
+ * @param key - accounts か daily_posts
+ * @param n - 値
+ */
+export async function setDefaultLimit(key: "accounts" | "daily_posts", n: number) {
+  const sql = neon(testEnv.DATABASE_URL);
+  createDb(testEnv.DATABASE_URL);
+  if (key === "accounts") await sql`UPDATE operator_settings SET default_account_limit = ${n}`;
+  else await sql`UPDATE operator_settings SET default_daily_post_limit = ${n}`;
+  await sql`INSERT INTO app_limit_defaults (app, key, value) VALUES ('threads', ${key}, ${n}) ON CONFLICT (app, key) DO UPDATE SET value = EXCLUDED.value`;
 }

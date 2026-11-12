@@ -35,6 +35,8 @@ type AppEntitlement = {
   features: ReadonlySet<string>;
   /** 上限（アプリが登録した名前。値が null なら上限なし＝運営者） */
   limits: Readonly<Record<string, number | null>>;
+  /** 退会を受け付けた人か（PR2b で足した）。アプリは、退会の出来事が届いて片づけるまでの間、その人の持ち物を誰にも見せず、自動の処理も止める */
+  withdrawn: boolean;
 };
 ```
 
@@ -50,6 +52,7 @@ await emitEvent(tx, "user.withdrawn", { userId });
 ```
 
 - `tx`は共通のトランザクション。表の変更と同じトランザクションで書く。
+- 退会（PR2b）：共通は `withdrawn_users` に書いたトランザクションで `user.withdrawn` を書き、すぐ届ける。`users` の行は、その出来事がすべての届け先で済んだあとで消す（`deleteUserRowIfCleaned`。PR3 で外部キーを外すまでは、先に消すとアプリの行が外部キーで消えて片づけられないため）。届かなければ、5分ごとの届けと日次の退会の続きでやり直す。
 - 書いたあと、応答を返してから`ctx.waitUntil(deliverPendingEvents(env))`ですぐに届ける。届かなかった分は、5分ごとの定期処理（`*/5 * * * *`の最初）でやり直す。
 
 ### 受け取る（アプリ）

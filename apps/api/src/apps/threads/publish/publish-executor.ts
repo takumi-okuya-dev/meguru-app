@@ -1,7 +1,7 @@
 // 公開まで進める（specs/005-auto-post contracts/auto-post-job.md 手順4、research.md R6・R7）。
 // 二重の公開を防ぐため、公開を送る前にコンテナーのIDと publish_requested_at を保存する。
 // publish_requested_at があり結果がわからない間は、新しいコンテナーを作らない（1つのコンテナーは1回しか公開できない）。
-import { loadOwnerEntitlement, ownerAutopostOn } from "../access/owner";
+import { loadOwnerAppEntitlement, ownerBlockReason } from "../access/owner";
 import {
   AUTOPOST_FIND_PUBLISHED_HOURS,
   AUTOPOST_RECHECK_MAX_MINUTES,
@@ -151,10 +151,9 @@ async function executeOwned(
   }
   // オーナーが読むだけなら、新しく公開しない（やり直し待ちも含む）。公開の結果がわからない途中だけは確かめる（specs/013 R8）
   if (!attempt.publishRequestedAt) {
-    const owner = await loadOwnerEntitlement(db, attempt.accountId, billingModeOf(env), now);
-    if (owner && !owner.fullAccess) return ctx.backToApproved("billing_inactive");
-    // オーナーが自動投稿を使えなくなったら、新しく公開しない（specs/019 FR-008）
-    if (!(await ownerAutopostOn(db, attempt.accountId))) return ctx.backToApproved("auto_post_off");
+    // オーナーが自動投稿を使えなくなったときも、新しく公開しない（specs/019 FR-008）
+    const blocked = ownerBlockReason(await loadOwnerAppEntitlement(db, attempt.accountId, billingModeOf(env), now));
+    if (blocked) return ctx.backToApproved(blocked);
   }
   if (!cred?.token || cred.threadsUserId === null) {
     // 接続がない・鍵の設定ミスで復号できない。結果がわからない途中なら待ち、そうでなければ一時的な失敗として数える

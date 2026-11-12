@@ -2,7 +2,7 @@
 // 契約（使える状態）・料金なし・運営者・機能のON/OFF・上限を、1つにまとめて返す。アプリは共通の表を読まず、これだけを使う。
 // 判定の中身は今の関数（entitlementFromFacts・billingExemptSql・testAccessSql・機能のOFF）をそのまま使い、結果を変えない。
 import type { Entitlement } from "@meguru/shared";
-import { and, eq, inArray } from "drizzle-orm";
+import { eq, inArray, sql } from "drizzle-orm";
 import type { BillingMode } from "../../kernel/config";
 import type { Db, TxDb } from "../../kernel/db/client";
 import { billingFactsColumns, entitlementFromFacts } from "../billing/billing-service";
@@ -39,7 +39,7 @@ function accessOf(e: Entitlement): AppEntitlement["access"] {
 }
 
 /**
- * 利用者の番号をまとめて、アプリ向けの利用権を読む（問い合わせは3回。人数によらない）。
+ * 利用者の番号をまとめて、アプリ向けの利用権を読む（問い合わせは1回。人数によらない）。
  * @param db - データベース（トランザクションの中でもよい）
  * @param mode - 決済のモード（運営者の一覧を含む）
  * @param userIds - 利用者の番号（重複は1つにまとめる）
@@ -57,32 +57,30 @@ export async function loadAppEntitlements(
   const ids = [...new Set(userIds)];
   const out = new Map<string, AppEntitlement>();
   if (ids.length === 0) return out;
-  const [rows, userLimits, defaults] = await Promise.all([
-    db
-      .select({
-        ...billingFactsColumns(mode),
-        id: users.id,
-        clerkUserId: users.clerkUserId,
-        withdrawalRequestedAt: users.withdrawalRequestedAt,
-        disabled: disabledAppFeaturesSql(users.id, app),
-      })
-      .from(users)
-      .leftJoin(subscriptions, eq(subscriptions.userId, users.id))
-      .where(inArray(users.id, ids)),
-    db
-      .select({ userId: userAppLimits.userId, key: userAppLimits.key, value: userAppLimits.value })
-      .from(userAppLimits)
-      .where(and(inArray(userAppLimits.userId, ids), eq(userAppLimits.app, app))),
-    db.select({ key: appLimitDefaults.key, value: appLimitDefaults.value }).from(appLimitDefaults).where(eq(appLimitDefaults.app, app)),
-  ]);
-  const defaultOf = new Map(defaults.map((d) => [d.key, d.value]));
+  // 問い合わせは1回（利用者の行・契約・機能のOFF・人ごとの上限・既定の上限）。APIのたびに通る判定なので、同時の接続を増やさない
+  const rows = await db
+    .select({
+      ...billingFactsColumns(mode),
+      id: users.id,
+      clerkUserId: users.clerkUserId,
+      withdrawalRequestedAt: users.withdrawalRequestedAt,
+      disabled: disabledAppFeaturesSql(users.id, app),
+      ownLimits: sql<{ key: string; value: number }[]>`coalesce((SELECT json_agg(json_build_object('key', l."key", 'value', l."value"))
+        FROM ${userAppLimits} l WHERE l."user_id" = ${users.id} AND l."app" = ${app}), '[]'::json)`,
+      defaultLimits: sql<{ key: string; value: number }[]>`coalesce((SELECT json_agg(json_build_object('key', d."key", 'value', d."value"))
+        FROM ${appLimitDefaults} d WHERE d."app" = ${app}), '[]'::json)`,
+    })
+    .from(users)
+    .leftJoin(subscriptions, eq(subscriptions.userId, users.id))
+    .where(inArray(users.id, ids));
   const limitDefs = appLimits(app);
   const featureKeys = appFeatures(app).map((f) => f.key);
   for (const r of rows) {
     const operator = (mode.operators ?? []).includes(r.clerkUserId);
     const billing = entitlementFromFacts(mode, r, now);
     const off = new Set(r.disabled ?? []);
-    const own = new Map(userLimits.filter((l) => l.userId === r.id).map((l) => [l.key, l.value]));
+    const own = new Map((r.ownLimits ?? []).map((l) => [l.key, l.value]));
+    const defaultOf = new Map((r.defaultLimits ?? []).map((d) => [d.key, d.value]));
     const limits: Record<string, number | null> = {};
     for (const [key, def] of Object.entries(limitDefs)) {
       limits[key] = operator ? def.operatorValue : (own.get(key) ?? defaultOf.get(key) ?? def.max);
