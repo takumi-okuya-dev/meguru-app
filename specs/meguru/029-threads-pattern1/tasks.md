@@ -210,7 +210,8 @@ description: "Task list for feature meguru/029 Threads pattern ①"
 
 ## Phase 6：古いものを消す（PR5）
 
-> **PR5は2つに分けた**：PR5a＝コード（T057〜T061。CI を流す）、PR5b＝文書と Constitution（T062〜T066。CI なし）。
+> **PR5は3つに分けた**：PR5a＝コード（T057・T059〜T061。CI を流す）、PR5b＝文書と Constitution（T062〜T066。CI なし）、PR5c＝`/api/me` から Threads の中身を消す（T058）。
+> T058 を PR5c に分けたのは、デプロイしている前の版の画面（PR4 の版）が `/api/me` の Threads の項目を必須として読むため（API が画面より先に入れ替わる数分と、開いたままのタブで画面が壊れる）。PR5a の画面は `/api/me` の余分な項目を無視するので、PR5a の画面がデプロイされたあとに PR5c で API から消す（PR #107 のセルフレビュー）。共通の型（`meResponseSchema`）は PR5a で共通の項目だけにした
 > PR5a で分かったこと：
 > - `/api/me` が Threads の中身を作らなくなったので、利用の状態の「ずれの直し」は `/api/threads/me` と毎日の数え直しで行う。チームの出入りでは「使っているか」は変わらない（チームに入るには自分のアカウントが要り、最後のアカウントを消すとチームからも外れるため）ので、伝え直しは足していない
 > - `operator_settings` は、3列を消すと設定が残らないので、表ごと消した。`platform/hooks.ts` の `registerModule` は `platform/registry/modules.ts` へ移した
@@ -219,7 +220,7 @@ description: "Task list for feature meguru/029 Threads pattern ①"
 **Goal**：古い道筋・`/api/me`のThreadsの部分・上限の古い列・知らせの仕組みを消す。
 
 - [X] T057 [US3] 古い道筋（`/api/accounts/…`・`/api/teams/…`・`/api/invites/…`・`/api/me/needs-review-counts`・`/api/operator/{accounts,tester-applications,tester-settings}`）を消す。`routes:snapshot`を書き直し、`threads-routes-alias.test.ts`を新しい道筋だけのテストにする。
-- [X] T058 [US3] `/api/me`からThreadsの部分を消す：`packages/shared/src/schemas.ts`の`meResponseSchema`を共通の分だけにし、`apps/api/src/app.ts`の「`/api/me`に足す中身」を消す。`/api/me/withdrawal-preview`も共通の分だけにする。Webの型の誤りが0件（Threadsは`useThreadsMe`を読んでいる）。テストを直す（期待する結果は変えない）。
+- [ ] T058 [US3] `/api/me`からThreadsの部分を消す：`packages/shared/src/schemas.ts`の`meResponseSchema`を共通の分だけにし、`apps/api/src/app.ts`の「`/api/me`に足す中身」を消す。`/api/me/withdrawal-preview`も共通の分だけにする。Webの型の誤りが0件（Threadsは`useThreadsMe`を読んでいる）。テストを直す（期待する結果は変えない）。
 - [X] T059 [US2] `apps/api/src/platform/hooks.ts`と、そのテストを消す。
 - [X] T060 [US2] 上限の古い列（`users.account_limit`・`users.daily_post_limit`・`operator_settings.default_account_limit`・`default_daily_post_limit`・`tester_slot_capacity`）を消す：表の定義から消し、両方に書いていた処理を新しい表だけにして、`db:generate`でマイグレーションを作り、SQLを読む。`apps/api/test/migration/`にテストを足す（新しい表の値が残る）。
 - [ ] T061 [US4] PR5の確かめ：`pnpm lint`・`pnpm typecheck`・`pnpm test`・`pnpm e2e`。`/api/me`にThreadsのデータがない。PR5の説明に、古い列を消すマイグレーションが前の版のAPIを壊す例外（テスト環境だけ。spec FR-019）を書く。

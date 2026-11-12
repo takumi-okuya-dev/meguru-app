@@ -50,9 +50,9 @@ describe("退会の確認の内容", () => {
   it("消えるアカウント・チームの行き先・契約中かを返す", async () => {
     const { teamId } = await teamSetup();
     await subscribe("o1");
-    // 共通の分（メールアドレス・契約）と、Threadsの分（消えるアカウント・チームの行き先）を分けて返す（029 の PR5）
+    // 共通の分は /api/me/withdrawal-preview、Threadsの分は /api/threads/me/withdrawal-preview（共通の側にも PR5c まで Threads の分が入る）
     const res = await callBilling(app, "GET", "/api/me/withdrawal-preview", { user: "o1" });
-    expect(await res.json()).toEqual({ email: "o1@example.com", hasActiveSubscription: true });
+    expect(await res.json()).toMatchObject({ email: "o1@example.com", hasActiveSubscription: true });
     const threads = await callBilling(app, "GET", "/api/threads/me/withdrawal-preview", { user: "o1" });
     expect(await threads.json()).toEqual({
       ownedAccounts: [{ id: expect.any(String), name: "A" }],

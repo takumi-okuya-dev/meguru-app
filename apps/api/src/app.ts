@@ -174,7 +174,7 @@ export function createApp(deps: AppDeps = defaultDeps) {
   const authed = authMiddleware(deps.verifyAuth);
   const maybeAuthed = optionalAuthMiddleware(deps.verifyAuth) as unknown as typeof authed;
 
-  // Threadsの道筋（/api/threads/…。specs/meguru/029-threads-pattern1 contracts/api-routes.md 1）。古い道筋（/api/threads/accounts/… など）は
+  // Threadsの道筋（/api/threads/…。specs/meguru/029-threads-pattern1 contracts/api-routes.md 1）。古い道筋（/api/accounts/…・/api/teams/… など）は
   // PR5 で消した。Metaに登録した /api/threads/… の6本と /api/data-deletion は、ここに入れず今のまま。
   const threadsApi = new Hono<AppEnv>()
     .route("/", needsReviewCountRoutes(authed))

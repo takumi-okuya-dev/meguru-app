@@ -1,5 +1,5 @@
 // 0031_drop_old_limit_columns のテスト（specs/meguru/029-threads-pattern1 tasks.md T060）。
-// 上限の古い列と「最後に開いたアカウント」の古い列、operator_settings を消す。新しい表にない値だけを写してから消す（上書きしない）。
+// 上限の古い列と「最後に開いたアカウント」の古い列、operator_settings を消す。既定の値は新しい表にないものだけを写す（上書きしない）。
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type pg from "pg";
 import { applyMigrations, createScratchDb, migrationIndex } from "../helpers/migrate";
@@ -30,17 +30,15 @@ afterAll(async () => {
 });
 
 describe("0031_drop_old_limit_columns", () => {
-  it("新しい表にない値だけを写し、ある値は上書きしない", async () => {
+  it("既定の値は新しい表にないものだけを写し、ある値は上書きしない。人ごとの上限は写さない", async () => {
     const defaults = await client.query(`SELECT key, value FROM app_limit_defaults WHERE app = 'threads' ORDER BY key`);
     expect(defaults.rows).toEqual([
       { key: "accounts", value: 5 },
       { key: "daily_posts", value: 12 },
     ]);
+    // 人ごとの上限は写さない（行がないのは「既定値に戻した」の意味）。新しい表の行はそのまま
     const limits = await client.query(`SELECT user_id, key, value FROM user_app_limits ORDER BY user_id, key`);
-    expect(limits.rows).toEqual([
-      { user_id: ids.u1, key: "accounts", value: 3 },
-      { user_id: ids.u1, key: "daily_posts", value: 8 },
-    ]);
+    expect(limits.rows).toEqual([{ user_id: ids.u1, key: "accounts", value: 3 }]);
   });
 
   it("古い列と operator_settings がない", async () => {

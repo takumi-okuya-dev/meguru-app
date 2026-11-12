@@ -18,6 +18,7 @@ export { operatorOnly } from "./operator/operator-only";
 export { recordOperatorEvent, countRecentApplyActions } from "./operator/operator-events";
 // アプリを分けるための共通の土台（contracts/platform-entry.md）
 export { registerModule } from "./registry/modules";
+export { registerMeSection, registerWithdrawalPreviewSection, type MeSection } from "./identity/me-sections";
 export { registerConsumer, deliverPendingEvents, purgeDeliveredEvents, type EventConsumer, type PlatformEvent, type PlatformEventType } from "./events/events";
 export { loadAppEntitlement, loadAppEntitlements, loadAppFeatures, type AppEntitlement } from "./entitlement/entitlement";
 export { reportUsage, billingQuantityOf, usingAppsOf, appUsageOf, usersWithUsage, type AppUsageReport } from "./usage/usage";

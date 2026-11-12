@@ -32,7 +32,8 @@ const LIVE_STATUSES = ["trialing", "active", "past_due", "unpaid", "paused", "in
  * @returns メールアドレス・契約中か
  */
 export async function withdrawalPreview(db: Db, userId: string) {
-  // アプリの中身（消えるアカウント・外れるチーム）は、各アプリの道筋（Threadsなら /api/threads/me/withdrawal-preview）。specs/meguru/029
+  // アプリの中身（消えるアカウント・外れるチーム）は、アプリが registerWithdrawalPreviewSection で足す（前の版の画面のため。PR5c で消す。
+  // 新しい画面は各アプリの道筋（Threadsなら /api/threads/me/withdrawal-preview）を読む）
   const [user] = await db.select({ email: users.email }).from(users).where(eq(users.id, userId));
   const [sub] = await db.select({ status: subscriptions.status }).from(subscriptions).where(eq(subscriptions.userId, userId));
   return {

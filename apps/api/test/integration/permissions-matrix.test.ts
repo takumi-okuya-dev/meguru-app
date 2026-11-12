@@ -98,7 +98,8 @@ describe("関わり×APIの表（SC-002）", () => {
     const registered = new Set(
       app.routes
         .filter((r) => ["GET", "POST", "PUT", "PATCH", "DELETE"].includes(r.method))
-        .filter((r) => r.path.includes("/accounts/:accountId") || r.path.startsWith("/api/threads/teams") || r.path.startsWith("/api/team/"))
+        // Account（/api/threads/accounts/:accountId/…）とチーム（/api/threads/teams/…）の道筋を、上の表と突き合わせる
+        .filter((r) => r.path.includes("/accounts/:accountId") || r.path.startsWith("/api/threads/teams"))
         .map((r) => `${r.method} ${r.path}`),
     );
     const missing = [...registered].filter((k) => !known.has(k));

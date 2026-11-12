@@ -257,7 +257,7 @@ export async function setUserLimits(
   if (!isUuid(userId)) throw new AppError("USER_NOT_FOUND", 404, "user not found");
   const app = limitsApp();
   return withTransaction(env.DATABASE_URL, async (tx) => {
-    const [before] = await tx.select().from(users).where(eq(users.id, userId)).for("update").limit(1);
+    const [before] = await tx.select().from(users).where(eq(users.id, userId)).for("update").limit(1); // 同じ人の保存を順に並べる
     if (!before) throw new AppError("USER_NOT_FOUND", 404, "user not found");
     const beforeLimits = (await namedUserLimits(tx, app, [userId])).get(userId)!;
     await saveUserLimitRows(tx, app, userId, v);
