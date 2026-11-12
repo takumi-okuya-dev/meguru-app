@@ -61,7 +61,7 @@ Claude CodeとCodexで開発スキルを共用する手順と、利用制限時�
 - リリースは`develop`→`main`のPR（タイトルは「リリース：…」）。
 - 本番の急ぎの修正は`main`から`fix/*`を分け、`main`へマージしたあと、同じ変更を`develop`にも戻す（`git log --oneline main ^develop`が空になること）。
 - `main`・`develop`への直接のpushは禁止（PR必須・CIの成功が必須）。
-- デプロイは[.github/workflows/deploy.yml](.github/workflows/deploy.yml)が自動で行う（**マイグレーション → API → Web**の順。1つでも失敗したらそこで止まる）。やり直しはActionsの画面から手で動かせる。
+- デプロイは[.github/workflows/deploy.yml](.github/workflows/deploy.yml)が自動で行う（**マイグレーション → API → Web**の順。1つでも失敗したらそこで止まる）。文書・仕様・AIのスキル・E2Eだけの変更では動かない（[手順書](docs/release-runbook.md)の2）。やり直しはActionsの画面から手で動かせる。
 - 環境の違いは**コードの分岐にせず、設定だけに置く**（`APP_ENV`・`VITE_APP_ENV`）。本番以外の画面には、いちばん上に環境の帯が出る。
 - 機能を足すときの決まり（マイグレーションの書き方・リリースの前に確かめること・困ったときの戻し方）は[リリースの手順書](docs/release-runbook.md)。
 - ステージング（<https://develop.threads-grower-web.pages.dev>）で実際に作ったもの・秘密の値の置き場所・確かめ方は[ステージングの構築記録](docs/staging-setup-record.md)。
