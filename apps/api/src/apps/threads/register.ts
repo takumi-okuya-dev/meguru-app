@@ -17,7 +17,8 @@ import { buildThreadsMe, threadsWithdrawalPreview } from "./me/threads-me";
 export function registerThreads(): void {
   registerModule("threads", () => {
     // 機能のまとまりと上限の名前を、共通に登録する（specs/meguru/029 research.md R7）
-    registerAppFeatures(THREADS_APP, THREADS_FEATURES);
+    // 機能のON/OFF（運営の画面と、ログインした人の features）は Threads が持つ（specs/meguru/029 T070）
+    registerAppFeatures(THREADS_APP, THREADS_FEATURES, { switches: true });
     registerAppLimits(THREADS_APP, THREADS_LIMITS);
     // /api/me と退会の確かめに、Threadsの中身を足す（PR5 まで。前の画面のため。specs/meguru/029 contracts/api-routes.md 2）
     registerMeSection(THREADS_APP, buildThreadsMe);

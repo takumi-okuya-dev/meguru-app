@@ -5,6 +5,7 @@ export const THREADS_REGISTRY: OperatorAppRegistry = {
   apps: [
     {
       app: "threads",
+      featureSwitches: true,
       features: [
         { key: "autopost", label: FEATURE_LABELS.autopost, description: "自動投稿は、投稿をつくる・投稿ストック・パフォーマンスのまとまりです" },
         { key: "strategy", label: FEATURE_LABELS.strategy },

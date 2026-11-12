@@ -1782,7 +1782,7 @@ export const testGroupListSchema = z.object({ groups: z.array(testGroupSummarySc
 /** 運営者の画面のグループの詳しい内容。 */
 export const testGroupDetailSchema = testGroupSummarySchema.extend({
   /** グループの設定でOFFのまとまり（specs/019 FR-017。名前はアプリが登録したもの。specs/meguru/029 T070） */
-  disabled: z.array(z.string()),
+  disabled: z.array(z.string().regex(/^[a-z][a-z0-9_]*$/)),
   /** 入っている人（入った順） */
   members: z.array(z.object({ userId: z.string(), name: z.string(), email: z.string(), joinedAt: z.string() })),
   /** 記録（新しい順に TEST_GROUP_EVENTS_LIMIT 件） */
@@ -1865,6 +1865,8 @@ export const operatorAppRegistrySchema = z.object({
   apps: z.array(
     z.object({
       app: z.string(),
+      /** 機能のON/OFF（運営の「使える機能」の画面）を持つアプリか（今は1つだけ） */
+      featureSwitches: z.boolean(),
       features: z.array(z.object({ key: z.string(), label: z.string(), description: z.string().optional() })),
       limits: z.array(
         z.object({ key: z.string(), label: z.string(), min: z.number().int(), max: z.number().int(), operatorValue: z.number().int().nullable() }),

@@ -23,15 +23,28 @@ export type AppLimitDef = {
 };
 
 const features = new Map<string, readonly AppFeatureDef[]>();
+/** 機能のON/OFF（運営の画面と、ログインした人の features）を持つアプリ。登録のときにアプリが宣言する */
+let switchesOwner: string | undefined;
+/** 機能の名前の形（英小文字で始まり、英小文字・数字・_。DBの feature の列と、運営のリクエストの型に合わせる） */
+const FEATURE_KEY_RE = /^[a-z][a-z0-9_]*$/;
 const limits = new Map<string, Readonly<Record<string, AppLimitDef>>>();
 
 /**
  * アプリの機能のまとまりを登録する。同じアプリは1回だけ（2回目からは何もしない）。
+ * 機能のON/OFF（運営の画面と、ログインした人の features）を持つアプリは opts.switches で宣言する。運営の画面をアプリごとに
+ * 分けるまで、持てるのは1つのアプリだけ（2つ目の宣言は起動のときに止める。リクエストのたびには判断しない。PR #105 のセルフレビュー）。
  * @param app - アプリの番号（例：threads）
  * @param defs - 機能のまとまり（並びは運営の画面の順）
+ * @param opts - switches：このアプリが機能のON/OFFを持つ
+ * @throws Error 名前の形が違う・重なる、または2つ目のアプリが機能のON/OFFを持とうとしたとき
  */
-export function registerAppFeatures(app: string, defs: readonly AppFeatureDef[]): void {
+export function registerAppFeatures(app: string, defs: readonly AppFeatureDef[], opts: { switches?: boolean } = {}): void {
   if (features.has(app)) return;
+  const bad = defs.find((d) => !FEATURE_KEY_RE.test(d.key));
+  if (bad) throw new Error(`機能の名前「${bad.key}」の形が違います（英小文字で始まり、英小文字・数字・_ だけ）`);
+  if (opts.switches && switchesOwner && switchesOwner !== app) {
+    throw new Error(`機能のON/OFFは、アプリ「${switchesOwner}」がもう持っています（運営の画面をアプリごとに分けるまで、1つだけ）`);
+  }
   // 機能の名前は重ねない（同じアプリの中でも、アプリをまたいでも。ログインした人の features は1つの集合で持つため。specs/meguru/029 tasks.md T027）
   const keys = defs.map((d) => d.key);
   const inside = keys.find((k, i) => keys.indexOf(k) !== i);
@@ -41,19 +54,27 @@ export function registerAppFeatures(app: string, defs: readonly AppFeatureDef[])
     if (dup) throw new Error(`機能の名前「${dup.key}」は、アプリ「${other}」がもう登録しています`);
   }
   features.set(app, defs);
+  if (opts.switches) switchesOwner = app;
 }
 
 /**
- * 機能のON/OFFの運営の画面と、ログインした人の features が扱うアプリ（機能を登録した、ただ1つのアプリ。登録の順番では決めない）。
- * 運営の画面をアプリごとに分けるまで、ON/OFFは1つのアプリのものとして扱う（specs/meguru/029 tasks.md T070）。
+ * 機能のON/OFFの運営の画面と、ログインした人の features が扱うアプリ（registerAppFeatures で switches を宣言したアプリ）。
  * @returns アプリの番号
- * @throws Error 機能を登録したアプリがない（組み立ての登録漏れ。黙って全部ONにしないため）か、2つ以上あるとき
+ * @throws Error 宣言したアプリがないとき（組み立ての登録漏れ。黙って全部ONにしないため）
  */
 export function requireFeatureSettingsApp(): string {
-  const apps = [...features].filter(([, list]) => list.length > 0).map(([app]) => app);
-  if (apps.length === 1) return apps[0]!;
-  if (apps.length === 0) throw new Error("機能のON/OFFを扱うアプリが登録されていません（組み立てで registerAppFeatures を呼んでください）");
-  throw new Error(`機能を登録したアプリが2つ以上あります（${apps.join("・")}）。運営の画面をアプリごとに分けるまで、1つにしてください`);
+  if (!switchesOwner) throw new Error("機能のON/OFFを持つアプリが登録されていません（組み立てで registerAppFeatures(…, { switches: true }) を呼んでください）");
+  return switchesOwner;
+}
+
+/**
+ * 機能のON/OFFを持つアプリと、その機能の名前（登録の順）。
+ * @returns アプリの番号と名前
+ * @throws Error 宣言したアプリがないとき
+ */
+export function featureSettings(): { app: string; keys: string[] } {
+  const app = requireFeatureSettingsApp();
+  return { app, keys: (features.get(app) ?? []).map((d) => d.key) };
 }
 
 /**
@@ -118,4 +139,5 @@ export function isValidAppLimit(app: string, key: string, value: number): boolea
 export function resetRegistry(): void {
   features.clear();
   limits.clear();
+  switchesOwner = undefined;
 }

@@ -49,7 +49,7 @@ export function FeaturesPage() {
   const queryClient = useQueryClient();
   const list = useQuery({ queryKey: queryKeys.featureSettings, queryFn: api.featureSettings, retry: false });
   // まとまりの名前と説明は、アプリが登録したもの（specs/meguru/029 T070）
-  const defs = useFeatureDefs();
+  const { query: registry, defs } = useFeatureDefs();
   const label = featureLabeler(defs);
   const help = [...HELP, ...(defs ?? []).flatMap((d) => (d.description ? [d.description] : []))];
   const [email, setEmail] = useState("");
@@ -128,20 +128,20 @@ export function FeaturesPage() {
         <h2 id="feature-off-title" className="font-medium">
           OFFの人
         </h2>
-        {list.isPending ? (
+        {list.isPending || registry.isPending ? (
           <p className="text-sm text-muted-foreground">読み込み中…</p>
-        ) : list.isError ? (
+        ) : list.isError || registry.isError ? (
           <p role="alert" className="text-sm text-muted-foreground">
-            {describeError(list.error)}
+            {describeError(list.error ?? registry.error)}
           </p>
         ) : list.data.users.length === 0 ? (
           <p className="text-sm text-muted-foreground">OFFの人はいません</p>
         ) : (
-          <OffList users={list.data.users} onReset={setResetting} />
+          <OffList users={list.data.users} label={label} onReset={setResetting} />
         )}
       </section>
 
-      {list.data && (
+      {list.data && defs && (
         <Toggle title="最近の変更" region="最近の変更">
           {list.data.events.length === 0 ? (
             <p className="text-muted-foreground">まだ変更はありません</p>
@@ -195,17 +195,18 @@ export function FeaturesPage() {
 
 /**
  * OFFの人の一覧。
- * @param props - users：OFFの人、onReset：「すべてONに戻す」を押した
+ * @param props - users：OFFの人、label：まとまりの名前 → 表示名、onReset：「すべてONに戻す」を押した
  * @returns 一覧
  */
 function OffList({
   users,
+  label,
   onReset,
 }: {
   users: FeatureSettingsList["users"];
+  label: (key: string) => string;
   onReset: (u: { userId: string; name: string }) => void;
 }) {
-  const label = featureLabeler(useFeatureDefs());
   const labels = (fs: readonly string[]) => fs.map(label).join("・");
   return (
     <ul className="divide-y rounded-2xl border bg-card px-4">

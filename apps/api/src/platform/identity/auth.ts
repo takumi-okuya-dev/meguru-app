@@ -11,7 +11,7 @@ import { billingModeOf, operatorIdsOf, type BillingMode } from "../../kernel/con
 import { AppError, pgErrorCode } from "../../kernel/errors";
 import { referrerIdByCode } from "../referrals/referral-service";
 import { disabledAppFeaturesSql, featuresFrom } from "../features/feature-sql";
-import { appFeatures, requireFeatureSettingsApp } from "../registry/registry";
+import { featureSettings } from "../registry/registry";
 import { billingExemptSql, testAccessSql } from "../test-groups/test-group-service";
 import { entitlementFromFacts } from "../billing/billing-service";
 
@@ -143,6 +143,8 @@ export function authMiddleware(makeVerifier: (env: Env) => AuthVerifier) {
 
     const db = createDb(c.env.DATABASE_URL);
     const mode = billingModeOf(c.env);
+    // 機能のON/OFFを持つアプリと、その機能の名前（1回だけ引く）
+    const switches = featureSettings();
     // テスト用のグループがONなら、テスト版に入れるかも同じ問い合わせで読む（specs/016 plan.md「性能の目標」）
     const selectUser = () =>
       db
@@ -151,7 +153,7 @@ export function authMiddleware(makeVerifier: (env: Env) => AuthVerifier) {
           admitted: mode.testGroups ? testAccessSql(users, mode.operators) : sql<boolean>`true`,
           // 自分の使えないまとまり（specs/019）。同じ問い合わせで読む
           // 機能を登録したアプリの行だけ（specs/meguru/029 tasks.md T027。PR4 まで、ON/OFFは1つのアプリのもの）
-          disabled: disabledAppFeaturesSql(users.id, requireFeatureSettingsApp()),
+          disabled: disabledAppFeaturesSql(users.id, switches.app),
           // 契約前か（specs/024 research.md R9）。同じ問い合わせで読む
           billingExempt: billingExemptSql(users, mode),
           subStatus: subscriptions.status,
@@ -250,7 +252,7 @@ export function authMiddleware(makeVerifier: (env: Env) => AuthVerifier) {
       billing: mode,
       testAccess,
       operator: operatorIdsOf(c.env).includes(user.clerkUserId),
-      features: featuresFrom(disabled, appFeatures(requireFeatureSettingsApp()).map((d) => d.key)),
+      features: featuresFrom(disabled, switches.keys),
     });
     await next();
   });

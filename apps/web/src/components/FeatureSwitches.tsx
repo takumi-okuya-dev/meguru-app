@@ -37,7 +37,18 @@ type Props = {
  * @returns スイッチの組
  */
 export function FeatureSwitches(props: Props) {
-  const defs = useFeatureDefs();
+  const { query, defs } = useFeatureDefs();
+  if (query.isError) {
+    // 読めなければ、ずっと「読み込んでいます」のままにせず、理由と再試行を出す（PR #105 のセルフレビュー）
+    return (
+      <div role="alert" className="flex flex-wrap items-center gap-3 text-sm text-destructive">
+        <span>{describeError(query.error)}</span>
+        <Button variant="outline" className="h-9 rounded-full" onClick={() => void query.refetch()}>
+          もう一度読み込む
+        </Button>
+      </div>
+    );
+  }
   if (!defs) return <p className="text-sm text-muted-foreground">読み込んでいます…</p>;
   return <Switches {...props} defs={defs} />;
 }

@@ -13,7 +13,7 @@ import type { Env } from "../../kernel/env";
 import { AppError } from "../../kernel/errors";
 import { isUuid } from "../../kernel/validate";
 import { personName } from "../identity/people";
-import { appFeatures, requireFeatureSettingsApp } from "../registry/registry";
+import { appFeatures, featureSettings, requireFeatureSettingsApp } from "../registry/registry";
 
 /** 運営者（認証のミドルウェアが入れる users の行の一部）。 */
 type Operator = { id: string; displayName: string | null; email: string };
@@ -47,16 +47,16 @@ const ordered = (app: string, values: readonly string[] | null | undefined): str
   keysOf(app).filter((f) => (values ?? []).includes(f));
 
 /**
- * 保存する値が、登録したまとまりとちょうどそろっているかを確かめる（足りない・知らない名前は受け付けない）。
- * @param app - アプリの番号
+ * 保存する値が、機能のON/OFFを持つアプリの登録したまとまりとちょうどそろっているかを確かめる。道筋で、DBを読む前に呼ぶ
+ * （前と同じく、形の誤りは 404・409 より先に 400 で返す。PR #105 のセルフレビュー）。
  * @param input - 保存する値
- * @throws AppError VALIDATION_FAILED（そろっていないとき）
+ * @throws AppError VALIDATION_FAILED（足りない名前・登録していない名前を features.<名前> で示す）
  */
-function assertAllFeatures(app: string, input: FeatureValues): void {
-  const keys = keysOf(app);
-  const given = Object.keys(input);
-  if (given.length !== keys.length || !keys.every((k) => typeof input[k] === "boolean")) {
-    throw new AppError("VALIDATION_FAILED", 400, "features must list every registered feature", undefined, ["features"]);
+export function assertFeatureValues(input: FeatureValues): void {
+  const keys = featureSettings().keys;
+  const wrong = [...keys.filter((k) => typeof input[k] !== "boolean"), ...Object.keys(input).filter((k) => !keys.includes(k))];
+  if (wrong.length > 0) {
+    throw new AppError("VALIDATION_FAILED", 400, "features must list every registered feature", undefined, wrong.map((k) => `features.${k}`));
   }
 }
 
@@ -138,7 +138,7 @@ export async function saveFeatureSettings(env: Env, operator: Operator, userId: 
     const [locked] = await tx.select({ id: users.id }).from(users).where(eq(users.id, userId)).for("update");
     if (!locked) throw userNotFound();
     const app = appOf();
-    assertAllFeatures(app, input);
+    assertFeatureValues(input);
     const before = (await readUser(tx, app, eq(users.id, userId)))!;
     const { toDisable, toEnable, changes } = diff(app, before.disabled, input);
     if (toDisable.length > 0) {
@@ -178,7 +178,7 @@ export async function resetFeatureSettings(env: Env, operator: Operator, userId:
  */
 export async function saveGroupFeatures(tx: TxDb, operator: Operator, group: { id: string; name: string }, input: FeatureValues) {
   const app = appOf();
-  assertAllFeatures(app, input);
+  assertFeatureValues(input);
   const before = ordered(
     app,
     (

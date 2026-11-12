@@ -14,7 +14,7 @@ beforeEach(async () => {
 });
 
 const op = (method: string, path: string, body?: unknown) => callOp(app, method, path, { user: FEATURE_OPERATOR, body });
-const json = async (res: Response) => (await res.json()) as Record<string, unknown> & { error?: { code: string } };
+const json = async (res: Response) => (await res.json()) as Record<string, unknown> & { error?: { code: string; details?: string[] } };
 const ALL_ON = { autopost: true, strategy: true, team: true };
 
 async function events(subjectUserId: string) {
@@ -110,6 +110,12 @@ describe("PUT /api/operator/feature-settings/:userId", () => {
     const unknown = await op("PUT", `/api/operator/feature-settings/${userId}`, { features: { ...ALL_ON, photos: true } });
     expect(unknown.status).toBe(400);
     expect((await json(unknown)).error?.code).toBe("VALIDATION_FAILED");
+    // 足りない名前と登録していない名前を features.<名前> で示す。形の誤りは、人を探す前に 400（PR #105 のセルフレビュー）
+    const both = await op("PUT", "/api/operator/feature-settings/00000000-0000-4000-8000-000000000000", {
+      features: { autopost: true, strategy: true, photos: true },
+    });
+    expect(both.status).toBe(400);
+    expect((await json(both)).error?.details).toEqual(["features.team", "features.photos"]);
   });
 
   it("運営者が自分をOFFにしても、運営者のAPIは使える", async () => {
