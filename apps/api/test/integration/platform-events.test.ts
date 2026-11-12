@@ -126,6 +126,21 @@ describe("届ける", () => {
     expect([row!.status, row!.attempts]).toEqual(["done", 2]);
   });
 
+  it("試した回数が上限に達したまま pending の行は、受け取りを呼ばずに failed にする（途中で止まり続けたとき）", async () => {
+    let called = 0;
+    registerConsumer("threads", "user.withdrawn", async () => {
+      called += 1;
+    });
+    const id = await emitOne();
+    await db().execute(
+      sql`UPDATE platform_event_deliveries SET attempts = ${MAX_DELIVERY_ATTEMPTS}, next_attempt_at = now() - interval '1 minute' WHERE event_id = ${id}`,
+    );
+    expect(await deliverPendingEvents(testEnv)).toEqual({ delivered: 0, failed: 1 });
+    expect(called).toBe(0);
+    const [row] = await deliveriesOf(db(), [id]);
+    expect([row!.status, row!.lastError]).toEqual(["failed", "受け取りの途中で止まった"]);
+  });
+
   it("受け取りが登録されていない届け先は失敗として残す", async () => {
     registerConsumer("threads", "user.withdrawn", async () => {});
     const id = await emitOne();

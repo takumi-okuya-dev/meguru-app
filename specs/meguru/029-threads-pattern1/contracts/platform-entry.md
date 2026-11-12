@@ -72,7 +72,7 @@ async function onUserWithdrawn(event: PlatformEvent<"user.withdrawn">, env: Env)
 ```
 
 - 受け取りは、自分のトランザクションの中で`threads.received_events`に番号を書く。もうあれば、何もしないで成功を返す（2回届いても同じ結果）。
-- 例外を投げたら失敗。共通がやり直す（5分・10分・20分・…・最大1時間あける。10回で止めて`failed`）。試した回数は、届ける前（借りるとき）に数えるので、受け取りの途中で Worker が止まっても、いつかは`failed`で止まる。
+- 例外を投げたら失敗。共通がやり直す（5分・10分・20分・…・最大1時間あける。10回で止めて`failed`）。試した回数は、届ける前（借りるとき）に数え、上限に達したまま残った行は受け取りを呼ばずに`failed`にするので、受け取りの途中で Worker が止まり続けても、いつかは`failed`で止まる。
 - 5分ごとの定期処理では、出来事の届けと自動投稿を同時に動かす（届けで自動投稿を待たせない）。
 
 ### 種類（このfeature）
@@ -91,7 +91,7 @@ async function onUserWithdrawn(event: PlatformEvent<"user.withdrawn">, env: Env)
   - `using`：`quantity > 0`か、チームに1つ以上入っているか（今の`resolveMeApps`の判定と同じ）。
 - 応答を返す**前**に呼ぶ（作った直後に契約の画面を開いても、新しい数になるように）。
 - 数えた時刻（`countedAt`）を渡す。共通は、もっと新しい時刻の値がもう入っていれば書かない（同じ人の数を同時に伝えたとき、先に数えた古い値で上書きしない）。
-- 共通は`app_usage`を書き、`quantity`が変わったら`subscriptions.quantity_sync_needed`に印を付け、今の仕組みでStripeの数を合わせる。
+- 共通は`app_usage`を書き、料金の数（全アプリの合計。最低1）が**最後にStripeへ送った数（`subscriptions.quantity`）と違えば**`subscriptions.quantity_sync_needed`に印を付け、今の仕組みでStripeの数を合わせる。前と比べて変わったかでは決めないので、途中で止まって印が付かなくても、同じ数を伝え直せば付き直る。
 - 失敗に備えて、Threadsは毎日のまとめ処理で、全員の数を数え直して伝える（ずれを1日以内に直す）。
 - 共通の`/api/me`の`apps.using`は、`app_usage.using`から決める。
 

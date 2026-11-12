@@ -3,8 +3,8 @@
 // Stripeへ数を合わせる印を付ける（今の quantity_sync_needed の仕組み）。共通はアプリの表を読まない。
 import { and, eq, lte, sql } from "drizzle-orm";
 import type { Db, TxDb } from "../../kernel/db/client";
-import { markQuantityDirty } from "../billing/billing-service";
-import { appUsage } from "../schema";
+import { billingQuantity } from "@meguru/shared";
+import { appUsage, subscriptions } from "../schema";
 
 /** アプリが伝える利用の値。 */
 export type AppUsageReport = {
@@ -21,7 +21,9 @@ export type AppUsageReport = {
 
 /**
  * その人の利用の数・利用の状態を伝える。アプリのトランザクションが終わったあと、応答を返す前に呼ぶ。
- * 料金の数（全アプリの合計）が変わったら、Stripeへ数を合わせる印を付ける。
+ * 料金の数（全アプリの合計）が、最後にStripeへ送った数（subscriptions.quantity）と違えば、Stripeへ数を合わせる印を付ける。
+ * 「前と比べて変わったか」で決めないので、書いたあとで印を付ける前に止まっても、同じ数を伝え直せば（毎日の数え直しでも）印が付き直る
+ * （PR #92 のCodexレビュー）。
  * @param db - データベース
  * @param userId - 利用者の番号
  * @param app - アプリの番号
@@ -30,7 +32,6 @@ export type AppUsageReport = {
 export async function reportUsage(db: Db | TxDb, userId: string, app: string, usage: AppUsageReport): Promise<void> {
   if (!Number.isInteger(usage.quantity) || usage.quantity < 0) throw new Error(`利用の数が正しくありません：${usage.quantity}`);
   const countedAt = usage.countedAt ?? new Date();
-  const before = await billingQuantityOf(db, userId);
   await db
     .insert(appUsage)
     .values({ userId, app, quantity: usage.quantity, inUse: usage.using, updatedAt: countedAt })
@@ -39,8 +40,17 @@ export async function reportUsage(db: Db | TxDb, userId: string, app: string, us
       set: { quantity: usage.quantity, inUse: usage.using, updatedAt: countedAt },
       setWhere: lte(appUsage.updatedAt, countedAt),
     });
-  const after = await billingQuantityOf(db, userId);
-  if (after !== before) await markQuantityDirty(db, userId);
+  const quantity = billingQuantity(await billingQuantityOf(db, userId));
+  await db
+    .update(subscriptions)
+    .set({ quantitySyncNeeded: true })
+    .where(
+      and(
+        eq(subscriptions.userId, userId),
+        sql`${subscriptions.stripeSubscriptionId} IS NOT NULL`,
+        sql`${subscriptions.quantity} IS DISTINCT FROM ${quantity}`,
+      ),
+    );
 }
 
 /**

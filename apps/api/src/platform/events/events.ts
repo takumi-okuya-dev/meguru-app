@@ -2,7 +2,7 @@
 // 共通で起きたことを、表の変更と同じトランザクションで送り出しの表に書き、あとでアプリの受け取りに届ける。
 // 届けるのは、書いた直後（応答のあと）と5分ごとの定期処理。失敗したら間をあけてやり直し、10回で止める。
 // 受け取りは、同じ出来事が2回届いても結果が変わらないように作る（アプリの側で番号を記録する）。
-import { and, asc, eq, inArray, lte, sql } from "drizzle-orm";
+import { and, asc, eq, gte, inArray, lt, lte, sql } from "drizzle-orm";
 import { createDb, type Db, type TxDb } from "../../kernel/db/client";
 import type { Env } from "../../kernel/env";
 import { logger } from "../../kernel/logger";
@@ -119,6 +119,19 @@ function errorSummary(err: unknown): string {
  */
 export async function deliverPendingEvents(env: Env, now: Date = new Date()): Promise<{ delivered: number; failed: number }> {
   const db = createDb(env.DATABASE_URL);
+  // 試した回数が上限に達したまま pending の行（受け取りの途中で止まり続けた）は、受け取りを呼ばずに failed にする（PR #92 のCodexレビュー）
+  const exhausted = await db
+    .update(platformEventDeliveries)
+    .set({ status: "failed", lastError: sql`coalesce(${platformEventDeliveries.lastError}, '受け取りの途中で止まった')` })
+    .where(
+      and(
+        eq(platformEventDeliveries.status, "pending"),
+        gte(platformEventDeliveries.attempts, MAX_DELIVERY_ATTEMPTS),
+        lte(platformEventDeliveries.nextAttemptAt, now),
+      ),
+    )
+    .returning({ eventId: platformEventDeliveries.eventId, consumer: platformEventDeliveries.consumer });
+  for (const e of exhausted) logger.error("platform event: delivery failed", { ...e, attempts: MAX_DELIVERY_ATTEMPTS, err: "interrupted" });
   const due = await db
     .select({
       eventId: platformEventDeliveries.eventId,
@@ -134,7 +147,7 @@ export async function deliverPendingEvents(env: Env, now: Date = new Date()): Pr
     .orderBy(asc(platformEvents.createdAt))
     .limit(DELIVERY_BATCH);
   let delivered = 0;
-  let failed = 0;
+  let failed = exhausted.length;
   for (const d of due) {
     const where = and(eq(platformEventDeliveries.eventId, d.eventId), eq(platformEventDeliveries.consumer, d.consumer));
     // 借りる：まだ pending で時刻が来ているときだけ、次に試す時刻を先へ進め、試した回数を増やす（ほかの処理に取られていたら飛ばす）。
@@ -143,7 +156,14 @@ export async function deliverPendingEvents(env: Env, now: Date = new Date()): Pr
     const [claimed] = await db
       .update(platformEventDeliveries)
       .set({ nextAttemptAt: lease, attempts: sql`${platformEventDeliveries.attempts} + 1` })
-      .where(and(where, eq(platformEventDeliveries.status, "pending"), lte(platformEventDeliveries.nextAttemptAt, now)))
+      .where(
+        and(
+          where,
+          eq(platformEventDeliveries.status, "pending"),
+          lte(platformEventDeliveries.nextAttemptAt, now),
+          lt(platformEventDeliveries.attempts, MAX_DELIVERY_ATTEMPTS),
+        ),
+      )
       .returning({ attempts: platformEventDeliveries.attempts });
     if (!claimed) continue;
     const handler = consumers.get(d.consumer)?.get(d.type as PlatformEventType);

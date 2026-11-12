@@ -44,14 +44,16 @@ describe("reportUsage", () => {
     expect((await usingAppsOf(db(), userId)).sort()).toEqual(["people", "threads"]);
   });
 
-  it("数が変わったら、Stripeへ数を合わせる印を付ける。同じ数なら付けない", async () => {
+  it("料金の数が最後にStripeへ送った数と違えば印を付ける。同じなら付けない。印が消えても、伝え直せば付き直る", async () => {
     const { userId } = await createUserWithAccount("u1");
-    await insertSubscription(userId, { status: "active" });
+    await insertSubscription(userId, { status: "active", quantity: 1 });
+    // Stripeへ送った数（1）と同じ（数0も、料金の数は最低1）
     await reportUsage(db(), userId, "threads", { quantity: 1, using: true });
-    expect(await dirty(userId)).toBe(true);
-    await db().update(subscriptions).set({ quantitySyncNeeded: false }).where(eq(subscriptions.userId, userId));
-    await reportUsage(db(), userId, "threads", { quantity: 1, using: false });
     expect(await dirty(userId)).toBe(false);
+    await reportUsage(db(), userId, "threads", { quantity: 3, using: true });
+    expect(await dirty(userId)).toBe(true);
+    // 印を付けたあとで止まったなどで印が消えても、同じ数を伝え直せば付き直る（PR #92 のCodexレビュー）
+    await db().update(subscriptions).set({ quantitySyncNeeded: false }).where(eq(subscriptions.userId, userId));
     await reportUsage(db(), userId, "threads", { quantity: 3, using: true });
     expect(await dirty(userId)).toBe(true);
   });
