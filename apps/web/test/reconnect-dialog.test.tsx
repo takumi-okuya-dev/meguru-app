@@ -24,6 +24,7 @@ vi.mock("@/apps/threads/lib/api", async (orig) => {
     ...actual,
     threadsApi: {
       ...actual.threadsApi,
+      me,
       accountAccess,
       tokenConnect,
       connect,

@@ -19,7 +19,7 @@ vi.mock("@/lib/api-client", async (orig) => {
 });
 vi.mock("@/apps/threads/lib/api", async (orig) => {
   const actual = await orig<typeof import("@/apps/threads/lib/api")>();
-  return { ...actual, threadsApi: { ...actual.threadsApi, accountTeam, setTeamShared, createTeam } };
+  return { ...actual, threadsApi: { ...actual.threadsApi, me, accountTeam, setTeamShared, createTeam } };
 });
 const toastError = vi.fn();
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: toastError, dismiss: vi.fn() } }));

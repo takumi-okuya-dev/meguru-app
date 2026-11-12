@@ -30,6 +30,7 @@ import { NotFound } from "@/shell";
 import { ApiErrorScreen } from "@/components/ApiErrorScreen";
 import { LoadingSkeleton } from "@/components/LoadingSkeleton";
 import { accountPath, newAccountPath, sharedAccountPath } from "@/apps/threads/lib/paths";
+import { useThreadsMe } from "@/apps/threads/lib/use-threads-me";
 
 /** Account の画面の子に渡す値。 */
 export type AccountOutletContext = { account: AccountSummary };
@@ -61,7 +62,9 @@ export function reconnectBannerText(account: Pick<AccountSummary, "role" | "conn
 export function AccountLayout() {
   const { accountId } = useParams<{ accountId: string }>();
   const queryClient = useQueryClient();
-  const me = useQuery({ queryKey: queryKeys.me, queryFn: api.me });
+  // Threadsの「自分」（アカウントの一覧）と、共通の「自分」（契約の状態）
+  const me = useThreadsMe();
+  const shared = useQuery({ queryKey: queryKeys.me, queryFn: api.me });
   const account = useQuery({
     queryKey: threadsQueryKeys.account(accountId ?? ""),
     queryFn: () => threadsApi.account(accountId!),
@@ -82,9 +85,10 @@ export function AccountLayout() {
     void queryClient.invalidateQueries({ queryKey: queryKeys.me });
   });
 
-  if (me.isPending) return <LoadingSkeleton />;
+  if (me.isPending || shared.isPending) return <LoadingSkeleton />;
   // 一度読めていれば、裏での取り直しの失敗では画面を差し替えず、手元の一覧で表示を続ける。
   if (me.isLoadingError) return <ApiErrorScreen error={me.error} onRetry={() => void me.refetch()} />;
+  if (shared.isLoadingError) return <ApiErrorScreen error={shared.error} onRetry={() => void shared.refetch()} />;
   if (me.data.accounts.length === 0) return <Navigate to={newAccountPath()} replace />;
   if (account.isError) {
     if (account.error instanceof ApiError && account.error.code === "ACCOUNT_NOT_FOUND") {
@@ -121,7 +125,7 @@ export function AccountLayout() {
   // 帯の並び：無料体験の終わり → 読むだけ → 要再接続（specs/013 contracts/ui-routes.md「帯」）
   const banner = (
     <>
-      <TrialEndingBanner billing={me.data.billing} />
+      <TrialEndingBanner billing={shared.data.billing} />
       {access?.readOnly && <ReadOnlyBanner reason={access.readOnly.reason} />}
       {reconnectBanner}
     </>

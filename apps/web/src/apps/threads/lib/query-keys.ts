@@ -3,6 +3,9 @@
 
 /** ThreadsのTanStack Queryのキー。 */
 export const threadsQueryKeys = {
+  // Threadsの「自分」（/api/threads/me）。共通の ["me"] の下に置き、共通の自分を取り直すと一緒に取り直す
+  // （アカウント・チームが変わったことは、今は共通の自分の取り直しで画面に伝えているため。specs/meguru/029 tasks.md T051）
+  me: ["me", "threads"] as const,
   needsReviewCounts: ["me", "needs-review-counts"] as const,
   account: (id: string) => ["account", id] as const,
   // 関わりと権限（specs/011-team-revision）。Account の下に置き、Account の削除で一緒に消す

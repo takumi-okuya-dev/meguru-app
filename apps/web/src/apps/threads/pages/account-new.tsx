@@ -24,13 +24,16 @@ import { threadsApi } from "@/apps/threads/lib/api";
 import { isInvitePath, rememberInviteReturn } from "@/lib/invite-return";
 import { queryKeys } from "@/lib/query";
 import { accountPath } from "@/apps/threads/lib/paths";
+import { useThreadsMe } from "@/apps/threads/lib/use-threads-me";
 
 /**
  * アカウントを作る画面。名前の入力欄1つと「作る」。上限に達していれば、入力欄の代わりに上限の案内を出す。
  * @returns アカウントを作る画面
  */
 export function AccountNew() {
-  const me = useQuery({ queryKey: queryKeys.me, queryFn: api.me });
+  // Threadsの「自分」（アカウントの数の上限）と、共通の「自分」（契約の状態）
+  const me = useThreadsMe();
+  const shared = useQuery({ queryKey: queryKeys.me, queryFn: api.me });
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const [name, setName] = useState("");
@@ -47,12 +50,13 @@ export function AccountNew() {
     },
   });
 
-  if (me.isPending) return <LoadingSkeleton />;
+  if (me.isPending || shared.isPending) return <LoadingSkeleton />;
   // 一度読めていれば、裏での取り直しの失敗では画面を差し替えず、手元の一覧で表示を続ける。
   if (me.isLoadingError) return <ApiErrorScreen error={me.error} onRetry={() => void me.refetch()} />;
+  if (shared.isLoadingError) return <ApiErrorScreen error={shared.error} onRetry={() => void shared.refetch()} />;
 
   const { max, used } = me.data.accountLimit;
-  const billing = me.data.billing;
+  const billing = shared.data.billing;
   const createCode = create.error instanceof ApiError ? create.error.code : null;
   // 読むだけ（無料体験の終わり・支払いの失敗・解約の後）なら作れない（specs/013 FR-043）
   const readOnlyReason =

@@ -1,5 +1,5 @@
 // サイドバー左上のAccount切り替え。開くたびに所有Accountと要確認件数を読み直す。
-import { isCancelledError, useQuery, useQueryClient } from "@tanstack/react-query";
+import { isCancelledError, useQueryClient } from "@tanstack/react-query";
 import { accountLabel, type AccountSummary } from "@meguru/shared";
 import { CheckIcon, ChevronDownIcon, PlusIcon, TriangleAlertIcon } from "lucide-react";
 import { Fragment, useEffect, useRef, useState } from "react";
@@ -12,11 +12,10 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { api } from "@/lib/api-client";
 import { threadsApi } from "@/apps/threads/lib/api";
-import { queryKeys } from "@/lib/query";
 import { threadsQueryKeys } from "@/apps/threads/lib/query-keys";
 import { accountPath, newAccountPath } from "@/apps/threads/lib/paths";
+import { useThreadsMe } from "@/apps/threads/lib/use-threads-me";
 
 type MenuState = {
   phase: "loading-accounts" | "accounts-error" | "loading-counts" | "ready" | "counts-error";
@@ -34,7 +33,7 @@ const emptyMenu: MenuState = { phase: "loading-accounts", accounts: [], counts: 
 export function AccountSwitcher({ onNavigate }: { onNavigate?: () => void }) {
   const { accountId } = useParams<{ accountId: string }>();
   const queryClient = useQueryClient();
-  const me = useQuery({ queryKey: queryKeys.me, queryFn: api.me });
+  const me = useThreadsMe();
   const current = me.data?.accounts.find((a) => a.id === accountId) ?? me.data?.accounts[0];
   const [open, setOpen] = useState(false);
   const [menu, setMenu] = useState<MenuState>(emptyMenu);
@@ -54,10 +53,10 @@ export function AccountSwitcher({ onNavigate }: { onNavigate?: () => void }) {
    * @returns 取り直したAccount一覧。新しい読み込みに追い越されたら null
    */
   async function refreshMe(version: number) {
-    await queryClient.cancelQueries({ queryKey: queryKeys.me, exact: true });
+    await queryClient.cancelQueries({ queryKey: threadsQueryKeys.me, exact: true });
     for (let attempt = 0; ; attempt += 1) {
       try {
-        const fresh = await queryClient.fetchQuery({ queryKey: queryKeys.me, queryFn: api.me });
+        const fresh = await queryClient.fetchQuery({ queryKey: threadsQueryKeys.me, queryFn: threadsApi.me });
         return version === requestVersion.current ? fresh : null;
       } catch (error) {
         // 後から始まった取得に置き換えられたときだけ、その取得を待ち直す。

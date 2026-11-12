@@ -1,6 +1,6 @@
 // 未接続のアカウントの「Threadsとの接続」（specs/012 US2・US3、contracts/ui-routes.md「Threadsとの接続」）。
 // 「Threadsで許可する」（このアプリの接続）と、開くと出る「自分のMetaアプリのトークンでつなぐ」の2つ（specs/010 の見せ方）。
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation } from "@tanstack/react-query";
 import {
   TESTER_NOTICE,
   errorMessage,
@@ -15,15 +15,15 @@ import { Link } from "react-router";
 import { ConnectionBadge } from "@/apps/threads/components/ConnectionBadge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { ApiError, api, describeError } from "@/lib/api-client";
+import { ApiError, describeError } from "@/lib/api-client";
 import { threadsApi } from "@/apps/threads/lib/api";
-import { queryKeys } from "@/lib/query";
 import { cn } from "@/lib/utils";
 import { AccountSwitchSteps } from "./AccountSwitchSteps";
 import { TesterApplicationPanel } from "./TesterApplicationPanel";
 import { ThreadsAccountGuide } from "./ThreadsAccountGuide";
 import { TokenConnectForm } from "./TokenConnectForm";
 import { accountPath } from "@/apps/threads/lib/paths";
+import { useThreadsMe } from "@/apps/threads/lib/use-threads-me";
 
 /** 許可の画面から戻ってきたときのエラー（?error=…&account=…）。 */
 export type ConnectError = { code: ErrorCode; account: string | null };
@@ -74,7 +74,7 @@ export function ConnectMethods({
   initialError: ConnectError | null;
   onConnected: (warnings: TokenConnectResponse["warnings"]) => void;
 }) {
-  const me = useQuery({ queryKey: queryKeys.me, queryFn: api.me });
+  const me = useThreadsMe();
   const [tokenOpen, setTokenOpen] = useState(false);
   const oauth = useMutation({
     mutationFn: () => threadsApi.connect({ mode: "connect", accountId: account.id }),

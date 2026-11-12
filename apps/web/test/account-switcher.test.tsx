@@ -5,7 +5,7 @@ import type { AccountSummary, MeResponse, NeedsReviewCountsResponse } from "@meg
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { PageHeader } from "@/shell/layout/PageHeader";
-import { queryKeys } from "@/lib/query";
+import { threadsQueryKeys } from "@/apps/threads/lib/query-keys";
 import { ME_BILLING_OFF } from "./helpers/billing";
 
 const mocks = vi.hoisted(() => ({
@@ -21,12 +21,11 @@ vi.mock("@clerk/react", () => ({
   }),
   useClerk: () => ({ signOut: vi.fn() }),
 }));
+// 共通の「自分」は、Accountの画面の契約の帯だけに使う（Accountの一覧は Threadsの「自分」。specs/meguru/029 tasks.md T051）
 vi.mock("@/lib/api-client", async (importOriginal) => {
   const original = await importOriginal<typeof import("@/lib/api-client")>();
-  return {
-    ...original,
-    api: { ...original.api, me: mocks.me },
-  };
+  const { ME_BILLING_OFF } = await import("./helpers/billing");
+  return { ...original, api: { ...original.api, me: async () => ME_BILLING_OFF } };
 });
 vi.mock("@/apps/threads/lib/api", async (orig) => {
   const actual = await orig<typeof import("@/apps/threads/lib/api")>();
@@ -34,6 +33,7 @@ vi.mock("@/apps/threads/lib/api", async (orig) => {
     ...actual,
     threadsApi: {
       ...actual.threadsApi,
+      me: mocks.me,
       needsReviewCounts: mocks.needsReviewCounts,
       account: mocks.account,
       openAccount: mocks.openAccount,
@@ -282,7 +282,7 @@ describe("AccountSwitcherの横断要確認件数", () => {
     expect(await within(menu).findByText("要確認 5件")).toBeInTheDocument();
     finishOld(me([...accounts, account("deleted")]));
     await new Promise((resolve) => setTimeout(resolve, 0));
-    expect(client.getQueryData<MeResponse>(queryKeys.me)?.accounts.map((a) => a.id)).toEqual([
+    expect(client.getQueryData<MeResponse>(threadsQueryKeys.me)?.accounts.map((a) => a.id)).toEqual([
       "a1",
       "a2",
       "a3",
@@ -316,17 +316,17 @@ describe("AccountSwitcherの横断要確認件数", () => {
     );
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     renderSwitcher("/threads/accounts/a1", undefined, client);
-    await waitFor(() => expect(client.getQueryData(queryKeys.me)).toBeDefined());
+    await waitFor(() => expect(client.getQueryData(threadsQueryKeys.me)).toBeDefined());
     const menu = await openMenu();
     await waitFor(() => expect(mocks.me).toHaveBeenCalledTimes(2));
-    void client.invalidateQueries({ queryKey: queryKeys.me, exact: true });
+    void client.invalidateQueries({ queryKey: threadsQueryKeys.me, exact: true });
     await waitFor(() => expect(mocks.me).toHaveBeenCalledTimes(3));
     finishMenu(me(accounts));
     finishTracked(me([...accounts, account("added")]));
     expect(
       await within(menu).findByRole("menuitem", { name: /Account added/ }),
     ).toHaveTextContent("要確認 1件");
-    expect(client.getQueryData<MeResponse>(queryKeys.me)?.accounts.map((a) => a.id)).toEqual([
+    expect(client.getQueryData<MeResponse>(threadsQueryKeys.me)?.accounts.map((a) => a.id)).toEqual([
       "a1",
       "a2",
       "a3",
@@ -353,10 +353,10 @@ describe("AccountSwitcherの横断要確認件数", () => {
       );
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     renderSwitcher("/threads/accounts/a1", undefined, client);
-    await waitFor(() => expect(client.getQueryData(queryKeys.me)).toBeDefined());
+    await waitFor(() => expect(client.getQueryData(threadsQueryKeys.me)).toBeDefined());
     const menu = await openMenu();
     await waitFor(() => expect(mocks.me).toHaveBeenCalledTimes(2));
-    void client.invalidateQueries({ queryKey: queryKeys.me, exact: true });
+    void client.invalidateQueries({ queryKey: threadsQueryKeys.me, exact: true });
     await waitFor(() => expect(mocks.me).toHaveBeenCalledTimes(3));
     failMenu(new Error("network"));
     finishTracked(me(accounts.slice(0, 2)));

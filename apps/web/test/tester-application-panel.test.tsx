@@ -23,6 +23,7 @@ vi.mock("@/apps/threads/lib/api", async (orig) => {
     ...actual,
     threadsApi: {
       ...actual.threadsApi,
+      me: () => Promise.resolve(meResponse),
       testerApplication: () => Promise.resolve(appResponse),
       applyTester: mocks.apply,
       cancelTesterApplication: mocks.cancel,

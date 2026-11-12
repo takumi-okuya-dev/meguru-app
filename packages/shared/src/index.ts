@@ -1,4 +1,5 @@
 export * from "./apps";
+export * from "./apps/threads";
 export * from "./account-label";
 export * from "./analysis";
 export * from "./billing";

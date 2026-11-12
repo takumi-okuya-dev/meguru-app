@@ -35,7 +35,7 @@ vi.mock("@/apps/threads/lib/api", async (orig) => {
   const actual = await orig<typeof import("@/apps/threads/lib/api")>();
   // サイドバーは /access の features（specs/019）を見てから件数を読む
   const { OWNER_ACCESS } = await import("./helpers/access");
-  return { ...actual, threadsApi: { ...actual.threadsApi, getDraftCounts, accountAccess: async () => OWNER_ACCESS } };
+  return { ...actual, threadsApi: { ...actual.threadsApi, me: () => Promise.resolve(meResponse), getDraftCounts, accountAccess: async () => OWNER_ACCESS } };
 });
 
 const { ThreadsShell } = await import("@/apps/threads/sidebar");

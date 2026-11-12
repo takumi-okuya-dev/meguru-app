@@ -1,14 +1,12 @@
 // 「/threads」：Threadsのホーム。中身を持たない振り分け用のルート（FR-004・FR-005、規則2。specs/028 で「/」から移した）
-import { useQuery } from "@tanstack/react-query";
 import { errorMessage, isErrorCode } from "@meguru/shared";
 import { useEffect, useRef } from "react";
 import { Navigate, useSearchParams } from "react-router";
 import { toast } from "sonner";
-import { api } from "@/lib/api-client";
-import { queryKeys } from "@/lib/query";
 import { ApiErrorScreen } from "@/components/ApiErrorScreen";
 import { LoadingSkeleton } from "@/components/LoadingSkeleton";
 import { accountPath, newAccountPath } from "@/apps/threads/lib/paths";
+import { useThreadsMe } from "@/apps/threads/lib/use-threads-me";
 
 /**
  * 「/threads」の振り分け（FR-004・FR-005、規則2）。最後に使った Account か、「アカウントを作る」へ置き換え遷移する。
@@ -20,7 +18,7 @@ import { accountPath, newAccountPath } from "@/apps/threads/lib/paths";
 export function Landing() {
   // 開くたびに一覧を取り直し、届くまで行き先を決めない。古い一覧で決めると、消したアカウントへ戻って
   // 「開けなくなりました → / → 消したアカウント」を往復し続けることがある（取り直しが毎回打ち切られて、古い一覧のまま）
-  const me = useQuery({ queryKey: queryKeys.me, queryFn: api.me, refetchOnMount: "always" });
+  const me = useThreadsMe({ refetchOnMount: "always" });
   const [params] = useSearchParams();
   const error = params.get("error");
   const shown = useRef(false);

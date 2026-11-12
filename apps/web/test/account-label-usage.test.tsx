@@ -20,7 +20,7 @@ vi.mock("@/lib/api-client", async (importOriginal) => {
 });
 vi.mock("@/apps/threads/lib/api", async (orig) => {
   const actual = await orig<typeof import("@/apps/threads/lib/api")>();
-  return { ...actual, threadsApi: { ...actual.threadsApi, needsReviewCounts: mocks.needsReviewCounts } };
+  return { ...actual, threadsApi: { ...actual.threadsApi, me: mocks.me, needsReviewCounts: mocks.needsReviewCounts } };
 });
 
 const { AccountSwitcher } = await import("@/apps/threads/sidebar/AccountSwitcher");

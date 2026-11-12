@@ -2,17 +2,18 @@
 // 名前（1〜50文字）と、チームに入れる自分のアカウント（1つ以上）を選ぶ。作った人が管理者になる。
 // 追加のダイアログなので、ほかの追加・編集と同じ枠（FormDialogFrame。docs/ui-design.md 型B）を使う。
 // スマートフォンでは全画面のシート（左上に✕、右上に「作る」）になり、中身に余白が付く（2026-11-03）。
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { TEAM_NAME_MAX, countChars } from "@meguru/shared";
 import { useState } from "react";
 import { Link, useNavigate } from "react-router";
 import { AccountAvatar } from "@/apps/threads/components/AccountAvatar";
 import { FormDialogFrame } from "@/apps/threads/components/items/FormDialogFrame";
-import { ApiError, api, describeError } from "@/lib/api-client";
+import { ApiError, describeError } from "@/lib/api-client";
 import { threadsApi } from "@/apps/threads/lib/api";
 import { queryKeys } from "@/lib/query";
 import { cn } from "@/lib/utils";
 import { accountPath, teamPath } from "@/apps/threads/lib/paths";
+import { useThreadsMe } from "@/apps/threads/lib/use-threads-me";
 
 /**
  * チームを作るダイアログ。
@@ -30,7 +31,7 @@ export function CreateTeamDialog({
 }) {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
-  const me = useQuery({ queryKey: queryKeys.me, queryFn: api.me });
+  const me = useThreadsMe();
   const own = (me.data?.accounts ?? []).filter((a) => a.role === "owner");
   // 未接続のアカウントはチームに入れられない（specs/012 FR-050・FR-051）
   const connectedIds = new Set(own.filter((a) => a.connectionStatus !== "not_connected").map((a) => a.id));
