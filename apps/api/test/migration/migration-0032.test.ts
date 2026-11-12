@@ -40,23 +40,23 @@ afterAll(async () => {
 
 describe("0032_app_access_grants", () => {
   it("2つの表ができ、今の利用者とグループに許可を書ける", async () => {
-    await client.query(`INSERT INTO app_access_grants (app, user_id, granted_by) VALUES ('demo_granted', $1, $2)`, [ids.u1, ids.op]);
-    await client.query(`INSERT INTO group_app_access_grants (app, group_id, granted_by) VALUES ('demo_granted', $1, $2)`, [ids.group, ids.op]);
+    await client.query(`INSERT INTO app_access_grants (app, user_id, granted_by) VALUES ('demo-granted', $1, $2)`, [ids.u1, ids.op]);
+    await client.query(`INSERT INTO group_app_access_grants (app, group_id, granted_by) VALUES ('demo-granted', $1, $2)`, [ids.group, ids.op]);
     const own = await client.query(`SELECT app, user_id, granted_by, granted_at IS NOT NULL AS has_time FROM app_access_grants`);
-    expect(own.rows).toEqual([{ app: "demo_granted", user_id: ids.u1, granted_by: ids.op, has_time: true }]);
+    expect(own.rows).toEqual([{ app: "demo-granted", user_id: ids.u1, granted_by: ids.op, has_time: true }]);
     const group = await client.query(`SELECT app, group_id FROM group_app_access_grants`);
-    expect(group.rows).toEqual([{ app: "demo_granted", group_id: ids.group }]);
+    expect(group.rows).toEqual([{ app: "demo-granted", group_id: ids.group }]);
   });
 
   it("同じアプリと人（グループ）は1行だけ。アプリの名前の形が違えば入らない", async () => {
     await expect(
-      client.query(`INSERT INTO app_access_grants (app, user_id) VALUES ('demo_granted', $1)`, [ids.u1]),
+      client.query(`INSERT INTO app_access_grants (app, user_id) VALUES ('demo-granted', $1)`, [ids.u1]),
     ).rejects.toThrow(/app_access_grants_pkey/);
     await expect(client.query(`INSERT INTO app_access_grants (app, user_id) VALUES ('Demo', $1)`, [ids.u1])).rejects.toThrow(
       /app_access_grants_app_valid/,
     );
     await expect(
-      client.query(`INSERT INTO group_app_access_grants (app, group_id) VALUES ('demo-x', $1)`, [ids.group]),
+      client.query(`INSERT INTO group_app_access_grants (app, group_id) VALUES ('demo_x', $1)`, [ids.group]),
     ).rejects.toThrow(/group_app_access_grants_app_valid/);
   });
 

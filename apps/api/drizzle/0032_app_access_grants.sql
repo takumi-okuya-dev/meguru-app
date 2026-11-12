@@ -4,7 +4,7 @@ CREATE TABLE "app_access_grants" (
 	"granted_by" uuid,
 	"granted_at" timestamp (6) with time zone DEFAULT now() NOT NULL,
 	CONSTRAINT "app_access_grants_pkey" PRIMARY KEY("app","user_id"),
-	CONSTRAINT "app_access_grants_app_valid" CHECK ("app_access_grants"."app" ~ '^[a-z_]{1,30}$')
+	CONSTRAINT "app_access_grants_app_valid" CHECK ("app_access_grants"."app" ~ '^[a-z][a-z0-9-]{0,30}$')
 );
 --> statement-breakpoint
 CREATE TABLE "group_app_access_grants" (
@@ -13,7 +13,7 @@ CREATE TABLE "group_app_access_grants" (
 	"granted_by" uuid,
 	"granted_at" timestamp (6) with time zone DEFAULT now() NOT NULL,
 	CONSTRAINT "group_app_access_grants_pkey" PRIMARY KEY("app","group_id"),
-	CONSTRAINT "group_app_access_grants_app_valid" CHECK ("group_app_access_grants"."app" ~ '^[a-z_]{1,30}$')
+	CONSTRAINT "group_app_access_grants_app_valid" CHECK ("group_app_access_grants"."app" ~ '^[a-z][a-z0-9-]{0,30}$')
 );
 --> statement-breakpoint
 ALTER TABLE "app_access_grants" ADD CONSTRAINT "app_access_grants_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint

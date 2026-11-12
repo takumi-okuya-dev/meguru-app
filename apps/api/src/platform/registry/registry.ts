@@ -41,10 +41,10 @@ let limitsOwner: string | undefined;
 /** アプリの利用の決まり（登録の順。登録しないアプリは open） */
 const accessModes = new Map<string, AppAccessMode>();
 /**
- * 利用の許可の表に書けるアプリの名前の形（英小文字と _ の1〜30文字。許可の表の CHECK（platform/schema.ts）に合わせる。
- * specs/meguru/030-app-access plan.md「表」）
+ * 利用の許可の表に書けるアプリの名前の形（英小文字で始まり、英小文字・数字・- の31文字まで。アプリの番号の形で、機能の ON/OFF の表の
+ * app の列と、許可の表の CHECK（platform/schema.ts）に合わせる。specs/meguru/030-app-access plan.md「表」）
  */
-const ACCESS_APP_RE = /^[a-z_]{1,30}$/;
+const ACCESS_APP_RE = /^[a-z][a-z0-9-]{0,30}$/;
 
 /**
  * アプリの機能のまとまりを登録する。同じアプリは1回だけ（2回目からは何もしない）。
@@ -65,7 +65,7 @@ export function registerAppFeatures(app: string, defs: readonly AppFeatureDef[],
     return;
   }
   const bad = defs.find((d) => !FEATURE_KEY_RE.test(d.key));
-  if (bad) throw new Error(`機能の名前「${bad.key}」の形が違います（英小文字と _ の1〜30文字だけ）`);
+  if (bad) throw new Error(`機能の名前「${bad.key}」の形が違います（英小文字で始まり、英小文字・数字・- の31文字まで）`);
   // 機能の名前は重ねない（同じアプリの中でも、アプリをまたいでも。ログインした人の features は1つの集合で持つため。specs/meguru/029 tasks.md T027）
   const keys = defs.map((d) => d.key);
   const inside = keys.find((k, i) => keys.indexOf(k) !== i);
@@ -118,7 +118,7 @@ export function registerAppLimits(
     return;
   }
   const bad = Object.keys(defs).find((k) => !FEATURE_KEY_RE.test(k));
-  if (bad) throw new Error(`上限の名前「${bad}」の形が違います（英小文字と _ の1〜30文字だけ）`);
+  if (bad) throw new Error(`上限の名前「${bad}」の形が違います（英小文字で始まり、英小文字・数字・- の31文字まで）`);
   limits.set(app, defs);
   if (opts.operatorScreen) limitsOwner = app;
 }
@@ -131,7 +131,7 @@ export function registerAppLimits(
  * @throws Error 名前の形が違う、または同じアプリを違う決まりで登録しようとしたとき
  */
 export function registerAppAccess(app: string, mode: AppAccessMode): void {
-  if (!ACCESS_APP_RE.test(app)) throw new Error(`アプリの名前「${app}」の形が違います（英小文字と _ の1〜30文字だけ）`);
+  if (!ACCESS_APP_RE.test(app)) throw new Error(`アプリの名前「${app}」の形が違います（英小文字で始まり、英小文字・数字・- の31文字まで）`);
   const before = accessModes.get(app);
   if (before && before !== mode) throw new Error(`アプリ「${app}」の利用の決まりは、もう「${before}」で登録しています`);
   accessModes.set(app, mode);

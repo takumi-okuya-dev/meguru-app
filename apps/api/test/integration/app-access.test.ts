@@ -1,5 +1,5 @@
 // アプリの利用の許可（specs/meguru/030-app-access tasks.md T003〜T006、US1・US2）。
-// 仮のアプリ demo_granted を「運営者が開いた人だけ」で登録し、試しの道筋（requireAppAccess を付けたもの）で確かめる。
+// 仮のアプリ demo-granted を「運営者が開いた人だけ」で登録し、試しの道筋（requireAppAccess を付けたもの）で確かめる。
 // 人ごとの許可・グループの許可・閉じたグループ・運営者・許可なし、運営者のAPI（400・404・記録）、入口の関数の access、/api/me。
 import type { OperatorAppRegistry, OperatorUser, TestGroupDetail } from "@meguru/shared";
 import { neon } from "@neondatabase/serverless";
@@ -17,13 +17,13 @@ import { closeGroupRow, FEATURE_OPERATOR, makeGroup, operatorEnv } from "../help
 import { userRow } from "../helpers/test-groups";
 import { operatorEventRows } from "../helpers/tester-invites";
 
-const DEMO = "demo_granted";
+const DEMO = "demo-granted";
 registerAppAccess(DEMO, "granted");
 
 const app = makeApp();
 const OP = FEATURE_OPERATOR;
 
-/** 試しのアプリの道筋（demo_granted の関所だけを付ける）。 */
+/** 試しのアプリの道筋（demo-granted の関所だけを付ける）。 */
 const demo = new Hono<AppEnv>().get("/api/demo", authMiddleware(() => fakeVerifier), requireAppAccess(DEMO), (c) => c.json({ ok: true }));
 demo.onError((err, c) => {
   if (err instanceof AppError) return c.json({ error: { code: err.code, details: err.details } }, err.status);

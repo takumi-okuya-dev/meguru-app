@@ -363,7 +363,7 @@ export const appAccessGrants = pgTable(
   },
   (t) => [
     primaryKey({ name: "app_access_grants_pkey", columns: [t.app, t.userId] }),
-    check("app_access_grants_app_valid", sql`${t.app} ~ '^[a-z_]{1,30}$'`),
+    check("app_access_grants_app_valid", sql`${t.app} ~ '^[a-z][a-z0-9-]{0,30}$'`),
   ],
 );
 
@@ -380,7 +380,7 @@ export const groupAppAccessGrants = pgTable(
   },
   (t) => [
     primaryKey({ name: "group_app_access_grants_pkey", columns: [t.app, t.groupId] }),
-    check("group_app_access_grants_app_valid", sql`${t.app} ~ '^[a-z_]{1,30}$'`),
+    check("group_app_access_grants_app_valid", sql`${t.app} ~ '^[a-z][a-z0-9-]{0,30}$'`),
   ],
 );
 

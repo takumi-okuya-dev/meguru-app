@@ -28,7 +28,7 @@ const { FeaturesPage } = await import("@/shell/settings/features");
 const { TestGroupDetailPage } = await import("@/shell/settings/test-groups");
 
 /** 仮のアプリ（アプリの一覧にないので、名前は番号のまま出る）。 */
-const DEMO = "demo_granted";
+const DEMO = "demo-granted";
 
 const WITH_GRANTED: OperatorAppRegistry = {
   apps: [...THREADS_REGISTRY.apps, { app: DEMO, access: "granted", featureSwitches: false, operatorLimits: false, features: [], limits: [] }],

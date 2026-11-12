@@ -71,7 +71,7 @@ describe("resolveMeApps", () => {
   it("使えないアプリは、出せるアプリ・使っているアプリ・最後に使ったアプリ・入口の行き先から除く（specs/meguru/030 FR-004）", () => {
     expect(resolveMeApps(["threads"], "threads", new Set())).toEqual({ available: [], using: [], last: null, landing: null });
     // 使えるアプリの集合に、アプリの一覧で出していないアプリがあっても出さない（released のものだけ）
-    expect(resolveMeApps([], null, new Set(["threads", "demo_granted"])).available).toEqual(["threads"]);
+    expect(resolveMeApps([], null, new Set(["threads", "demo-granted"])).available).toEqual(["threads"]);
   });
 });
 
