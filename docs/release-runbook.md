@@ -30,6 +30,7 @@ feature/* ──PR──▶ develop ──自動──▶ ステージング（�
   - 流す：lint・型チェック・テストの結果が変わりうる変更。`apps/`・`packages/`・`e2e/`・`eslint-rules/`のコード、`package.json`・`pnpm-lock.yaml`、TypeScript・ESLint・Vitestの設定、`.github/workflows/`。
   - 流さない：文書（`docs/`・`specs/`・`*.md`）・`.specify/`・スキルの本文だけのPR。CIの成功が要るブランチの規則は、管理者がPRから`gh pr merge --admin`でマージして通す（マージしてよいかは、いつもどおりユーザーが決める）。
   - 迷ったら流す。
+- **デプロイも、出すものが変わらない変更だけなら動かない**。文書（`docs/`・`specs/`・`*.md`）・`.specify/`・AIのスキル・E2Eだけを変えたマージでは、ステージング・本番へのデプロイを飛ばす（`.github/workflows/deploy.yml`の`paths-ignore`）。1つでもほかのファイルを変えていれば、いつもどおり出る。出し直したいときは、Actionsの画面から手で動かす。
 - **大きな機能は、設定で止められるように作る**。`BILLING_ENABLED`・`THREADS_CONNECT_METHODS`と同じ形で、`apps/api/wrangler.toml`の環境ごとの`vars`で切り替える。
   1. 本番は「切」のまま出す。
   2. ステージングで「入」にして確かめる。

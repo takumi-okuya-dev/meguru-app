@@ -7,6 +7,21 @@ name: Deploy
 on:
   push:
     branches: [develop, main]
+    # 出すものが変わらない変更（文書・仕様・AIのスキル・E2E）だけのときは動かさない。Actionsは従量課金のため
+    # （docs/release-runbook.md 2）。1つでもほかのファイルを変えていれば、いつもどおり動く
+    paths-ignore:
+      - "*.md"
+      - "docs/**"
+      - "specs/**"
+      - ".specify/**"
+      - ".claude/**"
+      - ".agents/**"
+      - "agent/**"
+      - "_bmad/**"
+      - "_bmad-output/**"
+      - "skills-lock.json"
+      - "e2e/**"
+      - ".github/pull_request_template.md"
   # やり直し用。Actionsの画面から手で動かせる
   workflow_dispatch:
 
