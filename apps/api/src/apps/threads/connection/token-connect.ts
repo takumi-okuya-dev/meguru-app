@@ -1,5 +1,6 @@
 // 自分のMetaアプリのトークンでの追加・接続し直し（specs/010-token-account-add research.md R1〜R9、contracts/api.md）。
 // トークンの平文は、この関数の引数とローカルの変数の中だけで持つ。ログ・エラー・記録に渡さない（FR-043）。
+import { lockThreadsMember } from "../access/locks";
 import {
   TOKEN_ASSUMED_LIFETIME_DAYS,
   TOKEN_CHECK_FAILURE_LIMIT,
@@ -13,7 +14,6 @@ import {
 import { and, desc, eq, lt } from "drizzle-orm";
 import type { Env } from "../../../kernel/env";
 import { createDb, withTransaction, type Db, type TxDb } from "../../../kernel/db/client";
-import { lockUserRow } from "../../../kernel/db/locks";
 import { tokenCheckFailures } from "../schema";
 import { AppError } from "../../../kernel/errors";
 import { logger } from "../../../kernel/logger";
@@ -100,7 +100,7 @@ export async function assertNotLocked(db: Db | TxDb, userId: string, now: Date):
  */
 async function reserveCheck(env: Env, userId: string, now: Date): Promise<string> {
   return withTransaction(env.DATABASE_URL, async (tx) => {
-    await lockUserRow(tx, userId);
+    await lockThreadsMember(tx, userId);
     await assertNotLocked(tx, userId, now);
     const [row] = await tx
       .insert(tokenCheckFailures)

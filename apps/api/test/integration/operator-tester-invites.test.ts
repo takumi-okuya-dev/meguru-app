@@ -112,7 +112,7 @@ describe("招待した・見送る・戻す・外した", () => {
   });
 
   it("枠がいっぱいなら TESTER_SLOTS_FULL（使用数・枠の数）。force なら進む", async () => {
-    await q()`UPDATE operator_settings SET tester_slot_capacity = 1`;
+    await q()`UPDATE threads_settings SET tester_slot_capacity = 1 WHERE id = 1`;
     const a = await applied("u1", "shop_a");
     const b = await applied("u2", "shop_b");
     expect((await op(a.id, "invite")).status).toBe(200);

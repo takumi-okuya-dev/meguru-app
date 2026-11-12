@@ -15,9 +15,9 @@ import { and, eq, inArray, sql, type SQL } from "drizzle-orm";
 import { alias, type AnyPgColumn } from "drizzle-orm/pg-core";
 import type { Db, TxDb } from "../../../kernel/db/client";
 import { accounts, memberships, teamAccounts, teamMembers } from "../schema";
-import { users } from "../../../platform/schema";
-import { personName, type TeamAccess, type TeamStatusScope } from "../access/access";
-import { featureOnSql } from "../../../platform";
+import type { TeamAccess, TeamStatusScope } from "../access/access";
+import { loadAppFeatures, peopleNames } from "../../../platform";
+import { THREADS_APP } from "../registry";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -96,7 +96,6 @@ export async function getTeamStatus(
   const recentFrom = new Date(now.getTime() - TEAM_STATUS_GROWTH_WINDOW_DAYS * DAY_MS);
   const previousFrom = new Date(now.getTime() - 2 * TEAM_STATUS_GROWTH_WINDOW_DAYS * DAY_MS);
   const ownerM = alias(memberships, "owner_m");
-  const owner = alias(users, "owner_u");
 
   // ---- 人（範囲が担当なら、担当のAccountのオーナーだけ。編集者自身は出さない）----
   const actions = sql.join(
@@ -110,13 +109,10 @@ export async function getTeamStatus(
       userId: teamMembers.userId,
       role: teamMembers.role,
       joinedAt: teamMembers.joinedAt,
-      displayName: users.displayName,
-      email: users.email,
       lastActiveAt: sql<Date | string | null>`(SELECT max(l.created_at) FROM ${activityIn})`,
       activeCount7d: sql<number>`(SELECT count(*) FROM ${activityIn} AND l.created_at > ${stoppedBefore.toISOString()})::int`,
     })
     .from(teamMembers)
-    .innerJoin(users, eq(users.id, teamMembers.userId))
     .where(
       and(
         eq(teamMembers.teamId, teamId),
@@ -126,24 +122,6 @@ export async function getTeamStatus(
           : undefined,
       ),
     );
-
-  const people: (Person & { origin: number })[] = peopleRows.map((r) => {
-    const lastActiveAt = toDate(r.lastActiveAt);
-    const joinedAt = new Date(r.joinedAt);
-    const origin = Math.max(lastActiveAt?.getTime() ?? 0, joinedAt.getTime());
-    return {
-      userId: r.userId,
-      name: personName(r),
-      role: r.role,
-      isMe: r.userId === me,
-      joinedAt: joinedAt.toISOString(),
-      lastActiveAt: lastActiveAt?.toISOString() ?? null,
-      activeCount7d: r.activeCount7d,
-      stopped: origin < stoppedBefore.getTime(),
-      retentionLimited: lastActiveAt === null && joinedAt < retentionBefore,
-      origin,
-    };
-  });
 
   // ---- Account ----
   const confirmed = (
@@ -159,8 +137,6 @@ export async function getTeamStatus(
       addedAt: teamAccounts.addedAt,
       shared: teamAccounts.shared,
       ownerUserId: ownerM.userId,
-      ownerDisplayName: owner.displayName,
-      ownerEmail: owner.email,
       lastPostedAt: sql<
         Date | string | null
       >`(SELECT max(d.published_at) ${drafts} AND d.status = 'published')`,
@@ -168,7 +144,6 @@ export async function getTeamStatus(
         AND d.published_at > ${stoppedBefore.toISOString()})::int`,
       approvedCount: sql<number>`(SELECT count(*) ${drafts} AND d.status IN ('approved', 'publishing'))::int`,
       needsReviewCount: sql<number>`(SELECT count(*) ${drafts} AND d.status = 'needs_review')::int`,
-      autopostOn: featureOnSql(ownerM.userId, "autopost"),
       recentMedian: sql<
         number | null
       >`(SELECT percentile_cont(0.5) WITHIN GROUP (ORDER BY pm.views) ${confirmed(recentFrom, now)})`,
@@ -181,9 +156,32 @@ export async function getTeamStatus(
     .from(teamAccounts)
     .innerJoin(accounts, eq(accounts.id, teamAccounts.accountId))
     .innerJoin(ownerM, and(eq(ownerM.accountId, accounts.id), eq(ownerM.role, "owner")))
-    .innerJoin(owner, eq(owner.id, ownerM.userId))
     .where(and(eq(teamAccounts.teamId, teamId), inScope(teamAccounts.accountId, teamId, scope)))
     .orderBy(teamAccounts.addedAt, accounts.id);
+  // 名前とオーナーの自動投稿のON/OFFは、共通の入口の関数でまとめて読む（共通の表とJOINしない。specs/meguru/029 tasks.md T036）
+  const [names, ownerFeatures] = await Promise.all([
+    peopleNames(db, [...peopleRows.map((r) => r.userId), ...accountRows.map((r) => r.ownerUserId)]),
+    loadAppFeatures(db, accountRows.map((r) => r.ownerUserId), THREADS_APP),
+  ]);
+
+  const people: (Person & { origin: number })[] = peopleRows.map((r) => {
+    const lastActiveAt = toDate(r.lastActiveAt);
+    const joinedAt = new Date(r.joinedAt);
+    const origin = Math.max(lastActiveAt?.getTime() ?? 0, joinedAt.getTime());
+    return {
+      userId: r.userId,
+      name: names.get(r.userId) ?? "",
+      role: r.role,
+      isMe: r.userId === me,
+      joinedAt: joinedAt.toISOString(),
+      lastActiveAt: lastActiveAt?.toISOString() ?? null,
+      activeCount7d: r.activeCount7d,
+      stopped: origin < stoppedBefore.getTime(),
+      retentionLimited: lastActiveAt === null && joinedAt < retentionBefore,
+      origin,
+    };
+  });
+
 
   const accountList: (AccountStatus & { origin: number })[] = accountRows.map((r) => {
     const lastPostedAt = toDate(r.lastPostedAt);
@@ -199,7 +197,7 @@ export async function getTeamStatus(
       profilePictureUrl: canOpen ? r.account.profilePictureUrl : null,
       owner: {
         userId: r.ownerUserId,
-        name: personName({ displayName: r.ownerDisplayName, email: r.ownerEmail }),
+        name: names.get(r.ownerUserId) ?? "",
         isMe: r.ownerUserId === me,
       },
       connection: r.account.connectionStatus === "connected" ? "connected" : "disconnected",
@@ -210,7 +208,7 @@ export async function getTeamStatus(
       needsReviewCount: r.needsReviewCount,
       stopped: origin < stoppedBefore.getTime(),
       growth: growthOf(
-        r.autopostOn,
+        ownerFeatures.get(r.ownerUserId)?.has("autopost") ?? true,
         { median: r.recentMedian === null ? null : Number(r.recentMedian), count: r.recentCount },
         {
           median: r.previousMedian === null ? null : Number(r.previousMedian),

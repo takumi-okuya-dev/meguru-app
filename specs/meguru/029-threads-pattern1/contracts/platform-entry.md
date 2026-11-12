@@ -16,6 +16,8 @@
 | `loadAppEntitlement(db, mode, userId, app)` | 決済のモード・利用者の番号・アプリの番号 | `AppEntitlement`（下）。いなければ null | 権限の判定（アカウントを開く・書く） |
 | `loadAppEntitlements(db, mode, userIds, app)` | 決済のモード・利用者の番号の配列（重複は1つにまとめる）・アプリの番号 | `Map<userId, AppEntitlement>`（見つからない番号は入らない） | 自動投稿・数字の取得・メンションの定期処理（持ち主をまとめて調べる） |
 | `peopleNames(db, userIds)` | 利用者の番号の配列 | `Map<userId, string>`（画面に出す名前。今の`personName`の決め方） | チームの人の一覧・活動の記録・運営者のアカウント一覧 |
+| `peopleProfiles(db, userIds)` | 利用者の番号の配列 | `Map<userId, { displayName, email }>`（PR2c で足した） | 運営者のテスター招待の一覧（名前とメールアドレスを分けて出す） |
+| `loadAppFeatures(db, userIds, app)` | 利用者の番号の配列・アプリの番号 | `Map<userId, Set<機能の名前>>`（PR2c で足した。契約の判定が要らないところ） | チームの判定・運用状況・利用の数（チームのON/OFF・自動投稿のON/OFF） |
 | `reportUsage(db, userId, app, usage)` | `usage = { quantity: number, using: boolean }` | なし | アカウントを作る・消す・持ち主が変わる・チームに入る・抜ける・毎日の数え直し |
 | `operatorOnly` | — | 運営者だけを通す関所（今のまま） | 運営者のアカウント一覧・テスター招待 |
 

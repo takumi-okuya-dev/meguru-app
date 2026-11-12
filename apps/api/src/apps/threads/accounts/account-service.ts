@@ -1,19 +1,19 @@
 // Accountの作成・更新・上限（FR-008〜FR-017、research.md R8・R9）。Threadsとの接続は connection-service（specs/027）。
+import { DAILY_POST_LIMIT_MAX } from "@meguru/shared";
+import { lockThreadsMember } from "../access/locks";
 import { and, eq, isNull, lt, ne, or, sql } from "drizzle-orm";
 import type { Env } from "../../../kernel/env";
 import { createDb, withTransaction, type Db, type TxDb } from "../../../kernel/db/client";
-import { lockUserRow } from "../../../kernel/db/locks";
-import { accounts, memberships } from "../schema";
-import { users } from "../../../platform/schema";
+import { accounts, memberships, threadsUserStates } from "../schema";
 import { billingModeOf, type BillingMode } from "../../../kernel/config";
 import { AppError } from "../../../kernel/errors";
 import { authorizeAccount } from "../access/access";
-import { loadEntitlement, syncQuantity } from "../../../platform";
+import { loadAppEntitlement, syncQuantity } from "../../../platform";
+import { THREADS_APP } from "../registry";
 import { withdrawForAccountDeletion } from "../tester-invites/tester-application-service";
 import { trySyncThreadsUsage } from "./usage";
 import { recordActivity } from "../activity/activity-log";
 import { beforeAccountDeleted } from "../teams/team-service";
-import { effectiveLimits } from "../../../platform";
 
 // ---- 登録数の上限（specs/013 research.md R9。001 FR-015〜FR-017 を置き換えた） ----
 
@@ -48,11 +48,14 @@ export async function accountLimitFor(
   env: Pick<Env, "OPERATOR_CLERK_USER_IDS">,
   now: Date = new Date(),
 ) {
-  const [entitlement, used, limits] = await Promise.all([
-    loadEntitlement(db, userId, mode, now),
-    countOwnedAccounts(db, userId),
-    effectiveLimits(db, env, userId),
-  ]);
+  // 使える状態と運営者が決める上限は、共通の入口の関数で読む（specs/meguru/029 contracts/platform-entry.md 2）
+  const [ent, used] = await Promise.all([loadAppEntitlement(db, mode, userId, THREADS_APP, now), countOwnedAccounts(db, userId)]);
+  const entitlement = ent?.billing ?? null;
+  const limits = {
+    accountLimit: ent ? (ent.limits.accounts ?? null) : null,
+    dailyPostLimit: ent?.limits.daily_posts ?? DAILY_POST_LIMIT_MAX,
+    operator: ent?.operator ?? false,
+  };
   // 使える状態の上限（前からの無料体験なら1。読むだけ・契約前なら0）と、運営者が決める上限の小さい方（specs/024 FR-018）
   const byState = entitlement ? entitlement.accountLimit : 0;
   const byOperator = limits.accountLimit;
@@ -87,6 +90,19 @@ export async function assertCanAddAccount(db: Db | TxDb, userId: string, mode: B
   return limit;
 }
 
+/**
+ * 最後にアカウントを消した時刻を記録する（Threadsの threads_user_states。specs/meguru/029 tasks.md T071）。
+ * @param tx - トランザクション
+ * @param userId - 利用者の番号
+ * @param now - 消した時刻
+ */
+async function markAccountDeleted(tx: TxDb, userId: string, now: Date): Promise<void> {
+  await tx
+    .insert(threadsUserStates)
+    .values({ userId, lastAccountDeletedAt: now })
+    .onConflictDoUpdate({ target: threadsUserStates.userId, set: { lastAccountDeletedAt: now } });
+}
+
 // ---- アカウントを作る（specs/012 research.md R3） ----
 
 /**
@@ -101,7 +117,7 @@ export async function assertCanAddAccount(db: Db | TxDb, userId: string, mode: B
  */
 export async function createAccount(env: Env, userId: string, name: string) {
   const created = await withTransaction(env.DATABASE_URL, async (tx) => {
-    await lockUserRow(tx, userId);
+    await lockThreadsMember(tx, userId);
     await assertCanAddAccount(tx, userId, billingModeOf(env), env);
     const [account] = await tx
       .insert(accounts)
@@ -144,31 +160,30 @@ export async function openAccount(
   touchAccount = true,
 ): Promise<boolean> {
   const db = createDb(env.DATABASE_URL);
+  // 行がなければ作り、あれば条件付きで書き換える（Threadsの threads_user_states。specs/meguru/029 tasks.md T071）
+  const values = {
+    lastAccountId: accountId,
+    lastAccountClientId: req.clientId,
+    lastAccountOpenSeq: req.openSeq,
+    lastAccountOpenReceivedAt: receivedAt,
+  };
   const updated = await db
-    .update(users)
-    .set({
-      lastAccountId: accountId,
-      lastAccountClientId: req.clientId,
-      lastAccountOpenSeq: req.openSeq,
-      lastAccountOpenReceivedAt: receivedAt,
-      updatedAt: new Date(),
-    })
-    .where(
-      and(
-        eq(users.id, userId),
+    .insert(threadsUserStates)
+    .values({ userId, ...values })
+    .onConflictDoUpdate({
+      target: threadsUserStates.userId,
+      set: values,
+      setWhere: and(
+        or(isNull(threadsUserStates.lastAccountOpenReceivedAt), lt(threadsUserStates.lastAccountOpenReceivedAt, receivedAt)),
         or(
-          isNull(users.lastAccountOpenReceivedAt),
-          lt(users.lastAccountOpenReceivedAt, receivedAt),
-        ),
-        or(
-          isNull(users.lastAccountClientId),
-          ne(users.lastAccountClientId, req.clientId),
-          isNull(users.lastAccountOpenSeq),
-          lt(users.lastAccountOpenSeq, req.openSeq),
+          isNull(threadsUserStates.lastAccountClientId),
+          ne(threadsUserStates.lastAccountClientId, req.clientId),
+          isNull(threadsUserStates.lastAccountOpenSeq),
+          lt(threadsUserStates.lastAccountOpenSeq, req.openSeq),
         ),
       ),
-    )
-    .returning({ id: users.id });
+    })
+    .returning({ userId: threadsUserStates.userId });
   if (updated.length === 0) return false;
   if (touchAccount) await db.update(accounts).set({ lastUsedAt: receivedAt }).where(eq(accounts.id, accountId));
   return true;
@@ -219,7 +234,7 @@ export async function deleteAccount(
   confirmName: string,
 ) {
   await withTransaction(env.DATABASE_URL, async (tx) => {
-    await lockUserRow(tx, userId);
+    await lockThreadsMember(tx, userId);
     const { account } = await authorizeAccount(tx, { id: userId, billing: billingModeOf(env) }, accountId, "remove");
     if (!confirmName.trim() || confirmName.trim() !== account.name) {
       throw new AppError("CONFIRMATION_MISMATCH", 422, "confirmation does not match");
@@ -228,11 +243,7 @@ export async function deleteAccount(
     await beforeAccountDeleted(tx, account.id, userId);
     // テスター招待の申し込みを取り下げ、枠を使っていれば「外してよい」にする（specs/024 data-model.md 5）
     await withdrawForAccountDeletion(tx, account.id);
-    const now = new Date();
-    await tx
-      .update(users)
-      .set({ lastAccountDeletedAt: now, updatedAt: now })
-      .where(eq(users.id, userId));
+    await markAccountDeleted(tx, userId, new Date());
     await tx.delete(accounts).where(eq(accounts.id, account.id));
   });
   // 利用の数を共通へ伝え、次の請求から数を減らす（日割りの返金はしない。specs/013 FR-030）。失敗しても削除は成功のまま
@@ -256,12 +267,12 @@ export async function deleteAccountsOfThreadsUser(tx: TxDb, threadsUserId: strin
     .innerJoin(memberships, and(eq(memberships.accountId, accounts.id), eq(memberships.role, "owner")))
     .where(eq(accounts.threadsUserId, threadsUserId));
   for (const o of owners) {
-    await lockUserRow(tx, o.userId);
+    await lockThreadsMember(tx, o.userId);
     // チームの最後のアカウントなら、チームを抜けたものとする（specs/011 FR-046。アカウントの削除と同じ）
     await beforeAccountDeleted(tx, o.accountId, o.userId);
     // テスター招待の取り下げ（specs/024 data-model.md 5、PR #71 のCodexレビュー）
     await withdrawForAccountDeletion(tx, o.accountId);
-    await tx.update(users).set({ lastAccountDeletedAt: now, updatedAt: now }).where(eq(users.id, o.userId));
+    await markAccountDeleted(tx, o.userId, now);
   }
   await tx.delete(accounts).where(eq(accounts.threadsUserId, threadsUserId));
   // 持ち主（トランザクションのあとで、呼んだ側が利用の数を共通へ伝える。specs/meguru/029 research.md R6）

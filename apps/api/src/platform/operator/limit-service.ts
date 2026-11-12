@@ -90,18 +90,6 @@ export function dailyPostLimitSql(
   return sql<number>`(CASE WHEN ${isOperatorSql(ownerClerkUserId, operators)} THEN ${DAILY_POST_LIMIT_MAX} ELSE coalesce(${ownerDailyPostLimit}, ${def}, ${DAILY_POST_LIMIT_MAX}) END)::int`;
 }
 
-/**
- * 投稿に使う時刻（早い時刻から、1日の投稿数の上限の数まで。specs/024 FR-020）。
- * 時刻の一覧を読んで数える・予定を求める・投稿するところは、すべてここを通す（PR #71 のセルフレビュー）。
- * @param slotMinutes - 登録した時刻（0時からの分）
- * @param limit - 1日の投稿数の上限（省けば切らない）
- * @returns 投稿に使う時刻（昇順）
- */
-export function effectiveSlotMinutes(slotMinutes: readonly number[], limit: number | undefined): number[] {
-  const sorted = [...slotMinutes].sort((a, b) => a - b);
-  return limit === undefined ? sorted : sorted.slice(0, limit);
-}
-
 // ---- 運営者（US3。contracts/api.md「運営者の上限」） ----
 
 /**

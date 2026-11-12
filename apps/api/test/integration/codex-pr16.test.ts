@@ -6,7 +6,7 @@ import { subscriptions, users } from "../../src/db/schema";
 import { readGate } from "../../src/apps/threads/publish/auto-post-gate";
 import { runAutoPost } from "../../src/apps/threads/publish/auto-post-runner";
 import { fullAccessSql, reconcileSubscriptions, syncCustomer } from "../../src/platform/billing/billing-service";
-import { call, createUserWithAccount, db, fake, fakeClerk, insertSubscription, makeApp, resetDb, setBillingExempt, testEnv } from "../helpers/app";
+import { call, createUserWithAccount, db, fake, fakeClerk, insertSubscription, makeApp, resetDb, setBillingExempt, testEnv, setUserLimit } from "../helpers/app";
 import { addMin, connectedAccount, jst, publishedDrafts, setSchedule, db as sqlDb } from "../helpers/auto-post";
 import { billingEnv, callBilling, fakeStripe } from "../helpers/billing";
 
@@ -207,7 +207,7 @@ describe("P2：同時の読み直し・数の反映", () => {
   it("アカウントを同時に作っても、Stripeの数は最後の件数になり、印が消える", async () => {
     const { userId } = await createUserWithAccount("u1");
     // 4件まで作れるようにする（上限の既定値は3件。specs/024）
-    await db().update(users).set({ accountLimit: 10 }).where(eq(users.id, userId));
+    await setUserLimit({ userId }, "accounts", 10);
     const { url } = (await (await callBilling(app, "POST", "/api/billing/checkout", { user: "u1" })).json()) as { url: string };
     await fakeStripe.completeCheckout(url);
     await callBilling(app, "POST", "/api/billing/sync", { user: "u1" });

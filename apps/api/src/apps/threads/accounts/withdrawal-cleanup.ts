@@ -4,7 +4,7 @@
 import { and, asc, eq, inArray, ne } from "drizzle-orm";
 import type { TxDb } from "../../../kernel/db/client";
 import { WITHDRAWN_ACTOR_NAME } from "../../../platform";
-import { accounts, activityLogs, memberships, teamMembers, teams, threadsDeletionRequests } from "../schema";
+import { accounts, activityLogs, memberships, teamMembers, teams, threadsDeletionRequests, threadsUserStates } from "../schema";
 import { beforeAccountDeleted, chooseSuccessor } from "../teams/team-service";
 import { purgeForWithdrawal } from "../tester-invites/tester-application-service";
 
@@ -52,6 +52,8 @@ export async function cleanupForWithdrawal(tx: TxDb, userId: string, now: Date =
   // ほかの人のアカウントの担当と、チームの人から外す（今は users の行を消すと外部キーで消えるが、PR3 で外部キーを外すので自分で外す）
   await tx.delete(memberships).where(and(eq(memberships.userId, userId), ne(memberships.role, "owner")));
   await tx.delete(teamMembers).where(eq(teamMembers.userId, userId));
+  // 利用者ごとの状態（最後に開いたアカウント。specs/meguru/029 tasks.md T071）
+  await tx.delete(threadsUserStates).where(eq(threadsUserStates.userId, userId));
   // ほかの人のアカウントの操作の記録は残し、名前を「退会した人」にする（FR-053）
   await tx.update(activityLogs).set({ actorName: WITHDRAWN_ACTOR_NAME }).where(eq(activityLogs.actorUserId, userId));
 }

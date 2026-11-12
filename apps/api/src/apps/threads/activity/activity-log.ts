@@ -11,9 +11,9 @@ import {
 import { and, desc, eq, gte, inArray, lt, or, sql } from "drizzle-orm";
 import { withTransaction, type Db, type TxDb } from "../../../kernel/db/client";
 import { activityLogs } from "../schema";
-import { users } from "../../../platform/schema";
+import { peopleNames } from "../../../platform";
 import { AppError } from "../../../kernel/errors";
-import { isUuid, personName, type AccountAccess, type ActorRole } from "../access/access";
+import { isUuid, type AccountAccess, type ActorRole } from "../access/access";
 
 /** 操作の記録の種類（画面の絞り込みの単位）。 */
 export type ActivityKind = "review" | "draft" | "content" | "settings" | "member";
@@ -218,6 +218,6 @@ export async function purgeOldActivity(db: Db, now: Date = new Date()) {
  */
 export async function updatedByOf(db: Db | TxDb, userId: string | null | undefined): Promise<{ name: string } | null> {
   if (!userId) return null;
-  const [u] = await db.select({ displayName: users.displayName, email: users.email }).from(users).where(eq(users.id, userId)).limit(1);
-  return u ? { name: personName(u) } : null;
+  const name = (await peopleNames(db, [userId])).get(userId);
+  return name === undefined ? null : { name };
 }

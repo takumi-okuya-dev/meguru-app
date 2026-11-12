@@ -204,6 +204,13 @@
       "when": 1794475843058,
       "tag": "0028_threads_received_events",
       "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "7",
+      "when": 1794477280560,
+      "tag": "0029_threads_settings_user_states",
+      "breakpoints": true
     }
   ]
 }

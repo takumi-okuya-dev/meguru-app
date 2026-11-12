@@ -1,5 +1,6 @@
 // テスター招待の申し込み（specs/024-tester-invite-connect research.md R1〜R5・R14・R15、data-model.md 1-1・5）。
 // 申し込みの読み書きはこのファイルの外に書かない。接続・アカウントの削除・退会は、ここの関数を同じトランザクションで呼ぶ。
+import { lockThreadsMember } from "../access/locks";
 import {
   LIVE_TESTER_APPLICATION_STATUSES,
   TESTER_APPLICATIONS_LIST_LIMIT,
@@ -15,9 +16,8 @@ import {
 import { and, asc, desc, eq, inArray, isNotNull, isNull, ne, sql, type SQL } from "drizzle-orm";
 import type { Env } from "../../../kernel/env";
 import { createDb, withTransaction, type Db, type TxDb } from "../../../kernel/db/client";
-import { lockUserRow } from "../../../kernel/db/locks";
-import { testerApplications } from "../schema";
-import { operatorSettings, users, countRecentApplyActions, recordOperatorEvent, readOperatorSettings } from "../../../platform";
+import { testerApplications, threadsSettings } from "../schema";
+import { countRecentApplyActions, peopleProfiles, recordOperatorEvent } from "../../../platform";
 import { accounts } from "../schema";
 import { authorizeAccount, isUuid } from "../access/access";
 import { billingModeOf, testerInvitesEnabledOf, threadsAppIdOf } from "../../../kernel/config";
@@ -113,7 +113,7 @@ export async function apply(env: Env, user: { id: string }, accountId: string, r
   const username = normalizeThreadsUsername(rawUsername);
   if (!username) throw new AppError("VALIDATION_FAILED", 400, "invalid threads username", undefined, ["threadsUsername"]);
   return withTransaction(env.DATABASE_URL, async (tx) => {
-    await lockUserRow(tx, user.id);
+    await lockThreadsMember(tx, user.id);
     const { account } = await authorizeAccount(tx, { id: user.id, billing: billingModeOf(env) }, accountId, "owner");
     if (account.connectionStatus !== "not_connected") {
       throw new AppError("VALIDATION_FAILED", 400, "account already connected", undefined, ["accountId"]);
@@ -145,7 +145,7 @@ export async function apply(env: Env, user: { id: string }, accountId: string, r
 export async function cancel(env: Env, user: { id: string }, accountId: string): Promise<void> {
   assertTesterInvitesEnabled(env);
   await withTransaction(env.DATABASE_URL, async (tx) => {
-    await lockUserRow(tx, user.id);
+    await lockThreadsMember(tx, user.id);
     const { account } = await authorizeAccount(tx, { id: user.id, billing: billingModeOf(env) }, accountId, "owner");
     const live = await liveFor(tx, account.id);
     if (!live || (live.status !== "pending" && live.status !== "invited")) throw notPending();
@@ -345,6 +345,32 @@ export async function slotUsage(db: Db | TxDb): Promise<number> {
 }
 
 /**
+ * Threadsの運営の設定（1行だけ。なければ初めの値で作る。specs/meguru/029 tasks.md T024）。
+ * @param db - データベース（トランザクションの中でもよい）
+ * @returns 行
+ */
+async function readThreadsSettings(db: Db | TxDb) {
+  const [row] = await db.select().from(threadsSettings).where(eq(threadsSettings.id, 1)).limit(1);
+  if (row) return row;
+  const [created] = await db.insert(threadsSettings).values({ id: 1 }).onConflictDoNothing().returning();
+  return created ?? (await db.select().from(threadsSettings).where(eq(threadsSettings.id, 1)).limit(1))[0]!;
+}
+
+/**
+ * 申し込みの行に、申し込んだ人の表示名とメールアドレスを足す（共通の入口の関数で読む。共通の表とJOINしない）。
+ * @param db - データベース
+ * @param rows - 申し込みの行
+ * @returns 行と、申し込んだ人の表示名・メールアドレス（いなければ null）
+ */
+async function withApplicants(db: Db | TxDb, rows: { app: typeof testerApplications.$inferSelect }[]) {
+  const profiles = await peopleProfiles(db, rows.flatMap((r) => (r.app.userId ? [r.app.userId] : [])));
+  return rows.map((r) => {
+    const p = r.app.userId ? profiles.get(r.app.userId) : undefined;
+    return { app: r.app, name: p?.displayName ?? null, email: p?.email ?? null };
+  });
+}
+
+/**
  * 運営者の一覧（FR-008・FR-010・FR-012）。
  * @param env - Workers のバインディング
  * @param db - データベース
@@ -353,14 +379,11 @@ export async function slotUsage(db: Db | TxDb): Promise<number> {
  */
 export async function listForOperator(env: Env, db: Db, view: TesterApplicationView): Promise<OperatorTesterApplications> {
   const v = viewOf(view);
-  const rows = await db
-    .select({ app: testerApplications, name: users.displayName, email: users.email })
-    .from(testerApplications)
-    .leftJoin(users, eq(users.id, testerApplications.userId))
-    .where(v.where)
-    .orderBy(...v.order)
-    .limit(TESTER_APPLICATIONS_LIST_LIMIT);
-  const [settings, used, counts] = await Promise.all([readOperatorSettings(db), slotUsage(db), countsOf(db)]);
+  const rows = await withApplicants(
+    db,
+    await db.select({ app: testerApplications }).from(testerApplications).where(v.where).orderBy(...v.order).limit(TESTER_APPLICATIONS_LIST_LIMIT),
+  );
+  const [settings, used, counts] = await Promise.all([readThreadsSettings(db), slotUsage(db), countsOf(db)]);
   const names = [...new Set(rows.map((r) => r.app.threadsUsername))];
   const [dups, connected] = names.length === 0 ? [[], []] : await Promise.all([liveUsernames(db, names), connectedUsernames(db, names)]);
   return {
@@ -460,12 +483,7 @@ async function countsOf(db: Db) {
  * @returns 一覧の1行（行ごと消したら null）
  */
 async function operatorItem(db: Db, id: string): Promise<OperatorTesterApplication | null> {
-  const [r] = await db
-    .select({ app: testerApplications, name: users.displayName, email: users.email })
-    .from(testerApplications)
-    .leftJoin(users, eq(users.id, testerApplications.userId))
-    .where(eq(testerApplications.id, id))
-    .limit(1);
+  const [r] = await withApplicants(db, await db.select({ app: testerApplications }).from(testerApplications).where(eq(testerApplications.id, id)).limit(1));
   if (!r) return null;
   const [dups, connected] = await Promise.all([liveUsernames(db, [r.app.threadsUsername]), connectedUsernames(db, [r.app.threadsUsername])]);
   return toOperatorItem(r, dups, connected);
@@ -517,7 +535,7 @@ export async function invite(env: Env, operator: { id: string }, id: string, opt
     if (row.status !== "pending") throw notPending();
     // 枠の数を数えるあいだに、ほかの「招待した」が割り込まないようにする
     await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext('tester_slots'))`);
-    const [settings, used] = await Promise.all([readOperatorSettings(tx), slotUsage(tx)]);
+    const [settings, used] = await Promise.all([readThreadsSettings(tx), slotUsage(tx)]);
     if (!opts.force && used >= settings.testerSlotCapacity) {
       throw new AppError("TESTER_SLOTS_FULL", 409, "tester slots full", undefined, [String(used), String(settings.testerSlotCapacity)]);
     }
@@ -587,8 +605,8 @@ export async function setSlotCapacity(env: Env, operator: { id: string }, capaci
   // ほかの運営者の操作と同じく、招待の管理がOFFなら 404（FR-027。PR #71 のセルフレビュー）
   assertTesterInvitesEnabled(env);
   return withTransaction(env.DATABASE_URL, async (tx) => {
-    const before = await readOperatorSettings(tx);
-    await tx.update(operatorSettings).set({ testerSlotCapacity: capacity, updatedAt: new Date() }).where(eq(operatorSettings.id, 1));
+    const before = await readThreadsSettings(tx);
+    await tx.update(threadsSettings).set({ testerSlotCapacity: capacity, updatedAt: new Date() }).where(eq(threadsSettings.id, 1));
     await recordOperatorEvent(tx, {
       actorUserId: operator.id,
       action: "slot_capacity",

@@ -17,12 +17,10 @@ import { and, eq } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import type { Db, TxDb } from "../../../kernel/db/client";
 import { accounts, memberships, teamAccounts, teamMembers, teams } from "../schema";
-import { users } from "../../../platform/schema";
 import type { BillingMode } from "../../../kernel/config";
 import { AppError, notFound } from "../../../kernel/errors";
-import { loadAppEntitlements } from "../../../platform";
+import { loadAppEntitlements, loadAppFeatures, peopleNames } from "../../../platform";
 import { THREADS_APP } from "../registry";
-import { featureOnSql } from "../../../platform";
 
 /** accounts の行。 */
 export type AccountRow = typeof accounts.$inferSelect;
@@ -201,22 +199,16 @@ export async function authorizeTeamMember(
     if (!locked) throw teamNotFound();
   }
   const [row] = await db
-    .select({
-      team: teams,
-      role: teamMembers.role,
-      displayName: users.displayName,
-      email: users.email,
-      // チームを使えない人は、チームの画面と操作を使えない（specs/019 FR-009）
-      teamOn: featureOnSql(users.id, "team"),
-    })
+    .select({ team: teams, role: teamMembers.role })
     .from(teams)
     .innerJoin(teamMembers, and(eq(teamMembers.teamId, teams.id), eq(teamMembers.userId, user.id)))
-    .innerJoin(users, eq(users.id, teamMembers.userId))
     .where(eq(teams.id, teamId))
     .limit(1);
   if (!row) throw teamNotFound();
-  if (!row.teamOn) throw featureDisabled("team");
-  return { team: row.team, member: { id: user.id, name: personName(row), role: row.role } };
+  // チームを使えない人は、チームの画面と操作を使えない（specs/019 FR-009）。ON/OFFと名前は共通の入口の関数で読む
+  const [features, names] = await Promise.all([loadAppFeatures(db, [user.id], THREADS_APP), peopleNames(db, [user.id])]);
+  if (!features.get(user.id)?.has("team")) throw featureDisabled("team");
+  return { team: row.team, member: { id: user.id, name: names.get(user.id) ?? "", role: row.role } };
 }
 
 /**
@@ -254,19 +246,15 @@ export async function statusScopeOf(db: Db | TxDb, teamAccess: TeamAccess): Prom
   if (teamAccess.member.role === "admin") return { kind: "all" };
   if (teamAccess.member.role !== "editor") return null;
   const ownerM = alias(memberships, "owner_m");
-  const rows = await db
-    .select({ accountId: memberships.accountId })
+  const assigned = await db
+    .select({ accountId: memberships.accountId, ownerUserId: ownerM.userId })
     .from(memberships)
     .innerJoin(teamAccounts, and(eq(teamAccounts.accountId, memberships.accountId), eq(teamAccounts.teamId, teamAccess.team.id)))
     .innerJoin(ownerM, and(eq(ownerM.accountId, memberships.accountId), eq(ownerM.role, "owner")))
-    .where(
-      and(
-        eq(memberships.userId, teamAccess.member.id),
-        eq(memberships.role, "editor"),
-        eq(memberships.teamId, teamAccess.team.id),
-        featureOnSql(ownerM.userId, "team"),
-      ),
-    );
+    .where(and(eq(memberships.userId, teamAccess.member.id), eq(memberships.role, "editor"), eq(memberships.teamId, teamAccess.team.id)));
+  // オーナーがチームを使えるAccountだけ（ON/OFFは共通の入口の関数でまとめて読む）
+  const ownerFeatures = await loadAppFeatures(db, assigned.map((r) => r.ownerUserId), THREADS_APP);
+  const rows = assigned.filter((r) => ownerFeatures.get(r.ownerUserId)?.has("team"));
   return rows.length > 0 ? { kind: "assigned", accountIds: rows.map((r) => r.accountId) } : null;
 }
 

@@ -1,6 +1,6 @@
 // 投稿の設定（specs/005-auto-post research.md R1、contracts/api.md「GET・PUT /posting-schedule」）。
 // 自動投稿は全プランで使えるので、grower機能は判定しない（FR-004）。
-import { effectiveSlotMinutes } from "../../../platform";
+import { effectiveSlotMinutes } from "./slot-minutes";
 import { recordActivity, updatedByOf, withActivityTx } from "../activity/activity-log";
 import type { AccountAccess, AccountRow } from "../access/access";
 import {
