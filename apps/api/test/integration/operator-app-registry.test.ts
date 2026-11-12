@@ -26,14 +26,23 @@ describe("GET /api/operator/app-registry", () => {
         {
           app: "threads",
           featureSwitches: true,
+          operatorLimits: true,
           features: [
             { key: "autopost", label: FEATURE_LABELS.autopost, description: THREADS_FEATURES[0]!.description },
             { key: "strategy", label: FEATURE_LABELS.strategy },
             { key: "team", label: FEATURE_LABELS.team },
           ],
           limits: [
-            { key: "accounts", label: "アカウントの数", min: 1, max: ACCOUNT_LIMIT_MAX, operatorValue: null },
-            { key: "daily_posts", label: "1日の投稿数", min: 1, max: DAILY_POST_LIMIT_MAX, operatorValue: DAILY_POST_LIMIT_MAX },
+            { key: "accounts", label: "アカウントの数", min: 1, max: ACCOUNT_LIMIT_MAX, operatorValue: null, shortLabel: "アカウント", countsUsage: true },
+            {
+              key: "daily_posts",
+              label: "1日の投稿数",
+              min: 1,
+              max: DAILY_POST_LIMIT_MAX,
+              operatorValue: DAILY_POST_LIMIT_MAX,
+              shortLabel: "投稿",
+              note: "1アカウント",
+            },
           ],
         },
       ],

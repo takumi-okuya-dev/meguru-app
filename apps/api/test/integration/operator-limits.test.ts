@@ -15,19 +15,23 @@ const limits = async () => (await (await callT(app, "GET", "/api/operator/limits
 
 describe("既定値", () => {
   it("読み書きと範囲。記録が残る", async () => {
-    expect((await limits()).defaults).toEqual({ accountLimit: 3, dailyPostLimit: 10 });
-    expect((await callT(app, "PUT", "/api/operator/limits", { user: OP, body: { accountLimit: 0, dailyPostLimit: 10 } })).status).toBe(400);
-    expect((await callT(app, "PUT", "/api/operator/limits", { user: OP, body: { accountLimit: 3, dailyPostLimit: 251 } })).status).toBe(400);
+    expect((await limits()).defaults).toEqual({ accounts: 3, daily_posts: 10 });
+    expect((await callT(app, "PUT", "/api/operator/limits", { user: OP, body: { limits: { accounts: 0, daily_posts: 10 } } })).status).toBe(400);
+    expect((await callT(app, "PUT", "/api/operator/limits", { user: OP, body: { limits: { accounts: 3, daily_posts: 251 } } })).status).toBe(400);
+    // 名前は登録とそろえる（足りない・登録していない名前は 400。名前を limits.<名前> で示す。specs/meguru/029 T070）
+    const missing = await callT(app, "PUT", "/api/operator/limits", { user: OP, body: { limits: { accounts: 3, photos: 1 } } });
+    expect(missing.status).toBe(400);
+    expect(((await missing.json()) as { error: { details: string[] } }).error.details).toEqual(["limits.daily_posts", "limits.photos"]);
     await testEnv.AUTOPOST_KV.delete("autopost:wake");
-    expect((await callT(app, "PUT", "/api/operator/limits", { user: OP, body: { accountLimit: 5, dailyPostLimit: 8 } })).status).toBe(200);
+    expect((await callT(app, "PUT", "/api/operator/limits", { user: OP, body: { limits: { accounts: 5, daily_posts: 8 } } })).status).toBe(200);
     // 上限を変えたら定期処理を起こす（次に見る時刻が変わりうる。PR #71 のCodexレビュー）
     expect(await testEnv.AUTOPOST_KV.get("autopost:wake")).not.toBeNull();
     const after = await limits();
-    expect(after.defaults).toEqual({ accountLimit: 5, dailyPostLimit: 8 });
+    expect(after.defaults).toEqual({ accounts: 5, daily_posts: 8 });
     expect(after.events.map((e) => e.action)).toEqual(["default_limits"]);
     expect((await operatorEventRows())[0]!.detail).toEqual({
-      before: { accountLimit: 3, dailyPostLimit: 10 },
-      after: { accountLimit: 5, dailyPostLimit: 8 },
+      before: { accounts: 3, daily_posts: 10 },
+      after: { accounts: 5, daily_posts: 8 },
     });
   });
 });
@@ -37,20 +41,20 @@ describe("人ごとの上限", () => {
     await callT(app, "GET", "/api/me", { user: "u1" });
     expect(await codeOf(await callT(app, "GET", "/api/operator/limits/users?email=nobody@example.com", { user: OP }))).toBe("USER_NOT_FOUND");
     const found = (await (await callT(app, "GET", "/api/operator/limits/users?email=U1@example.com", { user: OP })).json()) as OperatorLimitUser;
-    expect(found).toMatchObject({ email: "u1@example.com", operator: false, accountLimit: null, dailyPostLimit: null, ownedAccountCount: 0 });
+    expect(found).toMatchObject({ email: "u1@example.com", operator: false, limits: { accounts: null, daily_posts: null }, usage: 0 });
 
-    const saved = await callT(app, "PUT", `/api/operator/limits/users/${found.userId}`, { user: OP, body: { accountLimit: 5, dailyPostLimit: null } });
-    expect(((await saved.json()) as OperatorLimitUser).accountLimit).toBe(5);
-    expect((await limits()).overrides).toEqual([expect.objectContaining({ userId: found.userId, accountLimit: 5, dailyPostLimit: null })]);
+    const saved = await callT(app, "PUT", `/api/operator/limits/users/${found.userId}`, { user: OP, body: { limits: { accounts: 5, daily_posts: null } } });
+    expect(((await saved.json()) as OperatorLimitUser).limits.accounts).toBe(5);
+    expect((await limits()).overrides).toEqual([expect.objectContaining({ userId: found.userId, limits: { accounts: 5, daily_posts: null } })]);
 
-    await callT(app, "PUT", `/api/operator/limits/users/${found.userId}`, { user: OP, body: { accountLimit: null, dailyPostLimit: null } });
+    await callT(app, "PUT", `/api/operator/limits/users/${found.userId}`, { user: OP, body: { limits: { accounts: null, daily_posts: null } } });
     expect((await limits()).overrides).toEqual([]);
     expect((await operatorEventRows()).filter((e) => e.action === "user_limits")).toHaveLength(2);
   });
 
   it("UUID の形でない ID は 404 USER_NOT_FOUND（500 にしない。PR #71 のセルフレビュー）", async () => {
     for (const id of ["-".repeat(36), "a".repeat(36)]) {
-      const res = await callT(app, "PUT", `/api/operator/limits/users/${id}`, { user: OP, body: { accountLimit: 3, dailyPostLimit: 10 } });
+      const res = await callT(app, "PUT", `/api/operator/limits/users/${id}`, { user: OP, body: { limits: { accounts: 3, daily_posts: 10 } } });
       expect([res.status, await codeOf(res)]).toEqual([404, "USER_NOT_FOUND"]);
     }
   });
@@ -67,7 +71,7 @@ describe("人ごとの上限", () => {
       ["PUT", "/api/operator/limits"],
       ["GET", "/api/operator/limits/users?email=a@example.com"],
     ] as const) {
-      const res = await callT(app, method, path, { user: "u1", body: method === "PUT" ? { accountLimit: 3, dailyPostLimit: 10 } : undefined });
+      const res = await callT(app, method, path, { user: "u1", body: method === "PUT" ? { limits: { accounts: 3, daily_posts: 10 } } : undefined });
       expect(await codeOf(res), path).toBe("OPERATOR_ONLY");
     }
   });

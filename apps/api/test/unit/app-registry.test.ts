@@ -5,6 +5,7 @@ import {
   appLimits,
   requireFeatureSettingsApp,
   isAppFeature,
+  operatorLimitsApp,
   isValidAppLimit,
   registerAppFeatures,
   registerAppLimits,
@@ -53,6 +54,24 @@ describe("登録", () => {
   it("2つ目のアプリが機能のON/OFFを持とうとしたら、登録のときに止める", () => {
     registerAppFeatures("sample", [{ key: "notes", label: "メモ" }], { switches: true });
     expect(() => registerAppFeatures("other", [{ key: "photos", label: "写真" }], { switches: true })).toThrow(/sample/);
+  });
+
+  it("運営の上限の画面が扱うアプリは、宣言したアプリ。2つ目の宣言と、名前の形の誤りは登録のときに止める", () => {
+    expect(operatorLimitsApp()).toBeUndefined();
+    registerAppLimits("sample", { people: { label: "人数", min: 1, max: 100, operatorValue: null } }, { operatorScreen: true });
+    registerAppLimits("other", { photos: { label: "写真", min: 1, max: 10, operatorValue: null } });
+    expect(operatorLimitsApp()).toBe("sample");
+    expect(() => registerAppLimits("third", { x: { label: "x", min: 1, max: 1, operatorValue: null } }, { operatorScreen: true })).toThrow(/sample/);
+    expect(() => registerAppLimits("bad", { dailyPosts: { label: "x", min: 1, max: 1, operatorValue: null } })).toThrow(/dailyPosts/);
+  });
+
+  it("2回目の登録で持ち主を宣言しても、黙って無視しない（PR #106 のセルフレビュー）", () => {
+    registerAppLimits("sample", { people: { label: "人数", min: 1, max: 100, operatorValue: null } });
+    registerAppLimits("sample", { people: { label: "人数", min: 1, max: 100, operatorValue: null } }, { operatorScreen: true });
+    expect(operatorLimitsApp()).toBe("sample");
+    registerAppFeatures("sample", [{ key: "notes", label: "メモ" }]);
+    registerAppFeatures("sample", [{ key: "notes", label: "メモ" }], { switches: true });
+    expect(requireFeatureSettingsApp()).toBe("sample");
   });
 
   it("機能の名前の形が違えば、登録のときに止める（DB の CHECK と同じ、英小文字と _ の1〜30文字）", () => {

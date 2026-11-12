@@ -17,8 +17,8 @@ export function operatorLimitRoutes(authed: MiddlewareHandler<AppEnv>) {
   return new Hono<AppEnv>()
     .get("/operator/limits", authed, operatorOnly, async (c) => c.json(await listLimits(createDb(c.env.DATABASE_URL))))
     .put("/operator/limits", authed, operatorOnly, async (c) => {
-      const v = await parseBody(defaultLimitsRequestSchema, c.req.json());
-      return c.json(await setDefaults(c.env, c.get("user"), v));
+      const { limits } = await parseBody(defaultLimitsRequestSchema, c.req.json());
+      return c.json(await setDefaults(c.env, c.get("user"), limits));
     })
     .get("/operator/limits/users", authed, operatorOnly, async (c) => {
       const parsed = operatorUserQuerySchema.safeParse({ email: c.req.query("email") });
@@ -26,7 +26,7 @@ export function operatorLimitRoutes(authed: MiddlewareHandler<AppEnv>) {
       return c.json(await findLimitUser(createDb(c.env.DATABASE_URL), c.env, parsed.data.email));
     })
     .put("/operator/limits/users/:userId", authed, operatorOnly, async (c) => {
-      const v = await parseBody(userLimitsRequestSchema, c.req.json());
-      return c.json(await setUserLimits(c.env, c.get("user"), c.req.param("userId"), v));
+      const { limits } = await parseBody(userLimitsRequestSchema, c.req.json());
+      return c.json(await setUserLimits(c.env, c.get("user"), c.req.param("userId"), limits));
     });
 }

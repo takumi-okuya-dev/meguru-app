@@ -20,7 +20,7 @@ const events = async () =>
 
 describe("上限の変更の出来事（limits.changed）", () => {
   it("既定の値を保存すると出来事が書かれ、Threadsに届いて自動投稿が起こされる", async () => {
-    expect((await callT(app, "PUT", "/api/operator/limits", { user: OP, body: { accountLimit: 5, dailyPostLimit: 8 } })).status).toBe(200);
+    expect((await callT(app, "PUT", "/api/operator/limits", { user: OP, body: { limits: { accounts: 5, daily_posts: 8 } } })).status).toBe(200);
     expect(await events()).toEqual([{ payload: { app: "threads" }, consumer: "threads", status: "done" }]);
     expect(await testEnv.AUTOPOST_KV.get("autopost:wake")).not.toBeNull();
   });
@@ -28,14 +28,14 @@ describe("上限の変更の出来事（limits.changed）", () => {
   it("人ごとの上限を保存すると、その人の番号つきで出来事が書かれる", async () => {
     await createUserWithAccount("u1");
     const userId = ((await db().query(`SELECT id FROM users WHERE clerk_user_id = 'u1'`)) as { id: string }[])[0]!.id;
-    const res = await callT(app, "PUT", `/api/operator/limits/users/${userId}`, { user: OP, body: { accountLimit: 2, dailyPostLimit: null } });
+    const res = await callT(app, "PUT", `/api/operator/limits/users/${userId}`, { user: OP, body: { limits: { accounts: 2, daily_posts: null } } });
     expect(res.status).toBe(200);
     expect(await events()).toEqual([{ payload: { app: "threads", userId }, consumer: "threads", status: "done" }]);
     expect(await testEnv.AUTOPOST_KV.get("autopost:wake")).not.toBeNull();
   });
 
   it("保存が失敗したら出来事も残らない", async () => {
-    expect((await callT(app, "PUT", "/api/operator/limits", { user: OP, body: { accountLimit: 0, dailyPostLimit: 10 } })).status).toBe(400);
+    expect((await callT(app, "PUT", "/api/operator/limits", { user: OP, body: { limits: { accounts: 0, daily_posts: 10 } } })).status).toBe(400);
     expect(await events()).toEqual([]);
   });
 });

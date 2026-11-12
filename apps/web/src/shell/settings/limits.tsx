@@ -1,19 +1,26 @@
 // 設定 > 運営 > 上限（specs/024-tester-invite-connect contracts/ui-routes.md 6、US3、FR-016・FR-017）。
-// 運営者だけ。全員の既定値と、人ごとの上限（アカウントの数・1日の投稿数）。運営者には上限をかけない。
-// 画面はモック（https://claude.ai/artifact/R6Pc9o8YomNZNDEB161eSf 6枚目）。
-import {
-  ACCOUNT_LIMIT_MAX,
-  DAILY_POST_LIMIT_MAX,
-  type DefaultLimits,
-  type OperatorLimitUser,
-} from "@meguru/shared";
+// 運営者だけ。全員の既定値と、人ごとの上限。運営者には上限をかけない。
+// 画面はモック（https://claude.ai/artifact/R6Pc9o8YomNZNDEB161eSf 6枚目）。上限の名前・表示名・範囲・短い名前は、アプリが
+// 登録したもの（登録の一覧。Threadsならアカウントの数・1日の投稿数。specs/meguru/029 tasks.md T070）。
+import type { OperatorLimitUser } from "@meguru/shared";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useId, useState, type FormEvent } from "react";
 import { Toggle } from "@/components/FeatureSwitches";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ApiError, api, describeError } from "@/lib/api-client";
+import { useLimitDefs, type LimitDef } from "@/lib/limit-defs";
 import { queryKeys } from "@/lib/query";
+
+/** 名前 → 既定値。 */
+type Defaults = Record<string, number>;
+
+/**
+ * 一覧に出す短い名前（登録がなければ表示名）。
+ * @param d - 上限
+ * @returns 短い名前
+ */
+const shortOf = (d: LimitDef) => d.shortLabel ?? d.label;
 
 /**
  * 日時の表示（例：11/8 14:02）。
@@ -26,15 +33,15 @@ const mdhm = (iso: string) => {
 };
 
 /**
- * 数の欄の値を読む（空なら null）。
+ * 数の欄の値を読む（空なら null）。範囲はアプリが登録したもの。
  * @param raw - 入力
- * @param max - 最大
- * @returns 1〜max の整数。違えば undefined、空なら null
+ * @param d - 上限（min・max）
+ * @returns min〜max の整数。違えば undefined、空なら null
  */
-const parseLimit = (raw: string, max: number): number | null | undefined => {
+const parseLimit = (raw: string, d: { min: number; max: number }): number | null | undefined => {
   if (raw.trim() === "") return null;
   const n = Number(raw);
-  return Number.isInteger(n) && n >= 1 && n <= max ? n : undefined;
+  return Number.isInteger(n) && n >= d.min && n <= d.max ? n : undefined;
 };
 
 /**
@@ -44,6 +51,7 @@ const parseLimit = (raw: string, max: number): number | null | undefined => {
 export function LimitsPage() {
   const client = useQueryClient();
   const q = useQuery({ queryKey: queryKeys.operatorLimits, queryFn: api.operatorLimits, retry: false });
+  const { query: registry, defs } = useLimitDefs();
   const [email, setEmail] = useState("");
   const [found, setFound] = useState<OperatorLimitUser | null>(null);
   const [searchError, setSearchError] = useState<string | null>(null);
@@ -72,14 +80,14 @@ export function LimitsPage() {
         <h2 id="limits-default-title" className="font-medium">
           全員の既定値
         </h2>
-        {q.isPending ? (
+        {q.isPending || registry.isPending ? (
           <p className="text-sm text-muted-foreground">読み込み中…</p>
-        ) : q.isError ? (
+        ) : q.isError || registry.isError ? (
           <p role="alert" className="text-sm text-muted-foreground">
-            {describeError(q.error)}
+            {describeError(q.error ?? registry.error)}
           </p>
         ) : (
-          <DefaultsForm key={JSON.stringify(q.data.defaults)} defaults={q.data.defaults} onSaved={refresh} />
+          <DefaultsForm key={JSON.stringify(q.data.defaults)} defs={defs ?? []} defaults={q.data.defaults} onSaved={refresh} />
         )}
       </section>
 
@@ -105,10 +113,16 @@ export function LimitsPage() {
             {searchError}
           </p>
         )}
-        {found && q.data && (
+        {found && registry.isError && (
+          <p role="alert" className="text-sm text-muted-foreground">
+            {describeError(registry.error)}
+          </p>
+        )}
+        {found && q.data && defs && (
           <UserLimitsCard
-            key={`${found.userId}-${found.accountLimit}-${found.dailyPostLimit}`}
+            key={`${found.userId}-${JSON.stringify(found.limits)}`}
             user={found}
+            defs={defs}
             defaults={q.data.defaults}
             onSaved={async (after) => {
               setFound(after);
@@ -122,24 +136,32 @@ export function LimitsPage() {
         <h2 id="limits-overrides-title" className="font-medium">
           既定値と違う人
         </h2>
-        {q.data && q.data.overrides.length === 0 ? (
+        {registry.isError ? (
+          <p role="alert" className="text-sm text-muted-foreground">
+            {describeError(registry.error)}
+          </p>
+        ) : q.data && defs && q.data.overrides.length === 0 ? (
           <p className="text-sm text-muted-foreground">いません</p>
-        ) : q.data ? (
+        ) : q.data && defs ? (
           <ul className="divide-y rounded-2xl border bg-card px-4">
             {q.data.overrides.map((o) => (
               <li key={o.userId} className="flex items-center gap-2.5 py-3">
                 <span className="flex min-w-0 flex-1 flex-col leading-snug">
                   <span className="truncate font-medium">{o.name ?? o.email}</span>
                   <span className="truncate text-[13px] text-muted-foreground">
-                    {o.accountLimit === null ? "アカウントは既定値" : `アカウント${o.accountLimit}件`}・
-                    {o.dailyPostLimit === null ? "投稿は既定値" : `投稿${o.dailyPostLimit}件`}
+                    {defs
+                      .map((d) => {
+                        const v = o.limits[d.key] ?? null;
+                        return v === null ? `${shortOf(d)}は既定値` : `${shortOf(d)}${v}件`;
+                      })
+                      .join("・")}
                   </span>
                 </span>
                 <Button
                   variant="ghost"
                   className="h-10 shrink-0 rounded-full md:h-9"
                   onClick={async () => {
-                    const after = await api.putUserLimits(o.userId, { accountLimit: null, dailyPostLimit: null });
+                    const after = await api.putUserLimits(o.userId, Object.fromEntries(defs.map((d) => [d.key, null])));
                     if (found?.userId === after.userId) setFound(after);
                     await refresh();
                   }}
@@ -178,7 +200,7 @@ export function LimitsPage() {
 
 /**
  * 数の欄（ラベルと「件」）。
- * @param props - label：項目名、note：下の小さな文、value・onChange：値、max：最大
+ * @param props - label：項目名、note：下の小さな文、value・onChange：値、min・max：範囲（アプリが登録したもの）
  * @returns 行
  */
 function LimitField({
@@ -186,6 +208,7 @@ function LimitField({
   note,
   value,
   onChange,
+  min,
   max,
   placeholder,
 }: {
@@ -193,6 +216,7 @@ function LimitField({
   note?: string;
   value: string;
   onChange: (v: string) => void;
+  min: number;
   max: number;
   placeholder?: string;
 }) {
@@ -208,7 +232,7 @@ function LimitField({
           id={id}
           type="number"
           inputMode="numeric"
-          min={1}
+          min={min}
           max={max}
           value={value}
           placeholder={placeholder}
@@ -223,22 +247,29 @@ function LimitField({
 
 /**
  * 全員の既定値のフォーム。
- * @param props - defaults：今の既定値、onSaved：保存できたとき
+ * @param props - defs：上限の一覧、defaults：今の既定値、onSaved：保存できたとき
  * @returns フォーム
  */
-function DefaultsForm({ defaults, onSaved }: { defaults: DefaultLimits; onSaved: () => Promise<unknown> }) {
-  const [account, setAccount] = useState(String(defaults.accountLimit));
-  const [daily, setDaily] = useState(String(defaults.dailyPostLimit));
+function DefaultsForm({ defs, defaults, onSaved }: { defs: readonly LimitDef[]; defaults: Defaults; onSaved: () => Promise<unknown> }) {
+  const [raw, setRaw] = useState<Record<string, string>>(() => Object.fromEntries(defs.map((d) => [d.key, String(defaults[d.key] ?? "")])));
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
-  const a = parseLimit(account, ACCOUNT_LIMIT_MAX);
-  const d = parseLimit(daily, DAILY_POST_LIMIT_MAX);
-  const valid = typeof a === "number" && typeof d === "number";
+  const parsed = Object.fromEntries(defs.map((d) => [d.key, parseLimit(raw[d.key] ?? "", d)]));
+  // 上限が1つもなければ保存しない（運営の上限の画面を持つアプリが登録されていない）
+  const valid = defs.length > 0 && defs.every((d) => typeof parsed[d.key] === "number");
   return (
     <div className="space-y-2.5">
       <div className="divide-y rounded-2xl border bg-card px-4">
-        <LimitField label="アカウントの数" value={account} onChange={setAccount} max={ACCOUNT_LIMIT_MAX} />
-        <LimitField label="1日の投稿数（1アカウント）" value={daily} onChange={setDaily} max={DAILY_POST_LIMIT_MAX} />
+        {defs.map((d) => (
+          <LimitField
+            key={d.key}
+            label={d.note ? `${d.label}（${d.note}）` : d.label}
+            value={raw[d.key] ?? ""}
+            onChange={(v) => setRaw((prev) => ({ ...prev, [d.key]: v }))}
+            min={d.min}
+            max={d.max}
+          />
+        ))}
       </div>
       {error && (
         <p role="alert" className="text-sm text-destructive">
@@ -254,7 +285,7 @@ function DefaultsForm({ defaults, onSaved }: { defaults: DefaultLimits; onSaved:
           setPending(true);
           setError(null);
           try {
-            await api.putDefaultLimits({ accountLimit: a, dailyPostLimit: d });
+            await api.putDefaultLimits(parsed as Record<string, number>);
             await onSaved();
           } catch (err) {
             setError(describeError(err));
@@ -271,26 +302,29 @@ function DefaultsForm({ defaults, onSaved }: { defaults: DefaultLimits; onSaved:
 
 /**
  * 見つかった人の上限のカード。空の欄は既定値。
- * @param props - user：見つかった人、defaults：既定値、onSaved：保存できたとき
+ * @param props - user：見つかった人、defs：上限の一覧、defaults：既定値、onSaved：保存できたとき
  * @returns カード
  */
 function UserLimitsCard({
   user,
+  defs,
   defaults,
   onSaved,
 }: {
   user: OperatorLimitUser;
-  defaults: DefaultLimits;
+  defs: readonly LimitDef[];
+  defaults: Defaults;
   onSaved: (after: OperatorLimitUser) => Promise<void>;
 }) {
-  const [account, setAccount] = useState(user.accountLimit === null ? "" : String(user.accountLimit));
-  const [daily, setDaily] = useState(user.dailyPostLimit === null ? "" : String(user.dailyPostLimit));
+  const [raw, setRaw] = useState<Record<string, string>>(() =>
+    Object.fromEntries(defs.map((d) => [d.key, user.limits[d.key] == null ? "" : String(user.limits[d.key])])),
+  );
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
-  const a = parseLimit(account, ACCOUNT_LIMIT_MAX);
-  const d = parseLimit(daily, DAILY_POST_LIMIT_MAX);
-  const valid = a !== undefined && d !== undefined;
-  const save = async (v: { accountLimit: number | null; dailyPostLimit: number | null }) => {
+  const parsed = Object.fromEntries(defs.map((d) => [d.key, parseLimit(raw[d.key] ?? "", d)]));
+  const valid = defs.length > 0 && defs.every((d) => parsed[d.key] !== undefined);
+  const usageDef = defs.find((d) => d.countsUsage);
+  const save = async (v: Record<string, number | null>) => {
     setPending(true);
     setError(null);
     try {
@@ -305,26 +339,23 @@ function UserLimitsCard({
     <div className="space-y-1 rounded-2xl border bg-card px-4 py-3.5">
       <span className="block font-medium">{user.name ?? user.email}</span>
       <span className="block text-[13px] text-muted-foreground">
-        {user.email}・アカウント{user.ownedAccountCount}件
+        {user.email}
+        {usageDef ? `・${shortOf(usageDef)}${user.usage}件` : ""}
       </span>
       {user.operator && <p className="pt-1 text-[13px]">運営者には上限をかけません</p>}
       <div className="divide-y">
-        <LimitField
-          label="アカウントの数"
-          note={a === null ? `既定値（${defaults.accountLimit}件）` : "この人だけ"}
-          value={account}
-          onChange={setAccount}
-          max={ACCOUNT_LIMIT_MAX}
-          placeholder={String(defaults.accountLimit)}
-        />
-        <LimitField
-          label="1日の投稿数"
-          note={d === null ? `既定値（${defaults.dailyPostLimit}件）` : "この人だけ"}
-          value={daily}
-          onChange={setDaily}
-          max={DAILY_POST_LIMIT_MAX}
-          placeholder={String(defaults.dailyPostLimit)}
-        />
+        {defs.map((d) => (
+          <LimitField
+            key={d.key}
+            label={d.label}
+            note={parsed[d.key] === null ? `既定値（${defaults[d.key]}件）` : "この人だけ"}
+            value={raw[d.key] ?? ""}
+            onChange={(v) => setRaw((prev) => ({ ...prev, [d.key]: v }))}
+            min={d.min}
+            max={d.max}
+            placeholder={String(defaults[d.key] ?? "")}
+          />
+        ))}
       </div>
       {error && (
         <p role="alert" className="text-sm text-destructive">
@@ -336,7 +367,7 @@ function UserLimitsCard({
           variant="outline"
           className="h-10 rounded-full md:h-9"
           disabled={!valid || pending}
-          onClick={() => valid && void save({ accountLimit: a, dailyPostLimit: d })}
+          onClick={() => valid && void save(parsed as Record<string, number | null>)}
         >
           保存
         </Button>
@@ -344,7 +375,7 @@ function UserLimitsCard({
           variant="ghost"
           className="h-10 rounded-full md:h-9"
           disabled={pending}
-          onClick={() => void save({ accountLimit: null, dailyPostLimit: null })}
+          onClick={() => void save(Object.fromEntries(defs.map((d) => [d.key, null])))}
         >
           既定値に戻す
         </Button>

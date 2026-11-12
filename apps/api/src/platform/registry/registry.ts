@@ -20,14 +20,22 @@ export type AppLimitDef = {
   max: number;
   /** 運営者に当てる値（null は上限なし） */
   operatorValue: number | null;
+  /** 一覧に出す短い名前（例：アカウント・投稿。「アカウント5件」「投稿は既定値」のように出す） */
+  shortLabel?: string;
+  /** 既定値の欄で、名前の後ろに括弧で添える文（例：1アカウント） */
+  note?: string;
+  /** この上限が、アプリから伝えられた利用の数（app_usage の数）を数えるものか（見つかった人に「アカウント3件」と出す） */
+  countsUsage?: boolean;
 };
 
 const features = new Map<string, readonly AppFeatureDef[]>();
 /** 機能のON/OFF（運営の画面と、ログインした人の features）を持つアプリ。登録のときにアプリが宣言する */
 let switchesOwner: string | undefined;
-/** 機能の名前の形（英小文字と _ の1〜30文字。DBの feature の列の CHECK（platform/schema.ts）と、運営のリクエストの型に合わせる） */
+/** 機能・上限の名前の形（英小文字と _ の1〜30文字。機能の表の CHECK（platform/schema.ts）と、@meguru/shared の appKeySchema に合わせる） */
 const FEATURE_KEY_RE = /^[a-z_]{1,30}$/;
 const limits = new Map<string, Readonly<Record<string, AppLimitDef>>>();
+/** 運営の上限の画面が扱うアプリ。登録のときにアプリが宣言する（機能のON/OFFと同じ決まり） */
+let limitsOwner: string | undefined;
 
 /**
  * アプリの機能のまとまりを登録する。同じアプリは1回だけ（2回目からは何もしない）。
@@ -39,12 +47,16 @@ const limits = new Map<string, Readonly<Record<string, AppLimitDef>>>();
  * @throws Error 名前の形が違う・重なる、または2つ目のアプリが機能のON/OFFを持とうとしたとき
  */
 export function registerAppFeatures(app: string, defs: readonly AppFeatureDef[], opts: { switches?: boolean } = {}): void {
-  if (features.has(app)) return;
-  const bad = defs.find((d) => !FEATURE_KEY_RE.test(d.key));
-  if (bad) throw new Error(`機能の名前「${bad.key}」の形が違います（英小文字と _ の1〜30文字だけ）`);
+  // 持ち主の宣言の重なりは、2回目の登録でも確かめる（2回目に宣言を足しても黙って無視しない。PR #106 のセルフレビュー）
   if (opts.switches && switchesOwner && switchesOwner !== app) {
     throw new Error(`機能のON/OFFは、アプリ「${switchesOwner}」がもう持っています（運営の画面をアプリごとに分けるまで、1つだけ）`);
   }
+  if (features.has(app)) {
+    if (opts.switches) switchesOwner = app;
+    return;
+  }
+  const bad = defs.find((d) => !FEATURE_KEY_RE.test(d.key));
+  if (bad) throw new Error(`機能の名前「${bad.key}」の形が違います（英小文字と _ の1〜30文字だけ）`);
   // 機能の名前は重ねない（同じアプリの中でも、アプリをまたいでも。ログインした人の features は1つの集合で持つため。specs/meguru/029 tasks.md T027）
   const keys = defs.map((d) => d.key);
   const inside = keys.find((k, i) => keys.indexOf(k) !== i);
@@ -81,10 +93,33 @@ export function featureSettings(): { app: string; keys: string[] } {
  * アプリの上限を登録する。同じアプリは1回だけ。
  * @param app - アプリの番号
  * @param defs - 名前ごとの上限の定義
+ * @param opts - operatorScreen：このアプリの上限を運営の上限の画面で扱う（1つのアプリだけ）
+ * @throws Error 名前の形が違う、または2つ目のアプリが運営の上限の画面を持とうとしたとき
  */
-export function registerAppLimits(app: string, defs: Readonly<Record<string, AppLimitDef>>): void {
-  if (limits.has(app)) return;
+export function registerAppLimits(
+  app: string,
+  defs: Readonly<Record<string, AppLimitDef>>,
+  opts: { operatorScreen?: boolean } = {},
+): void {
+  if (opts.operatorScreen && limitsOwner && limitsOwner !== app) {
+    throw new Error(`運営の上限の画面は、アプリ「${limitsOwner}」がもう持っています（画面をアプリごとに分けるまで、1つだけ）`);
+  }
+  if (limits.has(app)) {
+    if (opts.operatorScreen) limitsOwner = app;
+    return;
+  }
+  const bad = Object.keys(defs).find((k) => !FEATURE_KEY_RE.test(k));
+  if (bad) throw new Error(`上限の名前「${bad}」の形が違います（英小文字と _ の1〜30文字だけ）`);
   limits.set(app, defs);
+  if (opts.operatorScreen) limitsOwner = app;
+}
+
+/**
+ * 運営の上限の画面が扱うアプリ（registerAppLimits で operatorScreen を宣言したアプリ）。
+ * @returns アプリの番号（宣言がなければ undefined）
+ */
+export function operatorLimitsApp(): string | undefined {
+  return limitsOwner;
 }
 
 /**
@@ -140,4 +175,5 @@ export function resetRegistry(): void {
   features.clear();
   limits.clear();
   switchesOwner = undefined;
+  limitsOwner = undefined;
 }

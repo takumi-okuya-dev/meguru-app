@@ -14,9 +14,11 @@ const mocks = vi.hoisted(() => ({
   putDefaultLimits: vi.fn(),
   findLimitUser: vi.fn(),
   putUserLimits: vi.fn(),
+  appRegistry: vi.fn(),
 }));
 vi.mock("@/lib/api-client", async (orig) => {
   const actual = await orig<typeof import("@/lib/api-client")>();
+  // 上限の名前・表示名・範囲は、登録の一覧（appRegistry）から出す（specs/meguru/029 T070）
   return { ...actual, api: { ...actual.api, ...mocks } };
 });
 vi.mock("@/apps/threads/lib/api", async (orig) => {
@@ -27,6 +29,7 @@ vi.mock("@/apps/threads/lib/api", async (orig) => {
 const { ApiError } = await import("@/lib/api-client");
 const { SettingsLayout } = await import("@/shell/settings/settings-layout");
 const { LimitsPage } = await import("@/shell/settings/limits");
+const { THREADS_REGISTRY } = await import("./helpers/app-registry");
 
 const ME = {
   user: { id: "u", email: "op@example.com", displayName: null },
@@ -40,8 +43,8 @@ const ME = {
 };
 
 const LIMITS: OperatorLimits = {
-  defaults: { accountLimit: 3, dailyPostLimit: 10 },
-  overrides: [{ userId: "u-hanako", name: "山田 花子", email: "hanako@example.com", accountLimit: 5, dailyPostLimit: null }],
+  defaults: { accounts: 3, daily_posts: 10 },
+  overrides: [{ userId: "u-hanako", name: "山田 花子", email: "hanako@example.com", limits: { accounts: 5, daily_posts: null } }],
   events: [{ at: "2026-11-08T05:02:00.000Z", actor: "拓海", action: "user_limits", detail: null }],
 };
 
@@ -50,9 +53,8 @@ const HANAKO: OperatorLimitUser = {
   name: "山田 花子",
   email: "hanako@example.com",
   operator: false,
-  accountLimit: 5,
-  dailyPostLimit: null,
-  ownedAccountCount: 2,
+  limits: { accounts: 5, daily_posts: null },
+  usage: 2,
 };
 
 function renderAt(path = "/settings/limits") {
@@ -80,6 +82,7 @@ function renderAt(path = "/settings/limits") {
 
 beforeEach(() => {
   for (const fn of Object.values(mocks)) fn.mockReset();
+  mocks.appRegistry.mockResolvedValue(THREADS_REGISTRY);
   mocks.me.mockResolvedValue({ ...ME, operator: true });
   mocks.operatorLimits.mockResolvedValue(LIMITS);
 });
@@ -104,7 +107,7 @@ describe("「運営」の区分", () => {
 
 describe("全員の既定値", () => {
   it("今の値を出し、保存する", async () => {
-    mocks.putDefaultLimits.mockResolvedValue({ accountLimit: 4, dailyPostLimit: 8 });
+    mocks.putDefaultLimits.mockResolvedValue({ limits: { accounts: 4, daily_posts: 8 } });
     renderAt();
     const section = (await screen.findByRole("heading", { name: "全員の既定値" })).closest("section")!;
     const account = await within(section).findByLabelText("アカウントの数");
@@ -116,14 +119,14 @@ describe("全員の既定値", () => {
     await user.clear(daily);
     await user.type(daily, "8");
     await user.click(within(section).getByRole("button", { name: "保存" }));
-    await waitFor(() => expect(mocks.putDefaultLimits).toHaveBeenCalledWith({ accountLimit: 4, dailyPostLimit: 8 }));
+    await waitFor(() => expect(mocks.putDefaultLimits).toHaveBeenCalledWith({ accounts: 4, daily_posts: 8 }));
   });
 });
 
 describe("人ごとの上限", () => {
   it("探すと「この人だけ」「既定値」を出し、保存・既定値に戻す", async () => {
     mocks.findLimitUser.mockResolvedValue(HANAKO);
-    mocks.putUserLimits.mockResolvedValue({ ...HANAKO, accountLimit: null });
+    mocks.putUserLimits.mockResolvedValue({ ...HANAKO, limits: { accounts: null, daily_posts: null } });
     renderAt();
     const user = userEvent.setup();
     const section = (await screen.findByRole("heading", { name: "人ごとの上限" })).closest("section")!;
@@ -132,7 +135,7 @@ describe("人ごとの上限", () => {
     expect(await within(section).findByText("この人だけ")).toBeInTheDocument();
     expect(within(section).getByText("既定値（10件）")).toBeInTheDocument();
     await user.click(within(section).getByRole("button", { name: "既定値に戻す" }));
-    await waitFor(() => expect(mocks.putUserLimits).toHaveBeenCalledWith("u-hanako", { accountLimit: null, dailyPostLimit: null }));
+    await waitFor(() => expect(mocks.putUserLimits).toHaveBeenCalledWith("u-hanako", { accounts: null, daily_posts: null }));
   });
 
   it("運営者なら「運営者には上限をかけません」", async () => {
@@ -164,5 +167,17 @@ describe("既定値と違う人・記録", () => {
     const user = userEvent.setup();
     await user.click(screen.getByRole("button", { name: /変更の記録/ }));
     expect(await screen.findByText(/人ごとの上限を変えた（拓海）/)).toBeInTheDocument();
+  });
+});
+
+describe("登録の一覧が読めないとき（PR #106 のセルフレビュー）", () => {
+  it("既定値と既定値と違う人に理由を出し、保存できる形にしない", async () => {
+    mocks.appRegistry.mockRejectedValue(new ApiError("INTERNAL_ERROR", 500));
+    renderAt();
+    const defaults = (await screen.findByRole("heading", { name: "全員の既定値" })).closest("section")!;
+    expect(await within(defaults).findByRole("alert")).toBeInTheDocument();
+    expect(within(defaults).queryByRole("button", { name: "保存" })).not.toBeInTheDocument();
+    const overrides = screen.getByRole("heading", { name: "既定値と違う人" }).closest("section")!;
+    expect(within(overrides).getByRole("alert")).toBeInTheDocument();
   });
 });
