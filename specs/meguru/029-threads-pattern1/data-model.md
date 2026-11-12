@@ -158,7 +158,7 @@ Threads：user.withdrawn を受け取る（received_events に書く・同じト
 | PR | マイグレーション | 前の版のAPIが壊れないか |
 |---|---|---|
 | PR1 | `platform_events`・`platform_event_deliveries`・`app_usage`・`user_app_limits`・`app_limit_defaults`を作る。今のデータから`app_usage`・上限の表を写す。機能のON/OFFの表に`app`（既定`threads`）を足し、主キーと`CHECK`を替える | 壊れない（足すだけ。`app`は既定の値つき） |
-| PR2 | `threads_settings`（まだ`public`）を作り、`tester_slot_capacity`を写す | 壊れない |
+| PR2 | `threads_settings`・`threads_received_events`（まだ`public`）を作り、`tester_slot_capacity`を写す。`app_usage`を`memberships`とチームから数え直して写し直し、上限の表も古い列から写し直す（PR1とPR2の間のずれを消す） | 壊れない（足す・写すだけ） |
 | PR3 | スキーマ`threads`を作る。Threadsの31表と`threads_settings`・`received_events`を移す（`ALTER TABLE … SET SCHEMA`、`threads_settings`は`settings`に名前を変える）。共通との外部キーを外す | **壊れる**（前の版は`public`の表を見る）。テスト環境だけで受け入れる例外（spec FR-019）。デプロイの間の数分 |
 | PR5 | `users.account_limit`・`users.daily_post_limit`・`operator_settings`の3列を消す | **壊れる**（前の版はこの列を読む）。テスト環境だけの例外。PR4までの版はもう新しい表を読むので、PR4に戻すなら壊れない |
 

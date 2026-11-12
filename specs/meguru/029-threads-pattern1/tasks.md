@@ -23,6 +23,7 @@ description: "Task list for feature meguru/029 Threads pattern ①"
 
 ## Phase 1：Setup（基準を残す）
 
+- [X] T000 [US5] Constitution の「アプリのデータの分け方」を、作り始める前に改める（MINOR：4.9.0）。「すべてのアプリ（Threadsを含む）はパターン①」「Threadsは029でそろえる。そろえ終えるまでは029のPRの順に移る途中の形を認める」「チームはThreadsの機能」と書く（/speckit-analyze D1。2026-11-12に済ませた）。
 - [ ] T001 今の利用権の判定を、あとで比べられるように、状態ごとの結果をテストの期待する値として書き出す（契約中・未払いの読むだけ・契約前・料金なしの印・運営者・テスト用のグループ・機能のOFF・024の前の無料体験の途中）。`apps/api/test/integration/entitlement-baseline.test.ts`：今の`loadEntitlement`・`effectiveLimits`・`featureOnSql`系の結果を、同じデータで確かめる（この時点で通る）。
 - [ ] T002 [P] 今の料金の数（`countOwned`）と「使っているアプリ」（`resolveMeApps`）の判定を、利用者の種類ごと（持ち主・チームだけ・どちらもない）に確かめるテストを、`apps/api/test/integration/usage-baseline.test.ts`に書く（この時点で通る）。
 
@@ -51,7 +52,7 @@ description: "Task list for feature meguru/029 Threads pattern ①"
 - [ ] T012 [US2] `apps/api/src/platform/usage/`を作る：`reportUsage`と、`app_usage`を読む関数。T005を通す。料金の数は、まだ今の`countOwned`のまま（PR2で切り替える）。
 - [ ] T013 [US2] `apps/api/src/platform/registry/`を作る：`registerAppFeatures`・`registerAppLimits`と、登録の一覧を読む関数。T006を通す。
 - [ ] T014 [US2] 機能のON/OFFと上限の処理（`platform/features/`・`platform/operator/limit-service.ts`・`operator-limit-routes.ts`・`operator-feature-routes.ts`）を、`app`の列と新しい上限の表を読む形にする。書き込みは、古い列（`users.account_limit`など）にも同じ値を書く（PR5で古い列を消すまで）。値の確かめは登録の一覧で行う（共通のコードからThreadsの名前を消すのはPR2）。
-- [ ] T015 [US2] `apps/api/src/platform/index.ts`から、新しい入口の関数（`emitEvent`は共通の中だけ。アプリには`registerConsumer`の型・`loadEntitlement(s)`・`reportUsage`・`peopleNames`・`Entitlement`型）を出す。`personName`をまとめて読む`peopleNames`を足す。
+- [ ] T015 [US2] `apps/api/src/platform/index.ts`から、新しい入口の関数（`emitEvent`は共通の中だけ。アプリには`registerConsumer`の型・`loadEntitlement(s)`・`reportUsage`・`peopleNames`・`Entitlement`型）を出す。`personName`をまとめて読む`peopleNames`と、ログインしている人を返す`currentUser(c)`（今の認証のミドルウェアが入れる`AuthUser`を読むだけ）を足す。
 - [ ] T016 [US4] PR1の確かめ：`pnpm lint`・`pnpm typecheck`・`pnpm test`・`pnpm e2e`が通る。道筋の一覧（`routes.snapshot.txt`）が変わらない（quickstart.md 1）。
 
 **Checkpoint**：共通の土台ができた。Threadsはまだ使っていないので、動きは変わらない。→ PR1を出す。
@@ -75,13 +76,15 @@ description: "Task list for feature meguru/029 Threads pattern ①"
 
 ### 共有の型
 
-- [ ] T021 [P] [US3] `packages/shared/src/apps/threads/`を作り、`threadsMeResponseSchema`（今の`meResponseSchema`のThreadsの部分を写す）と`FEATURES`（`packages/shared/src/features.ts`から移す）を置く。`packages/shared/src/index.ts`から出す。今の`meResponseSchema`はPR5まで変えない。
+- [ ] T021 [US3] `packages/shared/src/apps/threads/`を作り、`threadsMeResponseSchema`（今の`meResponseSchema`のThreadsの部分を写す）と`FEATURES`（`packages/shared/src/features.ts`から移す）を置く。`packages/shared/src/index.ts`から出す。今の`meResponseSchema`はPR5まで変えない。
 
 ### 移動（中身は変えない）
 
 - [ ] T022 [US1] 招待のトークンの部品（`newInviteToken`・`sealInviteToken`・`openInviteToken`・`inviteUrl`）を、`apps/api/src/platform/teams/invite-service.ts`から`apps/api/src/kernel/invite-token.ts`へ移し、テストのグループと紹介の読みこみ先を直す（research.md R1）。
 - [ ] T023 [US1] `git mv`で、`apps/api/src/platform/accounts/`→`apps/api/src/apps/threads/accounts/`、`platform/access/`→`apps/threads/access/`、`platform/teams/`→`apps/threads/teams/`、`platform/activity/`→`apps/threads/activity/`。読みこみ先を直す（共通の部品は`../../platform`の入口から、Threadsの中は相対で）。表の定義（`accounts`・`memberships`・`teams`・`teamMembers`・`teamAccounts`・`activityLogs`）を、`platform/schema.ts`から`apps/threads/schema.ts`へ移す（まだ`public`のまま）。
 - [ ] T024 [US1] `operator_settings.tester_slot_capacity`を、Threadsの`threads_settings`（まだ`public`。data-model.md 3）へ移すマイグレーションを作る（表を作り、値を写す。古い列はPR5まで残し、両方に書く）。`apps/threads/tester-invites/`の読み書きを新しい表に替える。
+  - 同じマイグレーションの末尾で、**`app_usage`を`memberships`とチームから数え直して写し直す**（PR1とPR2の間に作った・消したアカウントの分のずれを消す。料金の数を`app_usage`に切り替えるT025の前提。/speckit-analyze G1）。`user_app_limits`・`app_limit_defaults`も、古い列から写し直す（PR1のデプロイの間に前の版が古い列だけに書いた分。U4）。
+  - マイグレーションのテスト（`apps/api/test/migration/`）：PR1のあとに`memberships`を足し・消しても、当てたあとに`app_usage`が今の数になる。
 
 ### 共通の側（Threadsを読まない形にする）
 
@@ -93,12 +96,14 @@ description: "Task list for feature meguru/029 Threads pattern ①"
 
 ### Threadsの側（共通の入口だけを使う形にする）
 
-- [ ] T030 [US2] `apps/api/src/apps/threads/access/access.ts`（`authorizeAccount`）を、持ち主の利用権を`loadEntitlement`で読む形にする（`users`・`subscriptions`を読まない）。
+- [ ] T030 [US2] `apps/api/src/apps/threads/access/access.ts`（`authorizeAccount`）を、持ち主の利用権を`loadEntitlement`で読む形にする（`users`・`subscriptions`を読まない）。**持ち主が退会した（利用権が`none`で、退会の記録がある）アカウントは、出来事が届いて消えるまでの間も、チームのほかの人を含めて誰にも見せない**（今は退会で即座に消えるので、見えない。spec 境目のケース、/speckit-analyze U1）。T017に、退会のあと出来事が届く前に、チームのほかの人がそのアカウントを開けない場面を足す。
 - [ ] T031 [US2] `apps/api/src/apps/threads/publish/auto-post-runner.ts`・`metrics/metrics-runner.ts`・`mention/mention-runner.ts`の、`users`・`subscriptions`・`memberships`とのJOINと`featureOnSql`系をやめ、Threadsの表だけで候補を読んでから`loadEntitlements`で持ち主をまとめて調べる形にする（research.md R4）。1件ずつ判定している`publish/publish-claim.ts`・`publish-executor.ts`・`auto-post-routes.ts`・`posting-schedule-routes.ts`（`loadOwnerEntitlement`・`ownerAutopostOn`・`effectiveLimits`）は、`loadEntitlement`に替える。今の定期処理と投稿のテストを、期待する結果を変えずに通す。
 - [ ] T032 [US2] `apps/api/src/apps/threads/events/`を作る：`markReceived`（`threads_received_events`。まだ`public`）・`onUserWithdrawn`・`onLimitsChanged`（contracts/platform-entry.md 3）。`received_events`の表を作るマイグレーションを、T024と同じPRで足す。T017・T019を通す。
 - [ ] T033 [US2] 知らせをなくす：`accountDeleting`・`accountOpened`はThreadsの中の処理に（アカウントを消す関数・開くAPIの中で直接呼ぶ）、`userWithdrawing`・`userAccountsDeleted`は`onUserWithdrawn`に、`limitsChanged`は`onLimitsChanged`に（research.md R8）。`apps/api/src/apps/threads/threads-hooks.ts`を消し、`apps/api/src/app.ts`で`registerAppFeatures`・`registerAppLimits`・`registerConsumer`を呼ぶ（contracts/module-boundaries.md 4）。`platform/hooks.ts`はPR5で消す（この時点で呼び出しが0になる）。
 - [ ] T034 [US2] Threadsが利用の数を伝える：アカウントを作る・消す（Metaのデータ削除の`deleteAccountsOfThreadsUser`を含む）・持ち主が変わる・チームに入る・抜ける処理で、トランザクションのあと・応答の前に`reportUsage`を呼ぶ。毎日のまとめ処理（`jobs/daily-jobs.ts`からThreadsの関数を呼ぶ）で全員を数え直す。T018を通す。
 - [ ] T035 [US3] `apps/api/src/apps/threads/me/`を作る：`GET /api/threads/me`・`GET /api/threads/me/withdrawal-preview`。`apps/api/src/apps/threads/index.ts`から出し、`app.ts`でつなぐ。T020を通す。`pnpm --filter api routes:snapshot`で一覧を書き直す（2本増える）。
+- [ ] T069 [US2] 運営の画面のための登録の一覧を返すAPI `GET /api/operator/app-registry`（共通。運営者だけ）を足す：登録されたアプリごとに、機能（名前・表示名・説明）と上限（名前・表示名・範囲）を返す。`registerAppFeatures`・`registerAppLimits`に表示名・説明を渡す形にする（contracts/platform-entry.md 5・api-routes.md 1）。テスト：`apps/api/test/integration/operator-app-registry.test.ts`（運営者でなければ403、今の3つの機能と2つの上限が今の表示名で返る）。
+- [ ] T070 [US2] 外枠の運営の画面（`apps/web/src/shell/settings/features.tsx`・`limits.tsx`）を、`FEATURE_LABELS`・「アカウントの数」・`ACCOUNT_LIMIT_MAX`などのThreadsの名前を直接書かず、T069のAPIの一覧で出す形にする。見た目と文言は今のまま（spec FR-012・FR-021、/speckit-analyze G2）。画面のテストを直す（期待する結果は変えない）。T021で`FEATURES`・`FEATURE_LABELS`をThreadsへ移すのは、このタスクのあと。
 - [ ] T036 [US1] Threadsのコードの`platform/schema`の読みこみ（`users`・`subscriptions`・`memberships`・`operatorSettings`）が0か所になったことを確かめる（`grep`）。共通の`index.ts`から、表の定義とSQLの部品（`featureOnSql`など）を出すのをやめる。
 - [ ] T037 [US4] PR2の確かめ：`pnpm lint`・`pnpm typecheck`・`pnpm test`・`pnpm e2e`。知らせの呼び出し（`runHook`）が0か所（quickstart.md 1）。
 
@@ -172,7 +177,7 @@ description: "Task list for feature meguru/029 Threads pattern ①"
 - [ ] T058 [US3] `/api/me`からThreadsの部分を消す：`packages/shared/src/schemas.ts`の`meResponseSchema`を共通の分だけにし、`apps/api/src/app.ts`の「`/api/me`に足す中身」を消す。`/api/me/withdrawal-preview`も共通の分だけにする。Webの型の誤りが0件（Threadsは`useThreadsMe`を読んでいる）。テストを直す（期待する結果は変えない）。
 - [ ] T059 [US2] `apps/api/src/platform/hooks.ts`と、そのテストを消す。
 - [ ] T060 [US2] 上限の古い列（`users.account_limit`・`users.daily_post_limit`・`operator_settings.default_account_limit`・`default_daily_post_limit`・`tester_slot_capacity`）を消す：表の定義から消し、両方に書いていた処理を新しい表だけにして、`db:generate`でマイグレーションを作り、SQLを読む。`apps/api/test/migration/`にテストを足す（新しい表の値が残る）。
-- [ ] T061 [US4] PR5の確かめ：`pnpm lint`・`pnpm typecheck`・`pnpm test`・`pnpm e2e`。`/api/me`にThreadsのデータがない。
+- [ ] T061 [US4] PR5の確かめ：`pnpm lint`・`pnpm typecheck`・`pnpm test`・`pnpm e2e`。`/api/me`にThreadsのデータがない。PR5の説明に、古い列を消すマイグレーションが前の版のAPIを壊す例外（テスト環境だけ。spec FR-019）を書く。
 
 ## Phase 7：文書（PR5）
 
@@ -181,7 +186,7 @@ description: "Task list for feature meguru/029 Threads pattern ①"
 - [ ] T062 [P] [US5] `docs/app-separation.md`：Threadsをパターン①にそろえたことを書く（5章「Threadsの扱い」を書き直す、2-1の図のThreadsをパターン①の色に、3-4の道のりの「今」を更新）。実例として、Threadsの`schema.ts`・`events/`・`reportUsage`の呼び出し・`/api/threads/me`の場所を指す。
 - [ ] T063 [P] [US5] `docs/module-map.md`：2章（共通16表・Threads33表・処理の行き先）、3章（持ち主でない列の例外がなくなる）、1-4（知らせ → 出来事）、4章（`operator_events`の例外がなくなる）、6章（アプリを足す手順を、Threadsを実例にしたパターン①の手順に）、7章（Webの`apps/threads/lib/`・`withdrawalPreview`）、1-1の図（contracts/module-boundaries.md 6）。
 - [ ] T064 [P] [US5] `docs/product-structure.md` 6・7（共通の表の行・Threadsの扱い・まだ決めていないこと）、`docs/architecture.md`（設計の判断の表の「Threadsはパターン②のまま」を直す）、`docs/parallel-development.md`（Threadsの改善の再開と、2作目が実装を始めてよいこと）、`docs/README.md`（文書の一覧の説明の更新）。
-- [ ] T065 [US5] Constitution の「アプリのデータの分け方」を、「Threadsもパターン①にそろえた（029）」に改める（MINOR：4.9.0）。`/speckit-constitution`の手順で、版と改めた日を直す。
+- [ ] T065 [US5] Constitution の「アプリのデータの分け方」の、T000で書いた「そろえる・途中の形を認める」を、「Threadsもパターン①にそろえた（029）」に直す（PATCH：4.9.1）。`/speckit-constitution`の手順で、版と改めた日を直す。
 - [ ] T066 [US5] 古い記述が残っていないことを確かめる：`grep`で「パターン②のまま」「`accounts`（共通）」「同じトランザクションの知らせ」「`runHook`」「`/api/accounts/`」を文書とコードのコメントから探し、今の形に直す（spec US5-2）。
 
 **Checkpoint**：→ PR5を出す。
@@ -194,8 +199,8 @@ description: "Task list for feature meguru/029 Threads pattern ①"
 ## Dependencies & Execution Order
 
 - **PR1（Phase 1〜2）** → **PR2（Phase 3）** → **PR3（Phase 4）** → **PR4（Phase 5）** → **PR5（Phase 6〜7）**。各PRは、前のPRが`develop`に入ってから切る（同じブランチで積み、PRごとに`develop`へ出してもよい）。
-- PR1の中：T001・T002（基準）→ T003〜T006（テスト）→ T007・T008（マイグレーション）→ T009〜T015 → T016。
-- PR2の中：T017〜T021（テスト・型）→ T022〜T024（移動）→ T025〜T029（共通の側）と T030〜T035（Threadsの側）は、T023の後なら並べて進められる（別ファイル）。T033はT032の後。→ T036・T037。
+- PR1の中：T000（Constitution。済み）→ T001・T002（基準）→ T003〜T006（テスト）→ T007・T008（マイグレーション）→ T009〜T015 → T016。
+- PR2の中：T017〜T021（テスト・型）→ T022〜T024（移動）→ T025〜T029（共通の側）と T030〜T035（Threadsの側）は、T023の後なら並べて進められる（別ファイル）。T033はT032の後。T069 → T070 → T021（`FEATURES`の移動）。→ T036・T037。
 - PR3：T038・T039（テスト）→ T040 → T041 → T042・T043 → T044・T045 → T046 →（マージ）→ T047。
 - PR4：T048・T049（API）→ T050 → T051・T052 → T053・T054 → T055 →（マージ）→ T056。
 - PR5：T056の確認のあと。T057〜T060 → T061、T062〜T066 は並べて進められる → （マージ）→ T067 → T068。

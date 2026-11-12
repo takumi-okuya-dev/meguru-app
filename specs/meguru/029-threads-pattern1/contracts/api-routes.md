@@ -21,6 +21,7 @@
 | `/api/me`・`/api/me/last-app`・`/api/me/referral`・`/api/me/withdraw`・`/api/me/withdrawal-preview` | 5 | 共通 | 変えない（`/api/me`と`withdrawal-preview`の中身は2章） |
 | `/api/billing/…`・`/api/stripe/webhook` | 5 | 共通 | 変えない（Stripeに登録した通知先） |
 | `/api/operator/feature-settings`・`limits`・`test-groups`・`users` | 16 | 共通 | 変えない |
+| （新） | — | 共通 | `GET /api/operator/app-registry`（登録されたアプリの機能と上限の一覧。運営の画面のため。運営者だけ） |
 | `/api/test-invites/…`・`/api/referral-page`・`/api/health` | 4 | 共通 | 変えない |
 
 - 新しい道筋の`accounts`・`teams`・`invites`・`me`・`operator`は、今の`/api/threads/…`（`callback`・`complete`・`connect`・`token-connect`・`webhooks/…`）とぶつからない。

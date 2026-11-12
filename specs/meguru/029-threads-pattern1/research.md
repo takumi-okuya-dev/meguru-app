@@ -62,6 +62,7 @@
 
 - **決定**：共通に`app_usage`（利用者・アプリ・数・使っているか・直した日時）を置く。Threadsは、アカウントを作る・消す・持ち主が変わる・チームに入る・抜けるたびに、自分のトランザクションが終わったあとで`reportUsage`を呼ぶ。共通は`app_usage`を書き、料金の数が変わったら今の`quantity_sync_needed`の印を付け、今の仕組み（Stripeへ数を合わせる・失敗したら定期処理でやり直す）で合わせる。
   - 料金の数は、今の`countOwned`（持ち主としてのアカウントの数）の代わりに、`app_usage`のThreadsの数を使う。契約を始めるとき（Checkout）も同じ。
+  - **PR1とPR2の間**：`app_usage`はPR1のマイグレーションで写すが、Threadsが`reportUsage`を呼ぶのはPR2から。そのため、PR2のマイグレーションで`memberships`から数え直して写し直してから、料金の数を`app_usage`に切り替える（/speckit-analyze G1）。
   - **ずれの防ぎ方**：`reportUsage`が失敗したとき（共通のDBの書き込みの失敗など）に備えて、Threadsは毎日のまとめ処理で、全員の数を数え直して`reportUsage`する（ずれを1日以内に直す）。作った直後に契約の画面を開いても、`reportUsage`はアカウントを作る応答を返す前に呼ぶので、古い数にはならない（spec FR-011）。
   - 「使っているアプリ」（`/api/me`の`apps.using`）は、`app_usage`の`using`から決める（spec FR-024）。Threadsは、自分のアカウントがあるか、チームに入っていれば`using = true`を伝える。
 - **見送った案**：共通が料金の数を知りたいときにThreadsを呼ぶ（共通 → アプリの向きになる）。出来事でThreadsから共通へ伝える（アプリ → 共通の出来事の仕組みが別に要る。入口の関数で足りる）。
@@ -72,7 +73,7 @@
   - 機能のON/OFF：`feature_disables`・`group_feature_disables`・`feature_setting_events`に`app`（既定`threads`）を足し、主キーに入れる。`feature`の値の`CHECK`（`autopost`・`strategy`・`team`）は、形の`CHECK`（英小文字と`_`）に替え、値は登録の一覧でコードが確かめる。
   - 上限：今の`users.account_limit`・`users.daily_post_limit`・`operator_settings.default_account_limit`・`default_daily_post_limit`を、`user_app_limits`（利用者・アプリ・名前・値）と`app_limit_defaults`（アプリ・名前・値）に写す。古い列は、新しい表を読む版が出たあと（PR5）で消す（[release-runbook.md](../../../docs/release-runbook.md) 3の「列を消すのは2回に分ける」）。
   - 共通の`@meguru/shared`の`FEATURES`は、Threadsの名前なので、`packages/shared/src/apps/threads/`へ移す（[product-structure.md](../../../docs/product-structure.md) 7の「Threads固有のものは移す候補」）。
-- **運営者の画面**：見た目と結果は変えない。共通の運営の画面は、登録されたアプリの機能・上限の一覧を出す（今はThreadsだけなので、今と同じ3つと2つ）。
+- **運営者の画面**：見た目と結果は変えない。共通の運営の画面（外枠の`settings/features.tsx`・`limits.tsx`。今はThreadsの名前を直接書いている）は、新しいAPI `GET /api/operator/app-registry`が返す登録の一覧（機能の名前・表示名・説明、上限の名前・表示名・範囲）を出す。今はThreadsだけなので、今と同じ3つと2つ（/speckit-analyze G2）。
 
 ## R8. 知らせの置き換え
 
@@ -85,6 +86,7 @@
 | `accountOpened`（アカウントを開いたあと） | アカウントを開くAPIがThreadsへ移るので、Threadsの中の処理 |
 
 - 退会の流れ：今は退会の処理（共通）が、1つのトランザクションでThreadsのアカウントも消している。これからは、共通は契約の解約・利用者の退会の記録・出来事を書くまでで終わり、Threadsのデータは出来事で10分以内に消える。退会した人は共通の関所で止まるので、その間にThreadsのデータに触れることはない（spec Edge Cases）。
+- **退会した人のアカウントが消えるまでの間**：出来事が届くまでの最大10分、退会した人が持ち主のアカウントは、チームのほかの人を含めて誰にも見せない。Threadsの権限の判定（`authorizeAccount`）で、持ち主の利用権が`none`で退会の記録があれば、見つからない扱いにする（今は退会で即座に消えるので、見える動きを変えない。/speckit-analyze U1）。
 - 退会の前の確かめ（`/api/me/withdrawal-preview`：消えるアカウントの一覧）は、Threadsのデータを含むので、Threadsの`/api/threads/me/withdrawal-preview`に分ける。画面は両方を読む（共通は契約、Threadsは消えるアカウント）。
 - `platform/hooks.ts`は消す。
 

@@ -2,7 +2,7 @@
 
 **ブランチ**：`feature/meguru-029-threads-pattern1` | **日付**：2026-11-12 | **仕様**：[spec.md](./spec.md)
 
-**入力**：`specs/meguru/029-threads-pattern1/spec.md`（Clarifications 2026-11-12を含む）、Constitution 4.8.1、[docs/app-separation.md](../../../docs/app-separation.md)、[docs/module-map.md](../../../docs/module-map.md)
+**入力**：`specs/meguru/029-threads-pattern1/spec.md`（Clarifications 2026-11-12を含む）、Constitution 4.9.0（この計画の確認で改めた。T000）、[docs/app-separation.md](../../../docs/app-separation.md)、[docs/module-map.md](../../../docs/module-map.md)
 
 ## 概要（Summary）
 
@@ -52,7 +52,7 @@ Threadsアプリ（今はパターン②）を、2作目より前にパターン
 
 ## Constitution Check
 
-*GATE：Phase 0の前に確かめ、Phase 1の後にもう一度確かめた。Constitution 4.8.1。*
+*GATE：Phase 0の前に確かめ、Phase 1の後にもう一度確かめた。Constitution 4.8.1 → /speckit-analyze のあと 4.9.0。*
 
 | 原則 | 確かめたこと | 結果 |
 |---|---|---|
@@ -63,7 +63,7 @@ Threadsアプリ（今はパターン②）を、2作目より前にパターン
 | V. 個人運用起点のシンプルさ | 利用者から見える変化はない。出来事・利用の数・機能と上限の登録は新しい仕組みだが、2作目・3作目で同じものを使うための最小限（Queuesを使わない・写しの表を持たない・画面を作らない）。複雑さの記録に書く | 合格（複雑さの記録あり） |
 | VI. 改善フィードバック | 数字の取得の処理は場所と読み方が変わるだけ | 合格 |
 | 技術スタック・運用コスト | 新しい依存・サービスなし。同じWorker・同じNeon。定期処理の回数も変えない | 合格 |
-| 技術スタック制約「アプリのデータの分け方」 | 今は「Threadsはパターン②のまま」と書いてある。このfeatureで、Threadsもパターン①にそろえたと改める（MINOR：4.9.0。PR5で`/speckit-constitution`の手順） | 合格（改定を伴う） |
+| 技術スタック制約「アプリのデータの分け方」 | 「Threadsはパターン②のまま」と書いてあったので、作り始める前（PR1の最初。T000）に「Threadsは029でパターン①にそろえる。そろえ終えるまでは途中の形を認める。チームはThreadsの機能」と改めた（MINOR：4.9.0、2026-11-12）。PR5で「そろえた」に直す（PATCH：4.9.1。T065） | 合格（改定済み） |
 | 開発ワークフロー | spec-kitの順。`specs/meguru/029-…`、ブランチ`feature/meguru-029-…`→`develop`。PRは下書き → セルフレビュー → コードを変えたPRはCI → Codex | 合格 |
 
 **Phase 1の後の確認**：data-model・contractsに、原則に反するものはない。マイグレーションの決まり（[release-runbook.md](../../../docs/release-runbook.md) 3）からの例外（PR3・PR5）は、本番がない今だけのものとして、spec・data-model・quickstartに書いた。

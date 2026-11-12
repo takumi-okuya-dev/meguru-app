@@ -93,12 +93,19 @@ async function onUserWithdrawn(db: Db, event: { id: string; payload: { userId: s
 
 ```ts
 // apps/api/src/app.ts（組み立て）
-registerAppFeatures("threads", ["autopost", "strategy", "team"]);
+registerAppFeatures("threads", [
+  { key: "autopost", label: "自動投稿", description: "投稿をつくる・投稿ストック・パフォーマンスのまとまりです" },
+  { key: "strategy", label: "戦略" },
+  { key: "team", label: "チーム" },
+]);
 registerAppLimits("threads", {
-  accounts: { min: 1, max: 1000 },
-  daily_posts: { min: 1, max: 250 },
+  accounts: { label: "アカウントの数", min: 1, max: 1000 },
+  daily_posts: { label: "1日の投稿数", min: 1, max: 250 },
 });
 ```
+
+- 表示名は今の`FEATURE_LABELS`、説明（任意）は今の運営の画面の説明の文（`settings/features.tsx`の「自動投稿は、…のまとまりです」）をそのまま写す。説明のない機能は、説明を出さない。
+- 外枠の運営の画面は、`GET /api/operator/app-registry`（運営者だけ）で、登録されたアプリごとの機能と上限の一覧を読んで出す（外枠にThreadsの名前を書かない）。
 
 - 共通の運営の画面と、機能のON/OFF・上限のAPIは、登録された一覧で値を確かめる。登録していない名前は400（`VALIDATION_FAILED`）。
 - 共通のコードに、Threadsの名前（`autopost`・`accounts`など）を書かない。
