@@ -103,7 +103,7 @@ export async function assertCanAddAccount(db: Db | TxDb, userId: string, mode: B
 }
 
 /**
- * 最後にアカウントを消した時刻を記録する（Threadsの threads_user_states。specs/meguru/029 tasks.md T071）。
+ * 最後にアカウントを消した時刻を記録する（Threadsの threads.user_states。specs/meguru/029 tasks.md T071）。
  * @param tx - トランザクション
  * @param userId - 利用者の番号
  * @param now - 消した時刻
@@ -171,7 +171,7 @@ export async function openAccount(
   /** オーナーのときだけ accounts.last_used_at を変える（手伝う人の操作でオーナーの並びを動かさない。specs/008 research.md R11） */
   touchAccount = true,
 ): Promise<boolean> {
-  // 行がなければ作り、あれば条件付きで書き換える（Threadsの threads_user_states。specs/meguru/029 tasks.md T071）。
+  // 行がなければ作り、あれば条件付きで書き換える（Threadsの threads.user_states。specs/meguru/029 tasks.md T071）。
   // 利用者のロックの中で、まだそのアカウントに関わっているときだけ書く（退会の片づけのあとに行を作り直さない。PR #97 のセルフレビュー）
   const values = {
     lastAccountId: accountId,
@@ -257,7 +257,7 @@ export async function renameAccount(env: Env, userId: string, accountId: string,
 
 /**
  * Account を削除する（FR-022、research.md R13）。
- * 1つのトランザクションで利用者のロック（lockThreadsMember）を取り、最後に消した時刻（threads_user_states）を記録してから削除する。
+ * 1つのトランザクションで利用者のロック（lockThreadsMember）を取り、最後に消した時刻（threads.user_states）を記録してから削除する。
  * @param env - Workers のバインディング
  * @param userId - users.id
  * @param accountId - 削除する Account の ID

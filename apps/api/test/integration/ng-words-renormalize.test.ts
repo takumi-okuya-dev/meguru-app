@@ -22,7 +22,7 @@ beforeEach(async () => {
  * @param staleNormalized - 古い正規化の値
  */
 async function insertStale(accountId: string, word: string, staleNormalized: string) {
-  await sql()`INSERT INTO ng_words (account_id, word, normalized) VALUES (${accountId}, ${word}, ${staleNormalized})`;
+  await sql()`INSERT INTO threads.ng_words (account_id, word, normalized) VALUES (${accountId}, ${word}, ${staleNormalized})`;
 }
 
 describe("登録済みのNGワードの normalized が古いとき", () => {
@@ -62,7 +62,7 @@ describe("登録済みのNGワードの normalized が古いとき", () => {
     const added = (await res.json()) as { added: unknown[]; duplicates: string[] };
     expect(added.added).toEqual([]);
     expect(added.duplicates).toEqual(["☀️"]);
-    const rows = (await sql()`SELECT count(*)::int AS n FROM ng_words WHERE account_id = ${accountId}`) as {
+    const rows = (await sql()`SELECT count(*)::int AS n FROM threads.ng_words WHERE account_id = ${accountId}`) as {
       n: number;
     }[];
     expect(rows[0]?.n).toBe(1);

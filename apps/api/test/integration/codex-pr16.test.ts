@@ -172,7 +172,7 @@ describe("P1：読むだけの候補を、件数の上限の前に外す（SQL�
   it("読むだけの投稿が上限より多くても、契約中のアカウントの反応数を取る", async () => {
     const NOON = jst("2030-01-10 12:00");
     const ro = await connectedAccount("ro", app);
-    const roOwner = ((await sqlDb()`SELECT user_id FROM memberships WHERE account_id = ${ro.accountId}`) as [{ user_id: string }])[0].user_id;
+    const roOwner = ((await sqlDb()`SELECT user_id FROM threads.memberships WHERE account_id = ${ro.accountId}`) as [{ user_id: string }])[0].user_id;
     // 定期処理の「今」から10日前の登録で、支払いの失敗（大まかな条件なら入ってしまう）
     await sqlDb()`UPDATE users SET created_at = ${new Date(NOON.getTime() - 10 * 86_400_000).toISOString()} WHERE id = ${roOwner}`;
     await insertSubscription(roOwner, { status: "past_due" });
@@ -181,7 +181,7 @@ describe("P1：読むだけの候補を、件数の上限の前に外す（SQL�
       await publishedDrafts(ro.accountId, Array.from({ length: 35 }, () => ({ publishedAt: new Date(NOON.getTime() - 24 * 3_600_000) })));
     }
     const ok = await connectedAccount("ok", app);
-    const okOwner = ((await sqlDb()`SELECT user_id FROM memberships WHERE account_id = ${ok.accountId}`) as [{ user_id: string }])[0].user_id;
+    const okOwner = ((await sqlDb()`SELECT user_id FROM threads.memberships WHERE account_id = ${ok.accountId}`) as [{ user_id: string }])[0].user_id;
     await setBillingExempt(okOwner, true);
     await publishedDrafts(ok.accountId, [{ publishedAt: new Date(NOON.getTime() - 23.5 * 3_600_000) }]);
     const env = billingEnv();

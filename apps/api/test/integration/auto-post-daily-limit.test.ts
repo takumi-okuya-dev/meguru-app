@@ -31,7 +31,7 @@ describe("1日の投稿数の上限", () => {
     await setSchedule(accountId, { slotMinutes: EIGHT });
     await setUserLimit({ clerkUserId: "u1" }, "daily_posts", 5);
     expect(await runDay(accountId, "2026-11-10")).toEqual([7, 8, 9, 10, 11]);
-    const [row] = (await db()`SELECT slot_minutes FROM posting_schedules WHERE account_id = ${accountId}`) as { slot_minutes: number[] }[];
+    const [row] = (await db()`SELECT slot_minutes FROM threads.posting_schedules WHERE account_id = ${accountId}`) as { slot_minutes: number[] }[];
     expect(row!.slot_minutes).toHaveLength(8);
   });
 

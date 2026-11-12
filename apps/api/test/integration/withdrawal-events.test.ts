@@ -36,13 +36,32 @@ describe("退会の出来事（user.withdrawn）", () => {
     const events = await rows<{ id: string }>(`SELECT id FROM platform_events WHERE type = 'user.withdrawn' AND payload->>'userId' = '${userId}'`);
     expect(events).toHaveLength(1);
     expect(await count("platform_event_deliveries", `event_id = '${events[0]!.id}' AND consumer = 'threads' AND status = 'done'`)).toBe(1);
-    expect(await count("threads_received_events", `event_id = '${events[0]!.id}'`)).toBe(1);
+    expect(await count("threads.received_events", `event_id = '${events[0]!.id}'`)).toBe(1);
     // 持ち主のアカウントが消え、チームは m1 に引き継がれ、利用者の行も消えた
-    expect(await count("accounts", `id = '${o1.accountId}'`)).toBe(0);
-    expect(await count("teams", `id = '${teamId}' AND admin_user_id <> '${userId}'`)).toBe(1);
-    expect(await count("team_members", `user_id = '${userId}'`)).toBe(0);
+    expect(await count("threads.accounts", `id = '${o1.accountId}'`)).toBe(0);
+    expect(await count("threads.teams", `id = '${teamId}' AND admin_user_id <> '${userId}'`)).toBe(1);
+    expect(await count("threads.team_members", `user_id = '${userId}'`)).toBe(0);
     expect(await count("users", `id = '${userId}'`)).toBe(0);
     expect(await count("withdrawn_users", `clerk_user_id = 'o1'`)).toBe(1);
+  });
+
+  it("外部キーで消えていた行を消し、作った人・直した人の欄を空にする（029 の PR3。research.md R3）", async () => {
+    await createUserWithAccount("o1", { name: "A" });
+    const m1 = await createUserWithAccount("m1", { name: "B" });
+    const userId = (await rows<{ id: string }>(`SELECT id FROM users WHERE clerk_user_id = 'o1'`))[0]!.id;
+    // o1 がほかの人（m1）のアカウントで直した記録と、o1 の接続の途中の記録
+    await db().query(`UPDATE threads.accounts SET core_rules_updated_by_user_id = $1 WHERE id = $2`, [userId, m1.accountId]);
+    await db().query(`INSERT INTO threads.posting_schedules (account_id, slot_minutes, updated_by_user_id) VALUES ($1, '{}', $2)`, [m1.accountId, userId]);
+    await db().query(`INSERT INTO threads.token_check_failures (user_id, failed_at, reason) VALUES ($1, now(), 'invalid')`, [userId]);
+    await db().query(`INSERT INTO threads.oauth_states (state_hash, user_id, mode, expires_at) VALUES ('h1', $1, 'new', now() + interval '10 minutes')`, [userId]);
+
+    expect((await withdraw("o1")).status).toBe(204);
+
+    expect(await count("threads.accounts", `id = '${m1.accountId}' AND core_rules_updated_by_user_id IS NULL`)).toBe(1);
+    expect(await count("threads.posting_schedules", `account_id = '${m1.accountId}' AND updated_by_user_id IS NULL`)).toBe(1);
+    expect(await count("threads.token_check_failures", `user_id = '${userId}'`)).toBe(0);
+    expect(await count("threads.oauth_states", `user_id = '${userId}'`)).toBe(0);
+    expect(await count("users", `id = '${userId}'`)).toBe(0);
   });
 
   it("出来事が届くまでは利用者の行を消さず、届いたあとに消す", async () => {
@@ -53,10 +72,10 @@ describe("退会の出来事（user.withdrawn）", () => {
 
     expect(await deleteUserRowIfCleaned(billingEnv(), userId)).toBe(false);
     expect(await count("users", `id = '${userId}'`)).toBe(1);
-    expect(await count("accounts", `id = '${o1.accountId}'`)).toBe(1);
+    expect(await count("threads.accounts", `id = '${o1.accountId}'`)).toBe(1);
 
     expect(await deliverPendingEvents(billingEnv())).toEqual({ delivered: 1, failed: 0 });
-    expect(await count("accounts", `id = '${o1.accountId}'`)).toBe(0);
+    expect(await count("threads.accounts", `id = '${o1.accountId}'`)).toBe(0);
     expect(await deleteUserRowIfCleaned(billingEnv(), userId)).toBe(true);
     expect(await count("users", `id = '${userId}'`)).toBe(0);
   });
@@ -84,8 +103,8 @@ describe("退会の出来事（user.withdrawn）", () => {
     // 届けたことを忘れたことにして、もう一度届ける
     await db().query(`UPDATE platform_event_deliveries SET status = 'pending', next_attempt_at = now() - interval '1 minute' WHERE event_id = $1`, [eventId]);
     expect(await deliverPendingEvents(billingEnv())).toEqual({ delivered: 1, failed: 0 });
-    expect(await count("threads_received_events", `event_id = '${eventId}'`)).toBe(1);
-    expect(await count("accounts", `id = '${other.accountId}'`)).toBe(1);
+    expect(await count("threads.received_events", `event_id = '${eventId}'`)).toBe(1);
+    expect(await count("threads.accounts", `id = '${other.accountId}'`)).toBe(1);
   });
 
   it("届けが失敗で止まっても、日次の続きでやり直し、片づいたら利用者の行を消す（契約は止め直さない）", async () => {
@@ -99,7 +118,7 @@ describe("退会の出来事（user.withdrawn）", () => {
     await resumeWithdrawals(billingEnv(), (id) => fakeClerk.delete(id));
 
     expect(await count("platform_event_deliveries", `event_id = '${eventId}' AND status = 'done'`)).toBe(1);
-    expect(await count("accounts", `id = '${o1.accountId}'`)).toBe(0);
+    expect(await count("threads.accounts", `id = '${o1.accountId}'`)).toBe(0);
     expect(await count("users", `id = '${userId}'`)).toBe(0);
     // 出来事は書き足していない（1つのまま）
     expect(await count("platform_events", `type = 'user.withdrawn'`)).toBe(1);

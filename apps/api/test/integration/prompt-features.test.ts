@@ -67,7 +67,7 @@ async function fillMaterials(accountId: string) {
 async function poorPost(accountId: string) {
   const [d] = await publishedDrafts(accountId, [{ body: "低調だった投稿", publishedAt: new Date(Date.now() - 200 * 3600_000) }]);
   await confirmedMetrics(accountId, d!.id, 10);
-  await db()`UPDATE post_metrics SET judgment = 'poor', judgment_ratio = 0.2, judgment_baseline = 50 WHERE draft_id = ${d!.id}`;
+  await db()`UPDATE threads.post_metrics SET judgment = 'poor', judgment_ratio = 0.2, judgment_baseline = 50 WHERE draft_id = ${d!.id}`;
 }
 
 const STRATEGY_HEADINGS = ["■アカウントの戦略設計", "■活動の目的・在り方", "■現在のプロフィールと固定投稿", "■今回組み込む宣伝内容", "■リサーチで見つけた"];

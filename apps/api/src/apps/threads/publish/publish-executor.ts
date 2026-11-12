@@ -227,7 +227,7 @@ class AttemptContext {
         and(
           eq(postDrafts.id, this.draft.id),
           eq(postDrafts.status, "publishing"),
-          sql`EXISTS (SELECT 1 FROM publish_attempts pa WHERE pa.id = ${this.attempt.id} AND pa.lease_token = ${this.leaseToken})`,
+          sql`EXISTS (SELECT 1 FROM threads.publish_attempts pa WHERE pa.id = ${this.attempt.id} AND pa.lease_token = ${this.leaseToken})`,
         ),
       );
   }

@@ -38,7 +38,7 @@ it.each(["auth", "transient"] as const)(
     await fake.publishFail("publish", "transient", 1);
     await run(now);
     const [attempt] = await attempts(accountId);
-    await db()`UPDATE publish_attempts SET publish_requested_at = NULL WHERE id = ${attempt!.id as string}`;
+    await db()`UPDATE threads.publish_attempts SET publish_requested_at = NULL WHERE id = ${attempt!.id as string}`;
     await fake.publishFail("containerStatus", kind, 1);
     await run(addMin(now, 5));
     expect(await draftRow(id!)).toMatchObject({ status: "publishing" });
@@ -53,9 +53,9 @@ it("直近24時間で250件ならその時刻を飛ばすが止めず、24時間
   // 12:00 と 21:30（日本時間）。250件は前日21:00（日本時間）なので、21:30には24時間の外になる
   await setSchedule(accountId, { slotMinutes: [720, 1290] });
   await db()`WITH batches AS (
-    INSERT INTO draft_batches (account_id, client_request_id, draft_count, delimiter_found)
+    INSERT INTO threads.draft_batches (account_id, client_request_id, draft_count, delimiter_found)
     SELECT ${accountId}, gen_random_uuid(), 50, true FROM generate_series(1, 5) RETURNING id
-  ) INSERT INTO post_drafts (account_id, batch_id, position, body, status, reviewed_at, published_at)
+  ) INSERT INTO threads.post_drafts (account_id, batch_id, position, body, status, reviewed_at, published_at)
   SELECT ${accountId}, b.id, g, '公開済み', 'published', now(), '2030-01-09T12:00:00Z' FROM batches b CROSS JOIN generate_series(0, 49) g`;
   await run(jst("2030-01-10 12:00"));
   expect(await attempts(accountId)).toMatchObject([
@@ -64,7 +64,7 @@ it("直近24時間で250件ならその時刻を飛ばすが止めず、24時間
   expect(await draftRow(id!)).toMatchObject({ status: "approved" });
   // 自分の記録で数えた上限では、翌日0時まで止めない（contracts/auto-post-job.md 手順3）
   expect(
-    await db()`SELECT paused_until FROM posting_schedules WHERE account_id = ${accountId}`,
+    await db()`SELECT paused_until FROM threads.posting_schedules WHERE account_id = ${accountId}`,
   ).toMatchObject([{ paused_until: null }]);
   expect(await fake.posts()).toHaveLength(0);
   await run(jst("2030-01-10 21:30"));
@@ -113,9 +113,9 @@ it("US2：要確認が500件でも、直前のチェックで安全に差し戻�
   const [id] = await approvedDrafts(accountId, ["あ".repeat(501)]);
   await setSchedule(accountId, { slotMinutes: [720] });
   await db()`WITH batches AS (
-    INSERT INTO draft_batches (account_id, client_request_id, draft_count, delimiter_found)
+    INSERT INTO threads.draft_batches (account_id, client_request_id, draft_count, delimiter_found)
     SELECT ${accountId}, gen_random_uuid(), 50, true FROM generate_series(1, 10) RETURNING id
-  ) INSERT INTO post_drafts (account_id, batch_id, position, body)
+  ) INSERT INTO threads.post_drafts (account_id, batch_id, position, body)
   SELECT ${accountId}, b.id, g, '未確認' FROM batches b CROSS JOIN generate_series(0, 49) g`;
   await run(jst("2030-01-10 12:00"));
   expect(await draftRow(id!)).toMatchObject({
@@ -123,7 +123,7 @@ it("US2：要確認が500件でも、直前のチェックで安全に差し戻�
     blocked_reason: "over_threads_limit",
   });
   expect(
-    await db()`SELECT count(*)::int AS n FROM post_drafts WHERE account_id = ${accountId} AND status = 'needs_review'`,
+    await db()`SELECT count(*)::int AS n FROM threads.post_drafts WHERE account_id = ${accountId} AND status = 'needs_review'`,
   ).toMatchObject([{ n: 501 }]);
   expect(await fake.posts()).toHaveLength(0);
 });
@@ -138,7 +138,7 @@ describe("PR #6 のCodexレビュー", () => {
     await run(now);
     expect(await attempts(accountId)).toMatchObject([{ state: "retry_wait" }]);
     // トークンは残っていて復号できるが、接続は要再接続
-    await db()`UPDATE accounts SET connection_status = 'needs_reconnect' WHERE id = ${accountId}`;
+    await db()`UPDATE threads.accounts SET connection_status = 'needs_reconnect' WHERE id = ${accountId}`;
     await run(addMin(now, 5));
     expect(await attempts(accountId)).toMatchObject([
       { state: "skipped", skip_reason: "needs_reconnect", draft_id: null },
@@ -158,7 +158,7 @@ describe("PR #6 のCodexレビュー", () => {
     await fake.dropPublishResponse(1);
     await run(now);
     expect(await draftRow(id!)).toMatchObject({ status: "publishing" });
-    await db()`UPDATE accounts SET connection_status = 'needs_reconnect' WHERE id = ${accountId}`;
+    await db()`UPDATE threads.accounts SET connection_status = 'needs_reconnect' WHERE id = ${accountId}`;
     await run(addMin(now, 5));
     expect(await draftRow(id!)).toMatchObject({ status: "published" });
     expect(await fake.posts()).toHaveLength(1);
@@ -231,7 +231,7 @@ describe("PR #6 のCodexレビュー", () => {
     // 23:56 の回が遅れ、上限の応答を受けたのは翌日の 0:01（日本時間）
     await run(jst("2030-01-10 23:56"), { clock: () => jst("2030-01-11 00:01") });
     const [schedule] =
-      await db()`SELECT paused_until FROM posting_schedules WHERE account_id = ${accountId}`;
+      await db()`SELECT paused_until FROM threads.posting_schedules WHERE account_id = ${accountId}`;
     expect(new Date(schedule!.paused_until as string).toISOString()).toBe(
       jst("2030-01-12 00:00").toISOString(),
     );
@@ -243,9 +243,9 @@ describe("PR #6 のCodexレビュー", () => {
     const [bad1, bad2, good] = await approvedDrafts(accountId, ["取れない1", "取れない2", "取れる"]);
     const mediaId = await fake.addPost(threadsUserId, "取れる", addMin(now, -120));
     // 取れない2件のほうが新しい（並び順だけでは、毎回この2件が選ばれる）
-    await db()`UPDATE post_drafts SET status = 'published', prioritized_at = NULL, published_at = ${addMin(now, -30).toISOString()},
+    await db()`UPDATE threads.post_drafts SET status = 'published', prioritized_at = NULL, published_at = ${addMin(now, -30).toISOString()},
       threads_media_id = 'missing-' || id WHERE id IN (${bad1!}, ${bad2!})`;
-    await db()`UPDATE post_drafts SET status = 'published', prioritized_at = NULL, published_at = ${addMin(now, -120).toISOString()},
+    await db()`UPDATE threads.post_drafts SET status = 'published', prioritized_at = NULL, published_at = ${addMin(now, -120).toISOString()},
       threads_media_id = ${mediaId} WHERE id = ${good!}`;
     await run(now);
     expect(await draftRow(good!)).toMatchObject({ threads_permalink: null });
@@ -264,8 +264,8 @@ describe("PR #6 のCodexレビュー", () => {
     await run(now);
     expect(await attempts(accountId)).toMatchObject([{ state: "retry_wait", retry_count: 1 }]);
     // 連携の取り消し（revokeConnection）と同じく、接続の行を消して要再接続にする
-    await db()`DELETE FROM threads_connections WHERE account_id = ${accountId}`;
-    await db()`UPDATE accounts SET connection_status = 'needs_reconnect' WHERE id = ${accountId}`;
+    await db()`DELETE FROM threads.threads_connections WHERE account_id = ${accountId}`;
+    await db()`UPDATE threads.accounts SET connection_status = 'needs_reconnect' WHERE id = ${accountId}`;
     await run(addMin(now, 5));
     expect(await attempts(accountId)).toMatchObject([
       { state: "skipped", skip_reason: "needs_reconnect", draft_id: null },
@@ -278,13 +278,13 @@ describe("PR #6 のCodexレビュー", () => {
     const stuck = await connectedAccount("u1");
     const drafts = await approvedDrafts(stuck.accountId, ["a", "b", "c", "d"]);
     for (const [i, draftId] of drafts.entries()) {
-      await db()`UPDATE post_drafts SET status = 'publishing', prioritized_at = NULL WHERE id = ${draftId}`;
+      await db()`UPDATE threads.post_drafts SET status = 'publishing', prioritized_at = NULL WHERE id = ${draftId}`;
       // 4時間前に公開を送ったが、結果を確かめられないまま（接続の行が消えている）
-      await db()`INSERT INTO publish_attempts (account_id, slot_at, slot_date, slot_minute, state, draft_id, container_id, publish_requested_at, created_at)
+      await db()`INSERT INTO threads.publish_attempts (account_id, slot_at, slot_date, slot_minute, state, draft_id, container_id, publish_requested_at, created_at)
         VALUES (${stuck.accountId}, ${addMin(now, -240 - i).toISOString()}, '2030-01-10', ${480 - i}, 'in_progress', ${draftId}, ${`c${i}`},
           ${addMin(now, -240).toISOString()}, ${addMin(now, -240).toISOString()})`;
     }
-    await db()`DELETE FROM threads_connections WHERE account_id = ${stuck.accountId}`;
+    await db()`DELETE FROM threads.threads_connections WHERE account_id = ${stuck.accountId}`;
     const other = await connectedAccount("u2");
     const [otherDraft] = await approvedDrafts(other.accountId, ["ほかのAccount"]);
     await setSchedule(other.accountId, { slotMinutes: [720] });
@@ -309,8 +309,8 @@ describe("PR #6 のCodexレビュー", () => {
     await run(now);
     expect(await attempts(accountId)).toMatchObject([{ state: "retry_wait" }]);
     // 連携の取り消し → 次の回より前に再接続
-    await db()`DELETE FROM threads_connections WHERE account_id = ${accountId}`;
-    await db()`UPDATE accounts SET connection_status = 'needs_reconnect' WHERE id = ${accountId}`;
+    await db()`DELETE FROM threads.threads_connections WHERE account_id = ${accountId}`;
+    await db()`UPDATE threads.accounts SET connection_status = 'needs_reconnect' WHERE id = ${accountId}`;
     const res = await call(app, "POST", "/api/threads/connect", {
       user: "u1",
       body: { mode: "reconnect", accountId },
@@ -331,9 +331,9 @@ describe("PR #6 のCodexレビュー", () => {
     const now = jst("2030-01-10 12:00");
     const { accountId } = await connectedAccount("u1");
     const [id] = await approvedDrafts(accountId, ["古い処理"]);
-    await db()`UPDATE post_drafts SET status = 'publishing', prioritized_at = NULL WHERE id = ${id!}`;
+    await db()`UPDATE threads.post_drafts SET status = 'publishing', prioritized_at = NULL WHERE id = ${id!}`;
     const token = crypto.randomUUID();
-    const [attempt] = await db()`INSERT INTO publish_attempts (account_id, slot_at, slot_date, slot_minute, state, draft_id, lease_until, lease_token)
+    const [attempt] = await db()`INSERT INTO threads.publish_attempts (account_id, slot_at, slot_date, slot_minute, state, draft_id, lease_until, lease_token)
       VALUES (${accountId}, ${now.toISOString()}, '2030-01-10', 720, 'in_progress', ${id!}, ${addMin(now, 2).toISOString()}, ${token}) RETURNING id`;
     const attemptId = attempt!.id as string;
     const real = createThreadsClient(testEnv);
@@ -342,7 +342,7 @@ describe("PR #6 のCodexレビュー", () => {
       ...real,
       createTextContainer: async (...args: Parameters<typeof real.createTextContainer>) => {
         const r = await real.createTextContainer(...args);
-        await db()`UPDATE publish_attempts SET lease_token = gen_random_uuid() WHERE id = ${attemptId}`;
+        await db()`UPDATE threads.publish_attempts SET lease_token = gen_random_uuid() WHERE id = ${attemptId}`;
         return r;
       },
     };
@@ -364,15 +364,15 @@ describe("PR #6 のCodexレビュー", () => {
     const now = jst("2030-01-10 12:00");
     const { accountId } = await connectedAccount("u1");
     const [id] = await approvedDrafts(accountId, ["記録の後の再接続"]);
-    await db()`UPDATE post_drafts SET status = 'publishing', prioritized_at = NULL WHERE id = ${id!}`;
+    await db()`UPDATE threads.post_drafts SET status = 'publishing', prioritized_at = NULL WHERE id = ${id!}`;
     const real = createThreadsClient(testEnv);
     const { containerId } = await real.createTextContainer(
       (await fake.issuedTokens()).at(-1)!,
-      (await db()`SELECT threads_user_id FROM accounts WHERE id = ${accountId}`)[0]!.threads_user_id as string,
+      (await db()`SELECT threads_user_id FROM threads.accounts WHERE id = ${accountId}`)[0]!.threads_user_id as string,
       "記録の後の再接続",
     );
     const token = crypto.randomUUID();
-    const [attempt] = await db()`INSERT INTO publish_attempts (account_id, slot_at, slot_date, slot_minute, state, draft_id, container_id, lease_until, lease_token, created_at)
+    const [attempt] = await db()`INSERT INTO threads.publish_attempts (account_id, slot_at, slot_date, slot_minute, state, draft_id, container_id, lease_until, lease_token, created_at)
       VALUES (${accountId}, ${now.toISOString()}, '2030-01-10', 720, 'in_progress', ${id!}, ${containerId}, ${addMin(now, 2).toISOString()}, ${token}, ${now.toISOString()}) RETURNING id`;
     // コンテナーの状態を確かめた後、公開を送るまでの間に再接続がコミットされた（世代番号が増えた）。
     // 再接続の callback に入った時刻（authorized_at）は、試みを作るより前のまま
@@ -380,8 +380,8 @@ describe("PR #6 のCodexレビュー", () => {
       ...real,
       getContainerStatus: async (...args: Parameters<typeof real.getContainerStatus>) => {
         const r = await real.getContainerStatus(...args);
-        await db()`UPDATE accounts SET connection_generation = connection_generation + 1 WHERE id = ${accountId}`;
-        await db()`UPDATE threads_connections SET authorized_at = ${addMin(now, -1).toISOString()} WHERE account_id = ${accountId}`;
+        await db()`UPDATE threads.accounts SET connection_generation = connection_generation + 1 WHERE id = ${accountId}`;
+        await db()`UPDATE threads.threads_connections SET authorized_at = ${addMin(now, -1).toISOString()} WHERE account_id = ${accountId}`;
         return r;
       },
     };
@@ -397,9 +397,9 @@ describe("PR #6 のCodexレビュー", () => {
   /** 前の時刻で持ち越した下書きを作る（carried_over の試みを参照する）。 */
   async function carriedDraft(accountId: string, body: string) {
     const [id] = await approvedDrafts(accountId, [body]);
-    const [carried] = await db()`INSERT INTO publish_attempts (account_id, slot_at, slot_date, slot_minute, state, last_error, retry_count)
+    const [carried] = await db()`INSERT INTO threads.publish_attempts (account_id, slot_at, slot_date, slot_minute, state, last_error, retry_count)
       VALUES (${accountId}, ${jst("2030-01-10 07:30").toISOString()}, '2030-01-10', 450, 'carried_over', 'threads_server', 3) RETURNING id`;
-    await db()`UPDATE post_drafts SET carryover_attempt_id = ${carried!.id as string} WHERE id = ${id!}`;
+    await db()`UPDATE threads.post_drafts SET carryover_attempt_id = ${carried!.id as string} WHERE id = ${id!}`;
     return id!;
   }
 
@@ -427,7 +427,7 @@ describe("PR #6 のCodexレビュー", () => {
       state: "retry_wait",
       is_carryover: true,
     });
-    await db()`UPDATE accounts SET connection_status = 'needs_reconnect' WHERE id = ${accountId}`;
+    await db()`UPDATE threads.accounts SET connection_status = 'needs_reconnect' WHERE id = ${accountId}`;
     const res = await call(app, "POST", "/api/threads/connect", {
       user: "u1",
       body: { mode: "reconnect", accountId },

@@ -223,7 +223,7 @@ describe("作る・保存", () => {
     const { accountId } = await createUserWithAccount("u1");
     const p = await promotion(accountId);
     const before = (
-      await sql()`SELECT title, content, event FROM promotions WHERE id = ${p.id}`
+      await sql()`SELECT title, content, event FROM threads.promotions WHERE id = ${p.id}`
     )[0];
     const d = await json<ListingDetail>(await generate(accountId, p.id));
     await json(
@@ -233,7 +233,7 @@ describe("作る・保存", () => {
       }),
     );
     expect(
-      (await sql()`SELECT title, content, event FROM promotions WHERE id = ${p.id}`)[0],
+      (await sql()`SELECT title, content, event FROM threads.promotions WHERE id = ${p.id}`)[0],
     ).toEqual(before);
     await json(
       await call(app, "PUT", `${base(accountId)}/promotions/${p.id}`, {
@@ -300,7 +300,7 @@ describe("状況と掲載URL（US4）", () => {
     expect(
       (await call(app, "DELETE", `${base(accountId)}/promotions/${p.id}`, { user: "u1" })).status,
     ).toBe(204);
-    expect(await sql()`SELECT 1 FROM promotion_listings`).toEqual([]);
+    expect(await sql()`SELECT 1 FROM threads.promotion_listings`).toEqual([]);
   });
 });
 

@@ -82,7 +82,7 @@ describe("POST /ng-words（FR-014・FR-016a）", () => {
   it("既存199語に2語を足すと 409 ITEM_LIMIT_REACHED で、何も足さない", async () => {
     const { accountId } = await createUserWithAccount("u1");
     const sql = neon(testEnv.DATABASE_URL);
-    await sql`INSERT INTO ng_words (account_id, word, normalized)
+    await sql`INSERT INTO threads.ng_words (account_id, word, normalized)
       SELECT ${accountId}, 'w' || g, 'w' || g FROM generate_series(1, 199) AS g`;
     const res = await addWords(accountId, ["新しい1", "新しい2"]);
     expect(res.status).toBe(409);
@@ -121,11 +121,11 @@ describe("POST /ng-words（FR-014・FR-016a）", () => {
     const sql = neon(testEnv.DATABASE_URL);
     // 1回ごとに登録・承認・追加の3リクエストを送る。CIでは1リクエスト1〜3秒かかるので、回数を抑えて時間の上限を延ばす
     for (let i = 0; i < 8; i++) {
-      await sql`DELETE FROM ng_words WHERE account_id = ${accountId}`;
+      await sql`DELETE FROM threads.ng_words WHERE account_id = ${accountId}`;
       const [d] = await register(accountId, [`絶対に伸びる ${i}`]);
       await Promise.all([approve(accountId, d!), addWords(accountId, ["絶対"])]);
       const [r] = (await sql`
-        SELECT count(*)::int AS n FROM post_drafts
+        SELECT count(*)::int AS n FROM threads.post_drafts
         WHERE account_id = ${accountId} AND status = 'approved' AND body LIKE '%絶対%'`) as [{ n: number }];
       expect(r.n).toBe(0);
     }
@@ -139,10 +139,10 @@ describe("POST /ng-words（FR-014・FR-016a）", () => {
     for (let done = 0; done < 500; done += 49) {
       const size = Math.min(49, 500 - done);
       const [b] = (await sql`
-        INSERT INTO draft_batches (account_id, client_request_id, draft_count, delimiter_found)
+        INSERT INTO threads.draft_batches (account_id, client_request_id, draft_count, delimiter_found)
         VALUES (${accountId}, gen_random_uuid(), ${size}, true) RETURNING id`) as [{ id: string }];
       await sql`
-        INSERT INTO post_drafts (account_id, batch_id, position, body)
+        INSERT INTO threads.post_drafts (account_id, batch_id, position, body)
         SELECT ${accountId}, ${b.id}, g, 'seed ' || g FROM generate_series(0, ${size - 1}) AS g`;
     }
     const res = await addWords(accountId, ["絶対"]);

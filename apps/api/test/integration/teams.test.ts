@@ -157,11 +157,11 @@ describe("PATCH・DELETE /api/teams/:teamId（FR-017）", () => {
     expect((await call(app, "DELETE", `/api/teams/${teamId}`, { user: "o1" })).status).toBe(403);
     expect((await call(app, "DELETE", `/api/teams/${teamId}`, { user: "a1" })).status).toBe(204);
     const counts = (await sql()`SELECT
-      (SELECT count(*)::int FROM teams) AS teams,
-      (SELECT count(*)::int FROM team_members) AS members,
-      (SELECT count(*)::int FROM team_accounts) AS accounts,
-      (SELECT count(*)::int FROM memberships WHERE role = 'editor') AS assigned,
-      (SELECT count(*)::int FROM post_drafts) AS drafts`) as Record<string, number>[];
+      (SELECT count(*)::int FROM threads.teams) AS teams,
+      (SELECT count(*)::int FROM threads.team_members) AS members,
+      (SELECT count(*)::int FROM threads.team_accounts) AS accounts,
+      (SELECT count(*)::int FROM threads.memberships WHERE role = 'editor') AS assigned,
+      (SELECT count(*)::int FROM threads.post_drafts) AS drafts`) as Record<string, number>[];
     expect(counts[0]).toEqual({ teams: 0, members: 0, accounts: 0, assigned: 0, drafts: 1 });
     expect((await activityRows(accountId)).map((r) => r.action)).toEqual(["team_deleted", "drafts_registered"]);
     // 担当だった人は、もう開けない
@@ -195,12 +195,12 @@ describe("招待リンク（FR-011・FR-016）", () => {
     );
     const { url } = await json<{ url: string }>(await call(app, "GET", `/api/teams/${teamId}/invite`, { user: "a1" }));
     const token = url.split("/invite/")[1]!;
-    const rows = (await sql()`SELECT invite_token_hash AS h, encode(invite_token_ciphertext, 'escape') AS c FROM teams`) as {
+    const rows = (await sql()`SELECT invite_token_hash AS h, encode(invite_token_ciphertext, 'escape') AS c FROM threads.teams`) as {
       h: string;
       c: string;
     }[];
     expect(rows[0]!.h).toMatch(/^[0-9a-f]{64}$/);
     expect(rows[0]!.c).not.toContain(token);
-    expect(JSON.stringify(await sql()`SELECT * FROM teams`)).not.toContain(token);
+    expect(JSON.stringify(await sql()`SELECT * FROM threads.teams`)).not.toContain(token);
   });
 });

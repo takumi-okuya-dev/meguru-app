@@ -35,7 +35,7 @@ export async function resetOperatorSettings() {
   await q()`UPDATE operator_settings SET default_account_limit = 3, default_daily_post_limit = 10, tester_slot_capacity = 25`;
   await q()`INSERT INTO app_limit_defaults (app, key, value) VALUES ('threads', 'accounts', 3), ('threads', 'daily_posts', 10)
     ON CONFLICT (app, key) DO UPDATE SET value = EXCLUDED.value`;
-  await q()`INSERT INTO threads_settings (id, tester_slot_capacity) VALUES (1, 25) ON CONFLICT (id) DO UPDATE SET tester_slot_capacity = 25`;
+  await q()`INSERT INTO threads.settings (id, tester_slot_capacity) VALUES (1, 25) ON CONFLICT (id) DO UPDATE SET tester_slot_capacity = 25`;
 }
 
 /**
@@ -65,7 +65,7 @@ export function applyFor(app: TestApp, user: string, accountId: string, threadsU
  * @returns 行（なければ undefined）
  */
 export async function applicationRow(id: string) {
-  const rows = (await q()`SELECT * FROM tester_applications WHERE id = ${id}`) as Record<string, unknown>[];
+  const rows = (await q()`SELECT * FROM threads.tester_applications WHERE id = ${id}`) as Record<string, unknown>[];
   return rows[0];
 }
 
@@ -75,7 +75,7 @@ export async function applicationRow(id: string) {
  * @returns 行
  */
 export async function applicationsOf(accountId: string) {
-  return (await q()`SELECT * FROM tester_applications WHERE account_id = ${accountId} ORDER BY created_at DESC`) as Record<string, unknown>[];
+  return (await q()`SELECT * FROM threads.tester_applications WHERE account_id = ${accountId} ORDER BY created_at DESC`) as Record<string, unknown>[];
 }
 
 /**
@@ -83,7 +83,7 @@ export async function applicationsOf(accountId: string) {
  * @param id - tester_applications.id
  */
 export async function markInvited(id: string) {
-  await q()`UPDATE tester_applications SET status = 'invited', holds_slot = true, status_changed_at = now() WHERE id = ${id}`;
+  await q()`UPDATE threads.tester_applications SET status = 'invited', holds_slot = true, status_changed_at = now() WHERE id = ${id}`;
 }
 
 /**

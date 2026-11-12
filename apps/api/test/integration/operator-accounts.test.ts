@@ -43,7 +43,7 @@ async function accountOf(
   const connected = method !== null;
   const createdAt = (opts.createdAt ?? new Date(Date.UTC(2026, 10, 1) + seq * 60_000)).toISOString();
   const [a] = (await q()`
-    INSERT INTO accounts (name, threads_user_id, username, connection_method, connection_status, created_at, updated_at)
+    INSERT INTO threads.accounts (name, threads_user_id, username, connection_method, connection_status, created_at, updated_at)
     VALUES (
       ${opts.name ?? `店${seq}`},
       ${connected ? `tu_${seq}` : null},
@@ -54,7 +54,7 @@ async function accountOf(
       ${createdAt}
     )
     RETURNING id`) as [{ id: string }];
-  await q()`INSERT INTO memberships (user_id, account_id, role) VALUES (${userId}, ${a.id}, 'owner')`;
+  await q()`INSERT INTO threads.memberships (user_id, account_id, role) VALUES (${userId}, ${a.id}, 'owner')`;
   return a.id;
 }
 
@@ -64,7 +64,7 @@ async function accountOf(
  */
 async function applicationOf(accountId: string, values: { status: string; holdsSlot?: boolean; removalReason?: string | null }) {
   await q()`
-    INSERT INTO tester_applications (account_id, threads_username, status, holds_slot, removal_reason)
+    INSERT INTO threads.tester_applications (account_id, threads_username, status, holds_slot, removal_reason)
     VALUES (${accountId}, ${`app_${++seq}`}, ${values.status}, ${values.holdsSlot ?? false}, ${values.removalReason ?? null})`;
 }
 
@@ -140,7 +140,7 @@ describe("GET /api/operator/accounts：行（US1）", () => {
     expect(first.items[0]!.id).toBe(ids[51]);
     expect(first.nextCursor).toMatch(new RegExp(`_${ids[2]}$`));
     // 境目のアカウントが消えても、続きは残りの2件だけ（先頭から返し直さない）
-    await q()`DELETE FROM accounts WHERE id = ${ids[2]!}`;
+    await q()`DELETE FROM threads.accounts WHERE id = ${ids[2]!}`;
     const second = await list(`?cursor=${encodeURIComponent(first.nextCursor!)}`);
     expect(second.items.map((i) => i.id)).toEqual([ids[1], ids[0]]);
     expect(second.nextCursor).toBeNull();
@@ -148,7 +148,7 @@ describe("GET /api/operator/accounts：行（US1）", () => {
 
   it("作った日時がマイクロ秒だけ違っても、続きで行を落とさない", async () => {
     await q()`
-      INSERT INTO accounts (name, connection_status, connection_method, created_at, updated_at)
+      INSERT INTO threads.accounts (name, connection_status, connection_method, created_at, updated_at)
       VALUES ('a', 'not_connected', NULL, '2026-10-01 00:00:00.000001+00', now()), ('b', 'not_connected', NULL, '2026-10-01 00:00:00.000002+00', now())`;
     // 印の日時と同じ b は ID で比べ、1マイクロ秒前の a も落とさない
     const cursor = "2026-10-01T00:00:00.000002Z_ffffffff-ffff-4fff-bfff-ffffffffffff";

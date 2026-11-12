@@ -21,7 +21,7 @@ async function runOn(now: Date) {
 }
 
 async function ownerIdOf(accountId: string) {
-  const [r] = (await db()`SELECT user_id FROM memberships WHERE account_id = ${accountId} AND role = 'owner'`) as [{ user_id: string }];
+  const [r] = (await db()`SELECT user_id FROM threads.memberships WHERE account_id = ${accountId} AND role = 'owner'`) as [{ user_id: string }];
   return r.user_id;
 }
 
@@ -65,7 +65,7 @@ describe("オーナーが読むだけ", () => {
     expect(first!.state).toBe("retry_wait");
     // 支払いが失敗して読むだけになる
     await insertSubscription(owner, { status: "past_due" });
-    await db()`UPDATE publish_attempts SET next_retry_at = now() - interval '1 minute' WHERE id = ${first!.id as string}`;
+    await db()`UPDATE threads.publish_attempts SET next_retry_at = now() - interval '1 minute' WHERE id = ${first!.id as string}`;
     await runOn(addMin(NOON, 10));
     const [after] = await attempts(accountId);
     expect(after).toMatchObject({ state: "skipped", skip_reason: "billing_inactive" });

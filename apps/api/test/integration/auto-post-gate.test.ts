@@ -102,7 +102,7 @@ describe("関所（DBに触れずに終える）", () => {
     // トークンの追加は autopost:wake を書く
     expect(await KV().get("autopost:wake")).not.toBeNull();
     const at = addMin(NOON, 30);
-    await neon(testEnv.DATABASE_URL)`UPDATE threads_connections SET recheck_at = ${at.toISOString()}`;
+    await neon(testEnv.DATABASE_URL)`UPDATE threads.threads_connections SET recheck_at = ${at.toISOString()}`;
     // 試験の時刻（2030年）に合わせて、知らせの時刻を入れ直す
     await KV().put("autopost:wake", JSON.stringify({ at: addMin(NOON, 1).toISOString() }));
     await runAutoPost(testEnv, addMin(NOON, 5));

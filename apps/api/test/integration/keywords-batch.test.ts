@@ -16,7 +16,7 @@ type ErrorBody = { error: { code: string; details?: unknown; remaining?: number 
 
 async function keywords(accountId: string) {
   const rows = (await neon(testEnv.DATABASE_URL)`
-    SELECT keyword, purpose FROM research_keywords WHERE account_id = ${accountId} ORDER BY keyword`) as {
+    SELECT keyword, purpose FROM threads.research_keywords WHERE account_id = ${accountId} ORDER BY keyword`) as {
     keyword: string;
     purpose: string | null;
   }[];
@@ -25,7 +25,7 @@ async function keywords(accountId: string) {
 
 async function fill(accountId: string, n: number) {
   await neon(testEnv.DATABASE_URL)`
-    INSERT INTO research_keywords (account_id, keyword, keyword_normalized)
+    INSERT INTO threads.research_keywords (account_id, keyword, keyword_normalized)
     SELECT ${accountId}, 'k' || g, 'k' || g FROM generate_series(1, ${n}) g`;
 }
 
@@ -33,7 +33,7 @@ describe("GET /research-keywords/idea-prompt", () => {
   it("課題の入力のあるものと、出す形が入る", async () => {
     const { accountId } = await createUserWithAccount("u1");
     await neon(testEnv.DATABASE_URL)`
-      INSERT INTO strategy_designs (account_id, target_persona) VALUES (${accountId}, '上京したばかりの20代')`;
+      INSERT INTO threads.strategy_designs (account_id, target_persona) VALUES (${accountId}, '上京したばかりの20代')`;
     const res = await call(app, "GET", `${base(accountId)}/idea-prompt`, { user: "u1" });
     expect(res.status).toBe(200);
     const { prompt } = (await res.json()) as { prompt: string };

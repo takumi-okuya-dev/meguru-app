@@ -80,7 +80,7 @@ describe("POST /api/invites/:token/accept（参加）", () => {
       { user: "a1", role: "admin" },
       { user: "u1", role: "member" },
     ]);
-    const rows = (await sql()`SELECT account_id, shared FROM team_accounts WHERE team_id = ${teamId} AND account_id IN (${a}, ${b})`) as {
+    const rows = (await sql()`SELECT account_id, shared FROM threads.team_accounts WHERE team_id = ${teamId} AND account_id IN (${a}, ${b})`) as {
       account_id: string;
       shared: boolean;
     }[];
@@ -108,7 +108,7 @@ describe("POST /api/invites/:token/accept（参加）", () => {
     });
     expect([notMine.status, (await errorOf(notMine)).code]).toEqual([404, "ACCOUNT_NOT_FOUND"]);
     // 失敗した参加では、何も入らない
-    expect((await sql()`SELECT count(*)::int AS n FROM team_accounts WHERE account_id = ${free}`) as { n: number }[]).toEqual([{ n: 0 }]);
+    expect((await sql()`SELECT count(*)::int AS n FROM threads.team_accounts WHERE account_id = ${free}`) as { n: number }[]).toEqual([{ n: 0 }]);
   });
 
   it("すでにチームの人は INVITE_ALREADY_MEMBER。同じ人の同時の参加でも1回だけ入る", async () => {

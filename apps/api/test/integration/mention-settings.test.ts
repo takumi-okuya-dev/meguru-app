@@ -97,7 +97,7 @@ describe("設定（T009）", () => {
     const added = await json<MentionSettings>(await addPerson(accountId, " @Minato_Place ", "港の運営", true), 201);
     expect(added.people).toMatchObject([{ username: "minato_place", label: "港の運営", always: true, pendingCount: 0 }]);
     for (const u of ["あいう", "minato_place"]) expect((await addPerson(accountId, u)).status).toBe(400);
-    const [acc] = (await sql()`SELECT username FROM accounts WHERE id = ${accountId}`) as [{ username: string }];
+    const [acc] = (await sql()`SELECT username FROM threads.accounts WHERE id = ${accountId}`) as [{ username: string }];
     expect((await addPerson(accountId, acc.username)).status).toBe(400);
     for (let i = 0; i < 19; i++) await addPerson(accountId, `p${i}`);
     const over = await addPerson(accountId, "p99");
@@ -120,7 +120,7 @@ describe("設定（T009）", () => {
       await draftOf(accountId, "published"),
     ];
     const ins = (draftId: string, usernames: string[], text: string, sendAfter: string | null = null) =>
-      sql()`INSERT INTO post_mentions (draft_id, account_id, usernames, text, delay_minutes, send_after)
+      sql()`INSERT INTO threads.post_mentions (draft_id, account_id, usernames, text, delay_minutes, send_after)
         VALUES (${draftId}, ${accountId}, ${usernames}, ${text}, ${sendAfter ? null : 30}, ${sendAfter})`;
     await ins(review, ["a", "b"], "シェアを\n@a @b");
     await ins(approved, ["a", "b"], "シェアを\n@a @b");
@@ -129,8 +129,8 @@ describe("設定（T009）", () => {
     const listed = await json<MentionSettings>(await call(app, "GET", `${base(accountId)}/mention-settings`, { user: "u1" }));
     expect(listed.people.find((p) => p.username === "a")!.pendingCount).toBe(4);
     await json(await call(app, "DELETE", `${base(accountId)}/mention-people/${s.people[0]!.id}`, { user: "u1" }));
-    const rows = (await sql()`SELECT m.draft_id, m.usernames, m.text, m.state, d.status FROM post_mentions m
-      JOIN post_drafts d ON d.id = m.draft_id`) as { draft_id: string; usernames: string[]; text: string; state: string; status: string }[];
+    const rows = (await sql()`SELECT m.draft_id, m.usernames, m.text, m.state, d.status FROM threads.post_mentions m
+      JOIN threads.post_drafts d ON d.id = m.draft_id`) as { draft_id: string; usernames: string[]; text: string; state: string; status: string }[];
     const by = new Map(rows.map((r) => [r.draft_id, r]));
     expect(by.get(review)).toMatchObject({ usernames: ["b"], text: "シェアを\n@b", state: "pending", status: "needs_review" });
     expect(by.get(approved)).toMatchObject({ usernames: ["b"], text: "シェアを\n@b", status: "needs_review" });

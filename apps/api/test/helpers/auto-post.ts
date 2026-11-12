@@ -33,7 +33,7 @@ export async function connectedAccount(user: string, app: TestApp = makeApp()) {
   await fake.addUser(threadsUserId, `${user}_${fakeSeq}`);
   const { callbackRes } = await connectNew(app, user, threadsUserId);
   if (callbackRes?.status !== 302) throw new Error("connect failed");
-  const [row] = (await sql()`SELECT id FROM accounts WHERE threads_user_id = ${threadsUserId}`) as [
+  const [row] = (await sql()`SELECT id FROM threads.accounts WHERE threads_user_id = ${threadsUserId}`) as [
     { id: string },
   ];
   return { accountId: row.id, threadsUserId };
@@ -48,14 +48,14 @@ export async function connectedAccount(user: string, app: TestApp = makeApp()) {
 export async function approvedDrafts(accountId: string, bodies: string[]): Promise<string[]> {
   const db = sql();
   const [b] = (await db`
-    INSERT INTO draft_batches (account_id, client_request_id, draft_count, delimiter_found)
+    INSERT INTO threads.draft_batches (account_id, client_request_id, draft_count, delimiter_found)
     VALUES (${accountId}, gen_random_uuid(), ${bodies.length}, true) RETURNING id`) as [
     { id: string },
   ];
   const ids: string[] = [];
   for (const [i, body] of bodies.entries()) {
     const [d] = (await db`
-      INSERT INTO post_drafts (account_id, batch_id, position, body, status, reviewed_at)
+      INSERT INTO threads.post_drafts (account_id, batch_id, position, body, status, reviewed_at)
       VALUES (${accountId}, ${b.id}, ${i}, ${body}, 'approved', now() - make_interval(secs => ${bodies.length - i}))
       RETURNING id`) as [{ id: string }];
     ids.push(d.id);
@@ -82,7 +82,7 @@ export async function setSchedule(
   const effectiveFrom = (s.effectiveFrom ?? new Date("2000-01-01T00:00:00Z")).toISOString();
   const pausedUntil = s.pausedUntil ? s.pausedUntil.toISOString() : null;
   await db`
-    INSERT INTO posting_schedules (account_id, enabled, slot_minutes, jitter, effective_from, paused_until)
+    INSERT INTO threads.posting_schedules (account_id, enabled, slot_minutes, jitter, effective_from, paused_until)
     VALUES (${accountId}, ${s.enabled ?? true}, ${s.slotMinutes}, ${s.jitter ?? false}, ${effectiveFrom}, ${pausedUntil})
     ON CONFLICT (account_id) DO UPDATE SET enabled = EXCLUDED.enabled, slot_minutes = EXCLUDED.slot_minutes,
       jitter = EXCLUDED.jitter, effective_from = EXCLUDED.effective_from, paused_until = EXCLUDED.paused_until`;
@@ -99,7 +99,7 @@ export async function run(now: Date, opts: { keepGate?: boolean; clock?: () => D
 
 /** 下書きの行。 */
 export async function draftRow(id: string) {
-  const [r] = (await sql()`SELECT * FROM post_drafts WHERE id = ${id}`) as [
+  const [r] = (await sql()`SELECT * FROM threads.post_drafts WHERE id = ${id}`) as [
     Record<string, unknown>,
   ];
   return r;
@@ -107,7 +107,7 @@ export async function draftRow(id: string) {
 
 /** その Account の試みの行（予定の時刻の順）。 */
 export async function attempts(accountId: string) {
-  return (await sql()`SELECT * FROM publish_attempts WHERE account_id = ${accountId} ORDER BY slot_at, created_at`) as Record<
+  return (await sql()`SELECT * FROM threads.publish_attempts WHERE account_id = ${accountId} ORDER BY slot_at, created_at`) as Record<
     string,
     unknown
   >[];
@@ -137,7 +137,7 @@ export async function publishedDrafts(
 ): Promise<{ id: string; mediaId: string | null }[]> {
   const db = sql();
   const [b] = (await db`
-    INSERT INTO draft_batches (account_id, client_request_id, draft_count, delimiter_found)
+    INSERT INTO threads.draft_batches (account_id, client_request_id, draft_count, delimiter_found)
     VALUES (${accountId}, gen_random_uuid(), ${items.length}, true) RETURNING id`) as [{ id: string }];
   const out: { id: string; mediaId: string | null }[] = [];
   for (const [i, it] of items.entries()) {
@@ -145,7 +145,7 @@ export async function publishedDrafts(
     const mediaId = it.mediaId === undefined ? String(18_000_000_000 + mediaSeq) : it.mediaId;
     const permalink = mediaId ? `https://www.threads.com/@x/post/${mediaId}` : null;
     const [d] = (await db`
-      INSERT INTO post_drafts (account_id, batch_id, position, body, status, reviewed_at, published_at, threads_media_id, threads_permalink)
+      INSERT INTO threads.post_drafts (account_id, batch_id, position, body, status, reviewed_at, published_at, threads_media_id, threads_permalink)
       VALUES (${accountId}, ${b.id}, ${i}, ${it.body ?? `投稿${mediaSeq}`}, 'published', ${it.publishedAt.toISOString()},
         ${it.publishedAt.toISOString()}, ${mediaId}, ${permalink})
       RETURNING id`) as [{ id: string }];
@@ -156,13 +156,13 @@ export async function publishedDrafts(
 
 /** 反応数の記録の行（なければ undefined）。 */
 export async function metricsRow(draftId: string) {
-  const [r] = (await sql()`SELECT * FROM post_metrics WHERE draft_id = ${draftId}`) as Record<string, unknown>[];
+  const [r] = (await sql()`SELECT * FROM threads.post_metrics WHERE draft_id = ${draftId}`) as Record<string, unknown>[];
   return r;
 }
 
 /** 取り込みの履歴（取り込んだ順）。 */
 export async function snapshotsOf(draftId: string) {
-  return (await sql()`SELECT * FROM post_metric_snapshots WHERE draft_id = ${draftId} ORDER BY fetched_at, kind`) as Record<
+  return (await sql()`SELECT * FROM threads.post_metric_snapshots WHERE draft_id = ${draftId} ORDER BY fetched_at, kind`) as Record<
     string,
     unknown
   >[];
@@ -182,7 +182,7 @@ export async function confirmedMetrics(
   state: "confirmed" | "late_confirmed" = "confirmed",
 ) {
   await sql()`
-    INSERT INTO post_metrics (draft_id, account_id, state, views, likes, replies, reposts, quotes, shares,
+    INSERT INTO threads.post_metrics (draft_id, account_id, state, views, likes, replies, reposts, quotes, shares,
       last_fetched_at, last_elapsed_minutes, last_kind, confirmed_at)
     VALUES (${draftId}, ${accountId}, ${state}, ${views}, 0, 0, 0, 0, 0, now(), 10080,
       ${state === "confirmed" ? "d7" : "late"}, now())`;

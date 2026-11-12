@@ -21,7 +21,7 @@ const on = (slotTimes: string[], expectedVersion: number, jitter = true) => ({
 
 async function effectiveFrom(accountId: string): Promise<number> {
   const [r] =
-    (await db()`SELECT effective_from FROM posting_schedules WHERE account_id = ${accountId}`) as [
+    (await db()`SELECT effective_from FROM threads.posting_schedules WHERE account_id = ${accountId}`) as [
       { effective_from: string },
     ];
   return new Date(r.effective_from).getTime();
@@ -113,7 +113,7 @@ describe("PUT /posting-schedule", () => {
     await fake.delayPublishingLimit(300);
     const res = await putSchedule(app, accountId, on(["07:30"], 0));
     expect(res.status).toBe(200);
-    const [row] = await db()`SELECT updated_at FROM posting_schedules WHERE account_id = ${accountId}`;
+    const [row] = await db()`SELECT updated_at FROM threads.posting_schedules WHERE account_id = ${accountId}`;
     const wake = JSON.parse((await testEnv.AUTOPOST_KV.get("autopost:wake"))!) as { at: string };
     // 保存の行の時刻（リクエストの始め）より、接続の確認の分（300ms）以上あと
     expect(Date.parse(wake.at) - new Date(row!.updated_at as string).getTime()).toBeGreaterThanOrEqual(300);
@@ -191,7 +191,7 @@ describe("PUT /posting-schedule", () => {
     expect(await reconnect.json()).toMatchObject({
       error: { code: "THREADS_NOT_READY", details: ["needs_reconnect"] },
     });
-    const [acc] = (await db()`SELECT connection_status FROM accounts WHERE id = ${accountId}`) as [
+    const [acc] = (await db()`SELECT connection_status FROM threads.accounts WHERE id = ${accountId}`) as [
       { connection_status: string },
     ];
     expect(acc.connection_status).toBe("needs_reconnect");

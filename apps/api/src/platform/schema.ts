@@ -32,10 +32,6 @@ import {
   TESTER_SLOT_CAPACITY_MIN,
 } from "@meguru/shared";
 import { bytea, timestamps, inList } from "../kernel/db/columns";
-// 境界の例外（docs/module-map.md 4）：operator_events.application_id と、users.last_account_id（最後に開いたアカウント）の外部キーのためだけに、
-// Threadsの表を読む（参照は遅延で、読みこみの循環でも壊れない）。029 の PR2b・PR3 でなくす（specs/meguru/029-threads-pattern1 data-model.md）
-// eslint-disable-next-line local/module-boundaries
-import { accounts, testerApplications } from "../apps/threads/schema";
 
 /** アプリを使う個人。Clerk のユーザーと1対1で対応する（data-model.md の users）。 */
 export const users = pgTable("users", {
@@ -43,7 +39,8 @@ export const users = pgTable("users", {
   clerkUserId: text("clerk_user_id").notNull().unique(),
   email: text("email").notNull(),
   displayName: text("display_name"),
-  lastAccountId: uuid("last_account_id").references((): AnyPgColumn => accounts.id, { onDelete: "set null" }),
+  // 029 の PR2c で Threads の threads.user_states へ移した。PR3 で外部キーを外した。列は PR5 で消す
+  lastAccountId: uuid("last_account_id"),
   lastAccountDeletedAt: timestamp("last_account_deleted_at", { withTimezone: true }),
   lastAccountClientId: text("last_account_client_id"),
   lastAccountOpenSeq: bigint("last_account_open_seq", { mode: "number" }),
@@ -289,7 +286,8 @@ export const operatorEvents = pgTable(
     id: uuid("id").primaryKey().defaultRandom(),
     actorUserId: uuid("actor_user_id").references(() => users.id, { onDelete: "set null" }),
     subjectUserId: uuid("subject_user_id").references(() => users.id, { onDelete: "set null" }),
-    applicationId: uuid("application_id").references(() => testerApplications.id, { onDelete: "set null" }),
+    // テスター招待の申し込みの番号（値だけ。029 の PR3 で Threads の表への外部キーを外した。research.md R3）
+    applicationId: uuid("application_id"),
     action: text("action").notNull(),
     detail: jsonb("detail"),
     createdAt: timestamp("created_at", { withTimezone: true, precision: 6 }).notNull().defaultNow(),

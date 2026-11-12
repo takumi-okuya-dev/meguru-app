@@ -138,20 +138,26 @@ description: "Task list for feature meguru/029 Threads pattern ①"
 
 ### テスト（先に書いて失敗を確かめる）
 
-- [ ] T038 [P] [US1] `eslint-rules/module-boundaries.test.js`に足す：止める＝`apps/threads/x`→`../../platform/schema`、`platform/x`→`../apps/threads/schema`、`platform/x`→`../db/schema`。通る＝`apps/threads/x`→`../../platform`（入口）、`db/schema.ts`→`../platform/schema`・`../apps/threads/schema`（組み立て）（contracts/module-boundaries.md 3）。
-- [ ] T039 [P] [US4] `apps/api/test/migration/migration-00NN.test.ts`（PR3の番号）：前の番号まで当てて、31表と`threads_settings`・`threads_received_events`にデータを入れ、当てたあとに、スキーマ`threads`の同じ表で件数と中身が一致する・共通 ⇄ Threadsの外部キーが0本（quickstart.md 1のSQL）・Threadsの中の外部キー（`accounts`への`cascade`など）が残る（spec SC-001・SC-005）。
+- [X] T038 [P] [US1] `eslint-rules/module-boundaries.test.js`に足す：止める＝`apps/threads/x`→`../../platform/schema`、`platform/x`→`../apps/threads/schema`、`platform/x`→`../db/schema`。通る＝`apps/threads/x`→`../../platform`（入口）、`db/schema.ts`→`../platform/schema`・`../apps/threads/schema`（組み立て）（contracts/module-boundaries.md 3）。
+- [X] T039 [P] [US4] `apps/api/test/migration/migration-00NN.test.ts`（PR3の番号）：前の番号まで当てて、31表と`threads_settings`・`threads_received_events`にデータを入れ、当てたあとに、スキーマ`threads`の同じ表で件数と中身が一致する・共通 ⇄ Threadsの外部キーが0本（quickstart.md 1のSQL）・Threadsの中の外部キー（`accounts`への`cascade`など）が残る（spec SC-001・SC-005）。
 
 ### 実装
 
-- [ ] T040 [US1] `apps/api/src/apps/threads/schema.ts`を`pgSchema("threads")`の表にする（31表と`settings`・`received_events`）。`users`への`references`をすべて外す（列は`uuid`のまま）。`platform/schema.ts`の`operatorEvents.applicationId`の`references`と、`eslint-disable-next-line`の例外を外す（data-model.md 1-3、research.md R3）。
-- [ ] T041 [US1] `pnpm --filter api db:generate`でマイグレーションを作る。**SQLを読み、`CREATE SCHEMA "threads"`と`ALTER TABLE … SET SCHEMA "threads"`になっていて、`DROP TABLE`・`CREATE TABLE`（移す表について）がないことを確かめる**。対話が要るときは、端末を持つ形で「移した」を選ぶ。できないときは`--custom`で手で書き、そのあと`db:generate`で差がないことを確かめる（research.md R2）。`threads_settings`は`settings`へ、`threads_received_events`は`received_events`へ名前を変える。T039を通す。
-- [ ] T042 [US1] 手で書いたSQL（マイグレーションのテスト・`apps/api/test/helpers`・E2Eの`e2e/tests/helpers.ts`のDBを空にする処理・`apps/api/scripts/seed-performance.ts`・`apps/api/src/jobs/key-rotation.ts`など）の表の名前に、スキーマ`threads`を付ける。`grep`で`public`の名前のまま残っていないことを確かめる。
-- [ ] T043 [US1] `eslint-rules/module-boundaries.js`に、T038の2つの違反を足す（`db/schema.ts`を経由した読みこみも止める）。T038を通す。`pnpm lint`で違反が0件。
+- [X] T040 [US1] `apps/api/src/apps/threads/schema.ts`を`pgSchema("threads")`の表にする（31表と`settings`・`received_events`）。`users`への`references`をすべて外す（列は`uuid`のまま）。`platform/schema.ts`の`operatorEvents.applicationId`の`references`と、`eslint-disable-next-line`の例外を外す（data-model.md 1-3、research.md R3）。
+- [X] T041 [US1] `pnpm --filter api db:generate`でマイグレーションを作る。**SQLを読み、`CREATE SCHEMA "threads"`と`ALTER TABLE … SET SCHEMA "threads"`になっていて、`DROP TABLE`・`CREATE TABLE`（移す表について）がないことを確かめる**。対話が要るときは、端末を持つ形で「移した」を選ぶ。できないときは`--custom`で手で書き、そのあと`db:generate`で差がないことを確かめる（research.md R2）。`threads_settings`は`settings`へ、`threads_received_events`は`received_events`へ名前を変える。T039を通す。
+- [X] T042 [US1] 手で書いたSQL（マイグレーションのテスト・`apps/api/test/helpers`・E2Eの`e2e/tests/helpers.ts`のDBを空にする処理・`apps/api/scripts/seed-performance.ts`・`apps/api/src/jobs/key-rotation.ts`など）の表の名前に、スキーマ`threads`を付ける。`grep`で`public`の名前のまま残っていないことを確かめる。
+- [X] T043 [US1] `eslint-rules/module-boundaries.js`に、T038の2つの違反を足す（`db/schema.ts`を経由した読みこみも止める）。T038を通す。`pnpm lint`で違反が0件。
 - [ ] T044 [US4] 作業場所でも確かめる：`pnpm worktree:new probe`で作り、その作業場所のDBにスキーマ`threads`ができ、`pnpm --filter api test`が通ることを確かめ、`pnpm worktree:remove probe`で片付ける（quickstart.md 2、spec FR-020）。
-- [ ] T045 [US4] PR3の確かめ：`pnpm lint`・`pnpm typecheck`・`pnpm test`・`pnpm e2e`。`pnpm --filter api db:generate`が「変更なし」。手元のDBで外部キーの本数が0（quickstart.md 1）。
+- [X] T045 [US4] PR3の確かめ：`pnpm lint`・`pnpm typecheck`・`pnpm test`・`pnpm e2e`。`pnpm --filter api db:generate`が「変更なし」。手元のDBで外部キーの本数が0（quickstart.md 1）。
 - [ ] T046 [US4] PR3の説明に、前の版のAPIが新しいDBで壊れる例外（デプロイの間の数分）と、テスト環境での確かめの手順（quickstart.md 3）を書く。
 
 **Checkpoint**：→ PR3を出す。マージの前に、テスト環境の件数を控え、テストユーザーに知らせる。
+
+**PR3の実装で分かったこと**：
+- マイグレーションは`0030_threads_schema`。drizzle-kitの対話は使わず`--custom`で手で書き、記録（snapshot）を表の移動・名前の変更・外部キーの外しに合わせて直した。`db:generate`が「変更なし」（T041）。
+- 外部キーは27本外した（Threads → `users`の25本と、`users.last_account_id`・`operator_events.application_id`）。Threadsの中の37本は残る。
+- **外部キーが自動でしていたことを、退会の片づけ（`withdrawal-cleanup.ts`）に足した**（research.md R3）：`token_check_failures`・`oauth_states`の行を消す、作った人・直した人の欄（18列）と`activity_logs.actor_user_id`・`tester_applications.user_id`を空にする。これらの列に索引はないが、退会は年に数回なので、表を読み通しても困らない。
+- 列挙型（`membership_role`など）は`public`のまま（表ではないので外部キーにならない。移すと手間が増えるだけ）。
 
 - [ ] T047 [US4] テスト環境：PR3のマージの前に件数とマージの直前の時刻（UTC）を控え、マージのあとに件数の一致・外部キー0本・主な流れを確かめ、結果をPR3の説明に書く（quickstart.md 3。ユーザーと一緒に行う）。
 
@@ -201,7 +207,7 @@ description: "Task list for feature meguru/029 Threads pattern ①"
 **Goal**：2作目の開発者が、Threadsを実例にしてパターン①をなぞれるようにする（spec US5・FR-023）。
 
 - [ ] T062 [P] [US5] `docs/app-separation.md`：Threadsをパターン①にそろえたことを書く（5章「Threadsの扱い」を書き直す、2-1の図のThreadsをパターン①の色に、3-4の道のりの「今」を更新）。実例として、Threadsの`schema.ts`・`events/`・`reportUsage`の呼び出し・`/api/threads/me`の場所を指す。
-- [ ] T063 [P] [US5] `docs/module-map.md`：2章（共通16表・Threads33表・処理の行き先）、3章（持ち主でない列の例外がなくなる）、1-4（知らせ → 出来事）、4章（`operator_events`の例外がなくなる）、6章（アプリを足す手順を、Threadsを実例にしたパターン①の手順に）、7章（Webの`apps/threads/lib/`・`withdrawalPreview`）、1-1の図（contracts/module-boundaries.md 6）。
+- [ ] T063 [P] [US5] `docs/module-map.md`：2章（共通16表・Threads34表・処理の行き先）、3章（持ち主でない列の例外がなくなる）、1-4（知らせ → 出来事）、4章（`operator_events`の例外がなくなる）、6章（アプリを足す手順を、Threadsを実例にしたパターン①の手順に）、7章（Webの`apps/threads/lib/`・`withdrawalPreview`）、1-1の図（contracts/module-boundaries.md 6）。
 - [ ] T064 [P] [US5] `docs/product-structure.md` 6・7（共通の表の行・Threadsの扱い・まだ決めていないこと）、`docs/architecture.md`（設計の判断の表の「Threadsはパターン②のまま」を直す）、`docs/parallel-development.md`（Threadsの改善の再開と、2作目が実装を始めてよいこと）、`docs/README.md`（文書の一覧の説明の更新）。
 - [ ] T065 [US5] Constitution の「アプリのデータの分け方」の、T000で書いた「そろえる・途中の形を認める」を、「Threadsもパターン①にそろえた（029）」に直す（PATCH：4.9.1）。`/speckit-constitution`の手順で、版と改めた日を直す。
 - [ ] T066 [US5] 古い記述が残っていないことを確かめる：`grep`で「パターン②のまま」「`accounts`（共通）」「同じトランザクションの知らせ」「`runHook`」「`/api/accounts/`」を文書とコードのコメントから探し、今の形に直す（spec US5-2）。

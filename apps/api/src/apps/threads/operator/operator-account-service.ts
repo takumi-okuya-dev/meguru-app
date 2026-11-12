@@ -60,18 +60,18 @@ export async function listOperatorAccounts(db: Db, query: OperatorAccountsQuery)
       SELECT a.id, a.name, a.username, ${METHOD} AS method, a.connection_status::text AS status, a.created_at,
              to_char(a.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') || '_' || a.id::text AS cursor,
              u.display_name AS owner_name, u.email AS owner_email,
-             (SELECT count(*)::int FROM memberships om WHERE om.user_id = m.user_id AND om.role = 'owner') AS owner_count,
+             (SELECT count(*)::int FROM threads.memberships om WHERE om.user_id = m.user_id AND om.role = 'owner') AS owner_count,
              (SELECT CASE
                        WHEN t.status IN ('pending', 'invited', 'connected') THEN t.status
                        ELSE 'removable'
                      END
-                FROM tester_applications t
+                FROM threads.tester_applications t
                WHERE t.account_id = a.id
                  AND (t.status IN ('pending', 'invited', 'connected') OR (t.holds_slot AND t.removal_reason IS NOT NULL))
                ORDER BY (t.status IN ('pending', 'invited', 'connected')) DESC, t.status_changed_at DESC
                LIMIT 1) AS tester
-        FROM accounts a
-        LEFT JOIN memberships m ON m.account_id = a.id AND m.role = 'owner'
+        FROM threads.accounts a
+        LEFT JOIN threads.memberships m ON m.account_id = a.id AND m.role = 'owner'
         LEFT JOIN users u ON u.id = m.user_id
         ${filter}
        ORDER BY a.created_at DESC, a.id DESC
@@ -82,7 +82,7 @@ export async function listOperatorAccounts(db: Db, query: OperatorAccountsQuery)
              count(*) FILTER (WHERE ${METHOD} = 'app')::int AS app,
              count(*) FILTER (WHERE ${METHOD} = 'token')::int AS token,
              count(*) FILTER (WHERE ${METHOD} = 'none')::int AS none
-        FROM accounts a
+        FROM threads.accounts a
     `),
   ]);
 

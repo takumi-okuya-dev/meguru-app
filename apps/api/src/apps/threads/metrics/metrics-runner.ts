@@ -534,13 +534,13 @@ async function judgeAccounts(db: Db, now: Date, accountIds: string[]) {
     WITH ranked AS (
       SELECT pm.account_id, pm.views,
         row_number() OVER (PARTITION BY pm.account_id ORDER BY d.published_at DESC, d.id) AS rn
-      FROM post_metrics pm JOIN post_drafts d ON d.id = pm.draft_id
+      FROM threads.post_metrics pm JOIN threads.post_drafts d ON d.id = pm.draft_id
       WHERE pm.account_id IN (${ids}) AND pm.state = 'confirmed' AND pm.views IS NOT NULL
     ), b AS (
       SELECT account_id, count(*) AS n, percentile_cont(0.5) WITHIN GROUP (ORDER BY views) AS median
       FROM ranked WHERE rn <= ${PERFORMANCE_BASELINE_SAMPLE} GROUP BY account_id
     )
-    UPDATE post_metrics pm SET
+    UPDATE threads.post_metrics pm SET
       judgment = (CASE
         WHEN pm.views::float8 / b.median >= ${PERFORMANCE_GOOD_RATIO} THEN 'good'
         WHEN pm.views::float8 / b.median <= ${PERFORMANCE_POOR_RATIO} THEN 'poor'

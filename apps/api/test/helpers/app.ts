@@ -64,14 +64,19 @@ export function call(
 export async function resetDb() {
   const sql = neon(testEnv.DATABASE_URL);
   createDb(testEnv.DATABASE_URL); // ローカルプロキシの設定を有効にする
-  await sql`TRUNCATE users, accounts, memberships, threads_connections, oauth_states, threads_deletion_requests, threads_revocations, strategy_designs, promotions, reference_posts, research_keywords, draft_batches, post_drafts, ng_words, posting_schedules, publish_attempts, teams, team_members, team_accounts, activity_logs, token_check_failures, subscriptions, withdrawn_users, platform_events, app_usage, user_app_limits, threads_received_events, threads_user_states CASCADE`;
+  await sql`TRUNCATE users, subscriptions, withdrawn_users, platform_events, app_usage, user_app_limits,
+    threads.accounts, threads.memberships, threads.threads_connections, threads.oauth_states, threads.threads_deletion_requests,
+    threads.threads_revocations, threads.strategy_designs, threads.promotions, threads.reference_posts, threads.research_keywords,
+    threads.draft_batches, threads.post_drafts, threads.ng_words, threads.posting_schedules, threads.publish_attempts, threads.teams,
+    threads.team_members, threads.team_accounts, threads.activity_logs, threads.token_check_failures, threads.received_events,
+    threads.user_states CASCADE`;
   // 運営者が決める値（1行だけ。TRUNCATE では消さない）を初めの値に戻す（specs/024）
   await sql`UPDATE operator_settings SET default_account_limit = 3, default_daily_post_limit = 10, tester_slot_capacity = 25`;
   // 新しい上限の表の既定の値も同じ値に戻す（specs/meguru/029 research.md R7）
   await sql`INSERT INTO app_limit_defaults (app, key, value) VALUES ('threads', 'accounts', 3), ('threads', 'daily_posts', 10)
     ON CONFLICT (app, key) DO UPDATE SET value = EXCLUDED.value`;
   // Threadsの運営の設定（テスター招待の枠。specs/meguru/029 tasks.md T024）
-  await sql`INSERT INTO threads_settings (id, tester_slot_capacity) VALUES (1, 25) ON CONFLICT (id) DO UPDATE SET tester_slot_capacity = 25`;
+  await sql`INSERT INTO threads.settings (id, tester_slot_capacity) VALUES (1, 25) ON CONFLICT (id) DO UPDATE SET tester_slot_capacity = 25`;
 }
 
 export function db() {
@@ -200,7 +205,7 @@ async function stateOwner(state: string): Promise<string> {
   const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(state));
   const hash = [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, "0")).join("");
   const rows = (await neon(testEnv.DATABASE_URL)`
-    SELECT u.clerk_user_id FROM oauth_states s JOIN users u ON u.id = s.user_id
+    SELECT u.clerk_user_id FROM threads.oauth_states s JOIN users u ON u.id = s.user_id
     WHERE s.state_hash = ${hash}`) as { clerk_user_id: string }[];
   if (!rows[0]) throw new Error("state が見つかりません（作成者を引けません）");
   return rows[0].clerk_user_id;
@@ -298,10 +303,10 @@ export async function createUserWithAccount(
   const threadsUserId = `tu_${user}_${Date.now()}_${accountSeq}`;
   const username = `${user}_${accountSeq}`;
   const [a] = (await sql`
-    INSERT INTO accounts (name, threads_user_id, username)
+    INSERT INTO threads.accounts (name, threads_user_id, username)
     VALUES (${opts.name ?? username}, ${threadsUserId}, ${username})
     RETURNING id`) as [{ id: string }];
-  await sql`INSERT INTO memberships (user_id, account_id, role) VALUES (${u.id}, ${a.id}, 'owner')`;
+  await sql`INSERT INTO threads.memberships (user_id, account_id, role) VALUES (${u.id}, ${a.id}, 'owner')`;
   // 本物のアカウントの作成と同じく、利用の数を共通へ伝える（specs/meguru/029 research.md R6）
   await syncThreadsUsage(createDb(testEnv.DATABASE_URL), u.id);
   return { userId: u.id, accountId: a.id };
@@ -325,10 +330,10 @@ export async function createUnconnectedAccount(
     ON CONFLICT (clerk_user_id) DO UPDATE SET updated_at = users.updated_at
     RETURNING id`) as [{ id: string }];
   const [a] = (await sql`
-    INSERT INTO accounts (name, connection_status, connection_method)
+    INSERT INTO threads.accounts (name, connection_status, connection_method)
     VALUES (${opts.name ?? "未接続のアカウント"}, 'not_connected', NULL)
     RETURNING id`) as [{ id: string }];
-  await sql`INSERT INTO memberships (user_id, account_id, role) VALUES (${u.id}, ${a.id}, 'owner')`;
+  await sql`INSERT INTO threads.memberships (user_id, account_id, role) VALUES (${u.id}, ${a.id}, 'owner')`;
   // 本物のアカウントの作成と同じく、利用の数を共通へ伝える（specs/meguru/029 research.md R6）
   await syncThreadsUsage(createDb(testEnv.DATABASE_URL), u.id);
   return { userId: u.id, accountId: a.id };
@@ -339,7 +344,7 @@ export async function setAccount(accountId: string, values: { connectionStatus?:
   const sql = neon(testEnv.DATABASE_URL);
   createDb(testEnv.DATABASE_URL);
   if (values.connectionStatus) {
-    await sql`UPDATE accounts SET connection_status = ${values.connectionStatus} WHERE id = ${accountId}`;
+    await sql`UPDATE threads.accounts SET connection_status = ${values.connectionStatus} WHERE id = ${accountId}`;
   }
 }
 

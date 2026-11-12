@@ -102,7 +102,7 @@ export async function getTeamStatus(
     TEAM_STATUS_ACTIVITY_ACTIONS.map((a) => sql`${a}`),
     sql`, `,
   );
-  const activityIn = sql`activity_logs l WHERE l.actor_user_id = ${teamMembers.userId}
+  const activityIn = sql`threads.activity_logs l WHERE l.actor_user_id = ${teamMembers.userId}
     AND ${inScope(sql`l.account_id`, teamId, scope)} AND l.action IN (${actions})`;
   const peopleRows = await db
     .select({
@@ -127,10 +127,10 @@ export async function getTeamStatus(
   const confirmed = (
     from: Date,
     to: Date,
-  ) => sql`FROM post_metrics pm JOIN post_drafts d ON d.id = pm.draft_id
+  ) => sql`FROM threads.post_metrics pm JOIN threads.post_drafts d ON d.id = pm.draft_id
     WHERE pm.account_id = ${accounts.id} AND pm.state IN ('confirmed', 'late_confirmed') AND pm.views IS NOT NULL
       AND d.published_at >= ${from.toISOString()} AND d.published_at < ${to.toISOString()}`;
-  const drafts = sql`FROM post_drafts d WHERE d.account_id = ${accounts.id}`;
+  const drafts = sql`FROM threads.post_drafts d WHERE d.account_id = ${accounts.id}`;
   const accountRows = await db
     .select({
       account: accounts,

@@ -24,12 +24,12 @@ async function setup() {
 
 /** チームの管理者の人数（いつも1人のはず） */
 async function adminCount(teamId: string) {
-  const [row] = (await sql()`SELECT count(*)::int AS n FROM team_members WHERE team_id = ${teamId} AND role = 'admin'`) as { n: number }[];
+  const [row] = (await sql()`SELECT count(*)::int AS n FROM threads.team_members WHERE team_id = ${teamId} AND role = 'admin'`) as { n: number }[];
   return row?.n ?? 0;
 }
 
 async function deleteAccount(accountId: string, user: string) {
-  const [acc] = (await sql()`SELECT name FROM accounts WHERE id = ${accountId}`) as { name: string }[];
+  const [acc] = (await sql()`SELECT name FROM threads.accounts WHERE id = ${accountId}`) as { name: string }[];
   return call(app, "DELETE", `/api/accounts/${accountId}`, { user, body: { confirmName: acc!.name } });
 }
 
@@ -45,7 +45,7 @@ describe("POST /api/teams/:teamId/leave（抜ける）", () => {
     expect((await activityRows(editorAcc)).map((r) => [r.action, r.actor_role])).toEqual([["team_member_left", "owner"]]);
     expect((await call(app, "POST", `/api/teams/${teamId}/leave`, { user: "m1" })).status).toBe(204);
     expect(await teamMemberRows(teamId)).toEqual([{ user: "a1", role: "admin" }]);
-    const [left] = (await sql()`SELECT count(*)::int AS n FROM team_accounts WHERE account_id IN (${memberAcc}, ${editorAcc})`) as { n: number }[];
+    const [left] = (await sql()`SELECT count(*)::int AS n FROM threads.team_accounts WHERE account_id IN (${memberAcc}, ${editorAcc})`) as { n: number }[];
     expect(left!.n).toBe(0);
     expect((await call(app, "GET", `/api/accounts/${memberAcc}/post-drafts`, { user: "m1" })).status).toBe(200);
   });
@@ -72,7 +72,7 @@ describe("POST /api/teams/:teamId/leave（抜ける）", () => {
       { user: "m1", role: "admin" },
       { user: "e1", role: "editor" },
     ]);
-    const [team] = (await sql()`SELECT admin_user_id FROM teams WHERE id = ${teamId}`) as { admin_user_id: string }[];
+    const [team] = (await sql()`SELECT admin_user_id FROM threads.teams WHERE id = ${teamId}`) as { admin_user_id: string }[];
     expect(team!.admin_user_id).toBe(m1);
   });
 });
@@ -127,7 +127,7 @@ describe("引き継ぎと編集者の上限（PR #14 のCodexレビュー）", (
     expect((await teamMemberRows(teamId)).find((m) => m.user === "a1")!.role).toBe("admin");
     // 抜けるときは編集者として残らないので通る
     expect((await call(app, "POST", `/api/teams/${teamId}/leave`, { user: "a1", body: { newAdminUserId: m1 } })).status).toBe(204);
-    const [editors] = (await sql()`SELECT count(*)::int AS n FROM team_members WHERE team_id = ${teamId} AND role = 'editor'`) as { n: number }[];
+    const [editors] = (await sql()`SELECT count(*)::int AS n FROM threads.team_members WHERE team_id = ${teamId} AND role = 'editor'`) as { n: number }[];
     expect(editors!.n).toBe(10);
   });
 });
@@ -163,7 +163,7 @@ describe("引き継ぎと管理者のチームの上限（PR #14 のCodexレビ�
     await joinTeam(teamId, "m1", [memberAcc]);
     for (let i = 0; i < 20; i++) await makeTeam("m1", []);
     expect((await deleteAccount(adminAcc, "a1")).status).toBe(204);
-    const [row] = (await sql()`SELECT count(*)::int AS n FROM teams WHERE id = ${teamId}`) as { n: number }[];
+    const [row] = (await sql()`SELECT count(*)::int AS n FROM threads.teams WHERE id = ${teamId}`) as { n: number }[];
     expect(row!.n).toBe(0);
   });
 });
@@ -181,7 +181,7 @@ describe("DELETE /api/teams/:teamId/members/:userId（外す）", () => {
   it("外したメンバーのアカウントでの、ほかの人の担当も消える", async () => {
     const { teamId, memberAcc, m1 } = await setup();
     expect((await call(app, "DELETE", `/api/teams/${teamId}/members/${m1}`, { user: "a1" })).status).toBe(204);
-    const [row] = (await sql()`SELECT count(*)::int AS n FROM memberships WHERE account_id = ${memberAcc} AND role = 'editor'`) as { n: number }[];
+    const [row] = (await sql()`SELECT count(*)::int AS n FROM threads.memberships WHERE account_id = ${memberAcc} AND role = 'editor'`) as { n: number }[];
     expect(row!.n).toBe(0);
     expect((await activityRows(memberAcc)).map((r) => [r.action, r.actor_role])).toEqual([["team_member_removed", "admin"]]);
   });
@@ -208,7 +208,7 @@ describe("アカウントの削除（FR-046）", () => {
     const { accountId } = await createUserWithAccount("solo");
     const { teamId } = await makeTeam("solo", [accountId]);
     expect((await deleteAccount(accountId, "solo")).status).toBe(204);
-    const [row] = (await sql()`SELECT count(*)::int AS n FROM teams WHERE id = ${teamId}`) as { n: number }[];
+    const [row] = (await sql()`SELECT count(*)::int AS n FROM threads.teams WHERE id = ${teamId}`) as { n: number }[];
     expect(row!.n).toBe(0);
   });
 
@@ -221,7 +221,7 @@ describe("アカウントの削除（FR-046）", () => {
       await Promise.all([deleteAccount(memberAcc, "m1"), call(app, "DELETE", `/api/teams/${teamId}/accounts/${memberAcc}`, { user: "m1" })]);
       // どちらの順で終わっても、m1 は2つ目のアカウントでチームに残る
       expect((await teamMemberRows(teamId)).map((m) => m.user), `round ${round}`).toContain("m1");
-      const [left] = (await sql()`SELECT count(*)::int AS n FROM team_accounts WHERE account_id = ${second}`) as { n: number }[];
+      const [left] = (await sql()`SELECT count(*)::int AS n FROM threads.team_accounts WHERE account_id = ${second}`) as { n: number }[];
       expect(left!.n, `round ${round}`).toBe(1);
     }
   });
@@ -246,7 +246,7 @@ describe("どの順番でも管理者がいないチームはできない（SC-0
     ];
     for (const step of steps) {
       await step();
-      const [exists] = (await sql()`SELECT count(*)::int AS n FROM teams WHERE id = ${teamId}`) as { n: number }[];
+      const [exists] = (await sql()`SELECT count(*)::int AS n FROM threads.teams WHERE id = ${teamId}`) as { n: number }[];
       if (exists!.n > 0) expect(await adminCount(teamId)).toBe(1);
     }
   });

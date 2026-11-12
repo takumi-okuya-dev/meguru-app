@@ -23,14 +23,14 @@ async function seed(o: { publishedAt: Date; delay?: number | null; usernames?: s
   const { accountId, threadsUserId } = await connectedAccount(o.user ?? "u1", app);
   const mediaId = await fake.addPost(threadsUserId, "本文", o.publishedAt);
   const draftId = await draftOf(accountId, "published", mediaId);
-  await sql()`UPDATE post_drafts SET published_at = ${o.publishedAt.toISOString()} WHERE id = ${draftId}`;
-  await sql()`INSERT INTO post_mentions (draft_id, account_id, usernames, text, delay_minutes, send_after)
+  await sql()`UPDATE threads.post_drafts SET published_at = ${o.publishedAt.toISOString()} WHERE id = ${draftId}`;
+  await sql()`INSERT INTO threads.post_mentions (draft_id, account_id, usernames, text, delay_minutes, send_after)
     VALUES (${draftId}, ${accountId}, ${o.usernames ?? ["a", "b"]}, ${o.text ?? "シェアお願いします\n@a @b"},
       ${o.delay === undefined ? 30 : o.delay}, ${o.sendAfter ? o.sendAfter.toISOString() : null})`;
   return { accountId, draftId, mediaId, threadsUserId };
 }
 const mentionRow = async (draftId: string) =>
-  ((await sql()`SELECT * FROM post_mentions WHERE draft_id = ${draftId}`) as Record<string, unknown>[])[0]!;
+  ((await sql()`SELECT * FROM threads.post_mentions WHERE draft_id = ${draftId}`) as Record<string, unknown>[])[0]!;
 const replies = async () => (await fake.posts()).filter((p) => (p as { replyToId?: string }).replyToId);
 
 describe("出す（T016）", () => {
@@ -63,13 +63,13 @@ describe("出す（T016）", () => {
   it("出す直前のNGワードは出さない。同じ人が24時間以内に済みなら、文を書き換えずに出さない（SC-002・SC-004）", async () => {
     const t0 = new Date("2030-01-10T03:00:00Z");
     const { accountId, draftId } = await seed({ publishedAt: t0 });
-    await sql()`INSERT INTO ng_words (account_id, word, normalized) VALUES (${accountId}, 'シェア', 'シェア')`;
+    await sql()`INSERT INTO threads.ng_words (account_id, word, normalized) VALUES (${accountId}, 'シェア', 'シェア')`;
     await run(new Date(t0.getTime() + 31 * MIN));
     expect(await mentionRow(draftId)).toMatchObject({ state: "failed", failure_reason: "ng_word" });
 
     const s2 = await seed({ publishedAt: t0, user: "u2" });
     const other = await draftOf(s2.accountId);
-    await sql()`INSERT INTO post_mentions (draft_id, account_id, usernames, text, delay_minutes, state, sent_at)
+    await sql()`INSERT INTO threads.post_mentions (draft_id, account_id, usernames, text, delay_minutes, state, sent_at)
       VALUES (${other}, ${s2.accountId}, ${["b"]}, '@b', 30, 'sent', ${new Date(t0.getTime()).toISOString()})`;
     await run(new Date(t0.getTime() + 31 * MIN));
     expect(await mentionRow(s2.draftId)).toMatchObject({ state: "failed", failure_reason: "limit", text: "シェアお願いします\n@a @b" });
@@ -103,7 +103,7 @@ describe("出せなかったとき（T023）", () => {
     expect(await mentionRow(a.draftId)).toMatchObject({ state: "failed", failure_reason: "expired" });
 
     const b = await seed({ publishedAt: t0, user: "u2" });
-    await sql()`UPDATE accounts SET replies_denied_at = now() WHERE id = ${b.accountId}`;
+    await sql()`UPDATE threads.accounts SET replies_denied_at = now() WHERE id = ${b.accountId}`;
     await run(new Date(t0.getTime() + 31 * MIN));
     expect(await mentionRow(b.draftId)).toMatchObject({ state: "failed", failure_reason: "no_permission" });
   });
@@ -111,7 +111,7 @@ describe("出せなかったとき（T023）", () => {
   it("返信先が見つからない → not_found。一時的な失敗はやり直し、3回で error", async () => {
     const t0 = new Date("2030-01-10T03:00:00Z");
     const a = await seed({ publishedAt: t0 });
-    await sql()`UPDATE post_drafts SET threads_media_id = 'missing' WHERE id = ${a.draftId}`;
+    await sql()`UPDATE threads.post_drafts SET threads_media_id = 'missing' WHERE id = ${a.draftId}`;
     await run(new Date(t0.getTime() + 31 * MIN));
     expect(await mentionRow(a.draftId)).toMatchObject({ state: "failed", failure_reason: "not_found" });
 
@@ -128,7 +128,7 @@ describe("出せなかったとき（T023）", () => {
   it("要再接続のあいだは待ち、出さない", async () => {
     const t0 = new Date("2030-01-10T03:00:00Z");
     const a = await seed({ publishedAt: t0 });
-    await sql()`UPDATE accounts SET connection_status = 'needs_reconnect' WHERE id = ${a.accountId}`;
+    await sql()`UPDATE threads.accounts SET connection_status = 'needs_reconnect' WHERE id = ${a.accountId}`;
     await run(new Date(t0.getTime() + 31 * MIN));
     expect(await mentionRow(a.draftId)).toMatchObject({ state: "pending" });
     expect(await replies()).toEqual([]);
@@ -160,7 +160,7 @@ describe("出せなかったとき（T023）", () => {
     // 返信のもとを作ったあと、公開の前に「やめる」が入った状態
     await fake.publishFail("publish", "transient", 1);
     await run(new Date(t0.getTime() + 31 * MIN));
-    await sql()`UPDATE post_mentions SET state = 'canceled', publish_requested_at = NULL WHERE draft_id = ${a.draftId}`;
+    await sql()`UPDATE threads.post_mentions SET state = 'canceled', publish_requested_at = NULL WHERE draft_id = ${a.draftId}`;
     await run(new Date(t0.getTime() + 60 * MIN));
     expect(await replies()).toEqual([]);
     expect(await mentionRow(a.draftId)).toMatchObject({ state: "canceled" });
@@ -169,7 +169,7 @@ describe("出せなかったとき（T023）", () => {
   it("下書きの投稿に失敗したら、時間差のメンションも出せなかったことにする（予定のまま残さない。PR #66 のCodexレビュー）", async () => {
     const { accountId } = await connectedAccount("u1", app);
     const [id] = await approvedDrafts(accountId, ["INVALID"]);
-    await sql()`INSERT INTO post_mentions (draft_id, account_id, usernames, text, delay_minutes)
+    await sql()`INSERT INTO threads.post_mentions (draft_id, account_id, usernames, text, delay_minutes)
       VALUES (${id}, ${accountId}, ${["a"]}, '@a', 30)`;
     await setSchedule(accountId, { slotMinutes: [720] });
     await fake.publishFail("createContainer", "invalid", 1);

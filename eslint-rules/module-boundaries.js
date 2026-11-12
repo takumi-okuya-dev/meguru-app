@@ -70,6 +70,8 @@ export default {
       notEntry: "{{unit}} は入口（{{unit}}/index.ts）から読んでください（docs/module-map.md）。",
       platformToApp: "共通（platform）はアプリ（{{unit}}）を使えません。知らせ（platform/hooks）を使ってください（docs/module-map.md）。",
       appToApp: "アプリ同士（{{from}} → {{unit}}）は直接使えません（docs/module-map.md）。",
+      appToPlatformSchema:
+        "アプリ（{{from}}）は共通の表の定義（platform/schema）を読めません。共通の入口の関数（platform/index.ts）を使ってください（specs/meguru/029-threads-pattern1 contracts/module-boundaries.md 3）。",
       unplaced:
         "{{from}} はどのモジュールにも入っていません。kernel・adapters/<名前>・platform・apps/<名前> のどれかに置いてください（組み立ては app.ts・index.ts・jobs/・db/schema.ts だけ。docs/module-map.md）。",
       lowerToUpper: "{{fromKind}}（{{from}}）は {{toKind}}（{{unit}}）を使えません。依存は 組み立て → アプリ → 共通 → 窓口 → 土台 の向きだけです（docs/module-map.md）。",
@@ -102,6 +104,9 @@ export default {
       const data = { unit: to.unit, from: from.unit, fromKind: kindName[from.kind], toKind: kindName[to.kind] };
       if (from.kind === "platform" && to.kind === "app") return context.report({ node, messageId: "platformToApp", data });
       if (from.kind === "app" && to.kind === "app") return context.report({ node, messageId: "appToApp", data });
+      if (from.kind === "app" && to.kind === "platform" && to.inner.length === 1 && to.inner[0] === "schema") {
+        return context.report({ node, messageId: "appToPlatformSchema", data });
+      }
       if (LEVEL[to.kind] > LEVEL[from.kind] || (from.kind === "adapter" && to.kind === "adapter")) {
         return context.report({ node, messageId: "lowerToUpper", data });
       }

@@ -25,12 +25,12 @@ export async function getProfileStatus(db: Db, access: AccountAccess, mode: Bill
     getStrategy(db, account.id),
     db.execute<{ promo_total: number; promo_targetable: number; posts: number; keywords: number }>(sql`
       SELECT
-        (SELECT count(*)::int FROM promotions WHERE account_id = ${account.id}) AS promo_total,
-        (SELECT count(*)::int FROM promotions
+        (SELECT count(*)::int FROM threads.promotions WHERE account_id = ${account.id}) AS promo_total,
+        (SELECT count(*)::int FROM threads.promotions
           WHERE account_id = ${account.id} AND status = 'active'
             AND (valid_until IS NULL OR valid_until >= ${today}::date)) AS promo_targetable,
-        (SELECT count(*)::int FROM reference_posts WHERE account_id = ${account.id}) AS posts,
-        (SELECT count(*)::int FROM research_keywords WHERE account_id = ${account.id}) AS keywords
+        (SELECT count(*)::int FROM threads.reference_posts WHERE account_id = ${account.id}) AS posts,
+        (SELECT count(*)::int FROM threads.research_keywords WHERE account_id = ${account.id}) AS keywords
     `),
     loadAppEntitlement(db, mode, access.owner.id, THREADS_APP, now).then((e) => e?.billing ?? null),
   ]);

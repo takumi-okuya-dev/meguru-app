@@ -2,13 +2,63 @@
 // 029 で共通の退会の処理から移した（specs/meguru/029-threads-pattern1 research.md R8）。出来事（user.withdrawn）の受け取りから、
 // Threadsのトランザクションの中で呼ぶ（events/received-events.ts）。共通は、この片づけが届いたあとで users の行を消す。
 import { and, asc, eq, inArray, ne } from "drizzle-orm";
+import type { PgColumn, PgTable } from "drizzle-orm/pg-core";
 import type { TxDb } from "../../../kernel/db/client";
 import { lockThreadsUser } from "../../../kernel/db/locks";
 import { WITHDRAWN_ACTOR_NAME } from "../../../platform";
-import { accounts, activityLogs, memberships, teamMembers, teams, threadsDeletionRequests, threadsUserStates } from "../schema";
+import {
+  accounts,
+  activityLogs,
+  analysisSettings,
+  mediaDefaults,
+  memberships,
+  mentionSettings,
+  oauthStates,
+  postClassifications,
+  postDrafts,
+  postingSchedules,
+  postMentions,
+  postMetrics,
+  promotionListings,
+  promotions,
+  referencePosts,
+  researchKeywords,
+  strategyDesigns,
+  teamAccounts,
+  teamMembers,
+  teams,
+  threadsDeletionRequests,
+  threadsUserStates,
+  tokenCheckFailures,
+} from "../schema";
 import { beforeAccountDeleted, chooseSuccessor } from "../teams/team-service";
 import { purgeForWithdrawal } from "../tester-invites/tester-application-service";
 import { lockThreadsMember } from "../access/locks";
+
+/**
+ * 作った人・直した人の欄（表示のための記録）。退会したら空にする。以前は users への外部キーの set null が空にしていたが、
+ * 029 の PR3 で外部キーを外したので、退会の出来事のときに Threads が空にする（specs/meguru/029-threads-pattern1 research.md R3）。
+ */
+const EDITOR_COLUMNS: [PgTable, PgColumn, string][] = [
+  [accounts, accounts.coreRulesUpdatedByUserId, "coreRulesUpdatedByUserId"],
+  [accounts, accounts.promotionRatioUpdatedByUserId, "promotionRatioUpdatedByUserId"],
+  [accounts, accounts.promptPostCountUpdatedByUserId, "promptPostCountUpdatedByUserId"],
+  [teamAccounts, teamAccounts.addedByUserId, "addedByUserId"],
+  [strategyDesigns, strategyDesigns.updatedByUserId, "updatedByUserId"],
+  [promotions, promotions.updatedByUserId, "updatedByUserId"],
+  [referencePosts, referencePosts.updatedByUserId, "updatedByUserId"],
+  [researchKeywords, researchKeywords.updatedByUserId, "updatedByUserId"],
+  [postDrafts, postDrafts.createdByUserId, "createdByUserId"],
+  [postDrafts, postDrafts.editedByUserId, "editedByUserId"],
+  [postingSchedules, postingSchedules.updatedByUserId, "updatedByUserId"],
+  [postMetrics, postMetrics.feedbackUpdatedByUserId, "feedbackUpdatedByUserId"],
+  [promotionListings, promotionListings.updatedByUserId, "updatedByUserId"],
+  [mediaDefaults, mediaDefaults.updatedByUserId, "updatedByUserId"],
+  [analysisSettings, analysisSettings.updatedByUserId, "updatedByUserId"],
+  [postClassifications, postClassifications.updatedByUserId, "updatedByUserId"],
+  [mentionSettings, mentionSettings.updatedByUserId, "updatedByUserId"],
+  [postMentions, postMentions.createdByUserId, "createdByUserId"],
+];
 
 /**
  * 退会する人のThreadsのデータを片づける。持ち主のアカウントを消し（アカウントの削除と同じ。001 FR-022）、チームは抜ける
@@ -64,8 +114,12 @@ export async function cleanupForWithdrawal(tx: TxDb, userId: string, now: Date =
   // ほかの人のアカウントの担当と、チームの人から外す（今は users の行を消すと外部キーで消えるが、PR3 で外部キーを外すので自分で外す）
   await tx.delete(memberships).where(and(eq(memberships.userId, userId), ne(memberships.role, "owner")));
   await tx.delete(teamMembers).where(eq(teamMembers.userId, userId));
-  // 利用者ごとの状態（最後に開いたアカウント。specs/meguru/029 tasks.md T071）
+  // 利用者ごとの状態（最後に開いたアカウント。specs/meguru/029 tasks.md T071）と、その人の接続の途中の記録
+  // （以前は users の外部キーの cascade が消していた。029 の PR3 で外部キーを外したので自分で消す。research.md R3）
   await tx.delete(threadsUserStates).where(eq(threadsUserStates.userId, userId));
-  // ほかの人のアカウントの操作の記録は残し、名前を「退会した人」にする（FR-053）
-  await tx.update(activityLogs).set({ actorName: WITHDRAWN_ACTOR_NAME }).where(eq(activityLogs.actorUserId, userId));
+  await tx.delete(tokenCheckFailures).where(eq(tokenCheckFailures.userId, userId));
+  await tx.delete(oauthStates).where(eq(oauthStates.userId, userId));
+  // ほかの人のアカウントの操作の記録は残し、名前を「退会した人」にして、利用者の番号を空にする（FR-053）
+  await tx.update(activityLogs).set({ actorName: WITHDRAWN_ACTOR_NAME, actorUserId: null }).where(eq(activityLogs.actorUserId, userId));
+  for (const [table, column, key] of EDITOR_COLUMNS) await tx.update(table).set({ [key]: null }).where(eq(column, userId));
 }

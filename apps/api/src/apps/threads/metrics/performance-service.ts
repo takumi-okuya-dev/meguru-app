@@ -66,20 +66,20 @@ export async function getPerformanceSummary(db: Db, account: AccountRow): Promis
     pending: number;
   }>(sql`
     WITH base AS (
-      SELECT pm.views FROM post_metrics pm JOIN post_drafts d ON d.id = pm.draft_id
+      SELECT pm.views FROM threads.post_metrics pm JOIN threads.post_drafts d ON d.id = pm.draft_id
       WHERE pm.account_id = ${account.id} AND pm.state = 'confirmed' AND pm.views IS NOT NULL
       ORDER BY d.published_at DESC, d.id LIMIT ${PERFORMANCE_BASELINE_SAMPLE}
     )
     SELECT
       (SELECT count(*)::int FROM base) AS n,
       (SELECT percentile_cont(0.5) WITHIN GROUP (ORDER BY views) FROM base) AS median,
-      (SELECT max(last_fetched_at) FROM post_metrics WHERE account_id = ${account.id}) AS last_fetched_at,
+      (SELECT max(last_fetched_at) FROM threads.post_metrics WHERE account_id = ${account.id}) AS last_fetched_at,
       count(*)::int AS all,
       count(*) FILTER (WHERE pm.judgment = 'good')::int AS good,
       count(*) FILTER (WHERE pm.judgment = 'normal')::int AS normal,
       count(*) FILTER (WHERE pm.judgment = 'poor')::int AS poor,
       count(*) FILTER (WHERE pm.draft_id IS NULL OR pm.state = 'updating')::int AS pending
-    FROM post_drafts d LEFT JOIN post_metrics pm ON pm.draft_id = d.id
+    FROM threads.post_drafts d LEFT JOIN threads.post_metrics pm ON pm.draft_id = d.id
     WHERE d.account_id = ${account.id} AND d.status = 'published'
   `);
   const r = res.rows[0]!;
@@ -384,7 +384,7 @@ export async function listExportRows(
         quotes: postMetricSnapshots.quotes,
         shares: postMetricSnapshots.shares,
         // 取り込んだ日（日本時間）のフォロワー数
-        followersOnDay: sql<number | null>`(SELECT f.followers_count FROM follower_snapshots f
+        followersOnDay: sql<number | null>`(SELECT f.followers_count FROM threads.follower_snapshots f
           WHERE f.account_id = ${postMetricSnapshots.accountId}
             AND f.snapshot_date = (${postMetricSnapshots.fetchedAt} AT TIME ZONE 'Asia/Tokyo')::date)`,
       })
@@ -437,7 +437,7 @@ export async function listExportRows(
       lastFetchedAt: postMetrics.lastFetchedAt,
       lastElapsedMinutes: postMetrics.lastElapsedMinutes,
       // 投稿した日時より前で最も新しいフォロワー数（FR-002c）
-      followersAtPost: sql<number | null>`(SELECT f.followers_count FROM follower_snapshots f
+      followersAtPost: sql<number | null>`(SELECT f.followers_count FROM threads.follower_snapshots f
         WHERE f.account_id = ${postDrafts.accountId} AND f.captured_at <= ${postDrafts.publishedAt}
         ORDER BY f.captured_at DESC LIMIT 1)`,
       h24Fetched: s24.id,

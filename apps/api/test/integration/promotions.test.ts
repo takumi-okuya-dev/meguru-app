@@ -130,7 +130,7 @@ describe("宣伝内容", () => {
   it("件数の上限の同時実行：49件のAccountに2つ同時に追加しても50件を超えない", async () => {
     const { accountId } = await createUserWithAccount("u1");
     const sql = neon(testEnv.DATABASE_URL);
-    await sql`INSERT INTO promotions (account_id, title, content)
+    await sql`INSERT INTO threads.promotions (account_id, title, content)
       SELECT ${accountId}, 't' || g, 'c' FROM generate_series(1, 49) AS g`;
     const results = await Promise.all(
       [1, 2].map(() => call(app, "POST", `${base(accountId)}/promotions`, { user: "u1", body: input() })),

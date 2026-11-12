@@ -83,10 +83,10 @@ describe("PATCH /api/teams/:teamId/accounts/:accountId（チームに見せる�
     // 下書きに付く blockedWords（＝オーナーのNGワードそのもの）の漏れを見逃す（セキュリティ監査 run-1）
     const db = sql();
     const [batch] = (await db`
-      INSERT INTO draft_batches (account_id, client_request_id, draft_count, delimiter_found)
+      INSERT INTO threads.draft_batches (account_id, client_request_id, draft_count, delimiter_found)
       VALUES (${ownerAcc}, gen_random_uuid(), 1, true) RETURNING id`) as [{ id: string }];
     await db`
-      INSERT INTO post_drafts (account_id, batch_id, position, body, status, blocked_at, blocked_reason, blocked_words)
+      INSERT INTO threads.post_drafts (account_id, batch_id, position, body, status, blocked_at, blocked_reason, blocked_words)
       VALUES (${ownerAcc}, ${batch.id}, 0, '案', 'needs_review', now(), 'ng_word', ARRAY['秘密の言葉'])`;
     expect((await share(teamId, ownerAcc, "o1", true)).status).toBe(204);
     const res = await call(app, "GET", `/api/accounts/${ownerAcc}/post-drafts`, { user: "m1" });
@@ -118,10 +118,10 @@ describe("PATCH /api/teams/:teamId/accounts/:accountId（チームに見せる�
     await call(app, "POST", `/api/accounts/${ownerAcc}/ng-words`, { user: "o1", body: { words: ["秘密の言葉"] } });
     const db = sql();
     const [batch] = (await db`
-      INSERT INTO draft_batches (account_id, client_request_id, draft_count, delimiter_found)
+      INSERT INTO threads.draft_batches (account_id, client_request_id, draft_count, delimiter_found)
       VALUES (${ownerAcc}, gen_random_uuid(), 1, true) RETURNING id`) as [{ id: string }];
     await db`
-      INSERT INTO post_drafts (account_id, batch_id, position, body, status, blocked_at, blocked_reason, blocked_words)
+      INSERT INTO threads.post_drafts (account_id, batch_id, position, body, status, blocked_at, blocked_reason, blocked_words)
       VALUES (${ownerAcc}, ${batch.id}, 0, '案', 'needs_review', now(), 'ng_word', ARRAY['秘密の言葉'])`;
     expect((await share(teamId, ownerAcc, "o1", true)).status).toBe(204);
     const res = await call(app, "GET", `/api/accounts/${ownerAcc}/post-drafts`, { user: "o1" });
@@ -131,7 +131,7 @@ describe("PATCH /api/teams/:teamId/accounts/:accountId（チームに見せる�
 
   it("見せてもらっている人の GET /accounts/:id は、名前とアイコンだけが本当の値で、接続・最後に使った日時は伏せる（PR #14 のCodexレビュー）", async () => {
     const { teamId, ownerAcc } = await setup();
-    await sql()`UPDATE accounts SET connection_status = 'needs_reconnect', connection_method = 'token', last_used_at = now() WHERE id = ${ownerAcc}`;
+    await sql()`UPDATE threads.accounts SET connection_status = 'needs_reconnect', connection_method = 'token', last_used_at = now() WHERE id = ${ownerAcc}`;
     expect((await share(teamId, ownerAcc, "o1", true)).status).toBe(204);
     const viewer = (await (await call(app, "GET", `/api/accounts/${ownerAcc}`, { user: "m1" })).json()) as Record<string, unknown>;
     expect(viewer).toMatchObject({
@@ -167,7 +167,7 @@ describe("POST・DELETE /api/teams/:teamId/accounts（自分のアカウント�
     const { teamId } = await setup();
     const { accountId: extra } = await createUserWithAccount("m1");
     expect((await call(app, "POST", `/api/teams/${teamId}/accounts`, { user: "m1", body: { accountId: extra, shared: true } })).status).toBe(204);
-    const [row] = (await sql()`SELECT shared FROM team_accounts WHERE account_id = ${extra}`) as { shared: boolean }[];
+    const [row] = (await sql()`SELECT shared FROM threads.team_accounts WHERE account_id = ${extra}`) as { shared: boolean }[];
     expect(row!.shared).toBe(true);
     expect((await activityRows(extra)).map((r) => r.action)).toEqual(["team_account_added"]);
     const { accountId: others } = await createUserWithAccount("z1");
@@ -182,7 +182,7 @@ describe("POST・DELETE /api/teams/:teamId/accounts（自分のアカウント�
     expect((await del(ownerAcc, "m1")).status).toBe(403);
     expect((await del(ownerAcc, "o1")).status).toBe(204);
     expect((await call(app, "GET", `/api/accounts/${ownerAcc}/post-drafts`, { user: "e1" })).status).toBe(404);
-    const [assigned] = (await sql()`SELECT count(*)::int AS n FROM memberships WHERE account_id = ${ownerAcc} AND role = 'editor'`) as { n: number }[];
+    const [assigned] = (await sql()`SELECT count(*)::int AS n FROM threads.memberships WHERE account_id = ${ownerAcc} AND role = 'editor'`) as { n: number }[];
     expect(assigned!.n).toBe(0);
     const last = await del(ownerAcc2, "o1");
     expect([last.status, await errorOf(last)]).toEqual([409, "TEAM_LAST_ACCOUNT"]);
