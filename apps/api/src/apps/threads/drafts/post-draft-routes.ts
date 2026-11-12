@@ -14,7 +14,7 @@ import { Hono, type MiddlewareHandler } from "hono";
 import type { AppEnv } from "../../../platform";
 import { inArray } from "drizzle-orm";
 import { createDb, withTransaction, type Db } from "../../../kernel/db/client";
-import { users, effectiveLimits } from "../../../platform";
+import { users } from "../../../platform";
 import { authorizeAccount, personName } from "../access/access";
 import { AppError } from "../../../kernel/errors";
 import { parseBody } from "../../../kernel/validate";
@@ -47,7 +47,7 @@ export function postDraftRoutes(authed: MiddlewareHandler<AppEnv>) {
       // 見せてもらっている人には、設定（NGワード・作る件数）と自動投稿の状態を見せない（specs/011 FR-031、Constitution原則V）
       const viewer = access.relation === "shared_viewer";
       // オーナーの1日の投稿数の上限（予定の時刻を上限の数までにする。specs/024 FR-020）
-      const { dailyPostLimit } = await effectiveLimits(db, c.env, access.owner.id);
+      const dailyPostLimit = access.ownerDailyPostLimit;
       const [drafts, ngWordRows] = await Promise.all([
         // 見せてもらっている人には、下書きに付く blockedWords（＝オーナーのNGワード）も返さない
         listAllDrafts(db, { ...account, ownerReadOnly: access.readOnly !== null, redactSettings: viewer, dailyPostLimit }),

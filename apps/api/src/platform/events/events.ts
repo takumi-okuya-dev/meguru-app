@@ -115,9 +115,16 @@ function errorSummary(err: unknown): string {
  * 書いた直後の届けと定期処理が重なっても、同じ届け先に同時に2回は届けない。
  * @param env - Workers のバインディング
  * @param now - 今の時刻
+ * @param opts - eventIds：この出来事だけを届ける（書いた直後に、ほかの出来事まで待たずに届けるため。PR #96 のセルフレビュー）
  * @returns 届けた数と失敗した数
  */
-export async function deliverPendingEvents(env: Env, now: Date = new Date()): Promise<{ delivered: number; failed: number }> {
+export async function deliverPendingEvents(
+  env: Env,
+  now: Date = new Date(),
+  opts: { eventIds?: readonly string[] } = {},
+): Promise<{ delivered: number; failed: number }> {
+  if (opts.eventIds && opts.eventIds.length === 0) return { delivered: 0, failed: 0 };
+  const only = opts.eventIds ? inArray(platformEventDeliveries.eventId, [...opts.eventIds]) : undefined;
   const db = createDb(env.DATABASE_URL);
   // 試した回数が上限に達したまま pending の行（受け取りの途中で止まり続けた）は、受け取りを呼ばずに failed にする（PR #92 のCodexレビュー）
   const exhausted = await db
@@ -128,6 +135,7 @@ export async function deliverPendingEvents(env: Env, now: Date = new Date()): Pr
         eq(platformEventDeliveries.status, "pending"),
         gte(platformEventDeliveries.attempts, MAX_DELIVERY_ATTEMPTS),
         lte(platformEventDeliveries.nextAttemptAt, now),
+        only,
       ),
     )
     .returning({ eventId: platformEventDeliveries.eventId, consumer: platformEventDeliveries.consumer });
@@ -143,7 +151,7 @@ export async function deliverPendingEvents(env: Env, now: Date = new Date()): Pr
     })
     .from(platformEventDeliveries)
     .innerJoin(platformEvents, eq(platformEvents.id, platformEventDeliveries.eventId))
-    .where(and(eq(platformEventDeliveries.status, "pending"), lte(platformEventDeliveries.nextAttemptAt, now)))
+    .where(and(eq(platformEventDeliveries.status, "pending"), lte(platformEventDeliveries.nextAttemptAt, now), only))
     .orderBy(asc(platformEvents.createdAt))
     .limit(DELIVERY_BATCH);
   let delivered = 0;
@@ -190,6 +198,24 @@ export async function deliverPendingEvents(env: Env, now: Date = new Date()): Pr
     }
   }
   return { delivered, failed };
+}
+
+/**
+ * 失敗で止まった届けを、もう一度届ける状態に戻す（試した回数も0に戻す）。退会の続きのように、届かないと先へ進めない
+ * 処理が、日次でやり直すときに使う。
+ * @param db - データベース
+ * @param eventIds - 出来事の番号
+ * @param now - 今の時刻
+ * @returns 戻した数
+ */
+export async function rearmFailedDeliveries(db: Db, eventIds: readonly string[], now: Date = new Date()): Promise<number> {
+  if (eventIds.length === 0) return 0;
+  const rows = await db
+    .update(platformEventDeliveries)
+    .set({ status: "pending", attempts: 0, nextAttemptAt: now })
+    .where(and(inArray(platformEventDeliveries.eventId, [...eventIds]), eq(platformEventDeliveries.status, "failed")))
+    .returning({ eventId: platformEventDeliveries.eventId });
+  return rows.length;
 }
 
 /**

@@ -2,7 +2,7 @@
 import { neon } from "@neondatabase/serverless";
 import { beforeEach, describe, expect, it } from "vitest";
 import { TEST_APP_SECRET } from "../env";
-import { authorizeAndCallback, call, connectExisting, fake, makeApp, resetDb, testEnv } from "../helpers/app";
+import { authorizeAndCallback, call, connectExisting, fake, makeApp, resetDb, testEnv, setDefaultLimit } from "../helpers/app";
 import { makeSignedRequest } from "../helpers/signed-request";
 import {
   applicationRow,
@@ -184,7 +184,7 @@ describe("Metaからのデータ削除でアカウントが消えたとき（PR 
 
 describe("退会したとき（research.md R15）", () => {
   it("枠を使っていない行は消え、枠を使っている行はユーザー名だけを残して外してよい。記録に個人の情報がない", async () => {
-    await q()`UPDATE operator_settings SET default_account_limit = 10`; // アカウントを4件作る
+    await setDefaultLimit("accounts", 10); // アカウントを4件作る
     const pending = await applied("u1", "pending_one");
     const declined = await applied("u1", "declined_one");
     await q()`UPDATE tester_applications SET status = 'declined', decline_reason = '見送り' WHERE id = ${declined.id}`;

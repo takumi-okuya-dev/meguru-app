@@ -1,6 +1,6 @@
 // US3：自動投稿の時刻の処理は、オーナーの1日の投稿数の上限の数までだけ（specs/024 research.md R7、FR-020、T042）
 import { beforeEach, describe, expect, it } from "vitest";
-import { call, fake, makeApp, resetDb, testEnv } from "../helpers/app";
+import { call, fake, makeApp, resetDb, testEnv, setUserLimit } from "../helpers/app";
 import { approvedDrafts, attempts, connectedAccount, db, jst, run, setSchedule } from "../helpers/auto-post";
 
 const app = makeApp();
@@ -29,7 +29,7 @@ describe("1日の投稿数の上限", () => {
     const { accountId } = await connectedAccount("u1", app);
     await approvedDrafts(accountId, Array.from({ length: 8 }, (_, i) => `案${i}`));
     await setSchedule(accountId, { slotMinutes: EIGHT });
-    await db()`UPDATE users SET daily_post_limit = 5 WHERE clerk_user_id = 'u1'`;
+    await setUserLimit({ clerkUserId: "u1" }, "daily_posts", 5);
     expect(await runDay(accountId, "2026-11-10")).toEqual([7, 8, 9, 10, 11]);
     const [row] = (await db()`SELECT slot_minutes FROM posting_schedules WHERE account_id = ${accountId}`) as { slot_minutes: number[] }[];
     expect(row!.slot_minutes).toHaveLength(8);
@@ -51,7 +51,7 @@ describe("上限が効く、ほかの場所", () => {
     await setSchedule(accountId, { slotMinutes: EIGHT });
     // 7〜9時の3つを投稿したあと、上限を2に下げる。10時の時刻は上限の外なので、試みを作らない
     for (const h of ["07", "08", "09"]) await run(jst(`2026-11-10 ${h}:00`));
-    await db()`UPDATE users SET daily_post_limit = 2 WHERE clerk_user_id = 'u1'`;
+    await setUserLimit({ clerkUserId: "u1" }, "daily_posts", 2);
     await run(jst("2026-11-10 10:00"));
     const rows = await attempts(accountId);
     expect(rows.filter((r) => r.state !== "skipped")).toHaveLength(3);
@@ -61,7 +61,7 @@ describe("上限が効く、ほかの場所", () => {
   it("自動投稿の状態の slotCount と、プロンプトの1日の投稿数は、上限の数まで", async () => {
     const { accountId } = await connectedAccount("u1", app);
     await setSchedule(accountId, { slotMinutes: EIGHT });
-    await db()`UPDATE users SET daily_post_limit = 5 WHERE clerk_user_id = 'u1'`;
+    await setUserLimit({ clerkUserId: "u1" }, "daily_posts", 5);
     const status = (await (await call(app, "GET", `/api/accounts/${accountId}/auto-post`, { user: "u1" })).json()) as {
       slotCount?: number;
       state?: { slotCount: number };

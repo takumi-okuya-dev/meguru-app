@@ -1,10 +1,12 @@
 // 取り出し（specs/005-auto-post contracts/auto-post-job.md 手順2の4・手順3、research.md R6・R7）。
 // 来ている時刻の試みの行を作り、同じトランザクションで、公開する下書きを選んで publishing にする。
 // 004 の承認・NGワードの追加と同じ「Account × 下書き」のロックの中で、その時点のNGワードで確かめる（Constitution原則I）。
-import { loadOwnerEntitlement, ownerAutopostOn, ownerDailyPostLimit } from "../access/owner";
+import { loadOwnerAppEntitlement, ownerBlockReason } from "../access/owner";
+import type { AppEntitlement } from "../../../platform";
 import {
   AUTOPOST_DAILY_API_LIMIT,
   AUTOPOST_LEASE_SECONDS,
+  DAILY_POST_LIMIT_MAX,
   addDays,
   checkPublishable,
   jstMidnight,
@@ -18,7 +20,7 @@ import { postDrafts, postingSchedules, publishAttempts } from "../schema";
 import { effectiveSlotMinutes } from "../../../platform";
 import { accounts } from "../schema";
 import type { Env } from "../../../kernel/env";
-import { billingModeOf, type BillingMode } from "../../../kernel/config";
+import { billingModeOf } from "../../../kernel/config";
 import { CLEAR_QUEUE_FIELDS, listQueueRows } from "../drafts/draft-service";
 import { listNgWords } from "../drafts/posting-rules-service";
 
@@ -58,7 +60,7 @@ function isCurrentSlot(accountId: string, slot: DueSlot, schedule: ScheduleRow, 
 /**
  * 公開してよいかの条件を確かめる（手順3の表）。満たさなければ飛ばす理由を返す。
  * @param tx - トランザクション
- * @param mode - 決済のモード（オーナーが読むだけなら billing_inactive。specs/013 research.md R8）
+ * @param owner - オーナーの利用権（読むだけ・退会の途中なら billing_inactive。specs/013 research.md R8）
  * @param accountId - accounts.id
  * @param schedule - 読み直した設定
  * @param slot - 来ている時刻
@@ -68,7 +70,7 @@ function isCurrentSlot(accountId: string, slot: DueSlot, schedule: ScheduleRow, 
  */
 async function skipReasonOf(
   tx: TxDb,
-  mode: BillingMode,
+  owner: AppEntitlement | null,
   accountId: string,
   schedule: ScheduleRow | undefined,
   slot: DueSlot,
@@ -81,11 +83,9 @@ async function skipReasonOf(
     .where(eq(accounts.id, accountId));
   if (!schedule?.enabled) return "auto_post_off";
   if (account?.connectionStatus !== "connected") return "needs_reconnect";
-  // 一覧を読んだ後にオーナーが読むだけになった（specs/013 research.md R8）
-  const owner = await loadOwnerEntitlement(tx, accountId, mode, now);
-  if (owner && !owner.fullAccess) return "billing_inactive";
-  // 一覧を読んだ後に、オーナーが自動投稿を使えなくなった（specs/019 FR-008）
-  if (!(await ownerAutopostOn(tx, accountId))) return "auto_post_off";
+  // 一覧を読んだ後にオーナーが読むだけ・退会の途中になった、または自動投稿を使えなくなった（specs/013 research.md R8、specs/019 FR-008）
+  const blocked = ownerBlockReason(owner);
+  if (blocked) return blocked;
   if (schedule.pausedUntil && schedule.pausedUntil.getTime() > now.getTime()) return "rate_limited";
   const published = (from: Date, to: Date) =>
     tx
@@ -153,8 +153,9 @@ export async function claimSlot(
       .from(postingSchedules)
       .where(eq(postingSchedules.accountId, accountId))
       .for("share");
-    // オーナーの1日の投稿数の上限は、設定と同じトランザクションで読み直す（一覧を読んだ後に下がっても超えない）
-    const dailyPostLimit = await ownerDailyPostLimit(tx, accountId, billingModeOf(env).operators ?? []);
+    // オーナーの利用権（1日の投稿数の上限・使える状態）は、設定と同じトランザクションで1回だけ読み直す（一覧を読んだ後に下がっても超えない）
+    const owner = await loadOwnerAppEntitlement(tx, accountId, billingModeOf(env), now);
+    const dailyPostLimit = owner?.limits.daily_posts ?? DAILY_POST_LIMIT_MAX;
     if (schedule?.enabled && !isCurrentSlot(accountId, slot, schedule, dailyPostLimit))
       return { kind: "stale" } as const;
 
@@ -175,7 +176,7 @@ export async function claimSlot(
     };
 
     // 自分の記録で250件に達した場合は paused_until を入れない（直前24時間の件数が減れば、次の時刻から投稿する）
-    const reason = await skipReasonOf(tx, billingModeOf(env), accountId, schedule, slot, now, dailyPostLimit);
+    const reason = await skipReasonOf(tx, owner, accountId, schedule, slot, now, dailyPostLimit);
     if (reason) return skip(reason, 0);
 
     const [queue, ngWordRows] = await Promise.all([

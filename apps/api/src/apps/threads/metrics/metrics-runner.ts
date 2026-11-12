@@ -26,7 +26,8 @@ import { and, asc, eq, gte, inArray, isNull, lt, or, sql, type SQL } from "drizz
 import type { BatchItem } from "drizzle-orm/batch";
 import type { Db } from "../../../kernel/db/client";
 import { followerSnapshots, postDrafts, postMetricSnapshots, postMetrics, threadsConnections } from "../schema";
-import { subscriptions, users, entitlementFromFacts, fullAccessSql, featureOnSql, billingExemptSql } from "../../../platform";
+import { loadAppEntitlements } from "../../../platform";
+import { THREADS_APP } from "../registry";
 import { accounts, memberships } from "../schema";
 import type { Env } from "../../../kernel/env";
 import { billingModeOf, type BillingMode } from "../../../kernel/config";
@@ -69,11 +70,6 @@ type Candidate = {
   taken: MetricsMilestone[];
   threadsUserId: string;
   generation: number;
-  ownerCreatedAt: Date;
-  ownerLegacyTrial: boolean;
-  ownerBillingExempt: boolean;
-  subStatus: string | null;
-  subCancelAtPeriodEnd: boolean | null;
   ciphertext: Uint8Array | null;
   iv: Uint8Array | null;
   keyVersion: number | null;
@@ -140,33 +136,15 @@ export async function runMetricsStage(
   // 6-1. 対象を読む
   const limit = calls + 40;
   const mode = billingModeOf(env);
-  const candidates = await loadCandidates(db, mode, now, catchup, todayStart, limit);
-  // オーナーが読むだけのアカウントは取らない（specs/013 research.md R8）。テスト版に入れないオーナー（specs/016）は、
-  // 候補を読むSQL（fullAccessSql）で外れているので、ここでは決済の状態だけを見直す
-  const ownerFull = (t: {
-    ownerCreatedAt: Date;
-    ownerLegacyTrial: boolean;
-    ownerBillingExempt: boolean;
-    subStatus: string | null;
-    subCancelAtPeriodEnd: boolean | null;
-  }) =>
-    entitlementFromFacts(
-      mode,
-      {
-        createdAt: t.ownerCreatedAt,
-        legacyTrial: t.ownerLegacyTrial,
-        billingExempt: t.ownerBillingExempt,
-        status: t.subStatus,
-        cancelAtPeriodEnd: t.subCancelAtPeriodEnd,
-      },
-      now,
-    ).fullAccess;
+  // オーナーが読むだけ・自動投稿を使えない・退会の途中のアカウントは取らない（specs/013 research.md R8、specs/016、specs/019 FR-008）。
+  // 使えるオーナーを先に利用権で決め、件数の上限の前に絞る（共通の表とJOINしない。specs/meguru/029 research.md R4、PR #16 のCodexレビュー）
+  const owners = await activeOwnerIds(db, mode, now);
+  const candidates = await loadCandidates(db, owners, now, catchup, todayStart, limit);
   let catchupRemaining = catchup && candidates.length >= limit;
 
   // 6-2. 何を取るかを決める
   const works: Work[] = [];
   for (const c of candidates) {
-    if (!ownerFull(c)) continue;
     const elapsed = elapsedMinutes(c.publishedAt, now);
     const taken = new Set(c.taken);
     const milestone = milestoneForElapsed(elapsed);
@@ -254,10 +232,9 @@ export async function runMetricsStage(
   // 6-4. フォロワー数（補いのときだけ）
   const followers: { accountId: string; count: number }[] = [];
   if (catchup && !stopped) {
-    const targets = await loadFollowerTargets(db, mode, now, today, todayStart);
+    const targets = await loadFollowerTargets(db, owners, now, today, todayStart);
     for (const t of targets) {
       if (skipAccounts.has(t.accountId) || denied.has(t.accountId)) continue;
-      if (!ownerFull(t)) continue;
       if (calls <= 0) {
         catchupRemaining = true;
         break;
@@ -313,9 +290,28 @@ function isConfirming(w: Work): boolean {
 }
 
 /**
+ * 反応を取り込んでよいオーナー（すべて使える・自動投稿を使える・退会の途中でない）の番号。接続済みのアカウントの
+ * オーナーだけを、共通の入口の関数（loadAppEntitlements）でまとめて調べる。オーナーの数だけ問い合わせの値が増えるが、
+ * 今の規模（テスト版で数十人）では問題にならない（specs/meguru/029 research.md R4。増えたら、利用権の写しを持つ形を考える）。
+ * @param db - データベース
+ * @param mode - 決済のモード
+ * @param now - 今
+ * @returns オーナーの番号
+ */
+async function activeOwnerIds(db: Db, mode: BillingMode, now: Date): Promise<string[]> {
+  const rows = await db
+    .selectDistinct({ id: memberships.userId })
+    .from(memberships)
+    .innerJoin(accounts, eq(accounts.id, memberships.accountId))
+    .where(and(eq(memberships.role, "owner"), eq(accounts.connectionStatus, "connected")));
+  const ents = await loadAppEntitlements(db, mode, rows.map((r) => r.id), THREADS_APP, now);
+  return [...ents].filter(([, e]) => e.billing.fullAccess && e.features.has("autopost") && !e.withdrawn).map(([id]) => id);
+}
+
+/**
  * 6-1 の対象を読む。時点の幅の中を先に、次に投稿IDのない投稿、最後に補いの投稿を古い順に。
  * @param db - データベース
- * @param mode - 決済のモード（オーナーが読むだけの行を外すのに使う）
+ * @param owners - 使えるオーナーの番号（activeOwnerIds）
  * @param now - 今
  * @param catchup - 補いをするか
  * @param todayStart - 今日の0時（日本時間）。権限のない印がこれより前なら対象にする
@@ -324,12 +320,13 @@ function isConfirming(w: Work): boolean {
  */
 async function loadCandidates(
   db: Db,
-  mode: BillingMode,
+  owners: readonly string[],
   now: Date,
   catchup: boolean,
   todayStart: Date,
   limit: number,
 ): Promise<Candidate[]> {
+  if (owners.length === 0) return [];
   const windows = (["h24", "d3", "d7"] as const).map((m) => {
     const center = now.getTime() - METRICS_MILESTONE_HOURS[m] * HOUR;
     return and(
@@ -350,11 +347,6 @@ async function loadCandidates(
       taken: sql<string[]>`coalesce(array_agg(${postMetricSnapshots.kind}::text) FILTER (WHERE ${postMetricSnapshots.kind} IS NOT NULL), '{}')`,
       threadsUserId: accounts.threadsUserId,
       generation: accounts.connectionGeneration,
-      ownerCreatedAt: users.createdAt,
-      ownerLegacyTrial: users.legacyTrial,
-      ownerBillingExempt: billingExemptSql(users, mode),
-      subStatus: subscriptions.status,
-      subCancelAtPeriodEnd: subscriptions.cancelAtPeriodEnd,
       ciphertext: threadsConnections.accessTokenCiphertext,
       iv: threadsConnections.accessTokenIv,
       keyVersion: threadsConnections.keyVersion,
@@ -362,8 +354,6 @@ async function loadCandidates(
     .from(postDrafts)
     .innerJoin(accounts, eq(accounts.id, postDrafts.accountId))
     .innerJoin(memberships, and(eq(memberships.accountId, accounts.id), eq(memberships.role, "owner")))
-    .innerJoin(users, eq(users.id, memberships.userId))
-    .leftJoin(subscriptions, eq(subscriptions.userId, users.id))
     .leftJoin(threadsConnections, eq(threadsConnections.accountId, accounts.id))
     .leftJoin(postMetrics, eq(postMetrics.draftId, postDrafts.id))
     .leftJoin(postMetricSnapshots, eq(postMetricSnapshots.draftId, postDrafts.id))
@@ -373,14 +363,12 @@ async function loadCandidates(
         eq(accounts.connectionStatus, "connected"),
         or(isNull(accounts.insightsDeniedAt), lt(accounts.insightsDeniedAt, todayStart)),
         or(isNull(postMetrics.state), eq(postMetrics.state, "updating")),
-        // オーナーが読むだけの行は、件数の上限の前に外す（PR #16 のCodexレビュー）
-        fullAccessSql(mode, now),
-        // オーナーが自動投稿を使えないアカウントも、反応を取り込まない（specs/019 FR-008。決済の判定には混ぜない）
-        featureOnSql(users.id, "autopost"),
+        // 使えるオーナーのアカウントだけ（件数の上限の前に絞る。PR #16 のCodexレビュー、specs/019 FR-008）
+        inArray(memberships.userId, [...owners]),
         due,
       ),
     )
-    .groupBy(postDrafts.id, accounts.id, users.id, subscriptions.userId, threadsConnections.accountId, postMetrics.draftId)
+    .groupBy(postDrafts.id, accounts.id, threadsConnections.accountId, postMetrics.draftId)
     .orderBy(priority, asc(postDrafts.publishedAt), asc(postDrafts.id))
     .limit(limit);
   // connected で絞っているので threads_user_id は必ずある（specs/012 の CHECK 制約）。型のために NULL を落とす
@@ -402,40 +390,32 @@ async function loadCandidates(
 /**
  * 6-4 のフォロワー数の対象：今日の記録がなく、直近30日に投稿済みがあるAccount。
  * @param db - データベース
- * @param mode - 決済のモード（オーナーが読むだけの行を外すのに使う）
+ * @param owners - 使えるオーナーの番号（activeOwnerIds）
  * @param now - 今
  * @param today - 今日（日本時間）
  * @param todayStart - 今日の0時（日本時間）
  * @returns 対象
  */
-async function loadFollowerTargets(db: Db, mode: BillingMode, now: Date, today: string, todayStart: Date) {
+async function loadFollowerTargets(db: Db, owners: readonly string[], now: Date, today: string, todayStart: Date) {
+  if (owners.length === 0) return [];
   const rows = await db
     .select({
       accountId: accounts.id,
       threadsUserId: accounts.threadsUserId,
       generation: accounts.connectionGeneration,
-      ownerCreatedAt: users.createdAt,
-      ownerLegacyTrial: users.legacyTrial,
-      ownerBillingExempt: billingExemptSql(users, mode),
-      subStatus: subscriptions.status,
-      subCancelAtPeriodEnd: subscriptions.cancelAtPeriodEnd,
       ciphertext: threadsConnections.accessTokenCiphertext,
       iv: threadsConnections.accessTokenIv,
       keyVersion: threadsConnections.keyVersion,
     })
     .from(accounts)
     .innerJoin(memberships, and(eq(memberships.accountId, accounts.id), eq(memberships.role, "owner")))
-    .innerJoin(users, eq(users.id, memberships.userId))
-    .leftJoin(subscriptions, eq(subscriptions.userId, users.id))
     .leftJoin(threadsConnections, eq(threadsConnections.accountId, accounts.id))
     .where(
       and(
         eq(accounts.connectionStatus, "connected"),
         or(isNull(accounts.insightsDeniedAt), lt(accounts.insightsDeniedAt, todayStart)),
-        // オーナーが読むだけの行は、件数の上限の前に外す（PR #16 のCodexレビュー）
-        fullAccessSql(mode, now),
-        // オーナーが自動投稿を使えないアカウントも、反応を取り込まない（specs/019 FR-008。決済の判定には混ぜない）
-        featureOnSql(users.id, "autopost"),
+        // 使えるオーナーのアカウントだけ（件数の上限の前に絞る。PR #16 のCodexレビュー、specs/019 FR-008）
+        inArray(memberships.userId, [...owners]),
         sql`EXISTS (SELECT 1 FROM ${postDrafts} d WHERE d.account_id = ${accounts.id} AND d.status = 'published'
           AND d.published_at >= ${new Date(now.getTime() - FOLLOWER_ACTIVE_DAYS * 24 * HOUR).toISOString()})`,
         sql`NOT EXISTS (SELECT 1 FROM ${followerSnapshots} f WHERE f.account_id = ${accounts.id} AND f.snapshot_date = ${today}::date)`,

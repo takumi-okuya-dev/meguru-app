@@ -18,7 +18,8 @@ import { operatorIdsOf } from "../../kernel/config";
 import { AppError } from "../../kernel/errors";
 import { isUuid } from "../../kernel/validate";
 import { listOperatorEvents, recordOperatorEvent } from "./operator-events";
-import { runHook } from "../hooks";
+import { deliverPendingEvents, emitEvent } from "../events/events";
+import { logger } from "../../kernel/logger";
 import { isOperatorSql } from "../test-groups/test-group-service";
 import { readOperatorSettings } from "./operator-settings";
 
@@ -168,6 +169,27 @@ async function mirrorUserLimits(tx: TxDb, userId: string, v: UserLimitsRequest):
 }
 
 /**
+ * 上限（アカウントの数・1日の投稿数）を登録したアプリ。運営の画面を登録の一覧で出す形にするまで（PR2c の T069・T070）、
+ * 上限は1つのアプリのものとして扱う。
+ * @returns アプリの番号（登録がなければ undefined）
+ */
+function limitsApp(): string | undefined {
+  return registeredApps().find((a) => "accounts" in appLimits(a));
+}
+
+/**
+ * 書いた出来事だけをすぐ届ける（ほかの出来事の届けを待たない。失敗しても保存は成功のまま。5分ごとの届けでやり直す）。
+ * @param env - Workers のバインディング
+ * @param eventId - 書いた出来事の番号（なければ何もしない）
+ */
+async function deliverSoon(env: Env, eventId: string | null): Promise<void> {
+  if (!eventId) return;
+  await deliverPendingEvents(env, new Date(), { eventIds: [eventId] }).catch((err: unknown) =>
+    logger.error("limits: event delivery failed", { err: String(err) }),
+  );
+}
+
+/**
  * 既定値を保存する（FR-016）。
  * @param env - Workers のバインディング
  * @param operator - 運営者
@@ -183,11 +205,12 @@ export async function setDefaults(env: Env, operator: { id: string }, v: Default
       .where(eq(operatorSettings.id, 1));
     await mirrorDefaults(tx, v);
     await recordOperatorEvent(tx, { actorUserId: operator.id, action: "default_limits", detail: { before, after: v } });
-    return v;
-  }).then(async (saved) => {
-    // 上限が上がると、次に見る時刻が早まることがある。定期処理を起こす（PR #71 のCodexレビュー）
-    // アプリに知らせる（Threads：自動投稿を起こす。specs/027 research.md R4）
-    await runHook("limitsChanged", { env });
+    // 上限が上がると、次に見る時刻が早まることがある。アプリに出来事で知らせる（Threads：自動投稿を起こす。PR #71 のCodexレビュー）
+    const app = limitsApp();
+    const eventId = app ? await emitEvent(tx, "limits.changed", { app }) : null;
+    return { saved: v, eventId };
+  }).then(async ({ saved, eventId }) => {
+    await deliverSoon(env, eventId);
     return saved;
   });
 }
@@ -215,8 +238,8 @@ export async function findLimitUser(db: Db, env: Pick<Env, "OPERATOR_CLERK_USER_
  */
 async function toLimitUser(db: Db | TxDb, env: Pick<Env, "OPERATOR_CLERK_USER_IDS">, u: typeof users.$inferSelect): Promise<OperatorLimitUser> {
   // 持ち主としてのアカウントの数は、アカウントの数の上限を登録したアプリから伝えられた利用の数（specs/meguru/029 research.md R6）。
-  // 全アプリの合計（料金の数）ではなく、そのアプリの数だけを出す。運営の画面を登録の一覧で出す形にするのは PR2b（T069・T070）
-  const app = registeredApps().find((a) => "accounts" in appLimits(a));
+  // 全アプリの合計（料金の数）ではなく、そのアプリの数だけを出す。運営の画面を登録の一覧で出す形にするのは PR2c（T069・T070）
+  const app = limitsApp();
   const owned = app ? ((await appUsageOf(db, u.id, app))?.quantity ?? 0) : 0;
   return {
     userId: u.id,
@@ -258,11 +281,11 @@ export async function setUserLimits(env: Env, operator: { id: string }, userId: 
         after: { accountLimit: v.accountLimit, dailyPostLimit: v.dailyPostLimit },
       },
     });
-    return toLimitUser(tx, env, after!);
-  }).then(async (saved) => {
-    // 上限が上がると、次に見る時刻が早まることがある。定期処理を起こす（PR #71 のCodexレビュー）
-    // アプリに知らせる（Threads：自動投稿を起こす。specs/027 research.md R4）
-    await runHook("limitsChanged", { env });
+    const app = limitsApp();
+    const eventId = app ? await emitEvent(tx, "limits.changed", { app, userId }) : null;
+    return { saved: await toLimitUser(tx, env, after!), eventId };
+  }).then(async ({ saved, eventId }) => {
+    await deliverSoon(env, eventId);
     return saved;
   });
 }

@@ -1,16 +1,16 @@
 // 退会（specs/013-billing FR-050〜FR-056、research.md R10）。
 // 外部（Stripe・Clerk）とDBを1つのトランザクションにできないので、「受け付け → 契約を止める → データを消す → ログインの情報を消す」
 // の順にし、どの段も2回目に走っても結果が同じになるようにする。途中で止まれば、画面のもう一度の操作か日次の処理で続きから終わる。
-import { and, eq, isNotNull, isNull, lt, sql } from "drizzle-orm";
+import { and, eq, inArray, isNotNull, isNull, lt, ne, sql } from "drizzle-orm";
 import type { Env } from "../../kernel/env";
 import { createDb, withTransaction, type Db, type TxDb } from "../../kernel/db/client";
 import { lockUserRow } from "../../kernel/db/locks";
-import { subscriptions, users, withdrawnUsers } from "../schema";
+import { platformEventDeliveries, platformEvents, subscriptions, users, withdrawnUsers } from "../schema";
 import { billingModeOf } from "../../kernel/config";
 import { AppError } from "../../kernel/errors";
 import { logger } from "../../kernel/logger";
 import { createStripeClient, StripeError, type StripeClient } from "../../adapters/stripe";
-import { runHook } from "../hooks";
+import { deliverPendingEvents, emitEvent, rearmFailedDeliveries } from "../events/events";
 
 /** 退会した人を記録に出すときの名前（FR-053）。 */
 export const WITHDRAWN_ACTOR_NAME = "退会した人";
@@ -95,11 +95,25 @@ async function finishWithdrawal(
   user: { id: string; clerkUserId: string },
   stripe: StripeClient,
 ) {
-  // 2. 契約を止める。消した後に契約が残って請求が続くことを防ぐため、データより先に止める
-  await stopBilling(env, user.id, stripe);
-  // 3. データを消す
-  await withTransaction(env.DATABASE_URL, (tx) => deleteUserData(tx, user));
-  // 4. ログインの情報を消す（失敗しても退会は成功。日次の処理で続ける）
+  const db = createDb(env.DATABASE_URL);
+  let eventIds = await withdrawalEventIds(db, user.id);
+  if (eventIds.length === 0) {
+    // 2. 契約を止める。消した後に契約が残って請求が続くことを防ぐため、データより先に止める
+    await stopBilling(env, user.id, stripe);
+    // 3. 退会を記録し、出来事（user.withdrawn）を書く。アプリのデータは、アプリが受け取って片づける（specs/meguru/029 research.md R8）
+    await withTransaction(env.DATABASE_URL, (tx) => recordWithdrawal(tx, user));
+    eventIds = await withdrawalEventIds(db, user.id);
+  } else {
+    // もう記録して出来事を書いた人（日次の続き）：契約は止め終えている。失敗で止まった届けを、もう一度届ける状態に戻す
+    const rearmed = await rearmFailedDeliveries(db, eventIds);
+    if (rearmed > 0) logger.warn("withdrawal: retrying failed deliveries", { userId: user.id, rearmed });
+  }
+  // 4. その人の出来事だけをすぐ届け、アプリの片づけが済んでいれば users の行を消す。届かなければ、5分ごとの届けと日次の続きでやり直す
+  await deliverPendingEvents(env, new Date(), { eventIds }).catch((err: unknown) =>
+    logger.error("withdrawal: event delivery failed", { userId: user.id, err: String(err) }),
+  );
+  await deleteUserRowIfCleaned(env, user.id);
+  // 5. ログインの情報を消す（失敗しても退会は成功。日次の処理で続ける）
   await deleteClerk(env, deleteClerkUser, user.clerkUserId);
 }
 
@@ -147,23 +161,60 @@ async function stopBilling(env: Env, userId: string, stripe: StripeClient) {
 }
 
 /**
- * 利用者のデータを消す（1つのトランザクション）。アプリのデータは知らせ（userWithdrawing）でアプリが片づける。
+ * その人の退会の出来事の番号（platform_events の部分索引 platform_events_withdrawn_user_idx を使う）。
+ * @param db - データベース（トランザクションの中でもよい）
+ * @param userId - users.id
+ * @returns 出来事の番号
+ */
+async function withdrawalEventIds(db: Db | TxDb, userId: string): Promise<string[]> {
+  const rows = await db
+    .select({ id: platformEvents.id })
+    .from(platformEvents)
+    .where(and(eq(platformEvents.type, "user.withdrawn"), sql`(${platformEvents.payload}->>'userId') = ${userId}`));
+  return rows.map((r) => r.id);
+}
+
+/**
+ * 退会を記録し、出来事（user.withdrawn）を書く（1つのトランザクション）。2回目に走っても出来事は1回だけ書く
+ * （その人の出来事がまだないときだけ）。users の行はここでは消さない：PR3 で外部キーを外すまでは、
+ * 先に消すとアプリの行（担当・チームの人）が外部キーで消え、アプリが片づけられなくなるため（029 tasks.md PR2 の頭）。
  * @param tx - トランザクション
  * @param user - 退会する人
  */
-async function deleteUserData(tx: TxDb, user: { id: string; clerkUserId: string }) {
+async function recordWithdrawal(tx: TxDb, user: { id: string; clerkUserId: string }) {
   await lockUserRow(tx, user.id);
   const [exists] = await tx.select({ id: users.id }).from(users).where(eq(users.id, user.id));
-  const now = new Date();
-  if (exists) {
-    // アプリの片づけ（Threads：招待の申し込み・持ち主のアカウント・チームの引き継ぎ・記録の名前）。
-    // 知らせで呼ぶ（specs/027 research.md R4。029 の PR2b で出来事に替える）
-    await runHook("userWithdrawing", { tx, userId: user.id });
-    // ログインの情報を消した後に残るセッションで、users の行が作り直されないように記録する
-    await tx.insert(withdrawnUsers).values({ clerkUserId: user.clerkUserId, withdrawnAt: now }).onConflictDoNothing();
-    // 担当・チームの人・契約の行は ON DELETE CASCADE で消える
-    await tx.delete(users).where(eq(users.id, user.id));
-  }
+  if (!exists) return;
+  // ログインの情報を消した後に残るセッションで、users の行が作り直されないように記録する
+  await tx.insert(withdrawnUsers).values({ clerkUserId: user.clerkUserId, withdrawnAt: new Date() }).onConflictDoNothing();
+  if ((await withdrawalEventIds(tx, user.id)).length === 0) await emitEvent(tx, "user.withdrawn", { userId: user.id });
+}
+
+/**
+ * その人の退会の出来事が、すべての届け先で済んでいれば、users の行を消す（担当・チームの人・契約・利用の数の行は
+ * ON DELETE CASCADE で消える）。済んでいなければ何もしない（次の届けのあと、日次の続きでもう一度試す）。
+ * @param env - Workers のバインディング
+ * @param userId - users.id
+ * @returns 消したなら true
+ */
+export async function deleteUserRowIfCleaned(env: Env, userId: string): Promise<boolean> {
+  return withTransaction(env.DATABASE_URL, async (tx) => {
+    await lockUserRow(tx, userId);
+    const [row] = await tx
+      .select({ id: users.id })
+      .from(users)
+      .where(and(eq(users.id, userId), isNotNull(users.withdrawalRequestedAt)));
+    if (!row) return false;
+    const eventIds = await withdrawalEventIds(tx, userId);
+    if (eventIds.length === 0) return false;
+    const [pending] = await tx
+      .select({ n: sql<number>`count(*)::int` })
+      .from(platformEventDeliveries)
+      .where(and(inArray(platformEventDeliveries.eventId, eventIds), ne(platformEventDeliveries.status, "done")));
+    if (Number(pending?.n ?? 0) > 0) return false;
+    await tx.delete(users).where(eq(users.id, userId));
+    return true;
+  });
 }
 
 /**
@@ -220,9 +271,15 @@ export async function resumeWithdrawals(
   }
   const pendingClerk = await db.select({ clerkUserId: withdrawnUsers.clerkUserId }).from(withdrawnUsers).where(isNull(withdrawnUsers.clerkDeletedAt));
   for (const p of pendingClerk) if (!(await deleteClerk(env, deleteClerkUser, p.clerkUserId))) failed += 1;
+  // users の行がまだ残っている人（アプリの片づけを待っている人）の記録は残す（作り直しを防ぎ、出来事を1回だけ書くため）
   const purged = await db
     .delete(withdrawnUsers)
-    .where(lt(withdrawnUsers.clerkDeletedAt, new Date(now.getTime() - WITHDRAWN_USER_RETENTION_HOURS * 3_600_000)))
+    .where(
+      and(
+        lt(withdrawnUsers.clerkDeletedAt, new Date(now.getTime() - WITHDRAWN_USER_RETENTION_HOURS * 3_600_000)),
+        sql`NOT EXISTS (SELECT 1 FROM ${users} WHERE ${users.clerkUserId} = ${withdrawnUsers.clerkUserId})`,
+      ),
+    )
     .returning({ id: withdrawnUsers.clerkUserId });
   return { finished, failed, purged: purged.length };
 }

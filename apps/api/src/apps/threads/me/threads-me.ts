@@ -2,7 +2,7 @@
 // GET /api/threads/me と GET /api/threads/me/withdrawal-preview。中身は029の前の /api/me・/api/me/withdrawal-preview の
 // Threadsの部分と同じ。PR5 までは、共通の /api/me にも同じ中身を足す（registerMeSection。前の画面のため）。
 import { FEATURES, type Role } from "@meguru/shared";
-import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNull, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { Hono, type Context, type MiddlewareHandler } from "hono";
 import { connectMethodsOf, testerInvitesEnabledOf } from "../../../kernel/config";
@@ -63,7 +63,8 @@ export async function buildThreadsMe(c: Context<AppEnv>) {
     .innerJoin(memberships, eq(memberships.accountId, accounts.id))
     .innerJoin(ownerM, and(eq(ownerM.accountId, accounts.id), eq(ownerM.role, "owner")))
     .innerJoin(ownerU, eq(ownerU.id, ownerM.userId))
-    .where(and(eq(memberships.userId, user.id), inArray(memberships.role, ["owner", "editor"])))
+    // オーナーが退会したアカウント（出来事が届いて片づけるまでの間）は出さない（authorizeAccount と同じ。PR #96 のセルフレビュー）
+    .where(and(eq(memberships.userId, user.id), inArray(memberships.role, ["owner", "editor"]), isNull(ownerU.withdrawalRequestedAt)))
     .orderBy(
       sql`CASE WHEN ${memberships.role} = 'owner' THEN 0 ELSE 1 END`,
       sql`${accounts.lastUsedAt} DESC NULLS LAST`,

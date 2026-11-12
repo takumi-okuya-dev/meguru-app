@@ -9,7 +9,6 @@ import { and, eq, sql } from "drizzle-orm";
 import { Hono, type MiddlewareHandler } from "hono";
 import type { AppEnv } from "../../../platform";
 import { createDb } from "../../../kernel/db/client";
-import { effectiveLimits } from "../../../platform";
 import { accounts } from "../schema";
 import { authorizeAccount } from "../access/access";
 import { recordActivity, updatedByOf, withActivityTx } from "../activity/activity-log";
@@ -62,7 +61,7 @@ export function promptRoutes(authed: MiddlewareHandler<AppEnv>) {
       const access = await authorizeAccount(db, user, c.req.param("accountId"), "view", { feature: "autopost" });
       const account = access.account;
       const count = parseCount(c.req.query("count")) ?? account.promptPostCount;
-      const { dailyPostLimit } = await effectiveLimits(db, c.env, access.owner.id);
+      const dailyPostLimit = access.ownerDailyPostLimit;
       return c.json(await getPrompt(db, account, count, access.features, dailyPostLimit));
     })
     .put("/accounts/:accountId/prompt-settings", authed, async (c) => {

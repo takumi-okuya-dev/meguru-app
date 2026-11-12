@@ -314,6 +314,10 @@ export const platformEvents = pgTable(
   (t) => [
     check("platform_events_type_valid", sql`${t.type} ~ '^[a-z][a-z0-9_]*([.][a-z][a-z0-9_]*)+$'`),
     index("platform_events_created_idx").on(t.createdAt),
+    // 退会の続きで、その人の退会の出来事を探す（specs/meguru/029 PR2b。PR #96 のセルフレビュー）
+    index("platform_events_withdrawn_user_idx")
+      .on(sql`(${t.payload}->>'userId')`)
+      .where(sql`${t.type} = 'user.withdrawn'`),
   ],
 );
 

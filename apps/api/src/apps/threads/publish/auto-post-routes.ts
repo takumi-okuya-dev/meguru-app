@@ -4,7 +4,6 @@ import { Hono, type MiddlewareHandler } from "hono";
 import type { AppEnv } from "../../../platform";
 import { createDb } from "../../../kernel/db/client";
 import { postingSchedules } from "../schema";
-import { effectiveLimits } from "../../../platform";
 import { authorizeAccount } from "../access/access";
 import { getAutoPostStatus } from "./auto-post-status";
 
@@ -19,7 +18,7 @@ export function autoPostRoutes(authed: MiddlewareHandler<AppEnv>) {
       const db = createDb(c.env.DATABASE_URL);
       const access = await authorizeAccount(db, c.get("user"), c.req.param("accountId"), "view", { feature: "autopost" });
       // オーナーが読むだけなら、自動投稿は止まっている（specs/013 research.md R8）
-      const { dailyPostLimit } = await effectiveLimits(db, c.env, access.owner.id);
+      const dailyPostLimit = access.ownerDailyPostLimit;
       return c.json(await getAutoPostStatus(db, { ...access.account, ownerReadOnly: access.readOnly !== null, dailyPostLimit }));
     })
     .post("/accounts/:accountId/auto-post/notices/blocked/dismiss", authed, async (c) => {
