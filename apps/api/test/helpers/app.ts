@@ -61,15 +61,32 @@ export function call(
   return app.request(path, { method, headers, body }, opts.env ?? testEnv);
 }
 
+/**
+ * DBの処理を、行き詰まり（deadlock。Postgres の 40P01）のときだけ数回やり直す。TRUNCATE は多くの表をまとめてロックするので、
+ * 前のテストの裏で終わりきっていない処理とぶつかることがある。行き詰まりでは Postgres が片方を取り消すので、やり直してよい。
+ * @param run - 処理
+ */
+async function retryOnDeadlock(run: () => Promise<unknown>): Promise<void> {
+  for (let attempt = 1; ; attempt++) {
+    try {
+      await run();
+      return;
+    } catch (err) {
+      if ((err as { code?: string }).code !== "40P01" || attempt >= 5) throw err;
+      await new Promise((r) => setTimeout(r, 100 * attempt));
+    }
+  }
+}
+
 export async function resetDb() {
   const sql = neon(testEnv.DATABASE_URL);
   createDb(testEnv.DATABASE_URL); // ローカルプロキシの設定を有効にする
-  await sql`TRUNCATE users, subscriptions, withdrawn_users, platform_events, app_usage, user_app_limits,
+  await retryOnDeadlock(() => sql`TRUNCATE users, subscriptions, withdrawn_users, platform_events, app_usage, user_app_limits,
     threads.accounts, threads.memberships, threads.threads_connections, threads.oauth_states, threads.threads_deletion_requests,
     threads.threads_revocations, threads.strategy_designs, threads.promotions, threads.reference_posts, threads.research_keywords,
     threads.draft_batches, threads.post_drafts, threads.ng_words, threads.posting_schedules, threads.publish_attempts, threads.teams,
     threads.team_members, threads.team_accounts, threads.activity_logs, threads.token_check_failures, threads.received_events,
-    threads.user_states CASCADE`;
+    threads.user_states CASCADE`);
   // 運営者が決める値（1行だけ。TRUNCATE では消さない）を初めの値に戻す（specs/024）
   await sql`UPDATE operator_settings SET default_account_limit = 3, default_daily_post_limit = 10, tester_slot_capacity = 25`;
   // 新しい上限の表の既定の値も同じ値に戻す（specs/meguru/029 research.md R7）
