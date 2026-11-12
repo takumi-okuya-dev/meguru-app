@@ -21,6 +21,7 @@ Claude CodeとCodexで開発スキルを共用する手順と、利用制限時�
 | [ご利用ガイド](docs/user-guide.md) | ユーザー |
 | [開発のご報告](docs/project-report.md) | 開発の依頼主 |
 | [技術ドキュメント](docs/architecture.md) | 開発者（構成・設計の意図・AI駆動開発の流れ） |
+| [アプリを分けて作る決まり](docs/app-separation.md) | 開発者（2作目からのDBの分け方・マイクロサービスへの道のり。図あり） |
 
 - リポジトリは非公開なので、外の人に見せるときはClaude Docsに反映して、そのリンクを共有する。反映は自動ではなく、共有したいときにClaude Codeへ「共有用を更新して」と頼む。
 - 図はMermaidで書く（GitHubでもClaude Docsでもそのまま表示される）。

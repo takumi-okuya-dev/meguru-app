@@ -20,6 +20,36 @@ APIのコード（1〜6章）とWebのコード（7章）を、どのモジュ�
 組み立て → アプリ → 共通 → 窓口 → 土台   （上から下へだけ。飛ばしてもよい）
 ```
 
+```mermaid
+flowchart TB
+  comp["組み立て<br/>app.ts・index.ts・jobs/・db/schema.ts"]
+  subgraph apps["アプリ（apps/）"]
+    direction LR
+    th["threads"]
+    mm["2作目（例：memo）"]
+  end
+  pf["共通（platform/）<br/>入口：platform/index.ts"]
+  ad["窓口（adapters/）<br/>Stripe・ThreadsのAPI・Meta"]
+  kn["土台（kernel/）<br/>設定・エラー・ログ・DBの接続"]
+
+  comp --> apps
+  comp --> pf
+  th -- "入口から" --> pf
+  mm -- "入口から" --> pf
+  apps -- "入口から" --> ad
+  pf -- "入口から" --> ad
+  ad --> kn
+  th -. "使わない" .-x mm
+  pf -. "使わない（呼ぶときは知らせ。1-4）" .-x apps
+  kn -. "使わない" .-x ad
+
+  classDef ok fill:#eef6ff,stroke:#3b82f6
+  class comp,th,mm,pf,ad,kn ok
+```
+
+- 実線の矢印は、使ってよい向き（上から下へ。間を飛ばして、土台を直接使うのもよい）。点線の ✕ は、使ってはいけない向き。ESLint の規則が止める（1-5）。
+- 2作目以降のアプリは、これに加えて DB の境界も守る（共通の表を読まない。[docs/app-separation.md](./app-separation.md) 2-1）。
+
 ### 1-2. 入口
 
 - 入口（`index.ts`）は、**共通全体（`platform/index.ts`）・アプリごと（`apps/<名前>/index.ts`）・窓口ごと（`adapters/<名前>/index.ts`）**に1つ。モジュールの直下の`schema.ts`（表の定義）も入口として読んでよい（`db/schema.ts`が共通とThreadsの表を読み直して出すため）。
@@ -31,6 +61,7 @@ APIのコード（1〜6章）とWebのコード（7章）を、どのモジュ�
 - 表には持ち主のモジュールが1つある（2章）。表の定義は持ち主の`schema.ts`に置き、入口から出す。
 - 持ち主でないモジュールは、表を読むことはできるが、書き換えてよいのは3章の例外の列だけ。
 - アプリの表が共通の表（`users`・`accounts`）を参照するのはよい。共通の表からアプリの表は参照しない。
+- **ただし、2作目以降のアプリは共通の表を参照しない**（読む・外部キーのどちらも。利用者のIDを値として持ち、共通の入口の関数から受け取る）。表はアプリ専用のスキーマに置く。今後マイクロサービスにしていく可能性に備えた決まりで、詳しくは[docs/app-separation.md](./app-separation.md)。Threadsは今のまま。
 
 ### 1-4. 知らせ（共通 → アプリ）
 
@@ -147,12 +178,12 @@ ESLintで止められる違反は0件にする。今すぐ直せないものは�
 2作目（例：`people`）を足すときの手順。
 
 1. `apps/api/src/apps/<名前>/`を作り、次を置く。
-   - `schema.ts`：そのアプリの表。共通の表（`users`・`accounts`）は`../../platform/schema`から参照してよい。共通の部品は`../../kernel/db/columns`。
+   - `schema.ts`：そのアプリの表。`pgSchema("<名前>")`でアプリ専用のスキーマに置き、共通の表（`platform/schema`）は参照しない。利用者のIDは`user_id`に値として持つ（外部キーなし。[docs/app-separation.md](./app-separation.md) 4）。共通の部品は`../../kernel/db/columns`。
    - 小分けのフォルダー（処理と`*-routes.ts`）。
    - `index.ts`：組み立てが使うもの（APIの入口を作る関数、知らせを受け取るなら`registerXxx()`）だけを出す。
-2. 共通は`../../platform`（入口）からだけ使う。Threadsのモジュールは使わない（ESLintが止める）。
+2. 共通は`../../platform`（入口）の関数からだけ使う（今の利用者・利用権など。共通の表は読まない）。共通で起きたこと（退会など）は、同じトランザクションの知らせではなく、出来事としてあとから受け取る。Threadsのモジュールは使わない（ESLintが止める）。
 3. `apps/api/src/db/schema.ts`に`export * from "../apps/<名前>/schema";`を足し、`pnpm --filter api db:generate`でマイグレーションを作る。
-4. `apps/api/src/app.ts`で、入口のAPIの関数を`.route("/", …)`でつなぐ。知らせを受け取るなら、`registerThreads()`と同じ場所で`registerXxx()`を呼ぶ。
+4. `apps/api/src/app.ts`で、入口のAPIの関数を`.route("/", …)`でつなぐ。APIの道筋は`/api/<名前>/…`にする。知らせを受け取るなら、`registerThreads()`と同じ場所で`registerXxx()`を呼ぶ。
 5. 入口を足したら`pnpm --filter api routes:snapshot`で一覧を書き直す。
 6. この地図の2章に、表と処理を足す。
 
