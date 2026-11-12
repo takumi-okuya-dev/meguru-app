@@ -13,9 +13,9 @@ import { toast } from "sonner";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { SwapLabel } from "@/components/SwapLabel";
 import { Button } from "@/components/ui/button";
-import { api } from "@/lib/api-client";
+import { threadsApi } from "@/apps/threads/lib/api";
 import { formatRelativeJst, formatSlotTime } from "@/lib/format";
-import { queryKeys } from "@/lib/query";
+import { threadsQueryKeys } from "@/apps/threads/lib/query-keys";
 import { cn } from "@/lib/utils";
 import { PostingScheduleDialog } from "./PostingScheduleDialog";
 import { SettingCard, SettingRow } from "@/components/SettingRow";
@@ -31,7 +31,7 @@ async function savedMessage(accountId: string, schedule: PostingSchedule): Promi
   const base = "投稿のスケジュールを保存しました";
   if (!schedule.enabled) return base;
   try {
-    const status = await api.getAutoPost(accountId);
+    const status = await threadsApi.getAutoPost(accountId);
     if (status.next) return `${base}。次の投稿は${formatRelativeJst(status.next.at)}の予定です`;
     if (status.notices.some((n) => n.kind === "no_approved"))
       return `${base}。承認済みの下書きを用意してください`;
@@ -63,8 +63,8 @@ export function PostingScheduleSection({
 }) {
   const accountId = account.id;
   const query = useQuery({
-    queryKey: queryKeys.postingSchedule(accountId),
-    queryFn: () => api.getPostingSchedule(accountId),
+    queryKey: threadsQueryKeys.postingSchedule(accountId),
+    queryFn: () => threadsApi.getPostingSchedule(accountId),
   });
   const queryClient = useQueryClient();
   const [editing, setEditing] = useState(false);
@@ -77,21 +77,21 @@ export function PostingScheduleSection({
   }, [editRequest, canEdit]);
 
   const check = useMutation({
-    mutationFn: () => api.checkThreads(accountId),
+    mutationFn: () => threadsApi.checkThreads(accountId),
     onSuccess: (r) => {
       // 要再接続になったら、接続の状態の表示も読み直す
       if (r.status === "needs_reconnect")
-        void queryClient.invalidateQueries({ queryKey: queryKeys.account(accountId) });
+        void queryClient.invalidateQueries({ queryKey: threadsQueryKeys.account(accountId) });
     },
   });
 
   const onSaved = async (saved: PostingSchedule, connectionCheck: ThreadsCheck | null) => {
     setEditing(false);
     await Promise.all([
-      queryClient.invalidateQueries({ queryKey: queryKeys.postingSchedule(accountId) }),
-      queryClient.invalidateQueries({ queryKey: queryKeys.autoPost(accountId) }),
-      queryClient.invalidateQueries({ queryKey: queryKeys.postDrafts(accountId) }),
-      queryClient.invalidateQueries({ queryKey: queryKeys.promptAll(accountId) }),
+      queryClient.invalidateQueries({ queryKey: threadsQueryKeys.postingSchedule(accountId) }),
+      queryClient.invalidateQueries({ queryKey: threadsQueryKeys.autoPost(accountId) }),
+      queryClient.invalidateQueries({ queryKey: threadsQueryKeys.postDrafts(accountId) }),
+      queryClient.invalidateQueries({ queryKey: threadsQueryKeys.promptAll(accountId) }),
     ]);
     if (connectionCheck?.status === "unknown") {
       toast.warning(

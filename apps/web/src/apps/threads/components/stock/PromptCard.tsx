@@ -19,8 +19,9 @@ import { PromptParts, SendModeSelect, useSendMode } from "@/apps/threads/compone
 import { PromptMaterials } from "@/apps/threads/components/create/PromptMaterials";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { api, describeError } from "@/lib/api-client";
-import { queryKeys } from "@/lib/query";
+import { describeError } from "@/lib/api-client";
+import { threadsApi } from "@/apps/threads/lib/api";
+import { threadsQueryKeys } from "@/apps/threads/lib/query-keys";
 import { isBillingRequired, isStale, saveErrorMessage } from "@/lib/save-error";
 import { cn } from "@/lib/utils";
 import { accountPath } from "@/apps/threads/lib/paths";
@@ -147,8 +148,8 @@ function PromptReadyCard({
   const lengthRef = useRef<PostLengthSettings | null>(null);
   const [lengthResetKey, setLengthResetKey] = useState(0);
   const prompt = useQuery({
-    queryKey: queryKeys.prompt(accountId, count),
-    queryFn: () => api.getPrompt(accountId, count),
+    queryKey: threadsQueryKeys.prompt(accountId, count),
+    queryFn: () => threadsApi.getPrompt(accountId, count),
     // 表示のたびに最新の材料から作り直す（FR-007）
     refetchOnMount: "always",
   });
@@ -173,7 +174,7 @@ function PromptReadyCard({
   }, [startKey, copyShown]);
 
   const { mutate: save, isPending: saving } = useMutation({
-    mutationFn: (n: number) => api.putPromptSettings(accountId, n, version.current),
+    mutationFn: (n: number) => threadsApi.putPromptSettings(accountId, n, version.current),
     onMutate: () => ({ generation: editGeneration.current }),
     onSuccess: ({ postCount, version: v }) => {
       // 遅れて届いた応答で、すでに知っている新しい版を巻き戻さない（PR #17 のCodexレビュー）
@@ -181,7 +182,7 @@ function PromptReadyCard({
       version.current = v;
       setSaved(postCount);
       setFailed(null);
-      queryClient.setQueryData<PostDraftList>(queryKeys.postDrafts(accountId), (old) =>
+      queryClient.setQueryData<PostDraftList>(threadsQueryKeys.postDrafts(accountId), (old) =>
         old ? { ...old, promptPostCount: postCount, promptPostCountVersion: v } : old,
       );
     },
@@ -199,7 +200,7 @@ function PromptReadyCard({
           setLengthSettings(latest.length);
         }
         // 投稿ストックのキャッシュも最新にする（画面を離れて戻ったときに、古い版で送らないように）
-        queryClient.setQueryData<PostDraftList>(queryKeys.postDrafts(accountId), (old) =>
+        queryClient.setQueryData<PostDraftList>(threadsQueryKeys.postDrafts(accountId), (old) =>
           old ? { ...old, promptPostCount: latest.postCount, promptPostCountVersion: latest.version } : old,
         );
         if (context?.generation === editGeneration.current) {
@@ -221,7 +222,7 @@ function PromptReadyCard({
   // 文字数と割合の保存（specs/014 FR-140）。作る件数と同じ版で衝突を見る
   const { mutate: saveLength, isPending: savingLength } = useMutation({
     mutationFn: (length: PostLengthSettings) =>
-      api.putPromptSettings(accountId, saved, version.current, length),
+      threadsApi.putPromptSettings(accountId, saved, version.current, length),
     onMutate: () => ({ generation: editGeneration.current }),
     onSuccess: ({ version: v, length }) => {
       // 遅れて届いた応答で、すでに知っている新しい版・設定を巻き戻さない（PR #17 のCodexレビュー）
@@ -230,12 +231,12 @@ function PromptReadyCard({
       // 保存した値をすぐ保存済みの値にする（読み直しを待たずに、未保存の扱いを外す）
       lengthRef.current = length;
       setLengthSettings(length);
-      queryClient.setQueryData<PostDraftList>(queryKeys.postDrafts(accountId), (old) =>
+      queryClient.setQueryData<PostDraftList>(threadsQueryKeys.postDrafts(accountId), (old) =>
         old ? { ...old, promptPostCountVersion: v } : old,
       );
       toast.success("文字数と割合を保存しました");
       // プロンプトの数字が変わるので作り直す
-      void queryClient.invalidateQueries({ queryKey: queryKeys.promptAll(accountId) });
+      void queryClient.invalidateQueries({ queryKey: threadsQueryKeys.promptAll(accountId) });
     },
     onError: (err, _length, context) => {
       if (isStale(err)) {
@@ -252,11 +253,11 @@ function PromptReadyCard({
         setFailed(null);
         // 入力中の件数は入力欄に残す（入力が止まった後に、その件数を最新の版で保存する）
         if (context?.generation === editGeneration.current) setCountInput(String(latest.postCount));
-        queryClient.setQueryData<PostDraftList>(queryKeys.postDrafts(accountId), (old) =>
+        queryClient.setQueryData<PostDraftList>(threadsQueryKeys.postDrafts(accountId), (old) =>
           old ? { ...old, promptPostCount: latest.postCount, promptPostCountVersion: latest.version } : old,
         );
         toast.info(`${staleUpdateTitle(err.updatedBy?.name)}。最新の文字数と割合を読み込みました`);
-        void queryClient.invalidateQueries({ queryKey: queryKeys.promptAll(accountId) });
+        void queryClient.invalidateQueries({ queryKey: threadsQueryKeys.promptAll(accountId) });
       } else if (isBillingRequired(err)) onReadOnly();
       else toast.error(saveErrorMessage(err));
     },

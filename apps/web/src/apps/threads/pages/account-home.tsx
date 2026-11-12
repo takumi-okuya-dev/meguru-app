@@ -23,9 +23,9 @@ import { ApiErrorScreen } from "@/components/ApiErrorScreen";
 import { ConnectionBadge } from "@/apps/threads/components/ConnectionBadge";
 import { PageBody, PageHeader } from "@/shell";
 import { Button } from "@/components/ui/button";
-import { api } from "@/lib/api-client";
+import { threadsApi } from "@/apps/threads/lib/api";
 import { formatDate } from "@/lib/format";
-import { queryKeys } from "@/lib/query";
+import { threadsQueryKeys } from "@/apps/threads/lib/query-keys";
 import { cn } from "@/lib/utils";
 import { useCurrentAccount } from "@/apps/threads/pages/account-layout";
 import { accountPath } from "@/apps/threads/lib/paths";
@@ -86,14 +86,14 @@ export function AccountHome() {
   const autopostOn = featureOn(access, "autopost");
   // 未接続で承認済みの案があれば、次にやることを「つなぐ」にする（Clarifications 2026-10-14）
   const counts = useQuery({
-    queryKey: queryKeys.draftCounts(account.id),
-    queryFn: () => api.getDraftCounts(account.id),
+    queryKey: threadsQueryKeys.draftCounts(account.id),
+    queryFn: () => threadsApi.getDraftCounts(account.id),
     enabled: notConnected && autopostOn,
   });
   const connectFirst = notConnected && can("owner") && (counts.data?.approved ?? 0) > 0;
   const status = useQuery({
-    queryKey: queryKeys.profileStatus(account.id),
-    queryFn: () => api.getProfileStatus(account.id),
+    queryKey: threadsQueryKeys.profileStatus(account.id),
+    queryFn: () => threadsApi.getProfileStatus(account.id),
   });
   const s = status.data;
   // 読み込めなかったら、読み込み中のまま止めずに原因と再読み込みを出す

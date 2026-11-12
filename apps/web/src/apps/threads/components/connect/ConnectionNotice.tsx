@@ -4,8 +4,9 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { CircleAlertIcon } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { api, describeError } from "@/lib/api-client";
-import { queryKeys } from "@/lib/query";
+import { describeError } from "@/lib/api-client";
+import { threadsApi } from "@/apps/threads/lib/api";
+import { threadsQueryKeys } from "@/apps/threads/lib/query-keys";
 
 /**
  * 違うアカウントでつながった知らせ。出すものがなければ何も出さない（読めないときも出さない）。
@@ -16,10 +17,10 @@ import { queryKeys } from "@/lib/query";
  */
 export function ConnectionNotice({ accountId }: { accountId: string }) {
   const client = useQueryClient();
-  const q = useQuery({ queryKey: queryKeys.connectionNotice(accountId), queryFn: () => api.connectionNotice(accountId) });
+  const q = useQuery({ queryKey: threadsQueryKeys.connectionNotice(accountId), queryFn: () => threadsApi.connectionNotice(accountId) });
   const dismiss = useMutation({
-    mutationFn: () => api.dismissConnectionNotice(accountId),
-    onSuccess: () => client.setQueryData(queryKeys.connectionNotice(accountId), { otherAccount: null }),
+    mutationFn: () => threadsApi.dismissConnectionNotice(accountId),
+    onSuccess: () => client.setQueryData(threadsQueryKeys.connectionNotice(accountId), { otherAccount: null }),
   });
   const other = q.data?.otherAccount;
   if (!other) return null;

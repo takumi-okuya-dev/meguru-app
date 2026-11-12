@@ -20,6 +20,7 @@ import { ThreadsShell } from "../sidebar";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { ApiError, api, describeError } from "@/lib/api-client";
+import { threadsApi } from "@/apps/threads/lib/api";
 import { isInvitePath, rememberInviteReturn } from "@/lib/invite-return";
 import { queryKeys } from "@/lib/query";
 import { accountPath } from "@/apps/threads/lib/paths";
@@ -39,7 +40,7 @@ export function AccountNew() {
     if (isInvitePath(next)) rememberInviteReturn(next);
   }, [next]);
   const create = useMutation({
-    mutationFn: () => api.createAccount({ name: name.trim() }),
+    mutationFn: () => threadsApi.createAccount({ name: name.trim() }),
     onSuccess: async (account) => {
       await queryClient.invalidateQueries({ queryKey: queryKeys.me });
       void navigate(accountPath(account.id));

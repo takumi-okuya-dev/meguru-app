@@ -34,10 +34,12 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { api, describeError } from "@/lib/api-client";
+import { describeError } from "@/lib/api-client";
+import { threadsApi } from "@/apps/threads/lib/api";
 import { useCallbackResult } from "@/apps/threads/lib/callback-result";
 import { takeInviteReturn } from "@/lib/invite-return";
 import { queryKeys } from "@/lib/query";
+import { threadsQueryKeys } from "@/apps/threads/lib/query-keys";
 import { useCurrentAccount } from "@/apps/threads/pages/account-layout";
 import { TeamSection } from "@/apps/threads/components/team/TeamSection";
 import { ReconnectDialog } from "@/apps/threads/components/connect/ReconnectDialog";
@@ -128,13 +130,13 @@ function AccountSettingsContent() {
     setJustConnected(true);
     await Promise.all([
       queryClient.invalidateQueries({ queryKey: queryKeys.me }),
-      queryClient.invalidateQueries({ queryKey: queryKeys.account(account.id) }),
+      queryClient.invalidateQueries({ queryKey: threadsQueryKeys.account(account.id) }),
     ]);
   };
 
   const remove = useMutation({
     // 入力した値はそのまま送る（正規化はサーバーでも行う）
-    mutationFn: () => api.deleteAccount(account.id, confirm),
+    mutationFn: () => threadsApi.deleteAccount(account.id, confirm),
     onSuccess: async () => {
       setOpen(false);
       queryClient.removeQueries({ queryKey: ["account", account.id] });

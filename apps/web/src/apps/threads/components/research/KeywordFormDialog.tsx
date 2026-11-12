@@ -3,7 +3,7 @@ import { SHORT_TEXT_MAX, countChars, isBlank, normalizeKeyword, type ResearchKey
 import { FieldWithCounter } from "@/components/FieldWithCounter";
 import { DeletedElsewhereNotice, FormDialogFrame } from "@/apps/threads/components/items/FormDialogFrame";
 import { useItemForm, type FormErrors } from "@/apps/threads/components/items/use-item-form";
-import { api } from "@/lib/api-client";
+import { threadsApi } from "@/apps/threads/lib/api";
 
 type Form = { keyword: string; purpose: string };
 const EMPTY: Form = { keyword: "", purpose: "" };
@@ -52,8 +52,8 @@ export function KeywordFormDialog({
     onLimitReached,
     save: (form, expectedVersion) =>
       expectedVersion === undefined
-        ? api.createResearchKeyword(accountId, form)
-        : api.updateResearchKeyword(accountId, item!.id, { ...form, expectedVersion }),
+        ? threadsApi.createResearchKeyword(accountId, form)
+        : threadsApi.updateResearchKeyword(accountId, item!.id, { ...form, expectedVersion }),
   });
   const { form, setField, errors } = f;
   // 重複は保存を待たずに、入力した時点で案内する

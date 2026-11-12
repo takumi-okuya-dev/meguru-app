@@ -2,8 +2,8 @@
 import type { AccountSummary } from "@meguru/shared";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { UsersIcon, XIcon } from "lucide-react";
-import { api } from "@/lib/api-client";
-import { queryKeys } from "@/lib/query";
+import { threadsApi } from "@/apps/threads/lib/api";
+import { threadsQueryKeys } from "@/apps/threads/lib/query-keys";
 import { useAccountAccess } from "@/apps/threads/lib/use-account-access";
 
 /**
@@ -16,8 +16,8 @@ export function AssignedNotice({ account }: { account: AccountSummary }) {
   // サイドバーと同じ問い合わせを使う（個人運用の問い合わせの数を増やさない。SC-005）
   const { access } = useAccountAccess(account.id);
   const dismiss = useMutation({
-    mutationFn: () => api.dismissAssignedNotice(account.id),
-    onSuccess: () => void queryClient.invalidateQueries({ queryKey: queryKeys.access(account.id) }),
+    mutationFn: () => threadsApi.dismissAssignedNotice(account.id),
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: threadsQueryKeys.access(account.id) }),
   });
   if (!access?.assignedNotice || dismiss.isSuccess) return null;
   return (

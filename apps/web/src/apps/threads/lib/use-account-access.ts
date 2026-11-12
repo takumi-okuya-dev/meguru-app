@@ -5,8 +5,10 @@ import { useQuery, useQueryClient, type QueryClient } from "@tanstack/react-quer
 import { useEffect } from "react";
 import { useNavigate } from "react-router";
 import { toast } from "sonner";
-import { api, setAccountAccessErrorListener, type AccountAccessErrorListener } from "@/lib/api-client";
+import { setAccountAccessErrorListener, type AccountAccessErrorListener } from "@/apps/threads/lib/api";
+import { threadsApi } from "@/apps/threads/lib/api";
 import { queryKeys } from "@/lib/query";
+import { threadsQueryKeys } from "@/apps/threads/lib/query-keys";
 import { threadsHomePath } from "@/apps/threads/lib/paths";
 
 /**
@@ -16,8 +18,8 @@ import { threadsHomePath } from "@/apps/threads/lib/paths";
  */
 export function useAccountAccess(accountId: string | undefined) {
   const query = useQuery({
-    queryKey: queryKeys.access(accountId ?? ""),
-    queryFn: () => api.accountAccess(accountId!),
+    queryKey: threadsQueryKeys.access(accountId ?? ""),
+    queryFn: () => threadsApi.accountAccess(accountId!),
     enabled: Boolean(accountId),
   });
   return { access: query.data, isPending: query.isPending, can: (p: Permission) => canDo(query.data, p) };
@@ -59,7 +61,7 @@ export function makeAccountAccessErrorHandler(ctx: {
   return (code, accountId) => {
     if (accountId !== ctx.accountId) return;
     if (code === "ROLE_FORBIDDEN") {
-      void ctx.queryClient.invalidateQueries({ queryKey: queryKeys.account(accountId) });
+      void ctx.queryClient.invalidateQueries({ queryKey: threadsQueryKeys.account(accountId) });
       return;
     }
     toast.error(ACCOUNT_ACCESS_LOST_MESSAGE, { id: "account-access-lost" });

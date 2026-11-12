@@ -14,8 +14,9 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { ApiError, api } from "@/lib/api-client";
-import { queryKeys } from "@/lib/query";
+import { ApiError } from "@/lib/api-client";
+import { threadsApi } from "@/apps/threads/lib/api";
+import { threadsQueryKeys } from "@/apps/threads/lib/query-keys";
 import { saveErrorMessage } from "@/lib/save-error";
 
 /**
@@ -50,14 +51,14 @@ export function NgWordsDialog({
   const atLimit = ngWords.length >= NG_WORD_LIMIT;
 
   const refresh = () => {
-    void queryClient.invalidateQueries({ queryKey: queryKeys.postingRules(accountId) });
+    void queryClient.invalidateQueries({ queryKey: threadsQueryKeys.postingRules(accountId) });
     // NGワードはラベル・承認・プロンプトに効き、追加で承認済みが要確認に戻ることがある
-    void queryClient.invalidateQueries({ queryKey: queryKeys.postDrafts(accountId) });
-    void queryClient.invalidateQueries({ queryKey: queryKeys.promptAll(accountId) });
+    void queryClient.invalidateQueries({ queryKey: threadsQueryKeys.postDrafts(accountId) });
+    void queryClient.invalidateQueries({ queryKey: threadsQueryKeys.promptAll(accountId) });
   };
 
   const add = useMutation({
-    mutationFn: (words: string[]) => api.addNgWords(accountId, words),
+    mutationFn: (words: string[]) => threadsApi.addNgWords(accountId, words),
     onSuccess: (res) => {
       setText("");
       setNotice(
@@ -80,7 +81,7 @@ export function NgWordsDialog({
   });
 
   const remove = useMutation({
-    mutationFn: (w: NgWord) => api.deleteNgWord(accountId, w.id),
+    mutationFn: (w: NgWord) => threadsApi.deleteNgWord(accountId, w.id),
     onSuccess: (_res, w) => {
       toast.success(`「${w.word}」を削除しました`, {
         duration: 5000,

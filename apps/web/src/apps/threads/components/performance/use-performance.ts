@@ -3,8 +3,8 @@ import { useInfiniteQuery } from "@tanstack/react-query";
 import type { PerformanceTab } from "@meguru/shared";
 import { useCallback } from "react";
 import { useSearchParams } from "react-router";
-import { api } from "@/lib/api-client";
-import { queryKeys } from "@/lib/query";
+import { threadsApi } from "@/apps/threads/lib/api";
+import { threadsQueryKeys } from "@/apps/threads/lib/query-keys";
 
 const TABS: PerformanceTab[] = ["all", "good", "normal", "poor", "pending"];
 
@@ -40,8 +40,8 @@ export function usePerformanceTab(): { tab: PerformanceTab; setTab: (tab: Perfor
  */
 export function usePerformance(accountId: string, tab: PerformanceTab) {
   return useInfiniteQuery({
-    queryKey: queryKeys.performance(accountId, tab),
-    queryFn: ({ pageParam }) => api.getPerformance(accountId, tab, pageParam),
+    queryKey: threadsQueryKeys.performance(accountId, tab),
+    queryFn: ({ pageParam }) => threadsApi.getPerformance(accountId, tab, pageParam),
     initialPageParam: undefined as string | undefined,
     getNextPageParam: (page) => page.nextCursor ?? undefined,
     refetchOnMount: "always",

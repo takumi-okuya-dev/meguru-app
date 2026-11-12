@@ -48,9 +48,10 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { ChevronDownIcon, SquarePenIcon } from "lucide-react";
-import { api, describeError } from "@/lib/api-client";
+import { describeError } from "@/lib/api-client";
+import { threadsApi } from "@/apps/threads/lib/api";
 import { formatRelativeJst } from "@/lib/format";
-import { queryKeys } from "@/lib/query";
+import { threadsQueryKeys } from "@/apps/threads/lib/query-keys";
 import { useCurrentAccount } from "@/apps/threads/pages/account-layout";
 import { accountPath } from "@/apps/threads/lib/paths";
 
@@ -84,8 +85,8 @@ function StockPageContent() {
   const account = useCurrentAccount();
   const queryClient = useQueryClient();
   const drafts = useQuery({
-    queryKey: queryKeys.postDrafts(account.id),
-    queryFn: () => api.listPostDrafts(account.id),
+    queryKey: threadsQueryKeys.postDrafts(account.id),
+    queryFn: () => threadsApi.listPostDrafts(account.id),
   });
   const { tab, setTab } = useStatusTab();
   const [picked, setPicked] = useState<ReadonlySet<string>>(new Set());
@@ -106,8 +107,8 @@ function StockPageContent() {
   const data = drafts.data;
   // 時間差のメンションの設定（specs/023）。設定を読めるのは view の人だけ（見せてもらっている人は読まない）
   const mentionSettings = useQuery({
-    queryKey: queryKeys.mentionSettings(account.id),
-    queryFn: () => api.mentionSettings(account.id),
+    queryKey: threadsQueryKeys.mentionSettings(account.id),
+    queryFn: () => threadsApi.mentionSettings(account.id),
     enabled: can("view"),
   });
 
@@ -172,9 +173,9 @@ function StockPageContent() {
   const selected = selectable.filter((d) => picked.has(d.id));
 
   const refresh = () => {
-    void queryClient.invalidateQueries({ queryKey: queryKeys.postDrafts(account.id) });
-    void queryClient.invalidateQueries({ queryKey: queryKeys.promptAll(account.id) });
-    void queryClient.invalidateQueries({ queryKey: queryKeys.autoPost(account.id) });
+    void queryClient.invalidateQueries({ queryKey: threadsQueryKeys.postDrafts(account.id) });
+    void queryClient.invalidateQueries({ queryKey: threadsQueryKeys.promptAll(account.id) });
+    void queryClient.invalidateQueries({ queryKey: threadsQueryKeys.autoPost(account.id) });
   };
 
   const unpick = (ids: string[]) =>
@@ -255,11 +256,11 @@ function StockPageContent() {
   const mentionSelected = async () => {
     setBusy(true);
     try {
-      const r = await api.attachMentionsBulk(account.id, selected.map((d) => ({ id: d.id, expectedVersion: d.version })));
+      const r = await threadsApi.attachMentionsBulk(account.id, selected.map((d) => ({ id: d.id, expectedVersion: d.version })));
       if (r.updated.length > 0) toast.success(`${r.updated.length}件にメンションを付けました`);
       if (r.skipped.length > 0) toast.error(`${r.skipped.length}件には付けられませんでした（「いつも付ける」の人が、ほかの投稿で予定に入っています）`);
       refresh();
-      void queryClient.invalidateQueries({ queryKey: queryKeys.mentionSettings(account.id) });
+      void queryClient.invalidateQueries({ queryKey: threadsQueryKeys.mentionSettings(account.id) });
     } catch (error) {
       toast.error(describeError(error));
     } finally {
@@ -327,9 +328,9 @@ function StockPageContent() {
   const prioritize = async (d: PostDraft) => {
     setBusy(true);
     try {
-      await api.prioritizeDraft(account.id, d.id, d.version);
+      await threadsApi.prioritizeDraft(account.id, d.id, d.version);
       const list = await drafts.refetch();
-      void queryClient.invalidateQueries({ queryKey: queryKeys.autoPost(account.id) });
+      void queryClient.invalidateQueries({ queryKey: threadsQueryKeys.autoPost(account.id) });
       const at = list.data?.schedule[d.id];
       toast.success(
         at ? `次の投稿にしました（${formatRelativeJst(at)}の予定）` : "次の投稿にしました",

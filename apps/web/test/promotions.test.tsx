@@ -11,9 +11,19 @@ const updatePromotion = vi.fn();
 const getPromotionSettings = vi.fn();
 const putPromotionSettings = vi.fn();
 const createPromotion = vi.fn();
-vi.mock("@/lib/api-client", async (orig) => {
-  const actual = await orig<typeof import("@/lib/api-client")>();
-  return { ...actual, api: { ...actual.api, listPromotions, updatePromotion, getPromotionSettings, putPromotionSettings, createPromotion } };
+vi.mock("@/apps/threads/lib/api", async (orig) => {
+  const actual = await orig<typeof import("@/apps/threads/lib/api")>();
+  return {
+    ...actual,
+    threadsApi: {
+      ...actual.threadsApi,
+      listPromotions,
+      updatePromotion,
+      getPromotionSettings,
+      putPromotionSettings,
+      createPromotion,
+    },
+  };
 });
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 

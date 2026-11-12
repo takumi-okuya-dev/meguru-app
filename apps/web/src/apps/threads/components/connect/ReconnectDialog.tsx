@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { api, describeError } from "@/lib/api-client";
+import { threadsApi } from "@/apps/threads/lib/api";
 import { queryKeys } from "@/lib/query";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -47,7 +48,7 @@ export function ReconnectDialog({
   const [doneWarnings, setDoneWarnings] = useState<TokenConnectResponse["warnings"] | null>(null);
   const method = account.connectionMethod ?? "app";
   const oauth = useMutation({
-    mutationFn: () => api.connect({ mode: "reconnect", accountId: account.id }),
+    mutationFn: () => threadsApi.connect({ mode: "reconnect", accountId: account.id }),
     onSuccess: ({ authorizeUrl }) => window.location.assign(authorizeUrl),
   });
 

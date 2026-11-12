@@ -12,9 +12,10 @@ import { LoadingSkeleton } from "@/components/LoadingSkeleton";
 import { PageBody, PageHeader } from "@/shell";
 import { HelpToggle } from "@/components/HelpToggle";
 import { Button } from "@/components/ui/button";
-import { ApiError, api } from "@/lib/api-client";
+import { ApiError } from "@/lib/api-client";
+import { threadsApi } from "@/apps/threads/lib/api";
 import { formatDaysAgoJst } from "@/lib/format";
-import { queryKeys } from "@/lib/query";
+import { threadsQueryKeys } from "@/apps/threads/lib/query-keys";
 import { NotFound } from "@/shell";
 import { teamPath } from "@/apps/threads/lib/paths";
 
@@ -104,10 +105,10 @@ function lastActiveLabel(p: TeamStatus["people"][number]): string {
  */
 export function TeamStatusPage() {
   const { teamId = "" } = useParams<{ teamId: string }>();
-  const team = useQuery({ queryKey: queryKeys.team(teamId), queryFn: () => api.getTeam(teamId) });
+  const team = useQuery({ queryKey: threadsQueryKeys.team(teamId), queryFn: () => threadsApi.getTeam(teamId) });
   const status = useQuery({
-    queryKey: queryKeys.teamStatus(teamId),
-    queryFn: () => api.teamStatus(teamId),
+    queryKey: threadsQueryKeys.teamStatus(teamId),
+    queryFn: () => threadsApi.teamStatus(teamId),
   });
   const back = (
     <Button

@@ -3,7 +3,7 @@
 import { useEffect, useId, useState } from "react";
 import { CopyPromptButton } from "@/apps/threads/components/CopyPromptButton";
 import { Button } from "@/components/ui/button";
-import { api } from "@/lib/api-client";
+import { threadsApi } from "@/apps/threads/lib/api";
 
 /**
  * 1件の解説の欄。
@@ -37,7 +37,7 @@ export function ExplainOne({
       </p>
       <CopyPromptButton
         label="解説のプロンプトをコピーする"
-        getText={async () => (await api.getExplainPrompt(accountId, postId)).prompt}
+        getText={async () => (await threadsApi.getExplainPrompt(accountId, postId)).prompt}
       />
       <label htmlFor={pasteId} className="block font-medium">
         解説を貼り付ける

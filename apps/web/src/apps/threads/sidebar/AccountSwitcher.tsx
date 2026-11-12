@@ -13,7 +13,9 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { api } from "@/lib/api-client";
+import { threadsApi } from "@/apps/threads/lib/api";
 import { queryKeys } from "@/lib/query";
+import { threadsQueryKeys } from "@/apps/threads/lib/query-keys";
 import { accountPath, newAccountPath } from "@/apps/threads/lib/paths";
 
 type MenuState = {
@@ -66,17 +68,17 @@ export function AccountSwitcher({ onNavigate }: { onNavigate?: () => void }) {
 
   async function loadCounts(accounts: AccountSummary[], version: number) {
     setMenu({ phase: "loading-counts", accounts, counts: {} });
-    let response: Awaited<ReturnType<typeof api.needsReviewCounts>>;
+    let response: Awaited<ReturnType<typeof threadsApi.needsReviewCounts>>;
     try {
       // APIを毎回呼び、キャッシュ済みの数字を今回の結果として表示しない。
-      response = await api.needsReviewCounts();
+      response = await threadsApi.needsReviewCounts();
     } catch {
       if (version === requestVersion.current)
         setMenu({ phase: "counts-error", accounts, counts: {} });
       return;
     }
     if (version !== requestVersion.current) return;
-    queryClient.setQueryData(queryKeys.needsReviewCounts, response);
+    queryClient.setQueryData(threadsQueryKeys.needsReviewCounts, response);
     const counts = Object.fromEntries(
       response.counts.map((row) => [row.accountId, row.needsReview]),
     );

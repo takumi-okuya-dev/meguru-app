@@ -24,7 +24,9 @@ import { useState, type ReactNode } from "react";
 import { Link, NavLink, useMatch, useParams } from "react-router";
 import { AppShell, Sidebar, type AppSidebar, type SidebarPartProps } from "@/shell";
 import { api } from "@/lib/api-client";
+import { threadsApi } from "@/apps/threads/lib/api";
 import { queryKeys } from "@/lib/query";
+import { threadsQueryKeys } from "@/apps/threads/lib/query-keys";
 import { cn } from "@/lib/utils";
 import { CreateTeamDialog } from "../components/team/CreateTeamDialog";
 import { TeamMark } from "../components/team/TeamMark";
@@ -105,8 +107,8 @@ function Body({ onNavigate }: SidebarPartProps) {
   const { access, isPending: accessPending } = useAccountAccess(accountId);
   const autopostOn = featureOn(access, "autopost");
   const counts = useQuery({
-    queryKey: queryKeys.draftCounts(accountId ?? ""),
-    queryFn: () => api.getDraftCounts(accountId!),
+    queryKey: threadsQueryKeys.draftCounts(accountId ?? ""),
+    queryFn: () => threadsApi.getDraftCounts(accountId!),
     // 自動投稿を使えないAccountでは、投稿ストックを出さないので読まない。使えるかがわかってから読む（specs/019）
     enabled: !!accountId && !accessPending && autopostOn,
   });

@@ -15,10 +15,16 @@ vi.mock("@/lib/api-client", async (orig) => {
   const actual = await orig<typeof import("@/lib/api-client")>();
   return {
     ...actual,
-    api: {
-      ...actual.api,
+    api: { ...actual.api, me },
+  };
+});
+vi.mock("@/apps/threads/lib/api", async (orig) => {
+  const actual = await orig<typeof import("@/apps/threads/lib/api")>();
+  return {
+    ...actual,
+    threadsApi: {
+      ...actual.threadsApi,
       accountAccess,
-      me,
       tokenConnect,
       connect,
       getPostingRules: vi.fn(() => new Promise(() => {})),

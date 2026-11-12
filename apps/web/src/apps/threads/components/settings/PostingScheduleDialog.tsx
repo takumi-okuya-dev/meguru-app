@@ -19,7 +19,8 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
-import { ApiError, api } from "@/lib/api-client";
+import { ApiError } from "@/lib/api-client";
+import { threadsApi } from "@/apps/threads/lib/api";
 import { formatSlotTime } from "@/lib/format";
 import { isStale } from "@/lib/save-error";
 
@@ -114,7 +115,7 @@ export function PostingScheduleDialog({
     save: async (form, expectedVersion) => {
       setNotReady(null);
       try {
-        const res = await api.putPostingSchedule(accountId, {
+        const res = await threadsApi.putPostingSchedule(accountId, {
           ...form,
           expectedVersion: expectedVersion ?? schedule.version,
         });

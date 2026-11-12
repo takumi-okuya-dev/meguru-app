@@ -20,8 +20,9 @@ import { toast } from "sonner";
 import { CopyPromptStatus, CopyPromptTrigger, useCopyPrompt } from "@/apps/threads/components/CopyPromptButton";
 import { FormDialogFrame } from "@/apps/threads/components/items/FormDialogFrame";
 import { Button } from "@/components/ui/button";
-import { api, describeError } from "@/lib/api-client";
-import { queryKeys } from "@/lib/query";
+import { describeError } from "@/lib/api-client";
+import { threadsApi } from "@/apps/threads/lib/api";
+import { threadsQueryKeys } from "@/apps/threads/lib/query-keys";
 import { cn } from "@/lib/utils";
 
 type Mode = "unclassified" | "classified";
@@ -95,14 +96,14 @@ function ThemeEditor({ accountId, themes, version }: { accountId: string; themes
   const [savedVersion, setSavedVersion] = useState<number | null | undefined>(undefined);
   const save = useMutation({
     mutationFn: (next: { id?: string; name: string }[]) =>
-      api.patchAnalysisSettings(accountId, {
+      threadsApi.patchAnalysisSettings(accountId, {
         expectedVersion: savedVersion === undefined ? version : savedVersion,
         themes: next.filter((t) => t.name.trim() !== ""),
       }),
     onSuccess: (res) => {
       setSavedVersion(res.settings.version);
       setEditing(null);
-      void queryClient.invalidateQueries({ queryKey: queryKeys.analysisAll(accountId) });
+      void queryClient.invalidateQueries({ queryKey: threadsQueryKeys.analysisAll(accountId) });
     },
     onError: (err) => toast.error(describeError(err)),
   });
@@ -183,17 +184,17 @@ export function ClassifyDialog({
   const [parsed, setParsed] = useState<{ items: ClassifyItem[]; problems: ClassifyProblem[] } | null>(null);
   const pasteId = useId();
   const list = useQuery({
-    queryKey: queryKeys.classifications(accountId, mode),
-    queryFn: () => api.classifications(accountId, mode),
+    queryKey: threadsQueryKeys.classifications(accountId, mode),
+    queryFn: () => threadsApi.classifications(accountId, mode),
   });
   const posts = list.data?.posts ?? [];
   const themes = list.data?.themes ?? [];
   const targets = posts.map((p) => ({ draftId: p.draftId, body: p.body }));
   const copy = useCopyPrompt({ getText: () => classifyPrompt(targets, themes) });
-  const refresh = () => void queryClient.invalidateQueries({ queryKey: queryKeys.analysisAll(accountId) });
+  const refresh = () => void queryClient.invalidateQueries({ queryKey: threadsQueryKeys.analysisAll(accountId) });
   const apply = useMutation({
     mutationFn: (items: ClassifyItem[]) =>
-      api.putClassifications(accountId, {
+      threadsApi.putClassifications(accountId, {
         source: "ai",
         items: items.map((i) => ({ draftId: i.draftId, openingType: i.openingType, themeId: i.themeId })),
       }),
@@ -206,7 +207,7 @@ export function ClassifyDialog({
   });
   const fix = useMutation({
     mutationFn: (item: { draftId: string; openingType: OpeningType; themeId: string | null }) =>
-      api.putClassifications(accountId, { source: "manual", items: [item] }),
+      threadsApi.putClassifications(accountId, { source: "manual", items: [item] }),
     onSuccess: refresh,
     onError: (err) => toast.error(describeError(err)),
   });
@@ -343,7 +344,7 @@ export function ClassifyDialog({
                   disabled={fix.isPending}
                   onChange={(v) => {
                     fix.mutate({ draftId: p.draftId, ...v });
-                    queryClient.setQueryData(queryKeys.classifications(accountId, "classified"), {
+                    queryClient.setQueryData(threadsQueryKeys.classifications(accountId, "classified"), {
                       ...list.data!,
                       posts: posts.map((x) => (x.draftId === p.draftId ? { ...x, ...v } : x)),
                     });

@@ -16,7 +16,8 @@ vi.mock("@/lib/api-client", async (orig) => {
   return { ...actual, api: { ...actual.api, me: () => meImpl() } };
 });
 
-const { ApiError, api } = await import("@/lib/api-client");
+const { ApiError } = await import("@/lib/api-client");
+const { threadsApi } = await import("@/apps/threads/lib/api");
 const { Landing } = await import("@/apps/threads/pages/home");
 const { RequireAuth } = await import("@/shell/guards/RequireAuth");
 
@@ -89,7 +90,7 @@ describe("APIクライアント", () => {
 
   it("通信に失敗したら API_UNREACHABLE", async () => {
     vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new TypeError("Failed to fetch")));
-    await expect(api.account("a1")).rejects.toMatchObject({ code: "API_UNREACHABLE", status: 0 });
+    await expect(threadsApi.account("a1")).rejects.toMatchObject({ code: "API_UNREACHABLE", status: 0 });
   });
 
   it("CONFIG_ERROR の項目名を受け取る", async () => {
@@ -101,6 +102,6 @@ describe("APIクライアント", () => {
         }),
       ),
     );
-    await expect(api.account("a1")).rejects.toMatchObject({ code: "CONFIG_ERROR", details: ["WEB_ORIGIN"] });
+    await expect(threadsApi.account("a1")).rejects.toMatchObject({ code: "CONFIG_ERROR", details: ["WEB_ORIGIN"] });
   });
 });

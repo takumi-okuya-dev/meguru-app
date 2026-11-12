@@ -3,8 +3,8 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { api } from "@/lib/api-client";
-import { queryKeys } from "@/lib/query";
+import { threadsApi } from "@/apps/threads/lib/api";
+import { threadsQueryKeys } from "@/apps/threads/lib/query-keys";
 import { CoreRulesDialog } from "./CoreRulesDialog";
 import { NgWordsDialog } from "./NgWordsDialog";
 import { PolicyInfoDialog } from "./PolicyInfoDialog";
@@ -26,8 +26,8 @@ const ruleCount = (text: string) => text.split("\n").filter((l) => l.trim() !== 
  */
 export function PostingRulesSection({ accountId, canEdit = true }: { accountId: string; canEdit?: boolean }) {
   const rules = useQuery({
-    queryKey: queryKeys.postingRules(accountId),
-    queryFn: () => api.getPostingRules(accountId),
+    queryKey: threadsQueryKeys.postingRules(accountId),
+    queryFn: () => threadsApi.getPostingRules(accountId),
   });
   const queryClient = useQueryClient();
   const [open, setOpen] = useState<Open>(null);
@@ -109,8 +109,8 @@ export function PostingRulesSection({ accountId, canEdit = true }: { accountId: 
           readOnly={!data.canEditCoreRules || !canEdit}
           onSaved={() => {
             setOpen(null);
-            void queryClient.invalidateQueries({ queryKey: queryKeys.postingRules(accountId) });
-            void queryClient.invalidateQueries({ queryKey: queryKeys.promptAll(accountId) });
+            void queryClient.invalidateQueries({ queryKey: threadsQueryKeys.postingRules(accountId) });
+            void queryClient.invalidateQueries({ queryKey: threadsQueryKeys.promptAll(accountId) });
           }}
           onClose={() => setOpen(null)}
         />

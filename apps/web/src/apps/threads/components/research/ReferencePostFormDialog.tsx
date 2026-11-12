@@ -4,7 +4,7 @@ import type { ReferencePost } from "@meguru/shared";
 import { DeletedElsewhereNotice, FormDialogFrame } from "@/apps/threads/components/items/FormDialogFrame";
 import { useItemForm } from "@/apps/threads/components/items/use-item-form";
 import { UnsavedChangesDialog } from "@/components/UnsavedChangesDialog";
-import { api } from "@/lib/api-client";
+import { threadsApi } from "@/apps/threads/lib/api";
 import { ReferencePostFields } from "./ReferencePostFields";
 import { EMPTY_REF_FORM, overLimitRef, toRefForm, toRefInput, validateRef, type RefForm } from "./reference-post-form";
 
@@ -50,8 +50,8 @@ export function ReferencePostFormDialog({
     onLimitReached,
     save: (form, expectedVersion) =>
       expectedVersion === undefined
-        ? api.createReferencePost(accountId, toRefInput(form))
-        : api.updateReferencePost(accountId, item!.id, { ...toRefInput(form), expectedVersion }),
+        ? threadsApi.createReferencePost(accountId, toRefInput(form))
+        : threadsApi.updateReferencePost(accountId, item!.id, { ...toRefInput(form), expectedVersion }),
   });
   const { form, setField, errors } = f;
 

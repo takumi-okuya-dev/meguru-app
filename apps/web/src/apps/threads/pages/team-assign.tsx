@@ -9,8 +9,9 @@ import { ApiErrorScreen } from "@/components/ApiErrorScreen";
 import { LoadingSkeleton } from "@/components/LoadingSkeleton";
 import { PageBody, PageHeader } from "@/shell";
 import { Button } from "@/components/ui/button";
-import { ApiError, api, describeError } from "@/lib/api-client";
-import { queryKeys } from "@/lib/query";
+import { ApiError, describeError } from "@/lib/api-client";
+import { threadsApi } from "@/apps/threads/lib/api";
+import { threadsQueryKeys } from "@/apps/threads/lib/query-keys";
 import { cn } from "@/lib/utils";
 import { NotFound } from "@/shell";
 import { teamPath } from "@/apps/threads/lib/paths";
@@ -22,20 +23,20 @@ import { teamPath } from "@/apps/threads/lib/paths";
 export function TeamAssignPage() {
   const { teamId = "" } = useParams<{ teamId: string }>();
   const queryClient = useQueryClient();
-  const team = useQuery({ queryKey: queryKeys.team(teamId), queryFn: () => api.getTeam(teamId) });
+  const team = useQuery({ queryKey: threadsQueryKeys.team(teamId), queryFn: () => threadsApi.getTeam(teamId) });
   const table = useQuery({
-    queryKey: queryKeys.teamAssignments(teamId),
-    queryFn: () => api.getAssignments(teamId),
+    queryKey: threadsQueryKeys.teamAssignments(teamId),
+    queryFn: () => threadsApi.getAssignments(teamId),
     enabled: team.data?.myRole === "admin",
   });
   const toggle = useMutation({
     mutationFn: ({ userId, accountId, on }: { userId: string; accountId: string; on: boolean }) =>
-      on ? api.assign(teamId, userId, accountId) : api.unassign(teamId, userId, accountId),
+      on ? threadsApi.assign(teamId, userId, accountId) : threadsApi.unassign(teamId, userId, accountId),
     // 押すとすぐ切り替え、失敗したら元に戻す
     onMutate: ({ userId, accountId, on }) => {
-      const prev = queryClient.getQueryData<TeamAssignments>(queryKeys.teamAssignments(teamId));
+      const prev = queryClient.getQueryData<TeamAssignments>(threadsQueryKeys.teamAssignments(teamId));
       if (prev) {
-        queryClient.setQueryData<TeamAssignments>(queryKeys.teamAssignments(teamId), {
+        queryClient.setQueryData<TeamAssignments>(threadsQueryKeys.teamAssignments(teamId), {
           ...prev,
           people: prev.people.map((p) =>
             p.userId !== userId
@@ -47,12 +48,12 @@ export function TeamAssignPage() {
       return { prev };
     },
     onError: (err, _v, ctx) => {
-      if (ctx?.prev) queryClient.setQueryData(queryKeys.teamAssignments(teamId), ctx.prev);
+      if (ctx?.prev) queryClient.setQueryData(threadsQueryKeys.teamAssignments(teamId), ctx.prev);
       toast.error(describeError(err));
     },
     onSettled: () => {
-      void queryClient.invalidateQueries({ queryKey: queryKeys.teamAssignments(teamId) });
-      void queryClient.invalidateQueries({ queryKey: queryKeys.team(teamId) });
+      void queryClient.invalidateQueries({ queryKey: threadsQueryKeys.teamAssignments(teamId) });
+      void queryClient.invalidateQueries({ queryKey: threadsQueryKeys.team(teamId) });
     },
   });
 

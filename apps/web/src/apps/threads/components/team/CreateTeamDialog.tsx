@@ -9,6 +9,7 @@ import { Link, useNavigate } from "react-router";
 import { AccountAvatar } from "@/apps/threads/components/AccountAvatar";
 import { FormDialogFrame } from "@/apps/threads/components/items/FormDialogFrame";
 import { ApiError, api, describeError } from "@/lib/api-client";
+import { threadsApi } from "@/apps/threads/lib/api";
 import { queryKeys } from "@/lib/query";
 import { cn } from "@/lib/utils";
 import { accountPath, teamPath } from "@/apps/threads/lib/paths";
@@ -45,7 +46,7 @@ export function CreateTeamDialog({
   const length = countChars(name.trim());
   const nameOk = length >= 1 && length <= TEAM_NAME_MAX;
   const create = useMutation({
-    mutationFn: () => api.createTeam({ name, accountIds: chosen }),
+    mutationFn: () => threadsApi.createTeam({ name, accountIds: chosen }),
     onSuccess: async ({ teamId }) => {
       await queryClient.invalidateQueries({ queryKey: queryKeys.me });
       onClose();

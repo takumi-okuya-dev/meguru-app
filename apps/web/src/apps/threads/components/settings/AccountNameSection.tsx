@@ -6,8 +6,10 @@ import { useEffect, useState, type FormEvent } from "react";
 import { toast } from "sonner";
 import { FieldWithCounter } from "@/components/FieldWithCounter";
 import { Button } from "@/components/ui/button";
-import { api, describeError } from "@/lib/api-client";
+import { describeError } from "@/lib/api-client";
+import { threadsApi } from "@/apps/threads/lib/api";
 import { queryKeys } from "@/lib/query";
+import { threadsQueryKeys } from "@/apps/threads/lib/query-keys";
 
 /**
  * アカウントの名前の区分。オーナーだけに出す（呼び出し側で出し分ける）。
@@ -20,12 +22,12 @@ export function AccountNameSection({ account }: { account: AccountSummary }) {
   // ほかの画面で直されたら、入力欄も合わせる
   useEffect(() => setName(account.name), [account.name]);
   const save = useMutation({
-    mutationFn: () => api.renameAccount(account.id, { name: name.trim() }),
+    mutationFn: () => threadsApi.renameAccount(account.id, { name: name.trim() }),
     onSuccess: async () => {
       toast.success("名前を保存しました");
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: queryKeys.me }),
-        queryClient.invalidateQueries({ queryKey: queryKeys.account(account.id) }),
+        queryClient.invalidateQueries({ queryKey: threadsQueryKeys.account(account.id) }),
       ]);
     },
   });

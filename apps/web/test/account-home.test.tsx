@@ -17,12 +17,21 @@ vi.mock("@/lib/api-client", async (orig) => {
     ...actual,
     api: {
       ...actual.api,
-      getAutoPost: async () => auto,
-      getDraftCounts: async () => ({ needsReview: 0, approved, rejected: 0, published: 0, publishFailed: 0 }),
-      accountAccess: async () => OWNER_ACCESS,
       // 「はじめに読んでほしいこと」は利用者が分かってから出す（specs/014 FR-061）。ここでは出さない
       me: () => new Promise(() => {}),
       referral: () => referral(),
+    },
+  };
+});
+vi.mock("@/apps/threads/lib/api", async (orig) => {
+  const actual = await orig<typeof import("@/apps/threads/lib/api")>();
+  return {
+    ...actual,
+    threadsApi: {
+      ...actual.threadsApi,
+      getAutoPost: async () => auto,
+      getDraftCounts: async () => ({ needsReview: 0, approved, rejected: 0, published: 0, publishFailed: 0 }),
+      accountAccess: async () => OWNER_ACCESS,
       getProfileStatus: () => (current instanceof Error ? Promise.reject(current) : Promise.resolve(current)),
     },
   };

@@ -1,8 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router";
-import { api } from "@/lib/api-client";
+import { threadsApi } from "@/apps/threads/lib/api";
 import { formatRelativeJst } from "@/lib/format";
-import { queryKeys } from "@/lib/query";
+import { threadsQueryKeys } from "@/apps/threads/lib/query-keys";
 import { Button } from "@/components/ui/button";
 import { ReconnectButton } from "@/apps/threads/components/ReconnectButton";
 import { accountPath } from "@/apps/threads/lib/paths";
@@ -14,8 +14,8 @@ import { accountPath } from "@/apps/threads/lib/paths";
  */
 export function NextPostCard({ accountId }: { accountId: string }) {
   const query = useQuery({
-    queryKey: queryKeys.autoPost(accountId),
-    queryFn: () => api.getAutoPost(accountId),
+    queryKey: threadsQueryKeys.autoPost(accountId),
+    queryFn: () => threadsApi.getAutoPost(accountId),
   });
   const data = query.data;
   if (!data)

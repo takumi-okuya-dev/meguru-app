@@ -15,8 +15,9 @@ import { useEffect, useId, useRef, useState } from "react";
 import { Link } from "react-router";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { ApiError, api } from "@/lib/api-client";
-import { queryKeys } from "@/lib/query";
+import { ApiError } from "@/lib/api-client";
+import { threadsApi } from "@/apps/threads/lib/api";
+import { threadsQueryKeys } from "@/apps/threads/lib/query-keys";
 import { saveErrorMessage } from "@/lib/save-error";
 import { useUnsavedChanges } from "@/lib/use-unsaved-changes";
 import { STOCK_LIMIT_MESSAGE } from "./messages";
@@ -69,14 +70,14 @@ export function PasteComposer({
   const focusedFor = useRef<string | null>(null);
 
   const refresh = () => {
-    void queryClient.invalidateQueries({ queryKey: queryKeys.postDrafts(accountId) });
+    void queryClient.invalidateQueries({ queryKey: threadsQueryKeys.postDrafts(accountId) });
     // 直近の下書きはプロンプトの材料なので、件数によらずプロンプトも取り直す
-    void queryClient.invalidateQueries({ queryKey: queryKeys.promptAll(accountId) });
+    void queryClient.invalidateQueries({ queryKey: threadsQueryKeys.promptAll(accountId) });
   };
 
   const send = useMutation({
     mutationFn: (req: { clientRequestId: string; text: string }) =>
-      api.createDraftBatch(accountId, { clientRequestId: req.clientRequestId, text: req.text }),
+      threadsApi.createDraftBatch(accountId, { clientRequestId: req.clientRequestId, text: req.text }),
     onSuccess: (result, req) => {
       pending.current = null;
       setText((current) => (current === req.text ? "" : current));
@@ -99,7 +100,7 @@ export function PasteComposer({
   });
 
   const undo = useMutation({
-    mutationFn: (r: Registered) => api.deleteDraftBatch(accountId, r.result.batchId),
+    mutationFn: (r: Registered) => threadsApi.deleteDraftBatch(accountId, r.result.batchId),
     onSuccess: ({ deletedCount }, r) => {
       setRegistered(null);
       // 書きかけの内容があれば上書きしない

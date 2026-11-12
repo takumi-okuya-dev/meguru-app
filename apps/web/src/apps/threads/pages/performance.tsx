@@ -20,7 +20,7 @@ import { usePerformance, usePerformanceTab } from "@/apps/threads/components/per
 import { Button } from "@/components/ui/button";
 import { Tabs } from "@/components/ui/tabs";
 import { formatJstShort } from "@/lib/format";
-import { queryKeys } from "@/lib/query";
+import { threadsQueryKeys } from "@/apps/threads/lib/query-keys";
 import { NotConnectedNotice } from "@/apps/threads/components/NotConnectedNotice";
 import { useCurrentAccount } from "@/apps/threads/pages/account-layout";
 
@@ -57,7 +57,7 @@ function ConnectedPerformance() {
   // 保存した項目を一覧に入れ、次のプロンプトに入る印を合わせる（繰り上がり。FR-022）
   const onSaved = (res: FeedbackResponse) => {
     const inPrompt = new Set(res.promptIds);
-    queryClient.setQueryData<InfiniteData<PerformancePageData>>(queryKeys.performance(account.id, tab), (data) =>
+    queryClient.setQueryData<InfiniteData<PerformancePageData>>(threadsQueryKeys.performance(account.id, tab), (data) =>
       data
         ? {
             ...data,
@@ -71,7 +71,7 @@ function ConnectedPerformance() {
           }
         : data,
     );
-    void queryClient.invalidateQueries({ queryKey: queryKeys.promptAll(account.id) });
+    void queryClient.invalidateQueries({ queryKey: threadsQueryKeys.promptAll(account.id) });
   };
 
   const pages = query.data?.pages ?? [];

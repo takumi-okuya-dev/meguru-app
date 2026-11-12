@@ -8,7 +8,7 @@ import { useMutation } from "@tanstack/react-query";
 import { useEffect, useRef } from "react";
 import { useNavigate, useSearchParams } from "react-router";
 import { CenteredLayout } from "@/shell";
-import { api } from "@/lib/api-client";
+import { threadsApi } from "@/apps/threads/lib/api";
 import { threadsHomePath } from "@/apps/threads/lib/paths";
 
 /**
@@ -37,8 +37,8 @@ export function ThreadsComplete() {
     mutationFn: () =>
       // 許可しなかったときも state を渡す（元のアカウントの画面へ戻すため）
       cancelled
-        ? api.completeConnect({ state: state!, error: "THREADS_AUTH_CANCELLED" })
-        : api.completeConnect({ state: state!, code: code! }),
+        ? threadsApi.completeConnect({ state: state!, error: "THREADS_AUTH_CANCELLED" })
+        : threadsApi.completeConnect({ state: state!, code: code! }),
     onSuccess: ({ redirectTo }) => {
       // 履歴に残さない（戻るボタンで、使い終わった state と code の付いたURLに戻らないように）
       navigate(isInsideApp(redirectTo) ? redirectTo : threadsHomePath(), { replace: true });

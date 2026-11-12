@@ -10,7 +10,18 @@ import { ME_BILLING_OFF, meBilling } from "./helpers/billing";
 const mocks = vi.hoisted(() => ({ me: vi.fn(), createAccount: vi.fn() }));
 vi.mock("@/lib/api-client", async (orig) => {
   const actual = await orig<typeof import("@/lib/api-client")>();
-  return { ...actual, api: { ...actual.api, me: mocks.me, createAccount: mocks.createAccount, needsReviewCounts: vi.fn(() => new Promise(() => {})) } };
+  return { ...actual, api: { ...actual.api, me: mocks.me } };
+});
+vi.mock("@/apps/threads/lib/api", async (orig) => {
+  const actual = await orig<typeof import("@/apps/threads/lib/api")>();
+  return {
+    ...actual,
+    threadsApi: {
+      ...actual.threadsApi,
+      createAccount: mocks.createAccount,
+      needsReviewCounts: vi.fn(() => new Promise(() => {})),
+    },
+  };
 });
 vi.mock("@clerk/react", () => ({ useUser: () => ({ user: null }), useClerk: () => ({ signOut: vi.fn() }) }));
 
