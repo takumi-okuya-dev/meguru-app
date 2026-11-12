@@ -3,6 +3,7 @@
 // Threadsのトランザクションの中で呼ぶ（events/received-events.ts）。共通は、この片づけが届いたあとで users の行を消す。
 import { and, asc, eq, inArray, ne } from "drizzle-orm";
 import type { TxDb } from "../../../kernel/db/client";
+import { lockThreadsUser } from "../../../kernel/db/locks";
 import { WITHDRAWN_ACTOR_NAME } from "../../../platform";
 import { accounts, activityLogs, memberships, teamMembers, teams, threadsDeletionRequests, threadsUserStates } from "../schema";
 import { beforeAccountDeleted, chooseSuccessor } from "../teams/team-service";
@@ -17,6 +18,14 @@ import { lockThreadsMember } from "../access/locks";
  * @param now - 今の時刻
  */
 export async function cleanupForWithdrawal(tx: TxDb, userId: string, now: Date = new Date()): Promise<void> {
+  // ロックは、ほかの処理と同じ順番「Threadsユーザー → 利用者」で取る（specs/010 research.md R6）。Metaのデータ削除は
+  // Threadsユーザーのロック → 削除の求めの行 → 利用者のロックの順なので、先に利用者のロックを取ると互いに待ち合う（PR #97 のCodexレビュー）
+  const threadsUsers = await tx
+    .selectDistinct({ threadsUserId: accounts.threadsUserId })
+    .from(accounts)
+    .innerJoin(memberships, and(eq(memberships.accountId, accounts.id), eq(memberships.role, "owner")))
+    .where(eq(memberships.userId, userId));
+  for (const t of threadsUsers.flatMap((r) => (r.threadsUserId ? [r.threadsUserId] : [])).sort()) await lockThreadsUser(tx, t);
   // その人のアカウントの作成・削除・接続の確定・最後に開いたアカウントの記録と直列にする（PR #97 のセルフレビュー）
   await lockThreadsMember(tx, userId);
   // 招待の申し込みを片づける（枠を使っていない行は消し、使っている行はユーザー名だけを残す。specs/024 research.md R15）
