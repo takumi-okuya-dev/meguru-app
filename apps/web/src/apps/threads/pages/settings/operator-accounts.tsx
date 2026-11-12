@@ -15,8 +15,9 @@ import { useEffect, useId, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ApiError, api, describeError } from "@/lib/api-client";
-import { queryKeys } from "@/lib/query";
+import { ApiError, describeError } from "@/lib/api-client";
+import { threadsApi } from "@/apps/threads/lib/api";
+import { threadsQueryKeys } from "@/apps/threads/lib/query-keys";
 import { MD_QUERY, useMediaQuery } from "@/lib/use-media-query";
 
 /** 入力が止まってから読み込むまでの時間（research.md R3）。 */
@@ -50,8 +51,8 @@ export function OperatorAccountsPage() {
   }, [input]);
 
   const list = useInfiniteQuery({
-    queryKey: queryKeys.operatorAccounts(method, q),
-    queryFn: ({ pageParam }) => api.operatorAccounts({ method, q, cursor: pageParam }),
+    queryKey: threadsQueryKeys.operatorAccounts(method, q),
+    queryFn: ({ pageParam }) => threadsApi.operatorAccounts({ method, q, cursor: pageParam }),
     initialPageParam: undefined as string | undefined,
     getNextPageParam: (page) => page.nextCursor ?? undefined,
     retry: false,

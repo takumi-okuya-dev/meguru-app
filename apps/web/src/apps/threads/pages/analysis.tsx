@@ -15,8 +15,9 @@ import { ScheduleHint } from "@/apps/threads/components/analysis/ScheduleHint";
 import { TrendCard } from "@/apps/threads/components/analysis/TrendCard";
 import { PageBody, PageHeader } from "@/shell";
 import { HelpToggle } from "@/components/HelpToggle";
-import { api, describeError } from "@/lib/api-client";
-import { queryKeys } from "@/lib/query";
+import { describeError } from "@/lib/api-client";
+import { threadsApi } from "@/apps/threads/lib/api";
+import { threadsQueryKeys } from "@/apps/threads/lib/query-keys";
 import { cn } from "@/lib/utils";
 import { useCurrentAccount } from "@/apps/threads/pages/account-layout";
 
@@ -60,17 +61,17 @@ export function AnalysisPage() {
   const scope: AnalysisScope = params.get("scope") === "regular" ? "regular" : "all";
   const [classifying, setClassifying] = useState(false);
   const query = useQuery({
-    queryKey: queryKeys.analysis(account.id, scope),
-    queryFn: () => api.analysis(account.id, scope),
+    queryKey: threadsQueryKeys.analysis(account.id, scope),
+    queryFn: () => threadsApi.analysis(account.id, scope),
   });
   const toggle = useMutation({
     mutationFn: (on: boolean) =>
-      api.patchAnalysisSettings(account.id, { expectedVersion: query.data?.settings.version ?? null, trendsInPrompt: on }),
+      threadsApi.patchAnalysisSettings(account.id, { expectedVersion: query.data?.settings.version ?? null, trendsInPrompt: on }),
     onSuccess: (res) => {
       // 続けて切り替えても古い版を送らないよう、保存した設定をすぐ入れる
-      queryClient.setQueryData<AnalysisResponse>(queryKeys.analysis(account.id, scope), (d) => (d ? { ...d, settings: res.settings } : d));
-      void queryClient.invalidateQueries({ queryKey: queryKeys.analysisAll(account.id) });
-      void queryClient.invalidateQueries({ queryKey: queryKeys.promptAll(account.id) });
+      queryClient.setQueryData<AnalysisResponse>(threadsQueryKeys.analysis(account.id, scope), (d) => (d ? { ...d, settings: res.settings } : d));
+      void queryClient.invalidateQueries({ queryKey: threadsQueryKeys.analysisAll(account.id) });
+      void queryClient.invalidateQueries({ queryKey: threadsQueryKeys.promptAll(account.id) });
     },
     onError: (err) => toast.error(describeError(err)),
   });

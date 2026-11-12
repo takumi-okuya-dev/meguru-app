@@ -21,7 +21,9 @@ import { UnsavedChangesProvider } from "@/components/UnsavedChangesProvider";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { ApiError, api } from "@/lib/api-client";
+import { threadsApi } from "@/apps/threads/lib/api";
 import { queryKeys } from "@/lib/query";
+import { threadsQueryKeys } from "@/apps/threads/lib/query-keys";
 import { useAccountOpen } from "@/apps/threads/lib/use-account-open";
 import { useAccountAccess, useAccountAccessErrors } from "@/apps/threads/lib/use-account-access";
 import { NotFound } from "@/shell";
@@ -61,8 +63,8 @@ export function AccountLayout() {
   const queryClient = useQueryClient();
   const me = useQuery({ queryKey: queryKeys.me, queryFn: api.me });
   const account = useQuery({
-    queryKey: queryKeys.account(accountId ?? ""),
-    queryFn: () => api.account(accountId!),
+    queryKey: threadsQueryKeys.account(accountId ?? ""),
+    queryFn: () => threadsApi.account(accountId!),
     enabled: Boolean(accountId) && (me.data?.accounts.length ?? 0) > 0,
   });
 
@@ -75,7 +77,7 @@ export function AccountLayout() {
   // 関わりと権限。見せてもらっているAccountの移動と、読むだけの帯（specs/013 FR-045）に使う
   const { access } = useAccountAccess(account.data ? accountId : undefined);
   useAccountOpen(unlisted ? undefined : accountId, (latest) => {
-    queryClient.setQueryData(queryKeys.account(latest.id), latest);
+    queryClient.setQueryData(threadsQueryKeys.account(latest.id), latest);
     // 一覧の接続状態・並び順も最新にする
     void queryClient.invalidateQueries({ queryKey: queryKeys.me });
   });

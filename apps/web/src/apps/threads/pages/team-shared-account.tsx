@@ -11,8 +11,9 @@ import { ApiErrorScreen } from "@/components/ApiErrorScreen";
 import { AccountAvatar } from "@/apps/threads/components/AccountAvatar";
 import { LoadingSkeleton } from "@/components/LoadingSkeleton";
 import { Button } from "@/components/ui/button";
-import { ApiError, api } from "@/lib/api-client";
-import { queryKeys } from "@/lib/query";
+import { ApiError } from "@/lib/api-client";
+import { threadsApi } from "@/apps/threads/lib/api";
+import { threadsQueryKeys } from "@/apps/threads/lib/query-keys";
 import { cn } from "@/lib/utils";
 import { accountPath, teamPath } from "@/apps/threads/lib/paths";
 
@@ -72,12 +73,12 @@ function LoadFailed({ onRetry }: { onRetry: () => void }) {
 function StockTab({ accountId, onLost }: { accountId: string; onLost: () => void }) {
   const [filter, setFilter] = useState<StockFilter>("approved");
   const drafts = useQuery({
-    queryKey: queryKeys.postDrafts(accountId),
-    queryFn: () => api.listPostDrafts(accountId),
+    queryKey: threadsQueryKeys.postDrafts(accountId),
+    queryFn: () => threadsApi.listPostDrafts(accountId),
   });
   const published = useQuery({
-    queryKey: queryKeys.published(accountId),
-    queryFn: () => api.listPublished(accountId),
+    queryKey: threadsQueryKeys.published(accountId),
+    queryFn: () => threadsApi.listPublished(accountId),
     enabled: filter === "published",
   });
   useReportLost(drafts.error ?? published.error, onLost);
@@ -146,20 +147,20 @@ function StockTab({ accountId, onLost }: { accountId: string; onLost: () => void
  */
 function StrategyTab({ accountId, onLost }: { accountId: string; onLost: () => void }) {
   const strategy = useQuery({
-    queryKey: queryKeys.strategy(accountId),
-    queryFn: () => api.getStrategy(accountId),
+    queryKey: threadsQueryKeys.strategy(accountId),
+    queryFn: () => threadsApi.getStrategy(accountId),
   });
   const promotions = useQuery({
-    queryKey: queryKeys.promotions(accountId),
-    queryFn: () => api.listPromotions(accountId),
+    queryKey: threadsQueryKeys.promotions(accountId),
+    queryFn: () => threadsApi.listPromotions(accountId),
   });
   const references = useQuery({
-    queryKey: queryKeys.referencePosts(accountId),
-    queryFn: () => api.listReferencePosts(accountId),
+    queryKey: threadsQueryKeys.referencePosts(accountId),
+    queryFn: () => threadsApi.listReferencePosts(accountId),
   });
   const keywords = useQuery({
-    queryKey: queryKeys.researchKeywords(accountId),
-    queryFn: () => api.listResearchKeywords(accountId),
+    queryKey: threadsQueryKeys.researchKeywords(accountId),
+    queryFn: () => threadsApi.listResearchKeywords(accountId),
   });
   useReportLost(strategy.error ?? promotions.error ?? references.error ?? keywords.error, onLost);
   if (strategy.isPending) return <LoadingSkeleton />;
@@ -275,14 +276,14 @@ export function TeamSharedAccountPage() {
   const tab = params.get("tab") === "strategy" ? "strategy" : "stock";
   const navigate = useNavigate();
   const access = useQuery({
-    queryKey: queryKeys.access(accountId),
-    queryFn: () => api.accountAccess(accountId),
+    queryKey: threadsQueryKeys.access(accountId),
+    queryFn: () => threadsApi.accountAccess(accountId),
   });
   const account = useQuery({
-    queryKey: queryKeys.account(accountId),
-    queryFn: () => api.account(accountId),
+    queryKey: threadsQueryKeys.account(accountId),
+    queryFn: () => threadsApi.account(accountId),
   });
-  const team = useQuery({ queryKey: queryKeys.team(teamId), queryFn: () => api.getTeam(teamId) });
+  const team = useQuery({ queryKey: threadsQueryKeys.team(teamId), queryFn: () => threadsApi.getTeam(teamId) });
   const [childLost, setChildLost] = useState(false);
   const onLost = useCallback(() => setChildLost(true), []);
   const lost =

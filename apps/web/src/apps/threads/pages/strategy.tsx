@@ -47,9 +47,9 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { api } from "@/lib/api-client";
+import { threadsApi } from "@/apps/threads/lib/api";
 import { formatDateTime } from "@/lib/format";
-import { queryKeys } from "@/lib/query";
+import { threadsQueryKeys } from "@/apps/threads/lib/query-keys";
 import { billingReasonOf, isBillingRequired, isStale, saveErrorMessage } from "@/lib/save-error";
 import { useUnsavedChanges } from "@/lib/use-unsaved-changes";
 import { cn } from "@/lib/utils";
@@ -81,7 +81,7 @@ function goToField(key: string, focus: boolean) {
  */
 export function StrategyPage() {
   const account = useCurrentAccount();
-  const query = useQuery({ queryKey: queryKeys.strategy(account.id), queryFn: () => api.getStrategy(account.id) });
+  const query = useQuery({ queryKey: threadsQueryKeys.strategy(account.id), queryFn: () => threadsApi.getStrategy(account.id) });
 
   if (query.isError) return <ApiErrorScreen error={query.error} onRetry={() => void query.refetch()} />;
   if (!query.data) {
@@ -150,20 +150,20 @@ function StrategyEditor({ accountId, initial }: { accountId: string; initial: St
   const applySaved = (s: Strategy, keepInput = false) => {
     setSaved(s);
     if (!keepInput) setValues(pickValues(s));
-    queryClient.setQueryData(queryKeys.strategy(accountId), s);
+    queryClient.setQueryData(threadsQueryKeys.strategy(accountId), s);
   };
 
   // 送った内容（payload）を変数として持ち、保存中に入力が続いても、その分を消さない
   const save = useMutation({
     mutationFn: ({ payload, expectedVersion }: { payload: StrategyValues; expectedVersion: number }) =>
-      api.putStrategy(accountId, { ...payload, expectedVersion }),
+      threadsApi.putStrategy(accountId, { ...payload, expectedVersion }),
     onSuccess: (s, { payload }) => {
       setSaved(s);
-      queryClient.setQueryData(queryKeys.strategy(accountId), s);
+      queryClient.setQueryData(threadsQueryKeys.strategy(accountId), s);
       // 保存中に入力が続いていなければ、保存後の値（空白だけの項目は空になる）に合わせる。
       // 続いていれば、その入力は残す（保存後の値との差分として、未保存の変更のまま）
       setValues((current) => (sameValues(current, payload) ? pickValues(s) : current));
-      void queryClient.invalidateQueries({ queryKey: queryKeys.profileStatus(accountId) });
+      void queryClient.invalidateQueries({ queryKey: threadsQueryKeys.profileStatus(accountId) });
       toast.success("保存しました");
     },
     onError: (err) => {

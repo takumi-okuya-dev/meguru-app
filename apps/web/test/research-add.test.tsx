@@ -15,7 +15,11 @@ const createReferencePostsBatch = vi.fn();
 const toastSuccess = vi.fn();
 vi.mock("@/lib/api-client", async (orig) => {
   const actual = await orig<typeof import("@/lib/api-client")>();
-  return { ...actual, api: { ...actual.api, listReferencePosts, listResearchKeywords, createReferencePostsBatch } };
+  return { ...actual, api: { ...actual.api } };
+});
+vi.mock("@/apps/threads/lib/api", async (orig) => {
+  const actual = await orig<typeof import("@/apps/threads/lib/api")>();
+  return { ...actual, threadsApi: { ...actual.threadsApi, listReferencePosts, listResearchKeywords, createReferencePostsBatch } };
 });
 vi.mock("sonner", () => ({ toast: { success: toastSuccess, error: vi.fn() } }));
 

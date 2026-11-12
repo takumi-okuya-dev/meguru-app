@@ -8,12 +8,12 @@ vi.mock("@/lib/api-client", async (orig) => {
   const actual = await orig<typeof import("@/lib/api-client")>();
   return {
     ...actual,
-    api: {
-      ...actual.api,
-      listReferencePosts: async () => ({ items: [], limit: 200, canEdit: true }),
-      listResearchKeywords: async () => ({ items: [], limit: 100, canEdit: true }),
-    },
+    api: { ...actual.api },
   };
+});
+vi.mock("@/apps/threads/lib/api", async (orig) => {
+  const actual = await orig<typeof import("@/apps/threads/lib/api")>();
+  return { ...actual, threadsApi: { ...actual.threadsApi, listReferencePosts: async () => ({ items: [], limit: 200, canEdit: true }), listResearchKeywords: async () => ({ items: [], limit: 100, canEdit: true }) } };
 });
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 

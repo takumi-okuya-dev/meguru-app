@@ -9,7 +9,7 @@ import {
   type PerformanceItem,
 } from "@meguru/shared";
 import { useEffect, useId, useState } from "react";
-import { api } from "@/lib/api-client";
+import { threadsApi } from "@/apps/threads/lib/api";
 import { isStale } from "@/lib/save-error";
 
 /**
@@ -44,7 +44,7 @@ export function FeedbackEditor({
   const save = useMutation({
     // 読み込んだ版を送り、他の人が先に保存していたら 409 にする（specs/008 FR-007）
     mutationFn: (body: { memo?: string | null; includeInPrompt?: boolean }) =>
-      api.updateFeedback(accountId, item.id, { ...body, expectedVersion: feedback.version }),
+      threadsApi.updateFeedback(accountId, item.id, { ...body, expectedVersion: feedback.version }),
     onSuccess: (res) => {
       onSaved(res);
       setSaved(true);

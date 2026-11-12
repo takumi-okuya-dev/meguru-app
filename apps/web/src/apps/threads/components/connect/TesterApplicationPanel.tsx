@@ -6,8 +6,9 @@ import { useId, useState, type FormEvent, type ReactNode } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { api, describeError } from "@/lib/api-client";
-import { queryKeys } from "@/lib/query";
+import { describeError } from "@/lib/api-client";
+import { threadsApi } from "@/apps/threads/lib/api";
+import { threadsQueryKeys } from "@/apps/threads/lib/query-keys";
 import { ThreadsAccountGuide } from "./ThreadsAccountGuide";
 
 /** 招待を承認する手順（Threadsのアプリの画面の名前が変わったら直す。docs/threads-token-guide.md と同じ考え方）。 */
@@ -35,9 +36,9 @@ export function TesterApplicationPanel({
   renderError: (expected: string | null) => ReactNode;
 }) {
   const client = useQueryClient();
-  const q = useQuery({ queryKey: queryKeys.testerApplication(accountId), queryFn: () => api.testerApplication(accountId) });
-  const refresh = () => client.invalidateQueries({ queryKey: queryKeys.testerApplication(accountId) });
-  const cancel = useMutation({ mutationFn: () => api.cancelTesterApplication(accountId), onSettled: refresh });
+  const q = useQuery({ queryKey: threadsQueryKeys.testerApplication(accountId), queryFn: () => threadsApi.testerApplication(accountId) });
+  const refresh = () => client.invalidateQueries({ queryKey: threadsQueryKeys.testerApplication(accountId) });
+  const cancel = useMutation({ mutationFn: () => threadsApi.cancelTesterApplication(accountId), onSettled: refresh });
 
   if (q.isPending) return <p className="text-sm text-muted-foreground">読み込み中…</p>;
   if (q.isError) return <p role="alert" className="text-sm text-muted-foreground">{describeError(q.error)}</p>;
@@ -137,7 +138,7 @@ function ApplyForm({
   const inputId = useId();
   const [value, setValue] = useState(initial);
   const [invalid, setInvalid] = useState(false);
-  const applyM = useMutation({ mutationFn: (raw: string) => api.applyTester(accountId, raw), onSuccess: onApplied });
+  const applyM = useMutation({ mutationFn: (raw: string) => threadsApi.applyTester(accountId, raw), onSuccess: onApplied });
   const submit = (e: FormEvent) => {
     e.preventDefault();
     if (!normalizeThreadsUsername(value)) {

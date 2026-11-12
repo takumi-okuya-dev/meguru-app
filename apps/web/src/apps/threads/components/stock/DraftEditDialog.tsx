@@ -13,7 +13,8 @@ import { FieldWithCounter } from "@/components/FieldWithCounter";
 import { DeletedElsewhereNotice, FormDialogFrame } from "@/apps/threads/components/items/FormDialogFrame";
 import { useItemForm, type FormErrors } from "@/apps/threads/components/items/use-item-form";
 import { useRef } from "react";
-import { api, ApiError } from "@/lib/api-client";
+import { ApiError } from "@/lib/api-client";
+import { threadsApi } from "@/apps/threads/lib/api";
 import { LabelRow, NgWordLabel, PolicyCautionLabels } from "./DraftLabels";
 import { ThreadsLengthBar } from "./ThreadsLengthBar";
 
@@ -58,7 +59,7 @@ export function DraftEditDialog({
     save: async (form, expectedVersion) => {
       let res;
       try {
-        res = await api.updatePostDraft(accountId, item.id, {
+        res = await threadsApi.updatePostDraft(accountId, item.id, {
           body: form.body,
           expectedVersion: expectedVersion ?? item.version,
         });

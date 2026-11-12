@@ -13,18 +13,12 @@ vi.mock("@/lib/api-client", async (orig) => {
   const actual = await orig<typeof import("@/lib/api-client")>();
   return {
     ...actual,
-    api: {
-      ...actual.api,
-      me: mocks.me,
-      tokenConnect: mocks.tokenConnect,
-      renameAccount: mocks.renameAccount,
-      accountAccess: vi.fn(async () => OWNER_ACCESS),
-      getPostingRules: vi.fn(() => new Promise(() => {})),
-      getPostingSchedule: mocks.getPostingSchedule,
-      getAutoPost: vi.fn(() => new Promise(() => {})),
-      accountTeam: vi.fn(() => new Promise(() => {})),
-    },
+    api: { ...actual.api, me: mocks.me },
   };
+});
+vi.mock("@/apps/threads/lib/api", async (orig) => {
+  const actual = await orig<typeof import("@/apps/threads/lib/api")>();
+  return { ...actual, threadsApi: { ...actual.threadsApi, tokenConnect: mocks.tokenConnect, renameAccount: mocks.renameAccount, accountAccess: vi.fn(async () => OWNER_ACCESS), getPostingRules: vi.fn(() => new Promise(() => {})), getPostingSchedule: mocks.getPostingSchedule, getAutoPost: vi.fn(() => new Promise(() => {})), accountTeam: vi.fn(() => new Promise(() => {})) } };
 });
 const toastSuccess = vi.fn();
 vi.mock("sonner", () => ({ toast: { success: toastSuccess, error: vi.fn(), warning: vi.fn(), dismiss: vi.fn() } }));

@@ -6,7 +6,7 @@ import { useId, useState } from "react";
 import { toast } from "sonner";
 import { CopyPromptStatus, CopyPromptTrigger, useCopyPrompt } from "@/apps/threads/components/CopyPromptButton";
 import { Button } from "@/components/ui/button";
-import { api } from "@/lib/api-client";
+import { threadsApi } from "@/apps/threads/lib/api";
 import { billingReasonOf, isBillingRequired, saveErrorMessage } from "@/lib/save-error";
 import { useUnsavedChanges } from "@/lib/use-unsaved-changes";
 
@@ -55,7 +55,7 @@ export function ExplainBatchPanel({
   const picked = parsed.filter((r, i) => r.problem === null && !unchecked.has(i));
 
   const save = useMutation({
-    mutationFn: () => api.saveExplanations(accountId, { items: picked.map((r) => ({ id: r.id!, whyGood: r.text })) }),
+    mutationFn: () => threadsApi.saveExplanations(accountId, { items: picked.map((r) => ({ id: r.id!, whyGood: r.text })) }),
     onSuccess: (res) => {
       if (res.saved.length > 0) toast.success(`${res.saved.length}件の解説を保存しました`);
       setSkippedCount(res.skipped.length);
@@ -72,7 +72,7 @@ export function ExplainBatchPanel({
 
   // 結果の文は、説明とボタンの行の下に出す（行の中に出すと、ボタンが動く）
   const prompt = useCopyPrompt({
-    getText: async () => (await api.getExplainPrompt(accountId, undefined)).prompt,
+    getText: async () => (await threadsApi.getExplainPrompt(accountId, undefined)).prompt,
     onCopied: () => {
       setOpen(true);
       setSkippedCount(0);

@@ -17,7 +17,11 @@ const acceptInvite = vi.fn();
 const me = vi.fn();
 vi.mock("@/lib/api-client", async (orig) => {
   const actual = await orig<typeof import("@/lib/api-client")>();
-  return { ...actual, api: { ...actual.api, previewInvite, acceptInvite, me } };
+  return { ...actual, api: { ...actual.api, me } };
+});
+vi.mock("@/apps/threads/lib/api", async (orig) => {
+  const actual = await orig<typeof import("@/apps/threads/lib/api")>();
+  return { ...actual, threadsApi: { ...actual.threadsApi, previewInvite, acceptInvite } };
 });
 
 const { ApiError } = await import("@/lib/api-client");

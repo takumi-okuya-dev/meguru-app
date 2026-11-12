@@ -10,8 +10,9 @@ import { toast } from "sonner";
 import { SettingCard, SettingRow } from "@/components/SettingRow";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
-import { api, describeError } from "@/lib/api-client";
-import { queryKeys } from "@/lib/query";
+import { describeError } from "@/lib/api-client";
+import { threadsApi } from "@/apps/threads/lib/api";
+import { threadsQueryKeys } from "@/apps/threads/lib/query-keys";
 import { cn } from "@/lib/utils";
 import { CreateTeamDialog } from "./CreateTeamDialog";
 import { RoleDiagram } from "./RoleDiagram";
@@ -50,21 +51,21 @@ function RolesHelp({ you }: { you?: "admin" | "member" | "editor" }) {
 function InTeam({ accountId, access }: { accountId: string; access: AccountAccessResponse }) {
   const queryClient = useQueryClient();
   const isOwner = access.relation === "owner";
-  const team = useQuery({ queryKey: queryKeys.accountTeam(accountId), queryFn: () => api.accountTeam(accountId) });
+  const team = useQuery({ queryKey: threadsQueryKeys.accountTeam(accountId), queryFn: () => threadsApi.accountTeam(accountId) });
   const share = useMutation({
-    mutationFn: (shared: boolean) => api.setTeamShared(access.team!.id, accountId, shared),
+    mutationFn: (shared: boolean) => threadsApi.setTeamShared(access.team!.id, accountId, shared),
     // 押すとすぐ切り替え、失敗したら元に戻す
     onMutate: (shared) => {
-      const prev = queryClient.getQueryData<AccountTeam>(queryKeys.accountTeam(accountId));
-      if (prev?.team) queryClient.setQueryData<AccountTeam>(queryKeys.accountTeam(accountId), { ...prev, team: { ...prev.team, shared } });
+      const prev = queryClient.getQueryData<AccountTeam>(threadsQueryKeys.accountTeam(accountId));
+      if (prev?.team) queryClient.setQueryData<AccountTeam>(threadsQueryKeys.accountTeam(accountId), { ...prev, team: { ...prev.team, shared } });
       return { prev };
     },
     onError: (err, _v, ctx) => {
-      if (ctx?.prev) queryClient.setQueryData(queryKeys.accountTeam(accountId), ctx.prev);
+      if (ctx?.prev) queryClient.setQueryData(threadsQueryKeys.accountTeam(accountId), ctx.prev);
       toast.error(describeError(err));
     },
     onSettled: () => {
-      void queryClient.invalidateQueries({ queryKey: queryKeys.accountTeam(accountId) });
+      void queryClient.invalidateQueries({ queryKey: threadsQueryKeys.accountTeam(accountId) });
       void queryClient.invalidateQueries({ queryKey: ["team", access.team!.id] });
     },
   });

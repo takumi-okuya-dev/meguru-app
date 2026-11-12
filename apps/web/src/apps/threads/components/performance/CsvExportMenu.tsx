@@ -23,7 +23,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { api } from "@/lib/api-client";
+import { threadsApi } from "@/apps/threads/lib/api";
 
 type Kind = "posts" | "snapshots";
 
@@ -37,7 +37,7 @@ async function buildCsv(accountId: string, kind: Kind): Promise<string> {
   const cells: CsvCell[][] = [];
   let before: string | undefined;
   do {
-    const page = await api.exportPerformance(accountId, kind, before);
+    const page = await threadsApi.exportPerformance(accountId, kind, before);
     for (const row of page.rows) {
       cells.push(
         kind === "posts" ? postExportCells(row as PostExportRow) : snapshotExportCells(row as SnapshotExportRow),

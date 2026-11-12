@@ -4,7 +4,8 @@ import { CORE_RULES_MAX, countChars, type CoreRulesResponse } from "@meguru/shar
 import { FieldWithCounter } from "@/components/FieldWithCounter";
 import { FormDialogFrame } from "@/apps/threads/components/items/FormDialogFrame";
 import { useItemForm } from "@/apps/threads/components/items/use-item-form";
-import { ApiError, api } from "@/lib/api-client";
+import { ApiError } from "@/lib/api-client";
+import { threadsApi } from "@/apps/threads/lib/api";
 import { isStale } from "@/lib/save-error";
 
 type Form = { text: string };
@@ -51,7 +52,7 @@ export function CoreRulesDialog({
     save: async (form, expectedVersion) => {
       try {
         return toItem(
-          await api.putCoreRules(accountId, {
+          await threadsApi.putCoreRules(accountId, {
             text: form.text,
             expectedVersion: expectedVersion ?? version,
           }),

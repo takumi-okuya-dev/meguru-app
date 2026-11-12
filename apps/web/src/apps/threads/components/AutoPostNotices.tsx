@@ -1,9 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { blockedReasonLabel, PUBLISH_ERROR_LABELS } from "@meguru/shared";
 import { Link } from "react-router";
-import { api, describeError } from "@/lib/api-client";
+import { describeError } from "@/lib/api-client";
+import { threadsApi } from "@/apps/threads/lib/api";
 import { formatRelativeJst } from "@/lib/format";
-import { queryKeys } from "@/lib/query";
+import { threadsQueryKeys } from "@/apps/threads/lib/query-keys";
 import { useAccountAccess } from "@/apps/threads/lib/use-account-access";
 import { NotConnectedNotice } from "@/apps/threads/components/NotConnectedNotice";
 import { ReconnectButton } from "@/apps/threads/components/ReconnectButton";
@@ -20,12 +21,12 @@ export function AutoPostNotices({ accountId, hideNotConnected = false }: { accou
   const client = useQueryClient();
   const { can } = useAccountAccess(accountId);
   const query = useQuery({
-    queryKey: queryKeys.autoPost(accountId),
-    queryFn: () => api.getAutoPost(accountId),
+    queryKey: threadsQueryKeys.autoPost(accountId),
+    queryFn: () => threadsApi.getAutoPost(accountId),
   });
   const dismiss = useMutation({
-    mutationFn: () => api.dismissBlockedNotice(accountId),
-    onSuccess: () => client.invalidateQueries({ queryKey: queryKeys.autoPost(accountId) }),
+    mutationFn: () => threadsApi.dismissBlockedNotice(accountId),
+    onSuccess: () => client.invalidateQueries({ queryKey: threadsQueryKeys.autoPost(accountId) }),
   });
   if (query.isError)
     return (

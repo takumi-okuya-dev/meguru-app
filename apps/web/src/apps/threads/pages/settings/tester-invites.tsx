@@ -18,8 +18,9 @@ import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/compone
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
-import { ApiError, api, describeError } from "@/lib/api-client";
-import { queryKeys } from "@/lib/query";
+import { ApiError, describeError } from "@/lib/api-client";
+import { threadsApi } from "@/apps/threads/lib/api";
+import { threadsQueryKeys } from "@/apps/threads/lib/query-keys";
 
 /** タブ（見送り・取り下げは下のリンクから）。 */
 const TABS = [
@@ -47,8 +48,8 @@ export function TesterInvitesPage() {
   const client = useQueryClient();
   const [view, setView] = useState<TesterApplicationView>("pending");
   const list = useQuery({
-    queryKey: queryKeys.operatorTesterApplications(view),
-    queryFn: () => api.operatorTesterApplications(view),
+    queryKey: threadsQueryKeys.operatorTesterApplications(view),
+    queryFn: () => threadsApi.operatorTesterApplications(view),
     retry: false,
   });
   const [capacityOpen, setCapacityOpen] = useState(false);
@@ -57,7 +58,7 @@ export function TesterInvitesPage() {
   const [pending, setPending] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
 
-  const refresh = () => client.invalidateQueries({ queryKey: queryKeys.operatorTesterApplicationsAll });
+  const refresh = () => client.invalidateQueries({ queryKey: threadsQueryKeys.operatorTesterApplicationsAll });
 
   /**
    * 運営者の操作を送る。枠がいっぱいなら確認のダイアログを出す。
@@ -74,7 +75,7 @@ export function TesterInvitesPage() {
     setActionError(null);
     setPending(true);
     try {
-      await api.operateTesterApplication(item.id, action, body);
+      await threadsApi.operateTesterApplication(item.id, action, body);
       await refresh();
       return true;
     } catch (err) {
@@ -217,7 +218,7 @@ export function TesterInvitesPage() {
           initial={data.slots.capacity}
           onCancel={() => setCapacityOpen(false)}
           onSave={async (n) => {
-            await api.setTesterSlotCapacity(n);
+            await threadsApi.setTesterSlotCapacity(n);
             await refresh();
             setCapacityOpen(false);
           }}

@@ -21,8 +21,12 @@ vi.mock("@/lib/api-client", async (orig) => {
   const actual = await orig<typeof import("@/lib/api-client")>();
   return {
     ...actual,
-    api: { ...actual.api, getAutoPost: async () => status, accountAccess: async () => access },
+    api: { ...actual.api },
   };
+});
+vi.mock("@/apps/threads/lib/api", async (orig) => {
+  const actual = await orig<typeof import("@/apps/threads/lib/api")>();
+  return { ...actual, threadsApi: { ...actual.threadsApi, getAutoPost: async () => status, accountAccess: async () => access } };
 });
 
 const { AutoPostNotices } = await import("@/apps/threads/components/AutoPostNotices");

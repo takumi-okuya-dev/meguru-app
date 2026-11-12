@@ -3,8 +3,8 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import { api } from "@/lib/api-client";
-import { queryKeys } from "@/lib/query";
+import { threadsApi } from "@/apps/threads/lib/api";
+import { threadsQueryKeys } from "@/apps/threads/lib/query-keys";
 import { saveErrorMessage } from "@/lib/save-error";
 
 /** 削除を確定するまでの時間（ミリ秒）。トーストの表示時間と同じ。 */
@@ -50,16 +50,16 @@ export function useDeferredDelete(accountId: string) {
     clearTimeout(p.timer);
     // 次の削除で前の削除を確定するときは、前のトーストの「元に戻す」も消す
     toast.dismiss(p.toastId);
-    const done = api.deletePostDrafts(accountId, p.ids).then(
+    const done = threadsApi.deletePostDrafts(accountId, p.ids).then(
       async () => {
         // 直近の下書きはプロンプトの材料なので、プロンプトも取り直す
-        void queryClient.invalidateQueries({ queryKey: queryKeys.promptAll(accountId) });
-        await queryClient.invalidateQueries({ queryKey: queryKeys.postDrafts(accountId) });
+        void queryClient.invalidateQueries({ queryKey: threadsQueryKeys.promptAll(accountId) });
+        await queryClient.invalidateQueries({ queryKey: threadsQueryKeys.postDrafts(accountId) });
         unhide(p.ids);
       },
       async (err: unknown) => {
         toast.error(saveErrorMessage(err));
-        await queryClient.invalidateQueries({ queryKey: queryKeys.postDrafts(accountId) });
+        await queryClient.invalidateQueries({ queryKey: threadsQueryKeys.postDrafts(accountId) });
         unhide(p.ids);
       },
     );

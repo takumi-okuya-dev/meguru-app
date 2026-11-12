@@ -6,7 +6,8 @@
 // - ホバーなどの先読みでは呼ばない（このフックは画面を実際に開いたときだけ使う）
 import type { AccountSummary } from "@meguru/shared";
 import { useEffect, useRef } from "react";
-import { ApiError, api } from "@/lib/api-client";
+import { ApiError } from "@/lib/api-client";
+import { threadsApi } from "@/apps/threads/lib/api";
 
 const pageClientId = crypto.randomUUID();
 let pageOpenSeq = 0;
@@ -24,11 +25,11 @@ export const OPEN_RETRY_DELAYS_MS = [500, 1000, 2000];
 export function useAccountOpen(
   accountId: string | undefined,
   onResult: (account: AccountSummary) => void,
-  deps: { openAccount?: typeof api.openAccount; clientId?: string } = {},
+  deps: { openAccount?: typeof threadsApi.openAccount; clientId?: string } = {},
 ) {
   const onResultRef = useRef(onResult);
   onResultRef.current = onResult;
-  const openAccount = deps.openAccount ?? api.openAccount;
+  const openAccount = deps.openAccount ?? threadsApi.openAccount;
   const clientId = deps.clientId ?? pageClientId;
 
   useEffect(() => {

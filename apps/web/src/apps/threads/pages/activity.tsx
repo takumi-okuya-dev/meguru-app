@@ -7,8 +7,8 @@ import { useState } from "react";
 import { Navigate } from "react-router";
 import { PageBody, PageHeader } from "@/shell";
 import { Button } from "@/components/ui/button";
-import { api } from "@/lib/api-client";
-import { queryKeys } from "@/lib/query";
+import { threadsApi } from "@/apps/threads/lib/api";
+import { threadsQueryKeys } from "@/apps/threads/lib/query-keys";
 import { useAccountAccess } from "@/apps/threads/lib/use-account-access";
 import { cn } from "@/lib/utils";
 import { useCurrentAccount } from "@/apps/threads/pages/account-layout";
@@ -255,8 +255,8 @@ export function ActivityPage() {
   const [kind, setKind] = useState("");
   const [actor, setActor] = useState("");
   const list = useInfiniteQuery({
-    queryKey: queryKeys.activity(account.id, kind, actor),
-    queryFn: ({ pageParam }) => api.listActivity(account.id, { kind, actor, cursor: pageParam }),
+    queryKey: threadsQueryKeys.activity(account.id, kind, actor),
+    queryFn: ({ pageParam }) => threadsApi.listActivity(account.id, { kind, actor, cursor: pageParam }),
     initialPageParam: undefined as string | undefined,
     getNextPageParam: (last) => last.nextCursor ?? undefined,
     enabled: can("activity"),

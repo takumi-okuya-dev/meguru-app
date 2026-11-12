@@ -18,9 +18,10 @@ import { AtSignIcon, CheckIcon } from "lucide-react";
 import { useId, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { api, describeError } from "@/lib/api-client";
+import { describeError } from "@/lib/api-client";
+import { threadsApi } from "@/apps/threads/lib/api";
 import { formatJstShort } from "@/lib/format";
-import { queryKeys } from "@/lib/query";
+import { threadsQueryKeys } from "@/apps/threads/lib/query-keys";
 import { cn } from "@/lib/utils";
 
 /** メンションを付ける相手（下書き・投稿済み）。 */
@@ -76,13 +77,13 @@ export function MentionPanel({
   const [editing, setEditing] = useState<string | null>(null);
 
   const refresh = () => {
-    void queryClient.invalidateQueries({ queryKey: queryKeys.postDrafts(accountId) });
-    void queryClient.invalidateQueries({ queryKey: queryKeys.published(accountId) });
-    void queryClient.invalidateQueries({ queryKey: queryKeys.mentionSettings(accountId) });
+    void queryClient.invalidateQueries({ queryKey: threadsQueryKeys.postDrafts(accountId) });
+    void queryClient.invalidateQueries({ queryKey: threadsQueryKeys.published(accountId) });
+    void queryClient.invalidateQueries({ queryKey: threadsQueryKeys.mentionSettings(accountId) });
   };
   const save = useMutation({
     mutationFn: (body: { usernames: string[]; text?: string }) =>
-      api.attachMention(accountId, target.id, { expectedVersion: target.version, ...body }),
+      threadsApi.attachMention(accountId, target.id, { expectedVersion: target.version, ...body }),
     onSuccess: () => {
       setLocal(null);
       setEditing(null);
@@ -91,7 +92,7 @@ export function MentionPanel({
     onError: (err) => toast.error(describeError(err)),
   });
   const remove = useMutation({
-    mutationFn: () => api.detachMention(accountId, target.id, target.kind === "draft" ? target.version : undefined),
+    mutationFn: () => threadsApi.detachMention(accountId, target.id, target.kind === "draft" ? target.version : undefined),
     onSuccess: refresh,
     onError: (err) => toast.error(describeError(err)),
   });

@@ -18,7 +18,7 @@ import { useState } from "react";
 import { FieldWithCounter } from "@/components/FieldWithCounter";
 import { DeletedElsewhereNotice, FormDialogFrame } from "@/apps/threads/components/items/FormDialogFrame";
 import { useItemForm, type FormErrors } from "@/apps/threads/components/items/use-item-form";
-import { api } from "@/lib/api-client";
+import { threadsApi } from "@/apps/threads/lib/api";
 import { cn } from "@/lib/utils";
 
 type Form = {
@@ -234,8 +234,8 @@ export function PromotionFormDialog({
         event: eventOf(form),
       };
       return expectedVersion === undefined
-        ? api.createPromotion(accountId, body)
-        : api.updatePromotion(accountId, item!.id, { ...body, expectedVersion });
+        ? threadsApi.createPromotion(accountId, body)
+        : threadsApi.updatePromotion(accountId, item!.id, { ...body, expectedVersion });
     },
   });
   const { form, setField, errors } = f;

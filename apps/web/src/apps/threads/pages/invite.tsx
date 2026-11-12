@@ -13,8 +13,10 @@ import { TeamMark } from "@/apps/threads/components/team/TeamMark";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { ApiError, api, describeError } from "@/lib/api-client";
+import { threadsApi } from "@/apps/threads/lib/api";
 import { rememberInviteReturn } from "@/lib/invite-return";
 import { queryKeys } from "@/lib/query";
+import { threadsQueryKeys } from "@/apps/threads/lib/query-keys";
 import { cn } from "@/lib/utils";
 import { accountPath, newAccountPath, teamPath, threadsHomePath } from "@/apps/threads/lib/paths";
 
@@ -30,8 +32,8 @@ export function InvitePage() {
   const queryClient = useQueryClient();
   const preview = useQuery({
     // ログインの状態で「参加できるか」が変わるので、キーに含める
-    queryKey: [...queryKeys.invite(token), Boolean(isSignedIn)],
-    queryFn: () => api.previewInvite(token),
+    queryKey: [...threadsQueryKeys.invite(token), Boolean(isSignedIn)],
+    queryFn: () => threadsApi.previewInvite(token),
     enabled: isLoaded,
     retry: false,
   });
@@ -43,7 +45,7 @@ export function InvitePage() {
 
   const accept = useMutation({
     mutationFn: () =>
-      api.acceptInvite(
+      threadsApi.acceptInvite(
         token,
         Object.keys(picked)
           .filter((id) => picked[id])

@@ -16,6 +16,7 @@ import { ConnectionBadge } from "@/apps/threads/components/ConnectionBadge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { ApiError, api, describeError } from "@/lib/api-client";
+import { threadsApi } from "@/apps/threads/lib/api";
 import { queryKeys } from "@/lib/query";
 import { cn } from "@/lib/utils";
 import { AccountSwitchSteps } from "./AccountSwitchSteps";
@@ -76,7 +77,7 @@ export function ConnectMethods({
   const me = useQuery({ queryKey: queryKeys.me, queryFn: api.me });
   const [tokenOpen, setTokenOpen] = useState(false);
   const oauth = useMutation({
-    mutationFn: () => api.connect({ mode: "connect", accountId: account.id }),
+    mutationFn: () => threadsApi.connect({ mode: "connect", accountId: account.id }),
     onSuccess: ({ authorizeUrl }) => window.location.assign(authorizeUrl),
   });
 

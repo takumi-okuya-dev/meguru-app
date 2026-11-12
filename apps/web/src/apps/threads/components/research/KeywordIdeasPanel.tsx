@@ -10,7 +10,8 @@ import { useId, useState } from "react";
 import { toast } from "sonner";
 import { CopyPromptStatus, CopyPromptTrigger, useCopyPrompt } from "@/apps/threads/components/CopyPromptButton";
 import { Button } from "@/components/ui/button";
-import { ApiError, api } from "@/lib/api-client";
+import { ApiError } from "@/lib/api-client";
+import { threadsApi } from "@/apps/threads/lib/api";
 import { billingReasonOf, isBillingRequired, saveErrorMessage } from "@/lib/save-error";
 import { useUnsavedChanges } from "@/lib/use-unsaved-changes";
 
@@ -55,7 +56,7 @@ export function KeywordIdeasPanel({
 
   const save = useMutation({
     mutationFn: () =>
-      api.createKeywordsBatch(accountId, {
+      threadsApi.createKeywordsBatch(accountId, {
         items: picked.map(({ keyword, purpose }) => ({ keyword, purpose })),
       }),
     onSuccess: () => {
@@ -88,7 +89,7 @@ export function KeywordIdeasPanel({
 
   // 結果の文は、説明とボタンの行の下に出す（行の中に出すと、ボタンが下の行へ押し出される）
   const prompt = useCopyPrompt({
-    getText: async () => (await api.getKeywordIdeaPrompt(accountId)).prompt,
+    getText: async () => (await threadsApi.getKeywordIdeaPrompt(accountId)).prompt,
     onCopied: () => setOpen(true),
   });
   return (

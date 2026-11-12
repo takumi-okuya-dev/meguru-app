@@ -11,8 +11,8 @@ import { PasteComposer } from "@/apps/threads/components/stock/PasteComposer";
 import { flushPendingDeletes } from "@/apps/threads/components/stock/use-deferred-delete";
 import { PromptCard } from "@/apps/threads/components/stock/PromptCard";
 import { STOCK_LIMIT_MESSAGE } from "@/apps/threads/components/stock/messages";
-import { api } from "@/lib/api-client";
-import { queryKeys } from "@/lib/query";
+import { threadsApi } from "@/apps/threads/lib/api";
+import { threadsQueryKeys } from "@/apps/threads/lib/query-keys";
 import { featureOn, useAccountAccess } from "@/apps/threads/lib/use-account-access";
 import { useCurrentAccount } from "@/apps/threads/pages/account-layout";
 
@@ -34,8 +34,8 @@ function CreatePageContent() {
   const account = useCurrentAccount();
   // 作る件数・プロンプトを作れるか・要確認の上限は、投稿ストックと同じ一覧から読む（同じキャッシュを使う）
   const drafts = useQuery({
-    queryKey: queryKeys.postDrafts(account.id),
-    queryFn: () => api.listPostDrafts(account.id),
+    queryKey: threadsQueryKeys.postDrafts(account.id),
+    queryFn: () => threadsApi.listPostDrafts(account.id),
   });
   const { access, can } = useAccountAccess(account.id);
   // 投稿ストックで削除して「元に戻す」を待っている下書きは、この画面を開いたときに確定する

@@ -8,7 +8,8 @@ import { BillingRequiredDialog } from "@/components/billing/BillingRequiredDialo
 import { FormDialogFrame } from "@/apps/threads/components/items/FormDialogFrame";
 import type { FormErrors } from "@/apps/threads/components/items/use-item-form";
 import { Button } from "@/components/ui/button";
-import { ApiError, api } from "@/lib/api-client";
+import { ApiError } from "@/lib/api-client";
+import { threadsApi } from "@/apps/threads/lib/api";
 import { billingReasonOf, isBillingRequired, saveErrorMessage } from "@/lib/save-error";
 import { useUnsavedChanges } from "@/lib/use-unsaved-changes";
 import { toast } from "sonner";
@@ -92,7 +93,7 @@ export function ReferencePostAddDialog({
   };
 
   const register = useMutation({
-    mutationFn: (items: RefForm[]) => api.createReferencePostsBatch(accountId, { items: items.map(toRefInput) }),
+    mutationFn: (items: RefForm[]) => threadsApi.createReferencePostsBatch(accountId, { items: items.map(toRefInput) }),
     onSuccess: (_res, items) => {
       toast.success(`${items.length}件を登録しました`);
       onSaved(items.length);

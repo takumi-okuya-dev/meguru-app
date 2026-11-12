@@ -21,8 +21,9 @@ import { ApiErrorScreen } from "@/components/ApiErrorScreen";
 import { LoadingSkeleton } from "@/components/LoadingSkeleton";
 import { PageBody, PageHeader } from "@/shell";
 import { Button } from "@/components/ui/button";
-import { ApiError, api } from "@/lib/api-client";
-import { queryKeys } from "@/lib/query";
+import { ApiError } from "@/lib/api-client";
+import { threadsApi } from "@/apps/threads/lib/api";
+import { threadsQueryKeys } from "@/apps/threads/lib/query-keys";
 import { saveErrorMessage } from "@/lib/save-error";
 import { cn } from "@/lib/utils";
 import { useCurrentAccount } from "@/apps/threads/pages/account-layout";
@@ -91,8 +92,8 @@ function MediaDefaultsSection({ accountId, canEdit }: { accountId: string; canEd
   const panelId = useId();
   const queryClient = useQueryClient();
   const list = useQuery({
-    queryKey: queryKeys.mediaDefaults(accountId),
-    queryFn: () => api.mediaDefaults(accountId),
+    queryKey: threadsQueryKeys.mediaDefaults(accountId),
+    queryFn: () => threadsApi.mediaDefaults(accountId),
     enabled: open,
   });
   const [draft, setDraft] = useState<Partial<Record<Media, Record<string, string>>>>({});
@@ -105,15 +106,15 @@ function MediaDefaultsSection({ accountId, canEdit }: { accountId: string; canEd
       media: Media;
       version: number | null;
       values: Record<string, string>;
-    }) => api.putMediaDefaults(accountId, media, version, values),
+    }) => threadsApi.putMediaDefaults(accountId, media, version, values),
     onSuccess: (_r, { media }) => {
       setDraft((d) => ({ ...d, [media]: undefined }));
-      void queryClient.invalidateQueries({ queryKey: queryKeys.mediaDefaults(accountId) });
+      void queryClient.invalidateQueries({ queryKey: threadsQueryKeys.mediaDefaults(accountId) });
       toast.success("保存しました");
     },
     onError: (err) => {
       toast.error(saveErrorMessage(err));
-      void queryClient.invalidateQueries({ queryKey: queryKeys.mediaDefaults(accountId) });
+      void queryClient.invalidateQueries({ queryKey: threadsQueryKeys.mediaDefaults(accountId) });
     },
   });
   return (
@@ -187,8 +188,8 @@ export function ExternalMediaPage() {
   const account = useCurrentAccount();
   const [params, setParams] = useSearchParams();
   const list = useQuery({
-    queryKey: queryKeys.externalMedia(account.id),
-    queryFn: () => api.externalMedia(account.id),
+    queryKey: threadsQueryKeys.externalMedia(account.id),
+    queryFn: () => threadsApi.externalMedia(account.id),
   });
   const selectId = useId();
 

@@ -42,8 +42,9 @@ import { LoadingSkeleton } from "@/components/LoadingSkeleton";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { PageBody, PageHeader } from "@/shell";
 import { Button } from "@/components/ui/button";
-import { ApiError, api } from "@/lib/api-client";
-import { queryKeys } from "@/lib/query";
+import { ApiError } from "@/lib/api-client";
+import { threadsApi } from "@/apps/threads/lib/api";
+import { threadsQueryKeys } from "@/apps/threads/lib/query-keys";
 import { isStale, saveErrorMessage } from "@/lib/save-error";
 import { useUnsavedChanges } from "@/lib/use-unsaved-changes";
 import { cn } from "@/lib/utils";
@@ -163,10 +164,10 @@ export function ExternalMediaListingPage() {
   const [params, setParams] = useSearchParams();
   const work = params.get("view") === "work";
   const queryClient = useQueryClient();
-  const key = queryKeys.listing(account.id, promotionId, mediaParam);
+  const key = threadsQueryKeys.listing(account.id, promotionId, mediaParam);
   const detail = useQuery({
     queryKey: key,
-    queryFn: () => api.listing(account.id, promotionId, media!),
+    queryFn: () => threadsApi.listing(account.id, promotionId, media!),
     enabled: media !== null,
   });
   const [draft, setDraft] = useState<Draft | null>(null);
@@ -201,10 +202,10 @@ export function ExternalMediaListingPage() {
 
   const afterSave = (d: ListingDetail) => {
     queryClient.setQueryData(key, d);
-    void queryClient.invalidateQueries({ queryKey: queryKeys.externalMedia(account.id) });
+    void queryClient.invalidateQueries({ queryKey: threadsQueryKeys.externalMedia(account.id) });
   };
   const generate = useMutation({
-    mutationFn: () => api.generateListing(account.id, promotionId, media!, baseVersion),
+    mutationFn: () => threadsApi.generateListing(account.id, promotionId, media!, baseVersion),
     onSuccess: (d) => {
       afterSave(d);
       toast.success("掲載内容を作りました");
@@ -216,7 +217,7 @@ export function ExternalMediaListingPage() {
   });
   const save = useMutation({
     mutationFn: (version: number | null) =>
-      api.updateListing(account.id, promotionId, media!, {
+      threadsApi.updateListing(account.id, promotionId, media!, {
         expectedVersion: version,
         status: draft!.status,
         postedUrl: draft!.postedUrl === "" ? null : draft!.postedUrl,

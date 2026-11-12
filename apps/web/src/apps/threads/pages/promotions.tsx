@@ -18,9 +18,10 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { ApiError, api } from "@/lib/api-client";
+import { ApiError } from "@/lib/api-client";
+import { threadsApi } from "@/apps/threads/lib/api";
 import { formatMonthDay } from "@/lib/format";
-import { queryKeys } from "@/lib/query";
+import { threadsQueryKeys } from "@/apps/threads/lib/query-keys";
 import { billingReasonOf, isBillingRequired, isStale, saveErrorMessage } from "@/lib/save-error";
 import { cn } from "@/lib/utils";
 import { useUnsavedChanges } from "@/lib/use-unsaved-changes";
@@ -57,10 +58,10 @@ function toInput(p: Promotion): PromotionInput {
 export function PromotionsPage() {
   const account = useCurrentAccount();
   const queryClient = useQueryClient();
-  const list = useQuery({ queryKey: queryKeys.promotions(account.id), queryFn: () => api.listPromotions(account.id) });
+  const list = useQuery({ queryKey: threadsQueryKeys.promotions(account.id), queryFn: () => threadsApi.listPromotions(account.id) });
   const settings = useQuery({
-    queryKey: queryKeys.promotionSettings(account.id),
-    queryFn: () => api.getPromotionSettings(account.id),
+    queryKey: threadsQueryKeys.promotionSettings(account.id),
+    queryFn: () => threadsApi.getPromotionSettings(account.id),
   });
   const [dialog, setDialog] = useState<DialogState>(null);
   const [toDelete, setToDelete] = useState<Promotion | null>(null);
@@ -75,8 +76,8 @@ export function PromotionsPage() {
   } | null>(null);
 
   const refresh = () => {
-    void queryClient.invalidateQueries({ queryKey: queryKeys.promotions(account.id) });
-    void queryClient.invalidateQueries({ queryKey: queryKeys.profileStatus(account.id) });
+    void queryClient.invalidateQueries({ queryKey: threadsQueryKeys.promotions(account.id) });
+    void queryClient.invalidateQueries({ queryKey: threadsQueryKeys.profileStatus(account.id) });
   };
   const onMutationError = (err: unknown) => {
     if (isBillingRequired(err)) return setBillingReason(billingReasonOf(err) ?? "");
@@ -89,7 +90,7 @@ export function PromotionsPage() {
 
   const changeStatus = useMutation({
     mutationFn: ({ item, status }: { item: Promotion; status: Promotion["status"] }) =>
-      api.updatePromotion(account.id, item.id, { ...toInput(item), status, expectedVersion: item.version }),
+      threadsApi.updatePromotion(account.id, item.id, { ...toInput(item), status, expectedVersion: item.version }),
     onSuccess: () => {
       refresh();
       toast.success("保存しました");
@@ -100,7 +101,7 @@ export function PromotionsPage() {
     },
   });
   const remove = useMutation({
-    mutationFn: (item: Promotion) => api.deletePromotion(account.id, item.id),
+    mutationFn: (item: Promotion) => threadsApi.deletePromotion(account.id, item.id),
     onSuccess: () => {
       setToDelete(null);
       refresh();
@@ -354,9 +355,9 @@ function RatioRow({
 
   const save = useMutation({
     mutationFn: (v: { text: string; expectedVersion: number }) =>
-      api.putPromotionSettings(accountId, Number(v.text), v.expectedVersion),
+      threadsApi.putPromotionSettings(accountId, Number(v.text), v.expectedVersion),
     onSuccess: (s, v) => {
-      queryClient.setQueryData(queryKeys.promotionSettings(accountId), s);
+      queryClient.setQueryData(threadsQueryKeys.promotionSettings(accountId), s);
       // 保存中に次の値を入力していたら、その入力は残す（版は保存した後のもの。PR #9 のCodexレビュー）
       setDraft((d) => (d && d.text !== v.text ? { text: d.text, version: s.version } : null));
       toast.success("保存しました");
@@ -406,7 +407,7 @@ function RatioRow({
         updatedByName={conflict?.by ?? null}
         onCancel={() => setConflict(null)}
         onReload={() => {
-          if (conflict) queryClient.setQueryData(queryKeys.promotionSettings(accountId), conflict.latest);
+          if (conflict) queryClient.setQueryData(threadsQueryKeys.promotionSettings(accountId), conflict.latest);
           setDraft(null);
           setConflict(null);
         }}

@@ -11,8 +11,9 @@ import {
 } from "@meguru/shared";
 import { useCallback } from "react";
 import { toast } from "sonner";
-import { ApiError, api } from "@/lib/api-client";
-import { queryKeys } from "@/lib/query";
+import { ApiError } from "@/lib/api-client";
+import { threadsApi } from "@/apps/threads/lib/api";
+import { threadsQueryKeys } from "@/apps/threads/lib/query-keys";
 import { saveErrorMessage } from "@/lib/save-error";
 import { SKIP_REASON_SHORT, skipMessage } from "./messages";
 
@@ -109,11 +110,11 @@ export function useReview(accountId: string) {
   const refresh = useCallback(async (): Promise<boolean> => {
     // 件数（post-drafts/counts）は post-drafts の下のキーなので、一緒に取り直す
     await Promise.all([
-      queryClient.invalidateQueries({ queryKey: queryKeys.postDrafts(accountId) }),
-      queryClient.invalidateQueries({ queryKey: queryKeys.promptAll(accountId) }),
-      queryClient.invalidateQueries({ queryKey: queryKeys.autoPost(accountId) }),
+      queryClient.invalidateQueries({ queryKey: threadsQueryKeys.postDrafts(accountId) }),
+      queryClient.invalidateQueries({ queryKey: threadsQueryKeys.promptAll(accountId) }),
+      queryClient.invalidateQueries({ queryKey: threadsQueryKeys.autoPost(accountId) }),
     ]);
-    return queryClient.getQueryState(queryKeys.postDrafts(accountId))?.status !== "error";
+    return queryClient.getQueryState(threadsQueryKeys.postDrafts(accountId))?.status !== "error";
   }, [accountId, queryClient]);
 
   const send = useCallback(
@@ -144,7 +145,7 @@ export function useReview(accountId: string) {
           // 返事だけが失われていても、APIは自分の送り直しとして結果を返す（PR #5 のCodexレビュー）
           for (let attempt = 0; attempt <= UNCERTAIN_RETRIES; attempt++) {
             try {
-              res = await api.reviewPostDrafts(accountId, body);
+              res = await threadsApi.reviewPostDrafts(accountId, body);
               break;
             } catch (err) {
               lastError = err;

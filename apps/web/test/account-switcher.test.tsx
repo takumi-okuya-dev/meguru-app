@@ -25,15 +25,12 @@ vi.mock("@/lib/api-client", async (importOriginal) => {
   const original = await importOriginal<typeof import("@/lib/api-client")>();
   return {
     ...original,
-    api: {
-      ...original.api,
-      me: mocks.me,
-      needsReviewCounts: mocks.needsReviewCounts,
-      account: mocks.account,
-      openAccount: mocks.openAccount,
-      getDraftCounts: mocks.getDraftCounts,
-    },
+    api: { ...original.api, me: mocks.me },
   };
+});
+vi.mock("@/apps/threads/lib/api", async (orig) => {
+  const actual = await orig<typeof import("@/apps/threads/lib/api")>();
+  return { ...actual, threadsApi: { ...actual.threadsApi, needsReviewCounts: mocks.needsReviewCounts, account: mocks.account, openAccount: mocks.openAccount, getDraftCounts: mocks.getDraftCounts } };
 });
 
 const { AccountSwitcher, groupHeading } = await import("@/apps/threads/sidebar/AccountSwitcher");

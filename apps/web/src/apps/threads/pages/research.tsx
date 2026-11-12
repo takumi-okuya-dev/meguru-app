@@ -26,9 +26,9 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { api } from "@/lib/api-client";
+import { threadsApi } from "@/apps/threads/lib/api";
 import { formatDateTime } from "@/lib/format";
-import { queryKeys } from "@/lib/query";
+import { threadsQueryKeys } from "@/apps/threads/lib/query-keys";
 import { billingReasonOf, isBillingRequired, saveErrorMessage } from "@/lib/save-error";
 import { cn } from "@/lib/utils";
 import { useCurrentAccount } from "@/apps/threads/pages/account-layout";
@@ -59,12 +59,12 @@ function ResearchPageContent() {
   const [params, setParams] = useSearchParams();
   const tab: Tab = params.get("tab") === "keywords" ? "keywords" : "posts";
   const posts = useQuery({
-    queryKey: queryKeys.referencePosts(account.id),
-    queryFn: () => api.listReferencePosts(account.id),
+    queryKey: threadsQueryKeys.referencePosts(account.id),
+    queryFn: () => threadsApi.listReferencePosts(account.id),
   });
   const keywords = useQuery({
-    queryKey: queryKeys.researchKeywords(account.id),
-    queryFn: () => api.listResearchKeywords(account.id),
+    queryKey: threadsQueryKeys.researchKeywords(account.id),
+    queryFn: () => threadsApi.listResearchKeywords(account.id),
   });
   const [dialog, setDialog] = useState<Dialog>(null);
   const [toDelete, setToDelete] = useState<ToDelete>(null);
@@ -80,16 +80,16 @@ function ResearchPageContent() {
   }, [postsLoaded, hash]);
 
   const refresh = () => {
-    void queryClient.invalidateQueries({ queryKey: queryKeys.referencePosts(account.id) });
-    void queryClient.invalidateQueries({ queryKey: queryKeys.researchKeywords(account.id) });
-    void queryClient.invalidateQueries({ queryKey: queryKeys.profileStatus(account.id) });
+    void queryClient.invalidateQueries({ queryKey: threadsQueryKeys.referencePosts(account.id) });
+    void queryClient.invalidateQueries({ queryKey: threadsQueryKeys.researchKeywords(account.id) });
+    void queryClient.invalidateQueries({ queryKey: threadsQueryKeys.profileStatus(account.id) });
   };
 
   const remove = useMutation({
     mutationFn: (target: NonNullable<ToDelete>) =>
       target.kind === "post"
-        ? api.deleteReferencePost(account.id, target.item.id)
-        : api.deleteResearchKeyword(account.id, target.item.id),
+        ? threadsApi.deleteReferencePost(account.id, target.item.id)
+        : threadsApi.deleteResearchKeyword(account.id, target.item.id),
     onSuccess: () => {
       setToDelete(null);
       refresh();

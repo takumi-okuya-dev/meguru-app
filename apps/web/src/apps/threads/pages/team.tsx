@@ -25,7 +25,9 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Switch } from "@/components/ui/switch";
 import { ApiError, api, describeError } from "@/lib/api-client";
+import { threadsApi } from "@/apps/threads/lib/api";
 import { queryKeys } from "@/lib/query";
+import { threadsQueryKeys } from "@/apps/threads/lib/query-keys";
 import { cn } from "@/lib/utils";
 import { NotFound } from "@/shell";
 import { accountPath, sharedAccountPath, teamPath, threadsHomePath } from "@/apps/threads/lib/paths";
@@ -240,19 +242,19 @@ export function TeamPage() {
   const { teamId = "" } = useParams<{ teamId: string }>();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
-  const team = useQuery({ queryKey: queryKeys.team(teamId), queryFn: () => api.getTeam(teamId) });
+  const team = useQuery({ queryKey: threadsQueryKeys.team(teamId), queryFn: () => threadsApi.getTeam(teamId) });
   const me = useQuery({ queryKey: queryKeys.me, queryFn: api.me });
   const isAdmin = team.data?.myRole === "admin";
   // 運用状況を開ける人だけ、ボタンの件数の印のために読む（運用状況の画面と同じキー。specs/020 research.md R8）
   const status = useQuery({
-    queryKey: queryKeys.teamStatus(teamId),
-    queryFn: () => api.teamStatus(teamId),
+    queryKey: threadsQueryKeys.teamStatus(teamId),
+    queryFn: () => threadsApi.teamStatus(teamId),
     enabled: team.data?.statusVisible === true,
   });
   const [inviteOpen, setInviteOpen] = useState(false);
   const invite = useQuery({
-    queryKey: queryKeys.teamInvite(teamId),
-    queryFn: () => api.getTeamInvite(teamId),
+    queryKey: threadsQueryKeys.teamInvite(teamId),
+    queryFn: () => threadsApi.getTeamInvite(teamId),
     enabled: inviteOpen && isAdmin,
   });
   const [pending, setPending] = useState<Pending>(null);
@@ -260,7 +262,7 @@ export function TeamPage() {
 
   const refresh = () =>
     Promise.all([
-      queryClient.invalidateQueries({ queryKey: queryKeys.team(teamId) }),
+      queryClient.invalidateQueries({ queryKey: threadsQueryKeys.team(teamId) }),
       queryClient.invalidateQueries({ queryKey: queryKeys.me }),
     ]);
   const close = () => {
@@ -286,18 +288,18 @@ export function TeamPage() {
     onError: (err) => toast.error(describeError(err)),
   });
   const rotate = useMutation({
-    mutationFn: () => api.rotateTeamInvite(teamId),
+    mutationFn: () => threadsApi.rotateTeamInvite(teamId),
     onSuccess: (data) => {
-      queryClient.setQueryData(queryKeys.teamInvite(teamId), data);
+      queryClient.setQueryData(threadsQueryKeys.teamInvite(teamId), data);
       toast.success("新しいリンクを作りました。前のリンクは使えません。");
     },
     onError: (err) => toast.error(describeError(err)),
   });
   const leave = useMutation({
-    mutationFn: (newAdminUserId?: string) => api.leaveTeam(teamId, newAdminUserId),
+    mutationFn: (newAdminUserId?: string) => threadsApi.leaveTeam(teamId, newAdminUserId),
     onSuccess: async () => {
       close();
-      queryClient.removeQueries({ queryKey: queryKeys.team(teamId) });
+      queryClient.removeQueries({ queryKey: threadsQueryKeys.team(teamId) });
       await queryClient.invalidateQueries({ queryKey: queryKeys.me });
       toast.success("チームを抜けました");
       void navigate(threadsHomePath(), { replace: true });
@@ -305,10 +307,10 @@ export function TeamPage() {
     onError: (err) => setError(describeError(err)),
   });
   const remove = useMutation({
-    mutationFn: () => api.deleteTeam(teamId),
+    mutationFn: () => threadsApi.deleteTeam(teamId),
     onSuccess: async () => {
       close();
-      queryClient.removeQueries({ queryKey: queryKeys.team(teamId) });
+      queryClient.removeQueries({ queryKey: threadsQueryKeys.team(teamId) });
       await queryClient.invalidateQueries({ queryKey: queryKeys.me });
       toast.success("チームを削除しました");
       void navigate(threadsHomePath(), { replace: true });
@@ -399,7 +401,7 @@ export function TeamPage() {
               type="button"
               aria-label={`${m.name}さんの参加の知らせを閉じる`}
               className="flex size-9 items-center justify-center rounded-lg text-muted-foreground hover:bg-accent"
-              onClick={() => quick.mutate(() => api.dismissJoinedNotice(teamId, m.userId))}
+              onClick={() => quick.mutate(() => threadsApi.dismissJoinedNotice(teamId, m.userId))}
             >
               <XIcon className="size-4" />
             </button>
@@ -423,7 +425,7 @@ export function TeamPage() {
                       aria-label={`${label}をチームに見せる`}
                       checked={a.shared}
                       disabled={quick.isPending}
-                      onCheckedChange={(v) => quick.mutate(() => api.setTeamShared(teamId, a.id, v))}
+                      onCheckedChange={(v) => quick.mutate(() => threadsApi.setTeamShared(teamId, a.id, v))}
                     />
                   </label>
                   {myAccounts.length > 1 && (
@@ -431,7 +433,7 @@ export function TeamPage() {
                       variant="ghost"
                       className="h-10 rounded-full text-muted-foreground md:h-9"
                       disabled={quick.isPending}
-                      onClick={() => quick.mutate(() => api.removeTeamAccount(teamId, a.id))}
+                      onClick={() => quick.mutate(() => threadsApi.removeTeamAccount(teamId, a.id))}
                     >
                       チームから外す
                     </Button>
@@ -485,7 +487,7 @@ export function TeamPage() {
                     <RoleToggle
                       member={m}
                       disabled={quick.isPending}
-                      onChange={(role) => quick.mutate(() => api.setMemberRole(teamId, m.userId, role))}
+                      onChange={(role) => quick.mutate(() => threadsApi.setMemberRole(teamId, m.userId, role))}
                     />
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
@@ -555,7 +557,7 @@ export function TeamPage() {
           destructive
           pending={action.isPending}
           error={error}
-          onConfirm={() => action.mutate(() => api.removeMember(teamId, pending.member.userId))}
+          onConfirm={() => action.mutate(() => threadsApi.removeMember(teamId, pending.member.userId))}
           onCancel={close}
         >
           <p>その人のアカウントはチームから外れ、担当もなくなります。アカウントは、その人のものとして残ります。</p>
@@ -567,7 +569,7 @@ export function TeamPage() {
           confirmLabel="引き継ぐ"
           pending={action.isPending}
           error={error}
-          onConfirm={() => action.mutate(() => api.transferAdmin(teamId, pending.member.userId))}
+          onConfirm={() => action.mutate(() => threadsApi.transferAdmin(teamId, pending.member.userId))}
           onCancel={close}
         >
           <p>
@@ -581,7 +583,7 @@ export function TeamPage() {
           current={t.name}
           pending={action.isPending}
           error={error}
-          onSave={(name) => action.mutate(() => api.renameTeam(teamId, name))}
+          onSave={(name) => action.mutate(() => threadsApi.renameTeam(teamId, name))}
           onCancel={close}
         />
       )}
@@ -610,7 +612,7 @@ export function TeamPage() {
                   <button
                     type="button"
                     disabled={action.isPending || a.connectionStatus === "not_connected"}
-                    onClick={() => action.mutate(() => api.addTeamAccount(teamId, a.id))}
+                    onClick={() => action.mutate(() => threadsApi.addTeamAccount(teamId, a.id))}
                     className="flex min-h-11 w-full items-center gap-3 rounded-xl border px-3 py-2 text-left hover:bg-accent disabled:opacity-60 disabled:hover:bg-transparent"
                   >
                     <AccountAvatar account={a} className="size-8" />

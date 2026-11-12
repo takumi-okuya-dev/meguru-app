@@ -8,7 +8,8 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { TOKEN_WARNING_KIND } from "@/apps/threads/components/connect/TokenWarnings";
-import { ApiError, api, describeError } from "@/lib/api-client";
+import { ApiError, describeError } from "@/lib/api-client";
+import { threadsApi } from "@/apps/threads/lib/api";
 import { accountPath } from "@/apps/threads/lib/paths";
 
 /** 隠している間に欄に出す文字。 */
@@ -72,7 +73,7 @@ export function TokenConnectForm(props: Props) {
       const token = pending.current;
       pending.current = null;
       if (!token) throw new Error("no token");
-      return api.tokenConnect({ mode: props.mode, accountId: props.accountId, token });
+      return threadsApi.tokenConnect({ mode: props.mode, accountId: props.accountId, token });
     },
     onSuccess: (result) => {
       setValue("");

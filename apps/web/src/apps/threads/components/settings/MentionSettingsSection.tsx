@@ -12,8 +12,9 @@ import { HelpToggle } from "@/components/HelpToggle";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { api, describeError } from "@/lib/api-client";
-import { queryKeys } from "@/lib/query";
+import { describeError } from "@/lib/api-client";
+import { threadsApi } from "@/apps/threads/lib/api";
+import { threadsQueryKeys } from "@/apps/threads/lib/query-keys";
 import { SettingCard, SettingRow } from "@/components/SettingRow";
 
 const HELP = [
@@ -30,18 +31,18 @@ const HELP = [
  */
 export function MentionSettingsSection({ accountId }: { accountId: string }) {
   const queryClient = useQueryClient();
-  const query = useQuery({ queryKey: queryKeys.mentionSettings(accountId), queryFn: () => api.mentionSettings(accountId) });
+  const query = useQuery({ queryKey: threadsQueryKeys.mentionSettings(accountId), queryFn: () => threadsApi.mentionSettings(accountId) });
   const [message, setMessage] = useState<string | null>(null);
   const [username, setUsername] = useState("");
   const [label, setLabel] = useState("");
   const [removing, setRemoving] = useState<MentionSettings["people"][number] | null>(null);
   const delayId = useId();
   const messageId = useId();
-  const set = (s: MentionSettings) => queryClient.setQueryData(queryKeys.mentionSettings(accountId), s);
+  const set = (s: MentionSettings) => queryClient.setQueryData(threadsQueryKeys.mentionSettings(accountId), s);
   const onError = (err: unknown) => toast.error(describeError(err));
   const saveSettings = useMutation({
     mutationFn: (v: { message: string; delayMinutes: number }) =>
-      api.putMentionSettings(accountId, { expectedVersion: query.data?.version ?? null, ...v }),
+      threadsApi.putMentionSettings(accountId, { expectedVersion: query.data?.version ?? null, ...v }),
     onSuccess: (s) => {
       set(s);
       setMessage(null);
@@ -49,7 +50,7 @@ export function MentionSettingsSection({ accountId }: { accountId: string }) {
     onError,
   });
   const add = useMutation({
-    mutationFn: () => api.addMentionPerson(accountId, { username, label }),
+    mutationFn: () => threadsApi.addMentionPerson(accountId, { username, label }),
     onSuccess: (s) => {
       set(s);
       setUsername("");
@@ -58,16 +59,16 @@ export function MentionSettingsSection({ accountId }: { accountId: string }) {
     onError,
   });
   const patch = useMutation({
-    mutationFn: (v: { id: string; always: boolean }) => api.patchMentionPerson(accountId, v.id, { always: v.always }),
+    mutationFn: (v: { id: string; always: boolean }) => threadsApi.patchMentionPerson(accountId, v.id, { always: v.always }),
     onSuccess: set,
     onError,
   });
   const remove = useMutation({
-    mutationFn: (id: string) => api.deleteMentionPerson(accountId, id),
+    mutationFn: (id: string) => threadsApi.deleteMentionPerson(accountId, id),
     onSuccess: (s) => {
       set(s);
       setRemoving(null);
-      void queryClient.invalidateQueries({ queryKey: queryKeys.postDrafts(accountId) });
+      void queryClient.invalidateQueries({ queryKey: threadsQueryKeys.postDrafts(accountId) });
     },
     onError,
   });

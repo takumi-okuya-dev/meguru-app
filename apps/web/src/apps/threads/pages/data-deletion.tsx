@@ -2,7 +2,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { useParams } from "react-router";
 import { CenteredLayout } from "@/shell";
-import { api } from "@/lib/api-client";
+import { threadsApi } from "@/apps/threads/lib/api";
 
 /**
  * Meta のデータ削除要求の状況の画面（research.md R7）。failed は「処理中」として表示する。
@@ -12,7 +12,7 @@ export function DataDeletion() {
   const { code } = useParams<{ code: string }>();
   const status = useQuery({
     queryKey: ["data-deletion", code],
-    queryFn: () => api.dataDeletionStatus(code!),
+    queryFn: () => threadsApi.dataDeletionStatus(code!),
     enabled: Boolean(code),
   });
 
