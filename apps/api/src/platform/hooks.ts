@@ -12,8 +12,9 @@ const registeredModules = new Set<string>();
  */
 export function registerModule(name: string, register: () => void): void {
   if (registeredModules.has(name)) return;
-  registeredModules.add(name);
+  // 登録が最後まで済んでから印を付ける（途中で例外になったら、次の呼び出しでもう一度試す。PR #98 のセルフレビュー）
   register();
+  registeredModules.add(name);
 }
 
 /** 登録の記録をすべて消す（テスト用）。 */

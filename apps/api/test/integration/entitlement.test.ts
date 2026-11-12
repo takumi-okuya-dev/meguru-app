@@ -7,7 +7,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { registerThreads } from "../../src/apps/threads";
 import { loadEntitlement } from "../../src/platform/billing/billing-service";
 import { loadAppEntitlement, loadAppEntitlements } from "../../src/platform/entitlement/entitlement";
-import { disabledFeaturesSql, featuresFrom } from "../../src/platform/features/feature-sql";
+import { disabledAppFeaturesSql, featuresFrom } from "../../src/platform/features/feature-sql";
 import { effectiveLimits, isOperator, setDefaults, setUserLimits } from "../../src/platform/operator/limit-service";
 import { users } from "../../src/platform/schema";
 import {
@@ -42,7 +42,7 @@ beforeEach(async () => {
 async function current(userId: string, mode: BillingMode) {
   const billing = await loadEntitlement(db(), userId, mode);
   const [row] = await db()
-    .select({ disabled: disabledFeaturesSql(users.id), clerk: users.clerkUserId })
+    .select({ disabled: disabledAppFeaturesSql(users.id, "threads"), clerk: users.clerkUserId })
     .from(users)
     .where(eq(users.id, userId));
   const limits = await effectiveLimits(db(), env, userId);

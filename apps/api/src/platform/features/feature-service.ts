@@ -15,6 +15,7 @@ import type { Env } from "../../kernel/env";
 import { AppError } from "../../kernel/errors";
 import { isUuid } from "../../kernel/validate";
 import { personName } from "../identity/people";
+import { requireFeatureSettingsApp } from "../registry/registry";
 
 /** 運営者（認証のミドルウェアが入れる users の行の一部）。 */
 type Operator = { id: string; displayName: string | null; email: string };
@@ -23,6 +24,13 @@ type Operator = { id: string; displayName: string | null; email: string };
 type FeatureValues = FeatureSettingsRequest["features"];
 
 const userNotFound = () => new AppError("USER_NOT_FOUND", 404, "user not found");
+
+/**
+ * 読み書きするアプリ（登録の一覧の requireFeatureSettingsApp）。どの問い合わせも、このアプリの行だけを読み書きする
+ * （2本目のアプリが同じ表に行を足しても混ざらない。PR #92 のセルフレビュー、specs/meguru/029 tasks.md T027）。
+ * 外から呼ぶ関数の初めで1回だけ決め、中の関数に渡す（途中で変わらないように）。
+ */
+const appOf = requireFeatureSettingsApp;
 
 /**
  * OFFのまとまりを FEATURES の順に並べる。
@@ -34,19 +42,20 @@ const ordered = (values: readonly string[] | null | undefined): Feature[] => FEA
 /**
  * 1人の今の設定と、入っている閉じていないグループの設定を読む。
  * @param db - データベース（トランザクションの中でもよい）
+ * @param app - アプリの番号
  * @param where - users を引く条件
  * @returns 見つかった人と今の設定。いなければ null
  */
-async function readUser(db: Db | TxDb, where: SQL): Promise<OperatorUser | null> {
+async function readUser(db: Db | TxDb, app: string, where: SQL): Promise<OperatorUser | null> {
   const [u] = await db
     .select({
       id: users.id,
       displayName: users.displayName,
       email: users.email,
-      disabled: sql<string[]>`coalesce((SELECT array_agg(${featureDisables.feature}) FROM ${featureDisables} WHERE ${featureDisables.userId} = ${users.id}), '{}')`,
+      disabled: sql<string[]>`coalesce((SELECT array_agg(${featureDisables.feature}) FROM ${featureDisables} WHERE ${featureDisables.userId} = ${users.id} AND ${featureDisables.app} = ${app}), '{}')`,
       groupId: testGroups.id,
       groupName: testGroups.name,
-      groupDisabled: sql<string[]>`coalesce((SELECT array_agg(${groupFeatureDisables.feature}) FROM ${groupFeatureDisables} WHERE ${groupFeatureDisables.groupId} = ${testGroups.id}), '{}')`,
+      groupDisabled: sql<string[]>`coalesce((SELECT array_agg(${groupFeatureDisables.feature}) FROM ${groupFeatureDisables} WHERE ${groupFeatureDisables.groupId} = ${testGroups.id} AND ${groupFeatureDisables.app} = ${app}), '{}')`,
     })
     .from(users)
     .leftJoin(testGroupMembers, eq(testGroupMembers.userId, users.id))
@@ -72,7 +81,7 @@ async function readUser(db: Db | TxDb, where: SQL): Promise<OperatorUser | null>
  * @throws AppError USER_NOT_FOUND
  */
 export async function findUserByEmail(db: Db, email: string): Promise<OperatorUser> {
-  const found = await readUser(db, sql`lower(${users.email}) = ${email}`);
+  const found = await readUser(db, appOf(), sql`lower(${users.email}) = ${email}`);
   if (!found) throw userNotFound();
   return found;
 }
@@ -106,18 +115,21 @@ export async function saveFeatureSettings(env: Env, operator: Operator, userId: 
     // 設定を変える人の行に鍵をかけてから今の設定を読む（同じ人を同時に変えたとき、記録が実際の変化と食い違わないように）
     const [locked] = await tx.select({ id: users.id }).from(users).where(eq(users.id, userId)).for("update");
     if (!locked) throw userNotFound();
-    const before = (await readUser(tx, eq(users.id, userId)))!;
+    const app = appOf();
+    const before = (await readUser(tx, app, eq(users.id, userId)))!;
     const { toDisable, toEnable, changes } = diff(before.disabled, input);
     if (toDisable.length > 0) {
       await tx
         .insert(featureDisables)
-        .values(toDisable.map((feature) => ({ userId, feature, disabledByUserId: operator.id })))
+        .values(toDisable.map((feature) => ({ userId, app, feature, disabledByUserId: operator.id })))
         .onConflictDoNothing();
     }
     if (toEnable.length > 0) {
-      await tx.delete(featureDisables).where(and(eq(featureDisables.userId, userId), inArray(featureDisables.feature, toEnable)));
+      await tx
+        .delete(featureDisables)
+        .where(and(eq(featureDisables.userId, userId), eq(featureDisables.app, app), inArray(featureDisables.feature, toEnable)));
     }
-    await recordChanges(tx, operator, { userId, name: before.name }, changes);
+    await recordChanges(tx, app, operator, { userId, name: before.name }, changes);
     return { ...before, disabled: FEATURES.filter((f) => !input[f]) };
   });
 }
@@ -142,24 +154,28 @@ export async function resetFeatureSettings(env: Env, operator: Operator, userId:
  * @param input - 3つすべての値
  */
 export async function saveGroupFeatures(tx: TxDb, operator: Operator, group: { id: string; name: string }, input: FeatureValues) {
+  const app = appOf();
   const before = ordered(
-    (await tx.select({ feature: groupFeatureDisables.feature }).from(groupFeatureDisables).where(eq(groupFeatureDisables.groupId, group.id))).map(
-      (r) => r.feature,
-    ),
+    (
+      await tx
+        .select({ feature: groupFeatureDisables.feature })
+        .from(groupFeatureDisables)
+        .where(and(eq(groupFeatureDisables.groupId, group.id), eq(groupFeatureDisables.app, app)))
+    ).map((r) => r.feature),
   );
   const { toDisable, toEnable, changes } = diff(before, input);
   if (toDisable.length > 0) {
     await tx
       .insert(groupFeatureDisables)
-      .values(toDisable.map((feature) => ({ groupId: group.id, feature, disabledByUserId: operator.id })))
+      .values(toDisable.map((feature) => ({ groupId: group.id, app, feature, disabledByUserId: operator.id })))
       .onConflictDoNothing();
   }
   if (toEnable.length > 0) {
     await tx
       .delete(groupFeatureDisables)
-      .where(and(eq(groupFeatureDisables.groupId, group.id), inArray(groupFeatureDisables.feature, toEnable)));
+      .where(and(eq(groupFeatureDisables.groupId, group.id), eq(groupFeatureDisables.app, app), inArray(groupFeatureDisables.feature, toEnable)));
   }
-  await recordChanges(tx, operator, { groupId: group.id, name: group.name }, changes);
+  await recordChanges(tx, app, operator, { groupId: group.id, name: group.name }, changes);
 }
 
 /**
@@ -169,19 +185,24 @@ export async function saveGroupFeatures(tx: TxDb, operator: Operator, group: { i
  * @returns OFFのまとまり（FEATURES の順）
  */
 export async function groupDisabledFeatures(db: Db | TxDb, groupId: string): Promise<Feature[]> {
-  const rows = await db.select({ feature: groupFeatureDisables.feature }).from(groupFeatureDisables).where(eq(groupFeatureDisables.groupId, groupId));
+  const rows = await db
+    .select({ feature: groupFeatureDisables.feature })
+    .from(groupFeatureDisables)
+    .where(and(eq(groupFeatureDisables.groupId, groupId), eq(groupFeatureDisables.app, appOf())));
   return ordered(rows.map((r) => r.feature));
 }
 
 /**
  * 変わったまとまりごとに記録を1行ずつ残す（その時点の名前を写す。research.md R7）。
  * @param tx - トランザクション
+ * @param app - アプリの番号
  * @param operator - 運営者
  * @param subject - 設定を変えられた人（userId）かグループ（groupId）と、その名前
  * @param changes - 変わったまとまりと、OFFにしたかONに戻したか
  */
 async function recordChanges(
   tx: TxDb,
+  app: string,
   operator: Operator,
   subject: { userId?: string; groupId?: string; name: string },
   changes: { feature: Feature; action: "disabled" | "enabled" }[],
@@ -189,6 +210,7 @@ async function recordChanges(
   if (changes.length === 0) return;
   await tx.insert(featureSettingEvents).values(
     changes.map((c) => ({
+      app,
       subjectUserId: subject.userId ?? null,
       subjectGroupId: subject.groupId ?? null,
       feature: c.feature,
@@ -207,7 +229,8 @@ async function recordChanges(
  * @returns 一覧と最近の変更
  */
 export async function listFeatureSettings(db: Db): Promise<FeatureSettingsList> {
-  const lastChanged = sql<Date | string | null>`(SELECT max(${featureSettingEvents.createdAt}) FROM ${featureSettingEvents} WHERE ${featureSettingEvents.subjectUserId} = ${users.id})`;
+  const app = appOf();
+  const lastChanged = sql<Date | string | null>`(SELECT max(${featureSettingEvents.createdAt}) FROM ${featureSettingEvents} WHERE ${featureSettingEvents.subjectUserId} = ${users.id} AND ${featureSettingEvents.app} = ${app})`;
   // 記録のない行（運営者の画面を通さずに入れた行）は、OFFにした時刻で並べる
   const updatedAt = sql<Date | string>`coalesce(${lastChanged}, max(${featureDisables.disabledAt}))`;
   const [rows, events] = await Promise.all([
@@ -221,9 +244,15 @@ export async function listFeatureSettings(db: Db): Promise<FeatureSettingsList> 
       })
       .from(featureDisables)
       .innerJoin(users, eq(users.id, featureDisables.userId))
+      .where(eq(featureDisables.app, app))
       .groupBy(users.id)
       .orderBy(desc(updatedAt), users.id),
-    db.select().from(featureSettingEvents).orderBy(desc(featureSettingEvents.createdAt), desc(featureSettingEvents.id)).limit(FEATURE_EVENTS_LIMIT),
+    db
+      .select()
+      .from(featureSettingEvents)
+      .where(eq(featureSettingEvents.app, app))
+      .orderBy(desc(featureSettingEvents.createdAt), desc(featureSettingEvents.id))
+      .limit(FEATURE_EVENTS_LIMIT),
   ]);
   return {
     users: rows.map((u) => ({

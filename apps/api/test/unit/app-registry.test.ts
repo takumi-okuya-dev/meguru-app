@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import {
   appFeatures,
   appLimits,
+  requireFeatureSettingsApp,
   isAppFeature,
   isValidAppLimit,
   registerAppFeatures,
@@ -28,6 +29,29 @@ describe("登録", () => {
     registerAppFeatures("sample", [{ key: "notes", label: "メモ" }]);
     registerAppFeatures("sample", [{ key: "other", label: "別" }]);
     expect(appFeatures("sample").map((f) => f.key)).toEqual(["notes"]);
+  });
+
+  it("機能の名前は、ほかのアプリと重ねられない（ログインした人の features を1つの集合で持つため。T027）", () => {
+    registerAppFeatures("sample", [{ key: "notes", label: "メモ" }]);
+    expect(() => registerAppFeatures("other", [{ key: "notes", label: "別のメモ" }])).toThrow(/notes/);
+    expect(registeredApps()).toEqual(["sample"]);
+  });
+
+  it("機能の名前は、同じアプリの中でも重ねられない", () => {
+    expect(() => registerAppFeatures("sample", [{ key: "notes", label: "メモ" }, { key: "notes", label: "メモ2" }])).toThrow(/notes/);
+    expect(registeredApps()).toEqual([]);
+  });
+
+  it("requireFeatureSettingsApp は、機能の名前が運営の画面の形（FEATURES）と同じアプリ。登録の順番によらない。なければ例外", () => {
+    expect(() => requireFeatureSettingsApp()).toThrow();
+    registerAppFeatures("sample", [{ key: "notes", label: "メモ" }]);
+    expect(() => requireFeatureSettingsApp()).toThrow();
+    registerAppFeatures("threads", [
+      { key: "autopost", label: "自動投稿" },
+      { key: "strategy", label: "戦略" },
+      { key: "team", label: "チーム" },
+    ]);
+    expect(requireFeatureSettingsApp()).toBe("threads");
   });
 
   it("登録していないアプリは空", () => {
