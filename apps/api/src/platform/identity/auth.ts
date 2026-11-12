@@ -2,7 +2,6 @@
 // Authorization: Bearer <Clerkのセッショントークン> を検証し、失敗したら 401 AUTH_REQUIRED。
 // 成功したら clerk_user_id で users を探し、なければその場で作る（JIT作成）。
 import { createClerkClient, verifyToken } from "@clerk/backend";
-import type { Feature } from "@meguru/shared";
 import { eq, sql } from "drizzle-orm";
 import { createMiddleware } from "hono/factory";
 import type { Env } from "../../kernel/env";
@@ -12,7 +11,7 @@ import { billingModeOf, operatorIdsOf, type BillingMode } from "../../kernel/con
 import { AppError, pgErrorCode } from "../../kernel/errors";
 import { referrerIdByCode } from "../referrals/referral-service";
 import { disabledAppFeaturesSql, featuresFrom } from "../features/feature-sql";
-import { requireFeatureSettingsApp } from "../registry/registry";
+import { featureSettings } from "../registry/registry";
 import { billingExemptSql, testAccessSql } from "../test-groups/test-group-service";
 import { entitlementFromFacts } from "../billing/billing-service";
 
@@ -75,7 +74,8 @@ export type CurrentUser = typeof users.$inferSelect & {
   /** 運営者か（招待制に関わらない。機能の設定の画面とAPIに使う。specs/019 research.md R5） */
   operator: boolean;
   /** 自分の使えるまとまり（人 ∪ グループ。チームを作る・入るの判定と /api/me に使う。specs/019 research.md R13） */
-  features: ReadonlySet<Feature>;
+  /** 使える機能のまとまり（アプリが登録した名前） */
+  features: ReadonlySet<string>;
 };
 /** 認証済みのリクエストで Hono のコンテキストに置く値。 */
 export type AuthVariables = {
@@ -143,6 +143,8 @@ export function authMiddleware(makeVerifier: (env: Env) => AuthVerifier) {
 
     const db = createDb(c.env.DATABASE_URL);
     const mode = billingModeOf(c.env);
+    // 機能のON/OFFを持つアプリと、その機能の名前（1回だけ引く）
+    const switches = featureSettings();
     // テスト用のグループがONなら、テスト版に入れるかも同じ問い合わせで読む（specs/016 plan.md「性能の目標」）
     const selectUser = () =>
       db
@@ -151,7 +153,7 @@ export function authMiddleware(makeVerifier: (env: Env) => AuthVerifier) {
           admitted: mode.testGroups ? testAccessSql(users, mode.operators) : sql<boolean>`true`,
           // 自分の使えないまとまり（specs/019）。同じ問い合わせで読む
           // 機能を登録したアプリの行だけ（specs/meguru/029 tasks.md T027。PR4 まで、ON/OFFは1つのアプリのもの）
-          disabled: disabledAppFeaturesSql(users.id, requireFeatureSettingsApp()),
+          disabled: disabledAppFeaturesSql(users.id, switches.app),
           // 契約前か（specs/024 research.md R9）。同じ問い合わせで読む
           billingExempt: billingExemptSql(users, mode),
           subStatus: subscriptions.status,
@@ -250,7 +252,7 @@ export function authMiddleware(makeVerifier: (env: Env) => AuthVerifier) {
       billing: mode,
       testAccess,
       operator: operatorIdsOf(c.env).includes(user.clerkUserId),
-      features: featuresFrom(disabled),
+      features: featuresFrom(disabled, switches.keys),
     });
     await next();
   });

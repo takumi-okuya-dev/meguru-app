@@ -7,7 +7,7 @@ import { operatorOnly } from "../operator/operator-only";
 import { createDb } from "../../kernel/db/client";
 import { AppError } from "../../kernel/errors";
 import { parseBody } from "../../kernel/validate";
-import { findUserByEmail, listFeatureSettings, resetFeatureSettings, saveFeatureSettings } from "./feature-service";
+import { assertFeatureValues, findUserByEmail, listFeatureSettings, resetFeatureSettings, saveFeatureSettings } from "./feature-service";
 
 /**
  * 運営者の機能の設定のルート。
@@ -24,6 +24,7 @@ export function operatorFeatureRoutes(authed: MiddlewareHandler<AppEnv>) {
     })
     .put("/operator/feature-settings/:userId", authed, operatorOnly, async (c) => {
       const { features } = await parseBody(featureSettingsRequestSchema, c.req.json());
+      assertFeatureValues(features);
       return c.json(await saveFeatureSettings(c.env, c.get("user"), c.req.param("userId"), features));
     })
     .delete("/operator/feature-settings/:userId", authed, operatorOnly, async (c) =>

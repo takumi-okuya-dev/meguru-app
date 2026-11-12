@@ -2,7 +2,8 @@
 import { z } from "zod";
 import { meAppsSchema } from "./apps/catalog";
 import { ERROR_CODES } from "./errors";
-import { FEATURE_EVENT_ACTIONS, FEATURES } from "./features";
+import { FEATURES } from "./apps/threads/features";
+import { FEATURE_EVENT_ACTIONS } from "./features";
 import {
   OPERATOR_ACCOUNT_METHODS,
   OPERATOR_ACCOUNT_TESTER_STATES,
@@ -1780,8 +1781,8 @@ export const testGroupListSchema = z.object({ groups: z.array(testGroupSummarySc
 
 /** 運営者の画面のグループの詳しい内容。 */
 export const testGroupDetailSchema = testGroupSummarySchema.extend({
-  /** グループの設定でOFFのまとまり（specs/019 FR-017） */
-  disabled: z.array(z.enum(FEATURES)),
+  /** グループの設定でOFFのまとまり（specs/019 FR-017。名前はアプリが登録したもの。specs/meguru/029 T070） */
+  disabled: z.array(z.string().regex(/^[a-z_]{1,30}$/)),
   /** 入っている人（入った順） */
   members: z.array(z.object({ userId: z.string(), name: z.string(), email: z.string(), joinedAt: z.string() })),
   /** 記録（新しい順に TEST_GROUP_EVENTS_LIMIT 件） */
@@ -1828,12 +1829,13 @@ export type ReferralPage = z.infer<typeof referralPageSchema>;
 
 // ---- 機能のまとまりごとのON/OFF（specs/019-feature-switches contracts/api.md「運営者のAPI」） ----
 
-const featureSchema = z.enum(FEATURES);
+/** 機能のまとまりの名前（アプリが登録したもの。共通はアプリの名前を知らない。形は DB の CHECK と同じ。specs/meguru/029 tasks.md T070）。 */
+const featureSchema = z.string().regex(/^[a-z_]{1,30}$/);
 
 /** GET /api/operator/users?email= のクエリ（完全一致。前後の空白を除き、大文字・小文字を区別しない）。 */
 export const operatorUserQuerySchema = z.object({ email: z.string().trim().toLowerCase().pipe(z.email()) });
 
-/** 運営者の画面の、見つかった人と今の設定（disabled は人の設定、group.disabled はグループの設定。FEATURES の順）。 */
+/** 運営者の画面の、見つかった人と今の設定（disabled は人の設定、group.disabled はグループの設定。登録の順）。 */
 export const operatorUserSchema = z.object({
   userId: z.string(),
   name: z.string(),
@@ -1845,9 +1847,12 @@ export const operatorUserSchema = z.object({
 /** 運営者の画面の、見つかった人と今の設定。 */
 export type OperatorUser = z.infer<typeof operatorUserSchema>;
 
-/** PUT /api/operator/feature-settings/:userId のリクエスト（3つすべての値）。 */
+/**
+ * PUT /api/operator/feature-settings/:userId のリクエスト（登録したまとまりすべての値。名前 → ON/OFF）。
+ * 登録した名前とそろっているかは、API が登録の一覧で確かめる（specs/meguru/029 tasks.md T070）。
+ */
 export const featureSettingsRequestSchema = z.object({
-  features: z.object({ autopost: z.boolean(), strategy: z.boolean(), team: z.boolean() }),
+  features: z.record(featureSchema, z.boolean()),
 });
 /** 機能の設定の保存の値。 */
 export type FeatureSettingsRequest = z.infer<typeof featureSettingsRequestSchema>;
@@ -1860,6 +1865,8 @@ export const operatorAppRegistrySchema = z.object({
   apps: z.array(
     z.object({
       app: z.string(),
+      /** 機能のON/OFF（運営の「使える機能」の画面）を持つアプリか（今は1つだけ） */
+      featureSwitches: z.boolean(),
       features: z.array(z.object({ key: z.string(), label: z.string(), description: z.string().optional() })),
       limits: z.array(
         z.object({ key: z.string(), label: z.string(), min: z.number().int(), max: z.number().int(), operatorValue: z.number().int().nullable() }),

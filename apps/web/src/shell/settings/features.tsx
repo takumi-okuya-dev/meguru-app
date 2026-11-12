@@ -1,7 +1,7 @@
 // 設定 > 運営 > 使える機能（specs/019-feature-switches contracts/ui-routes.md 4、US1・US4、FR-002・FR-013・FR-014）。
 // 運営者だけ。人を探して、まとまりごとにON/OFF（人の設定）。OFFの人の一覧と、最近の変更（人とグループ）。
 // 画面はモック（https://claude.ai/artifact/XbnRAoVcfS7HCprqHfrrqi 、2026-11-04 OK）のとおり。
-import { FEATURE_LABELS, type FeatureSettingsList, type OperatorUser } from "@meguru/shared";
+import type { FeatureSettingsList, OperatorUser } from "@meguru/shared";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState, type FormEvent } from "react";
 import { FeatureSwitches, Toggle } from "@/components/FeatureSwitches";
@@ -9,15 +9,15 @@ import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ApiError, api, describeError } from "@/lib/api-client";
+import { featureLabeler, useFeatureDefs } from "@/lib/feature-defs";
 import { queryKeys } from "@/lib/query";
 
-/** 「この画面について」の箇条書き（contracts/ui-routes.md 4）。 */
+/** 「この画面について」の箇条書き（contracts/ui-routes.md 4）。このあとに、アプリが登録したまとまりの説明を足す。 */
 const HELP = [
   "OFFにした機能は、その人のサイドバーから消えます",
   "書いた内容は消えません。ONに戻すとそのまま使えます",
   "チームでは、アカウントの持ち主の設定に従います",
   "グループでOFFの機能は、その人がONでも使えません",
-  "自動投稿は、投稿をつくる・投稿ストック・パフォーマンスのまとまりです",
 ];
 
 /**
@@ -40,7 +40,6 @@ const mdhm = (iso: string) => {
   return `${md(iso)} ${d.getHours()}:${String(d.getMinutes()).padStart(2, "0")}`;
 };
 
-const labels = (fs: readonly (keyof typeof FEATURE_LABELS)[]) => fs.map((f) => FEATURE_LABELS[f]).join("・");
 
 /**
  * 使える機能（/settings/features）。
@@ -49,6 +48,10 @@ const labels = (fs: readonly (keyof typeof FEATURE_LABELS)[]) => fs.map((f) => F
 export function FeaturesPage() {
   const queryClient = useQueryClient();
   const list = useQuery({ queryKey: queryKeys.featureSettings, queryFn: api.featureSettings, retry: false });
+  // まとまりの名前と説明は、アプリが登録したもの（specs/meguru/029 T070）
+  const { query: registry, defs } = useFeatureDefs();
+  const label = featureLabeler(defs);
+  const help = [...HELP, ...(defs ?? []).flatMap((d) => (d.description ? [d.description] : []))];
   const [email, setEmail] = useState("");
   const [found, setFound] = useState<OperatorUser | null>(null);
   const [searchError, setSearchError] = useState<string | null>(null);
@@ -125,20 +128,20 @@ export function FeaturesPage() {
         <h2 id="feature-off-title" className="font-medium">
           OFFの人
         </h2>
-        {list.isPending ? (
+        {list.isPending || registry.isPending ? (
           <p className="text-sm text-muted-foreground">読み込み中…</p>
-        ) : list.isError ? (
+        ) : list.isError || registry.isError ? (
           <p role="alert" className="text-sm text-muted-foreground">
-            {describeError(list.error)}
+            {describeError(list.error ?? registry.error)}
           </p>
         ) : list.data.users.length === 0 ? (
           <p className="text-sm text-muted-foreground">OFFの人はいません</p>
         ) : (
-          <OffList users={list.data.users} onReset={setResetting} />
+          <OffList users={list.data.users} label={label} onReset={setResetting} />
         )}
       </section>
 
-      {list.data && (
+      {list.data && defs && (
         <Toggle title="最近の変更" region="最近の変更">
           {list.data.events.length === 0 ? (
             <p className="text-muted-foreground">まだ変更はありません</p>
@@ -148,7 +151,7 @@ export function FeaturesPage() {
                 <li key={`${e.createdAt}-${i}`} className="flex gap-2.5">
                   <span className="w-[76px] shrink-0 text-muted-foreground tabular-nums">{mdhm(e.createdAt)}</span>
                   <span className="min-w-0">
-                    {e.subjectName}の{FEATURE_LABELS[e.feature]}を{e.action === "disabled" ? "OFF" : "ON"}（{e.actorName}）
+                    {e.subjectName}の{label(e.feature)}を{e.action === "disabled" ? "OFF" : "ON"}（{e.actorName}）
                   </span>
                 </li>
               ))}
@@ -159,7 +162,7 @@ export function FeaturesPage() {
 
       <Toggle title="この画面について" region="この画面について">
         <ul className="space-y-0.5">
-          {HELP.map((h) => (
+          {help.map((h) => (
             <li key={h}>・{h}</li>
           ))}
         </ul>
@@ -192,16 +195,19 @@ export function FeaturesPage() {
 
 /**
  * OFFの人の一覧。
- * @param props - users：OFFの人、onReset：「すべてONに戻す」を押した
+ * @param props - users：OFFの人、label：まとまりの名前 → 表示名、onReset：「すべてONに戻す」を押した
  * @returns 一覧
  */
 function OffList({
   users,
+  label,
   onReset,
 }: {
   users: FeatureSettingsList["users"];
+  label: (key: string) => string;
   onReset: (u: { userId: string; name: string }) => void;
 }) {
+  const labels = (fs: readonly string[]) => fs.map(label).join("・");
   return (
     <ul className="divide-y rounded-2xl border bg-card px-4">
       {users.map((u) => (

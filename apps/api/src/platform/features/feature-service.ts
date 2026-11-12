@@ -2,8 +2,6 @@
 // 人の設定とグループの設定の読み書きはここだけに置く。使えるかの判定は feature-sql.ts と authorizeAccount（access.ts）だけ。
 import {
   FEATURE_EVENTS_LIMIT,
-  FEATURES,
-  type Feature,
   type FeatureSettingsList,
   type FeatureSettingsRequest,
   type OperatorUser,
@@ -15,12 +13,12 @@ import type { Env } from "../../kernel/env";
 import { AppError } from "../../kernel/errors";
 import { isUuid } from "../../kernel/validate";
 import { personName } from "../identity/people";
-import { requireFeatureSettingsApp } from "../registry/registry";
+import { appFeatures, featureSettings, requireFeatureSettingsApp } from "../registry/registry";
 
 /** 運営者（認証のミドルウェアが入れる users の行の一部）。 */
 type Operator = { id: string; displayName: string | null; email: string };
 
-/** 3つすべてのまとまりの値（true ならON）。 */
+/** 登録したまとまりすべての値（名前 → ON/OFF。true ならON）。 */
 type FeatureValues = FeatureSettingsRequest["features"];
 
 const userNotFound = () => new AppError("USER_NOT_FOUND", 404, "user not found");
@@ -33,11 +31,34 @@ const userNotFound = () => new AppError("USER_NOT_FOUND", 404, "user not found")
 const appOf = requireFeatureSettingsApp;
 
 /**
- * OFFのまとまりを FEATURES の順に並べる。
- * @param values - OFFのまとまり（順不同）
- * @returns FEATURES の順のOFFのまとまり
+ * アプリが登録したまとまりの名前（登録の順。共通はアプリの名前を知らない。specs/meguru/029 tasks.md T070）。
+ * @param app - アプリの番号
+ * @returns まとまりの名前
  */
-const ordered = (values: readonly string[] | null | undefined): Feature[] => FEATURES.filter((f) => (values ?? []).includes(f));
+const keysOf = (app: string): string[] => appFeatures(app).map((d) => d.key);
+
+/**
+ * OFFのまとまりを登録の順に並べる（登録していない名前は除く）。
+ * @param app - アプリの番号
+ * @param values - OFFのまとまり（順不同）
+ * @returns 登録の順のOFFのまとまり
+ */
+const ordered = (app: string, values: readonly string[] | null | undefined): string[] =>
+  keysOf(app).filter((f) => (values ?? []).includes(f));
+
+/**
+ * 保存する値が、機能のON/OFFを持つアプリの登録したまとまりとちょうどそろっているかを確かめる。道筋で、DBを読む前に呼ぶ
+ * （前と同じく、形の誤りは 404・409 より先に 400 で返す。PR #105 のセルフレビュー）。
+ * @param input - 保存する値
+ * @throws AppError VALIDATION_FAILED（足りない名前・登録していない名前を features.<名前> で示す）
+ */
+export function assertFeatureValues(input: FeatureValues): void {
+  const keys = featureSettings().keys;
+  const wrong = [...keys.filter((k) => typeof input[k] !== "boolean"), ...Object.keys(input).filter((k) => !keys.includes(k))];
+  if (wrong.length > 0) {
+    throw new AppError("VALIDATION_FAILED", 400, "features must list every registered feature", undefined, wrong.map((k) => `features.${k}`));
+  }
+}
 
 /**
  * 1人の今の設定と、入っている閉じていないグループの設定を読む。
@@ -68,8 +89,8 @@ async function readUser(db: Db | TxDb, app: string, where: SQL): Promise<Operato
     userId: u.id,
     name: personName(u),
     email: u.email,
-    disabled: ordered(u.disabled),
-    group: u.groupId && u.groupName !== null ? { id: u.groupId, name: u.groupName, disabled: ordered(u.groupDisabled) } : null,
+    disabled: ordered(app, u.disabled),
+    group: u.groupId && u.groupName !== null ? { id: u.groupId, name: u.groupName, disabled: ordered(app, u.groupDisabled) } : null,
   };
 }
 
@@ -88,24 +109,25 @@ export async function findUserByEmail(db: Db, email: string): Promise<OperatorUs
 
 /**
  * 今のOFFと保存する値から、OFFにする・ONに戻すまとまりを求める。
+ * @param app - アプリの番号
  * @param before - 今のOFF
- * @param input - 3つすべての値
+ * @param input - 登録したまとまりすべての値
  * @returns OFFにするまとまりと、ONに戻すまとまり
  */
-function diff(before: readonly Feature[], input: FeatureValues) {
-  const toDisable = FEATURES.filter((f) => !input[f] && !before.includes(f));
+function diff(app: string, before: readonly string[], input: FeatureValues) {
+  const toDisable = keysOf(app).filter((f) => !input[f] && !before.includes(f));
   const toEnable = before.filter((f) => input[f]);
   return { toDisable, toEnable, changes: [...toDisable.map(disabledChange), ...toEnable.map(enabledChange)] };
 }
-const disabledChange = (feature: Feature) => ({ feature, action: "disabled" as const });
-const enabledChange = (feature: Feature) => ({ feature, action: "enabled" as const });
+const disabledChange = (feature: string) => ({ feature, action: "disabled" as const });
+const enabledChange = (feature: string) => ({ feature, action: "enabled" as const });
 
 /**
  * 人の設定を、まとまりごとにまとめて保存する（あとから保存したほうが残る）。値が変わったまとまりだけを記録する（FR-014）。
  * @param env - Workers のバインディング
  * @param operator - 運営者
  * @param userId - 設定を変える人の users.id
- * @param input - 3つすべての値
+ * @param input - 登録したまとまりすべての値
  * @returns 保存した後の設定
  * @throws AppError USER_NOT_FOUND
  */
@@ -116,8 +138,9 @@ export async function saveFeatureSettings(env: Env, operator: Operator, userId: 
     const [locked] = await tx.select({ id: users.id }).from(users).where(eq(users.id, userId)).for("update");
     if (!locked) throw userNotFound();
     const app = appOf();
+    assertFeatureValues(input);
     const before = (await readUser(tx, app, eq(users.id, userId)))!;
-    const { toDisable, toEnable, changes } = diff(before.disabled, input);
+    const { toDisable, toEnable, changes } = diff(app, before.disabled, input);
     if (toDisable.length > 0) {
       await tx
         .insert(featureDisables)
@@ -130,7 +153,7 @@ export async function saveFeatureSettings(env: Env, operator: Operator, userId: 
         .where(and(eq(featureDisables.userId, userId), eq(featureDisables.app, app), inArray(featureDisables.feature, toEnable)));
     }
     await recordChanges(tx, app, operator, { userId, name: before.name }, changes);
-    return { ...before, disabled: FEATURES.filter((f) => !input[f]) };
+    return { ...before, disabled: keysOf(app).filter((f) => !input[f]) };
   });
 }
 
@@ -143,7 +166,7 @@ export async function saveFeatureSettings(env: Env, operator: Operator, userId: 
  * @throws AppError USER_NOT_FOUND
  */
 export async function resetFeatureSettings(env: Env, operator: Operator, userId: string): Promise<OperatorUser> {
-  return saveFeatureSettings(env, operator, userId, { autopost: true, strategy: true, team: true });
+  return saveFeatureSettings(env, operator, userId, Object.fromEntries(keysOf(appOf()).map((k) => [k, true])));
 }
 
 /**
@@ -151,11 +174,13 @@ export async function resetFeatureSettings(env: Env, operator: Operator, userId:
  * @param tx - トランザクション（グループの行に鍵をかけたもの）
  * @param operator - 運営者
  * @param group - グループの id と名前
- * @param input - 3つすべての値
+ * @param input - 登録したまとまりすべての値
  */
 export async function saveGroupFeatures(tx: TxDb, operator: Operator, group: { id: string; name: string }, input: FeatureValues) {
   const app = appOf();
+  assertFeatureValues(input);
   const before = ordered(
+    app,
     (
       await tx
         .select({ feature: groupFeatureDisables.feature })
@@ -163,7 +188,7 @@ export async function saveGroupFeatures(tx: TxDb, operator: Operator, group: { i
         .where(and(eq(groupFeatureDisables.groupId, group.id), eq(groupFeatureDisables.app, app)))
     ).map((r) => r.feature),
   );
-  const { toDisable, toEnable, changes } = diff(before, input);
+  const { toDisable, toEnable, changes } = diff(app, before, input);
   if (toDisable.length > 0) {
     await tx
       .insert(groupFeatureDisables)
@@ -182,14 +207,15 @@ export async function saveGroupFeatures(tx: TxDb, operator: Operator, group: { i
  * グループの設定でOFFのまとまりを読む（グループの詳しい内容に出す）。
  * @param db - データベース
  * @param groupId - test_groups.id
- * @returns OFFのまとまり（FEATURES の順）
+ * @returns OFFのまとまり（登録の順）
  */
-export async function groupDisabledFeatures(db: Db | TxDb, groupId: string): Promise<Feature[]> {
+export async function groupDisabledFeatures(db: Db | TxDb, groupId: string): Promise<string[]> {
+  const app = appOf();
   const rows = await db
     .select({ feature: groupFeatureDisables.feature })
     .from(groupFeatureDisables)
-    .where(and(eq(groupFeatureDisables.groupId, groupId), eq(groupFeatureDisables.app, appOf())));
-  return ordered(rows.map((r) => r.feature));
+    .where(and(eq(groupFeatureDisables.groupId, groupId), eq(groupFeatureDisables.app, app)));
+  return ordered(app, rows.map((r) => r.feature));
 }
 
 /**
@@ -205,7 +231,7 @@ async function recordChanges(
   app: string,
   operator: Operator,
   subject: { userId?: string; groupId?: string; name: string },
-  changes: { feature: Feature; action: "disabled" | "enabled" }[],
+  changes: { feature: string; action: "disabled" | "enabled" }[],
 ) {
   if (changes.length === 0) return;
   await tx.insert(featureSettingEvents).values(
@@ -259,11 +285,11 @@ export async function listFeatureSettings(db: Db): Promise<FeatureSettingsList> 
       userId: u.id,
       name: personName(u),
       email: u.email,
-      disabled: ordered(u.disabled),
+      disabled: ordered(app, u.disabled),
       updatedAt: new Date(u.updatedAt).toISOString(),
     })),
     events: events.map((e) => ({
-      feature: e.feature as Feature,
+      feature: e.feature,
       action: e.action as "disabled" | "enabled",
       actorName: e.actorName,
       subjectName: e.subjectName,

@@ -1,6 +1,7 @@
 // アプリ向けの利用権（specs/meguru/029-threads-pattern1 contracts/platform-entry.md 2・6、T001・T004）。
 // 新しい loadAppEntitlement(s) が、今の判定（loadEntitlement・機能のOFF・effectiveLimits・運営者）と同じ結果になることを、
 // 状態ごとに同じデータで比べる。まとめて読んでも1人ずつと同じこと、見つからない番号は入らないことも確かめる。
+import { FEATURES } from "@meguru/shared";
 import { eq } from "drizzle-orm";
 import type { BillingMode } from "../../src/kernel/config";
 import { beforeEach, describe, expect, it } from "vitest";
@@ -48,7 +49,7 @@ async function current(userId: string, mode: BillingMode) {
   const limits = await effectiveLimits(db(), env, userId);
   return {
     billing,
-    features: [...featuresFrom(row!.disabled)].sort(),
+    features: [...featuresFrom(row!.disabled, FEATURES)].sort(),
     limits: { accounts: limits.accountLimit, daily_posts: limits.dailyPostLimit },
     operator: isOperator(env, row!.clerk),
   };

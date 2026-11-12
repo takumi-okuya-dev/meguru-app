@@ -43,7 +43,7 @@ describe("共通の部品にThreadsがない", () => {
     const body = src.slice(src.indexOf("export const queryKeys = {"));
     const keys = [...body.matchAll(/^ {2}([A-Za-z0-9_]+):/gm)].map((m) => m[1]);
     expect(keys.sort()).toEqual(
-      ["billing", "featureSettings", "me", "operatorLimits", "referral", "referralPage", "testGroup", "testGroups", "testInvite", "withdrawalPreview"].sort(),
+      ["appRegistry", "billing", "featureSettings", "me", "operatorLimits", "referral", "referralPage", "testGroup", "testGroups", "testInvite", "withdrawalPreview"].sort(),
     );
   });
 });

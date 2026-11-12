@@ -42,16 +42,23 @@ describe("登録", () => {
     expect(registeredApps()).toEqual([]);
   });
 
-  it("requireFeatureSettingsApp は、機能の名前が運営の画面の形（FEATURES）と同じアプリ。登録の順番によらない。なければ例外", () => {
-    expect(() => requireFeatureSettingsApp()).toThrow();
-    registerAppFeatures("sample", [{ key: "notes", label: "メモ" }]);
-    expect(() => requireFeatureSettingsApp()).toThrow();
-    registerAppFeatures("threads", [
-      { key: "autopost", label: "自動投稿" },
-      { key: "strategy", label: "戦略" },
-      { key: "team", label: "チーム" },
-    ]);
-    expect(requireFeatureSettingsApp()).toBe("threads");
+  it("requireFeatureSettingsApp は、機能のON/OFFを持つと宣言したアプリ。宣言がなければ例外（共通はアプリの名前を知らない。T070）", () => {
+    expect(() => requireFeatureSettingsApp()).toThrow(/登録されていません/);
+    registerAppFeatures("sample", [{ key: "notes", label: "メモ" }], { switches: true });
+    // ほかのアプリが機能を登録しても、ON/OFFの持ち主は変わらず、リクエストのたびの判断で止まらない（PR #105 のセルフレビュー）
+    registerAppFeatures("other", [{ key: "photos", label: "写真" }]);
+    expect(requireFeatureSettingsApp()).toBe("sample");
+  });
+
+  it("2つ目のアプリが機能のON/OFFを持とうとしたら、登録のときに止める", () => {
+    registerAppFeatures("sample", [{ key: "notes", label: "メモ" }], { switches: true });
+    expect(() => registerAppFeatures("other", [{ key: "photos", label: "写真" }], { switches: true })).toThrow(/sample/);
+  });
+
+  it("機能の名前の形が違えば、登録のときに止める（DB の CHECK と同じ、英小文字と _ の1〜30文字）", () => {
+    expect(() => registerAppFeatures("sample", [{ key: "photoBook", label: "写真" }])).toThrow(/photoBook/);
+    expect(() => registerAppFeatures("sample", [{ key: "feature_v2", label: "二番目" }])).toThrow(/feature_v2/);
+    expect(() => registerAppFeatures("sample", [{ key: "a".repeat(31), label: "長い" }])).toThrow(/a{31}/);
   });
 
   it("登録していないアプリは空", () => {

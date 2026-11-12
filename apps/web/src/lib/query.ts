@@ -31,5 +31,7 @@ export const queryKeys = {
   testGroup: (id: string) => ["test-groups", id] as const,
   // 機能のまとまりごとのON/OFF（specs/019）
   featureSettings: ["feature-settings"] as const,
+  // 登録されたアプリの機能と上限の一覧（specs/meguru/029 T070）
+  appRegistry: ["app-registry"] as const,
   operatorLimits: ["operator-limits"] as const,
 };

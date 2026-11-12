@@ -1,6 +1,7 @@
 // APIクライアント。Clerkのセッショントークンを付け、レスポンスを共通スキーマで検証する。
 // 401 を受けたら、セッション切れとして案内してから /sign-in へ遷移する（contracts/ui-routes.md の規則7）。
 import {
+  operatorAppRegistrySchema,
   billingRedirectSchema,
   withdrawalPreviewSchema,
   billingSummarySchema,
@@ -262,6 +263,8 @@ export const api = {
       method: "PUT",
       body: JSON.stringify({ features }),
     }),
+  // 登録されたアプリの機能と上限の一覧（運営の画面が、アプリの名前を直接書かずに出すため。specs/meguru/029 T070）
+  appRegistry: () => request("/api/operator/app-registry", operatorAppRegistrySchema),
   featureSettings: () => request("/api/operator/feature-settings", featureSettingsListSchema),
   findOperatorUser: (email: string) => request(`/api/operator/users?email=${encodeURIComponent(email)}`, operatorUserSchema),
   putFeatureSettings: (userId: string, features: FeatureSettingsRequest["features"]) =>

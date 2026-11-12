@@ -25,6 +25,7 @@ describe("GET /api/operator/app-registry", () => {
       apps: [
         {
           app: "threads",
+          featureSwitches: true,
           features: [
             { key: "autopost", label: FEATURE_LABELS.autopost, description: THREADS_FEATURES[0]!.description },
             { key: "strategy", label: FEATURE_LABELS.strategy },

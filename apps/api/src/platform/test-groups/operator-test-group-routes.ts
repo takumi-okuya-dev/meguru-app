@@ -1,5 +1,6 @@
 // /api/operator/test-groups（specs/016-test-groups contracts/api.md「運営者のAPI」）。
 // 運営者（OPERATOR_CLERK_USER_IDS）だけ。招待制がOFFの環境（本番）でも、機能の設定のために使う（specs/019 FR-017、research.md R11）。
+import { assertFeatureValues } from "../features/feature-service";
 import { featureSettingsRequestSchema, testGroupCreateRequestSchema, testGroupUpdateRequestSchema } from "@meguru/shared";
 import { Hono, type MiddlewareHandler } from "hono";
 import type { z } from "zod";
@@ -59,6 +60,7 @@ export function operatorTestGroupRoutes(authed: MiddlewareHandler<AppEnv>) {
     )
     .put("/operator/test-groups/:groupId/features", ...guard, async (c) => {
       const { features } = await parseBody(featureSettingsRequestSchema, c.req.json());
+      assertFeatureValues(features);
       return c.json(await updateTestGroupFeatures(c.env, c.get("user"), c.req.param("groupId"), features));
     })
     .delete("/operator/test-groups/:groupId/members/:userId", ...guard, async (c) =>
