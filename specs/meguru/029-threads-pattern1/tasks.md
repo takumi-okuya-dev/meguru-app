@@ -90,7 +90,7 @@ description: "Task list for feature meguru/029 Threads pattern ①"
 
 - [ ] T025 [US2] `apps/api/src/platform/billing/billing-service.ts`の料金の数（`countOwned`）を、`app_usage`の`threads`の`quantity`に替える。契約を始めるとき（Checkout）も同じ。T018の料金の部分を通す。
 - [ ] T026 [US2] `apps/api/src/platform/operator/limit-service.ts`の、持ち主のアカウントの数を数える部分（運営者の利用者の一覧など）を、`app_usage`に替える。アカウントの数の上限の判定（作れるか）は、Threadsへ移す（`apps/threads/accounts/`）。
-- [ ] T027 [US2] `apps/api/src/platform/features/feature-sql.ts`の、`memberships`をJOINする部分（アカウントの持ち主の機能）を消し、Threadsの側で`loadEntitlement`を使う形にする。共通のコードからThreadsの機能の名前（`autopost`など）を消し、登録の一覧を使う（spec FR-012）。
+- [ ] T027 [US2] 機能のOFFを読む・消す処理（`feature-sql.ts`の`disabledFeaturesSql`・`featureOnSql`、`feature-service.ts`の`readUser`・`saveFeatureSettings`の削除・`saveGroupFeatures`・`groupDisabledFeatures`）を、すべてアプリの番号で絞る形にする（PR1のセルフレビューの指摘。2本目のアプリが同じ名前の機能を使っても混ざらないように）。`apps/api/src/platform/features/feature-sql.ts`の、`memberships`をJOINする部分（アカウントの持ち主の機能）を消し、Threadsの側で`loadEntitlement`を使う形にする。共通のコードからThreadsの機能の名前（`autopost`など）を消し、登録の一覧を使う（spec FR-012）。
 - [ ] T028 [US2] `apps/api/src/platform/withdrawal/withdrawal-service.ts`を、契約の解約・利用者の退会の記録・`emitEvent(tx, "user.withdrawn", { userId })`までにする（Threadsのアカウントを消す部分をなくす）。
 - [ ] T029 [US2] `apps/api/src/platform/identity/me-routes.ts`：`apps.using`を`app_usage.using`から決める。`/api/me`のThreadsの部分は、PR5まで今の形で返すため、組み立て（`apps/api/src/app.ts`）からThreadsの「`/api/me`に足す中身を作る関数」を渡して呼ぶ（共通はThreadsを読まない）。`/api/me/withdrawal-preview`も同じ（PR5で共通の分だけにする）。
 

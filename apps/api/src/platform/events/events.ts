@@ -27,12 +27,11 @@ export type PlatformEvent<K extends PlatformEventType = PlatformEventType> = {
   createdAt: Date;
 };
 
-/** 出来事の受け取り。例外を投げたら失敗（やり直す）。 */
-export type EventConsumer<K extends PlatformEventType = PlatformEventType> = (
-  db: Db,
-  event: PlatformEvent<K>,
-  env: Env,
-) => Promise<void>;
+/**
+ * 出来事の受け取り。例外を投げたら失敗（やり直す）。自分の表を直すときは、自分でトランザクションを開く
+ * （`withTransaction(env.DATABASE_URL, …)`。受け取った番号の記録と表の変更を、同じトランザクションで行う）。
+ */
+export type EventConsumer<K extends PlatformEventType = PlatformEventType> = (event: PlatformEvent<K>, env: Env) => Promise<void>;
 
 /** 何度失敗したら止めるか。 */
 export const MAX_DELIVERY_ATTEMPTS = 10;
@@ -84,8 +83,11 @@ export async function emitEvent<K extends PlatformEventType>(
   const targets = consumersOf(type);
   if (targets.length === 0) throw new Error(`出来事「${type}」の受け取りが登録されていません（組み立てで registerConsumer を呼んでください）`);
   const id = crypto.randomUUID();
-  await tx.insert(platformEvents).values({ id, type, payload });
-  await tx.insert(platformEventDeliveries).values(targets.map((consumer) => ({ eventId: id, consumer })));
+  // 時刻は、届ける側（deliverPendingEvents）と同じ Workers の時計で入れる。DBの now() は Workers の時計と少しずれることがあり、
+  // 書いた直後に届けようとしても「まだ時刻が来ていない」になるため
+  const at = new Date();
+  await tx.insert(platformEvents).values({ id, type, payload, createdAt: at });
+  await tx.insert(platformEventDeliveries).values(targets.map((consumer) => ({ eventId: id, consumer, nextAttemptAt: at })));
   return id;
 }
 
@@ -135,20 +137,21 @@ export async function deliverPendingEvents(env: Env, now: Date = new Date()): Pr
   let failed = 0;
   for (const d of due) {
     const where = and(eq(platformEventDeliveries.eventId, d.eventId), eq(platformEventDeliveries.consumer, d.consumer));
-    // 借りる：まだ pending で時刻が来ているときだけ、次に試す時刻を先へ（ほかの処理に取られていたら飛ばす）
+    // 借りる：まだ pending で時刻が来ているときだけ、次に試す時刻を先へ進め、試した回数を増やす（ほかの処理に取られていたら飛ばす）。
+    // 回数を先に増やすので、受け取りの途中で Worker が止まっても、その回は数えられ、いつかは failed で止まる
     const lease = new Date(now.getTime() + retryDelayMs(d.attempts + 1));
     const [claimed] = await db
       .update(platformEventDeliveries)
-      .set({ nextAttemptAt: lease })
+      .set({ nextAttemptAt: lease, attempts: sql`${platformEventDeliveries.attempts} + 1` })
       .where(and(where, eq(platformEventDeliveries.status, "pending"), lte(platformEventDeliveries.nextAttemptAt, now)))
       .returning({ attempts: platformEventDeliveries.attempts });
     if (!claimed) continue;
     const handler = consumers.get(d.consumer)?.get(d.type as PlatformEventType);
-    const attempts = claimed.attempts + 1;
+    const attempts = claimed.attempts;
     try {
       if (!handler) throw new Error(`受け取りが登録されていません（${d.consumer} / ${d.type}）`);
-      await handler(db, { id: d.eventId, type: d.type as PlatformEventType, payload: d.payload as never, createdAt: d.createdAt }, env);
-      await db.update(platformEventDeliveries).set({ status: "done", attempts, deliveredAt: now, lastError: null }).where(where);
+      await handler({ id: d.eventId, type: d.type as PlatformEventType, payload: d.payload as never, createdAt: d.createdAt }, env);
+      await db.update(platformEventDeliveries).set({ status: "done", deliveredAt: now, lastError: null }).where(where);
       delivered += 1;
     } catch (err) {
       const stop = attempts >= MAX_DELIVERY_ATTEMPTS;
@@ -156,7 +159,6 @@ export async function deliverPendingEvents(env: Env, now: Date = new Date()): Pr
         .update(platformEventDeliveries)
         .set({
           status: stop ? "failed" : "pending",
-          attempts,
           nextAttemptAt: new Date(now.getTime() + retryDelayMs(attempts)),
           lastError: errorSummary(err),
         })

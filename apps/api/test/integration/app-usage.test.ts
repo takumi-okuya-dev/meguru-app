@@ -56,6 +56,15 @@ describe("reportUsage", () => {
     expect(await dirty(userId)).toBe(true);
   });
 
+  it("先に数えた古い値は、あとから数えた新しい値を上書きしない（同時に伝えたとき）", async () => {
+    const { userId } = await createUserWithAccount("u1");
+    const t1 = new Date(Date.now() - 1000);
+    const t2 = new Date();
+    await reportUsage(db(), userId, "threads", { quantity: 2, using: true, countedAt: t2 });
+    await reportUsage(db(), userId, "threads", { quantity: 1, using: true, countedAt: t1 });
+    expect(await billingQuantityOf(db(), userId)).toBe(2);
+  });
+
   it("負の数・小数は受け付けない", async () => {
     const { userId } = await createUserWithAccount("u1");
     await expect(reportUsage(db(), userId, "threads", { quantity: -1, using: false })).rejects.toThrow();

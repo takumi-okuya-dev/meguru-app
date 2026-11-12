@@ -1,5 +1,6 @@
 // 出来事（specs/meguru/029-threads-pattern1 research.md R5、contracts/platform-entry.md 3・6、T003）。
 // 同じトランザクションで書く・届け先ごとに pending の行ができる・届くと done・失敗したら間をあけてやり直す・10回で failed。
+import { sql } from "drizzle-orm";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { withTransaction } from "../../src/kernel/db/client";
 import {
@@ -67,7 +68,7 @@ describe("書く", () => {
 describe("届ける", () => {
   it("受け取りに番号・種類・中身を渡し、done にする。2回目の処理では何もしない", async () => {
     const got: PlatformEvent[] = [];
-    registerConsumer("threads", "user.withdrawn", async (_db, e) => {
+    registerConsumer("threads", "user.withdrawn", async (e) => {
       got.push(e as PlatformEvent);
     });
     const id = await emitOne();
@@ -113,6 +114,16 @@ describe("届ける", () => {
     const [row] = await deliveriesOf(db(), [id]);
     expect([row!.status, row!.attempts]).toEqual(["failed", MAX_DELIVERY_ATTEMPTS]);
     expect(await deliverPendingEvents(testEnv, new Date(at))).toEqual({ delivered: 0, failed: 0 });
+  });
+
+  it("受け取りの途中で止まっても、借りたときに回数を数えている（いつかは failed で止まる）", async () => {
+    registerConsumer("threads", "user.withdrawn", async () => {});
+    const id = await emitOne();
+    // 借りただけの状態（受け取りが終わる前に止まった）を作る：attempts を進め、時刻を過ぎた状態に戻す
+    await db().execute(sql`UPDATE platform_event_deliveries SET attempts = attempts + 1, next_attempt_at = now() - interval '1 minute' WHERE event_id = ${id}`);
+    expect(await deliverPendingEvents(testEnv)).toEqual({ delivered: 1, failed: 0 });
+    const [row] = await deliveriesOf(db(), [id]);
+    expect([row!.status, row!.attempts]).toEqual(["done", 2]);
   });
 
   it("受け取りが登録されていない届け先は失敗として残す", async () => {

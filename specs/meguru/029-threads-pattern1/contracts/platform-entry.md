@@ -23,7 +23,7 @@
 
 ```ts
 type AppEntitlement = {
-  /** full：すべて使える。read_only：読むだけ（未払いなど）。none：使えない（契約前・退会・テスト版に入れない） */
+  /** full：すべて使える。read_only：読むだけ（未払い・テスト版に入れない人など。今の判定と同じ）。none：使えない（契約前・見つからない） */
   access: "full" | "read_only" | "none";
   /** 契約の使える状態（今の Entitlement。画面の帯・読むだけの理由に使う） */
   billing: Entitlement;
@@ -38,7 +38,8 @@ type AppEntitlement = {
 };
 ```
 
-- 今の判定（`loadEntitlement`・`effectiveLimits`・`featureOnSql`・`billingExemptSql`・`fullAccessSql`・`testAccessSql`・`dailyPostLimitSql`）を1つにまとめたもの。**同じ利用者・同じ時刻なら、今の判定と同じ結果になること**を、テストで確かめる（024の前に始めた無料体験の途中の人も含む）。
+- 今の判定（`loadEntitlement`・`effectiveLimits`・`featureOnSql`・`billingExemptSql`・`fullAccessSql`・`testAccessSql`・`dailyPostLimitSql`）を1つにまとめたもの。読む列は今の`loadEntitlement`と同じもの（`billingFactsColumns`）を使う。
+- アカウントの数の上限は、Threadsが`billing.accountLimit`（契約の状態による上限。読むだけなら0）と`limits.accounts`（運営者が決める上限）の**小さい方**を使う（今の`accountLimitFor`と同じ）。共通は、上限の名前の意味を知らないので、この組み合わせはしない。**同じ利用者・同じ時刻なら、今の判定と同じ結果になること**を、テストで確かめる（024の前に始めた無料体験の途中の人も含む）。
 
 ## 3. 出来事
 
@@ -59,18 +60,20 @@ registerConsumer("threads", "user.withdrawn", onUserWithdrawn);
 ```
 
 ```ts
-// Threadsの受け取り（apps/threads の中）
-async function onUserWithdrawn(db: Db, event: { id: string; payload: { userId: string } }): Promise<void> {
-  await db.transaction(async (tx) => {
-    if (!(await markReceived(tx, event.id))) return; // もう受け取った
+// Threadsの受け取り（apps/threads の中）。受け取りには DB を渡さないので、自分でトランザクションを開く
+async function onUserWithdrawn(event: PlatformEvent<"user.withdrawn">, env: Env): Promise<void> {
+  const done = await withTransaction(env.DATABASE_URL, async (tx) => {
+    if (!(await markReceived(tx, event.id))) return false; // もう受け取った
     // … 自分の表だけを直す
+    return true;
   });
-  await reportUsage(db, event.payload.userId, "threads", { quantity: 0, using: false });
+  if (done) await reportUsage(createDb(env.DATABASE_URL), event.payload.userId, "threads", { quantity: 0, using: false });
 }
 ```
 
 - 受け取りは、自分のトランザクションの中で`threads.received_events`に番号を書く。もうあれば、何もしないで成功を返す（2回届いても同じ結果）。
-- 例外を投げたら失敗。共通がやり直す（5分・10分・20分・…・最大1時間あける。10回で止めて`failed`）。
+- 例外を投げたら失敗。共通がやり直す（5分・10分・20分・…・最大1時間あける。10回で止めて`failed`）。試した回数は、届ける前（借りるとき）に数えるので、受け取りの途中で Worker が止まっても、いつかは`failed`で止まる。
+- 5分ごとの定期処理では、出来事の届けと自動投稿を同時に動かす（届けで自動投稿を待たせない）。
 
 ### 種類（このfeature）
 
@@ -87,6 +90,7 @@ async function onUserWithdrawn(db: Db, event: { id: string; payload: { userId: s
   - `quantity`：持ち主としてのアカウントの数（今の`countOwned`と同じ数え方）。
   - `using`：`quantity > 0`か、チームに1つ以上入っているか（今の`resolveMeApps`の判定と同じ）。
 - 応答を返す**前**に呼ぶ（作った直後に契約の画面を開いても、新しい数になるように）。
+- 数えた時刻（`countedAt`）を渡す。共通は、もっと新しい時刻の値がもう入っていれば書かない（同じ人の数を同時に伝えたとき、先に数えた古い値で上書きしない）。
 - 共通は`app_usage`を書き、`quantity`が変わったら`subscriptions.quantity_sync_needed`に印を付け、今の仕組みでStripeの数を合わせる。
 - 失敗に備えて、Threadsは毎日のまとめ処理で、全員の数を数え直して伝える（ずれを1日以内に直す）。
 - 共通の`/api/me`の`apps.using`は、`app_usage.using`から決める。

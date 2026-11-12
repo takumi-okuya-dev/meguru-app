@@ -2,14 +2,13 @@
 // 契約（使える状態）・料金なし・運営者・機能のON/OFF・上限を、1つにまとめて返す。アプリは共通の表を読まず、これだけを使う。
 // 判定の中身は今の関数（entitlementFromFacts・billingExemptSql・testAccessSql・機能のOFF）をそのまま使い、結果を変えない。
 import type { Entitlement } from "@meguru/shared";
-import { and, eq, inArray, sql } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import type { BillingMode } from "../../kernel/config";
 import type { Db, TxDb } from "../../kernel/db/client";
-import { entitlementFromFacts } from "../billing/billing-service";
+import { billingFactsColumns, entitlementFromFacts } from "../billing/billing-service";
 import { disabledAppFeaturesSql } from "../features/feature-sql";
 import { appFeatures, appLimits } from "../registry/registry";
 import { appLimitDefaults, subscriptions, userAppLimits, users } from "../schema";
-import { billingExemptSql, testAccessSql } from "../test-groups/test-group-service";
 
 /** アプリ向けの利用権。 */
 export type AppEntitlement = {
@@ -28,7 +27,7 @@ export type AppEntitlement = {
 };
 
 /**
- * 契約の使える状態から、使えるかを決める。
+ * 契約の使える状態から、使えるかを決める。テスト版に入れない人は、今の判定どおり読むだけ（readOnlyReason が test_access）。
  * @param e - 契約の使える状態
  * @returns full・read_only・none
  */
@@ -59,14 +58,9 @@ export async function loadAppEntitlements(
   const [rows, userLimits, defaults] = await Promise.all([
     db
       .select({
+        ...billingFactsColumns(mode),
         id: users.id,
         clerkUserId: users.clerkUserId,
-        createdAt: users.createdAt,
-        billingExempt: billingExemptSql(users, mode),
-        legacyTrial: users.legacyTrial,
-        status: subscriptions.status,
-        cancelAtPeriodEnd: subscriptions.cancelAtPeriodEnd,
-        testAccess: mode.testGroups ? testAccessSql(users, mode.operators ?? []) : sql<boolean>`true`,
         disabled: disabledAppFeaturesSql(users.id, app),
       })
       .from(users)

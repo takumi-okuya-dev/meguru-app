@@ -43,7 +43,8 @@ export default {
     const at = new Date();
     ctx.waitUntil(
       controller.cron === AUTO_POST_CRON
-        ? deliverEvents(env, at).then(() => runAutoPost(env, at)).then(() => undefined)
+        ? // 出来事の届けで自動投稿を待たせない（同時に動かす。片方の失敗でもう片方を止めない）
+          Promise.allSettled([deliverEvents(env, at), runAutoPost(env, at)]).then(() => undefined)
         : runDailyJobs(env, at),
     );
   },

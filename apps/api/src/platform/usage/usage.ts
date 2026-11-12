@@ -1,7 +1,7 @@
 // 利用の数・利用の状態（specs/meguru/029-threads-pattern1 research.md R6、contracts/platform-entry.md 4）。
 // アプリが、その人の利用の数（料金の数）と、使っているかを伝える。共通は表を書き、料金の数が変わったら
 // Stripeへ数を合わせる印を付ける（今の quantity_sync_needed の仕組み）。共通はアプリの表を読まない。
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq, lte, sql } from "drizzle-orm";
 import type { Db, TxDb } from "../../kernel/db/client";
 import { markQuantityDirty } from "../billing/billing-service";
 import { appUsage } from "../schema";
@@ -12,6 +12,11 @@ export type AppUsageReport = {
   quantity: number;
   /** 使っているか（「使っているアプリ」に出す） */
   using: boolean;
+  /**
+   * 数えた時刻（既定は今）。同じ人の数を同時に伝えたとき、先に数えた古い値が、あとから数えた新しい値を上書きしないよう、
+   * これより新しい時刻の値がもう入っていれば書かない（セルフレビューの指摘）
+   */
+  countedAt?: Date;
 };
 
 /**
@@ -24,13 +29,15 @@ export type AppUsageReport = {
  */
 export async function reportUsage(db: Db | TxDb, userId: string, app: string, usage: AppUsageReport): Promise<void> {
   if (!Number.isInteger(usage.quantity) || usage.quantity < 0) throw new Error(`利用の数が正しくありません：${usage.quantity}`);
+  const countedAt = usage.countedAt ?? new Date();
   const before = await billingQuantityOf(db, userId);
   await db
     .insert(appUsage)
-    .values({ userId, app, quantity: usage.quantity, inUse: usage.using, updatedAt: new Date() })
+    .values({ userId, app, quantity: usage.quantity, inUse: usage.using, updatedAt: countedAt })
     .onConflictDoUpdate({
       target: [appUsage.userId, appUsage.app],
-      set: { quantity: usage.quantity, inUse: usage.using, updatedAt: new Date() },
+      set: { quantity: usage.quantity, inUse: usage.using, updatedAt: countedAt },
+      setWhere: lte(appUsage.updatedAt, countedAt),
     });
   const after = await billingQuantityOf(db, userId);
   if (after !== before) await markQuantityDirty(db, userId);
