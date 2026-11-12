@@ -1,7 +1,7 @@
 import { createApp } from "./app";
 import type { Env } from "./kernel/env";
 import { runAutoPost, registerThreads } from "./apps/threads";
-import { deliverPendingEvents } from "./platform";
+import { deliverPendingEvents, eventsDue } from "./platform";
 import { validateConfig } from "./kernel/config";
 import { logger, setLogAppEnv } from "./kernel/logger";
 import { runDailyJobs } from "./jobs/daily-jobs";
@@ -18,6 +18,8 @@ const AUTO_POST_CRON = "*/5 * * * *";
  */
 async function deliverEvents(env: Env, at: Date): Promise<void> {
   try {
+    // 届ける用のない回はDBを起こさない（費用のため。docs/architecture.md「固定費0円から始める」）
+    if (!(await eventsDue(env.AUTOPOST_KV, at))) return;
     const result = await deliverPendingEvents(env, at);
     if (result.delivered > 0 || result.failed > 0) logger.info("platform events delivered", result);
   } catch (err) {

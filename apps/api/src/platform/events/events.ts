@@ -2,7 +2,7 @@
 // 共通で起きたことを、表の変更と同じトランザクションで送り出しの表に書き、あとでアプリの受け取りに届ける。
 // 届けるのは、書いた直後（応答のあと）と5分ごとの定期処理。失敗したら間をあけてやり直し、10回で止める。
 // 受け取りは、同じ出来事が2回届いても結果が変わらないように作る（アプリの側で番号を記録する）。
-import { and, asc, eq, gte, inArray, lt, lte, sql } from "drizzle-orm";
+import { and, asc, eq, gte, inArray, lt, lte, min, sql } from "drizzle-orm";
 import { createDb, type Db, type TxDb } from "../../kernel/db/client";
 import type { Env } from "../../kernel/env";
 import { logger } from "../../kernel/logger";
@@ -124,8 +124,78 @@ export async function deliverPendingEvents(
   opts: { eventIds?: readonly string[] } = {},
 ): Promise<{ delivered: number; failed: number }> {
   if (opts.eventIds && opts.eventIds.length === 0) return { delivered: 0, failed: 0 };
-  const only = opts.eventIds ? inArray(platformEventDeliveries.eventId, [...opts.eventIds]) : undefined;
+  // 書いたばかりの出来事を届けるときは、先に「届ける用がある」と印を付ける（途中で止まっても、5分ごとの届けが拾う）
+  if (opts.eventIds) await markEventsDue(env.AUTOPOST_KV);
   const db = createDb(env.DATABASE_URL);
+  try {
+    return await deliverDue(env, db, now, opts.eventIds);
+  } finally {
+    // 次に届ける用がある時刻を覚える（5分ごとの届けは、それまでDBを起こさない）
+    await rememberNextAt(env.AUTOPOST_KV, db);
+  }
+}
+
+/** 次に届ける用がある時刻を覚えるKVのキー（自動投稿の関所と同じKVに、別の名前で置く）。 */
+const NEXT_AT_KEY = "platform-events:next-at";
+
+/**
+ * 届ける用がある、と印を付ける（KVに書けなくても止めない。5分ごとの届けは、印がなければDBを見る）。
+ * @param kv - KV
+ */
+async function markEventsDue(kv: KVNamespace): Promise<void> {
+  try {
+    await kv.put(NEXT_AT_KEY, new Date(0).toISOString());
+  } catch (err) {
+    logger.warn("platform events: failed to mark due", { err: String(err) });
+  }
+}
+
+/**
+ * まだ届いていない届けのうち、いちばん早い「次に試す時刻」を覚える（なければ none）。
+ * @param kv - KV
+ * @param db - データベース
+ */
+async function rememberNextAt(kv: KVNamespace, db: Db): Promise<void> {
+  try {
+    const [row] = await db
+      .select({ at: min(platformEventDeliveries.nextAttemptAt) })
+      .from(platformEventDeliveries)
+      .where(eq(platformEventDeliveries.status, "pending"));
+    await kv.put(NEXT_AT_KEY, row?.at ? new Date(row.at).toISOString() : "none");
+  } catch (err) {
+    logger.warn("platform events: failed to remember next time", { err: String(err) });
+  }
+}
+
+/**
+ * 5分ごとの届けで、DBを起こしてまで届ける用があるか（費用のため。用のない回はDBを起こさない。docs/architecture.md「固定費0円から始める」）。
+ * 覚えた時刻が来ていなければ、または届けるものがなければ false。覚えていない・読めないときは、念のため true。
+ * @param kv - KV
+ * @param now - 今の時刻
+ * @returns 届ける用があれば true
+ */
+export async function eventsDue(kv: KVNamespace, now: Date): Promise<boolean> {
+  try {
+    const raw = await kv.get(NEXT_AT_KEY);
+    if (raw === null) return true;
+    if (raw === "none") return false;
+    const at = Date.parse(raw);
+    return Number.isNaN(at) || at <= now.getTime();
+  } catch {
+    return true;
+  }
+}
+
+/**
+ * 時刻が来た届けを、受け取りに渡す（deliverPendingEvents の中身）。
+ * @param env - Workers のバインディング
+ * @param db - データベース
+ * @param now - 今の時刻
+ * @param eventIds - 届ける出来事（省けば、時刻が来たものすべて）
+ * @returns 届けた数と、失敗した数
+ */
+async function deliverDue(env: Env, db: Db, now: Date, eventIds?: readonly string[]): Promise<{ delivered: number; failed: number }> {
+  const only = eventIds ? inArray(platformEventDeliveries.eventId, [...eventIds]) : undefined;
   // 試した回数が上限に達したまま pending の行（受け取りの途中で止まり続けた）は、受け取りを呼ばずに failed にする（PR #92 のCodexレビュー）
   const exhausted = await db
     .update(platformEventDeliveries)
