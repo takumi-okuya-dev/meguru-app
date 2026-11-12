@@ -25,8 +25,8 @@ export type AppLimitDef = {
 const features = new Map<string, readonly AppFeatureDef[]>();
 /** 機能のON/OFF（運営の画面と、ログインした人の features）を持つアプリ。登録のときにアプリが宣言する */
 let switchesOwner: string | undefined;
-/** 機能の名前の形（英小文字で始まり、英小文字・数字・_。DBの feature の列と、運営のリクエストの型に合わせる） */
-const FEATURE_KEY_RE = /^[a-z][a-z0-9_]*$/;
+/** 機能の名前の形（英小文字と _ の1〜30文字。DBの feature の列の CHECK（platform/schema.ts）と、運営のリクエストの型に合わせる） */
+const FEATURE_KEY_RE = /^[a-z_]{1,30}$/;
 const limits = new Map<string, Readonly<Record<string, AppLimitDef>>>();
 
 /**
@@ -41,7 +41,7 @@ const limits = new Map<string, Readonly<Record<string, AppLimitDef>>>();
 export function registerAppFeatures(app: string, defs: readonly AppFeatureDef[], opts: { switches?: boolean } = {}): void {
   if (features.has(app)) return;
   const bad = defs.find((d) => !FEATURE_KEY_RE.test(d.key));
-  if (bad) throw new Error(`機能の名前「${bad.key}」の形が違います（英小文字で始まり、英小文字・数字・_ だけ）`);
+  if (bad) throw new Error(`機能の名前「${bad.key}」の形が違います（英小文字と _ の1〜30文字だけ）`);
   if (opts.switches && switchesOwner && switchesOwner !== app) {
     throw new Error(`機能のON/OFFは、アプリ「${switchesOwner}」がもう持っています（運営の画面をアプリごとに分けるまで、1つだけ）`);
   }

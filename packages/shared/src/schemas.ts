@@ -1782,7 +1782,7 @@ export const testGroupListSchema = z.object({ groups: z.array(testGroupSummarySc
 /** 運営者の画面のグループの詳しい内容。 */
 export const testGroupDetailSchema = testGroupSummarySchema.extend({
   /** グループの設定でOFFのまとまり（specs/019 FR-017。名前はアプリが登録したもの。specs/meguru/029 T070） */
-  disabled: z.array(z.string().regex(/^[a-z][a-z0-9_]*$/)),
+  disabled: z.array(z.string().regex(/^[a-z_]{1,30}$/)),
   /** 入っている人（入った順） */
   members: z.array(z.object({ userId: z.string(), name: z.string(), email: z.string(), joinedAt: z.string() })),
   /** 記録（新しい順に TEST_GROUP_EVENTS_LIMIT 件） */
@@ -1829,8 +1829,8 @@ export type ReferralPage = z.infer<typeof referralPageSchema>;
 
 // ---- 機能のまとまりごとのON/OFF（specs/019-feature-switches contracts/api.md「運営者のAPI」） ----
 
-/** 機能のまとまりの名前（アプリが登録したもの。共通はアプリの名前を知らない。specs/meguru/029 tasks.md T070）。 */
-const featureSchema = z.string().regex(/^[a-z][a-z0-9_]*$/);
+/** 機能のまとまりの名前（アプリが登録したもの。共通はアプリの名前を知らない。形は DB の CHECK と同じ。specs/meguru/029 tasks.md T070）。 */
+const featureSchema = z.string().regex(/^[a-z_]{1,30}$/);
 
 /** GET /api/operator/users?email= のクエリ（完全一致。前後の空白を除き、大文字・小文字を区別しない）。 */
 export const operatorUserQuerySchema = z.object({ email: z.string().trim().toLowerCase().pipe(z.email()) });

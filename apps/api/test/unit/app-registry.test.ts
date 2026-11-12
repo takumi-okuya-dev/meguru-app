@@ -55,9 +55,10 @@ describe("登録", () => {
     expect(() => registerAppFeatures("other", [{ key: "photos", label: "写真" }], { switches: true })).toThrow(/sample/);
   });
 
-  it("機能の名前の形が違えば、登録のときに止める（英小文字で始まり、英小文字・数字・_）", () => {
+  it("機能の名前の形が違えば、登録のときに止める（DB の CHECK と同じ、英小文字と _ の1〜30文字）", () => {
     expect(() => registerAppFeatures("sample", [{ key: "photoBook", label: "写真" }])).toThrow(/photoBook/);
-    expect(() => registerAppFeatures("sample", [{ key: "2fa", label: "二段階" }])).toThrow(/2fa/);
+    expect(() => registerAppFeatures("sample", [{ key: "feature_v2", label: "二番目" }])).toThrow(/feature_v2/);
+    expect(() => registerAppFeatures("sample", [{ key: "a".repeat(31), label: "長い" }])).toThrow(/a{31}/);
   });
 
   it("登録していないアプリは空", () => {
