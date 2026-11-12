@@ -1,6 +1,6 @@
 // GET /api/me（FR-004・FR-005、research.md R10。specs/008 research.md R11 で役割つきに広げ、
-// specs/011 research.md R5 で入っているチームを足した）。029 から、共通の情報だけを作り、アプリの中身は
-// アプリが登録した関数で足す（specs/meguru/029-threads-pattern1 contracts/api-routes.md 2）。
+// specs/011 research.md R5 で入っているチームを足した）。029 から、共通の情報だけを返す。アプリの中身は各アプリの道筋
+// （Threadsなら /api/threads/me）が返す（specs/meguru/029-threads-pattern1 contracts/api-routes.md 2）。
 import { type MeApps, lastAppRequestSchema, releasedApps, resolveLandingApp, withdrawRequestSchema } from "@meguru/shared";
 import { eq } from "drizzle-orm";
 import { Hono, type MiddlewareHandler } from "hono";
