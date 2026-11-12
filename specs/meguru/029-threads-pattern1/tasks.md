@@ -220,7 +220,8 @@ description: "Task list for feature meguru/029 Threads pattern ①"
 **Goal**：古い道筋・`/api/me`のThreadsの部分・上限の古い列・知らせの仕組みを消す。
 
 - [X] T057 [US3] 古い道筋（`/api/accounts/…`・`/api/teams/…`・`/api/invites/…`・`/api/me/needs-review-counts`・`/api/operator/{accounts,tester-applications,tester-settings}`）を消す。`routes:snapshot`を書き直し、`threads-routes-alias.test.ts`を新しい道筋だけのテストにする。
-- [ ] T058 [US3] `/api/me`からThreadsの部分を消す：`packages/shared/src/schemas.ts`の`meResponseSchema`を共通の分だけにし、`apps/api/src/app.ts`の「`/api/me`に足す中身」を消す。`/api/me/withdrawal-preview`も共通の分だけにする。Webの型の誤りが0件（Threadsは`useThreadsMe`を読んでいる）。テストを直す（期待する結果は変えない）。
+- [X] T058 [US3] `/api/me`からThreadsの部分を消す：`packages/shared/src/schemas.ts`の`meResponseSchema`を共通の分だけにし、`apps/api/src/app.ts`の「`/api/me`に足す中身」を消す。`/api/me/withdrawal-preview`も共通の分だけにする。Webの型の誤りが0件（Threadsは`useThreadsMe`を読んでいる）。テストを直す（期待する結果は変えない）。
+  - **実際の変更（PR5c）**：`/api/me` の Threads の中身は `apps/threads/register.ts` の登録（`registerMeSection`・`registerWithdrawalPreviewSection`）と共通の `me-sections` で足していたので、それを消した。テストは「`/api/me` に Threads の中身がある」から「ない」に変えた（期待する結果を変えた。Threads の中身は `/api/threads/me` で確かめる）
 - [X] T059 [US2] `apps/api/src/platform/hooks.ts`と、そのテストを消す。
 - [X] T060 [US2] 上限の古い列（`users.account_limit`・`users.daily_post_limit`・`operator_settings.default_account_limit`・`default_daily_post_limit`・`tester_slot_capacity`）を消す：表の定義から消し、両方に書いていた処理を新しい表だけにして、`db:generate`でマイグレーションを作り、SQLを読む。`apps/api/test/migration/`にテストを足す（新しい表の値が残る）。
 - [ ] T061 [US4] PR5の確かめ：`pnpm lint`・`pnpm typecheck`・`pnpm test`・`pnpm e2e`。`/api/me`にThreadsのデータがない。PR5の説明に、古い列を消すマイグレーションが前の版のAPIを壊す例外（テスト環境だけ。spec FR-019）を書く。
