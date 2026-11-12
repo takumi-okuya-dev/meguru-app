@@ -86,6 +86,11 @@ Given that feature description, do this:
 
 3. **Create the spec feature directory**:
 
+   **このリポジトリの決まり（meguru-app、2026-11-12）**：新しい仕様は`specs/<アプリ>/NNN-<短い名前>`に置き、番号はアプリのフォルダごとに振る。下の自動の番号（`specs/`の直下を見る）は使わず、この決まりで`SPECIFY_FEATURE_DIRECTORY`を決めてから進める。
+   - `<アプリ>`はアプリのID（`@meguru/shared`の`APP_CATALOG`の`id`。今は`threads`）。外枠や共通（どのアプリにも属さないもの）は`meguru`。どちらか分からないときは、ユーザーに聞く。
+   - `NNN`は、developと作業中のブランチの`specs/<アプリ>/`の最大の番号の次。`threads`と`meguru`は`029`から、新しいアプリは`001`から。
+   - `specs/001`〜`028`は動かさず、`specs/`の直下には新しい仕様を作らない。詳しくは`docs/product-structure.md`の6。
+
    Specs live under the default `specs/` directory unless the user explicitly provides `SPECIFY_FEATURE_DIRECTORY`.
 
    **Resolution order for `SPECIFY_FEATURE_DIRECTORY`**:
