@@ -2,6 +2,7 @@
 // /api/data-deletion は今のまま）。APIの基本のURL・認証のトークン・エラーの扱いは、共通の部品（lib/api-client.ts の request）を使う。
 import {
   threadsMeResponseSchema,
+  threadsWithdrawalPreviewSchema,
   accountAccessResponseSchema,
   accountTeamSchema,
   inviteAcceptResponseSchema,
@@ -134,6 +135,8 @@ function call<T>(path: string, schema: z.ZodType<T> | null, init: Parameters<typ
 export const threadsApi = {
   // Threadsの「自分」（アカウント・チーム・使える機能など。specs/meguru/029 contracts/api-routes.md 2）
   me: () => call("/api/threads/me", threadsMeResponseSchema),
+  // 退会の確かめのThreadsの分（消えるアカウント・チームの行き先。specs/meguru/029 tasks.md T052）
+  withdrawalPreview: () => call("/api/threads/me/withdrawal-preview", threadsWithdrawalPreviewSchema),
   needsReviewCounts: () => call("/api/threads/me/needs-review-counts", needsReviewCountsResponseSchema),
   account: (accountId: string) => call(`/api/threads/accounts/${accountId}`, accountSummarySchema),
   // ---- チーム（specs/011-team-revision contracts/api.md）----

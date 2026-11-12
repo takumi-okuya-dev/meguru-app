@@ -2,7 +2,7 @@
 import { useState } from "react";
 import { CenteredLayout } from "@/shell/layout/AppShell";
 import { Button } from "@/components/ui/button";
-import { WithdrawDialog } from "@/components/billing/WithdrawDialog";
+import { WithdrawDialog } from "@/shell/settings/WithdrawDialog";
 
 /**
  * 退会の手続きの途中の画面。

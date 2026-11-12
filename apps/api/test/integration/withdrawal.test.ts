@@ -130,6 +130,8 @@ describe("POST /api/me/withdraw", () => {
     const me = (await (await callBilling(app, "GET", "/api/me", { user: "o1" })).json()) as { withdrawalInProgress: boolean };
     expect(me.withdrawalInProgress).toBe(true);
     expect((await callBilling(app, "GET", "/api/me/withdrawal-preview", { user: "o1" })).status).toBe(200);
+    // 退会の確かめのThreadsの分も読める（退会のダイアログが読む。PR #104 のセルフレビュー）
+    expect((await callBilling(app, "GET", "/api/threads/me/withdrawal-preview", { user: "o1" })).status).toBe(200);
     expect((await withdraw("o1", "o1@example.com")).status).toBe(204);
     expect(await count("users", "clerk_user_id = 'o1'")).toBe(0);
   });

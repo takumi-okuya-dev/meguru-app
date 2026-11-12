@@ -82,6 +82,8 @@ export type AuthVariables = {
   user: CurrentUser;
   /** 契約前の人でも呼べる経路の印（allowBeforeSubscribe が付ける） */
   allowBeforeSubscribe?: boolean;
+  /** 自分の状態を知る・自分で退会するための経路の印（allowSelfService が付ける。退会の途中・テスト版に入れない・契約前でも呼べる） */
+  allowSelfService?: boolean;
 };
 
 /** Hono のアプリの型（Bindings と Variables）。共通とアプリのAPIの入口が使う（027で app.ts から移した）。 */
@@ -222,17 +224,18 @@ export function authMiddleware(makeVerifier: (env: Env) => AuthVerifier) {
     }
 
     // 退会の途中の人は、退会のAPIと GET /api/me のほかを止める（途中でデータを足させない。specs/013 research.md R10）
-    if (user.withdrawalRequestedAt && !SELF_SERVICE_ALLOWED.has(`${c.req.method} ${c.req.path}`)) {
+    const selfService = SELF_SERVICE_ALLOWED.has(`${c.req.method} ${c.req.path}`) || c.get("allowSelfService") === true;
+    if (user.withdrawalRequestedAt && !selfService) {
       throw new AppError("WITHDRAWAL_IN_PROGRESS", 409, "withdrawal in progress");
     }
     // テスト版に入れない人は、許す経路のほかを止める（specs/016 FR-006、research.md R5）。運営者は testAccessSql で入れる
     const operator = Boolean(mode.testGroups) && (mode.operators ?? []).includes(user.clerkUserId);
     const testAccess = mode.testGroups ? { admitted: Boolean(admitted), operator } : { admitted: true, operator: false };
-    if (!testAccess.admitted && !SELF_SERVICE_ALLOWED.has(`${c.req.method} ${c.req.path}`) && !TEST_INVITE_PATH.test(c.req.path)) {
+    if (!testAccess.admitted && !selfService && !TEST_INVITE_PATH.test(c.req.path)) {
       throw new AppError("TEST_ACCESS_REQUIRED", 403, "test access required");
     }
     // 契約前の人は、許す経路のほかを止める（specs/024 FR-029、research.md R9）。判定の順は 退会の途中 → テスト版 → 契約前
-    if (mode.enabled && facts && !subscribeAllowed(c.req.method, c.req.path, c.get("allowBeforeSubscribe") === true)) {
+    if (mode.enabled && facts && !selfService && !subscribeAllowed(c.req.method, c.req.path, c.get("allowBeforeSubscribe") === true)) {
       const e = entitlementFromFacts(mode, {
         createdAt: user.createdAt,
         legacyTrial: user.legacyTrial,
@@ -259,6 +262,16 @@ export function authMiddleware(makeVerifier: (env: Env) => AuthVerifier) {
  */
 export const allowBeforeSubscribe = createMiddleware<AppEnv>(async (c, next) => {
   c.set("allowBeforeSubscribe", true);
+  await next();
+});
+
+/**
+ * 自分の状態を知る・自分で退会するための経路の印を付けるミドルウェア（認証のミドルウェアより前に付ける）。退会の途中・
+ * テスト版に入れない・契約前の人でも呼べる（GET /api/me・退会と同じ扱い）。例：退会の確かめのアプリの分
+ * （specs/meguru/029-threads-pattern1 contracts/api-routes.md 2、PR #104 のセルフレビュー）。
+ */
+export const allowSelfService = createMiddleware<AppEnv>(async (c, next) => {
+  c.set("allowSelfService", true);
   await next();
 });
 

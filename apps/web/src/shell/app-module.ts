@@ -1,7 +1,7 @@
 // アプリが外枠に渡すもの（specs/028-meguru-shell data-model.md 4、research.md R3）。
 // 外枠はアプリのコードを読まない。各アプリが apps/<名前>/index.ts で AppModule を出し、組み立て（app-registry.ts）が一覧にして外枠に渡す。
 import type { LucideIcon } from "lucide-react";
-import { createContext, useContext, type ReactElement } from "react";
+import { createContext, useContext, type ComponentType, type ReactElement } from "react";
 import { useLocation, type RouteObject } from "react-router";
 
 /** 設定の画面（/settings）に、アプリが足す項目。 */
@@ -19,6 +19,26 @@ export type SettingsSectionContribution = {
   /** 項目の画面 */
   element: ReactElement;
 };
+
+/** 退会の確かめで、アプリが見せる中身（中身を読むクエリと、出す部品）。 */
+export type WithdrawalPreviewContribution = {
+  /** 中身を読む（TanStack Query の queryKey と queryFn） */
+  query: { queryKey: readonly unknown[]; queryFn: () => Promise<unknown> };
+  /** 読んだ中身を出す部品 */
+  Section: ComponentType<{ data: unknown }>;
+};
+
+/**
+ * 退会の確かめの中身を、読む関数と部品の型をそろえて作る（アプリの中では型が合っていることを確かめ、外枠には型を消して渡す）。
+ * @param c - 中身を読むクエリと、出す部品
+ * @returns AppModule の withdrawalPreview に渡す値
+ */
+export function defineWithdrawalPreview<T>(c: {
+  query: { queryKey: readonly unknown[]; queryFn: () => Promise<T> };
+  Section: ComponentType<{ data: T }>;
+}): WithdrawalPreviewContribution {
+  return c as unknown as WithdrawalPreviewContribution;
+}
 
 /** 前のURLと新しいURLの対応（頭を置き換える。specs/028 contracts/ui-routes.md 2）。 */
 export type LegacyRedirect = { from: string; to: string };
@@ -43,6 +63,8 @@ export type AppModule = {
   legacyRedirects?: LegacyRedirect[];
   /** 設定の画面に足す項目 */
   settingsSections?: SettingsSectionContribution[];
+  /** 退会の確かめで、このアプリについて見せる中身（なければ出さない。defineWithdrawalPreview で作る。specs/meguru/029 contracts/module-boundaries.md 5） */
+  withdrawalPreview?: WithdrawalPreviewContribution;
 };
 
 const AppRegistryContext = createContext<readonly AppModule[]>([]);

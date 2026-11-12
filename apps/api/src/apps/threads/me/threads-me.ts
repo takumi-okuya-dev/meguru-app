@@ -7,7 +7,7 @@ import { alias } from "drizzle-orm/pg-core";
 import { Hono, type Context, type MiddlewareHandler } from "hono";
 import { connectMethodsOf, testerInvitesEnabledOf } from "../../../kernel/config";
 import { createDb, type Db } from "../../../kernel/db/client";
-import { appUsageOf, loadAppEntitlements, peopleNames, reportUsage, type AppEnv } from "../../../platform";
+import { allowSelfService, appUsageOf, loadAppEntitlements, peopleNames, reportUsage, type AppEnv } from "../../../platform";
 import { toAccountSummary, type AccountRow } from "../access/access";
 import { accountLimitFor } from "../accounts/account-service";
 import { THREADS_APP } from "../registry";
@@ -163,7 +163,8 @@ export function threadsMeRoutes(authed: MiddlewareHandler<AppEnv>) {
       c.header("Cache-Control", "no-store");
       return c.json(await buildThreadsMe(c));
     })
-    .get("/threads/me/withdrawal-preview", authed, async (c) => {
+    // 退会の確かめは、退会の途中・テスト版に入れない・契約前の人でも読める（共通の /api/me/withdrawal-preview と同じ扱い）
+    .get("/threads/me/withdrawal-preview", allowSelfService, authed, async (c) => {
       c.header("Cache-Control", "no-store");
       return c.json(await threadsWithdrawalPreview(createDb(c.env.DATABASE_URL), c.get("user").id));
     });
