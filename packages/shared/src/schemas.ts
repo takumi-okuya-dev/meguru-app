@@ -56,7 +56,6 @@ import {
   MENTION_LABEL_MAX,
   MENTION_MESSAGE_MAX,
   MENTION_PER_REPLY_MAX,
-  ACCOUNT_LIMIT_MAX,
   DAILY_POST_LIMIT_MAX,
 } from "./limits";
 import {
@@ -1867,9 +1866,23 @@ export const operatorAppRegistrySchema = z.object({
       app: z.string(),
       /** 機能のON/OFF（運営の「使える機能」の画面）を持つアプリか（今は1つだけ） */
       featureSwitches: z.boolean(),
+      /** 運営の上限の画面が扱うアプリか（今は1つだけ） */
+      operatorLimits: z.boolean(),
       features: z.array(z.object({ key: z.string(), label: z.string(), description: z.string().optional() })),
       limits: z.array(
-        z.object({ key: z.string(), label: z.string(), min: z.number().int(), max: z.number().int(), operatorValue: z.number().int().nullable() }),
+        z.object({
+          key: z.string(),
+          label: z.string(),
+          min: z.number().int(),
+          max: z.number().int(),
+          operatorValue: z.number().int().nullable(),
+          /** 一覧に出す短い名前（例：アカウント） */
+          shortLabel: z.string().optional(),
+          /** 既定値の欄で、名前の後ろに括弧で添える文（例：1アカウント） */
+          note: z.string().optional(),
+          /** 利用の数を数える上限か */
+          countsUsage: z.boolean().optional(),
+        }),
       ),
     }),
   ),
@@ -2290,25 +2303,22 @@ export const testerSettingsRequestSchema = z.object({
   slotCapacity: z.number().int().min(TESTER_SLOT_CAPACITY_MIN).max(TESTER_SLOT_CAPACITY_MAX),
 });
 
-/** アカウントの数の上限の値。 */
-const accountLimitValueSchema = z.number().int().min(1).max(ACCOUNT_LIMIT_MAX);
-/** 1日の投稿数の上限の値。 */
-const dailyPostLimitValueSchema = z.number().int().min(1).max(DAILY_POST_LIMIT_MAX);
+// 運営者の上限は「名前 → 値」の形（名前と範囲はアプリが登録したもの。共通はアプリの名前を知らない。specs/meguru/029 tasks.md T070）。
+// 名前が登録とそろっているか・範囲に入っているかは、API が登録の一覧で確かめる。
 
-/** PUT /api/operator/limits のリクエスト（全員共通の既定値）。 */
-export const defaultLimitsRequestSchema = z.object({
-  accountLimit: accountLimitValueSchema,
-  dailyPostLimit: dailyPostLimitValueSchema,
-});
-/** 全員共通の既定値。 */
-export type DefaultLimits = z.infer<typeof defaultLimitsRequestSchema>;
+/** 上限の名前（DB の CHECK と同じ形）。 */
+const limitKeySchema = z.string().regex(/^[a-z_]{1,30}$/);
+/** 上限の値（1以上の整数。上の範囲は API が登録の一覧で確かめる）。 */
+const limitValueSchema = z.number().int().min(1);
 
-/** PUT /api/operator/limits/users/:userId のリクエスト（null は既定値に戻す）。 */
-export const userLimitsRequestSchema = z.object({
-  accountLimit: accountLimitValueSchema.nullable(),
-  dailyPostLimit: dailyPostLimitValueSchema.nullable(),
-});
-/** 利用者ごとの上限。 */
+/** PUT /api/operator/limits のリクエスト（全員共通の既定値。登録した上限すべての値）。 */
+export const defaultLimitsRequestSchema = z.object({ limits: z.record(limitKeySchema, limitValueSchema) });
+/** 全員共通の既定値の保存の値。 */
+export type DefaultLimitsRequest = z.infer<typeof defaultLimitsRequestSchema>;
+
+/** PUT /api/operator/limits/users/:userId のリクエスト（登録した上限すべての値。null は既定値に戻す）。 */
+export const userLimitsRequestSchema = z.object({ limits: z.record(limitKeySchema, limitValueSchema.nullable()) });
+/** 利用者ごとの上限の保存の値。 */
 export type UserLimitsRequest = z.infer<typeof userLimitsRequestSchema>;
 
 /** 運営者の画面の、見つかった人の上限（GET /api/operator/limits/users）。 */
@@ -2317,23 +2327,24 @@ export const operatorLimitUserSchema = z.object({
   name: z.string().nullable(),
   email: z.string(),
   operator: z.boolean(),
-  accountLimit: z.number().int().nullable(),
-  dailyPostLimit: z.number().int().nullable(),
-  ownedAccountCount: z.number().int(),
+  /** 名前ごとの、この人だけの上限（null は既定値） */
+  limits: z.record(z.string(), z.number().int().nullable()),
+  /** アプリから伝えられた利用の数（Threadsなら持ち主としてのアカウントの数） */
+  usage: z.number().int(),
 });
 /** 運営者の画面の、見つかった人の上限。 */
 export type OperatorLimitUser = z.infer<typeof operatorLimitUserSchema>;
 
 /** GET /api/operator/limits の応答。 */
 export const operatorLimitsSchema = z.object({
-  defaults: defaultLimitsRequestSchema,
+  /** 名前ごとの全員共通の既定値 */
+  defaults: z.record(z.string(), z.number().int()),
   overrides: z.array(
     z.object({
       userId: z.string(),
       name: z.string().nullable(),
       email: z.string(),
-      accountLimit: z.number().int().nullable(),
-      dailyPostLimit: z.number().int().nullable(),
+      limits: z.record(z.string(), z.number().int().nullable()),
     }),
   ),
   events: z.array(z.object({ at: z.string(), actor: z.string().nullable(), action: z.string(), detail: z.unknown() })),

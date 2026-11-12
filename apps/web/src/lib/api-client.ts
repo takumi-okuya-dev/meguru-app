@@ -276,14 +276,15 @@ export const api = {
     request(`/api/operator/feature-settings/${encodeURIComponent(userId)}`, operatorUserSchema, { method: "DELETE" }),
   // 上限（specs/024 contracts/api.md「運営者の上限」）
   operatorLimits: () => request("/api/operator/limits", operatorLimitsSchema),
-  putDefaultLimits: (v: { accountLimit: number; dailyPostLimit: number }) =>
-    request("/api/operator/limits", defaultLimitsRequestSchema, { method: "PUT", body: JSON.stringify(v) }),
+  // 上限は「名前 → 値」（名前はアプリが登録したもの。specs/meguru/029 T070）
+  putDefaultLimits: (limits: Record<string, number>) =>
+    request("/api/operator/limits", defaultLimitsRequestSchema, { method: "PUT", body: JSON.stringify({ limits }) }),
   findLimitUser: (email: string) =>
     request(`/api/operator/limits/users?email=${encodeURIComponent(email)}`, operatorLimitUserSchema),
-  putUserLimits: (userId: string, v: { accountLimit: number | null; dailyPostLimit: number | null }) =>
+  putUserLimits: (userId: string, limits: Record<string, number | null>) =>
     request(`/api/operator/limits/users/${encodeURIComponent(userId)}`, operatorLimitUserSchema, {
       method: "PUT",
-      body: JSON.stringify(v),
+      body: JSON.stringify({ limits }),
     }),
 };
 

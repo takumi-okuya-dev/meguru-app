@@ -4,7 +4,7 @@ import type { OperatorAppRegistry } from "@meguru/shared";
 import { Hono, type MiddlewareHandler } from "hono";
 import type { AppEnv } from "../identity/auth";
 import { operatorOnly } from "../operator/operator-only";
-import { appFeatures, appLimits, registeredApps, requireFeatureSettingsApp } from "./registry";
+import { appFeatures, appLimits, operatorLimitsApp, registeredApps, requireFeatureSettingsApp } from "./registry";
 
 /**
  * 登録の一覧を、運営の画面に返す形にする（機能も上限も、登録した順）。
@@ -12,12 +12,23 @@ import { appFeatures, appLimits, registeredApps, requireFeatureSettingsApp } fro
  */
 export function appRegistryView(): OperatorAppRegistry {
   const owner = requireFeatureSettingsApp();
+  const limitsOwner = operatorLimitsApp();
   return {
     apps: registeredApps().map((app) => ({
       app,
       featureSwitches: app === owner,
+      operatorLimits: app === limitsOwner,
       features: appFeatures(app).map((f) => ({ key: f.key, label: f.label, ...(f.description ? { description: f.description } : {}) })),
-      limits: Object.entries(appLimits(app)).map(([key, l]) => ({ key, label: l.label, min: l.min, max: l.max, operatorValue: l.operatorValue })),
+      limits: Object.entries(appLimits(app)).map(([key, l]) => ({
+        key,
+        label: l.label,
+        min: l.min,
+        max: l.max,
+        operatorValue: l.operatorValue,
+        ...(l.shortLabel ? { shortLabel: l.shortLabel } : {}),
+        ...(l.note ? { note: l.note } : {}),
+        ...(l.countsUsage ? { countsUsage: true } : {}),
+      })),
     })),
   };
 }

@@ -141,11 +141,11 @@ describe("今の判定と同じ結果になる（状態ごと）", () => {
   it("上限：運営者が変えた既定の値と、人ごとの値（両方の表に書かれる）", async () => {
     const { userId } = await createUserWithAccount("u1");
     const { userId: other } = await createUserWithAccount("u2");
-    await setDefaults(env, { id: other }, { accountLimit: 7, dailyPostLimit: 15 });
+    await setDefaults(env, { id: other }, { accounts: 7, daily_posts: 15 });
     await expectSame(userId, OFF);
-    await setUserLimits(env, { id: other }, userId, { accountLimit: 2, dailyPostLimit: null });
+    await setUserLimits(env, { id: other }, userId, { accounts: 2, daily_posts: null });
     expect((await expectSame(userId, OFF)).limits).toEqual({ accounts: 2, daily_posts: 15 });
-    await setUserLimits(env, { id: other }, userId, { accountLimit: null, dailyPostLimit: null });
+    await setUserLimits(env, { id: other }, userId, { accounts: null, daily_posts: null });
     expect((await expectSame(userId, OFF)).limits).toEqual({ accounts: 7, daily_posts: 15 });
   });
 });

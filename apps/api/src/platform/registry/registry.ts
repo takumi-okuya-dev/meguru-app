@@ -20,6 +20,12 @@ export type AppLimitDef = {
   max: number;
   /** 運営者に当てる値（null は上限なし） */
   operatorValue: number | null;
+  /** 一覧に出す短い名前（例：アカウント・投稿。「アカウント5件」「投稿は既定値」のように出す） */
+  shortLabel?: string;
+  /** 既定値の欄で、名前の後ろに括弧で添える文（例：1アカウント） */
+  note?: string;
+  /** この上限が、アプリから伝えられた利用の数（app_usage の数）を数えるものか（見つかった人に「アカウント3件」と出す） */
+  countsUsage?: boolean;
 };
 
 const features = new Map<string, readonly AppFeatureDef[]>();
@@ -28,6 +34,8 @@ let switchesOwner: string | undefined;
 /** 機能の名前の形（英小文字と _ の1〜30文字。DBの feature の列の CHECK（platform/schema.ts）と、運営のリクエストの型に合わせる） */
 const FEATURE_KEY_RE = /^[a-z_]{1,30}$/;
 const limits = new Map<string, Readonly<Record<string, AppLimitDef>>>();
+/** 運営の上限の画面が扱うアプリ。登録のときにアプリが宣言する（機能のON/OFFと同じ決まり） */
+let limitsOwner: string | undefined;
 
 /**
  * アプリの機能のまとまりを登録する。同じアプリは1回だけ（2回目からは何もしない）。
@@ -81,10 +89,30 @@ export function featureSettings(): { app: string; keys: string[] } {
  * アプリの上限を登録する。同じアプリは1回だけ。
  * @param app - アプリの番号
  * @param defs - 名前ごとの上限の定義
+ * @param opts - operatorScreen：このアプリの上限を運営の上限の画面で扱う（1つのアプリだけ）
+ * @throws Error 名前の形が違う、または2つ目のアプリが運営の上限の画面を持とうとしたとき
  */
-export function registerAppLimits(app: string, defs: Readonly<Record<string, AppLimitDef>>): void {
+export function registerAppLimits(
+  app: string,
+  defs: Readonly<Record<string, AppLimitDef>>,
+  opts: { operatorScreen?: boolean } = {},
+): void {
   if (limits.has(app)) return;
+  const bad = Object.keys(defs).find((k) => !FEATURE_KEY_RE.test(k));
+  if (bad) throw new Error(`上限の名前「${bad}」の形が違います（英小文字と _ の1〜30文字だけ）`);
+  if (opts.operatorScreen && limitsOwner && limitsOwner !== app) {
+    throw new Error(`運営の上限の画面は、アプリ「${limitsOwner}」がもう持っています（画面をアプリごとに分けるまで、1つだけ）`);
+  }
   limits.set(app, defs);
+  if (opts.operatorScreen) limitsOwner = app;
+}
+
+/**
+ * 運営の上限の画面が扱うアプリ（registerAppLimits で operatorScreen を宣言したアプリ）。
+ * @returns アプリの番号（宣言がなければ undefined）
+ */
+export function operatorLimitsApp(): string | undefined {
+  return limitsOwner;
 }
 
 /**
@@ -140,4 +168,5 @@ export function resetRegistry(): void {
   features.clear();
   limits.clear();
   switchesOwner = undefined;
+  limitsOwner = undefined;
 }

@@ -15,6 +15,6 @@ export const THREADS_FEATURES: readonly AppFeatureDef[] = [
 
 /** Threadsの上限（運営者は、アカウントの数は上限なし・1日の投稿数は最大。specs/024 data-model.md 4）。 */
 export const THREADS_LIMITS: Readonly<Record<string, AppLimitDef>> = {
-  accounts: { label: "アカウントの数", min: 1, max: ACCOUNT_LIMIT_MAX, operatorValue: null },
-  daily_posts: { label: "1日の投稿数", min: 1, max: DAILY_POST_LIMIT_MAX, operatorValue: DAILY_POST_LIMIT_MAX },
+  accounts: { label: "アカウントの数", min: 1, max: ACCOUNT_LIMIT_MAX, operatorValue: null, shortLabel: "アカウント", countsUsage: true },
+  daily_posts: { label: "1日の投稿数", min: 1, max: DAILY_POST_LIMIT_MAX, operatorValue: DAILY_POST_LIMIT_MAX, shortLabel: "投稿", note: "1アカウント" },
 };
