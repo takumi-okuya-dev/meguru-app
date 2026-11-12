@@ -1,4 +1,4 @@
-// /api/accounts/:accountId/reference-posts と /research-keywords（specs/002-strategy-profile contracts/api.md）
+// /api/threads/accounts/:accountId/reference-posts と /research-keywords（specs/002-strategy-profile contracts/api.md）
 import {
   EXPLAIN_BATCH_MAX,
   KEYWORD_LIMIT,

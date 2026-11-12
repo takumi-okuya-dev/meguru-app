@@ -73,7 +73,7 @@ describe("秘密情報", () => {
       body: { mode: "reconnect", accountId, token: revoked },
     });
     bodies.push(await reconnect.text());
-    for (const path of ["/api/me", `/api/accounts/${accountId}`, `/api/accounts/${accountId}/activity`, `/api/accounts/${accountId}/performance/export`]) {
+    for (const path of ["/api/me", `/api/threads/accounts/${accountId}`, `/api/threads/accounts/${accountId}/activity`, `/api/threads/accounts/${accountId}/performance/export`]) {
       bodies.push(await (await call(app, "GET", path, { user: "u1" })).text());
     }
     const rows = await q()`SELECT * FROM threads.activity_logs`;

@@ -2,11 +2,11 @@
 // 「自動投稿」「戦略」は開いているAccountのオーナーの /access の features、「チーム」は自分の /api/me の features で出し分ける。
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen, within } from "@testing-library/react";
-import type { AccountAccessResponse, Feature, MeResponse, ProfileStatus } from "@meguru/shared";
+import type { AccountAccessResponse, Feature, ProfileStatus } from "@meguru/shared";
 import { createMemoryRouter, Outlet, RouterProvider } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ALL_FEATURES, OWNER_ACCESS, VIEWER_ACCESS } from "./helpers/access";
-import { ME_BILLING_OFF } from "./helpers/billing";
+import { ME_BILLING_OFF, type MeWithThreads } from "./helpers/billing";
 import { account, listResponse, promptResponse, renderAccountRoutes } from "./helpers/stock";
 
 vi.mock("@clerk/react", () => ({
@@ -57,7 +57,7 @@ const ownerWithout = (...off: Feature[]): AccountAccessResponse => ({
   features: ALL_FEATURES.filter((f) => !off.includes(f)),
 });
 
-const ME: MeResponse = {
+const ME: MeWithThreads = {
   user: { id: "u", email: "t@example.com", displayName: "Takumi" },
   accounts: [{ ...account, id: "a1" }],
   landingAccountId: "a1",

@@ -10,7 +10,7 @@ beforeEach(async () => {
 });
 
 async function me(env: Env) {
-  return app.request("/api/me", { headers: { Authorization: "Bearer test:u1" } }, env);
+  return app.request("/api/threads/me", { headers: { Authorization: "Bearer test:u1" } }, env);
 }
 
 describe("THREADS_ACCESS_MODE", () => {

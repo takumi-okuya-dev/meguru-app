@@ -26,8 +26,8 @@ describe("未接続のアカウントとThreads（SC-005）", () => {
 
     await runDailyJobs(testEnv, at);
     await run(at);
-    await call(app, "POST", `/api/accounts/${accountId}/open`, { user: "u1", body: { clientId: "p", openSeq: 1 } });
-    const check = await call(app, "POST", `/api/accounts/${accountId}/threads-check`, { user: "u1" });
+    await call(app, "POST", `/api/threads/accounts/${accountId}/open`, { user: "u1", body: { clientId: "p", openSeq: 1 } });
+    const check = await call(app, "POST", `/api/threads/accounts/${accountId}/threads-check`, { user: "u1" });
     expect(await check.json()).toEqual({ status: "not_connected" });
 
     expect((await fake.callCounts()).total).toBe(before.total);

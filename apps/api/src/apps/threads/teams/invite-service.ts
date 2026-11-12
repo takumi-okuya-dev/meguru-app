@@ -62,7 +62,7 @@ export async function memberCount(db: Db | TxDb, teamId: string): Promise<number
 }
 
 /**
- * 招待の確認画面の情報（ログイン不要。contracts/api.md「GET /api/invites/:token」）。
+ * 招待の確認画面の情報（ログイン不要。contracts/api.md「GET /api/threads/invites/:token」）。
  * @param env - Workers のバインディング
  * @param token - 招待の文字列
  * @param viewer - ログインしていればその人

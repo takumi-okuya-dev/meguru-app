@@ -11,7 +11,7 @@ beforeEach(async () => {
   await testEnv.AUTOPOST_KV.delete("autopost:wake");
 });
 
-const path = (accountId: string) => `/api/accounts/${accountId}/posting-schedule`;
+const path = (accountId: string) => `/api/threads/accounts/${accountId}/posting-schedule`;
 const on = (slotTimes: string[], expectedVersion: number, jitter = true) => ({
   enabled: true,
   slotTimes,

@@ -1,4 +1,4 @@
-// /api/accounts/:accountId/external-media と /media-defaults（specs/021-external-media contracts/api.md）。
+// /api/threads/accounts/:accountId/external-media と /media-defaults（specs/021-external-media contracts/api.md）。
 // 読むのは view（オーナーと担当の人）、書くのは content。どれも機能のまとまり「戦略」（019）。見せてもらっている人には出さない（research.md R7）。
 import {
   listingGenerateRequestSchema,

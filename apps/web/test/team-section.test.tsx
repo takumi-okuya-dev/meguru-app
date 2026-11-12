@@ -3,11 +3,11 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import type { AccountTeam, MeResponse } from "@meguru/shared";
+import type { AccountTeam } from "@meguru/shared";
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { EDITOR_ACCESS, OWNER_ACCESS } from "./helpers/access";
-import { ME_BILLING_OFF } from "./helpers/billing";
+import { ME_BILLING_OFF, type MeWithThreads } from "./helpers/billing";
 
 const accountTeam = vi.fn();
 const setTeamShared = vi.fn();
@@ -36,7 +36,7 @@ const inTeam: AccountTeam = {
     { userId: "u-a", name: "田中 健", role: "admin" },
   ],
 };
-const meData: MeResponse = {
+const meData: MeWithThreads = {
   user: { id: "o1", email: "o1@example.com", displayName: "鈴木 花子" },
   accounts: [
     {

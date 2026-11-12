@@ -1,4 +1,4 @@
-// GET /api/accounts/:accountId/activity（specs/008-team-operations contracts/api.md「操作の記録」、FR-052）。
+// GET /api/threads/accounts/:accountId/activity（specs/008-team-operations contracts/api.md「操作の記録」、FR-052）。
 import { activityQuerySchema, invalidFields } from "@meguru/shared";
 import { Hono, type MiddlewareHandler } from "hono";
 import type { AppEnv } from "../../../platform";

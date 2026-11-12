@@ -67,7 +67,7 @@ export function meRoutes(authed: MiddlewareHandler<AppEnv>, deleteClerkUser: (en
     // 退会（specs/013 contracts/api.md「自分」、research.md R10）
     .get("/me/withdrawal-preview", authed, async (c) => {
       c.header("Cache-Control", "no-store");
-      // アプリの中身（消えるアカウントなど）は、アプリが登録した関数で足す（PR5 まで。前の画面のため）
+      // アプリの中身（消えるアカウントなど）は、アプリが登録した関数で足す（前の版の画面のため。PR5c で消す）
       const [own, sections] = await Promise.all([withdrawalPreview(createDb(c.env.DATABASE_URL), c.get("user").id), collectSections(c, "preview")]);
       return c.json({ ...sections, ...own });
     })

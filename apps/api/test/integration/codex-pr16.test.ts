@@ -211,7 +211,7 @@ describe("P2：同時の読み直し・数の反映", () => {
     const { url } = (await (await callBilling(app, "POST", "/api/billing/checkout", { user: "u1" })).json()) as { url: string };
     await fakeStripe.completeCheckout(url);
     await callBilling(app, "POST", "/api/billing/sync", { user: "u1" });
-    await Promise.all(["2", "3", "4"].map((name) => callBilling(app, "POST", "/api/accounts", { user: "u1", body: { name } })));
+    await Promise.all(["2", "3", "4"].map((name) => callBilling(app, "POST", "/api/threads/accounts", { user: "u1", body: { name } })));
     expect((await fakeStripe.subscriptions())[0]!.items.data[0]!.quantity).toBe(4);
     expect(await rowOf(userId)).toMatchObject({ quantity: 4, quantitySyncNeeded: false });
   });

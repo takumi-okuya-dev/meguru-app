@@ -17,7 +17,7 @@ async function json<T>(res: Response, status = 200): Promise<T> {
   return (await res.json()) as T;
 }
 const errorOf = async (res: Response) => ((await res.json()) as { error: { code: string } }).error;
-const base = (accountId: string) => `/api/accounts/${accountId}`;
+const base = (accountId: string) => `/api/threads/accounts/${accountId}`;
 
 /**
  * 日本時間の「今日からdays日前のhour時」。

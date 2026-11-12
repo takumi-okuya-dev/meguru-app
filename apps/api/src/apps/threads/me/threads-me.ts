@@ -1,6 +1,6 @@
 // Threadsの「自分」（specs/meguru/029-threads-pattern1 contracts/api-routes.md 2）。
 // GET /api/threads/me と GET /api/threads/me/withdrawal-preview。中身は029の前の /api/me・/api/me/withdrawal-preview の
-// Threadsの部分と同じ。PR5 までは、共通の /api/me にも同じ中身を足す（registerMeSection。前の画面のため）。
+// Threadsの部分と同じ。前の版の画面のため、共通の /api/me にも同じ中身を足している（registerMeSection。PR5c で消す）。
 import { FEATURES, type Role, type ThreadsMeResponse } from "@meguru/shared";
 import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";

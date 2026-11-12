@@ -9,7 +9,7 @@ beforeEach(async () => {
   await resetDb();
 });
 
-const base = (accountId: string) => `/api/accounts/${accountId}`;
+const base = (accountId: string) => `/api/threads/accounts/${accountId}`;
 
 type NgWord = { id: string; word: string; normalized: string };
 type PostDraft = { id: string; body: string; status: string; version: number; reviewedAt: string | null };

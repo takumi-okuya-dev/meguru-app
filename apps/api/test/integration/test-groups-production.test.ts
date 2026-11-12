@@ -39,7 +39,7 @@ describe("招待制がOFFの環境のグループ", () => {
 
   it("グループに入っていない人も、今までどおり使える", async () => {
     await createGroup();
-    const res = await call(app, "GET", "/api/me/needs-review-counts", { user: "outsider" });
+    const res = await call(app, "GET", "/api/threads/me/needs-review-counts", { user: "outsider" });
     expect(res.status).toBe(200);
   });
 });

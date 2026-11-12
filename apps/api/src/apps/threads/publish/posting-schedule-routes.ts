@@ -1,4 +1,4 @@
-// /api/accounts/:accountId/posting-schedule（specs/005-auto-post contracts/api.md）。
+// /api/threads/accounts/:accountId/posting-schedule（specs/005-auto-post contracts/api.md）。
 // 自動投稿は全プランで使えるので、grower機能は判定しない（FR-004）。
 import {
   AUTOPOST_JITTER_SECONDS,

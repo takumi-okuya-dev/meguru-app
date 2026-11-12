@@ -9,7 +9,7 @@ beforeEach(async () => {
   await resetDb();
 });
 
-const base = (accountId: string) => `/api/accounts/${accountId}`;
+const base = (accountId: string) => `/api/threads/accounts/${accountId}`;
 type Item = { id: string; version: number; keyword: string; body?: string; whyGood?: string };
 type ErrorBody = { error: { code: string; details?: string[] } };
 

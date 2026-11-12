@@ -1,6 +1,6 @@
 // /api/me と退会の確かめに、アプリが足す中身（specs/meguru/029-threads-pattern1 contracts/api-routes.md 2）。
 // 共通はアプリの表を読まないので、アプリが中身を作る関数を登録し、共通はそれを呼んで合わせる。
-// PR5 で /api/me からアプリの中身を外すまでの間だけ使う（前の画面のため）。新しい画面は /api/<アプリ>/me を読む。
+// 029 の PR5c で /api/me からアプリの中身を外すまでの間だけ使う（前の版の画面のため）。新しい画面は /api/<アプリ>/me を読む。
 import type { Context } from "hono";
 import type { AppEnv } from "./auth";
 

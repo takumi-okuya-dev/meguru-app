@@ -5,7 +5,7 @@ import userEvent from "@testing-library/user-event";
 import type { MeResponse } from "@meguru/shared";
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { ME_BILLING_OFF, meBilling } from "./helpers/billing";
+import { ME_BILLING_OFF, meBilling, type MeWithThreads } from "./helpers/billing";
 
 const mocks = vi.hoisted(() => ({ me: vi.fn(), startCheckout: vi.fn(), logout: vi.fn() }));
 vi.mock("@clerk/react", () => ({ useAuth: () => ({ isLoaded: true, isSignedIn: true }) }));
@@ -18,7 +18,7 @@ vi.mock("@/lib/api-client", async (orig) => {
 const { RequireAuth } = await import("@/shell/guards/RequireAuth");
 const { setSubscriptionRequired } = await import("@/lib/api-client");
 
-const ME = (state: MeResponse["billing"]["state"]): MeResponse => ({
+const ME = (state: MeResponse["billing"]["state"]): MeWithThreads => ({
   user: { id: "u", email: "u@example.com", displayName: null },
   accounts: [],
   landingAccountId: null,

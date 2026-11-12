@@ -10,7 +10,7 @@ import { createMemoryRouter, RouterProvider } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { AppModule, AppSidebar } from "@/shell";
 import { queryKeys } from "@/lib/query";
-import { ME_BILLING_OFF } from "./helpers/billing";
+import { ME_BILLING_OFF, type MeWithThreads } from "./helpers/billing";
 
 vi.mock("@clerk/react", () => ({
   useAuth: () => ({ isLoaded: true, isSignedIn: true }),
@@ -64,7 +64,7 @@ const sample = stubApp("sample", "サンプル", BoxIcon);
  * @param apps - apps
  * @returns 応答
  */
-function meWith(apps: MeResponse["apps"]): MeResponse {
+function meWith(apps: MeResponse["apps"]): MeWithThreads {
   return {
     ...ME_BILLING_OFF,
     user: { id: "u1", email: "a@example.com", displayName: null },
@@ -204,7 +204,7 @@ describe("最後に使ったアプリ（contracts/ui-routes.md 3・6）", () => 
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     renderAt("/threads", client);
     await waitFor(() => expect(mocks.putLastApp).toHaveBeenCalledWith("threads"));
-    await waitFor(() => expect(client.getQueryData<MeResponse>(queryKeys.me)?.apps.last).toBe("threads"));
+    await waitFor(() => expect(client.getQueryData<MeWithThreads>(queryKeys.me)?.apps.last).toBe("threads"));
     // 別のタブでサンプルを開いた：読み直すと apps.last がサンプルに戻る
     await client.refetchQueries({ queryKey: queryKeys.me });
     await waitFor(() => expect(mocks.putLastApp).toHaveBeenCalledTimes(2));

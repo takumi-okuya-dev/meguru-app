@@ -108,11 +108,11 @@ describe("退会の出来事（user.withdrawn）", () => {
     await createUserWithAccount("m1", { name: "B" });
     await joinTeam(teamId, "m1", []);
     await assign(teamId, "m1", o1.accountId);
-    expect((await call(app, "GET", `/api/accounts/${o1.accountId}`, { user: "m1" })).status).toBe(200);
+    expect((await call(app, "GET", `/api/threads/accounts/${o1.accountId}`, { user: "m1" })).status).toBe(200);
     const userId = (await rows<{ id: string }>(`SELECT id FROM users WHERE clerk_user_id = 'o1'`))[0]!.id;
     await db().query(`UPDATE users SET withdrawal_requested_at = now() WHERE id = $1`, [userId]);
     await withTransaction(testEnv.DATABASE_URL, (tx) => emitEvent(tx, "user.withdrawn", { userId }));
-    expect((await call(app, "GET", `/api/accounts/${o1.accountId}`, { user: "m1" })).status).toBe(404);
+    expect((await call(app, "GET", `/api/threads/accounts/${o1.accountId}`, { user: "m1" })).status).toBe(404);
   });
 
   it("同じ出来事を2回届けても、結果は同じ（2回目は何もしない）", async () => {

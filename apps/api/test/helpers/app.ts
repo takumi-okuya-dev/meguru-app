@@ -87,9 +87,7 @@ export async function resetDb() {
     threads.draft_batches, threads.post_drafts, threads.ng_words, threads.posting_schedules, threads.publish_attempts, threads.teams,
     threads.team_members, threads.team_accounts, threads.activity_logs, threads.token_check_failures, threads.received_events,
     threads.user_states CASCADE`);
-  // 運営者が決める値（1行だけ。TRUNCATE では消さない）を初めの値に戻す（specs/024）
-  await sql`UPDATE operator_settings SET default_account_limit = 3, default_daily_post_limit = 10, tester_slot_capacity = 25`;
-  // 新しい上限の表の既定の値も同じ値に戻す（specs/meguru/029 research.md R7）
+  // 上限の既定の値を初めの値に戻す（specs/024、specs/meguru/029 research.md R7）
   await sql`INSERT INTO app_limit_defaults (app, key, value) VALUES ('threads', 'accounts', 3), ('threads', 'daily_posts', 10)
     ON CONFLICT (app, key) DO UPDATE SET value = EXCLUDED.value`;
   // Threadsの運営の設定（テスター招待の枠。specs/meguru/029 tasks.md T024）
@@ -237,11 +235,11 @@ const redirectResponse = (to: string) =>
   new Response(null, { status: 302, headers: { Location: `${testEnv.WEB_ORIGIN.replace(/\/$/, "")}${to}` } });
 
 /**
- * 名前だけでアカウントを作る（POST /api/accounts。specs/012）。
+ * 名前だけでアカウントを作る（POST /api/threads/accounts。specs/012）。
  * @returns 作ったアカウントのID。作れなければ（上限など）NULL と応答
  */
 export async function createAccountVia(app: TestApp, user: string, name = "テストのアカウント") {
-  const res = await call(app, "POST", "/api/accounts", { user, body: { name } });
+  const res = await call(app, "POST", "/api/threads/accounts", { user, body: { name } });
   if (res.status !== 201) return { accountId: null as string | null, res };
   return { accountId: ((await res.clone().json()) as { id: string }).id, res };
 }
@@ -428,7 +426,7 @@ export async function endTrial(userId: string) {
 // ---- 上限（運営者が決める値）をテストで直接変える ----
 
 /**
- * 人ごとの上限を、古い列（users）と新しい表（user_app_limits）の両方に書く（運営の画面と同じ。specs/meguru/029 research.md R7）。
+ * 人ごとの上限を書く（user_app_limits。運営の画面と同じ。specs/meguru/029 research.md R7）。
  * @param who - clerkUserId か userId
  * @param key - accounts（アカウントの数）か daily_posts（1日の投稿数）
  * @param n - 値（null は既定の値に戻す）
@@ -440,8 +438,6 @@ export async function setUserLimit(who: { clerkUserId: string } | { userId: stri
     "userId" in who ? await sql`SELECT id FROM users WHERE id = ${who.userId}` : await sql`SELECT id FROM users WHERE clerk_user_id = ${who.clerkUserId}`
   ) as { id: string }[];
   if (!row) throw new Error("user not found");
-  if (key === "accounts") await sql`UPDATE users SET account_limit = ${n} WHERE id = ${row.id}`;
-  else await sql`UPDATE users SET daily_post_limit = ${n} WHERE id = ${row.id}`;
   if (n === null) await sql`DELETE FROM user_app_limits WHERE user_id = ${row.id} AND app = 'threads' AND key = ${key}`;
   else
     await sql`INSERT INTO user_app_limits (user_id, app, key, value) VALUES (${row.id}, 'threads', ${key}, ${n})
@@ -449,14 +445,12 @@ export async function setUserLimit(who: { clerkUserId: string } | { userId: stri
 }
 
 /**
- * 既定の上限を、古い列（operator_settings）と新しい表（app_limit_defaults）の両方に書く。
+ * 既定の上限を書く（app_limit_defaults）。
  * @param key - accounts か daily_posts
  * @param n - 値
  */
 export async function setDefaultLimit(key: "accounts" | "daily_posts", n: number) {
   const sql = neon(testEnv.DATABASE_URL);
   createDb(testEnv.DATABASE_URL);
-  if (key === "accounts") await sql`UPDATE operator_settings SET default_account_limit = ${n}`;
-  else await sql`UPDATE operator_settings SET default_daily_post_limit = ${n}`;
   await sql`INSERT INTO app_limit_defaults (app, key, value) VALUES ('threads', ${key}, ${n}) ON CONFLICT (app, key) DO UPDATE SET value = EXCLUDED.value`;
 }

@@ -2,11 +2,11 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import type { AccountSummary, MeResponse } from "@meguru/shared";
+import type { AccountSummary } from "@meguru/shared";
 import { createMemoryRouter, Outlet, RouterProvider, useParams } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { OWNER_ACCESS } from "./helpers/access";
-import { ME_BILLING_OFF } from "./helpers/billing";
+import { ME_BILLING_OFF, type MeWithThreads } from "./helpers/billing";
 
 const mocks = vi.hoisted(() => ({ me: vi.fn(), tokenConnect: vi.fn(), getPostingSchedule: vi.fn(), renameAccount: vi.fn() }));
 vi.mock("@/lib/api-client", async (orig) => {
@@ -84,7 +84,7 @@ beforeEach(() => {
   toastSuccess.mockReset();
   mocks.tokenConnect.mockReset();
   mocks.renameAccount.mockReset();
-  const me: MeResponse = {
+  const me: MeWithThreads = {
     user: { id: "u", email: "u@example.com", displayName: null },
     accounts: [unconnected],
     landingAccountId: "a1",

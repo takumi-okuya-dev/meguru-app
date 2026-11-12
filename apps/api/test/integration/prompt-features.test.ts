@@ -6,7 +6,7 @@ import { confirmedMetrics, db, publishedDrafts } from "../helpers/auto-post";
 import { disableFeatures } from "../helpers/features";
 
 const app = makeApp();
-const base = (id: string) => `/api/accounts/${id}`;
+const base = (id: string) => `/api/threads/accounts/${id}`;
 
 beforeEach(async () => {
   await resetDb();

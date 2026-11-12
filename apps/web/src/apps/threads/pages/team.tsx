@@ -26,12 +26,12 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { ApiError, describeError } from "@/lib/api-client";
 import { threadsApi } from "@/apps/threads/lib/api";
-import { queryKeys } from "@/lib/query";
 import { threadsQueryKeys } from "@/apps/threads/lib/query-keys";
 import { cn } from "@/lib/utils";
 import { NotFound } from "@/shell";
 import { accountPath, sharedAccountPath, teamPath, threadsHomePath } from "@/apps/threads/lib/paths";
 import { useThreadsMe } from "@/apps/threads/lib/use-threads-me";
+import { queryKeys } from "@/lib/query";
 
 const ROLE_NAMES = { admin: "管理者", member: "メンバー", editor: "編集者" } as const;
 
@@ -264,7 +264,7 @@ export function TeamPage() {
   const refresh = () =>
     Promise.all([
       queryClient.invalidateQueries({ queryKey: threadsQueryKeys.team(teamId) }),
-      queryClient.invalidateQueries({ queryKey: queryKeys.me }),
+      queryClient.invalidateQueries({ queryKey: threadsQueryKeys.me }),
     ]);
   const close = () => {
     setPending(null);
@@ -301,6 +301,7 @@ export function TeamPage() {
     onSuccess: async () => {
       close();
       queryClient.removeQueries({ queryKey: threadsQueryKeys.team(teamId) });
+      // 抜けると「使っているアプリ」が変わることがあるので、共通の「自分」も取り直す（["me"] は Threads の「自分」も含む）
       await queryClient.invalidateQueries({ queryKey: queryKeys.me });
       toast.success("チームを抜けました");
       void navigate(threadsHomePath(), { replace: true });

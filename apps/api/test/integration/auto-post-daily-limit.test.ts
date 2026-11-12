@@ -62,12 +62,12 @@ describe("上限が効く、ほかの場所", () => {
     const { accountId } = await connectedAccount("u1", app);
     await setSchedule(accountId, { slotMinutes: EIGHT });
     await setUserLimit({ clerkUserId: "u1" }, "daily_posts", 5);
-    const status = (await (await call(app, "GET", `/api/accounts/${accountId}/auto-post`, { user: "u1" })).json()) as {
+    const status = (await (await call(app, "GET", `/api/threads/accounts/${accountId}/auto-post`, { user: "u1" })).json()) as {
       slotCount?: number;
       state?: { slotCount: number };
     };
     expect(JSON.stringify(status)).toContain('"slotCount":5');
-    const prompt = (await (await call(app, "GET", `/api/accounts/${accountId}/prompt?count=10`, { user: "u1" })).json()) as { prompt: string };
+    const prompt = (await (await call(app, "GET", `/api/threads/accounts/${accountId}/prompt?count=10`, { user: "u1" })).json()) as { prompt: string };
     expect(prompt.prompt).not.toContain("1日の投稿は8件");
   });
 });

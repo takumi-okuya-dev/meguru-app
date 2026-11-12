@@ -9,7 +9,7 @@ beforeEach(async () => {
 });
 afterEach(() => vi.useRealTimers());
 
-const path = (accountId: string) => `/api/accounts/${accountId}/reference-posts`;
+const path = (accountId: string) => `/api/threads/accounts/${accountId}/reference-posts`;
 type Post = Record<string, unknown> & { id: string; version: number; freshness: string; shortId: string };
 type ErrorBody = { error: { code: string; details?: string[] } };
 

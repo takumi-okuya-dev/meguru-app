@@ -10,7 +10,7 @@ beforeEach(async () => {
 });
 
 const me = async (env = testerOperatorEnv()) =>
-  (await (await call(app, "GET", "/api/me", { user: "u1", env })).json()) as { testerInvites: { enabled: boolean } };
+  (await (await call(app, "GET", "/api/threads/me", { user: "u1", env })).json()) as { testerInvites: { enabled: boolean } };
 
 describe("GET /api/me の testerInvites", () => {
   it("審査の前（testers）で app を出していればON", async () => {

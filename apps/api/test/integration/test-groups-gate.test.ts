@@ -10,11 +10,11 @@ beforeEach(async () => {
 });
 
 const BLOCKED = [
-  ["POST", "/api/accounts"],
+  ["POST", "/api/threads/accounts"],
   ["GET", "/api/billing"],
-  ["GET", "/api/me/needs-review-counts"],
-  ["GET", "/api/invites/t_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"],
-  ["POST", "/api/teams"],
+  ["GET", "/api/threads/me/needs-review-counts"],
+  ["GET", "/api/threads/invites/t_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"],
+  ["POST", "/api/threads/teams"],
 ] as const;
 
 async function codeOf(res: Response) {
@@ -57,7 +57,7 @@ describe("入れない人", () => {
 describe("入れる人", () => {
   it("前からいた人（signed_up_open）は、グループに入っていなくても通る（FR-007・SC-005）", async () => {
     await call(app, "GET", "/api/me", { user: "old" });
-    const res = await callOn(app, "GET", "/api/me/needs-review-counts", { user: "old" });
+    const res = await callOn(app, "GET", "/api/threads/me/needs-review-counts", { user: "old" });
     expect(res.status).toBe(200);
   });
 
@@ -65,7 +65,7 @@ describe("入れる人", () => {
     const { token } = await createGroup(app);
     await callOn(app, "GET", "/api/me", { user: "member" });
     expect((await join(app, "member", token)).status).toBe(200);
-    expect((await callOn(app, "GET", "/api/me/needs-review-counts", { user: "member" })).status).toBe(200);
+    expect((await callOn(app, "GET", "/api/threads/me/needs-review-counts", { user: "member" })).status).toBe(200);
     const me = (await (await callOn(app, "GET", "/api/me", { user: "member" })).json()) as { testGroups: unknown };
     expect(me.testGroups).toEqual({ enabled: true, admitted: true, operator: false });
   });
@@ -74,10 +74,10 @@ describe("入れる人", () => {
     const { token } = await createGroup(app);
     await callOn(app, "GET", "/api/me", { user: "member" });
     await join(app, "member", token);
-    const created = await callOn(app, "POST", "/api/accounts", { user: "member", body: { name: "カフェ" } });
+    const created = await callOn(app, "POST", "/api/threads/accounts", { user: "member", body: { name: "カフェ" } });
     expect(created.status).toBe(201);
     const { id } = (await created.json()) as { id: string };
-    const access = await callOn(app, "GET", `/api/accounts/${id}/access`, { user: "member" });
+    const access = await callOn(app, "GET", `/api/threads/accounts/${id}/access`, { user: "member" });
     expect(access.status).toBe(200);
     expect(((await access.json()) as { readOnly: unknown }).readOnly).toBeNull();
   });
@@ -99,7 +99,7 @@ describe("入れる人", () => {
     await callOn(app, "GET", "/api/me", { user: "member" });
     await join(app, "member", token);
     await callOn(app, "POST", `/api/operator/test-groups/${id}/close`, { user: OPERATOR });
-    const res = await callOn(app, "GET", "/api/me/needs-review-counts", { user: "member" });
+    const res = await callOn(app, "GET", "/api/threads/me/needs-review-counts", { user: "member" });
     expect(await codeOf(res)).toBe("TEST_ACCESS_REQUIRED");
   });
 });
@@ -108,7 +108,7 @@ describe("OFFの環境（FR-015・SC-006）", () => {
   it("ONの間に登録した人でも、OFFなら誰も止まらない", async () => {
     await callOn(app, "GET", "/api/me", { user: "on_user" });
     await makeClosedSignup("on_user");
-    const res = await call(app, "GET", "/api/me/needs-review-counts", { user: "on_user" });
+    const res = await call(app, "GET", "/api/threads/me/needs-review-counts", { user: "on_user" });
     expect(res.status).toBe(200);
     const me = (await (await call(app, "GET", "/api/me", { user: "on_user" })).json()) as { testGroups: unknown };
     expect(me.testGroups).toEqual({ enabled: false, admitted: true, operator: false });

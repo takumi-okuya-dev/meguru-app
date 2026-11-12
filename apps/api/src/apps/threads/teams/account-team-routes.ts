@@ -1,4 +1,4 @@
-// /api/accounts/:accountId のチーム（specs/011-team-revision contracts/api.md「Account（変わる）」）。
+// /api/threads/accounts/:accountId のチーム（specs/011-team-revision contracts/api.md「Account（変わる）」）。
 import { FEATURES } from "@meguru/shared";
 import { Hono, type MiddlewareHandler } from "hono";
 import type { AppEnv } from "../../../platform";

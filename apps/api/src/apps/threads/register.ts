@@ -21,7 +21,8 @@ export function registerThreads(): void {
     registerAppFeatures(THREADS_APP, THREADS_FEATURES, { switches: true });
     // 運営の上限の画面は Threads の上限を扱う（specs/meguru/029 T070）
     registerAppLimits(THREADS_APP, THREADS_LIMITS, { operatorScreen: true });
-    // /api/me と退会の確かめに、Threadsの中身を足す（PR5 まで。前の画面のため。specs/meguru/029 contracts/api-routes.md 2）
+    // /api/me と退会の確かめに、Threadsの中身を足す（前の版の画面が読むため。この版の画面がデプロイされたあと、PR5c で消す。
+    // 新しい画面は /api/threads/me を読み、/api/me の余分な項目は無視する。specs/meguru/029 contracts/api-routes.md 2）
     registerMeSection(THREADS_APP, buildThreadsMe);
     registerWithdrawalPreviewSection(THREADS_APP, (c) => threadsWithdrawalPreview(createDb(c.env.DATABASE_URL), c.get("user").id));
     // 共通の出来事（specs/meguru/029 research.md R8）：退会したらThreadsのデータを片づける、上限が変わったら自動投稿を起こす

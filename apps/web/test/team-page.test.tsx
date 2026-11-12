@@ -2,10 +2,10 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import type { MeResponse, TeamDetail } from "@meguru/shared";
+import type { TeamDetail } from "@meguru/shared";
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { ME_BILLING_OFF } from "./helpers/billing";
+import { ME_BILLING_OFF, type MeWithThreads } from "./helpers/billing";
 
 const mocks = vi.hoisted(() => ({
   getTeam: vi.fn(),
@@ -82,7 +82,7 @@ function memberView(): TeamDetail {
   };
 }
 
-const meData: MeResponse = {
+const meData: MeWithThreads = {
   user: { id: "u-s", email: "s@example.com", displayName: "鈴木 花子" },
   accounts: [
     { id: "a-s", name: "カフェ B店", username: "a-s", displayName: "カフェ B店", profilePictureUrl: null, connectionStatus: "connected", lastUsedAt: null, role: "owner", ownerName: null },

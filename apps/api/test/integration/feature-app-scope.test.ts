@@ -17,7 +17,7 @@ describe("機能のON/OFFのアプリの範囲", () => {
     const { userId } = await createUserWithAccount("u1");
     await db().query(`INSERT INTO feature_disables (user_id, app, feature) VALUES ($1, 'people', 'team')`, [userId]);
 
-    const me = (await (await call(app, "GET", "/api/me", { user: "u1" })).json()) as { features: string[] };
+    const me = (await (await call(app, "GET", "/api/threads/me", { user: "u1" })).json()) as { features: string[] };
     expect(me.features).toContain("team");
 
     const found = (await (await callOp(app, "GET", "/api/operator/users?email=u1@example.com", { user: FEATURE_OPERATOR })).json()) as {

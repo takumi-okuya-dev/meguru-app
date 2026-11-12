@@ -1,4 +1,4 @@
-// /api/accounts/:accountId/promotions と /promotion-settings（specs/002-strategy-profile contracts/api.md）
+// /api/threads/accounts/:accountId/promotions と /promotion-settings（specs/002-strategy-profile contracts/api.md）
 import {
   PROMOTION_LIMIT,
   isExpired,

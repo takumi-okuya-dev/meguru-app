@@ -191,7 +191,7 @@ describe("GET /api/threads/callback（mode = connect）", () => {
     const { accountId } = await createAccountVia(app, "u1", "消すアカウント");
     const res = await call(app, "POST", "/api/threads/connect", { user: "u1", body: { mode: "connect", accountId } });
     const { authorizeUrl } = (await res.json()) as { authorizeUrl: string };
-    await call(app, "DELETE", `/api/accounts/${accountId}`, { user: "u1", body: { confirmName: "消すアカウント" } });
+    await call(app, "DELETE", `/api/threads/accounts/${accountId}`, { user: "u1", body: { confirmName: "消すアカウント" } });
     const cb = await authorizeAndCallback(app, authorizeUrl, { fakeUser: "1001" });
     const target = redirectTarget(cb);
     expect(target.pathname).toBe("/threads");

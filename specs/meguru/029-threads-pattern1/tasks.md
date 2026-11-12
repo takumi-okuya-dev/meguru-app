@@ -180,7 +180,7 @@ description: "Task list for feature meguru/029 Threads pattern ①"
 >   - PR4b-3＝T052（退会の確かめのThreadsの分を、AppModule の withdrawalPreview として外枠に渡す。退会のダイアログは外枠だけが使うので `shell/settings/` へ移した（共通の部品は外枠を読めないため））
 >   - PR4c＝T070 のうち機能のON/OFF・T021 のうち `FEATURES` の移動：運営の機能のON/OFFのリクエストの型を「名前 → ON/OFF」の一般の形にし（名前が登録とそろっているかは API が確かめる）、共通の `FeatureSwitches` と運営の「使える機能」の画面を、登録の一覧（`GET /api/operator/app-registry`）の名前・表示名・説明で出す形にした。機能のON/OFFを扱うアプリは「機能を登録したただ1つのアプリ」（2つ以上なら止める）。`FEATURES`・`FEATURE_LABELS`・`isFeature` を `@meguru/shared` の `apps/threads/features.ts` へ移した（共通の側には記録の種類と件数だけが残る）
 >   - PR4d＝T070 のうち上限の画面：運営の上限の API を「名前 → 値」の形にし（名前と範囲は登録の一覧で確かめる。見つかった人の数は `app_usage` の利用の数）、上限の画面を登録の一覧（名前・表示名・範囲・短い名前・添える文・利用の数を数えるか）で出す形にした。運営の上限の画面が扱うアプリは、アプリが `registerAppLimits(…, { operatorScreen: true })` で宣言する。古い列（`users.account_limit` など）との対応は、PR5 で古い列を消すまでの仕組みとして共通に残る
->   - T056（画面が新しい道筋だけを呼んでいるかのブラウザでの確かめ）は、PR4b-1 のマージのあとからできる。PR5 の前にユーザーと行う
+>   - T056：2026-11-13 に確かめた。ユーザーがテスト環境の画面を開発者ツールで見て、呼び出しが新しい道筋で答えていることを確かめ、テスト環境の画面の JavaScript（develop の `index-CqwL9PTU.js`）に古い道筋が0か所・新しい道筋（`/api/threads/…`）が104か所あることを確かめた
 >   - **PR5 に回したこと（PR #103 のセルフレビュー）**：Threads の画面は、PR5 まで `/api/me` と `/api/threads/me` の両方を読む（サーバーで Threads の中身を2回作る）。PR5 で `/api/me` から Threads の中身を消すときに、Threads の中身だけが変わったところ（アカウントを開く・名前を変える・チーム）の取り直しを `["me"]` から `threadsQueryKeys.me` に替える。退会のダイアログも同じで、PR5 まで `/api/me/withdrawal-preview` と `/api/threads/me/withdrawal-preview` の両方が Threads の分を作る（PR5 で共通の側から Threads の分を消す。PR #104 のセルフレビュー）
 
 **Goal**：ThreadsのAPIをThreadsの道筋の下にそろえ、Webの呼び出しとキー、`/api/me`のThreadsの部分の読み方をThreadsのフォルダへ移す。古い道筋は残す。
@@ -200,7 +200,7 @@ description: "Task list for feature meguru/029 Threads pattern ①"
 - [X] T053 [US3] Webのテストのモックを直す：Threadsの呼び出しを`@/lib/api-client`でモックしているテスト（約60ファイル）を、`@/apps/threads/lib/api`のモックに替える。`/api/me`の中のThreadsのデータを使うテストの手助け（`apps/web/test/helpers/`）は、`useThreadsMe`の値を入れる形にする。期待する結果は変えない（spec FR-022）。
 - [X] T054 [P] [US3] `apps/web/test/api-client-common.test.ts`：共通の`api-client.ts`に、Threadsの道筋（`/api/threads/`・`/api/accounts/`・`/api/teams/`）を呼ぶ関数がないことを確かめる（contracts/module-boundaries.md 5）。
 - [ ] T055 [US4] PR4の確かめ：`pnpm lint`・`pnpm typecheck`・`pnpm test`・`pnpm e2e`（quickstart.md 1）。
-- [ ] T056 [US3] テスト環境：PR4のマージのあと、画面が新しい道筋だけを呼んでいることを、ブラウザの開発者ツールのネットワークで確かめる（古い道筋を消す前の確認。quickstart.md 4-1。ユーザーと一緒に行う）。
+- [X] T056 [US3] テスト環境：PR4のマージのあと、画面が新しい道筋だけを呼んでいることを、ブラウザの開発者ツールのネットワークで確かめる（古い道筋を消す前の確認。quickstart.md 4-1。ユーザーと一緒に行う）。
 
 **Checkpoint**：→ PR4を出す。
 
@@ -210,12 +210,19 @@ description: "Task list for feature meguru/029 Threads pattern ①"
 
 ## Phase 6：古いものを消す（PR5）
 
+> **PR5は3つに分けた**：PR5a＝コード（T057・T059〜T061。CI を流す）、PR5b＝文書と Constitution（T062〜T066。CI なし）、PR5c＝`/api/me` から Threads の中身を消す（T058）。
+> T058 を PR5c に分けたのは、デプロイしている前の版の画面（PR4 の版）が `/api/me` の Threads の項目を必須として読むため（API が画面より先に入れ替わる数分と、開いたままのタブで画面が壊れる）。PR5a の画面は `/api/me` の余分な項目を無視するので、PR5a の画面がデプロイされたあとに PR5c で API から消す（PR #107 のセルフレビュー）。共通の型（`meResponseSchema`）は PR5a で共通の項目だけにした
+> PR5a で分かったこと：
+> - `/api/me` が Threads の中身を作らなくなったので、利用の状態の「ずれの直し」は `/api/threads/me` と毎日の数え直しで行う。チームの出入りでは「使っているか」は変わらない（チームに入るには自分のアカウントが要り、最後のアカウントを消すとチームからも外れるため）ので、伝え直しは足していない
+> - `operator_settings` は、3列を消すと設定が残らないので、表ごと消した。`platform/hooks.ts` の `registerModule` は `platform/registry/modules.ts` へ移した
+> - PR4b-2 の残り：Threads の中身だけが変わるところ（アカウントを開く・名前を変える・接続し直す・チームの操作）は `threadsQueryKeys.me` だけを取り直す。アカウントを作る・消す（使っているアプリが変わる）は今どおり `["me"]`
+
 **Goal**：古い道筋・`/api/me`のThreadsの部分・上限の古い列・知らせの仕組みを消す。
 
-- [ ] T057 [US3] 古い道筋（`/api/accounts/…`・`/api/teams/…`・`/api/invites/…`・`/api/me/needs-review-counts`・`/api/operator/{accounts,tester-applications,tester-settings}`）を消す。`routes:snapshot`を書き直し、`threads-routes-alias.test.ts`を新しい道筋だけのテストにする。
+- [X] T057 [US3] 古い道筋（`/api/accounts/…`・`/api/teams/…`・`/api/invites/…`・`/api/me/needs-review-counts`・`/api/operator/{accounts,tester-applications,tester-settings}`）を消す。`routes:snapshot`を書き直し、`threads-routes-alias.test.ts`を新しい道筋だけのテストにする。
 - [ ] T058 [US3] `/api/me`からThreadsの部分を消す：`packages/shared/src/schemas.ts`の`meResponseSchema`を共通の分だけにし、`apps/api/src/app.ts`の「`/api/me`に足す中身」を消す。`/api/me/withdrawal-preview`も共通の分だけにする。Webの型の誤りが0件（Threadsは`useThreadsMe`を読んでいる）。テストを直す（期待する結果は変えない）。
-- [ ] T059 [US2] `apps/api/src/platform/hooks.ts`と、そのテストを消す。
-- [ ] T060 [US2] 上限の古い列（`users.account_limit`・`users.daily_post_limit`・`operator_settings.default_account_limit`・`default_daily_post_limit`・`tester_slot_capacity`）を消す：表の定義から消し、両方に書いていた処理を新しい表だけにして、`db:generate`でマイグレーションを作り、SQLを読む。`apps/api/test/migration/`にテストを足す（新しい表の値が残る）。
+- [X] T059 [US2] `apps/api/src/platform/hooks.ts`と、そのテストを消す。
+- [X] T060 [US2] 上限の古い列（`users.account_limit`・`users.daily_post_limit`・`operator_settings.default_account_limit`・`default_daily_post_limit`・`tester_slot_capacity`）を消す：表の定義から消し、両方に書いていた処理を新しい表だけにして、`db:generate`でマイグレーションを作り、SQLを読む。`apps/api/test/migration/`にテストを足す（新しい表の値が残る）。
 - [ ] T061 [US4] PR5の確かめ：`pnpm lint`・`pnpm typecheck`・`pnpm test`・`pnpm e2e`。`/api/me`にThreadsのデータがない。PR5の説明に、古い列を消すマイグレーションが前の版のAPIを壊す例外（テスト環境だけ。spec FR-019）を書く。
 
 ## Phase 7：文書（PR5）

@@ -1,4 +1,4 @@
-// /api/accounts/:accountId/strategy（specs/002-strategy-profile contracts/api.md）
+// /api/threads/accounts/:accountId/strategy（specs/002-strategy-profile contracts/api.md）
 import { invalidFields, putStrategyRequestSchema } from "@meguru/shared";
 import { Hono, type MiddlewareHandler } from "hono";
 import type { AppEnv } from "../../../platform";
