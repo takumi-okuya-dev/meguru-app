@@ -13,6 +13,7 @@ import { collectMeRoutes } from "./me/collect-me";
 import { rosterRoutes } from "./roster/roster-routes";
 import { settingsRoutes } from "./settings/settings-routes";
 import { summaryRoutes } from "./summaries/summary-routes";
+import { candidateRoutes } from "./threads-candidates/candidate-routes";
 import { transferRoutes } from "./transfers/transfer-routes";
 
 import { registerCollect } from "./register";
@@ -41,6 +42,7 @@ function collectRoutes(authed: MiddlewareHandler<AppEnv>) {
     .route("/", closingRoutes(owner))
     .route("/", transferRoutes(owner))
     .route("/", summaryRoutes(owner))
+    .route("/", candidateRoutes(owner))
     .route("/", helperPublicRoutes());
 }
 

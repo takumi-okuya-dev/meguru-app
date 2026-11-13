@@ -234,6 +234,21 @@ description: "Task list for collect 001 event-day collection"
 
 ## Phase 9：User Story 6 - Threadsの宣伝内容から、イベントを選んで作る（Priority: P3）
 
+**2026-11-13 PR4の進め方**：ユーザーの判断で、Threads の側も集金管理のセッションで作った。次の4つに分けた（マージの順も同じ）。
+1. 共通のPR：`PlatformEventPayloads`に Threads の3つの出来事を足し、`emitEvent`を共通の入口から出す。受け取るアプリがまだなくても出せるよう`{ allowNoConsumers: true }`を足した。
+2. Threads のPR：宣伝内容のイベントの情報を作る・直す・消す、アカウントを消す（Metaのデータ削除も）、掲載の状況を変えるときに、同じトランザクションで出来事を書き、あとですぐ届ける。
+3. PR4a（集金管理のAPI・マイグレーション`0037_collect_threads_candidates`）：候補に写す・候補の一覧・作ったイベントの「元が変わった・消された」・退会で候補も消す。
+4. PR4b（集金管理の画面）。
+
+次のように直した・決めた。
+- `postedMedia`は、Threads の媒体の名前のまま送り、集金管理が受け取るときに自分の値に直す（contracts/events.md 2 では Threads が直すとしていたが、Threads が集金管理の値を知らないで済むようにした）。
+- 候補の「起きた時刻」は、イベントの情報（`details_occurred_at`）と掲載の状況（`media_occurred_at`）で分けた（data-model.md の`last_occurred_at`を2つに）。掲載の状況の出来事で、あとから届いた古いイベントの情報を捨ててしまわないため。
+- 掲載の状況の出来事が候補より先に届いたら捨てる（ふつうは宣伝内容を作ったときの「保存した」が先に届く）。
+- 「元が変わった」は、イベントを作ったあとの「保存した」だけで付ける。
+- 候補から作るときは、その主催者に見せている候補の番号だけを受け付ける（ほかは400）。
+- 名簿の画面の掲載済みの媒体は、`GET …/:eventId`の`threadsPostedMedia`で返す。
+- 機能を入れる前からある宣伝内容は、次に保存したときに候補になる（さかのぼって出来事は出さない）。
+
 **Goal**：Threadsの宣伝内容のイベントの情報を候補として受け取り、選んでイベントを作る。
 
 **Independent Test**：spec US6 の Independent Test。quickstart.md 6。
@@ -242,14 +257,14 @@ description: "Task list for collect 001 event-day collection"
 
 ### Tests for User Story 6 ⚠️
 
-- [ ] T073 [P] [US6] `api-test/integration/collect/threads-candidates.test.ts`：`saved`で候補ができる・上書き、`deleted`で消された印、`listing_status.changed`で掲載済みの媒体（021の名前→集金管理の値）、`occurredAt`の古い出来事は捨てる、2回届いても同じ結果、候補は`ownerUserId`の人にだけ返る、そこから作ったイベントに`source_changed_at`・`source_deleted_at`が付く（イベントの中身は変わらない）。research.md R15。
+- [x] T073 [P] [US6] `api-test/integration/collect/threads-candidates.test.ts`：`saved`で候補ができる・上書き、`deleted`で消された印、`listing_status.changed`で掲載済みの媒体（021の名前→集金管理の値）、`occurredAt`の古い出来事は捨てる、2回届いても同じ結果、候補は`ownerUserId`の人にだけ返る、そこから作ったイベントに`source_changed_at`・`source_deleted_at`が付く（イベントの中身は変わらない）。research.md R15。
 - [ ] T074 [P] [US6] `web-test/apps/collect/event-new-threads.test.tsx`：「Threadsのイベントから選ぶ」→ 候補 → 選ぶと名前・日時・会場・定員と区分の下書きが入る、保存するまでできない、候補がない・Threadsを使っていない人には出さないか理由を1行、名簿の媒体で掲載済みが先に並ぶ、「元が変わりました」の表示。
 
 ### Implementation for User Story 6
 
-- [ ] T075 [US6] `collect/schema.ts`に`threads_event_candidates`（data-model.md 2-10）を足す。マイグレーションを作り、SQLを読んでからコミットする。
-- [ ] T076 [US6] `collect/inbox/threads-candidates.ts`：3つの出来事の受け取り（contracts/events.md 2・3）を登録する。T071の退会の受け取りで候補も消す。
-- [ ] T077 [US6] 道筋`GET /api/collect/threads-candidates`と、イベントを作るときの`sourceThreadsPromotionId`の保存。`GET /api/collect/events/:eventId`の`sourceChangedAt`・`sourceDeletedAt`。名簿の画面に返す`postedMedia`。`routes.snapshot.txt`を更新する。
+- [x] T075 [US6] `collect/schema.ts`に`threads_event_candidates`（data-model.md 2-10）を足す。マイグレーションを作り、SQLを読んでからコミットする。
+- [x] T076 [US6] `collect/inbox/threads-candidates.ts`：3つの出来事の受け取り（contracts/events.md 2・3）を登録する。T071の退会の受け取りで候補も消す。
+- [x] T077 [US6] 道筋`GET /api/collect/threads-candidates`と、イベントを作るときの`sourceThreadsPromotionId`の保存。`GET /api/collect/events/:eventId`の`sourceChangedAt`・`sourceDeletedAt`。名簿の画面に返す`postedMedia`。`routes.snapshot.txt`を更新する。
 - [ ] T078 [US6] `wcollect/pages/EventNewPage.tsx`に「Threadsのイベントから選ぶ」、`wcollect/components/roster/`の媒体のボタンに「掲載済み」を先に並べる、イベントの画面に「元が変わりました／消されました」。T074を通す。
 
 **Checkpoint（PR4を出せる）**：quickstart.md 6 が通る。

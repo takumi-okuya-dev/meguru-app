@@ -12,6 +12,7 @@ import { and, asc, count, eq, inArray, sql } from "drizzle-orm";
 import { withTransaction, type Db, type TxDb } from "../../../kernel/db/client";
 import { AppError } from "../../../kernel/errors";
 import { loadOwnedEvent, type CollectEventRow } from "../access";
+import { assertOwnCandidate, postedMediaOf } from "../threads-candidates/candidate-service";
 import { collectEvents, collectPriceTiers, collectReceptionRecords, collectRosterPeople } from "../schema";
 
 type TierRow = typeof collectPriceTiers.$inferSelect;
@@ -145,7 +146,10 @@ export async function listEvents(db: Db, ownerUserId: string, now: Date): Promis
  */
 export async function getEvent(db: Db, ownerUserId: string, eventId: string): Promise<CollectEvent> {
   const row = await loadOwnedEvent(db, ownerUserId, eventId);
-  return toEvent(row, await loadTiers(db, row.id));
+  const event = toEvent(row, await loadTiers(db, row.id));
+  // Threads から作ったイベントは、元の宣伝内容で掲載済みの媒体を添える（名簿の媒体のボタンで先に並べる。FR-064）
+  if (row.sourceThreadsPromotionId) event.threadsPostedMedia = await postedMediaOf(db, row.sourceThreadsPromotionId);
+  return event;
 }
 
 /**
@@ -168,6 +172,8 @@ async function insertTiers(tx: TxDb, eventId: string, tiers: { name: string; amo
  */
 export async function createEvent(databaseUrl: string, ownerUserId: string, input: CreateCollectEventRequest): Promise<CollectEvent> {
   return withTransaction(databaseUrl, async (tx) => {
+    // Threads の候補から作るときは、その主催者に見せている候補だけ（FR-062）
+    if (input.sourceThreadsPromotionId) await assertOwnCandidate(tx, ownerUserId, input.sourceThreadsPromotionId);
     const [row] = await tx
       .insert(collectEvents)
       .values({

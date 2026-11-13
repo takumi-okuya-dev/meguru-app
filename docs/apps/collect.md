@@ -4,7 +4,7 @@
 
 ## 1. API：集金管理（apps/collect）
 
-パターン①の最初の2作目（specs/collect/001-event-day-collection）。運営者が開いた人だけが使う（`registerAppAccess("collect", "granted")`。specs/meguru/030-app-access）。道筋はすべて`/api/collect`の下。主催者の道筋には、ログインと利用の許可の関所（`access.ts`の`collectOwner`）を付ける。関所の外にあるのは、手伝う人の`/api/collect/r/:token/…`（受付用リンクと端末の印`X-Collect-Device`で確かめる）と、会場の共有の`/api/collect/live`（60秒の入場券で確かめる）だけ。今は PR1〜PR3 の分（イベント・料金の区分・名簿・既定値・受付・受付の手伝い・会場の共有・締め・振込待ち・まとめ・書き出し）。
+パターン①の最初の2作目（specs/collect/001-event-day-collection）。運営者が開いた人だけが使う（`registerAppAccess("collect", "granted")`。specs/meguru/030-app-access）。道筋はすべて`/api/collect`の下。主催者の道筋には、ログインと利用の許可の関所（`access.ts`の`collectOwner`）を付ける。関所の外にあるのは、手伝う人の`/api/collect/r/:token/…`（受付用リンクと端末の印`X-Collect-Device`で確かめる）と、会場の共有の`/api/collect/live`（60秒の入場券で確かめる）だけ。今は PR1〜PR4 の分（イベント・料金の区分・名簿・既定値・受付・受付の手伝い・会場の共有・締め・振込待ち・まとめ・書き出し・Threadsのイベントの候補）。
 
 | 小分け | 表 | 処理とAPIの入口 |
 |---|---|---|
@@ -19,8 +19,9 @@
 | `closing/`（締め・書き出し） | `settlements` | `tally.ts`（締めとまとめの数え方）・`closing-service.ts`（受け取った人ごとの精算・PayPayの確かめ・締める。締めたときの版を残し、あとで版が上がったら「締めのあとで変わった」）・`export-csv.ts`（UTF-8のBOMつき・CRLF）・`closing-routes.ts` |
 | `transfers/`（振込待ち） | — | `transfer-service.ts`（すべてのイベントの振込待ちと確かめた記録・確かめる・戻す。受付の画面の版は上げない）・`transfer-routes.ts` |
 | `summaries/`（消す・まとめ） | `event_summaries` | `summary-service.ts`（同じトランザクションで数字だけのまとめを書いてからイベントを消す。名前は入れない）・`summary-routes.ts` |
-| `inbox/`（出来事の受け取り） | `received_events` | `received-events.ts`（`user.withdrawn`：その主催者のイベント・まとめ・既定値をすべて消す） |
-| （直下） | — | `index.ts`（入口`collectModule`。道筋・毎日の処理・`tokenKeys`）・`schema.ts`（11表。スキーマ`collect`）・`access.ts`（関所とイベントの持ち主の確かめ）・`register.ts`（`registerCollect()`：利用の決まりと出来事の受け取りの登録） |
+| `threads-candidates/`（Threadsのイベントの候補） | `threads_event_candidates` | `candidate-service.ts`（持ち主にだけ見せる・イベントを作るときの元の確かめ・掲載済みの媒体）・`candidate-routes.ts`（`GET /api/collect/threads-candidates`） |
+| `inbox/`（出来事の受け取り） | `received_events` | `received-events.ts`（`user.withdrawn`：その主催者のイベント・まとめ・既定値・候補をすべて消す）・`threads-candidates.ts`（Threads の `threads.promotion_event.saved`・`.deleted`・`threads.listing_status.changed` を候補に写し、作ったイベントに「元が変わった・消された」を付ける） |
+| （直下） | — | `index.ts`（入口`collectModule`。道筋・毎日の処理・`tokenKeys`）・`schema.ts`（12表。スキーマ`collect`）・`access.ts`（関所とイベントの持ち主の確かめ）・`register.ts`（`registerCollect()`：利用の決まりと出来事の受け取りの登録） |
 
 ## 2. Web
 
