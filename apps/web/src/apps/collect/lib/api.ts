@@ -1,4 +1,5 @@
-// 集金管理のAPIの呼び出し（specs/collect/001-event-day-collection contracts/api.md 1〜3・7）。道筋は /api/collect/…。
+// 集金管理のAPIの呼び出し（specs/collect/001-event-day-collection contracts/api.md 1〜5・7）。道筋は /api/collect/…。
+// 手伝う人（ログインなし）の呼び出しは helper-api.ts。
 // APIの基本のURL・認証のトークン・エラーの扱いは、共通の部品（lib/api-client.ts の request・requestBlob）を使う。
 import {
   addRosterPersonResponseSchema,
@@ -7,7 +8,16 @@ import {
   collectEventSchema,
   collectMeSchema,
   collectSettingsSchema,
+  liveTicketResponseSchema,
   pastAttendeesResponseSchema,
+  receptionLinkResponseSchema,
+  receptionSnapshotSchema,
+  receptionWorkersResponseSchema,
+  recordReceptionResponseSchema,
+  versionResponseSchema,
+  walkInResponseSchema,
+  type RecordReceptionRequest,
+  type WalkInRequest,
   rosterListSchema,
   rosterPersonSchema,
   type CollectMedia,
@@ -59,4 +69,19 @@ export const collectApi = {
     request("/api/collect/settings/paypay-qr", collectSettingsSchema, { method: "PUT", body: image, headers: { "Content-Type": image.type } }),
   paypayQr: () => requestBlob("/api/collect/settings/paypay-qr"),
   deletePaypayQr: () => request("/api/collect/settings/paypay-qr", collectSettingsSchema, { method: "DELETE" }),
+  // ---- 受付（主催者） ----
+  reception: (eventId: string) => request(`${ev(eventId)}/reception`, receptionSnapshotSchema),
+  record: (eventId: string, personId: string, input: RecordReceptionRequest) =>
+    request(`${ev(eventId)}/reception/${encodeURIComponent(personId)}`, recordReceptionResponseSchema, json("PUT", input)),
+  undo: (eventId: string, personId: string) =>
+    request(`${ev(eventId)}/reception/${encodeURIComponent(personId)}`, versionResponseSchema, { method: "DELETE" }),
+  walkIn: (eventId: string, input: WalkInRequest) => request(`${ev(eventId)}/walk-ins`, walkInResponseSchema, json("POST", input)),
+  liveTicket: (eventId: string) => request(`${ev(eventId)}/live-ticket`, liveTicketResponseSchema, { method: "POST" }),
+  // ---- 受付の手伝い（主催者） ----
+  link: (eventId: string) => request(`${ev(eventId)}/link`, receptionLinkResponseSchema),
+  createLink: (eventId: string, expiresAt?: string) =>
+    request(`${ev(eventId)}/link`, receptionLinkResponseSchema, json("POST", expiresAt ? { expiresAt } : {})),
+  updateLink: (eventId: string, expiresAt: string) => request(`${ev(eventId)}/link`, receptionLinkResponseSchema, json("PATCH", { expiresAt })),
+  stopLink: (eventId: string) => request(`${ev(eventId)}/link/stop`, receptionLinkResponseSchema, { method: "POST" }),
+  workers: (eventId: string) => request(`${ev(eventId)}/helpers`, receptionWorkersResponseSchema),
 };

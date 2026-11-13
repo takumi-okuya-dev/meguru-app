@@ -8,10 +8,13 @@ import { Button } from "@/components/ui/button";
 import { api } from "@/lib/api-client";
 import { queryKeys } from "@/lib/query";
 import { CenteredLayout } from "@/shell";
-import { COLLECT_BASE } from "./lib/paths";
+import { COLLECT_BASE, HELPER_RECEPTION_ROUTE } from "./lib/paths";
 import { EventEditPage } from "./pages/EventEditPage";
 import { EventNewPage } from "./pages/EventNewPage";
 import { EventsPage } from "./pages/EventsPage";
+import { HelperReceptionPage } from "./pages/HelperReceptionPage";
+import { HelpersPage } from "./pages/HelpersPage";
+import { ReceptionPage } from "./pages/ReceptionPage";
 import { RosterPage } from "./pages/RosterPage";
 import { SettingsPage } from "./pages/SettingsPage";
 import { CollectShell } from "./sidebar/CollectShell";
@@ -53,7 +56,12 @@ export const collectRoutes: RouteObject[] = [
       { path: `${COLLECT_BASE}/events/new`, element: <EventNewPage /> },
       { path: `${COLLECT_BASE}/events/:eventId/edit`, element: <EventEditPage /> },
       { path: `${COLLECT_BASE}/events/:eventId/roster`, element: <RosterPage /> },
+      { path: `${COLLECT_BASE}/events/:eventId/reception`, element: <ReceptionPage /> },
+      { path: `${COLLECT_BASE}/events/:eventId/helpers`, element: <HelpersPage /> },
       { path: `${COLLECT_BASE}/settings`, element: <SettingsPage /> },
     ],
   },
 ];
+
+/** ログインのいらないルート（手伝う人の受付。specs/collect/001 contracts/ui-routes.md）。 */
+export const collectPublicRoutes: RouteObject[] = [{ path: HELPER_RECEPTION_ROUTE, element: <HelperReceptionPage /> }];
