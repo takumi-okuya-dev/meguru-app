@@ -21,4 +21,4 @@ specs/people/001-people-memo。運営者が開いた人だけが使える（`reg
 
 | モジュール | 主な中身 |
 |---|---|
-| `apps/people/` | `index.ts`（`peopleApp`）・`routes.tsx`・`shell/`（`PeopleShell`：サイドバーの中身と、767px以下の下のバー）・`pages/`（ホーム・取り込み・イベント）・`components/`（取り込みの段・同じ人の候補のカード）・`lib/`（`api.ts`・`query-keys.ts`・`paths.ts`・`read-csv-file.ts`） |
+| `apps/people/` | `index.ts`（`peopleApp`）・`routes.tsx`・`shell/`（`PeopleShell`：サイドバーの中身と、767px以下の下のバー）・`pages/`（誘う候補・取り込み・イベント・人の一覧・人のページ・人を足す・誘いの文と目標）・`components/`（取り込みの段・同じ人の候補のカード・`person/`（探す欄・絞り込み・人の行・人のページの各段・まとめる・消す・声かけの記録）・`candidates/`（誘う会の選択・目的の切り替え・候補の行と文のコピー・リピーターの段））・`lib/`（`api.ts`・`query-keys.ts`・`paths.ts`・`refresh.ts`・`read-csv-file.ts`） |

@@ -26,9 +26,15 @@ vi.mock("@/lib/api-client", async (orig) => {
   };
 });
 const events = vi.fn();
+const home = {
+  stats: vi.fn(async () => ({ repeaterCount: 0, repeaterGoal: null, nextOwnEvent: null })),
+  settings: vi.fn(async () => ({ inviteTemplate: null, repeaterGoal: null })),
+  candidates: vi.fn(async () => ({ persons: [], total: 0 })),
+  facets: vi.fn(async () => ({ nextAttendance: [], wantedConnections: [], careerInterests: [] })),
+};
 vi.mock("@/apps/people/lib/api", async (orig) => {
   const actual = await orig<typeof import("@/apps/people/lib/api")>();
-  return { ...actual, peopleApi: { ...actual.peopleApi, events } };
+  return { ...actual, peopleApi: { ...actual.peopleApi, events, ...home } };
 });
 
 const { ApiError } = await import("@/lib/api-client");
@@ -38,6 +44,7 @@ const { appById } = await import("@meguru/shared");
 beforeEach(() => {
   available = ["threads", "people"];
   events.mockReset();
+  events.mockResolvedValue([]);
 });
 
 describe("人物メモの入口", () => {
@@ -51,10 +58,16 @@ describe("人物メモの入口", () => {
 });
 
 describe("利用の許可", () => {
-  it("許可のある人には、ホームで「まずアンケートを取り込みましょう」と取り込みへの案内を出す", async () => {
+  it("許可のある人には、ホームに誘う候補を出す。同意した人がまだいなければ取り込みへ案内する", async () => {
     renderRoutes(peopleApp.routes, "/people");
-    expect(await screen.findByRole("heading", { name: "まずアンケートを取り込みましょう" })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /アンケートを取り込む/ })).toHaveAttribute("href", "/people/import");
+    expect(await screen.findByRole("heading", { name: "誘う候補" })).toBeInTheDocument();
+    expect(await screen.findByText(/個別の案内に同意した人が、まだいません/)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "アンケートを取り込む" })).toHaveAttribute("href", "/people/import");
+  });
+
+  it("/people/settings に誘いの文と目標の画面を出す", async () => {
+    renderRoutes(peopleApp.routes, "/people/settings");
+    expect(await screen.findByRole("heading", { name: "誘いの文と目標" })).toBeInTheDocument();
   });
 
   it("/api/me の available に people がない人には、どの画面も「使えない」画面にする", async () => {

@@ -1,7 +1,7 @@
 // 人物メモの移動の項目（specs/people/001-people-memo contracts/ui-routes.md 1）。サイドバーと下のバーで同じものを使う。
-// まだない画面の項目は、そのPRまで出さない（誘いの文と目標：PR3）。
-import { CalendarDaysIcon, FileUpIcon, SendIcon, UsersIcon, type LucideIcon } from "lucide-react";
-import { eventsPath, importPath, peopleHomePath, personsPath } from "../lib/paths";
+// 「誘いの文と目標」（設定）は、サイドバーの下にだけ出す（下のバーには出さない。ホームの「目標を決める」「誘いの文を変える」からも開く）。
+import { CalendarDaysIcon, FileUpIcon, MessageSquareTextIcon, SendIcon, UsersIcon, type LucideIcon } from "lucide-react";
+import { eventsPath, importPath, peopleHomePath, personsPath, settingsPath } from "../lib/paths";
 
 /** 移動の項目。 */
 export type PeopleNavItem = {
@@ -22,3 +22,6 @@ export const PEOPLE_NAV_ITEMS: readonly PeopleNavItem[] = [
   { to: importPath(), label: "取り込み", shortLabel: "取り込み", Icon: FileUpIcon },
   { to: eventsPath(), label: "イベント", shortLabel: "イベント", Icon: CalendarDaysIcon },
 ];
+
+/** サイドバーの下の項目（誘いの文と目標）。 */
+export const PEOPLE_SETTINGS_NAV_ITEM: PeopleNavItem = { to: settingsPath(), label: "誘いの文と目標", shortLabel: "設定", Icon: MessageSquareTextIcon };
