@@ -15,6 +15,17 @@ import { ChoiceButtons } from "./ChoiceButtons";
 export const MEDIA_OPTIONS = COLLECT_MEDIA.map((m) => ({ value: m, label: COLLECT_MEDIA_LABELS[m] }));
 
 /**
+ * 媒体のボタンの並び。Threads から作ったイベントは、元の宣伝内容で掲載済みの媒体を先に並べ、印を付ける（FR-064）。
+ * @param posted - 掲載済みの媒体
+ * @returns ボタンの並び
+ */
+export function mediaOptionsFor(posted: readonly CollectMedia[] = []) {
+  if (posted.length === 0) return MEDIA_OPTIONS;
+  const first = MEDIA_OPTIONS.filter((o) => posted.includes(o.value)).map((o) => ({ ...o, label: `${o.label}（掲載済み）` }));
+  return [...first, ...MEDIA_OPTIONS.filter((o) => !posted.includes(o.value))];
+}
+
+/**
  * 入力が落ち着いてから値を返す（候補を打つたびに読まない）。
  * @param value - 値
  * @param ms - 待つ時間
@@ -44,6 +55,7 @@ export function QuickAdd({
   onTierChange,
   onAdd,
   pending,
+  postedMedia,
 }: {
   eventId: string;
   tiers: readonly CollectTier[];
@@ -53,6 +65,8 @@ export function QuickAdd({
   onTierChange: (id: string) => void;
   onAdd: (input: PersonInput) => Promise<boolean>;
   pending: boolean;
+  /** Threads から作ったイベントの、元の宣伝内容で掲載済みの媒体（先に並べる） */
+  postedMedia?: readonly CollectMedia[];
 }) {
   const [name, setName] = useState("");
   const [kana, setKana] = useState("");
@@ -93,7 +107,7 @@ export function QuickAdd({
     <form onSubmit={(e) => void submit(e)} className="space-y-3 rounded-xl border p-3 sm:p-4" aria-label="名簿に足す">
       <div className="space-y-1.5">
         <div className="text-xs text-muted-foreground">媒体</div>
-        <ChoiceButtons label="媒体" options={MEDIA_OPTIONS} value={media} onChange={onMediaChange} />
+        <ChoiceButtons label="媒体" options={mediaOptionsFor(postedMedia)} value={media} onChange={onMediaChange} />
       </div>
       {tiers.length > 1 && (
         <div className="space-y-1.5">

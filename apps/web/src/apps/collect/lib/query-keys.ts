@@ -20,4 +20,5 @@ export const collectQueryKeys = {
   transfers: (q: string) => ["collect", "transfers", q] as const,
   transfersAll: ["collect", "transfers"] as const,
   summaries: ["collect", "summaries"] as const,
+  threadsCandidates: ["collect", "threads-candidates"] as const,
 };
