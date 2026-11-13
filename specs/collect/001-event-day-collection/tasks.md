@@ -57,7 +57,7 @@ description: "Task list for collect 001 event-day collection"
 - [x] T004 `develop`を取り込み（docs/parallel-development.md 5章）、029で決まった次の3つを読み、plan.md・research.md R2・R3・R12・data-model.md 5・contracts/events.md の言葉と、この一覧の該当のタスクを直す：①共通の入口の関数の名前と返す形（今の利用者・利用権・利用者の情報）②出来事の名前・形・受け取りの手助け（あれば`processed_events`を置き換える）③アプリ専用のスキーマとマイグレーションの作り方。直したことを plan.md の頭に1行で書く。
 - [x] T005 [P] `shared/collect/index.ts`を作り、`shared/index.ts`（パッケージの入口）から書き出す。中身は空の入口だけ。
 - [x] T006 [P] `collect/index.ts`（入口）・`collect/schema.ts`（`pgSchema("collect")`だけ）を作り、`api/db/schema.ts`に`export * from "../apps/collect/schema";`を1行足す。ESLintの境界の規則（`eslint-rules/module-boundaries.js`）が`apps/collect`に当たること（共通の表・`apps/threads`を読むと止まること）を、`eslint-rules/module-boundaries.test.js`に1例ずつ足して確かめる。
-- [ ] T007 [P] `wcollect/index.ts`で`AppModule`（`id: "collect"`・`basePath: "/collect"`・アイコンはlucideの`Wallet`・`startPath: "/collect/events/new"`・`routes`は空の一覧の画面だけ）を出し、`web/app-registry.ts`に1行足す。Webの境界の規則が当たること（`apps/collect` → `apps/threads`が止まる）を`eslint-rules/web-module-boundaries.test.js`に1例足す。
+- [x] T007 [P] `wcollect/index.ts`で`AppModule`（`id: "collect"`・`basePath: "/collect"`・アイコンはlucideの`Wallet`・`startPath: "/collect/events/new"`・`routes`は空の一覧の画面だけ）を出し、`web/app-registry.ts`に1行足す。Webの境界の規則が当たること（`apps/collect` → `apps/threads`が止まる）を`eslint-rules/web-module-boundaries.test.js`に1例足す。
 
 ## Phase 2：Foundational（すべてのUser Storyが頼るもの）
 
@@ -72,9 +72,9 @@ description: "Task list for collect 001 event-day collection"
 - [x] T014 `api-test/integration/collect/access.test.ts`を先に書く：利用権のない人は`/api/collect/*`が403 `APP_NOT_AVAILABLE`、ログインしていない人は401、ほかの主催者のイベントは404（あるかを見せない）。
 - [x] T015 `collect/access.ts`を作る（T014を通す）：共通の入口の関数で今の利用者と`collect`の利用権を確かめるHonoのミドルウェア`requireCollectOwner`と、イベントが主催者のものかを確かめる`loadOwnedEvent(db, ownerUserId, eventId)`。権限の判定はこのファイルに集める（Constitution原則V）。
 - [x] T016 `collect/index.ts`から`collectRoutes`（`/api/collect`の下のHono）を書き出し、`api/app.ts`で登録する。`GET /api/collect/me`（contracts/api.md 1。`hasPaypayQr`・`hasBankText`・`awaitingTransferCount`。PR1では`awaitingTransferCount`は0）を作り、`api-test/repo/routes.snapshot.txt`を更新する。
-- [ ] T017 [P] `wcollect/lib/api.ts`（集金管理の呼び出し。`web/lib/api-client.ts`の共通の土台を使う）・`wcollect/lib/query-keys.ts`・`wcollect/lib/paths.ts`を作る。
-- [ ] T018 [P] `wcollect/sidebar/CollectShell.tsx`と`AppSidebar`の中身（contracts/ui-routes.md 1：イベント／開いているイベントの名簿・受付・受付の手伝い・締め／振込待ち／下にPayPay・振込先の設定）を作る。PR1では、名簿だけを開けるようにし、まだない画面の項目は出さない。Webのテスト`web-test/apps/collect/sidebar.test.tsx`。
-- [ ] T019 [P] `wcollect/routes.tsx`：利用権がない人（`/api/me`の`available`に`collect`がない）には外枠の「使えない」画面を出す。Webのテストを先に書く。
+- [x] T017 [P] `wcollect/lib/api.ts`（集金管理の呼び出し。`web/lib/api-client.ts`の共通の土台を使う）・`wcollect/lib/query-keys.ts`・`wcollect/lib/paths.ts`を作る。
+- [x] T018 [P] `wcollect/sidebar/CollectShell.tsx`と`AppSidebar`の中身（contracts/ui-routes.md 1：イベント／開いているイベントの名簿・受付・受付の手伝い・締め／振込待ち／下にPayPay・振込先の設定）を作る。PR1では、名簿だけを開けるようにし、まだない画面の項目は出さない。Webのテスト`web-test/apps/collect/sidebar.test.tsx`。
+- [x] T019 [P] `wcollect/routes.tsx`：利用権がない人（`/api/me`の`available`に`collect`がない）には外枠の「使えない」画面を出す。Webのテストを先に書く。
 
 **Checkpoint**：集金管理の空の画面が、利用権のある人にだけ出る。
 
@@ -89,7 +89,7 @@ description: "Task list for collect 001 event-day collection"
 - [x] T020 [P] [US1] `api-test/integration/collect/events.test.ts`：イベントを作る（区分1つ以上・`methods`1つ以上、なければ400）、一覧が開催日時の近い順で`rosterCount`などを持つ、直す（区分を足す・並べる・名簿の人が使っている区分を消すと409 `TIER_IN_USE`）（contracts/api.md 2。消すとまとめはPR3）。
 - [x] T021 [P] [US1] `api-test/integration/collect/roster.test.ts`：1人足す（受付番号が足した順・消した番号は使い回さない・`sameNameAs`が同じ名前のときだけ返る）、まとめて足す（APIでも`cleanPastedLine`を当てる・空の行を除く・番号が続く）、飛び入りではない名簿の直す・消す、2つの呼び出しで同時に足しても番号が重ならない（research.md R8）。
 - [x] T022 [P] [US1] `api-test/integration/collect/past-attendees.test.ts`：主催者のほかのイベントの名簿から`name_key`ごとに最後のものを、`name_key`か`kana_key`の部分一致で最大5件、最後に来たイベント名と開催日時つきで返す。いまのイベントにいる人・ほかの主催者の名簿は出ない。`q`が空なら400（FR-027）。
-- [ ] T023 [P] [US1] `web-test/apps/collect/roster.test.tsx`：名前＋Enterで足して欄が空になる・媒体と区分を引き継ぐ・候補を選ぶと名前とふりがなが入る・まとめて貼ると確かめの一覧（`looksLikeNonName`の行は最初から外れている・行を直せる）が出てから足す・同じ名前の知らせ。
+- [x] T023 [P] [US1] `web-test/apps/collect/roster.test.tsx`：名前＋Enterで足して欄が空になる・媒体と区分を引き継ぐ・候補を選ぶと名前とふりがなが入る・まとめて貼ると確かめの一覧（`looksLikeNonName`の行は最初から外れている・行を直せる）が出てから足す・同じ名前の知らせ。
 
 ### Implementation for User Story 1
 
@@ -97,10 +97,10 @@ description: "Task list for collect 001 event-day collection"
 - [x] T025 [US1] `collect/roster/roster-service.ts`・`collect/roster/roster-routes.ts`：1人足す・まとめて足す・直す・消す。受付番号は`events.next_number`を同じトランザクションで`UPDATE … RETURNING`して取る（R8）。`name_key`・`kana_key`は`nameKey()`で入れる。名簿を変えたら`events.version`を1上げる（会場の共有はPR2でつなぐ）。
 - [x] T026 [US1] `collect/roster/past-attendees.ts`と道筋`GET /api/collect/past-attendees`（R9）。
 - [x] T027 [P] [US1] `collect/settings/settings-routes.ts`：`GET/PUT /api/collect/settings`（`bankText`「300文字まで」）と、`PUT/GET/DELETE /api/collect/settings/paypay-qr`（`image/png`・`image/jpeg`だけ・300KBを超えたら413 `IMAGE_TOO_LARGE`。R10）。テスト`api-test/integration/collect/settings.test.ts`を先に書く。
-- [ ] T028 [P] [US1] `wcollect/pages/EventsPage.tsx`（`/collect`：開催日の近い順・数・「受付を開く」など。モックの「イベント」）。
-- [ ] T029 [P] [US1] `wcollect/pages/EventNewPage.tsx`（`/collect/events/new`：一から作る。「Threadsのイベントから選ぶ」はPR4まで出さない）と`wcollect/pages/EventEditPage.tsx`（`/collect/events/:eventId/edit`：直す。消すはT072）。
-- [ ] T030 [US1] `wcollect/pages/RosterPage.tsx`と`wcollect/components/roster/`（続けて入れる欄・媒体のボタン・区分のボタン・候補・まとめて貼る（画面写真の文字の読み取りの案内つき）・確かめの一覧・名簿の表）。T023を通す。
-- [ ] T031 [P] [US1] `wcollect/pages/SettingsPage.tsx`（`/collect/settings`：QRの画像を画面で長い辺1,000px以内に縮めてから送る・振込先の案内）。
+- [x] T028 [P] [US1] `wcollect/pages/EventsPage.tsx`（`/collect`：開催日の近い順・数・「受付を開く」など。モックの「イベント」）。
+- [x] T029 [P] [US1] `wcollect/pages/EventNewPage.tsx`（`/collect/events/new`：一から作る。「Threadsのイベントから選ぶ」はPR4まで出さない）と`wcollect/pages/EventEditPage.tsx`（`/collect/events/:eventId/edit`：直す。消すはT072）。
+- [x] T030 [US1] `wcollect/pages/RosterPage.tsx`と`wcollect/components/roster/`（続けて入れる欄・媒体のボタン・区分のボタン・候補・まとめて貼る（画面写真の文字の読み取りの案内つき）・確かめの一覧・名簿の表）。T023を通す。
+- [x] T031 [P] [US1] `wcollect/pages/SettingsPage.tsx`（`/collect/settings`：QRの画像を画面で長い辺1,000px以内に縮めてから送る・振込先の案内）。
 
 **Checkpoint（PR1を出せる）**：quickstart.md 1 が通る。テスト版で、運営者が開いた人がイベントと名簿を作れる。
 
