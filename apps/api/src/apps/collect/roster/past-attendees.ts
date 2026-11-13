@@ -1,8 +1,9 @@
 // 前回の参加者の候補（specs/collect/001-event-day-collection contracts/api.md 3、FR-027、research.md R9、tasks.md T026）。
-// 主催者のほかのイベントの名簿から、name_key ごとに最後のもの（開催日時が一番新しいイベント）を選び、name_key か kana_key の部分一致で返す。
+// 主催者の、いまのイベントより前に開いたイベントの名簿から、name_key ごとに最後のもの（開催日時が一番新しいイベント）を選び、
+// name_key か kana_key の部分一致で返す。
 // いまのイベントの名簿にいる人と、ほかの主催者の名簿は出さない。
 import { COLLECT_LIMITS, nameKey, type PastAttendee } from "@meguru/shared";
-import { and, desc, eq, ne, notInArray, or, sql } from "drizzle-orm";
+import { and, desc, eq, lt, notInArray, or, sql } from "drizzle-orm";
 import type { Db } from "../../../kernel/db/client";
 import { loadOwnedEvent } from "../access";
 import { collectEvents, collectRosterPeople } from "../schema";
@@ -31,26 +32,32 @@ export async function findPastAttendees(db: Db, ownerUserId: string, eventId: st
   if (key === "") return [];
   const pattern = `%${escapeLike(key)}%`;
   const here = db.select({ nameKey: collectRosterPeople.nameKey }).from(collectRosterPeople).where(eq(collectRosterPeople.eventId, event.id));
-  const rows = await db
+  // 同じ名前ごとに、いまのイベントより前に開いたイベントのうち一番新しいもの（FR-027「過去のイベント」）
+  const latest = db
     .selectDistinctOn([collectRosterPeople.nameKey], {
-      name: collectRosterPeople.name,
-      kana: collectRosterPeople.kana,
-      lastEventName: collectEvents.name,
-      lastEventStartsAt: collectEvents.startsAt,
+      name: sql<string>`${collectRosterPeople.name}`.as("person_name"),
+      kana: sql<string | null>`${collectRosterPeople.kana}`.as("person_kana"),
+      lastEventName: sql<string>`${collectEvents.name}`.as("last_event_name"),
+      lastEventStartsAt: sql<Date>`${collectEvents.startsAt}`.as("last_event_starts_at"),
     })
     .from(collectRosterPeople)
     .innerJoin(collectEvents, eq(collectEvents.id, collectRosterPeople.eventId))
     .where(
       and(
         eq(collectEvents.ownerUserId, ownerUserId),
-        ne(collectEvents.id, event.id),
+        lt(collectEvents.startsAt, event.startsAt),
         or(sql`${collectRosterPeople.nameKey} LIKE ${pattern}`, sql`${collectRosterPeople.kanaKey} LIKE ${pattern}`),
         notInArray(collectRosterPeople.nameKey, here),
       ),
     )
-    .orderBy(collectRosterPeople.nameKey, desc(collectEvents.startsAt), desc(collectRosterPeople.createdAt));
-  return rows
-    .sort((a, b) => b.lastEventStartsAt.getTime() - a.lastEventStartsAt.getTime())
-    .slice(0, COLLECT_LIMITS.pastAttendees)
-    .map((r) => ({ name: r.name, kana: r.kana, lastEventName: r.lastEventName, lastEventStartsAt: r.lastEventStartsAt.toISOString() }));
+    .orderBy(collectRosterPeople.nameKey, desc(collectEvents.startsAt), desc(collectRosterPeople.createdAt))
+    .as("latest");
+  // 最後に来たイベントの新しい順に、5件だけ読む
+  const rows = await db.select().from(latest).orderBy(desc(latest.lastEventStartsAt), latest.name).limit(COLLECT_LIMITS.pastAttendees);
+  return rows.map((r) => ({
+    name: r.name,
+    kana: r.kana,
+    lastEventName: r.lastEventName,
+    lastEventStartsAt: new Date(r.lastEventStartsAt).toISOString(),
+  }));
 }

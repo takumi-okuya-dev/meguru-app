@@ -18,7 +18,7 @@ describe("GET /api/operator/app-registry", () => {
     expect(res.status).toBe(403);
   });
 
-  it("Threadsの3つの機能と2つの上限を、今の表示名と範囲で返す", async () => {
+  it("Threadsの3つの機能と2つの上限を、今の表示名と範囲で返す。集金管理は利用の決まりだけ", async () => {
     const res = await callOp(app, "GET", "/api/operator/app-registry", { user: FEATURE_OPERATOR });
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({
@@ -47,6 +47,8 @@ describe("GET /api/operator/app-registry", () => {
             },
           ],
         },
+        // 集金管理は運営者が開いた人だけが使う。機能のON/OFF・上限は持たない（specs/collect/001-event-day-collection）
+        { app: "collect", access: "granted", featureSwitches: false, operatorLimits: false, features: [], limits: [] },
       ],
     });
   });

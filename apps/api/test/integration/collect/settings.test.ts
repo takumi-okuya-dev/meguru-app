@@ -54,4 +54,24 @@ describe("PayPayのQRの画像", () => {
     expect(await errorOf(await putQr("o1", JPEG, "image/png"))).toEqual([400, "VALIDATION_FAILED"]);
     expect(await errorOf(await putQr("o1", new Uint8Array(), "image/png"))).toEqual([400, "VALIDATION_FAILED"]);
   });
+
+  it("大きさを言わない本文（chunked）でも、300KBを超えたところで 413 にする", async () => {
+    const chunk = new Uint8Array(64 * 1024);
+    let sent = 0;
+    const body = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        if (sent >= 10) return controller.close();
+        sent += 1;
+        controller.enqueue(chunk);
+      },
+    });
+    const res = await app.request(
+      "/api/collect/settings/paypay-qr",
+      { method: "PUT", headers: { Authorization: "Bearer test:o1", "Content-Type": "image/png" }, body, duplex: "half" } as RequestInit,
+      testEnv,
+    );
+    expect(await errorOf(res)).toEqual([413, "IMAGE_TOO_LARGE"]);
+    // 上限を超えたところでやめるので、全部は読まない
+    expect(sent).toBeLessThan(10);
+  });
 });

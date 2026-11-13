@@ -57,6 +57,17 @@ describe("前回の参加者", () => {
     expect(body.candidates.map((c) => c.name)).not.toContain("山田太郎");
   });
 
+  it("いまのイベントより後のイベントの名簿は出さない（過去のイベントだけ）", async () => {
+    const oct = await createCollectEvent(app, "o1", { name: "10月の会", startsAt: "2026-10-10T10:00:00.000Z", endsAt: null });
+    const now = await createCollectEvent(app, "o1", { name: "11月の会" });
+    const jan = await createCollectEvent(app, "o1", { name: "1月の会", startsAt: "2027-01-10T10:00:00.000Z", endsAt: null });
+    await addTo("o1", oct, "松本 れい");
+    await addTo("o1", jan, "松本 れい");
+    await addTo("o1", jan, "松井 けん");
+    const { body } = await search("o1", now.id, "松");
+    expect(body.candidates).toEqual([{ name: "松本 れい", kana: null, lastEventName: "10月の会", lastEventStartsAt: "2026-10-10T10:00:00.000Z" }]);
+  });
+
   it("% や _ は文字として探す。q が空なら 400", async () => {
     const past = await createCollectEvent(app, "o1", { startsAt: "2026-10-10T10:00:00.000Z", endsAt: null });
     const now = await createCollectEvent(app, "o1");

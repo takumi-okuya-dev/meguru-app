@@ -26,6 +26,13 @@ describe("cleanPastedLine", () => {
     expect(cleanPastedLine("3. 木村 ゆうき さん")).toBe("木村 ゆうき");
   });
 
+  it("メールアドレスの前に区切りがなくても、名前は残す", () => {
+    expect(cleanPastedLine("山田太郎,taro@example.com")).toBe("山田太郎");
+    expect(cleanPastedLine("山田太郎（taro@example.com）")).toBe("山田太郎");
+    expect(cleanPastedLine("山田太郎<taro@example.com>")).toBe("山田太郎");
+    expect(cleanPastedLine("山田太郎:taro@example.com")).toBe("山田太郎");
+  });
+
   it("記号や丸数字の頭も除く", () => {
     expect(cleanPastedLine("・佐藤 花子")).toBe("佐藤 花子");
     expect(cleanPastedLine("① 鈴木一郎さん")).toBe("鈴木一郎");
@@ -57,8 +64,10 @@ describe("looksLikeNonName", () => {
     expect(looksLikeNonName("123")).toBe(true);
   });
 
-  it("名前は偽", () => {
+  it("名前は偽（「円」で始まる名字・サロゲートペアの字を含む名前も）", () => {
     expect(looksLikeNonName("松本 れい")).toBe(false);
+    expect(looksLikeNonName("円山 花子")).toBe(false);
+    expect(looksLikeNonName("𠮷".repeat(30))).toBe(false);
     expect(looksLikeNonName("Taro Yamada")).toBe(false);
   });
 });

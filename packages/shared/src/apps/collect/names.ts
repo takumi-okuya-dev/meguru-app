@@ -18,8 +18,8 @@ export function nameKey(name: string): string {
     .toLowerCase();
 }
 
-/** メールアドレス。 */
-const EMAIL = /[^\s@]+@[^\s@]+\.[^\s@]+/g;
+/** メールアドレス（英数字の部分だけ。前に区切りなしで名前が続いても、名前まで消さない）。 */
+const EMAIL = /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g;
 /** 電話番号（0から始まる10〜11桁・+81。区切りのハイフン・空白・かっこを許す）。 */
 const PHONE = /(?:\+81|0)\d{1,4}[-\s(]*\d{1,4}[-\s)]*\d{3,4}/g;
 /** 行の頭の番号や記号（「1.」「2)」「①」「・」「-」「No.3」など）。 */
@@ -27,7 +27,9 @@ const LEADING_MARK = /^(?:no\.?\s*\d+|#?\d+\s*[.)、:．]?|[①-⑳]|[・\-*•�
 /** 敬称（後ろが空白か行の終わりのときだけ。「さんぺい」などの名前の一部は消さない）。 */
 const HONORIFIC = /\s*(?:様|さま|さん|殿)(?=\s|$)/gu;
 /** 行の終わりに残った区切り。 */
-const TRAILING_SEPARATORS = /[\s,、/|｜:：]+$/u;
+const TRAILING_SEPARATORS = /[\s,、/|｜:：<＜(（[［]+$/u;
+/** メールアドレス・電話番号を除いたあとに残った、空のかっこ。 */
+const EMPTY_BRACKETS = /[(（<＜[［]\s*[)）>＞\]］]/gu;
 
 /**
  * 貼った文の1行から、名前だけを取り出す（FR-026）：行の頭の番号や記号・敬称・メールアドレス・電話番号・前後の空白を除く。
@@ -43,14 +45,14 @@ export function cleanPastedLine(line: string): string {
     if (next === s) break;
     s = next;
   }
-  return s.replace(HONORIFIC, "").replace(TRAILING_SEPARATORS, "").replace(/\s+/gu, " ").trim();
+  return s.replace(EMPTY_BRACKETS, " ").replace(HONORIFIC, "").replace(TRAILING_SEPARATORS, "").replace(/\s+/gu, " ").trim();
 }
 
 /** 名前ではなさそうな行の印（日付・申込・チケット・金額など）。 */
 const NON_NAME_PATTERNS: readonly RegExp[] = [
   /\d{1,4}\s*[/／年月]\s*\d{1,2}/u,
   /申込|申し込み|チケット|参加費|合計|枚|件|受付|イベント|開催|会場|定員/u,
-  /[円¥￥]/u,
+  /\d[\d,]*\s*円|[¥￥]\s*\d/u,
   /\d{1,2}:\d{2}/,
 ];
 
@@ -63,7 +65,7 @@ const NON_NAME_PATTERNS: readonly RegExp[] = [
 export function looksLikeNonName(line: string): boolean {
   const s = line.normalize("NFKC").trim();
   if (s === "") return true;
-  if (s.length > 50) return true;
+  if ([...s].length > 50) return true;
   if (!/[\p{L}]/u.test(s)) return true;
   return NON_NAME_PATTERNS.some((p) => p.test(s));
 }

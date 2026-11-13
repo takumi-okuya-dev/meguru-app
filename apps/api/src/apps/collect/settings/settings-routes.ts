@@ -8,6 +8,37 @@ import type { AppEnv } from "../../../platform";
 import { deleteQr, getSettings, loadQr, saveBankText, saveQr, validateQrImage } from "./settings-service";
 
 /**
+ * 本文を、上限のバイト数まで読む。上限を超えたら、その場で読むのをやめて 413 IMAGE_TOO_LARGE（大きな本文を全部メモリに載せない）。
+ * @param body - 本文の流れ（なければ空）
+ * @param limit - 上限のバイト数
+ * @returns 読んだバイト列
+ * @throws AppError IMAGE_TOO_LARGE
+ */
+export async function readLimited(body: ReadableStream<Uint8Array> | null, limit: number): Promise<Uint8Array> {
+  if (!body) return new Uint8Array();
+  const reader = body.getReader();
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    size += value.byteLength;
+    if (size > limit) {
+      await reader.cancel();
+      throw new AppError("IMAGE_TOO_LARGE", 413, "image too large");
+    }
+    chunks.push(value);
+  }
+  const out = new Uint8Array(size);
+  let offset = 0;
+  for (const chunk of chunks) {
+    out.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return out;
+}
+
+/**
  * 既定値の道筋を作る。
  * @param owner - 主催者の関所（collectOwner）
  * @returns Hono のアプリ
@@ -22,10 +53,10 @@ export function settingsRoutes(owner: MiddlewareHandler<AppEnv>) {
       return c.json(await saveBankText(createDb(c.env.DATABASE_URL), c.get("user").id, bankText));
     })
     .put("/settings/paypay-qr", owner, async (c) => {
-      // 本文を読む前に、言われた大きさで大きすぎるものを断る（読んだあとにも確かめる）
+      // 本文を読む前に、言われた大きさで大きすぎるものを断る。言われていなくても、上限を超えたところで読むのをやめる
       const declared = Number(c.req.header("Content-Length") ?? "0");
       if (declared > COLLECT_LIMITS.paypayQrBytes) throw new AppError("IMAGE_TOO_LARGE", 413, "image too large");
-      const bytes = new Uint8Array(await c.req.arrayBuffer());
+      const bytes = await readLimited(c.req.raw.body, COLLECT_LIMITS.paypayQrBytes);
       const type = validateQrImage(c.req.header("Content-Type"), bytes);
       const db = createDb(c.env.DATABASE_URL);
       await saveQr(db, c.get("user").id, bytes, type);
