@@ -44,26 +44,34 @@ description: "Task list for collect 001 event-day collection"
 
 # PR1：土台・イベント・名簿
 
+**2026-11-13 PR1の進め方**：大きいので、**PR1a（共通の関数・API・マイグレーション）**と**PR1b（画面と、`APP_CATALOG`への`collect`の追加）**に分けた。`APP_CATALOG`に足すと`/api/me`の`available`に出るので、画面のあるPR1bで足す。029・030に合わせて、次のように直した（T004）。
+- 共通の置き場所は`packages/shared/src/apps/collect/`（029で`apps/threads/`の隣にした形。一覧の`shared/collect/`はこれに読み替える）。
+- エラーのコードは今の一覧に合わせ、`NOT_FOUND`は`ITEM_NOT_FOUND`、`VALIDATION`は`VALIDATION_FAILED`を使う。新しく足すのは`TIER_IN_USE`・`IMAGE_TOO_LARGE`（PR1）と、PR2・PR3の分だけ。
+- 受け取った出来事の表は、029の決まり（docs/module-map.md 6）に合わせて`received_events`（data-model.md 2-11の`processed_events`）。
+- 退会の出来事の受け取り（その主催者のイベント・既定値を消す）は、PR1でデータを持ち始めるので、PR3からPR1aへ前に出した。まとめ・候補の表ができたら、PR3・PR4で消す対象に足す。
+- 共通への利用の値（`reportUsage`）は、料金の数を0、イベントがあれば「使っている」で伝え、毎日の処理でも数え直す（docs/module-map.md 6 の4）。
+- 名簿の一覧と、名簿を変える応答には、イベントの`version`を入れる（PR2の会場の共有で使う）。
+
 ## Phase 1：Setup（始める前のそろえ）
 
-- [ ] T004 `develop`を取り込み（docs/parallel-development.md 5章）、029で決まった次の3つを読み、plan.md・research.md R2・R3・R12・data-model.md 5・contracts/events.md の言葉と、この一覧の該当のタスクを直す：①共通の入口の関数の名前と返す形（今の利用者・利用権・利用者の情報）②出来事の名前・形・受け取りの手助け（あれば`processed_events`を置き換える）③アプリ専用のスキーマとマイグレーションの作り方。直したことを plan.md の頭に1行で書く。
-- [ ] T005 [P] `shared/collect/index.ts`を作り、`shared/index.ts`（パッケージの入口）から書き出す。中身は空の入口だけ。
-- [ ] T006 [P] `collect/index.ts`（入口）・`collect/schema.ts`（`pgSchema("collect")`だけ）を作り、`api/db/schema.ts`に`export * from "../apps/collect/schema";`を1行足す。ESLintの境界の規則（`eslint-rules/module-boundaries.js`）が`apps/collect`に当たること（共通の表・`apps/threads`を読むと止まること）を、`eslint-rules/module-boundaries.test.js`に1例ずつ足して確かめる。
+- [x] T004 `develop`を取り込み（docs/parallel-development.md 5章）、029で決まった次の3つを読み、plan.md・research.md R2・R3・R12・data-model.md 5・contracts/events.md の言葉と、この一覧の該当のタスクを直す：①共通の入口の関数の名前と返す形（今の利用者・利用権・利用者の情報）②出来事の名前・形・受け取りの手助け（あれば`processed_events`を置き換える）③アプリ専用のスキーマとマイグレーションの作り方。直したことを plan.md の頭に1行で書く。
+- [x] T005 [P] `shared/collect/index.ts`を作り、`shared/index.ts`（パッケージの入口）から書き出す。中身は空の入口だけ。
+- [x] T006 [P] `collect/index.ts`（入口）・`collect/schema.ts`（`pgSchema("collect")`だけ）を作り、`api/db/schema.ts`に`export * from "../apps/collect/schema";`を1行足す。ESLintの境界の規則（`eslint-rules/module-boundaries.js`）が`apps/collect`に当たること（共通の表・`apps/threads`を読むと止まること）を、`eslint-rules/module-boundaries.test.js`に1例ずつ足して確かめる。
 - [ ] T007 [P] `wcollect/index.ts`で`AppModule`（`id: "collect"`・`basePath: "/collect"`・アイコンはlucideの`Wallet`・`startPath: "/collect/events/new"`・`routes`は空の一覧の画面だけ）を出し、`web/app-registry.ts`に1行足す。Webの境界の規則が当たること（`apps/collect` → `apps/threads`が止まる）を`eslint-rules/web-module-boundaries.test.js`に1例足す。
 
 ## Phase 2：Foundational（すべてのUser Storyが頼るもの）
 
 **⚠️ ここが終わるまで、US1〜US6は始めない。**
 
-- [ ] T008 [P] `shared/collect/names.test.ts`を先に書く：`nameKey`（NFKC・カタカナ→ひらがな・空白を除く・小文字。「ﾔﾏﾀﾞ　タロウ」と「やまだたろう」が同じ）、`cleanPastedLine`（`"1. 松本 れい 様 matsumoto@example.com"`→`"松本 れい"`、`"2. 井上 そら 様 090-1234-5678"`→`"井上 そら"`、`"3. 木村 ゆうき さん"`→`"木村 ゆうき"`、空の行→空）、`looksLikeNonName`（`"申込日 11/20"`・`"一般チケット 3,000円"`は真、`"松本 れい"`は偽）。research.md R9。
-- [ ] T009 `shared/collect/names.ts`に T008 の3つの関数を作る（jsdocつき）。
-- [ ] T010 [P] `shared/collect/media.ts`：媒体の値`minato`・`kokuchpro`・`tunagate`・`jimoty`・`peatix`・`youtrust`・`walk_in`・`other`と表示名（港・こくちーずプロ・つなげーと・ジモティー・Peatix・YOUTRUST・当日・その他）、021の媒体の名前との対応表（contracts/events.md 2）。テスト`shared/collect/media.test.ts`も書く。
-- [ ] T011 [P] `shared/collect/schemas.ts`：contracts/api.md の入力と出力の形（zod）。決まりはdata-model.mdのまま写す：イベントの`name`「必須・1〜100文字」、`venue`「100文字まで」、`capacity`「1〜10,000」、`methods`「`cash`・`paypay`・`transfer`の1つ以上」、料金の区分の`name`「1〜20文字」・`amount`「0〜999,999（円）」、名簿の`name`「1〜50文字」・`kana`「50文字まで」・`memo`「200文字まで」、手伝う人の`name`「1〜20文字」、`bankText`「300文字まで」、受付の`method`「`cash`・`paypay`・`transfer_today`・`transfer_later`・`none`」、`clientRequestId`はUUID。エラーのコード（contracts/api.md 0）も定数で書き出す。
-- [ ] T012 `collect/schema.ts`に、US1で使う表を作る（data-model.md 2-1・2-2・2-3・2-8）：`events`（`next_number`の初めは1、`version`の初めは0、`ends_at`は`starts_at`より後のcheck）、`price_tiers`（`event_id`は`ON DELETE CASCADE`）、`roster_people`（`(event_id, number)`一意、`(event_id, name_key)`索引、`media`はT010の値のcheck、`price_tier_id`は`ON DELETE NO ACTION`（`RESTRICT`にしない。イベントを消すときのCASCADEで止まるため。data-model.md 2-2）、`added_by_helper_id`はPR2で外部キーを足すので今は列だけ）、`owner_settings`（`paypay_qr`はbytea）。共通の表への外部キーは張らない（`owner_user_id`はuuidの値だけ）。
-- [ ] T013 マイグレーションを作る：`pnpm --filter api db:generate`でできたSQLを読み、スキーマ`collect`の作成とT012の表だけであることを確かめてコミットする（release-runbook.md 3。番号は`develop`の次）。`api-test/migration/`の今のテストが通ること。
-- [ ] T014 `api-test/integration/collect/access.test.ts`を先に書く：利用権のない人は`/api/collect/*`が403 `APP_NOT_AVAILABLE`、ログインしていない人は401、ほかの主催者のイベントは404（あるかを見せない）。
-- [ ] T015 `collect/access.ts`を作る（T014を通す）：共通の入口の関数で今の利用者と`collect`の利用権を確かめるHonoのミドルウェア`requireCollectOwner`と、イベントが主催者のものかを確かめる`loadOwnedEvent(db, ownerUserId, eventId)`。権限の判定はこのファイルに集める（Constitution原則V）。
-- [ ] T016 `collect/index.ts`から`collectRoutes`（`/api/collect`の下のHono）を書き出し、`api/app.ts`で登録する。`GET /api/collect/me`（contracts/api.md 1。`hasPaypayQr`・`hasBankText`・`awaitingTransferCount`。PR1では`awaitingTransferCount`は0）を作り、`api-test/repo/routes.snapshot.txt`を更新する。
+- [x] T008 [P] `shared/collect/names.test.ts`を先に書く：`nameKey`（NFKC・カタカナ→ひらがな・空白を除く・小文字。「ﾔﾏﾀﾞ　タロウ」と「やまだたろう」が同じ）、`cleanPastedLine`（`"1. 松本 れい 様 matsumoto@example.com"`→`"松本 れい"`、`"2. 井上 そら 様 090-1234-5678"`→`"井上 そら"`、`"3. 木村 ゆうき さん"`→`"木村 ゆうき"`、空の行→空）、`looksLikeNonName`（`"申込日 11/20"`・`"一般チケット 3,000円"`は真、`"松本 れい"`は偽）。research.md R9。
+- [x] T009 `shared/collect/names.ts`に T008 の3つの関数を作る（jsdocつき）。
+- [x] T010 [P] `shared/collect/media.ts`：媒体の値`minato`・`kokuchpro`・`tunagate`・`jimoty`・`peatix`・`youtrust`・`walk_in`・`other`と表示名（港・こくちーずプロ・つなげーと・ジモティー・Peatix・YOUTRUST・当日・その他）、021の媒体の名前との対応表（contracts/events.md 2）。テスト`shared/collect/media.test.ts`も書く。
+- [x] T011 [P] `shared/collect/schemas.ts`：contracts/api.md の入力と出力の形（zod）。決まりはdata-model.mdのまま写す：イベントの`name`「必須・1〜100文字」、`venue`「100文字まで」、`capacity`「1〜10,000」、`methods`「`cash`・`paypay`・`transfer`の1つ以上」、料金の区分の`name`「1〜20文字」・`amount`「0〜999,999（円）」、名簿の`name`「1〜50文字」・`kana`「50文字まで」・`memo`「200文字まで」、手伝う人の`name`「1〜20文字」、`bankText`「300文字まで」、受付の`method`「`cash`・`paypay`・`transfer_today`・`transfer_later`・`none`」、`clientRequestId`はUUID。エラーのコード（contracts/api.md 0）も定数で書き出す。
+- [x] T012 `collect/schema.ts`に、US1で使う表を作る（data-model.md 2-1・2-2・2-3・2-8）：`events`（`next_number`の初めは1、`version`の初めは0、`ends_at`は`starts_at`より後のcheck）、`price_tiers`（`event_id`は`ON DELETE CASCADE`）、`roster_people`（`(event_id, number)`一意、`(event_id, name_key)`索引、`media`はT010の値のcheck、`price_tier_id`は`ON DELETE NO ACTION`（`RESTRICT`にしない。イベントを消すときのCASCADEで止まるため。data-model.md 2-2）、`added_by_helper_id`はPR2で外部キーを足すので今は列だけ）、`owner_settings`（`paypay_qr`はbytea）。共通の表への外部キーは張らない（`owner_user_id`はuuidの値だけ）。
+- [x] T013 マイグレーションを作る：`pnpm --filter api db:generate`でできたSQLを読み、スキーマ`collect`の作成とT012の表だけであることを確かめてコミットする（release-runbook.md 3。番号は`develop`の次）。`api-test/migration/`の今のテストが通ること。
+- [x] T014 `api-test/integration/collect/access.test.ts`を先に書く：利用権のない人は`/api/collect/*`が403 `APP_NOT_AVAILABLE`、ログインしていない人は401、ほかの主催者のイベントは404（あるかを見せない）。
+- [x] T015 `collect/access.ts`を作る（T014を通す）：共通の入口の関数で今の利用者と`collect`の利用権を確かめるHonoのミドルウェア`requireCollectOwner`と、イベントが主催者のものかを確かめる`loadOwnedEvent(db, ownerUserId, eventId)`。権限の判定はこのファイルに集める（Constitution原則V）。
+- [x] T016 `collect/index.ts`から`collectRoutes`（`/api/collect`の下のHono）を書き出し、`api/app.ts`で登録する。`GET /api/collect/me`（contracts/api.md 1。`hasPaypayQr`・`hasBankText`・`awaitingTransferCount`。PR1では`awaitingTransferCount`は0）を作り、`api-test/repo/routes.snapshot.txt`を更新する。
 - [ ] T017 [P] `wcollect/lib/api.ts`（集金管理の呼び出し。`web/lib/api-client.ts`の共通の土台を使う）・`wcollect/lib/query-keys.ts`・`wcollect/lib/paths.ts`を作る。
 - [ ] T018 [P] `wcollect/sidebar/CollectShell.tsx`と`AppSidebar`の中身（contracts/ui-routes.md 1：イベント／開いているイベントの名簿・受付・受付の手伝い・締め／振込待ち／下にPayPay・振込先の設定）を作る。PR1では、名簿だけを開けるようにし、まだない画面の項目は出さない。Webのテスト`web-test/apps/collect/sidebar.test.tsx`。
 - [ ] T019 [P] `wcollect/routes.tsx`：利用権がない人（`/api/me`の`available`に`collect`がない）には外枠の「使えない」画面を出す。Webのテストを先に書く。
@@ -78,17 +86,17 @@ description: "Task list for collect 001 event-day collection"
 
 ### Tests for User Story 1 ⚠️
 
-- [ ] T020 [P] [US1] `api-test/integration/collect/events.test.ts`：イベントを作る（区分1つ以上・`methods`1つ以上、なければ400）、一覧が開催日時の近い順で`rosterCount`などを持つ、直す（区分を足す・並べる・名簿の人が使っている区分を消すと409 `TIER_IN_USE`）（contracts/api.md 2。消すとまとめはPR3）。
-- [ ] T021 [P] [US1] `api-test/integration/collect/roster.test.ts`：1人足す（受付番号が足した順・消した番号は使い回さない・`sameNameAs`が同じ名前のときだけ返る）、まとめて足す（APIでも`cleanPastedLine`を当てる・空の行を除く・番号が続く）、飛び入りではない名簿の直す・消す、2つの呼び出しで同時に足しても番号が重ならない（research.md R8）。
-- [ ] T022 [P] [US1] `api-test/integration/collect/past-attendees.test.ts`：主催者のほかのイベントの名簿から`name_key`ごとに最後のものを、`name_key`か`kana_key`の部分一致で最大5件、最後に来たイベント名と開催日時つきで返す。いまのイベントにいる人・ほかの主催者の名簿は出ない。`q`が空なら400（FR-027）。
+- [x] T020 [P] [US1] `api-test/integration/collect/events.test.ts`：イベントを作る（区分1つ以上・`methods`1つ以上、なければ400）、一覧が開催日時の近い順で`rosterCount`などを持つ、直す（区分を足す・並べる・名簿の人が使っている区分を消すと409 `TIER_IN_USE`）（contracts/api.md 2。消すとまとめはPR3）。
+- [x] T021 [P] [US1] `api-test/integration/collect/roster.test.ts`：1人足す（受付番号が足した順・消した番号は使い回さない・`sameNameAs`が同じ名前のときだけ返る）、まとめて足す（APIでも`cleanPastedLine`を当てる・空の行を除く・番号が続く）、飛び入りではない名簿の直す・消す、2つの呼び出しで同時に足しても番号が重ならない（research.md R8）。
+- [x] T022 [P] [US1] `api-test/integration/collect/past-attendees.test.ts`：主催者のほかのイベントの名簿から`name_key`ごとに最後のものを、`name_key`か`kana_key`の部分一致で最大5件、最後に来たイベント名と開催日時つきで返す。いまのイベントにいる人・ほかの主催者の名簿は出ない。`q`が空なら400（FR-027）。
 - [ ] T023 [P] [US1] `web-test/apps/collect/roster.test.tsx`：名前＋Enterで足して欄が空になる・媒体と区分を引き継ぐ・候補を選ぶと名前とふりがなが入る・まとめて貼ると確かめの一覧（`looksLikeNonName`の行は最初から外れている・行を直せる）が出てから足す・同じ名前の知らせ。
 
 ### Implementation for User Story 1
 
-- [ ] T024 [US1] `collect/events/event-service.ts`・`collect/events/event-routes.ts`：イベントと料金の区分の作る・読む・一覧・直す（contracts/api.md 2。消すはT070）。一覧の数（名簿の人数など）は data-model.md 4 のとおり毎回数える。
-- [ ] T025 [US1] `collect/roster/roster-service.ts`・`collect/roster/roster-routes.ts`：1人足す・まとめて足す・直す・消す。受付番号は`events.next_number`を同じトランザクションで`UPDATE … RETURNING`して取る（R8）。`name_key`・`kana_key`は`nameKey()`で入れる。名簿を変えたら`events.version`を1上げる（会場の共有はPR2でつなぐ）。
-- [ ] T026 [US1] `collect/roster/past-attendees.ts`と道筋`GET /api/collect/past-attendees`（R9）。
-- [ ] T027 [P] [US1] `collect/settings/settings-routes.ts`：`GET/PUT /api/collect/settings`（`bankText`「300文字まで」）と、`PUT/GET/DELETE /api/collect/settings/paypay-qr`（`image/png`・`image/jpeg`だけ・300KBを超えたら413 `IMAGE_TOO_LARGE`。R10）。テスト`api-test/integration/collect/settings.test.ts`を先に書く。
+- [x] T024 [US1] `collect/events/event-service.ts`・`collect/events/event-routes.ts`：イベントと料金の区分の作る・読む・一覧・直す（contracts/api.md 2。消すはT070）。一覧の数（名簿の人数など）は data-model.md 4 のとおり毎回数える。
+- [x] T025 [US1] `collect/roster/roster-service.ts`・`collect/roster/roster-routes.ts`：1人足す・まとめて足す・直す・消す。受付番号は`events.next_number`を同じトランザクションで`UPDATE … RETURNING`して取る（R8）。`name_key`・`kana_key`は`nameKey()`で入れる。名簿を変えたら`events.version`を1上げる（会場の共有はPR2でつなぐ）。
+- [x] T026 [US1] `collect/roster/past-attendees.ts`と道筋`GET /api/collect/past-attendees`（R9）。
+- [x] T027 [P] [US1] `collect/settings/settings-routes.ts`：`GET/PUT /api/collect/settings`（`bankText`「300文字まで」）と、`PUT/GET/DELETE /api/collect/settings/paypay-qr`（`image/png`・`image/jpeg`だけ・300KBを超えたら413 `IMAGE_TOO_LARGE`。R10）。テスト`api-test/integration/collect/settings.test.ts`を先に書く。
 - [ ] T028 [P] [US1] `wcollect/pages/EventsPage.tsx`（`/collect`：開催日の近い順・数・「受付を開く」など。モックの「イベント」）。
 - [ ] T029 [P] [US1] `wcollect/pages/EventNewPage.tsx`（`/collect/events/new`：一から作る。「Threadsのイベントから選ぶ」はPR4まで出さない）と`wcollect/pages/EventEditPage.tsx`（`/collect/events/:eventId/edit`：直す。消すはT072）。
 - [ ] T030 [US1] `wcollect/pages/RosterPage.tsx`と`wcollect/components/roster/`（続けて入れる欄・媒体のボタン・区分のボタン・候補・まとめて貼る（画面写真の文字の読み取りの案内つき）・確かめの一覧・名簿の表）。T023を通す。

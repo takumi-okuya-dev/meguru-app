@@ -54,6 +54,7 @@ import {
   activityRoutes,
   threadsMeRoutes,
 } from "./apps/threads";
+import { collectRoutes, registerCollect } from "./apps/collect";
 
 /** アプリに差し込む依存。テストでは偽の認証を渡す。 */
 export type AppDeps = {
@@ -80,6 +81,7 @@ export const defaultDeps: AppDeps = {
 export function createApp(deps: AppDeps = defaultDeps) {
   // アプリの知らせの受け取りを登録する（specs/027。何度呼んでも1回だけ）
   registerThreads();
+  registerCollect();
   const app = new Hono<AppEnv>();
 
   app.use("/api/*", async (c, next) => {
@@ -227,6 +229,8 @@ export function createApp(deps: AppDeps = defaultDeps) {
     // アプリの利用の許可（specs/meguru/030-app-access FR-005）
     .route("/", operatorAppAccessRoutes(authed))
     .route("/threads", threadsApi)
+    // 集金管理（specs/collect/001-event-day-collection contracts/api.md）。どの道筋も、ログインと集金管理の利用の許可が要る
+    .route("/collect", collectRoutes(authed))
     .route("/", threadsConnectRoutes(authed))
     .route("/", billingRoutes(authed))
     .route("/", stripeWebhookRoutes())

@@ -49,6 +49,11 @@ tester.run("module-boundaries", rule, {
     // 表の定義（schema.ts）は入口として読んでよい（db/schema.ts が共通とThreadsの表を読み直して出す）
     at("db/schema.ts", 'export * from "../platform/schema";'),
     at("db/schema.ts", 'export * from "../apps/threads/schema";'),
+    // 集金管理（specs/collect/001-event-day-collection tasks.md T006）：共通の入口と自分のフォルダーは読んでよい
+    at("apps/collect/events/event-service.ts", 'import { requireAppAccess } from "../../../platform";'),
+    at("apps/collect/events/event-service.ts", 'import { loadOwnedEvent } from "../access";'),
+    at("db/schema.ts", 'export * from "../apps/collect/schema";'),
+    at("app.ts", 'import { collectRoutes } from "./apps/collect";'),
     // strictPlacement：組み立ての場所はよい
     { ...at("jobs/daily-jobs.ts", 'import { x } from "../platform";'), options: [{ strictPlacement: true }] },
     { ...at("app.ts", 'import { x } from "./platform";'), options: [{ strictPlacement: true }] },
@@ -65,6 +70,11 @@ tester.run("module-boundaries", rule, {
     bad("app.ts", 'import { x } from "./apps/threads/drafts/draft-service";', "notEntry"),
     bad("platform/accounts/account-service.ts", 'import { x } from "../../apps/threads";', "platformToApp"),
     bad("apps/sample/index.ts", 'import { x } from "../threads";', "appToApp"),
+    // 集金管理は、共通の表の定義・Threadsのモジュールを読めない（specs/collect/001-event-day-collection tasks.md T006）
+    bad("apps/collect/events/event-service.ts", 'import { users } from "../../../platform/schema";', "appToPlatformSchema"),
+    bad("apps/collect/events/event-service.ts", 'import { accounts } from "../../threads/schema";', "appToApp"),
+    bad("apps/collect/index.ts", 'import { x } from "../threads";', "appToApp"),
+    bad("app.ts", 'import { x } from "./apps/collect/events/event-service";', "notEntry"),
     bad("adapters/stripe/stripe-client.ts", 'import { x } from "../../platform";', "lowerToUpper"),
     bad("kernel/config.ts", 'import { x } from "../adapters/stripe";', "lowerToUpper"),
     bad("kernel/config.ts", 'import { x } from "../platform";', "lowerToUpper"),
