@@ -66,7 +66,9 @@ export function QuickAdd({
     enabled: q !== "" && picked === null,
     staleTime: 30_000,
   });
-  const shown: PastAttendee[] = q !== "" && picked === null ? (candidates.data?.candidates ?? []) : [];
+  // 入力が落ち着くまで（打っている文字と、候補を読んだ文字が違う間）は、古い候補を出さない
+  const live = (name || kana).trim();
+  const shown: PastAttendee[] = q !== "" && q === live && picked === null ? (candidates.data?.candidates ?? []) : [];
 
   /**
    * 足す。成功したら欄を空にして、名前の欄に戻る。
@@ -78,8 +80,10 @@ export function QuickAdd({
     if (!trimmed || pending) return;
     const ok = await onAdd({ name: trimmed, kana: kana.trim() || null, media, priceTierId: tierId });
     if (ok) {
-      setName("");
-      setKana("");
+      // 返事を待つ間に次の人を打ち始めていたら、その文字は消さない
+      const sentKana = kana.trim();
+      setName((cur) => (cur.trim() === trimmed ? "" : cur));
+      setKana((cur) => (cur.trim() === sentKana ? "" : cur));
       setPicked(null);
       nameRef.current?.focus();
     }

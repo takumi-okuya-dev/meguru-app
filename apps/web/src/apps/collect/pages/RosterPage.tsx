@@ -38,6 +38,8 @@ export function RosterPage() {
   const refresh = () => {
     void queryClient.invalidateQueries({ queryKey: collectQueryKeys.roster(eventId) });
     void queryClient.invalidateQueries({ queryKey: collectQueryKeys.events });
+    // 名簿に入った人は候補に出さない（FR-027）ので、候補も読み直す
+    void queryClient.invalidateQueries({ queryKey: collectQueryKeys.pastAttendeesOf(eventId) });
   };
   const add = useMutation({ mutationFn: (input: PersonInput) => collectApi.addPerson(eventId, input), onSuccess: refresh });
   const bulk = useMutation({ mutationFn: (names: string[]) => collectApi.addPeopleBulk(eventId, { names, media, priceTierId: tierId }), onSuccess: refresh });

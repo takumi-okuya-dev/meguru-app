@@ -47,6 +47,7 @@ export function BulkPasteDialog({
   const [rows, setRows] = useState<PasteRow[] | null>(null);
   const chosen = (rows ?? []).filter((r) => r.include && r.name.trim() !== "");
   const tooLong = chosen.some((r) => [...r.name.trim()].length > COLLECT_LIMITS.personName);
+  const tooMany = chosen.length > COLLECT_LIMITS.bulkMax;
   const setRow = (key: number, patch: Partial<PasteRow>) => setRows((cur) => (cur ?? []).map((r) => (r.key === key ? { ...r, ...patch } : r)));
   return (
     <Dialog open onOpenChange={(v) => !v && onClose()}>
@@ -90,13 +91,14 @@ export function BulkPasteDialog({
               ))}
             </ul>
             {tooLong && <p className="text-sm text-destructive">名前は{COLLECT_LIMITS.personName}文字までです。長い行を直してください。</p>}
+            {tooMany && <p className="text-sm text-destructive">一度に足せるのは{COLLECT_LIMITS.bulkMax}人までです。分けて貼ってください。</p>}
             <div className="flex justify-between gap-2">
               <Button type="button" variant="ghost" onClick={() => setRows(null)}>
                 戻る
               </Button>
               <Button
                 type="button"
-                disabled={chosen.length === 0 || tooLong || pending}
+                disabled={chosen.length === 0 || tooLong || tooMany || pending}
                 onClick={async () => {
                   if (await onSubmit(chosen.map((r) => r.name.trim()))) onClose();
                 }}

@@ -103,6 +103,21 @@ describe("続けて入れる", () => {
     await waitFor(() => expect(mocks.addPerson).toHaveBeenLastCalledWith("e1", { name: "木村", kana: null, media: "kokuchpro", priceTierId: "t2" }));
   });
 
+  it("返事を待つ間に打ち始めた次の名前は消さない", async () => {
+    let resolve: (v: unknown) => void = () => {};
+    mocks.addPerson.mockReturnValueOnce(new Promise((r) => (resolve = r)));
+    const user = userEvent.setup();
+    renderRoster();
+    const name = await screen.findByRole("textbox", { name: "名前" });
+    await user.type(name, "松本 れい{Enter}");
+    await user.clear(name);
+    await user.type(name, "井上");
+    resolve({ person: person({}), sameNameAs: null, version: 1 });
+    await waitFor(() => expect(mocks.addPerson).toHaveBeenCalledTimes(1));
+    await new Promise((r) => setTimeout(r, 0));
+    expect(name).toHaveValue("井上");
+  });
+
   it("同じ名前の人がいれば知らせる", async () => {
     mocks.addPerson.mockResolvedValue({ person: person({ number: 2 }), sameNameAs: { number: 1, media: "kokuchpro" }, version: 2 });
     const user = userEvent.setup();

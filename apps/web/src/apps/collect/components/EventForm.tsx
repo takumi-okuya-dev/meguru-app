@@ -11,6 +11,16 @@ import { endsAtFrom, fromJstParts, toJstParts } from "../lib/event-time";
 /** 入力欄の料金の区分（金額は入力の途中の文字のまま持つ）。 */
 type TierDraft = { key: string; id?: string; name: string; amount: string };
 
+/**
+ * 入力の数を数にする（全角の数字・桁の区切りも受ける）。
+ * @param text - 入力
+ * @returns 数（数でなければ NaN）
+ */
+function toNumber(text: string): number {
+  const s = text.normalize("NFKC").replace(/,/g, "").trim();
+  return /^\d+$/.test(s) ? Number(s) : Number.NaN;
+}
+
 let tierSeq = 0;
 const newTier = (name = "", amount = ""): TierDraft => ({ key: `t${++tierSeq}`, name, amount });
 
@@ -74,15 +84,16 @@ export function EventForm({
     if ([...name].length > COLLECT_LIMITS.eventName) problems.push(`イベント名は${COLLECT_LIMITS.eventName}文字までです。`);
     if (!v.date || !v.start) problems.push("開催日と始まりの時刻を入れてください。");
     if (v.methods.length === 0) problems.push("使う払い方を1つ以上選んでください。");
-    const capacity = v.capacity.trim() === "" ? null : Number(v.capacity);
+    const capacity = v.capacity.trim() === "" ? null : toNumber(v.capacity);
     if (capacity !== null && (!Number.isInteger(capacity) || capacity < 1 || capacity > COLLECT_LIMITS.capacityMax)) {
       problems.push(`定員は1〜${COLLECT_LIMITS.capacityMax.toLocaleString("ja-JP")}人で入れてください。`);
     }
-    const tiers = v.tiers.map((t) => ({ id: t.id, name: t.name.trim(), amount: Number(t.amount.replace(/[,，]/g, "")) }));
+    // 金額が空なら、0円にせず入力の誤りにする（招待など0円の区分は「0」と入れてもらう）
+    const tiers = v.tiers.map((t) => ({ id: t.id, name: t.name.trim(), amount: t.amount.trim() === "" ? Number.NaN : toNumber(t.amount) }));
     if (tiers.length === 0) problems.push("料金の区分を1つ以上入れてください。");
     if (tiers.some((t) => !t.name || [...t.name].length > COLLECT_LIMITS.tierName)) problems.push(`区分の名前は1〜${COLLECT_LIMITS.tierName}文字で入れてください。`);
     if (tiers.some((t) => !Number.isInteger(t.amount) || t.amount < 0 || t.amount > COLLECT_LIMITS.tierAmountMax)) {
-      problems.push("金額は0〜999,999円の整数で入れてください。");
+      problems.push("金額は0〜999,999円の整数で入れてください（0円の区分は「0」と入れてください）。");
     }
     setErrors(problems);
     if (problems.length > 0) return;
