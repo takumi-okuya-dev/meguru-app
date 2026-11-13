@@ -187,14 +187,14 @@ export type OutreachStage = (typeof OUTREACH_STAGES)[OutreachPurpose][number];
 /** リピーターの目標の上限。 */
 export const REPEATER_GOAL_MAX = 10_000;
 
-/** 誘う候補のクエリで「誘う会を選んでいない」を表す値（eventId を書かなければ、API が次の自分の会を選ぶ）。 */
-export const NO_INVITE_EVENT = "none";
+/** 誘う候補のクエリで「次の自分の会を API が選ぶ」を表す値（eventId を書かなければ、誘う会を選んでいない）。 */
+export const NEXT_INVITE_EVENT = "next";
 
 /** GET /api/people/candidates のクエリ（人の一覧の絞り込み＋目的・誘う会・前に来た。FR-018・FR-019）。 */
 export const candidateQuerySchema = personListQuerySchema.extend({
   purpose: z.enum(OUTREACH_PURPOSES),
-  // 誘う会：書かなければ次の自分の会、none なら選んでいない（交流会への誘いのときだけ使う）
-  eventId: z.union([id, z.literal(NO_INVITE_EVENT)]).optional(),
+  // 誘う会：next なら次の自分の会、書かなければ選んでいない（交流会への誘いのときだけ使う）
+  eventId: z.union([id, z.literal(NEXT_INVITE_EVENT)]).optional(),
   visitedOwn: z
     .enum(["true", "false"])
     .optional()

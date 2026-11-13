@@ -1,7 +1,7 @@
 // 「/people」：誘う候補（ホーム。specs/people/001-people-memo contracts/ui-routes.md 1・3、spec US3・US5、research.md R17）。
 // 上にリピーターの数と目標・目的の切り替え（?purpose=work）・誘う会の選択・絞り込み・候補の行。
 // 同意のない人はAPIが返さない（画面では絞らない）。URLに置くのは目的だけ。探す言葉と絞り込みは画面の中にだけ置く（R18）。
-import { NO_INVITE_EVENT, type CandidateList, type OutreachPurpose, type PeopleEvent } from "@meguru/shared/people";
+import { NEXT_INVITE_EVENT, type CandidateList, type OutreachPurpose, type PeopleEvent } from "@meguru/shared/people";
 import { useQuery } from "@tanstack/react-query";
 import { ChevronDownIcon, SlidersHorizontalIcon } from "lucide-react";
 import { useRef, useState } from "react";
@@ -125,9 +125,16 @@ export function CandidatesPage() {
   const [sort, setSort] = useState<CandidateSort>("last_met");
 
   const ownEvents: PeopleEvent[] = (events.data ?? []).filter((e) => e.isOwn);
-  // 誘う会：選んでいなければ API が次の自分の会を選ぶ（eventId を送らない）。選んだ会が一覧にない（消した会など）ときは「選んでいない」
+  // 誘う会：選んでいなければ（undefined）API が次の自分の会を選ぶ（next を送る）。空の文字は「選んでいない」（eventId を送らない）
+  const nextOwn = stats.data?.nextOwnEvent ?? null;
+  // 選べると分かっている会（イベントの一覧の自分の会と、次の自分の会）。選んだ会がここにない（消した会など）ときは「選んでいない」
+  const knownEvents = nextOwn && !ownEvents.some((e) => e.id === nextOwn.id) ? [nextOwn, ...ownEvents] : ownEvents;
   const inviteEventParam =
-    eventChoice === undefined ? undefined : eventChoice === "" || (events.isSuccess && !ownEvents.some((e) => e.id === eventChoice)) ? NO_INVITE_EVENT : eventChoice;
+    eventChoice === undefined
+      ? NEXT_INVITE_EVENT
+      : eventChoice === "" || (events.isSuccess && !knownEvents.some((e) => e.id === eventChoice))
+        ? undefined
+        : eventChoice;
   // 設定が読めないときは初めの型（null）で文を作る。読み込み中は undefined（コピーを待つ）
   const template = settings.isSuccess ? settings.data.inviteTemplate : settings.isError ? null : undefined;
 
@@ -151,11 +158,13 @@ export function CandidatesPage() {
     placeholderData: (prev, prevQuery) =>
       prevQuery?.queryKey[3].purpose === purpose && prevQuery.queryKey[3].eventId === params.eventId ? prev : undefined,
   });
-  // 行の声かけを読んだ誘う会（API が決めた会。読み込み中は、選んだ会があればそれ）
+  // 行の声かけを読んだ誘う会（API が決めた会）
   const inviteEvent = purpose === "invite" ? (candidates.data?.inviteEvent ?? null) : null;
-  const inviteEventId = inviteEventParam === NO_INVITE_EVENT ? "" : (inviteEventParam ?? inviteEvent?.id ?? "");
-  // 選べる会：イベントの一覧が読めるまで・読めないときも、API が決めた会は出す
-  const pickerEvents = inviteEvent && !ownEvents.some((e) => e.id === inviteEvent.id) ? [inviteEvent, ...ownEvents] : ownEvents;
+  // 選択の欄の値：選んだ会。任せているときは API が決めた会、候補を読むまでは次の自分の会
+  const inviteEventId =
+    inviteEventParam === undefined ? "" : inviteEventParam !== NEXT_INVITE_EVENT ? inviteEventParam : (inviteEvent?.id ?? nextOwn?.id ?? "");
+  // 選べる会：イベントの一覧が読めるまで・読めないときも、次の自分の会と API が決めた会は出す（選び直せるように）
+  const pickerEvents = inviteEvent && !knownEvents.some((e) => e.id === inviteEvent.id) ? [inviteEvent, ...knownEvents] : knownEvents;
 
   const filterCount = activeFilterCount(filters) + (visitedOwn ? 1 : 0);
   const searching = q !== "" || filterCount > 0;

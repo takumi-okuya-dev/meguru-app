@@ -97,7 +97,7 @@ describe("誘う候補", () => {
     expect(all.persons.every((p) => p.outreach === null)).toBe(true);
   });
 
-  it("誘う会を書かなければ次の自分の会（ホームの数字と同じ会）で、その会への声かけが行に入る。none なら選んでいない", async () => {
+  it("eventId=next なら次の自分の会（ホームの数字と同じ会）で、その会への声かけが行に入る。書かなければ選んでいない", async () => {
     // 次の自分の会は今日の日付で変わるので、ホームの数字（stats）の nextOwnEvent と比べる。なければ足す
     let [, stats] = await read<{ nextOwnEvent: { id: string } | null }>(await callPeople("GET", "/stats", "u1"));
     if (!stats.nextOwnEvent) {
@@ -107,15 +107,15 @@ describe("誘う候補", () => {
     const nextId = stats.nextOwnEvent!.id;
     const [taro] = (await rawSql()`SELECT id FROM people.persons WHERE line_name = 'たろう'`) as { id: string }[];
     await callPeople("POST", "/outreaches", "u1", { personId: taro!.id, purpose: "invite", eventId: nextId });
-    const auto = (await candidates("purpose=invite")) as List & { inviteEvent: { id: string } | null };
+    const auto = (await candidates("purpose=invite&eventId=next")) as List & { inviteEvent: { id: string } | null };
     expect(auto.inviteEvent?.id).toBe(nextId);
     expect(auto.persons.find((p) => p.id === taro!.id)!.outreach?.event?.id).toBe(nextId);
-    const none = (await candidates("purpose=invite&eventId=none")) as List & { inviteEvent: unknown };
+    const none = (await candidates("purpose=invite")) as List & { inviteEvent: unknown };
     expect(none.inviteEvent).toBeNull();
     expect(none.persons.every((p) => p.outreach === null)).toBe(true);
     const chosen = (await candidates(`purpose=invite&eventId=${oct}`)) as List & { inviteEvent: { id: string; name: string } | null };
     expect(chosen.inviteEvent).toMatchObject({ id: oct, name: "10月の会" });
-    const work = (await candidates("purpose=work")) as List & { inviteEvent: unknown };
+    const work = (await candidates("purpose=work&eventId=next")) as List & { inviteEvent: unknown };
     expect(work.inviteEvent).toBeNull();
     expect((await callPeople("GET", "/candidates?purpose=invite&eventId=nope", "u1")).status).toBe(400);
   });
@@ -124,7 +124,7 @@ describe("誘う候補", () => {
     await rawSql()`DELETE FROM people.events WHERE user_id = (SELECT user_id FROM people.events WHERE id = ${dec}) AND held_on >= current_date - 1 AND is_own`;
     const [, stats] = await read<{ nextOwnEvent: unknown }>(await callPeople("GET", "/stats", "u1"));
     expect(stats.nextOwnEvent).toBeNull();
-    expect(((await candidates("purpose=invite")) as List & { inviteEvent: unknown }).inviteEvent).toBeNull();
+    expect(((await candidates("purpose=invite&eventId=next")) as List & { inviteEvent: unknown }).inviteEvent).toBeNull();
   });
 
   it("仕事のつなぎでは誘う会を見ない（消えた会の番号でも 404 にしない）。交流会への誘いでは 404", async () => {

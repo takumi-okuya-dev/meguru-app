@@ -81,16 +81,23 @@ export async function loadOwnedRow<T extends OwnedTable>(db: PeopleDb, table: T,
  * 作り手の中で、同じ名前（nameKey）の行がほかにあれば 409 PEOPLE_NAME_TAKEN（直すときは自分自身を除く。タグ・自由な項目）。
  * @param tx - トランザクション（作り手のロックの中で呼ぶ）
  * @param table - 表
- * @param keyColumn - nameKey の列
+ * @param keyName - nameKey の列の名前（同じ表の列だけ渡せる）
  * @param userId - 作り手
  * @param key - nameKey
  * @param exceptId - 除く行
  */
-export async function assertKeyFree<T extends OwnedTable>(tx: TxDb, table: T, keyColumn: PgColumn, userId: string, key: string, exceptId?: string): Promise<void> {
+export async function assertKeyFree<T extends OwnedTable, K extends { [C in keyof T]: T[C] extends PgColumn ? C : never }[keyof T]>(
+  tx: TxDb,
+  table: T,
+  keyName: K,
+  userId: string,
+  key: string,
+  exceptId?: string,
+): Promise<void> {
   const [same] = await tx
     .select({ id: table.id })
     .from(table as PgTable)
-    .where(and(eq(table.userId, userId), eq(keyColumn, key)));
+    .where(and(eq(table.userId, userId), eq(table[keyName] as PgColumn, key)));
   if (same && same.id !== exceptId) throw new AppError("PEOPLE_NAME_TAKEN", 409, "name taken");
 }
 

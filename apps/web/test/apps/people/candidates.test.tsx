@@ -22,12 +22,12 @@ const api = {
 let nextOwn: { id: string; name: string; heldOn: string; isOwn: boolean } | null = null;
 vi.mock("@/apps/people/lib/api", async (orig) => {
   const actual = await orig<typeof import("@/apps/people/lib/api")>();
-  // 候補の返りの inviteEvent は API と同じ決め方で足す（eventId なし→次の自分の会、none→なし、仕事のつなぎ→なし）
+  // 候補の返りの inviteEvent は API と同じ決め方で足す（next→次の自分の会、なし→なし、仕事のつなぎ→なし）
   const candidates = async (p: { purpose: string; eventId?: string }) => {
     const res = await api.candidates(p);
     const known = [EVENT_1213, EVENT_1125, EVENT_1011].find((e) => e.id === p.eventId);
     const inviteEvent =
-      p.purpose !== "invite" || p.eventId === "none" ? null : p.eventId ? (known ? { id: known.id, name: known.name, heldOn: known.heldOn, isOwn: true } : null) : nextOwn;
+      p.purpose !== "invite" || !p.eventId ? null : p.eventId === "next" ? nextOwn : known ? { id: known.id, name: known.name, heldOn: known.heldOn, isOwn: true } : null;
     return { inviteEvent, ...res };
   };
   return { ...actual, peopleApi: { ...actual.peopleApi, ...api, candidates } };
@@ -110,8 +110,8 @@ describe("誘う候補", () => {
     expect(row).toHaveTextContent("最後に会った日 2026年10月11日");
     expect(within(row).getByText("次回：参加したい")).toBeInTheDocument();
     expect(within(row).getByRole("link", { name: /山田はなこ/ })).toHaveAttribute("href", "/people/list/p1");
-    // 誘う会を送らない（API が次の自分の会を選ぶ）
-    expect(api.candidates).toHaveBeenLastCalledWith(expect.objectContaining({ purpose: "invite", eventId: undefined, offset: 0 }));
+    // 誘う会は API に任せる（next。API が次の自分の会を選ぶ）
+    expect(api.candidates).toHaveBeenLastCalledWith(expect.objectContaining({ purpose: "invite", eventId: "next", offset: 0 }));
     // 選べるのは自分の会だけ
     const picker = screen.getByLabelText("誘う会");
     expect(picker).toHaveValue("e3");
@@ -127,7 +127,7 @@ describe("誘う候補", () => {
     await user.click(screen.getByRole("button", { name: /絞り込み/ }));
     expect(screen.queryByLabelText("来たイベント")).not.toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "前に来た" }));
-    await waitFor(() => expect(api.candidates).toHaveBeenLastCalledWith(expect.objectContaining({ visitedOwn: true, eventId: undefined })));
+    await waitFor(() => expect(api.candidates).toHaveBeenLastCalledWith(expect.objectContaining({ visitedOwn: true, eventId: "next" })));
     await user.click(screen.getByRole("button", { name: "参加できそう" }));
     await waitFor(() => expect(api.candidates).toHaveBeenLastCalledWith(expect.objectContaining({ visitedOwn: true, next: ["参加できそう"] })));
     await user.click(screen.getByRole("button", { name: "絞り込みを外す" }));
@@ -342,13 +342,13 @@ describe("誘う候補", () => {
     expect(api.candidates).toHaveBeenCalledTimes(1);
   });
 
-  it("「選んでいません」を選ぶと none を送り、文をコピーできない", async () => {
+  it("「選んでいません」を選ぶと誘う会を送らず、文をコピーできない", async () => {
     const user = userEvent.setup();
     renderRoutes(ROUTES, "/people");
     await firstRow();
     await waitFor(() => expect(screen.getByLabelText("誘う会")).toBeEnabled());
     await user.selectOptions(screen.getByLabelText("誘う会"), "");
-    await waitFor(() => expect(api.candidates).toHaveBeenLastCalledWith(expect.objectContaining({ eventId: "none" })));
+    await waitFor(() => expect(api.candidates).toHaveBeenLastCalledWith(expect.objectContaining({ eventId: undefined })));
     const row = await firstRow();
     await waitFor(() => expect(within(row).getByRole("button", { name: /文をコピー/ })).toBeDisabled());
     expect(screen.getByLabelText("誘う会")).toHaveValue("");
@@ -365,5 +365,10 @@ describe("誘う候補", () => {
     expect(screen.getByLabelText("誘う会")).toHaveValue("e3");
     await user.click(within(row).getByRole("button", { name: /文をコピー/ }));
     expect(writeText).toHaveBeenCalledWith(expect.stringContaining("IT交流会 12/13"));
+    // 「選んでいません」にしても、次の自分の会を選び直せる
+    await user.selectOptions(screen.getByLabelText("誘う会"), "");
+    await waitFor(() => expect(api.candidates).toHaveBeenLastCalledWith(expect.objectContaining({ eventId: undefined })));
+    await user.selectOptions(screen.getByLabelText("誘う会"), "e3");
+    await waitFor(() => expect(api.candidates).toHaveBeenLastCalledWith(expect.objectContaining({ eventId: "e3" })));
   });
 });

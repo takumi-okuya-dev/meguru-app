@@ -66,7 +66,7 @@ export async function createField(env: Env, userId: string, label: string): Prom
   return withTransaction(env.DATABASE_URL, async (tx) => {
     await lockActiveOwner(tx, env, userId);
     const key = nameKey(label);
-    await assertKeyFree(tx, peopleCustomFields, peopleCustomFields.labelKey, userId, key);
+    await assertKeyFree(tx, peopleCustomFields, "labelKey", userId, key);
     const [stat] = await tx.select({ n: count(), last: max(peopleCustomFields.position) }).from(peopleCustomFields).where(eq(peopleCustomFields.userId, userId));
     if ((stat?.n ?? 0) >= FIELDS_MAX) throw new AppError("VALIDATION_FAILED", 400, "invalid request", undefined, ["label"]);
     const [row] = await tx
@@ -90,7 +90,7 @@ export async function renameField(env: Env, userId: string, fieldId: string, lab
     await lockOwner(tx, userId);
     const f = await loadOwnedField(tx, userId, fieldId);
     const key = nameKey(label);
-    await assertKeyFree(tx, peopleCustomFields, peopleCustomFields.labelKey, userId, key, f.id);
+    await assertKeyFree(tx, peopleCustomFields, "labelKey", userId, key, f.id);
     await tx.update(peopleCustomFields).set({ label, labelKey: key }).where(eq(peopleCustomFields.id, f.id));
     return { id: f.id, label, position: f.position };
   });

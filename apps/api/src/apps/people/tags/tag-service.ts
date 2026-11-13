@@ -49,7 +49,7 @@ export async function createTag(env: Env, userId: string, name: string): Promise
   return withTransaction(env.DATABASE_URL, async (tx) => {
     await lockActiveOwner(tx, env, userId);
     const key = nameKey(name);
-    await assertKeyFree(tx, peopleTags, peopleTags.nameKey, userId, key);
+    await assertKeyFree(tx, peopleTags, "nameKey", userId, key);
     const [n] = await tx.select({ n: count() }).from(peopleTags).where(eq(peopleTags.userId, userId));
     if ((n?.n ?? 0) >= TAGS_MAX) throw new AppError("VALIDATION_FAILED", 400, "invalid request", undefined, ["name"]);
     const [row] = await tx.insert(peopleTags).values({ userId, name, nameKey: key }).returning({ id: peopleTags.id, name: peopleTags.name });
@@ -70,7 +70,7 @@ export async function renameTag(env: Env, userId: string, tagId: string, name: s
     await lockOwner(tx, userId);
     const tag = await loadOwnedTag(tx, userId, tagId);
     const key = nameKey(name);
-    await assertKeyFree(tx, peopleTags, peopleTags.nameKey, userId, key, tag.id);
+    await assertKeyFree(tx, peopleTags, "nameKey", userId, key, tag.id);
     await tx.update(peopleTags).set({ name, nameKey: key }).where(eq(peopleTags.id, tag.id));
     return { id: tag.id, name };
   });
