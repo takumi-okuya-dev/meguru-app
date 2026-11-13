@@ -10,4 +10,10 @@ export const collectQueryKeys = {
   pastAttendeesOf: (eventId: string) => ["collect", "past-attendees", eventId] as const,
   settings: ["collect", "settings"] as const,
   paypayQr: ["collect", "paypay-qr"] as const,
+  reception: (eventId: string) => ["collect", "reception", eventId] as const,
+  link: (eventId: string) => ["collect", "link", eventId] as const,
+  workers: (eventId: string) => ["collect", "workers", eventId] as const,
+  helperInfo: (token: string) => ["collect", "helper", token, "info"] as const,
+  helperReception: (token: string) => ["collect", "helper", token, "reception"] as const,
+  helperPaypayQr: (token: string) => ["collect", "helper", token, "paypay-qr"] as const,
 };
