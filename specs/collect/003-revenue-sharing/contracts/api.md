@@ -16,7 +16,7 @@
   revenue: { paid: number, awaiting: number, awaitingConfirmation: number },
   expenses: Expense[],              // { id, name, amount, payer: { memberId: string | null, name: string } | null }
   expenseTotal: number,
-  members: TeamMember[],            // { id, name, role, ratioTenths: number | null, isOwner, linked: boolean, invite: { expiresAt } | null }
+  members: SharingMember[],            // { id, name, role, ratioTenths: number | null, isOwner, linked: boolean, invite: { expiresAt } | null }
   maxRatioTenths: number | null,    // リーダーの傾斜の合計の上限（メンバーがいないときは null）
   current: Distribution,            // A＝支払い済み − 経費
   projected: Distribution,          // A′＝支払い済み＋振込待ち − 経費

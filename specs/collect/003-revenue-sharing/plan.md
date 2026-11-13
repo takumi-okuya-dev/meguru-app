@@ -18,7 +18,7 @@
 
 001 と同じ（TypeScript・Hono・Drizzle・zod・React・TanStack Query・Cloudflare Workers・Neon）。新しい依存は足さない。
 
-- **ストレージ**：`collect` スキーマに表を3つ（`expenses`・`team_members`・`team_invites`）、2つの表に列を足す（[data-model.md](./data-model.md)）。マイグレーション1つ（PR1）。
+- **ストレージ**：`collect` スキーマに表を3つ（`expenses`・`sharing_members`・`sharing_invites`）、2つの表に列を足す（[data-model.md](./data-model.md)）。マイグレーション1つ（PR1）。
 - **テスト**：分配の計算の単体テスト（spec の例・端数・リーダー2人・全員リーダー・1人・赤字・傾斜の上限）、API の結合テスト（経費・運営メンバー・傾斜の上限・分配のもと（確かめ待ち・振込待ち）・紹介経由の売上・招待（出す・出し直し・止める・期限・受ける・主催者・二重）・つながった人の道筋（利用の許可なしで見える・ほかのイベントは 404・名簿が出ない）・退会・まとめ・CSV）、Web のテスト、E2E（主催者と招待された人の2つのブラウザ）。
 - **性能の目標**：分配の画面を開くのは締めの画面と同じ問い合わせの数＋2（経費・運営メンバー）。
 - **制約**：パターン①。共通のファイルは変えない見込み（`routes.snapshot.txt` だけ）。お金を動かさない。

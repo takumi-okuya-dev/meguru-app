@@ -6,34 +6,34 @@
 
 ## Phase 1: 共通の形と計算（PR1）
 
-- [ ] T001 分配の計算 `computeDistribution(amount, members)` を packages/shared/src/apps/collect/distribution.ts に作る（research R1：円の整数・`ratioTenths`・端数は最初のリーダー→主催者→最初の人・全員リーダーは比で分ける・1人・赤字は |A| で負担の目安）。傾斜の上限 `maxRatioTenths(members)`（R2：メンバーがいれば N×10、いなければ null）も
-- [ ] T002 [P] 単体テスト packages/shared/test/collect/distribution.test.ts（20,000円・4人・12 → 6,002／4,666×3、15 → 7,502／4,166、リーダー2人、全員リーダー、1人、メンバーだけ、赤字、合計がいつも A と同じ（ばらばらの入力で試す））
-- [ ] T003 [P] 形とエラーのコードを packages/shared/src/apps/collect/sharing.ts と errors.ts に足す（`SharingSnapshot`・`Expense`・`TeamMember`・`Distribution`・入力の形（経費の名前1〜40文字・金額1〜999,999・運営メンバーの名前1〜40文字・`ratioTenths` 10〜50）・`RATIO_TOO_HIGH`・`ALREADY_LINKED`・`INVITE_INACTIVE`・つながった人の形）。`referrerKey(name)`（敬称を除いて `nameKey`）を names.ts に、名簿の人の形に `referrer` を足す
+- [x] T001 分配の計算 `computeDistribution(amount, members)` を packages/shared/src/apps/collect/distribution.ts に作る（research R1：円の整数・`ratioTenths`・端数は最初のリーダー→主催者→最初の人・全員リーダーは比で分ける・1人・赤字は |A| で負担の目安）。傾斜の上限 `maxRatioTenths(members)`（R2：メンバーがいれば N×10、いなければ null）も
+- [x] T002 [P] 単体テスト packages/shared/test/collect/distribution.test.ts（20,000円・4人・12 → 6,002／4,666×3、15 → 7,502／4,166、リーダー2人、全員リーダー、1人、メンバーだけ、赤字、合計がいつも A と同じ（ばらばらの入力で試す））
+- [x] T003 [P] 形とエラーのコードを packages/shared/src/apps/collect/sharing.ts と errors.ts に足す（`SharingSnapshot`・`Expense`・`SharingMember`・`Distribution`・入力の形（経費の名前1〜40文字・金額1〜999,999・運営メンバーの名前1〜40文字・`ratioTenths` 10〜50）・`RATIO_TOO_HIGH`・`ALREADY_LINKED`・`INVITE_INACTIVE`・つながった人の形）。`referrerKey(name)`（敬称を除いて `nameKey`）を names.ts に、名簿の人の形に `referrer` を足す
 
 ## Phase 2: 表（PR1）
 
-- [ ] T004 apps/api/src/apps/collect/schema.ts に `expenses`・`team_members`・`team_invites` と、`roster_people.referrer`・`referrer_key`、`event_summaries.expense_total`・`referred` を足す（data-model.md 1・2 の check と索引のとおり）。`pnpm db:generate` でマイグレーションを作り、頭に説明を書く
-- [ ] T005 docs/apps/collect.md の表の一覧と数を直す
+- [x] T004 apps/api/src/apps/collect/schema.ts に `expenses`・`sharing_members`・`sharing_invites` と、`roster_people.referrer`・`referrer_key`、`event_summaries.expense_total`・`referred` を足す（data-model.md 1・2 の check と索引のとおり）。`pnpm db:generate` でマイグレーションを作り、頭に説明を書く
+- [x] T005 docs/apps/collect.md の表の一覧と数を直す
 
 ## Phase 3: User Story 1・2 経費と分配（PR1、P1）
 
-- [ ] T006 [US1] apps/api/src/apps/collect/sharing/sharing-service.ts：`sharingSnapshot`（主催者の行がなければ作る・tally で支払い済みと振込待ち・経費・運営メンバー・招待・今と見込みの分配・立て替えの戻し）
-- [ ] T007 [US1] 経費の足す・直す・消す（上限100件・立て替えた人は運営メンバーか名前のどちらか）を sharing-service.ts に
-- [ ] T008 [US2] 運営メンバーの足す・直す・消す・つながりを外す（上限20人・傾斜の上限 `RATIO_TOO_HIGH`・リーダーの既定12・主催者の行のつながりは外せない）を sharing-service.ts に
-- [ ] T009 [US1] [US2] 道筋を apps/api/src/apps/collect/sharing/sharing-routes.ts に作り、apps/api/src/apps/collect/index.ts でつなぐ（contracts/api.md 1-1〜1-3）
+- [x] T006 [US1] apps/api/src/apps/collect/sharing/sharing-service.ts：`sharingSnapshot`（主催者の行がなければ作る・tally で支払い済みと振込待ち・経費・運営メンバー・招待・今と見込みの分配・立て替えの戻し）
+- [x] T007 [US1] 経費の足す・直す・消す（上限100件・立て替えた人は運営メンバーか名前のどちらか）を sharing-service.ts に
+- [x] T008 [US2] 運営メンバーの足す・直す・消す・つながりを外す（上限20人・傾斜の上限 `RATIO_TOO_HIGH`・リーダーの既定12・主催者の行のつながりは外せない）を sharing-service.ts に
+- [x] T009 [US1] [US2] 道筋を apps/api/src/apps/collect/sharing/sharing-routes.ts に作り、apps/api/src/apps/collect/index.ts でつなぐ（contracts/api.md 1-1〜1-3）
 
 ## Phase 4: User Story 3 紹介した人（PR1、P2）
 
-- [ ] T010 [US3] 名簿の足す・まとめて貼る・直すで `referrer` を受けて `referrer_key` を入れる（apps/api/src/apps/collect/roster/roster-service.ts）。名簿の人の形に出す
-- [ ] T011 [US3] `GET …/referrals`・`GET /referrers` を sharing に（tally と同じ数え方。確かめ待ちは来場に数え売上に入れない）
-- [ ] T012 [US3] CSV に「紹介した人」の列（apps/api/src/apps/collect/closing/export-csv.ts）、まとめに `expenseTotal`・`referred`（summaries とイベントを消すところ）
+- [x] T010 [US3] 名簿の足す・まとめて貼る・直すで `referrer` を受けて `referrer_key` を入れる（apps/api/src/apps/collect/roster/roster-service.ts）。名簿の人の形に出す
+- [x] T011 [US3] `GET …/referrals`・`GET /referrers` を sharing に（tally と同じ数え方。確かめ待ちは来場に数え売上に入れない）
+- [x] T012 [US3] CSV に「紹介した人」の列（apps/api/src/apps/collect/closing/export-csv.ts）、まとめに `expenseTotal`・`referred`（summaries とイベントを消すところ）
 
 ## Phase 5: User Story 5 招待とつながった人（PR1、P2）
 
-- [ ] T013 [US5] apps/api/src/apps/collect/sharing/invite-service.ts：招待を出す（`ci_`＋32バイト・SHA-256・7日・出し直しは消してから）・止める・読む・受ける（主催者自身・二重は `ALREADY_LINKED`・使えないリンクは `INVITE_INACTIVE`）
-- [ ] T014 [US5] つながった人の道筋 `GET /shares`・`GET /shares/:eventId`（ログインだけ。名簿・参加者を返さない）と招待の道筋を apps/api/src/apps/collect/sharing/member-routes.ts に作り、index.ts でつなぐ
-- [ ] T015 [US5] 退会のときにつながりを外す（apps/api/src/apps/collect/inbox/received-events.ts の `onUserWithdrawn`）
-- [ ] T016 結合テスト apps/api/test/integration/collect/sharing.test.ts・referrals.test.ts・team-invites.test.ts と routes.snapshot.txt
+- [x] T013 [US5] apps/api/src/apps/collect/sharing/invite-service.ts：招待を出す（`ci_`＋32バイト・SHA-256・7日・出し直しは消してから）・止める・読む・受ける（主催者自身・二重は `ALREADY_LINKED`・使えないリンクは `INVITE_INACTIVE`）
+- [x] T014 [US5] つながった人の道筋 `GET /shares`・`GET /shares/:eventId`（ログインだけ。名簿・参加者を返さない）と招待の道筋を apps/api/src/apps/collect/sharing/member-routes.ts に作り、index.ts でつなぐ
+- [x] T015 [US5] 退会のときにつながりを外す（apps/api/src/apps/collect/inbox/received-events.ts の `onUserWithdrawn`）
+- [x] T016 結合テスト apps/api/test/integration/collect/sharing.test.ts・referrals.test.ts・sharing-invites.test.ts と routes.snapshot.txt
 
 ## Phase 6: 主催者の画面（PR2）
 
@@ -52,6 +52,6 @@
 - [ ] T026 [US5] 招待を受ける画面 apps/web/src/apps/collect/pages/JoinPage.tsx（`/collect/join/:token`。ログインしていなければ `/sign-in?next=…`）
 - [ ] T027 [US5] つながった人の画面 apps/web/src/apps/collect/pages/SharesPage.tsx（`/collect/shares`・`/collect/shares/:eventId`。集金管理の骨格の外。読むだけ・自分の行に「あなた」）
 - [ ] T028 [US5] 利用の許可のない人の「使えません」の画面に、つながったイベントがあれば入口を出す（apps/web/src/apps/collect/routes.tsx）
-- [ ] T029 Web のテスト apps/web/test/collect/team-invites.test.tsx
+- [ ] T029 Web のテスト apps/web/test/collect/sharing-invites.test.tsx
 - [ ] T030 E2E e2e/tests/collect-sharing.spec.ts（主催者：経費・運営メンバー・分配 → 招待 → 別の利用者が受けて見る・名簿が見えない）
 - [ ] T031 docs/apps/collect-guide.md に分配と招待の使い方

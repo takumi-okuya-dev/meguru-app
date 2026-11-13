@@ -12,13 +12,13 @@
 | event_id | uuid | `events.id`、CASCADE |
 | name | text | 1〜40文字 |
 | amount | integer | 1〜999,999 |
-| payer_member_id | uuid null | `team_members.id`、SET NULL（立て替えた運営メンバー） |
+| payer_member_id | uuid null | `sharing_members.id`、SET NULL（立て替えた運営メンバー） |
 | payer_name | text null | 運営メンバーでない人の名前（40文字まで）。`payer_member_id` と両方は入らない（check） |
 | created_at | timestamptz | |
 
 - 索引：`(event_id, created_at)`。1イベント100件まで（API で確かめる）。
 
-### 1-2. `team_members`（運営メンバー。spec FR-010・FR-011・FR-052）
+### 1-2. `sharing_members`（運営メンバー。spec FR-010・FR-011・FR-052）
 
 | 列 | 型 | 決まり |
 |---|---|---|
@@ -37,12 +37,12 @@
 - 索引：`(user_id) WHERE user_id IS NOT NULL`（つながったイベントの一覧）。
 - 1イベント20人まで。リーダーの Σratio_tenths ≤ 人数×10（メンバーがいるとき。API で確かめる。research R2）。
 
-### 1-3. `team_invites`（招待。spec FR-050・FR-051）
+### 1-3. `sharing_invites`（招待。spec FR-050・FR-051）
 
 | 列 | 型 | 決まり |
 |---|---|---|
 | id | uuid | 主キー |
-| member_id | uuid | `team_members.id`、CASCADE。一意（1人に1つ） |
+| member_id | uuid | `sharing_members.id`、CASCADE。一意（1人に1つ） |
 | token_hash | text | SHA-256（16進）。一意 |
 | expires_at | timestamptz | 作ってから7日 |
 | created_at | timestamptz | |

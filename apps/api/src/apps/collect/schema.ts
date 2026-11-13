@@ -2,7 +2,8 @@
 // 表はスキーマ collect に置き、共通の表（users など）への外部キーは張らない。主催者は owner_user_id に値として持ち、
 // 退会の片づけは出来事（user.withdrawn）で集金管理が行う（docs/app-separation.md 4）。外部キーは集金管理の表の中だけに張る。
 // PR1 の分（イベント・料金の区分・名簿・主催者の既定値・受け取った出来事）、PR2 の分（受付の記録・受付用リンク・手伝う人・端末）、
-// PR3 の分（精算・イベントのまとめ）、PR4 の分（Threadsのイベントの候補）、002 の分（セルフ受付：本人の申告・申し出・端末）。
+// PR3 の分（精算・イベントのまとめ）、PR4 の分（Threadsのイベントの候補）、002 の分（セルフ受付：本人の申告・申し出・端末）、
+// 003 の分（経費・運営メンバー・招待・紹介した人・まとめの経費と紹介）。
 import { sql } from "drizzle-orm";
 import { bigint, boolean, check, index, integer, jsonb, pgSchema, primaryKey, smallint, text, timestamp, uniqueIndex, uuid, type AnyPgColumn } from "drizzle-orm/pg-core";
 import {
@@ -17,6 +18,9 @@ import {
   RECEIVER_KINDS,
   RECEPTION_LIMITS,
   RECEPTION_METHODS,
+  SHARING_LIMITS,
+  SHARING_ROLES,
+  RATIO_TENTHS,
 } from "@meguru/shared";
 import { bytea, inList, timestamps } from "../../kernel/db/columns";
 
@@ -103,6 +107,9 @@ export const collectRosterPeople = collectSchema.table(
       .notNull()
       .references(() => collectPriceTiers.id, { onDelete: "no action" }),
     memo: text("memo"),
+    // 紹介した人と、見比べるための形（referrerKey。specs/collect/003 data-model.md 2-1）
+    referrer: text("referrer"),
+    referrerKey: text("referrer_key"),
     // 飛び入りを手伝う人が足したとき（手伝う人を消したら空にする）
     addedByHelperId: uuid("added_by_helper_id").references((): AnyPgColumn => collectHelpers.id, { onDelete: "set null" }),
     // 飛び入りの送り直しで二重にしない（R6。飛び入りのときだけ入る）
@@ -113,11 +120,14 @@ export const collectRosterPeople = collectSchema.table(
     uniqueIndex("roster_people_event_number_key").on(t.eventId, t.number),
     index("roster_people_event_name_key_idx").on(t.eventId, t.nameKey),
     index("roster_people_price_tier_idx").on(t.priceTierId),
+    index("roster_people_event_referrer_idx").on(t.eventId, t.referrerKey),
     check("roster_people_name_length", sql`char_length(${t.name}) BETWEEN 1 AND ${sql.raw(String(COLLECT_LIMITS.personName))}`),
     check("roster_people_kana_length", sql`char_length(${t.kana}) <= ${sql.raw(String(COLLECT_LIMITS.kana))}`),
     check("roster_people_memo_length", sql`char_length(${t.memo}) <= ${sql.raw(String(COLLECT_LIMITS.memo))}`),
     check("roster_people_media_valid", sql`${t.media} IN (${inList(COLLECT_MEDIA)})`),
     check("roster_people_number_positive", sql`${t.number} >= 1`),
+    check("roster_people_referrer_length", sql`char_length(${t.referrer}) <= ${sql.raw(String(COLLECT_LIMITS.referrer))}`),
+    check("roster_people_referrer_pair", sql`(${t.referrer} IS NULL) = (${t.referrerKey} IS NULL)`),
   ],
 );
 
@@ -295,6 +305,12 @@ export const collectEventSummaries = collectSchema.table(
     byMethod: jsonb("by_method").$type<ByMethod>().notNull(),
     byMedia: jsonb("by_media").$type<MediaStats[]>().notNull(),
     awaitingTransfer: jsonb("awaiting_transfer").$type<CountAmount>().notNull(),
+    // 003：経費の合計と、紹介ありの人数と売上（名前は残さない。specs/collect/003 data-model.md 2-2）
+    expenseTotal: integer("expense_total").notNull().default(0),
+    referred: jsonb("referred")
+      .$type<{ count: number; paid: number; awaiting: number }>()
+      .notNull()
+      .default(sql`'{"count":0,"paid":0,"awaiting":0}'::jsonb`),
     eventDeletedAt: timestamp("event_deleted_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [index("event_summaries_owner_idx").on(t.ownerUserId, t.startsAt)],
@@ -370,4 +386,77 @@ export const collectSelfCheckInDevices = collectSchema.table(
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [primaryKey({ columns: [t.linkId, t.deviceHash] })],
+);
+
+/** 運営メンバー（specs/collect/003 data-model.md 1-2）。つながった利用者は user_id に値として持つ（共通の表は参照しない）。 */
+export const collectSharingMembers = collectSchema.table(
+  "sharing_members",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    eventId: uuid("event_id")
+      .notNull()
+      .references(() => collectEvents.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    role: text("role").notNull(),
+    // 傾斜を10倍した整数（リーダーのときだけ。1.2倍＝12）
+    ratioTenths: integer("ratio_tenths"),
+    position: integer("position").notNull(),
+    isOwner: boolean("is_owner").notNull().default(false),
+    userId: uuid("user_id"),
+    linkedAt: timestamp("linked_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index("sharing_members_event_idx").on(t.eventId, t.position),
+    // 1人が1つのイベントで2つの運営メンバーにならない
+    uniqueIndex("sharing_members_event_user_key").on(t.eventId, t.userId).where(sql`${t.userId} IS NOT NULL`),
+    uniqueIndex("sharing_members_event_owner_key").on(t.eventId).where(sql`${t.isOwner}`),
+    index("sharing_members_user_idx").on(t.userId).where(sql`${t.userId} IS NOT NULL`),
+    check("sharing_members_role_valid", sql`${t.role} IN (${inList(SHARING_ROLES)})`),
+    check(
+      "sharing_members_ratio",
+      sql`(${t.role} = 'leader' AND ${t.ratioTenths} BETWEEN ${sql.raw(String(RATIO_TENTHS.min))} AND ${sql.raw(String(RATIO_TENTHS.max))}) OR (${t.role} = 'member' AND ${t.ratioTenths} IS NULL)`,
+    ),
+    check("sharing_members_link_pair", sql`(${t.userId} IS NULL) = (${t.linkedAt} IS NULL)`),
+    check("sharing_members_name_length", sql`char_length(${t.name}) BETWEEN 1 AND ${sql.raw(String(SHARING_LIMITS.memberName))}`),
+  ],
+);
+
+/** 経費（specs/collect/003 data-model.md 1-1）。立て替えた人は運営メンバーか名前のどちらか。 */
+export const collectExpenses = collectSchema.table(
+  "expenses",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    eventId: uuid("event_id")
+      .notNull()
+      .references(() => collectEvents.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    amount: integer("amount").notNull(),
+    payerMemberId: uuid("payer_member_id").references(() => collectSharingMembers.id, { onDelete: "set null" }),
+    payerName: text("payer_name"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index("expenses_event_idx").on(t.eventId, t.createdAt),
+    index("expenses_payer_member_idx").on(t.payerMemberId),
+    check("expenses_amount_range", sql`${t.amount} BETWEEN 1 AND ${sql.raw(String(SHARING_LIMITS.expenseAmountMax))}`),
+    check("expenses_name_length", sql`char_length(${t.name}) BETWEEN 1 AND ${sql.raw(String(SHARING_LIMITS.expenseName))}`),
+    check("expenses_payer_name_length", sql`char_length(${t.payerName}) BETWEEN 1 AND ${sql.raw(String(SHARING_LIMITS.memberName))}`),
+    check("expenses_payer_either", sql`${t.payerMemberId} IS NULL OR ${t.payerName} IS NULL`),
+  ],
+);
+
+/** 運営メンバーの招待（specs/collect/003 data-model.md 1-3、research.md R6）。トークンはハッシュだけを持つ。 */
+export const collectSharingInvites = collectSchema.table(
+  "sharing_invites",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    memberId: uuid("member_id")
+      .notNull()
+      .unique()
+      .references(() => collectSharingMembers.id, { onDelete: "cascade" }),
+    tokenHash: text("token_hash").notNull().unique(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
 );

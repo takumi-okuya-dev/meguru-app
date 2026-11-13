@@ -1,12 +1,12 @@
 // 書き出し（specs/collect/001-event-day-collection FR-046、research.md R13、tasks.md T059）。
-// UTF-8（BOMつき）・改行 CRLF・受付番号の順。Excel で文字化けせずに開ける。ファイル名は「集金_<開催日>_<イベント名>.csv」。
+// 紹介した人の列は specs/collect/003 FR-023。UTF-8（BOMつき）・改行 CRLF・受付番号の順。Excel で文字化けせずに開ける。ファイル名は「集金_<開催日>_<イベント名>.csv」。
 import { COLLECT_MEDIA_LABELS, RECEPTION_METHOD_LABELS, type CollectMedia, type ReceptionMethod } from "@meguru/shared";
 import { asc, eq } from "drizzle-orm";
 import type { Db } from "../../../kernel/db/client";
 import { loadOwnedEvent } from "../access";
 import { collectHelpers, collectPriceTiers, collectReceptionRecords, collectRosterPeople } from "../schema";
 
-const HEADER = ["受付番号", "名前", "ふりがな", "媒体", "料金の区分", "来場", "払い方", "金額", "受け取った人", "記録した時刻", "入金を確かめた日", "メモ"];
+const HEADER = ["受付番号", "名前", "ふりがな", "媒体", "料金の区分", "来場", "払い方", "金額", "受け取った人", "記録した時刻", "入金を確かめた日", "紹介した人", "メモ"];
 const JST_OFFSET_MS = 9 * 60 * 60 * 1000;
 
 /**
@@ -79,6 +79,7 @@ export async function exportCsv(db: Db, ownerUserId: string, eventId: string): P
       r ? receiverLabel(r, helperName) : "",
       r ? jst(r.recordedAt, true) : "",
       r?.transferConfirmedAt ? jst(r.transferConfirmedAt, false) : "",
+      p.referrer ?? "",
       p.memo ?? "",
     ];
   });
