@@ -1,12 +1,12 @@
 // 作り手の設定と数字（specs/people/001-people-memo contracts/api.md 6、research.md R12・R17、tasks.md T078・T085）。
-import { jstDate, type PeopleSettings, type PeopleStats } from "@meguru/shared/people";
-import { and, asc, eq, gte, sql } from "drizzle-orm";
+import type { PeopleSettings, PeopleStats } from "@meguru/shared/people";
+import { eq, sql } from "drizzle-orm";
 import { createDb, withTransaction, type Db } from "../../../kernel/db/client";
 import type { Env } from "../../../kernel/env";
 import { lockActiveOwner } from "../access";
-import { peopleEvents, peopleOwnerSettings } from "../schema";
+import { peopleOwnerSettings } from "../schema";
 import { personStatsSql } from "../persons/person-query";
-import { toEvent } from "../events/event-service";
+import { nextOwnEvent } from "../events/event-service";
 
 /**
  * 設定を読む（まだなければ両方 null）。
@@ -59,15 +59,10 @@ export async function updateSettings(
  * @returns 数字
  */
 export async function getStats(db: Db, userId: string, now = new Date()): Promise<PeopleStats> {
-  const [repeaters, [next], settings] = await Promise.all([
+  const [repeaters, next, settings] = await Promise.all([
     db.execute<{ n: number }>(sql`SELECT count(*)::int AS n FROM (${personStatsSql(userId)}) s WHERE s.own_count >= 2`),
-    db
-      .select()
-      .from(peopleEvents)
-      .where(and(eq(peopleEvents.userId, userId), eq(peopleEvents.isOwn, true), gte(peopleEvents.heldOn, jstDate(now))))
-      .orderBy(asc(peopleEvents.heldOn), asc(peopleEvents.createdAt))
-      .limit(1),
+    nextOwnEvent(db, userId, now),
     getSettings(db, userId),
   ]);
-  return { repeaterCount: Number(repeaters.rows[0]?.n ?? 0), repeaterGoal: settings.repeaterGoal, nextOwnEvent: next ? toEvent(next) : null };
+  return { repeaterCount: Number(repeaters.rows[0]?.n ?? 0), repeaterGoal: settings.repeaterGoal, nextOwnEvent: next };
 }
