@@ -15,7 +15,7 @@ export function settingsRoutes() {
     .get("/settings", async (c) => c.json(await getSettings(createDb(c.env.DATABASE_URL), c.get("user").id)))
     .put("/settings", async (c) => {
       const input = await parseBody(settingsUpdateSchema, c.req.json());
-      return c.json(await updateSettings(createDb(c.env.DATABASE_URL), c.get("user").id, input));
+      return c.json(await updateSettings(c.env, c.get("user").id, input));
     })
     .get("/stats", async (c) => c.json(await getStats(createDb(c.env.DATABASE_URL), c.get("user").id)));
 }

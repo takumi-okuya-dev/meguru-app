@@ -1,7 +1,9 @@
 // 作り手の設定と数字（specs/people/001-people-memo contracts/api.md 6、research.md R12・R17、tasks.md T078・T085）。
 import { jstDate, type PeopleSettings, type PeopleStats } from "@meguru/shared/people";
 import { and, asc, eq, gte, sql } from "drizzle-orm";
-import type { Db } from "../../../kernel/db/client";
+import { createDb, withTransaction, type Db } from "../../../kernel/db/client";
+import type { Env } from "../../../kernel/env";
+import { lockActiveOwner } from "../access";
 import { peopleEvents, peopleOwnerSettings } from "../schema";
 import { personStatsSql } from "../persons/person-query";
 import { toEvent } from "../events/event-service";
@@ -19,20 +21,24 @@ export async function getSettings(db: Db, userId: string): Promise<PeopleSetting
 
 /**
  * 設定を直す（渡した項目だけ）。
- * @param db - データベース
+ * @param env - Workers のバインディング
  * @param userId - 作り手
  * @param input - 誘いの文の型（null は初めの型）・リピーターの目標
  * @returns 直したあとの設定
  */
-export async function updateSettings(db: Db, userId: string, input: { inviteTemplate?: string | null; repeaterGoal?: number | null }): Promise<PeopleSettings> {
+export async function updateSettings(env: Env, userId: string, input: { inviteTemplate?: string | null; repeaterGoal?: number | null }): Promise<PeopleSettings> {
   const set: Partial<typeof peopleOwnerSettings.$inferInsert> = { updatedAt: new Date() };
   if (input.inviteTemplate !== undefined) set.inviteTemplate = input.inviteTemplate;
   if (input.repeaterGoal !== undefined) set.repeaterGoal = input.repeaterGoal;
-  await db
-    .insert(peopleOwnerSettings)
-    .values({ userId, ...set })
-    .onConflictDoUpdate({ target: peopleOwnerSettings.userId, set });
-  return getSettings(db, userId);
+  // 行を作る書き込みなので、退会の途中でないことをロックの中で確かめる（退会の片づけのあとに設定が残らないように）
+  await withTransaction(env.DATABASE_URL, async (tx) => {
+    await lockActiveOwner(tx, env, userId);
+    await tx
+      .insert(peopleOwnerSettings)
+      .values({ userId, ...set })
+      .onConflictDoUpdate({ target: peopleOwnerSettings.userId, set });
+  });
+  return getSettings(createDb(env.DATABASE_URL), userId);
 }
 
 /**

@@ -28,5 +28,7 @@ export function formatInviteDate(heldOn: string): string {
  */
 export function buildInviteMessage(template: string | null | undefined, values: { name: string; eventName: string; heldOn: string }): string {
   const t = template && template.trim() !== "" ? template : DEFAULT_INVITE_TEMPLATE;
-  return t.replaceAll("{名前}", values.name).replaceAll("{会の名前}", values.eventName).replaceAll("{日にち}", formatInviteDate(values.heldOn));
+  const fill: Record<string, string> = { 名前: values.name, 会の名前: values.eventName, 日にち: formatInviteDate(values.heldOn) };
+  // 1回で差し込む（差し込んだ名前の中の「{日にち}」や「$'」を、もう一度読み替えない）
+  return t.replace(/\{(名前|会の名前|日にち)\}/g, (_, key: string) => fill[key]!);
 }

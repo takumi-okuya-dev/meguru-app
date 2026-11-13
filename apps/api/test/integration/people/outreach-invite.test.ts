@@ -58,6 +58,11 @@ describe("声かけを始める", () => {
     expect((await callPeople("POST", "/outreaches", "u2", { personId: taro, purpose: "invite", eventId: theirs })).status).toBe(404);
     expect((await callPeople("POST", "/outreaches", "u1", { personId: taro, purpose: "work", targetName: "港" })).status).toBe(400);
   });
+
+  it("誘えるのは自分の会だけ（よその会は 400）", async () => {
+    const other = await makeEvent("u1", "よその会", "2026-12-20", false);
+    expect((await callPeople("POST", "/outreaches", "u1", { personId: taro, purpose: "invite", eventId: other })).status).toBe(400);
+  });
 });
 
 describe("進み具合", () => {
@@ -93,6 +98,22 @@ describe("自動で「来た」（FR-022）", () => {
     await start();
     await callPeople("POST", `/persons/${taro}/attendances`, "u1", { eventId: dec });
     expect((await outreachesOf())[0]).toMatchObject({ stage: "attended" });
+  });
+
+  it("会ったイベントを外すと、自動で「来た」にした声かけは「参加リンクを送った」に戻る", async () => {
+    await start();
+    await callPeople("POST", `/persons/${taro}/attendances`, "u1", { eventId: dec });
+    expect((await callPeople("DELETE", `/persons/${taro}/attendances/${dec}`, "u1")).status).toBe(204);
+    expect((await outreachesOf())[0]).toMatchObject({ stage: "link_sent", attendedAt: null });
+  });
+
+  it("まとめても、残す人の、相手と関係のない会の声かけは変えない（手で戻したものを「来た」にしない）", async () => {
+    const [, mine] = await start(taro, dec);
+    await callPeople("POST", `/persons/${taro}/attendances`, "u1", { eventId: dec });
+    await callPeople("PATCH", `/outreaches/${mine.outreach.id}`, "u1", { stage: "link_sent" });
+    const [, other] = await read<{ person: { id: string } }>(await callPeople("POST", "/persons", "u1", { lineName: "べつじん", consent: { invite: false, work: false } }));
+    await callPeople("POST", `/persons/${taro}/merge`, "u1", { otherPersonId: other.person.id });
+    expect((await outreachesOf())[0]).toMatchObject({ stage: "link_sent" });
   });
 
   it("まとめると、相手の誘った会への回答で attended になる。同じ声かけが両方にあれば、進み具合の先の方が残る", async () => {

@@ -16,7 +16,8 @@ import { inviteOutreachesFor } from "./outreach-service";
  */
 export async function listCandidates(db: Db, userId: string, query: CandidateQuery): Promise<CandidateList> {
   const { purpose, visitedOwn, eventId, ...rest } = query;
-  if (eventId) await loadOwnedEvent(db, userId, eventId);
+  // 誘う会は交流会への誘いのときだけ使う（仕事のつなぎでは見ない）
+  if (purpose === "invite" && eventId) await loadOwnedEvent(db, userId, eventId);
   const extra: SQL[] = [purpose === "invite" ? sql`p.consent_invite = true` : sql`p.consent_work = true`];
   if (visitedOwn) extra.push(sql`coalesce(st.own_count, 0) >= 1`);
   const list = await queryPersons(db, userId, rest, extra);

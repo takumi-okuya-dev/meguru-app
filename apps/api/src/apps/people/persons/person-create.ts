@@ -8,7 +8,7 @@ import { isUuid } from "../../../kernel/validate";
 import { loadOwnedEvent, loadOwnedPerson, lockActiveOwner, lockOwner } from "../access";
 import { peopleManualAttendances, peoplePersons, peopleResponses } from "../schema";
 import { reportPeopleUsage } from "../usage";
-import { markInviteAttended } from "../outreach/outreach-service";
+import { markInviteAttended, resetInviteAttended } from "../outreach/outreach-service";
 import { derivePersons, recordManualConsent } from "./person-derive";
 import { personSummary } from "./person-service";
 
@@ -86,7 +86,11 @@ export async function removeAttendance(env: Env, userId: string, personId: strin
       .delete(peopleManualAttendances)
       .where(and(eq(peopleManualAttendances.personId, p.id), eq(peopleManualAttendances.eventId, eventId), eq(peopleManualAttendances.userId, userId)))
       .returning({ eventId: peopleManualAttendances.eventId });
-    if (removed.length > 0) return;
+    if (removed.length > 0) {
+      // その会への誘いを、自動で「来た」にしていたら戻す
+      await resetInviteAttended(tx, userId, [p.id]);
+      return;
+    }
     const [byResponse] = await tx
       .select({ id: peopleResponses.id })
       .from(peopleResponses)

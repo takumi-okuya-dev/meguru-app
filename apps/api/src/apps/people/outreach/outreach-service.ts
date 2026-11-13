@@ -2,12 +2,13 @@
 // 同じ声かけは1つ（交流会への誘いは人と誘う会、仕事のつなぎは人と相談先）。その目的の同意がない人には始めない（FR-018）。
 // 相手の情報を外へ送る道は作らない（FR-023・FR-024）。声かけの行の user_id（作り手）が、判断した人（R16）。
 import { OUTREACH_STAGES, type Outreach, type OutreachPurpose, type OutreachStage } from "@meguru/shared/people";
-import { and, eq, inArray, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { withTransaction, type TxDb } from "../../../kernel/db/client";
 import type { Env } from "../../../kernel/env";
 import { AppError, itemNotFound } from "../../../kernel/errors";
 import { isUuid } from "../../../kernel/validate";
 import { loadOwnedEvent, loadOwnedPerson, lockOwner, type PeopleDb } from "../access";
+import { attendanceSql } from "../persons/person-query";
 import { peopleEvents, peopleOutreaches } from "../schema";
 
 /** 進み具合ごとの日時の列。 */
@@ -49,7 +50,8 @@ async function selectOutreaches(db: PeopleDb, userId: string, where: ReturnType<
     .select({ o: peopleOutreaches, event: peopleEvents })
     .from(peopleOutreaches)
     .leftJoin(peopleEvents, eq(peopleEvents.id, peopleOutreaches.eventId))
-    .where(and(eq(peopleOutreaches.userId, userId), where));
+    .where(and(eq(peopleOutreaches.userId, userId), where))
+    .orderBy(desc(peopleOutreaches.askedAt));
   return rows.map(toOutreach);
 }
 
@@ -61,8 +63,7 @@ async function selectOutreaches(db: PeopleDb, userId: string, where: ReturnType<
  * @returns 声かけ
  */
 export async function outreachesOfPerson(db: PeopleDb, userId: string, personId: string): Promise<Outreach[]> {
-  const list = await selectOutreaches(db, userId, eq(peopleOutreaches.personId, personId));
-  return list.sort((a, b) => (a.askedAt < b.askedAt ? 1 : a.askedAt > b.askedAt ? -1 : 0));
+  return selectOutreaches(db, userId, eq(peopleOutreaches.personId, personId));
 }
 
 /**
@@ -94,7 +95,9 @@ export async function createInviteOutreach(env: Env, userId: string, input: { pe
   return withTransaction(env.DATABASE_URL, async (tx) => {
     await lockOwner(tx, userId);
     const p = await loadOwnedPerson(tx, userId, input.personId);
-    await loadOwnedEvent(tx, userId, input.eventId);
+    const event = await loadOwnedEvent(tx, userId, input.eventId);
+    // 誘えるのは自分の会だけ（よその会には誘わない）
+    if (!event.isOwn) throw new AppError("VALIDATION_FAILED", 400, "invalid request", undefined, ["eventId"]);
     const same = and(eq(peopleOutreaches.personId, p.id), eq(peopleOutreaches.purpose, "invite"), eq(peopleOutreaches.eventId, input.eventId));
     const [existing] = await selectOutreaches(tx, userId, same);
     if (existing) return { outreach: existing, created: false };
@@ -187,6 +190,20 @@ export async function markInviteAttended(tx: TxDb, userId: string, pairs: readon
       link_sent_at = coalesce(o.link_sent_at, ${now}), attended_at = ${now}, updated_at = ${now}
     FROM (VALUES ${values}) AS v(person_id, event_id)
     WHERE o.user_id = ${userId} AND o.purpose = 'invite' AND o.person_id = v.person_id AND o.event_id = v.event_id AND o.stage <> 'attended'`);
+}
+
+/**
+ * 来た記録がなくなった誘いの声かけを「来た」から戻す（会ったイベントを外す・取り込みの取り消し・分けるのあとで呼ぶ）。
+ * 自動で「来た」にしたものと同じく、戻したら「参加リンクを送った」にする（その日時は残す）。
+ * @param tx - トランザクション（作り手のロックを取ったもの）
+ * @param userId - 作り手
+ * @param personIds - 来た記録が動いた人
+ */
+export async function resetInviteAttended(tx: TxDb, userId: string, personIds: readonly string[]): Promise<void> {
+  if (personIds.length === 0) return;
+  await tx.execute(sql`UPDATE ${peopleOutreaches} AS o SET stage = 'link_sent', attended_at = NULL, updated_at = now()
+    WHERE o.user_id = ${userId} AND o.purpose = 'invite' AND o.stage = 'attended' AND ${inArray(sql`o.person_id`, [...personIds])}
+      AND NOT EXISTS (SELECT 1 FROM (${attendanceSql(userId)}) a WHERE a.person_id = o.person_id AND a.event_id = o.event_id)`);
 }
 
 /**

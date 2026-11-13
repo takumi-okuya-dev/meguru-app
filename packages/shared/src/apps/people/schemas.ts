@@ -162,7 +162,9 @@ export type CandidateQuery = z.infer<typeof candidateQuerySchema>;
 /** POST /api/people/outreaches の入力（PR3 は交流会への誘いだけ。仕事のつなぎは PR4）。 */
 export const outreachCreateSchema = z.object({ personId: id, purpose: z.literal("invite"), eventId: id });
 /** PATCH /api/people/outreaches/:outreachId の入力。 */
-export const outreachUpdateSchema = z.object({ stage: z.enum(["asked", "link_sent", "attended", "approved", "connected"]) });
+export const outreachUpdateSchema = z.object({
+  stage: z.enum([...new Set(Object.values(OUTREACH_STAGES).flat())] as [OutreachStage, ...OutreachStage[]]),
+});
 /** PUT /api/people/settings の入力。型の空白だけは null（初めの型）。 */
 export const settingsUpdateSchema = z
   .object({

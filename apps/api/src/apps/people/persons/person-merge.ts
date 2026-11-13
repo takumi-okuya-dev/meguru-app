@@ -6,7 +6,7 @@ import type { Env } from "../../../kernel/env";
 import { AppError } from "../../../kernel/errors";
 import { loadOwnedPerson, loadOwnedResponse, lockOwner } from "../access";
 import { peopleConsentChanges, peopleManualAttendances, peoplePersons, peopleResponses } from "../schema";
-import { markInviteAttended, mergeOutreaches } from "../outreach/outreach-service";
+import { markInviteAttended, mergeOutreaches, resetInviteAttended } from "../outreach/outreach-service";
 import { derivePersons } from "./person-derive";
 import { attendanceSql } from "./person-query";
 import { personSummary } from "./person-service";
@@ -46,6 +46,8 @@ export async function mergePersons(env: Env, userId: string, personId: string, o
     await lockOwner(tx, userId);
     const keep = await loadOwnedPerson(tx, userId, personId);
     const other = await loadOwnedPerson(tx, userId, otherPersonId);
+    // 相手の来たイベント（まとめたあと、残す人の誘いを「来た」にするのは、相手から来た分だけ。手で戻した声かけを上書きしない）
+    const fromOther = (await attendedEventsOf(tx, userId, other.id)).map((x) => ({ personId: keep.id, eventId: x.eventId }));
     await tx.update(peopleResponses).set({ personId: keep.id }).where(and(eq(peopleResponses.personId, other.id), eq(peopleResponses.userId, userId)));
     await tx.execute(sql`INSERT INTO ${peopleManualAttendances} (person_id, event_id, user_id, created_at)
       SELECT ${keep.id}, m.event_id, m.user_id, m.created_at FROM ${peopleManualAttendances} m WHERE m.person_id = ${other.id}
@@ -74,7 +76,7 @@ export async function mergePersons(env: Env, userId: string, personId: string, o
       .where(and(eq(peoplePersons.id, keep.id), eq(peoplePersons.userId, userId)));
     await derivePersons(tx, userId, [keep.id]);
     // 誘った会に来た記録があれば、その声かけを「来た」にする（FR-022）
-    await markInviteAttended(tx, userId, await attendedEventsOf(tx, userId, keep.id));
+    await markInviteAttended(tx, userId, fromOther);
     return personSummary(tx, userId, keep.id);
   });
 }
@@ -111,6 +113,8 @@ export async function splitResponse(env: Env, userId: string, responseId: string
       .returning({ id: peoplePersons.id });
     await tx.update(peopleResponses).set({ personId: fresh!.id }).where(and(eq(peopleResponses.id, r.id), eq(peopleResponses.userId, userId)));
     await derivePersons(tx, userId, [r.personId, fresh!.id]);
+    // 声かけは元の人に残る。分けた回答で「来た」にしていたら戻す
+    await resetInviteAttended(tx, userId, [r.personId]);
     return personSummary(tx, userId, fresh!.id);
   });
 }

@@ -20,6 +20,11 @@ describe("誘いの文", () => {
     expect(buildInviteMessage("参加リンク https://example.com", { name: "はなこ", eventName: "会", heldOn: "2026-12-13" })).toBe("参加リンク https://example.com");
   });
 
+  it("名前や会の名前の中の「$」や差し込みの形を、読み替えない", () => {
+    expect(buildInviteMessage("{名前}さん、{会の名前}", { name: "ゆう$'", eventName: "{日にち}の会", heldOn: "2026-12-13" })).toBe("ゆう$'さん、{日にち}の会");
+    expect(buildInviteMessage("{名前}", { name: "$$みき", eventName: "x", heldOn: "2026-12-13" })).toBe("$$みき");
+  });
+
   it("空の型・null は初めの型を使う", () => {
     expect(buildInviteMessage(null, { name: "a", eventName: "b", heldOn: "2026-12-13" })).toBe(buildInviteMessage(DEFAULT_INVITE_TEMPLATE, { name: "a", eventName: "b", heldOn: "2026-12-13" }));
   });

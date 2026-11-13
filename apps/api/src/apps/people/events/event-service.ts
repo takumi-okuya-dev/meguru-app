@@ -141,23 +141,26 @@ export async function updateEvent(env: Env, userId: string, eventId: string, inp
  */
 export async function eventDetail(db: Db, userId: string, eventId: string): Promise<PeopleEventDetail> {
   const event = await loadOwnedEvent(db, userId, eventId);
-  const [counts, imports] = await Promise.all([
+  // 自分の会だけ、初めて・前にも来た人の数を出す（消した人は内訳に入れない。R12）
+  const breakdown = event.isOwn
+    ? db.execute<{ first: number; returning: number }>(sql`
+        SELECT (count(*) FILTER (WHERE NOT x.prev))::int AS first, (count(*) FILTER (WHERE x.prev))::int AS returning
+        FROM (SELECT a.person_id, ${previousOwnSql(userId, event.heldOn)} AS prev FROM (${attendanceSql(userId)}) a WHERE a.event_id = ${eventId}) x`)
+    : null;
+  const [counts, imports, own] = await Promise.all([
     countsByEvent(db, userId, eventId),
     db
       .select()
       .from(peopleImports)
       .where(and(eq(peopleImports.eventId, eventId), eq(peopleImports.userId, userId)))
       .orderBy(desc(peopleImports.createdAt)),
+    breakdown,
   ]);
   const c = counts.get(eventId);
   const stats: PeopleEventDetail["stats"] = { attendeeCount: (c?.attendees ?? 0) + (c?.erased ?? 0), erasedCount: c?.erased ?? 0 };
-  // 自分の会だけ、初めて・前にも来た人の数を出す（消した人は内訳に入れない。R12）
-  if (event.isOwn) {
-    const res = await db.execute<{ first: number; returning: number }>(sql`
-      SELECT (count(*) FILTER (WHERE NOT x.prev))::int AS first, (count(*) FILTER (WHERE x.prev))::int AS returning
-      FROM (SELECT a.person_id, ${previousOwnSql(userId, event.heldOn)} AS prev FROM (${attendanceSql(userId)}) a WHERE a.event_id = ${eventId}) x`);
-    stats.firstTimeCount = Number(res.rows[0]?.first ?? 0);
-    stats.returningCount = Number(res.rows[0]?.returning ?? 0);
+  if (own) {
+    stats.firstTimeCount = Number(own.rows[0]?.first ?? 0);
+    stats.returningCount = Number(own.rows[0]?.returning ?? 0);
   }
   return {
     event: toEvent(event),
@@ -186,7 +189,7 @@ export async function eventAttendees(db: Db, userId: string, eventId: string): P
   const res = await db.execute<{ id: string; real_name: string | null; line_name: string | null; by_response: boolean; prev: boolean }>(sql`
     SELECT p.id, p.real_name, p.line_name,
       EXISTS (SELECT 1 FROM ${peopleResponses} r WHERE r.person_id = p.id AND r.event_id = ${eventId}) AS by_response,
-      ${previousOwnSql(userId, event.heldOn, sql`p.id`)} AS prev
+      ${event.isOwn ? previousOwnSql(userId, event.heldOn, sql`p.id`) : sql`false`} AS prev
     FROM ${peoplePersons} p
     WHERE p.user_id = ${userId}
       AND (EXISTS (SELECT 1 FROM ${peopleResponses} r WHERE r.person_id = p.id AND r.event_id = ${eventId})

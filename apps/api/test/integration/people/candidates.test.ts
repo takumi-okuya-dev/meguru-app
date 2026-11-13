@@ -97,6 +97,13 @@ describe("誘う候補", () => {
     expect(all.persons.every((p) => p.outreach === null)).toBe(true);
   });
 
+  it("仕事のつなぎでは誘う会を見ない（消えた会の番号でも 404 にしない）。交流会への誘いでは 404", async () => {
+    const gone = await makeEvent("u1", "消す会", "2026-12-20");
+    await callPeople("DELETE", `/events/${gone}`, "u1", {});
+    expect((await callPeople("GET", `/candidates?purpose=work&eventId=${gone}`, "u1")).status).toBe(200);
+    expect((await callPeople("GET", `/candidates?purpose=invite&eventId=${gone}`, "u1")).status).toBe(404);
+  });
+
   it("purpose がないと 400、ほかの作り手には出ない", async () => {
     expect((await callPeople("GET", "/candidates", "u1")).status).toBe(400);
     await grantPeople("u2");
