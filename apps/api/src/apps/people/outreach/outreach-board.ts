@@ -1,16 +1,14 @@
 // 会ごとの声かけの一覧（specs/people/002-sales-list plan.md 3、FR-108）。誘う会への誘いの声かけを、進み具合ごとに並べる。
-import type { OutreachBoard, OutreachBoardRow, PersonListQuery } from "@meguru/shared/people";
+import type { OutreachBoard, OutreachBoardRow } from "@meguru/shared/people";
 import { sql } from "drizzle-orm";
 import type { Db } from "../../../kernel/db/client";
 import { AppError } from "../../../kernel/errors";
 import { loadOwnedEvent } from "../access";
 import { toEvent } from "../events/event-service";
-import { queryPersons } from "../persons/person-list";
+import { NO_FILTER, queryPersons } from "../persons/person-list";
 import { peopleOutreaches } from "../schema";
 import { inviteOutreachesFor } from "./outreach-service";
 
-/** 絞り込みのない一覧のクエリ。 */
-const NO_FILTER: PersonListQuery = { next: [], wanted: [], career: [], tag: [], likelihood: [], offset: 0 };
 
 /**
  * 会ごとの声かけの一覧。自分の会でなければ 400（よその会には誘わない）。

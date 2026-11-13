@@ -54,7 +54,7 @@ describe("次にやること", () => {
   });
 
   it("誕生日の形が違えば 400", async () => {
-    for (const bad of ["13-01", "1-1", "02-30x", "2026-01-01"]) {
+    for (const bad of ["13-01", "1-1", "02-30x", "2026-01-01", "02-30", "02-31", "04-31"]) {
       expect((await callPeople("PATCH", `/persons/${ids["たろう"]}`, "u1", { birthdayMd: bad })).status).toBe(400);
     }
   });
@@ -73,6 +73,16 @@ describe("次にやること", () => {
   });
 });
 
+describe("うるう日の誕生日と、更新順", () => {
+  it("2月29日の誕生日を入れられる。連絡の記録を足すと、一覧の更新順で先に出る", async () => {
+    expect((await callPeople("PATCH", `/persons/${ids["じろう"]}`, "u1", { birthdayMd: "02-29" })).status).toBe(200);
+    await callPeople("PATCH", `/persons/${ids["はなこ"]}`, "u1", { memoTalk: "x" });
+    await callPeople("POST", `/persons/${ids["たろう"]}/contact-logs`, "u1", { contactedOn: "2026-11-01", channel: "line", note: "あいさつ" });
+    const [, list] = await read<{ persons: { displayName: string }[] }>(await callPeople("GET", "/persons?sort=updated", "u1"));
+    expect(list.persons[0]!.displayName).toBe("たろう");
+  });
+});
+
 describe("連絡の記録", () => {
   it("足す・直す・消す。新しい順。探す欄で当たる。ほかの作り手は404", async () => {
     const add = (contactedOn: string, note: string, channel = "line") => callPeople("POST", `/persons/${ids["たろう"]}/contact-logs`, "u1", { contactedOn, channel, note });
@@ -81,6 +91,7 @@ describe("連絡の記録", () => {
     await add("2026-11-01", "会場でGoの話", "venue");
     expect((await add("2026-11-01", "")).status).toBe(400);
     expect((await callPeople("POST", `/persons/${ids["たろう"]}/contact-logs`, "u1", { contactedOn: "2026-11-01", channel: "done", note: "x" })).status).toBe(400);
+    expect((await callPeople("PATCH", `/contact-logs/${b1.log.id}`, "u1", { channel: "done" })).status).toBe(400);
     const [, d] = await read<{ contactLogs: Log[] }>(await callPeople("GET", `/persons/${ids["たろう"]}`, "u1"));
     expect(d.contactLogs.map((l) => l.note)).toEqual(["会場でGoの話", "お礼を送った"]);
     expect((await callPeople("PATCH", `/contact-logs/${b1.log.id}`, "u1", { note: "お礼のLINE" })).status).toBe(200);

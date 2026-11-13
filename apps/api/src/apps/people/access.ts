@@ -37,6 +37,16 @@ export async function lockActiveOwner(tx: TxDb, env: Env, userId: string): Promi
 }
 
 /**
+ * 人の更新の時刻を今にする（タグ・連絡の記録・自由な項目・リンクを直したあと。一覧の「更新順」に効かせる。specs/people/002）。
+ * @param tx - トランザクション
+ * @param userId - 作り手
+ * @param personId - 人
+ */
+export async function touchPerson(tx: TxDb, userId: string, personId: string): Promise<void> {
+  await tx.update(peoplePersons).set({ updatedAt: new Date() }).where(and(eq(peoplePersons.id, personId), eq(peoplePersons.userId, userId)));
+}
+
+/**
  * 作り手のイベントを読む。ない・ほかの作り手のものなら 404。
  * @param db - データベース
  * @param userId - 作り手

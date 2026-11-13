@@ -84,7 +84,7 @@ describe("SNS のリンク", () => {
     expect((await put({ instagram: "https://www.instagram.com/taro/", x: "https://x.com/taro" })).status).toBe(200);
     const [, d] = await read<{ links: Record<string, string> }>(await callPeople("GET", `/persons/${ids["たろう"]}`, "u1"));
     expect(d.links).toEqual({ instagram: "https://www.instagram.com/taro/", x: "https://x.com/taro" });
-    for (const bad of [{ x: "http://x.com/taro" }, { x: "https://evil.example/x.com" }, { facebook: "https://user@facebook.com/a" }, { instagram: "javascript:alert(1)" }]) {
+    for (const bad of [{ x: "HTTPS://x.com/taro" }, { x: "http://x.com/taro" }, { x: "https://evil.example/x.com" }, { facebook: "https://user@facebook.com/a" }, { instagram: "javascript:alert(1)" }]) {
       expect((await put(bad)).status).toBe(400);
     }
     await put({ instagram: null, facebook: "https://facebook.com/taro" });

@@ -39,6 +39,9 @@ type Row = {
   birthday_md: string | null;
 };
 
+/** 絞り込みのない一覧のクエリ（ホーム・会ごとの声かけの一覧が使う）。 */
+export const NO_FILTER: PersonListQuery = { next: [], wanted: [], career: [], tag: [], likelihood: [], offset: 0 };
+
 /** 人の一覧の1行（ホームの誕生日にも使う）。 */
 export type PersonRow = PersonListItem & { birthdayMd: string | null };
 
@@ -140,19 +143,19 @@ export async function queryPersons(
         SELECT p.id, p.real_name, p.line_name, p.consent_invite, p.consent_work, st.last_met_on, st.first_met_on, st.own_count,
           (lr.person_id IS NOT NULL) AS has_response, lr.next_attendance, lr.wanted_connections, lr.career_interests,
           p.likelihood, p.next_action_on, p.next_action_note, p.birthday_md, p.updated_at,
-          coalesce(p.real_name_key, p.line_name_key, '') AS name_key,
-          (SELECT coalesce(json_agg(json_build_object('id', t.id, 'name', t.name) ORDER BY t.name_key), '[]'::json)
-            FROM ${peoplePersonTags} pt JOIN ${peopleTags} t ON t.id = pt.tag_id WHERE pt.person_id = p.id) AS tags
+          coalesce(p.real_name_key, p.line_name_key, '') AS name_key
         FROM ${peoplePersons} p
         LEFT JOIN st ON st.person_id = p.id
         LEFT JOIN lr ON lr.person_id = p.id
         WHERE ${sql.join(conds, sql` AND `)}
       )
     SELECT (SELECT count(*) FROM f)::int AS total,
-      (SELECT coalesce(json_agg(x), '[]'::json) FROM (
-        SELECT * FROM f ORDER BY ${options.orderBy ?? SORT_SQL[query.sort ?? "last_met"]}
-        LIMIT ${limit} OFFSET ${offset}
-      ) x) AS rows`);
+      (SELECT coalesce(json_agg(y), '[]'::json) FROM (
+        -- タグは、そのページの人の分だけ組み立てる（全員の分を作らない）
+        SELECT x.*, (SELECT coalesce(json_agg(json_build_object('id', t.id, 'name', t.name) ORDER BY t.name_key), '[]'::json)
+            FROM ${peoplePersonTags} pt JOIN ${peopleTags} t ON t.id = pt.tag_id WHERE pt.person_id = x.id) AS tags
+        FROM (SELECT * FROM f ORDER BY ${options.orderBy ?? SORT_SQL[query.sort ?? "last_met"]} LIMIT ${limit} OFFSET ${offset}) x
+      ) y) AS rows`);
   const [out] = res.rows;
   return {
     total: Number(out?.total ?? 0),

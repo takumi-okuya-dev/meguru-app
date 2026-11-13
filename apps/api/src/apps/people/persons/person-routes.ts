@@ -42,8 +42,13 @@ export function personRoutes() {
     // 書き出し（絞り込みは本文で受ける。名前を URL に載せない。/persons/:personId より先に置く）
     .post("/persons/export", async (c) => {
       const input = await parseBody(personExportSchema, c.req.json().catch(() => ({})));
-      const { filename, body } = await exportPersons(createDb(c.env.DATABASE_URL), c.get("user").id, { ...input, offset: 0 });
-      return c.body(body, 200, { "Content-Type": "text/csv; charset=utf-8", "Content-Disposition": `attachment; filename="${filename}"`, "Cache-Control": "no-store" });
+      const { filename, body, truncated } = await exportPersons(createDb(c.env.DATABASE_URL), c.get("user").id, { ...input, offset: 0 });
+      return c.body(body, 200, {
+        "Content-Type": "text/csv; charset=utf-8",
+        "Content-Disposition": `attachment; filename="${filename}"`,
+        "Cache-Control": "no-store",
+        "X-People-Export-Truncated": truncated ? "true" : "false",
+      });
     })
     .post("/persons", async (c) => {
       const input = await parseBody(personCreateSchema, c.req.json());

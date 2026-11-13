@@ -5,7 +5,7 @@ import { withTransaction, type Db, type TxDb } from "../../../kernel/db/client";
 import type { Env } from "../../../kernel/env";
 import { AppError, itemNotFound } from "../../../kernel/errors";
 import { isUuid } from "../../../kernel/validate";
-import { loadOwnedPerson, lockActiveOwner, lockOwner, type PeopleDb } from "../access";
+import { loadOwnedPerson, lockActiveOwner, lockOwner, touchPerson, type PeopleDb } from "../access";
 import { peoplePersonTags, peopleTags } from "../schema";
 
 /**
@@ -168,6 +168,7 @@ export async function setPersonTags(env: Env, userId: string, personId: string, 
     if (ids.size > TAGS_PER_PERSON_MAX) throw new AppError("VALIDATION_FAILED", 400, "invalid request", undefined, ["tagIds"]);
     await tx.delete(peoplePersonTags).where(and(eq(peoplePersonTags.personId, p.id), eq(peoplePersonTags.userId, userId)));
     if (ids.size > 0) await tx.insert(peoplePersonTags).values([...ids].map((tagId) => ({ personId: p.id, tagId, userId })));
+    await touchPerson(tx, userId, p.id);
     return tagsOfPerson(tx, userId, p.id);
   });
 }

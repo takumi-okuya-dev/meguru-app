@@ -1,7 +1,7 @@
 // 人の一覧の書き出し（specs/people/002-sales-list plan.md 3、FR-111）。絞り込みに合う人を CSV（UTF-8・BOM）にする。
 // ファイルは残さない（返すだけ）。Excel で式として読まれる頭の文字（= + - @ と、タブ・改行）は ' を付けて逃がす。
 import { jstDate, type PersonListQuery } from "@meguru/shared/people";
-import { and, eq, inArray } from "drizzle-orm";
+import { and, asc, eq, inArray } from "drizzle-orm";
 import type { Db } from "../../../kernel/db/client";
 import { peoplePersonFieldValues, peoplePersonLinks, peoplePersons, peopleResponses } from "../schema";
 import { listFields } from "../fields/field-service";
@@ -29,10 +29,15 @@ export function csvCell(v: string | number | null | undefined): string {
  * @param userId - 作り手
  * @param query - 人の一覧と同じ絞り込み
  * @param now - 今の時刻（ファイル名の日付）
- * @returns ファイル名と CSV のバイト（BOM つき）
+ * @returns ファイル名と CSV のバイト（BOM つき）と、上限で切ったか
  */
-export async function exportPersons(db: Db, userId: string, query: PersonListQuery, now = new Date()): Promise<{ filename: string; body: Uint8Array<ArrayBuffer> }> {
-  const [{ persons }, fields] = await Promise.all([queryPersons(db, userId, query, [], { limit: EXPORT_LIMIT, offset: 0 }), listFields(db, userId)]);
+export async function exportPersons(
+  db: Db,
+  userId: string,
+  query: PersonListQuery,
+  now = new Date(),
+): Promise<{ filename: string; body: Uint8Array<ArrayBuffer>; truncated: boolean }> {
+  const [{ persons, total }, fields] = await Promise.all([queryPersons(db, userId, query, [], { limit: EXPORT_LIMIT, offset: 0 }), listFields(db, userId)]);
   const ids = persons.map((p) => p.id);
   const [memos, lines, values, links] = ids.length
     ? await Promise.all([
@@ -43,7 +48,9 @@ export async function exportPersons(db: Db, userId: string, query: PersonListQue
         db
           .selectDistinct({ personId: peopleResponses.personId, lineName: peopleResponses.lineName })
           .from(peopleResponses)
-          .where(and(eq(peopleResponses.userId, userId), inArray(peopleResponses.personId, ids))),
+          .where(and(eq(peopleResponses.userId, userId), inArray(peopleResponses.personId, ids)))
+          // 別名の並びを毎回同じにする
+          .orderBy(asc(peopleResponses.personId), asc(peopleResponses.lineName)),
         db
           .select({ personId: peoplePersonFieldValues.personId, fieldId: peoplePersonFieldValues.fieldId, value: peoplePersonFieldValues.value })
           .from(peoplePersonFieldValues)
@@ -117,5 +124,6 @@ export async function exportPersons(db: Db, userId: string, query: PersonListQue
   const body = new Uint8Array(new ArrayBuffer(bytes.length + 3));
   body.set([0xef, 0xbb, 0xbf]);
   body.set(bytes, 3);
-  return { filename: `people-${jstDate(now).replaceAll("-", "")}.csv`, body };
+  // 上限を超えたら切ったことを知らせる（画面が「最初の1万人だけ」と出せるように）
+  return { filename: `people-${jstDate(now).replaceAll("-", "")}.csv`, body, truncated: total > persons.length };
 }

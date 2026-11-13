@@ -1,11 +1,9 @@
 // ホーム：今日やること・過ぎたもの・近い誕生日（specs/people/002-sales-list plan.md 3、FR-104・FR-105）。
-import { BIRTHDAY_WINDOW_DAYS, jstDate, type HomeItem, type PeopleHome, type PersonListQuery } from "@meguru/shared/people";
+import { BIRTHDAY_WINDOW_DAYS, jstDate, type HomeItem, type PeopleHome } from "@meguru/shared/people";
 import { sql } from "drizzle-orm";
 import type { Db } from "../../../kernel/db/client";
-import { queryPersons } from "../persons/person-list";
+import { NO_FILTER, queryPersons } from "../persons/person-list";
 
-/** 絞り込みのない一覧のクエリ。 */
-const NO_FILTER: PersonListQuery = { next: [], wanted: [], career: [], tag: [], likelihood: [], offset: 0 };
 /** ホームに出す人数の上限（それぞれ）。 */
 const HOME_LIMIT = 200;
 
@@ -25,6 +23,25 @@ export function daysUntilBirthday(today: string, md: string): number {
 }
 
 /**
+ * 今日から7日（今日を含む）の月日。うるう年でない年は、3月1日の日に2月29日の人も入れる（daysUntilBirthday と同じ数え方）。
+ * @param today - 今日（YYYY-MM-DD）
+ * @returns 月日（MM-DD）
+ */
+export function windowMonthDays(today: string): string[] {
+  const [y, m, d] = today.split("-").map(Number) as [number, number, number];
+  const out: string[] = [];
+  for (let i = 0; i < BIRTHDAY_WINDOW_DAYS; i++) {
+    const t = new Date(Date.UTC(y, m - 1, d + i));
+    const md = `${String(t.getUTCMonth() + 1).padStart(2, "0")}-${String(t.getUTCDate()).padStart(2, "0")}`;
+    out.push(md);
+    const year = t.getUTCFullYear();
+    const leap = (year % 4 === 0 && year % 100 !== 0) || year % 400 === 0;
+    if (md === "03-01" && !leap) out.push("02-29");
+  }
+  return out;
+}
+
+/**
  * ホームの3つの並び。
  * @param db - データベース
  * @param userId - 作り手
@@ -36,7 +53,12 @@ export async function getHome(db: Db, userId: string, now = new Date()): Promise
   const [todayRows, overdueRows, birthdayRows] = await Promise.all([
     queryPersons(db, userId, NO_FILTER, [sql`p.next_action_on = ${today}::date`], { limit: HOME_LIMIT, offset: 0, orderBy: sql`name_key, id` }),
     queryPersons(db, userId, NO_FILTER, [sql`p.next_action_on < ${today}::date`], { limit: HOME_LIMIT, offset: 0, orderBy: sql`next_action_on, name_key, id` }),
-    queryPersons(db, userId, NO_FILTER, [sql`p.birthday_md IS NOT NULL`], { limit: 5000, offset: 0, orderBy: sql`name_key, id` }),
+    // 誕生日は、今日から7日の月日だけを SQL で選ぶ（人の数によらず漏れない）
+    queryPersons(db, userId, NO_FILTER, [sql`p.birthday_md IN (${sql.join(windowMonthDays(today).map((md) => sql`${md}`), sql`, `)})`], {
+      limit: HOME_LIMIT,
+      offset: 0,
+      orderBy: sql`name_key, id`,
+    }),
   ]);
   const birthdays: HomeItem[] = birthdayRows.persons
     .map((p) => ({ p, days: daysUntilBirthday(today, p.birthdayMd!) }))

@@ -74,6 +74,16 @@ describe("分ける", () => {
   });
 });
 
+describe("取り消しの確かめ", () => {
+  it("タグ・次にやること・連絡の記録などがある人は、書き足しのある人（sales）として確かめる", async () => {
+    await callPeople("PUT", `/persons/${taro}/tags`, "u1", { newTagNames: ["常連"] });
+    const [imp] = (await rawSql()`SELECT import_id FROM people.responses WHERE person_id = ${taro}`) as { import_id: string }[];
+    const [, undo] = await read<{ peopleWithNotes: { notes: string[] }[] }>(await callPeople("GET", `/imports/${imp!.import_id}/undo-preview`, "u1"));
+    expect(undo.peopleWithNotes.map((p) => p.notes)).toEqual([["sales"]]);
+    expect((await callPeople("DELETE", `/imports/${imp!.import_id}`, "u1")).status).toBe(409);
+  });
+});
+
 describe("退会", () => {
   it("タグ・自由な項目も消える（人に付いたものは人と一緒に消える）", async () => {
     const [user] = (await rawSql()`SELECT user_id FROM people.persons LIMIT 1`) as { user_id: string }[];

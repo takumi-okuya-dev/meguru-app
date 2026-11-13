@@ -16,6 +16,7 @@ import {
   PERSON_SORTS,
   TAG_NAME_MAX,
   TAGS_PER_PERSON_MAX,
+  isRealMonthDay,
   type ContactChannel,
   type LinkKind,
   type PersonGroup,
@@ -124,6 +125,7 @@ export const personUpdateSchema = z
     birthdayMd: z
       .string()
       .regex(/^(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])$/)
+      .refine(isRealMonthDay, { message: "invalid date" })
       .nullable()
       .optional(),
     // 来てくれそう度（3＝高・2＝中・1＝低、null＝なし。FR-107）
@@ -250,7 +252,7 @@ export const contactLogCreateSchema = z.object({
 });
 /** PATCH /api/people/contact-logs/:logId の入力。 */
 export const contactLogUpdateSchema = z
-  .object({ contactedOn: dateString.optional(), channel: z.enum(CONTACT_CHANNELS).optional(), note: contactNote.optional() })
+  .object({ contactedOn: dateString.optional(), channel: z.enum(CONTACT_CHANNELS).exclude(["done"]).optional(), note: contactNote.optional() })
   .refine((v) => Object.keys(v).length > 0, { message: "empty", path: ["note"] });
 /** 自由な項目の名前。 */
 const fieldLabel = z
@@ -501,7 +503,8 @@ export type OutreachBoardRow = PersonListItem & { outreach: Outreach };
 export type OutreachBoard = { event: PeopleEvent; stages: { asked: OutreachBoardRow[]; link_sent: OutreachBoardRow[]; attended: OutreachBoardRow[] } };
 
 /** 書き足し（取り消しで確かめる。R14）。 */
-export type PersonNote = "memo" | "outreach" | "manual_consent" | "manual_attendance";
+/** 書き足しの種類（sales は 002 の書き足し：タグ・次にやること・連絡の記録・来てくれそう度・誕生日・自由な項目・SNS のリンク）。 */
+export type PersonNote = "memo" | "outreach" | "manual_consent" | "manual_attendance" | "sales";
 /** GET /api/people/imports/:importId/undo-preview の返り。 */
 export type ImportUndoPreview = {
   responseCount: number;

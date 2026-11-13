@@ -12,6 +12,7 @@ const NOTE_LABELS: Record<PersonNote, string> = {
   outreach: "声かけ",
   manual_consent: "手で直した同意",
   manual_attendance: "手で足した会ったイベント",
+  sales: "タグ・次にやること・連絡の記録など",
 };
 
 /** 確かめに出す中身（イベントを消すときは、取り込みの数と声かけの数も）。 */

@@ -53,8 +53,25 @@ const LINK_HOSTS: Record<LinkKind, readonly string[]> = {
  */
 export function isAllowedLinkUrl(kind: LinkKind, url: string): boolean {
   // URL の部品を読む（共通のパッケージは DOM の型を読まないので、URL のクラスを使わずに形で確かめる）。ユーザー名・ポートつきは断る
-  const m = /^https:\/\/([a-z0-9.-]+)(\/[^\s]*)?$/i.exec(url);
+  // スキームは小文字の https だけ（DB の check と同じ）。ホストは大文字も小文字にそろえて比べる
+  const m = /^https:\/\/([A-Za-z0-9.-]+)(\/[^\s]*)?$/.exec(url);
   if (!m) return false;
   const host = m[1]!.toLowerCase().replace(/^www\./, "");
   return LINK_HOSTS[kind].includes(host);
+}
+
+/** 月ごとの日数（2月は29日まで。誕生日なので、うるう年の2月29日も許す）。 */
+const DAYS_IN_MONTH = [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31] as const;
+
+/**
+ * ある月日（MM-DD）か（02-30・04-31 などを断る）。
+ * @param md - 月日
+ * @returns ある月日なら true
+ */
+export function isRealMonthDay(md: string): boolean {
+  const m = /^(\d{2})-(\d{2})$/.exec(md);
+  if (!m) return false;
+  const month = Number(m[1]);
+  const day = Number(m[2]);
+  return month >= 1 && month <= 12 && day >= 1 && day <= DAYS_IN_MONTH[month - 1]!;
 }

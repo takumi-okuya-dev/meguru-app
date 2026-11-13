@@ -5,7 +5,7 @@ import { withTransaction } from "../../../kernel/db/client";
 import type { Env } from "../../../kernel/env";
 import { AppError, itemNotFound } from "../../../kernel/errors";
 import { isUuid } from "../../../kernel/validate";
-import { loadOwnedPerson, lockActiveOwner, lockOwner, type PeopleDb } from "../access";
+import { loadOwnedPerson, lockActiveOwner, lockOwner, touchPerson, type PeopleDb } from "../access";
 import { peopleContactLogs, peoplePersons } from "../schema";
 
 /**
@@ -49,6 +49,7 @@ export async function addContactLog(env: Env, userId: string, personId: string, 
       .insert(peopleContactLogs)
       .values({ userId, personId: p.id, ...input })
       .returning();
+    await touchPerson(tx, userId, p.id);
     return toLog(row!);
   });
 }
@@ -87,6 +88,7 @@ export async function updateContactLog(env: Env, userId: string, logId: string, 
       .set({ ...input, updatedAt: new Date() })
       .where(eq(peopleContactLogs.id, log.id))
       .returning();
+    await touchPerson(tx, userId, log.personId);
     return toLog(row!);
   });
 }
@@ -102,6 +104,7 @@ export async function deleteContactLog(env: Env, userId: string, logId: string):
     await lockOwner(tx, userId);
     const log = await loadOwnedLog(tx, userId, logId);
     await tx.delete(peopleContactLogs).where(eq(peopleContactLogs.id, log.id));
+    await touchPerson(tx, userId, log.personId);
   });
 }
 

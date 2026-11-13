@@ -1,11 +1,11 @@
 // 自由な項目と SNS のリンク（specs/people/002-sales-list plan.md 3、FR-109・FR-110）。
 import { FIELDS_MAX, LINK_KINDS, nameKey, type CustomField, type LinkKind, type PersonFieldValue, type PersonLinks } from "@meguru/shared/people";
-import { and, asc, count, eq, inArray, max } from "drizzle-orm";
+import { and, asc, count, eq, inArray, max, sql } from "drizzle-orm";
 import { withTransaction, type TxDb } from "../../../kernel/db/client";
 import type { Env } from "../../../kernel/env";
 import { AppError, itemNotFound } from "../../../kernel/errors";
 import { isUuid } from "../../../kernel/validate";
-import { loadOwnedPerson, lockActiveOwner, lockOwner, type PeopleDb } from "../access";
+import { loadOwnedPerson, lockActiveOwner, lockOwner, touchPerson, type PeopleDb } from "../access";
 import { peopleCustomFields, peoplePersonFieldValues, peoplePersonLinks } from "../schema";
 
 /**
@@ -158,7 +158,14 @@ export async function reorderFields(env: Env, userId: string, fieldIds: string[]
     if (fieldIds.length !== mine.size || new Set(fieldIds).size !== fieldIds.length || !fieldIds.every((id) => mine.has(id))) {
       throw new AppError("VALIDATION_FAILED", 400, "invalid request", undefined, ["fieldIds"]);
     }
-    for (const [i, id] of fieldIds.entries()) await tx.update(peopleCustomFields).set({ position: i }).where(eq(peopleCustomFields.id, id));
+    // 1回の UPDATE でまとめて並べ替える
+    if (fieldIds.length > 0) {
+      const values = sql.join(
+        fieldIds.map((id, i) => sql`(${id}::uuid, ${i}::int)`),
+        sql`, `,
+      );
+      await tx.execute(sql`UPDATE ${peopleCustomFields} AS f SET position = v.pos FROM (VALUES ${values}) AS v(id, pos) WHERE f.id = v.id AND f.user_id = ${userId}`);
+    }
     return listFields(tx, userId);
   });
 }
@@ -183,16 +190,19 @@ export async function setPersonFields(env: Env, userId: string, personId: string
         .where(and(eq(peopleCustomFields.userId, userId), inArray(peopleCustomFields.id, ids)));
       if (owned.length !== ids.length) throw itemNotFound();
     }
-    for (const v of values) {
-      if (v.value === null) {
-        await tx.delete(peoplePersonFieldValues).where(and(eq(peoplePersonFieldValues.personId, p.id), eq(peoplePersonFieldValues.fieldId, v.fieldId)));
-      } else {
-        await tx
-          .insert(peoplePersonFieldValues)
-          .values({ personId: p.id, fieldId: v.fieldId, userId, value: v.value })
-          .onConflictDoUpdate({ target: [peoplePersonFieldValues.personId, peoplePersonFieldValues.fieldId], set: { value: v.value } });
-      }
+    // 消すものは1回の DELETE、入れるものは1回の複数行の upsert でまとめる
+    const removed = values.filter((v) => v.value === null).map((v) => v.fieldId);
+    const kept = values.filter((v): v is { fieldId: string; value: string } => v.value !== null);
+    if (removed.length > 0) {
+      await tx.delete(peoplePersonFieldValues).where(and(eq(peoplePersonFieldValues.personId, p.id), inArray(peoplePersonFieldValues.fieldId, removed)));
     }
+    if (kept.length > 0) {
+      await tx
+        .insert(peoplePersonFieldValues)
+        .values(kept.map((v) => ({ personId: p.id, fieldId: v.fieldId, userId, value: v.value })))
+        .onConflictDoUpdate({ target: [peoplePersonFieldValues.personId, peoplePersonFieldValues.fieldId], set: { value: sql`excluded.value` } });
+    }
+    await touchPerson(tx, userId, p.id);
     return fieldsOfPerson(tx, userId, p.id);
   });
 }
@@ -220,6 +230,7 @@ export async function setPersonLinks(env: Env, userId: string, personId: string,
           .onConflictDoUpdate({ target: [peoplePersonLinks.personId, peoplePersonLinks.kind], set: { url } });
       }
     }
+    await touchPerson(tx, userId, p.id);
     return linksOfPerson(tx, userId, p.id);
   });
 }
