@@ -6,6 +6,7 @@
 // 時刻の列は、読み戻した値と一致させるため、必ず JavaScript の Date で書く（DBの now() は使わない）
 import { and, eq, inArray, isNotNull, lt, min, ne, sql } from "drizzle-orm";
 import type { Env } from "../../../kernel/env";
+import { deliverPromotionEvents } from "../strategy/promotion-events";
 import { createDb, withTransaction } from "../../../kernel/db/client";
 import { lockThreadsUser } from "../../../kernel/db/locks";
 import { threadsDeletionRequests } from "../schema";
@@ -89,6 +90,8 @@ export async function attemptDeletion(
 
   // 消したアカウントの持ち主（トランザクションのあとで、利用の数を共通へ伝える。specs/meguru/029 research.md R6）
   let owners: string[] = [];
+  // 宣伝内容のイベントの情報を消したという出来事（集金管理などへ。トランザクションのあとで届ける）
+  const promotionEventIds: string[] = [];
   let result: "completed" | "skipped";
   try {
     result = await withTransaction(env.DATABASE_URL, async (tx) => {
@@ -127,7 +130,7 @@ export async function attemptDeletion(
       await hooks.beforeDelete?.();
 
       // 4. Accountを削除する。持ち主のロック（lockThreadsMember）を取り、最後に消した時刻を記録する（research.md R13）。
-      owners = await deleteAccountsOfThreadsUser(tx, threadsUserId, now);
+      owners = await deleteAccountsOfThreadsUser(tx, threadsUserId, now, promotionEventIds);
 
       // 5. 完了を記録し、平文のIDを消す（hmac は完了の直前に始めた認可フローの照合に使うので残す）
       await tx
@@ -147,6 +150,7 @@ export async function attemptDeletion(
   }
   // 削除はもう確定している。利用の数を伝えるのに失敗しても「完了」のまま（ログに残し、毎日の数え直しで直す）
   for (const userId of owners) await trySyncThreadsUsage(db, userId);
+  await deliverPromotionEvents(env, promotionEventIds);
   return result;
 }
 
