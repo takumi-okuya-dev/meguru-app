@@ -20,7 +20,17 @@ export { recordOperatorEvent, countRecentApplyActions } from "./operator/operato
 // アプリを分けるための共通の土台（contracts/platform-entry.md）
 export { registerModule } from "./registry/modules";
 export { appDailyJobs, registerAppModules, type ApiAppModule, type AppTokenKeys, type DailyJob } from "./registry/app-module";
-export { registerConsumer, deliverPendingEvents, nextPendingAttemptAt, purgeDeliveredEvents, type EventConsumer, type PlatformEvent, type PlatformEventType } from "./events/events";
+export {
+  registerConsumer,
+  emitEvent,
+  deliverPendingEvents,
+  nextPendingAttemptAt,
+  purgeDeliveredEvents,
+  type EventConsumer,
+  type PlatformEvent,
+  type PlatformEventType,
+  type ThreadsPromotionEventSaved,
+} from "./events/events";
 export { readEventGate, shouldDeliver, nextEventCheckAt, writeEventGate } from "./events/delivery-gate";
 export { loadAppEntitlement, loadAppEntitlements, loadAppFeatures, type AppEntitlement } from "./entitlement/entitlement";
 export { reportUsage, billingQuantityOf, usingAppsOf, appUsageOf, usersWithUsage, type AppUsageReport } from "./usage/usage";

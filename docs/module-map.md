@@ -63,7 +63,7 @@ flowchart TB
 - アプリの表は共通の表を参照しない（読む・外部キーのどちらも）。利用者のIDを値として持ち、名前や利用権は共通の入口の関数から受け取る。共通の表もアプリの表を参照しない（Threadsと共通の間の外部キーは0本）。
 - アプリの表はアプリ専用のスキーマに置く（Threadsは`threads`）。共通の表は`public`。今後マイクロサービスにしていく可能性に備えた決まりで、詳しくは[docs/app-separation.md](./app-separation.md)。
 
-### 1-4. 出来事（共通 → アプリ）
+### 1-4. 出来事（共通 → アプリ、アプリ → アプリ）
 
 共通で起きたこと（退会など）をアプリに伝えるときは、共通が出来事を出し、アプリがあとから受け取る（`platform/events/events.ts`）。共通は、自分の表の変更と同じトランザクションで送り出しの表（`platform_events`）に書き、書いたあとすぐと、5分ごとの定期処理で、登録された受け取りに届ける。受け取りは、組み立てでアプリの`registerXxx()`を呼んで登録する（中で`registerModule("<名前>", …)`と`registerConsumer`を使い、何度呼んでも1回だけ。Threadsは`apps/threads/register.ts`）。
 
@@ -71,11 +71,13 @@ flowchart TB
 - 受け取りは、自分のトランザクションの中で出来事のIDを自分の表に記録し、もうあれば何もしない（同じ出来事が2回届いても同じ結果。Threadsは`threads.received_events`）。
 - 受け取りが失敗したら、間をあけてやり直す（5分・10分・20分・40分、そのあとは1時間ごと）。10回失敗したら`failed`で止め、`platform_event_deliveries`とログに残す。
 - アプリから共通へ伝えるときは、出来事ではなく入口の関数（`reportUsage`など）を呼ぶ。
+- アプリがほかのアプリに伝えるとき（Threads → 集金管理）も、同じ出来事の仕組みを使う。出す側のアプリは、自分の表の変更と同じトランザクションで共通の入口の`emitEvent`を呼び、トランザクションのあとで`deliverPendingEvents`を`eventIds`つきで呼ぶ。受け取るアプリがまだない（入っていない）こともあるので、`{ allowNoConsumers: true }`を付ける（届け先がなければ書かない）。出来事の種類と中身は`platform/events/events.ts`の`PlatformEventPayloads`に足す（共通のPRで）。
 
 | 出来事 | 出すところ | Threadsでの受け取り（`apps/threads/events/received-events.ts`） |
 |---|---|---|
 | `user.withdrawn` | 退会の処理（`platform/withdrawal/withdrawal-service.ts`）。利用者を退会にしたのと同じトランザクション。すべての受け取りが済んだあとで、共通が`users`の行を消す | その人が持ち主のアカウントを消し（テスター招待の片づけ・Metaのデータ削除の要求の完了を含む）、メンバー・チーム・担当から外し、作った人の欄を空にする（`apps/threads/accounts/withdrawal-cleanup.ts`） |
 | `limits.changed` | 運営者が上限を保存したとき（`platform/operator/limit-service.ts`）。保存と同じトランザクション | 自動投稿を起こす（`notifyWake`） |
+| `threads.promotion_event.saved`・`threads.promotion_event.deleted`・`threads.listing_status.changed` | Threads が宣伝内容のイベントの情報・外部媒体の掲載の状況を変えたとき（同じトランザクション） | （Threadsは受け取らない）集金管理が「Threadsのイベントの候補」に写す（specs/collect/001 contracts/events.md 2） |
 
 - 027で作った同じトランザクションの「知らせ」（`platform/hooks.ts`）は、029で消した。アカウントを消すとき・開くときの処理は、アカウントがThreadsの持ち物になったので、Threadsの中の処理にした。
 
