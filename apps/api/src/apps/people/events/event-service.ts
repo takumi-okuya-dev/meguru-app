@@ -1,14 +1,15 @@
 // イベント（specs/people/001-people-memo contracts/api.md 2、data-model.md 4、research.md R12・R14）。
 // 参加者数＝その会の来た記録の人数（回答 ∪ 手で足した会ったイベント）＋消した人の来た記録の行数。毎回数える。
 import type { EventDeletePreview, PeopleAttendee, PeopleEvent, PeopleEventDetail, PeopleEventListItem, UndoResult } from "@meguru/shared/people";
-import { and, desc, eq, sql, type SQL } from "drizzle-orm";
+import { and, count, desc, eq, sql, type SQL } from "drizzle-orm";
 import { withTransaction, type Db } from "../../../kernel/db/client";
 import type { Env } from "../../../kernel/env";
 import { logger } from "../../../kernel/logger";
 import { displayNameOf, loadOwnedEvent, lockActiveOwner, lockOwner, type PeopleDb } from "../access";
 import { executeUndo, planUndo, toUndoPreview } from "../imports/undo";
 import { derivePersons } from "../persons/person-derive";
-import { peopleErasedAttendances, peopleEvents, peopleImports, peopleManualAttendances, peoplePersons, peopleResponses } from "../schema";
+import { peopleErasedAttendances, peopleEvents, peopleImports, peopleManualAttendances, peopleOutreaches, peoplePersons, peopleResponses } from "../schema";
+import { attendanceSql } from "../persons/person-query";
 import { reportPeopleUsage } from "../usage";
 
 /**
@@ -18,6 +19,18 @@ import { reportPeopleUsage } from "../usage";
  */
 export function toEvent(e: typeof peopleEvents.$inferSelect): PeopleEvent {
   return { id: e.id, name: e.name, heldOn: e.heldOn, isOwn: e.isOwn };
+}
+
+/**
+ * その人が、開催日より前の自分の会に来たか（同じ日の会は前に数えない。R12）。
+ * @param userId - 作り手
+ * @param heldOn - 比べる開催日
+ * @param personId - 人の列（省くと a.person_id）
+ * @returns 真偽の式
+ */
+function previousOwnSql(userId: string, heldOn: string, personId: SQL = sql`a.person_id`): SQL {
+  return sql`EXISTS (SELECT 1 FROM (${attendanceSql(userId)}) a2 JOIN ${peopleEvents} e2 ON e2.id = a2.event_id
+    WHERE a2.person_id = ${personId} AND e2.is_own AND e2.held_on < ${heldOn}::date)`;
 }
 
 /** イベントごとの数。 */
@@ -128,18 +141,30 @@ export async function updateEvent(env: Env, userId: string, eventId: string, inp
  */
 export async function eventDetail(db: Db, userId: string, eventId: string): Promise<PeopleEventDetail> {
   const event = await loadOwnedEvent(db, userId, eventId);
-  const [counts, imports] = await Promise.all([
+  // 自分の会だけ、初めて・前にも来た人の数を出す（消した人は内訳に入れない。R12）
+  const breakdown = event.isOwn
+    ? db.execute<{ first: number; returning: number }>(sql`
+        SELECT (count(*) FILTER (WHERE NOT x.prev))::int AS first, (count(*) FILTER (WHERE x.prev))::int AS returning
+        FROM (SELECT a.person_id, ${previousOwnSql(userId, event.heldOn)} AS prev FROM (${attendanceSql(userId)}) a WHERE a.event_id = ${eventId}) x`)
+    : null;
+  const [counts, imports, own] = await Promise.all([
     countsByEvent(db, userId, eventId),
     db
       .select()
       .from(peopleImports)
       .where(and(eq(peopleImports.eventId, eventId), eq(peopleImports.userId, userId)))
       .orderBy(desc(peopleImports.createdAt)),
+    breakdown,
   ]);
   const c = counts.get(eventId);
+  const stats: PeopleEventDetail["stats"] = { attendeeCount: (c?.attendees ?? 0) + (c?.erased ?? 0), erasedCount: c?.erased ?? 0 };
+  if (own) {
+    stats.firstTimeCount = Number(own.rows[0]?.first ?? 0);
+    stats.returningCount = Number(own.rows[0]?.returning ?? 0);
+  }
   return {
     event: toEvent(event),
-    stats: { attendeeCount: (c?.attendees ?? 0) + (c?.erased ?? 0), erasedCount: c?.erased ?? 0 },
+    stats,
     imports: imports.map((i) => ({
       id: i.id,
       createdAt: i.createdAt.toISOString(),
@@ -160,10 +185,11 @@ export async function eventDetail(db: Db, userId: string, eventId: string): Prom
  * @returns 来た人
  */
 export async function eventAttendees(db: Db, userId: string, eventId: string): Promise<PeopleAttendee[]> {
-  await loadOwnedEvent(db, userId, eventId);
-  const res = await db.execute<{ id: string; real_name: string | null; line_name: string | null; by_response: boolean }>(sql`
+  const event = await loadOwnedEvent(db, userId, eventId);
+  const res = await db.execute<{ id: string; real_name: string | null; line_name: string | null; by_response: boolean; prev: boolean }>(sql`
     SELECT p.id, p.real_name, p.line_name,
-      EXISTS (SELECT 1 FROM ${peopleResponses} r WHERE r.person_id = p.id AND r.event_id = ${eventId}) AS by_response
+      EXISTS (SELECT 1 FROM ${peopleResponses} r WHERE r.person_id = p.id AND r.event_id = ${eventId}) AS by_response,
+      ${event.isOwn ? previousOwnSql(userId, event.heldOn, sql`p.id`) : sql`false`} AS prev
     FROM ${peoplePersons} p
     WHERE p.user_id = ${userId}
       AND (EXISTS (SELECT 1 FROM ${peopleResponses} r WHERE r.person_id = p.id AND r.event_id = ${eventId})
@@ -174,6 +200,8 @@ export async function eventAttendees(db: Db, userId: string, eventId: string): P
     displayName: displayNameOf({ realName: r.real_name, lineName: r.line_name }),
     lineName: r.line_name,
     via: r.by_response ? ("response" as const) : ("manual" as const),
+    // 初めて／前にもは自分の会だけ（R12）
+    ...(event.isOwn ? { firstTime: !r.prev } : {}),
   }));
 }
 
@@ -203,8 +231,11 @@ export async function eventDeletePreview(db: Db, userId: string, eventId: string
   await loadOwnedEvent(db, userId, eventId);
   const ids = await importIdsOf(db, userId, eventId);
   const plan = await planUndo(db, userId, ids, eventId);
-  // 声かけ（PR3）の数は、声かけの表を作るときに足す
-  return { ...toUndoPreview(plan), importCount: ids.length, outreachCount: 0 };
+  const [outreaches] = await db
+    .select({ n: count() })
+    .from(peopleOutreaches)
+    .where(and(eq(peopleOutreaches.eventId, eventId), eq(peopleOutreaches.userId, userId)));
+  return { ...toUndoPreview(plan), importCount: ids.length, outreachCount: outreaches?.n ?? 0 };
 }
 
 /**

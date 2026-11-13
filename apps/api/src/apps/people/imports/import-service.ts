@@ -20,6 +20,7 @@ import { loadOwnedEvent, lockActiveOwner, type PeopleDb } from "../access";
 import { derivePersons } from "../persons/person-derive";
 import { peopleImports, peoplePersons, peopleResponses } from "../schema";
 import { reportPeopleUsage } from "../usage";
+import { markInviteAttended } from "../outreach/outreach-service";
 import { classifyRows, toPreviewRow, type ParsedRow } from "./classify";
 import { consentChoicesIn, mappingErrorsOf, rememberMappings, resolveChoicePurposes, resolveColumns } from "./mapping";
 
@@ -188,6 +189,12 @@ export async function commitImport(
       .set({ importedCount: counts.importedCount, createdPeopleCount: counts.createdPeopleCount, linkedCount: counts.linkedCount, skippedCount: counts.skippedCount })
       .where(eq(peopleImports.id, importId));
     await derivePersons(tx, userId, [...withResponse]);
+    // 誘った会の回答なら、その人の声かけを「来た」にする（FR-022）
+    await markInviteAttended(
+      tx,
+      userId,
+      [...withResponse].map((personId) => ({ personId, eventId: input.eventId })),
+    );
     return { import: { id: importId, ...counts } };
   });
   // ログには番号と数だけ（名前・答えを出さない。R18）

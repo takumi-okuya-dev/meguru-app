@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { describeError } from "@/lib/api-client";
 import { cn } from "@/lib/utils";
 import { PageBody, PageHeader } from "@/shell";
+import { ListPager } from "../components/person/ListPager";
 import { activeFilterCount, EMPTY_FILTERS, PersonFilters, type PersonFilterValue } from "../components/person/PersonFilters";
 import { PersonRow } from "../components/person/PersonRow";
 import { PersonSearchBox } from "../components/person/PersonSearchBox";
@@ -67,16 +68,7 @@ function PersonListBody({
           ))}
         </ul>
       )}
-      {paged && (
-        <nav aria-label="ページ" className="flex justify-between gap-2">
-          <Button variant="outline" className="h-11 rounded-full md:h-9" disabled={offset === 0} onClick={() => onPage(Math.max(0, offset - PERSONS_PAGE_SIZE))}>
-            前の{PERSONS_PAGE_SIZE}人
-          </Button>
-          <Button variant="outline" className="h-11 rounded-full md:h-9" disabled={offset + PERSONS_PAGE_SIZE >= total} onClick={() => onPage(offset + PERSONS_PAGE_SIZE)}>
-            次の{PERSONS_PAGE_SIZE}人
-          </Button>
-        </nav>
-      )}
+      <ListPager offset={offset} total={total} onPage={onPage} />
     </>
   );
 }

@@ -42,7 +42,19 @@ function list(values: readonly string[]): SQL {
  * @returns 人と全体の数
  */
 export async function listPersons(db: Db, userId: string, query: PersonListQuery): Promise<PersonList> {
-  const conds: SQL[] = [sql`p.user_id = ${userId}`];
+  return queryPersons(db, userId, query, []);
+}
+
+/**
+ * 人の一覧の問い合わせ（誘う候補も使う。R22）。足した条件は、人（p）・数（st：last_met_on・own_count）・いちばん新しい回答（lr）の列で書く。
+ * @param db - データベース
+ * @param userId - 作り手
+ * @param query - 探す言葉と絞り込み
+ * @param extra - 足す条件（誘う候補の同意・前に来た）
+ * @returns 人と全体の数
+ */
+export async function queryPersons(db: Db, userId: string, query: PersonListQuery, extra: SQL[]): Promise<PersonList> {
+  const conds: SQL[] = [sql`p.user_id = ${userId}`, ...extra];
   const q = query.q?.normalize("NFKC").trim() ?? "";
   if (q !== "") {
     // メモは、保存した側も NFKC にそろえて比べる（全角の「ＡＢＣ」と半角の「ABC」を同じに見る）

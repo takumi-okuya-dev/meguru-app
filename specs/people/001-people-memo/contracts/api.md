@@ -132,8 +132,8 @@
 
 | 道筋 | 説明 |
 |---|---|
-| `GET /api/people/candidates?purpose=invite&eventId=&visitedOwn=&next=&wanted=&career=&lastMetFrom=&lastMetTo=&q=&offset=` | `purpose`（`invite`・`work`）は必須。**その目的の同意が真の人だけ**を返す（FR-018。画面では絞らない）。`visitedOwn=true`で「前に来た」だけ。並びと形は人の一覧と同じ＋`outreach`（`invite`なら`eventId`の会への声かけ、`work`なら最新の声かけ。なければ`null`） |
-| `POST /api/people/outreaches` | `{ personId, purpose: "invite", eventId }`か`{ personId, purpose: "work", targetName }`（1〜100文字）。その目的の同意がなければ409 `OUTREACH_NO_CONSENT`。同じ声かけがあれば200で今のものを返し、なければ201で`asked`から始める（R16） |
+| `GET /api/people/candidates?purpose=invite&eventId=&visitedOwn=&next=&wanted=&career=&lastMetFrom=&lastMetTo=&q=&offset=` | `purpose`（`invite`・`work`）は必須。**その目的の同意が真の人だけ**を返す（FR-018。画面では絞らない）。`eventId`は誘う会（人の一覧と違い、来たイベントでは絞らない。その会への声かけを行に入れるためだけに使う）。`visitedOwn=true`で「前に来た」だけ。並びと形は人の一覧と同じ＋`outreach`（`invite`なら`eventId`の会への声かけ、`work`なら最新の声かけ。なければ`null`） |
+| `POST /api/people/outreaches` | `{ personId, purpose: "invite", eventId }`か`{ personId, purpose: "work", targetName }`（1〜100文字。`work`はPR4から。PR3では400）。その目的の同意がなければ409 `OUTREACH_NO_CONSENT`。同じ声かけがあれば200で今のものを返し、なければ201で`asked`から始める（R16） |
 | `PATCH /api/people/outreaches/:outreachId` | `{ stage }`（同じ目的の進み具合のどれか）。`work`で`approved_at`がないのに`connected`なら409 `OUTREACH_NEEDS_APPROVAL`。戻したら先の日時を空にする → `{ outreach }` |
 | `DELETE /api/people/outreaches/:outreachId` | 押し間違いを消す → 204 |
 

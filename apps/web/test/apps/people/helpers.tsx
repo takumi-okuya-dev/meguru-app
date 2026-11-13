@@ -2,9 +2,11 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render } from "@testing-library/react";
 import type {
+  CandidateItem,
   ImportColumn,
   ImportPreview,
   ImportPreviewRow,
+  Outreach,
   PeopleEventListItem,
   PersonDetail,
   PersonListItem,
@@ -34,6 +36,9 @@ export function renderRoutes(routes: RouteObject[], path: string) {
 export const EVENT_1011: PeopleEventListItem = { id: "e1", name: "10月11日 IT交流会", heldOn: "2026-10-11", isOwn: true, attendeeCount: 20, importCount: 1 };
 /** ほかの人の会の見本。 */
 export const EVENT_1125: PeopleEventListItem = { id: "e2", name: "11月25日 もくもく会", heldOn: "2026-11-25", isOwn: false, attendeeCount: 10, importCount: 1 };
+
+/** これからの自分の会の見本（誘う会）。 */
+export const EVENT_1213: PeopleEventListItem = { id: "e3", name: "IT交流会 12/13", heldOn: "2026-12-13", isOwn: true, attendeeCount: 0, importCount: 0 };
 
 /** CSVの見出し。 */
 export const HEADERS = ["タイムスタンプ", "LINE名を教えてください", "本名", "次回参加", "個別のご案内"];
@@ -160,6 +165,37 @@ export function makeDetail(over: Partial<PersonDetail> = {}): PersonDetail {
     ],
     consentChanges: [{ invite: true, work: false, source: "response", basisOn: "2026-10-11", changedAt: "2026-10-12T03:00:00.000Z" }],
     outreaches: [],
+    ...over,
+  };
+}
+
+/**
+ * 誘う候補の1行を作る。
+ * @param over - 上書き
+ * @returns 候補の1行
+ */
+export function makeCandidate(over: Partial<CandidateItem> = {}): CandidateItem {
+  return { ...makeListItem(), outreach: null, ...over };
+}
+
+/**
+ * 交流会への誘いの声かけを作る（12/13の会へ・興味を聞いた）。
+ * @param over - 上書き
+ * @returns 声かけ
+ */
+export function makeOutreach(over: Partial<Outreach> = {}): Outreach {
+  return {
+    id: "o1",
+    personId: "p1",
+    purpose: "invite",
+    event: { id: EVENT_1213.id, name: EVENT_1213.name, heldOn: EVENT_1213.heldOn },
+    targetName: null,
+    stage: "asked",
+    askedAt: "2026-11-20T03:00:00.000Z",
+    linkSentAt: null,
+    attendedAt: null,
+    approvedAt: null,
+    connectedAt: null,
     ...over,
   };
 }

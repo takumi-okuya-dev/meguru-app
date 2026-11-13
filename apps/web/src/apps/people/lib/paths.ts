@@ -68,3 +68,11 @@ export function newPersonPath(): string {
 export function personPath(personId: string): string {
   return `${PEOPLE_BASE}/list/${encodeURIComponent(personId)}`;
 }
+
+/**
+ * 誘いの文と目標（設定）。
+ * @returns URL
+ */
+export function settingsPath(): string {
+  return `${PEOPLE_BASE}/settings`;
+}

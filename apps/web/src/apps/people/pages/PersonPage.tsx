@@ -1,6 +1,6 @@
 // 「/people/list/:personId」：人のページ（specs/people/001-people-memo contracts/ui-routes.md 1、US4・US2・US7）。
 // 本名（直す）・LINE名と別名・同意（直す・記録）・メモ2つ・来たイベント（新しい順・アンケートの答え・「別の人に分ける」）・
-// 「この人と同じ人」（まとめる）・「この人を消す」。声かけの記録はPR3から。
+// 声かけの記録（PR3）・「この人と同じ人」（まとめる）・「この人を消す」。
 import { useQuery } from "@tanstack/react-query";
 import { MergeIcon, Trash2Icon } from "lucide-react";
 import { useState } from "react";
@@ -16,6 +16,7 @@ import { PersonDeleteDialog } from "../components/person/PersonDeleteDialog";
 import { PersonMemoSection } from "../components/person/PersonMemoSection";
 import { PersonMergeDialog } from "../components/person/PersonMergeDialog";
 import { PersonNameSection } from "../components/person/PersonNameSection";
+import { PersonOutreachSection } from "../components/person/PersonOutreachSection";
 import { peopleApi } from "../lib/api";
 import { peopleQueryKeys } from "../lib/query-keys";
 
@@ -33,7 +34,7 @@ export function PersonPage() {
     if (detail.error instanceof ApiError && detail.error.code === "ITEM_NOT_FOUND") return <NotFound message="この人はいません（消したか、まとめた人です）" />;
     return <ApiErrorScreen error={detail.error} onRetry={() => void detail.refetch()} />;
   }
-  const { person, attendances, consentChanges } = detail.data;
+  const { person, attendances, consentChanges, outreaches } = detail.data;
   // 分けたあとに別の人のページへ移ったら、開いていたダイアログは出さない
   const open = dialog?.personId === person.id ? dialog.kind : null;
 
@@ -41,10 +42,11 @@ export function PersonPage() {
     <>
       <PageHeader title={person.displayName} />
       <PageBody className="space-y-6">
-        <PersonNameSection key={person.id} person={person} />
-        <PersonConsentSection key={person.id} personId={person.id} consent={person.consent} changes={consentChanges} />
-        <PersonMemoSection key={`${person.id}:${person.memoAppearance ?? ""}:${person.memoTalk ?? ""}`} person={person} />
-        <PersonAttendanceSection key={person.id} personId={person.id} attendances={attendances} />
+        <PersonNameSection key={`name:${person.id}`} person={person} />
+        <PersonConsentSection key={`consent:${person.id}`} personId={person.id} consent={person.consent} changes={consentChanges} />
+        <PersonMemoSection key={`memo:${person.id}:${person.memoAppearance ?? ""}:${person.memoTalk ?? ""}`} person={person} />
+        <PersonAttendanceSection key={`attendance:${person.id}`} personId={person.id} attendances={attendances} />
+        <PersonOutreachSection outreaches={outreaches} />
 
         <section className="flex flex-col gap-2 border-t pt-6 sm:flex-row sm:flex-wrap">
           <Button variant="outline" className="h-11 rounded-full md:h-9" onClick={() => setDialog({ kind: "merge", personId: person.id })}>
