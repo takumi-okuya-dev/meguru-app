@@ -1,6 +1,6 @@
 # モジュール地図（API・Web）
 
-**作成**：2026-11-10（specs/027-modular-monolith） | **Webの章**：2026-11-12（specs/028-meguru-shell） | **更新**：2026-11-13（Threadsをパターン①にそろえた。specs/meguru/029-threads-pattern1） | **対象**：`apps/api/src`・`apps/web/src`
+**作成**：2026-11-10（specs/027-modular-monolith） | **Webの章**：2026-11-12（specs/028-meguru-shell） | **更新**：2026-11-13（Threadsをパターン①にそろえた。specs/meguru/029-threads-pattern1。集金管理を足した。specs/collect/001-event-day-collection） | **対象**：`apps/api/src`・`apps/web/src`
 
 APIのコード（1〜6章）とWebのコード（7章）を、どのモジュールが持つかを決めた地図。表の持ち主・入口・依存の向き・例外を、ここを正本として管理する。プロダクト全体の形は[docs/product-structure.md](./product-structure.md)、構想の正本は personal-knowledge-base の`Wiki/仕事/システム開発/アイデア/個人開発版Google Workspace構想（スイート型SaaS）.md`。
 
@@ -129,6 +129,20 @@ flowchart TB
 | `events/`（出来事の受け取り） | `received_events` | `received-events.ts`（`user.withdrawn`・`limits.changed`の受け取り。1-4） |
 | （直下） | — | `index.ts`（入口）・`schema.ts`（34表。スキーマ`threads`）・`register.ts`（`registerThreads()`：機能・上限・出来事の受け取りの登録）・`registry.ts`（アプリの番号・機能と上限の名前） |
 
+### 2-2b. 集金管理（apps/collect）
+
+パターン①の最初の2作目（specs/collect/001-event-day-collection）。運営者が開いた人だけが使う（`registerAppAccess("collect", "granted")`。specs/meguru/030-app-access）。道筋はすべて`/api/collect`の下で、ログインと利用の許可の関所（`access.ts`の`collectOwner`）を付ける。今は PR1 の分（イベント・料金の区分・名簿・既定値）。
+
+| 小分け | 表 | 処理とAPIの入口 |
+|---|---|---|
+| `events/`（イベント・料金の区分） | `events`・`price_tiers` | `event-service.ts`・`event-routes.ts` |
+| `roster/`（名簿・前回の参加者） | `roster_people` | `roster-service.ts`（受付番号は`events.next_number`から取る）・`past-attendees.ts`・`roster-routes.ts` |
+| `settings/`（主催者の既定値） | `owner_settings` | `settings-service.ts`（PayPayのQRの画像・振込先の案内）・`settings-routes.ts` |
+| `me/`（集金管理の「自分」） | — | `collect-me.ts`（`GET /api/collect/me`） |
+| `usage/`（利用の値） | — | `usage.ts`（料金の数は0、イベントがあれば「使っている」を`reportUsage`で伝える。毎日の数え直し） |
+| `inbox/`（出来事の受け取り） | `received_events` | `received-events.ts`（`user.withdrawn`：その主催者のデータをすべて消す） |
+| （直下） | — | `index.ts`（入口）・`schema.ts`（5表。スキーマ`collect`）・`access.ts`（関所とイベントの持ち主の確かめ）・`register.ts`（`registerCollect()`：利用の決まりと出来事の受け取りの登録） |
+
 ### 2-2c. 人物メモ（apps/people）
 
 specs/people/001-people-memo。運営者が開いた人だけが使える（`registerAppAccess("people", "granted")`）。道筋は`/api/people`の下で、すべてログインと`requireAppAccess("people")`を通る。
@@ -142,7 +156,7 @@ specs/people/001-people-memo。運営者が開いた人だけが使える（`reg
 | `inbox/`（出来事の受け取り） | `received_events` | `withdrawal.ts`（`user.withdrawn`の受け取り） |
 | （直下） | — | `index.ts`（入口）・`schema.ts`（11表。スキーマ`people`）・`register.ts`（`registerPeople()`）・`registry.ts`（アプリの番号）・`access.ts`（持ち主の確かめ・作り手のロック）・`usage.ts`（`reportUsage`。数はいつも0）・`routes.ts`（`/api/people`の関所と道筋） |
 
-共通17表（`public`）＋Threads34表（`threads`）＋人物メモ11表（`people`）＝62表（`db/schema.ts`がまとめて出す）。共通とアプリの間、アプリ同士の外部キーは0本。
+共通17表（`public`）＋Threads34表（`threads`）＋集金管理5表（`collect`）＋人物メモ11表（`people`）＝67表（`db/schema.ts`がまとめて出す）。共通とアプリの間、アプリ同士の外部キーは0本。
 
 ### 2-3. 窓口（adapters）
 
@@ -159,11 +173,11 @@ specs/people/001-people-memo。運営者が開いた人だけが使える（`reg
 
 | ファイル | 役割 |
 |---|---|
-| `app.ts` | APIの入口の登録。初めに`registerThreads()`・`registerPeople()`を呼ぶ。ThreadsのAPIは`/api/threads`、人物メモのAPIは`/api/people`の下にまとめてつなぐ |
-| `index.ts` | Workersの入口（`fetch`・`scheduled`）。定期処理の初めに`registerThreads()`・`registerPeople()`を呼ぶ。5分ごとの回では、出来事の届け（`deliverPendingEvents`）と自動投稿を同時に動かす |
-| `jobs/daily-jobs.ts` | 毎日の処理（共通の退会のやり直し・届いた出来事の片づけと、Threadsのトークンの更新・片づけ・利用の数の数え直しなど）。各モジュールの入口の関数を順に呼ぶだけ。初めに`registerThreads()`・`registerPeople()`を呼ぶ |
+| `app.ts` | APIの入口の登録。初めに`registerThreads()`・`registerCollect()`・`registerPeople()`を呼ぶ。ThreadsのAPIは`/api/threads`、集金管理は`/api/collect`、人物メモは`/api/people`の下にまとめてつなぐ |
+| `index.ts` | Workersの入口（`fetch`・`scheduled`）。定期処理の初めに`registerThreads()`・`registerCollect()`・`registerPeople()`を呼ぶ。5分ごとの回では、出来事の届け（`deliverPendingEvents`）と自動投稿を同時に動かす |
+| `jobs/daily-jobs.ts` | 毎日の処理（共通の退会のやり直し・届いた出来事の片づけと、Threadsのトークンの更新・片づけ・利用の数の数え直しなど）。各モジュールの入口の関数を順に呼ぶだけ。初めに`registerThreads()`・`registerCollect()`・`registerPeople()`を呼ぶ |
 | `jobs/key-rotation.ts` | 暗号の鍵の入れ替え（`scripts/rotate-token-key.ts`から使う）。共通（テストのグループの招待のトークン）とThreads（接続のトークン・チームの招待のトークン）の両方の表を書き換えるので、組み立てに置く |
-| `db/schema.ts` | 共通・Threads・人物メモの`schema.ts`を読み直して出すだけ（drizzle-kitとテスト用） |
+| `db/schema.ts` | 共通・Threads・集金管理・人物メモの`schema.ts`を読み直して出すだけ（drizzle-kitとテスト用） |
 
 ## 3. 例外：持ち主でないモジュールが書き換えてよい列
 

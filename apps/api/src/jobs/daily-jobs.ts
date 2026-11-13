@@ -16,6 +16,7 @@ import {
   purgeOldActivity,
   recountThreadsUsage,
 } from "../apps/threads";
+import { recountCollectUsage, registerCollect } from "../apps/collect";
 import { registerPeople } from "../apps/people";
 import { purgeDeliveredEvents, reconcileSubscriptions, clerkUserDeleter, resumeWithdrawals } from "../platform";
 
@@ -27,6 +28,7 @@ import { purgeDeliveredEvents, reconcileSubscriptions, clerkUserDeleter, resumeW
 export async function runDailyJobs(env: Env, now: Date = new Date()) {
   // 退会のやり直しなどで共通の処理が出来事を出すので、アプリの受け取りを登録しておく（何度呼んでも1回だけ。specs/meguru/029）
   registerThreads();
+  registerCollect();
   registerPeople();
   const steps: [string, () => Promise<unknown>][] = [
     ["token refresh", () => refreshExpiringTokens(env, createThreadsClient(env), now)],
@@ -39,6 +41,8 @@ export async function runDailyJobs(env: Env, now: Date = new Date()) {
     ["data deletion retry", () => retryDeletions(env, now)],
     // Threadsの利用の数を数え直して共通へ伝える（伝え損ねた分を直す。specs/meguru/029 research.md R6）。料金の合わせ直しの前に行う
     ["threads usage recount", () => recountThreadsUsage(env)],
+    // 集金管理の「使っているか」を数え直して伝える（料金の数はいつも0。specs/collect/001-event-day-collection）
+    ["collect usage recount", () => recountCollectUsage(env)],
     // 契約の状態とアカウントの数を、Stripeと合わせ直す（specs/013 research.md R5・R6）。データ削除の後に行う
     ["billing reconcile", () => reconcileSubscriptions(env)],
     // 退会の続き（契約を止める・データを消す・ログインの情報を消す。specs/013 research.md R10）

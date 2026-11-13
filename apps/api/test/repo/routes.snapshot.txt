@@ -2,6 +2,8 @@
 ALL /* ×1
 ALL /api/* ×2
 ALL /api/people/* ×2
+DELETE /api/collect/events/:eventId/roster/:personId ×2
+DELETE /api/collect/settings/paypay-qr ×2
 DELETE /api/operator/feature-settings/:userId ×3
 DELETE /api/operator/test-groups/:groupId/members/:userId ×3
 DELETE /api/people/events/:eventId ×1
@@ -20,6 +22,13 @@ DELETE /api/threads/teams/:teamId/accounts/:accountId ×3
 DELETE /api/threads/teams/:teamId/assignments/:userId/accounts/:accountId ×3
 DELETE /api/threads/teams/:teamId/members/:userId ×3
 GET /api/billing ×2
+GET /api/collect/events ×2
+GET /api/collect/events/:eventId ×2
+GET /api/collect/events/:eventId/roster ×2
+GET /api/collect/me ×2
+GET /api/collect/past-attendees ×2
+GET /api/collect/settings ×2
+GET /api/collect/settings/paypay-qr ×2
 GET /api/data-deletion/:confirmationCode ×1
 GET /api/health ×1
 GET /api/me ×2
@@ -80,6 +89,8 @@ GET /api/threads/teams/:teamId ×3
 GET /api/threads/teams/:teamId/assignments ×3
 GET /api/threads/teams/:teamId/invite ×3
 GET /api/threads/teams/:teamId/status ×3
+PATCH /api/collect/events/:eventId ×2
+PATCH /api/collect/events/:eventId/roster/:personId ×2
 PATCH /api/operator/test-groups/:groupId ×3
 PATCH /api/people/events/:eventId ×1
 PATCH /api/threads/accounts/:accountId ×2
@@ -92,6 +103,9 @@ PATCH /api/threads/teams/:teamId/members/:userId ×3
 POST /api/billing/checkout ×3
 POST /api/billing/portal ×3
 POST /api/billing/sync ×3
+POST /api/collect/events ×2
+POST /api/collect/events/:eventId/roster ×2
+POST /api/collect/events/:eventId/roster/bulk ×2
 POST /api/me/withdraw ×2
 POST /api/operator/test-groups ×3
 POST /api/operator/test-groups/:groupId/close ×3
@@ -138,6 +152,8 @@ POST /api/threads/teams/:teamId/members/:userId/joined-notice/dismiss ×3
 POST /api/threads/token-connect ×3
 POST /api/threads/webhooks/data-deletion ×2
 POST /api/threads/webhooks/uninstall ×2
+PUT /api/collect/settings ×2
+PUT /api/collect/settings/paypay-qr ×2
 PUT /api/me/last-app ×2
 PUT /api/operator/app-access/groups/:groupId ×3
 PUT /api/operator/app-access/users/:userId ×3

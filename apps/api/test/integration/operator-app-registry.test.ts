@@ -22,8 +22,8 @@ describe("GET /api/operator/app-registry", () => {
     const res = await callOp(app, "GET", "/api/operator/app-registry", { user: FEATURE_OPERATOR });
     expect(res.status).toBe(200);
     const body = (await res.json()) as { apps: { app: string }[] };
-    // Threads のほかのアプリ（人物メモなど）は、運営者が開いた人だけが使う。機能のON/OFF・上限は持たない（アプリが増えても書き直さない）
-    expect(body.apps.map((a) => a.app)).toContain("people");
+    // Threads のほかのアプリ（集金管理・人物メモなど）は、運営者が開いた人だけが使う。機能のON/OFF・上限は持たない（アプリが増えても書き直さない）
+    expect(body.apps.map((a) => a.app)).toEqual(expect.arrayContaining(["collect", "people"]));
     for (const other of body.apps.filter((a) => a.app !== "threads")) {
       expect(other).toEqual({ app: other.app, access: "granted", featureSwitches: false, operatorLimits: false, features: [], limits: [] });
     }

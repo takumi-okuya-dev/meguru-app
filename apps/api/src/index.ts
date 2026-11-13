@@ -1,6 +1,7 @@
 import { createApp } from "./app";
 import type { Env } from "./kernel/env";
 import { runAutoPost, registerThreads } from "./apps/threads";
+import { registerCollect } from "./apps/collect";
 import { registerPeople } from "./apps/people";
 import { createDb } from "./kernel/db/client";
 import { deliverPendingEvents, nextEventCheckAt, nextPendingAttemptAt, readEventGate, shouldDeliver, writeEventGate } from "./platform";
@@ -37,6 +38,7 @@ export default {
   async scheduled(controller: ScheduledController, env: Env, ctx: ExecutionContext) {
     // アプリの登録（機能・上限・出来事の受け取り）をする（何度呼んでも1回だけ。specs/meguru/029）
     registerThreads();
+    registerCollect();
     registerPeople();
     setLogAppEnv(env.APP_ENV);
     // 設定の関所は fetch 側のミドルウェアにしか無かったので、Cron はここで同じ検査をする。

@@ -2,6 +2,8 @@
 
 **ブランチ**：`feature/collect-001-event-day-collection` | **日付**：2026-11-12 | **仕様**：[spec.md](./spec.md)
 
+**2026-11-13（T004）**：029・030に合わせて、共通の置き場所（`packages/shared/src/apps/collect/`）・エラーのコード（`ITEM_NOT_FOUND`・`VALIDATION_FAILED`）・受け取った出来事の表（`received_events`）・利用の許可（030の`registerAppAccess`・`requireAppAccess`）を直した。詳しくは tasks.md の「PR1」の頭。
+
 **入力**：`specs/collect/001-event-day-collection/spec.md`（Clarifications 2026-11-12・3回分を含む）、Constitution 4.8.1、[docs/app-separation.md](../../../docs/app-separation.md)、[docs/module-map.md](../../../docs/module-map.md)、[docs/parallel-development.md](../../../docs/parallel-development.md)、specs/meguru/029（Threadsをパターン①にそろえる。共通の入口の関数と出来事の仕組み）
 
 **実装の時期**：Threadsをパターン①にそろえる作業（029。Threadsのリファクタリング）が`develop`に入るまで、**実装は始めない**（2026-11-12 ユーザーの決定。コード・マイグレーション・`wrangler.toml`・共通の変更を含め、このfeatureでは文書のほかに何も作らない）。この計画は文書まで。029のplanで入口の関数・出来事・スキーマの作り方が決まったら、この計画の該当の所（R2・R3・R12、data-model.md 5）を合わせる。

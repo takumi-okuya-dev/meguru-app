@@ -96,7 +96,7 @@ describe("退会の出来事（user.withdrawn）", () => {
     expect(await count("users", `id = '${userId}'`)).toBe(1);
     expect(await count("threads.accounts", `id = '${o1.accountId}'`)).toBe(1);
 
-    // 届け先は、退会を受け取ると登録したアプリの数（Threads・人物メモなど。アプリが増えても数を書き直さない）
+    // 届け先は、退会を受け取ると登録したアプリの数（Threads・集金管理・人物メモなど。アプリが増えても数を書き直さない）
     const targets = await count("platform_event_deliveries", `event_id = '${eventId}'`);
     expect(targets).toBeGreaterThanOrEqual(2);
     expect(await deliverPendingEvents(billingEnv())).toEqual({ delivered: targets, failed: 0 });
@@ -131,6 +131,7 @@ describe("退会の出来事（user.withdrawn）", () => {
     expect(await deliverPendingEvents(billingEnv())).toEqual({ delivered: targets, failed: 0 });
     expect(await count("threads.received_events", `event_id = '${eventId}'`)).toBe(1);
     expect(await count("people.received_events", `event_id = '${eventId}'`)).toBe(1);
+    expect(await count("collect.received_events", `event_id = '${eventId}'`)).toBe(1);
     expect(await count("threads.accounts", `id = '${other.accountId}'`)).toBe(1);
   });
 

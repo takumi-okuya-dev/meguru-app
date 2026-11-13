@@ -236,8 +236,15 @@
     {
       "idx": 33,
       "version": "7",
-      "when": 1794527172955,
-      "tag": "0033_people_schema",
+      "when": 1794526825021,
+      "tag": "0033_collect_schema",
+      "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "7",
+      "when": 1794541267576,
+      "tag": "0034_people_schema",
       "breakpoints": true
     }
   ]

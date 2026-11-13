@@ -1,5 +1,5 @@
 {
-  "id": "a6288cd9-2f78-4672-8fa9-01f905179881",
+  "id": "8a7b57d2-4d8b-4b74-a625-21e36959eba3",
   "prevId": "021f40c6-5da9-44c5-a81e-1b9a6ef0c3d3",
   "version": "7",
   "dialect": "postgresql",
@@ -6501,461 +6501,9 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
-    "people.choice_mappings": {
-      "name": "choice_mappings",
-      "schema": "people",
-      "columns": {
-        "user_id": {
-          "name": "user_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "choice_key": {
-          "name": "choice_key",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "choice_text": {
-          "name": "choice_text",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "purpose": {
-          "name": "purpose",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "timestamp (6) with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {},
-      "compositePrimaryKeys": {
-        "choice_mappings_user_id_choice_key_pk": {
-          "name": "choice_mappings_user_id_choice_key_pk",
-          "columns": [
-            "user_id",
-            "choice_key"
-          ]
-        }
-      },
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {
-        "people_choice_mappings_key_length": {
-          "name": "people_choice_mappings_key_length",
-          "value": "char_length(\"people\".\"choice_mappings\".\"choice_key\") BETWEEN 1 AND 500"
-        },
-        "people_choice_mappings_text_length": {
-          "name": "people_choice_mappings_text_length",
-          "value": "char_length(\"people\".\"choice_mappings\".\"choice_text\") BETWEEN 1 AND 500"
-        },
-        "people_choice_mappings_purpose": {
-          "name": "people_choice_mappings_purpose",
-          "value": "\"people\".\"choice_mappings\".\"purpose\" IN ('invite', 'work', 'decline', 'ignore')"
-        }
-      },
-      "isRLSEnabled": false
-    },
-    "people.column_mappings": {
-      "name": "column_mappings",
-      "schema": "people",
-      "columns": {
-        "user_id": {
-          "name": "user_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "question_key": {
-          "name": "question_key",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "question_text": {
-          "name": "question_text",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "field": {
-          "name": "field",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "timestamp (6) with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {},
-      "compositePrimaryKeys": {
-        "column_mappings_user_id_question_key_pk": {
-          "name": "column_mappings_user_id_question_key_pk",
-          "columns": [
-            "user_id",
-            "question_key"
-          ]
-        }
-      },
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {
-        "people_column_mappings_key_length": {
-          "name": "people_column_mappings_key_length",
-          "value": "char_length(\"people\".\"column_mappings\".\"question_key\") BETWEEN 1 AND 500"
-        },
-        "people_column_mappings_text_length": {
-          "name": "people_column_mappings_text_length",
-          "value": "char_length(\"people\".\"column_mappings\".\"question_text\") BETWEEN 1 AND 500"
-        },
-        "people_column_mappings_field": {
-          "name": "people_column_mappings_field",
-          "value": "\"people\".\"column_mappings\".\"field\" IN ('line_name', 'real_name', 'submitted_at', 'next_attendance', 'bring_friends', 'wanted_connections', 'career_interests', 'contact_consent', 'other')"
-        }
-      },
-      "isRLSEnabled": false
-    },
-    "people.consent_changes": {
-      "name": "consent_changes",
-      "schema": "people",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true,
-          "default": "gen_random_uuid()"
-        },
-        "person_id": {
-          "name": "person_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "user_id": {
-          "name": "user_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "invite": {
-          "name": "invite",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "work": {
-          "name": "work",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "source": {
-          "name": "source",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "response_id": {
-          "name": "response_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "basis_on": {
-          "name": "basis_on",
-          "type": "date",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "changed_at": {
-          "name": "changed_at",
-          "type": "timestamp (6) with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "people_consent_changes_person_idx": {
-          "name": "people_consent_changes_person_idx",
-          "columns": [
-            {
-              "expression": "person_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "changed_at",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "people_consent_changes_user_idx": {
-          "name": "people_consent_changes_user_idx",
-          "columns": [
-            {
-              "expression": "user_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "consent_changes_person_id_persons_id_fk": {
-          "name": "consent_changes_person_id_persons_id_fk",
-          "tableFrom": "consent_changes",
-          "tableTo": "persons",
-          "schemaTo": "people",
-          "columnsFrom": [
-            "person_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "consent_changes_response_id_responses_id_fk": {
-          "name": "consent_changes_response_id_responses_id_fk",
-          "tableFrom": "consent_changes",
-          "tableTo": "responses",
-          "schemaTo": "people",
-          "columnsFrom": [
-            "response_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "set null",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {
-        "people_consent_changes_source": {
-          "name": "people_consent_changes_source",
-          "value": "\"people\".\"consent_changes\".\"source\" IN ('response', 'manual')"
-        }
-      },
-      "isRLSEnabled": false
-    },
-    "people.erased_attendances": {
-      "name": "erased_attendances",
-      "schema": "people",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true,
-          "default": "gen_random_uuid()"
-        },
-        "user_id": {
-          "name": "user_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "event_id": {
-          "name": "event_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "import_id": {
-          "name": "import_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "erased_at": {
-          "name": "erased_at",
-          "type": "timestamp (6) with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "people_erased_attendances_event_idx": {
-          "name": "people_erased_attendances_event_idx",
-          "columns": [
-            {
-              "expression": "event_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "people_erased_attendances_user_idx": {
-          "name": "people_erased_attendances_user_idx",
-          "columns": [
-            {
-              "expression": "user_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "erased_attendances_event_id_events_id_fk": {
-          "name": "erased_attendances_event_id_events_id_fk",
-          "tableFrom": "erased_attendances",
-          "tableTo": "events",
-          "schemaTo": "people",
-          "columnsFrom": [
-            "event_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "erased_attendances_import_id_imports_id_fk": {
-          "name": "erased_attendances_import_id_imports_id_fk",
-          "tableFrom": "erased_attendances",
-          "tableTo": "imports",
-          "schemaTo": "people",
-          "columnsFrom": [
-            "import_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "people.erased_responses": {
-      "name": "erased_responses",
-      "schema": "people",
-      "columns": {
-        "event_id": {
-          "name": "event_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "dedupe_hash": {
-          "name": "dedupe_hash",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "user_id": {
-          "name": "user_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "erased_at": {
-          "name": "erased_at",
-          "type": "timestamp (6) with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "people_erased_responses_user_idx": {
-          "name": "people_erased_responses_user_idx",
-          "columns": [
-            {
-              "expression": "user_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "erased_responses_event_id_events_id_fk": {
-          "name": "erased_responses_event_id_events_id_fk",
-          "tableFrom": "erased_responses",
-          "tableTo": "events",
-          "schemaTo": "people",
-          "columnsFrom": [
-            "event_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {
-        "erased_responses_event_id_dedupe_hash_pk": {
-          "name": "erased_responses_event_id_dedupe_hash_pk",
-          "columns": [
-            "event_id",
-            "dedupe_hash"
-          ]
-        }
-      },
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "people.events": {
+    "collect.events": {
       "name": "events",
-      "schema": "people",
+      "schema": "collect",
       "columns": {
         "id": {
           "name": "id",
@@ -6964,8 +6512,8 @@
           "notNull": true,
           "default": "gen_random_uuid()"
         },
-        "user_id": {
-          "name": "user_id",
+        "owner_user_id": {
+          "name": "owner_user_id",
           "type": "uuid",
           "primaryKey": false,
           "notNull": true
@@ -6976,18 +6524,86 @@
           "primaryKey": false,
           "notNull": true
         },
-        "held_on": {
-          "name": "held_on",
-          "type": "date",
+        "starts_at": {
+          "name": "starts_at",
+          "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": true
         },
-        "is_own": {
-          "name": "is_own",
-          "type": "boolean",
+        "ends_at": {
+          "name": "ends_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "venue": {
+          "name": "venue",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "capacity": {
+          "name": "capacity",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "methods": {
+          "name": "methods",
+          "type": "text[]",
           "primaryKey": false,
           "notNull": true,
-          "default": true
+          "default": "ARRAY['cash','paypay','transfer']::text[]"
+        },
+        "next_number": {
+          "name": "next_number",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 1
+        },
+        "version": {
+          "name": "version",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "closed_at": {
+          "name": "closed_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "closed_version": {
+          "name": "closed_version",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "paypay_checked_at": {
+          "name": "paypay_checked_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "source_threads_promotion_id": {
+          "name": "source_threads_promotion_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "source_changed_at": {
+          "name": "source_changed_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "source_deleted_at": {
+          "name": "source_deleted_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
         },
         "created_at": {
           "name": "created_at",
@@ -7005,17 +6621,17 @@
         }
       },
       "indexes": {
-        "people_events_user_held_idx": {
-          "name": "people_events_user_held_idx",
+        "events_owner_idx": {
+          "name": "events_owner_idx",
           "columns": [
             {
-              "expression": "user_id",
+              "expression": "owner_user_id",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
             },
             {
-              "expression": "held_on",
+              "expression": "starts_at",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -7032,353 +6648,60 @@
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {
-        "people_events_name_length": {
-          "name": "people_events_name_length",
-          "value": "char_length(\"people\".\"events\".\"name\") BETWEEN 1 AND 100"
+        "events_name_length": {
+          "name": "events_name_length",
+          "value": "char_length(\"collect\".\"events\".\"name\") BETWEEN 1 AND 100"
+        },
+        "events_venue_length": {
+          "name": "events_venue_length",
+          "value": "char_length(\"collect\".\"events\".\"venue\") <= 100"
+        },
+        "events_capacity_range": {
+          "name": "events_capacity_range",
+          "value": "\"collect\".\"events\".\"capacity\" BETWEEN 1 AND 10000"
+        },
+        "events_ends_after_starts": {
+          "name": "events_ends_after_starts",
+          "value": "\"collect\".\"events\".\"ends_at\" IS NULL OR \"collect\".\"events\".\"ends_at\" > \"collect\".\"events\".\"starts_at\""
+        },
+        "events_methods_valid": {
+          "name": "events_methods_valid",
+          "value": "cardinality(\"collect\".\"events\".\"methods\") >= 1 AND \"collect\".\"events\".\"methods\" <@ ARRAY['cash', 'paypay', 'transfer']::text[]"
+        },
+        "events_next_number_positive": {
+          "name": "events_next_number_positive",
+          "value": "\"collect\".\"events\".\"next_number\" >= 1"
         }
       },
       "isRLSEnabled": false
     },
-    "people.imports": {
-      "name": "imports",
-      "schema": "people",
+    "collect.owner_settings": {
+      "name": "owner_settings",
+      "schema": "collect",
       "columns": {
-        "id": {
-          "name": "id",
+        "owner_user_id": {
+          "name": "owner_user_id",
           "type": "uuid",
           "primaryKey": true,
-          "notNull": true,
-          "default": "gen_random_uuid()"
-        },
-        "user_id": {
-          "name": "user_id",
-          "type": "uuid",
-          "primaryKey": false,
           "notNull": true
         },
-        "event_id": {
-          "name": "event_id",
-          "type": "uuid",
+        "paypay_qr": {
+          "name": "paypay_qr",
+          "type": "bytea",
           "primaryKey": false,
-          "notNull": true
+          "notNull": false
         },
-        "row_count": {
-          "name": "row_count",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "imported_count": {
-          "name": "imported_count",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 0
-        },
-        "created_people_count": {
-          "name": "created_people_count",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 0
-        },
-        "linked_count": {
-          "name": "linked_count",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 0
-        },
-        "skipped_count": {
-          "name": "skipped_count",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 0
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp (6) with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "people_imports_user_idx": {
-          "name": "people_imports_user_idx",
-          "columns": [
-            {
-              "expression": "user_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "people_imports_event_idx": {
-          "name": "people_imports_event_idx",
-          "columns": [
-            {
-              "expression": "event_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "imports_event_id_events_id_fk": {
-          "name": "imports_event_id_events_id_fk",
-          "tableFrom": "imports",
-          "tableTo": "events",
-          "schemaTo": "people",
-          "columnsFrom": [
-            "event_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {
-        "people_imports_row_count_range": {
-          "name": "people_imports_row_count_range",
-          "value": "\"people\".\"imports\".\"row_count\" BETWEEN 0 AND 500"
-        }
-      },
-      "isRLSEnabled": false
-    },
-    "people.manual_attendances": {
-      "name": "manual_attendances",
-      "schema": "people",
-      "columns": {
-        "person_id": {
-          "name": "person_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "event_id": {
-          "name": "event_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "user_id": {
-          "name": "user_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp (6) with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "people_manual_attendances_event_idx": {
-          "name": "people_manual_attendances_event_idx",
-          "columns": [
-            {
-              "expression": "event_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "people_manual_attendances_user_idx": {
-          "name": "people_manual_attendances_user_idx",
-          "columns": [
-            {
-              "expression": "user_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "manual_attendances_person_id_persons_id_fk": {
-          "name": "manual_attendances_person_id_persons_id_fk",
-          "tableFrom": "manual_attendances",
-          "tableTo": "persons",
-          "schemaTo": "people",
-          "columnsFrom": [
-            "person_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "manual_attendances_event_id_events_id_fk": {
-          "name": "manual_attendances_event_id_events_id_fk",
-          "tableFrom": "manual_attendances",
-          "tableTo": "events",
-          "schemaTo": "people",
-          "columnsFrom": [
-            "event_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {
-        "manual_attendances_person_id_event_id_pk": {
-          "name": "manual_attendances_person_id_event_id_pk",
-          "columns": [
-            "person_id",
-            "event_id"
-          ]
-        }
-      },
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "people.persons": {
-      "name": "persons",
-      "schema": "people",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true,
-          "default": "gen_random_uuid()"
-        },
-        "user_id": {
-          "name": "user_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "real_name": {
-          "name": "real_name",
+        "paypay_qr_type": {
+          "name": "paypay_qr_type",
           "type": "text",
           "primaryKey": false,
           "notNull": false
         },
-        "real_name_key": {
-          "name": "real_name_key",
+        "bank_text": {
+          "name": "bank_text",
           "type": "text",
           "primaryKey": false,
           "notNull": false
-        },
-        "line_name": {
-          "name": "line_name",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "line_name_key": {
-          "name": "line_name_key",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "entered_line_name": {
-          "name": "entered_line_name",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "entered_line_name_key": {
-          "name": "entered_line_name_key",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "memo_appearance": {
-          "name": "memo_appearance",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "memo_talk": {
-          "name": "memo_talk",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "consent_invite": {
-          "name": "consent_invite",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": false
-        },
-        "consent_work": {
-          "name": "consent_work",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": false
-        },
-        "consent_source": {
-          "name": "consent_source",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'none'"
-        },
-        "consent_basis_on": {
-          "name": "consent_basis_on",
-          "type": "date",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "consent_updated_at": {
-          "name": "consent_updated_at",
-          "type": "timestamp (6) with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "created_by_import_id": {
-          "name": "created_by_import_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
         },
         "updated_at": {
           "name": "updated_at",
@@ -7388,54 +6711,79 @@
           "default": "now()"
         }
       },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "owner_settings_paypay_qr_size": {
+          "name": "owner_settings_paypay_qr_size",
+          "value": "octet_length(\"collect\".\"owner_settings\".\"paypay_qr\") <= 307200"
+        },
+        "owner_settings_paypay_qr_type_valid": {
+          "name": "owner_settings_paypay_qr_type_valid",
+          "value": "\"collect\".\"owner_settings\".\"paypay_qr_type\" IN ('image/png', 'image/jpeg')"
+        },
+        "owner_settings_paypay_qr_pair": {
+          "name": "owner_settings_paypay_qr_pair",
+          "value": "(\"collect\".\"owner_settings\".\"paypay_qr\" IS NULL) = (\"collect\".\"owner_settings\".\"paypay_qr_type\" IS NULL)"
+        },
+        "owner_settings_bank_text_length": {
+          "name": "owner_settings_bank_text_length",
+          "value": "char_length(\"collect\".\"owner_settings\".\"bank_text\") <= 300"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "collect.price_tiers": {
+      "name": "price_tiers",
+      "schema": "collect",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "event_id": {
+          "name": "event_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "amount": {
+          "name": "amount",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "position": {
+          "name": "position",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
       "indexes": {
-        "people_persons_user_idx": {
-          "name": "people_persons_user_idx",
+        "price_tiers_event_idx": {
+          "name": "price_tiers_event_idx",
           "columns": [
             {
-              "expression": "user_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "people_persons_user_real_name_idx": {
-          "name": "people_persons_user_real_name_idx",
-          "columns": [
-            {
-              "expression": "user_id",
+              "expression": "event_id",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
             },
             {
-              "expression": "real_name_key",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "people_persons_user_line_name_idx": {
-          "name": "people_persons_user_line_name_idx",
-          "columns": [
-            {
-              "expression": "user_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "line_name_key",
+              "expression": "position",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -7448,18 +6796,18 @@
         }
       },
       "foreignKeys": {
-        "persons_created_by_import_id_imports_id_fk": {
-          "name": "persons_created_by_import_id_imports_id_fk",
-          "tableFrom": "persons",
-          "tableTo": "imports",
-          "schemaTo": "people",
+        "price_tiers_event_id_events_id_fk": {
+          "name": "price_tiers_event_id_events_id_fk",
+          "tableFrom": "price_tiers",
+          "tableTo": "events",
+          "schemaTo": "collect",
           "columnsFrom": [
-            "created_by_import_id"
+            "event_id"
           ],
           "columnsTo": [
             "id"
           ],
-          "onDelete": "set null",
+          "onDelete": "cascade",
           "onUpdate": "no action"
         }
       },
@@ -7467,40 +6815,20 @@
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {
-        "people_persons_real_name_length": {
-          "name": "people_persons_real_name_length",
-          "value": "\"people\".\"persons\".\"real_name\" IS NULL OR char_length(\"people\".\"persons\".\"real_name\") BETWEEN 1 AND 100"
+        "price_tiers_name_length": {
+          "name": "price_tiers_name_length",
+          "value": "char_length(\"collect\".\"price_tiers\".\"name\") BETWEEN 1 AND 20"
         },
-        "people_persons_line_name_length": {
-          "name": "people_persons_line_name_length",
-          "value": "\"people\".\"persons\".\"line_name\" IS NULL OR char_length(\"people\".\"persons\".\"line_name\") BETWEEN 1 AND 100"
-        },
-        "people_persons_entered_line_name_length": {
-          "name": "people_persons_entered_line_name_length",
-          "value": "\"people\".\"persons\".\"entered_line_name\" IS NULL OR char_length(\"people\".\"persons\".\"entered_line_name\") BETWEEN 1 AND 100"
-        },
-        "people_persons_memo_appearance_length": {
-          "name": "people_persons_memo_appearance_length",
-          "value": "\"people\".\"persons\".\"memo_appearance\" IS NULL OR char_length(\"people\".\"persons\".\"memo_appearance\") <= 300"
-        },
-        "people_persons_memo_talk_length": {
-          "name": "people_persons_memo_talk_length",
-          "value": "\"people\".\"persons\".\"memo_talk\" IS NULL OR char_length(\"people\".\"persons\".\"memo_talk\") <= 1000"
-        },
-        "people_persons_consent_source": {
-          "name": "people_persons_consent_source",
-          "value": "\"people\".\"persons\".\"consent_source\" IN ('none', 'response', 'manual')"
-        },
-        "people_persons_has_name": {
-          "name": "people_persons_has_name",
-          "value": "\"people\".\"persons\".\"real_name\" IS NOT NULL OR \"people\".\"persons\".\"line_name\" IS NOT NULL"
+        "price_tiers_amount_range": {
+          "name": "price_tiers_amount_range",
+          "value": "\"collect\".\"price_tiers\".\"amount\" BETWEEN 0 AND 999999"
         }
       },
       "isRLSEnabled": false
     },
-    "people.received_events": {
+    "collect.received_events": {
       "name": "received_events",
-      "schema": "people",
+      "schema": "collect",
       "columns": {
         "event_id": {
           "name": "event_id",
@@ -7524,9 +6852,9 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
-    "people.responses": {
-      "name": "responses",
-      "schema": "people",
+    "collect.roster_people": {
+      "name": "roster_people",
+      "schema": "collect",
       "columns": {
         "id": {
           "name": "id",
@@ -7535,130 +6863,77 @@
           "notNull": true,
           "default": "gen_random_uuid()"
         },
-        "user_id": {
-          "name": "user_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
         "event_id": {
           "name": "event_id",
           "type": "uuid",
           "primaryKey": false,
           "notNull": true
         },
-        "import_id": {
-          "name": "import_id",
+        "number": {
+          "name": "number",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "name_key": {
+          "name": "name_key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "kana": {
+          "name": "kana",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "kana_key": {
+          "name": "kana_key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "media": {
+          "name": "media",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "price_tier_id": {
+          "name": "price_tier_id",
           "type": "uuid",
           "primaryKey": false,
           "notNull": true
         },
-        "person_id": {
-          "name": "person_id",
+        "memo": {
+          "name": "memo",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "added_by_helper_id": {
+          "name": "added_by_helper_id",
           "type": "uuid",
           "primaryKey": false,
-          "notNull": true
-        },
-        "dedupe_hash": {
-          "name": "dedupe_hash",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "submitted_at": {
-          "name": "submitted_at",
-          "type": "timestamp (6) with time zone",
-          "primaryKey": false,
           "notNull": false
-        },
-        "line_name": {
-          "name": "line_name",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "line_name_key": {
-          "name": "line_name_key",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "real_name": {
-          "name": "real_name",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "real_name_key": {
-          "name": "real_name_key",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "next_attendance": {
-          "name": "next_attendance",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "bring_friends": {
-          "name": "bring_friends",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "wanted_connections": {
-          "name": "wanted_connections",
-          "type": "text[]",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'{}'::text[]"
-        },
-        "career_interests": {
-          "name": "career_interests",
-          "type": "text[]",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'{}'::text[]"
-        },
-        "consent_choices": {
-          "name": "consent_choices",
-          "type": "text[]",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'{}'::text[]"
-        },
-        "consent_invite": {
-          "name": "consent_invite",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": false
-        },
-        "consent_work": {
-          "name": "consent_work",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": false
-        },
-        "answers": {
-          "name": "answers",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": true
         },
         "created_at": {
           "name": "created_at",
-          "type": "timestamp (6) with time zone",
+          "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": true,
           "default": "now()"
         }
       },
       "indexes": {
-        "people_responses_event_dedupe_idx": {
-          "name": "people_responses_event_dedupe_idx",
+        "roster_people_event_number_key": {
+          "name": "roster_people_event_number_key",
           "columns": [
             {
               "expression": "event_id",
@@ -7667,7 +6942,7 @@
               "nulls": "last"
             },
             {
-              "expression": "dedupe_hash",
+              "expression": "number",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -7678,17 +6953,17 @@
           "method": "btree",
           "with": {}
         },
-        "people_responses_user_line_name_idx": {
-          "name": "people_responses_user_line_name_idx",
+        "roster_people_event_name_key_idx": {
+          "name": "roster_people_event_name_key_idx",
           "columns": [
             {
-              "expression": "user_id",
+              "expression": "event_id",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
             },
             {
-              "expression": "line_name_key",
+              "expression": "name_key",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -7699,26 +6974,11 @@
           "method": "btree",
           "with": {}
         },
-        "people_responses_person_idx": {
-          "name": "people_responses_person_idx",
+        "roster_people_price_tier_idx": {
+          "name": "roster_people_price_tier_idx",
           "columns": [
             {
-              "expression": "person_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "people_responses_import_idx": {
-          "name": "people_responses_import_idx",
-          "columns": [
-            {
-              "expression": "import_id",
+              "expression": "price_tier_id",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -7731,11 +6991,11 @@
         }
       },
       "foreignKeys": {
-        "responses_event_id_events_id_fk": {
-          "name": "responses_event_id_events_id_fk",
-          "tableFrom": "responses",
+        "roster_people_event_id_events_id_fk": {
+          "name": "roster_people_event_id_events_id_fk",
+          "tableFrom": "roster_people",
           "tableTo": "events",
-          "schemaTo": "people",
+          "schemaTo": "collect",
           "columnsFrom": [
             "event_id"
           ],
@@ -7745,32 +7005,18 @@
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
-        "responses_import_id_imports_id_fk": {
-          "name": "responses_import_id_imports_id_fk",
-          "tableFrom": "responses",
-          "tableTo": "imports",
-          "schemaTo": "people",
+        "roster_people_price_tier_id_price_tiers_id_fk": {
+          "name": "roster_people_price_tier_id_price_tiers_id_fk",
+          "tableFrom": "roster_people",
+          "tableTo": "price_tiers",
+          "schemaTo": "collect",
           "columnsFrom": [
-            "import_id"
+            "price_tier_id"
           ],
           "columnsTo": [
             "id"
           ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "responses_person_id_persons_id_fk": {
-          "name": "responses_person_id_persons_id_fk",
-          "tableFrom": "responses",
-          "tableTo": "persons",
-          "schemaTo": "people",
-          "columnsFrom": [
-            "person_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
+          "onDelete": "no action",
           "onUpdate": "no action"
         }
       },
@@ -7778,29 +7024,25 @@
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {
-        "people_responses_dedupe_hash": {
-          "name": "people_responses_dedupe_hash",
-          "value": "\"people\".\"responses\".\"dedupe_hash\" ~ '^[0-9a-f]{64}$'"
+        "roster_people_name_length": {
+          "name": "roster_people_name_length",
+          "value": "char_length(\"collect\".\"roster_people\".\"name\") BETWEEN 1 AND 50"
         },
-        "people_responses_line_name_length": {
-          "name": "people_responses_line_name_length",
-          "value": "char_length(\"people\".\"responses\".\"line_name\") BETWEEN 1 AND 100"
+        "roster_people_kana_length": {
+          "name": "roster_people_kana_length",
+          "value": "char_length(\"collect\".\"roster_people\".\"kana\") <= 50"
         },
-        "people_responses_real_name_length": {
-          "name": "people_responses_real_name_length",
-          "value": "\"people\".\"responses\".\"real_name\" IS NULL OR char_length(\"people\".\"responses\".\"real_name\") BETWEEN 1 AND 100"
+        "roster_people_memo_length": {
+          "name": "roster_people_memo_length",
+          "value": "char_length(\"collect\".\"roster_people\".\"memo\") <= 200"
         },
-        "people_responses_next_attendance_length": {
-          "name": "people_responses_next_attendance_length",
-          "value": "\"people\".\"responses\".\"next_attendance\" IS NULL OR char_length(\"people\".\"responses\".\"next_attendance\") <= 500"
+        "roster_people_media_valid": {
+          "name": "roster_people_media_valid",
+          "value": "\"collect\".\"roster_people\".\"media\" IN ('minato', 'kokuchpro', 'tunagate', 'jimoty', 'peatix', 'youtrust', 'walk_in', 'other')"
         },
-        "people_responses_bring_friends_length": {
-          "name": "people_responses_bring_friends_length",
-          "value": "\"people\".\"responses\".\"bring_friends\" IS NULL OR char_length(\"people\".\"responses\".\"bring_friends\") <= 500"
-        },
-        "people_responses_choices_count": {
-          "name": "people_responses_choices_count",
-          "value": "cardinality(\"people\".\"responses\".\"wanted_connections\") <= 30 AND cardinality(\"people\".\"responses\".\"career_interests\") <= 30 AND cardinality(\"people\".\"responses\".\"consent_choices\") <= 30"
+        "roster_people_number_positive": {
+          "name": "roster_people_number_positive",
+          "value": "\"collect\".\"roster_people\".\"number\" >= 1"
         }
       },
       "isRLSEnabled": false
@@ -7951,7 +7193,7 @@
   },
   "schemas": {
     "threads": "threads",
-    "people": "people"
+    "collect": "collect"
   },
   "sequences": {},
   "roles": {},

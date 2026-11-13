@@ -76,6 +76,9 @@ export const ERROR_CODES = [
   "RATE_LIMITED",
   // アプリの利用の許可（specs/meguru/030-app-access FR-003）
   "APP_NOT_AVAILABLE",
+  // 集金管理（specs/collect/001-event-day-collection contracts/api.md 0）
+  "TIER_IN_USE",
+  "IMAGE_TOO_LARGE",
   // 人物メモ（specs/people/001-people-memo contracts/api.md 0）
   "IMPORT_TOO_LARGE",
   "IMPORT_MAPPING_INVALID",
@@ -284,6 +287,10 @@ export function errorMessage(code: ErrorCode, ctx: ErrorMessageContext = {}): Er
       return { message: "少し時間をおいてから、もう一度お試しください。", action: "retry-later" };
     case "APP_NOT_AVAILABLE":
       return { message: "このアプリは今は使えません。", action: "none" };
+    case "TIER_IN_USE":
+      return { message: "この料金の区分は、名簿の人か受付の記録が使っているので消せません。", action: "none" };
+    case "IMAGE_TOO_LARGE":
+      return { message: "画像が大きすぎます。300KB以内にしてください。", action: "none" };
     case "IMPORT_TOO_LARGE":
       return { message: "CSVが大きすぎます。500行・60列まで、1つの答えは5,000文字までにしてください。", action: "none" };
     case "IMPORT_MAPPING_INVALID":
