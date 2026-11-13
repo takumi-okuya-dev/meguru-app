@@ -1,7 +1,7 @@
 // 取り込みの取り消しと、イベントを消す（specs/people/001-people-memo research.md R14、contracts/api.md 2・3-3）。
 // 取り消すと、その取り込みの回答と、その取り込みだけで作られた人（ほかの回答も手で足した会ったイベントも残らない人）が消える。
 // 書き足しのある人（メモ・声かけ・手で直した同意・手で足した会ったイベント）がいれば、残すか消すかを作り手が選ぶ。
-import type { PersonNote, UndoResult } from "@meguru/shared/people";
+import type { ImportUndoPreview, PersonNote, UndoResult } from "@meguru/shared/people";
 import { and, eq, inArray, sql } from "drizzle-orm";
 import type { TxDb } from "../../../kernel/db/client";
 import { AppError } from "../../../kernel/errors";
@@ -26,9 +26,10 @@ export type UndoPlan = {
  * @param db - データベース（書く前の確かめではトランザクション）
  * @param userId - 作り手
  * @param importIds - 取り消す取り込み（イベントを消すときは、そのイベントのすべて）
+ * @param deletingEventId - イベントを消すときのイベント（そのイベントの手で足した会ったイベントも一緒に消えるので、残る理由に数えない）
  * @returns 見積もり
  */
-export async function planUndo(db: PeopleDb, userId: string, importIds: readonly string[]): Promise<UndoPlan> {
+export async function planUndo(db: PeopleDb, userId: string, importIds: readonly string[], deletingEventId?: string): Promise<UndoPlan> {
   if (importIds.length === 0) return { responseCount: 0, affected: [], removable: [], peopleWithNotes: [] };
   const ids = [...importIds];
   const [responses, created] = await Promise.all([
@@ -45,11 +46,25 @@ export async function planUndo(db: PeopleDb, userId: string, importIds: readonly
           eq(peoplePersons.userId, userId),
           inArray(peoplePersons.createdByImportId, ids),
           sql`NOT EXISTS (SELECT 1 FROM ${peopleResponses} r WHERE r.person_id = ${peoplePersons.id} AND NOT (${inArray(sql`r.import_id`, ids)}))`,
-          sql`NOT EXISTS (SELECT 1 FROM ${peopleManualAttendances} m WHERE m.person_id = ${peoplePersons.id})`,
+          deletingEventId
+            ? sql`NOT EXISTS (SELECT 1 FROM ${peopleManualAttendances} m WHERE m.person_id = ${peoplePersons.id} AND m.event_id <> ${deletingEventId})`
+            : sql`NOT EXISTS (SELECT 1 FROM ${peopleManualAttendances} m WHERE m.person_id = ${peoplePersons.id})`,
         ),
       ),
   ]);
   const removable = created.map((p) => p.id);
+  // 消すイベントに手で足した会ったイベントがある人は、書き足しのある人として確かめる
+  const manualAttendance =
+    removable.length && deletingEventId
+      ? new Set(
+          (
+            await db
+              .select({ personId: peopleManualAttendances.personId })
+              .from(peopleManualAttendances)
+              .where(and(inArray(peopleManualAttendances.personId, removable), eq(peopleManualAttendances.eventId, deletingEventId)))
+          ).map((r) => r.personId),
+        )
+      : new Set<string>();
   const manualConsent = removable.length
     ? new Set(
         (
@@ -66,6 +81,7 @@ export async function planUndo(db: PeopleDb, userId: string, importIds: readonly
       const notes: PersonNote[] = [];
       if (p.memoAppearance || p.memoTalk) notes.push("memo");
       if (manualConsent.has(p.id)) notes.push("manual_consent");
+      if (manualAttendance.has(p.id)) notes.push("manual_attendance");
       return { personId: p.id, displayName: displayNameOf(p), notes };
     })
     .filter((p) => p.notes.length > 0)
@@ -79,10 +95,11 @@ export async function planUndo(db: PeopleDb, userId: string, importIds: readonly
  * @param userId - 作り手
  * @param importIds - 取り消す取り込み
  * @param keep - 書き足しのある人を残すか（省くと、いれば 409）
+ * @param deletingEventId - イベントを消すときのイベント
  * @returns 消した人と残した人の数
  */
-export async function executeUndo(tx: TxDb, userId: string, importIds: readonly string[], keep: boolean | undefined): Promise<UndoResult> {
-  const plan = await planUndo(tx, userId, importIds);
+export async function executeUndo(tx: TxDb, userId: string, importIds: readonly string[], keep: boolean | undefined, deletingEventId?: string): Promise<UndoResult> {
+  const plan = await planUndo(tx, userId, importIds, deletingEventId);
   if (plan.peopleWithNotes.length > 0 && keep === undefined) {
     throw new AppError("PEOPLE_CONFIRM_REQUIRED", 409, "people confirm required", undefined, undefined, { count: plan.peopleWithNotes.length });
   }
@@ -97,4 +114,13 @@ export async function executeUndo(tx: TxDb, userId: string, importIds: readonly 
     plan.affected.filter((id) => !removedSet.has(id)),
   );
   return { removedPeopleCount: removed.length, keptPeopleCount: kept.size };
+}
+
+/**
+ * 見積もりを、取り消しの確かめの返りの形にする（取り込みの取り消しとイベントを消すで同じ形）。
+ * @param plan - 見積もり
+ * @returns 取り消しの確かめ
+ */
+export function toUndoPreview(plan: UndoPlan): ImportUndoPreview {
+  return { responseCount: plan.responseCount, removedPeopleCount: plan.removable.length, peopleWithNotes: plan.peopleWithNotes };
 }

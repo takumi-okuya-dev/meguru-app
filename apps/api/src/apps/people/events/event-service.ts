@@ -5,8 +5,8 @@ import { and, desc, eq, sql, type SQL } from "drizzle-orm";
 import { withTransaction, type Db } from "../../../kernel/db/client";
 import type { Env } from "../../../kernel/env";
 import { logger } from "../../../kernel/logger";
-import { loadOwnedEvent, lockOwner, type PeopleDb } from "../access";
-import { executeUndo, planUndo } from "../imports/undo";
+import { displayNameOf, loadOwnedEvent, lockOwner, type PeopleDb } from "../access";
+import { executeUndo, planUndo, toUndoPreview } from "../imports/undo";
 import { peopleErasedAttendances, peopleEvents, peopleImports, peopleManualAttendances, peoplePersons, peopleResponses } from "../schema";
 import { reportPeopleUsage } from "../usage";
 
@@ -149,12 +149,11 @@ export async function eventAttendees(db: Db, userId: string, eventId: string): P
       AND (EXISTS (SELECT 1 FROM ${peopleResponses} r WHERE r.person_id = p.id AND r.event_id = ${eventId})
         OR EXISTS (SELECT 1 FROM ${peopleManualAttendances} m WHERE m.person_id = p.id AND m.event_id = ${eventId}))
     ORDER BY coalesce(p.real_name, p.line_name), p.id`);
-  const rows = res.rows.map((r) => ({ personId: r.id, realName: r.real_name, lineName: r.line_name, byResponse: r.by_response }));
-  return rows.map((r) => ({
-    personId: r.personId,
-    displayName: r.realName ?? r.lineName ?? "",
-    lineName: r.lineName,
-    via: r.byResponse ? ("response" as const) : ("manual" as const),
+  return res.rows.map((r) => ({
+    personId: r.id,
+    displayName: displayNameOf({ realName: r.real_name, lineName: r.line_name }),
+    lineName: r.line_name,
+    via: r.by_response ? ("response" as const) : ("manual" as const),
   }));
 }
 
@@ -183,9 +182,9 @@ async function importIdsOf(db: PeopleDb, userId: string, eventId: string): Promi
 export async function eventDeletePreview(db: Db, userId: string, eventId: string): Promise<EventDeletePreview> {
   await loadOwnedEvent(db, userId, eventId);
   const ids = await importIdsOf(db, userId, eventId);
-  const plan = await planUndo(db, userId, ids);
+  const plan = await planUndo(db, userId, ids, eventId);
   // 声かけ（PR3）の数は、声かけの表を作るときに足す
-  return { responseCount: plan.responseCount, removedPeopleCount: plan.removable.length, peopleWithNotes: plan.peopleWithNotes, importCount: ids.length, outreachCount: 0 };
+  return { ...toUndoPreview(plan), importCount: ids.length, outreachCount: 0 };
 }
 
 /**
@@ -202,7 +201,7 @@ export async function deleteEvent(env: Env, db: Db, userId: string, eventId: str
     await lockOwner(tx, userId);
     await loadOwnedEvent(tx, userId, eventId);
     const ids = await importIdsOf(tx, userId, eventId);
-    const r = await executeUndo(tx, userId, ids, keep);
+    const r = await executeUndo(tx, userId, ids, keep, eventId);
     await tx.delete(peopleEvents).where(and(eq(peopleEvents.id, eventId), eq(peopleEvents.userId, userId)));
     return r;
   });

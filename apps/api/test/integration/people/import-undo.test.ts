@@ -83,4 +83,17 @@ describe("イベントを消す", () => {
     expect((await callPeople("GET", `/events/${nov}`, "u1")).status).toBe(404);
     expect(await peopleCounts()).toMatchObject({ persons: 2, responses: 2, imports: 1 });
   });
+
+  it("消すイベントに手で足した会ったイベントだけが残る人も、書き足しのある人として確かめて消せる", async () => {
+    await twoImports();
+    const sql = rawSql();
+    const [jiro] = (await sql`SELECT id, user_id FROM people.persons WHERE line_name = 'じろう'`) as { id: string; user_id: string }[];
+    await sql`INSERT INTO people.manual_attendances (person_id, event_id, user_id) VALUES (${jiro!.id}, ${nov}, ${jiro!.user_id})`;
+    const [, preview] = await read<{ removedPeopleCount: number; peopleWithNotes: { displayName: string; notes: string[] }[] }>(
+      await callPeople("GET", `/events/${nov}/delete-preview`, "u1"),
+    );
+    expect([preview.removedPeopleCount, preview.peopleWithNotes.map((p) => [p.displayName, p.notes])]).toEqual([1, [["じろう", ["manual_attendance"]]]]);
+    expect(await read(await callPeople("DELETE", `/events/${nov}`, "u1", { keepPeopleWithNotes: false }))).toEqual([200, { removedPeopleCount: 1, keptPeopleCount: 0 }]);
+    expect(await peopleCounts()).toMatchObject({ persons: 2 });
+  });
 });

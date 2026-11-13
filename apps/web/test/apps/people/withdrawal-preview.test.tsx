@@ -9,6 +9,7 @@ vi.mock("@/apps/people/lib/api", async (orig) => {
 });
 
 const { peopleApp } = await import("@/apps/people");
+const { ApiError } = await import("@/lib/api-client");
 
 describe("退会の確かめ", () => {
   it("GET /api/people/me の数で「人物メモ：人 n人・イベント n件が消えます」を出す", async () => {
@@ -25,5 +26,19 @@ describe("退会の確かめ", () => {
     const preview = peopleApp.withdrawalPreview!;
     render(<preview.Section data={await preview.query.queryFn()} />);
     expect(screen.getByText("人物メモ：人 0人・イベント 0件が消えます")).toBeInTheDocument();
+  });
+
+  it("人物メモを開いていない人（403 APP_NOT_AVAILABLE）は失敗にせず、何も出さない（退会のボタンを止めない）", async () => {
+    me.mockRejectedValue(new ApiError("APP_NOT_AVAILABLE", 403));
+    const preview = peopleApp.withdrawalPreview!;
+    const data = await preview.query.queryFn();
+    expect(data).toBeNull();
+    const { container } = render(<preview.Section data={data} />);
+    expect(container).toBeEmptyDOMElement();
+  });
+
+  it("ほかの失敗は失敗のまま（退会のダイアログが読み直しを出す）", async () => {
+    me.mockRejectedValue(new ApiError("INTERNAL_ERROR", 500));
+    await expect(peopleApp.withdrawalPreview!.query.queryFn()).rejects.toBeInstanceOf(ApiError);
   });
 });

@@ -295,7 +295,7 @@ stateDiagram-v2
 | 列 | 60列 | 画面・API |
 | 見出し（質問文） | 1列500文字 | 画面・API |
 | 値 | 1つ5,000文字 | 画面・API |
-| 本文 | 1.5MB | API（`bodyLimit`） |
+| 本文 | 3MB（Shift_JISのファイルはUTF-8のJSONで1.5倍ほどになるため。PR #111 のセルフレビュー） | API（`bodyLimit`） |
 | LINE名・本名 | 100文字（超えた行は「取り込めない行」） | API |
 
 上限を超えたら400 `IMPORT_TOO_LARGE`（どの上限か）。

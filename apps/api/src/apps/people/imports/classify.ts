@@ -57,7 +57,18 @@ export type Classified = { rows: ParsedRow[]; summary: ImportPreview["summary"] 
  */
 function single(v: string | undefined, max: number): string | null {
   const s = (v ?? "").trim();
-  return s === "" ? null : s.slice(0, max);
+  return s === "" ? null : cut(s, max);
+}
+
+/**
+ * 文字の数（コードポイント）で切る（絵文字を半分に切らない）。
+ * @param s - 文字
+ * @param max - 上限
+ * @returns 切った文字
+ */
+function cut(s: string, max: number): string {
+  const chars = [...s];
+  return chars.length > max ? chars.slice(0, max).join("") : s;
 }
 
 /**
@@ -68,7 +79,7 @@ function single(v: string | undefined, max: number): string | null {
 function multi(v: string | undefined): string[] {
   return splitChoices(v)
     .slice(0, CHOICES_MAX)
-    .map((c) => c.slice(0, CHOICE_MAX));
+    .map((c) => cut(c, CHOICE_MAX));
 }
 
 /**
@@ -108,8 +119,10 @@ export async function classifyRows(
       const realName = single(at(r, idx.real), Number.MAX_SAFE_INTEGER);
       const consentChoices = multi(at(r, idx.consent));
       const lineNameKey = nameKey(lineName);
-      // 二重の印：イベント・回答の時刻の文字・LINE名（時刻の列がなければ全部の列の値）。名前を含まないハッシュにする（R8・R18）
-      const seed = idx.at >= 0 ? `${eventId}|${(at(r, idx.at) ?? "").trim()}|${lineNameKey}` : `${eventId}|${r.join("\u001f")}`;
+      // 二重の印：イベント・回答の時刻の文字・LINE名（時刻の列がない・時刻が空なら全部の列の値）。名前を含まないハッシュにする（R8・R18）。
+      // 時刻が空の行を時刻とLINE名だけで見ると、同じLINE名の別の人が1つの回答にまとまってしまう（PR #111 のセルフレビュー）
+      const atText = (at(r, idx.at) ?? "").trim();
+      const seed = atText !== "" ? `${eventId}|${atText}|${lineNameKey}` : `${eventId}|${r.join("\u001f")}`;
       let invalidReason: ImportInvalidReason | undefined;
       if (lineName === "") invalidReason = "line_name_empty";
       else if ([...lineName].length > PERSON_NAME_MAX) invalidReason = "line_name_too_long";

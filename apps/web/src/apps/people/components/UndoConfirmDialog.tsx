@@ -75,7 +75,10 @@ export function UndoConfirmDialog({
           <ul className="list-disc space-y-0.5 pl-5">
             {p.importCount !== undefined && <li>取り込み {p.importCount}件を取り消します</li>}
             <li>回答 {p.responseCount}件が消えます</li>
-            <li>ほかの会に来ていない人 {p.removedPeopleCount}人が消えます</li>
+            <li>
+              ほかの会に来ていない人 {withNotes.length > 0 ? p.removedPeopleCount - withNotes.length : p.removedPeopleCount}人が消えます
+              {withNotes.length > 0 && <>（下の書き足しのある人 {withNotes.length}人は、選んだとおりに残すか消す）</>}
+            </li>
             {p.outreachCount !== undefined && p.outreachCount > 0 && <li>この会への声かけ {p.outreachCount}件が消えます</li>}
           </ul>
           {withNotes.length > 0 && (

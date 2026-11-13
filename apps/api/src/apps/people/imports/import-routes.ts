@@ -10,10 +10,13 @@ import type { AppEnv } from "../../../platform";
 import { loadOwnedImport, lockOwner } from "../access";
 import { reportPeopleUsage } from "../usage";
 import { commitImport, previewImport } from "./import-service";
-import { executeUndo, planUndo } from "./undo";
+import { executeUndo, planUndo, toUndoPreview } from "./undo";
 
-/** 取り込みの本文の上限（data-model.md 5）。 */
-const IMPORT_BODY_MAX_BYTES = 1_500_000;
+/**
+ * 取り込みの本文の上限（data-model.md 5）。画面はファイルを1MBまでで受けるが、Shift_JIS のファイルは UTF-8 の JSON にすると
+ * 1.5倍ほどになり、引用符の分も増えるので、余裕をもって3MBにする（PR #111 のセルフレビュー）。行・列・文字の上限は別に確かめる。
+ */
+const IMPORT_BODY_MAX_BYTES = 3_000_000;
 
 /** 本文の上限を超えたら 400 IMPORT_TOO_LARGE。 */
 const importBodyLimit = bodyLimit({
@@ -41,8 +44,7 @@ export function importRoutes() {
       const db = createDb(c.env.DATABASE_URL);
       const userId = c.get("user").id;
       const imp = await loadOwnedImport(db, userId, c.req.param("importId"));
-      const plan = await planUndo(db, userId, [imp.id]);
-      return c.json({ responseCount: plan.responseCount, removedPeopleCount: plan.removable.length, peopleWithNotes: plan.peopleWithNotes });
+      return c.json(toUndoPreview(await planUndo(db, userId, [imp.id])));
     })
     .delete("/imports/:importId", async (c) => {
       const { keepPeopleWithNotes } = await parseBody(keepPeopleSchema, c.req.json().catch(() => ({})));

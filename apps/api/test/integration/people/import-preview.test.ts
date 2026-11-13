@@ -111,8 +111,8 @@ describe("上限", () => {
     }
   });
 
-  it("本文が1.5MBを超えると 400 IMPORT_TOO_LARGE", async () => {
-    const big = Array.from({ length: 400 }, (_, i) => formRow({ line: `p${i}`, free: "あ".repeat(1500) }, i));
+  it("本文が3MBを超えると 400 IMPORT_TOO_LARGE", async () => {
+    const big = Array.from({ length: 500 }, (_, i) => formRow({ line: `p${i}`, free: "あ".repeat(2500) }, i));
     const [status, body] = await read<{ error: { code: string } }>(await previewForm("u1", eventId, big));
     expect([status, body.error.code]).toEqual([400, "IMPORT_TOO_LARGE"]);
   });

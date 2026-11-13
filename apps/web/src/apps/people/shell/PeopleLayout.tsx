@@ -26,7 +26,8 @@ export function isAppNotAvailable(error: unknown): boolean {
 }
 
 /**
- * 読み込み・書き込みのどれかが 403 APP_NOT_AVAILABLE になったかを見張る。
+ * 人物メモの読み込み・書き込みが、新しく 403 APP_NOT_AVAILABLE になったかを見張る。
+ * 前から残っている失敗（開く前の退会の確かめなど）や、ほかのアプリの失敗では切り替えない（PR #111 のセルフレビュー）。
  * @returns なったら true
  */
 function useAppNotAvailableSeen(): boolean {
@@ -34,10 +35,10 @@ function useAppNotAvailableSeen(): boolean {
   const [seen, setSeen] = useState(false);
   useEffect(() => {
     const offQueries = queryClient.getQueryCache().subscribe((e) => {
-      if (isAppNotAvailable(e.query.state.error)) setSeen(true);
+      if (e.type === "updated" && e.action.type === "error" && e.query.queryKey[0] === "people" && isAppNotAvailable(e.action.error)) setSeen(true);
     });
     const offMutations = queryClient.getMutationCache().subscribe((e) => {
-      if (isAppNotAvailable(e.mutation?.state.error)) setSeen(true);
+      if (e.type === "updated" && e.action.type === "error" && isAppNotAvailable(e.action.error)) setSeen(true);
     });
     return () => {
       offQueries();

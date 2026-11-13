@@ -105,6 +105,15 @@ describe("二重にしない", () => {
     expect(r!.dedupe_hash).toMatch(/^[0-9a-f]{64}$/);
   });
 
+  it("回答の時刻が空の行は、同じLINE名でも答えが違えば別の回答（両方「別の人」で2人）", async () => {
+    const rows = [formRow({ line: "たろう", at: "", next: "参加できそう" }, 1), formRow({ line: "たろう", at: "", next: "次回は難しい" }, 2)];
+    const [, body] = await read<Result>(await commitForm("u1", eventId, rows, [
+      { row: 0, action: "new" },
+      { row: 1, action: "new" },
+    ]));
+    expect(body.import).toMatchObject({ importedCount: 2, createdPeopleCount: 2 });
+  });
+
   it("同じ行が1つのCSVに2つあれば組になり、両方「別の人」でも回答は1つで、回答のない人は残らない", async () => {
     const row = formRow({ line: "たろう" }, 1);
     const [, body] = await read<Result>(

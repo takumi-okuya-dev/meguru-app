@@ -150,4 +150,4 @@
 
 ## 7. APIの入口の一覧
 
-`apps/api/test/repo/routes.snapshot.txt`に上の道筋を足す（`pnpm --filter api routes:snapshot`）。取り込みの2本（3-1・3-2）は`bodyLimit`で本文を1.5MBまでにする（data-model.md 5）。
+`apps/api/test/repo/routes.snapshot.txt`に上の道筋を足す（`pnpm --filter api routes:snapshot`）。取り込みの2本（3-1・3-2）は`bodyLimit`で本文を3MBまでにする（data-model.md 5）。
