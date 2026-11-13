@@ -1,7 +1,7 @@
 // 会場の共有のつなぎ方（specs/collect/001-event-day-collection contracts/realtime.md 1・4、tasks.md T041）。
 // 入場券を取って WebSocket につなぎ、知らせを渡す。つながったら・画面に戻ったら、スナップショットを読み直す。
 // 切れたら1秒・2秒・4秒…（最大30秒）で入場券を取り直してつなぎ直し、つながらない間は15秒ごとに読み直す。
-// リンクが止められた（手伝う人）ときは、つなぎ直さない。
+// リンクが止められた手伝う人の画面は、つなぎ直さない（主催者の画面は止めない）。
 import type { LiveMessage, LiveTicketResponse } from "@meguru/shared";
 import { useEffect, useRef, useState } from "react";
 import { API_BASE_URL, ApiError } from "@/lib/api-client";
@@ -36,11 +36,13 @@ export function retryDelay(attempt: number): number {
 
 /**
  * 会場の共有につなぐ。
- * @param opts - enabled：つなぐか、getTicket：入場券を取る、onMessage：知らせを受けたとき、onResync：スナップショットを読み直すとき
+ * @param opts - enabled：つなぐか、helper：手伝う人の画面か（リンクが止められたら、つなぎ直さない）、getTicket：入場券を取る、
+ *   onMessage：知らせを受けたとき、onResync：スナップショットを読み直すとき
  * @returns 状態
  */
 export function useLive(opts: {
   enabled: boolean;
+  helper?: boolean;
   getTicket: () => Promise<LiveTicketResponse>;
   onMessage: (message: LiveMessage) => void;
   onResync: () => void;
@@ -105,7 +107,8 @@ export function useLive(opts: {
           return;
         }
         latest.current.onMessage(message);
-        if (message.type === "link.stopped") stopped = true;
+        // リンクを止めたこと（出し直しを含む）で止まるのは手伝う人の画面だけ。主催者の画面はつなぎ直しを続ける
+        if (message.type === "link.stopped" && latest.current.helper) stopped = true;
       };
       ws.onclose = (e) => {
         if (socket === ws) socket = null;

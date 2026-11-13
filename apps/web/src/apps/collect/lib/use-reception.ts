@@ -103,7 +103,14 @@ export function useReception(source: ReceptionSource, enabled = true) {
     [apply, resync, source],
   );
 
-  const live: LiveStatus = useLive({ enabled: enabled && snapshot.isSuccess, getTicket: source.liveTicket, onMessage, onResync: resync });
+  // 一度読めたら、あとの読み直しが失敗しても、つなぎ直しと15秒ごとの読み直しを続ける（止めると、APIが戻っても画面が追いつかない）
+  const live: LiveStatus = useLive({
+    enabled: enabled && snapshot.data !== undefined,
+    helper: source.viewer.kind === "helper",
+    getTicket: source.liveTicket,
+    onMessage,
+    onResync: resync,
+  });
 
   const send = async (personId: string, input: RecordReceptionRequest) => {
     setPending((p) => ({ ...p, [personId]: { status: "saving", input } }));
@@ -149,9 +156,10 @@ export function useReception(source: ReceptionSource, enabled = true) {
         resync();
       }
     },
-    walkIn: async (name: string): Promise<boolean> => {
+    // 飛び入りを足す。clientRequestId は呼ぶ側（ダイアログ）が1回の飛び入りに1つ作り、送り直しでも同じものを使う（二重にしない）
+    walkIn: async (name: string, clientRequestId: string): Promise<boolean> => {
       try {
-        const res = await source.walkIn({ name, clientRequestId: crypto.randomUUID() });
+        const res = await source.walkIn({ name, clientRequestId });
         apply(res.version, (s) => withPerson(s, res.person, source.viewer));
         return true;
       } catch (err) {

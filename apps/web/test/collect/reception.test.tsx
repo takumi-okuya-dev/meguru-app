@@ -15,7 +15,7 @@ const mocks = vi.hoisted(() => ({
   undo: vi.fn(),
   walkIn: vi.fn(),
   paypayQr: vi.fn(),
-  live: { onMessage: null as null | ((m: LiveMessage) => void) },
+  live: { onMessage: null as null | ((m: LiveMessage) => void), enabled: [] as boolean[] },
 }));
 vi.mock("@/apps/collect/lib/api", () => ({
   collectApi: {
@@ -29,8 +29,9 @@ vi.mock("@/apps/collect/lib/api", () => ({
 }));
 // 会場の共有はつながず、知らせを手で送れるようにする
 vi.mock("@/apps/collect/lib/live", () => ({
-  useLive: (opts: { onMessage: (m: LiveMessage) => void }) => {
+  useLive: (opts: { onMessage: (m: LiveMessage) => void; enabled: boolean }) => {
     mocks.live.onMessage = opts.onMessage;
+    mocks.live.enabled.push(opts.enabled);
     return "live";
   },
 }));
@@ -106,6 +107,7 @@ beforeEach(() => {
   mocks.reception.mockResolvedValue(snapshot());
   mocks.paypayQr.mockResolvedValue(new Blob(["png"], { type: "image/png" }));
   mocks.live.onMessage = null;
+  mocks.live.enabled = [];
   globalThis.URL.createObjectURL = vi.fn(() => "blob:qr");
   globalThis.URL.revokeObjectURL = vi.fn();
 });
@@ -237,5 +239,34 @@ describe("会場の共有", () => {
       }),
     );
     expect(await screen.findByRole("listitem", { name: "No.13 飛び入り 太郎" })).toBeInTheDocument();
+  });
+
+  it("読み直しが失敗しても、会場の共有のつなぎ直しは止めない（一度読めたスナップショットがあるあいだ）", async () => {
+    renderReception();
+    await screen.findByRole("listitem", { name: /井上 そら/ });
+    mocks.reception.mockRejectedValue(new ApiError("API_UNREACHABLE", 0));
+    act(() => mocks.live.onMessage!({ type: "resync", eventId: "e1", version: 6, at: "" }));
+    await waitFor(() => expect(mocks.reception).toHaveBeenCalledTimes(2));
+    await new Promise((r) => setTimeout(r, 50));
+    expect(mocks.live.enabled.at(-1)).toBe(true);
+    expect(screen.getByRole("listitem", { name: /井上 そら/ })).toBeInTheDocument();
+  });
+
+  it("飛び入りの送り直し（応答が届かなかった）は、同じ clientRequestId で送る", async () => {
+    mocks.walkIn
+      .mockRejectedValueOnce(new ApiError("API_UNREACHABLE", 0))
+      .mockResolvedValueOnce({ person: { id: "p9", number: 13, name: "飛び入り", kana: null, media: "walk_in", priceTierId: "t1" }, version: 6 });
+    const user = userEvent.setup();
+    renderReception();
+    await screen.findByRole("listitem", { name: /井上 そら/ });
+    await user.click(screen.getByRole("button", { name: /飛び入り/ }));
+    const dialog = await screen.findByRole("dialog");
+    await user.type(within(dialog).getByRole("textbox", { name: "飛び入りの名前" }), "飛び入り");
+    await user.click(within(dialog).getByRole("button", { name: "足す" }));
+    await waitFor(() => expect(mocks.walkIn).toHaveBeenCalledTimes(1));
+    await user.click(within(dialog).getByRole("button", { name: "足す" }));
+    await waitFor(() => expect(mocks.walkIn).toHaveBeenCalledTimes(2));
+    const [first, second] = mocks.walkIn.mock.calls;
+    expect(second![1].clientRequestId).toBe(first![1].clientRequestId);
   });
 });

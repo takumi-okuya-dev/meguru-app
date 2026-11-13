@@ -76,4 +76,25 @@ describe("useLive", () => {
     await flush();
     expect(second.result.current).toBe("stopped");
   });
+
+  it("主催者の画面は、link.stopped を受けても、あとで切れたらつなぎ直す（止まるのは手伝う人の画面だけ）", async () => {
+    const getTicket = vi.fn().mockResolvedValue({ ticket: "t", expiresAt: "" });
+    const owner = renderHook(() => useLive({ enabled: true, getTicket, onMessage: vi.fn(), onResync: vi.fn() }));
+    await flush();
+    act(() => FakeSocket.all[0]!.onopen!());
+    act(() => FakeSocket.all[0]!.onmessage!({ data: JSON.stringify({ type: "link.stopped", eventId: "e1", version: 2, at: "" }) }));
+    act(() => FakeSocket.all[0]!.onclose!({ code: 1006 }));
+    expect(owner.result.current).toBe("offline");
+    await act(async () => vi.advanceTimersByTime(1000));
+    expect(getTicket).toHaveBeenCalledTimes(2);
+
+    FakeSocket.all = [];
+    const helperTicket = vi.fn().mockResolvedValue({ ticket: "t", expiresAt: "" });
+    const helper = renderHook(() => useLive({ enabled: true, helper: true, getTicket: helperTicket, onMessage: vi.fn(), onResync: vi.fn() }));
+    await flush();
+    act(() => FakeSocket.all[0]!.onopen!());
+    act(() => FakeSocket.all[0]!.onmessage!({ data: JSON.stringify({ type: "link.stopped", eventId: "e1", version: 2, at: "" }) }));
+    act(() => FakeSocket.all[0]!.onclose!({ code: 1006 }));
+    expect(helper.result.current).toBe("stopped");
+  });
 });

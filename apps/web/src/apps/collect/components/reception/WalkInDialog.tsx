@@ -7,11 +7,21 @@ import { Input } from "@/components/ui/input";
 
 /**
  * 飛び入りを足すダイアログ。
+ * 応答が届かずに送り直しても二重に足さないよう、ダイアログを開いている間は同じ clientRequestId を使う。
  * @param props - initialName：検索に入れていた言葉、onAdd：足す（足せたら true）、onClose：閉じる
  * @returns ダイアログ
  */
-export function WalkInDialog({ initialName, onAdd, onClose }: { initialName: string; onAdd: (name: string) => Promise<boolean>; onClose: () => void }) {
+export function WalkInDialog({
+  initialName,
+  onAdd,
+  onClose,
+}: {
+  initialName: string;
+  onAdd: (name: string, clientRequestId: string) => Promise<boolean>;
+  onClose: () => void;
+}) {
   const [name, setName] = useState(initialName);
+  const [clientRequestId] = useState(() => crypto.randomUUID());
   const [saving, setSaving] = useState(false);
   return (
     <Dialog open onOpenChange={(v) => !v && onClose()}>
@@ -24,7 +34,7 @@ export function WalkInDialog({ initialName, onAdd, onClose }: { initialName: str
             e.preventDefault();
             if (!name.trim() || saving) return;
             setSaving(true);
-            const ok = await onAdd(name.trim());
+            const ok = await onAdd(name.trim(), clientRequestId);
             setSaving(false);
             if (ok) onClose();
           }}

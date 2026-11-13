@@ -186,8 +186,8 @@ export function ReceptionBoard({
       {walkIn && (
         <WalkInDialog
           initialName={/^\d+$/.test(query.trim()) ? "" : query.trim()}
-          onAdd={async (name) => {
-            const ok = await state.walkIn(name);
+          onAdd={async (name, clientRequestId) => {
+            const ok = await state.walkIn(name, clientRequestId);
             if (ok) setQuery(name);
             return ok;
           }}
