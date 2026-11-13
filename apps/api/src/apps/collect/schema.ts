@@ -1,10 +1,20 @@
 // 集金管理（apps/collect）の表の定義（specs/collect/001-event-day-collection data-model.md 2、research.md R1・R2）。
 // 表はスキーマ collect に置き、共通の表（users など）への外部キーは張らない。主催者は owner_user_id に値として持ち、
 // 退会の片づけは出来事（user.withdrawn）で集金管理が行う（docs/app-separation.md 4）。外部キーは集金管理の表の中だけに張る。
-// PR1 の分（イベント・料金の区分・名簿・主催者の既定値・受け取った出来事）。受付・手伝う人・精算・まとめの表は、それぞれのPRで足す。
+// PR1 の分（イベント・料金の区分・名簿・主催者の既定値・受け取った出来事）と、PR2 の分（受付の記録・受付用リンク・手伝う人・端末）。
+// 精算・まとめの表は PR3 で足す。
 import { sql } from "drizzle-orm";
-import { bigint, check, index, integer, pgSchema, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
-import { COLLECT_LIMITS, COLLECT_MEDIA, COLLECT_METHODS, PAYPAY_QR_TYPES } from "@meguru/shared";
+import { bigint, boolean, check, index, integer, pgSchema, smallint, text, timestamp, uniqueIndex, uuid, type AnyPgColumn } from "drizzle-orm/pg-core";
+import {
+  COLLECT_LIMITS,
+  COLLECT_MEDIA,
+  COLLECT_METHODS,
+  PAYMENT_STATUSES,
+  PAYPAY_QR_TYPES,
+  RECEIVER_KINDS,
+  RECEPTION_LIMITS,
+  RECEPTION_METHODS,
+} from "@meguru/shared";
 import { bytea, inList, timestamps } from "../../kernel/db/columns";
 
 /** 集金管理のスキーマ。 */
@@ -90,8 +100,10 @@ export const collectRosterPeople = collectSchema.table(
       .notNull()
       .references(() => collectPriceTiers.id, { onDelete: "no action" }),
     memo: text("memo"),
-    // 飛び入りを手伝う人が足したとき（外部キーは手伝う人の表と一緒に PR2 で張る）
-    addedByHelperId: uuid("added_by_helper_id"),
+    // 飛び入りを手伝う人が足したとき（手伝う人を消したら空にする）
+    addedByHelperId: uuid("added_by_helper_id").references((): AnyPgColumn => collectHelpers.id, { onDelete: "set null" }),
+    // 飛び入りの送り直しで二重にしない（R6。飛び入りのときだけ入る）
+    clientRequestId: uuid("client_request_id").unique(),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
@@ -129,3 +141,102 @@ export const collectReceivedEvents = collectSchema.table("received_events", {
   eventId: uuid("event_id").primaryKey(),
   receivedAt: timestamp("received_at", { withTimezone: true, precision: 6 }).notNull().defaultNow(),
 });
+
+/** 受付の記録（data-model.md 2-4）。名簿の人1人に1行（主キー）で、二重の記録を止める（R6）。 */
+export const collectReceptionRecords = collectSchema.table(
+  "reception_records",
+  {
+    rosterPersonId: uuid("roster_person_id")
+      .primaryKey()
+      .references(() => collectRosterPeople.id, { onDelete: "cascade" }),
+    eventId: uuid("event_id")
+      .notNull()
+      .references(() => collectEvents.id, { onDelete: "cascade" }),
+    method: text("method").notNull(),
+    // 記録したときの区分（受付で変えたら変えたもの。名簿の区分は変えない。R17）。イベントを消すときの CASCADE で止まらないよう NO ACTION
+    priceTierId: uuid("price_tier_id")
+      .notNull()
+      .references(() => collectPriceTiers.id, { onDelete: "no action" }),
+    amount: integer("amount").notNull(),
+    amountOverridden: boolean("amount_overridden").notNull().default(false),
+    receiverKind: text("receiver_kind").notNull(),
+    // 手伝う人が受け取ったとき。イベントを消すときの CASCADE で止まらないよう NO ACTION（RESTRICT にしない）
+    receiverHelperId: uuid("receiver_helper_id").references((): AnyPgColumn => collectHelpers.id, { onDelete: "no action" }),
+    paymentStatus: text("payment_status").notNull(),
+    transferConfirmedAt: timestamp("transfer_confirmed_at", { withTimezone: true }),
+    recordedAt: timestamp("recorded_at", { withTimezone: true }).notNull().defaultNow(),
+    clientRequestId: uuid("client_request_id").notNull().unique(),
+  },
+  (t) => [
+    index("reception_records_event_idx").on(t.eventId),
+    index("reception_records_price_tier_idx").on(t.priceTierId),
+    index("reception_records_receiver_helper_idx").on(t.receiverHelperId),
+    check("reception_records_method_valid", sql`${t.method} IN (${inList(RECEPTION_METHODS)})`),
+    check("reception_records_amount_range", sql`${t.amount} BETWEEN 0 AND ${sql.raw(String(COLLECT_LIMITS.tierAmountMax))}`),
+    check("reception_records_none_is_free", sql`${t.method} <> 'none' OR ${t.amount} = 0`),
+    check("reception_records_receiver_kind_valid", sql`${t.receiverKind} IN (${inList(RECEIVER_KINDS)})`),
+    check("reception_records_receiver_pair", sql`(${t.receiverKind} = 'helper') = (${t.receiverHelperId} IS NOT NULL)`),
+    check("reception_records_payment_status_valid", sql`${t.paymentStatus} IN (${inList(PAYMENT_STATUSES)})`),
+    check(
+      "reception_records_awaiting_only_transfer",
+      sql`${t.paymentStatus} = 'paid' OR ${t.method} IN ('transfer_today', 'transfer_later')`,
+    ),
+  ],
+);
+
+/** 受付用リンク（data-model.md 2-5）。照合はハッシュ、主催者がQRを出し直すのは暗号化した写し（AADはイベントの番号。R7）。 */
+export const collectReceptionLinks = collectSchema.table(
+  "reception_links",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    eventId: uuid("event_id")
+      .notNull()
+      .references(() => collectEvents.id, { onDelete: "cascade" }),
+    tokenHash: text("token_hash").notNull().unique(),
+    tokenCiphertext: bytea("token_ciphertext").notNull(),
+    tokenIv: bytea("token_iv").notNull(),
+    tokenKeyVersion: smallint("token_key_version").notNull(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    stoppedAt: timestamp("stopped_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  // 使えるリンク（止めていないもの）は、イベントに1つだけ
+  (t) => [uniqueIndex("reception_links_one_active_key").on(t.eventId).where(sql`${t.stoppedAt} IS NULL`)],
+);
+
+/** 手伝う人（data-model.md 2-6）。同じ name_key は、名前を入れた人が「別の人」と答えたときだけ2行になる（R7）。 */
+export const collectHelpers = collectSchema.table(
+  "helpers",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    eventId: uuid("event_id")
+      .notNull()
+      .references(() => collectEvents.id, { onDelete: "cascade" }),
+    linkId: uuid("link_id")
+      .notNull()
+      .references(() => collectReceptionLinks.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    nameKey: text("name_key").notNull(),
+    joinedAt: timestamp("joined_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index("helpers_event_idx").on(t.eventId),
+    index("helpers_link_name_key_idx").on(t.linkId, t.nameKey),
+    check("helpers_name_length", sql`char_length(${t.name}) BETWEEN 1 AND ${sql.raw(String(RECEPTION_LIMITS.helperName))}`),
+  ],
+);
+
+/** 手伝う人の端末（data-model.md 2-6）。端末の印はハッシュだけを持つ。 */
+export const collectHelperDevices = collectSchema.table(
+  "helper_devices",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    helperId: uuid("helper_id")
+      .notNull()
+      .references(() => collectHelpers.id, { onDelete: "cascade" }),
+    secretHash: text("secret_hash").notNull().unique(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    lastSeenAt: timestamp("last_seen_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("helper_devices_helper_idx").on(t.helperId)],
+);

@@ -4,6 +4,8 @@ const key = (byte: number) => btoa(String.fromCharCode(...new Uint8Array(32).fil
 export const TEST_WEB_ORIGIN = "http://localhost:5173";
 export const TEST_APP_SECRET = "test-app-secret";
 
+export const TEST_COLLECT_LIVE_SECRET = "test-collect-live-secret-0000000000";
+
 export const TEST_STRIPE_WEBHOOK_SECRET = "whsec_TestOnlyWebhookSecret000";
 
 export function testBindings(fakeThreadsUrl: string, databaseUrl: string, fakeStripeUrl = "http://127.0.0.1:1") {
@@ -29,5 +31,7 @@ export function testBindings(fakeThreadsUrl: string, databaseUrl: string, fakeSt
     STRIPE_WEBHOOK_SECRET: TEST_STRIPE_WEBHOOK_SECRET,
     STRIPE_PRICE_ID: "price_TestOnlyTiered",
     STRIPE_API_BASE_URL: fakeStripeUrl,
+    // 集金管理の会場の共有の入場券（specs/collect/001 research.md R5）
+    COLLECT_LIVE_SECRET: TEST_COLLECT_LIVE_SECRET,
   };
 }

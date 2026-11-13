@@ -3,11 +3,14 @@
 // 各行の書き込みは、読んだ時点の key_version と accounts.connection_generation を条件にし、
 // その間に再接続などで書き換わった行は飛ばす（トークンの値は変わらないので世代番号は上げない）。
 // 組み立て（docs/module-map.md 2-5）に置く：共通（テストのグループの招待のトークン）とThreads（チームの招待のトークン・接続のトークン）の両方の暗号を入れ替えるため（specs/027・specs/meguru/029）。
+// ほかのアプリの値は、アプリの入口の tokenKeys（ApiAppModule）を一覧の順に呼んで入れ替える（ここにアプリの表を書き足さない）。
 import { and, eq, ne, sql } from "drizzle-orm";
 import type { Env } from "../kernel/env";
 import { createDb } from "../kernel/db/client";
 import { accounts, teams, testGroups, threadsConnections } from "../db/schema";
 import { createTokenCipher, KeyRingError } from "../kernel/crypto";
+import { API_APPS } from "../app-modules";
+import type { ApiAppModule } from "../platform";
 
 /**
  * 暗号鍵のローテーション（research.md R5 の手順3・4）。古いバージョンの行を、新しいIVと現在の鍵で暗号化し直す。
@@ -16,10 +19,11 @@ import { createTokenCipher, KeyRingError } from "../kernel/crypto";
  * 不足の検査・暗号化し直し・残りの件数に含める。テストのグループの招待リンク（test_groups。specs/016 research.md R8）も同じ鍵なので同じに扱う。
  * 招待は、読んだ時点の照合用ハッシュと鍵のバージョンを条件にする（作り直された・先に入れ替えられた行は飛ばす）。
  * @param env - バインディング（鍵リング・現在のバージョン・DATABASE_URL）
+ * @param apps - アプリの一覧（tokenKeys を持つアプリの値も入れ替える。既定は組み立ての API_APPS）
  * @returns 暗号化し直した件数、飛ばした件数、旧バージョンの残りの件数
  * @throws KeyRingError 鍵が欠けているバージョンの行があるとき（開始しない）
  */
-export async function rotateTokenKeys(env: Env) {
+export async function rotateTokenKeys(env: Env, apps: readonly ApiAppModule[] = API_APPS) {
   const cipher = createTokenCipher(env.TOKEN_ENCRYPTION_KEYS, env.TOKEN_ENCRYPTION_KEY_VERSION);
   const ring = JSON.parse(env.TOKEN_ENCRYPTION_KEYS) as Record<string, string>;
   const db = createDb(env.DATABASE_URL);
@@ -30,6 +34,9 @@ export async function rotateTokenKeys(env: Env) {
     ...(await db.selectDistinct({ v: teams.inviteKeyVersion }).from(teams)),
     ...(await db.selectDistinct({ v: testGroups.inviteKeyVersion }).from(testGroups)),
   ];
+  // アプリが共通の鍵で暗号化して持つ値（ApiAppModule.tokenKeys。specs/collect/001 の受付用リンクなど）
+  const appTokens = apps.flatMap((m) => (m.tokenKeys ? [m.tokenKeys] : []));
+  for (const t of appTokens) versions.push(...(await t.versionsInUse(env)).map((v) => ({ v })));
   const missing = [...new Set(versions.map((r) => r.v))].filter((v) => v !== null && !(String(v) in ring));
   if (missing.length > 0) {
     throw new KeyRingError(`key ring is missing versions used by existing rows: ${missing.join(", ")}`);
@@ -111,6 +118,12 @@ export async function rotateTokenKeys(env: Env) {
     else skipped += 1;
   }
 
+  for (const t of appTokens) {
+    const r = await t.rotate(env, cipher);
+    rotated += r.rotated;
+    skipped += r.skipped;
+  }
+
   const [remaining] = await db
     .select({
       n: sql<number>`(
@@ -120,5 +133,7 @@ export async function rotateTokenKeys(env: Env) {
       )::int`,
     })
     .from(sql`(SELECT 1) AS one`);
-  return { rotated, skipped, remainingOldVersionRows: remaining?.n ?? 0 };
+  let appRemaining = 0;
+  for (const t of appTokens) appRemaining += await t.remaining(env, cipher.currentVersion);
+  return { rotated, skipped, remainingOldVersionRows: (remaining?.n ?? 0) + appRemaining };
 }

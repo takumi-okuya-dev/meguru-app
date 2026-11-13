@@ -12,7 +12,7 @@ import { and, asc, count, eq, inArray, sql } from "drizzle-orm";
 import { withTransaction, type Db, type TxDb } from "../../../kernel/db/client";
 import { AppError } from "../../../kernel/errors";
 import { loadOwnedEvent, type CollectEventRow } from "../access";
-import { collectEvents, collectPriceTiers, collectRosterPeople } from "../schema";
+import { collectEvents, collectPriceTiers, collectReceptionRecords, collectRosterPeople } from "../schema";
 
 type TierRow = typeof collectPriceTiers.$inferSelect;
 
@@ -89,7 +89,7 @@ export function sortByNearest<T extends { startsAt: string }>(events: T[], now: 
 }
 
 /**
- * 主催者のイベントの一覧（FR-012）。来場の数・振込待ちの数は、受付の記録の表ができる PR2・PR3 まで0。
+ * 主催者のイベントの一覧（FR-012）。名簿の人数・来場の数・振込待ちの数を、イベントごとにまとめて数える。
  * @param db - データベース
  * @param ownerUserId - 主催者
  * @param now - 今（並びの基準）
@@ -107,6 +107,19 @@ export async function listEvents(db: Db, ownerUserId: string, now: Date): Promis
           .where(inArray(collectRosterPeople.eventId, events.map((e) => e.id)))
           .groupBy(collectRosterPeople.eventId);
   const rosterCount = new Map(counts.map((r) => [r.eventId, Number(r.n)]));
+  const recordCounts =
+    events.length === 0
+      ? []
+      : await db
+          .select({
+            eventId: collectReceptionRecords.eventId,
+            attended: count(),
+            awaiting: sql<number>`count(*) FILTER (WHERE ${collectReceptionRecords.paymentStatus} = 'awaiting_transfer')`.mapWith(Number),
+          })
+          .from(collectReceptionRecords)
+          .where(inArray(collectReceptionRecords.eventId, events.map((e) => e.id)))
+          .groupBy(collectReceptionRecords.eventId);
+  const records = new Map(recordCounts.map((r) => [r.eventId, r]));
   const items = events.map((event) => ({
     id: event.id,
     name: event.name,
@@ -115,8 +128,8 @@ export async function listEvents(db: Db, ownerUserId: string, now: Date): Promis
     venue: event.venue,
     closedAt: event.closedAt?.toISOString() ?? null,
     rosterCount: rosterCount.get(event.id) ?? 0,
-    attendedCount: 0,
-    awaitingTransferCount: 0,
+    attendedCount: Number(records.get(event.id)?.attended ?? 0),
+    awaitingTransferCount: records.get(event.id)?.awaiting ?? 0,
     fromThreads: event.sourceThreadsPromotionId !== null,
   }));
   return sortByNearest(items, now);
@@ -175,7 +188,7 @@ export async function createEvent(databaseUrl: string, ownerUserId: string, inpu
 
 /**
  * 区分を、渡された全部の区分（並びのとおり）に合わせる。id のあるものは直し、ないものは足し、渡されなかった区分は消す。
- * 名簿の人が使っている区分は消せない（409 TIER_IN_USE）。受付の記録が使っている区分の確かめは PR2 で足す。
+ * 名簿の人か受付の記録が使っている区分は消せない（409 TIER_IN_USE。受付で変えた区分は記録にだけある。R17）。
  * @param tx - トランザクション（イベントの行はロック済み）
  * @param eventId - イベントの番号
  * @param tiers - 渡された区分
@@ -194,7 +207,11 @@ async function replaceTiers(tx: TxDb, eventId: string, tiers: CollectTierInput[]
       .select({ n: count() })
       .from(collectRosterPeople)
       .where(and(eq(collectRosterPeople.eventId, eventId), inArray(collectRosterPeople.priceTierId, removed)));
-    if ((used?.n ?? 0) > 0) throw new AppError("TIER_IN_USE", 409, "tier in use");
+    const [recorded] = await tx
+      .select({ n: count() })
+      .from(collectReceptionRecords)
+      .where(and(eq(collectReceptionRecords.eventId, eventId), inArray(collectReceptionRecords.priceTierId, removed)));
+    if ((used?.n ?? 0) + (recorded?.n ?? 0) > 0) throw new AppError("TIER_IN_USE", 409, "tier in use");
     await tx.delete(collectPriceTiers).where(and(eq(collectPriceTiers.eventId, eventId), inArray(collectPriceTiers.id, removed)));
   }
   for (const [i, t] of tiers.entries()) {

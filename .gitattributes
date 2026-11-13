@@ -3,6 +3,7 @@
 # そのため、これらのファイルは「1行に1つ」だけにし、ほかの中身を足さない。取り込んだあとは型チェックとテストで確かめる。
 apps/api/src/app-modules.ts merge=union
 apps/api/src/db/schema.ts merge=union
+apps/api/src/durable-objects.ts merge=union
 apps/api/test/repo/routes.snapshot.txt merge=union
 apps/web/src/app-list.ts merge=union
 packages/shared/src/apps/app-list.ts merge=union
