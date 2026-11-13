@@ -56,7 +56,16 @@ function isRetryable(err: unknown): boolean {
  */
 export function useReception(source: ReceptionSource, enabled = true) {
   const queryClient = useQueryClient();
-  const snapshot = useQuery({ queryKey: source.queryKey, queryFn: source.snapshot, enabled });
+  const snapshot = useQuery({
+    queryKey: source.queryKey,
+    // 読んでいる間に知らせや自分の操作で新しい版を当てていたら、古いスナップショットで上書きしない
+    queryFn: async () => {
+      const fresh = await source.snapshot();
+      const current = queryClient.getQueryData<ReceptionSnapshot>(source.queryKey);
+      return current && current.version > fresh.version ? current : fresh;
+    },
+    enabled,
+  });
   const [pending, setPending] = useState<Record<string, PendingRecord>>({});
 
   const resync = useCallback(() => void queryClient.invalidateQueries({ queryKey: source.queryKey }), [queryClient, source.queryKey]);

@@ -46,7 +46,8 @@ export function PaypaySheet({
   onReceived: () => void;
   onClose: () => void;
 }) {
-  const qr = useQuery({ queryKey: qrKey, queryFn: loadQr, enabled: hasQr, staleTime: Infinity });
+  // 開くたびに読み直す（主催者がQRを差し替えたら、手伝う人の画面にも次に開いたときに出す）。読む間は前の画像を出しておく
+  const qr = useQuery({ queryKey: qrKey, queryFn: loadQr, enabled: hasQr, staleTime: 0 });
   const url = useObjectUrl(qr.data);
   return (
     <Dialog open onOpenChange={(v) => !v && onClose()}>

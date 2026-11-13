@@ -269,4 +269,32 @@ describe("会場の共有", () => {
     const [first, second] = mocks.walkIn.mock.calls;
     expect(second![1].clientRequestId).toBe(first![1].clientRequestId);
   });
+
+  it("読み直しの返事が、あとから当てた知らせより古い版なら、上書きしない", async () => {
+    renderReception();
+    await screen.findByRole("listitem", { name: /井上 そら/ });
+    let resolve: (v: ReceptionSnapshot) => void = () => {};
+    mocks.reception.mockReturnValueOnce(new Promise((r) => (resolve = r)));
+    // 版が飛んで読み直しが始まる（版5のまま）
+    act(() => mocks.live.onMessage!({ type: "resync", eventId: "e1", version: 6, at: "" }));
+    await waitFor(() => expect(mocks.reception).toHaveBeenCalledTimes(2));
+    // 読んでいる間に、版6の記録の知らせが届く
+    act(() => mocks.live.onMessage!({ type: "reception.recorded", eventId: "e1", version: 6, at: "", personId: "p2", record: recordOf("p2", "paypay") }));
+    expect(await screen.findByRole("listitem", { name: /井上 そら（受付済み）/ })).toBeInTheDocument();
+    // 読み直しの返事は版5（記録の前）
+    await act(async () => resolve(snapshot()));
+    await new Promise((r) => setTimeout(r, 20));
+    expect(screen.getByRole("listitem", { name: /井上 そら（受付済み）/ })).toBeInTheDocument();
+  });
+
+  it("PayPayのQRは、シートを開くたびに読み直す", async () => {
+    const user = userEvent.setup();
+    renderReception();
+    await screen.findByRole("listitem", { name: /松本 れい/ });
+    await user.click(within(row(/松本 れい/)).getByRole("button", { name: "PayPay" }));
+    await within(await screen.findByRole("dialog")).findByRole("img", { name: "PayPayの受け取り用QR" });
+    await user.click(within(screen.getByRole("dialog")).getByRole("button", { name: "やめる" }));
+    await user.click(within(row(/松本 れい/)).getByRole("button", { name: "PayPay" }));
+    await waitFor(() => expect(mocks.paypayQr).toHaveBeenCalledTimes(2));
+  });
 });
