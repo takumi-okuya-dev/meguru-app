@@ -1,11 +1,14 @@
 // 集金管理（apps/collect）の表の定義（specs/collect/001-event-day-collection data-model.md 2、research.md R1・R2）。
 // 表はスキーマ collect に置き、共通の表（users など）への外部キーは張らない。主催者は owner_user_id に値として持ち、
 // 退会の片づけは出来事（user.withdrawn）で集金管理が行う（docs/app-separation.md 4）。外部キーは集金管理の表の中だけに張る。
-// PR1 の分（イベント・料金の区分・名簿・主催者の既定値・受け取った出来事）と、PR2 の分（受付の記録・受付用リンク・手伝う人・端末）。
-// 精算・まとめの表は PR3 で足す。
+// PR1 の分（イベント・料金の区分・名簿・主催者の既定値・受け取った出来事）、PR2 の分（受付の記録・受付用リンク・手伝う人・端末）、
+// PR3 の分（精算・イベントのまとめ）。
 import { sql } from "drizzle-orm";
-import { bigint, boolean, check, index, integer, pgSchema, smallint, text, timestamp, uniqueIndex, uuid, type AnyPgColumn } from "drizzle-orm/pg-core";
+import { bigint, boolean, check, index, integer, jsonb, pgSchema, primaryKey, smallint, text, timestamp, uniqueIndex, uuid, type AnyPgColumn } from "drizzle-orm/pg-core";
 import {
+  type ByMethod,
+  type CountAmount,
+  type MediaStats,
   COLLECT_LIMITS,
   COLLECT_MEDIA,
   COLLECT_METHODS,
@@ -239,4 +242,45 @@ export const collectHelperDevices = collectSchema.table(
     lastSeenAt: timestamp("last_seen_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [index("helper_devices_helper_idx").on(t.helperId)],
+);
+
+/**
+ * 精算（data-model.md 2-7）。受け取った人ごとの現金の合計（あるはずの額）は、受付の記録から毎回数える。
+ * 精算したときの合計を expected_at_settle に残し、そのあとで記録が変わったら「精算したあとで変わった」と出す。
+ */
+export const collectSettlements = collectSchema.table(
+  "settlements",
+  {
+    eventId: uuid("event_id")
+      .notNull()
+      .references(() => collectEvents.id, { onDelete: "cascade" }),
+    // "owner" か、手伝う人の番号
+    receiverKey: text("receiver_key").notNull(),
+    countedAmount: integer("counted_amount"),
+    settledAt: timestamp("settled_at", { withTimezone: true }),
+    expectedAtSettle: integer("expected_at_settle"),
+  },
+  (t) => [
+    primaryKey({ columns: [t.eventId, t.receiverKey] }),
+    check("settlements_counted_amount_range", sql`${t.countedAmount} >= 0`),
+    check("settlements_settled_pair", sql`(${t.settledAt} IS NULL) = (${t.expectedAtSettle} IS NULL)`),
+  ],
+);
+
+/** イベントのまとめ（data-model.md 2-9、R11）。イベントを消すときに数字だけを残す。参加者・手伝う人の名前は入れない（FR-014）。 */
+export const collectEventSummaries = collectSchema.table(
+  "event_summaries",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    ownerUserId: uuid("owner_user_id").notNull(),
+    name: text("name").notNull(),
+    startsAt: timestamp("starts_at", { withTimezone: true }).notNull(),
+    rosterCount: integer("roster_count").notNull(),
+    attendedCount: integer("attended_count").notNull(),
+    byMethod: jsonb("by_method").$type<ByMethod>().notNull(),
+    byMedia: jsonb("by_media").$type<MediaStats[]>().notNull(),
+    awaitingTransfer: jsonb("awaiting_transfer").$type<CountAmount>().notNull(),
+    eventDeletedAt: timestamp("event_deleted_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("event_summaries_owner_idx").on(t.ownerUserId, t.startsAt)],
 );

@@ -3,6 +3,7 @@ import { Hono, type MiddlewareHandler } from "hono";
 import { COLLECT_APP } from "@meguru/shared";
 import type { ApiAppModule, AppEnv } from "../../platform";
 import { collectOwner } from "./access";
+import { closingRoutes } from "./closing/closing-routes";
 import { eventRoutes } from "./events/event-routes";
 import { helperOwnerRoutes, helperPublicRoutes } from "./helpers/helper-routes";
 import { receptionLinkTokenKeys } from "./helpers/link-tokens";
@@ -11,6 +12,8 @@ import { receptionRoutes } from "./reception/reception-routes";
 import { collectMeRoutes } from "./me/collect-me";
 import { rosterRoutes } from "./roster/roster-routes";
 import { settingsRoutes } from "./settings/settings-routes";
+import { summaryRoutes } from "./summaries/summary-routes";
+import { transferRoutes } from "./transfers/transfer-routes";
 
 import { registerCollect } from "./register";
 
@@ -35,6 +38,9 @@ function collectRoutes(authed: MiddlewareHandler<AppEnv>) {
     .route("/", receptionRoutes(owner))
     .route("/", helperOwnerRoutes(owner))
     .route("/", liveRoutes(owner))
+    .route("/", closingRoutes(owner))
+    .route("/", transferRoutes(owner))
+    .route("/", summaryRoutes(owner))
     .route("/", helperPublicRoutes());
 }
 
