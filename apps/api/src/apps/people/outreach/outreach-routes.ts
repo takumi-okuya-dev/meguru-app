@@ -5,7 +5,7 @@ import { createDb } from "../../../kernel/db/client";
 import { parseBody, parseQuery } from "../../../kernel/validate";
 import type { AppEnv } from "../../../platform";
 import { listCandidates } from "./candidate-service";
-import { createInviteOutreach, deleteOutreach, updateOutreachStage } from "./outreach-service";
+import { createOutreach, deleteOutreach, updateOutreachStage } from "./outreach-service";
 
 /**
  * 誘う候補と声かけの道筋（ログインと利用の許可の関所は、上の peopleRoutes が付ける）。
@@ -20,8 +20,9 @@ export function outreachRoutes() {
     })
     .post("/outreaches", async (c) => {
       const input = await parseBody(outreachCreateSchema, c.req.json());
-      const { outreach, created } = await createInviteOutreach(c.env, c.get("user").id, input);
-      return c.json({ outreach }, created ? 201 : 200);
+      const { outreach, created } = await createOutreach(c.env, c.get("user").id, input);
+      // 同じ声かけがもうあれば 200（created: false）。画面が「もう記録があります」と出せるよう、本文にも書く
+      return c.json({ outreach, created }, created ? 201 : 200);
     })
     .patch("/outreaches/:outreachId", async (c) => {
       const { stage } = await parseBody(outreachUpdateSchema, c.req.json());
