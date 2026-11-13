@@ -230,6 +230,40 @@ export async function requestBlob(path: string, init: RequestOptions = {}): Prom
   return (await send(path, init)).blob();
 }
 
+/** 受け取ったファイルと、応答の見出し（API が CORS で出している見出しだけ読める。apps/api/src/app.ts の exposeHeaders）。 */
+export type ReceivedFile = { blob: Blob; filename: string | null; headers: Headers };
+
+/**
+ * Content-Disposition からファイル名を読む（filename* の UTF-8 を先に、なければ filename）。
+ * @param value - 見出しの値
+ * @returns ファイル名（なければ null）
+ */
+export function dispositionFilename(value: string | null): string | null {
+  if (!value) return null;
+  const star = /filename\*\s*=\s*UTF-8''([^;]+)/i.exec(value);
+  if (star) {
+    try {
+      return decodeURIComponent(star[1]!.trim());
+    } catch {
+      // 形の崩れた filename* は読まず、filename を使う
+    }
+  }
+  const plain = /filename\s*=\s*(?:"([^"]*)"|([^;]+))/i.exec(value);
+  const name = (plain?.[1] ?? plain?.[2] ?? "").trim();
+  return name === "" ? null : name;
+}
+
+/**
+ * ファイルを書き出す API を呼び、中身とファイル名・見出しを返す（CSV の書き出しなど）。トークンとエラーの扱いは request と同じ。
+ * @param path - /api から始まる道筋
+ * @param init - fetch の設定
+ * @returns 受け取ったファイル
+ */
+export async function requestFile(path: string, init: RequestOptions = {}): Promise<ReceivedFile> {
+  const res = await send(path, init);
+  return { blob: await res.blob(), filename: dispositionFilename(res.headers.get("Content-Disposition")), headers: res.headers };
+}
+
 
 /** API の呼び出し。レスポンスは共通のスキーマで検証する。 */
 export const api = {

@@ -42,7 +42,7 @@ import type {
   PeopleStats,
 } from "@meguru/shared/people";
 import { z } from "zod";
-import { request, requestBlob } from "@/lib/api-client";
+import { request, requestFile } from "@/lib/api-client";
 
 /**
  * 応答を確かめずに、型だけを当てるスキーマ（応答の形は API と同じ共通の型で決めている）。
@@ -89,7 +89,7 @@ export type PersonUpdateInput = {
 export type ContactLogInput = { contactedOn: string; channel: Exclude<ContactChannel, "done">; note: string };
 
 /** 書き出したファイル。 */
-export type ExportedFile = { blob: Blob; filename: string };
+export type ExportedFile = { blob: Blob; filename: string; truncated: boolean };
 
 /** 誘う候補の目的・誘う会・前に来た・人の一覧と同じ絞り込み（eventId は誘う会。人は絞らない）。 */
 export type CandidateParams = PersonListParams & { purpose: OutreachPurpose; visitedOwn?: boolean };
@@ -161,7 +161,7 @@ export function exportBody(params: PersonListParams): Record<string, unknown> {
 
 /**
  * 書き出しのファイル名（API の Content-Disposition と同じ形：people-YYYYMMDD.csv。日本時間の今日）。
- * 共通の requestBlob は応答の見出しを返さず、見出しは別のオリジンから読めない（CORS）ので、画面でも同じ形で作る。
+ * ふだんは API の見出しのファイル名を使う。見出しが読めなかったときだけ、これを使う。
  * @param now - 今の時刻
  * @returns ファイル名
  */
@@ -329,8 +329,9 @@ export const peopleApi = {
     (await request(`${personUrl(id)}/links`, typed<{ links: PersonLinks }>(), withBody("PUT", links))).links,
   // ---- 002：会ごとの声かけの一覧・書き出し ----
   outreachBoard: (eventId: string) => request(`${eventUrl(eventId)}/outreach-board`, typed<OutreachBoard>()),
-  exportPersons: async (params: PersonListParams): Promise<ExportedFile> => ({
-    blob: await requestBlob("/api/people/persons/export", withBody("POST", exportBody(params))),
-    filename: exportFilename(),
-  }),
+  exportPersons: async (params: PersonListParams): Promise<ExportedFile> => {
+    const file = await requestFile("/api/people/persons/export", withBody("POST", exportBody(params)));
+    // 1万人で切ったかは API の見出しで分かる（書き出したときの人数で決まる）
+    return { blob: file.blob, filename: file.filename ?? exportFilename(), truncated: file.headers.get("X-Export-Truncated") === "true" };
+  },
 };

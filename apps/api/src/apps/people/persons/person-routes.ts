@@ -47,7 +47,7 @@ export function personRoutes() {
         "Content-Type": "text/csv; charset=utf-8",
         "Content-Disposition": `attachment; filename="${filename}"`,
         "Cache-Control": "no-store",
-        "X-People-Export-Truncated": truncated ? "true" : "false",
+        "X-Export-Truncated": truncated ? "true" : "false",
       });
     })
     .post("/persons", async (c) => {

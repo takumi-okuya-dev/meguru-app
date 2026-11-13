@@ -91,6 +91,9 @@ export function createApp(deps: AppDeps = defaultDeps) {
       allowHeaders: ["Authorization", "Content-Type", "X-Referral-Code", "X-Collect-Device"],
       // PATCH：チーム名・任せる範囲・改善メモ（specs/006・008。PR #9 のCodexレビュー）
       allowMethods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+      // 画面から読む応答の見出し（別のオリジンからは、ここに書いたものしか読めない）。ファイルの書き出しのファイル名と、
+      // 上限で切ったか（人物メモの書き出しなど。アプリの名前を付けない共通の見出しにする）
+      exposeHeaders: ["Content-Disposition", "X-Export-Truncated"],
       credentials: false,
     });
     return corsMiddleware(c, next);

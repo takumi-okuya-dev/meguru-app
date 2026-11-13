@@ -3,7 +3,6 @@
 // 人の行（100人ずつ）・「人を足す」・「書き出す」。
 // 探す言葉と絞り込みは画面の中にだけ置く（URLやブラウザの保存に名前・答えを残さない。R18）。並べ方はAPIで覚える（どの端末でも同じ。FR-103）。
 import {
-  EXPORT_LIMIT,
   PERSON_GROUPS,
   PERSON_SORTS,
   PERSONS_PAGE_SIZE,
@@ -19,6 +18,7 @@ import { toast } from "sonner";
 import { Link } from "react-router";
 import { Button } from "@/components/ui/button";
 import { describeError } from "@/lib/api-client";
+import { saveFile } from "@/lib/save-file";
 import { cn } from "@/lib/utils";
 import { PageBody, PageHeader } from "@/shell";
 import { fieldClass } from "../components/EventForm";
@@ -30,7 +30,6 @@ import { PersonRow } from "../components/person/PersonRow";
 import { PersonSearchBox } from "../components/person/PersonSearchBox";
 import { useDebouncedValue } from "../components/person/use-debounced-value";
 import { peopleApi, type PersonListParams } from "../lib/api";
-import { saveFile } from "../lib/save-file";
 import { importPath, newPersonPath } from "../lib/paths";
 import { peopleQueryKeys } from "../lib/query-keys";
 
@@ -204,11 +203,11 @@ export function PeopleListPage() {
   // 書き出しは、画面に出ている一覧と同じ条件のときだけ押せる（探す言葉の待ちの途中・前の結果を出したまま読んでいる間は押せない）
   const settled = persons.isSuccess && !persons.isPlaceholderData && text.trim() === q;
   const exportList = useMutation({
-    mutationFn: async ({ params: p, total }: { params: PersonListParams; total: number }) => ({ file: await peopleApi.exportPersons(p), total }),
-    onSuccess: ({ file, total }) => {
+    mutationFn: (p: PersonListParams) => peopleApi.exportPersons(p),
+    onSuccess: (file) => {
       saveFile(file.blob, file.filename);
-      // 1万人を超えると、APIは最初の1万人だけを書き出す（書き出したときの条件の人数で決める）
-      if (total > EXPORT_LIMIT) toast.warning("最初の1万人だけ書き出しました。");
+      // 1万人を超えると、APIは最初の1万人だけを書き出す（API の見出しで分かる）
+      if (file.truncated) toast.warning("最初の1万人だけ書き出しました。");
       else toast.success("書き出しました。");
     },
   });
@@ -249,7 +248,7 @@ export function PeopleListPage() {
           <div className="flex flex-wrap items-center gap-2">
             <Button type="button" variant="outline" className="h-11 rounded-full md:h-9" disabled={exportList.isPending || !settled}
               onClick={() => {
-                if (settled) exportList.mutate({ params, total: persons.data.total });
+                if (settled) exportList.mutate(params);
               }}
             >
               <DownloadIcon /> 書き出す
