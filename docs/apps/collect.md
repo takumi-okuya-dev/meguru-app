@@ -23,4 +23,4 @@
 
 | モジュール | 主な中身 |
 |---|---|
-| `apps/collect/` | `index.ts`（`collectApp`）・`routes.tsx`（利用の許可のない人には「使えない」の案内だけ）・`sidebar/CollectShell.tsx`（イベント・作る・開いているイベントの名簿・PayPay・振込先の設定）・`pages/`（イベントの一覧・作る・直す・名簿・設定）・`components/`（イベントの入力欄・名簿の続けて入れる欄・まとめて貼る・直す）・`lib/`（`api.ts`の`collectApi`・`query-keys.ts`・`paths.ts`・`event-time.ts`・`image.ts`） |
+| `apps/collect/` | `index.ts`（`collectApp`。ログインのいらない`publicRoutes`に手伝う人の受付`/collect/r/:token`）・`routes.tsx`（利用の許可のない人には「使えない」の案内だけ）・`sidebar/CollectShell.tsx`（イベント・作る・開いているイベントの名簿・受付・受付の手伝い・PayPay・振込先の設定）・`pages/`（イベントの一覧・作る・直す・名簿・受付・受付の手伝い・手伝う人の受付・設定）・`components/`（イベントの入力欄・名簿の続けて入れる欄・まとめて貼る・直す・`reception/`の受付の画面の中身（主催者と手伝う人で同じもの）・`QrCode.tsx`）・`lib/`（`api.ts`の`collectApi`・`helper-api.ts`（手伝う人の呼び出し。共通の`request`は401でログインへ移すので使わない）・`live.ts`（会場の共有のつなぎ方）・`use-reception.ts`（受付の状態と、知らせ・応答の当て方）・`reception-model.ts`・`device-store.ts`・`query-keys.ts`・`paths.ts`・`event-time.ts`・`image.ts`） |

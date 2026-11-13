@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { formatJstWithWeekday } from "@/lib/format";
 import { PageBody, PageHeader } from "@/shell";
 import { collectApi } from "../lib/api";
-import { collectSettingsPath, eventEditPath, newEventPath, rosterPath } from "../lib/paths";
+import { collectSettingsPath, eventEditPath, newEventPath, receptionPath, rosterPath } from "../lib/paths";
 import { collectQueryKeys } from "../lib/query-keys";
 
 /**
@@ -90,6 +90,9 @@ export function EventsPage() {
                   </dl>
                 </div>
                 <div className="flex flex-wrap gap-2">
+                  <Button asChild size="sm">
+                    <Link to={receptionPath(e.id)}>受付</Link>
+                  </Button>
                   <Button asChild size="sm" variant="outline">
                     <Link to={rosterPath(e.id)}>名簿</Link>
                   </Button>
