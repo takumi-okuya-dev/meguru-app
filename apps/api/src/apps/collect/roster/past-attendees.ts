@@ -32,9 +32,12 @@ export async function findPastAttendees(db: Db, ownerUserId: string, eventId: st
   if (key === "") return [];
   const pattern = `%${escapeLike(key)}%`;
   const here = db.select({ nameKey: collectRosterPeople.nameKey }).from(collectRosterPeople).where(eq(collectRosterPeople.eventId, event.id));
-  // 同じ名前ごとに、いまのイベントより前に開いたイベントのうち一番新しいもの（FR-027「過去のイベント」）
+  // 同じ名前ごとに、いまのイベントより前に開いたイベントのうち一番新しいもの（FR-027「過去のイベント」）を先に選び、
+  // そのあとで探す文字で絞る（先に絞ると、ふりがなが変わった人で、古いイベントと古いふりがなを返してしまう。research.md R9）
   const latest = db
     .selectDistinctOn([collectRosterPeople.nameKey], {
+      nameKey: sql<string>`${collectRosterPeople.nameKey}`.as("person_name_key"),
+      kanaKey: sql<string | null>`${collectRosterPeople.kanaKey}`.as("person_kana_key"),
       name: sql<string>`${collectRosterPeople.name}`.as("person_name"),
       kana: sql<string | null>`${collectRosterPeople.kana}`.as("person_kana"),
       lastEventName: sql<string>`${collectEvents.name}`.as("last_event_name"),
@@ -42,18 +45,16 @@ export async function findPastAttendees(db: Db, ownerUserId: string, eventId: st
     })
     .from(collectRosterPeople)
     .innerJoin(collectEvents, eq(collectEvents.id, collectRosterPeople.eventId))
-    .where(
-      and(
-        eq(collectEvents.ownerUserId, ownerUserId),
-        lt(collectEvents.startsAt, event.startsAt),
-        or(sql`${collectRosterPeople.nameKey} LIKE ${pattern}`, sql`${collectRosterPeople.kanaKey} LIKE ${pattern}`),
-        notInArray(collectRosterPeople.nameKey, here),
-      ),
-    )
+    .where(and(eq(collectEvents.ownerUserId, ownerUserId), lt(collectEvents.startsAt, event.startsAt), notInArray(collectRosterPeople.nameKey, here)))
     .orderBy(collectRosterPeople.nameKey, desc(collectEvents.startsAt), desc(collectRosterPeople.createdAt))
     .as("latest");
   // 最後に来たイベントの新しい順に、5件だけ読む
-  const rows = await db.select().from(latest).orderBy(desc(latest.lastEventStartsAt), latest.name).limit(COLLECT_LIMITS.pastAttendees);
+  const rows = await db
+    .select()
+    .from(latest)
+    .where(or(sql`${latest.nameKey} LIKE ${pattern}`, sql`${latest.kanaKey} LIKE ${pattern}`))
+    .orderBy(desc(latest.lastEventStartsAt), latest.name)
+    .limit(COLLECT_LIMITS.pastAttendees);
   return rows.map((r) => ({
     name: r.name,
     kana: r.kana,

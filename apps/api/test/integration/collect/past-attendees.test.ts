@@ -44,6 +44,16 @@ describe("前回の参加者", () => {
     ]);
   });
 
+  it("ふりがなが変わった人は、古いふりがなで探しても、最後に来たイベントと今のふりがなを返す", async () => {
+    const sep = await createCollectEvent(app, "o1", { name: "9月の会", startsAt: "2026-09-10T10:00:00.000Z", endsAt: null });
+    const oct = await createCollectEvent(app, "o1", { name: "10月の会", startsAt: "2026-10-10T10:00:00.000Z", endsAt: null });
+    const now = await createCollectEvent(app, "o1");
+    await addTo("o1", sep, "松本 れい", "まつもと れい");
+    await addTo("o1", oct, "松本 れい", "まつもと あきら");
+    const { body } = await search("o1", now.id, "れい");
+    expect(body.candidates).toEqual([{ name: "松本 れい", kana: "まつもと あきら", lastEventName: "10月の会", lastEventStartsAt: "2026-10-10T10:00:00.000Z" }]);
+  });
+
   it("いまのイベントにいる人・ほかの主催者の名簿は出さない。最大5件", async () => {
     const past = await createCollectEvent(app, "o1", { name: "前の会", startsAt: "2026-10-10T10:00:00.000Z", endsAt: null });
     const now = await createCollectEvent(app, "o1");

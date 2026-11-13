@@ -7,6 +7,7 @@ import {
   pastAttendeesQuerySchema,
   putCollectSettingsRequestSchema,
   updateCollectEventRequestSchema,
+  updateRosterPersonRequestSchema,
 } from "../../../src";
 
 const TIER_ID = "3f8b7c1e-2d4a-4b6f-9a1c-5e7d8f9a0b1c";
@@ -62,6 +63,12 @@ describe("名簿の入力", () => {
     expect(addRosterPersonRequestSchema.safeParse({ ...ok, kana: "あ".repeat(51) }).success).toBe(false);
     expect(addRosterPersonRequestSchema.safeParse({ ...ok, memo: "あ".repeat(201) }).success).toBe(false);
     expect(addRosterPersonRequestSchema.safeParse({ ...ok, media: "line" }).success).toBe(false);
+  });
+
+  it("名簿の人を直すときは、1つは項目が要る（知らない項目だけも不可）", () => {
+    expect(updateRosterPersonRequestSchema.safeParse({}).success).toBe(false);
+    expect(updateRosterPersonRequestSchema.safeParse({ unknown: 1 }).success).toBe(false);
+    expect(updateRosterPersonRequestSchema.safeParse({ memo: "" }).success).toBe(true);
   });
 
   it("まとめて足すのは1〜300行", () => {

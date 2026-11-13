@@ -192,14 +192,16 @@ export const bulkAddRosterRequestSchema = z.object({
 /** POST /api/collect/events/:eventId/roster/bulk の入力。 */
 export type BulkAddRosterRequest = z.infer<typeof bulkAddRosterRequestSchema>;
 
-/** PATCH /api/collect/events/:eventId/roster/:personId の入力（FR-025。どの項目も省ける）。 */
-export const updateRosterPersonRequestSchema = z.object({
-  name: personFields.name.optional(),
-  kana: personFields.kana.optional(),
-  media: personFields.media.optional(),
-  priceTierId: personFields.priceTierId.optional(),
-  memo: personFields.memo.optional(),
-});
+/** PATCH /api/collect/events/:eventId/roster/:personId の入力（FR-025。どの項目も省けるが、1つは要る）。 */
+export const updateRosterPersonRequestSchema = z
+  .object({
+    name: personFields.name.optional(),
+    kana: personFields.kana.optional(),
+    media: personFields.media.optional(),
+    priceTierId: personFields.priceTierId.optional(),
+    memo: personFields.memo.optional(),
+  })
+  .refine((v) => Object.values(v).some((x) => x !== undefined), { message: "nothing to update", path: ["name"] });
 /** PATCH /api/collect/events/:eventId/roster/:personId の入力。 */
 export type UpdateRosterPersonRequest = z.infer<typeof updateRosterPersonRequestSchema>;
 

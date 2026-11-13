@@ -96,6 +96,11 @@ describe("直す・消す", () => {
     expect(body.version).toBe(2);
   });
 
+  it("何も直さない PATCH は 400（500 にしない）", async () => {
+    const { person } = (await (await add({ name: "松本 れい" })).json()) as { person: Person };
+    expect(await errorOf(await call(app, "PATCH", `/api/collect/events/${event.id}/roster/${person.id}`, { user: "o1", body: {} }))).toEqual([400, "VALIDATION_FAILED"]);
+  });
+
   it("ない人・ほかのイベントの人は 404", async () => {
     const other = await createCollectEvent(app, "o1");
     const { person } = (await (
