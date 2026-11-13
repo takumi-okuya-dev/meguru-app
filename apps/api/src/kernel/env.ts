@@ -46,4 +46,11 @@ export interface Env {
   STRIPE_PORTAL_CONFIGURATION_ID?: string;
   /** 適格請求書の登録をしたときの10%（内税）の税率（txr_） */
   STRIPE_TAX_RATE_ID?: string;
+  /** 集金管理の会場の共有（Durable Object CollectLiveRoom。specs/collect/001 research.md R4） */
+  COLLECT_LIVE: DurableObjectNamespace;
+  /**
+   * 会場の共有の入場券に署名する秘密（Secretで入れる。R5）。入れていない間は、会場の共有だけが使えない
+   * （入場券の道筋が 503 CONFIG_ERROR。画面は15秒ごとの読み直しで動く）。ほかの道筋は止めない
+   */
+  COLLECT_LIVE_SECRET?: string;
 }

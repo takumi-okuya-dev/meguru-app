@@ -14,8 +14,12 @@ tester.run("module-boundaries（集金管理）", rule, {
     at("apps/collect/events/event-service.ts", 'import { loadOwnedEvent } from "../access";'),
     at("db/schema.ts", 'export * from "../apps/collect/schema";'),
     at("app-modules.ts", 'import { collectModule } from "./apps/collect";'),
+    // Durable Object の一覧（組み立て）はアプリの入口から書き出す
+    at("durable-objects.ts", 'export { CollectLiveRoom } from "./apps/collect";'),
   ],
   invalid: [
+    // Durable Object の一覧も、アプリの中のファイルは読めない
+    bad("durable-objects.ts", 'export { CollectLiveRoom } from "./apps/collect/live/live-room";', "notEntry"),
     // 共通の表の定義・Threadsのモジュールを読めない
     bad(
       "apps/collect/events/event-service.ts",

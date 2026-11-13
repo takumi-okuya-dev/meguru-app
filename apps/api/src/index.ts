@@ -8,6 +8,9 @@ import { validateConfig } from "./kernel/config";
 import { logger, setLogAppEnv } from "./kernel/logger";
 import { runDailyJobs } from "./jobs/daily-jobs";
 
+// アプリの Durable Object（一覧は durable-objects.ts。wrangler.toml の結びつけと同じ名前で書き出す）
+export * from "./durable-objects";
+
 const app = createApp();
 
 /** 自動投稿の Cron（specs/005-auto-post contracts/api.md「定期処理」）。それ以外は日次の処理。 */

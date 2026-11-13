@@ -127,10 +127,19 @@ describe("wrangler.toml の環境ごとの設定", () => {
     expect(one("env.staging.vars")?.THREADS_APP_ID).not.toBe('"000000000000000"');
   });
 
+  // 集金管理の会場の共有（specs/collect/001-event-day-collection contracts/realtime.md 5）。Durable Object の結びつけと
+  // マイグレーションは名前付きの環境に受け継がれないので、3か所すべてにあることを確かめる
+  it.each(["", "env.staging.", "env.production."])("[[%sdurable_objects.bindings]] と migrations に CollectLiveRoom がある", (prefix) => {
+    const binding = all(`${prefix}durable_objects.bindings`).find((b) => b.name === '"COLLECT_LIVE"');
+    expect(binding?.class_name, `${prefix || "一番上の"} COLLECT_LIVE の結びつけがない`).toBe('"CollectLiveRoom"');
+    const migration = all(`${prefix}migrations`).find((m) => m.new_sqlite_classes?.includes('"CollectLiveRoom"'));
+    expect(migration, `${prefix || "一番上の"} CollectLiveRoom のマイグレーションがない`).toBeDefined();
+  });
+
   it("秘密情報は wrangler.toml に書かれていない", () => {
     expect(toml).not.toMatch(/sk_(live|test)_[A-Za-z0-9]{10,}/);
     expect(toml).not.toMatch(/whsec_[A-Za-z0-9]{10,}/);
     expect(toml).not.toMatch(/postgres(ql)?:\/\//);
-    expect(toml).not.toMatch(/^\s*(TOKEN_ENCRYPTION_KEYS|IDENTIFIER_HASH_KEY|THREADS_APP_SECRET|CLERK_SECRET_KEY)\s*=/m);
+    expect(toml).not.toMatch(/^\s*(TOKEN_ENCRYPTION_KEYS|IDENTIFIER_HASH_KEY|THREADS_APP_SECRET|CLERK_SECRET_KEY|COLLECT_LIVE_SECRET)\s*=/m);
   });
 });

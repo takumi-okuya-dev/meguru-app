@@ -2,11 +2,25 @@
 // アプリを足すときに共通の場所（app.ts・index.ts・jobs/daily-jobs.ts）を直さずに済むようにして、並行開発のぶつかりを減らす。
 import type { AppId } from "@meguru/shared";
 import type { Hono, MiddlewareHandler } from "hono";
+import type { TokenCipher } from "../../kernel/crypto";
 import type { Env } from "../../kernel/env";
 import type { AppEnv } from "../identity/auth";
 
 /** 毎日の処理の1つ（名前と、走らせる関数）。 */
 export type DailyJob = readonly [name: string, run: () => Promise<unknown>];
+
+/**
+ * アプリが共通の鍵（TOKEN_ENCRYPTION_KEYS）で暗号化して持つ値の、鍵の入れ替えの手助け（jobs/key-rotation.ts が回す）。
+ * 鍵の入れ替えをアプリの表ごとに書き足さずに済むようにする。
+ */
+export type AppTokenKeys = {
+  /** 使っている鍵の版（鍵リングに欠けている版があれば、入れ替えを始めない） */
+  versionsInUse: (env: Env) => Promise<number[]>;
+  /** 今の版でない行を、今の鍵で暗号化し直す（その間に書き換わった行は飛ばす） */
+  rotate: (env: Env, cipher: TokenCipher) => Promise<{ rotated: number; skipped: number }>;
+  /** 今の版でない行の残りの数 */
+  remaining: (env: Env, currentVersion: number) => Promise<number>;
+};
 
 /** API のアプリの入口。各アプリの index.ts が1つ出す。 */
 export type ApiAppModule = {
@@ -18,6 +32,8 @@ export type ApiAppModule = {
   routes?: (authed: MiddlewareHandler<AppEnv>) => Hono<AppEnv>;
   /** 毎日の処理（利用の数の数え直しなど）。共通の料金の合わせ直しの前に、アプリの一覧の順に走る */
   dailyJobs?: (env: Env, now: Date) => readonly DailyJob[];
+  /** 共通の鍵で暗号化して持つ値（鍵の入れ替えで暗号化し直す） */
+  tokenKeys?: AppTokenKeys;
 };
 
 /**

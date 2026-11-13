@@ -52,3 +52,7 @@ THREADS_ACCESS_MODE=testers
 # どの環境で動いているか（specs/015-deploy-environments）。production / staging / development の3つだけ
 # 本番とステージングは wrangler.toml の [env.*].vars で入る。手元は development
 APP_ENV=development
+
+# 集金管理の会場の共有の入場券に署名する秘密（specs/collect/001-event-day-collection research.md R5）。32バイト以上の乱数
+# （例：openssl rand -base64 32）。入れなくてもAPIは動き、会場の共有だけが使えない（画面は15秒ごとに読み直す）
+# COLLECT_LIVE_SECRET=

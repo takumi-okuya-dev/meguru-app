@@ -460,6 +460,11 @@ done
 
 - `TOKEN_ENCRYPTION_KEYS`・`IDENTIFIER_HASH_KEY`は、**環境ごとに別の値**を作ります（作り方は「4. 鍵を作る」）。
 - 秘密でない値（`WEB_ORIGIN`・`THREADS_REDIRECT_URI`・`CLERK_PUBLISHABLE_KEY`・`THREADS_APP_ID`・`STRIPE_PRICE_ID`など）は、`wrangler.toml`の`[env.*].vars`を直してPRでマージします。
+- 集金管理の会場の共有（specs/collect/001-event-day-collection research.md R5）の入場券に署名する秘密`COLLECT_LIVE_SECRET`も、環境ごとに別の値で入れます。入れなくてもAPIは動き、会場の共有だけが使えません（受付の画面は15秒ごとの読み直しで動き、ほかの人の記録が出るのが遅れます）。
+
+  ```bash
+  openssl rand -base64 32 | tr -d '\n' | pnpm --filter api exec wrangler secret put COLLECT_LIVE_SECRET --env staging   # 本番は --env production
+  ```
 
 ### 9-7. Clerk（T024・T031）
 
