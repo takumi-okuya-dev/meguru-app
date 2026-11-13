@@ -2,6 +2,7 @@
 // APIの基本のURL・認証のトークン・エラーの扱いは、共通の部品（lib/api-client.ts の request）を使う。
 // 応答の形は @meguru/shared/people の型（応答の zod スキーマは共通にないので、型だけを当てる）。
 import type {
+  CandidateList,
   EventDeletePreview,
   ImportPreview,
   ImportResult,
@@ -21,6 +22,11 @@ import type {
   Consent,
   ConsentPurpose,
   ImportField,
+  Outreach,
+  OutreachPurpose,
+  OutreachStage,
+  PeopleSettings,
+  PeopleStats,
 } from "@meguru/shared/people";
 import { z } from "zod";
 import { request } from "@/lib/api-client";
@@ -58,13 +64,21 @@ export type PersonCreateInput = { realName?: string; lineName?: string; eventId?
 /** 人を直すの入力（本名の null は本名を消す。メモの空は null）。 */
 export type PersonUpdateInput = { realName?: string | null; memoAppearance?: string | null; memoTalk?: string | null };
 
+/** 誘う候補の目的・誘う会・前に来た・人の一覧と同じ絞り込み（eventId は誘う会。人は絞らない）。 */
+export type CandidateParams = PersonListParams & { purpose: OutreachPurpose; visitedOwn?: boolean };
+
+/** 声かけを始めるの入力（PR3 は交流会への誘いだけ）。 */
+export type OutreachCreateInput = { personId: string; eventId: string };
+
+/** 設定を直すの入力（省いた項目は変えない。型の null は初めの型、目標の null は目標なし）。 */
+export type SettingsUpdateInput = Partial<PeopleSettings>;
+
 /**
- * 人の一覧のクエリの文字を作る（next・wanted・career はくり返す）。
+ * 人の一覧と同じ絞り込みを、クエリに足す（next・wanted・career はくり返す）。
+ * @param sp - 足す先
  * @param params - 探す言葉と絞り込み
- * @returns `?…`（何もなければ空）
  */
-export function personListSearch(params: PersonListParams): string {
-  const sp = new URLSearchParams();
+function appendListParams(sp: URLSearchParams, params: PersonListParams): void {
   if (params.q && params.q.trim() !== "") sp.set("q", params.q.trim());
   if (params.eventId) sp.set("eventId", params.eventId);
   for (const v of params.next ?? []) sp.append("next", v);
@@ -73,8 +87,40 @@ export function personListSearch(params: PersonListParams): string {
   if (params.lastMetFrom) sp.set("lastMetFrom", params.lastMetFrom);
   if (params.lastMetTo) sp.set("lastMetTo", params.lastMetTo);
   if (params.offset) sp.set("offset", String(params.offset));
+}
+
+/**
+ * クエリの文字にする。
+ * @param sp - クエリ
+ * @returns `?…`（何もなければ空）
+ */
+function toSearch(sp: URLSearchParams): string {
   const text = sp.toString();
   return text === "" ? "" : `?${text}`;
+}
+
+/**
+ * 人の一覧のクエリの文字を作る（next・wanted・career はくり返す）。
+ * @param params - 探す言葉と絞り込み
+ * @returns `?…`（何もなければ空）
+ */
+export function personListSearch(params: PersonListParams): string {
+  const sp = new URLSearchParams();
+  appendListParams(sp, params);
+  return toSearch(sp);
+}
+
+/**
+ * 誘う候補のクエリの文字を作る。誘う会（eventId）は交流会への誘いのときだけ送る。
+ * @param params - 目的・誘う会・前に来た・絞り込み
+ * @returns `?…`
+ */
+export function candidateSearch(params: CandidateParams): string {
+  const { purpose, visitedOwn, eventId, ...rest } = params;
+  const sp = new URLSearchParams({ purpose });
+  appendListParams(sp, { ...rest, ...(purpose === "invite" && eventId ? { eventId } : {}) });
+  if (visitedOwn) sp.set("visitedOwn", "true");
+  return toSearch(sp);
 }
 
 /**
@@ -105,6 +151,13 @@ const importUrl = (id: string) => `/api/people/imports/${encodeURIComponent(id)}
  * @returns 道筋
  */
 const personUrl = (id: string) => `/api/people/persons/${encodeURIComponent(id)}`;
+
+/**
+ * 声かけの道筋。
+ * @param id - 声かけのID
+ * @returns 道筋
+ */
+const outreachUrl = (id: string) => `/api/people/outreaches/${encodeURIComponent(id)}`;
 
 /** 人物メモのAPIの呼び出し。 */
 export const peopleApi = {
@@ -145,4 +198,15 @@ export const peopleApi = {
   splitResponse: async (responseId: string) =>
     (await request(`/api/people/responses/${encodeURIComponent(responseId)}/split`, typed<{ person: PersonSummary }>(), { method: "POST" })).person,
   deletePerson: (id: string, confirmName: string) => request(personUrl(id), null, withBody("DELETE", { confirmName })),
+  // ---- 誘う候補・声かけ（contracts/api.md 5）----
+  candidates: (params: CandidateParams) => request(`/api/people/candidates${candidateSearch(params)}`, typed<CandidateList>()),
+  createOutreach: async (input: OutreachCreateInput) =>
+    (await request("/api/people/outreaches", typed<{ outreach: Outreach }>(), withBody("POST", { ...input, purpose: "invite" }))).outreach,
+  updateOutreach: async (id: string, stage: OutreachStage) =>
+    (await request(outreachUrl(id), typed<{ outreach: Outreach }>(), withBody("PATCH", { stage }))).outreach,
+  deleteOutreach: (id: string) => request(outreachUrl(id), null, { method: "DELETE" }),
+  // ---- 設定・数字（contracts/api.md 6）----
+  settings: () => request("/api/people/settings", typed<PeopleSettings>()),
+  updateSettings: (input: SettingsUpdateInput) => request("/api/people/settings", typed<PeopleSettings>(), withBody("PUT", input)),
+  stats: () => request("/api/people/stats", typed<PeopleStats>()),
 };

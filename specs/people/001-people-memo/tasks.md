@@ -195,7 +195,7 @@ description: "Task list for people 001 people memo"
 - [x] T070 [P] [US3] `ptest/candidates.test.ts`：`purpose=invite`は交流会への誘いの同意が真の人だけ、**「個別の案内は希望しない」と答えた人・同意の列がなかった人は、どの絞り込みの組み合わせでも出ない**（すべての絞り込みを順に当てて確かめる。SC-003）、手で同意した人は出る、`visitedOwn=true`で自分の会に1回以上来た人だけ（参加者として出た会だけの人は出ない）、ほかの絞り込みと並び（最後に会った日の新しい順）、`eventId`の会への声かけ（`outreach`）が行に入る、`purpose`がないと400。FR-018・FR-019。
 - [x] T071 [P] [US3] `ptest/outreach-invite.test.ts`：声かけを始める（同意がなければ409 `OUTREACH_NO_CONSENT`、同じ人・同じ誘う会なら200で今のもの・新しければ201で`asked`）、`stage`を`link_sent`・`attended`へ進める・1つ戻すと先の日時が空になる、誘った会の回答を取り込んで同じ人につなぐ・まとめる・会ったイベントを足すと自動で`attended`（FR-022）、誘う会を消すと声かけも消える、人を消すと声かけも消える、まとめるとき同じ声かけが両方にあれば進み具合の先の方が残る。research.md R15・R16。
 - [x] T072 [P] [US3] `ptest/settings.test.ts`：`GET/PUT /api/people/settings`（`inviteTemplate`「1〜500文字か`null`」・`repeaterGoal`「1〜10,000か`null`」。超えたら400）、`GET /api/people/stats`の`nextOwnEvent`（今日以降でいちばん近い自分の会。なければ`null`）。
-- [ ] T073 [P] [US3] `wtest/candidates.test.tsx`：誘う会の初めの値、絞り込み、「文をコピー」で`navigator.clipboard.writeText`に名前・会の名前・日にちの入った文（使えないときは文を選んだ欄）、コピーのあと「興味を聞いたにする」で声かけを始める、進み具合のボタン、誘う会がないときは「誘う会を選んでください」、上に「個別の案内に同意した人だけを出しています」。
+- [x] T073 [P] [US3] `wtest/candidates.test.tsx`：誘う会の初めの値、絞り込み、「文をコピー」で`navigator.clipboard.writeText`に名前・会の名前・日にちの入った文（使えないときは文を選んだ欄）、コピーのあと「興味を聞いたにする」で声かけを始める、進み具合のボタン、誘う会がないときは「誘う会を選んでください」、上に「個別の案内に同意した人だけを出しています」。
 
 ### Implementation for User Story 3
 
@@ -205,10 +205,10 @@ description: "Task list for people 001 people memo"
 - [x] T077 [US3] `ppl/outreach/outreach-service.ts`・`ppl/outreach/outreach-routes.ts`：`POST /api/people/outreaches`（同意の確かめ・同じ声かけは今のものを返す）・`PATCH`（同じ目的の進み具合・戻したら先の日時を空に）・`DELETE`（`invite`の分。`work`は T089）。`markInviteAttended(tx, personId, eventId)`を書き出す。`routes.snapshot.txt`を更新する。
 - [x] T078 [US3] `ppl/settings/settings-service.ts`・`ppl/settings/settings-routes.ts`：`GET/PUT /api/people/settings`・`GET /api/people/stats`（`nextOwnEvent`。リピーターは T085）。`routes.snapshot.txt`を更新する。
 - [x] T079 [US3] 自動で「来た」をつなぐ：`ppl/imports/commit.ts`（新しい人・つないだ人）・`ppl/persons/person-merge.ts`（あわせて声かけの移し替え：同じ声かけが両方にあれば進み具合の先の方を残す）・`ppl/persons/person-create.ts`（会ったイベントを足す）のトランザクションの最後で`markInviteAttended`を呼ぶ。T071を通す。
-- [ ] T080 [US3] `wppl/pages/CandidatesPage.tsx`（`/people`。PR1の`HomePage.tsx`を置き換える）と`wppl/components/candidates/`（誘う会の選択・絞り込み・人の行・文をコピー・興味を聞いたにする・進み具合）。文は`buildInviteMessage`で作る（APIを呼ばない）。T073を通す。
-- [ ] T081 [P] [US3] `wppl/pages/SettingsPage.tsx`（`/people/settings`：誘いの文の型（差し込みの説明・見本・初めの型に戻す）・リピーターの目標）と、サイドバーの「誘いの文と目標」。
-- [ ] T082 [US3] `wppl/pages/PersonPage.tsx`に声かけの記録（誘う会ごとの進み具合と日時）を足す。
-- [ ] T083 [US3] `e2e/tests/people-invite.spec.ts`：①10/11・11/25を取り込んだ状態で誘う候補を開き、「前に来た」「次回参加」で絞る ②「個別の案内は希望しない」の人が出ない ③文をコピー → 興味を聞いたにする ④**390px幅で、下のバーの「誘う候補」→「文をコピー」の3回のタップ以内で文がコピーされる**（SC-005）（quickstart.md 4）。
+- [x] T080 [US3] `wppl/pages/CandidatesPage.tsx`（`/people`。PR1の`HomePage.tsx`を置き換える）と`wppl/components/candidates/`（誘う会の選択・絞り込み・人の行・文をコピー・興味を聞いたにする・進み具合）。文は`buildInviteMessage`で作る（APIを呼ばない）。T073を通す。
+- [x] T081 [P] [US3] `wppl/pages/SettingsPage.tsx`（`/people/settings`：誘いの文の型（差し込みの説明・見本・初めの型に戻す）・リピーターの目標）と、サイドバーの「誘いの文と目標」。
+- [x] T082 [US3] `wppl/pages/PersonPage.tsx`に声かけの記録（誘う会ごとの進み具合と日時）を足す。
+- [x] T083 [US3] `e2e/tests/people-invite.spec.ts`：①10/11・11/25を取り込んだ状態で誘う候補を開き、「前に来た」「次回参加」で絞る ②「個別の案内は希望しない」の人が出ない ③文をコピー → 興味を聞いたにする ④**390px幅で、下のバーの「誘う候補」→「文をコピー」の3回のタップ以内で文がコピーされる**（SC-005）（quickstart.md 4）。
 
 ## Phase 10：User Story 5 - リピーターの目標と今の数を比べる（Priority: P2）
 
@@ -220,7 +220,7 @@ description: "Task list for people 001 people memo"
 
 - [x] T084 [P] [US5] `ptest/stats.test.ts`：リピーター＝自分の会の来た記録が2つ以上の人（参加者として出た会は数えない・手で足した会ったイベントも数える・同じ会に回答が2つでも1回）、`GET /api/people/stats`の`repeaterCount`・`repeaterGoal`、自分の会の`stats`の`firstTimeCount`・`returningCount`（その会より前の開催日の自分の会に来ていない／来た。同じ日は前に数えない）・`erasedCount`は別に出る、`attendees`の`firstTime`、イベントの開催日・自分の会かを直すと数が変わる。research.md R12。
 - [x] T085 [US5] `ppl/settings/settings-service.ts`の`stats`に`repeaterCount`、`ppl/events/event-service.ts`の自分の会の`stats`に`firstTimeCount`・`returningCount`と`attendees`の`firstTime`を足す（T051 の部品で数える）。T084を通す。
-- [ ] T086 [P] [US5] `wtest/repeater.test.tsx`を先に書いてから、`wppl/pages/CandidatesPage.tsx`の上の段（「リピーター n人／目標 n人」、目標がなければ「目標を決める」）と`wppl/pages/EventPage.tsx`の数字（参加者・初めて・前にも来た・消した人）を作る。
+- [x] T086 [P] [US5] `wtest/repeater.test.tsx`を先に書いてから、`wppl/pages/CandidatesPage.tsx`の上の段（「リピーター n人／目標 n人」、目標がなければ「目標を決める」）と`wppl/pages/EventPage.tsx`の数字（参加者・初めて・前にも来た・消した人）を作る。
 
 **Checkpoint（PR3を出せる）**：quickstart.md 4 が通る。テスト版で、12月の会の誘いに使える。
 

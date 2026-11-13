@@ -6,7 +6,7 @@ import { PageBody, PageHeader } from "@/shell";
 import { EventForm } from "../components/EventForm";
 import { peopleApi } from "../lib/api";
 import { eventPath, eventsPath } from "../lib/paths";
-import { peopleQueryKeys } from "../lib/query-keys";
+import { refreshEvents } from "../lib/refresh";
 
 /**
  * イベントを作る画面。作ったらイベントのページへ移る。
@@ -18,7 +18,7 @@ export function EventNewPage() {
   const create = useMutation({
     mutationFn: peopleApi.createEvent,
     onSuccess: async (event) => {
-      await queryClient.invalidateQueries({ queryKey: peopleQueryKeys.events });
+      await refreshEvents(queryClient);
       void navigate(eventPath(event.id));
     },
   });

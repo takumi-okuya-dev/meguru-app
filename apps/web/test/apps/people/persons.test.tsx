@@ -2,7 +2,7 @@
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { EVENT_1011, EVENT_1125, makeDetail, makeListItem, makeSummary, renderRoutes } from "./helpers";
+import { EVENT_1011, EVENT_1125, makeDetail, makeListItem, makeOutreach, makeSummary, renderRoutes } from "./helpers";
 
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 const api = {
@@ -229,5 +229,27 @@ describe("人のページ", () => {
     await user.click(screen.getByRole("button", { name: "保存" }));
     expect(screen.getByText("LINE名がないので、本名は消せません")).toBeInTheDocument();
     expect(api.updatePerson).not.toHaveBeenCalled();
+  });
+});
+
+describe("人のページの声かけの記録", () => {
+  it("誘う会ごとに、今の進み具合と各段の日時・「あなたが記録」を出す", async () => {
+    api.person.mockResolvedValue(
+      makeDetail({ outreaches: [makeOutreach({ stage: "link_sent", linkSentAt: "2026-11-22T03:00:00.000Z" })] }),
+    );
+    renderRoutes(ROUTES, "/people/list/p1");
+    const section = (await screen.findByRole("heading", { name: "声かけの記録" })).closest("section")!;
+    expect(section).toHaveTextContent("2026年12月13日 IT交流会 12/13への誘い");
+    expect(section).toHaveTextContent("参加リンクを送った");
+    expect(section).toHaveTextContent(/興味を聞いた：/);
+    expect(section).toHaveTextContent(/参加リンクを送った：/);
+    expect(section).not.toHaveTextContent(/来た：/);
+    expect(section).toHaveTextContent("あなたが記録");
+  });
+
+  it("記録がなければ、まだないと出す", async () => {
+    renderRoutes(ROUTES, "/people/list/p1");
+    const section = (await screen.findByRole("heading", { name: "声かけの記録" })).closest("section")!;
+    expect(section).toHaveTextContent("まだ声かけの記録はありません");
   });
 });
