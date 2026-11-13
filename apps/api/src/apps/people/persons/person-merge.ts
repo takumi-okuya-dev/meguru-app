@@ -1,12 +1,14 @@
 // まとめる・分ける（specs/people/001-people-memo contracts/api.md 4、research.md R15、tasks.md T061・T062）。
 import { MEMO_APPEARANCE_MAX, MEMO_TALK_MAX, nameKey, type PersonSummary } from "@meguru/shared/people";
 import { and, count, eq, sql } from "drizzle-orm";
-import { withTransaction } from "../../../kernel/db/client";
+import { withTransaction, type TxDb } from "../../../kernel/db/client";
 import type { Env } from "../../../kernel/env";
 import { AppError } from "../../../kernel/errors";
 import { loadOwnedPerson, loadOwnedResponse, lockOwner } from "../access";
 import { peopleConsentChanges, peopleManualAttendances, peoplePersons, peopleResponses } from "../schema";
+import { markInviteAttended, mergeOutreaches, resetInviteAttended } from "../outreach/outreach-service";
 import { derivePersons } from "./person-derive";
+import { attendanceSql } from "./person-query";
 import { personSummary } from "./person-service";
 
 /** メモをつなぐ区切り（R15）。 */
@@ -44,6 +46,8 @@ export async function mergePersons(env: Env, userId: string, personId: string, o
     await lockOwner(tx, userId);
     const keep = await loadOwnedPerson(tx, userId, personId);
     const other = await loadOwnedPerson(tx, userId, otherPersonId);
+    // 相手の来たイベント（まとめたあと、残す人の誘いを「来た」にするのは、相手から来た分だけ。手で戻した声かけを上書きしない）
+    const fromOther = (await attendedEventsOf(tx, userId, other.id)).map((x) => ({ personId: keep.id, eventId: x.eventId }));
     await tx.update(peopleResponses).set({ personId: keep.id }).where(and(eq(peopleResponses.personId, other.id), eq(peopleResponses.userId, userId)));
     await tx.execute(sql`INSERT INTO ${peopleManualAttendances} (person_id, event_id, user_id, created_at)
       SELECT ${keep.id}, m.event_id, m.user_id, m.created_at FROM ${peopleManualAttendances} m WHERE m.person_id = ${other.id}
@@ -54,6 +58,8 @@ export async function mergePersons(env: Env, userId: string, personId: string, o
       .where(and(eq(peopleConsentChanges.personId, other.id), eq(peopleConsentChanges.userId, userId)));
     const realName = keep.realName ?? other.realName;
     const enteredLineName = keep.enteredLineName ?? other.enteredLineName;
+    // 声かけを移す（同じ声かけは進み具合の先の方を残す）。相手を消す前に行う（消すと声かけも外部キーで消える）
+    await mergeOutreaches(tx, userId, keep.id, other.id);
     // 相手を先に消す（手で足した会ったイベントは外部キーで一緒に消える。移した分は上で写した）
     await tx.delete(peoplePersons).where(and(eq(peoplePersons.id, other.id), eq(peoplePersons.userId, userId)));
     await tx
@@ -69,8 +75,22 @@ export async function mergePersons(env: Env, userId: string, personId: string, o
       })
       .where(and(eq(peoplePersons.id, keep.id), eq(peoplePersons.userId, userId)));
     await derivePersons(tx, userId, [keep.id]);
+    // 誘った会に来た記録があれば、その声かけを「来た」にする（FR-022）
+    await markInviteAttended(tx, userId, fromOther);
     return personSummary(tx, userId, keep.id);
   });
+}
+
+/**
+ * 人の来たイベント（回答 ∪ 手で足した会ったイベント）。
+ * @param tx - トランザクション
+ * @param userId - 作り手
+ * @param personId - 人
+ * @returns 人と来たイベントの組
+ */
+async function attendedEventsOf(tx: TxDb, userId: string, personId: string): Promise<{ personId: string; eventId: string }[]> {
+  const res = await tx.execute<{ event_id: string }>(sql`SELECT a.event_id FROM (${attendanceSql(userId)}) a WHERE a.person_id = ${personId}`);
+  return res.rows.map((r) => ({ personId, eventId: r.event_id }));
 }
 
 /**
@@ -93,6 +113,8 @@ export async function splitResponse(env: Env, userId: string, responseId: string
       .returning({ id: peoplePersons.id });
     await tx.update(peopleResponses).set({ personId: fresh!.id }).where(and(eq(peopleResponses.id, r.id), eq(peopleResponses.userId, userId)));
     await derivePersons(tx, userId, [r.personId, fresh!.id]);
+    // 声かけは元の人に残る。分けた回答で「来た」にしていたら戻す
+    await resetInviteAttended(tx, userId, [r.personId]);
     return personSummary(tx, userId, fresh!.id);
   });
 }
