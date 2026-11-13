@@ -1,4 +1,4 @@
-// /api/collect/events（specs/collect/001-event-day-collection contracts/api.md 2）。消す（まとめを残す）は PR3。
+// /api/collect/events（specs/collect/001-event-day-collection contracts/api.md 2）。消す（まとめを残す）は summaries/summary-routes.ts。
 import { createCollectEventRequestSchema, updateCollectEventRequestSchema } from "@meguru/shared";
 import { Hono, type MiddlewareHandler } from "hono";
 import { createDb } from "../../../kernel/db/client";
