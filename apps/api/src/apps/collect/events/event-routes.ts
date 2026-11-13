@@ -4,6 +4,7 @@ import { Hono, type MiddlewareHandler } from "hono";
 import { createDb } from "../../../kernel/db/client";
 import { parseBody } from "../../../kernel/validate";
 import type { AppEnv } from "../../../platform";
+import { notifyLive } from "../live/notify";
 import { syncCollectUsage } from "../usage/usage";
 import { createEvent, getEvent, listEvents, updateEvent } from "./event-service";
 
@@ -31,6 +32,9 @@ export function eventRoutes(owner: MiddlewareHandler<AppEnv>) {
     })
     .patch("/events/:eventId", owner, async (c) => {
       const input = await parseBody(updateCollectEventRequestSchema, c.req.json());
-      return c.json(await updateEvent(c.env.DATABASE_URL, c.get("user").id, c.req.param("eventId"), input));
+      const event = await updateEvent(c.env.DATABASE_URL, c.get("user").id, c.req.param("eventId"), input);
+      // 名前・払い方・区分が変わるので、受付の画面は全体を読み直す
+      await notifyLive(c, event.id, { type: "resync", version: event.version });
+      return c.json(event);
     });
 }

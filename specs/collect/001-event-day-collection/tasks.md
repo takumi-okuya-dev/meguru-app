@@ -108,6 +108,16 @@ description: "Task list for collect 001 event-day collection"
 
 # PR2：受付・会場の共有・受付の手伝い
 
+**2026-11-13 PR2の進め方**：大きいので、**PR2a（共通の形・API・会場の共有・マイグレーション）**と**PR2b（画面とE2E）**に分けた。マイグレーションはPR2の表をまとめて1つ（`0035_collect_reception`。人物メモが0034を先に使った）。031（並行開発の決まり）に合わせ、集金管理のフォルダーの外の変更（Durable Objectの書き出し・`wrangler.toml`・`kernel/env.ts`・CORS・鍵の入れ替えの差し込み口`tokenKeys`）は、共通のPR（#116）に分けて先に入れた。エラーコードは`packages/shared/src/apps/collect/errors.ts`、地図は`docs/apps/collect.md`。次のように直した・決めた。
+- ほかの人の記録を取り消したときのエラーは、`FORBIDDEN`ではなく`RECORD_NOT_YOURS`（403）。今の一覧に汎用の`FORBIDDEN`がなく、画面が文言を出し分けられるようにするため。
+- `COLLECT_LIVE_SECRET`は必須にしない。入れていない間は、入場券の道筋だけが503 `CONFIG_ERROR`で、受付はできる（画面は15秒ごとの読み直しで動く）。設定の誤りで、すでにあるThreadsのAPIを止めないため。
+- Durable Object`CollectLiveRoom`は、`cloudflare:workers`の`DurableObject`を継がない形（`ctx`を受け取るだけのclass）。APIの入口の一覧を書き出すスクリプトとそのテストがNodeで`app.ts`を読み、Nodeは`cloudflare:`のimportを読めないため。WebSocketの休止の仕組みはこの形でも使える。
+- 飛び入りの送り直しを二重にしないため、`roster_people`に`client_request_id`（空でよい・一意）を足した。
+- 名簿の変更（PR1の道筋）とイベントの変更も、会場の共有に知らせる（1人の追加・直しは`roster.changed`に人を付け、まとめて足す・消すは中身なしで読み直し、イベントを直したら`resync`）。
+- 受付の記録ができたので、イベントの一覧の来場・振込待ちの数と、`/api/collect/me`の振込待ちの数を数える（PR1では0だった）。
+- 受付用リンクのトークンは共通の鍵で暗号化するので、集金管理の入口の`tokenKeys`（`helpers/link-tokens.ts`）から鍵の入れ替えに足した（止めたリンクは出し直さないので入れ替えない）。
+- 手伝う人の道筋（`/r/:token/…`）は`helpers/helper-routes.ts`に、主催者のリンク・受付をしている人の道筋と並べて置いた。
+
 ## Phase 4：User Story 2 - 受付で、来た人と払い方と受け取った人を1タップで記録する（Priority: P1）
 
 **Goal**：受付で1回押すと、来場・払い方・金額・受け取った人が残り、会場のほかの画面に5秒以内に出る。二重に記録しない。
@@ -116,18 +126,18 @@ description: "Task list for collect 001 event-day collection"
 
 ### Tests for User Story 2 ⚠️
 
-- [ ] T032 [P] [US2] `api-test/integration/collect/reception.test.ts`：記録する（区分の金額・`priceTierId`で区分を変えると記録の区分と金額が変わり**名簿の区分は変わらない**（R17）・`amount`を直接入れると`amount_overridden`・`none`は0円・振込は`awaiting_transfer`）、受付の記録が使っている区分を消すと409 `TIER_IN_USE`、受付済みの人は409 `ALREADY_RECORDED`と先の記録、**同時に2つ送っても1件だけ**（`Promise.all`）、同じ`clientRequestId`の送り直しは201で同じ結果、取り消す、飛び入り（媒体`walk_in`・最初の区分）、スナップショットの`stats`（来場・現金・PayPay・振込待ち・`mine`）、変更のたびに`version`が1上がる。research.md R6。
-- [ ] T033 [P] [US2] `api-test/integration/collect/live.test.ts`：入場券の署名と期限（60秒を過ぎたら401・ほかのイベントの入場券では入れない）、記録・取り消し・飛び入りのあとに、そのイベントの`CollectLiveRoom`へ知らせ（`reception.recorded`・`reception.undone`・`roster.changed`、`version`つき）が送られる、WebSocketにつないだ2つの相手の両方に届く（vitestのWorkersの中でDurable Objectを動かす）。contracts/realtime.md。
+- [x] T032 [P] [US2] `api-test/integration/collect/reception.test.ts`：記録する（区分の金額・`priceTierId`で区分を変えると記録の区分と金額が変わり**名簿の区分は変わらない**（R17）・`amount`を直接入れると`amount_overridden`・`none`は0円・振込は`awaiting_transfer`）、受付の記録が使っている区分を消すと409 `TIER_IN_USE`、受付済みの人は409 `ALREADY_RECORDED`と先の記録、**同時に2つ送っても1件だけ**（`Promise.all`）、同じ`clientRequestId`の送り直しは201で同じ結果、取り消す、飛び入り（媒体`walk_in`・最初の区分）、スナップショットの`stats`（来場・現金・PayPay・振込待ち・`mine`）、変更のたびに`version`が1上がる。research.md R6。
+- [x] T033 [P] [US2] `api-test/integration/collect/live.test.ts`：入場券の署名と期限（60秒を過ぎたら401・ほかのイベントの入場券では入れない）、記録・取り消し・飛び入りのあとに、そのイベントの`CollectLiveRoom`へ知らせ（`reception.recorded`・`reception.undone`・`roster.changed`、`version`つき）が送られる、WebSocketにつないだ2つの相手の両方に届く（vitestのWorkersの中でDurable Objectを動かす）。contracts/realtime.md。
 - [ ] T034 [P] [US2] `web-test/apps/collect/reception.test.tsx`：名前・ふりがな・受付番号の一部で絞る（ひらがなとカタカナ・全角と半角を区別しない）、払い方を押すと記録の呼び出し1回、PayPayはQRのシート→「受け取った」、振込は当日・後日を選ぶ、受付済みの行は払い方を出さない、保存できなかったら「保存できませんでした・もう一度送る」を出して受付済みに見せない（FR-037）、知らせで1行が変わる、`version`が飛んだらスナップショットを読み直す。
 
 ### Implementation for User Story 2
 
-- [ ] T035 [US2] `collect/schema.ts`に`reception_records`を足す（data-model.md 2-4：`roster_person_id`が主キー・`client_request_id`一意・`price_tier_id`（記録したときの区分。`ON DELETE NO ACTION`）・`method`と`receiver_kind`と`payment_status`のcheck・`receiver_helper_id`の外部キーはT046で足す）。マイグレーションを作り、SQLを読んでからコミットする。
-- [ ] T036 [US2] `collect/reception/reception-service.ts`：記録（区分と金額は記録に持ち、名簿の区分は変えない。R17。`INSERT … ON CONFLICT DO NOTHING RETURNING`、返らなければ先の記録で409。同じ`clientRequestId`は前の結果を返す）・取り消し・飛び入り・スナップショット・数字（data-model.md 4）。変更のたびに`events.version`を上げ、新しい`version`を返す。受け取った人は呼んだ人（PR2のこの段では主催者＝`owner`）。
-- [ ] T037 [US2] `collect/reception/reception-routes.ts`：contracts/api.md 4 の道筋（主催者）。`routes.snapshot.txt`を更新する。
-- [ ] T038 [US2] `collect/live/live-room.ts`：Durable Object`CollectLiveRoom`（WebSocketの休止の仕組み`ctx.acceptWebSocket`・`POST /broadcast`はWorkerの中からだけ・受付をする人の印を`serializeAttachment`で持つ・保存は使わない）。`api/index.ts`から書き出す。
-- [ ] T039 [US2] `apps/api/wrangler.toml`の一番上・`[env.staging]`・`[env.production]`のすべてに、Durable Objectの結びつけ`COLLECT_LIVE`（`class_name = "CollectLiveRoom"`）と`[[migrations]]`（`new_sqlite_classes = ["CollectLiveRoom"]`）を書く。`api-test/unit/wrangler-config.test.ts`に、3つの環境すべてにあることの確かめを足す。`api/kernel/env.ts`に`COLLECT_LIVE`と`COLLECT_LIVE_SECRET`の型、`apps/api/.dev.vars.example`と`api-test/env.ts`に`COLLECT_LIVE_SECRET`を足す。
-- [ ] T040 [US2] `collect/live/live-ticket.ts`（入場券の署名と確かめ。HMAC-SHA256・`COLLECT_LIVE_SECRET`・イベントの番号・受付をする人・60秒）・`collect/live/notify.ts`（保存のあと`ctx.waitUntil`で`CollectLiveRoom`に知らせる）・道筋`POST /api/collect/events/:eventId/live-ticket`と`GET /api/collect/live?ticket=`（R5）。T036の変更のあとに`notify`を呼ぶ。
+- [x] T035 [US2] `collect/schema.ts`に`reception_records`を足す（data-model.md 2-4：`roster_person_id`が主キー・`client_request_id`一意・`price_tier_id`（記録したときの区分。`ON DELETE NO ACTION`）・`method`と`receiver_kind`と`payment_status`のcheck・`receiver_helper_id`の外部キーはT046で足す）。マイグレーションを作り、SQLを読んでからコミットする。
+- [x] T036 [US2] `collect/reception/reception-service.ts`：記録（区分と金額は記録に持ち、名簿の区分は変えない。R17。`INSERT … ON CONFLICT DO NOTHING RETURNING`、返らなければ先の記録で409。同じ`clientRequestId`は前の結果を返す）・取り消し・飛び入り・スナップショット・数字（data-model.md 4）。変更のたびに`events.version`を上げ、新しい`version`を返す。受け取った人は呼んだ人（PR2のこの段では主催者＝`owner`）。
+- [x] T037 [US2] `collect/reception/reception-routes.ts`：contracts/api.md 4 の道筋（主催者）。`routes.snapshot.txt`を更新する。
+- [x] T038 [US2] `collect/live/live-room.ts`：Durable Object`CollectLiveRoom`（WebSocketの休止の仕組み`ctx.acceptWebSocket`・`POST /broadcast`はWorkerの中からだけ・受付をする人の印を`serializeAttachment`で持つ・保存は使わない）。`api/index.ts`から書き出す。
+- [x] T039 [US2] `apps/api/wrangler.toml`の一番上・`[env.staging]`・`[env.production]`のすべてに、Durable Objectの結びつけ`COLLECT_LIVE`（`class_name = "CollectLiveRoom"`）と`[[migrations]]`（`new_sqlite_classes = ["CollectLiveRoom"]`）を書く。`api-test/unit/wrangler-config.test.ts`に、3つの環境すべてにあることの確かめを足す。`api/kernel/env.ts`に`COLLECT_LIVE`と`COLLECT_LIVE_SECRET`の型、`apps/api/.dev.vars.example`と`api-test/env.ts`に`COLLECT_LIVE_SECRET`を足す。
+- [x] T040 [US2] `collect/live/live-ticket.ts`（入場券の署名と確かめ。HMAC-SHA256・`COLLECT_LIVE_SECRET`・イベントの番号・受付をする人・60秒）・`collect/live/notify.ts`（保存のあと`ctx.waitUntil`で`CollectLiveRoom`に知らせる）・道筋`POST /api/collect/events/:eventId/live-ticket`と`GET /api/collect/live?ticket=`（R5）。T036の変更のあとに`notify`を呼ぶ。
 - [ ] T041 [US2] `wcollect/lib/live.ts`：入場券を取ってつなぐ・知らせで行を直す・`version`が飛んだら・つなぎ直したら・画面に戻ったらスナップショットを読み直す・切れたら1秒・2秒・4秒…最大30秒でつなぎ直す・つながらない間は15秒ごとに読み直す（contracts/realtime.md 4）。
 - [ ] T042 [US2] `wcollect/pages/ReceptionPage.tsx`と`wcollect/components/reception/`（上の数字の段（来場・現金・PayPay・振込待ち・あなたが受け取った現金）・会場で共有中の表示・検索・受付の行（区分の変更・金額を直接入れる）・払い方のボタン（高さ44px以上）・PayPayのシート（QRを大きく）・振込のシート（当日・後日・受付番号の案内）・飛び入り・保存できなかった行）。T034を通す。
 
@@ -141,17 +151,17 @@ description: "Task list for collect 001 event-day collection"
 
 ### Tests for User Story 3 ⚠️
 
-- [ ] T043 [P] [US3] `api-test/integration/collect/helpers.test.ts`：リンクを出す（使えるリンクは1つ・トークンはハッシュと暗号文で持つ・同じリンクを返す・期限の既定は開催日の日本時間23:59:59と終わりの時刻の1時間後の遅い方。19:00〜翌1:00のイベントでは翌2:00）、参加する（端末の印を返す・同じ名前は409 `HELPER_NAME_TAKEN`・`sameAsHelperId`で同じ人に端末を足す・`asNew`で別の人）、端末の印なしは401 `DEVICE_REQUIRED`、手伝う人の記録は`receiver_kind = helper`、**ほかの人の記録の取り消しは403 `FORBIDDEN`**、手伝う人のスナップショットにメモが入らない、止めた・期限が過ぎたリンクは410 `LINK_INACTIVE`で記録は残る、止めると`link.stopped`が知らされる、出し直すと前のトークンは使えない、受付をしている人の一覧（件数・最後の記録・受け取った現金・端末の数。「同じ人」でまとめると2）。research.md R7。
-- [ ] T044 [P] [US3] `api-test/integration/collect/helper-routes-scope.test.ts`：手伝う人の資格（端末の印）で、名簿の編集・締め・振込・書き出し・設定・ほかのイベントの道筋が呼べないこと（`/api/collect/r/:token/…`以外は主催者のログインが要る）。FR-071。
+- [x] T043 [P] [US3] `api-test/integration/collect/helpers.test.ts`：リンクを出す（使えるリンクは1つ・トークンはハッシュと暗号文で持つ・同じリンクを返す・期限の既定は開催日の日本時間23:59:59と終わりの時刻の1時間後の遅い方。19:00〜翌1:00のイベントでは翌2:00）、参加する（端末の印を返す・同じ名前は409 `HELPER_NAME_TAKEN`・`sameAsHelperId`で同じ人に端末を足す・`asNew`で別の人）、端末の印なしは401 `DEVICE_REQUIRED`、手伝う人の記録は`receiver_kind = helper`、**ほかの人の記録の取り消しは403 `FORBIDDEN`**、手伝う人のスナップショットにメモが入らない、止めた・期限が過ぎたリンクは410 `LINK_INACTIVE`で記録は残る、止めると`link.stopped`が知らされる、出し直すと前のトークンは使えない、受付をしている人の一覧（件数・最後の記録・受け取った現金・端末の数。「同じ人」でまとめると2）。research.md R7。
+- [x] T044 [P] [US3] `api-test/integration/collect/helper-routes-scope.test.ts`：手伝う人の資格（端末の印）で、名簿の編集・締め・振込・書き出し・設定・ほかのイベントの道筋が呼べないこと（`/api/collect/r/:token/…`以外は主催者のログインが要る）。FR-071。
 - [ ] T045 [P] [US3] `web-test/apps/collect/helper-reception.test.tsx`：名前を入れる画面 → 受付だけの画面（サイドバーなし）、同じ端末は保存した端末の印で続きから、409で「すでに〇〇さんがいます。同じ人ですか？」→ 同じ人／別の人、自分の記録だけ「取り消す」が出る、止められたら「このリンクは止められました」、ブラウザの保存が使えないときも名前を入れれば使える。
 
 ### Implementation for User Story 3
 
-- [ ] T046 [US3] `collect/schema.ts`に`reception_links`（data-model.md 2-5：`token_hash`一意・暗号文の列・使えるリンクはイベントに1つの部分一意索引）・`helpers`・`helper_devices`（2-6）を足し、`reception_records.receiver_helper_id`（`ON DELETE NO ACTION`。`RESTRICT`にしない）と`roster_people.added_by_helper_id`（`ON DELETE SET NULL`）の外部キーを張る。マイグレーションを作り、SQLを読んでからコミットする。
-- [ ] T047 [US3] `collect/helpers/link-service.ts`：リンクを出す・期限を変える・止める・出し直す（トークンは`newInviteToken("cr_")`の作り方、ハッシュは`sha256Hex`、暗号文はチームの招待と同じ`createTokenCipher`。共通の入口から使えないときは`kernel/crypto.ts`を直接使う）。止めたら`link.stopped`を知らせる。
-- [ ] T048 [US3] `collect/helpers/helper-service.ts`：参加（同じ名前の扱い・端末の印の発行とハッシュ・`last_seen_at`）と、端末の印の確かめ。`collect/access.ts`に`requireHelperDevice`（`:token`と`X-Collect-Device`を確かめ、リンクが使えないと410）を足す。
-- [ ] T049 [US3] `collect/reception/reception-service.ts`を、受け取った人に手伝う人を入れられるようにし、取り消しを「主催者はすべて・手伝う人は自分の記録だけ」にする（FR-039）。手伝う人のスナップショットはメモを除く（FR-002）。
-- [ ] T050 [US3] `collect/helpers/helper-routes.ts`：contracts/api.md 8 の道筋（`/api/collect/r/:token/…`。ログインの関所の外に登録）と、主催者の道筋 contracts/api.md 5（リンク・受付をしている人）。`routes.snapshot.txt`を更新する。手伝う人の出入りで`helpers.changed`を知らせる。
+- [x] T046 [US3] `collect/schema.ts`に`reception_links`（data-model.md 2-5：`token_hash`一意・暗号文の列・使えるリンクはイベントに1つの部分一意索引）・`helpers`・`helper_devices`（2-6）を足し、`reception_records.receiver_helper_id`（`ON DELETE NO ACTION`。`RESTRICT`にしない）と`roster_people.added_by_helper_id`（`ON DELETE SET NULL`）の外部キーを張る。マイグレーションを作り、SQLを読んでからコミットする。
+- [x] T047 [US3] `collect/helpers/link-service.ts`：リンクを出す・期限を変える・止める・出し直す（トークンは`newInviteToken("cr_")`の作り方、ハッシュは`sha256Hex`、暗号文はチームの招待と同じ`createTokenCipher`。共通の入口から使えないときは`kernel/crypto.ts`を直接使う）。止めたら`link.stopped`を知らせる。
+- [x] T048 [US3] `collect/helpers/helper-service.ts`：参加（同じ名前の扱い・端末の印の発行とハッシュ・`last_seen_at`）と、端末の印の確かめ。`collect/access.ts`に`requireHelperDevice`（`:token`と`X-Collect-Device`を確かめ、リンクが使えないと410）を足す。
+- [x] T049 [US3] `collect/reception/reception-service.ts`を、受け取った人に手伝う人を入れられるようにし、取り消しを「主催者はすべて・手伝う人は自分の記録だけ」にする（FR-039）。手伝う人のスナップショットはメモを除く（FR-002）。
+- [x] T050 [US3] `collect/helpers/helper-routes.ts`：contracts/api.md 8 の道筋（`/api/collect/r/:token/…`。ログインの関所の外に登録）と、主催者の道筋 contracts/api.md 5（リンク・受付をしている人）。`routes.snapshot.txt`を更新する。手伝う人の出入りで`helpers.changed`を知らせる。
 - [ ] T051 [P] [US3] `wcollect/pages/HelpersPage.tsx`（`/collect/events/:eventId/helpers`：リンク・QR（`wcollect/components/QrCode.tsx`を、Webにすでにある`uqr`で集金管理の中に作る。新しい依存は足さない。Threadsの部品はアプリ同士で使えないので使わない。R18）・コピー・期限・止める・出し直す・受付をしている人の表（端末の数を含む））。
 - [ ] T052 [US3] `wcollect/pages/HelperReceptionPage.tsx`を`AppModule`の`publicRoutes`（`/collect/r/:token`）に足す：名前を入れる → 受付（T042の部品を使い、名簿の編集・締めの入口は出さない）。端末の印はリンクごとに`localStorage`へ（読めなければ持たない）。T045を通す。
 - [ ] T053 [US3] `e2e/tests/collect-reception.spec.ts`：主催者と手伝う人の2つのブラウザで、①手伝う人の記録が5秒以内に主催者の画面に出る ②同じ人を同時に押して1件 ③手伝う人に主催者の記録の「取り消す」が出ない ④リンクを止めると手伝う人の画面が止まる ⑤受付の1人が、探す→払い方→（PayPay・振込ならシートの1回）の3回の操作で終わる（SC-001の操作の数）⑥手伝う人がリンクを開いてから受付の画面までの操作が、名前の入力と「受付を始める」だけ（SC-007）（quickstart.md 2）。

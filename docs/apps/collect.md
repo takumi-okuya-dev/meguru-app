@@ -4,7 +4,7 @@
 
 ## 1. API：集金管理（apps/collect）
 
-パターン①の最初の2作目（specs/collect/001-event-day-collection）。運営者が開いた人だけが使う（`registerAppAccess("collect", "granted")`。specs/meguru/030-app-access）。道筋はすべて`/api/collect`の下で、ログインと利用の許可の関所（`access.ts`の`collectOwner`）を付ける。今は PR1 の分（イベント・料金の区分・名簿・既定値）。
+パターン①の最初の2作目（specs/collect/001-event-day-collection）。運営者が開いた人だけが使う（`registerAppAccess("collect", "granted")`。specs/meguru/030-app-access）。道筋はすべて`/api/collect`の下。主催者の道筋には、ログインと利用の許可の関所（`access.ts`の`collectOwner`）を付ける。関所の外にあるのは、手伝う人の`/api/collect/r/:token/…`（受付用リンクと端末の印`X-Collect-Device`で確かめる）と、会場の共有の`/api/collect/live`（60秒の入場券で確かめる）だけ。今は PR1・PR2 の分（イベント・料金の区分・名簿・既定値・受付・受付の手伝い・会場の共有）。
 
 | 小分け | 表 | 処理とAPIの入口 |
 |---|---|---|
@@ -13,8 +13,11 @@
 | `settings/`（主催者の既定値） | `owner_settings` | `settings-service.ts`（PayPayのQRの画像・振込先の案内）・`settings-routes.ts` |
 | `me/`（集金管理の「自分」） | — | `collect-me.ts`（`GET /api/collect/me`） |
 | `usage/`（利用の値） | — | `usage.ts`（料金の数は0、イベントがあれば「使っている」を`reportUsage`で伝える。毎日の数え直し） |
+| `reception/`（受付） | `reception_records` | `reception-service.ts`（記録は名簿の人1人に1行・`clientRequestId`の送り直し・取り消し・飛び入り・スナップショットと数字）・`reception-routes.ts` |
+| `helpers/`（受付の手伝い） | `reception_links`・`helpers`・`helper_devices` | `link-service.ts`（受付用リンク。トークンはハッシュと暗号文）・`link-tokens.ts`（鍵の入れ替え。入口の`tokenKeys`）・`helper-service.ts`（参加・端末の印の確かめ・受付をしている人の一覧）・`helper-routes.ts`（主催者の道筋と、ログインのいらない`/r/:token/…`） |
+| `live/`（会場の共有） | — | `live-room.ts`（Durable Object`CollectLiveRoom`。知らせを配るだけで保存しない。組み立ての`durable-objects.ts`が書き出す）・`live-ticket.ts`（入場券の署名。`COLLECT_LIVE_SECRET`）・`notify.ts`（保存のあと`waitUntil`で知らせる）・`live-routes.ts` |
 | `inbox/`（出来事の受け取り） | `received_events` | `received-events.ts`（`user.withdrawn`：その主催者のデータをすべて消す） |
-| （直下） | — | `index.ts`（入口）・`schema.ts`（5表。スキーマ`collect`）・`access.ts`（関所とイベントの持ち主の確かめ）・`register.ts`（`registerCollect()`：利用の決まりと出来事の受け取りの登録） |
+| （直下） | — | `index.ts`（入口`collectModule`。道筋・毎日の処理・`tokenKeys`）・`schema.ts`（9表。スキーマ`collect`）・`access.ts`（関所とイベントの持ち主の確かめ）・`register.ts`（`registerCollect()`：利用の決まりと出来事の受け取りの登録） |
 
 ## 2. Web
 
