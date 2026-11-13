@@ -23,8 +23,11 @@ const LATIN_ROW = "A〜Z";
 /** 読めない文字（漢字など）のまとまりの名前。 */
 const OTHER_ROW = "そのほか（漢字など）";
 
+/** わ行の後ろの、ほかの行に入る文字（ゔ はあ行、小さい ゕ・ゖ はか行）。 */
+const KANA_EXTRA_ROWS: Record<number, string> = { 0x3094: "あ行", 0x3095: "か行", 0x3096: "か行" };
+
 /**
- * 名前の頭の文字の、あいうえおの行。カタカナはひらがなに読み替える。漢字は読みがわからないので「そのほか」。
+ * 名前の頭の文字の、あいうえおの行。カタカナはひらがなに読み替える（ヴ→ゔ・ヵ→ゕ・ヶ→ゖ）。漢字は読みがわからないので「そのほか」。
  * @param name - 表示名
  * @returns 行の名前
  */
@@ -33,7 +36,9 @@ export function kanaRowOf(name: string): string {
   if (first === undefined) return OTHER_ROW;
   // カタカナ（ァ〜ヶ）はひらがなへ
   const code = first >= 0x30a1 && first <= 0x30f6 ? first - 0x60 : first;
-  if (code >= 0x3041 && code <= 0x3096) {
+  const extra = KANA_EXTRA_ROWS[code];
+  if (extra) return extra;
+  if (code >= 0x3041 && code <= 0x3093) {
     let row = KANA_ROWS[0]![1];
     for (const [start, label] of KANA_ROWS) if (code >= start) row = label;
     return row;

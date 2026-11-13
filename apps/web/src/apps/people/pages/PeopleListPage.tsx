@@ -3,6 +3,7 @@
 // 人の行（100人ずつ）・「人を足す」・「書き出す」。
 // 探す言葉と絞り込みは画面の中にだけ置く（URLやブラウザの保存に名前・答えを残さない。R18）。並べ方はAPIで覚える（どの端末でも同じ。FR-103）。
 import {
+  EXPORT_LIMIT,
   PERSON_GROUPS,
   PERSON_SORTS,
   PERSONS_PAGE_SIZE,
@@ -36,8 +37,6 @@ import { peopleQueryKeys } from "../lib/query-keys";
 /** 並べ方を覚えるまでの初めの値（APIの初めの値と同じ）。 */
 const DEFAULT_VIEW: PersonView = { sort: "last_met", group: "none" };
 
-/** 書き出せる人数の上限（API の person-export.ts と同じ）。 */
-const EXPORT_LIMIT = 10_000;
 
 /**
  * 一覧の中身（数・行・ページの移動）。
@@ -111,10 +110,10 @@ function PersonListBody({
 
 /**
  * 並べ方とまとめた表示の選択。
- * @param props - value：今の並べ方、disabled：読み込み中、onChange：選んだとき
+ * @param props - value：今の並べ方、onChange：選んだとき
  * @returns 選択
  */
-function ViewPicker({ value, disabled, onChange }: { value: PersonView; disabled: boolean; onChange: (view: PersonView) => void }) {
+function ViewPicker({ value, onChange }: { value: PersonView; onChange: (view: PersonView) => void }) {
   const id = useId();
   return (
     <div className="grid grid-cols-2 gap-2">
@@ -126,7 +125,6 @@ function ViewPicker({ value, disabled, onChange }: { value: PersonView; disabled
           id={`${id}-sort`}
           className={fieldClass}
           value={value.sort}
-          disabled={disabled}
           onChange={(e) => onChange({ ...value, sort: e.target.value as PersonSort })}
         >
           {PERSON_SORTS.map((s) => (
@@ -144,7 +142,6 @@ function ViewPicker({ value, disabled, onChange }: { value: PersonView; disabled
           id={`${id}-group`}
           className={fieldClass}
           value={value.group}
-          disabled={disabled}
           onChange={(e) => onChange({ ...value, group: e.target.value as PersonGroup })}
         >
           {PERSON_GROUPS.map((g) => (
@@ -170,18 +167,26 @@ export function PeopleListPage() {
   const [page, setPage] = useState({ key: "", offset: 0 });
   const topRef = useRef<HTMLDivElement>(null);
   const queryClient = useQueryClient();
-  // 並べ方：選んだら画面の値、選ぶまではAPIで覚えた値（読めなければ初めの値）
+  // 並べ方：選んだら画面の値。選ぶまではAPIで覚えた値で、届くまでは初めの値（最後に会った順・まとめない）ですぐ読む。
+  // 届いたら、まだ選び直していない画面だけを切り替える（選んだあとは上書きしない）
   const settings = useQuery({ queryKey: peopleQueryKeys.settings, queryFn: peopleApi.settings });
   const [viewChoice, setViewChoice] = useState<PersonView | null>(null);
   const view = viewChoice ?? settings.data?.personView ?? DEFAULT_VIEW;
+  // 並べ方の保存が並んで走ったとき、最後に送ったものの応答だけをキャッシュに入れる（古い応答で新しい選択を上書きしない）
+  const viewSeq = useRef(0);
   const saveView = useMutation({
-    mutationFn: (personView: PersonView) => peopleApi.updateSettings({ personView }),
-    onSuccess: (saved) => queryClient.setQueryData(peopleQueryKeys.settings, saved),
-    onError: () => toast.error("並べ方を覚えられませんでした。この画面では選んだ並べ方で出します。"),
+    mutationFn: async ({ personView, seq }: { personView: PersonView; seq: number }) => ({ saved: await peopleApi.updateSettings({ personView }), seq }),
+    onSuccess: ({ saved, seq }) => {
+      if (seq === viewSeq.current) queryClient.setQueryData(peopleQueryKeys.settings, saved);
+    },
+    onError: (_, { seq }) => {
+      if (seq === viewSeq.current) toast.error("並べ方を覚えられませんでした。この画面では選んだ並べ方で出します。");
+    },
   });
   const changeView = (next: PersonView) => {
     setViewChoice(next);
-    saveView.mutate(next);
+    viewSeq.current += 1;
+    saveView.mutate({ personView: next, seq: viewSeq.current });
   };
   // 探す言葉か絞り込みか並べ方が変わったら、1ページ目に戻す
   const searchKey = JSON.stringify([q, filters, view.sort]);
@@ -192,18 +197,18 @@ export function PeopleListPage() {
     queryKey: peopleQueryKeys.personList(params),
     queryFn: () => peopleApi.persons(params),
     placeholderData: keepPreviousData,
-    // 覚えた並べ方がわかってから読む（2回読まないように）
-    enabled: !settings.isPending,
   });
   const facets = useQuery({ queryKey: peopleQueryKeys.facets, queryFn: peopleApi.facets });
   const events = useQuery({ queryKey: peopleQueryKeys.events, queryFn: peopleApi.events });
   const tags = useQuery({ queryKey: peopleQueryKeys.tags, queryFn: peopleApi.tags });
+  // 書き出しは、画面に出ている一覧と同じ条件のときだけ押せる（探す言葉の待ちの途中・前の結果を出したまま読んでいる間は押せない）
+  const settled = persons.isSuccess && !persons.isPlaceholderData && text.trim() === q;
   const exportList = useMutation({
-    mutationFn: () => peopleApi.exportPersons(params),
-    onSuccess: ({ blob, filename }) => {
-      saveFile(blob, filename);
-      // 1万人を超えると、APIは最初の1万人だけを書き出す
-      if ((persons.data?.total ?? 0) > EXPORT_LIMIT) toast.warning("最初の1万人だけ書き出しました。");
+    mutationFn: async ({ params: p, total }: { params: PersonListParams; total: number }) => ({ file: await peopleApi.exportPersons(p), total }),
+    onSuccess: ({ file, total }) => {
+      saveFile(file.blob, file.filename);
+      // 1万人を超えると、APIは最初の1万人だけを書き出す（書き出したときの条件の人数で決める）
+      if (total > EXPORT_LIMIT) toast.warning("最初の1万人だけ書き出しました。");
       else toast.success("書き出しました。");
     },
   });
@@ -240,9 +245,13 @@ export function PeopleListPage() {
             <ChevronDownIcon className={cn("transition-transform", showFilters && "rotate-180")} aria-hidden="true" />
           </Button>
           {showFilters && <PersonFilters value={filters} onChange={setFilters} facets={facets.data} events={events.data} tags={tags.data} />}
-          <ViewPicker value={view} disabled={settings.isPending} onChange={changeView} />
+          <ViewPicker value={view} onChange={changeView} />
           <div className="flex flex-wrap items-center gap-2">
-            <Button type="button" variant="outline" className="h-11 rounded-full md:h-9" disabled={exportList.isPending || !persons.isSuccess} onClick={() => exportList.mutate()}>
+            <Button type="button" variant="outline" className="h-11 rounded-full md:h-9" disabled={exportList.isPending || !settled}
+              onClick={() => {
+                if (settled) exportList.mutate({ params, total: persons.data.total });
+              }}
+            >
               <DownloadIcon /> 書き出す
             </Button>
             <span className="text-[13px] text-muted-foreground">今の絞り込みに合う人を、CSVで保存します。</span>

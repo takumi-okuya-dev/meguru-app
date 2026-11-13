@@ -152,8 +152,9 @@ export function FieldSettingsSection() {
   const reorder = useMutation({
     mutationFn: (ids: string[]) => peopleApi.reorderFields(ids),
     onSuccess: async (saved) => {
+      // 項目の一覧は返りの順をそのまま入れる（読み直さない）。人のページの項目の順だけ読み直す
       queryClient.setQueryData(peopleQueryKeys.fields, saved);
-      await refreshFields(queryClient);
+      await queryClient.invalidateQueries({ queryKey: peopleQueryKeys.persons });
     },
   });
   const list = fields.data ?? [];

@@ -1,5 +1,5 @@
 // 設定の自由な項目：足す・名前を直す・並べ替える（上へ・下へ）・消す（specs/people/002-sales-list tasks.md T216・T221、spec US6 AS1、FR-109）。
-import { screen, within } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderRoutes } from "./helpers";
@@ -64,7 +64,18 @@ describe("自由な項目の設定", () => {
     await user.click(within(list).getByRole("button", { name: "「出身」を上へ" }));
     expect(api.reorderFields).toHaveBeenCalledWith(["f1", "f3", "f2"]);
     await user.click(await within(list).findByRole("button", { name: "「好きなもの」を下へ" }));
-    expect(api.reorderFields).toHaveBeenLastCalledWith(["f2", "f1", "f3"]);
+    // 返った順（f1・f3・f2）のまま、いちばん上を下へ
+    expect(api.reorderFields).toHaveBeenLastCalledWith(["f3", "f1", "f2"]);
+  });
+
+  it("並べ替えたあとは、項目の一覧を読み直さず、返った順をそのまま出す", async () => {
+    const user = userEvent.setup();
+    renderRoutes(ROUTES, "/people/settings");
+    const list = await screen.findByRole("list", { name: "自由な項目の一覧" });
+    expect(api.fields).toHaveBeenCalledTimes(1);
+    await user.click(within(list).getByRole("button", { name: "「出身」を上へ" }));
+    await waitFor(() => expect(within(list).getAllByRole("listitem").map((li) => li.textContent)).toEqual([expect.stringContaining("好きなもの"), expect.stringContaining("出身"), expect.stringContaining("紹介された本")]));
+    expect(api.fields).toHaveBeenCalledTimes(1);
   });
 
   it("名前を直す。同じ名前があれば（409 PEOPLE_NAME_TAKEN）「同じ名前がもうあります。」", async () => {

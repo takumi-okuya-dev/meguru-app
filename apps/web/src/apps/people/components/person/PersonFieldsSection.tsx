@@ -21,18 +21,25 @@ export function PersonFieldsSection({ personId, fields }: { personId: string; fi
   const id = useId();
   const queryClient = useQueryClient();
   const [values, setValues] = useState<Record<string, string>>(() => Object.fromEntries(fields.map((f) => [f.fieldId, f.value ?? ""])));
+  /**
+   * 項目の値を変えたか（前後の空白は見ない）。
+   * @param f - 項目と今の値
+   * @returns 変えたら true
+   */
+  const changed = (f: PersonFieldValue) => (values[f.fieldId] ?? "").trim() !== (f.value ?? "");
   const save = useMutation({
+    // 変えた項目だけ送る（触っていない項目の値は送らない）
     mutationFn: () =>
       peopleApi.setPersonFields(
         personId,
-        fields.map((f) => ({ fieldId: f.fieldId, value: (values[f.fieldId] ?? "").trim() === "" ? null : (values[f.fieldId] ?? "") })),
+        fields.filter(changed).map((f) => ({ fieldId: f.fieldId, value: (values[f.fieldId] ?? "").trim() === "" ? null : (values[f.fieldId] ?? "") })),
       ),
     onSuccess: async () => {
       toast.success("項目を保存しました");
       await refreshPersons(queryClient);
     },
   });
-  const dirty = fields.some((f) => (values[f.fieldId] ?? "").trim() !== (f.value ?? ""));
+  const dirty = fields.some(changed);
   const over = fields.some((f) => countChars(values[f.fieldId] ?? "") > FIELD_VALUE_MAX);
   return (
     <section className="space-y-3" aria-labelledby={`${id}-heading`}>

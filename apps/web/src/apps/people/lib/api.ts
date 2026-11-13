@@ -100,43 +100,63 @@ export type OutreachCreateResult = { outreach: Outreach; created: boolean };
 /** 設定を直すの入力（省いた項目は変えない。型の null は初めの型、目標の null は目標なし）。 */
 export type SettingsUpdateInput = Partial<PeopleSettings>;
 
+/** 絞り込みの項目の形（text：前後の空白を外した言葉、one：1つの値、many：くり返す値）。 */
+type ListFilterKind = "text" | "one" | "many";
+
 /**
- * 人の一覧と同じ絞り込みを、クエリに足す（next・wanted・career はくり返す）。
+ * 人の一覧の絞り込みの項目と並び（クエリと書き出しの本文の両方を、ここから作る）。
+ * 項目を足すときは、ここに1行足す。
+ */
+const LIST_FILTERS = [
+  ["q", "text"],
+  ["eventId", "one"],
+  ["next", "many"],
+  ["wanted", "many"],
+  ["career", "many"],
+  ["lastMetFrom", "one"],
+  ["lastMetTo", "one"],
+  ["tag", "many"],
+  ["likelihood", "many"],
+  ["sort", "one"],
+] as const satisfies readonly (readonly [keyof PersonListParams, ListFilterKind])[];
+
+/** 送る形にした絞り込みの1項目。 */
+type ListFilterEntry = { key: string; kind: ListFilterKind; value: string | string[] | undefined };
+
+/**
+ * 絞り込みを、項目の並びのとおりに送る形にする（空の言葉・値は undefined）。
+ * @param params - 探す言葉と絞り込み
+ * @returns 項目ごとの値
+ */
+function listFilterEntries(params: PersonListParams): ListFilterEntry[] {
+  return LIST_FILTERS.map(([key, kind]) => {
+    const raw = params[key];
+    if (kind === "many") return { key, kind, value: (raw as string[] | undefined) ?? [] };
+    const text = typeof raw === "string" ? (kind === "text" ? raw.trim() : raw) : undefined;
+    return { key, kind, value: text ? text : undefined };
+  });
+}
+
+/**
+ * 人の一覧と同じ絞り込みを、クエリに足す（くり返す値は同じ名前で並べる）。
  * @param sp - 足す先
  * @param params - 探す言葉と絞り込み
  */
 function appendListParams(sp: URLSearchParams, params: PersonListParams): void {
-  if (params.q && params.q.trim() !== "") sp.set("q", params.q.trim());
-  if (params.eventId) sp.set("eventId", params.eventId);
-  for (const v of params.next ?? []) sp.append("next", v);
-  for (const v of params.wanted ?? []) sp.append("wanted", v);
-  for (const v of params.career ?? []) sp.append("career", v);
-  if (params.lastMetFrom) sp.set("lastMetFrom", params.lastMetFrom);
-  if (params.lastMetTo) sp.set("lastMetTo", params.lastMetTo);
-  for (const v of params.tag ?? []) sp.append("tag", v);
-  for (const v of params.likelihood ?? []) sp.append("likelihood", v);
-  if (params.sort) sp.set("sort", params.sort);
+  for (const { key, value } of listFilterEntries(params)) {
+    if (Array.isArray(value)) for (const v of value) sp.append(key, v);
+    else if (value !== undefined) sp.set(key, value);
+  }
   if (params.offset) sp.set("offset", String(params.offset));
 }
 
 /**
- * 書き出しの本文（人の一覧と同じ絞り込み。名前を URL に載せないよう本文で送る。FR-112）。
+ * 書き出しの本文（人の一覧と同じ絞り込み。名前を URL に載せないよう本文で送る。FR-112）。くり返す値は空でも配列で送る。
  * @param params - 探す言葉と絞り込み
  * @returns 本文
  */
 export function exportBody(params: PersonListParams): Record<string, unknown> {
-  return {
-    ...(params.q && params.q.trim() !== "" ? { q: params.q.trim() } : {}),
-    ...(params.eventId ? { eventId: params.eventId } : {}),
-    next: params.next ?? [],
-    wanted: params.wanted ?? [],
-    career: params.career ?? [],
-    ...(params.lastMetFrom ? { lastMetFrom: params.lastMetFrom } : {}),
-    ...(params.lastMetTo ? { lastMetTo: params.lastMetTo } : {}),
-    tag: params.tag ?? [],
-    likelihood: params.likelihood ?? [],
-    ...(params.sort ? { sort: params.sort } : {}),
-  };
+  return Object.fromEntries(listFilterEntries(params).flatMap(({ key, value }) => (value === undefined ? [] : [[key, value]])));
 }
 
 /**

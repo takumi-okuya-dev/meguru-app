@@ -24,6 +24,18 @@ const { groupPersons, kanaRowOf } = await import("@/apps/people/components/perso
 const { personListSearch } = await import("@/apps/people/lib/api");
 
 const ROUTES = [{ path: "/people/list", element: <PeopleListPage /> }];
+
+/**
+ * あとで返す約束（読み込み中・応答の順を確かめる）。
+ * @returns 約束と、返す処理
+ */
+function deferred<T>() {
+  let resolve!: (v: T) => void;
+  const promise = new Promise<T>((res) => {
+    resolve = res;
+  });
+  return { promise, resolve };
+}
 const REGULAR = { id: "t1", name: "常連" };
 const SPEAKER = { id: "t2", name: "登壇してくれそう" };
 
@@ -49,12 +61,52 @@ beforeEach(() => {
 afterEach(() => localStorage.clear());
 
 describe("並べ方とまとめた表示", () => {
-  it("開いたら、APIで覚えた並べ方で読む（覚えた値がわかってから1回だけ読む）", async () => {
+  it("開いたら、覚えた値を待たずに初めの並べ方ですぐ読み、覚えた値が届いたら切り替える", async () => {
+    const later = deferred<object>();
+    api.settings.mockReturnValue(later.promise);
     renderRoutes(ROUTES, "/people/list");
-    await waitFor(() => expect(screen.getByLabelText("並べ方")).toHaveValue("kana"));
     await screen.findByText("全 3人");
-    expect(api.persons).toHaveBeenCalledTimes(1);
-    expect(api.persons).toHaveBeenLastCalledWith(expect.objectContaining({ sort: "kana" }));
+    expect(api.persons).toHaveBeenCalledWith(expect.objectContaining({ sort: "last_met" }));
+    expect(screen.getByLabelText("並べ方")).toHaveValue("last_met");
+    later.resolve({ inviteTemplate: null, repeaterGoal: null, personView: { sort: "kana", group: "tag" } });
+    await waitFor(() => expect(screen.getByLabelText("並べ方")).toHaveValue("kana"));
+    expect(screen.getByLabelText("まとめ方")).toHaveValue("tag");
+    await waitFor(() => expect(api.persons).toHaveBeenLastCalledWith(expect.objectContaining({ sort: "kana" })));
+  });
+
+  it("覚えた値が届く前に選び直したら、届いても上書きしない", async () => {
+    const user = userEvent.setup();
+    const later = deferred<object>();
+    api.settings.mockReturnValue(later.promise);
+    renderRoutes(ROUTES, "/people/list");
+    await screen.findByText("全 3人");
+    await user.selectOptions(screen.getByLabelText("並べ方"), "first_met");
+    later.resolve({ inviteTemplate: null, repeaterGoal: null, personView: { sort: "kana", group: "tag" } });
+    await waitFor(() => expect(api.persons).toHaveBeenLastCalledWith(expect.objectContaining({ sort: "first_met" })));
+    expect(screen.getByLabelText("並べ方")).toHaveValue("first_met");
+    expect(screen.getByLabelText("まとめ方")).toHaveValue("none");
+  });
+
+  it("並べ方の保存が並んで走っても、古い応答で新しい選択を上書きしない（開き直すと最後の選択）", async () => {
+    const user = userEvent.setup();
+    const slow = deferred<object>();
+    api.settings.mockResolvedValueOnce({ inviteTemplate: null, repeaterGoal: null, personView: { sort: "kana", group: "none" } });
+    // 開き直したときの読み直しは返さない（キャッシュの値を見る）
+    api.settings.mockReturnValue(new Promise(() => {}));
+    api.updateSettings.mockReturnValueOnce(slow.promise);
+    api.updateSettings.mockImplementationOnce(async (input: object) => ({ inviteTemplate: null, repeaterGoal: null, ...input }));
+    const router = renderRoutes([...ROUTES, { path: "/people/other", element: <p>ほかの画面</p> }], "/people/list");
+    await screen.findByText("全 3人");
+    await waitFor(() => expect(screen.getByLabelText("並べ方")).toHaveValue("kana"));
+    await user.selectOptions(screen.getByLabelText("並べ方"), "likelihood");
+    await user.selectOptions(screen.getByLabelText("並べ方"), "first_met");
+    await waitFor(() => expect(api.updateSettings).toHaveBeenCalledTimes(2));
+    slow.resolve({ inviteTemplate: null, repeaterGoal: null, personView: { sort: "likelihood", group: "none" } });
+    await new Promise((r) => setTimeout(r, 0));
+    await router.navigate("/people/other");
+    await screen.findByText("ほかの画面");
+    await router.navigate("/people/list");
+    await waitFor(() => expect(screen.getByLabelText("並べ方")).toHaveValue("first_met"));
   });
 
   it("並べ方とまとめ方を選ぶと、その順で読み、APIで覚える。ブラウザには置かない", async () => {
@@ -130,6 +182,10 @@ describe("まとめ方の部品", () => {
     expect(kanaRowOf("ﾀﾛｳ")).toBe("た行");
     expect(kanaRowOf("ゆうき")).toBe("や行");
     expect(kanaRowOf("んな")).toBe("わ行");
+    expect(kanaRowOf("ヴィクトル")).toBe("あ行");
+    expect(kanaRowOf("ゔぁ")).toBe("あ行");
+    expect(kanaRowOf("ヶ丘")).toBe("か行");
+    expect(kanaRowOf("ゕ")).toBe("か行");
     expect(kanaRowOf("Ken")).toBe("A〜Z");
     expect(kanaRowOf("山田")).toBe("そのほか（漢字など）");
   });

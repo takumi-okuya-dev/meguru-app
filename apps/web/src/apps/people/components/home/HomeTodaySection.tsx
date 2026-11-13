@@ -1,6 +1,6 @@
 // ホームの「今日やること・過ぎたもの・近い誕生日」（specs/people/002-sales-list spec US2、FR-104）。誘う候補の画面の上に出す。
 // 行を押すと人のページへ。過ぎたものは目立たせる。知らせ（メール・通知）は作らない。
-import type { HomeItem, PeopleHome } from "@meguru/shared/people";
+import { HOME_LIMIT, type HomeItem, type PeopleHome } from "@meguru/shared/people";
 import { useQuery } from "@tanstack/react-query";
 import { ChevronRightIcon } from "lucide-react";
 import { useState } from "react";
@@ -51,6 +51,7 @@ function HomeGroup({ title, items, kind, empty }: { title: string; items: HomeIt
           ))}
         </ul>
       )}
+      {items.length >= HOME_LIMIT && <p className="px-1 text-[13px] text-muted-foreground">ほかにもいます（最初の{HOME_LIMIT}人まで出しています）。</p>}
       {items.length > FIRST_ROWS && (
         <Button type="button" variant="ghost" className="h-11 rounded-full md:h-9" onClick={() => setAll((v) => !v)}>
           {all ? "少なく出す" : `すべて出す（${items.length}人）`}

@@ -1,14 +1,12 @@
 // 人の一覧の書き出し（specs/people/002-sales-list plan.md 3、FR-111）。絞り込みに合う人を CSV（UTF-8・BOM）にする。
 // ファイルは残さない（返すだけ）。Excel で式として読まれる頭の文字（= + - @ と、タブ・改行）は ' を付けて逃がす。
-import { jstDate, type PersonListQuery } from "@meguru/shared/people";
+import { EXPORT_LIMIT, jstDate, type PersonListQuery } from "@meguru/shared/people";
 import { and, asc, eq, inArray } from "drizzle-orm";
 import type { Db } from "../../../kernel/db/client";
 import { peoplePersonFieldValues, peoplePersonLinks, peoplePersons, peopleResponses } from "../schema";
 import { listFields } from "../fields/field-service";
 import { queryPersons } from "./person-list";
 
-/** 書き出せる人数の上限。 */
-const EXPORT_LIMIT = 10_000;
 /** 来てくれそう度の名前。 */
 const LIKELIHOOD_LABEL: Record<number, string> = { 3: "高", 2: "中", 1: "低" };
 

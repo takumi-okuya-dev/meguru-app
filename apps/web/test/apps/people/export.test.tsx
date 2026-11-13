@@ -20,6 +20,7 @@ vi.mock("@/apps/people/lib/api", async (orig) => {
 
 const { PeopleListPage } = await import("@/apps/people/pages/PeopleListPage");
 const { exportBody, exportFilename } = await import("@/apps/people/lib/api");
+const { saveFile, REVOKE_DELAY_MS } = await import("@/apps/people/lib/save-file");
 
 const ROUTES = [{ path: "/people/list", element: <PeopleListPage /> }];
 let clicked: { download: string; href: string }[] = [];
@@ -70,6 +71,56 @@ describe("書き出す", () => {
     await screen.findByText("全 12000人");
     await user.click(screen.getByRole("button", { name: /書き出す/ }));
     await waitFor(() => expect(toast.warning).toHaveBeenCalledWith("最初の1万人だけ書き出しました。"));
+  });
+
+  it("探す言葉の待ちの途中と、前の結果を出したまま読んでいる間は押せない（画面に出ている条件だけで書き出す）", async () => {
+    const user = userEvent.setup();
+    let release!: (v: object) => void;
+    api.persons.mockImplementation((p: { q?: string }) =>
+      p.q ? new Promise((res) => (release = res)) : Promise.resolve({ persons: [makeListItem()], total: 1 }),
+    );
+    renderRoutes(ROUTES, "/people/list");
+    await screen.findByText("全 1人");
+    const button = screen.getByRole("button", { name: /書き出す/ });
+    expect(button).toBeEnabled();
+    await user.type(screen.getByLabelText("人を探す"), "はな");
+    // 待ちの途中
+    expect(button).toBeDisabled();
+    // 新しい条件で読んでいる間（前の結果を出したまま）
+    await waitFor(() => expect(api.persons).toHaveBeenLastCalledWith(expect.objectContaining({ q: "はな" })));
+    expect(button).toBeDisabled();
+    release({ persons: [makeListItem()], total: 1 });
+    await waitFor(() => expect(button).toBeEnabled());
+    await user.click(button);
+    await waitFor(() => expect(requestBlob).toHaveBeenCalledTimes(1));
+    expect(JSON.parse((requestBlob.mock.calls[0]![1] as RequestInit).body as string)).toMatchObject({ q: "はな" });
+  });
+
+  it("「最初の1万人だけ」は、書き出したときの条件の人数で決める（前の結果の人数を使わない）", async () => {
+    const user = userEvent.setup();
+    api.persons.mockImplementation(async (p: { tag?: string[] }) => ({ persons: [makeListItem()], total: p.tag?.length ? 5 : 12_000 }));
+    renderRoutes(ROUTES, "/people/list");
+    await screen.findByText("全 12000人");
+    await user.click(screen.getByRole("button", { name: /絞り込み/ }));
+    await user.click(screen.getByRole("button", { name: "#常連" }));
+    await screen.findByText("当てはまる人 5人");
+    await user.click(screen.getByRole("button", { name: /書き出す/ }));
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith("書き出しました。"));
+    expect(toast.warning).not.toHaveBeenCalled();
+  });
+
+  it("保存の URL は、すぐには捨てず、少し待ってから捨てる", () => {
+    vi.useFakeTimers();
+    try {
+      saveFile(new Blob(["a"]), "people-20261113.csv");
+      expect(clicked).toEqual([{ download: "people-20261113.csv", href: "blob:people-export" }]);
+      vi.advanceTimersByTime(1000);
+      expect(URL.revokeObjectURL).not.toHaveBeenCalled();
+      vi.advanceTimersByTime(REVOKE_DELAY_MS);
+      expect(URL.revokeObjectURL).toHaveBeenCalledWith("blob:people-export");
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("書き出しの本文は、探す言葉を URL ではなく本文に入れる（空の項目は送らない）", () => {

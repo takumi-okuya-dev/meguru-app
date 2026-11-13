@@ -18,6 +18,10 @@ export const FIELDS_MAX = 30;
 export const FIELD_VALUE_MAX = 500;
 /** SNS のリンクの上限。 */
 export const LINK_URL_MAX = 500;
+/** 書き出せる人数の上限（超えたら最初の分だけ書き出す）。 */
+export const EXPORT_LIMIT = 10_000;
+/** ホームのそれぞれのまとまりに出す人数の上限。 */
+export const HOME_LIMIT = 200;
 /** ホームの「近い誕生日」に出す日数（今日を含めて）。 */
 export const BIRTHDAY_WINDOW_DAYS = 7;
 

@@ -210,6 +210,23 @@ describe("自由な項目", () => {
     ]);
   });
 
+  it("変えた項目だけを送る（触っていない項目の値は送らない）", async () => {
+    const user = userEvent.setup();
+    api.person.mockResolvedValue(
+      makeDetail({
+        fields: [
+          { fieldId: "f1", label: "好きなもの", value: "コーヒー" },
+          { fieldId: "f2", label: "紹介された本", value: "リーダブルコード" },
+        ],
+      }),
+    );
+    renderRoutes(ROUTES, "/people/list/p1");
+    const s = await section("自由な項目");
+    await user.type(within(s).getByLabelText("紹介された本"), "（2冊目）");
+    await user.click(within(s).getByRole("button", { name: "項目を保存" }));
+    expect(api.setPersonFields).toHaveBeenCalledWith("p1", [{ fieldId: "f2", value: "リーダブルコード（2冊目）" }]);
+  });
+
   it("項目がなければ、設定で足せると出す", async () => {
     renderRoutes(ROUTES, "/people/list/p1");
     const s = await section("自由な項目");
@@ -246,6 +263,20 @@ describe("SNS のリンク", () => {
     await user.type(within(s).getByLabelText("X"), "https://twitter.com/hanako");
     await user.click(within(s).getByRole("button", { name: "リンクを保存" }));
     expect(api.setPersonLinks).toHaveBeenCalledWith("p1", { instagram: "https://www.instagram.com/hanako", x: "https://twitter.com/hanako", facebook: null });
+  });
+
+  it("「やめる」で、捨てた入力を残さない（開き直すと今のリンク）", async () => {
+    const user = userEvent.setup();
+    api.person.mockResolvedValue(makeDetail({ links: { x: "https://x.com/hanako" } }));
+    renderRoutes(ROUTES, "/people/list/p1");
+    const s = await section("SNS のリンク");
+    await user.click(within(s).getByRole("button", { name: "リンクを直す" }));
+    await user.type(within(s).getByLabelText("Instagram"), "https://instagram.com/other");
+    await user.clear(within(s).getByLabelText("X"));
+    await user.click(within(s).getByRole("button", { name: "やめる" }));
+    await user.click(within(s).getByRole("button", { name: "リンクを直す" }));
+    expect(within(s).getByLabelText("Instagram")).toHaveValue("");
+    expect(within(s).getByLabelText("X")).toHaveValue("https://x.com/hanako");
   });
 
   it("APIが断ったら（400）文言を出す", async () => {

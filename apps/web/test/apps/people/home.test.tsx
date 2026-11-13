@@ -74,6 +74,18 @@ describe("ホーム", () => {
     expect(screen.queryByRole("region", { name: "近い誕生日" })).not.toBeInTheDocument();
   });
 
+  it("APIの上限（200人）に届いたまとまりには「ほかにもいます」と出す", async () => {
+    api.home.mockResolvedValue({
+      today: Array.from({ length: 200 }, (_, i) => item(`p${i}`, `人${i}`, { nextAction: { on: "2026-11-13", note: "連絡" } })),
+      overdue: [item("b", "ぶんた", { nextAction: { on: "2026-11-12", note: "お礼" } })],
+      birthdays: [],
+    });
+    renderRoutes(ROUTES, "/people");
+    const today = await screen.findByRole("region", { name: "今日やること" });
+    expect(within(today).getByText("ほかにもいます（最初の200人まで出しています）。")).toBeInTheDocument();
+    expect(within(screen.getByRole("region", { name: "過ぎたもの" })).queryByText(/ほかにもいます/)).not.toBeInTheDocument();
+  });
+
   it("6人以上いるときは5人まで出し、「すべて出す」で残りも出す", async () => {
     const user = userEvent.setup();
     api.home.mockResolvedValue({

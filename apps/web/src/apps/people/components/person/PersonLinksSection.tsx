@@ -31,6 +31,15 @@ function validLink(kind: LinkKind, value: string): boolean {
 }
 
 /**
+ * 今のリンクを欄の値にする。
+ * @param links - 今のリンク
+ * @returns 種類ごとの欄の値
+ */
+function linkValues(links: PersonLinks): Record<LinkKind, string> {
+  return { instagram: links.instagram ?? "", x: links.x ?? "", facebook: links.facebook ?? "" };
+}
+
+/**
  * SNS のリンクの段。リンクが変わったら呼ぶ側が key を変えて作り直す。
  * @param props - personId：人、links：今のリンク
  * @returns 段
@@ -39,7 +48,7 @@ export function PersonLinksSection({ personId, links }: { personId: string; link
   const id = useId();
   const queryClient = useQueryClient();
   const [editing, setEditing] = useState(false);
-  const [values, setValues] = useState<Record<LinkKind, string>>({ instagram: links.instagram ?? "", x: links.x ?? "", facebook: links.facebook ?? "" });
+  const [values, setValues] = useState<Record<LinkKind, string>>(() => linkValues(links));
   const save = useMutation({
     mutationFn: () => peopleApi.setPersonLinks(personId, Object.fromEntries(LINK_KINDS.map((k) => [k, values[k].trim() === "" ? null : values[k].trim()]))),
     onSuccess: async () => {
@@ -106,7 +115,17 @@ export function PersonLinksSection({ personId, links }: { personId: string; link
               <Button type="submit" className="h-11 rounded-full md:h-9" disabled={!allValid || save.isPending}>
                 リンクを保存
               </Button>
-              <Button type="button" variant="ghost" className="h-11 rounded-full md:h-9" onClick={() => setEditing(false)}>
+              <Button
+                type="button"
+                variant="ghost"
+                className="h-11 rounded-full md:h-9"
+                onClick={() => {
+                  // 捨てた入力を残さない（今のリンクに戻す）
+                  setValues(linkValues(links));
+                  save.reset();
+                  setEditing(false);
+                }}
+              >
                 やめる
               </Button>
             </div>
