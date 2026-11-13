@@ -1,5 +1,5 @@
 // 人のページ・直す・同意を直す（specs/people/001-people-memo contracts/api.md 4、research.md R10・R11、tasks.md T053）。
-import { nameKey, type PersonConsent, type PersonDetail, type PersonResponse, type PersonSummary } from "@meguru/shared/people";
+import { nameKey, type PersonConsent, type PersonDetail, type PersonResponse, type PersonSummary, type PersonTag } from "@meguru/shared/people";
 import { and, desc, eq, sql } from "drizzle-orm";
 import { withTransaction } from "../../../kernel/db/client";
 import type { Env } from "../../../kernel/env";
@@ -9,6 +9,9 @@ import { peopleConsentChanges, peopleEvents, peopleManualAttendances, peoplePers
 import { derivePersons, newerResponse, recordManualConsent } from "./person-derive";
 import { personStatsSql } from "./person-query";
 import { outreachesOfPerson } from "../outreach/outreach-service";
+import { contactLogsOf } from "../contact/contact-log-service";
+import { fieldsOfPerson, linksOfPerson } from "../fields/field-service";
+import { tagsOfPerson } from "../tags/tag-service";
 
 /**
  * 回答を、人のページの形にする。
@@ -39,7 +42,7 @@ function toResponse(r: typeof peopleResponses.$inferSelect): PersonResponse {
  */
 export async function personDetail(db: PeopleDb, userId: string, personId: string): Promise<PersonDetail> {
   const p = await loadOwnedPerson(db, userId, personId);
-  const [responses, manuals, changes, outreaches] = await Promise.all([
+  const [responses, manuals, changes, outreaches, tags, logs, fields, links] = await Promise.all([
     db
       .select({ r: peopleResponses, event: peopleEvents })
       .from(peopleResponses)
@@ -56,6 +59,10 @@ export async function personDetail(db: PeopleDb, userId: string, personId: strin
       .where(and(eq(peopleConsentChanges.personId, p.id), eq(peopleConsentChanges.userId, userId)))
       .orderBy(desc(peopleConsentChanges.changedAt)),
     outreachesOfPerson(db, userId, p.id),
+    tagsOfPerson(db, userId, p.id),
+    contactLogsOf(db, userId, p.id),
+    fieldsOfPerson(db, userId, p.id),
+    linksOfPerson(db, userId, p.id),
   ]);
 
   const key = (x: (typeof responses)[number]) => ({ id: x.r.id, heldOn: x.event.heldOn, submittedAt: x.r.submittedAt, createdAt: x.r.createdAt });
@@ -73,7 +80,7 @@ export async function personDetail(db: PeopleDb, userId: string, personId: strin
   const attendances = [...byEvent.values()].sort((a, b) => (a.event.heldOn === b.event.heldOn ? a.event.name.localeCompare(b.event.name, "ja") : a.event.heldOn < b.event.heldOn ? 1 : -1));
 
   return {
-    person: toSummary(p, otherLineNamesOf(p, sorted.map((x) => x.r.lineName)), attendances[0]?.event.heldOn ?? null),
+    person: toSummary(p, otherLineNamesOf(p, sorted.map((x) => x.r.lineName)), attendances[0]?.event.heldOn ?? null, tags),
     attendances,
     consentChanges: changes.map((c) => ({
       invite: c.invite,
@@ -83,6 +90,9 @@ export async function personDetail(db: PeopleDb, userId: string, personId: strin
       changedAt: c.changedAt.toISOString(),
     })),
     outreaches,
+    contactLogs: logs,
+    fields,
+    links,
   };
 }
 
@@ -91,9 +101,10 @@ export async function personDetail(db: PeopleDb, userId: string, personId: strin
  * @param p - 人の行
  * @param otherLineNames - 別名
  * @param lastMetOn - 最後に会った日
+ * @param tags - 付いたタグ
  * @returns 人
  */
-function toSummary(p: typeof peoplePersons.$inferSelect, otherLineNames: string[], lastMetOn: string | null): PersonSummary {
+function toSummary(p: typeof peoplePersons.$inferSelect, otherLineNames: string[], lastMetOn: string | null, tags: PersonTag[]): PersonSummary {
   return {
     id: p.id,
     displayName: displayNameOf(p),
@@ -104,6 +115,10 @@ function toSummary(p: typeof peoplePersons.$inferSelect, otherLineNames: string[
     memoTalk: p.memoTalk,
     consent: consentOf(p),
     lastMetOn,
+    tags,
+    likelihood: p.likelihood,
+    nextAction: p.nextActionOn && p.nextActionNote ? { on: p.nextActionOn, note: p.nextActionNote } : null,
+    birthdayMd: p.birthdayMd,
   };
 }
 
@@ -126,16 +141,17 @@ function consentOf(p: typeof peoplePersons.$inferSelect): PersonConsent {
 export async function personSummary(db: PeopleDb, userId: string, personId: string): Promise<PersonSummary> {
   const p = await loadOwnedPerson(db, userId, personId);
   // 頭に要るのは、別名（回答のLINE名）と最後に会った日だけ（回答の答えや同意の記録は読まない）
-  const [lines, stats] = await Promise.all([
+  const [lines, stats, tags] = await Promise.all([
     db
       .select({ id: peopleResponses.id, lineName: peopleResponses.lineName, heldOn: peopleEvents.heldOn, submittedAt: peopleResponses.submittedAt, createdAt: peopleResponses.createdAt })
       .from(peopleResponses)
       .innerJoin(peopleEvents, eq(peopleEvents.id, peopleResponses.eventId))
       .where(and(eq(peopleResponses.personId, p.id), eq(peopleResponses.userId, userId))),
     db.execute<{ last_met_on: string | null }>(sql`SELECT s.last_met_on FROM (${personStatsSql(userId)}) s WHERE s.person_id = ${p.id}`),
+    tagsOfPerson(db, userId, p.id),
   ]);
   const sorted = [...lines].sort((a, b) => (newerResponse(a, b) ? -1 : 1));
-  return toSummary(p, otherLineNamesOf(p, sorted.map((l) => l.lineName)), stats.rows[0]?.last_met_on ?? null);
+  return toSummary(p, otherLineNamesOf(p, sorted.map((l) => l.lineName)), stats.rows[0]?.last_met_on ?? null, tags);
 }
 
 /**
@@ -164,7 +180,15 @@ export async function updatePerson(
   env: Env,
   userId: string,
   personId: string,
-  input: { realName?: string | null; memoAppearance?: string | null; memoTalk?: string | null },
+  input: {
+    realName?: string | null;
+    memoAppearance?: string | null;
+    memoTalk?: string | null;
+    nextActionOn?: string | null;
+    nextActionNote?: string | null;
+    birthdayMd?: string | null;
+    likelihood?: number | null;
+  },
 ): Promise<PersonSummary> {
   return withTransaction(env.DATABASE_URL, async (tx) => {
     await lockOwner(tx, userId);
@@ -178,6 +202,13 @@ export async function updatePerson(
     }
     if (input.memoAppearance !== undefined) set.memoAppearance = input.memoAppearance;
     if (input.memoTalk !== undefined) set.memoTalk = input.memoTalk;
+    // 002：次にやること（日付と文は一緒に。入力の形で確かめてある）・誕生日・来てくれそう度
+    if (input.nextActionOn !== undefined) {
+      set.nextActionOn = input.nextActionOn;
+      set.nextActionNote = input.nextActionNote ?? null;
+    }
+    if (input.birthdayMd !== undefined) set.birthdayMd = input.birthdayMd;
+    if (input.likelihood !== undefined) set.likelihood = input.likelihood;
     await tx
       .update(peoplePersons)
       .set(set)

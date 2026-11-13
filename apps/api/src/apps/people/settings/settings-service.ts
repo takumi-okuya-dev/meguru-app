@@ -16,7 +16,12 @@ import { toEvent } from "../events/event-service";
  */
 export async function getSettings(db: Db, userId: string): Promise<PeopleSettings> {
   const [row] = await db.select().from(peopleOwnerSettings).where(eq(peopleOwnerSettings.userId, userId));
-  return { inviteTemplate: row?.inviteTemplate ?? null, repeaterGoal: row?.repeaterGoal ?? null };
+  return {
+    inviteTemplate: row?.inviteTemplate ?? null,
+    repeaterGoal: row?.repeaterGoal ?? null,
+    // 並べ方（まだなければ、最後に会った順・まとめない。specs/people/002 FR-103）
+    personView: (row?.personView as PeopleSettings["personView"] | null) ?? { sort: "last_met", group: "none" },
+  };
 }
 
 /**
@@ -26,10 +31,15 @@ export async function getSettings(db: Db, userId: string): Promise<PeopleSetting
  * @param input - 誘いの文の型（null は初めの型）・リピーターの目標
  * @returns 直したあとの設定
  */
-export async function updateSettings(env: Env, userId: string, input: { inviteTemplate?: string | null; repeaterGoal?: number | null }): Promise<PeopleSettings> {
+export async function updateSettings(
+  env: Env,
+  userId: string,
+  input: { inviteTemplate?: string | null; repeaterGoal?: number | null; personView?: PeopleSettings["personView"] },
+): Promise<PeopleSettings> {
   const set: Partial<typeof peopleOwnerSettings.$inferInsert> = { updatedAt: new Date() };
   if (input.inviteTemplate !== undefined) set.inviteTemplate = input.inviteTemplate;
   if (input.repeaterGoal !== undefined) set.repeaterGoal = input.repeaterGoal;
+  if (input.personView !== undefined) set.personView = input.personView;
   // 行を作る書き込みなので、退会の途中でないことをロックの中で確かめる（退会の片づけのあとに設定が残らないように）
   await withTransaction(env.DATABASE_URL, async (tx) => {
     await lockActiveOwner(tx, env, userId);

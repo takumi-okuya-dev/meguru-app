@@ -5,6 +5,7 @@ import { createDb } from "../../../kernel/db/client";
 import { parseBody, parseQuery } from "../../../kernel/validate";
 import type { AppEnv } from "../../../platform";
 import { listCandidates } from "./candidate-service";
+import { outreachBoard } from "./outreach-board";
 import { createOutreach, deleteOutreach, updateOutreachStage } from "./outreach-service";
 
 /**
@@ -14,10 +15,18 @@ import { createOutreach, deleteOutreach, updateOutreachStage } from "./outreach-
 export function outreachRoutes() {
   return new Hono<AppEnv>()
     .get("/candidates", async (c) => {
-      // くり返せるクエリ（next・wanted・career）は queries で読む
-      const raw = { ...c.req.query(), next: c.req.queries("next"), wanted: c.req.queries("wanted"), career: c.req.queries("career") };
+      // くり返せるクエリ（next・wanted・career・tag・likelihood）は queries で読む
+      const raw = {
+        ...c.req.query(),
+        next: c.req.queries("next"),
+        wanted: c.req.queries("wanted"),
+        career: c.req.queries("career"),
+        tag: c.req.queries("tag"),
+        likelihood: c.req.queries("likelihood"),
+      };
       return c.json(await listCandidates(createDb(c.env.DATABASE_URL), c.get("user").id, parseQuery(candidateQuerySchema, raw)));
     })
+    .get("/events/:eventId/outreach-board", async (c) => c.json(await outreachBoard(createDb(c.env.DATABASE_URL), c.get("user").id, c.req.param("eventId"))))
     .post("/outreaches", async (c) => {
       const input = await parseBody(outreachCreateSchema, c.req.json());
       const { outreach, created } = await createOutreach(c.env, c.get("user").id, input);
