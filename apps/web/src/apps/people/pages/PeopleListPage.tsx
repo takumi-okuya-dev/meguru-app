@@ -203,10 +203,10 @@ export function PeopleListPage() {
   // 書き出しは、画面に出ている一覧と同じ条件のときだけ押せる（探す言葉の待ちの途中・前の結果を出したまま読んでいる間は押せない）
   const settled = persons.isSuccess && !persons.isPlaceholderData && text.trim() === q;
   const exportList = useMutation({
-    mutationFn: (p: PersonListParams) => peopleApi.exportPersons(p),
+    mutationFn: ({ params: p, total }: { params: PersonListParams; total: number }) => peopleApi.exportPersons(p, total),
     onSuccess: (file) => {
       saveFile(file.blob, file.filename);
-      // 1万人を超えると、APIは最初の1万人だけを書き出す（API の見出しで分かる）
+      // 1万人を超えると、APIは最初の1万人だけを書き出す（API の見出しで分かる。読めなければ一覧の人数で決める）
       if (file.truncated) toast.warning("最初の1万人だけ書き出しました。");
       else toast.success("書き出しました。");
     },
@@ -248,7 +248,7 @@ export function PeopleListPage() {
           <div className="flex flex-wrap items-center gap-2">
             <Button type="button" variant="outline" className="h-11 rounded-full md:h-9" disabled={exportList.isPending || !settled}
               onClick={() => {
-                if (settled) exportList.mutate(params);
+                if (settled) exportList.mutate({ params, total: persons.data.total });
               }}
             >
               <DownloadIcon /> 書き出す

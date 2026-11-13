@@ -2,7 +2,7 @@
 // APIの基本のURL・認証のトークン・エラーの扱いは、共通の部品（lib/api-client.ts の request）を使う。
 // 応答の形は @meguru/shared/people の型（応答の zod スキーマは共通にないので、型だけを当てる）。
 // 002（声かけリスト）：タグ・連絡の記録・自由な項目・SNS のリンク・ホーム・会ごとの声かけの一覧・書き出し（specs/people/002-sales-list plan.md 3）。
-import { jstDate } from "@meguru/shared/people";
+import { EXPORT_LIMIT, jstDate } from "@meguru/shared/people";
 import type {
   ContactChannel,
   ContactLog,
@@ -329,9 +329,9 @@ export const peopleApi = {
     (await request(`${personUrl(id)}/links`, typed<{ links: PersonLinks }>(), withBody("PUT", links))).links,
   // ---- 002：会ごとの声かけの一覧・書き出し ----
   outreachBoard: (eventId: string) => request(`${eventUrl(eventId)}/outreach-board`, typed<OutreachBoard>()),
-  exportPersons: async (params: PersonListParams): Promise<ExportedFile> => {
+  exportPersons: async (params: PersonListParams, listTotal: number): Promise<ExportedFile> => {
     const file = await requestFile("/api/people/persons/export", withBody("POST", exportBody(params)));
-    // 1万人で切ったかは API の見出しで分かる（書き出したときの人数で決まる）
-    return { blob: file.blob, filename: file.filename ?? exportFilename(), truncated: file.headers.get("X-Export-Truncated") === "true" };
+    // 1万人で切ったかは API の見出しで分かる。見出しが読めなければ（古い API など）、同じ条件の一覧の人数で決める
+    return { blob: file.blob, filename: file.filename ?? exportFilename(), truncated: file.truncated ?? listTotal > EXPORT_LIMIT };
   },
 };

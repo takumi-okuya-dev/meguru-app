@@ -47,11 +47,11 @@ afterEach(() => vi.restoreAllMocks());
 /**
  * API が返したことにするファイル。
  * @param filename - Content-Disposition のファイル名（読めなければ null）
- * @param truncated - 1万人で切ったか（X-Export-Truncated）
+ * @param truncated - 1万人で切ったか（X-Export-Truncated。読めなければ null）
  * @returns requestFile の戻り値
  */
-function exported(filename: string | null, truncated: boolean) {
-  return { blob: new Blob(["\uFEFF名前\r\n"], { type: "text/csv" }), filename, headers: new Headers({ "X-Export-Truncated": String(truncated) }) };
+function exported(filename: string | null, truncated: boolean | null) {
+  return { blob: new Blob(["\uFEFF名前\r\n"], { type: "text/csv" }), filename, truncated, headers: new Headers() };
 }
 
 describe("書き出す", () => {
@@ -112,6 +112,16 @@ describe("書き出す", () => {
     await user.click(screen.getByRole("button", { name: /書き出す/ }));
     await waitFor(() => expect(toast.success).toHaveBeenCalledWith("書き出しました。"));
     expect(toast.warning).not.toHaveBeenCalled();
+  });
+
+  it("切ったかの見出しが読めなければ（古い API など）、一覧の人数で決める", async () => {
+    const user = userEvent.setup();
+    requestFile.mockImplementation(async () => exported("people-20261113.csv", null));
+    api.persons.mockResolvedValue({ persons: [makeListItem()], total: 12_000 });
+    renderRoutes(ROUTES, "/people/list");
+    await screen.findByText("全 12000人");
+    await user.click(screen.getByRole("button", { name: /書き出す/ }));
+    await waitFor(() => expect(toast.warning).toHaveBeenCalledWith("最初の1万人だけ書き出しました。"));
   });
 
   it("見出しのファイル名が読めなければ、同じ形（people-YYYYMMDD.csv）で作る", async () => {

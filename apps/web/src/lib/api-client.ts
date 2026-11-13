@@ -158,11 +158,11 @@ export function configureApiClient(opts: { getToken: TokenGetter; onSessionExpir
   onSessionExpired = opts.onSessionExpired;
 }
 
-/** request・requestBlob の設定。 */
+/** request・requestBlob・requestFile の設定。 */
 type RequestOptions = RequestInit & { auth?: boolean; onError?: (err: ApiError) => void };
 
 /**
- * API を呼び、成功の応答を返す（トークンを付け、失敗は ApiError にする）。request・requestBlob の中身。
+ * API を呼び、成功の応答を返す（トークンを付け、失敗は ApiError にする）。request・requestBlob・requestFile の中身。
  * @param path - /api から始まる道筋
  * @param init - fetch の設定
  * @returns 成功の応答
@@ -227,11 +227,14 @@ export async function request<T>(path: string, schema: z.ZodType<T> | null, init
  * @returns 受け取ったファイル
  */
 export async function requestBlob(path: string, init: RequestOptions = {}): Promise<Blob> {
-  return (await send(path, init)).blob();
+  return (await requestFile(path, init)).blob;
 }
 
-/** 受け取ったファイルと、応答の見出し（API が CORS で出している見出しだけ読める。apps/api/src/app.ts の exposeHeaders）。 */
-export type ReceivedFile = { blob: Blob; filename: string | null; headers: Headers };
+/**
+ * 受け取ったファイル。見出しは、API が CORS で出しているものだけ読める（apps/api/src/app.ts の exposeHeaders）。
+ * truncated は X-Export-Truncated（上限で切ったか）。見出しがなければ null（古い API など。呼ぶ側が別の手がかりで決める）。
+ */
+export type ReceivedFile = { blob: Blob; filename: string | null; truncated: boolean | null; headers: Headers };
 
 /**
  * Content-Disposition からファイル名を読む（filename* の UTF-8 を先に、なければ filename）。
@@ -240,7 +243,8 @@ export type ReceivedFile = { blob: Blob; filename: string | null; headers: Heade
  */
 export function dispositionFilename(value: string | null): string | null {
   if (!value) return null;
-  const star = /filename\*\s*=\s*UTF-8''([^;]+)/i.exec(value);
+  // filename*=UTF-8'<言語>'<名前>（言語は空のことが多い）
+  const star = /filename\*\s*=\s*UTF-8'[^']*'([^;]+)/i.exec(value);
   if (star) {
     try {
       return decodeURIComponent(star[1]!.trim());
@@ -248,8 +252,9 @@ export function dispositionFilename(value: string | null): string | null {
       // 形の崩れた filename* は読まず、filename を使う
     }
   }
-  const plain = /filename\s*=\s*(?:"([^"]*)"|([^;]+))/i.exec(value);
-  const name = (plain?.[1] ?? plain?.[2] ?? "").trim();
+  // 引用符の中は \" のように逃がせる
+  const plain = /filename\s*=\s*(?:"((?:[^"\\]|\\.)*)"|([^;]+))/i.exec(value);
+  const name = (plain?.[1]?.replace(/\\(.)/g, "$1") ?? plain?.[2] ?? "").trim();
   return name === "" ? null : name;
 }
 
@@ -261,7 +266,13 @@ export function dispositionFilename(value: string | null): string | null {
  */
 export async function requestFile(path: string, init: RequestOptions = {}): Promise<ReceivedFile> {
   const res = await send(path, init);
-  return { blob: await res.blob(), filename: dispositionFilename(res.headers.get("Content-Disposition")), headers: res.headers };
+  const truncated = res.headers.get("X-Export-Truncated");
+  return {
+    blob: await res.blob(),
+    filename: dispositionFilename(res.headers.get("Content-Disposition")),
+    truncated: truncated === null ? null : truncated === "true",
+    headers: res.headers,
+  };
 }
 
 

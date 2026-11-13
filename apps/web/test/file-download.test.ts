@@ -15,7 +15,12 @@ describe("Content-Disposition のファイル名", () => {
     );
   });
 
-  it("filename* がなければ filename（引用符あり・なし）", () => {
+  it("filename* の言語の印があっても読む", () => {
+    expect(dispositionFilename(`attachment; filename="x.csv"; filename*=UTF-8'ja'${encodeURIComponent("集金.csv")}`)).toBe("集金.csv");
+  });
+
+  it("filename* がなければ filename（引用符あり・なし・引用符の中で逃がした引用符）", () => {
+    expect(dispositionFilename('attachment; filename="a\\"b.csv"')).toBe('a"b.csv');
     expect(dispositionFilename('attachment; filename="people-20261113.csv"')).toBe("people-20261113.csv");
     expect(dispositionFilename("attachment; filename=people-20261113.csv")).toBe("people-20261113.csv");
   });
@@ -45,13 +50,19 @@ describe("requestFile", () => {
     const file = await requestFile("/api/people/persons/export", { method: "POST", body: "{}" });
     expect(await file.blob.text()).toBe("名前\r\n");
     expect(file.filename).toBe("people-20261113.csv");
-    expect(file.headers.get("X-Export-Truncated")).toBe("true");
+    expect(file.truncated).toBe(true);
     expect(new Headers((fetchMock.mock.calls[0] as unknown as [string, RequestInit])[1].headers).get("Authorization")).toBe("Bearer t");
   });
 
-  it("見出しが読めなければ filename は null", async () => {
+  it("見出しが読めなければ filename・truncated は null", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => new Response("x", { status: 200 })));
-    expect((await requestFile("/api/x")).filename).toBeNull();
+    const file = await requestFile("/api/x");
+    expect([file.filename, file.truncated]).toEqual([null, null]);
+  });
+
+  it("X-Export-Truncated: false は false", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => new Response("x", { status: 200, headers: { "X-Export-Truncated": "false" } })));
+    expect((await requestFile("/api/x")).truncated).toBe(false);
   });
 });
 
