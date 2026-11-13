@@ -27,6 +27,7 @@ Claude CodeとCodexで開発スキルを共用する手順と、利用制限時�
 
 - 機能：`specs/001`〜`028`を実装し、`develop`に入れた（ステージングに出ている）。2026-11-12からは、Threadsの改善と新しいアプリ（人物管理・集金管理）を並行して進める（[並行開発の手順](docs/parallel-development.md)）。
 - 本番：まだ立ち上げていない。本番に出す前の準備は[リリースの手順書](docs/release-runbook.md) 4・4-1。
+- 集金管理（めぐる 集金・`/collect`）：当日の受付と集金（現金・PayPay・振込）、ログインなしの受付の手伝い、締め・振込待ち・まとめまで、テスト版に入った（運営者が開いた人だけ）。使い方は[集金の使い方](docs/apps/collect-guide.md)、地図は[docs/apps/collect.md](docs/apps/collect.md)。
 - 公開の判断（MetaのApp Review・事業者としての手続き）のメモは[次の機能のメモ](docs/next-features.md)。
 
 ## ブランチとデプロイ
