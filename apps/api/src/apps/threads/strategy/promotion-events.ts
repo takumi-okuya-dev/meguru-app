@@ -36,20 +36,23 @@ function venueOf(e: PromotionEvent): string | null {
 /**
  * 宣伝内容のイベントの情報が変わったことを書く。イベントの情報（開催日時）があれば「保存した」、前はあって今はない
  * （消した・宣伝内容を消した）なら「消した」。どちらもなければ何もしない。
+ * 名前（宣伝内容のタイトル）もイベントの情報も前と同じなら書かない（本文やターゲットだけを直したときに、集金管理の
+ * イベントに「元が変わった」を付けないため）。
  * @param tx - 宣伝内容を変えたトランザクション
- * @param before - 変える前のイベントの情報（新しく作ったときは null）
+ * @param before - 変える前の宣伝内容（新しく作ったときは null）
  * @param after - 変えたあとの宣伝内容の行（消したときは null）
  * @param ctx - promotionId・threadsAccountId（accounts.id）・ownerUserId（アカウントの持ち主）・now
  * @returns 書いた出来事の番号（書かなかったら空）
  */
 export async function emitPromotionEventChange(
   tx: Db | TxDb,
-  before: PromotionEvent | null,
+  before: Pick<PromotionRow, "title" | "event"> | null,
   after: Pick<PromotionRow, "title" | "event"> | null,
   ctx: { promotionId: string; threadsAccountId: string; ownerUserId: string; now: Date },
 ): Promise<string[]> {
   const occurredAt = ctx.now.toISOString();
   const e = after?.event ?? null;
+  if (before && after && before.title === after.title && JSON.stringify(before.event) === JSON.stringify(after.event)) return [];
   if (after && e) {
     const id = await emitEvent(
       tx,
@@ -71,7 +74,7 @@ export async function emitPromotionEventChange(
     );
     return id ? [id] : [];
   }
-  if (!before) return [];
+  if (!before?.event) return [];
   const id = await emitEvent(tx, "threads.promotion_event.deleted", { promotionId: ctx.promotionId, occurredAt }, { allowNoConsumers: true });
   return id ? [id] : [];
 }

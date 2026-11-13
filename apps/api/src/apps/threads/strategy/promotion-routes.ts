@@ -211,7 +211,7 @@ export function promotionRoutes(authed: MiddlewareHandler<AppEnv>) {
           (current) => updatedByOf(q, current.updatedByUserId),
         );
         await recordActivity(q, access, { kind: "content", action: "promotion_updated", summary: updated.title });
-        eventIds = await emitPromotionEventChange(q, before?.event ?? null, updated, {
+        eventIds = await emitPromotionEventChange(q, before ?? null, updated, {
           promotionId: id,
           threadsAccountId: account.id,
           ownerUserId: access.owner.id,
@@ -239,7 +239,7 @@ export function promotionRoutes(authed: MiddlewareHandler<AppEnv>) {
           .returning();
         if (removed[0]) {
           await recordActivity(q, access, { kind: "content", action: "promotion_deleted", summary: removed[0].title });
-          eventIds = await emitPromotionEventChange(q, removed[0].event, null, {
+          eventIds = await emitPromotionEventChange(q, removed[0], null, {
             promotionId: id,
             threadsAccountId: account.id,
             ownerUserId: access.owner.id,

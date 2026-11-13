@@ -75,6 +75,25 @@ describe("宣伝内容のイベントの情報の出来事", () => {
     expect(received).toHaveLength(2);
   });
 
+  it("本文だけを直したときは書かない（集金管理のイベントに「元が変わった」を付けない）。名前を直したら書く", async () => {
+    listen();
+    const { accountId } = await createUserWithAccount("u1");
+    const q = await createPromotion(accountId, { event: EVENT, title: "勉強会" });
+    received.length = 0;
+    const onlyBody = await call(app, "PUT", `${base(accountId)}/promotions/${q.id}`, {
+      user: "u1",
+      body: { title: "勉強会", content: "本文だけ直した", event: EVENT, expectedVersion: q.version },
+    });
+    expect(onlyBody.status, await onlyBody.clone().text()).toBe(200);
+    expect(received).toHaveLength(0);
+    const renamed = await call(app, "PUT", `${base(accountId)}/promotions/${q.id}`, {
+      user: "u1",
+      body: { title: "勉強会 第2回", content: "本文だけ直した", event: EVENT, expectedVersion: q.version + 1 },
+    });
+    expect(renamed.status, await renamed.clone().text()).toBe(200);
+    expect(received.map((e) => e.type)).toEqual(["threads.promotion_event.saved"]);
+  });
+
   it("宣伝内容を消すと「消した」。アカウントを消すと、イベントの情報のある宣伝内容ごとに「消した」", async () => {
     listen();
     const { accountId } = await createUserWithAccount("u1", { name: "テストのアカウント" });
