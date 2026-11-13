@@ -187,9 +187,14 @@ export type OutreachStage = (typeof OUTREACH_STAGES)[OutreachPurpose][number];
 /** リピーターの目標の上限。 */
 export const REPEATER_GOAL_MAX = 10_000;
 
+/** 誘う候補のクエリで「次の自分の会を API が選ぶ」を表す値（eventId を書かなければ、誘う会を選んでいない）。 */
+export const NEXT_INVITE_EVENT = "next";
+
 /** GET /api/people/candidates のクエリ（人の一覧の絞り込み＋目的・誘う会・前に来た。FR-018・FR-019）。 */
 export const candidateQuerySchema = personListQuerySchema.extend({
   purpose: z.enum(OUTREACH_PURPOSES),
+  // 誘う会：next なら次の自分の会、書かなければ選んでいない（交流会への誘いのときだけ使う）
+  eventId: z.union([id, z.literal(NEXT_INVITE_EVENT)]).optional(),
   visitedOwn: z
     .enum(["true", "false"])
     .optional()
@@ -470,8 +475,8 @@ export type Outreach = {
 };
 /** 誘う候補の1行（人の一覧の行＋声かけ）。 */
 export type CandidateItem = PersonListItem & { outreach: Outreach | null };
-/** GET /api/people/candidates の返り。 */
-export type CandidateList = { persons: CandidateItem[]; total: number };
+/** GET /api/people/candidates の返り。inviteEvent は行の声かけを読んだ誘う会（仕事のつなぎ・選んでいないときは null）。 */
+export type CandidateList = { persons: CandidateItem[]; total: number; inviteEvent: PeopleEvent | null };
 /** GET /api/people/settings の返り。 */
 export type PeopleSettings = { inviteTemplate: string | null; repeaterGoal: number | null; personView: PersonView };
 /** GET /api/people/stats の返り。 */

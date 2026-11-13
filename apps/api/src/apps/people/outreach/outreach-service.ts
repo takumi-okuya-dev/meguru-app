@@ -5,9 +5,8 @@ import { nameKey, OUTREACH_STAGES, type Outreach, type OutreachCreateInput, type
 import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { withTransaction, type TxDb } from "../../../kernel/db/client";
 import type { Env } from "../../../kernel/env";
-import { AppError, itemNotFound } from "../../../kernel/errors";
-import { isUuid } from "../../../kernel/validate";
-import { loadOwnedEvent, loadOwnedPerson, lockActiveOwner, lockOwner, type PeopleDb } from "../access";
+import { AppError } from "../../../kernel/errors";
+import { loadOwnedEvent, loadOwnedOutreach, loadOwnedPerson, lockActiveOwner, lockOwner, type PeopleDb } from "../access";
 import { attendanceSql } from "../persons/person-query";
 import { peopleEvents, peopleOutreaches } from "../schema";
 
@@ -137,23 +136,6 @@ export async function latestWorkOutreachesFor(db: PeopleDb, userId: string, pers
     .where(and(eq(peopleOutreaches.userId, userId), eq(peopleOutreaches.purpose, "work"), inArray(peopleOutreaches.personId, [...personIds])))
     .orderBy(peopleOutreaches.personId, desc(peopleOutreaches.askedAt), desc(peopleOutreaches.id));
   return new Map(rows.map((r) => [r.o.personId, toOutreach({ o: r.o, event: null })]));
-}
-
-/**
- * 声かけを読む。ない・ほかの作り手のものなら 404。
- * @param db - データベース
- * @param userId - 作り手
- * @param outreachId - 声かけ
- * @returns 声かけの行
- */
-async function loadOwnedOutreach(db: PeopleDb, userId: string, outreachId: string) {
-  if (!isUuid(outreachId)) throw itemNotFound();
-  const [row] = await db
-    .select()
-    .from(peopleOutreaches)
-    .where(and(eq(peopleOutreaches.id, outreachId), eq(peopleOutreaches.userId, userId)));
-  if (!row) throw itemNotFound();
-  return row;
 }
 
 /**

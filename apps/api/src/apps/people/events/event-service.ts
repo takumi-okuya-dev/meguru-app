@@ -1,7 +1,7 @@
 // イベント（specs/people/001-people-memo contracts/api.md 2、data-model.md 4、research.md R12・R14）。
 // 参加者数＝その会の来た記録の人数（回答 ∪ 手で足した会ったイベント）＋消した人の来た記録の行数。毎回数える。
-import type { EventDeletePreview, PeopleAttendee, PeopleEvent, PeopleEventDetail, PeopleEventListItem, UndoResult } from "@meguru/shared/people";
-import { and, count, desc, eq, sql, type SQL } from "drizzle-orm";
+import { jstDate, type EventDeletePreview, type PeopleAttendee, type PeopleEvent, type PeopleEventDetail, type PeopleEventListItem, type UndoResult } from "@meguru/shared/people";
+import { and, asc, count, desc, eq, gte, sql, type SQL } from "drizzle-orm";
 import { withTransaction, type Db } from "../../../kernel/db/client";
 import type { Env } from "../../../kernel/env";
 import { logger } from "../../../kernel/logger";
@@ -19,6 +19,23 @@ import { reportPeopleUsage } from "../usage";
  */
 export function toEvent(e: typeof peopleEvents.$inferSelect): PeopleEvent {
   return { id: e.id, name: e.name, heldOn: e.heldOn, isOwn: e.isOwn };
+}
+
+/**
+ * 今日以降でいちばん近い自分の会（誘う会の初めの値・ホームの数字。R17）。
+ * @param db - データベース
+ * @param userId - 作り手
+ * @param now - 今の時刻
+ * @returns イベント（なければ null）
+ */
+export async function nextOwnEvent(db: PeopleDb, userId: string, now = new Date()): Promise<PeopleEvent | null> {
+  const [next] = await db
+    .select()
+    .from(peopleEvents)
+    .where(and(eq(peopleEvents.userId, userId), eq(peopleEvents.isOwn, true), gte(peopleEvents.heldOn, jstDate(now))))
+    .orderBy(asc(peopleEvents.heldOn), asc(peopleEvents.createdAt))
+    .limit(1);
+  return next ? toEvent(next) : null;
 }
 
 /**

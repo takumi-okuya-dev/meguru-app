@@ -50,7 +50,8 @@ export async function refreshSettings(queryClient: QueryClient): Promise<void> {
 }
 
 /**
- * イベントを作ったあと：イベントの一覧と、数字（次の自分の会＝誘う会の初めの値）を読み直す。
+ * イベントを作ったあと：イベントの一覧と、数字（次の自分の会）を読み直す。誘う候補は捨てる（誘う会の初めの値を API が
+ * 選び直す。候補のキーは「次の自分の会」のままで変わらないので、捨てないと前の会の声かけの行を出したままになる）。
  * @param queryClient - クエリのクライアント
  * @returns 読み直しが終わるまでの Promise
  */
@@ -59,6 +60,7 @@ export async function refreshEvents(queryClient: QueryClient): Promise<void> {
     queryClient.invalidateQueries({ queryKey: peopleQueryKeys.events }),
     queryClient.invalidateQueries({ queryKey: peopleQueryKeys.stats }),
   ]);
+  queryClient.removeQueries({ queryKey: peopleQueryKeys.candidatesAll });
 }
 
 /**

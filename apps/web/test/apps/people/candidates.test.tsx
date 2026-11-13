@@ -18,9 +18,19 @@ const api = {
   updateOutreach: vi.fn(),
   deleteOutreach: vi.fn(),
 };
+/** 次の自分の会（API が誘う会を選ばなかったときに選ぶ会）。テストごとに変える。 */
+let nextOwn: { id: string; name: string; heldOn: string; isOwn: boolean } | null = null;
 vi.mock("@/apps/people/lib/api", async (orig) => {
   const actual = await orig<typeof import("@/apps/people/lib/api")>();
-  return { ...actual, peopleApi: { ...actual.peopleApi, ...api } };
+  // 候補の返りの inviteEvent は API と同じ決め方で足す（next→次の自分の会、なし→なし、仕事のつなぎ→なし）
+  const candidates = async (p: { purpose: string; eventId?: string }) => {
+    const res = await api.candidates(p);
+    const known = [EVENT_1213, EVENT_1125, EVENT_1011].find((e) => e.id === p.eventId);
+    const inviteEvent =
+      p.purpose !== "invite" || !p.eventId ? null : p.eventId === "next" ? nextOwn : known ? { id: known.id, name: known.name, heldOn: known.heldOn, isOwn: true } : null;
+    return { inviteEvent, ...res };
+  };
+  return { ...actual, peopleApi: { ...actual.peopleApi, ...api, candidates } };
 });
 
 const { CandidatesPage } = await import("@/apps/people/pages/CandidatesPage");
@@ -65,6 +75,7 @@ function deferred<T>() {
 
 beforeEach(() => {
   for (const f of Object.values(api)) f.mockReset();
+  nextOwn = { id: EVENT_1213.id, name: EVENT_1213.name, heldOn: EVENT_1213.heldOn, isOwn: true };
   api.home.mockResolvedValue({ today: [], overdue: [], birthdays: [] });
   api.tags.mockResolvedValue([]);
   api.stats.mockResolvedValue({ repeaterCount: 4, repeaterGoal: 10, nextOwnEvent: { id: EVENT_1213.id, name: EVENT_1213.name, heldOn: EVENT_1213.heldOn, isOwn: true } });
@@ -91,7 +102,7 @@ describe("誘う候補のクエリ", () => {
 });
 
 describe("誘う候補", () => {
-  it("上に「個別の案内に同意した人だけを出しています」。誘う会は初めから次の自分の会で、その会の候補を読む", async () => {
+  it("上に「個別の案内に同意した人だけを出しています」。誘う会は初めから次の自分の会（API が選ぶ）で、その会の候補を読む", async () => {
     renderRoutes(ROUTES, "/people");
     expect(screen.getByText("個別の案内に同意した人だけを出しています")).toBeInTheDocument();
     const row = await firstRow();
@@ -99,7 +110,8 @@ describe("誘う候補", () => {
     expect(row).toHaveTextContent("最後に会った日 2026年10月11日");
     expect(within(row).getByText("次回：参加したい")).toBeInTheDocument();
     expect(within(row).getByRole("link", { name: /山田はなこ/ })).toHaveAttribute("href", "/people/list/p1");
-    expect(api.candidates).toHaveBeenLastCalledWith(expect.objectContaining({ purpose: "invite", eventId: "e3", offset: 0 }));
+    // 誘う会は API に任せる（next。API が次の自分の会を選ぶ）
+    expect(api.candidates).toHaveBeenLastCalledWith(expect.objectContaining({ purpose: "invite", eventId: "next", offset: 0 }));
     // 選べるのは自分の会だけ
     const picker = screen.getByLabelText("誘う会");
     expect(picker).toHaveValue("e3");
@@ -115,7 +127,7 @@ describe("誘う候補", () => {
     await user.click(screen.getByRole("button", { name: /絞り込み/ }));
     expect(screen.queryByLabelText("来たイベント")).not.toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "前に来た" }));
-    await waitFor(() => expect(api.candidates).toHaveBeenLastCalledWith(expect.objectContaining({ visitedOwn: true, eventId: "e3" })));
+    await waitFor(() => expect(api.candidates).toHaveBeenLastCalledWith(expect.objectContaining({ visitedOwn: true, eventId: "next" })));
     await user.click(screen.getByRole("button", { name: "参加できそう" }));
     await waitFor(() => expect(api.candidates).toHaveBeenLastCalledWith(expect.objectContaining({ visitedOwn: true, next: ["参加できそう"] })));
     await user.click(screen.getByRole("button", { name: "絞り込みを外す" }));
@@ -214,12 +226,12 @@ describe("誘う候補", () => {
     const writeText = vi.fn(async () => {});
     setClipboard(writeText);
     api.stats.mockResolvedValue({ repeaterCount: 0, repeaterGoal: null, nextOwnEvent: null });
+    nextOwn = null;
     renderRoutes(ROUTES, "/people");
     const row = await firstRow();
-    expect(screen.getByText("誘う会を選んでください（文のコピーに使います）。")).toBeInTheDocument();
+    expect(await screen.findByText("誘う会を選んでください（文のコピーに使います）。")).toBeInTheDocument();
     expect(screen.getByLabelText("誘う会")).toHaveValue("");
     expect(within(row).getByRole("button", { name: /文をコピー/ })).toBeDisabled();
-    expect(api.candidates).toHaveBeenLastCalledWith(expect.not.objectContaining({ eventId: expect.anything() }));
     await user.selectOptions(screen.getByLabelText("誘う会"), "e1");
     await waitFor(() => expect(api.candidates).toHaveBeenLastCalledWith(expect.objectContaining({ eventId: "e1" })));
     const again = await firstRow();
@@ -315,28 +327,48 @@ describe("誘う候補", () => {
     expect(writeText).toHaveBeenCalledWith("山田はなこさん、12月13日（日）のIT交流会 12/13、もしご興味あれば一緒にいかがですか？");
   });
 
-  it("イベントの一覧が読めるまでは、誘う会を選べず候補も読まない。読めたら次の自分の会で読む", async () => {
-    const later = deferred<(typeof EVENT_1213)[]>();
-    api.events.mockReturnValue(later.promise);
+  it("数字（stats）とイベントの一覧を待たずに候補を読む。誘う会は API が選んだ会を出す", async () => {
+    const stats = deferred<object>();
+    const events = deferred<(typeof EVENT_1213)[]>();
+    api.stats.mockReturnValue(stats.promise);
+    api.events.mockReturnValue(events.promise);
     renderRoutes(ROUTES, "/people");
-    const picker = await screen.findByLabelText("誘う会");
-    expect(picker).toBeDisabled();
-    expect(picker).toHaveValue("");
-    await waitFor(() => expect(api.stats).toHaveBeenCalled());
-    expect(api.candidates).not.toHaveBeenCalled();
-    later.resolve([EVENT_1213, EVENT_1125, EVENT_1011]);
-    await waitFor(() => expect(screen.getByLabelText("誘う会")).toHaveValue("e3"));
+    await firstRow();
     expect(api.candidates).toHaveBeenCalledTimes(1);
-    expect(api.candidates).toHaveBeenLastCalledWith(expect.objectContaining({ eventId: "e3" }));
+    expect(screen.getByLabelText("誘う会")).toHaveValue("e3");
+    events.resolve([EVENT_1213, EVENT_1125, EVENT_1011]);
+    await waitFor(() => expect(screen.getByLabelText("誘う会")).toBeEnabled());
+    expect(screen.getByLabelText("誘う会")).toHaveValue("e3");
+    expect(api.candidates).toHaveBeenCalledTimes(1);
   });
 
-  it("イベントの一覧が読めないときは、誘う会を選んでいない扱いにして、文をコピーできない", async () => {
+  it("「選んでいません」を選ぶと誘う会を送らず、文をコピーできない", async () => {
+    const user = userEvent.setup();
+    renderRoutes(ROUTES, "/people");
+    await firstRow();
+    await waitFor(() => expect(screen.getByLabelText("誘う会")).toBeEnabled());
+    await user.selectOptions(screen.getByLabelText("誘う会"), "");
+    await waitFor(() => expect(api.candidates).toHaveBeenLastCalledWith(expect.objectContaining({ eventId: undefined })));
+    const row = await firstRow();
+    await waitFor(() => expect(within(row).getByRole("button", { name: /文をコピー/ })).toBeDisabled());
+    expect(screen.getByLabelText("誘う会")).toHaveValue("");
+  });
+
+  it("イベントの一覧が読めないときも、API が選んだ次の自分の会で文をコピーできる。読めなかったことは出す", async () => {
+    const user = userEvent.setup();
+    const writeText = vi.fn(async () => {});
+    setClipboard(writeText);
     api.events.mockRejectedValue(new ApiError("INTERNAL_ERROR", 500));
     renderRoutes(ROUTES, "/people");
     const row = await firstRow();
-    expect(screen.getByText("イベントの一覧を読めませんでした。画面を読み込み直してください。")).toBeInTheDocument();
-    expect(screen.getByLabelText("誘う会")).toHaveValue("");
-    expect(within(row).getByRole("button", { name: /文をコピー/ })).toBeDisabled();
-    expect(api.candidates).toHaveBeenLastCalledWith(expect.not.objectContaining({ eventId: expect.anything() }));
+    expect(await screen.findByText("イベントの一覧を読めませんでした。画面を読み込み直してください。")).toBeInTheDocument();
+    expect(screen.getByLabelText("誘う会")).toHaveValue("e3");
+    await user.click(within(row).getByRole("button", { name: /文をコピー/ }));
+    expect(writeText).toHaveBeenCalledWith(expect.stringContaining("IT交流会 12/13"));
+    // 「選んでいません」にしても、次の自分の会を選び直せる
+    await user.selectOptions(screen.getByLabelText("誘う会"), "");
+    await waitFor(() => expect(api.candidates).toHaveBeenLastCalledWith(expect.objectContaining({ eventId: undefined })));
+    await user.selectOptions(screen.getByLabelText("誘う会"), "e3");
+    await waitFor(() => expect(api.candidates).toHaveBeenLastCalledWith(expect.objectContaining({ eventId: "e3" })));
   });
 });

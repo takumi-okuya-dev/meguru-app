@@ -1,7 +1,7 @@
 // 「/people」：誘う候補（ホーム。specs/people/001-people-memo contracts/ui-routes.md 1・3、spec US3・US5、research.md R17）。
 // 上にリピーターの数と目標・目的の切り替え（?purpose=work）・誘う会の選択・絞り込み・候補の行。
 // 同意のない人はAPIが返さない（画面では絞らない）。URLに置くのは目的だけ。探す言葉と絞り込みは画面の中にだけ置く（R18）。
-import type { CandidateList, OutreachPurpose, PeopleEvent } from "@meguru/shared/people";
+import { NEXT_INVITE_EVENT, type CandidateList, type OutreachPurpose, type PeopleEvent } from "@meguru/shared/people";
 import { useQuery } from "@tanstack/react-query";
 import { ChevronDownIcon, SlidersHorizontalIcon } from "lucide-react";
 import { useRef, useState } from "react";
@@ -125,11 +125,16 @@ export function CandidatesPage() {
   const [sort, setSort] = useState<CandidateSort>("last_met");
 
   const ownEvents: PeopleEvent[] = (events.data ?? []).filter((e) => e.isOwn);
+  // 誘う会：選んでいなければ（undefined）API が次の自分の会を選ぶ（next を送る）。空の文字は「選んでいない」（eventId を送らない）
   const nextOwn = stats.data?.nextOwnEvent ?? null;
-  const chosenId = eventChoice ?? nextOwn?.id ?? "";
-  // 誘う会はイベントの一覧にある自分の会からだけ選ぶ。一覧が読めるまで・読めないとき・一覧にない会（消した会など）は「選んでいない」
-  const inviteEvent = ownEvents.find((e) => e.id === chosenId) ?? null;
-  const inviteEventId = inviteEvent?.id ?? "";
+  // 選べると分かっている会（イベントの一覧の自分の会と、次の自分の会）。選んだ会がここにない（消した会など）ときは「選んでいない」
+  const knownEvents = nextOwn && !ownEvents.some((e) => e.id === nextOwn.id) ? [nextOwn, ...ownEvents] : ownEvents;
+  const inviteEventParam =
+    eventChoice === undefined
+      ? NEXT_INVITE_EVENT
+      : eventChoice === "" || (events.isSuccess && !knownEvents.some((e) => e.id === eventChoice))
+        ? undefined
+        : eventChoice;
   // 設定が読めないときは初めの型（null）で文を作る。読み込み中は undefined（コピーを待つ）
   const template = settings.isSuccess ? settings.data.inviteTemplate : settings.isError ? null : undefined;
 
@@ -139,7 +144,7 @@ export function CandidatesPage() {
   const params: CandidateParams = {
     ...filters,
     purpose,
-    eventId: purpose === "invite" && inviteEventId !== "" ? inviteEventId : undefined,
+    eventId: purpose === "invite" ? inviteEventParam : undefined,
     visitedOwn,
     sort,
     ...(q !== "" ? { q } : {}),
@@ -152,9 +157,14 @@ export function CandidatesPage() {
     // （同意のちがう人を一瞬でも並べない・前の会の声かけを進めたり消したりしない）
     placeholderData: (prev, prevQuery) =>
       prevQuery?.queryKey[3].purpose === purpose && prevQuery.queryKey[3].eventId === params.eventId ? prev : undefined,
-    // 誘う会の初めの値（次の自分の会）と、選べる会（イベントの一覧）がわかってから読む（行の進み具合がその会のものになる）
-    enabled: purpose === "work" || (!stats.isPending && !events.isPending),
   });
+  // 行の声かけを読んだ誘う会（API が決めた会）
+  const inviteEvent = purpose === "invite" ? (candidates.data?.inviteEvent ?? null) : null;
+  // 選択の欄の値：選んだ会。任せているときは API が決めた会、候補を読むまでは次の自分の会
+  const inviteEventId =
+    inviteEventParam === undefined ? "" : inviteEventParam !== NEXT_INVITE_EVENT ? inviteEventParam : (inviteEvent?.id ?? nextOwn?.id ?? "");
+  // 選べる会：イベントの一覧が読めるまで・読めないときも、次の自分の会と API が決めた会は出す（選び直せるように）
+  const pickerEvents = inviteEvent && !knownEvents.some((e) => e.id === inviteEvent.id) ? [inviteEvent, ...knownEvents] : knownEvents;
 
   const filterCount = activeFilterCount(filters) + (visitedOwn ? 1 : 0);
   const searching = q !== "" || filterCount > 0;
@@ -174,7 +184,7 @@ export function CandidatesPage() {
         <p className="text-[13px] text-muted-foreground">個別の案内に同意した人だけを出しています</p>
         {purpose === "invite" ? (
           <>
-            <InviteEventPicker value={inviteEventId} events={ownEvents} loading={events.isPending} failed={events.isError} onChange={setEventChoice} />
+            <InviteEventPicker value={inviteEventId} events={pickerEvents} loading={events.isPending} failed={events.isError} onChange={setEventChoice} />
             {settings.isError && (
               <p className="text-[13px] text-muted-foreground">誘いの文の型を読めなかったので、初めの型で文を作ります。</p>
             )}

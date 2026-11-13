@@ -3,9 +3,8 @@ import { jstDate, type ContactChannel, type ContactLog } from "@meguru/shared/pe
 import { and, desc, eq } from "drizzle-orm";
 import { withTransaction } from "../../../kernel/db/client";
 import type { Env } from "../../../kernel/env";
-import { AppError, itemNotFound } from "../../../kernel/errors";
-import { isUuid } from "../../../kernel/validate";
-import { loadOwnedPerson, lockActiveOwner, lockOwner, touchPerson, type PeopleDb } from "../access";
+import { AppError } from "../../../kernel/errors";
+import { loadOwnedLog, loadOwnedPerson, lockActiveOwner, lockOwner, touchPerson, type PeopleDb } from "../access";
 import { peopleContactLogs, peoplePersons } from "../schema";
 
 /**
@@ -52,23 +51,6 @@ export async function addContactLog(env: Env, userId: string, personId: string, 
     await touchPerson(tx, userId, p.id);
     return toLog(row!);
   });
-}
-
-/**
- * 作り手の記録を読む。ない・ほかの作り手のものなら 404。
- * @param db - データベース
- * @param userId - 作り手
- * @param logId - 記録
- * @returns 記録の行
- */
-async function loadOwnedLog(db: PeopleDb, userId: string, logId: string) {
-  if (!isUuid(logId)) throw itemNotFound();
-  const [row] = await db
-    .select()
-    .from(peopleContactLogs)
-    .where(and(eq(peopleContactLogs.id, logId), eq(peopleContactLogs.userId, userId)));
-  if (!row) throw itemNotFound();
-  return row;
 }
 
 /**

@@ -15,6 +15,8 @@ export const peopleQueryKeys = {
   // 人（一覧・誘う候補・人のページ）。["people", "persons"] でまとめて読み直せる（名前・同意・声かけが変わると、どれも変わる）
   persons: ["people", "persons"] as const,
   personList: (params: PersonListParams) => ["people", "persons", "list", params] as const,
+  /** 誘う候補の全部（イベントを作ったあとに捨てる）。 */
+  candidatesAll: ["people", "persons", "candidates"] as const,
   candidates: (params: CandidateParams) => ["people", "persons", "candidates", params] as const,
   person: (id: string) => ["people", "persons", "detail", id] as const,
   facets: ["people", "facets"] as const,
