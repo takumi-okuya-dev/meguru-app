@@ -64,6 +64,16 @@ describe("探す", () => {
     expect(await names("q=_")).toEqual([]);
   });
 
+  it("メモは全角と半角を区別せずに探せる。見えない文字だけの言葉で、すべての人に当たらない", async () => {
+    await commitForm("u1", oct, [formRow({ line: "たろう" }, 1), formRow({ line: "はなこ" }, 2)]);
+    const taro = await personId("たろう");
+    await callPeople("PATCH", `/persons/${taro}`, "u1", { memoTalk: "ＡＢＣ商事でﾃﾞｻﾞｲﾝ" });
+    expect(await names("q=ＡＢＣ")).toEqual(["たろう"]);
+    expect(await names("q=abc")).toEqual(["たろう"]);
+    expect(await names(`q=${encodeURIComponent("デザイン")}`)).toEqual(["たろう"]);
+    expect(await names(`q=${encodeURIComponent("\u200b")}`)).toEqual([]);
+  });
+
   it("ほかの作り手の人は出ない。同意に関わらず出る", async () => {
     await commitForm("u1", oct, [formRow({ line: "たろう", consent: "個別の案内は希望しない" })]);
     await grantPeople("u2");

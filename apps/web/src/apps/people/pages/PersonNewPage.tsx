@@ -68,7 +68,7 @@ export function PersonNewPage() {
               id={`${id}-real`}
               className={fieldClass}
               value={realName}
-              maxLength={PERSON_NAME_MAX}
+              maxLength={PERSON_NAME_MAX * 2}
               placeholder="例：山田 花子"
               autoComplete="off"
               aria-invalid={nameError}
@@ -86,7 +86,7 @@ export function PersonNewPage() {
               id={`${id}-line`}
               className={fieldClass}
               value={lineName}
-              maxLength={PERSON_NAME_MAX}
+              maxLength={PERSON_NAME_MAX * 2}
               placeholder="例：はなこ"
               autoComplete="off"
               aria-invalid={nameError}

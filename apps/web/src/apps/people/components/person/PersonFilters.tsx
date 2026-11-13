@@ -51,7 +51,9 @@ function toggle(list: string[], value: string): string[] {
  * @param props - label：項目の名前、values：選べる値、selected：選んだ値、onToggle：押したとき
  * @returns チップの並び
  */
-function ChipGroup({ label, values, selected, onToggle }: { label: string; values: FacetValue[]; selected: string[]; onToggle: (value: string) => void }) {
+function ChipGroup({ label, values: facetValues, selected, onToggle }: { label: string; values: FacetValue[]; selected: string[]; onToggle: (value: string) => void }) {
+  // 選んだ値が選べる値からなくなっても（その値の人を消した・まとめた）、外せるようにチップを残す（0人）
+  const values = [...facetValues, ...selected.filter((v) => !facetValues.some((f) => f.value === v)).map((v) => ({ value: v, count: 0 }))];
   if (values.length === 0) return null;
   return (
     <fieldset className="space-y-1.5">

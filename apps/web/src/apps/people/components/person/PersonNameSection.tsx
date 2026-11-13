@@ -48,7 +48,7 @@ function RealNameForm({ person, onDone }: { person: PersonSummary; onDone: () =>
         id={id}
         className={fieldClass}
         value={value}
-        maxLength={PERSON_NAME_MAX}
+        maxLength={PERSON_NAME_MAX * 2}
         placeholder="例：山田 花子"
         aria-invalid={error !== null}
         onChange={(e) => {

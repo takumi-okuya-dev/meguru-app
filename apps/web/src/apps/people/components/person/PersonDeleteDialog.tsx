@@ -70,7 +70,7 @@ export function PersonDeleteDialog({ person, onClose }: { person: PersonSummary;
           id={id}
           className={fieldClass}
           value={confirmName}
-          maxLength={PERSON_NAME_MAX}
+          maxLength={PERSON_NAME_MAX * 2}
           autoComplete="off"
           onChange={(e) => {
             setConfirmName(e.target.value);

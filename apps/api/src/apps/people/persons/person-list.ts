@@ -45,11 +45,18 @@ export async function listPersons(db: Db, userId: string, query: PersonListQuery
   const conds: SQL[] = [sql`p.user_id = ${userId}`];
   const q = query.q?.normalize("NFKC").trim() ?? "";
   if (q !== "") {
-    const key = likePattern(nameKey(q));
+    // メモは、保存した側も NFKC にそろえて比べる（全角の「ＡＢＣ」と半角の「ABC」を同じに見る）
     const memo = likePattern(q);
-    conds.push(sql`(p.real_name_key LIKE ${key} OR p.line_name_key LIKE ${key} OR p.entered_line_name_key LIKE ${key}
-      OR EXISTS (SELECT 1 FROM ${peopleResponses} r WHERE r.person_id = p.id AND r.line_name_key LIKE ${key})
-      OR p.memo_appearance ILIKE ${memo} OR p.memo_talk ILIKE ${memo})`);
+    const memoCond = sql`normalize(coalesce(p.memo_appearance, ''), NFKC) ILIKE ${memo} OR normalize(coalesce(p.memo_talk, ''), NFKC) ILIKE ${memo}`;
+    // 見えない文字だけの言葉は nameKey で空になる。そのときは名前で比べない（'%%' ですべての人に当たらないように）
+    const key = nameKey(q);
+    if (key === "") conds.push(sql`(${memoCond})`);
+    else {
+      const pattern = likePattern(key);
+      conds.push(sql`(p.real_name_key LIKE ${pattern} OR p.line_name_key LIKE ${pattern} OR p.entered_line_name_key LIKE ${pattern}
+        OR EXISTS (SELECT 1 FROM ${peopleResponses} r WHERE r.person_id = p.id AND r.line_name_key LIKE ${pattern})
+        OR ${memoCond})`);
+    }
   }
   if (query.eventId) conds.push(sql`EXISTS (SELECT 1 FROM att WHERE att.person_id = p.id AND att.event_id = ${query.eventId})`);
   if (query.next.length > 0) conds.push(sql`lr.next_attendance IN (${list(query.next)})`);
@@ -60,7 +67,7 @@ export async function listPersons(db: Db, userId: string, query: PersonListQuery
 
   const res = await db.execute<{ total: number; rows: Row[] }>(sql`
     WITH att AS (${attendanceSql(userId)}),
-      st AS (${personStatsSql(userId)}),
+      st AS (${personStatsSql(userId, sql`att`)}),
       lr AS (${latestResponseSql(userId)}),
       f AS (
         SELECT p.id, p.real_name, p.line_name, p.consent_invite, p.consent_work, st.last_met_on, st.own_count,

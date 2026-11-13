@@ -1,12 +1,13 @@
 // 人のページ・直す・同意を直す（specs/people/001-people-memo contracts/api.md 4、research.md R10・R11、tasks.md T053）。
 import { nameKey, type PersonConsent, type PersonDetail, type PersonResponse, type PersonSummary } from "@meguru/shared/people";
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, sql } from "drizzle-orm";
 import { withTransaction, type Db } from "../../../kernel/db/client";
 import type { Env } from "../../../kernel/env";
 import { AppError } from "../../../kernel/errors";
 import { displayNameOf, loadOwnedPerson, lockOwner, type PeopleDb } from "../access";
 import { peopleConsentChanges, peopleEvents, peopleManualAttendances, peoplePersons, peopleResponses } from "../schema";
-import { derivePersons, recordManualConsent } from "./person-derive";
+import { derivePersons, newerResponse, recordManualConsent } from "./person-derive";
+import { personStatsSql } from "./person-query";
 
 /**
  * 回答を、人のページの形にする。
@@ -26,20 +27,6 @@ function toResponse(r: typeof peopleResponses.$inferSelect): PersonResponse {
     consentChoices: r.consentChoices,
     answers: r.answers,
   };
-}
-
-/**
- * 回答 a が b より新しいか（開催日 → 回答の時刻（ないものは古い）→ 取り込んだ時刻。R10）。
- * @param a - 回答と開催日
- * @param b - 回答と開催日
- * @returns a が新しければ正
- */
-function newerFirst(a: { heldOn: string; r: typeof peopleResponses.$inferSelect }, b: { heldOn: string; r: typeof peopleResponses.$inferSelect }): number {
-  if (a.heldOn !== b.heldOn) return a.heldOn < b.heldOn ? 1 : -1;
-  const sa = a.r.submittedAt?.getTime() ?? -Infinity;
-  const sb = b.r.submittedAt?.getTime() ?? -Infinity;
-  if (sa !== sb) return sb - sa;
-  return b.r.createdAt.getTime() - a.r.createdAt.getTime();
 }
 
 /**
@@ -69,7 +56,8 @@ export async function personDetail(db: PeopleDb, userId: string, personId: strin
       .orderBy(desc(peopleConsentChanges.changedAt)),
   ]);
 
-  const sorted = responses.map((x) => ({ heldOn: x.event.heldOn, r: x.r, event: x.event })).sort(newerFirst);
+  const key = (x: (typeof responses)[number]) => ({ id: x.r.id, heldOn: x.event.heldOn, submittedAt: x.r.submittedAt, createdAt: x.r.createdAt });
+  const sorted = [...responses].sort((a, b) => (newerResponse(key(a), key(b)) ? -1 : 1)).map((x) => ({ r: x.r, event: x.event }));
   // 来たイベント（新しい順）。回答があれば response、手で足しただけなら manual
   const byEvent = new Map<string, PersonDetail["attendances"][number]>();
   for (const x of sorted) {
@@ -82,13 +70,8 @@ export async function personDetail(db: PeopleDb, userId: string, personId: strin
   }
   const attendances = [...byEvent.values()].sort((a, b) => (a.event.heldOn === b.event.heldOn ? a.event.name.localeCompare(b.event.name, "ja") : a.event.heldOn < b.event.heldOn ? 1 : -1));
 
-  // 別名：今のLINE名のほかの、回答のLINE名（新しい順）と手で足したときのLINE名（R10）
-  const others: string[] = [];
-  for (const name of [...sorted.map((x) => x.r.lineName), p.enteredLineName]) {
-    if (name && name !== p.lineName && !others.includes(name)) others.push(name);
-  }
   return {
-    person: toSummary(p, others, attendances[0]?.event.heldOn ?? null),
+    person: toSummary(p, otherLineNamesOf(p, sorted.map((x) => x.r.lineName)), attendances[0]?.event.heldOn ?? null),
     attendances,
     consentChanges: changes.map((c) => ({
       invite: c.invite,
@@ -139,7 +122,32 @@ function consentOf(p: typeof peoplePersons.$inferSelect): PersonConsent {
  * @returns 人
  */
 export async function personSummary(db: PeopleDb, userId: string, personId: string): Promise<PersonSummary> {
-  return (await personDetail(db, userId, personId)).person;
+  const p = await loadOwnedPerson(db, userId, personId);
+  // 頭に要るのは、別名（回答のLINE名）と最後に会った日だけ（回答の答えや同意の記録は読まない）
+  const [lines, stats] = await Promise.all([
+    db
+      .select({ id: peopleResponses.id, lineName: peopleResponses.lineName, heldOn: peopleEvents.heldOn, submittedAt: peopleResponses.submittedAt, createdAt: peopleResponses.createdAt })
+      .from(peopleResponses)
+      .innerJoin(peopleEvents, eq(peopleEvents.id, peopleResponses.eventId))
+      .where(and(eq(peopleResponses.personId, p.id), eq(peopleResponses.userId, userId))),
+    db.execute<{ last_met_on: string | null }>(sql`SELECT s.last_met_on FROM (${personStatsSql(userId)}) s WHERE s.person_id = ${p.id}`),
+  ]);
+  const sorted = [...lines].sort((a, b) => (newerResponse(a, b) ? -1 : 1));
+  return toSummary(p, otherLineNamesOf(p, sorted.map((l) => l.lineName)), stats.rows[0]?.last_met_on ?? null);
+}
+
+/**
+ * 別名（今のLINE名のほかの、回答のLINE名（新しい順）と手で足したときのLINE名。R10）。
+ * @param p - 人の行
+ * @param responseLineNames - 回答のLINE名（新しい順）
+ * @returns 別名
+ */
+function otherLineNamesOf(p: typeof peoplePersons.$inferSelect, responseLineNames: string[]): string[] {
+  const others: string[] = [];
+  for (const name of [...responseLineNames, p.enteredLineName]) {
+    if (name && name !== p.lineName && !others.includes(name)) others.push(name);
+  }
+  return others;
 }
 
 /**
