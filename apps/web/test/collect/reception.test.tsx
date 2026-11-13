@@ -86,6 +86,8 @@ const recordOf = (personId: string, method: ReceptionMethod, amount = 3000) => (
   recordedAt: "2026-11-20T10:05:00.000Z",
 });
 
+let client: QueryClient;
+
 /**
  * 受付の画面を描く。
  */
@@ -93,8 +95,9 @@ function renderReception() {
   const router = createMemoryRouter([{ path: "/collect/events/:eventId/reception", element: <ReceptionPage /> }], {
     initialEntries: ["/collect/events/e1/reception"],
   });
+  client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   render(
-    <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+    <QueryClientProvider client={client}>
       <RouterProvider router={router} />
     </QueryClientProvider>,
   );
@@ -296,5 +299,23 @@ describe("会場の共有", () => {
     await user.click(within(screen.getByRole("dialog")).getByRole("button", { name: "やめる" }));
     await user.click(within(row(/松本 れい/)).getByRole("button", { name: "PayPay" }));
     await waitFor(() => expect(mocks.paypayQr).toHaveBeenCalledTimes(2));
+  });
+
+  it("記録・取り消し・ほかの人の記録の知らせで、サイドバーの振込待ちの数（/api/collect/me）を読み直す", async () => {
+    mocks.record.mockResolvedValue({ record: recordOf("p3", "transfer_later"), version: 6 });
+    mocks.undo.mockResolvedValue({ version: 8 });
+    const user = userEvent.setup();
+    renderReception();
+    await screen.findByRole("listitem", { name: /木村 ゆうき/ });
+    const spy = vi.spyOn(client, "invalidateQueries");
+    const meCalls = () => spy.mock.calls.filter(([f]) => JSON.stringify(f?.queryKey) === JSON.stringify(["collect", "me"])).length;
+    await user.click(within(row(/木村 ゆうき/)).getByRole("button", { name: "振込" }));
+    await user.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "後日振り込む" }));
+    await waitFor(() => expect(meCalls()).toBe(1));
+    act(() => mocks.live.onMessage!({ type: "reception.recorded", eventId: "e1", version: 7, at: "", personId: "p2", record: recordOf("p2", "transfer_today") }));
+    expect(meCalls()).toBe(2);
+    await user.click(within(await screen.findByRole("listitem", { name: /木村 ゆうき（受付済み）/ })).getByRole("button", { name: "取り消す" }));
+    await user.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "取り消す" }));
+    await waitFor(() => expect(meCalls()).toBe(3));
   });
 });

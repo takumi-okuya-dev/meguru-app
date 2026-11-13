@@ -41,6 +41,8 @@ export function EventEditPage() {
       queryClient.removeQueries({ queryKey: collectQueryKeys.event(eventId) });
       void queryClient.invalidateQueries({ queryKey: collectQueryKeys.events });
       void queryClient.invalidateQueries({ queryKey: collectQueryKeys.summaries });
+      // 消したイベントの振込待ちは数えなくなる（サイドバーの数）
+      void queryClient.invalidateQueries({ queryKey: collectQueryKeys.me });
       toast.success("イベントを消しました。数字はまとめに残しました。");
       navigate(eventsPath());
     },

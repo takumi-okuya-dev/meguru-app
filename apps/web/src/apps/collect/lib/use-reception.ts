@@ -17,6 +17,7 @@ import { useCallback, useState } from "react";
 import { toast } from "sonner";
 import { ApiError } from "@/lib/api-client";
 import { collectErrorText } from "./errors";
+import { collectQueryKeys } from "./query-keys";
 import { useLive, type LiveStatus } from "./live";
 import { withPerson, withRecord, type ReceptionViewer } from "./reception-model";
 
@@ -90,12 +91,19 @@ export function useReception(source: ReceptionSource, enabled = true) {
     [queryClient, source.queryKey, resync],
   );
 
+  // 受付の記録が変わったら、主催者のサイドバーの振込待ちの数（/api/collect/me）も読み直す（振込の記録・取り消しで変わる）
+  const refreshMe = useCallback(() => {
+    if (source.viewer.kind === "owner") void queryClient.invalidateQueries({ queryKey: collectQueryKeys.me });
+  }, [queryClient, source.viewer.kind]);
+
   const onMessage = useCallback(
     (m: LiveMessage) => {
       switch (m.type) {
         case "reception.recorded":
+          refreshMe();
           return apply(m.version, (s) => withRecord(s, m.personId, m.record, source.viewer));
         case "reception.undone":
+          refreshMe();
           return apply(m.version, (s) => withRecord(s, m.personId, null, source.viewer));
         case "roster.changed":
           if (m.person) return apply(m.version, (s) => withPerson(s, m.person!, source.viewer));
@@ -109,7 +117,7 @@ export function useReception(source: ReceptionSource, enabled = true) {
           return resync();
       }
     },
-    [apply, resync, source],
+    [apply, resync, refreshMe, source],
   );
 
   // 一度読めたら、あとの読み直しが失敗しても、つなぎ直しと15秒ごとの読み直しを続ける（止めると、APIが戻っても画面が追いつかない）
@@ -126,6 +134,7 @@ export function useReception(source: ReceptionSource, enabled = true) {
     try {
       const res = await source.record(personId, input);
       apply(res.version, (s) => withRecord(s, personId, res.record, source.viewer));
+      refreshMe();
       setPending(({ [personId]: _done, ...rest }) => rest);
     } catch (err) {
       if (isRetryable(err)) {
@@ -160,6 +169,7 @@ export function useReception(source: ReceptionSource, enabled = true) {
       try {
         const { version } = await source.undo(personId);
         apply(version, (s) => withRecord(s, personId, null, source.viewer));
+        refreshMe();
       } catch (err) {
         toast.error(collectErrorText(err));
         resync();
