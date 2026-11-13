@@ -284,6 +284,68 @@ export const peopleErasedResponses = peopleSchema.table(
   (t) => [primaryKey({ columns: [t.eventId, t.dedupeHash] }), index("people_erased_responses_user_idx").on(t.userId)],
 );
 
+// ---- 2-11. 声かけ（PR3） ----
+
+/** 声かけ（2-11）。同じ声かけは1つ（交流会への誘いは人と誘う会、仕事のつなぎは人と相談先。R16）。 */
+export const peopleOutreaches = peopleSchema.table(
+  "outreaches",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id").notNull(),
+    personId: uuid("person_id")
+      .notNull()
+      .references(() => peoplePersons.id, { onDelete: "cascade" }),
+    purpose: text("purpose").notNull(),
+    eventId: uuid("event_id").references(() => peopleEvents.id, { onDelete: "cascade" }),
+    // 相談先の名前（参加者の名前ではないので、一意の印に入れてよい。data-model.md 2-11）
+    targetName: text("target_name"),
+    targetKey: text("target_key"),
+    stage: text("stage").notNull(),
+    askedAt: at("asked_at").notNull(),
+    linkSentAt: at("link_sent_at"),
+    attendedAt: at("attended_at"),
+    approvedAt: at("approved_at"),
+    connectedAt: at("connected_at"),
+    ...timestamps,
+  },
+  (t) => [
+    check("people_outreaches_purpose", sql`${t.purpose} IN ('invite', 'work')`),
+    check(
+      "people_outreaches_target",
+      sql`(${t.purpose} = 'invite' AND ${t.eventId} IS NOT NULL AND ${t.targetName} IS NULL AND ${t.targetKey} IS NULL)
+        OR (${t.purpose} = 'work' AND ${t.eventId} IS NULL AND ${t.targetName} IS NOT NULL AND char_length(${t.targetName}) BETWEEN 1 AND 100 AND ${t.targetKey} IS NOT NULL)`,
+    ),
+    check(
+      "people_outreaches_stage",
+      sql`(${t.purpose} = 'invite' AND ${t.stage} IN ('asked', 'link_sent', 'attended')) OR (${t.purpose} = 'work' AND ${t.stage} IN ('asked', 'approved', 'connected'))`,
+    ),
+    // つないだのは、本人のOKのあとだけ（FR-023）
+    check("people_outreaches_connected_after_approved", sql`${t.stage} <> 'connected' OR ${t.approvedAt} IS NOT NULL`),
+    uniqueIndex("people_outreaches_invite_unique").on(t.personId, t.eventId).where(sql`${t.purpose} = 'invite'`),
+    uniqueIndex("people_outreaches_work_unique").on(t.personId, t.targetKey).where(sql`${t.purpose} = 'work'`),
+    index("people_outreaches_user_idx").on(t.userId),
+    index("people_outreaches_person_idx").on(t.personId),
+    index("people_outreaches_event_idx").on(t.eventId),
+  ],
+);
+
+// ---- 2-12. 作り手の設定（PR3） ----
+
+/** 作り手の設定（2-12）。誘いの文の型（空なら初めの型。R17）とリピーターの目標。 */
+export const peopleOwnerSettings = peopleSchema.table(
+  "owner_settings",
+  {
+    userId: uuid("user_id").primaryKey(),
+    inviteTemplate: text("invite_template"),
+    repeaterGoal: integer("repeater_goal"),
+    updatedAt: at("updated_at").notNull().defaultNow(),
+  },
+  (t) => [
+    check("people_owner_settings_invite_template", sql`${t.inviteTemplate} IS NULL OR char_length(${t.inviteTemplate}) BETWEEN 1 AND 500`),
+    check("people_owner_settings_repeater_goal", sql`${t.repeaterGoal} IS NULL OR ${t.repeaterGoal} BETWEEN 1 AND 10000`),
+  ],
+);
+
 // ---- 2-13. 受け取った出来事 ----
 
 /** 受け取った出来事の番号（2-13。2回届いても同じ結果にする）。 */
