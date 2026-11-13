@@ -9,11 +9,14 @@ import {
   liveTicketResponseSchema,
   receptionSnapshotSchema,
   recordReceptionResponseSchema,
+  resolveSelfRequestResponseSchema,
   versionResponseSchema,
   walkInResponseSchema,
+  type ConfirmReceptionRequest,
   type ErrorCode,
   type HelperJoinRequest,
   type RecordReceptionRequest,
+  type SelfRequestAction,
   type WalkInRequest,
 } from "@meguru/shared";
 import type { z } from "zod";
@@ -86,4 +89,9 @@ export const helperApi = {
   walkIn: (token: string, device: string, input: WalkInRequest) => call(walkInResponseSchema, token, "/walk-ins", device, json("POST", input)),
   paypayQr: async (token: string, device: string) => (await send(token, "/paypay-qr", device)).blob(),
   liveTicket: (token: string, device: string) => call(liveTicketResponseSchema, token, "/live-ticket", device, { method: "POST" }),
+  // セルフ受付の確かめ・申し出（specs/collect/002）
+  confirm: (token: string, device: string, personId: string, input: ConfirmReceptionRequest) =>
+    call(recordReceptionResponseSchema, token, `${person(personId)}/confirm`, device, json("POST", input)),
+  resolveRequest: (token: string, device: string, requestId: string, action: SelfRequestAction, personId?: string) =>
+    call(resolveSelfRequestResponseSchema, token, `/self-requests/${encodeURIComponent(requestId)}/${action}`, device, json("POST", personId ? { personId } : {})),
 };
