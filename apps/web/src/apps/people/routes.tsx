@@ -6,6 +6,9 @@ import { EventPage } from "./pages/EventPage";
 import { EventsPage } from "./pages/EventsPage";
 import { HomePage } from "./pages/HomePage";
 import { ImportPage } from "./pages/ImportPage";
+import { PeopleListPage } from "./pages/PeopleListPage";
+import { PersonNewPage } from "./pages/PersonNewPage";
+import { PersonPage } from "./pages/PersonPage";
 import { PEOPLE_BASE } from "./lib/paths";
 import { PeopleLayout } from "./shell/PeopleLayout";
 
@@ -16,6 +19,9 @@ export const peopleRoutes: RouteObject[] = [
     element: <PeopleLayout />,
     children: [
       { index: true, element: <HomePage /> },
+      { path: "list", element: <PeopleListPage /> },
+      { path: "list/new", element: <PersonNewPage /> },
+      { path: "list/:personId", element: <PersonPage /> },
       { path: "import", element: <ImportPage /> },
       { path: "events", element: <EventsPage /> },
       { path: "events/new", element: <EventNewPage /> },

@@ -83,14 +83,23 @@ describe("イベントを作る", () => {
 });
 
 describe("イベントのページ", () => {
-  it("参加者数・来た人の名前・取り込みの一覧を出す", async () => {
+  it("参加者数・来た人の名前・取り込みの一覧を出す。来た人は人のページへのリンク", async () => {
     renderRoutes(ROUTES, "/people/events/e1");
     expect(await screen.findByText("参加者 2人")).toBeInTheDocument();
     expect(await screen.findByText("たろう")).toBeInTheDocument();
     expect(screen.getByText("山田はなこ")).toBeInTheDocument();
-    // 人のページへのリンクはPR2から
-    expect(screen.queryByRole("link", { name: "たろう" })).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /たろう/ })).toHaveAttribute("href", "/people/list/p1");
+    expect(screen.getByRole("link", { name: /山田はなこ/ })).toHaveAttribute("href", "/people/list/p2");
     expect(screen.getByText(/3行のうち 2件を取り込み/)).toBeInTheDocument();
+    // 消した人がいなければ出さない
+    expect(screen.queryByText(/消した人/)).not.toBeInTheDocument();
+  });
+
+  it("消した人がいれば「消した人 n人」を出す", async () => {
+    api.event.mockResolvedValue({ ...DETAIL, stats: { attendeeCount: 3, erasedCount: 1 } });
+    renderRoutes(ROUTES, "/people/events/e1");
+    expect(await screen.findByText("参加者 3人")).toBeInTheDocument();
+    expect(screen.getByText("消した人 1人")).toBeInTheDocument();
   });
 
   it("「取り消す」は書き足しのある人を出し、残すか消すかを選ぶまで押せない。選ぶと取り消す", async () => {

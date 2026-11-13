@@ -116,14 +116,14 @@
 
 | 道筋 | 説明 |
 |---|---|
-| `GET /api/people/persons?q=&eventId=&next=&wanted=&career=&lastMetFrom=&lastMetTo=&offset=` | 人の一覧（同意に関わらない。FR-017）。`next`・`wanted`・`career`は値（くり返して複数）。最後に会った日の新しい順・100人ずつ（R22）。各行`{ id, displayName, realName, lineName, lastMetOn, ownEventCount, latestAnswers, consent: { invite, work } }`＋`{ total }` |
+| `GET /api/people/persons?q=&eventId=&next=&wanted=&career=&lastMetFrom=&lastMetTo=&offset=` | 人の一覧（同意に関わらない。FR-017）。`next`・`wanted`・`career`は値（くり返して複数）。`q`は100文字まで。最後に会った日の新しい順・100人ずつ（R22）。各行`{ id, displayName, realName, lineName, lastMetOn, ownEventCount, latestAnswers, consent: { invite, work } }`＋`{ total }` |
 | `GET /api/people/facets` | `{ nextAttendance: [{ value, count }], wantedConnections: [...], careerInterests: [...] }`（いちばん新しい回答に出てくる値。多い順。R22） |
 | `POST /api/people/persons` | 手で足す `{ realName?, lineName?, eventId?, consent: { invite, work } }`（`realName`か`lineName`のどちらかは必須。1〜100文字）→ 201 `{ person }`。同意は手直しの事実として記録する（R11）。`eventId`があれば会ったイベントとして足す（FR-014） |
 | `GET /api/people/persons/:personId` | 人のページ：`{ person: { id, realName, lineName, otherLineNames, memoAppearance, memoTalk, consent: { invite, work, source, basisOn }, lastMetOn }, attendances: [{ event: { id, name, heldOn, isOwn }, via, responses: [{ id, submittedAt, lineName, realName, nextAttendance, bringFriends, wantedConnections, careerInterests, consentChoices, answers }] }], consentChanges: [{ invite, work, source, basisOn, changedAt }], outreaches: [...] }`（来たイベントは新しい順。FR-025。`outreaches`はPR3から） |
-| `PATCH /api/people/persons/:personId` | `{ realName?, memoAppearance?, memoTalk? }`（本名は1〜100文字か`null`、見た目の特徴は300文字まで、話したことは1,000文字まで。FR-015） |
+| `PATCH /api/people/persons/:personId` | `{ realName?, memoAppearance?, memoTalk? }`（本名は1〜100文字か`null`、見た目の特徴は300文字まで、話したことは1,000文字まで。メモの空白だけは`null`。FR-015）→ `{ person }`。LINE名のない人の本名を`null`にするのは400 |
 | `PUT /api/people/persons/:personId/consent` | `{ invite, work }`。手直しの事実として記録し、同意を決め直す（R11）→ `{ consent }` |
-| `POST /api/people/persons/:personId/attendances` | `{ eventId }`で会ったイベントを足す（もうあれば何もしない）。誘った会の声かけを「来た」にする（PR3から） |
-| `DELETE /api/people/persons/:personId/attendances/:eventId` | 手で足した会ったイベントを外す（回答による来た記録は外せない） |
+| `POST /api/people/persons/:personId/attendances` | `{ eventId }`で会ったイベントを足す（もうあれば何もしない）→ `{ person }`。誘った会の声かけを「来た」にする（PR3から） |
+| `DELETE /api/people/persons/:personId/attendances/:eventId` | 手で足した会ったイベントを外す → 204。回答による来た記録しかなければ400 `VALIDATION_FAILED`、どちらもなければ404 |
 | `POST /api/people/persons/:personId/merge` | `{ otherPersonId }`。`:personId`に集めて相手を消す（R15）→ `{ person }` |
 | `POST /api/people/responses/:responseId/split` | その回答を新しい人に分ける（R15）→ 201 `{ person }`。元の人に回答が1つしかなければ400 `VALIDATION_FAILED` |
 | `DELETE /api/people/persons/:personId` | 本文`{ confirmName }`。表示名と`nameKey`で違えば400 `CONFIRMATION_MISMATCH`。消した人の数・回答の印を残してから消す（R13）→ 204 |

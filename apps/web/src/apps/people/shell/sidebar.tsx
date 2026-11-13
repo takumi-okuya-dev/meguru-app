@@ -1,5 +1,5 @@
 // 人物メモのサイドバーの中身（specs/people/001-people-memo contracts/ui-routes.md 1、specs/028 research.md R8）。
-// 外枠のサイドバーの枠に、頭（アプリの名前）と中身（誘う候補・取り込み・イベント）を渡す。まだない画面の項目は出さない。
+// 外枠のサイドバーの枠に、頭（アプリの名前）と中身（誘う候補・人・取り込み・イベント）を渡す。まだない画面の項目は出さない。
 import { ContactIcon } from "lucide-react";
 import { NavLink } from "react-router";
 import type { AppSidebar, SidebarPartProps } from "@/shell";

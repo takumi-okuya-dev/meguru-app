@@ -43,3 +43,28 @@ export function newEventPath(): string {
 export function eventPath(eventId: string): string {
   return `${PEOPLE_BASE}/events/${encodeURIComponent(eventId)}`;
 }
+
+/**
+ * 人の一覧。
+ * @returns URL
+ */
+export function personsPath(): string {
+  return `${PEOPLE_BASE}/list`;
+}
+
+/**
+ * 人を手で足す。
+ * @returns URL
+ */
+export function newPersonPath(): string {
+  return `${PEOPLE_BASE}/list/new`;
+}
+
+/**
+ * 人のページ。
+ * @param personId - 人のID
+ * @returns URL
+ */
+export function personPath(personId: string): string {
+  return `${PEOPLE_BASE}/list/${encodeURIComponent(personId)}`;
+}

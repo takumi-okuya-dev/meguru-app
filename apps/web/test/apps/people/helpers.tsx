@@ -1,7 +1,16 @@
 // 人物メモの画面のテストの入れ物と見本（名前はすべて作ったもの）。
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render } from "@testing-library/react";
-import type { ImportColumn, ImportPreview, ImportPreviewRow, PeopleEventListItem } from "@meguru/shared/people";
+import type {
+  ImportColumn,
+  ImportPreview,
+  ImportPreviewRow,
+  PeopleEventListItem,
+  PersonDetail,
+  PersonListItem,
+  PersonResponse,
+  PersonSummary,
+} from "@meguru/shared/people";
 import { createMemoryRouter, RouterProvider, type RouteObject } from "react-router";
 
 /**
@@ -72,3 +81,85 @@ export function makePreview(rows: ImportPreviewRow[], over: Partial<ImportPrevie
 
 /** 答えの見本。 */
 export const ANSWERS = { nextAttendance: "参加したい", wantedConnections: ["エンジニア"], careerInterests: ["転職"] };
+
+/**
+ * 人の一覧の1行を作る。
+ * @param over - 上書き
+ * @returns 一覧の1行
+ */
+export function makeListItem(over: Partial<PersonListItem> = {}): PersonListItem {
+  return {
+    id: "p1",
+    displayName: "山田はなこ",
+    realName: "山田はなこ",
+    lineName: "はな",
+    lastMetOn: "2026-10-11",
+    ownEventCount: 1,
+    latestAnswers: ANSWERS,
+    consent: { invite: true, work: false },
+    ...over,
+  };
+}
+
+/**
+ * 人のページの回答を作る。
+ * @param over - 上書き
+ * @returns 回答
+ */
+export function makeResponse(over: Partial<PersonResponse> = {}): PersonResponse {
+  return {
+    id: "r1",
+    submittedAt: "2026-10-11T10:00:00.000Z",
+    lineName: "はな",
+    realName: "山田はなこ",
+    nextAttendance: "参加したい",
+    bringFriends: null,
+    wantedConnections: ["エンジニア"],
+    careerInterests: ["転職"],
+    consentChoices: [],
+    answers: [
+      { q: "LINE名を教えてください", a: "はな" },
+      { q: "次回参加", a: "参加したい" },
+      { q: "ひとこと", a: "" },
+    ],
+    ...over,
+  };
+}
+
+/**
+ * 人のページの頭を作る。
+ * @param over - 上書き
+ * @returns 人
+ */
+export function makeSummary(over: Partial<PersonSummary> = {}): PersonSummary {
+  return {
+    id: "p1",
+    displayName: "山田はなこ",
+    realName: "山田はなこ",
+    lineName: "はな",
+    otherLineNames: ["はなこ🌸"],
+    memoAppearance: null,
+    memoTalk: null,
+    consent: { invite: true, work: false, source: "response", basisOn: "2026-10-11" },
+    lastMetOn: "2026-11-25",
+    ...over,
+  };
+}
+
+/**
+ * 人のページを作る（11月25日と10月11日に来て、回答が2つ）。
+ * @param over - 上書き
+ * @returns 人のページ
+ */
+export function makeDetail(over: Partial<PersonDetail> = {}): PersonDetail {
+  return {
+    person: makeSummary(),
+    attendances: [
+      { event: { id: "e2", name: EVENT_1125.name, heldOn: EVENT_1125.heldOn, isOwn: false }, via: "response", responses: [makeResponse({ id: "r2", lineName: "はなこ🌸", submittedAt: "2026-11-25T10:00:00.000Z" })] },
+      { event: { id: "e1", name: EVENT_1011.name, heldOn: EVENT_1011.heldOn, isOwn: true }, via: "response", responses: [makeResponse()] },
+    ],
+    consentChanges: [{ invite: true, work: false, source: "response", basisOn: "2026-10-11", changedAt: "2026-10-12T03:00:00.000Z" }],
+    outreaches: [],
+    ...over,
+  };
+}

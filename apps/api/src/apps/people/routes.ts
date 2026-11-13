@@ -5,6 +5,7 @@ import { requireAppAccess, type AppEnv } from "../../platform";
 import { eventRoutes } from "./events/event-routes";
 import { importRoutes } from "./imports/import-routes";
 import { peopleMeRoutes } from "./me/me-routes";
+import { personRoutes } from "./persons/person-routes";
 import { PEOPLE_APP } from "./registry";
 
 /**
@@ -17,5 +18,6 @@ export function peopleRoutes(authed: MiddlewareHandler<AppEnv>) {
     .use("*", authed, requireAppAccess(PEOPLE_APP))
     .route("/", peopleMeRoutes())
     .route("/", eventRoutes())
-    .route("/", importRoutes());
+    .route("/", importRoutes())
+    .route("/", personRoutes());
 }

@@ -1,8 +1,8 @@
 // 「/people/events/:eventId」：イベントのページ（specs/people/001-people-memo contracts/ui-routes.md 1、research.md R14）。
-// 参加者数・来た人の一覧（人のページへのリンクはPR2から）・取り込みの一覧と「取り消す」・直す・消す。
+// 参加者数（消した人の数も）・来た人の一覧（押すと人のページ）・取り込みの一覧と「取り消す」・直す・消す。
 import type { UndoResult } from "@meguru/shared/people";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { PencilIcon, Trash2Icon } from "lucide-react";
+import { ChevronRightIcon, PencilIcon, Trash2Icon } from "lucide-react";
 import { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
 import { toast } from "sonner";
@@ -17,7 +17,7 @@ import { EventForm } from "../components/EventForm";
 import { formatHeldOn } from "../components/format";
 import { UndoConfirmDialog } from "../components/UndoConfirmDialog";
 import { peopleApi } from "../lib/api";
-import { eventsPath, importPath } from "../lib/paths";
+import { eventsPath, importPath, personPath } from "../lib/paths";
 import { peopleQueryKeys } from "../lib/query-keys";
 
 /**
@@ -95,9 +95,12 @@ export function EventPage() {
           ) : (
             <ul className="divide-y rounded-2xl border bg-card">
               {attendees.data.map((a) => (
-                <li key={a.personId} className="flex min-h-11 items-center gap-2 px-4 py-2 text-sm">
-                  <span className="min-w-0 flex-1 truncate">{a.displayName}</span>
-                  {a.lineName && a.lineName !== a.displayName && <span className="truncate text-muted-foreground">LINE：{a.lineName}</span>}
+                <li key={a.personId}>
+                  <Link to={personPath(a.personId)} className="flex min-h-11 items-center gap-2 px-4 py-2 text-sm hover:bg-accent">
+                    <span className="min-w-0 flex-1 truncate">{a.displayName}</span>
+                    {a.lineName && a.lineName !== a.displayName && <span className="min-w-0 truncate text-muted-foreground">LINE：{a.lineName}</span>}
+                    <ChevronRightIcon className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+                  </Link>
                 </li>
               ))}
             </ul>

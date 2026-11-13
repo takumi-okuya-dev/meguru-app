@@ -110,21 +110,23 @@ export async function derivePersons(tx: TxDb, userId: string, personIds: readonl
   if (changes.length > 0) await tx.insert(peopleConsentChanges).values(changes);
 }
 
+/** 回答の新しさを比べるのに使う項目。 */
+export type ResponseOrderKey = { id: string; heldOn: string; submittedAt: Date | null; createdAt: Date };
+
 /**
- * 回答 a が b より新しいか（開催日 → 回答の時刻（読めないものは古い）→ 取り込んだ時刻）。
+ * 回答 a が b より新しいか（開催日 → 回答の時刻（読めないものは古い）→ 取り込んだ時刻 → 番号）。「いちばん新しい回答」の決まりはここだけに置く
+ * （SQL の写しは person-query.ts の latestResponseSql。並びを変えるときは両方を直す）。
  * @param a - 回答
  * @param b - 回答
  * @returns a が新しければ true
  */
-function newerResponse(
-  a: { heldOn: string; submittedAt: Date | null; createdAt: Date },
-  b: { heldOn: string; submittedAt: Date | null; createdAt: Date },
-): boolean {
+export function newerResponse(a: ResponseOrderKey, b: ResponseOrderKey): boolean {
   if (a.heldOn !== b.heldOn) return a.heldOn > b.heldOn;
   const sa = a.submittedAt?.getTime() ?? -Infinity;
   const sb = b.submittedAt?.getTime() ?? -Infinity;
   if (sa !== sb) return sa > sb;
-  return a.createdAt.getTime() > b.createdAt.getTime();
+  if (a.createdAt.getTime() !== b.createdAt.getTime()) return a.createdAt.getTime() > b.createdAt.getTime();
+  return a.id > b.id;
 }
 
 /**
