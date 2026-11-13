@@ -17,7 +17,18 @@ specs/people/001-people-memo。運営者が開いた人だけが使える（`reg
 | `inbox/`（出来事の受け取り） | `received_events` | `withdrawal.ts`（`user.withdrawn`の受け取り） |
 | （直下） | — | `index.ts`（入口）・`schema.ts`（13表。スキーマ`people`）・`register.ts`（`registerPeople()`）・`registry.ts`（アプリの番号）・`access.ts`（持ち主の確かめ・作り手のロック）・`usage.ts`（`reportUsage`。数はいつも0）・`routes.ts`（`/api/people`の関所と道筋） |
 
-## 2. Web
+## 2. 2作目の実例として（docs/app-separation.md 5 の Threads の表と同じ見方）
+
+| 何 | 人物メモの実例 |
+|---|---|
+| 表の置き場所 | `apps/api/src/apps/people/schema.ts`。`pgSchema("people")`で13表。共通の表との外部キーは0本で、作り手は`user_id`の値で持つ |
+| 使える人 | `register.ts`で`registerAppAccess("people", "granted")`、`routes.ts`で`requireAppAccess("people")`（運営者が開いた人だけ。specs/meguru/030） |
+| 出来事の受け取り | `inbox/withdrawal.ts`。`user.withdrawn`で、自分のトランザクションの中で`people.received_events`に番号を記録し、作り手のロックを取ってからデータを消す |
+| 書き込みの直列 | `access.ts`の`lockOwner`（作り手ごとのアドバイザリーロック）。行を作る書き込みは`lockActiveOwner`で、退会の途中でないことをロックの中で確かめる |
+| 利用の数 | `usage.ts`の`reportPeopleUsage`（料金の数はいつも0、イベントか人があれば「使っている」） |
+| 使い方 | [docs/apps/people-guide.md](./people-guide.md) |
+
+## 3. Web
 
 | モジュール | 主な中身 |
 |---|---|

@@ -1,7 +1,7 @@
 // 声かけと進み具合（specs/people/001-people-memo contracts/api.md 5、research.md R16、tasks.md T077・T079）。
 // 同じ声かけは1つ（交流会への誘いは人と誘う会、仕事のつなぎは人と相談先）。その目的の同意がない人には始めない（FR-018）。
 // 相手の情報を外へ送る道は作らない（FR-023・FR-024）。声かけの行の user_id（作り手）が、判断した人（R16）。
-import { OUTREACH_STAGES, type Outreach, type OutreachPurpose, type OutreachStage } from "@meguru/shared/people";
+import { nameKey, OUTREACH_STAGES, type Outreach, type OutreachPurpose, type OutreachStage } from "@meguru/shared/people";
 import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { withTransaction, type TxDb } from "../../../kernel/db/client";
 import type { Env } from "../../../kernel/env";
@@ -85,28 +85,59 @@ export async function inviteOutreachesFor(db: PeopleDb, userId: string, eventId:
 }
 
 /**
- * 交流会への誘いの声かけを始める。同じ声かけがあれば今のものを返す（created: false）。同意がなければ 409 OUTREACH_NO_CONSENT。
+ * 声かけを始める。交流会への誘いは人と誘う会（自分の会だけ）、仕事のつなぎは人と相談先（nameKey で同じなら同じ相談先）。
+ * 同じ声かけがあれば今のものを返す（created: false）。その目的の同意がなければ 409 OUTREACH_NO_CONSENT（FR-018）。
  * @param env - Workers のバインディング
  * @param userId - 作り手
- * @param input - 人と誘う会
+ * @param input - 人と、誘う会か相談先
  * @returns 声かけと、新しく作ったか
  */
-export async function createInviteOutreach(env: Env, userId: string, input: { personId: string; eventId: string }): Promise<{ outreach: Outreach; created: boolean }> {
+export async function createOutreach(
+  env: Env,
+  userId: string,
+  input: { personId: string; purpose: "invite"; eventId: string } | { personId: string; purpose: "work"; targetName: string },
+): Promise<{ outreach: Outreach; created: boolean }> {
   return withTransaction(env.DATABASE_URL, async (tx) => {
     await lockOwner(tx, userId);
     const p = await loadOwnedPerson(tx, userId, input.personId);
-    const event = await loadOwnedEvent(tx, userId, input.eventId);
-    // 誘えるのは自分の会だけ（よその会には誘わない）
-    if (!event.isOwn) throw new AppError("VALIDATION_FAILED", 400, "invalid request", undefined, ["eventId"]);
-    const same = and(eq(peopleOutreaches.personId, p.id), eq(peopleOutreaches.purpose, "invite"), eq(peopleOutreaches.eventId, input.eventId));
+    let same;
+    let values: typeof peopleOutreaches.$inferInsert;
+    const now = new Date();
+    if (input.purpose === "invite") {
+      const event = await loadOwnedEvent(tx, userId, input.eventId);
+      // 誘えるのは自分の会だけ（よその会には誘わない）
+      if (!event.isOwn) throw new AppError("VALIDATION_FAILED", 400, "invalid request", undefined, ["eventId"]);
+      same = and(eq(peopleOutreaches.personId, p.id), eq(peopleOutreaches.purpose, "invite"), eq(peopleOutreaches.eventId, input.eventId));
+      values = { userId, personId: p.id, purpose: "invite", eventId: input.eventId, stage: "asked", askedAt: now };
+    } else {
+      const targetKey = nameKey(input.targetName);
+      same = and(eq(peopleOutreaches.personId, p.id), eq(peopleOutreaches.purpose, "work"), eq(peopleOutreaches.targetKey, targetKey));
+      values = { userId, personId: p.id, purpose: "work", targetName: input.targetName, targetKey, stage: "asked", askedAt: now };
+    }
     const [existing] = await selectOutreaches(tx, userId, same);
     if (existing) return { outreach: existing, created: false };
-    if (!p.consentInvite) throw new AppError("OUTREACH_NO_CONSENT", 409, "outreach without consent");
-    const now = new Date();
-    await tx.insert(peopleOutreaches).values({ userId, personId: p.id, purpose: "invite", eventId: input.eventId, stage: "asked", askedAt: now });
+    const consented = input.purpose === "invite" ? p.consentInvite : p.consentWork;
+    if (!consented) throw new AppError("OUTREACH_NO_CONSENT", 409, "outreach without consent");
+    await tx.insert(peopleOutreaches).values(values);
     const [created] = await selectOutreaches(tx, userId, same);
     return { outreach: created!, created: true };
   });
+}
+
+/**
+ * 人ごとの最新の仕事のつなぎの声かけ（誘う候補の行に入れる）。
+ * @param db - データベース
+ * @param userId - 作り手
+ * @param personIds - 人
+ * @returns 人の番号 → 声かけ
+ */
+export async function latestWorkOutreachesFor(db: PeopleDb, userId: string, personIds: readonly string[]): Promise<Map<string, Outreach>> {
+  if (personIds.length === 0) return new Map();
+  // 並びは始めた時刻の新しい順なので、人ごとの最初のものが最新
+  const list = await selectOutreaches(db, userId, and(eq(peopleOutreaches.purpose, "work"), inArray(peopleOutreaches.personId, [...personIds])));
+  const out = new Map<string, Outreach>();
+  for (const o of list) if (!out.has(o.personId)) out.set(o.personId, o);
+  return out;
 }
 
 /**

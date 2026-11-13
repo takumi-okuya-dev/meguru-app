@@ -159,8 +159,11 @@ export const candidateQuerySchema = personListQuerySchema.extend({
 /** GET /api/people/candidates のクエリ（読んだあと）。 */
 export type CandidateQuery = z.infer<typeof candidateQuerySchema>;
 
-/** POST /api/people/outreaches の入力（PR3 は交流会への誘いだけ。仕事のつなぎは PR4）。 */
-export const outreachCreateSchema = z.object({ personId: id, purpose: z.literal("invite"), eventId: id });
+/** POST /api/people/outreaches の入力（交流会への誘いは誘う会、仕事のつなぎは相談先の名前。R16）。 */
+export const outreachCreateSchema = z.discriminatedUnion("purpose", [
+  z.object({ personId: id, purpose: z.literal("invite"), eventId: id }),
+  z.object({ personId: id, purpose: z.literal("work"), targetName: personName }),
+]);
 /** PATCH /api/people/outreaches/:outreachId の入力。 */
 export const outreachUpdateSchema = z.object({
   stage: z.enum([...new Set(Object.values(OUTREACH_STAGES).flat())] as [OutreachStage, ...OutreachStage[]]),

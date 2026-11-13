@@ -1,4 +1,4 @@
-// 人のページの声かけの記録（誘う会ごとの進み具合と日時。specs/people/001-people-memo contracts/ui-routes.md 1、research.md R16）。
+// 人のページの声かけの記録（誘う会・相談先ごとの進み具合と日時。specs/people/001-people-memo contracts/ui-routes.md 1、research.md R16）。
 // 001の作り手は1人なので、記録したのは作り手。「あなたが記録」と出す。
 import type { Outreach } from "@meguru/shared/people";
 import { useId } from "react";
@@ -34,7 +34,7 @@ function stageTimes(o: Outreach): { label: string; at: string }[] {
  */
 function outreachTitle(o: Outreach): string {
   if (o.purpose === "invite") return o.event ? `${formatHeldOn(o.event.heldOn)} ${o.event.name}への誘い` : "交流会への誘い";
-  return o.targetName ? `${o.targetName}へのつなぎ` : "仕事の相談先へのつなぎ";
+  return o.targetName ? `仕事の相談先へのつなぎ（相談先：${o.targetName}）` : "仕事の相談先へのつなぎ";
 }
 
 /**
@@ -61,7 +61,7 @@ export function PersonOutreachSection({ outreaches }: { outreaches: Outreach[] }
         声かけの記録
       </h2>
       {outreaches.length === 0 ? (
-        <p className="text-sm text-muted-foreground">まだ声かけの記録はありません。誘う候補の「文をコピー」のあとに記録できます。</p>
+        <p className="text-sm text-muted-foreground">まだ声かけの記録はありません。誘う候補の画面から記録できます。</p>
       ) : (
         <ul className="divide-y rounded-2xl border bg-card">
           {outreaches.map((o) => (

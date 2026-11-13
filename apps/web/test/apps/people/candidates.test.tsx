@@ -131,7 +131,7 @@ describe("誘う候補", () => {
     expect(api.createOutreach).not.toHaveBeenCalled();
     api.candidates.mockResolvedValue({ persons: [makeCandidate({ outreach: makeOutreach() })], total: 1 });
     await user.click(within(row).getByRole("button", { name: "興味を聞いたにする" }));
-    expect(api.createOutreach).toHaveBeenCalledWith({ personId: "p1", eventId: "e3" });
+    expect(api.createOutreach).toHaveBeenCalledWith({ personId: "p1", purpose: "invite", eventId: "e3" });
     const group = await within(row).findByRole("group", { name: "進み具合" });
     expect(within(group).getByRole("button", { name: "興味を聞いた" })).toHaveAttribute("aria-pressed", "true");
     expect(within(row).queryByRole("button", { name: "興味を聞いたにする" })).not.toBeInTheDocument();
@@ -231,7 +231,7 @@ describe("誘う候補", () => {
     expect(router.state.location.search).toBe("?purpose=work");
     await waitFor(() => expect(api.candidates).toHaveBeenLastCalledWith(expect.objectContaining({ purpose: "work", eventId: undefined })));
     expect(screen.getByRole("button", { name: "仕事の相談先へのつなぎ" })).toHaveAttribute("aria-pressed", "true");
-    expect(screen.getByText(/仕事の相談先へつなぐ記録は、次の版で足します/)).toBeInTheDocument();
+    expect(screen.getByText(/本人に聞いて、OKをもらってからつなぎます/)).toBeInTheDocument();
     expect(screen.queryByLabelText("誘う会")).not.toBeInTheDocument();
     await firstRow();
     expect(screen.queryByRole("button", { name: /文をコピー/ })).not.toBeInTheDocument();
