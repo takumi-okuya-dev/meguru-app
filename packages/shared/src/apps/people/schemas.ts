@@ -2,7 +2,7 @@
 // 入力は zod で確かめ、出力は型だけを書く（APIと画面で同じ形を使う）。
 import { z } from "zod";
 import { CONSENT_PURPOSES, type Consent } from "./answers";
-import { IMPORT_FIELDS, MEMO_APPEARANCE_MAX, MEMO_TALK_MAX, PERSON_NAME_MAX, type ImportField } from "./fields";
+import { IMPORT_FIELDS, MEMO_APPEARANCE_MAX, MEMO_TALK_MAX, PERSON_NAME_MAX, SEARCH_QUERY_MAX, type ImportField } from "./fields";
 
 /** 日付（YYYY-MM-DD。日本時間の日付）。 */
 const dateString = z
@@ -101,6 +101,32 @@ export const attendanceCreateSchema = z.object({ eventId: id });
 export const personMergeSchema = z.object({ otherPersonId: id });
 /** DELETE /api/people/persons/:personId の入力。 */
 export const personDeleteSchema = z.object({ confirmName: z.string().trim().min(1).max(PERSON_NAME_MAX) });
+/** PUT /api/people/persons/:personId/consent の入力。 */
+export const consentUpdateSchema = consentSchema;
+
+/**
+ * くり返せるクエリの値（1つなら文字、2つ以上なら配列で届く）を配列にする。
+ * @returns zod のスキーマ
+ */
+const manyValues = () =>
+  z
+    .union([z.string().max(500), z.array(z.string().max(500)).max(30)])
+    .optional()
+    .transform((v) => (v === undefined ? [] : Array.isArray(v) ? v : [v]).filter((s) => s !== ""));
+
+/** GET /api/people/persons のクエリ（R22）。`next`・`wanted`・`career`はくり返せる。 */
+export const personListQuerySchema = z.object({
+  q: z.string().max(SEARCH_QUERY_MAX).optional(),
+  eventId: id.optional(),
+  next: manyValues(),
+  wanted: manyValues(),
+  career: manyValues(),
+  lastMetFrom: dateString.optional(),
+  lastMetTo: dateString.optional(),
+  offset: z.coerce.number().int().min(0).max(1_000_000).default(0),
+});
+/** GET /api/people/persons のクエリ（読んだあと）。 */
+export type PersonListQuery = z.infer<typeof personListQuerySchema>;
 
 // ---- 出力の型 ----
 
@@ -171,6 +197,61 @@ export type ImportPreview = {
 };
 /** POST /api/people/imports の返り。 */
 export type ImportResult = { import: Omit<PeopleImportSummary, "createdAt"> };
+
+/** 人の一覧の1行（GET /api/people/persons。R22）。 */
+export type PersonListItem = {
+  id: string;
+  displayName: string;
+  realName: string | null;
+  lineName: string | null;
+  /** 最後に会った日（来たイベントの開催日のいちばん新しい日。会っていなければ null） */
+  lastMetOn: string | null;
+  /** 自分の会に来た回数 */
+  ownEventCount: number;
+  /** いちばん新しい回答の答え（回答がなければ null） */
+  latestAnswers: AnswerSummary | null;
+  consent: Consent;
+};
+/** GET /api/people/persons の返り。 */
+export type PersonList = { persons: PersonListItem[]; total: number };
+/** 選べる値と人数。 */
+export type FacetValue = { value: string; count: number };
+/** GET /api/people/facets の返り（いちばん新しい回答の値。多い順）。 */
+export type PeopleFacets = { nextAttendance: FacetValue[]; wantedConnections: FacetValue[]; careerInterests: FacetValue[] };
+/** 人の同意（人のページ）。 */
+export type PersonConsent = Consent & { source: "none" | "response" | "manual"; basisOn: string | null };
+/** 人（人のページの頭）。 */
+export type PersonSummary = {
+  id: string;
+  displayName: string;
+  realName: string | null;
+  lineName: string | null;
+  /** 別名（今のLINE名のほかの、回答のLINE名と手で足したときのLINE名。R10） */
+  otherLineNames: string[];
+  memoAppearance: string | null;
+  memoTalk: string | null;
+  consent: PersonConsent;
+  lastMetOn: string | null;
+};
+/** 人のページの回答。 */
+export type PersonResponse = {
+  id: string;
+  submittedAt: string | null;
+  lineName: string;
+  realName: string | null;
+  nextAttendance: string | null;
+  bringFriends: string | null;
+  wantedConnections: string[];
+  careerInterests: string[];
+  consentChoices: string[];
+  answers: { q: string; a: string }[];
+};
+/** 人のページの来たイベント（新しい順）。回答があれば via: response、手で足しただけなら manual。 */
+export type PersonAttendance = { event: PeopleEvent; via: "response" | "manual"; responses: PersonResponse[] };
+/** 同意の記録。 */
+export type PersonConsentChange = Consent & { source: "response" | "manual"; basisOn: string; changedAt: string };
+/** GET /api/people/persons/:personId の返り（outreaches は PR3 から）。 */
+export type PersonDetail = { person: PersonSummary; attendances: PersonAttendance[]; consentChanges: PersonConsentChange[]; outreaches: unknown[] };
 
 /** 書き足し（取り消しで確かめる。R14）。 */
 export type PersonNote = "memo" | "outreach" | "manual_consent" | "manual_attendance";

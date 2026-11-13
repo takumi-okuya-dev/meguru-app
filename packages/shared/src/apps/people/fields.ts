@@ -34,6 +34,10 @@ export const IMPORT_FIELD_LABELS: Record<ImportField, string> = {
 
 /** 名前と答えの文字の上限（data-model.md 2-5・2-6）。 */
 export const PERSON_NAME_MAX = 100;
+/** 人の一覧の1ページの人数（R22）。 */
+export const PERSONS_PAGE_SIZE = 100;
+/** 探す言葉の上限。 */
+export const SEARCH_QUERY_MAX = 100;
 /** 見た目の特徴の上限。 */
 export const MEMO_APPEARANCE_MAX = 300;
 /** 話したことの上限。 */
