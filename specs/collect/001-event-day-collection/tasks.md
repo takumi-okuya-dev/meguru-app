@@ -237,7 +237,7 @@ description: "Task list for collect 001 event-day collection"
 **2026-11-13 PR4の進め方**：ユーザーの判断で、Threads の側も集金管理のセッションで作った。次の4つに分けた（マージの順も同じ）。
 1. 共通のPR：`PlatformEventPayloads`に Threads の3つの出来事を足し、`emitEvent`を共通の入口から出す。受け取るアプリがまだなくても出せるよう`{ allowNoConsumers: true }`を足した。
 2. Threads のPR：宣伝内容のイベントの情報を作る・直す・消す、アカウントを消す（Metaのデータ削除も）、掲載の状況を変えるときに、同じトランザクションで出来事を書き、あとですぐ届ける。
-3. PR4a（集金管理のAPI・マイグレーション`0037_collect_threads_candidates`）：候補に写す・候補の一覧・作ったイベントの「元が変わった・消された」・退会で候補も消す。
+3. PR4a（集金管理のAPI・マイグレーション`0038_collect_threads_candidates`）：候補に写す・候補の一覧・作ったイベントの「元が変わった・消された」・退会で候補も消す。
 4. PR4b（集金管理の画面）。
 
 次のように直した・決めた。
