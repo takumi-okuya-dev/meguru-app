@@ -20,6 +20,7 @@ import { isUuid } from "../../../kernel/validate";
 import { toRecord } from "../reception/reception-service";
 import {
   collectEvents,
+  collectOwnerSettings,
   collectPriceTiers,
   collectReceptionLinks,
   collectReceptionRecords,
@@ -105,7 +106,7 @@ export async function activeSelfLink(db: Db | TxDb, token: string, now: Date): P
 }
 
 /**
- * リンクを開いた画面に出すもの（イベントの名前・日時・会場・払い方だけ）。
+ * リンクを開いた画面に出すもの（イベントの名前・日時・会場・払い方と、PayPayのQRの有無・振込先の案内だけ）。
  * @param db - データベース
  * @param token - 道筋の :token
  * @param now - 今
@@ -114,14 +115,26 @@ export async function activeSelfLink(db: Db | TxDb, token: string, now: Date): P
 export async function selfLinkInfo(db: Db, token: string, now: Date): Promise<SelfLinkInfo> {
   const link = await loadSelfLink(db, token);
   const [event] = await db
-    .select({ name: collectEvents.name, startsAt: collectEvents.startsAt, venue: collectEvents.venue, methods: collectEvents.methods })
+    .select({
+      name: collectEvents.name,
+      startsAt: collectEvents.startsAt,
+      venue: collectEvents.venue,
+      methods: collectEvents.methods,
+      ownerUserId: collectEvents.ownerUserId,
+    })
     .from(collectEvents)
     .where(eq(collectEvents.id, link.eventId))
     .limit(1);
   if (!event) throw linkNotFound();
+  const [settings] = await db
+    .select({ hasPaypayQr: sql<boolean>`${collectOwnerSettings.paypayQr} IS NOT NULL`, bankText: collectOwnerSettings.bankText })
+    .from(collectOwnerSettings)
+    .where(eq(collectOwnerSettings.ownerUserId, event.ownerUserId))
+    .limit(1);
   return {
     status: statusOf(link, now),
     event: { name: event.name, startsAt: event.startsAt.toISOString(), venue: event.venue, methods: event.methods as SelfLinkInfo["event"]["methods"] },
+    settings: { hasPaypayQr: settings?.hasPaypayQr ?? false, bankText: settings?.bankText ?? null },
   };
 }
 

@@ -31,6 +31,8 @@ export type SelfMethod = (typeof SELF_METHODS)[number];
 export const selfLinkInfoSchema = z.object({
   status: z.enum(RECEPTION_LINK_STATUSES),
   event: z.object({ name: z.string(), startsAt: z.string(), venue: z.string().nullable(), methods: z.array(z.enum(COLLECT_METHODS)) }),
+  /** PayPayのQRがあるか・振込先の案内（払い方を選んだあとの案内に出す。spec FR-015） */
+  settings: z.object({ hasPaypayQr: z.boolean(), bankText: z.string().nullable() }),
 });
 /** GET /api/collect/s/:token の応答。 */
 export type SelfLinkInfo = z.infer<typeof selfLinkInfoSchema>;
