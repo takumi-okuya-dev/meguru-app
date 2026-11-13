@@ -1,4 +1,5 @@
 // 消したイベントのまとめ（/collect/summaries。specs/collect/001-event-day-collection FR-014、tasks.md T072）。数字だけで、名前は入っていない。
+import { COLLECT_MEDIA_LABELS, RECEPTION_METHOD_LABELS, RECEPTION_METHODS, type EventSummary } from "@meguru/shared";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -12,6 +13,67 @@ import { collectApi } from "../lib/api";
 import { collectErrorText } from "../lib/errors";
 import { collectQueryKeys } from "../lib/query-keys";
 import { yen } from "../lib/reception-model";
+
+/**
+ * まとめの内訳（払い方ごとの件数と合計・媒体ごとの名簿・来場・売上。FR-014）。開いたときだけ出す。
+ * @param props - summary：まとめ
+ * @returns 内訳
+ */
+function SummaryDetail({ summary }: { summary: EventSummary }) {
+  return (
+    <details className="text-sm">
+      <summary className="cursor-pointer text-muted-foreground">内訳を見る</summary>
+      <div className="mt-2 space-y-3">
+        <div className="overflow-x-auto">
+          <table className="w-full" aria-label={`${summary.name}の払い方ごと`}>
+            <thead className="text-left text-xs text-muted-foreground">
+              <tr>
+                <th className="py-1 pr-3 font-normal">払い方</th>
+                <th className="py-1 pr-3 font-normal">件数</th>
+                <th className="py-1 font-normal">合計</th>
+              </tr>
+            </thead>
+            <tbody>
+              {RECEPTION_METHODS.map((m) => (
+                <tr key={m} className="border-t">
+                  <td className="py-1 pr-3">{RECEPTION_METHOD_LABELS[m]}</td>
+                  <td className="py-1 pr-3 tabular-nums">{summary.byMethod[m].count}件</td>
+                  <td className="py-1 tabular-nums">{yen(summary.byMethod[m].amount)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        {summary.byMedia.length > 0 && (
+          <div className="overflow-x-auto">
+            <table className="w-full" aria-label={`${summary.name}の媒体ごと`}>
+              <thead className="text-left text-xs text-muted-foreground">
+                <tr>
+                  <th className="py-1 pr-3 font-normal">媒体</th>
+                  <th className="py-1 pr-3 font-normal">名簿</th>
+                  <th className="py-1 pr-3 font-normal">来場</th>
+                  <th className="py-1 pr-3 font-normal">支払い済み</th>
+                  <th className="py-1 font-normal">振込待ち</th>
+                </tr>
+              </thead>
+              <tbody>
+                {summary.byMedia.map((m) => (
+                  <tr key={m.media} className="border-t">
+                    <td className="py-1 pr-3">{COLLECT_MEDIA_LABELS[m.media]}</td>
+                    <td className="py-1 pr-3 tabular-nums">{m.roster}人</td>
+                    <td className="py-1 pr-3 tabular-nums">{m.attended}人</td>
+                    <td className="py-1 pr-3 tabular-nums">{yen(m.paid)}</td>
+                    <td className="py-1 tabular-nums">{yen(m.awaiting)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </details>
+  );
+}
 
 /**
  * まとめの画面。
@@ -53,6 +115,7 @@ export function SummariesPage() {
                       来場 {s.attendedCount} / {s.rosterCount}人・現金 {yen(s.byMethod.cash.amount)}・PayPay {yen(s.byMethod.paypay.amount)}・振込 {yen(transfer)}
                       {s.awaitingTransfer.count > 0 && `（うち振込待ち ${s.awaitingTransfer.count}件・${yen(s.awaitingTransfer.amount)}）`}
                     </div>
+                    <SummaryDetail summary={s} />
                   </div>
                   <Button type="button" variant="ghost" size="sm" onClick={() => setRemoving({ id: s.id, name: s.name })}>
                     消す

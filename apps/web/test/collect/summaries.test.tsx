@@ -44,7 +44,7 @@ beforeEach(() => {
         rosterCount: 20,
         attendedCount: 18,
         byMethod: { cash: { count: 10, amount: 30000 }, paypay: { count: 5, amount: 15000 }, transfer_today: zero, transfer_later: { count: 2, amount: 6000 }, none: { count: 1, amount: 0 } },
-        byMedia: [],
+        byMedia: [{ media: "peatix", roster: 12, attended: 11, paid: 33000, awaiting: 3000 }],
         awaitingTransfer: { count: 1, amount: 3000 },
         eventDeletedAt: "2026-10-20T00:00:00.000Z",
       },
@@ -76,6 +76,12 @@ describe("まとめ", () => {
     renderAt("/collect/summaries");
     const row = await screen.findByRole("listitem", { name: "10月の会" });
     expect(row).toHaveTextContent("来場 18 / 20人・現金 30,000円・PayPay 15,000円・振込 6,000円（うち振込待ち 1件・3,000円）");
+    // 内訳：払い方ごとの件数と合計・媒体ごと（FR-014）
+    await user.click(within(row).getByText("内訳を見る"));
+    const methods = within(row).getByRole("table", { name: "10月の会の払い方ごと" });
+    expect(within(methods).getByRole("row", { name: /現金 10件 30,000円/ })).toBeInTheDocument();
+    const media = within(row).getByRole("table", { name: "10月の会の媒体ごと" });
+    expect(within(media).getByRole("row", { name: /Peatix 12人 11人 33,000円 3,000円/ })).toBeInTheDocument();
     await user.click(within(row).getByRole("button", { name: "消す" }));
     await user.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "消す" }));
     await waitFor(() => expect(mocks.deleteSummary).toHaveBeenCalledWith("s1"));

@@ -1,13 +1,21 @@
 // 締めの画面（specs/collect/001-event-day-collection User Story 4、FR-040〜FR-045、tasks.md T056）。
 import type { ClosingSnapshot } from "@meguru/shared";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const mocks = vi.hoisted(() => ({ closing: vi.fn(), settle: vi.fn(), checkPaypay: vi.fn(), close: vi.fn(), exportCsv: vi.fn() }));
+const mocks = vi.hoisted(() => ({ closing: vi.fn(), settle: vi.fn(), checkPaypay: vi.fn(), close: vi.fn(), exportCsv: vi.fn(), liveTicket: vi.fn() }));
+const live = vi.hoisted(() => ({ onMessage: null as null | (() => void) }));
 vi.mock("@/apps/collect/lib/api", () => ({ collectApi: mocks }));
+// 会場の共有はつながず、知らせを手で送れるようにする
+vi.mock("@/apps/collect/lib/live", () => ({
+  useLive: (opts: { onMessage: () => void }) => {
+    live.onMessage = opts.onMessage;
+    return "live";
+  },
+}));
 vi.mock("sonner", () => ({ toast: { info: vi.fn(), error: vi.fn(), success: vi.fn() } }));
 
 const { ClosingPage, diffText } = await import("@/apps/collect/pages/ClosingPage");
@@ -107,5 +115,14 @@ describe("締め", () => {
     renderClosing();
     expect(await screen.findByRole("status")).toHaveTextContent("締めたあとで受付の記録が変わりました");
     expect(screen.getByRole("button", { name: "もう一度締める" })).toBeInTheDocument();
+  });
+
+  it("会場の共有の知らせ（手伝う人の記録など）が来たら、数字を読み直す", async () => {
+    renderClosing();
+    await screen.findByRole("heading", { name: /PayPay 1件/ });
+    expect(mocks.closing).toHaveBeenCalledTimes(1);
+    mocks.closing.mockResolvedValue(snapshot({ paypay: { ...snapshot().paypay, count: 2, amount: 5000 } }));
+    act(() => live.onMessage!());
+    expect(await screen.findByRole("heading", { name: /PayPay 2件・5,000円/ })).toBeInTheDocument();
   });
 });

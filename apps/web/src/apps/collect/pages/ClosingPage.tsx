@@ -17,6 +17,7 @@ import { PageBody, PageHeader } from "@/shell";
 import { collectApi } from "../lib/api";
 import { collectErrorText } from "../lib/errors";
 import { transfersPath } from "../lib/paths";
+import { useLive } from "../lib/live";
 import { collectQueryKeys } from "../lib/query-keys";
 import { yen } from "../lib/reception-model";
 
@@ -97,6 +98,10 @@ export function ClosingPage() {
   const { eventId = "" } = useParams<{ eventId: string }>();
   const queryClient = useQueryClient();
   const closing = useQuery({ queryKey: collectQueryKeys.closing(eventId), queryFn: () => collectApi.closing(eventId) });
+  // 締めの画面を開いている間も、会場の受付（手伝う人の記録・取り消し・飛び入り）が続くことがある。会場の共有の知らせが来たら
+  // 数字を読み直す（つながらない間は15秒ごと）。古い数字のまま精算・締めをしないため
+  const refresh = () => void queryClient.invalidateQueries({ queryKey: collectQueryKeys.closing(eventId) });
+  useLive({ enabled: closing.data !== undefined, getTicket: () => collectApi.liveTicket(eventId), onMessage: refresh, onResync: refresh });
   const [confirmClose, setConfirmClose] = useState(false);
   const set = (next: ClosingSnapshot) => queryClient.setQueryData(collectQueryKeys.closing(eventId), next);
   const settle = useMutation({
