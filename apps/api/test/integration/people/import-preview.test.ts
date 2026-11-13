@@ -88,6 +88,12 @@ describe("行の判定", () => {
     expect(await peopleCounts()).toEqual(before);
   });
 
+  it("同意の選択肢が上限（30個）を超えても、切る前の全部で決める（31個目の「希望しない」を落とさない）", async () => {
+    const consent = [...Array<string>(30).fill("交流会・勉強会の案内"), "個別の案内は希望しない"].join(", ");
+    const [, body] = await read<Preview>(await previewForm("u1", eventId, [formRow({ line: "たろう", consent })]));
+    expect(body.rows[0]!.consent).toEqual({ invite: false, work: false });
+  });
+
   it("もう取り込んだ行は already_imported", async () => {
     const rows = [formRow({ line: "たろう" }, 1), formRow({ line: "はなこ" }, 2)];
     await commitForm("u1", eventId, rows);

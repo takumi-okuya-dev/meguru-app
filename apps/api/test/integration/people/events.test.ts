@@ -1,7 +1,7 @@
 // イベント（specs/people/001-people-memo tasks.md T024、contracts/api.md 2）。
 import { beforeEach, describe, expect, it } from "vitest";
 import { resetDb } from "../../helpers/app";
-import { callPeople, commitForm, formRow, grantPeople, makeEvent, read } from "../../helpers/people";
+import { callPeople, commitForm, formRow, grantPeople, makeEvent, rawSql, read } from "../../helpers/people";
 
 beforeEach(async () => {
   await resetDb();
@@ -52,5 +52,22 @@ describe("イベント", () => {
       ["あきら", "response"],
       ["たろう", "response"],
     ]);
+  });
+
+  it("開催日を変えると、その会に回答のある人の今のLINE名と同意を決め直す", async () => {
+    const oct = await makeEvent("u1", "10月の会", "2026-10-11");
+    const nov = await makeEvent("u1", "11月の会", "2026-11-25");
+    await commitForm("u1", oct, [formRow({ line: "たろう" })]);
+    const sql = rawSql();
+    const [taro] = (await sql`SELECT id FROM people.persons`) as { id: string }[];
+    await commitForm("u1", nov, [formRow({ line: "たろう🌸", at: "2026/11/25 21:00:00", consent: "個別の案内は希望しない" })], [{ row: 0, action: "link", personId: taro!.id }]);
+    const person = async () => (await sql`SELECT line_name, consent_invite FROM people.persons WHERE id = ${taro!.id}`)[0];
+    expect(await person()).toEqual({ line_name: "たろう🌸", consent_invite: false });
+    // 名前だけ直しても変わらない
+    expect((await callPeople("PATCH", `/events/${oct}`, "u1", { name: "10月の会（改）" })).status).toBe(200);
+    expect(await person()).toEqual({ line_name: "たろう🌸", consent_invite: false });
+    // 10月の会を11月の会より後ろにすると、10月の会の回答が今のものになる
+    expect((await callPeople("PATCH", `/events/${oct}`, "u1", { heldOn: "2026-12-01" })).status).toBe(200);
+    expect(await person()).toEqual({ line_name: "たろう", consent_invite: true });
   });
 });

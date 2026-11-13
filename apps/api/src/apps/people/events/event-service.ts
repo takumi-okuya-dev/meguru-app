@@ -5,8 +5,9 @@ import { and, desc, eq, sql, type SQL } from "drizzle-orm";
 import { withTransaction, type Db } from "../../../kernel/db/client";
 import type { Env } from "../../../kernel/env";
 import { logger } from "../../../kernel/logger";
-import { displayNameOf, loadOwnedEvent, lockOwner, type PeopleDb } from "../access";
+import { displayNameOf, loadOwnedEvent, lockActiveOwner, lockOwner, type PeopleDb } from "../access";
 import { executeUndo, planUndo, toUndoPreview } from "../imports/undo";
+import { derivePersons } from "../persons/person-derive";
 import { peopleErasedAttendances, peopleEvents, peopleImports, peopleManualAttendances, peoplePersons, peopleResponses } from "../schema";
 import { reportPeopleUsage } from "../usage";
 
@@ -69,34 +70,53 @@ export async function listEvents(db: Db, userId: string): Promise<PeopleEventLis
 }
 
 /**
- * イベントを作る。
+ * イベントを作る（作り手のロックの中で、退会の途中でないことを確かめてから作る）。
+ * @param env - Workers のバインディング
  * @param db - データベース
  * @param userId - 作り手
  * @param input - 名前・開催日・自分の会か
  * @returns 作ったイベント
  */
-export async function createEvent(db: Db, userId: string, input: { name: string; heldOn: string; isOwn: boolean }): Promise<PeopleEvent> {
-  const [row] = await db.insert(peopleEvents).values({ userId, ...input }).returning();
+export async function createEvent(env: Env, db: Db, userId: string, input: { name: string; heldOn: string; isOwn: boolean }): Promise<PeopleEvent> {
+  const row = await withTransaction(env.DATABASE_URL, async (tx) => {
+    await lockActiveOwner(tx, env, userId);
+    const [created] = await tx.insert(peopleEvents).values({ userId, ...input }).returning();
+    return created!;
+  });
   await reportPeopleUsage(db, userId);
-  return toEvent(row!);
+  return toEvent(row);
 }
 
 /**
- * イベントを直す。
- * @param db - データベース
+ * イベントを直す。開催日が変わったら、その会に回答のある人の今のLINE名と同意を決め直す（どの回答が新しいかが変わるため。PR #111 の Codex レビュー）。
+ * @param env - Workers のバインディング
  * @param userId - 作り手
  * @param eventId - イベント
  * @param input - 直す項目
  * @returns 直したイベント
  */
-export async function updateEvent(db: Db, userId: string, eventId: string, input: { name?: string; heldOn?: string; isOwn?: boolean }): Promise<PeopleEvent> {
-  await loadOwnedEvent(db, userId, eventId);
-  const [row] = await db
-    .update(peopleEvents)
-    .set({ ...input, updatedAt: new Date() })
-    .where(and(eq(peopleEvents.id, eventId), eq(peopleEvents.userId, userId)))
-    .returning();
-  return toEvent(row!);
+export async function updateEvent(env: Env, userId: string, eventId: string, input: { name?: string; heldOn?: string; isOwn?: boolean }): Promise<PeopleEvent> {
+  return withTransaction(env.DATABASE_URL, async (tx) => {
+    await lockOwner(tx, userId);
+    const before = await loadOwnedEvent(tx, userId, eventId);
+    const [row] = await tx
+      .update(peopleEvents)
+      .set({ ...input, updatedAt: new Date() })
+      .where(and(eq(peopleEvents.id, eventId), eq(peopleEvents.userId, userId)))
+      .returning();
+    if (input.heldOn !== undefined && input.heldOn !== before.heldOn) {
+      const affected = await tx
+        .selectDistinct({ personId: peopleResponses.personId })
+        .from(peopleResponses)
+        .where(and(eq(peopleResponses.eventId, eventId), eq(peopleResponses.userId, userId)));
+      await derivePersons(
+        tx,
+        userId,
+        affected.map((r) => r.personId),
+      );
+    }
+    return toEvent(row!);
+  });
 }
 
 /**

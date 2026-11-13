@@ -1,9 +1,13 @@
 // 人物メモの持ち主の確かめと、作り手のロック（specs/people/001-people-memo contracts/api.md 0、research.md R5・R18）。
 // 持ち主の判定はこのファイルに集める（Constitution原則V）。ほかの作り手のものは 404 ITEM_NOT_FOUND（あるかどうかを見せない。FR-032）。
 import { and, eq, sql } from "drizzle-orm";
+import { billingModeOf } from "../../kernel/config";
 import type { Db, TxDb } from "../../kernel/db/client";
-import { itemNotFound } from "../../kernel/errors";
+import type { Env } from "../../kernel/env";
+import { AppError, itemNotFound } from "../../kernel/errors";
 import { isUuid } from "../../kernel/validate";
+import { loadAppEntitlement } from "../../platform";
+import { PEOPLE_APP } from "./registry";
 import { peopleEvents, peopleImports, peoplePersons, peopleResponses } from "./schema";
 
 /** 読む先（トランザクションの中でもよい）。 */
@@ -16,6 +20,20 @@ export type PeopleDb = Db | TxDb;
  */
 export async function lockOwner(tx: TxDb, userId: string): Promise<void> {
   await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${"people_owner:" + userId}, 0))`);
+}
+
+/**
+ * 作り手のロックを取り、その人が退会の途中でないことを、ロックの中で確かめる（新しい行を作る書き込みの頭で呼ぶ）。
+ * 退会の片づけ（onUserWithdrawn）も同じロックを取るので、片づけのあとに行が作り直されない（PR #111 の Codex レビュー）。
+ * 関所を通ったあとで退会が始まった書き込みは、ここで 409 WITHDRAWAL_IN_PROGRESS にする。
+ * @param tx - トランザクション
+ * @param env - Workers のバインディング
+ * @param userId - 作り手
+ */
+export async function lockActiveOwner(tx: TxDb, env: Env, userId: string): Promise<void> {
+  await lockOwner(tx, userId);
+  const owner = await loadAppEntitlement(tx, billingModeOf(env), userId, PEOPLE_APP);
+  if (!owner || owner.withdrawn) throw new AppError("WITHDRAWAL_IN_PROGRESS", 409, "withdrawal in progress");
 }
 
 /**

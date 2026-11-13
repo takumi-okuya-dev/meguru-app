@@ -117,6 +117,8 @@ export async function classifyRows(
     rows.map(async (r, row): Promise<ParsedRow> => {
       const lineName = (at(r, idx.line) ?? "").trim();
       const realName = single(at(r, idx.real), Number.MAX_SAFE_INTEGER);
+      // 同意は、切る前の全部の選択肢で決める（31個目の「希望しない」を落として案内してよいにしない。PR #111 の Codex レビュー）
+      const allConsentChoices = splitChoices(at(r, idx.consent));
       const consentChoices = multi(at(r, idx.consent));
       const lineNameKey = nameKey(lineName);
       // 二重の印：イベント・回答の時刻の文字・LINE名（時刻の列がない・時刻が空なら全部の列の値）。名前を含まないハッシュにする（R8・R18）。
@@ -138,7 +140,7 @@ export async function classifyRows(
         wantedConnections: multi(at(r, idx.wanted)),
         careerInterests: multi(at(r, idx.career)),
         consentChoices,
-        consent: idx.consent < 0 ? { invite: false, work: false } : consentFromChoices(consentChoices, purposes),
+        consent: idx.consent < 0 ? { invite: false, work: false } : consentFromChoices(allConsentChoices, purposes),
         answers: columns.map((c, i) => ({ q: c.header, a: r[i] ?? "" })),
         dedupeHash: await sha256Hex(seed),
         status: invalidReason ? "invalid" : "new",

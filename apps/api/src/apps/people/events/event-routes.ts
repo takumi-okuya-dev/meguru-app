@@ -15,7 +15,7 @@ export function eventRoutes() {
     .get("/events", async (c) => c.json({ events: await listEvents(createDb(c.env.DATABASE_URL), c.get("user").id) }))
     .post("/events", async (c) => {
       const input = await parseBody(eventCreateSchema, c.req.json());
-      return c.json({ event: await createEvent(createDb(c.env.DATABASE_URL), c.get("user").id, input) }, 201);
+      return c.json({ event: await createEvent(c.env, createDb(c.env.DATABASE_URL), c.get("user").id, input) }, 201);
     })
     .get("/events/:eventId", async (c) => c.json(await eventDetail(createDb(c.env.DATABASE_URL), c.get("user").id, c.req.param("eventId"))))
     .get("/events/:eventId/attendees", async (c) =>
@@ -23,7 +23,7 @@ export function eventRoutes() {
     )
     .patch("/events/:eventId", async (c) => {
       const input = await parseBody(eventUpdateSchema, c.req.json());
-      return c.json({ event: await updateEvent(createDb(c.env.DATABASE_URL), c.get("user").id, c.req.param("eventId"), input) });
+      return c.json({ event: await updateEvent(c.env, c.get("user").id, c.req.param("eventId"), input) });
     })
     .get("/events/:eventId/delete-preview", async (c) =>
       c.json(await eventDeletePreview(createDb(c.env.DATABASE_URL), c.get("user").id, c.req.param("eventId"))),

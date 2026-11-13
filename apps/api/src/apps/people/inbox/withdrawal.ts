@@ -5,6 +5,7 @@ import { withTransaction } from "../../../kernel/db/client";
 import type { Env } from "../../../kernel/env";
 import { logger } from "../../../kernel/logger";
 import type { PlatformEvent } from "../../../platform";
+import { lockOwner } from "../access";
 import { peopleChoiceMappings, peopleColumnMappings, peopleEvents, peoplePersons, peopleReceivedEvents } from "../schema";
 
 /**
@@ -18,6 +19,8 @@ export async function onUserWithdrawn(event: PlatformEvent<"user.withdrawn">, en
   const counts = await withTransaction(env.DATABASE_URL, async (tx) => {
     const fresh = await tx.insert(peopleReceivedEvents).values({ eventId: event.id }).onConflictDoNothing().returning({ eventId: peopleReceivedEvents.eventId });
     if (fresh.length === 0) return null;
+    // 作り手のロックを取る：途中の書き込み（イベントを作る・取り込む）が終わるのを待ち、片づけのあとは lockActiveOwner が止める
+    await lockOwner(tx, userId);
     // イベントを消すと、取り込み・回答・手で足した会ったイベント・消した人の数と印も外部キーで消える
     const events = await tx.delete(peopleEvents).where(eq(peopleEvents.userId, userId)).returning({ id: peopleEvents.id });
     // 人を消すと、同意の記録も外部キーで消える

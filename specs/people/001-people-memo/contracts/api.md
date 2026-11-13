@@ -35,10 +35,10 @@
 | 道筋 | 説明 |
 |---|---|
 | `GET /api/people/events` | 開催日の新しい順。各行`{ id, name, heldOn, isOwn, attendeeCount, importCount }` |
-| `POST /api/people/events` | `{ name, heldOn, isOwn }` → 201 `{ event }` |
+| `POST /api/people/events` | `{ name, heldOn, isOwn }` → 201 `{ event }`。作り手のロックの中で退会の途中でないことを確かめ、途中なら409 `WITHDRAWAL_IN_PROGRESS`（取り込みの書く方も同じ。R19） |
 | `GET /api/people/events/:eventId` | `{ event, stats, imports }`。`stats`は自分の会なら`{ attendeeCount, firstTimeCount, returningCount, erasedCount }`、自分の会でなければ`{ attendeeCount, erasedCount }`（R12。PR1では`attendeeCount`・`erasedCount`だけ、PR3で初めて・前にもを足す）。`imports`は`[{ id, createdAt, rowCount, importedCount, createdPeopleCount, linkedCount, skippedCount }]` |
 | `GET /api/people/events/:eventId/attendees` | その会に来た人：`[{ personId, displayName, lineName, via: "response" \| "manual", firstTime?: boolean }]`（名前の順。`firstTime`は自分の会だけ・PR3から） |
-| `PATCH /api/people/events/:eventId` | `{ name?, heldOn?, isOwn? }` |
+| `PATCH /api/people/events/:eventId` | `{ name?, heldOn?, isOwn? }`。開催日が変わったら、その会に回答のある人の今のLINE名と同意を決め直す（R10・R11） |
 | `GET /api/people/events/:eventId/delete-preview` | 取り込みの取り消し（3章）と同じ形を、その会のすべての取り込みについてまとめて返す＋`importCount`（取り込みの数）・`outreachCount` |
 | `DELETE /api/people/events/:eventId` | 本文`{ keepPeopleWithNotes?: boolean }`。書き足しのある人がいて省いたら409 `PEOPLE_CONFIRM_REQUIRED`（R14） |
 

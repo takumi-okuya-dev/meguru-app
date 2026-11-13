@@ -16,7 +16,7 @@ import { withTransaction } from "../../../kernel/db/client";
 import type { Env } from "../../../kernel/env";
 import { AppError, itemNotFound } from "../../../kernel/errors";
 import { logger } from "../../../kernel/logger";
-import { loadOwnedEvent, lockOwner, type PeopleDb } from "../access";
+import { loadOwnedEvent, lockActiveOwner, type PeopleDb } from "../access";
 import { derivePersons } from "../persons/person-derive";
 import { peopleImports, peoplePersons, peopleResponses } from "../schema";
 import { reportPeopleUsage } from "../usage";
@@ -110,7 +110,7 @@ export async function commitImport(
   if (new Set(linked).size !== linked.length) throw new AppError("VALIDATION_FAILED", 400, "invalid request", undefined, ["decisions"]);
 
   const result = await withTransaction(env.DATABASE_URL, async (tx) => {
-    await lockOwner(tx, userId);
+    await lockActiveOwner(tx, env, userId);
     await loadOwnedEvent(tx, userId, input.eventId);
     const prep = await prepare(tx, userId, input);
     // LINE名の列がない → ["line_name"]、同じ項目に2列 → その項目、項目のない列がある → ["columns"]

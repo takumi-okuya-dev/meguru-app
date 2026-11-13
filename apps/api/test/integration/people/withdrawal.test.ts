@@ -1,8 +1,9 @@
 // 退会の受け取りと、ログに名前を出さないこと（specs/people/001-people-memo tasks.md T044・T047、contracts/events.md、research.md R18・R19）。
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { createEvent } from "../../../src/apps/people/events/event-service";
 import { onUserWithdrawn } from "../../../src/apps/people/inbox/withdrawal";
 import type { PlatformEvent } from "../../../src/platform";
-import { resetDb, testEnv } from "../../helpers/app";
+import { db, resetDb, testEnv } from "../../helpers/app";
 import { callPeople, commitForm, FORM_HEADERS, formRow, grantPeople, makeEvent, rawSql, read } from "../../helpers/people";
 
 /**
@@ -47,6 +48,19 @@ describe("退会", () => {
     expect(await rowsOf(u2)).toMatchObject({ events: 1, responses: 1, persons: 1 });
     const received = (await rawSql()`SELECT count(*)::int AS n FROM people.received_events`) as { n: number }[];
     expect(received[0]!.n).toBe(1);
+  });
+});
+
+describe("退会の途中・あと", () => {
+  it("関所を通ったあとで退会が始まっても、ロックの中で確かめて、イベントを作らない（409 WITHDRAWAL_IN_PROGRESS）。利用者の行が消えたあとも作らない", async () => {
+    const u1 = await grantPeople("u1");
+    const sql = rawSql();
+    const input = { name: "会", heldOn: "2026-10-11", isOwn: true };
+    await sql`UPDATE users SET withdrawal_requested_at = now() WHERE id = ${u1}`;
+    await expect(createEvent(testEnv, db(), u1, input)).rejects.toMatchObject({ code: "WITHDRAWAL_IN_PROGRESS", status: 409 });
+    await sql`DELETE FROM users WHERE id = ${u1}`;
+    await expect(createEvent(testEnv, db(), u1, input)).rejects.toMatchObject({ code: "WITHDRAWAL_IN_PROGRESS" });
+    expect((await rowsOf(u1)).events).toBe(0);
   });
 });
 
