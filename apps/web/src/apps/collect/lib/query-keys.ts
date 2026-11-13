@@ -16,4 +16,8 @@ export const collectQueryKeys = {
   helperInfo: (token: string) => ["collect", "helper", token, "info"] as const,
   helperReception: (token: string) => ["collect", "helper", token, "reception"] as const,
   helperPaypayQr: (token: string) => ["collect", "helper", token, "paypay-qr"] as const,
+  closing: (eventId: string) => ["collect", "closing", eventId] as const,
+  transfers: (q: string) => ["collect", "transfers", q] as const,
+  transfersAll: ["collect", "transfers"] as const,
+  summaries: ["collect", "summaries"] as const,
 };

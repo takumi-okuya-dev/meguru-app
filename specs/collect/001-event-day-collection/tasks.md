@@ -190,14 +190,14 @@ description: "Task list for collect 001 event-day collection"
 
 - [x] T054 [P] [US4] `api-test/integration/collect/closing.test.ts`：受け取った人ごとの現金（主催者と手伝う人に分かれる）、渡された額と差、精算した、PayPayの件数と合計と「履歴と合った」、振込の受け取った分と振込待ち、媒体ごと（名簿・来場・支払い済み・振込待ち）、来なかった人、締めると`unsettled`を返す（締めることは止めない）、締めたあとに記録を変えると`changedAfterClose`が真（`closed_version`と`version`の比較）、精算したあとにその人の現金の記録を取り消すと「精算したあとで変わった」。
 - [x] T055 [P] [US4] `api-test/integration/collect/export.test.ts`：CSVがUTF-8（BOMつき）・CRLF・受付番号の順・列（受付番号・名前・ふりがな・媒体・料金の区分・来場・払い方・金額・受け取った人・記録した時刻（日本時間）・入金を確かめた日・メモ）、ファイル名が`集金_<開催日>_<イベント名>.csv`（RFC 5987）、手伝う人は呼べない。research.md R13。
-- [ ] T056 [P] [US4] `web-test/apps/collect/closing.test.tsx`：人ごとの精算の行（額を入れると差が出る・精算した）、PayPay、振込、媒体ごと、来なかった人、精算していない人がいるときの知らせ、締めたあとに変わったときの知らせ。
+- [x] T056 [P] [US4] `web-test/apps/collect/closing.test.tsx`：人ごとの精算の行（額を入れると差が出る・精算した）、PayPay、振込、媒体ごと、来なかった人、精算していない人がいるときの知らせ、締めたあとに変わったときの知らせ。
 
 ### Implementation for User Story 4
 
 - [x] T057 [US4] `collect/schema.ts`に`settlements`（data-model.md 2-7：`(event_id, receiver_key)`が主キー）を足す。マイグレーションを作り、SQLを読んでからコミットする。
 - [x] T058 [US4] `collect/closing/closing-service.ts`・`collect/closing/closing-routes.ts`：contracts/api.md 6 の締めの道筋（スナップショット・精算・PayPayを確かめる・締める）。
 - [x] T059 [US4] `collect/closing/export-csv.ts`と道筋`GET /api/collect/events/:eventId/export.csv`。`routes.snapshot.txt`を更新する。
-- [ ] T060 [US4] `wcollect/pages/ClosingPage.tsx`と`wcollect/components/closing/`（モックの「締め」）。書き出しは、ログインのトークンつきで受け取ってからファイルにする。T056を通す。
+- [x] T060 [US4] `wcollect/pages/ClosingPage.tsx`と`wcollect/components/closing/`（モックの「締め」）。書き出しは、ログインのトークンつきで受け取ってからファイルにする。T056を通す。
 
 ## Phase 7：User Story 5 - 後日、振込を確かめ、未入金の人に連絡する（Priority: P2）
 
@@ -209,13 +209,13 @@ description: "Task list for collect 001 event-day collection"
 
 - [x] T061 [P] [US5] `shared/collect/messages.test.ts`：`buildTransferMessage({ name, eventName, amount, number, kana, bankText })`が、名前・イベント名・金額・「振込の名義の前に受付番号『12』を付けてください（例：12ヤマダタロウ）」・振込先を含む。振込先がないときは「振込先は主催者にお問い合わせください」にする。
 - [x] T062 [P] [US5] `api-test/integration/collect/transfers.test.ts`：すべてのイベントの振込待ち（受付番号・名前で探せる）、入金を確かめると支払い済み・確かめた日・締めの振込に反映、戻す、ほかの主催者の人は404、`GET /api/collect/me`の`awaitingTransferCount`。
-- [ ] T063 [P] [US5] `web-test/apps/collect/transfers.test.tsx`：一覧・探す・確かめた・戻す・連絡文をコピー（コピーできないときは文を選ぶ）。
+- [x] T063 [P] [US5] `web-test/apps/collect/transfers.test.tsx`：一覧・探す・確かめた・戻す・連絡文をコピー（コピーできないときは文を選ぶ）。
 
 ### Implementation for User Story 5
 
 - [x] T064 [US5] `shared/collect/messages.ts`に`buildTransferMessage`を作る（T061を通す）。
 - [x] T065 [US5] `collect/transfers/transfer-service.ts`・`collect/transfers/transfer-routes.ts`（contracts/api.md 7 の振込の道筋）。`GET /api/collect/me`の`awaitingTransferCount`を数える。`routes.snapshot.txt`を更新する。
-- [ ] T066 [US5] `wcollect/pages/TransfersPage.tsx`（`/collect/transfers`。モックの「振込待ち」）とサイドバーの数。T063を通す。
+- [x] T066 [US5] `wcollect/pages/TransfersPage.tsx`（`/collect/transfers`。モックの「振込待ち」）とサイドバーの数。T063を通す。
 
 ## Phase 8：イベントを消す・まとめ・退会（US1のFR-011・FR-014と、Edge Cases）
 
@@ -224,7 +224,7 @@ description: "Task list for collect 001 event-day collection"
 - [x] T069 `collect/schema.ts`に`event_summaries`（data-model.md 2-9）と、029に受け取りの手助けがなければ`processed_events`（2-11）を足す。マイグレーションを作り、SQLを読んでからコミットする。
 - [x] T070 `collect/events/event-delete.ts`：同じトランザクションでまとめを書いてからイベントを消す（R11）。道筋`DELETE /api/collect/events/:eventId`・`GET/DELETE /api/collect/summaries…`。`routes.snapshot.txt`を更新する。
 - [x] T071 `collect/inbox/withdrawal.ts`：029の出来事の受け取りに、退会の受け取りを登録する（`collect/index.ts`の登録の関数から。029の決めた形に合わせる）。
-- [ ] T072 [P] `wcollect/pages/EventEditPage.tsx`に「イベントを消す」（確かめの画面：名簿と記録が消え、数字のまとめだけが残る）、`wcollect/pages/SummariesPage.tsx`（`/collect/summaries`）を足す。Webのテストも書く。
+- [x] T072 [P] `wcollect/pages/EventEditPage.tsx`に「イベントを消す」（確かめの画面：名簿と記録が消え、数字のまとめだけが残る）、`wcollect/pages/SummariesPage.tsx`（`/collect/summaries`）を足す。Webのテストも書く。
 
 **Checkpoint（PR3を出せる）**：quickstart.md 3・4・5 が通る。
 

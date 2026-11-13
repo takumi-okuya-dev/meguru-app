@@ -9,6 +9,7 @@ import { api } from "@/lib/api-client";
 import { queryKeys } from "@/lib/query";
 import { CenteredLayout } from "@/shell";
 import { COLLECT_BASE, HELPER_RECEPTION_ROUTE } from "./lib/paths";
+import { ClosingPage } from "./pages/ClosingPage";
 import { EventEditPage } from "./pages/EventEditPage";
 import { EventNewPage } from "./pages/EventNewPage";
 import { EventsPage } from "./pages/EventsPage";
@@ -17,6 +18,8 @@ import { HelpersPage } from "./pages/HelpersPage";
 import { ReceptionPage } from "./pages/ReceptionPage";
 import { RosterPage } from "./pages/RosterPage";
 import { SettingsPage } from "./pages/SettingsPage";
+import { SummariesPage } from "./pages/SummariesPage";
+import { TransfersPage } from "./pages/TransfersPage";
 import { CollectShell } from "./sidebar/CollectShell";
 
 /**
@@ -58,6 +61,9 @@ export const collectRoutes: RouteObject[] = [
       { path: `${COLLECT_BASE}/events/:eventId/roster`, element: <RosterPage /> },
       { path: `${COLLECT_BASE}/events/:eventId/reception`, element: <ReceptionPage /> },
       { path: `${COLLECT_BASE}/events/:eventId/helpers`, element: <HelpersPage /> },
+      { path: `${COLLECT_BASE}/events/:eventId/closing`, element: <ClosingPage /> },
+      { path: `${COLLECT_BASE}/transfers`, element: <TransfersPage /> },
+      { path: `${COLLECT_BASE}/summaries`, element: <SummariesPage /> },
       { path: `${COLLECT_BASE}/settings`, element: <SettingsPage /> },
     ],
   },
