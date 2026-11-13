@@ -2,7 +2,7 @@
 import { WalletIcon } from "lucide-react";
 import type { AppModule } from "@/shell";
 import { COLLECT_BASE, newEventPath } from "./lib/paths";
-import { collectRoutes } from "./routes";
+import { collectPublicRoutes, collectRoutes } from "./routes";
 
 /** 集金管理のアプリ。 */
 export const collectApp: AppModule = {
@@ -11,4 +11,5 @@ export const collectApp: AppModule = {
   icon: WalletIcon,
   startPath: newEventPath(),
   routes: collectRoutes,
+  publicRoutes: collectPublicRoutes,
 };

@@ -117,6 +117,7 @@ description: "Task list for collect 001 event-day collection"
 - 受付の記録ができたので、イベントの一覧の来場・振込待ちの数と、`/api/collect/me`の振込待ちの数を数える（PR1では0だった）。
 - 受付用リンクのトークンは共通の鍵で暗号化するので、集金管理の入口の`tokenKeys`（`helpers/link-tokens.ts`）から鍵の入れ替えに足した（止めたリンクは出し直さないので入れ替えない）。
 - 手伝う人の道筋（`/r/:token/…`）は`helpers/helper-routes.ts`に、主催者のリンク・受付をしている人の道筋と並べて置いた。
+- 画面（PR2b）：手伝う人の呼び出しは`wcollect/lib/helper-api.ts`に分けた（共通の`request`は401をログインの切れとして扱い、ログインの画面へ移すため）。受付の画面の中身（`components/reception/`）は、主催者と手伝う人で同じものを使う。E2Eでは、利用の許可・イベント・名簿をDBに直接入れる。
 
 ## Phase 4：User Story 2 - 受付で、来た人と払い方と受け取った人を1タップで記録する（Priority: P1）
 
@@ -128,7 +129,7 @@ description: "Task list for collect 001 event-day collection"
 
 - [x] T032 [P] [US2] `api-test/integration/collect/reception.test.ts`：記録する（区分の金額・`priceTierId`で区分を変えると記録の区分と金額が変わり**名簿の区分は変わらない**（R17）・`amount`を直接入れると`amount_overridden`・`none`は0円・振込は`awaiting_transfer`）、受付の記録が使っている区分を消すと409 `TIER_IN_USE`、受付済みの人は409 `ALREADY_RECORDED`と先の記録、**同時に2つ送っても1件だけ**（`Promise.all`）、同じ`clientRequestId`の送り直しは201で同じ結果、取り消す、飛び入り（媒体`walk_in`・最初の区分）、スナップショットの`stats`（来場・現金・PayPay・振込待ち・`mine`）、変更のたびに`version`が1上がる。research.md R6。
 - [x] T033 [P] [US2] `api-test/integration/collect/live.test.ts`：入場券の署名と期限（60秒を過ぎたら401・ほかのイベントの入場券では入れない）、記録・取り消し・飛び入りのあとに、そのイベントの`CollectLiveRoom`へ知らせ（`reception.recorded`・`reception.undone`・`roster.changed`、`version`つき）が送られる、WebSocketにつないだ2つの相手の両方に届く（vitestのWorkersの中でDurable Objectを動かす）。contracts/realtime.md。
-- [ ] T034 [P] [US2] `web-test/apps/collect/reception.test.tsx`：名前・ふりがな・受付番号の一部で絞る（ひらがなとカタカナ・全角と半角を区別しない）、払い方を押すと記録の呼び出し1回、PayPayはQRのシート→「受け取った」、振込は当日・後日を選ぶ、受付済みの行は払い方を出さない、保存できなかったら「保存できませんでした・もう一度送る」を出して受付済みに見せない（FR-037）、知らせで1行が変わる、`version`が飛んだらスナップショットを読み直す。
+- [x] T034 [P] [US2] `web-test/apps/collect/reception.test.tsx`：名前・ふりがな・受付番号の一部で絞る（ひらがなとカタカナ・全角と半角を区別しない）、払い方を押すと記録の呼び出し1回、PayPayはQRのシート→「受け取った」、振込は当日・後日を選ぶ、受付済みの行は払い方を出さない、保存できなかったら「保存できませんでした・もう一度送る」を出して受付済みに見せない（FR-037）、知らせで1行が変わる、`version`が飛んだらスナップショットを読み直す。
 
 ### Implementation for User Story 2
 
@@ -138,8 +139,8 @@ description: "Task list for collect 001 event-day collection"
 - [x] T038 [US2] `collect/live/live-room.ts`：Durable Object`CollectLiveRoom`（WebSocketの休止の仕組み`ctx.acceptWebSocket`・`POST /broadcast`はWorkerの中からだけ・受付をする人の印を`serializeAttachment`で持つ・保存は使わない）。`api/index.ts`から書き出す。
 - [x] T039 [US2] `apps/api/wrangler.toml`の一番上・`[env.staging]`・`[env.production]`のすべてに、Durable Objectの結びつけ`COLLECT_LIVE`（`class_name = "CollectLiveRoom"`）と`[[migrations]]`（`new_sqlite_classes = ["CollectLiveRoom"]`）を書く。`api-test/unit/wrangler-config.test.ts`に、3つの環境すべてにあることの確かめを足す。`api/kernel/env.ts`に`COLLECT_LIVE`と`COLLECT_LIVE_SECRET`の型、`apps/api/.dev.vars.example`と`api-test/env.ts`に`COLLECT_LIVE_SECRET`を足す。
 - [x] T040 [US2] `collect/live/live-ticket.ts`（入場券の署名と確かめ。HMAC-SHA256・`COLLECT_LIVE_SECRET`・イベントの番号・受付をする人・60秒）・`collect/live/notify.ts`（保存のあと`ctx.waitUntil`で`CollectLiveRoom`に知らせる）・道筋`POST /api/collect/events/:eventId/live-ticket`と`GET /api/collect/live?ticket=`（R5）。T036の変更のあとに`notify`を呼ぶ。
-- [ ] T041 [US2] `wcollect/lib/live.ts`：入場券を取ってつなぐ・知らせで行を直す・`version`が飛んだら・つなぎ直したら・画面に戻ったらスナップショットを読み直す・切れたら1秒・2秒・4秒…最大30秒でつなぎ直す・つながらない間は15秒ごとに読み直す（contracts/realtime.md 4）。
-- [ ] T042 [US2] `wcollect/pages/ReceptionPage.tsx`と`wcollect/components/reception/`（上の数字の段（来場・現金・PayPay・振込待ち・あなたが受け取った現金）・会場で共有中の表示・検索・受付の行（区分の変更・金額を直接入れる）・払い方のボタン（高さ44px以上）・PayPayのシート（QRを大きく）・振込のシート（当日・後日・受付番号の案内）・飛び入り・保存できなかった行）。T034を通す。
+- [x] T041 [US2] `wcollect/lib/live.ts`：入場券を取ってつなぐ・知らせで行を直す・`version`が飛んだら・つなぎ直したら・画面に戻ったらスナップショットを読み直す・切れたら1秒・2秒・4秒…最大30秒でつなぎ直す・つながらない間は15秒ごとに読み直す（contracts/realtime.md 4）。
+- [x] T042 [US2] `wcollect/pages/ReceptionPage.tsx`と`wcollect/components/reception/`（上の数字の段（来場・現金・PayPay・振込待ち・あなたが受け取った現金）・会場で共有中の表示・検索・受付の行（区分の変更・金額を直接入れる）・払い方のボタン（高さ44px以上）・PayPayのシート（QRを大きく）・振込のシート（当日・後日・受付番号の案内）・飛び入り・保存できなかった行）。T034を通す。
 
 **Checkpoint**：主催者が2台で受付し、片方の記録が5秒以内にもう片方に出る。
 
@@ -153,7 +154,7 @@ description: "Task list for collect 001 event-day collection"
 
 - [x] T043 [P] [US3] `api-test/integration/collect/helpers.test.ts`：リンクを出す（使えるリンクは1つ・トークンはハッシュと暗号文で持つ・同じリンクを返す・期限の既定は開催日の日本時間23:59:59と終わりの時刻の1時間後の遅い方。19:00〜翌1:00のイベントでは翌2:00）、参加する（端末の印を返す・同じ名前は409 `HELPER_NAME_TAKEN`・`sameAsHelperId`で同じ人に端末を足す・`asNew`で別の人）、端末の印なしは401 `DEVICE_REQUIRED`、手伝う人の記録は`receiver_kind = helper`、**ほかの人の記録の取り消しは403 `FORBIDDEN`**、手伝う人のスナップショットにメモが入らない、止めた・期限が過ぎたリンクは410 `LINK_INACTIVE`で記録は残る、止めると`link.stopped`が知らされる、出し直すと前のトークンは使えない、受付をしている人の一覧（件数・最後の記録・受け取った現金・端末の数。「同じ人」でまとめると2）。research.md R7。
 - [x] T044 [P] [US3] `api-test/integration/collect/helper-routes-scope.test.ts`：手伝う人の資格（端末の印）で、名簿の編集・締め・振込・書き出し・設定・ほかのイベントの道筋が呼べないこと（`/api/collect/r/:token/…`以外は主催者のログインが要る）。FR-071。
-- [ ] T045 [P] [US3] `web-test/apps/collect/helper-reception.test.tsx`：名前を入れる画面 → 受付だけの画面（サイドバーなし）、同じ端末は保存した端末の印で続きから、409で「すでに〇〇さんがいます。同じ人ですか？」→ 同じ人／別の人、自分の記録だけ「取り消す」が出る、止められたら「このリンクは止められました」、ブラウザの保存が使えないときも名前を入れれば使える。
+- [x] T045 [P] [US3] `web-test/apps/collect/helper-reception.test.tsx`：名前を入れる画面 → 受付だけの画面（サイドバーなし）、同じ端末は保存した端末の印で続きから、409で「すでに〇〇さんがいます。同じ人ですか？」→ 同じ人／別の人、自分の記録だけ「取り消す」が出る、止められたら「このリンクは止められました」、ブラウザの保存が使えないときも名前を入れれば使える。
 
 ### Implementation for User Story 3
 
@@ -162,15 +163,22 @@ description: "Task list for collect 001 event-day collection"
 - [x] T048 [US3] `collect/helpers/helper-service.ts`：参加（同じ名前の扱い・端末の印の発行とハッシュ・`last_seen_at`）と、端末の印の確かめ。`collect/access.ts`に`requireHelperDevice`（`:token`と`X-Collect-Device`を確かめ、リンクが使えないと410）を足す。
 - [x] T049 [US3] `collect/reception/reception-service.ts`を、受け取った人に手伝う人を入れられるようにし、取り消しを「主催者はすべて・手伝う人は自分の記録だけ」にする（FR-039）。手伝う人のスナップショットはメモを除く（FR-002）。
 - [x] T050 [US3] `collect/helpers/helper-routes.ts`：contracts/api.md 8 の道筋（`/api/collect/r/:token/…`。ログインの関所の外に登録）と、主催者の道筋 contracts/api.md 5（リンク・受付をしている人）。`routes.snapshot.txt`を更新する。手伝う人の出入りで`helpers.changed`を知らせる。
-- [ ] T051 [P] [US3] `wcollect/pages/HelpersPage.tsx`（`/collect/events/:eventId/helpers`：リンク・QR（`wcollect/components/QrCode.tsx`を、Webにすでにある`uqr`で集金管理の中に作る。新しい依存は足さない。Threadsの部品はアプリ同士で使えないので使わない。R18）・コピー・期限・止める・出し直す・受付をしている人の表（端末の数を含む））。
-- [ ] T052 [US3] `wcollect/pages/HelperReceptionPage.tsx`を`AppModule`の`publicRoutes`（`/collect/r/:token`）に足す：名前を入れる → 受付（T042の部品を使い、名簿の編集・締めの入口は出さない）。端末の印はリンクごとに`localStorage`へ（読めなければ持たない）。T045を通す。
-- [ ] T053 [US3] `e2e/tests/collect-reception.spec.ts`：主催者と手伝う人の2つのブラウザで、①手伝う人の記録が5秒以内に主催者の画面に出る ②同じ人を同時に押して1件 ③手伝う人に主催者の記録の「取り消す」が出ない ④リンクを止めると手伝う人の画面が止まる ⑤受付の1人が、探す→払い方→（PayPay・振込ならシートの1回）の3回の操作で終わる（SC-001の操作の数）⑥手伝う人がリンクを開いてから受付の画面までの操作が、名前の入力と「受付を始める」だけ（SC-007）（quickstart.md 2）。
+- [x] T051 [P] [US3] `wcollect/pages/HelpersPage.tsx`（`/collect/events/:eventId/helpers`：リンク・QR（`wcollect/components/QrCode.tsx`を、Webにすでにある`uqr`で集金管理の中に作る。新しい依存は足さない。Threadsの部品はアプリ同士で使えないので使わない。R18）・コピー・期限・止める・出し直す・受付をしている人の表（端末の数を含む））。
+- [x] T052 [US3] `wcollect/pages/HelperReceptionPage.tsx`を`AppModule`の`publicRoutes`（`/collect/r/:token`）に足す：名前を入れる → 受付（T042の部品を使い、名簿の編集・締めの入口は出さない）。端末の印はリンクごとに`localStorage`へ（読めなければ持たない）。T045を通す。
+- [x] T053 [US3] `e2e/tests/collect-reception.spec.ts`：主催者と手伝う人の2つのブラウザで、①手伝う人の記録が5秒以内に主催者の画面に出る ②同じ人を同時に押して1件 ③手伝う人に主催者の記録の「取り消す」が出ない ④リンクを止めると手伝う人の画面が止まる ⑤受付の1人が、探す→払い方→（PayPay・振込ならシートの1回）の3回の操作で終わる（SC-001の操作の数）⑥手伝う人がリンクを開いてから受付の画面までの操作が、名前の入力と「受付を始める」だけ（SC-007）（quickstart.md 2）。
 
 **Checkpoint（PR2を出せる）**：quickstart.md 2 が通る。テスト版で、当日の受付を複数人でできる。
 
 ---
 
 # PR3：締め・振込・まとめ・CSV・退会
+
+**2026-11-13 PR3の進め方**：031の決まり（マイグレーションのあるPRは小さく切って先に入れる）に合わせ、**PR3a（共通の形・API・マイグレーション`0036_collect_closing`）**と**PR3b（画面）**に分けた。次のように決めた。
+- 精算に`expected_at_settle`（精算したときの受け取った人の現金の合計）を足した。精算のあとでその人の記録が取り消されても「精算したあとで変わった」と出せるように（data-model.md 2-7 にない列）。
+- 精算・PayPayの確かめ・締め・振込の確かめは、受付の画面の版を上げない（締めのあとの「変わった」にしない。振込の確かめは後日のことが多いため）。締めの画面と振込の数は毎回数えるので反映される。
+- `processed_events`は作らず、PR1の`received_events`を使う（029の決まり）。退会では、まとめ（`event_summaries`）も消す。
+- 書き出しは、表計算ソフトの式として読まれる頭の文字（`=`・`+`・`-`・`@`）の値に`'`を付ける。
+- イベントを消したら、手伝う人の画面を止めるため`link.stopped`を知らせる。
 
 ## Phase 6：User Story 4 - 締めで、現金の精算・PayPay・振込が合っているかを確かめる（Priority: P1）
 
@@ -180,16 +188,16 @@ description: "Task list for collect 001 event-day collection"
 
 ### Tests for User Story 4 ⚠️
 
-- [ ] T054 [P] [US4] `api-test/integration/collect/closing.test.ts`：受け取った人ごとの現金（主催者と手伝う人に分かれる）、渡された額と差、精算した、PayPayの件数と合計と「履歴と合った」、振込の受け取った分と振込待ち、媒体ごと（名簿・来場・支払い済み・振込待ち）、来なかった人、締めると`unsettled`を返す（締めることは止めない）、締めたあとに記録を変えると`changedAfterClose`が真（`closed_version`と`version`の比較）、精算したあとにその人の現金の記録を取り消すと「精算したあとで変わった」。
-- [ ] T055 [P] [US4] `api-test/integration/collect/export.test.ts`：CSVがUTF-8（BOMつき）・CRLF・受付番号の順・列（受付番号・名前・ふりがな・媒体・料金の区分・来場・払い方・金額・受け取った人・記録した時刻（日本時間）・入金を確かめた日・メモ）、ファイル名が`集金_<開催日>_<イベント名>.csv`（RFC 5987）、手伝う人は呼べない。research.md R13。
-- [ ] T056 [P] [US4] `web-test/apps/collect/closing.test.tsx`：人ごとの精算の行（額を入れると差が出る・精算した）、PayPay、振込、媒体ごと、来なかった人、精算していない人がいるときの知らせ、締めたあとに変わったときの知らせ。
+- [x] T054 [P] [US4] `api-test/integration/collect/closing.test.ts`：受け取った人ごとの現金（主催者と手伝う人に分かれる）、渡された額と差、精算した、PayPayの件数と合計と「履歴と合った」、振込の受け取った分と振込待ち、媒体ごと（名簿・来場・支払い済み・振込待ち）、来なかった人、締めると`unsettled`を返す（締めることは止めない）、締めたあとに記録を変えると`changedAfterClose`が真（`closed_version`と`version`の比較）、精算したあとにその人の現金の記録を取り消すと「精算したあとで変わった」。
+- [x] T055 [P] [US4] `api-test/integration/collect/export.test.ts`：CSVがUTF-8（BOMつき）・CRLF・受付番号の順・列（受付番号・名前・ふりがな・媒体・料金の区分・来場・払い方・金額・受け取った人・記録した時刻（日本時間）・入金を確かめた日・メモ）、ファイル名が`集金_<開催日>_<イベント名>.csv`（RFC 5987）、手伝う人は呼べない。research.md R13。
+- [x] T056 [P] [US4] `web-test/apps/collect/closing.test.tsx`：人ごとの精算の行（額を入れると差が出る・精算した）、PayPay、振込、媒体ごと、来なかった人、精算していない人がいるときの知らせ、締めたあとに変わったときの知らせ。
 
 ### Implementation for User Story 4
 
-- [ ] T057 [US4] `collect/schema.ts`に`settlements`（data-model.md 2-7：`(event_id, receiver_key)`が主キー）を足す。マイグレーションを作り、SQLを読んでからコミットする。
-- [ ] T058 [US4] `collect/closing/closing-service.ts`・`collect/closing/closing-routes.ts`：contracts/api.md 6 の締めの道筋（スナップショット・精算・PayPayを確かめる・締める）。
-- [ ] T059 [US4] `collect/closing/export-csv.ts`と道筋`GET /api/collect/events/:eventId/export.csv`。`routes.snapshot.txt`を更新する。
-- [ ] T060 [US4] `wcollect/pages/ClosingPage.tsx`と`wcollect/components/closing/`（モックの「締め」）。書き出しは、ログインのトークンつきで受け取ってからファイルにする。T056を通す。
+- [x] T057 [US4] `collect/schema.ts`に`settlements`（data-model.md 2-7：`(event_id, receiver_key)`が主キー）を足す。マイグレーションを作り、SQLを読んでからコミットする。
+- [x] T058 [US4] `collect/closing/closing-service.ts`・`collect/closing/closing-routes.ts`：contracts/api.md 6 の締めの道筋（スナップショット・精算・PayPayを確かめる・締める）。
+- [x] T059 [US4] `collect/closing/export-csv.ts`と道筋`GET /api/collect/events/:eventId/export.csv`。`routes.snapshot.txt`を更新する。
+- [x] T060 [US4] `wcollect/pages/ClosingPage.tsx`と`wcollect/components/closing/`（モックの「締め」）。書き出しは、ログインのトークンつきで受け取ってからファイルにする。T056を通す。
 
 ## Phase 7：User Story 5 - 後日、振込を確かめ、未入金の人に連絡する（Priority: P2）
 
@@ -199,24 +207,24 @@ description: "Task list for collect 001 event-day collection"
 
 ### Tests for User Story 5 ⚠️
 
-- [ ] T061 [P] [US5] `shared/collect/messages.test.ts`：`buildTransferMessage({ name, eventName, amount, number, kana, bankText })`が、名前・イベント名・金額・「振込の名義の前に受付番号『12』を付けてください（例：12ヤマダタロウ）」・振込先を含む。振込先がないときは「振込先は主催者にお問い合わせください」にする。
-- [ ] T062 [P] [US5] `api-test/integration/collect/transfers.test.ts`：すべてのイベントの振込待ち（受付番号・名前で探せる）、入金を確かめると支払い済み・確かめた日・締めの振込に反映、戻す、ほかの主催者の人は404、`GET /api/collect/me`の`awaitingTransferCount`。
-- [ ] T063 [P] [US5] `web-test/apps/collect/transfers.test.tsx`：一覧・探す・確かめた・戻す・連絡文をコピー（コピーできないときは文を選ぶ）。
+- [x] T061 [P] [US5] `shared/collect/messages.test.ts`：`buildTransferMessage({ name, eventName, amount, number, kana, bankText })`が、名前・イベント名・金額・「振込の名義の前に受付番号『12』を付けてください（例：12ヤマダタロウ）」・振込先を含む。振込先がないときは「振込先は主催者にお問い合わせください」にする。
+- [x] T062 [P] [US5] `api-test/integration/collect/transfers.test.ts`：すべてのイベントの振込待ち（受付番号・名前で探せる）、入金を確かめると支払い済み・確かめた日・締めの振込に反映、戻す、ほかの主催者の人は404、`GET /api/collect/me`の`awaitingTransferCount`。
+- [x] T063 [P] [US5] `web-test/apps/collect/transfers.test.tsx`：一覧・探す・確かめた・戻す・連絡文をコピー（コピーできないときは文を選ぶ）。
 
 ### Implementation for User Story 5
 
-- [ ] T064 [US5] `shared/collect/messages.ts`に`buildTransferMessage`を作る（T061を通す）。
-- [ ] T065 [US5] `collect/transfers/transfer-service.ts`・`collect/transfers/transfer-routes.ts`（contracts/api.md 7 の振込の道筋）。`GET /api/collect/me`の`awaitingTransferCount`を数える。`routes.snapshot.txt`を更新する。
-- [ ] T066 [US5] `wcollect/pages/TransfersPage.tsx`（`/collect/transfers`。モックの「振込待ち」）とサイドバーの数。T063を通す。
+- [x] T064 [US5] `shared/collect/messages.ts`に`buildTransferMessage`を作る（T061を通す）。
+- [x] T065 [US5] `collect/transfers/transfer-service.ts`・`collect/transfers/transfer-routes.ts`（contracts/api.md 7 の振込の道筋）。`GET /api/collect/me`の`awaitingTransferCount`を数える。`routes.snapshot.txt`を更新する。
+- [x] T066 [US5] `wcollect/pages/TransfersPage.tsx`（`/collect/transfers`。モックの「振込待ち」）とサイドバーの数。T063を通す。
 
 ## Phase 8：イベントを消す・まとめ・退会（US1のFR-011・FR-014と、Edge Cases）
 
-- [ ] T067 [P] `api-test/integration/collect/delete-and-summary.test.ts`：イベントを消すと、名簿・記録・リンク・手伝う人・精算が消え、`event_summaries`に数字だけが残る（**名前・手伝う人の名前が入らない**）、まとめの一覧と消す、消したイベントの人は前回の参加者に出ない。FR-011・FR-014。
-- [ ] T068 [P] `api-test/integration/collect/withdrawal.test.ts`：共通の退会の出来事を受け取ると、その人のイベント・まとめ・既定値（PR4のあとはThreadsの候補も）が消える。**同じ出来事を2回受け取っても同じ結果**。ほかの人のデータは消えない。contracts/events.md 1。
-- [ ] T069 `collect/schema.ts`に`event_summaries`（data-model.md 2-9）と、029に受け取りの手助けがなければ`processed_events`（2-11）を足す。マイグレーションを作り、SQLを読んでからコミットする。
-- [ ] T070 `collect/events/event-delete.ts`：同じトランザクションでまとめを書いてからイベントを消す（R11）。道筋`DELETE /api/collect/events/:eventId`・`GET/DELETE /api/collect/summaries…`。`routes.snapshot.txt`を更新する。
-- [ ] T071 `collect/inbox/withdrawal.ts`：029の出来事の受け取りに、退会の受け取りを登録する（`collect/index.ts`の登録の関数から。029の決めた形に合わせる）。
-- [ ] T072 [P] `wcollect/pages/EventEditPage.tsx`に「イベントを消す」（確かめの画面：名簿と記録が消え、数字のまとめだけが残る）、`wcollect/pages/SummariesPage.tsx`（`/collect/summaries`）を足す。Webのテストも書く。
+- [x] T067 [P] `api-test/integration/collect/delete-and-summary.test.ts`：イベントを消すと、名簿・記録・リンク・手伝う人・精算が消え、`event_summaries`に数字だけが残る（**名前・手伝う人の名前が入らない**）、まとめの一覧と消す、消したイベントの人は前回の参加者に出ない。FR-011・FR-014。
+- [x] T068 [P] `api-test/integration/collect/withdrawal.test.ts`：共通の退会の出来事を受け取ると、その人のイベント・まとめ・既定値（PR4のあとはThreadsの候補も）が消える。**同じ出来事を2回受け取っても同じ結果**。ほかの人のデータは消えない。contracts/events.md 1。
+- [x] T069 `collect/schema.ts`に`event_summaries`（data-model.md 2-9）と、029に受け取りの手助けがなければ`processed_events`（2-11）を足す。マイグレーションを作り、SQLを読んでからコミットする。
+- [x] T070 `collect/events/event-delete.ts`：同じトランザクションでまとめを書いてからイベントを消す（R11）。道筋`DELETE /api/collect/events/:eventId`・`GET/DELETE /api/collect/summaries…`。`routes.snapshot.txt`を更新する。
+- [x] T071 `collect/inbox/withdrawal.ts`：029の出来事の受け取りに、退会の受け取りを登録する（`collect/index.ts`の登録の関数から。029の決めた形に合わせる）。
+- [x] T072 [P] `wcollect/pages/EventEditPage.tsx`に「イベントを消す」（確かめの画面：名簿と記録が消え、数字のまとめだけが残る）、`wcollect/pages/SummariesPage.tsx`（`/collect/summaries`）を足す。Webのテストも書く。
 
 **Checkpoint（PR3を出せる）**：quickstart.md 3・4・5 が通る。
 

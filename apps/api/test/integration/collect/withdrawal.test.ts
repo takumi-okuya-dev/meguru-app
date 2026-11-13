@@ -15,13 +15,18 @@ const sql = () => neon(testEnv.DATABASE_URL);
 const count = async (query: string) => Number(((await sql().query(query)) as { n: number }[])[0]!.n);
 
 describe("退会の出来事", () => {
-  it("その主催者のイベント・区分・名簿・既定値を消し、ほかの主催者のものは残す。2回届いても同じ", async () => {
+  it("その主催者のイベント・区分・名簿・まとめ・既定値を消し、ほかの主催者のものは残す。2回届いても同じ", async () => {
     const o1 = await grantCollect(app, "o1");
     await grantCollect(app, "o2");
     const e1 = await createCollectEvent(app, "o1");
     await call(app, "POST", `/api/collect/events/${e1.id}/roster`, { user: "o1", body: { name: "a", media: "peatix", priceTierId: e1.tiers[0]!.id } });
     await call(app, "PUT", "/api/collect/settings", { user: "o1", body: { bankText: "銀行" } });
     await createCollectEvent(app, "o2");
+    // 消したイベントのまとめ（o1 と o2）
+    const gone = await createCollectEvent(app, "o1");
+    await call(app, "DELETE", `/api/collect/events/${gone.id}`, { user: "o1" });
+    const keep = await createCollectEvent(app, "o2");
+    await call(app, "DELETE", `/api/collect/events/${keep.id}`, { user: "o2" });
 
     const event = { id: crypto.randomUUID(), type: "user.withdrawn" as const, payload: { userId: o1 }, createdAt: new Date() };
     await onUserWithdrawn(event, testEnv);
@@ -32,6 +37,8 @@ describe("退会の出来事", () => {
     expect(await count(`SELECT count(*)::int AS n FROM collect.roster_people WHERE event_id = '${e1.id}'`)).toBe(0);
     expect(await count(`SELECT count(*)::int AS n FROM collect.owner_settings WHERE owner_user_id = '${o1}'`)).toBe(0);
     expect(await count(`SELECT count(*)::int AS n FROM collect.events`)).toBe(1);
+    expect(await count(`SELECT count(*)::int AS n FROM collect.event_summaries WHERE owner_user_id = '${o1}'`)).toBe(0);
+    expect(await count(`SELECT count(*)::int AS n FROM collect.event_summaries`)).toBe(1);
   });
 
   it("退会すると、集金管理にも出来事が届いて片づく", async () => {

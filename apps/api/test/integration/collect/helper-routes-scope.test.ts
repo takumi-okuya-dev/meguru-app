@@ -1,5 +1,5 @@
 // 手伝う人の資格で呼べる道筋の範囲（specs/collect/001-event-day-collection FR-071、contracts/api.md 8、tasks.md T044）。
-// 端末の印（X-Collect-Device）で呼べるのは /api/collect/r/:token/… だけ。名簿の編集・締め・振込・書き出し・設定・ほかのイベントの道筋は、
+// 端末の印（X-Collect-Device）で呼べるのは /api/collect/r/:token/… だけ。名簿の編集・締め・振込・書き出し・設定・まとめ・ほかのイベントの道筋は、
 // 主催者のログインが要る（端末の印では 401）。
 import { beforeEach, describe, expect, it } from "vitest";
 import { call, makeApp, resetDb } from "../../helpers/app";
@@ -49,6 +49,16 @@ describe("手伝う人の端末の印では、主催者の道筋は呼べない"
     ["PATCH", "/api/collect/events/:eventId/link"],
     ["POST", "/api/collect/events/:eventId/link/stop"],
     ["GET", "/api/collect/events/:eventId/helpers"],
+    ["GET", "/api/collect/events/:eventId/closing"],
+    ["PUT", "/api/collect/events/:eventId/settlements/owner"],
+    ["POST", "/api/collect/events/:eventId/paypay-check"],
+    ["POST", "/api/collect/events/:eventId/close"],
+    ["GET", "/api/collect/events/:eventId/export.csv"],
+    ["DELETE", "/api/collect/events/:eventId"],
+    ["GET", "/api/collect/transfers"],
+    ["POST", "/api/collect/transfers/:personId/confirm"],
+    ["DELETE", "/api/collect/transfers/:personId/confirm"],
+    ["GET", "/api/collect/summaries"],
   ])("%s %s は 401", async (method, template) => {
     const path = template.replace(":eventId", event.id).replace(":personId", personId);
     const body = method === "GET" ? undefined : { method: "cash", clientRequestId: crypto.randomUUID() };
