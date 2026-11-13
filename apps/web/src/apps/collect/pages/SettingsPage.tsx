@@ -66,9 +66,10 @@ export function SettingsPage() {
   });
   const saveBank = useMutation({
     mutationFn: (text: string) => collectApi.saveBankText(text.trim() || null),
-    onSuccess: (next) => {
+    onSuccess: (next, submitted) => {
       afterSave(next);
-      setBankText(null);
+      // 保存の途中で書き足した分は残す（送った文のままのときだけ、下書きを捨てて保存した値を出す）
+      setBankText((draft) => (draft === submitted ? null : draft));
       toast.success("振込先の案内を保存しました。");
     },
     onError: (err) => toast.error(collectErrorText(err)),
