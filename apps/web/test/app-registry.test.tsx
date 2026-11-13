@@ -92,8 +92,9 @@ describe("アプリの一覧とのそろえ", () => {
 
   it("組み立ては、出してよいアプリ（released）だけを登録する", async () => {
     const { registeredApps } = await import("@/app-registry");
-    const { appById } = await import("@meguru/shared");
-    expect(registeredApps.map((a) => a.id)).toEqual(["threads", "collect", "people"]);
+    const { appById, releasedApps } = await import("@meguru/shared");
+    // 出してよいアプリには、どれも Web の入口がある（アプリの数は書かない。specs/meguru/031）
+    expect(registeredApps.map((a) => a.id).sort()).toEqual(releasedApps().map((a) => a.id).sort());
     expect(registeredApps.every((a) => appById(a.id)?.released)).toBe(true);
   });
 });

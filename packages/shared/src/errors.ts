@@ -1,5 +1,6 @@
 // エラーコードと、画面に出す日本語の文言（contracts/ui-routes.md「エラー文言」）。
 // APIは code だけを返し、Webがここから文言を引く。
+import { APP_ERROR_CODES, APP_ERROR_MESSAGES, type AppErrorCode } from "./apps/app-errors";
 import { TEAM_EDITOR_LIMIT, TEAM_MEMBER_LIMIT, TEAMS_PER_ADMIN, TEST_GROUP_CAPACITY_MAX, TEST_GROUP_CAPACITY_MIN } from "./limits";
 
 /** APIとWebで共有するエラーコードの一覧（contracts/api.md・ui-routes.md）。 */
@@ -76,20 +77,21 @@ export const ERROR_CODES = [
   "RATE_LIMITED",
   // アプリの利用の許可（specs/meguru/030-app-access FR-003）
   "APP_NOT_AVAILABLE",
-  // 集金管理（specs/collect/001-event-day-collection contracts/api.md 0）
-  "TIER_IN_USE",
-  "IMAGE_TOO_LARGE",
-  // 人物メモ（specs/people/001-people-memo contracts/api.md 0）
-  "IMPORT_TOO_LARGE",
-  "IMPORT_MAPPING_INVALID",
-  "IMPORT_DECISIONS_REQUIRED",
-  "PEOPLE_CONFIRM_REQUIRED",
-  "OUTREACH_NEEDS_APPROVAL",
-  "OUTREACH_NO_CONSENT",
+  // アプリごとのエラーコードは、アプリのフォルダーの errors.ts に置き、apps/app-errors.ts がまとめる（specs/meguru/031）
+  ...APP_ERROR_CODES,
 ] as const;
 
 /** エラーコード。 */
 export type ErrorCode = (typeof ERROR_CODES)[number];
+
+/**
+ * アプリのフォルダーに置いたエラーコードか（文言はアプリの errors.ts にある）。
+ * @param code - エラーコード
+ * @returns アプリのエラーコードなら true
+ */
+function isAppErrorCode(code: ErrorCode): code is AppErrorCode {
+  return Object.hasOwn(APP_ERROR_MESSAGES, code);
+}
 
 /**
  * 文字列がエラーコードかを確かめる。
@@ -140,6 +142,7 @@ export type ErrorMessage = { message: string; action: NextAction };
  * @returns 文言と次に取れる操作
  */
 export function errorMessage(code: ErrorCode, ctx: ErrorMessageContext = {}): ErrorMessage {
+  if (isAppErrorCode(code)) return APP_ERROR_MESSAGES[code];
   switch (code) {
     case "AUTH_REQUIRED":
       return { message: "セッションの有効期限が切れました。もう一度ログインしてください。", action: "sign-in" };
@@ -287,22 +290,6 @@ export function errorMessage(code: ErrorCode, ctx: ErrorMessageContext = {}): Er
       return { message: "少し時間をおいてから、もう一度お試しください。", action: "retry-later" };
     case "APP_NOT_AVAILABLE":
       return { message: "このアプリは今は使えません。", action: "none" };
-    case "TIER_IN_USE":
-      return { message: "この料金の区分は、名簿の人か受付の記録が使っているので消せません。", action: "none" };
-    case "IMAGE_TOO_LARGE":
-      return { message: "画像が大きすぎます。300KB以内にしてください。", action: "none" };
-    case "IMPORT_TOO_LARGE":
-      return { message: "CSVが大きすぎます。500行・60列まで、1つの答えは5,000文字までにしてください。", action: "none" };
-    case "IMPORT_MAPPING_INVALID":
-      return { message: "列の対応を見直してください（LINE名の列が要ります。同じ項目は1列だけ選べます）。", action: "none" };
-    case "IMPORT_DECISIONS_REQUIRED":
-      return { message: "まだ決めていない行があります。同じ人の候補と同意の選択肢を選んでから、もう一度取り込んでください。", action: "none" };
-    case "PEOPLE_CONFIRM_REQUIRED":
-      return { message: "メモや声かけを書き足した人がいます。残すか消すかを選んでください。", action: "none" };
-    case "OUTREACH_NEEDS_APPROVAL":
-      return { message: "先に「OKをもらった」にしてください。本人のOKのあとでつなげます。", action: "none" };
-    case "OUTREACH_NO_CONSENT":
-      return { message: "この人は、この目的の個別の案内に同意していません。", action: "none" };
     case "INVITE_INVALID":
       return {
         message: "このリンクは使えません。作り直されたか、チームが削除されました。管理者に、新しいリンクを頼んでください。",

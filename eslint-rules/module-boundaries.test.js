@@ -1,32 +1,8 @@
 // module-boundaries のテスト（specs/027-modular-monolith contracts/module-boundaries.md 4、T003）。node --test eslint-rules/ で動かす。
-import { describe, it } from "node:test";
-import { RuleTester } from "eslint";
-import tseslint from "typescript-eslint";
 import rule from "./module-boundaries.js";
+import { ruleTester } from "./rule-test-helpers.js";
 
-// RuleTester を node:test の describe・it で動かす
-RuleTester.describe = describe;
-RuleTester.it = it;
-RuleTester.itOnly = it.only;
-
-const tester = new RuleTester({ languageOptions: { parser: tseslint.parser, ecmaVersion: 2022, sourceType: "module" } });
-
-const SRC = "/repo/apps/api/src";
-/**
- * テストの1件を作る。
- * @param file - src からのファイルのパス
- * @param code - コード
- * @returns RuleTester のテストの1件
- */
-const at = (file, code) => ({ filename: `${SRC}/${file}`, code });
-/**
- * 違反するテストの1件を作る。
- * @param file - src からのファイルのパス
- * @param code - コード
- * @param messageId - 期待するメッセージ
- * @returns RuleTester のテストの1件
- */
-const bad = (file, code, messageId) => ({ ...at(file, code), errors: [{ messageId }] });
+const { tester, at, bad } = ruleTester("apps/api/src");
 
 tester.run("module-boundaries", rule, {
   valid: [
@@ -49,14 +25,8 @@ tester.run("module-boundaries", rule, {
     // 表の定義（schema.ts）は入口として読んでよい（db/schema.ts が共通とThreadsの表を読み直して出す）
     at("db/schema.ts", 'export * from "../platform/schema";'),
     at("db/schema.ts", 'export * from "../apps/threads/schema";'),
-    // 集金管理（specs/collect/001-event-day-collection tasks.md T006）：共通の入口と自分のフォルダーは読んでよい
-    at("apps/collect/events/event-service.ts", 'import { requireAppAccess } from "../../../platform";'),
-    at("apps/collect/events/event-service.ts", 'import { loadOwnedEvent } from "../access";'),
-    at("db/schema.ts", 'export * from "../apps/collect/schema";'),
-    at("app.ts", 'import { collectRoutes } from "./apps/collect";'),
-    // 人物メモ（specs/people/001-people-memo tasks.md T003）：共通の入口は読める
-    at("apps/people/imports/import-service.ts", 'import { reportUsage } from "../../../platform";'),
-    at("db/schema.ts", 'export * from "../apps/people/schema";'),
+    // アプリの一覧（specs/meguru/031）は組み立てなので、アプリの入口を読んでよい。アプリごとの例は module-boundaries.<アプリ>.test.js
+    at("app-modules.ts", 'import { threadsModule } from "./apps/threads";'),
     // strictPlacement：組み立ての場所はよい
     { ...at("jobs/daily-jobs.ts", 'import { x } from "../platform";'), options: [{ strictPlacement: true }] },
     { ...at("app.ts", 'import { x } from "./platform";'), options: [{ strictPlacement: true }] },
@@ -73,14 +43,7 @@ tester.run("module-boundaries", rule, {
     bad("app.ts", 'import { x } from "./apps/threads/drafts/draft-service";', "notEntry"),
     bad("platform/accounts/account-service.ts", 'import { x } from "../../apps/threads";', "platformToApp"),
     bad("apps/sample/index.ts", 'import { x } from "../threads";', "appToApp"),
-    // 集金管理は、共通の表の定義・Threadsのモジュールを読めない（specs/collect/001-event-day-collection tasks.md T006）
-    bad("apps/collect/events/event-service.ts", 'import { users } from "../../../platform/schema";', "appToPlatformSchema"),
-    bad("apps/collect/events/event-service.ts", 'import { accounts } from "../../threads/schema";', "appToApp"),
-    bad("apps/collect/index.ts", 'import { x } from "../threads";', "appToApp"),
-    bad("app.ts", 'import { x } from "./apps/collect/events/event-service";', "notEntry"),
-    // 人物メモは共通の表の定義と、Threadsを読めない（T003）
-    bad("apps/people/persons/person-list.ts", 'import { users } from "../../../platform/schema";', "appToPlatformSchema"),
-    bad("apps/people/imports/import-service.ts", 'import { accounts } from "../../threads/schema";', "appToApp"),
+    bad("app-modules.ts", 'import { x } from "./apps/threads/register";', "notEntry"),
     bad("adapters/stripe/stripe-client.ts", 'import { x } from "../../platform";', "lowerToUpper"),
     bad("kernel/config.ts", 'import { x } from "../adapters/stripe";', "lowerToUpper"),
     bad("kernel/config.ts", 'import { x } from "../platform";', "lowerToUpper"),

@@ -1,6 +1,16 @@
 // トークンでの接続のエラー文言（specs/010-token-account-add contracts/api.md「文言」）
 import { describe, expect, it } from "vitest";
-import { errorMessage, isErrorCode } from "../src/errors";
+import { ERROR_CODES, errorMessage, isErrorCode } from "../src/errors";
+
+describe("エラーコードの一覧", () => {
+  it("同じコードが2つない（アプリのエラーコードが共通やほかのアプリと重なると、文言がだまって置き換わる。specs/meguru/031）", () => {
+    expect(new Set(ERROR_CODES).size).toBe(ERROR_CODES.length);
+  });
+
+  it("どのコードにも文言がある", () => {
+    for (const code of ERROR_CODES) expect(errorMessage(code).message).not.toBe("");
+  });
+});
 
 describe("トークンでの接続のエラー文言", () => {
   it("新しいコードはエラーコードとして扱える", () => {

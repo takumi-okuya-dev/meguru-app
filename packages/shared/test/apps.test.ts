@@ -21,13 +21,25 @@ describe("アプリの一覧", () => {
   });
 
   it("出してよいアプリだけを releasedApps と isReleasedAppId が通す", () => {
-    // 集金管理（specs/collect/001-event-day-collection）・人物メモ（specs/people/001-people-memo）は出してよいアプリ。だれに出すかは API の利用の許可で決める
-    expect(releasedApps().map((a) => a.id)).toEqual(["threads", "collect", "people"]);
+    // アプリの数や並びは書かない（アプリを足しても直さない。specs/meguru/031）。だれに出すかは API の利用の許可で決める
+    expect(releasedApps().map((a) => a.id)).toContain("threads");
+    expect(releasedApps().every((a) => a.released)).toBe(true);
+    // 出してよくないアプリは releasedApps にも isReleasedAppId にも出ない
+    for (const a of APP_CATALOG.filter((x) => !x.released)) {
+      expect(releasedApps()).not.toContain(a);
+      expect(isReleasedAppId(a.id)).toBe(false);
+    }
     expect(isReleasedAppId("threads")).toBe(true);
-    expect(isReleasedAppId("collect")).toBe(true);
-    expect(isReleasedAppId("people")).toBe(true);
     expect(isReleasedAppId("unknown-app")).toBe(false);
     expect(isReleasedAppId(1)).toBe(false);
+  });
+});
+
+describe("アプリの一覧の形", () => {
+  it("アプリの番号とパスは重ならない（取り込みで同じ行が2つ残っていないかも確かめる）", () => {
+    const ids = APP_CATALOG.map((a) => a.id);
+    expect(new Set(ids).size).toBe(ids.length);
+    expect(new Set(APP_CATALOG.map((a) => a.basePath)).size).toBe(ids.length);
   });
 });
 

@@ -7,6 +7,7 @@ import { validateConfig } from "./kernel/config";
 import { AppError } from "./kernel/errors";
 import { logger, setLogAppEnv } from "./kernel/logger";
 import {
+  registerAppModules,
   authMiddleware,
   optionalAuthMiddleware,
   clerkVerifier,
@@ -29,7 +30,6 @@ import {
   dataDeletionRoutes,
   threadsWebhookRoutes,
   needsReviewCountRoutes,
-  registerThreads,
   performanceRoutes,
   postDraftRoutes,
   autoPostRoutes,
@@ -54,8 +54,7 @@ import {
   activityRoutes,
   threadsMeRoutes,
 } from "./apps/threads";
-import { collectRoutes, registerCollect } from "./apps/collect";
-import { peopleRoutes, registerPeople } from "./apps/people";
+import { API_APPS } from "./app-modules";
 
 /** アプリに差し込む依存。テストでは偽の認証を渡す。 */
 export type AppDeps = {
@@ -80,10 +79,8 @@ export const defaultDeps: AppDeps = {
  * @returns /api 以下のルートを持つアプリ
  */
 export function createApp(deps: AppDeps = defaultDeps) {
-  // アプリの知らせの受け取りを登録する（specs/027。何度呼んでも1回だけ）
-  registerThreads();
-  registerCollect();
-  registerPeople();
+  // アプリの登録（機能・上限・利用の決まり・出来事の受け取り）をする（specs/027・specs/meguru/031。何度呼んでも1回だけ）
+  registerAppModules(API_APPS);
   const app = new Hono<AppEnv>();
 
   app.use("/api/*", async (c, next) => {
@@ -231,15 +228,13 @@ export function createApp(deps: AppDeps = defaultDeps) {
     // アプリの利用の許可（specs/meguru/030-app-access FR-005）
     .route("/", operatorAppAccessRoutes(authed))
     .route("/threads", threadsApi)
-    // 集金管理（specs/collect/001-event-day-collection contracts/api.md）。どの道筋も、ログインと集金管理の利用の許可が要る
-    .route("/collect", collectRoutes(authed))
-    // 人物メモの道筋（/api/people/…。specs/people/001-people-memo contracts/api.md）
-    .route("/people", peopleRoutes(authed))
     .route("/", threadsConnectRoutes(authed))
     .route("/", billingRoutes(authed))
     .route("/", stripeWebhookRoutes())
     .route("/", threadsWebhookRoutes())
     .route("/", dataDeletionRoutes());
+  // アプリの道筋は /api/<アプリの番号> の下につなぐ（アプリの一覧 app-modules.ts。specs/meguru/031）。どの道筋の関所も、アプリの側が付ける
+  for (const m of API_APPS) if (m.routes) routes.route(`/${m.id}`, m.routes(authed));
 
   return routes;
 }

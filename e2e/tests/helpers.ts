@@ -55,10 +55,10 @@ export async function resetAll() {
   const client = new pg.Client({ connectionString: DIRECT_DB });
   await client.connect();
   try {
-    // 表を足しても漏れないよう、public（共通）と threads（Threads。specs/meguru/029 PR3）のすべての表を空にする
-    // （マイグレーションの記録は drizzle スキーマにあるので残る）
+    // 表やアプリ（スキーマ）を足しても漏れないよう、共通（public）とすべてのアプリのスキーマの表を空にする（specs/meguru/031）。
+    // アプリのスキーマ＝受け取った出来事の表（received_events）を持つスキーマ。拡張機能など外のスキーマと、マイグレーションの記録（drizzle）は残す
     const { rows } = await client.query<{ name: string }>(
-      "SELECT quote_ident(schemaname) || '.' || quote_ident(tablename) AS name FROM pg_tables WHERE schemaname IN ('public', 'threads', 'people')",
+      "SELECT quote_ident(schemaname) || '.' || quote_ident(tablename) AS name FROM pg_tables WHERE schemaname = 'public' OR schemaname IN (SELECT schemaname FROM pg_tables WHERE tablename = 'received_events' AND schemaname <> 'drizzle')",
     );
     if (rows.length > 0) await client.query(`TRUNCATE ${rows.map((r) => r.name).join(", ")} CASCADE`);
   } finally {

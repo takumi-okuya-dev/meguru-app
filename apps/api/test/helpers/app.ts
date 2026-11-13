@@ -78,17 +78,35 @@ async function retryOnDeadlock(run: () => Promise<unknown>): Promise<void> {
   }
 }
 
+/** アプリのスキーマの表（1回だけ読む）。 */
+let appTables: Promise<string[]> | undefined;
+
+/**
+ * アプリのスキーマのすべての表を読む。アプリのスキーマ＝受け取った出来事の表（received_events）を持つスキーマ（どのアプリも持つ。
+ * docs/module-map.md 6）。アプリや表を足しても、ここを直さずに済む（specs/meguru/031）。拡張機能など外のスキーマは空にしない。
+ * @param sql - DBの問い合わせ
+ * @returns 「スキーマ.表」の一覧
+ */
+function loadAppTables(sql: ReturnType<typeof neon<false, false>>): Promise<string[]> {
+  appTables ??= sql
+    .query(
+      "SELECT quote_ident(schemaname) || '.' || quote_ident(tablename) AS name FROM pg_tables WHERE schemaname IN (SELECT schemaname FROM pg_tables WHERE tablename = 'received_events' AND schemaname NOT IN ('public', 'drizzle')) ORDER BY 1",
+    )
+    .then((rows) => (rows as { name: string }[]).map((r) => r.name))
+    .catch((err: unknown) => {
+      // 失敗を覚え続けない（次の resetDb で読み直す）
+      appTables = undefined;
+      throw err;
+    });
+  return appTables;
+}
+
 export async function resetDb() {
   const sql = neon(testEnv.DATABASE_URL);
   createDb(testEnv.DATABASE_URL); // ローカルプロキシの設定を有効にする
-  await retryOnDeadlock(() => sql`TRUNCATE users, subscriptions, withdrawn_users, platform_events, app_usage, user_app_limits,
-    threads.accounts, threads.memberships, threads.threads_connections, threads.oauth_states, threads.threads_deletion_requests,
-    threads.threads_revocations, threads.strategy_designs, threads.promotions, threads.reference_posts, threads.research_keywords,
-    threads.draft_batches, threads.post_drafts, threads.ng_words, threads.posting_schedules, threads.publish_attempts, threads.teams,
-    threads.team_members, threads.team_accounts, threads.activity_logs, threads.token_check_failures, threads.received_events,
-    threads.user_states, collect.events, collect.owner_settings, collect.received_events,
-    people.events, people.imports, people.column_mappings, people.choice_mappings, people.persons, people.responses,
-    people.manual_attendances, people.consent_changes, people.erased_attendances, people.erased_responses, people.received_events CASCADE`);
+  // 共通（public）は決めた表だけ、アプリのスキーマはすべての表を空にする
+  const tables = ["users", "subscriptions", "withdrawn_users", "platform_events", "app_usage", "user_app_limits", ...(await loadAppTables(sql))];
+  await retryOnDeadlock(() => sql.query(`TRUNCATE ${tables.join(", ")} CASCADE`));
   // 上限の既定の値を初めの値に戻す（specs/024、specs/meguru/029 research.md R7）
   await sql`INSERT INTO app_limit_defaults (app, key, value) VALUES ('threads', 'accounts', 3), ('threads', 'daily_posts', 10)
     ON CONFLICT (app, key) DO UPDATE SET value = EXCLUDED.value`;

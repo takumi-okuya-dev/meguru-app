@@ -1,6 +1,7 @@
 // Threadsを共通に登録する（組み立てが registerThreads() を呼ぶ。specs/meguru/029-threads-pattern1 contracts/module-boundaries.md 4）。
 // 機能と上限の名前・共通の出来事の受け取りを、共通の入口の関数で登録する。
 import {
+  type ApiAppModule,
   registerAppFeatures,
   registerAppLimits,
   registerConsumer,
@@ -22,3 +23,6 @@ export function registerThreads(): void {
     registerConsumer(THREADS_APP, "limits.changed", onLimitsChanged);
   });
 }
+
+/** Threadsの入口（組み立ての一覧 app-modules.ts が読む）。道筋と毎日の処理は数が多く順番もあるので、app.ts・jobs/daily-jobs.ts が自分でつなぐ。 */
+export const threadsModule: ApiAppModule = { id: THREADS_APP, register: registerThreads };
