@@ -36,7 +36,7 @@ specs/people/001-people-memo。運営者が開いた人だけが使える（`reg
 
 | モジュール | 主な中身 |
 |---|---|
-| `apps/people/` | 002 で足したもの：`components/home/`（今日の声かけ）・`components/person/`（タグ・声かけの予定・連絡の記録・自由な項目・SNS のリンク・行の印・まとめた表示）・`components/settings/`（タグと自由な項目の設定）・`pages/OutreachBoardPage.tsx`（会ごとの声かけの一覧）・`lib/save-file.ts`（書き出しの保存）。`index.ts`（`peopleApp`）・`routes.tsx`・`shell/`（`PeopleShell`：サイドバーの中身と、767px以下の下のバー）・`pages/`（誘う候補・取り込み・イベント・人の一覧・人のページ・人を足す・誘いの文と目標）・`components/`（取り込みの段・同じ人の候補のカード・`person/`（探す欄・絞り込み・人の行・人のページの各段・まとめる・消す・声かけの記録）・`candidates/`（誘う会の選択・目的の切り替え・候補の行と文のコピー・リピーターの段））・`lib/`（`api.ts`・`query-keys.ts`・`paths.ts`・`refresh.ts`・`read-csv-file.ts`） |
+| `apps/people/` | 002 で足したもの：`components/home/`（今日の声かけ）・`components/person/`（タグ・声かけの予定・連絡の記録・自由な項目・SNS のリンク・行の印・まとめた表示）・`components/settings/`（タグと自由な項目の設定）・`pages/OutreachBoardPage.tsx`（会ごとの声かけの一覧）。書き出しの保存は共通の `lib/save-file.ts`。`index.ts`（`peopleApp`）・`routes.tsx`・`shell/`（`PeopleShell`：サイドバーの中身と、767px以下の下のバー）・`pages/`（誘う候補・取り込み・イベント・人の一覧・人のページ・人を足す・誘いの文と目標）・`components/`（取り込みの段・同じ人の候補のカード・`person/`（探す欄・絞り込み・人の行・人のページの各段・まとめる・消す・声かけの記録）・`candidates/`（誘う会の選択・目的の切り替え・候補の行と文のコピー・リピーターの段））・`lib/`（`api.ts`・`query-keys.ts`・`paths.ts`・`refresh.ts`・`read-csv-file.ts`） |
 
 ## 4. 使い方（主催者向け）
 

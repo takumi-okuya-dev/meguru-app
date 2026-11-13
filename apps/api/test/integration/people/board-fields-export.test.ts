@@ -103,6 +103,7 @@ describe("書き出し", () => {
     expect(res.status).toBe(200);
     expect(res.headers.get("content-type")).toContain("text/csv");
     expect(res.headers.get("content-disposition")).toMatch(/attachment; filename="people-\d{8}\.csv"/);
+    expect(res.headers.get("x-export-truncated")).toBe("false");
     const buf = new Uint8Array(await res.arrayBuffer());
     expect([...buf.slice(0, 3)]).toEqual([0xef, 0xbb, 0xbf]);
     const text = new TextDecoder().decode(buf.slice(3));
