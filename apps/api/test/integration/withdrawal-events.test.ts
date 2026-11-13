@@ -90,14 +90,16 @@ describe("退会の出来事（user.withdrawn）", () => {
     const o1 = await createUserWithAccount("o1", { name: "A" });
     const userId = (await rows<{ id: string }>(`SELECT id FROM users WHERE clerk_user_id = 'o1'`))[0]!.id;
     await db().query(`UPDATE users SET withdrawal_requested_at = now() WHERE id = $1`, [userId]);
-    await withTransaction(testEnv.DATABASE_URL, (tx) => emitEvent(tx, "user.withdrawn", { userId }));
+    const eventId = await withTransaction(testEnv.DATABASE_URL, (tx) => emitEvent(tx, "user.withdrawn", { userId }));
 
     expect(await deleteUserRowIfCleaned(billingEnv(), userId)).toBe(false);
     expect(await count("users", `id = '${userId}'`)).toBe(1);
     expect(await count("threads.accounts", `id = '${o1.accountId}'`)).toBe(1);
 
-    // 届け先は Threads と集金管理の2つ（specs/collect/001-event-day-collection contracts/events.md 1）
-    expect(await deliverPendingEvents(billingEnv())).toEqual({ delivered: 2, failed: 0 });
+    // 届け先は、退会を受け取ると登録したアプリの数（Threads・集金管理・人物メモなど。アプリが増えても数を書き直さない）
+    const targets = await count("platform_event_deliveries", `event_id = '${eventId}'`);
+    expect(targets).toBeGreaterThanOrEqual(2);
+    expect(await deliverPendingEvents(billingEnv())).toEqual({ delivered: targets, failed: 0 });
     expect(await count("threads.accounts", `id = '${o1.accountId}'`)).toBe(0);
     expect(await deleteUserRowIfCleaned(billingEnv(), userId)).toBe(true);
     expect(await count("users", `id = '${userId}'`)).toBe(0);
@@ -125,8 +127,10 @@ describe("退会の出来事（user.withdrawn）", () => {
     await deliverPendingEvents(billingEnv());
     // 届けたことを忘れたことにして、もう一度届ける
     await db().query(`UPDATE platform_event_deliveries SET status = 'pending', next_attempt_at = now() - interval '1 minute' WHERE event_id = $1`, [eventId]);
-    expect(await deliverPendingEvents(billingEnv())).toEqual({ delivered: 2, failed: 0 });
+    const targets = await count("platform_event_deliveries", `event_id = '${eventId}'`);
+    expect(await deliverPendingEvents(billingEnv())).toEqual({ delivered: targets, failed: 0 });
     expect(await count("threads.received_events", `event_id = '${eventId}'`)).toBe(1);
+    expect(await count("people.received_events", `event_id = '${eventId}'`)).toBe(1);
     expect(await count("collect.received_events", `event_id = '${eventId}'`)).toBe(1);
     expect(await count("threads.accounts", `id = '${other.accountId}'`)).toBe(1);
   });
@@ -141,8 +145,8 @@ describe("退会の出来事（user.withdrawn）", () => {
 
     await resumeWithdrawals(billingEnv(), (id) => fakeClerk.delete(id));
 
-    // Threads と集金管理の2つの届けが済む
-    expect(await count("platform_event_deliveries", `event_id = '${eventId}' AND status = 'done'`)).toBe(2);
+    // 登録したアプリの届けがすべて済む
+    expect(await count("platform_event_deliveries", `event_id = '${eventId}' AND status = 'done'`)).toBe(await count("platform_event_deliveries", `event_id = '${eventId}'`));
     expect(await count("threads.accounts", `id = '${o1.accountId}'`)).toBe(0);
     expect(await count("users", `id = '${userId}'`)).toBe(0);
     // 出来事は書き足していない（1つのまま）

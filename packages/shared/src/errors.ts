@@ -79,6 +79,13 @@ export const ERROR_CODES = [
   // 集金管理（specs/collect/001-event-day-collection contracts/api.md 0）
   "TIER_IN_USE",
   "IMAGE_TOO_LARGE",
+  // 人物メモ（specs/people/001-people-memo contracts/api.md 0）
+  "IMPORT_TOO_LARGE",
+  "IMPORT_MAPPING_INVALID",
+  "IMPORT_DECISIONS_REQUIRED",
+  "PEOPLE_CONFIRM_REQUIRED",
+  "OUTREACH_NEEDS_APPROVAL",
+  "OUTREACH_NO_CONSENT",
 ] as const;
 
 /** エラーコード。 */
@@ -284,6 +291,18 @@ export function errorMessage(code: ErrorCode, ctx: ErrorMessageContext = {}): Er
       return { message: "この料金の区分は、名簿の人か受付の記録が使っているので消せません。", action: "none" };
     case "IMAGE_TOO_LARGE":
       return { message: "画像が大きすぎます。300KB以内にしてください。", action: "none" };
+    case "IMPORT_TOO_LARGE":
+      return { message: "CSVが大きすぎます。500行・60列まで、1つの答えは5,000文字までにしてください。", action: "none" };
+    case "IMPORT_MAPPING_INVALID":
+      return { message: "列の対応を見直してください（LINE名の列が要ります。同じ項目は1列だけ選べます）。", action: "none" };
+    case "IMPORT_DECISIONS_REQUIRED":
+      return { message: "まだ決めていない行があります。同じ人の候補と同意の選択肢を選んでから、もう一度取り込んでください。", action: "none" };
+    case "PEOPLE_CONFIRM_REQUIRED":
+      return { message: "メモや声かけを書き足した人がいます。残すか消すかを選んでください。", action: "none" };
+    case "OUTREACH_NEEDS_APPROVAL":
+      return { message: "先に「OKをもらった」にしてください。本人のOKのあとでつなげます。", action: "none" };
+    case "OUTREACH_NO_CONSENT":
+      return { message: "この人は、この目的の個別の案内に同意していません。", action: "none" };
     case "INVITE_INVALID":
       return {
         message: "このリンクは使えません。作り直されたか、チームが削除されました。管理者に、新しいリンクを頼んでください。",

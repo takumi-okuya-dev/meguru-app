@@ -3,10 +3,11 @@
 import { appById } from "@meguru/shared";
 import { collectApp } from "@/apps/collect";
 import { threadsApp } from "@/apps/threads";
+import { peopleApp } from "@/apps/people";
 import type { AppModule } from "@/shell";
 
 /** 作ったアプリの入口（出すかどうかは released で決める）。 */
-const allApps: readonly AppModule[] = [threadsApp, collectApp];
+const allApps: readonly AppModule[] = [threadsApp, collectApp, peopleApp];
 
 /** 出せるアプリの入口。 */
 export const registeredApps: readonly AppModule[] = allApps.filter((a) => appById(a.id)?.released === true);

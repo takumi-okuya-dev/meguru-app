@@ -143,7 +143,20 @@ flowchart TB
 | `inbox/`（出来事の受け取り） | `received_events` | `received-events.ts`（`user.withdrawn`：その主催者のデータをすべて消す） |
 | （直下） | — | `index.ts`（入口）・`schema.ts`（5表。スキーマ`collect`）・`access.ts`（関所とイベントの持ち主の確かめ）・`register.ts`（`registerCollect()`：利用の決まりと出来事の受け取りの登録） |
 
-共通17表（`public`）＋Threads34表（`threads`）＋集金管理5表（`collect`）＝56表（`db/schema.ts`がまとめて出す）。共通とアプリの間、アプリ同士の間の外部キーは0本。
+### 2-2c. 人物メモ（apps/people）
+
+specs/people/001-people-memo。運営者が開いた人だけが使える（`registerAppAccess("people", "granted")`）。道筋は`/api/people`の下で、すべてログインと`requireAppAccess("people")`を通る。
+
+| 小分け | 表 | 処理とAPIの入口 |
+|---|---|---|
+| `events/`（イベント） | `events` | `event-service.ts`（作る・直す・一覧・数字・来た人・消す。参加者数は毎回数える）・`event-routes.ts` |
+| `imports/`（取り込み） | `imports`・`column_mappings`・`choice_mappings`・`responses`・`erased_responses` | `mapping.ts`（列と同意の選択肢の対応・覚える）・`classify.ts`（行の判定・二重の印）・`candidates.ts`（同じ人の候補）・`import-service.ts`（プレビューと書く）・`undo.ts`（取り消し・イベントを消すときの取り消し）・`import-routes.ts` |
+| `persons/`（人） | `persons`・`manual_attendances`・`consent_changes`・`erased_attendances` | `person-derive.ts`（今のLINE名と同意を決め直す） |
+| `me/`（人物メモの「自分」） | — | `me-routes.ts`（`GET /api/people/me`） |
+| `inbox/`（出来事の受け取り） | `received_events` | `withdrawal.ts`（`user.withdrawn`の受け取り） |
+| （直下） | — | `index.ts`（入口）・`schema.ts`（11表。スキーマ`people`）・`register.ts`（`registerPeople()`）・`registry.ts`（アプリの番号）・`access.ts`（持ち主の確かめ・作り手のロック）・`usage.ts`（`reportUsage`。数はいつも0）・`routes.ts`（`/api/people`の関所と道筋） |
+
+共通17表（`public`）＋Threads34表（`threads`）＋集金管理5表（`collect`）＋人物メモ11表（`people`）＝67表（`db/schema.ts`がまとめて出す）。共通とアプリの間、アプリ同士の外部キーは0本。
 
 ### 2-3. 窓口（adapters）
 
@@ -160,11 +173,11 @@ flowchart TB
 
 | ファイル | 役割 |
 |---|---|
-| `app.ts` | APIの入口の登録。初めに`registerThreads()`・`registerCollect()`を呼ぶ。ThreadsのAPIは`/api/threads`、集金管理は`/api/collect`の下にまとめてつなぐ |
-| `index.ts` | Workersの入口（`fetch`・`scheduled`）。定期処理の初めに`registerThreads()`・`registerCollect()`を呼ぶ。5分ごとの回では、出来事の届け（`deliverPendingEvents`）と自動投稿を同時に動かす |
-| `jobs/daily-jobs.ts` | 毎日の処理（共通の退会のやり直し・届いた出来事の片づけと、Threadsのトークンの更新・片づけ・利用の数の数え直しなど）。各モジュールの入口の関数を順に呼ぶだけ。初めに`registerThreads()`・`registerCollect()`を呼ぶ |
+| `app.ts` | APIの入口の登録。初めに`registerThreads()`・`registerCollect()`・`registerPeople()`を呼ぶ。ThreadsのAPIは`/api/threads`、集金管理は`/api/collect`、人物メモは`/api/people`の下にまとめてつなぐ |
+| `index.ts` | Workersの入口（`fetch`・`scheduled`）。定期処理の初めに`registerThreads()`・`registerCollect()`・`registerPeople()`を呼ぶ。5分ごとの回では、出来事の届け（`deliverPendingEvents`）と自動投稿を同時に動かす |
+| `jobs/daily-jobs.ts` | 毎日の処理（共通の退会のやり直し・届いた出来事の片づけと、Threadsのトークンの更新・片づけ・利用の数の数え直しなど）。各モジュールの入口の関数を順に呼ぶだけ。初めに`registerThreads()`・`registerCollect()`・`registerPeople()`を呼ぶ |
 | `jobs/key-rotation.ts` | 暗号の鍵の入れ替え（`scripts/rotate-token-key.ts`から使う）。共通（テストのグループの招待のトークン）とThreads（接続のトークン・チームの招待のトークン）の両方の表を書き換えるので、組み立てに置く |
-| `db/schema.ts` | 共通・Threads・集金管理の`schema.ts`を読み直して出すだけ（drizzle-kitとテスト用） |
+| `db/schema.ts` | 共通・Threads・集金管理・人物メモの`schema.ts`を読み直して出すだけ（drizzle-kitとテスト用） |
 
 ## 3. 例外：持ち主でないモジュールが書き換えてよい列
 
@@ -248,6 +261,7 @@ Webのコード（`apps/web/src`）を、外枠（めぐるの共通の画面の
 | `shell/` | `app-module.ts`（`AppModule`・`AppRegistryProvider`・`useCurrentApp`・`useEntryAppHome`・`defineWithdrawalPreview`）・`routes.tsx`（`buildRoutes`）・`layout/`（`AppShell`・サイドバーの枠・`AppSwitcher`・`UserMenu`・`PageHeader`・`EnvBanner`）・`pages/`（入口の振り分け・すべてのアプリ・前のURLの転送・ログイン・利用規約・特定商取引法の表記・テスト用のグループの招待・紹介・見つかりません）・`settings/`（共通の設定。退会のダイアログ`WithdrawDialog.tsx`は、アプリの`withdrawalPreview`を並べて出す。運営の機能・上限・グループの画面は、名前と範囲を`GET /api/operator/app-registry`の一覧から出す）・`guards/`（関所）・`lib/`（`seller-info`・`use-last-app`） |
 | `apps/threads/` | `index.ts`（`threadsApp`）・`routes.tsx`・`sidebar/`（アカウントの切り替え・機能の一覧・チーム・`ThreadsShell`）・`pages/`（アカウント・チーム・接続から戻る画面・チームの招待・トークンの作り方・データ削除の確認・運営の「テスター招待」「アカウント一覧」）・`components/`・`lib/`（`api.ts`の`threadsApi`・`query-keys.ts`の`threadsQueryKeys`・`use-threads-me.ts`の`useThreadsMe`（`/api/threads/me`）・`paths.ts`・`use-account-access` など） |
 | `apps/collect/` | `index.ts`（`collectApp`）・`routes.tsx`（利用の許可のない人には「使えない」の案内だけ）・`sidebar/CollectShell.tsx`（イベント・作る・開いているイベントの名簿・PayPay・振込先の設定）・`pages/`（イベントの一覧・作る・直す・名簿・設定）・`components/`（イベントの入力欄・名簿の続けて入れる欄・まとめて貼る・直す）・`lib/`（`api.ts`の`collectApi`・`query-keys.ts`・`paths.ts`・`event-time.ts`・`image.ts`） |
+| `apps/people/` | `index.ts`（`peopleApp`）・`routes.tsx`・`shell/`（`PeopleShell`：サイドバーの中身と、767px以下の下のバー）・`pages/`（ホーム・取り込み・イベント）・`components/`（取り込みの段・同じ人の候補のカード）・`lib/`（`api.ts`・`query-keys.ts`・`paths.ts`・`read-csv-file.ts`） |
 | `components/`・`lib/` | `components/ui`・`ApiErrorScreen`・`LoadingSkeleton`・`FeatureUnavailableNotice`・`ConfirmDialog`・`billing/`・`lib/api-client.ts`（`request`・ファイルを受け取る`requestBlob`）・`query.ts`（どちらも共通のAPIだけ）・`feature-defs.ts`・`limit-defs.ts`（運営の画面が使う登録の一覧）・`home-link.ts`・`invite-return.ts`・`referral-store.ts`・`use-logout.ts` など |
 
 ### 7-4. URLの決まり

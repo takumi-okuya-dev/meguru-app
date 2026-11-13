@@ -17,6 +17,7 @@ import {
   recountThreadsUsage,
 } from "../apps/threads";
 import { recountCollectUsage, registerCollect } from "../apps/collect";
+import { registerPeople } from "../apps/people";
 import { purgeDeliveredEvents, reconcileSubscriptions, clerkUserDeleter, resumeWithdrawals } from "../platform";
 
 /**
@@ -28,6 +29,7 @@ export async function runDailyJobs(env: Env, now: Date = new Date()) {
   // 退会のやり直しなどで共通の処理が出来事を出すので、アプリの受け取りを登録しておく（何度呼んでも1回だけ。specs/meguru/029）
   registerThreads();
   registerCollect();
+  registerPeople();
   const steps: [string, () => Promise<unknown>][] = [
     ["token refresh", () => refreshExpiringTokens(env, createThreadsClient(env), now)],
     ["expired oauth states", () => cleanupExpiredOauthStates(env, now)],

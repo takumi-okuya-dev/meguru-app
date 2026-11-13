@@ -2,7 +2,7 @@
 
 **出会いと挑戦が、めぐる。** イベント・コミュニティの流れ（告知・集客→申込・集金→当日→人の記録→次回の告知）を支えるアプリを、共通のアカウント・契約で束ねるスイート。全体の形は[プロダクトの構造](docs/product-structure.md)。
 
-今入っているアプリは**めぐる Threads**（旧ThreadsGrower）。Threadsアカウントを「投稿ストック→承認→自動投稿→分析→改善」のループで育てる。
+今入っているアプリは**めぐる Threads**（旧ThreadsGrower）。Threadsアカウントを「投稿ストック→承認→自動投稿→分析→改善」のループで育てる。2作目として**めぐる 人物メモ**（`/people`。イベントのアンケートのCSVから会った人の一覧を作り、次の会に誘う。運営者が開いた人だけが使えるテスト版。specs/people/001-people-memo）を作っている。
 
 - 2026-11-11、リポジトリ名を`threads-grower-app`から`meguru-app`に変えた。GitHubは古いURLを転送する。Cloudflare・Neonの名前（`threads-grower-api`・`threads-grower-web`など）とブラウザに保存する値の名前は、URLや保存した設定が変わらないよう、ドメインを移すときまで今のままにする。
 

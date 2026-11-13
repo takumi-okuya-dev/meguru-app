@@ -86,7 +86,9 @@ export async function resetDb() {
     threads.threads_revocations, threads.strategy_designs, threads.promotions, threads.reference_posts, threads.research_keywords,
     threads.draft_batches, threads.post_drafts, threads.ng_words, threads.posting_schedules, threads.publish_attempts, threads.teams,
     threads.team_members, threads.team_accounts, threads.activity_logs, threads.token_check_failures, threads.received_events,
-    threads.user_states, collect.events, collect.owner_settings, collect.received_events CASCADE`);
+    threads.user_states, collect.events, collect.owner_settings, collect.received_events,
+    people.events, people.imports, people.column_mappings, people.choice_mappings, people.persons, people.responses,
+    people.manual_attendances, people.consent_changes, people.erased_attendances, people.erased_responses, people.received_events CASCADE`);
   // 上限の既定の値を初めの値に戻す（specs/024、specs/meguru/029 research.md R7）
   await sql`INSERT INTO app_limit_defaults (app, key, value) VALUES ('threads', 'accounts', 3), ('threads', 'daily_posts', 10)
     ON CONFLICT (app, key) DO UPDATE SET value = EXCLUDED.value`;

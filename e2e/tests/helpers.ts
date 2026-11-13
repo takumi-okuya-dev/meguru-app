@@ -58,7 +58,7 @@ export async function resetAll() {
     // 表を足しても漏れないよう、public（共通）と threads（Threads。specs/meguru/029 PR3）のすべての表を空にする
     // （マイグレーションの記録は drizzle スキーマにあるので残る）
     const { rows } = await client.query<{ name: string }>(
-      "SELECT quote_ident(schemaname) || '.' || quote_ident(tablename) AS name FROM pg_tables WHERE schemaname IN ('public', 'threads')",
+      "SELECT quote_ident(schemaname) || '.' || quote_ident(tablename) AS name FROM pg_tables WHERE schemaname IN ('public', 'threads', 'people')",
     );
     if (rows.length > 0) await client.query(`TRUNCATE ${rows.map((r) => r.name).join(", ")} CASCADE`);
   } finally {

@@ -55,6 +55,7 @@ import {
   threadsMeRoutes,
 } from "./apps/threads";
 import { collectRoutes, registerCollect } from "./apps/collect";
+import { peopleRoutes, registerPeople } from "./apps/people";
 
 /** アプリに差し込む依存。テストでは偽の認証を渡す。 */
 export type AppDeps = {
@@ -82,6 +83,7 @@ export function createApp(deps: AppDeps = defaultDeps) {
   // アプリの知らせの受け取りを登録する（specs/027。何度呼んでも1回だけ）
   registerThreads();
   registerCollect();
+  registerPeople();
   const app = new Hono<AppEnv>();
 
   app.use("/api/*", async (c, next) => {
@@ -231,6 +233,8 @@ export function createApp(deps: AppDeps = defaultDeps) {
     .route("/threads", threadsApi)
     // 集金管理（specs/collect/001-event-day-collection contracts/api.md）。どの道筋も、ログインと集金管理の利用の許可が要る
     .route("/collect", collectRoutes(authed))
+    // 人物メモの道筋（/api/people/…。specs/people/001-people-memo contracts/api.md）
+    .route("/people", peopleRoutes(authed))
     .route("/", threadsConnectRoutes(authed))
     .route("/", billingRoutes(authed))
     .route("/", stripeWebhookRoutes())

@@ -21,11 +21,12 @@ describe("アプリの一覧", () => {
   });
 
   it("出してよいアプリだけを releasedApps と isReleasedAppId が通す", () => {
-    // 集金管理（specs/collect/001-event-day-collection）は出してよいアプリ。だれに出すかは API の利用の許可で決める
-    expect(releasedApps().map((a) => a.id)).toEqual(["threads", "collect"]);
+    // 集金管理（specs/collect/001-event-day-collection）・人物メモ（specs/people/001-people-memo）は出してよいアプリ。だれに出すかは API の利用の許可で決める
+    expect(releasedApps().map((a) => a.id)).toEqual(["threads", "collect", "people"]);
     expect(isReleasedAppId("threads")).toBe(true);
     expect(isReleasedAppId("collect")).toBe(true);
-    expect(isReleasedAppId("people")).toBe(false);
+    expect(isReleasedAppId("people")).toBe(true);
+    expect(isReleasedAppId("unknown-app")).toBe(false);
     expect(isReleasedAppId(1)).toBe(false);
   });
 });
@@ -33,7 +34,8 @@ describe("アプリの一覧", () => {
 describe("PUT /api/me/last-app の入力", () => {
   it("出してよいアプリのIDだけを受ける", () => {
     expect(lastAppRequestSchema.safeParse({ app: "threads" }).success).toBe(true);
-    expect(lastAppRequestSchema.safeParse({ app: "people" }).success).toBe(false);
+    expect(lastAppRequestSchema.safeParse({ app: "people" }).success).toBe(true);
+    expect(lastAppRequestSchema.safeParse({ app: "unknown-app" }).success).toBe(false);
     expect(lastAppRequestSchema.safeParse({}).success).toBe(false);
   });
 });

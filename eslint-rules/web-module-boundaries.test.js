@@ -115,5 +115,7 @@ tester.run("web-module-boundaries", rule, {
     { ...bad("hooks/use-x.ts", "export const x = 1;", "unplaced"), options: strict },
     // apps の直下のファイルはアプリではない（入口として扱わない）
     { ...bad("apps/index.ts", "export const x = 1;", "unplaced"), options: strict },
+    // 人物メモ（specs/people/001-people-memo tasks.md T004）も、Threadsを直接使えない
+    bad("apps/people/pages/ImportPage.tsx", 'import { threadsApp } from "@/apps/threads";', "appToApp"),
   ],
 });

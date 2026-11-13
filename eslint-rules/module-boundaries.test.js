@@ -54,6 +54,9 @@ tester.run("module-boundaries", rule, {
     at("apps/collect/events/event-service.ts", 'import { loadOwnedEvent } from "../access";'),
     at("db/schema.ts", 'export * from "../apps/collect/schema";'),
     at("app.ts", 'import { collectRoutes } from "./apps/collect";'),
+    // 人物メモ（specs/people/001-people-memo tasks.md T003）：共通の入口は読める
+    at("apps/people/imports/import-service.ts", 'import { reportUsage } from "../../../platform";'),
+    at("db/schema.ts", 'export * from "../apps/people/schema";'),
     // strictPlacement：組み立ての場所はよい
     { ...at("jobs/daily-jobs.ts", 'import { x } from "../platform";'), options: [{ strictPlacement: true }] },
     { ...at("app.ts", 'import { x } from "./platform";'), options: [{ strictPlacement: true }] },
@@ -75,6 +78,9 @@ tester.run("module-boundaries", rule, {
     bad("apps/collect/events/event-service.ts", 'import { accounts } from "../../threads/schema";', "appToApp"),
     bad("apps/collect/index.ts", 'import { x } from "../threads";', "appToApp"),
     bad("app.ts", 'import { x } from "./apps/collect/events/event-service";', "notEntry"),
+    // 人物メモは共通の表の定義と、Threadsを読めない（T003）
+    bad("apps/people/persons/person-list.ts", 'import { users } from "../../../platform/schema";', "appToPlatformSchema"),
+    bad("apps/people/imports/import-service.ts", 'import { accounts } from "../../threads/schema";', "appToApp"),
     bad("adapters/stripe/stripe-client.ts", 'import { x } from "../../platform";', "lowerToUpper"),
     bad("kernel/config.ts", 'import { x } from "../adapters/stripe";', "lowerToUpper"),
     bad("kernel/config.ts", 'import { x } from "../platform";', "lowerToUpper"),

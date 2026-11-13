@@ -18,10 +18,16 @@ describe("GET /api/operator/app-registry", () => {
     expect(res.status).toBe(403);
   });
 
-  it("Threadsの3つの機能と2つの上限を、今の表示名と範囲で返す。集金管理は利用の決まりだけ", async () => {
+  it("Threadsの3つの機能と2つの上限を、今の表示名と範囲で返す。ほかのアプリは利用の決まりだけ", async () => {
     const res = await callOp(app, "GET", "/api/operator/app-registry", { user: FEATURE_OPERATOR });
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({
+    const body = (await res.json()) as { apps: { app: string }[] };
+    // Threads のほかのアプリ（集金管理・人物メモなど）は、運営者が開いた人だけが使う。機能のON/OFF・上限は持たない（アプリが増えても書き直さない）
+    expect(body.apps.map((a) => a.app)).toEqual(expect.arrayContaining(["collect", "people"]));
+    for (const other of body.apps.filter((a) => a.app !== "threads")) {
+      expect(other).toEqual({ app: other.app, access: "granted", featureSwitches: false, operatorLimits: false, features: [], limits: [] });
+    }
+    expect({ apps: body.apps.filter((a) => a.app === "threads") }).toEqual({
       apps: [
         {
           app: "threads",
@@ -47,8 +53,6 @@ describe("GET /api/operator/app-registry", () => {
             },
           ],
         },
-        // 集金管理は運営者が開いた人だけが使う。機能のON/OFF・上限は持たない（specs/collect/001-event-day-collection）
-        { app: "collect", access: "granted", featureSwitches: false, operatorLimits: false, features: [], limits: [] },
       ],
     });
   });

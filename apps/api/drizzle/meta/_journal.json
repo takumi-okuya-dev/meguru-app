@@ -239,6 +239,13 @@
       "when": 1794526825021,
       "tag": "0033_collect_schema",
       "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "7",
+      "when": 1794541267576,
+      "tag": "0034_people_schema",
+      "breakpoints": true
     }
   ]
 }
