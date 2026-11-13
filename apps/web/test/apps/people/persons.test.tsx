@@ -4,7 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { EVENT_1011, EVENT_1125, makeDetail, makeListItem, makeOutreach, makeSummary, renderRoutes } from "./helpers";
 
-vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
+vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn(), warning: vi.fn() } }));
 const api = {
   persons: vi.fn(),
   facets: vi.fn(),
@@ -12,6 +12,8 @@ const api = {
   person: vi.fn(),
   updatePerson: vi.fn(),
   updateConsent: vi.fn(),
+  settings: vi.fn(),
+  tags: vi.fn(),
 };
 vi.mock("@/apps/people/lib/api", async (orig) => {
   const actual = await orig<typeof import("@/apps/people/lib/api")>();
@@ -43,6 +45,8 @@ beforeEach(() => {
   });
   api.events.mockResolvedValue([EVENT_1125, EVENT_1011]);
   api.person.mockResolvedValue(makeDetail());
+  api.settings.mockResolvedValue({ inviteTemplate: null, repeaterGoal: null, personView: { sort: "last_met", group: "none" } });
+  api.tags.mockResolvedValue([]);
 });
 
 describe("人の一覧のクエリ", () => {

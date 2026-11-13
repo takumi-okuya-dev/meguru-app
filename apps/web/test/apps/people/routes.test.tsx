@@ -31,6 +31,9 @@ const home = {
   settings: vi.fn(async () => ({ inviteTemplate: null, repeaterGoal: null })),
   candidates: vi.fn(async () => ({ persons: [], total: 0 })),
   facets: vi.fn(async () => ({ nextAttendance: [], wantedConnections: [], careerInterests: [] })),
+  home: vi.fn(async () => ({ today: [], overdue: [], birthdays: [] })),
+  tags: vi.fn(async () => []),
+  fields: vi.fn(async () => []),
 };
 vi.mock("@/apps/people/lib/api", async (orig) => {
   const actual = await orig<typeof import("@/apps/people/lib/api")>();

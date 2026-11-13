@@ -11,10 +11,13 @@ import { describeError } from "@/lib/api-client";
 import { cn } from "@/lib/utils";
 import { PageBody, PageHeader } from "@/shell";
 import { CandidateRow } from "../components/candidates/CandidateRow";
+import { HomeTodaySection } from "../components/home/HomeTodaySection";
 import { CopyFallbackDialog } from "../components/candidates/CopyFallbackDialog";
 import { InviteEventPicker } from "../components/candidates/InviteEventPicker";
 import { PurposeSwitch } from "../components/candidates/PurposeSwitch";
 import { RepeaterBand } from "../components/candidates/RepeaterBand";
+import { fieldClass } from "../components/EventForm";
+import { PERSON_SORT_LABELS } from "../components/person/labels";
 import { ListPager } from "../components/person/ListPager";
 import { activeFilterCount, EMPTY_FILTERS, FilterChip, PersonFilters, type PersonFilterValue } from "../components/person/PersonFilters";
 import { PersonSearchBox } from "../components/person/PersonSearchBox";
@@ -22,6 +25,11 @@ import { useDebouncedValue } from "../components/person/use-debounced-value";
 import { peopleApi, type CandidateParams } from "../lib/api";
 import { importPath } from "../lib/paths";
 import { peopleQueryKeys } from "../lib/query-keys";
+
+/** 誘う候補で選べる並べ方。 */
+const CANDIDATE_SORTS = ["last_met", "likelihood"] as const;
+/** 誘う候補の並べ方。 */
+type CandidateSort = (typeof CANDIDATE_SORTS)[number];
 
 /**
  * 候補の並びの中身（数・行・ページの移動）。
@@ -112,6 +120,9 @@ export function CandidatesPage() {
   const settings = useQuery({ queryKey: peopleQueryKeys.settings, queryFn: peopleApi.settings });
   const events = useQuery({ queryKey: peopleQueryKeys.events, queryFn: peopleApi.events });
   const facets = useQuery({ queryKey: peopleQueryKeys.facets, queryFn: peopleApi.facets });
+  const tags = useQuery({ queryKey: peopleQueryKeys.tags, queryFn: peopleApi.tags });
+  // 並べ方（誘う候補は、最後に会った順か来てくれそう度順。画面の中だけ）
+  const [sort, setSort] = useState<CandidateSort>("last_met");
 
   const ownEvents: PeopleEvent[] = (events.data ?? []).filter((e) => e.isOwn);
   const nextOwn = stats.data?.nextOwnEvent ?? null;
@@ -123,13 +134,14 @@ export function CandidatesPage() {
   const template = settings.isSuccess ? settings.data.inviteTemplate : settings.isError ? null : undefined;
 
   // 探す言葉・絞り込み・目的が変わったら、1ページ目に戻す
-  const searchKey = JSON.stringify([purpose, q, filters, visitedOwn]);
+  const searchKey = JSON.stringify([purpose, q, filters, visitedOwn, sort]);
   const offset = page.key === searchKey ? page.offset : 0;
   const params: CandidateParams = {
     ...filters,
     purpose,
     eventId: purpose === "invite" && inviteEventId !== "" ? inviteEventId : undefined,
     visitedOwn,
+    sort,
     ...(q !== "" ? { q } : {}),
     offset,
   };
@@ -156,6 +168,7 @@ export function CandidatesPage() {
     <>
       <PageHeader title="誘う候補" />
       <PageBody className="space-y-4">
+        <HomeTodaySection />
         <RepeaterBand stats={stats.data} />
         <PurposeSwitch value={purpose} onChange={changePurpose} />
         <p className="text-[13px] text-muted-foreground">個別の案内に同意した人だけを出しています</p>
@@ -190,6 +203,7 @@ export function CandidatesPage() {
               value={filters}
               onChange={setFilters}
               facets={facets.data}
+              tags={tags.data}
               showEvent={false}
               showCounts={false}
               lead={
@@ -207,6 +221,18 @@ export function CandidatesPage() {
               }}
             />
           )}
+          <div className="space-y-1">
+            <label htmlFor="people-candidate-sort" className="text-[13px] text-muted-foreground">
+              並べ方
+            </label>
+            <select id="people-candidate-sort" className={fieldClass} value={sort} onChange={(e) => setSort(e.target.value as CandidateSort)}>
+              {CANDIDATE_SORTS.map((s) => (
+                <option key={s} value={s}>
+                  {PERSON_SORT_LABELS[s]}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
 
         {candidates.isPending ? (

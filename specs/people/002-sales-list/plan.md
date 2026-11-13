@@ -40,10 +40,10 @@
 | `GET/POST /fields`・`PATCH/DELETE /fields/:fieldId`・`PUT /fields/order` | 自由な項目 |
 | `PUT /persons/:personId/fields` | `{ values: { fieldId, value \| null }[] }` |
 | `PUT /persons/:personId/links` | `{ instagram?, x?, facebook? }`（null で外す） |
-| `GET /persons`・`GET /candidates` | 001 に足す：`tag`（くり返し）・`likelihood`（くり返し）・`sort`・`group`。返りの行に `tags`・`likelihood`・`nextAction`・`firstMetOn`（並べ方のため） |
+| `GET /persons`・`GET /candidates` | 001 に足す：`tag`（くり返し）・`likelihood`（くり返し）・`sort`（まとめた表示は画面がそのページの中でまとめるので、API は受けない）。返りの行に `tags`・`likelihood`・`nextAction`・`firstMetOn`（並べ方のため） |
 | `GET /home` | `{ today: Item[], overdue: Item[], birthdays: Item[] }`（`Item` は人の一覧の行＋`nextAction`／`birthdayMd`） |
 | `GET /events/:eventId/outreach-board` | 誘いの声かけを進み具合ごとに：`{ stages: { asked: Row[], link_sent: Row[], attended: Row[] } }`（`Row` は人＋声かけ） |
-| `POST /persons/export` | 本文に人の一覧と同じ絞り込み → `text/csv`（BOM つき）。`Content-Disposition` のファイル名は日付だけ |
+| `POST /persons/export` | 本文に人の一覧と同じ絞り込み → `text/csv`（BOM つき）。`Content-Disposition` のファイル名は日付だけ。1万人で切ったら `X-People-Export-Truncated: true`。今は CORS でこの2つの見出しを出していないので、画面は同じ形のファイル名を作り、一覧の `total` で切ったかを決める（見出しを読めるようにするのは共通の小さな PR で、あとで） |
 | `GET/PUT /settings` | 001 に足す：`personView: { sort, group }` |
 
 人のページ（`GET /persons/:personId`）に、`tags`・`nextAction`・`birthdayMd`・`likelihood`・`contactLogs`（新しい順）・`fields`（項目の順に、値つき）・`links` を足す。

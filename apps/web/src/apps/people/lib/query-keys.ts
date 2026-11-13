@@ -18,6 +18,12 @@ export const peopleQueryKeys = {
   candidates: (params: CandidateParams) => ["people", "persons", "candidates", params] as const,
   person: (id: string) => ["people", "persons", "detail", id] as const,
   facets: ["people", "facets"] as const,
+  // 002：ホーム・会ごとの声かけの一覧も人の並び（次にやること・タグ・声かけで変わる）なので ["people", "persons"] の下に置く
+  home: ["people", "persons", "home"] as const,
+  outreachBoard: (eventId: string) => ["people", "persons", "outreach-board", eventId] as const,
+  // タグ（人数つき）・自由な項目
+  tags: ["people", "tags"] as const,
+  fields: ["people", "fields"] as const,
   // 誘いの文の型とリピーターの目標・リピーターの数と次の自分の会
   settings: ["people", "settings"] as const,
   stats: ["people", "stats"] as const,

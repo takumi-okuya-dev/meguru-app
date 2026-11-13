@@ -7,6 +7,8 @@ import { EVENT_1011, EVENT_1125, EVENT_1213, makeCandidate, makeOutreach, render
 
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 const api = {
+  home: vi.fn(),
+  tags: vi.fn(),
   candidates: vi.fn(),
   stats: vi.fn(),
   settings: vi.fn(),
@@ -63,6 +65,8 @@ function deferred<T>() {
 
 beforeEach(() => {
   for (const f of Object.values(api)) f.mockReset();
+  api.home.mockResolvedValue({ today: [], overdue: [], birthdays: [] });
+  api.tags.mockResolvedValue([]);
   api.stats.mockResolvedValue({ repeaterCount: 4, repeaterGoal: 10, nextOwnEvent: { id: EVENT_1213.id, name: EVENT_1213.name, heldOn: EVENT_1213.heldOn, isOwn: true } });
   api.settings.mockResolvedValue({ inviteTemplate: null, repeaterGoal: 10 });
   api.events.mockResolvedValue([EVENT_1213, EVENT_1125, EVENT_1011]);
