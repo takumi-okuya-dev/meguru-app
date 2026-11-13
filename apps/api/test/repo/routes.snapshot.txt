@@ -13,6 +13,7 @@ DELETE /api/operator/feature-settings/:userId ×3
 DELETE /api/operator/test-groups/:groupId/members/:userId ×3
 DELETE /api/people/events/:eventId ×1
 DELETE /api/people/imports/:importId ×1
+DELETE /api/people/outreaches/:outreachId ×1
 DELETE /api/people/persons/:personId ×1
 DELETE /api/people/persons/:personId/attendances/:eventId ×1
 DELETE /api/threads/accounts/:accountId ×2
@@ -59,6 +60,7 @@ GET /api/operator/limits/users ×3
 GET /api/operator/test-groups ×3
 GET /api/operator/test-groups/:groupId ×3
 GET /api/operator/users ×3
+GET /api/people/candidates ×1
 GET /api/people/events ×1
 GET /api/people/events/:eventId ×1
 GET /api/people/events/:eventId/attendees ×1
@@ -68,6 +70,8 @@ GET /api/people/imports/:importId/undo-preview ×1
 GET /api/people/me ×1
 GET /api/people/persons ×1
 GET /api/people/persons/:personId ×1
+GET /api/people/settings ×1
+GET /api/people/stats ×1
 GET /api/referral-page ×1
 GET /api/test-invites/:token ×2
 GET /api/threads/accounts/:accountId ×2
@@ -115,6 +119,7 @@ PATCH /api/collect/events/:eventId/link ×2
 PATCH /api/collect/events/:eventId/roster/:personId ×2
 PATCH /api/operator/test-groups/:groupId ×3
 PATCH /api/people/events/:eventId ×1
+PATCH /api/people/outreaches/:outreachId ×1
 PATCH /api/people/persons/:personId ×1
 PATCH /api/threads/accounts/:accountId ×2
 PATCH /api/threads/accounts/:accountId/analysis/settings ×2
@@ -146,6 +151,7 @@ POST /api/operator/test-groups/:groupId/rotate-invite ×3
 POST /api/people/events ×1
 POST /api/people/imports ×2
 POST /api/people/imports/preview ×2
+POST /api/people/outreaches ×1
 POST /api/people/persons ×1
 POST /api/people/persons/:personId/attendances ×1
 POST /api/people/persons/:personId/merge ×1
@@ -202,6 +208,7 @@ PUT /api/operator/limits ×3
 PUT /api/operator/limits/users/:userId ×3
 PUT /api/operator/test-groups/:groupId/features ×3
 PUT /api/people/persons/:personId/consent ×1
+PUT /api/people/settings ×1
 PUT /api/threads/accounts/:accountId/analysis/classifications ×2
 PUT /api/threads/accounts/:accountId/core-rules ×2
 PUT /api/threads/accounts/:accountId/external-media/:promotionId/:media ×2

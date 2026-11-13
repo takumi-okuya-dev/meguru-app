@@ -8,6 +8,7 @@ import { isUuid } from "../../../kernel/validate";
 import { loadOwnedEvent, loadOwnedPerson, lockActiveOwner, lockOwner } from "../access";
 import { peopleManualAttendances, peoplePersons, peopleResponses } from "../schema";
 import { reportPeopleUsage } from "../usage";
+import { markInviteAttended } from "../outreach/outreach-service";
 import { derivePersons, recordManualConsent } from "./person-derive";
 import { personSummary } from "./person-service";
 
@@ -63,6 +64,8 @@ export async function addAttendance(env: Env, userId: string, personId: string, 
     const p = await loadOwnedPerson(tx, userId, personId);
     await loadOwnedEvent(tx, userId, eventId);
     await tx.insert(peopleManualAttendances).values({ personId: p.id, eventId, userId }).onConflictDoNothing();
+    // 誘った会なら、その声かけを「来た」にする（FR-022）
+    await markInviteAttended(tx, userId, [{ personId: p.id, eventId }]);
     return personSummary(tx, userId, p.id);
   });
 }

@@ -7,7 +7,7 @@ import type { TxDb } from "../../../kernel/db/client";
 import { AppError } from "../../../kernel/errors";
 import { displayNameOf, type PeopleDb } from "../access";
 import { derivePersons } from "../persons/person-derive";
-import { peopleConsentChanges, peopleImports, peopleManualAttendances, peoplePersons, peopleResponses } from "../schema";
+import { peopleConsentChanges, peopleImports, peopleManualAttendances, peopleOutreaches, peoplePersons, peopleResponses } from "../schema";
 
 /** 取り消しの見積もり。 */
 export type UndoPlan = {
@@ -75,11 +75,27 @@ export async function planUndo(db: PeopleDb, userId: string, importIds: readonly
         ).map((r) => r.personId),
       )
     : new Set<string>();
-  // 声かけ（PR3）の書き足しは、声かけの表を作るときに足す
+  // 声かけ（イベントを消すときは、その会への声かけは一緒に消えるので数えない）
+  const outreach = removable.length
+    ? new Set(
+        (
+          await db
+            .selectDistinct({ personId: peopleOutreaches.personId })
+            .from(peopleOutreaches)
+            .where(
+              and(
+                inArray(peopleOutreaches.personId, removable),
+                deletingEventId ? sql`(${peopleOutreaches.eventId} IS NULL OR ${peopleOutreaches.eventId} <> ${deletingEventId})` : undefined,
+              ),
+            )
+        ).map((r) => r.personId),
+      )
+    : new Set<string>();
   const peopleWithNotes = created
     .map((p) => {
       const notes: PersonNote[] = [];
       if (p.memoAppearance || p.memoTalk) notes.push("memo");
+      if (outreach.has(p.id)) notes.push("outreach");
       if (manualConsent.has(p.id)) notes.push("manual_consent");
       if (manualAttendance.has(p.id)) notes.push("manual_attendance");
       return { personId: p.id, displayName: displayNameOf(p), notes };

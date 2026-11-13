@@ -1,0 +1,216 @@
+// 声かけと進み具合（specs/people/001-people-memo contracts/api.md 5、research.md R16、tasks.md T077・T079）。
+// 同じ声かけは1つ（交流会への誘いは人と誘う会、仕事のつなぎは人と相談先）。その目的の同意がない人には始めない（FR-018）。
+// 相手の情報を外へ送る道は作らない（FR-023・FR-024）。声かけの行の user_id（作り手）が、判断した人（R16）。
+import { OUTREACH_STAGES, type Outreach, type OutreachPurpose, type OutreachStage } from "@meguru/shared/people";
+import { and, eq, inArray, sql } from "drizzle-orm";
+import { withTransaction, type TxDb } from "../../../kernel/db/client";
+import type { Env } from "../../../kernel/env";
+import { AppError, itemNotFound } from "../../../kernel/errors";
+import { isUuid } from "../../../kernel/validate";
+import { loadOwnedEvent, loadOwnedPerson, lockOwner, type PeopleDb } from "../access";
+import { peopleEvents, peopleOutreaches } from "../schema";
+
+/** 進み具合ごとの日時の列。 */
+const STAGE_AT = { link_sent: "linkSentAt", attended: "attendedAt", approved: "approvedAt", connected: "connectedAt" } as const;
+
+/** 声かけの行と誘う会。 */
+type Row = { o: typeof peopleOutreaches.$inferSelect; event: typeof peopleEvents.$inferSelect | null };
+
+/**
+ * 声かけを返りの形にする。
+ * @param r - 声かけの行と誘う会
+ * @returns 声かけ
+ */
+function toOutreach(r: Row): Outreach {
+  return {
+    id: r.o.id,
+    personId: r.o.personId,
+    purpose: r.o.purpose as OutreachPurpose,
+    event: r.event ? { id: r.event.id, name: r.event.name, heldOn: r.event.heldOn } : null,
+    targetName: r.o.targetName,
+    stage: r.o.stage as OutreachStage,
+    askedAt: r.o.askedAt.toISOString(),
+    linkSentAt: r.o.linkSentAt?.toISOString() ?? null,
+    attendedAt: r.o.attendedAt?.toISOString() ?? null,
+    approvedAt: r.o.approvedAt?.toISOString() ?? null,
+    connectedAt: r.o.connectedAt?.toISOString() ?? null,
+  };
+}
+
+/**
+ * 声かけを読む（誘う会つき）。
+ * @param db - データベース
+ * @param userId - 作り手
+ * @param where - 条件
+ * @returns 声かけ
+ */
+async function selectOutreaches(db: PeopleDb, userId: string, where: ReturnType<typeof and>): Promise<Outreach[]> {
+  const rows = await db
+    .select({ o: peopleOutreaches, event: peopleEvents })
+    .from(peopleOutreaches)
+    .leftJoin(peopleEvents, eq(peopleEvents.id, peopleOutreaches.eventId))
+    .where(and(eq(peopleOutreaches.userId, userId), where));
+  return rows.map(toOutreach);
+}
+
+/**
+ * 人の声かけ（新しく始めた順）。
+ * @param db - データベース
+ * @param userId - 作り手
+ * @param personId - 人
+ * @returns 声かけ
+ */
+export async function outreachesOfPerson(db: PeopleDb, userId: string, personId: string): Promise<Outreach[]> {
+  const list = await selectOutreaches(db, userId, eq(peopleOutreaches.personId, personId));
+  return list.sort((a, b) => (a.askedAt < b.askedAt ? 1 : a.askedAt > b.askedAt ? -1 : 0));
+}
+
+/**
+ * 誘う会への声かけを、人ごとに読む（誘う候補の行に入れる）。
+ * @param db - データベース
+ * @param userId - 作り手
+ * @param eventId - 誘う会
+ * @param personIds - 人
+ * @returns 人の番号 → 声かけ
+ */
+export async function inviteOutreachesFor(db: PeopleDb, userId: string, eventId: string, personIds: readonly string[]): Promise<Map<string, Outreach>> {
+  if (personIds.length === 0) return new Map();
+  const list = await selectOutreaches(
+    db,
+    userId,
+    and(eq(peopleOutreaches.purpose, "invite"), eq(peopleOutreaches.eventId, eventId), inArray(peopleOutreaches.personId, [...personIds])),
+  );
+  return new Map(list.map((o) => [o.personId, o]));
+}
+
+/**
+ * 交流会への誘いの声かけを始める。同じ声かけがあれば今のものを返す（created: false）。同意がなければ 409 OUTREACH_NO_CONSENT。
+ * @param env - Workers のバインディング
+ * @param userId - 作り手
+ * @param input - 人と誘う会
+ * @returns 声かけと、新しく作ったか
+ */
+export async function createInviteOutreach(env: Env, userId: string, input: { personId: string; eventId: string }): Promise<{ outreach: Outreach; created: boolean }> {
+  return withTransaction(env.DATABASE_URL, async (tx) => {
+    await lockOwner(tx, userId);
+    const p = await loadOwnedPerson(tx, userId, input.personId);
+    await loadOwnedEvent(tx, userId, input.eventId);
+    const same = and(eq(peopleOutreaches.personId, p.id), eq(peopleOutreaches.purpose, "invite"), eq(peopleOutreaches.eventId, input.eventId));
+    const [existing] = await selectOutreaches(tx, userId, same);
+    if (existing) return { outreach: existing, created: false };
+    if (!p.consentInvite) throw new AppError("OUTREACH_NO_CONSENT", 409, "outreach without consent");
+    const now = new Date();
+    await tx.insert(peopleOutreaches).values({ userId, personId: p.id, purpose: "invite", eventId: input.eventId, stage: "asked", askedAt: now });
+    const [created] = await selectOutreaches(tx, userId, same);
+    return { outreach: created!, created: true };
+  });
+}
+
+/**
+ * 声かけを読む。ない・ほかの作り手のものなら 404。
+ * @param db - データベース
+ * @param userId - 作り手
+ * @param outreachId - 声かけ
+ * @returns 声かけの行
+ */
+async function loadOwnedOutreach(db: PeopleDb, userId: string, outreachId: string) {
+  if (!isUuid(outreachId)) throw itemNotFound();
+  const [row] = await db
+    .select()
+    .from(peopleOutreaches)
+    .where(and(eq(peopleOutreaches.id, outreachId), eq(peopleOutreaches.userId, userId)));
+  if (!row) throw itemNotFound();
+  return row;
+}
+
+/**
+ * 進み具合を変える（同じ目的の進み具合ならどれにでも。戻したら、それより先の日時を空にする。R16）。
+ * 仕事のつなぎで、本人のOKの前に「つないだ」にしようとしたら 409 OUTREACH_NEEDS_APPROVAL（FR-023）。
+ * @param env - Workers のバインディング
+ * @param userId - 作り手
+ * @param outreachId - 声かけ
+ * @param stage - 進み具合
+ * @returns 声かけ
+ */
+export async function updateOutreachStage(env: Env, userId: string, outreachId: string, stage: OutreachStage): Promise<Outreach> {
+  return withTransaction(env.DATABASE_URL, async (tx) => {
+    await lockOwner(tx, userId);
+    const o = await loadOwnedOutreach(tx, userId, outreachId);
+    const stages: readonly string[] = OUTREACH_STAGES[o.purpose as OutreachPurpose];
+    const to = stages.indexOf(stage);
+    if (to < 0) throw new AppError("VALIDATION_FAILED", 400, "invalid request", undefined, ["stage"]);
+    if (stage === "connected" && !o.approvedAt) throw new AppError("OUTREACH_NEEDS_APPROVAL", 409, "outreach needs approval");
+    const now = new Date();
+    const set: Partial<typeof peopleOutreaches.$inferInsert> = { stage, updatedAt: now };
+    stages.forEach((s, i) => {
+      if (s === "asked") return;
+      const col = STAGE_AT[s as keyof typeof STAGE_AT];
+      // ここまでの段は、まだ日時がなければ今にする。先の段の日時は空にする
+      if (i <= to) set[col] = o[col] ?? now;
+      else set[col] = null;
+    });
+    await tx.update(peopleOutreaches).set(set).where(and(eq(peopleOutreaches.id, o.id), eq(peopleOutreaches.userId, userId)));
+    const [fresh] = await selectOutreaches(tx, userId, eq(peopleOutreaches.id, o.id));
+    return fresh!;
+  });
+}
+
+/**
+ * 声かけを消す（押し間違い）。
+ * @param env - Workers のバインディング
+ * @param userId - 作り手
+ * @param outreachId - 声かけ
+ */
+export async function deleteOutreach(env: Env, userId: string, outreachId: string): Promise<void> {
+  await withTransaction(env.DATABASE_URL, async (tx) => {
+    await lockOwner(tx, userId);
+    const o = await loadOwnedOutreach(tx, userId, outreachId);
+    await tx.delete(peopleOutreaches).where(and(eq(peopleOutreaches.id, o.id), eq(peopleOutreaches.userId, userId)));
+  });
+}
+
+/**
+ * 誘った会に来た人の声かけを「来た」にする（取り込み・まとめる・会ったイベントを足すのトランザクションの最後で呼ぶ。FR-022）。
+ * もう「来た」の声かけは変えない。
+ * @param tx - トランザクション（作り手のロックを取ったもの）
+ * @param userId - 作り手
+ * @param pairs - 人と、来たイベント
+ */
+export async function markInviteAttended(tx: TxDb, userId: string, pairs: readonly { personId: string; eventId: string }[]): Promise<void> {
+  if (pairs.length === 0) return;
+  const now = new Date();
+  const values = sql.join(
+    pairs.map((p) => sql`(${p.personId}::uuid, ${p.eventId}::uuid)`),
+    sql`, `,
+  );
+  await tx.execute(sql`UPDATE ${peopleOutreaches} AS o SET stage = 'attended',
+      link_sent_at = coalesce(o.link_sent_at, ${now}), attended_at = ${now}, updated_at = ${now}
+    FROM (VALUES ${values}) AS v(person_id, event_id)
+    WHERE o.user_id = ${userId} AND o.purpose = 'invite' AND o.person_id = v.person_id AND o.event_id = v.event_id AND o.stage <> 'attended'`);
+}
+
+/**
+ * まとめるとき、相手の声かけを残す人へ移す。同じ声かけが両方にあれば、進み具合の先の方を残す（R15）。
+ * @param tx - トランザクション（作り手のロックを取ったもの）
+ * @param userId - 作り手
+ * @param keepId - 残す人
+ * @param otherId - 相手
+ */
+export async function mergeOutreaches(tx: TxDb, userId: string, keepId: string, otherId: string): Promise<void> {
+  const rows = await tx
+    .select()
+    .from(peopleOutreaches)
+    .where(and(eq(peopleOutreaches.userId, userId), inArray(peopleOutreaches.personId, [keepId, otherId])));
+  const sameKey = (o: typeof peopleOutreaches.$inferSelect) => `${o.purpose}|${o.eventId ?? ""}|${o.targetKey ?? ""}`;
+  const rank = (o: typeof peopleOutreaches.$inferSelect) => (OUTREACH_STAGES[o.purpose as OutreachPurpose] as readonly string[]).indexOf(o.stage);
+  const keepByKey = new Map(rows.filter((o) => o.personId === keepId).map((o) => [sameKey(o), o]));
+  for (const o of rows.filter((x) => x.personId === otherId)) {
+    const mine = keepByKey.get(sameKey(o));
+    if (mine && rank(mine) >= rank(o)) {
+      await tx.delete(peopleOutreaches).where(eq(peopleOutreaches.id, o.id));
+      continue;
+    }
+    if (mine) await tx.delete(peopleOutreaches).where(eq(peopleOutreaches.id, mine.id));
+    await tx.update(peopleOutreaches).set({ personId: keepId, updatedAt: new Date() }).where(eq(peopleOutreaches.id, o.id));
+  }
+}

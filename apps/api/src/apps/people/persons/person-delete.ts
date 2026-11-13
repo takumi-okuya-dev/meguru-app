@@ -37,7 +37,7 @@ export async function deletePerson(env: Env, userId: string, personId: string, c
     await tx.execute(sql`INSERT INTO ${peopleErasedResponses} (event_id, dedupe_hash, user_id)
       SELECT r.event_id, r.dedupe_hash, r.user_id FROM ${peopleResponses} r WHERE r.person_id = ${p.id} AND r.user_id = ${userId}
       ON CONFLICT DO NOTHING`);
-    // ③ 人を消す（回答・手で足した会ったイベント・同意の記録は外部キーで一緒に消える）
+    // ③ 人を消す（回答・手で足した会ったイベント・同意の記録・声かけは外部キーで一緒に消える）
     await tx.delete(peoplePersons).where(and(eq(peoplePersons.id, p.id), eq(peoplePersons.userId, userId)));
   });
   await reportPeopleUsage(createDb(env.DATABASE_URL), userId);

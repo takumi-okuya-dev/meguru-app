@@ -45,7 +45,7 @@ describe("イベント", () => {
     const [, detail] = await read<{ stats: unknown; imports: { rowCount: number; importedCount: number; createdPeopleCount: number }[] }>(
       await callPeople("GET", `/events/${oct}`, "u1"),
     );
-    expect(detail.stats).toEqual({ attendeeCount: 2, erasedCount: 0 });
+    expect(detail.stats).toEqual({ attendeeCount: 2, erasedCount: 0, firstTimeCount: 2, returningCount: 0 });
     expect(detail.imports.map((i) => [i.rowCount, i.importedCount, i.createdPeopleCount])).toEqual([[2, 2, 2]]);
     const [, att] = await read<{ attendees: { displayName: string; via: string }[] }>(await callPeople("GET", `/events/${oct}/attendees`, "u1"));
     expect(att.attendees.map((a) => [a.displayName, a.via])).toEqual([

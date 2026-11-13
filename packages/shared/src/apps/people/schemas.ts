@@ -3,6 +3,7 @@
 import { z } from "zod";
 import { CONSENT_PURPOSES, type Consent } from "./answers";
 import { IMPORT_FIELDS, MEMO_APPEARANCE_MAX, MEMO_TALK_MAX, PERSON_NAME_MAX, SEARCH_QUERY_MAX, type ImportField } from "./fields";
+import { INVITE_TEMPLATE_MAX } from "./invite";
 
 /** 日付（YYYY-MM-DD。日本時間の日付）。 */
 const dateString = z
@@ -134,6 +135,47 @@ export const personListQuerySchema = z.object({
 /** GET /api/people/persons のクエリ（読んだあと）。 */
 export type PersonListQuery = z.infer<typeof personListQuerySchema>;
 
+// ---- 誘う候補・声かけ・設定（contracts/api.md 5・6。PR3） ----
+
+/** 声かけの目的（交流会への誘い・仕事の相談先へのつなぎ）。 */
+export const OUTREACH_PURPOSES = ["invite", "work"] as const;
+/** 声かけの目的。 */
+export type OutreachPurpose = (typeof OUTREACH_PURPOSES)[number];
+/** 目的ごとの進み具合（R16）。 */
+export const OUTREACH_STAGES = { invite: ["asked", "link_sent", "attended"], work: ["asked", "approved", "connected"] } as const;
+/** 進み具合。 */
+export type OutreachStage = (typeof OUTREACH_STAGES)[OutreachPurpose][number];
+/** リピーターの目標の上限。 */
+export const REPEATER_GOAL_MAX = 10_000;
+
+/** GET /api/people/candidates のクエリ（人の一覧の絞り込み＋目的・誘う会・前に来た。FR-018・FR-019）。 */
+export const candidateQuerySchema = personListQuerySchema.extend({
+  purpose: z.enum(OUTREACH_PURPOSES),
+  visitedOwn: z
+    .enum(["true", "false"])
+    .optional()
+    .transform((v) => v === "true"),
+});
+/** GET /api/people/candidates のクエリ（読んだあと）。 */
+export type CandidateQuery = z.infer<typeof candidateQuerySchema>;
+
+/** POST /api/people/outreaches の入力（PR3 は交流会への誘いだけ。仕事のつなぎは PR4）。 */
+export const outreachCreateSchema = z.object({ personId: id, purpose: z.literal("invite"), eventId: id });
+/** PATCH /api/people/outreaches/:outreachId の入力。 */
+export const outreachUpdateSchema = z.object({ stage: z.enum(["asked", "link_sent", "attended", "approved", "connected"]) });
+/** PUT /api/people/settings の入力。型の空白だけは null（初めの型）。 */
+export const settingsUpdateSchema = z
+  .object({
+    inviteTemplate: z
+      .string()
+      .refine(withinChars(INVITE_TEMPLATE_MAX), { message: "too long" })
+      .nullable()
+      .optional()
+      .transform((v) => (v === undefined ? undefined : v === null || v.trim() === "" ? null : v)),
+    repeaterGoal: z.number().int().min(1).max(REPEATER_GOAL_MAX).nullable().optional(),
+  })
+  .refine((v) => v.inviteTemplate !== undefined || v.repeaterGoal !== undefined, { message: "empty", path: ["inviteTemplate"] });
+
 // ---- 出力の型 ----
 
 /** GET /api/people/me。 */
@@ -257,7 +299,30 @@ export type PersonAttendance = { event: PeopleEvent; via: "response" | "manual";
 /** 同意の記録。 */
 export type PersonConsentChange = Consent & { source: "response" | "manual"; basisOn: string; changedAt: string };
 /** GET /api/people/persons/:personId の返り（outreaches は PR3 から）。 */
-export type PersonDetail = { person: PersonSummary; attendances: PersonAttendance[]; consentChanges: PersonConsentChange[]; outreaches: unknown[] };
+export type PersonDetail = { person: PersonSummary; attendances: PersonAttendance[]; consentChanges: PersonConsentChange[]; outreaches: Outreach[] };
+
+/** 声かけ（contracts/api.md 5）。 */
+export type Outreach = {
+  id: string;
+  personId: string;
+  purpose: OutreachPurpose;
+  event: { id: string; name: string; heldOn: string } | null;
+  targetName: string | null;
+  stage: OutreachStage;
+  askedAt: string;
+  linkSentAt: string | null;
+  attendedAt: string | null;
+  approvedAt: string | null;
+  connectedAt: string | null;
+};
+/** 誘う候補の1行（人の一覧の行＋声かけ）。 */
+export type CandidateItem = PersonListItem & { outreach: Outreach | null };
+/** GET /api/people/candidates の返り。 */
+export type CandidateList = { persons: CandidateItem[]; total: number };
+/** GET /api/people/settings の返り。 */
+export type PeopleSettings = { inviteTemplate: string | null; repeaterGoal: number | null };
+/** GET /api/people/stats の返り。 */
+export type PeopleStats = { repeaterCount: number; repeaterGoal: number | null; nextOwnEvent: PeopleEvent | null };
 
 /** 書き足し（取り消しで確かめる。R14）。 */
 export type PersonNote = "memo" | "outreach" | "manual_consent" | "manual_attendance";

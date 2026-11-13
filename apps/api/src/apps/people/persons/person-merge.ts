@@ -1,12 +1,14 @@
 // まとめる・分ける（specs/people/001-people-memo contracts/api.md 4、research.md R15、tasks.md T061・T062）。
 import { MEMO_APPEARANCE_MAX, MEMO_TALK_MAX, nameKey, type PersonSummary } from "@meguru/shared/people";
 import { and, count, eq, sql } from "drizzle-orm";
-import { withTransaction } from "../../../kernel/db/client";
+import { withTransaction, type TxDb } from "../../../kernel/db/client";
 import type { Env } from "../../../kernel/env";
 import { AppError } from "../../../kernel/errors";
 import { loadOwnedPerson, loadOwnedResponse, lockOwner } from "../access";
 import { peopleConsentChanges, peopleManualAttendances, peoplePersons, peopleResponses } from "../schema";
+import { markInviteAttended, mergeOutreaches } from "../outreach/outreach-service";
 import { derivePersons } from "./person-derive";
+import { attendanceSql } from "./person-query";
 import { personSummary } from "./person-service";
 
 /** メモをつなぐ区切り（R15）。 */
@@ -54,6 +56,8 @@ export async function mergePersons(env: Env, userId: string, personId: string, o
       .where(and(eq(peopleConsentChanges.personId, other.id), eq(peopleConsentChanges.userId, userId)));
     const realName = keep.realName ?? other.realName;
     const enteredLineName = keep.enteredLineName ?? other.enteredLineName;
+    // 声かけを移す（同じ声かけは進み具合の先の方を残す）。相手を消す前に行う（消すと声かけも外部キーで消える）
+    await mergeOutreaches(tx, userId, keep.id, other.id);
     // 相手を先に消す（手で足した会ったイベントは外部キーで一緒に消える。移した分は上で写した）
     await tx.delete(peoplePersons).where(and(eq(peoplePersons.id, other.id), eq(peoplePersons.userId, userId)));
     await tx
@@ -69,8 +73,22 @@ export async function mergePersons(env: Env, userId: string, personId: string, o
       })
       .where(and(eq(peoplePersons.id, keep.id), eq(peoplePersons.userId, userId)));
     await derivePersons(tx, userId, [keep.id]);
+    // 誘った会に来た記録があれば、その声かけを「来た」にする（FR-022）
+    await markInviteAttended(tx, userId, await attendedEventsOf(tx, userId, keep.id));
     return personSummary(tx, userId, keep.id);
   });
+}
+
+/**
+ * 人の来たイベント（回答 ∪ 手で足した会ったイベント）。
+ * @param tx - トランザクション
+ * @param userId - 作り手
+ * @param personId - 人
+ * @returns 人と来たイベントの組
+ */
+async function attendedEventsOf(tx: TxDb, userId: string, personId: string): Promise<{ personId: string; eventId: string }[]> {
+  const res = await tx.execute<{ event_id: string }>(sql`SELECT a.event_id FROM (${attendanceSql(userId)}) a WHERE a.person_id = ${personId}`);
+  return res.rows.map((r) => ({ personId, eventId: r.event_id }));
 }
 
 /**
