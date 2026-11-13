@@ -150,9 +150,10 @@ flowchart TB
 |---|---|
 | `app-modules.ts` | アプリの一覧（`API_APPS`。各アプリの`index.ts`が出す`ApiAppModule`を1行に1つ並べる）・`registerApps()`・`appDailyJobs()`。アプリを足すときに直す共通の場所は、ここの2行だけ（`merge=union`。specs/meguru/031） |
 | `app.ts` | APIの入口の登録。初めに`registerApps()`を呼ぶ。ThreadsのAPIは`/api/threads`ほかに自分でつなぎ、ほかのアプリは一覧を回して`/api/<アプリの番号>`の下につなぐ |
-| `index.ts` | Workersの入口（`fetch`・`scheduled`）。定期処理の初めに`registerApps()`を呼ぶ。5分ごとの回では、出来事の届け（`deliverPendingEvents`）と自動投稿を同時に動かす |
+| `index.ts` | Workersの入口（`fetch`・`scheduled`と、`durable-objects.ts`のDurable Objectの書き出し）。定期処理の初めに`registerApps()`を呼ぶ。5分ごとの回では、出来事の届け（`deliverPendingEvents`）と自動投稿を同時に動かす |
 | `jobs/daily-jobs.ts` | 毎日の処理（共通の退会のやり直し・届いた出来事の片づけと、Threadsのトークンの更新・片づけ・利用の数の数え直しなど）。各モジュールの入口の関数を順に呼ぶだけ。初めに`registerApps()`を呼び、アプリの毎日の処理（`appDailyJobs`）は料金の合わせ直しの前に走らせる |
-| `jobs/key-rotation.ts` | 暗号の鍵の入れ替え（`scripts/rotate-token-key.ts`から使う）。共通（テストのグループの招待のトークン）とThreads（接続のトークン・チームの招待のトークン）の両方の表を書き換えるので、組み立てに置く |
+| `jobs/key-rotation.ts` | 暗号の鍵の入れ替え（`scripts/rotate-token-key.ts`から使う）。共通（テストのグループの招待のトークン）とThreads（接続のトークン・チームの招待のトークン）の両方の表を書き換えるので、組み立てに置く。ほかのアプリの値は、アプリの入口の`tokenKeys`（`ApiAppModule`）を一覧の順に呼ぶ |
+| `durable-objects.ts` | Durable Object の一覧（1行に1つ。`merge=union`）。`index.ts`が`export *`で書き出す。結びつけは`wrangler.toml`の3か所 |
 | `db/schema.ts` | 共通と各アプリの`schema.ts`を読み直して出すだけ（drizzle-kitとテスト用。`merge=union`） |
 
 ## 3. 例外：持ち主でないモジュールが書き換えてよい列

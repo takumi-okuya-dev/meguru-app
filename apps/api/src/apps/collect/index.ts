@@ -9,6 +9,9 @@ import { rosterRoutes } from "./roster/roster-routes";
 import { settingsRoutes } from "./settings/settings-routes";
 
 import { registerCollect } from "./register";
+
+// 会場の共有の Durable Object（組み立ての durable-objects.ts が書き出す。specs/collect/001 research.md R4）
+export { CollectLiveRoom } from "./live/live-room";
 import { recountCollectUsage } from "./usage/usage";
 
 /**

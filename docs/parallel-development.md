@@ -141,6 +141,7 @@ cd ../meguru-app-people && claude       # その作業場所で Claude Code を�
 |---|---|
 | `apps/api/src/app-modules.ts` | `<名前>Module`の import と、`API_APPS`の1行 |
 | `apps/api/src/db/schema.ts` | `export * from "../apps/<名前>/schema";` |
+| `apps/api/src/durable-objects.ts` | Durable Object の`export { … } from "./apps/<名前>";`（wrangler.toml の結びつけと同じ名前。結びつけそのものは共通のPRで足す） |
 | `apps/web/src/app-list.ts` | `<名前>App`の import と、`ALL_APPS`の1行 |
 | `packages/shared/src/apps/app-list.ts` | アプリの一覧の1行（中身は`apps/<名前>/catalog-entry.ts`） |
 | `packages/shared/src/apps/app-errors.ts` | エラーコードと文言（中身は`apps/<名前>/errors.ts`） |

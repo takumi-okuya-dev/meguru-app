@@ -23,6 +23,18 @@ crons = ["0 18 * * *", "*/5 * * * *"]
 binding = "AUTOPOST_KV"
 id = "00000000000000000000000000000000"
 
+# 集金管理の会場の共有（specs/collect/001-event-day-collection research.md R4・contracts/realtime.md 5）。
+# イベントごとの Durable Object が、つないでいる画面に知らせを配るだけ（何も保存しない）。名前付きの環境は受け継がないので、
+# 3か所（ここ・staging・production）に書く（書き忘れは test/unit/wrangler-config.test.ts で止まる）。
+# 入場券の署名の秘密は `wrangler secret put COLLECT_LIVE_SECRET --env …`（.dev.vars.example 参照）
+[[durable_objects.bindings]]
+name = "COLLECT_LIVE"
+class_name = "CollectLiveRoom"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["CollectLiveRoom"]
+
 # 秘密でない設定。秘密情報は `wrangler secret put` / .dev.vars で設定する（.dev.vars.example 参照）
 [vars]
 THREADS_AUTH_BASE_URL = "https://threads.com"
@@ -42,6 +54,14 @@ crons = ["0 18 * * *", "*/5 * * * *"]
 [[env.staging.kv_namespaces]]
 binding = "AUTOPOST_KV"
 id = "8721878c58494198ae62714a771f8829"
+
+[[env.staging.durable_objects.bindings]]
+name = "COLLECT_LIVE"
+class_name = "CollectLiveRoom"
+
+[[env.staging.migrations]]
+tag = "v1"
+new_sqlite_classes = ["CollectLiveRoom"]
 
 [env.staging.vars]
 APP_ENV = "staging"
@@ -82,6 +102,14 @@ crons = ["0 18 * * *", "*/5 * * * *"]
 [[env.production.kv_namespaces]]
 binding = "AUTOPOST_KV"
 id = "e5fd38abb2a847b9a02588d9f2842d0b"
+
+[[env.production.durable_objects.bindings]]
+name = "COLLECT_LIVE"
+class_name = "CollectLiveRoom"
+
+[[env.production.migrations]]
+tag = "v1"
+new_sqlite_classes = ["CollectLiveRoom"]
 
 [env.production.vars]
 APP_ENV = "production"

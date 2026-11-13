@@ -87,7 +87,8 @@ export function createApp(deps: AppDeps = defaultDeps) {
     const corsMiddleware = cors({
       origin: c.env.WEB_ORIGIN,
       // X-Referral-Code：紹介リンクを開いた人の登録で、紹介した人を記録する（specs/017 research.md R4）
-      allowHeaders: ["Authorization", "Content-Type", "X-Referral-Code"],
+      // X-Collect-Device：集金管理の手伝う人の端末の印（specs/collect/001 research.md R7）
+      allowHeaders: ["Authorization", "Content-Type", "X-Referral-Code", "X-Collect-Device"],
       // PATCH：チーム名・任せる範囲・改善メモ（specs/006・008。PR #9 のCodexレビュー）
       allowMethods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
       credentials: false,

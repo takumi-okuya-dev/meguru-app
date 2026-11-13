@@ -91,4 +91,30 @@ describe("rotateTokenKeys", () => {
     const env = { ...testEnv, TOKEN_ENCRYPTION_KEYS: JSON.stringify({ "2": KEY2 }), TOKEN_ENCRYPTION_KEY_VERSION: "2" };
     await expect(rotateTokenKeys(env)).rejects.toBeInstanceOf(KeyRingError);
   });
+
+  it("アプリの tokenKeys も、鍵の確かめ・入れ替え・残りの数に入る（specs/collect/001 の受付用リンクなど）", async () => {
+    const calls: string[] = [];
+    const app = {
+      id: "collect" as const,
+      register: () => {},
+      tokenKeys: {
+        versionsInUse: async () => [1],
+        rotate: async (_env: unknown, cipher: { currentVersion: number }) => {
+          calls.push(`rotate:${cipher.currentVersion}`);
+          return { rotated: 2, skipped: 1 };
+        },
+        remaining: async (_env: unknown, current: number) => {
+          calls.push(`remaining:${current}`);
+          return 3;
+        },
+      },
+    };
+    const ring = { ...JSON.parse(testEnv.TOKEN_ENCRYPTION_KEYS), "2": KEY2 };
+    const env = { ...testEnv, TOKEN_ENCRYPTION_KEYS: JSON.stringify(ring), TOKEN_ENCRYPTION_KEY_VERSION: "2" };
+    expect(await rotateTokenKeys(env, [app])).toEqual({ rotated: 2, skipped: 1, remainingOldVersionRows: 3 });
+    expect(calls).toEqual(["rotate:2", "remaining:2"]);
+    // アプリが使っている版の鍵が欠けていれば始めない
+    const onlyNew = { ...testEnv, TOKEN_ENCRYPTION_KEYS: JSON.stringify({ "2": KEY2 }), TOKEN_ENCRYPTION_KEY_VERSION: "2" };
+    await expect(rotateTokenKeys(onlyNew, [app])).rejects.toBeInstanceOf(KeyRingError);
+  });
 });
