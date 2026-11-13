@@ -1,15 +1,14 @@
 // 集金管理のサイドバーの中身と画面の骨格（specs/collect/001-event-day-collection contracts/ui-routes.md 1、tasks.md T018）。
-// 上から：アプリの名前 → イベント・イベントを作る → 開いているイベント（名簿・受付・受付の手伝い）→ 下に PayPay・振込先の設定。
-// まだ作っていない画面（締め・振込待ち）は出さない（PR3で足す）。
+// 上から：アプリの名前 → イベント・イベントを作る・振込待ち（数）・まとめ → 開いているイベント（名簿・受付・受付の手伝い・締め）→ 下に PayPay・振込先の設定。
 import { appById } from "@meguru/shared";
 import { useQuery } from "@tanstack/react-query";
-import { CalendarPlusIcon, CalendarDaysIcon, ListChecksIcon, ScanLineIcon, SettingsIcon, UsersIcon, WalletIcon } from "lucide-react";
+import { ArchiveIcon, BanknoteIcon, CalendarPlusIcon, CalendarDaysIcon, ClipboardCheckIcon, ListChecksIcon, ScanLineIcon, SettingsIcon, UsersIcon, WalletIcon } from "lucide-react";
 import type { ReactNode } from "react";
 import { NavLink, useMatch } from "react-router";
 import { AppShell, type AppSidebar, type SidebarPartProps } from "@/shell";
 import { cn } from "@/lib/utils";
 import { collectApi } from "../lib/api";
-import { COLLECT_BASE, collectSettingsPath, eventsPath, helpersPath, newEventPath, receptionPath, rosterPath } from "../lib/paths";
+import { COLLECT_BASE, closingPath, collectSettingsPath, eventsPath, helpersPath, newEventPath, receptionPath, rosterPath, summariesPath, transfersPath } from "../lib/paths";
 import { collectQueryKeys } from "../lib/query-keys";
 
 const itemClass = ({ isActive }: { isActive: boolean }) =>
@@ -43,6 +42,8 @@ function Body({ onNavigate }: SidebarPartProps) {
     queryFn: () => collectApi.event(openEventId!),
     enabled: Boolean(openEventId),
   });
+  const me = useQuery({ queryKey: collectQueryKeys.me, queryFn: collectApi.me });
+  const awaiting = me.data?.awaitingTransferCount ?? 0;
   return (
     <nav aria-label="集金管理" className="flex-1 space-y-0.5 overflow-y-auto px-2 py-1">
       <NavLink to={eventsPath()} end className={itemClass} onClick={onNavigate}>
@@ -50,6 +51,17 @@ function Body({ onNavigate }: SidebarPartProps) {
       </NavLink>
       <NavLink to={newEventPath()} className={itemClass} onClick={onNavigate}>
         <CalendarPlusIcon className="size-5 lg:size-[18px]" /> イベントを作る
+      </NavLink>
+      <NavLink to={transfersPath()} className={itemClass} onClick={onNavigate}>
+        <BanknoteIcon className="size-5 lg:size-[18px]" /> 振込待ち
+        {awaiting > 0 && (
+          <span className="ml-auto rounded-full bg-primary px-2 text-xs text-primary-foreground tabular-nums" aria-label={`${awaiting}件`}>
+            {awaiting}
+          </span>
+        )}
+      </NavLink>
+      <NavLink to={summariesPath()} className={itemClass} onClick={onNavigate}>
+        <ArchiveIcon className="size-5 lg:size-[18px]" /> まとめ
       </NavLink>
       {openEventId && (
         <div className="space-y-0.5">
@@ -62,6 +74,9 @@ function Body({ onNavigate }: SidebarPartProps) {
           </NavLink>
           <NavLink to={helpersPath(openEventId)} className={itemClass} onClick={onNavigate}>
             <UsersIcon className="size-5 lg:size-[18px]" /> 受付の手伝い
+          </NavLink>
+          <NavLink to={closingPath(openEventId)} className={itemClass} onClick={onNavigate}>
+            <ClipboardCheckIcon className="size-5 lg:size-[18px]" /> 締め
           </NavLink>
         </div>
       )}

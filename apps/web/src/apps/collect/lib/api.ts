@@ -1,4 +1,4 @@
-// 集金管理のAPIの呼び出し（specs/collect/001-event-day-collection contracts/api.md 1〜5・7）。道筋は /api/collect/…。
+// 集金管理のAPIの呼び出し（specs/collect/001-event-day-collection contracts/api.md 1〜7）。道筋は /api/collect/…。
 // 手伝う人（ログインなし）の呼び出しは helper-api.ts。
 // APIの基本のURL・認証のトークン・エラーの扱いは、共通の部品（lib/api-client.ts の request・requestBlob）を使う。
 import {
@@ -7,8 +7,15 @@ import {
   collectEventListSchema,
   collectEventSchema,
   collectMeSchema,
+  closeResponseSchema,
+  closingSnapshotSchema,
   collectSettingsSchema,
+  deleteEventResponseSchema,
+  eventSummaryListSchema,
   liveTicketResponseSchema,
+  transferItemSchema,
+  transferListSchema,
+  type PutSettlementRequest,
   pastAttendeesResponseSchema,
   receptionLinkResponseSchema,
   receptionSnapshotSchema,
@@ -84,4 +91,19 @@ export const collectApi = {
   updateLink: (eventId: string, expiresAt: string) => request(`${ev(eventId)}/link`, receptionLinkResponseSchema, json("PATCH", { expiresAt })),
   stopLink: (eventId: string) => request(`${ev(eventId)}/link/stop`, receptionLinkResponseSchema, { method: "POST" }),
   workers: (eventId: string) => request(`${ev(eventId)}/helpers`, receptionWorkersResponseSchema),
+  // ---- 締め ----
+  closing: (eventId: string) => request(`${ev(eventId)}/closing`, closingSnapshotSchema),
+  settle: (eventId: string, receiverKey: string, input: PutSettlementRequest) =>
+    request(`${ev(eventId)}/settlements/${encodeURIComponent(receiverKey)}`, closingSnapshotSchema, json("PUT", input)),
+  checkPaypay: (eventId: string) => request(`${ev(eventId)}/paypay-check`, closingSnapshotSchema, { method: "POST" }),
+  close: (eventId: string) => request(`${ev(eventId)}/close`, closeResponseSchema, { method: "POST" }),
+  exportCsv: (eventId: string) => requestBlob(`${ev(eventId)}/export.csv`),
+  // ---- 振込待ち ----
+  transfers: (q: string) => request(`/api/collect/transfers${q ? `?${new URLSearchParams({ q })}` : ""}`, transferListSchema),
+  confirmTransfer: (personId: string) => request(`/api/collect/transfers/${encodeURIComponent(personId)}/confirm`, transferItemSchema, { method: "POST" }),
+  unconfirmTransfer: (personId: string) => request(`/api/collect/transfers/${encodeURIComponent(personId)}/confirm`, transferItemSchema, { method: "DELETE" }),
+  // ---- 消す・まとめ ----
+  deleteEvent: (eventId: string) => request(ev(eventId), deleteEventResponseSchema, { method: "DELETE" }),
+  summaries: () => request("/api/collect/summaries", eventSummaryListSchema),
+  deleteSummary: (summaryId: string) => request(`/api/collect/summaries/${encodeURIComponent(summaryId)}`, null, { method: "DELETE" }),
 };

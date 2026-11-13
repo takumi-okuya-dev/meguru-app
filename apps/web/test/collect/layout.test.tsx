@@ -56,15 +56,17 @@ describe("集金管理の骨格", () => {
     expect(mocks.events).not.toHaveBeenCalled();
   });
 
-  it("許可のある人には、サイドバーとイベントの一覧を出す（まだない画面の項目は出さない）", async () => {
+  it("許可のある人には、サイドバーとイベントの一覧を出す（イベントを開いていなければ、イベントの項目は出さない）", async () => {
     mocks.me.mockResolvedValue(meWith(["threads", "collect"]));
     renderAt("/collect");
     expect(await screen.findByText("まだイベントがありません")).toBeInTheDocument();
     const nav = screen.getByRole("navigation", { name: "集金管理" });
     expect(within(nav).getByRole("link", { name: "イベント" })).toHaveAttribute("href", "/collect");
     expect(within(nav).getByRole("link", { name: "イベントを作る" })).toHaveAttribute("href", "/collect/events/new");
+    expect(within(nav).getByRole("link", { name: /振込待ち/ })).toHaveAttribute("href", "/collect/transfers");
+    expect(within(nav).getByRole("link", { name: "まとめ" })).toHaveAttribute("href", "/collect/summaries");
     expect(within(nav).queryByRole("link", { name: "名簿" })).toBeNull();
-    expect(within(nav).queryByRole("link", { name: /受付|締め|振込待ち/ })).toBeNull();
+    expect(within(nav).queryByRole("link", { name: /受付|締め/ })).toBeNull();
     expect(screen.getByRole("link", { name: "PayPay・振込先の設定" })).toHaveAttribute("href", "/collect/settings");
   });
 
