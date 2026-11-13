@@ -65,9 +65,8 @@ tester.run("web-module-boundaries", rule, {
     // 組み立て → 入口
     at("app-registry.ts", 'import { threadsApp } from "@/apps/threads";'),
     at("app-registry.ts", 'import { threadsApp } from "./apps/threads/index";'),
-    // 集金管理（specs/collect/001-event-day-collection tasks.md T007）
-    at("app-registry.ts", 'import { collectApp } from "@/apps/collect";'),
-    at("apps/collect/pages/RosterPage.tsx", 'import { PageHeader } from "@/shell";'),
+    // アプリの入口の一覧（specs/meguru/031）も組み立て。アプリごとの例は web-module-boundaries.<アプリ>.test.js
+    at("app-list.ts", 'import { threadsApp } from "@/apps/threads";'),
     at("router.tsx", 'import { RequireAuth } from "@/shell";'),
     at("main.tsx", 'import { router } from "./router";'),
     at("main.tsx", 'import "./index.css";'),
@@ -89,8 +88,6 @@ tester.run("web-module-boundaries", rule, {
     bad("apps/sample/pages/home.tsx", 'import { threadsApp } from "@/apps/threads";', "appToApp"),
     bad("apps/threads/pages/stock.tsx", 'import { x } from "../../sample/lib/x";', "appToApp"),
     bad("apps/sample/index.ts", 'export * from "@/apps/threads/routes";', "appToApp"),
-    // 集金管理は Threads の部品を使えない（specs/collect/001-event-day-collection tasks.md T007・R18）
-    bad("apps/collect/pages/RosterPage.tsx", 'import { QrCode } from "@/apps/threads/components/QrCode";', "appToApp"),
     // ② 外枠 → アプリ（入口も）
     bad("shell/layout/Sidebar.tsx", 'import { threadsApp } from "@/apps/threads";', "shellToApp"),
     bad("shell/layout/Sidebar.tsx", 'import { Body } from "../../apps/threads/sidebar/Body";', "shellToApp"),
@@ -115,7 +112,5 @@ tester.run("web-module-boundaries", rule, {
     { ...bad("hooks/use-x.ts", "export const x = 1;", "unplaced"), options: strict },
     // apps の直下のファイルはアプリではない（入口として扱わない）
     { ...bad("apps/index.ts", "export const x = 1;", "unplaced"), options: strict },
-    // 人物メモ（specs/people/001-people-memo tasks.md T004）も、Threadsを直接使えない
-    bad("apps/people/pages/ImportPage.tsx", 'import { threadsApp } from "@/apps/threads";', "appToApp"),
   ],
 });

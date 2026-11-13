@@ -129,34 +129,9 @@ flowchart TB
 | `events/`（出来事の受け取り） | `received_events` | `received-events.ts`（`user.withdrawn`・`limits.changed`の受け取り。1-4） |
 | （直下） | — | `index.ts`（入口）・`schema.ts`（34表。スキーマ`threads`）・`register.ts`（`registerThreads()`：機能・上限・出来事の受け取りの登録）・`registry.ts`（アプリの番号・機能と上限の名前） |
 
-### 2-2b. 集金管理（apps/collect）
+### 2-2b. 2作目からのアプリ
 
-パターン①の最初の2作目（specs/collect/001-event-day-collection）。運営者が開いた人だけが使う（`registerAppAccess("collect", "granted")`。specs/meguru/030-app-access）。道筋はすべて`/api/collect`の下で、ログインと利用の許可の関所（`access.ts`の`collectOwner`）を付ける。今は PR1 の分（イベント・料金の区分・名簿・既定値）。
-
-| 小分け | 表 | 処理とAPIの入口 |
-|---|---|---|
-| `events/`（イベント・料金の区分） | `events`・`price_tiers` | `event-service.ts`・`event-routes.ts` |
-| `roster/`（名簿・前回の参加者） | `roster_people` | `roster-service.ts`（受付番号は`events.next_number`から取る）・`past-attendees.ts`・`roster-routes.ts` |
-| `settings/`（主催者の既定値） | `owner_settings` | `settings-service.ts`（PayPayのQRの画像・振込先の案内）・`settings-routes.ts` |
-| `me/`（集金管理の「自分」） | — | `collect-me.ts`（`GET /api/collect/me`） |
-| `usage/`（利用の値） | — | `usage.ts`（料金の数は0、イベントがあれば「使っている」を`reportUsage`で伝える。毎日の数え直し） |
-| `inbox/`（出来事の受け取り） | `received_events` | `received-events.ts`（`user.withdrawn`：その主催者のデータをすべて消す） |
-| （直下） | — | `index.ts`（入口）・`schema.ts`（5表。スキーマ`collect`）・`access.ts`（関所とイベントの持ち主の確かめ）・`register.ts`（`registerCollect()`：利用の決まりと出来事の受け取りの登録） |
-
-### 2-2c. 人物メモ（apps/people）
-
-specs/people/001-people-memo。運営者が開いた人だけが使える（`registerAppAccess("people", "granted")`）。道筋は`/api/people`の下で、すべてログインと`requireAppAccess("people")`を通る。
-
-| 小分け | 表 | 処理とAPIの入口 |
-|---|---|---|
-| `events/`（イベント） | `events` | `event-service.ts`（作る・直す・一覧・数字・来た人・消す。参加者数は毎回数える）・`event-routes.ts` |
-| `imports/`（取り込み） | `imports`・`column_mappings`・`choice_mappings`・`responses`・`erased_responses` | `mapping.ts`（列と同意の選択肢の対応・覚える）・`classify.ts`（行の判定・二重の印）・`candidates.ts`（同じ人の候補）・`import-service.ts`（プレビューと書く）・`undo.ts`（取り消し・イベントを消すときの取り消し）・`import-routes.ts` |
-| `persons/`（人） | `persons`・`manual_attendances`・`consent_changes`・`erased_attendances` | `person-derive.ts`（今のLINE名と同意を決め直す） |
-| `me/`（人物メモの「自分」） | — | `me-routes.ts`（`GET /api/people/me`） |
-| `inbox/`（出来事の受け取り） | `received_events` | `withdrawal.ts`（`user.withdrawn`の受け取り） |
-| （直下） | — | `index.ts`（入口）・`schema.ts`（11表。スキーマ`people`）・`register.ts`（`registerPeople()`）・`registry.ts`（アプリの番号）・`access.ts`（持ち主の確かめ・作り手のロック）・`usage.ts`（`reportUsage`。数はいつも0）・`routes.ts`（`/api/people`の関所と道筋） |
-
-共通17表（`public`）＋Threads34表（`threads`）＋集金管理5表（`collect`）＋人物メモ11表（`people`）＝67表（`db/schema.ts`がまとめて出す）。共通とアプリの間、アプリ同士の外部キーは0本。
+アプリごとの表・処理・APIの入口は、`docs/apps/<アプリの番号>.md`に置く（集金管理：[docs/apps/collect.md](./apps/collect.md)、人物メモ：[docs/apps/people.md](./apps/people.md)）。この文書にはアプリの節を足さない（並行開発で同じ文書に行を足し合わないため。specs/meguru/031）。表の数の合計も書かない。共通とアプリの間、アプリ同士の外部キーは0本。
 
 ### 2-3. 窓口（adapters）
 
@@ -173,11 +148,12 @@ specs/people/001-people-memo。運営者が開いた人だけが使える（`reg
 
 | ファイル | 役割 |
 |---|---|
-| `app.ts` | APIの入口の登録。初めに`registerThreads()`・`registerCollect()`・`registerPeople()`を呼ぶ。ThreadsのAPIは`/api/threads`、集金管理は`/api/collect`、人物メモは`/api/people`の下にまとめてつなぐ |
-| `index.ts` | Workersの入口（`fetch`・`scheduled`）。定期処理の初めに`registerThreads()`・`registerCollect()`・`registerPeople()`を呼ぶ。5分ごとの回では、出来事の届け（`deliverPendingEvents`）と自動投稿を同時に動かす |
-| `jobs/daily-jobs.ts` | 毎日の処理（共通の退会のやり直し・届いた出来事の片づけと、Threadsのトークンの更新・片づけ・利用の数の数え直しなど）。各モジュールの入口の関数を順に呼ぶだけ。初めに`registerThreads()`・`registerCollect()`・`registerPeople()`を呼ぶ |
+| `app-modules.ts` | アプリの一覧（`API_APPS`。各アプリの`index.ts`が出す`ApiAppModule`を1行に1つ並べる）・`registerApps()`・`appDailyJobs()`。アプリを足すときに直す共通の場所は、ここの2行だけ（`merge=union`。specs/meguru/031） |
+| `app.ts` | APIの入口の登録。初めに`registerApps()`を呼ぶ。ThreadsのAPIは`/api/threads`ほかに自分でつなぎ、ほかのアプリは一覧を回して`/api/<アプリの番号>`の下につなぐ |
+| `index.ts` | Workersの入口（`fetch`・`scheduled`）。定期処理の初めに`registerApps()`を呼ぶ。5分ごとの回では、出来事の届け（`deliverPendingEvents`）と自動投稿を同時に動かす |
+| `jobs/daily-jobs.ts` | 毎日の処理（共通の退会のやり直し・届いた出来事の片づけと、Threadsのトークンの更新・片づけ・利用の数の数え直しなど）。各モジュールの入口の関数を順に呼ぶだけ。初めに`registerApps()`を呼び、アプリの毎日の処理（`appDailyJobs`）は料金の合わせ直しの前に走らせる |
 | `jobs/key-rotation.ts` | 暗号の鍵の入れ替え（`scripts/rotate-token-key.ts`から使う）。共通（テストのグループの招待のトークン）とThreads（接続のトークン・チームの招待のトークン）の両方の表を書き換えるので、組み立てに置く |
-| `db/schema.ts` | 共通・Threads・集金管理・人物メモの`schema.ts`を読み直して出すだけ（drizzle-kitとテスト用） |
+| `db/schema.ts` | 共通と各アプリの`schema.ts`を読み直して出すだけ（drizzle-kitとテスト用。`merge=union`） |
 
 ## 3. 例外：持ち主でないモジュールが書き換えてよい列
 
@@ -212,15 +188,16 @@ ESLintで止められる違反は0件にする。今すぐ直せないものは�
    - `schema.ts`：そのアプリの表。`pgSchema("<名前>")`でアプリ専用のスキーマに置き、共通の表（`platform/schema`）は参照しない。利用者のIDは`user_id`に値として持つ（外部キーなし。[docs/app-separation.md](./app-separation.md) 4）。共通の部品は`../../kernel/db/columns`。受け取った出来事の表（`received_events`）も置く（Threads：`apps/threads/schema.ts`）。
    - 小分けのフォルダー（処理と`*-routes.ts`）。
    - `registry.ts`：アプリの番号と、機能・上限の名前・表示名・範囲（Threads：`apps/threads/registry.ts`）。
-   - `register.ts`：`registerXxx()`。`registerModule("<名前>", …)`の中で、`registerAppFeatures`・`registerAppLimits`・`registerConsumer`を呼ぶ（Threads：`apps/threads/register.ts`の`registerThreads()`）。
-   - `index.ts`：組み立てが使うもの（APIの入口を作る関数・`registerXxx()`・定期処理の関数）だけを出す。
+   - `register.ts`：`registerXxx()`。`registerModule("<名前>", …)`の中で、`registerAppFeatures`・`registerAppLimits`・`registerAppAccess`・`registerConsumer`を呼ぶ（Threads：`apps/threads/register.ts`の`registerThreads()`）。
+   - `index.ts`：組み立てが使う`<名前>Module`（`ApiAppModule`：`id`・`register`・`routes`・`dailyJobs`）を出す（人物メモ：`apps/people/index.ts`の`peopleModule`）。
 2. 共通は`../../platform`（入口）の関数からだけ使う（`currentUser`・`loadAppEntitlement(s)`・`loadAppFeatures`・`peopleNames`など。共通の表の定義は読まない。ESLintが止める）。運営者が開いた人だけに使わせるアプリは、組み立てで`registerAppAccess("<名前>", "granted")`を呼び、アプリの道筋に`requireAppAccess("<名前>")`を付ける（使えない人は403 `APP_NOT_AVAILABLE`。`loadAppEntitlement(s)`も`access: "none"`を返す。specs/meguru/030-app-access）。登録しないアプリはだれでも使える。Threadsのモジュールは使わない（ESLintが止める）。
 3. 共通の出来事（少なくとも退会の`user.withdrawn`）を受け取る。受け取りは、自分のトランザクションの中で出来事のIDを`received_events`に記録し、もうあれば何もしない。退会なら、その人のデータを消す（Threads：`apps/threads/events/received-events.ts`・`accounts/withdrawal-cleanup.ts`）。
-4. 料金の数・使っているかが変わるたびに、自分のトランザクションのあとで`reportUsage`を呼ぶ。ずれに備えて、毎日の処理でも数え直して伝える（Threads：`apps/threads/accounts/usage.ts`と、`jobs/daily-jobs.ts`の`recountThreadsUsage`）。
+4. 料金の数・使っているかが変わるたびに、自分のトランザクションのあとで`reportUsage`を呼ぶ。ずれに備えて、毎日の処理でも数え直して伝える（`<名前>Module`の`dailyJobs`。集金管理：`apps/collect/index.ts`の`collectModule`）。
 5. `apps/api/src/db/schema.ts`に`export * from "../apps/<名前>/schema";`を足し、`pnpm --filter api db:generate`でマイグレーションを作る。できたSQLを読み、スキーマを作る文があることを確かめる。
-6. `apps/api/src/app.ts`で、入口のAPIの関数を`/api/<名前>`の下につなぐ（Threads：`threadsApi`を`.route("/threads", …)`）。アプリの「自分」の情報は`/api/<名前>/me`から返し、共通の`/api/me`には足さない（Threads：`apps/threads/me/threads-me.ts`）。`registerThreads()`と同じ場所（`app.ts`・`index.ts`・`jobs/daily-jobs.ts`）で`registerXxx()`を呼ぶ。
+6. `apps/api/src/app-modules.ts`に、import を1行と`API_APPS`に1行を足す（**`app.ts`・`index.ts`・`jobs/daily-jobs.ts`は直さない**）。道筋は`/api/<名前>`の下につながる。アプリの「自分」の情報は`/api/<名前>/me`から返し、共通の`/api/me`には足さない（Threads：`apps/threads/me/threads-me.ts`）。
 7. 入口を足したら`pnpm --filter api routes:snapshot`で一覧を書き直す。
-8. この地図の2章に、表と処理を足す。
+8. `docs/apps/<名前>.md`を作り、表と処理を書く（この文書には足さない）。
+9. エラーコードは`packages/shared/src/apps/<名前>/errors.ts`に置き、`packages/shared/src/apps/app-errors.ts`に1行ずつ足す（共通の`errors.ts`は直さない）。境界のルールの例は`eslint-rules/module-boundaries.<名前>.test.js`に置く。
 
 - ESLintの規則は、`apps/<名前>/`の形から自動でアプリとして当たる（設定は要らない）。
 - 出来事の種類を足すときは、`platform/events/events.ts`の型に足し、名前を`platform_events.type`の`CHECK`の形（`user.withdrawn`のような「まとまり.こと」）に合わせる。中身に入れるのは番号だけ。
@@ -234,7 +211,7 @@ Webのコード（`apps/web/src`）を、外枠（めぐるの共通の画面の
 
 | 種類 | 置き場所 | 中身 | 使ってよい相手 |
 |---|---|---|---|
-| 組み立て | `main.tsx`・`router.tsx`・`app-registry.ts` | 出せるアプリの一覧（`registeredApps`）を作り、外枠の`buildRoutes`に渡してルーターを組む | すべて（外枠とアプリは入口から） |
+| 組み立て | `main.tsx`・`router.tsx`・`app-registry.ts`・`app-list.ts` | 作ったアプリの入口の一覧（`app-list.ts`の`ALL_APPS`。1行に1つ・`merge=union`）から出せるアプリの一覧（`registeredApps`）を作り、外枠の`buildRoutes`に渡してルーターを組む | すべて（外枠とアプリは入口から） |
 | アプリ | `apps/<名前>/`（今は`threads`） | アプリの画面・ルート・サイドバーの中身・アプリでだけ使う部品 | 外枠の入口（`shell/index.ts`）・共通の部品。**アプリ同士は使わない** |
 | 外枠 | `shell/` | 画面の骨格（サイドバーの枠・アプリの切り替え・ユーザーメニュー・上部バー）・入口の振り分け（`/`）・すべてのアプリ（`/apps`）・共通の設定（`/settings`）・ログインのいらない共通のページ・関所（ログイン・契約・退会・テスト版） | 共通の部品。**アプリは使わない**（アプリの一覧は組み立てから受け取る） |
 | 共通の部品 | `components/`・`lib/` | 見た目の部品（`components/ui`）・共通のAPIの呼び出し（`lib/api-client.ts`）・書式・保存のエラー・確認のダイアログ・契約の帯など | 共通の部品だけ |
@@ -260,8 +237,7 @@ Webのコード（`apps/web/src`）を、外枠（めぐるの共通の画面の
 |---|---|
 | `shell/` | `app-module.ts`（`AppModule`・`AppRegistryProvider`・`useCurrentApp`・`useEntryAppHome`・`defineWithdrawalPreview`）・`routes.tsx`（`buildRoutes`）・`layout/`（`AppShell`・サイドバーの枠・`AppSwitcher`・`UserMenu`・`PageHeader`・`EnvBanner`）・`pages/`（入口の振り分け・すべてのアプリ・前のURLの転送・ログイン・利用規約・特定商取引法の表記・テスト用のグループの招待・紹介・見つかりません）・`settings/`（共通の設定。退会のダイアログ`WithdrawDialog.tsx`は、アプリの`withdrawalPreview`を並べて出す。運営の機能・上限・グループの画面は、名前と範囲を`GET /api/operator/app-registry`の一覧から出す）・`guards/`（関所）・`lib/`（`seller-info`・`use-last-app`） |
 | `apps/threads/` | `index.ts`（`threadsApp`）・`routes.tsx`・`sidebar/`（アカウントの切り替え・機能の一覧・チーム・`ThreadsShell`）・`pages/`（アカウント・チーム・接続から戻る画面・チームの招待・トークンの作り方・データ削除の確認・運営の「テスター招待」「アカウント一覧」）・`components/`・`lib/`（`api.ts`の`threadsApi`・`query-keys.ts`の`threadsQueryKeys`・`use-threads-me.ts`の`useThreadsMe`（`/api/threads/me`）・`paths.ts`・`use-account-access` など） |
-| `apps/collect/` | `index.ts`（`collectApp`）・`routes.tsx`（利用の許可のない人には「使えない」の案内だけ）・`sidebar/CollectShell.tsx`（イベント・作る・開いているイベントの名簿・PayPay・振込先の設定）・`pages/`（イベントの一覧・作る・直す・名簿・設定）・`components/`（イベントの入力欄・名簿の続けて入れる欄・まとめて貼る・直す）・`lib/`（`api.ts`の`collectApi`・`query-keys.ts`・`paths.ts`・`event-time.ts`・`image.ts`） |
-| `apps/people/` | `index.ts`（`peopleApp`）・`routes.tsx`・`shell/`（`PeopleShell`：サイドバーの中身と、767px以下の下のバー）・`pages/`（ホーム・取り込み・イベント）・`components/`（取り込みの段・同じ人の候補のカード）・`lib/`（`api.ts`・`query-keys.ts`・`paths.ts`・`read-csv-file.ts`） |
+| `apps/<名前>/`（2作目から） | アプリごとの置き場所は`docs/apps/<名前>.md`の「Web」 |
 | `components/`・`lib/` | `components/ui`・`ApiErrorScreen`・`LoadingSkeleton`・`FeatureUnavailableNotice`・`ConfirmDialog`・`billing/`・`lib/api-client.ts`（`request`・ファイルを受け取る`requestBlob`）・`query.ts`（どちらも共通のAPIだけ）・`feature-defs.ts`・`limit-defs.ts`（運営の画面が使う登録の一覧）・`home-link.ts`・`invite-return.ts`・`referral-store.ts`・`use-logout.ts` など |
 
 ### 7-4. URLの決まり
@@ -281,9 +257,9 @@ Webのコード（`apps/web/src`）を、外枠（めぐるの共通の画面の
 
 ### 7-6. Webにアプリを足す手順
 
-1. `packages/shared/src/apps.ts`の`APP_CATALOG`に1行足す（ID・名前・パス・説明・料金・`released: false`）。
+1. `packages/shared/src/apps/<名前>/catalog-entry.ts`にアプリの一覧の1行（ID・名前・パス・説明・料金・`released: false`）を置き、`packages/shared/src/apps/app-list.ts`に import を1行と一覧に1行を足す。
 2. `apps/web/src/apps/<名前>/`を作り、`index.ts`で`AppModule`を出す（`id`・`basePath`・`icon`・`startPath`・`routes`。ルートは`/<名前>/…`の下）。画面の枠は`AppShell`に自分のサイドバーの中身（`AppSidebar`）を渡す。
-3. `apps/web/src/app-registry.ts`の一覧に1行足す（**外枠のほかの場所は直さない**）。
+3. `apps/web/src/app-list.ts`に import を1行と一覧に1行を足す（**外枠のほかの場所は直さない**）。境界のルールの例は`eslint-rules/web-module-boundaries.<名前>.test.js`に置く。
 4. APIは6章の手順で`apps/api/src/apps/<名前>/`に足す（`reportUsage`で「使っているか」を伝えれば、`/api/me`の`apps.using`に入る）。画面からのAPIの呼び出しとキーは`apps/<名前>/lib/`に置き、退会の確かめに出す中身があれば`withdrawalPreview`を渡す。
 5. 業務の判断とデータのやりとりは、APIと`@meguru/shared`に置く。Webの画面やブラウザだけで動く仕組みに閉じこめない（モバイル化を見込んだ決まり。Constitutionの技術スタック制約）。
 6. 出してよくなったら`released: true`にする。

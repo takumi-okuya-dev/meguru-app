@@ -1,7 +1,7 @@
 // スイート「めぐる」のアプリの一覧（specs/028-meguru-shell data-model.md 2、research.md R7）。
 // 名前・パス・説明・料金を1か所に置き、API・Web・将来のモバイルの画面で食い違わないようにする。
 import { z } from "zod";
-import { BILLING_UNIT_PRICE_JPY } from "../billing";
+import { APP_CATALOG } from "./app-list";
 
 /** アプリの一覧の1行。 */
 export type AppCatalogEntry = {
@@ -21,52 +21,8 @@ export type AppCatalogEntry = {
   released: boolean;
 };
 
-/** アプリの一覧（並びは、すべてのアプリの画面とアプリの切り替えの順）。 */
-export const APP_CATALOG = [
-  {
-    id: "threads",
-    name: "めぐる Threads",
-    basePath: "/threads",
-    summary: "Threadsの投稿を、人格を保ったまま育てる",
-    details: [
-      "戦略（課題・宣伝内容・リサーチ）を書くと、投稿の案を作るためのプロンプトができます",
-      "投稿の案は、承認したものだけを、決めた時刻に自動で投稿します",
-      "投稿の反応を取り込み、伸びた投稿・伸びなかった投稿を次の案に生かせます",
-      "チームで、ほかの人のアカウントの運用を手伝えます",
-    ],
-    priceLabel: `アカウント1件につき月${BILLING_UNIT_PRICE_JPY.toLocaleString("ja-JP")}円`,
-    released: true,
-  },
-  {
-    // 集金管理（specs/collect/001-event-day-collection）。運営者が開いた人だけに出す（利用の許可。specs/meguru/030-app-access）
-    id: "collect",
-    name: "めぐる 集金",
-    basePath: "/collect",
-    summary: "イベント当日の集金（現金・PayPay・振込）を、1人1タップで記録する",
-    details: [
-      "申込は今の媒体のまま。名簿は手で続けて入れるか、申込の一覧を貼ってまとめて入れます",
-      "前に来た人は、名前を入れ始めると候補に出ます",
-      "PayPayの受け取り用QRと振込先を登録しておくと、受付ですぐ出せます",
-      "お金はアプリを通りません。払い方と金額の記録だけを持ちます",
-    ],
-    priceLabel: "テスト版（料金なし）",
-    released: true,
-  },
-  {
-    // 人物メモ（specs/people/001-people-memo research.md R3）。運営者が開いた人だけが使える（API の registerAppAccess("people", "granted")）
-    id: "people",
-    name: "めぐる 人物メモ",
-    basePath: "/people",
-    summary: "アンケートから会った人を覚え、次の会に誘う",
-    details: [
-      "イベントのアンケート（GoogleフォームのCSV）を取り込むと、会った人の一覧ができます",
-      "同じ人は、イベントをまたいで1人にまとまり、来た会・答え・メモを1ページで見られます",
-      "次の会に誘うときは、個別の案内に同意した人だけが候補に並びます",
-    ],
-    priceLabel: "テスト版（料金なし）",
-    released: true,
-  },
-] as const satisfies readonly AppCatalogEntry[];
+/** アプリの一覧（並びは、すべてのアプリの画面とアプリの切り替えの順）。各アプリの行は、アプリのフォルダーの catalog-entry.ts にある（specs/meguru/031）。 */
+export { APP_CATALOG };
 
 /** アプリのID。 */
 export type AppId = (typeof APP_CATALOG)[number]["id"];

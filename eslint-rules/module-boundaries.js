@@ -3,7 +3,7 @@
 // 依存の向き（組み立て → アプリ → 共通 → 窓口 → 土台）と、ほかのモジュールは入口（index.ts）から読む決まりを確かめる。
 // アプリの判定はパスの形（apps/<名前>/）で行うので、アプリを足しても設定は要らない。
 // 入口は、モジュールの直下の index.ts と schema.ts（表の定義は、ほかのモジュールと組み立てに見せるもの）。
-// strictPlacement を true にすると、組み立てと決めた場所（app.ts・index.ts・jobs/・db/schema.ts）のほかにあるファイルを知らせる（027の並べ替えのあとに有効にする）。
+// strictPlacement を true にすると、組み立てと決めた場所（app.ts・app-modules.ts・index.ts・jobs/・db/schema.ts）のほかにあるファイルを知らせる（027の並べ替えのあとに有効にする）。
 import path from "node:path";
 
 /** 種類の上下（大きいほど上。上から下へだけ読んでよい）。 */
@@ -39,7 +39,13 @@ function isEntry(target) {
  * @returns 組み立ての場所なら true
  */
 export function isCompositionPlace(rel) {
-  return rel === "app" || rel === "index" || rel === "db/schema" || rel.startsWith("jobs/");
+  return (
+    rel === "app" ||
+    rel === "app-modules" ||
+    rel === "index" ||
+    rel === "db/schema" ||
+    rel.startsWith("jobs/")
+  );
 }
 
 /**
@@ -73,7 +79,7 @@ export default {
       appToPlatformSchema:
         "アプリ（{{from}}）は共通の表の定義（platform/schema）を読めません。共通の入口の関数（platform/index.ts）を使ってください（specs/meguru/029-threads-pattern1 contracts/module-boundaries.md 3）。",
       unplaced:
-        "{{from}} はどのモジュールにも入っていません。kernel・adapters/<名前>・platform・apps/<名前> のどれかに置いてください（組み立ては app.ts・index.ts・jobs/・db/schema.ts だけ。docs/module-map.md）。",
+        "{{from}} はどのモジュールにも入っていません。kernel・adapters/<名前>・platform・apps/<名前> のどれかに置いてください（組み立ては app.ts・app-modules.ts・index.ts・jobs/・db/schema.ts だけ。docs/module-map.md）。",
       lowerToUpper: "{{fromKind}}（{{from}}）は {{toKind}}（{{unit}}）を使えません。依存は 組み立て → アプリ → 共通 → 窓口 → 土台 の向きだけです（docs/module-map.md）。",
     },
   },

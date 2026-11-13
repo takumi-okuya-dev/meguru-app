@@ -1,13 +1,8 @@
 // 出せるアプリの一覧（組み立て。specs/028-meguru-shell research.md R3・R7、contracts/web-module-boundaries.md 5）。
-// アプリを足すときは、ここに1行足す（外枠のほかの場所は直さない）。@meguru/shared のアプリの一覧で released のアプリだけを登録する。
+// アプリを足すときは app-list.ts に1行足す（ここと外枠のほかの場所は直さない。specs/meguru/031）。@meguru/shared のアプリの一覧で released のアプリだけを登録する。
 import { appById } from "@meguru/shared";
-import { collectApp } from "@/apps/collect";
-import { threadsApp } from "@/apps/threads";
-import { peopleApp } from "@/apps/people";
+import { ALL_APPS } from "@/app-list";
 import type { AppModule } from "@/shell";
 
-/** 作ったアプリの入口（出すかどうかは released で決める）。 */
-const allApps: readonly AppModule[] = [threadsApp, collectApp, peopleApp];
-
 /** 出せるアプリの入口。 */
-export const registeredApps: readonly AppModule[] = allApps.filter((a) => appById(a.id)?.released === true);
+export const registeredApps: readonly AppModule[] = ALL_APPS.filter((a) => appById(a.id)?.released === true);

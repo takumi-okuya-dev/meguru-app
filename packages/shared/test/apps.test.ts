@@ -21,11 +21,12 @@ describe("アプリの一覧", () => {
   });
 
   it("出してよいアプリだけを releasedApps と isReleasedAppId が通す", () => {
-    // 集金管理（specs/collect/001-event-day-collection）・人物メモ（specs/people/001-people-memo）は出してよいアプリ。だれに出すかは API の利用の許可で決める
-    expect(releasedApps().map((a) => a.id)).toEqual(["threads", "collect", "people"]);
+    // アプリの数や並びは書かない（アプリを足しても直さない。specs/meguru/031）。だれに出すかは API の利用の許可で決める
+    expect(releasedApps().map((a) => a.id)).toEqual(
+      APP_CATALOG.filter((a) => a.released).map((a) => a.id),
+    );
+    for (const a of APP_CATALOG) expect(isReleasedAppId(a.id)).toBe(a.released);
     expect(isReleasedAppId("threads")).toBe(true);
-    expect(isReleasedAppId("collect")).toBe(true);
-    expect(isReleasedAppId("people")).toBe(true);
     expect(isReleasedAppId("unknown-app")).toBe(false);
     expect(isReleasedAppId(1)).toBe(false);
   });

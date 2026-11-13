@@ -68,7 +68,7 @@ cd ../meguru-app-people && claude       # その作業場所で Claude Code を�
 
    `git switch develop`は使わない。`develop`はほかの作業場所が使っていることがあり、同じブランチは2つの作業場所で同時に開けないため。
 2. **仕様を書く**。`/speckit-specify`で`specs/<アプリ>/NNN-…`に置く。番号は、`develop`と作業中のブランチの`specs/<アプリ>/`の最大の番号の次（[product-structure.md](./product-structure.md) 6）。そのあとは[ai-skills.md](./ai-skills.md)の順に、計画・タスク・実装まで進める。
-3. **自分のフォルダの中で作る**。人物管理なら`apps/api/src/apps/<アプリ>/`・`apps/web/src/apps/<アプリ>/`・`specs/<アプリ>/`。ほかのアプリのフォルダには触らない。
+3. **自分のフォルダの中で作る**。人物管理なら`apps/api/src/apps/<アプリ>/`・`apps/web/src/apps/<アプリ>/`・`specs/<アプリ>/`・`docs/apps/<アプリ>.md`。ほかのアプリのフォルダには触らない。共通の場所は11章の一覧だけを触る。
 4. **PRを出す**（[release-runbook.md](./release-runbook.md) 2）。下書きで出す → セルフレビュー → コードを変えたPRだけ`run-ci`でCI → Ready for review → Codexのレビュー → ユーザーがマージを決める。
 5. **ステージングで確かめる**。マージすると`develop`がステージングに出る（文書だけのPRでは出ない）。
 
@@ -84,7 +84,7 @@ cd ../meguru-app-people && claude       # その作業場所で Claude Code を�
   pnpm --filter api db:migrate     # マイグレーションが増えていることがある
   ```
 
-- ぶつかったら、ほかのアプリのフォルダの変更は相手の側を取る。共通の変更がぶつかったら、そのセッションで直さず、ユーザーに相談する。
+- ぶつかったら、ほかのアプリのフォルダの変更は相手の側を取る。共通の変更がぶつかったら、そのセッションで直さず、ユーザーに相談する（11章）。
 
 ## 6. マイグレーションがぶつかったとき
 
@@ -129,3 +129,47 @@ cd ../meguru-app-people && claude       # その作業場所で Claude Code を�
 - **手元の設定ファイル**（`apps/api/.dev.vars`・`apps/web/.env.local`・`e2e/.env.local`）は、もとのクローンから写し、DBとポートの行（`DATABASE_URL`・`WEB_ORIGIN`・`VITE_API_BASE_URL`）だけを書き換える。
 - **結合テストとE2Eの順番待ち**：Workersからつなぐ`local-neon-http-proxy`は1つで、2つの作業場所で同時に流すと認証の問い合わせが追いつかずに落ちる。そこで、Postgresの`postgres`のDBのアドバイザリーロックで順番を待つ（`apps/api/test/global-setup.ts`・`e2e/global-setup.ts`）。テストを止めれば、接続が切れてロックは外れる。
 
+## 11. ぶつからないための決まり（必ず守る）
+
+2026-11-13に、人物メモ（PR #111）と集金管理（PR #113・#114）を続けて取り込んだとき、19か所がぶつかった。どれも「アプリを足すたびに、共通の場所へ1行足す所」で、各アプリのフォルダの中身は1つもぶつからなかった。git が自動でまとめた結果が間違っていたテストも1件あった。そこで共通の作りを変え（specs/meguru/031-conflict-free-composition）、次の決まりを置く。**どのセッションも、この決まりを守る。**
+
+### 11-1. アプリを足す・広げるときに触ってよい共通の場所
+
+アプリの番号を`<名前>`とする。共通のファイルで触ってよいのは、次の「1行に1つ」の一覧だけ。どれも`.gitattributes`で`merge=union`にしてあり、2つのブランチが同時に1行ずつ足しても両方の行が残る。
+
+| 一覧 | 足すもの |
+|---|---|
+| `apps/api/src/app-modules.ts` | `<名前>Module`の import と、`API_APPS`の1行 |
+| `apps/api/src/db/schema.ts` | `export * from "../apps/<名前>/schema";` |
+| `apps/web/src/app-list.ts` | `<名前>App`の import と、`ALL_APPS`の1行 |
+| `packages/shared/src/apps/app-list.ts` | アプリの一覧の1行（中身は`apps/<名前>/catalog-entry.ts`） |
+| `packages/shared/src/apps/app-errors.ts` | エラーコードと文言（中身は`apps/<名前>/errors.ts`） |
+| `packages/shared/src/apps/index.ts` | `export * from "./<名前>";`（`@meguru/shared/<名前>`で読ませるアプリは足さない） |
+| `apps/api/test/repo/routes.snapshot.txt` | `pnpm --filter api routes:snapshot`で書き直す |
+
+- これらのファイルは**1行に1つだけ**書く。1行に2つ並べたり、一覧のほかの中身（関数・説明の文）を足したりしない。union は、同じ行を両方が書き換えると両方の行を残すので、壊れた形が残る。取り込んだあとは、型チェックとテストで確かめる。
+- 次のファイルは、アプリを足す・広げるために**直さない**：`app.ts`・`index.ts`・`jobs/daily-jobs.ts`・`packages/shared/src/errors.ts`・`packages/shared/src/apps/catalog.ts`・`apps/web/src/app-registry.ts`・`apps/api/test/helpers/app.ts`（テストのDBの片づけは、アプリのスキーマの表を自動で読む）・`e2e/tests/helpers.ts`。
+- アプリの地図は`docs/apps/<名前>.md`に書く。`docs/module-map.md`にはアプリの節を足さず、表の数の合計も書かない。
+- 境界のルールの例は`eslint-rules/module-boundaries.<名前>.test.js`・`eslint-rules/web-module-boundaries.<名前>.test.js`に置く（共通のテストのファイルには足さない）。
+
+### 11-2. テストにアプリの数を書かない
+
+「アプリは2つ」「届け先は2つ」「`["threads", "collect"]`と同じ」のように、**アプリの数や並びをそのまま書いたテストを書かない**。アプリが増えるたびに、ほかのセッションのテストが落ちる。
+
+- 数は、登録された数（DBの行の数・`releasedApps()`・`APP_CATALOG`）と比べる（例：`apps/api/test/integration/withdrawal-events.test.ts`）。
+- 自分のアプリがあることは`toContain`・`toMatchObject`・`expect.arrayContaining`で確かめる。
+
+### 11-3. 共通を直すとき
+
+- 11-1の一覧のほかの共通のファイル（`platform/`・Webの外枠・`@meguru/shared`の共通の部分・`kernel/`・`eslint-rules/`のルールそのもの）を直すときは、**アプリのPRに混ぜず、小さなPRに分けて先に`develop`へ入れる**（5章）。
+- 作る前に、ユーザーに「共通のPRを出す」と伝える。ほかのセッションには、そのPRが入るまで同じ共通のファイルを触らないよう、ユーザーから伝えてもらう。
+
+### 11-4. マイグレーション
+
+- マイグレーションの番号の取り合いは避けられない。**マイグレーションのあるPRは小さく切り、先に`develop`へ入れる**（表を作るPRと、画面・処理を足すPRを分ける）。
+- ぶつかったら6章の手順で作り直す（番号を手で直さない）。できたSQLが前と同じかを`diff`で確かめる。
+
+### 11-5. develop を早めに取り込む
+
+- 作業中のブランチには、**少なくとも1日1回、またPRを出す前とマージの前に必ず**`develop`を取り込む（5章）。ずれが小さいうちに直す。
+- ぶつかったら、ほかのアプリのフォルダの変更は相手の側を取る。11-1の一覧は、両方の行を残す（union で自動で残るはず）。それ以外の共通のファイルがぶつかったら、そのセッションで直さず、ユーザーに相談する。

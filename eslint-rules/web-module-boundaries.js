@@ -6,7 +6,7 @@
 import path from "node:path";
 
 /** 組み立てのファイル（src からの相対のパス、拡張子なし）。 */
-const COMPOSITION = new Set(["main", "router", "app-registry"]);
+const COMPOSITION = new Set(["main", "router", "app-registry", "app-list"]);
 
 /**
  * src からの相対のパス（拡張子なし）から、モジュールを求める。
@@ -65,7 +65,7 @@ export default {
       commonToUpper: "共通の部品（components・lib）は {{toKind}}（{{unit}}）を使えません（docs/module-map.md「Webの境界」）。",
       toComposition: "{{fromKind}}（{{from}}）は組み立て（{{unit}}）を使えません（docs/module-map.md「Webの境界」）。",
       unplaced:
-        "{{from}} はどのモジュールにも入っていません。components・lib・shell・apps/<名前> のどれかに置いてください（組み立ては main・router・app-registry だけ。docs/module-map.md「Webの境界」）。",
+        "{{from}} はどのモジュールにも入っていません。components・lib・shell・apps/<名前> のどれかに置いてください（組み立ては main・router・app-registry・app-list だけ。docs/module-map.md「Webの境界」）。",
     },
   },
   create(context) {
