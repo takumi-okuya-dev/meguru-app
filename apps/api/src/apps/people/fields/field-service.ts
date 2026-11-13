@@ -1,11 +1,10 @@
 // 自由な項目と SNS のリンク（specs/people/002-sales-list plan.md 3、FR-109・FR-110）。
 import { FIELDS_MAX, LINK_KINDS, nameKey, type CustomField, type LinkKind, type PersonFieldValue, type PersonLinks } from "@meguru/shared/people";
 import { and, asc, count, eq, inArray, max, sql } from "drizzle-orm";
-import { withTransaction, type TxDb } from "../../../kernel/db/client";
+import { withTransaction } from "../../../kernel/db/client";
 import type { Env } from "../../../kernel/env";
 import { AppError, itemNotFound } from "../../../kernel/errors";
-import { isUuid } from "../../../kernel/validate";
-import { loadOwnedPerson, lockActiveOwner, lockOwner, touchPerson, type PeopleDb } from "../access";
+import { assertKeyFree, loadOwnedField, loadOwnedPerson, lockActiveOwner, lockOwner, touchPerson, type PeopleDb } from "../access";
 import { peopleCustomFields, peoplePersonFieldValues, peoplePersonLinks } from "../schema";
 
 /**
@@ -57,38 +56,6 @@ export async function linksOfPerson(db: PeopleDb, userId: string, personId: stri
 }
 
 /**
- * 作り手の項目を読む。ない・ほかの作り手のものなら 404。
- * @param db - データベース
- * @param userId - 作り手
- * @param fieldId - 項目
- * @returns 項目の行
- */
-async function loadOwnedField(db: PeopleDb, userId: string, fieldId: string) {
-  if (!isUuid(fieldId)) throw itemNotFound();
-  const [row] = await db
-    .select()
-    .from(peopleCustomFields)
-    .where(and(eq(peopleCustomFields.id, fieldId), eq(peopleCustomFields.userId, userId)));
-  if (!row) throw itemNotFound();
-  return row;
-}
-
-/**
- * 同じ名前の項目があれば 409 PEOPLE_NAME_TAKEN（直すときは自分自身を除く）。
- * @param tx - トランザクション
- * @param userId - 作り手
- * @param key - nameKey
- * @param exceptId - 除く項目
- */
-async function assertLabelFree(tx: TxDb, userId: string, key: string, exceptId?: string): Promise<void> {
-  const [same] = await tx
-    .select({ id: peopleCustomFields.id })
-    .from(peopleCustomFields)
-    .where(and(eq(peopleCustomFields.userId, userId), eq(peopleCustomFields.labelKey, key)));
-  if (same && same.id !== exceptId) throw new AppError("PEOPLE_NAME_TAKEN", 409, "name taken");
-}
-
-/**
  * 項目を足す（いちばん後ろ。30まで）。
  * @param env - Workers のバインディング
  * @param userId - 作り手
@@ -99,7 +66,7 @@ export async function createField(env: Env, userId: string, label: string): Prom
   return withTransaction(env.DATABASE_URL, async (tx) => {
     await lockActiveOwner(tx, env, userId);
     const key = nameKey(label);
-    await assertLabelFree(tx, userId, key);
+    await assertKeyFree(tx, peopleCustomFields, peopleCustomFields.labelKey, userId, key);
     const [stat] = await tx.select({ n: count(), last: max(peopleCustomFields.position) }).from(peopleCustomFields).where(eq(peopleCustomFields.userId, userId));
     if ((stat?.n ?? 0) >= FIELDS_MAX) throw new AppError("VALIDATION_FAILED", 400, "invalid request", undefined, ["label"]);
     const [row] = await tx
@@ -123,7 +90,7 @@ export async function renameField(env: Env, userId: string, fieldId: string, lab
     await lockOwner(tx, userId);
     const f = await loadOwnedField(tx, userId, fieldId);
     const key = nameKey(label);
-    await assertLabelFree(tx, userId, key, f.id);
+    await assertKeyFree(tx, peopleCustomFields, peopleCustomFields.labelKey, userId, key, f.id);
     await tx.update(peopleCustomFields).set({ label, labelKey: key }).where(eq(peopleCustomFields.id, f.id));
     return { id: f.id, label, position: f.position };
   });

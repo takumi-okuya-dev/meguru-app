@@ -1,11 +1,10 @@
 // タグ（specs/people/002-sales-list plan.md 3、FR-101）。作り手ごとに持ち、同じ名前（nameKey）は1つ。
 import { nameKey, TAGS_MAX, TAGS_PER_PERSON_MAX, type PeopleTag, type PersonTag } from "@meguru/shared/people";
 import { and, asc, count, eq, inArray, sql } from "drizzle-orm";
-import { withTransaction, type Db, type TxDb } from "../../../kernel/db/client";
+import { withTransaction, type Db } from "../../../kernel/db/client";
 import type { Env } from "../../../kernel/env";
 import { AppError, itemNotFound } from "../../../kernel/errors";
-import { isUuid } from "../../../kernel/validate";
-import { loadOwnedPerson, lockActiveOwner, lockOwner, touchPerson, type PeopleDb } from "../access";
+import { assertKeyFree, loadOwnedPerson, loadOwnedTag, lockActiveOwner, lockOwner, touchPerson, type PeopleDb } from "../access";
 import { peoplePersonTags, peopleTags } from "../schema";
 
 /**
@@ -40,38 +39,6 @@ export async function listTags(db: Db, userId: string): Promise<PeopleTag[]> {
 }
 
 /**
- * 作り手のタグを読む。ない・ほかの作り手のものなら 404。
- * @param db - データベース
- * @param userId - 作り手
- * @param tagId - タグ
- * @returns タグの行
- */
-async function loadOwnedTag(db: PeopleDb, userId: string, tagId: string) {
-  if (!isUuid(tagId)) throw itemNotFound();
-  const [row] = await db
-    .select()
-    .from(peopleTags)
-    .where(and(eq(peopleTags.id, tagId), eq(peopleTags.userId, userId)));
-  if (!row) throw itemNotFound();
-  return row;
-}
-
-/**
- * 同じ名前のタグがあれば 409 PEOPLE_NAME_TAKEN（直すときは自分自身を除く）。
- * @param tx - トランザクション
- * @param userId - 作り手
- * @param key - nameKey
- * @param exceptId - 除くタグ
- */
-async function assertNameFree(tx: TxDb, userId: string, key: string, exceptId?: string): Promise<void> {
-  const [same] = await tx
-    .select({ id: peopleTags.id })
-    .from(peopleTags)
-    .where(and(eq(peopleTags.userId, userId), eq(peopleTags.nameKey, key)));
-  if (same && same.id !== exceptId) throw new AppError("PEOPLE_NAME_TAKEN", 409, "name taken");
-}
-
-/**
  * タグを作る（作り手のタグは100まで）。
  * @param env - Workers のバインディング
  * @param userId - 作り手
@@ -82,7 +49,7 @@ export async function createTag(env: Env, userId: string, name: string): Promise
   return withTransaction(env.DATABASE_URL, async (tx) => {
     await lockActiveOwner(tx, env, userId);
     const key = nameKey(name);
-    await assertNameFree(tx, userId, key);
+    await assertKeyFree(tx, peopleTags, peopleTags.nameKey, userId, key);
     const [n] = await tx.select({ n: count() }).from(peopleTags).where(eq(peopleTags.userId, userId));
     if ((n?.n ?? 0) >= TAGS_MAX) throw new AppError("VALIDATION_FAILED", 400, "invalid request", undefined, ["name"]);
     const [row] = await tx.insert(peopleTags).values({ userId, name, nameKey: key }).returning({ id: peopleTags.id, name: peopleTags.name });
@@ -103,7 +70,7 @@ export async function renameTag(env: Env, userId: string, tagId: string, name: s
     await lockOwner(tx, userId);
     const tag = await loadOwnedTag(tx, userId, tagId);
     const key = nameKey(name);
-    await assertNameFree(tx, userId, key, tag.id);
+    await assertKeyFree(tx, peopleTags, peopleTags.nameKey, userId, key, tag.id);
     await tx.update(peopleTags).set({ name, nameKey: key }).where(eq(peopleTags.id, tag.id));
     return { id: tag.id, name };
   });
