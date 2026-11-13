@@ -158,21 +158,19 @@ export function configureApiClient(opts: { getToken: TokenGetter; onSessionExpir
   onSessionExpired = opts.onSessionExpired;
 }
 
+/** request・requestBlob の設定。 */
+type RequestOptions = RequestInit & { auth?: boolean; onError?: (err: ApiError) => void };
+
 /**
- * API を呼ぶ共通の部品。トークンを付け、エラーを ApiError にし、レスポンスをスキーマで検証する。アプリの呼び出し
- * （apps/<名前>/lib/api.ts）からも使う（specs/meguru/029-threads-pattern1 contracts/api-routes.md 4）。
+ * API を呼び、成功の応答を返す（トークンを付け、失敗は ApiError にする）。request・requestBlob の中身。
  * @param path - /api から始まる道筋
- * @param schema - レスポンスのスキーマ（中身がなければ null）
- * @param init - fetch の設定（auth: false でトークンを付けない。onError は ApiError を投げる前に呼ぶ。アプリが自分のエラーを扱うため）
- * @returns 検証したレスポンス
+ * @param init - fetch の設定
+ * @returns 成功の応答
  */
-export async function request<T>(
-  path: string,
-  schema: z.ZodType<T> | null,
-  init: RequestInit & { auth?: boolean; onError?: (err: ApiError) => void } = {},
-): Promise<T> {
+async function send(path: string, init: RequestOptions): Promise<Response> {
   const headers = new Headers(init.headers);
-  if (init.body !== undefined) headers.set("Content-Type", "application/json");
+  // 本文は JSON の文字列がふつう。画像など、呼ぶ側が形式を決めたときはそのまま送る（集金管理のQRの画像。specs/collect/001 R10）
+  if (init.body !== undefined && !headers.has("Content-Type")) headers.set("Content-Type", "application/json");
   if (init.auth !== false) {
     const token = await getToken();
     if (token) headers.set("Authorization", `Bearer ${token}`);
@@ -205,8 +203,31 @@ export async function request<T>(
     init.onError?.(err);
     throw err;
   }
+  return res;
+}
+
+/**
+ * API を呼ぶ共通の部品。トークンを付け、エラーを ApiError にし、レスポンスをスキーマで検証する。アプリの呼び出し
+ * （apps/<名前>/lib/api.ts）からも使う（specs/meguru/029-threads-pattern1 contracts/api-routes.md 4）。
+ * @param path - /api から始まる道筋
+ * @param schema - レスポンスのスキーマ（中身がなければ null）
+ * @param init - fetch の設定（auth: false でトークンを付けない。onError は ApiError を投げる前に呼ぶ。アプリが自分のエラーを扱うため）
+ * @returns 検証したレスポンス
+ */
+export async function request<T>(path: string, schema: z.ZodType<T> | null, init: RequestOptions = {}): Promise<T> {
+  const res = await send(path, init);
   if (schema === null || res.status === 204) return undefined as T;
   return schema.parse(await res.json());
+}
+
+/**
+ * 画像などのファイルを受け取る API を呼ぶ（集金管理のQRの画像など）。トークンとエラーの扱いは request と同じ。
+ * @param path - /api から始まる道筋
+ * @param init - fetch の設定
+ * @returns 受け取ったファイル
+ */
+export async function requestBlob(path: string, init: RequestOptions = {}): Promise<Blob> {
+  return (await send(path, init)).blob();
 }
 
 
