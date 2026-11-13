@@ -45,6 +45,8 @@ function renderShell(path: string) {
       { path: "/people/import", element: page },
       { path: "/people/events", element: page },
       { path: "/people/events/new", element: page },
+      { path: "/people/list", element: page },
+      { path: "/people/list/:personId", element: page },
     ],
     path,
   );
@@ -58,8 +60,7 @@ describe("下のバー", () => {
     renderShell("/people/import");
     const bar = await screen.findByRole("navigation", { name: "人物メモのメニュー" });
     const links = within(bar).getAllByRole("link");
-    // まだない画面（人）は出さない
-    expect(links.map((l) => l.textContent)).toEqual(["誘う候補", "取り込み", "イベント"]);
+    expect(links.map((l) => l.textContent)).toEqual(["誘う候補", "人", "取り込み", "イベント"]);
     expect(within(bar).getByRole("link", { name: "取り込み" })).toHaveAttribute("aria-current", "page");
     expect(within(bar).getByRole("link", { name: "誘う候補" })).not.toHaveAttribute("aria-current");
     expect(within(bar).getByRole("link", { name: "取り込み" }).className).toContain("font-semibold");
@@ -81,11 +82,19 @@ describe("下のバー", () => {
     expect(screen.queryByRole("navigation", { name: "人物メモのメニュー" })).not.toBeInTheDocument();
   });
 
-  it("1024px以上ではサイドバーに誘う候補・取り込み・イベントを出す（人はまだ出さない）", async () => {
+  it("人のページでは「人」を濃く出す", async () => {
+    setViewport(390);
+    renderShell("/people/list/p1");
+    const bar = await screen.findByRole("navigation", { name: "人物メモのメニュー" });
+    expect(within(bar).getByRole("link", { name: "人" })).toHaveAttribute("aria-current", "page");
+    expect(within(bar).getByRole("link", { name: "人" })).toHaveAttribute("href", "/people/list");
+  });
+
+  it("1024px以上ではサイドバーに誘う候補・人・取り込み・イベントを出す", async () => {
     setViewport(1024);
     renderShell("/people/events");
     const nav = await screen.findByRole("navigation", { name: "人物メモ" });
-    expect(within(nav).getAllByRole("link").map((l) => l.textContent?.trim())).toEqual(["誘う候補", "取り込み", "イベント"]);
+    expect(within(nav).getAllByRole("link").map((l) => l.textContent?.trim())).toEqual(["誘う候補", "人", "取り込み", "イベント"]);
     expect(within(nav).getByRole("link", { name: "イベント" })).toHaveAttribute("aria-current", "page");
     expect(screen.queryByRole("navigation", { name: "人物メモのメニュー" })).not.toBeInTheDocument();
   });

@@ -81,6 +81,11 @@ describe("直す", () => {
     expect([d.person.displayName, d.person.realName, d.person.memoAppearance]).toEqual(["たろう", null, null]);
   });
 
+  it("上限は文字の数で数える（絵文字も1文字。DBと画面の数え方と同じ）", async () => {
+    expect((await callPeople("PATCH", `/persons/${taro}`, "u1", { memoAppearance: "😀".repeat(300), realName: "🌸".repeat(100) })).status).toBe(200);
+    expect((await callPeople("PATCH", `/persons/${taro}`, "u1", { memoAppearance: "😀".repeat(301) })).status).toBe(400);
+  });
+
   it("上限を超える・空の本文は 400 VALIDATION_FAILED", async () => {
     for (const bad of [{ realName: "" }, { realName: "x".repeat(101) }, { memoAppearance: "x".repeat(301) }, { memoTalk: "x".repeat(1001) }, {}]) {
       const [status, body] = await read<{ error: { code: string } }>(await callPeople("PATCH", `/persons/${taro}`, "u1", bad));

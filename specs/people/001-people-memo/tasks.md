@@ -128,18 +128,18 @@ description: "Task list for people 001 people memo"
 
 ### Tests for User Story 4 ⚠️
 
-- [ ] T048 [P] [US4] `ptest/persons-list.test.ts`：`q`で本名・今のLINE名・前の回答のLINE名・`entered_line_name`の一部（`nameKey`で比べる。ひらがなとカタカナ・全角と半角を区別しない）とメモの言葉で探せる、`%`・`_`を入れても全部に当たらない、絞り込み（来たイベント・次回参加の値・欲しいつながりの値（どれか1つを含む）・キャリアの興味・`lastMetFrom`・`lastMetTo`）は**いちばん新しい回答**の答えで比べる、並びは最後に会った日の新しい順（会っていない人は後ろ）、100人ずつ・`total`、同意に関わらず出る、ほかの作り手の人は出ない、`GET /api/people/facets`がいちばん新しい回答の値を多い順で返す。research.md R22。
-- [ ] T049 [P] [US4] `ptest/person-detail.test.ts`：人のページの形（contracts/api.md 4。来たイベントは新しい順・イベントごとの回答と`answers`・別名・同意と記録）、`PATCH`（`realName`「1〜100文字か`null`」・`memoAppearance`「300文字まで」・`memoTalk`「1,000文字まで」。超えたら400）、本名を直すと`q`で新しい本名で探せる、`PUT …/consent`で`consent_source = manual`・`consent_changes`に1行（いつ・どう）、そのあと新しいイベントの回答を取り込むと回答の同意に変わる、前のイベントの回答では変わらない（research.md R11）。
-- [ ] T050 [P] [US4] `wtest/persons.test.tsx`：一覧の探す欄・絞り込みのチップ（facetsの値）・行（名前・LINE名・最後に会った日）・人のページの各段・メモを書いて保存・同意を直す（記録が出る）・本名を直す。
+- [x] T048 [P] [US4] `ptest/persons-list.test.ts`：`q`で本名・今のLINE名・前の回答のLINE名・`entered_line_name`の一部（`nameKey`で比べる。ひらがなとカタカナ・全角と半角を区別しない）とメモの言葉で探せる、`%`・`_`を入れても全部に当たらない、絞り込み（来たイベント・次回参加の値・欲しいつながりの値（どれか1つを含む）・キャリアの興味・`lastMetFrom`・`lastMetTo`）は**いちばん新しい回答**の答えで比べる、並びは最後に会った日の新しい順（会っていない人は後ろ）、100人ずつ・`total`、同意に関わらず出る、ほかの作り手の人は出ない、`GET /api/people/facets`がいちばん新しい回答の値を多い順で返す。research.md R22。
+- [x] T049 [P] [US4] `ptest/person-detail.test.ts`：人のページの形（contracts/api.md 4。来たイベントは新しい順・イベントごとの回答と`answers`・別名・同意と記録）、`PATCH`（`realName`「1〜100文字か`null`」・`memoAppearance`「300文字まで」・`memoTalk`「1,000文字まで」。超えたら400）、本名を直すと`q`で新しい本名で探せる、`PUT …/consent`で`consent_source = manual`・`consent_changes`に1行（いつ・どう）、そのあと新しいイベントの回答を取り込むと回答の同意に変わる、前のイベントの回答では変わらない（research.md R11）。
+- [x] T050 [P] [US4] `wtest/persons.test.tsx`：一覧の探す欄・絞り込みのチップ（facetsの値）・行（名前・LINE名・最後に会った日）・人のページの各段・メモを書いて保存・同意を直す（記録が出る）・本名を直す。
 
 ### Implementation for User Story 4
 
-- [ ] T051 [US4] `ppl/persons/person-query.ts`：来た記録（`responses` ∪ `manual_attendances`）・最後に会った日・自分の会の回数・いちばん新しい回答（`DISTINCT ON (person_id)`。並びは data-model.md 4）の問い合わせの部品を1か所に作る。人の一覧・誘う候補・数字で使い回す（research.md R22）。
-- [ ] T052 [US4] `ppl/persons/person-list.ts`・`ppl/persons/person-routes.ts`：`GET /api/people/persons`と`GET /api/people/facets`。`routes.snapshot.txt`を更新する。
-- [ ] T053 [US4] `ppl/persons/person-service.ts`：人のページ（`GET /api/people/persons/:personId`）・`PATCH`（`real_name_key`も直す）・`PUT …/consent`（手直しの事実として`consent_changes`に書き、T031 で決め直す）。`routes.snapshot.txt`を更新する。
-- [ ] T054 [P] [US4] `wppl/pages/PeopleListPage.tsx`（`/people/list`）と`wppl/components/person/`（探す欄・絞り込み・人の行）。
-- [ ] T055 [US4] `wppl/pages/PersonPage.tsx`（`/people/list/:personId`：本名（直す）・LINE名と別名・同意（直す・記録）・メモ2つ・来たイベント（新しい順・アンケートの答え））。T050を通す。
-- [ ] T056 [US4] `wppl/pages/EventPage.tsx`の来た人の一覧から人のページへ行けるようにし、サイドバーと下のバーの「人」を出す。
+- [x] T051 [US4] `ppl/persons/person-query.ts`：来た記録（`responses` ∪ `manual_attendances`）・最後に会った日・自分の会の回数・いちばん新しい回答（`DISTINCT ON (person_id)`。並びは data-model.md 4）の問い合わせの部品を1か所に作る。人の一覧・誘う候補・数字で使い回す（research.md R22）。
+- [x] T052 [US4] `ppl/persons/person-list.ts`・`ppl/persons/person-routes.ts`：`GET /api/people/persons`と`GET /api/people/facets`。`routes.snapshot.txt`を更新する。
+- [x] T053 [US4] `ppl/persons/person-service.ts`：人のページ（`GET /api/people/persons/:personId`）・`PATCH`（`real_name_key`も直す）・`PUT …/consent`（手直しの事実として`consent_changes`に書き、T031 で決め直す）。`routes.snapshot.txt`を更新する。
+- [x] T054 [P] [US4] `wppl/pages/PeopleListPage.tsx`（`/people/list`）と`wppl/components/person/`（探す欄・絞り込み・人の行）。
+- [x] T055 [US4] `wppl/pages/PersonPage.tsx`（`/people/list/:personId`：本名（直す）・LINE名と別名・同意（直す・記録）・メモ2つ・来たイベント（新しい順・アンケートの答え））。T050を通す。
+- [x] T056 [US4] `wppl/pages/EventPage.tsx`の来た人の一覧から人のページへ行けるようにし、サイドバーと下のバーの「人」を出す。
 
 ## Phase 7：User Story 2 - 同じ人をつなぎ、手で人を足す（残りの部分）（Priority: P1）
 
@@ -149,17 +149,17 @@ description: "Task list for people 001 people memo"
 
 ### Tests for User Story 2 ⚠️
 
-- [ ] T057 [P] [US2] `ptest/person-manual.test.ts`：手で足す（`realName`か`lineName`のどちらかは必須・1〜100文字、同意は手直しの事実として`consent_source = manual`、`eventId`があれば会ったイベント）、会ったイベントを足す（もうあれば何もしない）・外す（回答による来た記録は外せない）、手で足した人が一覧に出て、来た記録・最後に会った日に入る、取り込みでLINE名が同じなら候補になる（`entered_line_name`）。FR-014。
-- [ ] T058 [P] [US2] `ptest/person-merge-split.test.ts`：まとめる（回答・会ったイベント（重なりは1つ）・同意の記録が移る、本名は残す人のもの（なければ相手）、メモは「残す人 ／ 相手」でつなぐ（上限を超える分は相手の方を切る）、相手は消える、参加者数は変わらない、`erased_*`は増えない、今のLINE名・同意の決め直し、自分自身は400・ほかの作り手は404）、分ける（新しい人ができ回答とその来た記録が移る、メモ・手直しの同意は元の人に残る、回答が1つの人は400 `VALIDATION_FAILED`、両方の今のLINE名・同意の決め直し）。research.md R15。
-- [ ] T059 [P] [US2] `wtest/person-merge.test.tsx`：人を足す画面、人のページの「この人と同じ人」（名前で探して選ぶ → 確かめ → まとまる）、回答ごとの「別の人に分ける」（確かめ → 新しい人のページへ）。
+- [x] T057 [P] [US2] `ptest/person-manual.test.ts`：手で足す（`realName`か`lineName`のどちらかは必須・1〜100文字、同意は手直しの事実として`consent_source = manual`、`eventId`があれば会ったイベント）、会ったイベントを足す（もうあれば何もしない）・外す（回答による来た記録は外せない）、手で足した人が一覧に出て、来た記録・最後に会った日に入る、取り込みでLINE名が同じなら候補になる（`entered_line_name`）。FR-014。
+- [x] T058 [P] [US2] `ptest/person-merge-split.test.ts`：まとめる（回答・会ったイベント（重なりは1つ）・同意の記録が移る、本名は残す人のもの（なければ相手）、メモは「残す人 ／ 相手」でつなぐ（上限を超える分は相手の方を切る）、相手は消える、参加者数は変わらない、`erased_*`は増えない、今のLINE名・同意の決め直し、自分自身は400・ほかの作り手は404）、分ける（新しい人ができ回答とその来た記録が移る、メモ・手直しの同意は元の人に残る、回答が1つの人は400 `VALIDATION_FAILED`、両方の今のLINE名・同意の決め直し）。research.md R15。
+- [x] T059 [P] [US2] `wtest/person-merge.test.tsx`：人を足す画面、人のページの「この人と同じ人」（名前で探して選ぶ → 確かめ → まとまる）、回答ごとの「別の人に分ける」（確かめ → 新しい人のページへ）。
 
 ### Implementation for User Story 2
 
-- [ ] T060 [US2] `ppl/persons/person-create.ts`：`POST /api/people/persons`と`POST/DELETE /api/people/persons/:personId/attendances…`。足すのあと`reportPeopleUsage`。`routes.snapshot.txt`を更新する。
-- [ ] T061 [US2] `ppl/persons/person-merge.ts`：`POST /api/people/persons/:personId/merge`（`withTransaction`・`lockOwner`・research.md R15のとおり。声かけの移し替えはPR3の T079 で足す）。
-- [ ] T062 [US2] `ppl/persons/person-split.ts`：`POST /api/people/responses/:responseId/split`（`withTransaction`・`lockOwner`）。`routes.snapshot.txt`を更新する。
-- [ ] T063 [P] [US2] `wppl/pages/PersonNewPage.tsx`（`/people/list/new`：本名・LINE名・会ったイベント・同意2つ）。
-- [ ] T064 [US2] `wppl/pages/PersonPage.tsx`に「この人と同じ人」のダイアログと、回答ごとの「別の人に分ける」を足す。T059を通す。
+- [x] T060 [US2] `ppl/persons/person-create.ts`：`POST /api/people/persons`と`POST/DELETE /api/people/persons/:personId/attendances…`。足すのあと`reportPeopleUsage`。`routes.snapshot.txt`を更新する。
+- [x] T061 [US2] `ppl/persons/person-merge.ts`：`POST /api/people/persons/:personId/merge`（`withTransaction`・`lockOwner`・research.md R15のとおり。声かけの移し替えはPR3の T079 で足す）。
+- [x] T062 [US2] `ppl/persons/person-split.ts`：`POST /api/people/responses/:responseId/split`（`withTransaction`・`lockOwner`）。`routes.snapshot.txt`を更新する。
+- [x] T063 [P] [US2] `wppl/pages/PersonNewPage.tsx`（`/people/list/new`：本名・LINE名・会ったイベント・同意2つ）。
+- [x] T064 [US2] `wppl/pages/PersonPage.tsx`に「この人と同じ人」のダイアログと、回答ごとの「別の人に分ける」を足す。T059を通す。
 
 ## Phase 8：User Story 7 - 参加者の求めで、その人の記録を消す（Priority: P3）
 
@@ -169,13 +169,13 @@ description: "Task list for people 001 people memo"
 
 ### Tests for User Story 7 ⚠️
 
-- [ ] T065 [P] [US7] `ptest/person-delete.test.ts`：`confirmName`が表示名と`nameKey`で違えば400 `CONFIRMATION_MISMATCH`、合えば204で、その人の回答・会ったイベント・同意の記録が消え、人の一覧・`q`・facets・人のページ（404）に出ない、来たイベントの参加者数は変わらない（`erased_attendances`）、その会の取り込みを取り消すと消した人の分も数から抜ける、同じCSVをもう一度プレビューすると、その人の行は`erased`になり取り込まれない、別のイベントの回答（新しいハッシュ）は新しい人として入る（US7 AS3）、`erased_attendances`・`erased_responses`に名前・答えが入っていない。research.md R13・SC-006。
-- [ ] T066 [P] [US7] `wtest/person-delete.test.tsx`：確かめの画面（消えるもの・残るもの・「元に戻せません」）、名前を入れるまで「消す」が押せない、消したら一覧へ戻る。
+- [x] T065 [P] [US7] `ptest/person-delete.test.ts`：`confirmName`が表示名と`nameKey`で違えば400 `CONFIRMATION_MISMATCH`、合えば204で、その人の回答・会ったイベント・同意の記録が消え、人の一覧・`q`・facets・人のページ（404）に出ない、来たイベントの参加者数は変わらない（`erased_attendances`）、その会の取り込みを取り消すと消した人の分も数から抜ける、同じCSVをもう一度プレビューすると、その人の行は`erased`になり取り込まれない、別のイベントの回答（新しいハッシュ）は新しい人として入る（US7 AS3）、`erased_attendances`・`erased_responses`に名前・答えが入っていない。research.md R13・SC-006。
+- [x] T066 [P] [US7] `wtest/person-delete.test.tsx`：確かめの画面（消えるもの・残るもの・「元に戻せません」）、名前を入れるまで「消す」が押せない、消したら一覧へ戻る。
 
 ### Implementation for User Story 7
 
-- [ ] T067 [US7] `ppl/persons/person-delete.ts`と道筋`DELETE /api/people/persons/:personId`（`withTransaction`・`lockOwner` → イベントごとに`erased_attendances`（同じイベントに回答が2つあれば古い取り込み、手で足した会ったイベントなら取り込みの番号は空）→ 回答の`dedupe_hash`を`erased_responses`へ（`ON CONFLICT DO NOTHING`）→ 人を消す）。消すのあと`reportPeopleUsage`。`logger`に名前を渡さない。`routes.snapshot.txt`を更新する。
-- [ ] T068 [US7] `wppl/pages/PersonPage.tsx`に「この人を消す」と確かめの画面を足し、`wppl/pages/EventPage.tsx`に「消した人 n人」を出す。T066を通す。
+- [x] T067 [US7] `ppl/persons/person-delete.ts`と道筋`DELETE /api/people/persons/:personId`（`withTransaction`・`lockOwner` → イベントごとに`erased_attendances`（同じイベントに回答が2つあれば古い取り込み、手で足した会ったイベントなら取り込みの番号は空）→ 回答の`dedupe_hash`を`erased_responses`へ（`ON CONFLICT DO NOTHING`）→ 人を消す）。消すのあと`reportPeopleUsage`。`logger`に名前を渡さない。`routes.snapshot.txt`を更新する。
+- [x] T068 [US7] `wppl/pages/PersonPage.tsx`に「この人を消す」と確かめの画面を足し、`wppl/pages/EventPage.tsx`に「消した人 n人」を出す。T066を通す。
 
 **Checkpoint（PR2を出せる）**：quickstart.md 3 が通る。テスト版で、人を探して思い出す道具として使える。
 

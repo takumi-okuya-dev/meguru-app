@@ -11,8 +11,14 @@ const dateString = z
   .refine((s) => !Number.isNaN(Date.parse(`${s}T00:00:00Z`)) && new Date(`${s}T00:00:00Z`).toISOString().startsWith(s), { message: "invalid date" });
 /** 番号。 */
 const id = z.string().uuid();
+/**
+ * 文字の数（コードポイント）が上限までか。DBの char_length と画面の数え方にそろえる（絵文字を2文字と数えない。人物メモの PR2 で直した）。
+ * @param max - 上限
+ * @returns 確かめる関数
+ */
+const withinChars = (max: number) => (s: string) => [...s].length <= max;
 /** 名前（前後の空白を外して1〜100文字）。 */
-const personName = z.string().trim().min(1).max(PERSON_NAME_MAX);
+const personName = z.string().trim().min(1).refine(withinChars(PERSON_NAME_MAX), { message: "too long" });
 /**
  * 空にできるメモ（前後の空白を外し、空なら null）。
  * @param max - 文字の上限
@@ -21,7 +27,7 @@ const personName = z.string().trim().min(1).max(PERSON_NAME_MAX);
 const memo = (max: number) =>
   z
     .string()
-    .max(max)
+    .refine(withinChars(max), { message: "too long" })
     .nullable()
     .transform((s) => (s === null || s.trim() === "" ? null : s.trim()));
 
@@ -100,7 +106,7 @@ export const attendanceCreateSchema = z.object({ eventId: id });
 /** POST /api/people/persons/:personId/merge の入力。 */
 export const personMergeSchema = z.object({ otherPersonId: id });
 /** DELETE /api/people/persons/:personId の入力。 */
-export const personDeleteSchema = z.object({ confirmName: z.string().trim().min(1).max(PERSON_NAME_MAX) });
+export const personDeleteSchema = z.object({ confirmName: personName });
 /** PUT /api/people/persons/:personId/consent の入力。 */
 export const consentUpdateSchema = consentSchema;
 
