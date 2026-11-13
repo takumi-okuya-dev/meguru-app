@@ -66,9 +66,10 @@ function snapshot(over: Partial<ReceptionSnapshot> = {}): ReceptionSnapshot {
       closedAt: null,
     },
     people: [person("p1", 1, "松本 れい", "まつもと れい"), person("p2", 2, "井上 そら", "いのうえ そら"), person("p3", 12, "木村 ゆうき")],
-    stats: { arrived: 0, rosterCount: 3, cash: 0, paypay: 0, awaitingTransferCount: 0, awaitingTransferAmount: 0, mine: 0 },
+    stats: { arrived: 0, rosterCount: 3, cash: 0, paypay: 0, awaitingTransferCount: 0, awaitingTransferAmount: 0, mine: 0, awaitingConfirmationCount: 0, awaitingConfirmationAmount: 0 },
     helpers: [],
     settings: { hasPaypayQr: true, bankText: "めぐる銀行 渋谷支店 普通 1234567" },
+    selfRequests: [],
     ...over,
   };
 }
@@ -84,6 +85,8 @@ const recordOf = (personId: string, method: ReceptionMethod, amount = 3000) => (
   paymentStatus: method.startsWith("transfer") ? ("awaiting_transfer" as const) : ("paid" as const),
   transferConfirmedAt: null,
   recordedAt: "2026-11-20T10:05:00.000Z",
+  selfReported: false,
+  confirmedAt: null,
 });
 
 let client: QueryClient;

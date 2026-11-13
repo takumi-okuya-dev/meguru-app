@@ -38,9 +38,10 @@ export const RECEPTION_LIMITS = {
 } as const;
 
 /** 受け取った人の種類。 */
-export const RECEIVER_KINDS = ["owner", "helper"] as const;
-/** 支払いの状態。 */
-export const PAYMENT_STATUSES = ["paid", "awaiting_transfer"] as const;
+/** 受け取った人の種類（`self` は参加者の本人の申告で、まだ受付をする人が確かめていない。specs/collect/002 research.md R3）。 */
+export const RECEIVER_KINDS = ["owner", "helper", "self"] as const;
+/** 支払いの状態（`awaiting_confirmation` は本人の申告の現金・PayPayの確かめ待ち。specs/collect/002）。 */
+export const PAYMENT_STATUSES = ["paid", "awaiting_transfer", "awaiting_confirmation"] as const;
 
 /** PUT …/reception/:personId の入力（FR-031・FR-032・FR-035）。区分と金額は記録にだけ持つ（R17）。 */
 export const recordReceptionRequestSchema = z.object({
@@ -64,6 +65,10 @@ export const receptionRecordSchema = z.object({
   paymentStatus: z.enum(PAYMENT_STATUSES),
   transferConfirmedAt: z.string().nullable(),
   recordedAt: z.string(),
+  /** 参加者の本人の申告で作った記録（確かめたあとも true。specs/collect/002） */
+  selfReported: z.boolean().default(false),
+  /** 受付をする人が確かめた時刻（本人の申告のとき） */
+  confirmedAt: z.string().nullable().default(null),
 });
 /** 受付の記録。 */
 export type ReceptionRecord = z.infer<typeof receptionRecordSchema>;
@@ -115,6 +120,9 @@ export const receptionStatsSchema = z.object({
   awaitingTransferCount: z.number().int(),
   awaitingTransferAmount: z.number().int(),
   mine: z.number().int(),
+  /** 本人の申告の確かめ待ち（現金・PayPayの合計には入れない。specs/collect/002） */
+  awaitingConfirmationCount: z.number().int().default(0),
+  awaitingConfirmationAmount: z.number().int().default(0),
 });
 /** 受付の画面の数字。 */
 export type ReceptionStats = z.infer<typeof receptionStatsSchema>;
@@ -147,6 +155,8 @@ export const receptionSnapshotSchema = z.object({
   helpers: z.array(receptionHelperSchema),
   /** PayPayのシートと振込のシートに出すもの */
   settings: z.object({ hasPaypayQr: z.boolean(), bankText: z.string().nullable() }),
+  /** セルフ受付の飛び入りの申し出（待ちだけ。specs/collect/002） */
+  selfRequests: z.array(z.lazy(() => selfRequestSchema)).default([]),
 });
 /** GET …/reception の応答。 */
 export type ReceptionSnapshot = z.infer<typeof receptionSnapshotSchema>;
@@ -160,11 +170,31 @@ export type LiveTicketResponse = z.infer<typeof liveTicketResponseSchema>;
 export type LiveMessage = { eventId: string; version: number; at: string } & (
   | { type: "reception.recorded"; personId: string; record: ReceptionRecord }
   | { type: "reception.undone"; personId: string }
-  | { type: "roster.changed"; personId?: string; person?: ReceptionPerson }
+  // selfRequests はセルフ受付の申し出を名簿に入れたとき（同じ版で申し出の一覧も変わる。specs/collect/002）
+  | { type: "roster.changed"; personId?: string; person?: ReceptionPerson; selfRequests?: SelfRequest[] }
   | { type: "helpers.changed"; helpers: ReceptionHelper[] }
   | { type: "link.stopped" }
   | { type: "resync" }
+  | { type: "self_requests.changed"; selfRequests: SelfRequest[] }
+  | { type: "self_link.stopped" }
 );
+
+/** セルフ受付の飛び入りの申し出（受付の画面に出す。specs/collect/002 data-model.md 2-2）。 */
+export const selfRequestSchema = z.object({ id: z.string(), name: z.string(), kana: z.string().nullable(), createdAt: z.string() });
+/** セルフ受付の飛び入りの申し出。 */
+export type SelfRequest = z.infer<typeof selfRequestSchema>;
+
+/** POST …/reception/:personId/confirm の入力（確かめ待ちを支払い済みにする。払い方・区分・金額を直せる。specs/collect/002 FR-031）。 */
+export const confirmReceptionRequestSchema = z.object({
+  method: z.enum(["cash", "paypay"]).optional(),
+  priceTierId: z.uuid().optional(),
+  amount: z.number().int().min(0).max(COLLECT_LIMITS.tierAmountMax).optional(),
+});
+/** POST …/reception/:personId/confirm の入力。 */
+export type ConfirmReceptionRequest = z.infer<typeof confirmReceptionRequestSchema>;
+
+/** POST …/self-requests/:requestId/match の入力（名簿の人に当てる）。 */
+export const matchSelfRequestSchema = z.object({ personId: z.uuid() });
 
 /** 受付用リンク（GET・POST・PATCH …/link の応答。ない・止めたあとは null）。 */
 export const receptionLinkSchema = z.object({ url: z.string(), expiresAt: z.string(), stoppedAt: z.string().nullable() });

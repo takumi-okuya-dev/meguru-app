@@ -28,7 +28,7 @@
 
 ## 3. 参加者（ログインなし）
 
-道筋の `:token` はセルフ受付のリンク（`cs_…`）。端末の印を見出し `X-Collect-Self-Device`（UUID）で送る（ないと 400 `VALIDATION_FAILED`）。
+道筋の `:token` はセルフ受付のリンク（`cs_…`）。端末の印を見出し `X-Collect-Device`（UUID。手伝う人と同じ見出しの名前。CORS ですでに許しているので、共通の `app.ts` を変えずに済む）で送る（ないと 400 `VALIDATION_FAILED`）。
 
 | 道筋 | 説明 |
 |---|---|

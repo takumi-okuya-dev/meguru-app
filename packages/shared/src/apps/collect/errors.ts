@@ -10,6 +10,9 @@ export const COLLECT_ERROR_CODES = [
   "LINK_INACTIVE",
   "DEVICE_REQUIRED",
   "RECORD_NOT_YOURS",
+  "NOT_AWAITING_CONFIRMATION",
+  "REQUEST_PENDING",
+  "REQUEST_RESOLVED",
 ] as const;
 
 /** 集金管理のエラーの文言。 */
@@ -24,4 +27,7 @@ export const COLLECT_ERROR_MESSAGES: Record<(typeof COLLECT_ERROR_CODES)[number]
   LINK_INACTIVE: { message: "この受付用リンクは止められたか、期限が過ぎました。", action: "none" },
   DEVICE_REQUIRED: { message: "名前を入れ直してから、もう一度お試しください。", action: "none" },
   RECORD_NOT_YOURS: { message: "ほかの人が受け取った記録は取り消せません。", action: "none" },
+  NOT_AWAITING_CONFIRMATION: { message: "この人の受付は、もう確かめ済みか、取り消されています。", action: "reload" },
+  REQUEST_PENDING: { message: "申し出は受付の人が確かめています。少し待ってください。", action: "none" },
+  REQUEST_RESOLVED: { message: "この申し出は、ほかの人がもう片付けました。", action: "reload" },
 };

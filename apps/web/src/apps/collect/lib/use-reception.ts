@@ -106,13 +106,23 @@ export function useReception(source: ReceptionSource, enabled = true) {
           refreshMe();
           return apply(m.version, (s) => withRecord(s, m.personId, null, source.viewer));
         case "roster.changed":
-          if (m.person) return apply(m.version, (s) => withPerson(s, m.person!, source.viewer));
+          if (m.person) {
+            return apply(m.version, (s) => {
+              const next = withPerson(s, m.person!, source.viewer);
+              return m.selfRequests ? { ...next, selfRequests: m.selfRequests } : next;
+            });
+          }
           return resync();
         case "helpers.changed":
           return apply(m.version, (s) => ({ ...s, helpers: m.helpers }));
         case "link.stopped":
           source.onLinkStopped?.();
           return resync();
+        // セルフ受付（specs/collect/002）。リンクを止めても、受付の画面はそのまま使える
+        case "self_requests.changed":
+          return apply(m.version, (s) => ({ ...s, selfRequests: m.selfRequests }));
+        case "self_link.stopped":
+          return apply(m.version, (s) => s);
         case "resync":
           return resync();
       }

@@ -54,6 +54,8 @@ const record = (personId: string, helperId: string | null) => ({
   paymentStatus: "paid" as const,
   transferConfirmedAt: null,
   recordedAt: "2026-11-20T10:05:00.000Z",
+  selfReported: false,
+  confirmedAt: null,
 });
 
 /**
@@ -79,9 +81,10 @@ function snapshot(): ReceptionSnapshot {
       { person: p("p2", 2, "井上 そら"), record: record("p2", null) },
       { person: p("p3", 3, "木村 ゆうき"), record: null },
     ],
-    stats: { arrived: 2, rosterCount: 3, cash: 6000, paypay: 0, awaitingTransferCount: 0, awaitingTransferAmount: 0, mine: 3000 },
+    stats: { arrived: 2, rosterCount: 3, cash: 6000, paypay: 0, awaitingTransferCount: 0, awaitingTransferAmount: 0, mine: 3000, awaitingConfirmationCount: 0, awaitingConfirmationAmount: 0 },
     helpers: [{ id: "h1", name: "井上", joinedAt: "2026-11-20T09:50:00.000Z" }],
     settings: { hasPaypayQr: false, bankText: null },
+    selfRequests: [],
   };
 }
 

@@ -12,8 +12,14 @@ import { collectEvents, collectReceptionLinks } from "../schema";
 
 type LinkRow = typeof collectReceptionLinks.$inferSelect;
 
-/** 受付用リンクの画面のパス（Web の /collect/r/:token）。 */
-const HELPER_ROUTE = "collect/r";
+/** リンクの種類：helper＝手伝う人の受付用リンク（001）、self＝参加者のセルフ受付（specs/collect/002 research.md R1）。 */
+export type LinkKind = "helper" | "self";
+
+/** 種類ごとの画面のパスとトークンの頭。 */
+const KIND: Record<LinkKind, { route: string; prefix: string }> = {
+  helper: { route: "collect/r", prefix: "cr_" },
+  self: { route: "collect/s", prefix: "cs_" },
+};
 const JST_OFFSET_MS = 9 * 60 * 60 * 1000;
 const HOUR_MS = 60 * 60 * 1000;
 
@@ -38,20 +44,21 @@ export function defaultLinkExpiry(event: Pick<CollectEventRow, "startsAt" | "end
  */
 async function toLink(env: Env, row: LinkRow): Promise<ReceptionLink> {
   const token = await openInviteToken(env, { ciphertext: row.tokenCiphertext, iv: row.tokenIv, keyVersion: row.tokenKeyVersion }, row.eventId);
-  return { url: inviteUrl(env, token, HELPER_ROUTE), expiresAt: row.expiresAt.toISOString(), stoppedAt: row.stoppedAt?.toISOString() ?? null };
+  return { url: inviteUrl(env, token, KIND[row.kind as LinkKind].route), expiresAt: row.expiresAt.toISOString(), stoppedAt: row.stoppedAt?.toISOString() ?? null };
 }
 
 /**
  * イベントの使えるリンク（止めていないもの。期限が過ぎていても返す）。
  * @param db - データベース
  * @param eventId - イベントの番号
+ * @param kind - リンクの種類
  * @returns リンクの行
  */
-async function activeLinkRow(db: Db | TxDb, eventId: string): Promise<LinkRow | undefined> {
+async function activeLinkRow(db: Db | TxDb, eventId: string, kind: LinkKind): Promise<LinkRow | undefined> {
   const [row] = await db
     .select()
     .from(collectReceptionLinks)
-    .where(and(eq(collectReceptionLinks.eventId, eventId), isNull(collectReceptionLinks.stoppedAt)))
+    .where(and(eq(collectReceptionLinks.eventId, eventId), eq(collectReceptionLinks.kind, kind), isNull(collectReceptionLinks.stoppedAt)))
     .limit(1);
   return row;
 }
@@ -72,11 +79,12 @@ function assertFuture(expiresAt: Date, now: Date): void {
  * @param db - データベース
  * @param ownerUserId - 主催者
  * @param eventId - イベントの番号
+ * @param kind - リンクの種類（既定は手伝う人の受付用リンク）
  * @returns リンク
  */
-export async function getLink(env: Env, db: Db, ownerUserId: string, eventId: string): Promise<ReceptionLink | null> {
+export async function getLink(env: Env, db: Db, ownerUserId: string, eventId: string, kind: LinkKind = "helper"): Promise<ReceptionLink | null> {
   const event = await loadOwnedEvent(db, ownerUserId, eventId);
-  const row = await activeLinkRow(db, event.id);
+  const row = await activeLinkRow(db, event.id, kind);
   return row ? toLink(env, row) : null;
 }
 
@@ -87,16 +95,24 @@ export async function getLink(env: Env, db: Db, ownerUserId: string, eventId: st
  * @param eventId - イベントの番号
  * @param expiresAt - 期限（省いたら既定）
  * @param now - 今
+ * @param kind - リンクの種類（既定は手伝う人の受付用リンク）
  * @returns リンク
  */
-export async function createLink(env: Env, ownerUserId: string, eventId: string, expiresAt: Date | undefined, now: Date): Promise<ReceptionLink> {
+export async function createLink(
+  env: Env,
+  ownerUserId: string,
+  eventId: string,
+  expiresAt: Date | undefined,
+  now: Date,
+  kind: LinkKind = "helper",
+): Promise<ReceptionLink> {
   if (expiresAt) assertFuture(expiresAt, now);
   const row = await withTransaction(env.DATABASE_URL, async (tx) => {
     const event = await loadOwnedEvent(tx, ownerUserId, eventId, { forUpdate: true });
-    const current = await activeLinkRow(tx, event.id);
+    const current = await activeLinkRow(tx, event.id, kind);
     if (current && current.expiresAt > now) return current;
     if (current) await tx.update(collectReceptionLinks).set({ stoppedAt: now }).where(eq(collectReceptionLinks.id, current.id));
-    const token = newInviteToken("cr_");
+    const token = newInviteToken(KIND[kind].prefix);
     const sealed = await sealInviteToken(env, token, event.id);
     const [created] = await tx
       .insert(collectReceptionLinks)
@@ -107,6 +123,7 @@ export async function createLink(env: Env, ownerUserId: string, eventId: string,
         tokenIv: sealed.iv,
         tokenKeyVersion: sealed.keyVersion,
         expiresAt: expiresAt ?? defaultLinkExpiry(event),
+        kind,
       })
       .returning();
     return created!;
@@ -121,17 +138,25 @@ export async function createLink(env: Env, ownerUserId: string, eventId: string,
  * @param eventId - イベントの番号
  * @param expiresAt - 新しい期限
  * @param now - 今
+ * @param kind - リンクの種類（既定は手伝う人の受付用リンク）
  * @returns リンク
  * @throws AppError ITEM_NOT_FOUND（使えるリンクがない）
  */
-export async function updateLinkExpiry(env: Env, ownerUserId: string, eventId: string, expiresAt: Date, now: Date): Promise<ReceptionLink> {
+export async function updateLinkExpiry(
+  env: Env,
+  ownerUserId: string,
+  eventId: string,
+  expiresAt: Date,
+  now: Date,
+  kind: LinkKind = "helper",
+): Promise<ReceptionLink> {
   assertFuture(expiresAt, now);
   const db = createDb(env.DATABASE_URL);
   const event = await loadOwnedEvent(db, ownerUserId, eventId);
   const [row] = await db
     .update(collectReceptionLinks)
     .set({ expiresAt })
-    .where(and(eq(collectReceptionLinks.eventId, event.id), isNull(collectReceptionLinks.stoppedAt)))
+    .where(and(eq(collectReceptionLinks.eventId, event.id), eq(collectReceptionLinks.kind, kind), isNull(collectReceptionLinks.stoppedAt)))
     .returning();
   if (!row) throw new AppError("ITEM_NOT_FOUND", 404, "no active link");
   return toLink(env, row);
@@ -144,16 +169,17 @@ export async function updateLinkExpiry(env: Env, ownerUserId: string, eventId: s
  * @param ownerUserId - 主催者
  * @param eventId - イベントの番号
  * @param now - 今
+ * @param kind - リンクの種類（既定は手伝う人の受付用リンク）
  * @returns 新しい版
  * @throws AppError ITEM_NOT_FOUND（使えるリンクがない）
  */
-export async function stopLink(databaseUrl: string, ownerUserId: string, eventId: string, now: Date): Promise<{ version: number }> {
+export async function stopLink(databaseUrl: string, ownerUserId: string, eventId: string, now: Date, kind: LinkKind = "helper"): Promise<{ version: number }> {
   return withTransaction(databaseUrl, async (tx) => {
     const event = await loadOwnedEvent(tx, ownerUserId, eventId, { forUpdate: true });
     const stopped = await tx
       .update(collectReceptionLinks)
       .set({ stoppedAt: now })
-      .where(and(eq(collectReceptionLinks.eventId, event.id), isNull(collectReceptionLinks.stoppedAt)))
+      .where(and(eq(collectReceptionLinks.eventId, event.id), eq(collectReceptionLinks.kind, kind), isNull(collectReceptionLinks.stoppedAt)))
       .returning({ id: collectReceptionLinks.id });
     if (stopped.length === 0) throw new AppError("ITEM_NOT_FOUND", 404, "no active link");
     const [row] = await tx

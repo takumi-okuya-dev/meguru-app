@@ -72,3 +72,29 @@ export async function errorOf(res: Response): Promise<[number, string]> {
   const body = (await res.json()) as { error: { code: string } };
   return [res.status, body.error.code];
 }
+
+/**
+ * セルフ受付のリンクを出して、トークンを返す（specs/collect/002）。
+ * @param app - テストのアプリ
+ * @param user - 主催者
+ * @param eventId - イベントの番号
+ * @returns トークン（cs_…）
+ */
+export async function selfToken(app: TestApp, user: string, eventId: string): Promise<string> {
+  const res = await call(app, "POST", `/api/collect/events/${eventId}/self-link`, { user });
+  const { link } = (await res.json()) as { link: { url: string } };
+  return link.url.split("/collect/s/")[1]!;
+}
+
+/**
+ * 参加者として呼ぶ（端末の印つき）。
+ * @param app - テストのアプリ
+ * @param method - メソッド
+ * @param path - /api/collect/s/:token のあとの道筋を含む全体
+ * @param device - 端末の印（UUID）
+ * @param body - 本文
+ * @returns 応答
+ */
+export function asParticipant(app: TestApp, method: string, path: string, device: string, body?: unknown) {
+  return call(app, method, path, { headers: { "X-Collect-Device": device }, ...(body === undefined ? {} : { body }) });
+}

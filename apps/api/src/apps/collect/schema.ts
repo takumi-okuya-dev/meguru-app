@@ -2,7 +2,7 @@
 // 表はスキーマ collect に置き、共通の表（users など）への外部キーは張らない。主催者は owner_user_id に値として持ち、
 // 退会の片づけは出来事（user.withdrawn）で集金管理が行う（docs/app-separation.md 4）。外部キーは集金管理の表の中だけに張る。
 // PR1 の分（イベント・料金の区分・名簿・主催者の既定値・受け取った出来事）、PR2 の分（受付の記録・受付用リンク・手伝う人・端末）、
-// PR3 の分（精算・イベントのまとめ）、PR4 の分（Threadsのイベントの候補）。
+// PR3 の分（精算・イベントのまとめ）、PR4 の分（Threadsのイベントの候補）、002 の分（セルフ受付：本人の申告・申し出・端末）。
 import { sql } from "drizzle-orm";
 import { bigint, boolean, check, index, integer, jsonb, pgSchema, primaryKey, smallint, text, timestamp, uniqueIndex, uuid, type AnyPgColumn } from "drizzle-orm/pg-core";
 import {
@@ -169,6 +169,12 @@ export const collectReceptionRecords = collectSchema.table(
     transferConfirmedAt: timestamp("transfer_confirmed_at", { withTimezone: true }),
     recordedAt: timestamp("recorded_at", { withTimezone: true }).notNull().defaultNow(),
     clientRequestId: uuid("client_request_id").notNull().unique(),
+    // 参加者の本人の申告で作った（specs/collect/002 research.md R3。確かめたあとも true）
+    selfReported: boolean("self_reported").notNull().default(false),
+    // 申告した端末の印のハッシュ（同じ端末からの選び直し）
+    selfDeviceHash: text("self_device_hash"),
+    // 受付をする人が確かめた時刻
+    confirmedAt: timestamp("confirmed_at", { withTimezone: true }),
   },
   (t) => [
     index("reception_records_event_idx").on(t.eventId),
@@ -180,10 +186,14 @@ export const collectReceptionRecords = collectSchema.table(
     check("reception_records_receiver_kind_valid", sql`${t.receiverKind} IN (${inList(RECEIVER_KINDS)})`),
     check("reception_records_receiver_pair", sql`(${t.receiverKind} = 'helper') = (${t.receiverHelperId} IS NOT NULL)`),
     check("reception_records_payment_status_valid", sql`${t.paymentStatus} IN (${inList(PAYMENT_STATUSES)})`),
+    // 振込待ちは振込だけ。確かめ待ちは、本人の申告（receiver_kind = self）の現金・PayPayだけ（specs/collect/002）
     check(
-      "reception_records_awaiting_only_transfer",
-      sql`${t.paymentStatus} = 'paid' OR ${t.method} IN ('transfer_today', 'transfer_later')`,
+      "reception_records_payment_status_pair",
+      sql`${t.paymentStatus} = 'paid'
+        OR (${t.paymentStatus} = 'awaiting_transfer' AND ${t.method} IN ('transfer_today', 'transfer_later'))
+        OR (${t.paymentStatus} = 'awaiting_confirmation' AND ${t.method} IN ('cash', 'paypay') AND ${t.receiverKind} = 'self')`,
     ),
+    check("reception_records_self_receiver", sql`${t.receiverKind} <> 'self' OR ${t.selfReported}`),
   ],
 );
 
@@ -202,9 +212,14 @@ export const collectReceptionLinks = collectSchema.table(
     expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
     stoppedAt: timestamp("stopped_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    // 種類：helper＝手伝う人の受付用リンク（001）、self＝参加者のセルフ受付（specs/collect/002 research.md R1）
+    kind: text("kind").notNull().default("helper"),
   },
-  // 使えるリンク（止めていないもの）は、イベントに1つだけ
-  (t) => [uniqueIndex("reception_links_one_active_key").on(t.eventId).where(sql`${t.stoppedAt} IS NULL`)],
+  // 使えるリンク（止めていないもの）は、イベントと種類ごとに1つだけ
+  (t) => [
+    uniqueIndex("reception_links_one_active_key").on(t.eventId, t.kind).where(sql`${t.stoppedAt} IS NULL`),
+    check("reception_links_kind_valid", sql`${t.kind} IN ('helper', 'self')`),
+  ],
 );
 
 /** 手伝う人（data-model.md 2-6）。同じ name_key は、名前を入れた人が「別の人」と答えたときだけ2行になる（R7）。 */
@@ -310,4 +325,49 @@ export const collectThreadsEventCandidates = collectSchema.table(
     mediaOccurredAt: timestamp("media_occurred_at", { withTimezone: true, precision: 6 }),
   },
   (t) => [index("threads_event_candidates_owner_idx").on(t.ownerUserId, t.startsAt)],
+);
+
+/** セルフ受付の飛び入りの申し出（specs/collect/002 data-model.md 2-2）。受付をする人が名簿に入れる・当てる・断る。 */
+export const collectSelfCheckInRequests = collectSchema.table(
+  "self_check_in_requests",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    eventId: uuid("event_id")
+      .notNull()
+      .references(() => collectEvents.id, { onDelete: "cascade" }),
+    linkId: uuid("link_id")
+      .notNull()
+      .references(() => collectReceptionLinks.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    nameKey: text("name_key").notNull(),
+    kana: text("kana"),
+    deviceHash: text("device_hash").notNull(),
+    status: text("status").notNull().default("pending"),
+    rosterPersonId: uuid("roster_person_id").references(() => collectRosterPeople.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    resolvedAt: timestamp("resolved_at", { withTimezone: true }),
+  },
+  (t) => [
+    index("self_check_in_requests_event_idx").on(t.eventId, t.status),
+    // 1つの端末が待てる申し出は1件
+    uniqueIndex("self_check_in_requests_one_pending_key").on(t.linkId, t.deviceHash).where(sql`${t.status} = 'pending'`),
+    check("self_check_in_requests_status_valid", sql`${t.status} IN ('pending', 'accepted', 'matched', 'rejected')`),
+    check("self_check_in_requests_name_length", sql`char_length(${t.name}) BETWEEN 1 AND ${sql.raw(String(COLLECT_LIMITS.personName))}`),
+    check("self_check_in_requests_kana_length", sql`char_length(${t.kana}) <= ${sql.raw(String(COLLECT_LIMITS.kana))}`),
+  ],
+);
+
+/** セルフ受付の参加者の端末と、探す回数（specs/collect/002 data-model.md 2-3、research.md R2）。印はハッシュだけを持つ。 */
+export const collectSelfCheckInDevices = collectSchema.table(
+  "self_check_in_devices",
+  {
+    linkId: uuid("link_id")
+      .notNull()
+      .references(() => collectReceptionLinks.id, { onDelete: "cascade" }),
+    deviceHash: text("device_hash").notNull(),
+    windowStartedAt: timestamp("window_started_at", { withTimezone: true, precision: 6 }).notNull().defaultNow(),
+    searchCount: integer("search_count").notNull().default(0),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.linkId, t.deviceHash] })],
 );
