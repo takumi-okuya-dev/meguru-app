@@ -1,11 +1,9 @@
 // ホーム：今日やること・過ぎたもの・近い誕生日（specs/people/002-sales-list plan.md 3、FR-104・FR-105）。
-import { BIRTHDAY_WINDOW_DAYS, jstDate, type HomeItem, type PeopleHome } from "@meguru/shared/people";
+import { BIRTHDAY_WINDOW_DAYS, HOME_LIMIT, jstDate, type HomeItem, type PeopleHome } from "@meguru/shared/people";
 import { sql } from "drizzle-orm";
 import type { Db } from "../../../kernel/db/client";
 import { NO_FILTER, queryPersons } from "../persons/person-list";
 
-/** ホームに出す人数の上限（それぞれ）。 */
-const HOME_LIMIT = 200;
 
 /**
  * 今日から誕生日（MM-DD）まで、あと何日か（年をまたぐ。2月29日は、うるう年でない年は3月1日として数える）。

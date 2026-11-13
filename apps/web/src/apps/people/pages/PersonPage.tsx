@@ -1,6 +1,7 @@
 // 「/people/list/:personId」：人のページ（specs/people/001-people-memo contracts/ui-routes.md 1、US4・US2・US7）。
 // 本名（直す）・LINE名と別名・同意（直す・記録）・メモ2つ・来たイベント（新しい順・アンケートの答え・「別の人に分ける」）・
 // 声かけの記録（PR3）・「この人と同じ人」（まとめる）・「この人を消す」。
+// 002（声かけリスト）：次にやること・来てくれそう度・誕生日・タグ・連絡の記録・自由な項目・SNS のリンク（specs/people/002-sales-list）。
 import { useQuery } from "@tanstack/react-query";
 import { MergeIcon, Trash2Icon } from "lucide-react";
 import { useState } from "react";
@@ -12,11 +13,16 @@ import { ApiError } from "@/lib/api-client";
 import { NotFound, PageBody, PageHeader } from "@/shell";
 import { PersonAttendanceSection } from "../components/person/PersonAttendanceSection";
 import { PersonConsentSection } from "../components/person/PersonConsentSection";
+import { PersonContactLogSection } from "../components/person/PersonContactLogSection";
 import { PersonDeleteDialog } from "../components/person/PersonDeleteDialog";
+import { PersonFieldsSection } from "../components/person/PersonFieldsSection";
+import { PersonFollowUpSection } from "../components/person/PersonFollowUpSection";
+import { PersonLinksSection } from "../components/person/PersonLinksSection";
 import { PersonMemoSection } from "../components/person/PersonMemoSection";
 import { PersonMergeDialog } from "../components/person/PersonMergeDialog";
 import { PersonNameSection } from "../components/person/PersonNameSection";
 import { PersonOutreachSection } from "../components/person/PersonOutreachSection";
+import { PersonTagsSection } from "../components/person/PersonTagsSection";
 import { peopleApi } from "../lib/api";
 import { peopleQueryKeys } from "../lib/query-keys";
 
@@ -34,7 +40,7 @@ export function PersonPage() {
     if (detail.error instanceof ApiError && detail.error.code === "ITEM_NOT_FOUND") return <NotFound message="この人はいません（消したか、まとめた人です）" />;
     return <ApiErrorScreen error={detail.error} onRetry={() => void detail.refetch()} />;
   }
-  const { person, attendances, consentChanges, outreaches } = detail.data;
+  const { person, attendances, consentChanges, outreaches, contactLogs, fields, links } = detail.data;
   // 分けたあとに別の人のページへ移ったら、開いていたダイアログは出さない
   const open = dialog?.personId === person.id ? dialog.kind : null;
 
@@ -43,8 +49,13 @@ export function PersonPage() {
       <PageHeader title={person.displayName} />
       <PageBody className="space-y-6">
         <PersonNameSection key={`name:${person.id}`} person={person} />
+        <PersonFollowUpSection key={`follow:${person.id}`} person={person} />
+        <PersonTagsSection key={`tags:${person.id}`} personId={person.id} tags={person.tags} />
+        <PersonContactLogSection key={`logs:${person.id}`} personId={person.id} logs={contactLogs} />
         <PersonConsentSection key={`consent:${person.id}`} personId={person.id} consent={person.consent} changes={consentChanges} />
         <PersonMemoSection key={`memo:${person.id}:${person.memoAppearance ?? ""}:${person.memoTalk ?? ""}`} person={person} />
+        <PersonFieldsSection key={`fields:${person.id}:${fields.map((f) => `${f.fieldId}=${f.value ?? ""}`).join("|")}`} personId={person.id} fields={fields} />
+        <PersonLinksSection key={`links:${person.id}:${JSON.stringify(links)}`} personId={person.id} links={links} />
         <PersonAttendanceSection key={`attendance:${person.id}`} personId={person.id} attendances={attendances} />
         <PersonOutreachSection outreaches={outreaches} />
 

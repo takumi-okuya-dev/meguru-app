@@ -7,6 +7,8 @@ import { EVENT_1125, EVENT_1213, makeCandidate, renderRoutes } from "./helpers";
 
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 const api = {
+  home: vi.fn(),
+  tags: vi.fn(),
   candidates: vi.fn(),
   stats: vi.fn(),
   settings: vi.fn(),
@@ -37,6 +39,8 @@ const OWN_DETAIL: PeopleEventDetail = {
 
 beforeEach(() => {
   for (const f of Object.values(api)) f.mockReset();
+  api.home.mockResolvedValue({ today: [], overdue: [], birthdays: [] });
+  api.tags.mockResolvedValue([]);
   api.settings.mockResolvedValue({ inviteTemplate: null, repeaterGoal: null });
   api.events.mockResolvedValue([EVENT_1213]);
   api.facets.mockResolvedValue({ nextAttendance: [], wantedConnections: [], careerInterests: [] });

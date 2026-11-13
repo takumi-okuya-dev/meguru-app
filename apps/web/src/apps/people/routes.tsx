@@ -6,6 +6,7 @@ import { EventNewPage } from "./pages/EventNewPage";
 import { EventPage } from "./pages/EventPage";
 import { EventsPage } from "./pages/EventsPage";
 import { ImportPage } from "./pages/ImportPage";
+import { OutreachBoardPage } from "./pages/OutreachBoardPage";
 import { PeopleListPage } from "./pages/PeopleListPage";
 import { PersonNewPage } from "./pages/PersonNewPage";
 import { PersonPage } from "./pages/PersonPage";
@@ -27,6 +28,7 @@ export const peopleRoutes: RouteObject[] = [
       { path: "events", element: <EventsPage /> },
       { path: "events/new", element: <EventNewPage /> },
       { path: "events/:eventId", element: <EventPage /> },
+      { path: "events/:eventId/outreach", element: <OutreachBoardPage /> },
       { path: "settings", element: <SettingsPage /> },
     ],
   },

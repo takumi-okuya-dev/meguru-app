@@ -60,3 +60,27 @@ export async function refreshEvents(queryClient: QueryClient): Promise<void> {
     queryClient.invalidateQueries({ queryKey: peopleQueryKeys.stats }),
   ]);
 }
+
+/**
+ * 人のタグを付け外ししたあと：人の並び（一覧・候補・ホーム・人のページ）と、タグの一覧（人数）を読み直す。
+ * @param queryClient - クエリのクライアント
+ * @returns 読み直しが終わるまでの Promise
+ */
+export async function refreshTags(queryClient: QueryClient): Promise<void> {
+  await Promise.all([
+    queryClient.invalidateQueries({ queryKey: peopleQueryKeys.persons }),
+    queryClient.invalidateQueries({ queryKey: peopleQueryKeys.tags }),
+  ]);
+}
+
+/**
+ * 自由な項目を足す・直す・並べ替える・消したあと：項目の一覧と、人のページ（項目の値）を読み直す。
+ * @param queryClient - クエリのクライアント
+ * @returns 読み直しが終わるまでの Promise
+ */
+export async function refreshFields(queryClient: QueryClient): Promise<void> {
+  await Promise.all([
+    queryClient.invalidateQueries({ queryKey: peopleQueryKeys.fields }),
+    queryClient.invalidateQueries({ queryKey: peopleQueryKeys.persons }),
+  ]);
+}

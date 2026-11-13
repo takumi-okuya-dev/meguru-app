@@ -1,7 +1,19 @@
 // 人物メモのAPIの呼び出し（specs/people/001-people-memo contracts/api.md）。道筋は /api/people/…。
 // APIの基本のURL・認証のトークン・エラーの扱いは、共通の部品（lib/api-client.ts の request）を使う。
 // 応答の形は @meguru/shared/people の型（応答の zod スキーマは共通にないので、型だけを当てる）。
+// 002（声かけリスト）：タグ・連絡の記録・自由な項目・SNS のリンク・ホーム・会ごとの声かけの一覧・書き出し（specs/people/002-sales-list plan.md 3）。
+import { jstDate } from "@meguru/shared/people";
 import type {
+  ContactChannel,
+  ContactLog,
+  CustomField,
+  LinkKind,
+  OutreachBoard,
+  PeopleHome,
+  PeopleTag,
+  PersonFieldValue,
+  PersonLinks,
+  PersonTag,
   CandidateList,
   EventDeletePreview,
   ImportPreview,
@@ -30,7 +42,7 @@ import type {
   PeopleStats,
 } from "@meguru/shared/people";
 import { z } from "zod";
-import { request } from "@/lib/api-client";
+import { request, requestBlob } from "@/lib/api-client";
 
 /**
  * 応答を確かめずに、型だけを当てるスキーマ（応答の形は API と同じ共通の型で決めている）。
@@ -62,8 +74,22 @@ export type PersonListParams = Partial<PersonListQuery>;
 /** 人を手で足すの入力（本名かLINE名のどちらかは必須）。 */
 export type PersonCreateInput = { realName?: string; lineName?: string; eventId?: string; consent: Consent };
 
-/** 人を直すの入力（本名の null は本名を消す。メモの空は null）。 */
-export type PersonUpdateInput = { realName?: string | null; memoAppearance?: string | null; memoTalk?: string | null };
+/** 人を直すの入力（本名の null は本名を消す。メモの空は null。次にやることは日付と文を一緒に。誕生日は MM-DD。来てくれそう度は 3＝高〜1＝低）。 */
+export type PersonUpdateInput = {
+  realName?: string | null;
+  memoAppearance?: string | null;
+  memoTalk?: string | null;
+  nextActionOn?: string | null;
+  nextActionNote?: string | null;
+  birthdayMd?: string | null;
+  likelihood?: number | null;
+};
+
+/** 連絡の記録を足す・直すの入力（「やったこと」は画面からは作らない）。 */
+export type ContactLogInput = { contactedOn: string; channel: Exclude<ContactChannel, "done">; note: string };
+
+/** 書き出したファイル。 */
+export type ExportedFile = { blob: Blob; filename: string };
 
 /** 誘う候補の目的・誘う会・前に来た・人の一覧と同じ絞り込み（eventId は誘う会。人は絞らない）。 */
 export type CandidateParams = PersonListParams & { purpose: OutreachPurpose; visitedOwn?: boolean };
@@ -74,20 +100,73 @@ export type OutreachCreateResult = { outreach: Outreach; created: boolean };
 /** 設定を直すの入力（省いた項目は変えない。型の null は初めの型、目標の null は目標なし）。 */
 export type SettingsUpdateInput = Partial<PeopleSettings>;
 
+/** 絞り込みの項目の形（text：前後の空白を外した言葉、one：1つの値、many：くり返す値）。 */
+type ListFilterKind = "text" | "one" | "many";
+
 /**
- * 人の一覧と同じ絞り込みを、クエリに足す（next・wanted・career はくり返す）。
+ * 人の一覧の絞り込みの項目と並び（クエリと書き出しの本文の両方を、ここから作る）。
+ * 項目を足すときは、ここに1行足す。
+ */
+const LIST_FILTERS = [
+  ["q", "text"],
+  ["eventId", "one"],
+  ["next", "many"],
+  ["wanted", "many"],
+  ["career", "many"],
+  ["lastMetFrom", "one"],
+  ["lastMetTo", "one"],
+  ["tag", "many"],
+  ["likelihood", "many"],
+  ["sort", "one"],
+] as const satisfies readonly (readonly [keyof PersonListParams, ListFilterKind])[];
+
+/** 送る形にした絞り込みの1項目。 */
+type ListFilterEntry = { key: string; kind: ListFilterKind; value: string | string[] | undefined };
+
+/**
+ * 絞り込みを、項目の並びのとおりに送る形にする（空の言葉・値は undefined）。
+ * @param params - 探す言葉と絞り込み
+ * @returns 項目ごとの値
+ */
+function listFilterEntries(params: PersonListParams): ListFilterEntry[] {
+  return LIST_FILTERS.map(([key, kind]) => {
+    const raw = params[key];
+    if (kind === "many") return { key, kind, value: (raw as string[] | undefined) ?? [] };
+    const text = typeof raw === "string" ? (kind === "text" ? raw.trim() : raw) : undefined;
+    return { key, kind, value: text ? text : undefined };
+  });
+}
+
+/**
+ * 人の一覧と同じ絞り込みを、クエリに足す（くり返す値は同じ名前で並べる）。
  * @param sp - 足す先
  * @param params - 探す言葉と絞り込み
  */
 function appendListParams(sp: URLSearchParams, params: PersonListParams): void {
-  if (params.q && params.q.trim() !== "") sp.set("q", params.q.trim());
-  if (params.eventId) sp.set("eventId", params.eventId);
-  for (const v of params.next ?? []) sp.append("next", v);
-  for (const v of params.wanted ?? []) sp.append("wanted", v);
-  for (const v of params.career ?? []) sp.append("career", v);
-  if (params.lastMetFrom) sp.set("lastMetFrom", params.lastMetFrom);
-  if (params.lastMetTo) sp.set("lastMetTo", params.lastMetTo);
+  for (const { key, value } of listFilterEntries(params)) {
+    if (Array.isArray(value)) for (const v of value) sp.append(key, v);
+    else if (value !== undefined) sp.set(key, value);
+  }
   if (params.offset) sp.set("offset", String(params.offset));
+}
+
+/**
+ * 書き出しの本文（人の一覧と同じ絞り込み。名前を URL に載せないよう本文で送る。FR-112）。くり返す値は空でも配列で送る。
+ * @param params - 探す言葉と絞り込み
+ * @returns 本文
+ */
+export function exportBody(params: PersonListParams): Record<string, unknown> {
+  return Object.fromEntries(listFilterEntries(params).flatMap(({ key, value }) => (value === undefined ? [] : [[key, value]])));
+}
+
+/**
+ * 書き出しのファイル名（API の Content-Disposition と同じ形：people-YYYYMMDD.csv。日本時間の今日）。
+ * 共通の requestBlob は応答の見出しを返さず、見出しは別のオリジンから読めない（CORS）ので、画面でも同じ形で作る。
+ * @param now - 今の時刻
+ * @returns ファイル名
+ */
+export function exportFilename(now = new Date()): string {
+  return `people-${jstDate(now).replaceAll("-", "")}.csv`;
 }
 
 /**
@@ -160,6 +239,20 @@ const personUrl = (id: string) => `/api/people/persons/${encodeURIComponent(id)}
  */
 const outreachUrl = (id: string) => `/api/people/outreaches/${encodeURIComponent(id)}`;
 
+/**
+ * タグの道筋。
+ * @param id - タグのID
+ * @returns 道筋
+ */
+const tagUrl = (id: string) => `/api/people/tags/${encodeURIComponent(id)}`;
+
+/**
+ * 自由な項目の道筋。
+ * @param id - 項目のID
+ * @returns 道筋
+ */
+const fieldUrl = (id: string) => `/api/people/fields/${encodeURIComponent(id)}`;
+
 /** 人物メモのAPIの呼び出し。 */
 export const peopleApi = {
   me: () => request("/api/people/me", typed<PeopleMe>()),
@@ -209,4 +302,35 @@ export const peopleApi = {
   settings: () => request("/api/people/settings", typed<PeopleSettings>()),
   updateSettings: (input: SettingsUpdateInput) => request("/api/people/settings", typed<PeopleSettings>(), withBody("PUT", input)),
   stats: () => request("/api/people/stats", typed<PeopleStats>()),
+  // ---- 002：ホーム・タグ（specs/people/002-sales-list plan.md 3）----
+  home: () => request("/api/people/home", typed<PeopleHome>()),
+  tags: async () => (await request("/api/people/tags", typed<{ tags: PeopleTag[] }>())).tags,
+  renameTag: async (id: string, name: string) => (await request(tagUrl(id), typed<{ tag: PeopleTag }>(), withBody("PATCH", { name }))).tag,
+  deleteTag: (id: string) => request(tagUrl(id), null, { method: "DELETE" }),
+  setPersonTags: async (id: string, input: { tagIds: string[]; newTagNames: string[] }) =>
+    (await request(`${personUrl(id)}/tags`, typed<{ tags: PersonTag[] }>(), withBody("PUT", input))).tags,
+  // ---- 002：次にやること・連絡の記録 ----
+  finishNextAction: (id: string, log: boolean) => request(`${personUrl(id)}/next-action/done`, null, withBody("POST", { log })),
+  addContactLog: async (id: string, input: ContactLogInput) =>
+    (await request(`${personUrl(id)}/contact-logs`, typed<{ log: ContactLog }>(), withBody("POST", input))).log,
+  updateContactLog: async (logId: string, input: Partial<ContactLogInput>) =>
+    (await request(`/api/people/contact-logs/${encodeURIComponent(logId)}`, typed<{ log: ContactLog }>(), withBody("PATCH", input))).log,
+  deleteContactLog: (logId: string) => request(`/api/people/contact-logs/${encodeURIComponent(logId)}`, null, { method: "DELETE" }),
+  // ---- 002：自由な項目・SNS のリンク ----
+  fields: async () => (await request("/api/people/fields", typed<{ fields: CustomField[] }>())).fields,
+  createField: async (label: string) => (await request("/api/people/fields", typed<{ field: CustomField }>(), withBody("POST", { label }))).field,
+  renameField: async (id: string, label: string) => (await request(fieldUrl(id), typed<{ field: CustomField }>(), withBody("PATCH", { label }))).field,
+  deleteField: (id: string) => request(fieldUrl(id), null, { method: "DELETE" }),
+  reorderFields: async (fieldIds: string[]) =>
+    (await request("/api/people/fields/order", typed<{ fields: CustomField[] }>(), withBody("PUT", { fieldIds }))).fields,
+  setPersonFields: async (id: string, values: { fieldId: string; value: string | null }[]) =>
+    (await request(`${personUrl(id)}/fields`, typed<{ fields: PersonFieldValue[] }>(), withBody("PUT", { values }))).fields,
+  setPersonLinks: async (id: string, links: Partial<Record<LinkKind, string | null>>) =>
+    (await request(`${personUrl(id)}/links`, typed<{ links: PersonLinks }>(), withBody("PUT", links))).links,
+  // ---- 002：会ごとの声かけの一覧・書き出し ----
+  outreachBoard: (eventId: string) => request(`${eventUrl(eventId)}/outreach-board`, typed<OutreachBoard>()),
+  exportPersons: async (params: PersonListParams): Promise<ExportedFile> => ({
+    blob: await requestBlob("/api/people/persons/export", withBody("POST", exportBody(params))),
+    filename: exportFilename(),
+  }),
 };
