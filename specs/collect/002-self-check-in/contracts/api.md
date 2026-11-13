@@ -32,7 +32,7 @@
 
 | 道筋 | 説明 |
 |---|---|
-| `GET /api/collect/s/:token` | `{ status: "active" \| "stopped" \| "expired", event: { name, startsAt, venue, methods } }`。リンクがなければ 404 |
+| `GET /api/collect/s/:token` | `{ status: "active" \| "stopped" \| "expired", event: { name, startsAt, venue, methods }, settings: { hasPaypayQr, bankText } }`（PayPay・振込を選んだあとの案内に使う）。リンクがなければ 404 |
 | `POST /api/collect/s/:token/search` | `{ query }` → `{ result: "found", person: { id, number, name, tierName, amount }, record: { method, paymentStatus } \| null }` か `{ result: "ambiguous" }`（同じ名前が2人以上。受付番号を聞く）か `{ result: "not_found" }`。回数の上限を超えたら 429 `RATE_LIMITED` |
 | `POST /api/collect/s/:token/declare` | `{ personId, method, clientRequestId }` → 201 `{ record, version }`。受付済みなら 409 `ALREADY_RECORDED`（ただし同じ端末の確かめ待ちなら、払い方を選び直して 200）。0円の区分は `method` を省いて来場だけ |
 | `POST /api/collect/s/:token/requests` | `{ name, kana? }` → 201 `{ requestId }`。同じ端末の待ちがあれば 409 `REQUEST_PENDING`、リンク全体の待ちが上限なら 429 |

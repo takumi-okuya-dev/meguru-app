@@ -38,7 +38,13 @@ describe("リンク（主催者）", () => {
     const helper = (await (await call(app, "POST", `/api/collect/events/${event.id}/link`, { user: "o1" })).json()) as { link: { url: string } };
     expect(helper.link.url).toContain("/collect/r/cr_");
     const info = (await (await call(app, "GET", s())).json()) as Record<string, unknown>;
-    expect(info).toEqual({ status: "active", event: { name: "IT交流会", startsAt: expect.any(String), venue: "渋谷", methods: ["cash", "paypay", "transfer"] } });
+    expect(info).toEqual({
+      status: "active",
+      event: { name: "IT交流会", startsAt: expect.any(String), venue: "渋谷", methods: ["cash", "paypay", "transfer"] },
+      settings: { hasPaypayQr: false, bankText: null },
+    });
+    await call(app, "PUT", "/api/collect/settings", { user: "o1", body: { bankText: "めぐる銀行 渋谷支店 普通 1234567" } });
+    expect(((await (await call(app, "GET", s())).json()) as { settings: unknown }).settings).toEqual({ hasPaypayQr: false, bankText: "めぐる銀行 渋谷支店 普通 1234567" });
     // 同じものを返す・GET でも同じ
     expect(await selfToken(app, "o1", event.id)).toBe(token);
   });
