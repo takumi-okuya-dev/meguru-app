@@ -47,6 +47,20 @@ async function firstRow() {
   return screen.getAllByRole("listitem").find((li) => li.textContent?.includes("山田はなこ"))!;
 }
 
+/**
+ * あとで返す約束（読み込み中の間を確かめる）。
+ * @returns 約束と、返す処理
+ */
+function deferred<T>() {
+  let resolve!: (v: T) => void;
+  let reject!: (e: unknown) => void;
+  const promise = new Promise<T>((res, rej) => {
+    resolve = res;
+    reject = rej;
+  });
+  return { promise, resolve, reject };
+}
+
 beforeEach(() => {
   for (const f of Object.values(api)) f.mockReset();
   api.stats.mockResolvedValue({ repeaterCount: 4, repeaterGoal: 10, nextOwnEvent: { id: EVENT_1213.id, name: EVENT_1213.name, heldOn: EVENT_1213.heldOn, isOwn: true } });
@@ -233,5 +247,92 @@ describe("誘う候補", () => {
     await user.click(screen.getByRole("button", { name: /絞り込み/ }));
     await user.click(screen.getByRole("button", { name: "前に来た" }));
     expect(router.state.location.search).toBe("");
+  });
+
+  it("誘う会を変えた直後は、前の会の声かけの行を残さない（前の会の声かけを進めたり消したりしない）", async () => {
+    const user = userEvent.setup();
+    const later = deferred<{ persons: ReturnType<typeof makeCandidate>[]; total: number }>();
+    api.candidates.mockImplementation(async (p: { eventId?: string }) =>
+      p.eventId === "e1" ? later.promise : { persons: [makeCandidate({ outreach: makeOutreach() })], total: 1 },
+    );
+    renderRoutes(ROUTES, "/people");
+    expect(await screen.findByRole("group", { name: "進み具合" })).toBeInTheDocument();
+    await user.selectOptions(screen.getByLabelText("誘う会"), "e1");
+    expect(await screen.findByText("読み込んでいます…")).toBeInTheDocument();
+    expect(screen.queryByRole("group", { name: "進み具合" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "声かけの記録を消す" })).not.toBeInTheDocument();
+    later.resolve({ persons: [makeCandidate()], total: 1 });
+    const row = await firstRow();
+    expect(within(row).queryByRole("group", { name: "進み具合" })).not.toBeInTheDocument();
+    expect(api.updateOutreach).not.toHaveBeenCalled();
+    expect(api.deleteOutreach).not.toHaveBeenCalled();
+  });
+
+  it("絞り込みを変えて前の行を出したまま読んでいる間は、行の操作を押せない", async () => {
+    const user = userEvent.setup();
+    const later = deferred<{ persons: ReturnType<typeof makeCandidate>[]; total: number }>();
+    api.candidates.mockImplementation(async (p: { visitedOwn?: boolean }) =>
+      p.visitedOwn ? later.promise : { persons: [makeCandidate({ outreach: makeOutreach() })], total: 1 },
+    );
+    renderRoutes(ROUTES, "/people");
+    const row = await firstRow();
+    await user.click(screen.getByRole("button", { name: /絞り込み/ }));
+    await user.click(screen.getByRole("button", { name: "前に来た" }));
+    await waitFor(() => expect(within(row).getByRole("button", { name: "参加リンクを送った" })).toBeDisabled());
+    expect(within(row).getByRole("button", { name: /文をコピー/ })).toBeDisabled();
+    expect(within(row).getByRole("button", { name: "声かけの記録を消す" })).toBeDisabled();
+    later.resolve({ persons: [makeCandidate({ outreach: makeOutreach() })], total: 1 });
+    await waitFor(() => expect(within(screen.getAllByRole("listitem")[0]!).getByRole("button", { name: "参加リンクを送った" })).toBeEnabled());
+  });
+
+  it("別の操作が成功したら、前の操作のエラーを消す", async () => {
+    const user = userEvent.setup();
+    api.candidates.mockResolvedValue({ persons: [makeCandidate({ outreach: makeOutreach() })], total: 1 });
+    api.updateOutreach.mockRejectedValue(new ApiError("INTERNAL_ERROR", 500));
+    renderRoutes(ROUTES, "/people");
+    const row = await firstRow();
+    await user.click(within(row).getByRole("button", { name: "参加リンクを送った" }));
+    expect(await within(row).findByRole("alert")).toBeInTheDocument();
+    await user.click(within(row).getByRole("button", { name: "声かけの記録を消す" }));
+    await waitFor(() => expect(api.deleteOutreach).toHaveBeenCalledWith("o1"));
+    await waitFor(() => expect(within(row).queryByRole("alert")).not.toBeInTheDocument());
+  });
+
+  it("設定が読めないときは、初めの型で文を作り、読めなかったことを短く出す", async () => {
+    const user = userEvent.setup();
+    const writeText = vi.fn(async () => {});
+    setClipboard(writeText);
+    api.settings.mockRejectedValue(new ApiError("INTERNAL_ERROR", 500));
+    renderRoutes(ROUTES, "/people");
+    const row = await firstRow();
+    expect(await screen.findByText("誘いの文の型を読めなかったので、初めの型で文を作ります。")).toBeInTheDocument();
+    await waitFor(() => expect(within(row).getByRole("button", { name: /文をコピー/ })).toBeEnabled());
+    await user.click(within(row).getByRole("button", { name: /文をコピー/ }));
+    expect(writeText).toHaveBeenCalledWith("山田はなこさん、12月13日（日）のIT交流会 12/13、もしご興味あれば一緒にいかがですか？");
+  });
+
+  it("イベントの一覧が読めるまでは、誘う会を選べず候補も読まない。読めたら次の自分の会で読む", async () => {
+    const later = deferred<(typeof EVENT_1213)[]>();
+    api.events.mockReturnValue(later.promise);
+    renderRoutes(ROUTES, "/people");
+    const picker = await screen.findByLabelText("誘う会");
+    expect(picker).toBeDisabled();
+    expect(picker).toHaveValue("");
+    await waitFor(() => expect(api.stats).toHaveBeenCalled());
+    expect(api.candidates).not.toHaveBeenCalled();
+    later.resolve([EVENT_1213, EVENT_1125, EVENT_1011]);
+    await waitFor(() => expect(screen.getByLabelText("誘う会")).toHaveValue("e3"));
+    expect(api.candidates).toHaveBeenCalledTimes(1);
+    expect(api.candidates).toHaveBeenLastCalledWith(expect.objectContaining({ eventId: "e3" }));
+  });
+
+  it("イベントの一覧が読めないときは、誘う会を選んでいない扱いにして、文をコピーできない", async () => {
+    api.events.mockRejectedValue(new ApiError("INTERNAL_ERROR", 500));
+    renderRoutes(ROUTES, "/people");
+    const row = await firstRow();
+    expect(screen.getByText("イベントの一覧を読めませんでした。画面を読み込み直してください。")).toBeInTheDocument();
+    expect(screen.getByLabelText("誘う会")).toHaveValue("");
+    expect(within(row).getByRole("button", { name: /文をコピー/ })).toBeDisabled();
+    expect(api.candidates).toHaveBeenLastCalledWith(expect.not.objectContaining({ eventId: expect.anything() }));
   });
 });

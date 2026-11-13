@@ -25,7 +25,7 @@ import { peopleQueryKeys } from "../lib/query-keys";
 
 /**
  * 候補の並びの中身（数・行・ページの移動）。
- * @param props - data：候補、offset：何人目から、searching：探す言葉か絞り込みがあるか、dimmed：前のページを出したまま読んでいる、
+ * @param props - data：候補、offset：何人目から、searching：探す言葉か絞り込みがあるか、dimmed：前のページを出したまま読んでいる（行の操作は押せない）、
  *   purpose：目的、inviteEvent：誘う会、template：誘いの文の型、onFallback：コピーできなかったとき、onPage：ページを移る
  * @returns 中身
  */
@@ -73,7 +73,15 @@ function CandidateListBody({
         <ul className={cn("divide-y rounded-2xl border bg-card", dimmed && "opacity-60")}>
           {persons.map((p) => (
             // 誘う会を変えたら、行の「コピーした」を捨てる
-            <CandidateRow key={`${p.id}:${inviteEvent?.id ?? ""}`} person={p} purpose={purpose} inviteEvent={inviteEvent} template={template} onFallback={onFallback} />
+            <CandidateRow
+              key={`${p.id}:${inviteEvent?.id ?? ""}`}
+              person={p}
+              purpose={purpose}
+              inviteEvent={inviteEvent}
+              template={template}
+              locked={dimmed}
+              onFallback={onFallback}
+            />
           ))}
         </ul>
       )}
@@ -108,9 +116,11 @@ export function CandidatesPage() {
   const ownEvents: PeopleEvent[] = (events.data ?? []).filter((e) => e.isOwn);
   const nextOwn = stats.data?.nextOwnEvent ?? null;
   const chosenId = eventChoice ?? nextOwn?.id ?? "";
-  const inviteEvent = ownEvents.find((e) => e.id === chosenId) ?? (nextOwn !== null && nextOwn.id === chosenId ? nextOwn : null);
-  // 選んだ会を消したあとなどは「選んでいない」にする
+  // 誘う会はイベントの一覧にある自分の会からだけ選ぶ。一覧が読めるまで・読めないとき・一覧にない会（消した会など）は「選んでいない」
+  const inviteEvent = ownEvents.find((e) => e.id === chosenId) ?? null;
   const inviteEventId = inviteEvent?.id ?? "";
+  // 設定が読めないときは初めの型（null）で文を作る。読み込み中は undefined（コピーを待つ）
+  const template = settings.isSuccess ? settings.data.inviteTemplate : settings.isError ? null : undefined;
 
   // 探す言葉・絞り込み・目的が変わったら、1ページ目に戻す
   const searchKey = JSON.stringify([purpose, q, filters, visitedOwn]);
@@ -126,10 +136,12 @@ export function CandidatesPage() {
   const candidates = useQuery({
     queryKey: peopleQueryKeys.candidates(params),
     queryFn: () => peopleApi.candidates(params),
-    // ページを移る・絞り込むあいだは前の行を出したままにする。目的を替えたときは出さない（同意のちがう人を一瞬でも並べない）
-    placeholderData: (prev, prevQuery) => (prevQuery?.queryKey[3].purpose === purpose ? prev : undefined),
-    // 誘う会の初めの値（次の自分の会）がわかってから読む（行の進み具合がその会のものになる）
-    enabled: purpose === "work" || !stats.isPending,
+    // ページを移る・絞り込むあいだは前の行を出したままにする（行の操作は押せない）。目的か誘う会を替えたときは出さない
+    // （同意のちがう人を一瞬でも並べない・前の会の声かけを進めたり消したりしない）
+    placeholderData: (prev, prevQuery) =>
+      prevQuery?.queryKey[3].purpose === purpose && prevQuery.queryKey[3].eventId === params.eventId ? prev : undefined,
+    // 誘う会の初めの値（次の自分の会）と、選べる会（イベントの一覧）がわかってから読む（行の進み具合がその会のものになる）
+    enabled: purpose === "work" || (!stats.isPending && !events.isPending),
   });
 
   const filterCount = activeFilterCount(filters) + (visitedOwn ? 1 : 0);
@@ -148,7 +160,12 @@ export function CandidatesPage() {
         <PurposeSwitch value={purpose} onChange={changePurpose} />
         <p className="text-[13px] text-muted-foreground">個別の案内に同意した人だけを出しています</p>
         {purpose === "invite" ? (
-          <InviteEventPicker value={inviteEventId} events={ownEvents} onChange={setEventChoice} />
+          <>
+            <InviteEventPicker value={inviteEventId} events={ownEvents} loading={events.isPending} failed={events.isError} onChange={setEventChoice} />
+            {settings.isError && (
+              <p className="text-[13px] text-muted-foreground">誘いの文の型を読めなかったので、初めの型で文を作ります。</p>
+            )}
+          </>
         ) : (
           <p className="rounded-xl bg-muted px-3 py-2 text-[13px] text-muted-foreground">仕事の相談先へつなぐ記録は、次の版で足します。今は候補を見るだけです。</p>
         )}
@@ -209,7 +226,7 @@ export function CandidatesPage() {
             dimmed={candidates.isPlaceholderData}
             purpose={purpose}
             inviteEvent={inviteEvent}
-            template={settings.isSuccess ? settings.data.inviteTemplate : undefined}
+            template={template}
             onFallback={setFallbackText}
             onPage={goTo}
           />

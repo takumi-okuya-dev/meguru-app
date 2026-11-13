@@ -3,12 +3,12 @@ import { PERSONS_PAGE_SIZE } from "@meguru/shared/people";
 import { Button } from "@/components/ui/button";
 
 /**
- * 「前の100人」「次の100人」。100人以下なら何も出さない。
+ * 「前の100人」「次の100人」。1ページ目で100人以下なら何も出さない（2ページ目より先では、数が減っても戻れるように出す）。
  * @param props - offset：何人目から、total：全体の数、onPage：ページを移る
  * @returns ページの移動
  */
 export function ListPager({ offset, total, onPage }: { offset: number; total: number; onPage: (offset: number) => void }) {
-  if (total <= PERSONS_PAGE_SIZE) return null;
+  if (total <= PERSONS_PAGE_SIZE && offset === 0) return null;
   return (
     <nav aria-label="ページ" className="flex justify-between gap-2">
       <Button variant="outline" className="h-11 rounded-full md:h-9" disabled={offset === 0} onClick={() => onPage(Math.max(0, offset - PERSONS_PAGE_SIZE))}>

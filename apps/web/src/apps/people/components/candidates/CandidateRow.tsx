@@ -87,18 +87,21 @@ function InviteStageButtons({
 
 /**
  * 交流会への誘いの操作（文をコピー・興味を聞いたにする・進み具合）。
- * @param props - person：候補、inviteEvent：誘う会（なければ null）、template：誘いの文の型（読み込み中は undefined）、onFallback：コピーできなかったときに文を渡す
+ * @param props - person：候補、inviteEvent：誘う会（なければ null）、template：誘いの文の型（読み込み中は undefined、null は初めの型）、
+ *   locked：前の行を出したまま読み直している（押せなくする）、onFallback：コピーできなかったときに文を渡す
  * @returns 操作
  */
 function InviteActions({
   person,
   inviteEvent,
   template,
+  locked,
   onFallback,
 }: {
   person: CandidateItem;
   inviteEvent: PeopleEvent | null;
   template: string | null | undefined;
+  locked: boolean;
   onFallback: (text: string) => void;
 }) {
   const queryClient = useQueryClient();
@@ -120,7 +123,14 @@ function InviteActions({
     },
   });
   const failed = [start, move, remove].find((m) => m.isError);
-  const pending = start.isPending || move.isPending || remove.isPending;
+  const pending = locked || start.isPending || move.isPending || remove.isPending;
+  /**
+   * 1つの操作を始める前に、ほかの操作の結果（古いエラー）を消す。出すのは最後の操作のエラーだけ。
+   * @param keep - これから始める操作
+   */
+  const clearOthers = (keep: { reset: () => void }) => {
+    for (const m of [start, move, remove]) if (m !== keep) m.reset();
+  };
 
   const copy = async () => {
     if (!inviteEvent || template === undefined) return;
@@ -137,14 +147,17 @@ function InviteActions({
           type="button"
           variant="outline"
           className="h-11 rounded-full md:h-9"
-          disabled={!inviteEvent || template === undefined}
+          disabled={locked || !inviteEvent || template === undefined}
           title={inviteEvent ? undefined : "誘う会を選んでください"}
           onClick={() => void copy()}
         >
           <CopyIcon /> 文をコピー
         </Button>
         {outreach === null && copied && inviteEvent && (
-          <Button type="button" className="h-11 rounded-full md:h-9" disabled={pending} onClick={() => start.mutate(inviteEvent.id)}>
+          <Button type="button" className="h-11 rounded-full md:h-9" disabled={pending} onClick={() => {
+              clearOthers(start);
+              start.mutate(inviteEvent.id);
+            }}>
             興味を聞いたにする
           </Button>
         )}
@@ -153,8 +166,14 @@ function InviteActions({
         <InviteStageButtons
           stage={outreach.stage}
           pending={pending}
-          onChange={(stage) => move.mutate({ id: outreach.id, stage })}
-          onRemove={() => remove.mutate(outreach.id)}
+          onChange={(stage) => {
+            clearOthers(move);
+            move.mutate({ id: outreach.id, stage });
+          }}
+          onRemove={() => {
+            clearOthers(remove);
+            remove.mutate(outreach.id);
+          }}
         />
       )}
       {failed && (
@@ -168,7 +187,8 @@ function InviteActions({
 
 /**
  * 誘う候補の1行。
- * @param props - person：候補、purpose：目的、inviteEvent：誘う会、template：誘いの文の型、onFallback：コピーできなかったときに文を渡す
+ * @param props - person：候補、purpose：目的、inviteEvent：誘う会、template：誘いの文の型、locked：前の行を出したまま読み直している、
+ *   onFallback：コピーできなかったときに文を渡す
  * @returns 行
  */
 export function CandidateRow({
@@ -176,12 +196,14 @@ export function CandidateRow({
   purpose,
   inviteEvent,
   template,
+  locked = false,
   onFallback,
 }: {
   person: CandidateItem;
   purpose: OutreachPurpose;
   inviteEvent: PeopleEvent | null;
   template: string | null | undefined;
+  locked?: boolean;
   onFallback: (text: string) => void;
 }) {
   const showLine = person.lineName !== null && person.lineName !== person.displayName;
@@ -195,7 +217,7 @@ export function CandidateRow({
         <div className="text-sm text-muted-foreground">{lastMetLabel(person.lastMetOn)}</div>
       </Link>
       <AnswerBadges answers={person.latestAnswers} />
-      {purpose === "invite" && <InviteActions person={person} inviteEvent={inviteEvent} template={template} onFallback={onFallback} />}
+      {purpose === "invite" && <InviteActions person={person} inviteEvent={inviteEvent} template={template} locked={locked} onFallback={onFallback} />}
     </li>
   );
 }

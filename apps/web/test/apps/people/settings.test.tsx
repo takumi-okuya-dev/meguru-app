@@ -64,7 +64,18 @@ describe("誘いの文の型", () => {
     expect(box).toHaveValue("{名前}さん、来てね");
     await user.click(screen.getByRole("button", { name: "初めの型に戻す" }));
     expect(api.updateSettings).toHaveBeenCalledWith({ inviteTemplate: null });
-    expect(box).toHaveValue(DEFAULT_INVITE_TEMPLATE);
+    await waitFor(() => expect(box).toHaveValue(DEFAULT_INVITE_TEMPLATE));
+  });
+
+  it("「初めの型に戻す」の保存が失敗したら、作り手の型を欄に残す", async () => {
+    const user = userEvent.setup();
+    api.settings.mockResolvedValue({ inviteTemplate: "{名前}さん、来てね", repeaterGoal: null });
+    api.updateSettings.mockRejectedValue(new Error("network"));
+    renderRoutes(ROUTES, "/people/settings");
+    const box = await screen.findByLabelText("型");
+    await user.click(screen.getByRole("button", { name: "初めの型に戻す" }));
+    expect(await screen.findByRole("alert")).toBeInTheDocument();
+    expect(box).toHaveValue("{名前}さん、来てね");
   });
 
   it("文字の数を出し（絵文字も1文字）、500文字を超えると保存できない", async () => {
@@ -72,10 +83,12 @@ describe("誘いの文の型", () => {
     renderRoutes(ROUTES, "/people/settings");
     const box = await screen.findByLabelText("型");
     await replaceText(user, box, "🌸".repeat(500));
-    expect(screen.getByText("500／500文字")).toBeInTheDocument();
+    expect(screen.getByText("500/500")).toBeInTheDocument();
+    expect(screen.queryByText("500文字以内で入力してください")).not.toBeInTheDocument();
     expect(screen.getAllByRole("button", { name: "保存" })[0]).toBeEnabled();
     await user.type(box, "あ");
-    expect(screen.getByText(/501／500文字/)).toHaveTextContent("長すぎます");
+    expect(screen.getByText("501/500")).toBeInTheDocument();
+    expect(screen.getByText("500文字以内で入力してください")).toBeInTheDocument();
     expect(screen.getAllByRole("button", { name: "保存" })[0]).toBeDisabled();
   });
 });
@@ -97,12 +110,29 @@ describe("リピーターの目標", () => {
     await waitFor(() => expect(api.updateSettings).toHaveBeenCalledWith({ repeaterGoal: 10 }));
   });
 
+  it("数として読めない入力（abc・-・e）は、目標を消さずに文言を出す。全角の数字は読む", async () => {
+    const user = userEvent.setup();
+    api.settings.mockResolvedValue({ inviteTemplate: null, repeaterGoal: 10 });
+    renderRoutes(ROUTES, "/people/settings");
+    const goal = await screen.findByLabelText("目標の人数");
+    const save = screen.getAllByRole("button", { name: "保存" })[1]!;
+    for (const bad of ["abc", "-", "e", "1.5"]) {
+      await replaceText(user, goal, bad);
+      await user.click(save);
+      expect(screen.getByText("1〜10,000の数を入れてください。")).toBeInTheDocument();
+    }
+    expect(api.updateSettings).not.toHaveBeenCalled();
+    await replaceText(user, goal, "２０");
+    await user.click(save);
+    await waitFor(() => expect(api.updateSettings).toHaveBeenCalledWith({ repeaterGoal: 20 }));
+  });
+
   it("空にして保存すると、目標なし（null）を送る", async () => {
     const user = userEvent.setup();
     api.settings.mockResolvedValue({ inviteTemplate: null, repeaterGoal: 10 });
     renderRoutes(ROUTES, "/people/settings");
     const goal = await screen.findByLabelText("目標の人数");
-    expect(goal).toHaveValue(10);
+    expect(goal).toHaveValue("10");
     await user.clear(goal);
     await user.click(screen.getAllByRole("button", { name: "保存" })[1]!);
     expect(api.updateSettings).toHaveBeenCalledWith({ repeaterGoal: null });

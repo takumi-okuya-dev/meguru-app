@@ -115,6 +115,25 @@ describe("人の一覧", () => {
   });
 });
 
+describe("人の一覧のページの移動", () => {
+  it("2ページ目で数が100人以下に減っても、前のページへ戻れる", async () => {
+    const user = userEvent.setup();
+    api.persons.mockImplementation(async (p: { offset?: number }) =>
+      p.offset ? { persons: [], total: 90 } : { persons: [makeListItem({ displayName: "人0" })], total: 150 },
+    );
+    renderRoutes(ROUTES, "/people/list");
+    expect(await screen.findByText("全 150人")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "次の100人" }));
+    expect(await screen.findByText("全 90人")).toBeInTheDocument();
+    const back = screen.getByRole("button", { name: "前の100人" });
+    expect(back).toBeEnabled();
+    expect(screen.getByRole("button", { name: "次の100人" })).toBeDisabled();
+    await user.click(back);
+    expect(await screen.findByText("人0")).toBeInTheDocument();
+    expect(api.persons).toHaveBeenLastCalledWith(expect.objectContaining({ offset: 0 }));
+  });
+});
+
 describe("人のページ", () => {
   it("本名・LINE名・別名・同意・メモ・来たイベント（新しい順・答え）を出す", async () => {
     renderRoutes(ROUTES, "/people/list/p1");

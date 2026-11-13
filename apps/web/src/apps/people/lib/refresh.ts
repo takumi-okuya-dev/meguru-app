@@ -28,15 +28,13 @@ export async function refreshAllPeople(queryClient: QueryClient, removedPersonId
 }
 
 /**
- * 声かけを始める・進める・消したあと：誘う候補の行と人のページ（どちらも ["people", "persons"] の下）と、数字を読み直す。
+ * 声かけを始める・進める・消したあと：誘う候補の行と人のページ（どちらも ["people", "persons"] の下）を読み直す。
+ * 数字（リピーター・次の自分の会）は声かけでは変わらないので読み直さない。
  * @param queryClient - クエリのクライアント
  * @returns 読み直しが終わるまでの Promise
  */
 export async function refreshOutreaches(queryClient: QueryClient): Promise<void> {
-  await Promise.all([
-    queryClient.invalidateQueries({ queryKey: peopleQueryKeys.persons }),
-    queryClient.invalidateQueries({ queryKey: peopleQueryKeys.stats }),
-  ]);
+  await queryClient.invalidateQueries({ queryKey: peopleQueryKeys.persons });
 }
 
 /**

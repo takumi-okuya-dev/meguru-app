@@ -7,13 +7,14 @@ import {
   REPEATER_GOAL_MAX,
   type PeopleSettings,
 } from "@meguru/shared/people";
+import { countChars } from "@meguru/shared";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useId, useState, type FormEvent } from "react";
 import { toast } from "sonner";
 import { ApiErrorScreen } from "@/components/ApiErrorScreen";
 import { LoadingSkeleton } from "@/components/LoadingSkeleton";
+import { FieldWithCounter } from "@/components/FieldWithCounter";
 import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
 import { describeError } from "@/lib/api-client";
 import { cn } from "@/lib/utils";
 import { PageBody, PageHeader } from "@/shell";
@@ -31,15 +32,6 @@ const PLACEHOLDERS = [
   { key: "{会の名前}", text: "誘う会の名前" },
   { key: "{日にち}", text: "誘う会の日にち（例：12月13日（土））" },
 ];
-
-/**
- * 文字の数（絵文字も1文字に数える）。
- * @param text - 文字
- * @returns 数
- */
-function countChars(text: string): number {
-  return [...text].length;
-}
 
 /**
  * 設定を保存する処理（保存したら設定と数字を読み直す）。
@@ -65,8 +57,8 @@ function TemplateSection({ template }: { template: string | null }) {
   const id = useId();
   const save = useSaveSettings();
   const [text, setText] = useState(template ?? DEFAULT_INVITE_TEMPLATE);
-  const count = countChars(text);
-  const tooLong = count > INVITE_TEMPLATE_MAX;
+  // 文字の数は絵文字も1文字（DB の char_length と同じ数え方）
+  const tooLong = countChars(text) > INVITE_TEMPLATE_MAX;
   const isDefault = template === null;
   const submit = (e: FormEvent) => {
     e.preventDefault();
@@ -75,8 +67,8 @@ function TemplateSection({ template }: { template: string | null }) {
     save.mutate({ inviteTemplate: text.trim() === "" || text === DEFAULT_INVITE_TEMPLATE ? null : text });
   };
   const reset = () => {
-    setText(DEFAULT_INVITE_TEMPLATE);
-    save.mutate({ inviteTemplate: null });
+    // 保存できてから欄を初めの型にする（失敗したら作り手の型を欄に残す）
+    save.mutate({ inviteTemplate: null }, { onSuccess: () => setText(DEFAULT_INVITE_TEMPLATE) });
   };
   return (
     <section className="space-y-3" aria-labelledby={`${id}-heading`}>
@@ -97,22 +89,7 @@ function TemplateSection({ template }: { template: string | null }) {
         </ul>
       </div>
       <form className="space-y-3" onSubmit={submit}>
-        <div className="space-y-1">
-          <label htmlFor={`${id}-template`} className="text-sm font-medium">
-            型
-          </label>
-          <Textarea
-            id={`${id}-template`}
-            rows={4}
-            value={text}
-            aria-invalid={tooLong}
-            aria-describedby={`${id}-count`}
-            onChange={(e) => setText(e.target.value)}
-          />
-          <p id={`${id}-count`} className={cn("text-right text-[13px] tabular-nums", tooLong ? "text-destructive" : "text-muted-foreground")}>
-            {count}／{INVITE_TEMPLATE_MAX}文字{tooLong && "（長すぎます）"}
-          </p>
-        </div>
+        <FieldWithCounter id={`${id}-template`} label="型" value={text} onChange={setText} max={INVITE_TEMPLATE_MAX} rows={4} />
         <div className="space-y-1">
           <p className="text-sm font-medium">見本</p>
           <p data-testid="invite-preview" className="rounded-xl bg-muted px-3 py-2 text-sm break-words whitespace-pre-wrap">
@@ -143,7 +120,8 @@ function TemplateSection({ template }: { template: string | null }) {
  * @returns 目標（空は null）。読めない・範囲の外は undefined
  */
 function parseGoal(text: string): number | null | undefined {
-  const t = text.trim();
+  // 全角の数字も読む
+  const t = text.normalize("NFKC").trim();
   if (t === "") return null;
   if (!/^\d+$/.test(t)) return undefined;
   const n = Number(t);
@@ -180,13 +158,12 @@ function GoalSection({ goal }: { goal: number | null }) {
             目標の人数
           </label>
           <div className="flex items-center gap-2">
+            {/* type=number だと、読めない入力（abc・-・e）が空として届き、目標が消えてしまう。文字で受けて自分で確かめる */}
             <input
               id={`${id}-goal`}
-              type="number"
+              type="text"
               inputMode="numeric"
-              min={1}
-              max={REPEATER_GOAL_MAX}
-              step={1}
+              autoComplete="off"
               className={cn(fieldClass, "max-w-40")}
               value={text}
               aria-invalid={touched && invalid}
