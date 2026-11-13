@@ -1,7 +1,7 @@
 // 受付の画面の中身（specs/collect/001-event-day-collection User Story 2・3、FR-030〜FR-039、tasks.md T042）。
 // 主催者の画面と手伝う人の画面で同じものを使う。上に数字の段と会場の共有の状態、検索、受付の行、飛び入り。
 // 受付の1人は「探す → 払い方 →（PayPay・振込ならシートの1回）」で終わる（SC-001）。
-import type { ReceptionPerson, ReceptionSnapshot } from "@meguru/shared";
+import type { ReceptionPerson, ReceptionRecord, ReceptionSnapshot } from "@meguru/shared";
 import { SearchIcon, UserPlusIcon } from "lucide-react";
 import { useState } from "react";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
@@ -13,6 +13,7 @@ import type { RecordChoice, ReceptionState } from "../../lib/use-reception";
 import { AdjustDialog, type Adjustment } from "./AdjustDialog";
 import { PaypaySheet, TransferSheet } from "./PaySheets";
 import { ReceptionRow, type PayButton } from "./ReceptionRow";
+import { SelfPanel } from "./SelfPanel";
 import { StatsBar } from "./StatsBar";
 import { WalkInDialog } from "./WalkInDialog";
 
@@ -22,6 +23,18 @@ const LIVE_TEXT: Record<LiveStatus, string> = {
   offline: "会場の共有につなぎ直しています（その間は15秒ごとに読み直します）",
   stopped: "会場の共有は止まっています",
 };
+
+/**
+ * 受け取った人の名前（本人の申告は、確かめたら確かめた人の前に「本人の申告→」。specs/collect/002）。
+ * @param rec - 受付の記録
+ * @param helperName - 手伝う人の名前
+ * @returns 名前
+ */
+function receiverNameOf(rec: ReceptionRecord, helperName: Map<string, string>): string {
+  if (rec.receiverKind === "self") return "本人の申告";
+  const who = rec.receiverKind === "owner" ? "主催者" : (helperName.get(rec.receiverHelperId ?? "") ?? "手伝う人");
+  return rec.selfReported ? `本人の申告→${who}` : who;
+}
 
 /**
  * 受付の画面の中身。
@@ -77,6 +90,7 @@ export function ReceptionBoard({
       <p className="text-xs text-muted-foreground" aria-live="polite">
         {LIVE_TEXT[state.live]}
       </p>
+      <SelfPanel state={state} snap={snap} />
       <div className="flex flex-wrap gap-2">
         <div className="relative min-w-0 flex-1">
           <SearchIcon className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
@@ -110,8 +124,8 @@ export function ReceptionBoard({
                 buttons={buttons}
                 tierLabel={`${tier?.name ?? "区分なし"} ${yen(amountOf(person))}`}
                 adjusted={Boolean(adjustments[person.id])}
-                receiverName={rec ? (rec.receiverKind === "owner" ? "主催者" : (helperName.get(rec.receiverHelperId ?? "") ?? "手伝う人")) : null}
-                canUndo={rec !== null && (viewer.kind === "owner" || isMine(rec, viewer))}
+                receiverName={rec ? receiverNameOf(rec, helperName) : null}
+                canUndo={rec !== null && (viewer.kind === "owner" || isMine(rec, viewer) || (rec.receiverKind === "self" && rec.transferConfirmedAt === null))}
                 onPay={(b) => {
                   if (b === "paypay" || b === "transfer") setPaying({ person, kind: b });
                   else record(person, b);

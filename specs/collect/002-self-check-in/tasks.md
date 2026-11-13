@@ -52,12 +52,12 @@
 
 # PR1b：画面・E2E
 
-- [ ] T017 [US3] `web/pages/SelfCheckInPage.tsx`（`/collect/events/:eventId/self`）：QR・コピー・期限・止める・出し直す・件数。サイドバーに「セルフ受付」。
-- [ ] T018 [US1] `web/pages/SelfCheckInPublicPage.tsx`（`publicRoutes` の `/collect/s/:token`）と `web/lib/self-api.ts`：探す → 払い方 → 案内（現金・PayPayのQR・振込）、選び直し、見つからない・同じ名前・受付済み・止められた、申し出と待ち、見えている間だけ3秒ごとに自分の状態を読む。端末の印はリンクごとに `localStorage`（読めなければ開いている間だけ）。
-- [ ] T019 [US2・US4] `web/components/reception/`：受付の画面の上に「確かめ待ち」（受け取った・払い方を変えて受け取る・申告を取り消す）と「申し出」（名簿に入れる・名簿の人に当てる・断る）。数字の段に確かめ待ち。締めの画面に確かめ待ちの知らせ。
-- [ ] T020 [P] `web-test/self-check-in.test.tsx`・`web-test/self-confirm.test.tsx`。
-- [ ] T021 `e2e/tests/collect-self-check-in.spec.ts`：参加者と主催者の2つのブラウザ。参加者が探して PayPay を選ぶ → 5秒以内に主催者の確かめ待ち → 受け取った → 参加者の画面が「済みました」。申し出 → 名簿に入れる → 払い方へ。390px ではみ出さない。
-- [ ] T022 `docs/apps/collect.md`・`docs/apps/collect-guide.md` の使い方、tasks.md の印。
+- [x] T017 [US3] `web/pages/SelfCheckInPage.tsx`（`/collect/events/:eventId/self`）：QR・コピー・期限・止める・出し直す・件数。サイドバーに「セルフ受付」。
+- [x] T018 [US1] `web/pages/SelfCheckInPublicPage.tsx`（`publicRoutes` の `/collect/s/:token`）と `web/lib/self-api.ts`：探す → 払い方 → 案内（現金・PayPayのQR・振込）、選び直し、見つからない・同じ名前・受付済み・止められた、申し出と待ち、見えている間だけ3秒ごとに自分の状態を読む。端末の印はリンクごとに `localStorage`（読めなければ開いている間だけ）。
+- [x] T019 [US2・US4] `web/components/reception/`：受付の画面の上に「確かめ待ち」（受け取った・払い方を変えて受け取る・申告を取り消す）と「申し出」（名簿に入れる・名簿の人に当てる・断る）。数字の段に確かめ待ち。締めの画面に確かめ待ちの知らせ。
+- [x] T020 [P] `web-test/self-check-in.test.tsx`・`web-test/self-confirm.test.tsx`。
+- [x] T021 `e2e/tests/collect-self-check-in.spec.ts`：参加者と主催者の2つのブラウザ。参加者が探して PayPay を選ぶ → 5秒以内に主催者の確かめ待ち → 受け取った → 参加者の画面が「済みました」。申し出 → 名簿に入れる → 払い方へ。390px ではみ出さない。
+- [x] T022 `docs/apps/collect.md`、tasks.md の印。（`docs/apps/collect-guide.md` の使い方は、#123 が入ってから足す）
 
 ## Dependencies
 

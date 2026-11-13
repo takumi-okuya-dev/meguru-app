@@ -4,12 +4,14 @@
 // - 記録は押すたびに clientRequestId を作る。保存できなかった行は「保存できませんでした・もう一度送る」で残し、同じ clientRequestId で
 //   送り直す（二重にならない）。保存できるまで、その行を受付済みに見せない（FR-037）。
 import type {
+  ConfirmReceptionRequest,
   LiveMessage,
   LiveTicketResponse,
   ReceptionPerson,
   ReceptionSnapshot,
   RecordReceptionRequest,
   RecordReceptionResponse,
+  SelfRequestAction,
   WalkInRequest,
 } from "@meguru/shared";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -30,6 +32,9 @@ export type ReceptionSource = {
   undo: (personId: string) => Promise<{ version: number }>;
   walkIn: (input: WalkInRequest) => Promise<{ person: ReceptionPerson; version: number }>;
   liveTicket: () => Promise<LiveTicketResponse>;
+  // セルフ受付の本人の申告を確かめる・申し出を片付ける（specs/collect/002）
+  confirm: (personId: string, input: ConfirmReceptionRequest) => Promise<RecordReceptionResponse>;
+  resolveRequest: (requestId: string, action: SelfRequestAction, personId?: string) => Promise<{ version: number; person?: ReceptionPerson }>;
   // リンクが止められた（手伝う人）
   onLinkStopped?: () => void;
 };
@@ -193,6 +198,36 @@ export function useReception(source: ReceptionSource, enabled = true) {
         return true;
       } catch (err) {
         toast.error(collectErrorText(err));
+        return false;
+      }
+    },
+    // 本人の申告を確かめる（受け取った人は自分。払い方・区分・金額を直せる）
+    confirm: async (personId: string, input: ConfirmReceptionRequest = {}): Promise<boolean> => {
+      try {
+        const res = await source.confirm(personId, input);
+        apply(res.version, (s) => withRecord(s, personId, res.record, source.viewer));
+        refreshMe();
+        return true;
+      } catch (err) {
+        if (err instanceof ApiError && err.code === "NOT_AWAITING_CONFIRMATION") toast.info("この人は、ほかの人がもう確かめたか、取り消しました。");
+        else toast.error(collectErrorText(err));
+        resync();
+        return false;
+      }
+    },
+    // セルフ受付の申し出を片付ける（名簿に入れる・名簿の人に当てる・断る）
+    resolveRequest: async (requestId: string, action: SelfRequestAction, personId?: string): Promise<boolean> => {
+      try {
+        const res = await source.resolveRequest(requestId, action, personId);
+        apply(res.version, (s) => {
+          const next = res.person ? withPerson(s, res.person, source.viewer) : s;
+          return { ...next, selfRequests: next.selfRequests.filter((r) => r.id !== requestId) };
+        });
+        return true;
+      } catch (err) {
+        if (err instanceof ApiError && err.code === "REQUEST_RESOLVED") toast.info("この申し出は、ほかの人がもう片付けました。");
+        else toast.error(collectErrorText(err));
+        resync();
         return false;
       }
     },

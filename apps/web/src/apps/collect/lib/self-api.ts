@@ -27,7 +27,7 @@ const memory = new Map<string, string>();
 export function selfDevice(token: string): string {
   const cached = memory.get(token);
   if (cached) return cached;
-  let value: string | null = null;
+  let value: string | null;
   try {
     value = window.localStorage.getItem(keyOf(token));
   } catch {

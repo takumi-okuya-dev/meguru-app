@@ -11,7 +11,7 @@ import { yen } from "../../lib/reception-model";
  * @param blob - 画像
  * @returns URL（まだなければ null）
  */
-function useObjectUrl(blob: Blob | undefined): string | null {
+export function useObjectUrl(blob: Blob | undefined): string | null {
   const [url, setUrl] = useState<string | null>(null);
   useEffect(() => {
     if (!blob) return;
