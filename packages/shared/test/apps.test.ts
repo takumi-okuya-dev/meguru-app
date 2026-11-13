@@ -17,9 +17,10 @@ describe("アプリの一覧", () => {
   });
 
   it("出してよいアプリだけを releasedApps と isReleasedAppId が通す", () => {
-    expect(releasedApps().map((a) => a.id)).toEqual(["threads"]);
+    expect(releasedApps().map((a) => a.id)).toEqual(["threads", "people"]);
     expect(isReleasedAppId("threads")).toBe(true);
-    expect(isReleasedAppId("people")).toBe(false);
+    expect(isReleasedAppId("people")).toBe(true);
+    expect(isReleasedAppId("unknown-app")).toBe(false);
     expect(isReleasedAppId(1)).toBe(false);
   });
 });
@@ -27,7 +28,8 @@ describe("アプリの一覧", () => {
 describe("PUT /api/me/last-app の入力", () => {
   it("出してよいアプリのIDだけを受ける", () => {
     expect(lastAppRequestSchema.safeParse({ app: "threads" }).success).toBe(true);
-    expect(lastAppRequestSchema.safeParse({ app: "people" }).success).toBe(false);
+    expect(lastAppRequestSchema.safeParse({ app: "people" }).success).toBe(true);
+    expect(lastAppRequestSchema.safeParse({ app: "unknown-app" }).success).toBe(false);
     expect(lastAppRequestSchema.safeParse({}).success).toBe(false);
   });
 });

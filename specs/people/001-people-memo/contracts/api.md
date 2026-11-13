@@ -39,7 +39,7 @@
 | `GET /api/people/events/:eventId` | `{ event, stats, imports }`。`stats`は自分の会なら`{ attendeeCount, firstTimeCount, returningCount, erasedCount }`、自分の会でなければ`{ attendeeCount, erasedCount }`（R12。PR1では`attendeeCount`・`erasedCount`だけ、PR3で初めて・前にもを足す）。`imports`は`[{ id, createdAt, rowCount, importedCount, createdPeopleCount, linkedCount, skippedCount }]` |
 | `GET /api/people/events/:eventId/attendees` | その会に来た人：`[{ personId, displayName, lineName, via: "response" \| "manual", firstTime?: boolean }]`（名前の順。`firstTime`は自分の会だけ・PR3から） |
 | `PATCH /api/people/events/:eventId` | `{ name?, heldOn?, isOwn? }` |
-| `GET /api/people/events/:eventId/delete-preview` | 取り込みの取り消し（3章）と同じ形を、その会のすべての取り込みについてまとめて返す＋`outreachCount` |
+| `GET /api/people/events/:eventId/delete-preview` | 取り込みの取り消し（3章）と同じ形を、その会のすべての取り込みについてまとめて返す＋`importCount`（取り込みの数）・`outreachCount` |
 | `DELETE /api/people/events/:eventId` | 本文`{ keepPeopleWithNotes?: boolean }`。書き足しのある人がいて省いたら409 `PEOPLE_CONFIRM_REQUIRED`（R14） |
 
 ## 3. 取り込み（FR-001〜FR-010）

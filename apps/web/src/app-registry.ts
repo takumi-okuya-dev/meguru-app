@@ -2,10 +2,11 @@
 // アプリを足すときは、ここに1行足す（外枠のほかの場所は直さない）。@meguru/shared のアプリの一覧で released のアプリだけを登録する。
 import { appById } from "@meguru/shared";
 import { threadsApp } from "@/apps/threads";
+import { peopleApp } from "@/apps/people";
 import type { AppModule } from "@/shell";
 
 /** 作ったアプリの入口（出すかどうかは released で決める）。 */
-const allApps: readonly AppModule[] = [threadsApp];
+const allApps: readonly AppModule[] = [threadsApp, peopleApp];
 
 /** 出せるアプリの入口。 */
 export const registeredApps: readonly AppModule[] = allApps.filter((a) => appById(a.id)?.released === true);

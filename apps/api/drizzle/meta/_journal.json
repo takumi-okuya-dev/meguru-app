@@ -232,6 +232,13 @@
       "when": 1794509509764,
       "tag": "0032_app_access_grants",
       "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1794527172955,
+      "tag": "0033_people_schema",
+      "breakpoints": true
     }
   ]
 }

@@ -76,6 +76,13 @@ export const ERROR_CODES = [
   "RATE_LIMITED",
   // アプリの利用の許可（specs/meguru/030-app-access FR-003）
   "APP_NOT_AVAILABLE",
+  // 人物メモ（specs/people/001-people-memo contracts/api.md 0）
+  "IMPORT_TOO_LARGE",
+  "IMPORT_MAPPING_INVALID",
+  "IMPORT_DECISIONS_REQUIRED",
+  "PEOPLE_CONFIRM_REQUIRED",
+  "OUTREACH_NEEDS_APPROVAL",
+  "OUTREACH_NO_CONSENT",
 ] as const;
 
 /** エラーコード。 */
@@ -277,6 +284,18 @@ export function errorMessage(code: ErrorCode, ctx: ErrorMessageContext = {}): Er
       return { message: "少し時間をおいてから、もう一度お試しください。", action: "retry-later" };
     case "APP_NOT_AVAILABLE":
       return { message: "このアプリは今は使えません。", action: "none" };
+    case "IMPORT_TOO_LARGE":
+      return { message: "CSVが大きすぎます。500行・60列まで、1つの答えは5,000文字までにしてください。", action: "none" };
+    case "IMPORT_MAPPING_INVALID":
+      return { message: "列の対応を見直してください（LINE名の列が要ります。同じ項目は1列だけ選べます）。", action: "none" };
+    case "IMPORT_DECISIONS_REQUIRED":
+      return { message: "まだ決めていない行があります。同じ人の候補と同意の選択肢を選んでから、もう一度取り込んでください。", action: "none" };
+    case "PEOPLE_CONFIRM_REQUIRED":
+      return { message: "メモや声かけを書き足した人がいます。残すか消すかを選んでください。", action: "none" };
+    case "OUTREACH_NEEDS_APPROVAL":
+      return { message: "先に「OKをもらった」にしてください。本人のOKのあとでつなげます。", action: "none" };
+    case "OUTREACH_NO_CONSENT":
+      return { message: "この人は、この目的の個別の案内に同意していません。", action: "none" };
     case "INVITE_INVALID":
       return {
         message: "このリンクは使えません。作り直されたか、チームが削除されました。管理者に、新しいリンクを頼んでください。",

@@ -4,6 +4,8 @@
 
 **入力**：`specs/people/001-people-memo/spec.md`（Clarifications 2026-11-13を含む）、Constitution 4.9.0、[docs/app-separation.md](../../../docs/app-separation.md)、[docs/module-map.md](../../../docs/module-map.md)（6章・7-6）、[docs/product-structure.md](../../../docs/product-structure.md) 5〜7、[docs/parallel-development.md](../../../docs/parallel-development.md)、[029 contracts/platform-entry.md](../../meguru/029-threads-pattern1/contracts/platform-entry.md)（入口の関数・出来事・登録）、specs/meguru/030-app-access（アプリの利用の許可。まだ`develop`に入っていない）、[specs/collect/001-event-day-collection](../../collect/001-event-day-collection/plan.md)（計画の形・`nameKey`）
 
+**T001の確かめ（2026-11-13）**：030は`develop`に入り、`registerAppAccess`・`requireAppAccess`（`apps/api/src/platform/index.ts`）・`APP_NOT_AVAILABLE`（`packages/shared/src/errors.ts`）の名前と置き場所は、この計画のとおりだった。直すところはない。「まだ決めていないこと」1〜4は、とりあえずの決めのまま実装した。
+
 **実装の時期**：029は`develop`に入った（Threadsはパターン①）。**030（アプリの利用の許可）が`develop`に入ってから、PR1を始める**。人物メモの側で利用権の仕組みは作らない（research.md R3）。
 
 ## まだ決めていないこと（ユーザーに確かめたい）

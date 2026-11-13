@@ -87,7 +87,7 @@ describe("アプリの一覧とのそろえ", () => {
   it("組み立ては、出してよいアプリ（released）だけを登録する", async () => {
     const { registeredApps } = await import("@/app-registry");
     const { appById } = await import("@meguru/shared");
-    expect(registeredApps.map((a) => a.id)).toEqual(["threads"]);
+    expect(registeredApps.map((a) => a.id)).toEqual(["threads", "people"]);
     expect(registeredApps.every((a) => appById(a.id)?.released)).toBe(true);
   });
 });

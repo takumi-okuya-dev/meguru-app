@@ -169,11 +169,9 @@ describe("運営者の画面の読む方（appAccess）", () => {
 
   it("登録の一覧に、各アプリの利用の決まりが入る（だれでも使えるアプリは open）", async () => {
     const registry = (await (await callOp("GET", "/api/operator/app-registry", { user: OP })).json()) as OperatorAppRegistry;
-    expect(registry.apps.map((a) => [a.app, a.access])).toEqual([
-      ["threads", "open"],
-      [DEMO, "granted"],
-    ]);
-    expect(registry.apps[1]).toEqual({ app: DEMO, access: "granted", featureSwitches: false, operatorLimits: false, features: [], limits: [] });
+    // 人物メモなど、ほかのアプリも「運営者が開いた人だけ」で登録している（アプリが増えても書き直さない）
+    expect(Object.fromEntries(registry.apps.map((a) => [a.app, a.access]))).toMatchObject({ threads: "open", people: "granted", [DEMO]: "granted" });
+    expect(registry.apps.find((a) => a.app === DEMO)).toEqual({ app: DEMO, access: "granted", featureSwitches: false, operatorLimits: false, features: [], limits: [] });
   });
 });
 

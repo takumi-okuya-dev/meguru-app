@@ -149,19 +149,20 @@ sequenceDiagram
   participant DB as people スキーマ
 
   U->>W: 人物管理を開く
-  W->>C: GET /api/people/people（Clerkのトークン付き）
-  C->>P: ログインを確かめる
+  W->>C: GET /api/people/events（Clerkのトークン付き）
+  C->>P: ログインを確かめる（authMiddleware）
   P-->>C: 今の利用者（利用者のID）
+  C->>P: アプリの利用の許可を確かめる（requireAppAccess("people")。なければ 403）
+  P-->>C: 使える
   C->>M: 利用者のIDを渡して呼ぶ
-  M->>P: 利用権を確かめる（利用者のID・people）
-  P-->>M: 使える
   M->>DB: 利用者のIDで自分の表を読む
-  DB-->>M: 人物の一覧
-  M-->>W: 200 人物の一覧
+  DB-->>M: イベントの一覧
+  M-->>W: 200 イベントの一覧
 ```
 
 - 2作目は、利用者のIDを`user_id`の列に値として持つ。`users`の表に外部キーは張らない。
 - 名前など共通の情報が要るときも、共通の入口の関数を呼ぶ（2作目の表に写して持たない）。
+- 人物メモ（specs/people/001-people-memo）は、この形で作った。関所は`apps/people/routes.ts`の`use("*", authed, requireAppAccess("people"))`の1か所、持ち主の確かめは`apps/people/access.ts`の1か所。同じ作り手の取り込み・取り消しは、作り手ごとのアドバイザリーロック（`lockOwner`）で直列にする。退会は`registerConsumer("people", "user.withdrawn", …)`で受け取り、`people.received_events`で2回届いても同じ結果にする。
 - Threadsも同じ流れで動く。たとえば`GET /api/threads/me`（`apps/api/src/apps/threads/me/threads-me.ts`）は、利用権を`loadAppEntitlements`、名前を`peopleNames`で受け取り、自分の表だけを読む。
 
 ### 3-2. 退会したとき（共通で起きたことを、アプリが知る）

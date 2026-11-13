@@ -1,8 +1,11 @@
 # 入口と、それぞれの処理（関所を含む）の数
 ALL /* ×1
 ALL /api/* ×2
+ALL /api/people/* ×2
 DELETE /api/operator/feature-settings/:userId ×3
 DELETE /api/operator/test-groups/:groupId/members/:userId ×3
+DELETE /api/people/events/:eventId ×1
+DELETE /api/people/imports/:importId ×1
 DELETE /api/threads/accounts/:accountId ×2
 DELETE /api/threads/accounts/:accountId/draft-batches/:batchId ×2
 DELETE /api/threads/accounts/:accountId/mention-people/:personId ×2
@@ -29,6 +32,12 @@ GET /api/operator/limits/users ×3
 GET /api/operator/test-groups ×3
 GET /api/operator/test-groups/:groupId ×3
 GET /api/operator/users ×3
+GET /api/people/events ×1
+GET /api/people/events/:eventId ×1
+GET /api/people/events/:eventId/attendees ×1
+GET /api/people/events/:eventId/delete-preview ×1
+GET /api/people/imports/:importId/undo-preview ×1
+GET /api/people/me ×1
 GET /api/referral-page ×1
 GET /api/test-invites/:token ×2
 GET /api/threads/accounts/:accountId ×2
@@ -72,6 +81,7 @@ GET /api/threads/teams/:teamId/assignments ×3
 GET /api/threads/teams/:teamId/invite ×3
 GET /api/threads/teams/:teamId/status ×3
 PATCH /api/operator/test-groups/:groupId ×3
+PATCH /api/people/events/:eventId ×1
 PATCH /api/threads/accounts/:accountId ×2
 PATCH /api/threads/accounts/:accountId/analysis/settings ×2
 PATCH /api/threads/accounts/:accountId/mention-people/:personId ×2
@@ -86,6 +96,9 @@ POST /api/me/withdraw ×2
 POST /api/operator/test-groups ×3
 POST /api/operator/test-groups/:groupId/close ×3
 POST /api/operator/test-groups/:groupId/rotate-invite ×3
+POST /api/people/events ×1
+POST /api/people/imports ×2
+POST /api/people/imports/preview ×2
 POST /api/stripe/webhook ×2
 POST /api/test-invites/:token/join ×2
 POST /api/threads/accounts ×2
@@ -152,3 +165,5 @@ PUT /api/threads/teams/:teamId/assignments/:userId/accounts/:accountId ×3
 #1 ALL /api/*
 #2 ALL /*
 #3 ALL /api/*
+#4 ALL /api/people/*
+#5 ALL /api/people/*
