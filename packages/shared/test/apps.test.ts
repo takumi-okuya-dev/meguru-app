@@ -16,9 +16,15 @@ describe("アプリの一覧", () => {
     expect(threads.priceLabel).toBe("アカウント1件につき月1,000円");
   });
 
+  it("集金管理は「めぐる 集金」で、パスは /collect、料金なし", () => {
+    expect(appById("collect")).toMatchObject({ name: "めぐる 集金", basePath: "/collect", priceLabel: "テスト版（料金なし）" });
+  });
+
   it("出してよいアプリだけを releasedApps と isReleasedAppId が通す", () => {
-    expect(releasedApps().map((a) => a.id)).toEqual(["threads"]);
+    // 集金管理（specs/collect/001-event-day-collection）は出してよいアプリ。だれに出すかは API の利用の許可で決める
+    expect(releasedApps().map((a) => a.id)).toEqual(["threads", "collect"]);
     expect(isReleasedAppId("threads")).toBe(true);
+    expect(isReleasedAppId("collect")).toBe(true);
     expect(isReleasedAppId("people")).toBe(false);
     expect(isReleasedAppId(1)).toBe(false);
   });

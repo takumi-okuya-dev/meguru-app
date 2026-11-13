@@ -1,0 +1,62 @@
+// 集金管理のAPIの呼び出し（specs/collect/001-event-day-collection contracts/api.md 1〜3・7）。道筋は /api/collect/…。
+// APIの基本のURL・認証のトークン・エラーの扱いは、共通の部品（lib/api-client.ts の request・requestBlob）を使う。
+import {
+  addRosterPersonResponseSchema,
+  bulkAddRosterResponseSchema,
+  collectEventListSchema,
+  collectEventSchema,
+  collectMeSchema,
+  collectSettingsSchema,
+  pastAttendeesResponseSchema,
+  rosterListSchema,
+  rosterPersonSchema,
+  type CollectMedia,
+  type CollectMethod,
+} from "@meguru/shared";
+import { z } from "zod";
+import { request, requestBlob } from "@/lib/api-client";
+
+/** イベントを作る・直すときの入力（画面の値）。 */
+export type EventInput = {
+  name: string;
+  startsAt: string;
+  endsAt: string | null;
+  venue: string | null;
+  capacity: number | null;
+  methods: CollectMethod[];
+  tiers: { id?: string; name: string; amount: number }[];
+};
+
+/** 名簿の人を足す・直すときの入力。 */
+export type PersonInput = { name: string; kana?: string | null; media: CollectMedia; priceTierId: string; memo?: string | null };
+
+const json = (method: string, body: unknown): RequestInit => ({ method, body: JSON.stringify(body) });
+const ev = (eventId: string) => `/api/collect/events/${encodeURIComponent(eventId)}`;
+
+/** 集金管理のAPI。 */
+export const collectApi = {
+  me: () => request("/api/collect/me", collectMeSchema),
+  // ---- イベント ----
+  events: () => request("/api/collect/events", collectEventListSchema),
+  event: (eventId: string) => request(ev(eventId), collectEventSchema),
+  createEvent: (input: EventInput) => request("/api/collect/events", collectEventSchema, json("POST", input)),
+  updateEvent: (eventId: string, input: Partial<EventInput>) => request(ev(eventId), collectEventSchema, json("PATCH", input)),
+  // ---- 名簿 ----
+  roster: (eventId: string) => request(`${ev(eventId)}/roster`, rosterListSchema),
+  addPerson: (eventId: string, input: PersonInput) => request(`${ev(eventId)}/roster`, addRosterPersonResponseSchema, json("POST", input)),
+  addPeopleBulk: (eventId: string, input: { names: string[]; media: CollectMedia; priceTierId: string }) =>
+    request(`${ev(eventId)}/roster/bulk`, bulkAddRosterResponseSchema, json("POST", input)),
+  updatePerson: (eventId: string, personId: string, input: Partial<PersonInput>) =>
+    request(`${ev(eventId)}/roster/${encodeURIComponent(personId)}`, z.object({ person: rosterPersonSchema, version: z.number() }), json("PATCH", input)),
+  deletePerson: (eventId: string, personId: string) =>
+    request(`${ev(eventId)}/roster/${encodeURIComponent(personId)}`, z.object({ version: z.number() }), { method: "DELETE" }),
+  pastAttendees: (eventId: string, q: string) =>
+    request(`/api/collect/past-attendees?${new URLSearchParams({ eventId, q })}`, pastAttendeesResponseSchema),
+  // ---- 既定値 ----
+  settings: () => request("/api/collect/settings", collectSettingsSchema),
+  saveBankText: (bankText: string | null) => request("/api/collect/settings", collectSettingsSchema, json("PUT", { bankText })),
+  uploadPaypayQr: (image: Blob) =>
+    request("/api/collect/settings/paypay-qr", collectSettingsSchema, { method: "PUT", body: image, headers: { "Content-Type": image.type } }),
+  paypayQr: () => requestBlob("/api/collect/settings/paypay-qr"),
+  deletePaypayQr: () => request("/api/collect/settings/paypay-qr", collectSettingsSchema, { method: "DELETE" }),
+};
