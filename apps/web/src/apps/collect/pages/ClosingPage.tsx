@@ -13,6 +13,7 @@ import { LoadingSkeleton } from "@/components/LoadingSkeleton";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { formatJstShort } from "@/lib/format";
+import { saveFile } from "@/lib/save-file";
 import { PageBody, PageHeader } from "@/shell";
 import { collectApi } from "../lib/api";
 import { collectErrorText } from "../lib/errors";
@@ -20,6 +21,16 @@ import { transfersPath } from "../lib/paths";
 import { useLive } from "../lib/live";
 import { collectQueryKeys } from "../lib/query-keys";
 import { yen } from "../lib/reception-model";
+
+/**
+ * API のファイル名が読めないときの CSV のファイル名（API の export-csv.ts と同じく、ファイル名に使えない文字は _ にする）。
+ * @param event - イベント（名前と始まる時刻）
+ * @returns 「集金_2026-11-20_IT交流会.csv」
+ */
+export function fallbackCsvName(event: { name: string; startsAt: string }): string {
+  const day = new Date(new Date(event.startsAt).getTime() + 9 * 3600_000).toISOString().slice(0, 10);
+  return `集金_${day}_${event.name.replace(/[\\/:*?"<>|\r\n]/g, "_")}.csv`;
+}
 
 /**
  * 渡された額と合計の差の言葉。
@@ -122,15 +133,8 @@ export function ClosingPage() {
   });
   const exportCsv = useMutation({
     mutationFn: () => collectApi.exportCsv(eventId),
-    onSuccess: (blob) => {
-      const c = closing.data!;
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `集金_${new Date(new Date(c.event.startsAt).getTime() + 9 * 3600_000).toISOString().slice(0, 10)}_${c.event.name}.csv`;
-      a.click();
-      URL.revokeObjectURL(url);
-    },
+    // ファイル名は API が付けたもの（使えない文字は API が置き換える）。読めないときだけ画面で作る
+    onSuccess: ({ blob, filename }) => saveFile(blob, filename ?? fallbackCsvName(closing.data!.event)),
     onError: (e) => toast.error(collectErrorText(e)),
   });
 
