@@ -48,10 +48,10 @@
 
 ## Phase 7: 招待とつながった人の画面（PR3）
 
-- [ ] T025 [US5] 運営メンバーの行の「招待のリンクを出す」（QR・コピー・期限・止める・出し直す）を MemberList に
-- [ ] T026 [US5] 招待を受ける画面 apps/web/src/apps/collect/pages/JoinPage.tsx（`/collect/join/:token`。ログインしていなければ `/sign-in?next=…`）
-- [ ] T027 [US5] つながった人の画面 apps/web/src/apps/collect/pages/SharesPage.tsx（`/collect/shares`・`/collect/shares/:eventId`。集金管理の骨格の外。読むだけ・自分の行に「あなた」）
-- [ ] T028 [US5] 利用の許可のない人の「使えません」の画面に、つながったイベントがあれば入口を出す（apps/web/src/apps/collect/routes.tsx）
-- [ ] T029 Web のテスト apps/web/test/collect/sharing-invites.test.tsx
-- [ ] T030 E2E e2e/tests/collect-sharing.spec.ts（主催者：経費・運営メンバー・分配 → 招待 → 別の利用者が受けて見る・名簿が見えない）
-- [ ] T031 docs/apps/collect-guide.md に分配と招待の使い方
+- [x] T025 [US5] 運営メンバーの行の「招待のリンクを出す」（QR・コピー・期限・止める・出し直す）を MemberList に
+- [x] T026 [US5] 招待を受ける画面 apps/web/src/apps/collect/pages/JoinPage.tsx（`/collect/join/:token`。ログインしていなければ `/sign-in?next=…`）
+- [x] T027 [US5] つながった人の画面 apps/web/src/apps/collect/pages/SharesPage.tsx（`/collect/shares`・`/collect/shares/:eventId`。集金管理の骨格の外。読むだけ・自分の行に「あなた」）
+- [x] T028 [US5] 利用の許可のない人の「使えません」の画面に、つながったイベントがあれば入口を出す（apps/web/src/apps/collect/routes.tsx）
+- [x] T029 Web のテスト apps/web/test/collect/sharing-invites.test.tsx
+- [x] T030 E2E e2e/tests/collect-sharing.spec.ts（主催者：経費・運営メンバー・分配 → 招待 → 別の利用者が受けて見る・名簿が見えない）
+- [ ] T031 docs/apps/collect-guide.md に分配と招待の使い方（collect-guide.md を入れる #123 のあとで足す）

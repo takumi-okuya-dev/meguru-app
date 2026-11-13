@@ -10,6 +10,7 @@ import { formatJstShort } from "@/lib/format";
 import { PageBody, PageHeader } from "@/shell";
 import { DistributionTable, RevenueSummary } from "../components/sharing/DistributionTable";
 import { ExpenseList } from "../components/sharing/ExpenseList";
+import { InviteButton } from "../components/sharing/InviteButton";
 import { MemberList } from "../components/sharing/MemberList";
 import { ReferralTable } from "../components/sharing/ReferralTable";
 import { collectApi } from "../lib/api";
@@ -89,7 +90,19 @@ export function SharingPage() {
             onAdd={(input) => run(() => collectApi.addMember(eventId, input))}
             onUpdate={(id, input) => run(() => collectApi.updateMember(eventId, id, input))}
             onDelete={(id) => run(() => collectApi.deleteMember(eventId, id))}
+            extra={(m) => (
+              <InviteButton
+                eventId={eventId}
+                member={m}
+                onChange={(next) =>
+                  next
+                    ? queryClient.setQueryData(collectQueryKeys.sharing(eventId), next)
+                    : void queryClient.invalidateQueries({ queryKey: collectQueryKeys.sharing(eventId) })
+                }
+              />
+            )}
           />
+          <p className="text-xs text-muted-foreground">「招待」でリンクを送ると、運営メンバーはめぐるにログインして、このイベントの分配を読むだけで見られます。</p>
         </section>
 
         <section aria-labelledby="distribution-title" className={section}>
