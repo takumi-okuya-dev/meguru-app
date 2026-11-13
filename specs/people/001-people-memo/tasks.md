@@ -191,24 +191,24 @@ description: "Task list for people 001 people memo"
 
 ### Tests for User Story 3 ⚠️
 
-- [ ] T069 [P] [US3] `sp/invite.test.ts`：`buildInviteMessage(template, { name, eventName, heldOn })`が`{名前}`・`{会の名前}`・`{日にち}`を差し込む（`{日にち}`は「12月13日（土）」の形・日本時間）、`DEFAULT_INVITE_TEMPLATE`が「{名前}さん、{日にち}の{会の名前}、もしご興味あれば一緒にいかがですか？」、型に差し込みがなくても型のまま返す。research.md R17。
-- [ ] T070 [P] [US3] `ptest/candidates.test.ts`：`purpose=invite`は交流会への誘いの同意が真の人だけ、**「個別の案内は希望しない」と答えた人・同意の列がなかった人は、どの絞り込みの組み合わせでも出ない**（すべての絞り込みを順に当てて確かめる。SC-003）、手で同意した人は出る、`visitedOwn=true`で自分の会に1回以上来た人だけ（参加者として出た会だけの人は出ない）、ほかの絞り込みと並び（最後に会った日の新しい順）、`eventId`の会への声かけ（`outreach`）が行に入る、`purpose`がないと400。FR-018・FR-019。
-- [ ] T071 [P] [US3] `ptest/outreach-invite.test.ts`：声かけを始める（同意がなければ409 `OUTREACH_NO_CONSENT`、同じ人・同じ誘う会なら200で今のもの・新しければ201で`asked`）、`stage`を`link_sent`・`attended`へ進める・1つ戻すと先の日時が空になる、誘った会の回答を取り込んで同じ人につなぐ・まとめる・会ったイベントを足すと自動で`attended`（FR-022）、誘う会を消すと声かけも消える、人を消すと声かけも消える、まとめるとき同じ声かけが両方にあれば進み具合の先の方が残る。research.md R15・R16。
-- [ ] T072 [P] [US3] `ptest/settings.test.ts`：`GET/PUT /api/people/settings`（`inviteTemplate`「1〜500文字か`null`」・`repeaterGoal`「1〜10,000か`null`」。超えたら400）、`GET /api/people/stats`の`nextOwnEvent`（今日以降でいちばん近い自分の会。なければ`null`）。
-- [ ] T073 [P] [US3] `wtest/candidates.test.tsx`：誘う会の初めの値、絞り込み、「文をコピー」で`navigator.clipboard.writeText`に名前・会の名前・日にちの入った文（使えないときは文を選んだ欄）、コピーのあと「興味を聞いたにする」で声かけを始める、進み具合のボタン、誘う会がないときは「誘う会を選んでください」、上に「個別の案内に同意した人だけを出しています」。
+- [x] T069 [P] [US3] `sp/invite.test.ts`：`buildInviteMessage(template, { name, eventName, heldOn })`が`{名前}`・`{会の名前}`・`{日にち}`を差し込む（`{日にち}`は「12月13日（土）」の形・日本時間）、`DEFAULT_INVITE_TEMPLATE`が「{名前}さん、{日にち}の{会の名前}、もしご興味あれば一緒にいかがですか？」、型に差し込みがなくても型のまま返す。research.md R17。
+- [x] T070 [P] [US3] `ptest/candidates.test.ts`：`purpose=invite`は交流会への誘いの同意が真の人だけ、**「個別の案内は希望しない」と答えた人・同意の列がなかった人は、どの絞り込みの組み合わせでも出ない**（すべての絞り込みを順に当てて確かめる。SC-003）、手で同意した人は出る、`visitedOwn=true`で自分の会に1回以上来た人だけ（参加者として出た会だけの人は出ない）、ほかの絞り込みと並び（最後に会った日の新しい順）、`eventId`の会への声かけ（`outreach`）が行に入る、`purpose`がないと400。FR-018・FR-019。
+- [x] T071 [P] [US3] `ptest/outreach-invite.test.ts`：声かけを始める（同意がなければ409 `OUTREACH_NO_CONSENT`、同じ人・同じ誘う会なら200で今のもの・新しければ201で`asked`）、`stage`を`link_sent`・`attended`へ進める・1つ戻すと先の日時が空になる、誘った会の回答を取り込んで同じ人につなぐ・まとめる・会ったイベントを足すと自動で`attended`（FR-022）、誘う会を消すと声かけも消える、人を消すと声かけも消える、まとめるとき同じ声かけが両方にあれば進み具合の先の方が残る。research.md R15・R16。
+- [x] T072 [P] [US3] `ptest/settings.test.ts`：`GET/PUT /api/people/settings`（`inviteTemplate`「1〜500文字か`null`」・`repeaterGoal`「1〜10,000か`null`」。超えたら400）、`GET /api/people/stats`の`nextOwnEvent`（今日以降でいちばん近い自分の会。なければ`null`）。
+- [x] T073 [P] [US3] `wtest/candidates.test.tsx`：誘う会の初めの値、絞り込み、「文をコピー」で`navigator.clipboard.writeText`に名前・会の名前・日にちの入った文（使えないときは文を選んだ欄）、コピーのあと「興味を聞いたにする」で声かけを始める、進み具合のボタン、誘う会がないときは「誘う会を選んでください」、上に「個別の案内に同意した人だけを出しています」。
 
 ### Implementation for User Story 3
 
-- [ ] T074 [US3] `sp/invite.ts`に`buildInviteMessage`・`DEFAULT_INVITE_TEMPLATE`を作る（T069を通す）。
-- [ ] T075 [US3] `ppl/schema.ts`に`outreaches`（data-model.md 2-11：`purpose`「`invite`・`work`」のcheck、`invite`なら`event_id`必須・`target_name`は空、`work`なら`event_id`は空・`target_name`「1〜100文字」必須のcheck、`stage`の値のcheck（`invite`：`asked`・`link_sent`・`attended`、`work`：`asked`・`approved`・`connected`）、「`stage = connected`なら`approved_at`がある」のcheck、部分一意索引`(person_id, event_id) WHERE purpose = 'invite'`・`(person_id, target_key) WHERE purpose = 'work'`、`person_id`・`event_id`は`ON DELETE CASCADE`）と`owner_settings`（2-12：`invite_template`「1〜500文字」・`repeater_goal`「1〜10,000」のcheck）を足す。マイグレーションを作り、SQLを読んでからコミットする。`api-test/helpers/app.ts`の`TRUNCATE`に2つの表を足す。
-- [ ] T076 [US3] `ppl/outreach/candidate-service.ts`・`ppl/outreach/candidate-routes.ts`：`GET /api/people/candidates`（T051 の部品を使い、目的の同意を問い合わせの条件に入れる。画面では絞らない）。`routes.snapshot.txt`を更新する。
-- [ ] T077 [US3] `ppl/outreach/outreach-service.ts`・`ppl/outreach/outreach-routes.ts`：`POST /api/people/outreaches`（同意の確かめ・同じ声かけは今のものを返す）・`PATCH`（同じ目的の進み具合・戻したら先の日時を空に）・`DELETE`（`invite`の分。`work`は T089）。`markInviteAttended(tx, personId, eventId)`を書き出す。`routes.snapshot.txt`を更新する。
-- [ ] T078 [US3] `ppl/settings/settings-service.ts`・`ppl/settings/settings-routes.ts`：`GET/PUT /api/people/settings`・`GET /api/people/stats`（`nextOwnEvent`。リピーターは T085）。`routes.snapshot.txt`を更新する。
-- [ ] T079 [US3] 自動で「来た」をつなぐ：`ppl/imports/commit.ts`（新しい人・つないだ人）・`ppl/persons/person-merge.ts`（あわせて声かけの移し替え：同じ声かけが両方にあれば進み具合の先の方を残す）・`ppl/persons/person-create.ts`（会ったイベントを足す）のトランザクションの最後で`markInviteAttended`を呼ぶ。T071を通す。
-- [ ] T080 [US3] `wppl/pages/CandidatesPage.tsx`（`/people`。PR1の`HomePage.tsx`を置き換える）と`wppl/components/candidates/`（誘う会の選択・絞り込み・人の行・文をコピー・興味を聞いたにする・進み具合）。文は`buildInviteMessage`で作る（APIを呼ばない）。T073を通す。
-- [ ] T081 [P] [US3] `wppl/pages/SettingsPage.tsx`（`/people/settings`：誘いの文の型（差し込みの説明・見本・初めの型に戻す）・リピーターの目標）と、サイドバーの「誘いの文と目標」。
-- [ ] T082 [US3] `wppl/pages/PersonPage.tsx`に声かけの記録（誘う会ごとの進み具合と日時）を足す。
-- [ ] T083 [US3] `e2e/tests/people-invite.spec.ts`：①10/11・11/25を取り込んだ状態で誘う候補を開き、「前に来た」「次回参加」で絞る ②「個別の案内は希望しない」の人が出ない ③文をコピー → 興味を聞いたにする ④**390px幅で、下のバーの「誘う候補」→「文をコピー」の3回のタップ以内で文がコピーされる**（SC-005）（quickstart.md 4）。
+- [x] T074 [US3] `sp/invite.ts`に`buildInviteMessage`・`DEFAULT_INVITE_TEMPLATE`を作る（T069を通す）。
+- [x] T075 [US3] `ppl/schema.ts`に`outreaches`（data-model.md 2-11：`purpose`「`invite`・`work`」のcheck、`invite`なら`event_id`必須・`target_name`は空、`work`なら`event_id`は空・`target_name`「1〜100文字」必須のcheck、`stage`の値のcheck（`invite`：`asked`・`link_sent`・`attended`、`work`：`asked`・`approved`・`connected`）、「`stage = connected`なら`approved_at`がある」のcheck、部分一意索引`(person_id, event_id) WHERE purpose = 'invite'`・`(person_id, target_key) WHERE purpose = 'work'`、`person_id`・`event_id`は`ON DELETE CASCADE`）と`owner_settings`（2-12：`invite_template`「1〜500文字」・`repeater_goal`「1〜10,000」のcheck）を足す。マイグレーションを作り、SQLを読んでからコミットする。`api-test/helpers/app.ts`の`TRUNCATE`に2つの表を足す。
+- [x] T076 [US3] `ppl/outreach/candidate-service.ts`・`ppl/outreach/candidate-routes.ts`：`GET /api/people/candidates`（T051 の部品を使い、目的の同意を問い合わせの条件に入れる。画面では絞らない）。`routes.snapshot.txt`を更新する。
+- [x] T077 [US3] `ppl/outreach/outreach-service.ts`・`ppl/outreach/outreach-routes.ts`：`POST /api/people/outreaches`（同意の確かめ・同じ声かけは今のものを返す）・`PATCH`（同じ目的の進み具合・戻したら先の日時を空に）・`DELETE`（`invite`の分。`work`は T089）。`markInviteAttended(tx, personId, eventId)`を書き出す。`routes.snapshot.txt`を更新する。
+- [x] T078 [US3] `ppl/settings/settings-service.ts`・`ppl/settings/settings-routes.ts`：`GET/PUT /api/people/settings`・`GET /api/people/stats`（`nextOwnEvent`。リピーターは T085）。`routes.snapshot.txt`を更新する。
+- [x] T079 [US3] 自動で「来た」をつなぐ：`ppl/imports/commit.ts`（新しい人・つないだ人）・`ppl/persons/person-merge.ts`（あわせて声かけの移し替え：同じ声かけが両方にあれば進み具合の先の方を残す）・`ppl/persons/person-create.ts`（会ったイベントを足す）のトランザクションの最後で`markInviteAttended`を呼ぶ。T071を通す。
+- [x] T080 [US3] `wppl/pages/CandidatesPage.tsx`（`/people`。PR1の`HomePage.tsx`を置き換える）と`wppl/components/candidates/`（誘う会の選択・絞り込み・人の行・文をコピー・興味を聞いたにする・進み具合）。文は`buildInviteMessage`で作る（APIを呼ばない）。T073を通す。
+- [x] T081 [P] [US3] `wppl/pages/SettingsPage.tsx`（`/people/settings`：誘いの文の型（差し込みの説明・見本・初めの型に戻す）・リピーターの目標）と、サイドバーの「誘いの文と目標」。
+- [x] T082 [US3] `wppl/pages/PersonPage.tsx`に声かけの記録（誘う会ごとの進み具合と日時）を足す。
+- [x] T083 [US3] `e2e/tests/people-invite.spec.ts`：①10/11・11/25を取り込んだ状態で誘う候補を開き、「前に来た」「次回参加」で絞る ②「個別の案内は希望しない」の人が出ない ③文をコピー → 興味を聞いたにする ④**390px幅で、下のバーの「誘う候補」→「文をコピー」の3回のタップ以内で文がコピーされる**（SC-005）（quickstart.md 4）。
 
 ## Phase 10：User Story 5 - リピーターの目標と今の数を比べる（Priority: P2）
 
@@ -218,9 +218,9 @@ description: "Task list for people 001 people memo"
 
 ### Tests for User Story 5 ⚠️
 
-- [ ] T084 [P] [US5] `ptest/stats.test.ts`：リピーター＝自分の会の来た記録が2つ以上の人（参加者として出た会は数えない・手で足した会ったイベントも数える・同じ会に回答が2つでも1回）、`GET /api/people/stats`の`repeaterCount`・`repeaterGoal`、自分の会の`stats`の`firstTimeCount`・`returningCount`（その会より前の開催日の自分の会に来ていない／来た。同じ日は前に数えない）・`erasedCount`は別に出る、`attendees`の`firstTime`、イベントの開催日・自分の会かを直すと数が変わる。research.md R12。
-- [ ] T085 [US5] `ppl/settings/settings-service.ts`の`stats`に`repeaterCount`、`ppl/events/event-service.ts`の自分の会の`stats`に`firstTimeCount`・`returningCount`と`attendees`の`firstTime`を足す（T051 の部品で数える）。T084を通す。
-- [ ] T086 [P] [US5] `wtest/repeater.test.tsx`を先に書いてから、`wppl/pages/CandidatesPage.tsx`の上の段（「リピーター n人／目標 n人」、目標がなければ「目標を決める」）と`wppl/pages/EventPage.tsx`の数字（参加者・初めて・前にも来た・消した人）を作る。
+- [x] T084 [P] [US5] `ptest/stats.test.ts`：リピーター＝自分の会の来た記録が2つ以上の人（参加者として出た会は数えない・手で足した会ったイベントも数える・同じ会に回答が2つでも1回）、`GET /api/people/stats`の`repeaterCount`・`repeaterGoal`、自分の会の`stats`の`firstTimeCount`・`returningCount`（その会より前の開催日の自分の会に来ていない／来た。同じ日は前に数えない）・`erasedCount`は別に出る、`attendees`の`firstTime`、イベントの開催日・自分の会かを直すと数が変わる。research.md R12。
+- [x] T085 [US5] `ppl/settings/settings-service.ts`の`stats`に`repeaterCount`、`ppl/events/event-service.ts`の自分の会の`stats`に`firstTimeCount`・`returningCount`と`attendees`の`firstTime`を足す（T051 の部品で数える）。T084を通す。
+- [x] T086 [P] [US5] `wtest/repeater.test.tsx`を先に書いてから、`wppl/pages/CandidatesPage.tsx`の上の段（「リピーター n人／目標 n人」、目標がなければ「目標を決める」）と`wppl/pages/EventPage.tsx`の数字（参加者・初めて・前にも来た・消した人）を作る。
 
 **Checkpoint（PR3を出せる）**：quickstart.md 4 が通る。テスト版で、12月の会の誘いに使える。
 
@@ -236,20 +236,20 @@ description: "Task list for people 001 people memo"
 
 ### Tests for User Story 6 ⚠️
 
-- [ ] T087 [P] [US6] `ptest/outreach-work.test.ts`：`purpose=work`の候補は仕事のつなぎの同意が真の人だけ（「個別の案内は希望しない」の人は出ない）、声かけを始める（`targetName`「1〜100文字」・同意がなければ409 `OUTREACH_NO_CONSENT`・同じ人で`nameKey`が同じ相談先なら200で今のもの・`asked`から）、**`approved`の前に`connected`にすると409 `OUTREACH_NEEDS_APPROVAL`**（表のcheckでも止まる）、`approved` → `connected`で日時が残る、人のページの`outreaches`に相談先・日時が出る、誘う候補の行の`outreach`は最新の声かけ。FR-023・research.md R16。
-- [ ] T088 [P] [US6] `wtest/candidates-work.test.tsx`：目的の切り替え（`?purpose=work`）、「声かけを始める」（相談先の名前を入れる）、「OKをもらった」の前に「つないだ」が出ない、人のページの記録（いつ・どの相談先へ・「あなたが記録」）。
+- [x] T087 [P] [US6] `ptest/outreach-work.test.ts`：`purpose=work`の候補は仕事のつなぎの同意が真の人だけ（「個別の案内は希望しない」の人は出ない）、声かけを始める（`targetName`「1〜100文字」・同意がなければ409 `OUTREACH_NO_CONSENT`・同じ人で`nameKey`が同じ相談先なら200で今のもの・`asked`から）、**`approved`の前に`connected`にすると409 `OUTREACH_NEEDS_APPROVAL`**（表のcheckでも止まる）、`approved` → `connected`で日時が残る、人のページの`outreaches`に相談先・日時が出る、誘う候補の行の`outreach`は最新の声かけ。FR-023・research.md R16。
+- [x] T088 [P] [US6] `wtest/candidates-work.test.tsx`：目的の切り替え（`?purpose=work`）、「声かけを始める」（相談先の名前を入れる）、「OKをもらった」の前に「つないだ」が出ない、人のページの記録（いつ・どの相談先へ・「あなたが記録」）。
 
 ### Implementation for User Story 6
 
-- [ ] T089 [US6] `ppl/outreach/outreach-service.ts`に`work`（`target_key`＝`nameKey(targetName)`・`approved_at`がなければ`connected`は409・戻すと先の日時を空に）と、`ppl/outreach/candidate-service.ts`に`purpose=work`の最新の声かけを足す。T087を通す。
-- [ ] T090 [US6] `wppl/pages/CandidatesPage.tsx`の目的の切り替えと`wppl/components/candidates/`の「声かけを始める」・進み具合のボタン、`wppl/pages/PersonPage.tsx`の仕事のつなぎの記録。T088を通す。
+- [x] T089 [US6] `ppl/outreach/outreach-service.ts`に`work`（`target_key`＝`nameKey(targetName)`・`approved_at`がなければ`connected`は409・戻すと先の日時を空に）と、`ppl/outreach/candidate-service.ts`に`purpose=work`の最新の声かけを足す。T087を通す。
+- [x] T090 [US6] `wppl/pages/CandidatesPage.tsx`の目的の切り替えと`wppl/components/candidates/`の「声かけを始める」・進み具合のボタン、`wppl/pages/PersonPage.tsx`の仕事のつなぎの記録。T088を通す。
 
 ## Phase 12：文書と仕上げ（各PRで、そのPRの分を直す）
 
-- [ ] T091 [P] `docs/module-map.md`に人物メモを足す（2章に`apps/people`の表・入口・道筋の表、2-5の組み立てに`registerPeople()`、7-3にWebの`apps/people/`）。PR1で土台と取り込み、PR2で人、PR3で声かけ・設定。
-- [ ] T092 [P] `docs/app-separation.md`の例（`people`）を、実際に作った形（`requireAppAccess`・`registerConsumer`・`people.received_events`・作り手のロック）に合わせて直す（7章「2作目を作って具体的になったら直す」。PR1）。
-- [ ] T093 [P] `docs/product-structure.md`・`README.md`・`docs/architecture.md`に、めぐるのアプリとして人物メモを足す。`docs/ui-design.md`「5. 画面幅ごとの振る舞い」に、人物メモの下のバー（767px以下・4つ・アプリの切り替えは上部バーの左）を1行足す（research.md R20。PR1）。
-- [ ] T094 [P] `docs/user-guide.md`に、人物メモの使い方（取り込み・同じ人・人のページ・誘う候補・声かけ・消す）を足す（PR3・PR4）。
+- [x] T091 [P] `docs/module-map.md`に人物メモを足す（2章に`apps/people`の表・入口・道筋の表、2-5の組み立てに`registerPeople()`、7-3にWebの`apps/people/`）。PR1で土台と取り込み、PR2で人、PR3で声かけ・設定。
+- [x] T092 [P] （共通の文書は直さず、`docs/apps/people.md` 2章に実例を書いた。docs/parallel-development.md 11）`docs/app-separation.md`の例（`people`）を、実際に作った形（`requireAppAccess`・`registerConsumer`・`people.received_events`・作り手のロック）に合わせて直す（7章「2作目を作って具体的になったら直す」。PR1）。
+- [x] T093 [P] `docs/product-structure.md`・`README.md`・`docs/architecture.md`に、めぐるのアプリとして人物メモを足す。`docs/ui-design.md`「5. 画面幅ごとの振る舞い」に、人物メモの下のバー（767px以下・4つ・アプリの切り替えは上部バーの左）を1行足す（research.md R20。PR1）。
+- [x] T094 [P] （共通の文書は直さず、`docs/apps/people.md` 4章に書いた。docs/parallel-development.md 11）`docs/user-guide.md`に、人物メモの使い方（取り込み・同じ人・人のページ・誘う候補・声かけ・消す）を足す（PR3・PR4）。
 - [ ] T095 `specs/people/001-people-memo/quickstart.md`の1〜6を、各PRのマージのあとにテスト版で手で確かめ、確かめた日と結果を`specs/people/001-people-memo/checklists/manual-check.md`に残す。あわせて時間を測って同じファイルに書く：20行のCSVの初めての取り込み（5分以内）と2回目（2分以内。SC-001）、2回分を取り込んだあと12月の会の候補を出すまで（1分以内。SC-002）、同じ人の候補1組を見分けて選ぶ（10秒以内。SC-004）、スマートフォンで誘う候補から文のコピーまで（3回のタップ以内。SC-005）。作り手が実際の会で使い、SC-007の3つを満たしたかを同じファイルに書く。
 - [ ] T096 [P] スマートフォン（390px幅）で、取り込み（列の対応・候補のカード）・人の一覧・人のページ・誘う候補が横にスクロールしないこと、押すところが44px以上であること、下のバーで中身の最後が隠れないことを確かめる（spec Edge Cases「スマートフォンでの取り込み」）。
 

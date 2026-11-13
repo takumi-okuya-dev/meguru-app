@@ -28,7 +28,9 @@ async function rowsOf(userId: string) {
     (SELECT count(*) FROM people.responses WHERE user_id = ${userId})::int AS responses,
     (SELECT count(*) FROM people.persons WHERE user_id = ${userId})::int AS persons,
     (SELECT count(*) FROM people.consent_changes WHERE user_id = ${userId})::int AS consent_changes,
-    (SELECT count(*) FROM people.column_mappings WHERE user_id = ${userId})::int AS column_mappings`) as [Record<string, number>];
+    (SELECT count(*) FROM people.column_mappings WHERE user_id = ${userId})::int AS column_mappings,
+    (SELECT count(*) FROM people.outreaches WHERE user_id = ${userId})::int AS outreaches,
+    (SELECT count(*) FROM people.owner_settings WHERE user_id = ${userId})::int AS owner_settings`) as [Record<string, number>];
   return r;
 }
 
@@ -40,12 +42,18 @@ describe("退会", () => {
   it("その人の人物メモのデータが消え、同じ出来事を2回受け取っても同じ結果。ほかの人のデータは消えない", async () => {
     const u1 = await grantPeople("u1");
     const u2 = await grantPeople("u2");
-    for (const u of ["u1", "u2"]) await commitForm(u, await makeEvent(u), [formRow({ line: "たろう" }, 1)]);
+    for (const u of ["u1", "u2"]) {
+      const ev = await makeEvent(u);
+      await commitForm(u, ev, [formRow({ line: "たろう" }, 1)]);
+      const [p] = (await rawSql()`SELECT p.id FROM people.persons p JOIN people.events e ON e.user_id = p.user_id WHERE e.id = ${ev}`) as { id: string }[];
+      await callPeople("POST", "/outreaches", u, { personId: p!.id, purpose: "invite", eventId: ev });
+      await callPeople("PUT", "/settings", u, { repeaterGoal: 5 });
+    }
     const event = withdrawn(u1);
     await onUserWithdrawn(event, testEnv);
     await onUserWithdrawn(event, testEnv);
-    expect(await rowsOf(u1)).toEqual({ events: 0, imports: 0, responses: 0, persons: 0, consent_changes: 0, column_mappings: 0 });
-    expect(await rowsOf(u2)).toMatchObject({ events: 1, responses: 1, persons: 1 });
+    expect(await rowsOf(u1)).toEqual({ events: 0, imports: 0, responses: 0, persons: 0, consent_changes: 0, column_mappings: 0, outreaches: 0, owner_settings: 0 });
+    expect(await rowsOf(u2)).toMatchObject({ events: 1, responses: 1, persons: 1, outreaches: 1, owner_settings: 1 });
     const received = (await rawSql()`SELECT count(*)::int AS n FROM people.received_events`) as { n: number }[];
     expect(received[0]!.n).toBe(1);
   });

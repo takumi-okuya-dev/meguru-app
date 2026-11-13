@@ -47,6 +47,7 @@ function renderShell(path: string) {
       { path: "/people/events/new", element: page },
       { path: "/people/list", element: page },
       { path: "/people/list/:personId", element: page },
+      { path: "/people/settings", element: page },
     ],
     path,
   );
@@ -90,11 +91,29 @@ describe("下のバー", () => {
     expect(within(bar).getByRole("link", { name: "人" })).toHaveAttribute("href", "/people/list");
   });
 
-  it("1024px以上ではサイドバーに誘う候補・人・取り込み・イベントを出す", async () => {
+  it("ホーム（/people）では「誘う候補」を濃く出す", async () => {
+    setViewport(390);
+    renderShell("/people");
+    const bar = await screen.findByRole("navigation", { name: "人物メモのメニュー" });
+    expect(within(bar).getByRole("link", { name: "誘う候補" })).toHaveAttribute("aria-current", "page");
+    expect(within(bar).getByRole("link", { name: "誘う候補" })).toHaveAttribute("href", "/people");
+    expect(within(bar).getByRole("link", { name: "人" })).not.toHaveAttribute("aria-current");
+  });
+
+  it("誘いの文と目標（設定）は下のバーに出さず、どの項目も濃くしない", async () => {
+    setViewport(390);
+    renderShell("/people/settings");
+    const bar = await screen.findByRole("navigation", { name: "人物メモのメニュー" });
+    expect(within(bar).queryByRole("link", { name: /誘いの文と目標|設定/ })).not.toBeInTheDocument();
+    expect(within(bar).queryByRole("link", { current: "page" })).not.toBeInTheDocument();
+  });
+
+  it("1024px以上ではサイドバーに誘う候補・人・取り込み・イベントと、下に誘いの文と目標を出す", async () => {
     setViewport(1024);
     renderShell("/people/events");
     const nav = await screen.findByRole("navigation", { name: "人物メモ" });
-    expect(within(nav).getAllByRole("link").map((l) => l.textContent?.trim())).toEqual(["誘う候補", "人", "取り込み", "イベント"]);
+    expect(within(nav).getAllByRole("link").map((l) => l.textContent?.trim())).toEqual(["誘う候補", "人", "取り込み", "イベント", "誘いの文と目標"]);
+    expect(within(nav).getByRole("link", { name: "誘いの文と目標" })).toHaveAttribute("href", "/people/settings");
     expect(within(nav).getByRole("link", { name: "イベント" })).toHaveAttribute("aria-current", "page");
     expect(screen.queryByRole("navigation", { name: "人物メモのメニュー" })).not.toBeInTheDocument();
   });

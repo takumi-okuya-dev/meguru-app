@@ -9,6 +9,7 @@ import { EventForm, fieldClass } from "../EventForm";
 import { formatHeldOn } from "../format";
 import { peopleApi } from "../../lib/api";
 import { peopleQueryKeys } from "../../lib/query-keys";
+import { refreshEvents } from "../../lib/refresh";
 
 /**
  * イベントを選ぶ段。
@@ -37,7 +38,7 @@ export function EventStep({
   const create = useMutation({
     mutationFn: peopleApi.createEvent,
     onSuccess: async (event) => {
-      await queryClient.invalidateQueries({ queryKey: peopleQueryKeys.events });
+      await refreshEvents(queryClient);
       onSelect(event.id);
       setCreating(false);
     },

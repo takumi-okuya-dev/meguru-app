@@ -1,7 +1,8 @@
 // 人の一覧の絞り込み（来たイベント・次回参加・欲しいつながり・キャリアの興味・最後に会った日。specs/people/001-people-memo research.md R22）。
 // 答えの値は、いちばん新しい回答に出てくる値（GET /api/people/facets）をチップで出す。
+// 誘う候補の画面でも使う（来たイベントの代わりに「前に来た」を頭に置く）。
 import type { FacetValue, PeopleEvent, PeopleFacets } from "@meguru/shared/people";
-import { useId } from "react";
+import { useId, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { fieldClass } from "../EventForm";
@@ -47,11 +48,44 @@ function toggle(list: string[], value: string): string[] {
 }
 
 /**
+ * 押すと選ぶ・外すを切り替えるチップ。
+ * @param props - pressed：選んでいるか、onClick：押したとき、children：中身
+ * @returns チップ
+ */
+export function FilterChip({ pressed, onClick, children }: { pressed: boolean; onClick: () => void; children: ReactNode }) {
+  return (
+    <button
+      type="button"
+      aria-pressed={pressed}
+      className={cn(
+        "inline-flex min-h-11 max-w-full items-center gap-1 rounded-full border px-3 text-sm md:min-h-8",
+        pressed ? "border-foreground bg-foreground text-background" : "bg-card hover:bg-accent",
+      )}
+      onClick={onClick}
+    >
+      {children}
+    </button>
+  );
+}
+
+/**
  * 答えの値のチップの並び。
- * @param props - label：項目の名前、values：選べる値、selected：選んだ値、onToggle：押したとき
+ * @param props - label：項目の名前、values：選べる値、selected：選んだ値、onToggle：押したとき、showCounts：人数を出すか
  * @returns チップの並び
  */
-function ChipGroup({ label, values: facetValues, selected, onToggle }: { label: string; values: FacetValue[]; selected: string[]; onToggle: (value: string) => void }) {
+function ChipGroup({
+  label,
+  values: facetValues,
+  selected,
+  onToggle,
+  showCounts,
+}: {
+  label: string;
+  values: FacetValue[];
+  selected: string[];
+  onToggle: (value: string) => void;
+  showCounts: boolean;
+}) {
   // 選んだ値が選べる値からなくなっても（その値の人を消した・まとめた）、外せるようにチップを残す（0人）
   const values = [...facetValues, ...selected.filter((v) => !facetValues.some((f) => f.value === v)).map((v) => ({ value: v, count: 0 }))];
   if (values.length === 0) return null;
@@ -62,19 +96,10 @@ function ChipGroup({ label, values: facetValues, selected, onToggle }: { label: 
         {values.map((f) => {
           const on = selected.includes(f.value);
           return (
-            <button
-              key={f.value}
-              type="button"
-              aria-pressed={on}
-              className={cn(
-                "inline-flex min-h-11 max-w-full items-center gap-1 rounded-full border px-3 text-sm md:min-h-8",
-                on ? "border-foreground bg-foreground text-background" : "bg-card hover:bg-accent",
-              )}
-              onClick={() => onToggle(f.value)}
-            >
+            <FilterChip key={f.value} pressed={on} onClick={() => onToggle(f.value)}>
               <span className="truncate">{f.value}</span>
-              <span className={cn("shrink-0 tabular-nums", on ? "text-background/80" : "text-muted-foreground")}>{f.count}人</span>
-            </button>
+              {showCounts && <span className={cn("shrink-0 tabular-nums", on ? "text-background/80" : "text-muted-foreground")}>{f.count}人</span>}
+            </FilterChip>
           );
         })}
       </div>
@@ -84,7 +109,9 @@ function ChipGroup({ label, values: facetValues, selected, onToggle }: { label: 
 
 /**
  * 人の一覧の絞り込み。
- * @param props - value：絞り込みの値、onChange：変わったとき、facets：選べる答えの値、events：選べるイベント
+ * @param props - value：絞り込みの値、onChange：変わったとき、facets：選べる答えの値、events：選べるイベント、showEvent：「来たイベント」を出すか、
+ *   showCounts：チップに人数（全員の中の数）を出すか、lead：頭に置くほかの絞り込み、extraCount：lead で絞っている数、
+ *   onClear：「絞り込みを外す」（省くと value だけを空にする）
  * @returns 絞り込み
  */
 export function PersonFilters({
@@ -92,33 +119,46 @@ export function PersonFilters({
   onChange,
   facets,
   events,
+  showEvent = true,
+  showCounts = true,
+  lead,
+  extraCount = 0,
+  onClear,
 }: {
   value: PersonFilterValue;
   onChange: (value: PersonFilterValue) => void;
   facets: PeopleFacets | undefined;
-  events: PeopleEvent[] | undefined;
+  events?: PeopleEvent[] | undefined;
+  showEvent?: boolean;
+  showCounts?: boolean;
+  lead?: ReactNode;
+  extraCount?: number;
+  onClear?: () => void;
 }) {
   const id = useId();
   return (
     <div className="space-y-4 rounded-2xl border bg-card p-4">
-      <div className="space-y-1">
-        <label htmlFor={`${id}-event`} className="text-sm font-medium">
-          来たイベント
-        </label>
-        <select
-          id={`${id}-event`}
-          className={fieldClass}
-          value={value.eventId ?? ""}
-          onChange={(e) => onChange({ ...value, eventId: e.target.value || undefined })}
-        >
-          <option value="">すべて</option>
-          {(events ?? []).map((e) => (
-            <option key={e.id} value={e.id}>
-              {formatHeldOn(e.heldOn)} {e.name}
-            </option>
-          ))}
-        </select>
-      </div>
+      {lead}
+      {showEvent && (
+        <div className="space-y-1">
+          <label htmlFor={`${id}-event`} className="text-sm font-medium">
+            来たイベント
+          </label>
+          <select
+            id={`${id}-event`}
+            className={fieldClass}
+            value={value.eventId ?? ""}
+            onChange={(e) => onChange({ ...value, eventId: e.target.value || undefined })}
+          >
+            <option value="">すべて</option>
+            {(events ?? []).map((e) => (
+              <option key={e.id} value={e.id}>
+                {formatHeldOn(e.heldOn)} {e.name}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
       {FACET_GROUPS.map((g) => (
         <ChipGroup
           key={g.key}
@@ -126,6 +166,7 @@ export function PersonFilters({
           values={facets?.[g.facet] ?? []}
           selected={value[g.key]}
           onToggle={(v) => onChange({ ...value, [g.key]: toggle(value[g.key], v) })}
+          showCounts={showCounts}
         />
       ))}
       <fieldset className="space-y-1.5">
@@ -148,8 +189,8 @@ export function PersonFilters({
           />
         </div>
       </fieldset>
-      {activeFilterCount(value) > 0 && (
-        <Button type="button" variant="ghost" className="h-11 rounded-full md:h-9" onClick={() => onChange(EMPTY_FILTERS)}>
+      {activeFilterCount(value) + extraCount > 0 && (
+        <Button type="button" variant="ghost" className="h-11 rounded-full md:h-9" onClick={() => (onClear ? onClear() : onChange(EMPTY_FILTERS))}>
           絞り込みを外す
         </Button>
       )}

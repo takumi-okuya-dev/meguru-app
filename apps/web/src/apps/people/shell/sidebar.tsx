@@ -1,10 +1,10 @@
 // 人物メモのサイドバーの中身（specs/people/001-people-memo contracts/ui-routes.md 1、specs/028 research.md R8）。
-// 外枠のサイドバーの枠に、頭（アプリの名前）と中身（誘う候補・人・取り込み・イベント）を渡す。まだない画面の項目は出さない。
+// 外枠のサイドバーの枠に、頭（アプリの名前）と中身（誘う候補・人・取り込み・イベント・下に誘いの文と目標）を渡す。
 import { ContactIcon } from "lucide-react";
 import { NavLink } from "react-router";
 import type { AppSidebar, SidebarPartProps } from "@/shell";
 import { cn } from "@/lib/utils";
-import { PEOPLE_NAV_ITEMS } from "./nav-items";
+import { PEOPLE_NAV_ITEMS, PEOPLE_SETTINGS_NAV_ITEM } from "./nav-items";
 
 /**
  * 項目の見た目。
@@ -36,13 +36,21 @@ function Header() {
  * @returns サイドバーの中身
  */
 function Body({ onNavigate }: SidebarPartProps) {
+  const settings = PEOPLE_SETTINGS_NAV_ITEM;
   return (
-    <nav aria-label="人物メモ" className="flex-1 space-y-0.5 overflow-y-auto px-2 py-1">
-      {PEOPLE_NAV_ITEMS.map(({ to, label, Icon, end }) => (
-        <NavLink key={to} to={to} end={end} className={itemClass} onClick={onNavigate}>
-          <Icon className="size-5 lg:size-[18px]" /> {label}
+    <nav aria-label="人物メモ" className="flex flex-1 flex-col overflow-y-auto px-2 py-1">
+      <div className="space-y-0.5">
+        {PEOPLE_NAV_ITEMS.map(({ to, label, Icon, end }) => (
+          <NavLink key={to} to={to} end={end} className={itemClass} onClick={onNavigate}>
+            <Icon className="size-5 lg:size-[18px]" /> {label}
+          </NavLink>
+        ))}
+      </div>
+      <div className="mt-auto border-t pt-1">
+        <NavLink to={settings.to} className={itemClass} onClick={onNavigate}>
+          <settings.Icon className="size-5 lg:size-[18px]" /> {settings.label}
         </NavLink>
-      ))}
+      </div>
     </nav>
   );
 }

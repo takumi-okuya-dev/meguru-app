@@ -13,6 +13,7 @@ import {
   primaryKey,
   text,
   timestamp,
+  smallint,
   uniqueIndex,
   uuid,
   type AnyPgColumn,
@@ -138,6 +139,11 @@ export const peoplePersons = peopleSchema.table(
     consentSource: text("consent_source").notNull().default("none"),
     consentBasisOn: date("consent_basis_on", { mode: "string" }),
     consentUpdatedAt: at("consent_updated_at"),
+    // 次にやること（日付と文は一緒にある・ない）・誕生日の月日（年は持たない）・来てくれそう度（3＝高。specs/people/002 plan.md 2）
+    nextActionOn: date("next_action_on", { mode: "string" }),
+    nextActionNote: text("next_action_note"),
+    birthdayMd: text("birthday_md"),
+    likelihood: smallint("likelihood"),
     // その人を作った取り込み（取り消しで消す人を見分ける。R14）
     createdByImportId: uuid("created_by_import_id").references((): AnyPgColumn => peopleImports.id, { onDelete: "set null" }),
     ...timestamps,
@@ -150,6 +156,13 @@ export const peoplePersons = peopleSchema.table(
     check("people_persons_memo_talk_length", sql`${t.memoTalk} IS NULL OR char_length(${t.memoTalk}) <= 1000`),
     check("people_persons_consent_source", sql`${t.consentSource} IN ('none', 'response', 'manual')`),
     check("people_persons_has_name", sql`${t.realName} IS NOT NULL OR ${t.lineName} IS NOT NULL`),
+    check(
+      "people_persons_next_action",
+      sql`(${t.nextActionOn} IS NULL AND ${t.nextActionNote} IS NULL) OR (${t.nextActionOn} IS NOT NULL AND char_length(${t.nextActionNote}) BETWEEN 1 AND 200)`,
+    ),
+    check("people_persons_birthday_md", sql`${t.birthdayMd} IS NULL OR ${t.birthdayMd} ~ '^(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])$'`),
+    check("people_persons_likelihood", sql`${t.likelihood} IS NULL OR ${t.likelihood} BETWEEN 1 AND 3`),
+    index("people_persons_user_next_action_idx").on(t.userId, t.nextActionOn),
     index("people_persons_user_idx").on(t.userId),
     index("people_persons_user_real_name_idx").on(t.userId, t.realNameKey),
     index("people_persons_user_line_name_idx").on(t.userId, t.lineNameKey),
@@ -338,11 +351,117 @@ export const peopleOwnerSettings = peopleSchema.table(
     userId: uuid("user_id").primaryKey(),
     inviteTemplate: text("invite_template"),
     repeaterGoal: integer("repeater_goal"),
+    // 人の一覧の並べ方（{ sort, group }。どの端末でも同じ。specs/people/002 FR-103）
+    personView: jsonb("person_view").$type<{ sort: string; group: string }>(),
     updatedAt: at("updated_at").notNull().defaultNow(),
   },
   (t) => [
     check("people_owner_settings_invite_template", sql`${t.inviteTemplate} IS NULL OR char_length(${t.inviteTemplate}) BETWEEN 1 AND 500`),
     check("people_owner_settings_repeater_goal", sql`${t.repeaterGoal} IS NULL OR ${t.repeaterGoal} BETWEEN 1 AND 10000`),
+  ],
+);
+
+// ---- 002：タグ・連絡の記録・自由な項目・SNS のリンク（specs/people/002-sales-list plan.md 2） ----
+
+/** タグ（作り手ごと。同じ名前は nameKey で1つ）。 */
+export const peopleTags = peopleSchema.table(
+  "tags",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id").notNull(),
+    name: text("name").notNull(),
+    nameKey: text("name_key").notNull(),
+    createdAt: at("created_at").notNull().defaultNow(),
+  },
+  (t) => [check("people_tags_name_length", sql`char_length(${t.name}) BETWEEN 1 AND 30`), uniqueIndex("people_tags_user_name_idx").on(t.userId, t.nameKey)],
+);
+
+/** 人に付けたタグ。 */
+export const peoplePersonTags = peopleSchema.table(
+  "person_tags",
+  {
+    personId: uuid("person_id")
+      .notNull()
+      .references(() => peoplePersons.id, { onDelete: "cascade" }),
+    tagId: uuid("tag_id")
+      .notNull()
+      .references(() => peopleTags.id, { onDelete: "cascade" }),
+    userId: uuid("user_id").notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.personId, t.tagId] }), index("people_person_tags_tag_idx").on(t.tagId)],
+);
+
+/** 連絡の記録（いつ・何で・何を話したか。done は次にやることを終えた記録）。 */
+export const peopleContactLogs = peopleSchema.table(
+  "contact_logs",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id").notNull(),
+    personId: uuid("person_id")
+      .notNull()
+      .references(() => peoplePersons.id, { onDelete: "cascade" }),
+    contactedOn: date("contacted_on", { mode: "string" }).notNull(),
+    channel: text("channel").notNull(),
+    note: text("note").notNull(),
+    ...timestamps,
+  },
+  (t) => [
+    check("people_contact_logs_channel", sql`${t.channel} IN ('line', 'venue', 'other', 'done')`),
+    check("people_contact_logs_note_length", sql`char_length(${t.note}) BETWEEN 1 AND 1000`),
+    index("people_contact_logs_person_idx").on(t.personId, t.contactedOn),
+    index("people_contact_logs_user_idx").on(t.userId),
+  ],
+);
+
+/** 自由な項目（作り手ごと。並びは position）。 */
+export const peopleCustomFields = peopleSchema.table(
+  "custom_fields",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id").notNull(),
+    label: text("label").notNull(),
+    labelKey: text("label_key").notNull(),
+    position: integer("position").notNull(),
+    createdAt: at("created_at").notNull().defaultNow(),
+  },
+  (t) => [check("people_custom_fields_label_length", sql`char_length(${t.label}) BETWEEN 1 AND 30`), uniqueIndex("people_custom_fields_user_label_idx").on(t.userId, t.labelKey)],
+);
+
+/** 自由な項目の値（1人1項目に1つ）。 */
+export const peoplePersonFieldValues = peopleSchema.table(
+  "person_field_values",
+  {
+    personId: uuid("person_id")
+      .notNull()
+      .references(() => peoplePersons.id, { onDelete: "cascade" }),
+    fieldId: uuid("field_id")
+      .notNull()
+      .references(() => peopleCustomFields.id, { onDelete: "cascade" }),
+    userId: uuid("user_id").notNull(),
+    value: text("value").notNull(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.personId, t.fieldId] }),
+    check("people_person_field_values_length", sql`char_length(${t.value}) BETWEEN 1 AND 500`),
+    index("people_person_field_values_field_idx").on(t.fieldId),
+  ],
+);
+
+/** SNS のリンク（Instagram・X・Facebook のプロフィールの URL）。 */
+export const peoplePersonLinks = peopleSchema.table(
+  "person_links",
+  {
+    personId: uuid("person_id")
+      .notNull()
+      .references(() => peoplePersons.id, { onDelete: "cascade" }),
+    kind: text("kind").notNull(),
+    userId: uuid("user_id").notNull(),
+    url: text("url").notNull(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.personId, t.kind] }),
+    check("people_person_links_kind", sql`${t.kind} IN ('instagram', 'x', 'facebook')`),
+    check("people_person_links_url", sql`char_length(${t.url}) BETWEEN 1 AND 500 AND ${t.url} LIKE 'https://%'`),
   ],
 );
 
