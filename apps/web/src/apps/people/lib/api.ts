@@ -23,6 +23,7 @@ import type {
   ConsentPurpose,
   ImportField,
   Outreach,
+  OutreachCreateInput,
   OutreachPurpose,
   OutreachStage,
   PeopleSettings,
@@ -67,8 +68,8 @@ export type PersonUpdateInput = { realName?: string | null; memoAppearance?: str
 /** 誘う候補の目的・誘う会・前に来た・人の一覧と同じ絞り込み（eventId は誘う会。人は絞らない）。 */
 export type CandidateParams = PersonListParams & { purpose: OutreachPurpose; visitedOwn?: boolean };
 
-/** 声かけを始めるの入力（PR3 は交流会への誘いだけ）。 */
-export type OutreachCreateInput = { personId: string; eventId: string };
+/** 声かけを始めたときの返り（created: false は、同じ声かけがもうあった）。 */
+export type OutreachCreateResult = { outreach: Outreach; created: boolean };
 
 /** 設定を直すの入力（省いた項目は変えない。型の null は初めの型、目標の null は目標なし）。 */
 export type SettingsUpdateInput = Partial<PeopleSettings>;
@@ -200,8 +201,7 @@ export const peopleApi = {
   deletePerson: (id: string, confirmName: string) => request(personUrl(id), null, withBody("DELETE", { confirmName })),
   // ---- 誘う候補・声かけ（contracts/api.md 5）----
   candidates: (params: CandidateParams) => request(`/api/people/candidates${candidateSearch(params)}`, typed<CandidateList>()),
-  createOutreach: async (input: OutreachCreateInput) =>
-    (await request("/api/people/outreaches", typed<{ outreach: Outreach }>(), withBody("POST", { ...input, purpose: "invite" }))).outreach,
+  createOutreach: (input: OutreachCreateInput) => request("/api/people/outreaches", typed<OutreachCreateResult>(), withBody("POST", input)),
   updateOutreach: async (id: string, stage: OutreachStage) =>
     (await request(outreachUrl(id), typed<{ outreach: Outreach }>(), withBody("PATCH", { stage }))).outreach,
   deleteOutreach: (id: string) => request(outreachUrl(id), null, { method: "DELETE" }),

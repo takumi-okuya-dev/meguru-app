@@ -49,14 +49,14 @@ describe("声かけを始める", () => {
     expect(await outreachesOf()).toHaveLength(1);
   });
 
-  it("同意がなければ 409 OUTREACH_NO_CONSENT。ほかの作り手の人・会は 404。仕事のつなぎは PR4 まで 400", async () => {
+  it("同意がなければ 409 OUTREACH_NO_CONSENT。ほかの作り手の人・会は 404。仕事のつなぎの同意がない人も 409", async () => {
     const [status, body] = await read<{ error: { code: string } }>(await callPeople("POST", "/outreaches", "u1", { personId: jiro, purpose: "invite", eventId: dec }));
     expect([status, body.error.code]).toEqual([409, "OUTREACH_NO_CONSENT"]);
     await grantPeople("u2");
     const theirs = await makeEvent("u2", "よその会", "2026-12-20");
     expect((await callPeople("POST", "/outreaches", "u1", { personId: taro, purpose: "invite", eventId: theirs })).status).toBe(404);
     expect((await callPeople("POST", "/outreaches", "u2", { personId: taro, purpose: "invite", eventId: theirs })).status).toBe(404);
-    expect((await callPeople("POST", "/outreaches", "u1", { personId: taro, purpose: "work", targetName: "港" })).status).toBe(400);
+    expect((await callPeople("POST", "/outreaches", "u1", { personId: taro, purpose: "work", targetName: "相談先" })).status).toBe(409);
   });
 
   it("誘えるのは自分の会だけ（よその会は 400）", async () => {

@@ -4,6 +4,7 @@ import { z } from "zod";
 import { CONSENT_PURPOSES, type Consent } from "./answers";
 import { IMPORT_FIELDS, MEMO_APPEARANCE_MAX, MEMO_TALK_MAX, PERSON_NAME_MAX, SEARCH_QUERY_MAX, type ImportField } from "./fields";
 import { INVITE_TEMPLATE_MAX } from "./invite";
+import { nameKey } from "./names";
 
 /** 日付（YYYY-MM-DD。日本時間の日付）。 */
 const dateString = z
@@ -159,8 +160,14 @@ export const candidateQuerySchema = personListQuerySchema.extend({
 /** GET /api/people/candidates のクエリ（読んだあと）。 */
 export type CandidateQuery = z.infer<typeof candidateQuerySchema>;
 
-/** POST /api/people/outreaches の入力（PR3 は交流会への誘いだけ。仕事のつなぎは PR4）。 */
-export const outreachCreateSchema = z.object({ personId: id, purpose: z.literal("invite"), eventId: id });
+/** POST /api/people/outreaches の入力（交流会への誘いは誘う会、仕事のつなぎは相談先の名前。R16）。 */
+export const outreachCreateSchema = z.discriminatedUnion("purpose", [
+  z.object({ personId: id, purpose: z.literal("invite"), eventId: id }),
+  // 相談先は、見えない文字だけの名前を断る（nameKey が空だと、みな同じ相談先とみなされてしまう）
+  z.object({ personId: id, purpose: z.literal("work"), targetName: personName.refine((s) => nameKey(s) !== "", { message: "empty" }) }),
+]);
+/** POST /api/people/outreaches の入力（読んだあと）。 */
+export type OutreachCreateInput = z.infer<typeof outreachCreateSchema>;
 /** PATCH /api/people/outreaches/:outreachId の入力。 */
 export const outreachUpdateSchema = z.object({
   stage: z.enum([...new Set(Object.values(OUTREACH_STAGES).flat())] as [OutreachStage, ...OutreachStage[]]),

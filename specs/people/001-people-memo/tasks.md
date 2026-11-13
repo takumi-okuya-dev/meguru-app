@@ -236,20 +236,20 @@ description: "Task list for people 001 people memo"
 
 ### Tests for User Story 6 ⚠️
 
-- [ ] T087 [P] [US6] `ptest/outreach-work.test.ts`：`purpose=work`の候補は仕事のつなぎの同意が真の人だけ（「個別の案内は希望しない」の人は出ない）、声かけを始める（`targetName`「1〜100文字」・同意がなければ409 `OUTREACH_NO_CONSENT`・同じ人で`nameKey`が同じ相談先なら200で今のもの・`asked`から）、**`approved`の前に`connected`にすると409 `OUTREACH_NEEDS_APPROVAL`**（表のcheckでも止まる）、`approved` → `connected`で日時が残る、人のページの`outreaches`に相談先・日時が出る、誘う候補の行の`outreach`は最新の声かけ。FR-023・research.md R16。
-- [ ] T088 [P] [US6] `wtest/candidates-work.test.tsx`：目的の切り替え（`?purpose=work`）、「声かけを始める」（相談先の名前を入れる）、「OKをもらった」の前に「つないだ」が出ない、人のページの記録（いつ・どの相談先へ・「あなたが記録」）。
+- [x] T087 [P] [US6] `ptest/outreach-work.test.ts`：`purpose=work`の候補は仕事のつなぎの同意が真の人だけ（「個別の案内は希望しない」の人は出ない）、声かけを始める（`targetName`「1〜100文字」・同意がなければ409 `OUTREACH_NO_CONSENT`・同じ人で`nameKey`が同じ相談先なら200で今のもの・`asked`から）、**`approved`の前に`connected`にすると409 `OUTREACH_NEEDS_APPROVAL`**（表のcheckでも止まる）、`approved` → `connected`で日時が残る、人のページの`outreaches`に相談先・日時が出る、誘う候補の行の`outreach`は最新の声かけ。FR-023・research.md R16。
+- [x] T088 [P] [US6] `wtest/candidates-work.test.tsx`：目的の切り替え（`?purpose=work`）、「声かけを始める」（相談先の名前を入れる）、「OKをもらった」の前に「つないだ」が出ない、人のページの記録（いつ・どの相談先へ・「あなたが記録」）。
 
 ### Implementation for User Story 6
 
-- [ ] T089 [US6] `ppl/outreach/outreach-service.ts`に`work`（`target_key`＝`nameKey(targetName)`・`approved_at`がなければ`connected`は409・戻すと先の日時を空に）と、`ppl/outreach/candidate-service.ts`に`purpose=work`の最新の声かけを足す。T087を通す。
-- [ ] T090 [US6] `wppl/pages/CandidatesPage.tsx`の目的の切り替えと`wppl/components/candidates/`の「声かけを始める」・進み具合のボタン、`wppl/pages/PersonPage.tsx`の仕事のつなぎの記録。T088を通す。
+- [x] T089 [US6] `ppl/outreach/outreach-service.ts`に`work`（`target_key`＝`nameKey(targetName)`・`approved_at`がなければ`connected`は409・戻すと先の日時を空に）と、`ppl/outreach/candidate-service.ts`に`purpose=work`の最新の声かけを足す。T087を通す。
+- [x] T090 [US6] `wppl/pages/CandidatesPage.tsx`の目的の切り替えと`wppl/components/candidates/`の「声かけを始める」・進み具合のボタン、`wppl/pages/PersonPage.tsx`の仕事のつなぎの記録。T088を通す。
 
 ## Phase 12：文書と仕上げ（各PRで、そのPRの分を直す）
 
-- [ ] T091 [P] `docs/module-map.md`に人物メモを足す（2章に`apps/people`の表・入口・道筋の表、2-5の組み立てに`registerPeople()`、7-3にWebの`apps/people/`）。PR1で土台と取り込み、PR2で人、PR3で声かけ・設定。
-- [ ] T092 [P] `docs/app-separation.md`の例（`people`）を、実際に作った形（`requireAppAccess`・`registerConsumer`・`people.received_events`・作り手のロック）に合わせて直す（7章「2作目を作って具体的になったら直す」。PR1）。
-- [ ] T093 [P] `docs/product-structure.md`・`README.md`・`docs/architecture.md`に、めぐるのアプリとして人物メモを足す。`docs/ui-design.md`「5. 画面幅ごとの振る舞い」に、人物メモの下のバー（767px以下・4つ・アプリの切り替えは上部バーの左）を1行足す（research.md R20。PR1）。
-- [ ] T094 [P] `docs/user-guide.md`に、人物メモの使い方（取り込み・同じ人・人のページ・誘う候補・声かけ・消す）を足す（PR3・PR4）。
+- [x] T091 [P] `docs/module-map.md`に人物メモを足す（2章に`apps/people`の表・入口・道筋の表、2-5の組み立てに`registerPeople()`、7-3にWebの`apps/people/`）。PR1で土台と取り込み、PR2で人、PR3で声かけ・設定。
+- [x] T092 [P] （共通の文書は直さず、`docs/apps/people.md` 2章に実例を書いた。docs/parallel-development.md 11）`docs/app-separation.md`の例（`people`）を、実際に作った形（`requireAppAccess`・`registerConsumer`・`people.received_events`・作り手のロック）に合わせて直す（7章「2作目を作って具体的になったら直す」。PR1）。
+- [x] T093 [P] `docs/product-structure.md`・`README.md`・`docs/architecture.md`に、めぐるのアプリとして人物メモを足す。`docs/ui-design.md`「5. 画面幅ごとの振る舞い」に、人物メモの下のバー（767px以下・4つ・アプリの切り替えは上部バーの左）を1行足す（research.md R20。PR1）。
+- [x] T094 [P] （共通の文書は直さず、`docs/apps/people.md` 4章に書いた。docs/parallel-development.md 11）`docs/user-guide.md`に、人物メモの使い方（取り込み・同じ人・人のページ・誘う候補・声かけ・消す）を足す（PR3・PR4）。
 - [ ] T095 `specs/people/001-people-memo/quickstart.md`の1〜6を、各PRのマージのあとにテスト版で手で確かめ、確かめた日と結果を`specs/people/001-people-memo/checklists/manual-check.md`に残す。あわせて時間を測って同じファイルに書く：20行のCSVの初めての取り込み（5分以内）と2回目（2分以内。SC-001）、2回分を取り込んだあと12月の会の候補を出すまで（1分以内。SC-002）、同じ人の候補1組を見分けて選ぶ（10秒以内。SC-004）、スマートフォンで誘う候補から文のコピーまで（3回のタップ以内。SC-005）。作り手が実際の会で使い、SC-007の3つを満たしたかを同じファイルに書く。
 - [ ] T096 [P] スマートフォン（390px幅）で、取り込み（列の対応・候補のカード）・人の一覧・人のページ・誘う候補が横にスクロールしないこと、押すところが44px以上であること、下のバーで中身の最後が隠れないことを確かめる（spec Edge Cases「スマートフォンでの取り込み」）。
 

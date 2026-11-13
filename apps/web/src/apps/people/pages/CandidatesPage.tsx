@@ -167,7 +167,9 @@ export function CandidatesPage() {
             )}
           </>
         ) : (
-          <p className="rounded-xl bg-muted px-3 py-2 text-[13px] text-muted-foreground">仕事の相談先へつなぐ記録は、次の版で足します。今は候補を見るだけです。</p>
+          <p className="rounded-xl bg-muted px-3 py-2 text-[13px] text-muted-foreground">
+            本人に聞いて、OKをもらってからつなぎます。ここは記録だけで、相手の情報をどこかへ送ることはしません。
+          </p>
         )}
 
         <div ref={topRef} className="scroll-mt-16 space-y-2">
