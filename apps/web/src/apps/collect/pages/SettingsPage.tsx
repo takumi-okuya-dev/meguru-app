@@ -1,6 +1,6 @@
 // PayPay・振込先の設定（/collect/settings。specs/collect/001-event-day-collection FR-013、research.md R10、tasks.md T031）。
 // QRの画像は画面で縮めてから送る（長い辺1,000px以内・300KB以内）。振込先の案内は300文字まで。どのイベントでも使う。
-import { COLLECT_LIMITS } from "@meguru/shared";
+import { COLLECT_LIMITS, type CollectSettings } from "@meguru/shared";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ImageUpIcon, Trash2Icon } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
@@ -42,14 +42,16 @@ export function SettingsPage() {
   const settings = useQuery({ queryKey: collectQueryKeys.settings, queryFn: collectApi.settings });
   const [bankText, setBankText] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
-  const afterSave = (next: Awaited<ReturnType<typeof collectApi.settings>>) => {
-    queryClient.setQueryData(collectQueryKeys.settings, next);
+  // 応答はいつも設定の全部だが、保存したほうの項目だけを書き換える（QRと振込先の保存が同時に動いて、
+  // 返事の順が入れ替わっても、新しいほうの値を古い値で上書きしない）
+  const afterSave = <K extends keyof CollectSettings>(key: K, next: CollectSettings) => {
+    queryClient.setQueryData<CollectSettings>(collectQueryKeys.settings, (prev) => (prev ? { ...prev, [key]: next[key] } : next));
     void queryClient.invalidateQueries({ queryKey: collectQueryKeys.me });
   };
   const upload = useMutation({
     mutationFn: async (file: File) => collectApi.uploadPaypayQr(await shrinkQrImage(file)),
     onSuccess: (next) => {
-      afterSave(next);
+      afterSave("hasPaypayQr", next);
       void queryClient.invalidateQueries({ queryKey: collectQueryKeys.paypayQr });
       toast.success("QRの画像を保存しました。");
     },
@@ -58,7 +60,7 @@ export function SettingsPage() {
   const removeQr = useMutation({
     mutationFn: collectApi.deletePaypayQr,
     onSuccess: (next) => {
-      afterSave(next);
+      afterSave("hasPaypayQr", next);
       queryClient.removeQueries({ queryKey: collectQueryKeys.paypayQr });
       toast.success("QRの画像を消しました。");
     },
@@ -67,7 +69,7 @@ export function SettingsPage() {
   const saveBank = useMutation({
     mutationFn: (text: string) => collectApi.saveBankText(text.trim() || null),
     onSuccess: (next, submitted) => {
-      afterSave(next);
+      afterSave("bankText", next);
       // 保存の途中で書き足した分は残す（送った文のままのときだけ、下書きを捨てて保存した値を出す）
       setBankText((draft) => (draft === submitted ? null : draft));
       toast.success("振込先の案内を保存しました。");
@@ -76,6 +78,8 @@ export function SettingsPage() {
   });
   if (settings.isPending) return <LoadingSkeleton />;
   if (settings.isLoadingError) return <ApiErrorScreen error={settings.error} onRetry={() => void settings.refetch()} />;
+  // QRの画像を変える・消すは、どちらかが終わるまでもう一方を押せなくする（同じ項目の返事の順が入れ替わらないように）
+  const qrBusy = upload.isPending || removeQr.isPending;
   const text = bankText ?? settings.data.bankText ?? "";
   const tooLong = [...text].length > COLLECT_LIMITS.bankText;
   return (
@@ -101,11 +105,11 @@ export function SettingsPage() {
             }}
           />
           <div className="flex flex-wrap gap-2">
-            <Button type="button" variant="outline" disabled={upload.isPending} onClick={() => fileRef.current?.click()}>
+            <Button type="button" variant="outline" disabled={qrBusy} onClick={() => fileRef.current?.click()}>
               <ImageUpIcon className="size-4" /> {settings.data.hasPaypayQr ? "画像を変える" : "画像を選ぶ"}
             </Button>
             {settings.data.hasPaypayQr && (
-              <Button type="button" variant="ghost" disabled={removeQr.isPending} onClick={() => removeQr.mutate()}>
+              <Button type="button" variant="ghost" disabled={qrBusy} onClick={() => removeQr.mutate()}>
                 <Trash2Icon className="size-4" /> 消す
               </Button>
             )}
