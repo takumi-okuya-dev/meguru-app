@@ -3,6 +3,9 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { resetDb } from "../../helpers/app";
 import { callPeople, commitForm, formRow, grantPeople, makeEvent, rawSql, read } from "../../helpers/people";
 
+/** 並べ方の初めの値（specs/people/002）。 */
+const VIEW = { sort: "last_met", group: "none" };
+
 beforeEach(async () => {
   await resetDb();
   await grantPeople("u1");
@@ -10,13 +13,13 @@ beforeEach(async () => {
 
 describe("設定", () => {
   it("初めは両方 null。直すと読める。型の空白だけは null（初めの型）に戻る", async () => {
-    expect(await read(await callPeople("GET", "/settings", "u1"))).toEqual([200, { inviteTemplate: null, repeaterGoal: null }]);
+    expect(await read(await callPeople("GET", "/settings", "u1"))).toEqual([200, { inviteTemplate: null, repeaterGoal: null, personView: VIEW }]);
     expect(await read(await callPeople("PUT", "/settings", "u1", { inviteTemplate: "{名前}さん、来てね", repeaterGoal: 10 }))).toEqual([
       200,
-      { inviteTemplate: "{名前}さん、来てね", repeaterGoal: 10 },
+      { inviteTemplate: "{名前}さん、来てね", repeaterGoal: 10, personView: VIEW },
     ]);
-    expect(await read(await callPeople("PUT", "/settings", "u1", { inviteTemplate: "  " }))).toEqual([200, { inviteTemplate: null, repeaterGoal: 10 }]);
-    expect(await read(await callPeople("PUT", "/settings", "u1", { repeaterGoal: null }))).toEqual([200, { inviteTemplate: null, repeaterGoal: null }]);
+    expect(await read(await callPeople("PUT", "/settings", "u1", { inviteTemplate: "  " }))).toEqual([200, { inviteTemplate: null, repeaterGoal: 10, personView: VIEW }]);
+    expect(await read(await callPeople("PUT", "/settings", "u1", { repeaterGoal: null }))).toEqual([200, { inviteTemplate: null, repeaterGoal: null, personView: VIEW }]);
   });
 
   it("上限を超える・形の違う値・空の本文は 400。ほかの作り手の設定は見えない", async () => {
@@ -25,7 +28,7 @@ describe("設定", () => {
     }
     expect((await callPeople("PUT", "/settings", "u1", { inviteTemplate: "🌸".repeat(500) })).status).toBe(200);
     await grantPeople("u2");
-    expect(await read(await callPeople("GET", "/settings", "u2"))).toEqual([200, { inviteTemplate: null, repeaterGoal: null }]);
+    expect(await read(await callPeople("GET", "/settings", "u2"))).toEqual([200, { inviteTemplate: null, repeaterGoal: null, personView: VIEW }]);
   });
 });
 

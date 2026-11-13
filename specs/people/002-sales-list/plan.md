@@ -32,7 +32,7 @@
 
 | 道筋 | 説明 |
 |---|---|
-| `GET/POST /tags`・`PATCH/DELETE /tags/:tagId` | タグの一覧（人数つき）・作る・名前を直す・消す |
+| `GET/POST /tags`・`PATCH/DELETE /tags/:tagId` | タグの一覧（人数つき）・作る・名前を直す・消す。同じ名前（nameKey）は409 `PEOPLE_NAME_TAKEN`（人物メモの `errors.ts` に足す） |
 | `PUT /persons/:personId/tags` | `{ tagIds }` でその人のタグを置き換える（新しい名前は `{ newTagNames }` で作って付ける） |
 | `PATCH /persons/:personId` | 001 に足す：`nextActionOn`・`nextActionNote`（両方か両方 null）・`birthdayMd`・`likelihood` |
 | `POST /persons/:personId/next-action/done` | `{ log: boolean }`。次にやることを消し、`log` なら連絡の記録に `channel: done` で写す |

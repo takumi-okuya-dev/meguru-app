@@ -25,5 +25,5 @@ export async function listCandidates(db: Db, userId: string, query: CandidateQue
   const ids = list.persons.map((p) => p.id);
   const outreaches =
     purpose === "work" ? await latestWorkOutreachesFor(db, userId, ids) : eventId ? await inviteOutreachesFor(db, userId, eventId, ids) : new Map();
-  return { total: list.total, persons: list.persons.map((p) => ({ ...p, outreach: outreaches.get(p.id) ?? null })) };
+  return { total: list.total, persons: list.persons.map(({ birthdayMd: _, ...p }) => ({ ...p, outreach: outreaches.get(p.id) ?? null })) };
 }

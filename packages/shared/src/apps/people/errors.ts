@@ -9,6 +9,8 @@ export const PEOPLE_ERROR_CODES = [
   "PEOPLE_CONFIRM_REQUIRED",
   "OUTREACH_NEEDS_APPROVAL",
   "OUTREACH_NO_CONSENT",
+  // 002：タグ・自由な項目の名前が、もうある（nameKey で同じ）
+  "PEOPLE_NAME_TAKEN",
 ] as const;
 
 /** 人物メモのエラーの文言。 */
@@ -38,4 +40,5 @@ export const PEOPLE_ERROR_MESSAGES: Record<(typeof PEOPLE_ERROR_CODES)[number], 
     message: "この人は、この目的の個別の案内に同意していません。",
     action: "none",
   },
+  PEOPLE_NAME_TAKEN: { message: "同じ名前がもうあります。", action: "none" },
 };

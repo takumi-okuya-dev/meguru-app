@@ -5,9 +5,13 @@ import { requireAppAccess, type AppEnv } from "../../platform";
 import { eventRoutes } from "./events/event-routes";
 import { importRoutes } from "./imports/import-routes";
 import { peopleMeRoutes } from "./me/me-routes";
+import { contactLogRoutes } from "./contact/contact-log-routes";
+import { fieldRoutes } from "./fields/field-routes";
+import { homeRoutes } from "./home/home-routes";
 import { outreachRoutes } from "./outreach/outreach-routes";
 import { personRoutes } from "./persons/person-routes";
 import { settingsRoutes } from "./settings/settings-routes";
+import { tagRoutes } from "./tags/tag-routes";
 import { PEOPLE_APP } from "./registry";
 
 /**
@@ -23,5 +27,9 @@ export function peopleRoutes(authed: MiddlewareHandler<AppEnv>) {
     .route("/", importRoutes())
     .route("/", personRoutes())
     .route("/", outreachRoutes())
-    .route("/", settingsRoutes());
+    .route("/", settingsRoutes())
+    .route("/", tagRoutes())
+    .route("/", contactLogRoutes())
+    .route("/", fieldRoutes())
+    .route("/", homeRoutes());
 }
