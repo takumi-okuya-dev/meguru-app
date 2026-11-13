@@ -37,14 +37,14 @@
 
 ## Phase 6: 主催者の画面（PR2）
 
-- [ ] T017 [US1] apps/web/src/apps/collect/lib/api.ts に分配・経費・運営メンバー・招待・紹介の呼び出し、query-keys・paths（`sharingPath`）を足す
-- [ ] T018 [US1] 分配の画面 apps/web/src/apps/collect/pages/SharingPage.tsx（売上・経費・残る額（今・見込み）の段）とルート・サイドバーの「分配」・締めの画面からの入口
-- [ ] T019 [US1] 経費の一覧と足す・直す・消す apps/web/src/apps/collect/components/sharing/ExpenseList.tsx
-- [ ] T020 [US2] 運営メンバーと傾斜 apps/web/src/apps/collect/components/sharing/MemberList.tsx（傾斜は 1.0〜上限・0.1きざみ。入力しながら共通の計算で出し直す）
-- [ ] T021 [US2] 分配の表と内訳 apps/web/src/apps/collect/components/sharing/DistributionTable.tsx（今・見込みの切り替え・端数・立て替えの戻し・受け取る合計・赤字）
-- [ ] T022 [US3] 紹介経由の売上 apps/web/src/apps/collect/components/sharing/ReferralTable.tsx
-- [ ] T023 [US3] 名簿の紹介した人（PersonDialog・まとめて貼るの列・名簿の行）を apps/web/src/apps/collect/components/roster/ に
-- [ ] T024 Web のテスト apps/web/test/collect/sharing.test.tsx・roster の紹介した人
+- [x] T017 [US1] apps/web/src/apps/collect/lib/api.ts に分配・経費・運営メンバー・招待・紹介の呼び出し、query-keys・paths（`sharingPath`）を足す
+- [x] T018 [US1] 分配の画面 apps/web/src/apps/collect/pages/SharingPage.tsx（売上・経費・残る額（今・見込み）の段）とルート・サイドバーの「分配」・締めの画面からの入口
+- [x] T019 [US1] 経費の一覧と足す・直す・消す apps/web/src/apps/collect/components/sharing/ExpenseList.tsx
+- [x] T020 [US2] 運営メンバーと傾斜 apps/web/src/apps/collect/components/sharing/MemberList.tsx（傾斜は 1.0〜上限・0.1きざみ。入力しながら共通の計算で出し直す）
+- [x] T021 [US2] 分配の表と内訳 apps/web/src/apps/collect/components/sharing/DistributionTable.tsx（今・見込みの切り替え・端数・立て替えの戻し・受け取る合計・赤字）
+- [x] T022 [US3] 紹介経由の売上 apps/web/src/apps/collect/components/sharing/ReferralTable.tsx
+- [x] T023 [US3] 名簿の紹介した人（PersonDialog・まとめて貼るの列・名簿の行）を apps/web/src/apps/collect/components/roster/ に
+- [x] T024 Web のテスト apps/web/test/collect/sharing.test.tsx・roster の紹介した人
 
 ## Phase 7: 招待とつながった人の画面（PR3）
 

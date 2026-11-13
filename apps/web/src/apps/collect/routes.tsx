@@ -20,6 +20,7 @@ import { RosterPage } from "./pages/RosterPage";
 import { SelfCheckInPage } from "./pages/SelfCheckInPage";
 import { SelfCheckInPublicPage } from "./pages/SelfCheckInPublicPage";
 import { SettingsPage } from "./pages/SettingsPage";
+import { SharingPage } from "./pages/SharingPage";
 import { SummariesPage } from "./pages/SummariesPage";
 import { TransfersPage } from "./pages/TransfersPage";
 import { CollectShell } from "./sidebar/CollectShell";
@@ -65,6 +66,7 @@ export const collectRoutes: RouteObject[] = [
       { path: `${COLLECT_BASE}/events/:eventId/helpers`, element: <HelpersPage /> },
       { path: `${COLLECT_BASE}/events/:eventId/self`, element: <SelfCheckInPage /> },
       { path: `${COLLECT_BASE}/events/:eventId/closing`, element: <ClosingPage /> },
+      { path: `${COLLECT_BASE}/events/:eventId/sharing`, element: <SharingPage /> },
       { path: `${COLLECT_BASE}/transfers`, element: <TransfersPage /> },
       { path: `${COLLECT_BASE}/summaries`, element: <SummariesPage /> },
       { path: `${COLLECT_BASE}/settings`, element: <SettingsPage /> },

@@ -16,7 +16,7 @@ import { formatJstShort } from "@/lib/format";
 import { PageBody, PageHeader } from "@/shell";
 import { collectApi } from "../lib/api";
 import { collectErrorText } from "../lib/errors";
-import { receptionPath, transfersPath } from "../lib/paths";
+import { receptionPath, sharingPath, transfersPath } from "../lib/paths";
 import { useLive } from "../lib/live";
 import { collectQueryKeys } from "../lib/query-keys";
 import { yen } from "../lib/reception-model";
@@ -156,6 +156,11 @@ export function ClosingPage() {
           <h2 className="truncate font-medium">{c.event.name}</h2>
           <p className="text-sm text-muted-foreground">
             来場 {c.attendance.arrived} / {c.attendance.rosterCount}人{c.closedAt && `・締めた（${formatJstShort(c.closedAt)}）`}
+          </p>
+          <p className="text-sm">
+            <Link to={sharingPath(eventId)} className="underline underline-offset-2">
+              経費を入れて、運営メンバーへの分配を見る
+            </Link>
           </p>
           {c.changedAfterClose && (
             <p role="status" className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-sm">

@@ -1,8 +1,8 @@
 // 集金管理のサイドバーの中身と画面の骨格（specs/collect/001-event-day-collection contracts/ui-routes.md 1、tasks.md T018）。
-// 上から：アプリの名前 → イベント・イベントを作る・振込待ち（数）・まとめ → 開いているイベント（名簿・受付・受付の手伝い・セルフ受付・締め）→ 下に PayPay・振込先の設定。
+// 上から：アプリの名前 → イベント・イベントを作る・振込待ち（数）・まとめ → 開いているイベント（名簿・受付・受付の手伝い・セルフ受付・締め・分配）→ 下に PayPay・振込先の設定。
 import { appById } from "@meguru/shared";
 import { useQuery } from "@tanstack/react-query";
-import { ArchiveIcon, BanknoteIcon, CalendarPlusIcon, CalendarDaysIcon, ClipboardCheckIcon, ListChecksIcon, QrCodeIcon, ScanLineIcon, SettingsIcon, UsersIcon, WalletIcon } from "lucide-react";
+import { ArchiveIcon, BanknoteIcon, CalendarPlusIcon, CalendarDaysIcon, ClipboardCheckIcon, HandCoinsIcon, ListChecksIcon, QrCodeIcon, ScanLineIcon, SettingsIcon, UsersIcon, WalletIcon } from "lucide-react";
 import type { ReactNode } from "react";
 import { NavLink, useMatch } from "react-router";
 import { AppShell, type AppSidebar, type SidebarPartProps } from "@/shell";
@@ -18,6 +18,7 @@ import {
   receptionPath,
   rosterPath,
   selfCheckInPath,
+  sharingPath,
   summariesPath,
   transfersPath,
 } from "../lib/paths";
@@ -92,6 +93,9 @@ function Body({ onNavigate }: SidebarPartProps) {
           </NavLink>
           <NavLink to={closingPath(openEventId)} className={itemClass} onClick={onNavigate}>
             <ClipboardCheckIcon className="size-5 lg:size-[18px]" /> 締め
+          </NavLink>
+          <NavLink to={sharingPath(openEventId)} className={itemClass} onClick={onNavigate}>
+            <HandCoinsIcon className="size-5 lg:size-[18px]" /> 分配
           </NavLink>
         </div>
       )}

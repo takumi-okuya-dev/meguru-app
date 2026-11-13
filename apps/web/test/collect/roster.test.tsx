@@ -14,6 +14,7 @@ const mocks = vi.hoisted(() => ({
   addPerson: vi.fn(),
   addPeopleBulk: vi.fn(),
   pastAttendees: vi.fn(),
+  updatePerson: vi.fn(),
   toastInfo: vi.fn(),
   toastError: vi.fn(),
 }));
@@ -24,8 +25,9 @@ vi.mock("@/apps/collect/lib/api", () => ({
     addPerson: mocks.addPerson,
     addPeopleBulk: mocks.addPeopleBulk,
     pastAttendees: mocks.pastAttendees,
-    updatePerson: vi.fn(),
+    updatePerson: mocks.updatePerson,
     deletePerson: vi.fn(),
+    referrers: () => Promise.resolve({ names: ["井上"] }),
   },
 }));
 vi.mock("sonner", () => ({ toast: { info: mocks.toastInfo, error: mocks.toastError, success: vi.fn() } }));
@@ -162,7 +164,7 @@ describe("まとめて貼る", () => {
     await user.clear(second);
     await user.type(second, "井上 空");
     await user.click(within(dialog).getByRole("button", { name: "2人を足す" }));
-    await waitFor(() => expect(mocks.addPeopleBulk).toHaveBeenCalledWith("e1", { names: ["松本 れい", "井上 空"], media: "peatix", priceTierId: "t1" }));
+    await waitFor(() => expect(mocks.addPeopleBulk).toHaveBeenCalledWith("e1", { names: ["松本 れい", "井上 空"], media: "peatix", priceTierId: "t1", referrer: null }));
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
   });
 });
@@ -178,5 +180,20 @@ describe("名簿の表", () => {
     expect(within(rows[2]!).getByText("港")).toBeInTheDocument();
     expect(within(rows[2]!).getByText("早割")).toBeInTheDocument();
     expect(screen.getByText("名簿 2人")).toBeInTheDocument();
+  });
+
+  it("紹介した人を行に出し、直すダイアログで直せる（候補が出る）", async () => {
+    mocks.roster.mockResolvedValue({ people: [person({ referrer: "井上", memo: "初参加" })], version: 3 });
+    mocks.updatePerson.mockResolvedValue({ person: person({ referrer: "木村" }), version: 4 });
+    renderRoster();
+    expect(await screen.findByText("紹介：井上・初参加")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "No.1 松本 れいを直す" }));
+    const dialog = screen.getByRole("dialog");
+    const input = within(dialog).getByLabelText("紹介した人");
+    expect(input).toHaveValue("井上");
+    await userEvent.clear(input);
+    await userEvent.type(input, "木村");
+    await userEvent.click(within(dialog).getByRole("button", { name: "保存する" }));
+    await waitFor(() => expect(mocks.updatePerson).toHaveBeenCalledWith("e1", "p1", expect.objectContaining({ referrer: "木村", memo: "初参加" })));
   });
 });

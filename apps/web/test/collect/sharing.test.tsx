@@ -1,0 +1,152 @@
+// 分配の画面（specs/collect/003-revenue-sharing User Story 1〜3、tasks.md T024）。
+import { computeDistribution, type SharingSnapshot } from "@meguru/shared";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { render, screen, waitFor, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { createMemoryRouter, RouterProvider } from "react-router";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+const mocks = vi.hoisted(() => ({
+  sharing: vi.fn(),
+  referrals: vi.fn(),
+  referrers: vi.fn(),
+  addExpense: vi.fn(),
+  updateExpense: vi.fn(),
+  deleteExpense: vi.fn(),
+  addMember: vi.fn(),
+  updateMember: vi.fn(),
+  deleteMember: vi.fn(),
+}));
+vi.mock("@/apps/collect/lib/api", () => ({ collectApi: mocks }));
+const toast = vi.hoisted(() => ({ info: vi.fn(), error: vi.fn(), success: vi.fn() }));
+vi.mock("sonner", () => ({ toast }));
+
+const { SharingPage } = await import("@/apps/collect/pages/SharingPage");
+
+type Member = SharingSnapshot["members"][number];
+const owner: Member = { id: "o", name: "主催者", role: "leader", ratioTenths: 12, isOwner: true, linked: true, invite: null };
+const member = (id: string, name: string): Member => ({ id, name, role: "member", ratioTenths: null, isOwner: false, linked: false, invite: null });
+
+/**
+ * 分配の画面の数字を作る（分配は共通の計算で出す）。
+ * @param over - 変える分
+ * @returns 数字
+ */
+function snapshot(over: Partial<SharingSnapshot> = {}): SharingSnapshot {
+  const members = over.members ?? [owner, member("a", "井上"), member("b", "木村"), member("c", "佐藤")];
+  const revenue = over.revenue ?? { paid: 25000, awaiting: 3000, awaitingConfirmation: 0 };
+  const expenseTotal = over.expenseTotal ?? 5000;
+  const calc = members.map((m) => ({ id: m.id, role: m.role, ratioTenths: m.ratioTenths, isOwner: m.isOwner }));
+  return {
+    event: { id: "e1", name: "IT交流会", startsAt: "2026-11-20T10:00:00.000Z" },
+    revenue,
+    expenses: [{ id: "x1", name: "会場費", amount: 5000, payer: { memberId: "o", name: "主催者" } }],
+    expenseTotal,
+    members,
+    maxRatioTenths: members.length * 10,
+    current: computeDistribution(revenue.paid - expenseTotal, calc),
+    projected: computeDistribution(revenue.paid + revenue.awaiting - expenseTotal, calc),
+    reimbursements: [{ memberId: "o", name: "主催者", amount: 5000 }],
+    ...over,
+  };
+}
+
+/**
+ * 分配の画面を描く。
+ */
+function renderPage() {
+  const router = createMemoryRouter([{ path: "/collect/events/:eventId/sharing", element: <SharingPage /> }], { initialEntries: ["/collect/events/e1/sharing"] });
+  render(
+    <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+      <RouterProvider router={router} />
+    </QueryClientProvider>,
+  );
+}
+
+beforeEach(() => {
+  for (const m of Object.values(mocks)) m.mockReset();
+  mocks.sharing.mockResolvedValue(snapshot());
+  mocks.referrals.mockResolvedValue({ rows: [{ name: "井上", people: 3, attended: 2, paid: 6000, awaiting: 3000 }, { name: null, people: 1, attended: 1, paid: 3000, awaiting: 0 }] });
+  mocks.referrers.mockResolvedValue({ names: [] });
+});
+
+describe("分配の画面", () => {
+  it("売上と残る額（今と見込み）・spec の例の分配額（リーダー6,002円・メンバー各4,666円）と立て替えの戻し", async () => {
+    renderPage();
+    expect(await screen.findByLabelText("今の残る額")).toHaveTextContent("20,000円");
+    expect(screen.getByLabelText("見込みの残る額")).toHaveTextContent("23,000円");
+    const leader = screen.getByRole("row", { name: "主催者の分配" });
+    expect(within(leader).getByText("6,002円")).toBeInTheDocument();
+    expect(within(leader).getByText("端数 2円 を含む")).toBeInTheDocument();
+    // 受け取る合計＝分配額＋立て替えの戻し
+    expect(within(leader).getByText("11,002円")).toBeInTheDocument();
+    expect(within(screen.getByRole("row", { name: "井上の分配" })).getAllByText("4,666円")).toHaveLength(2);
+  });
+
+  it("見込みに切り替えると、振込待ちを含めた額で出す", async () => {
+    renderPage();
+    await userEvent.click(await screen.findByRole("tab", { name: "見込み" }));
+    // 23,000 ÷ 4 × 1.2 = 6,900、メンバー floor(16,100 ÷ 3) = 5,366、端数 2
+    expect(within(screen.getByRole("row", { name: "主催者の分配" })).getByText("6,902円")).toBeInTheDocument();
+    expect(within(screen.getByRole("row", { name: "井上の分配" })).getAllByText("5,366円")).toHaveLength(2);
+  });
+
+  it("赤字なら知らせて、負担の目安として出す", async () => {
+    mocks.sharing.mockResolvedValue(snapshot({ revenue: { paid: 3000, awaiting: 0, awaitingConfirmation: 0 } }));
+    renderPage();
+    expect(await screen.findByText(/赤字 2,000円/)).toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: "負担の目安" })).toBeInTheDocument();
+  });
+
+  it("経費を足すと API の数字で描き直す", async () => {
+    mocks.addExpense.mockResolvedValue(snapshot({ expenseTotal: 6000, expenses: [] }));
+    renderPage();
+    await userEvent.click(await screen.findByRole("button", { name: "経費を足す" }));
+    const dialog = screen.getByRole("dialog");
+    await userEvent.type(within(dialog).getByLabelText("経費の名前"), "飲食");
+    await userEvent.type(within(dialog).getByLabelText("金額"), "1,000");
+    await userEvent.selectOptions(within(dialog).getByLabelText("立て替えた人"), "運営メンバーでない人");
+    await userEvent.type(within(dialog).getByLabelText("立て替えた人の名前"), "会場の人");
+    await userEvent.click(within(dialog).getByRole("button", { name: "保存する" }));
+    await waitFor(() => expect(mocks.addExpense).toHaveBeenCalledWith("e1", { name: "飲食", amount: 1000, payerMemberId: null, payerName: "会場の人" }));
+    expect(await screen.findByLabelText("今の残る額")).toHaveTextContent("19,000円");
+  });
+
+  it("運営メンバーの倍率：入れながら分配額の見込みを出し、上限を超えると保存できない", async () => {
+    mocks.updateMember.mockResolvedValue(snapshot());
+    renderPage();
+    await userEvent.click(await screen.findByRole("button", { name: "主催者を直す" }));
+    const dialog = screen.getByRole("dialog");
+    const ratio = within(dialog).getByLabelText("倍率");
+    await userEvent.clear(ratio);
+    await userEvent.type(ratio, "1.5");
+    expect(within(dialog).getByText(/この人の分配額は 7,502円/)).toBeInTheDocument();
+    await userEvent.clear(ratio);
+    await userEvent.type(ratio, "4.1");
+    expect(within(dialog).getByRole("alert")).toHaveTextContent("4.0倍以下");
+    expect(within(dialog).getByRole("button", { name: "保存する" })).toBeDisabled();
+    await userEvent.clear(ratio);
+    await userEvent.type(ratio, "1.5");
+    await userEvent.click(within(dialog).getByRole("button", { name: "保存する" }));
+    await waitFor(() => expect(mocks.updateMember).toHaveBeenCalledWith("e1", "o", { name: "主催者", role: "leader", ratioTenths: 15 }));
+  });
+
+  it("API が断ったら言葉を出す", async () => {
+    const { ApiError } = await import("@/lib/api-client");
+    mocks.addMember.mockRejectedValue(new ApiError("RATIO_TOO_HIGH", 400));
+    renderPage();
+    await userEvent.click(await screen.findByRole("button", { name: "運営メンバーを足す" }));
+    const dialog = screen.getByRole("dialog");
+    await userEvent.type(within(dialog).getByLabelText("運営メンバーの名前"), "長谷川");
+    await userEvent.click(within(dialog).getByRole("button", { name: "保存する" }));
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith(expect.stringContaining("倍率")));
+  });
+
+  it("紹介経由の売上（紹介なしは最後）", async () => {
+    renderPage();
+    const table = await screen.findByRole("table", { name: "紹介経由の売上" });
+    expect(within(table).getByText("井上")).toBeInTheDocument();
+    expect(within(table).getByText("紹介なし")).toBeInTheDocument();
+    expect(within(table).getByText("6,000円")).toBeInTheDocument();
+  });
+});

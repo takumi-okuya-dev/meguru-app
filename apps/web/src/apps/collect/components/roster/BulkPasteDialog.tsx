@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { ReferrerInput } from "./ReferrerInput";
 
 /** 確かめの一覧の1行。 */
 export type PasteRow = { key: number; original: string; name: string; include: boolean };
@@ -27,7 +28,7 @@ export function rowsFromPaste(text: string): PasteRow[] {
 /**
  * まとめて貼るダイアログ。
  * @param props - media・tier：足す人の媒体と区分（入力欄で選んでいるもの）、pending：足している途中か、
- *   onSubmit：名前の一覧を足す（成功したら true）、onClose：閉じる
+ *   onSubmit：名前の一覧と、みなに付ける紹介した人を足す（成功したら true）、onClose：閉じる
  * @returns ダイアログ
  */
 export function BulkPasteDialog({
@@ -40,11 +41,12 @@ export function BulkPasteDialog({
   media: CollectMedia;
   tier: CollectTier | undefined;
   pending: boolean;
-  onSubmit: (names: string[]) => Promise<boolean>;
+  onSubmit: (names: string[], referrer: string | null) => Promise<boolean>;
   onClose: () => void;
 }) {
   const [text, setText] = useState("");
   const [rows, setRows] = useState<PasteRow[] | null>(null);
+  const [referrer, setReferrer] = useState("");
   const chosen = (rows ?? []).filter((r) => r.include && r.name.trim() !== "");
   const tooLong = chosen.some((r) => [...r.name.trim()].length > COLLECT_LIMITS.personName);
   const tooMany = chosen.length > COLLECT_LIMITS.bulkMax;
@@ -90,6 +92,10 @@ export function BulkPasteDialog({
                 </li>
               ))}
             </ul>
+            <div className="space-y-1">
+              <div className="text-xs text-muted-foreground">みなに付ける紹介した人（いれば。違う人はあとから直せます）</div>
+              <ReferrerInput value={referrer} onChange={setReferrer} />
+            </div>
             {tooLong && <p className="text-sm text-destructive">名前は{COLLECT_LIMITS.personName}文字までです。長い行を直してください。</p>}
             {tooMany && <p className="text-sm text-destructive">一度に足せるのは{COLLECT_LIMITS.bulkMax}人までです。分けて貼ってください。</p>}
             <div className="flex justify-between gap-2">
@@ -100,7 +106,7 @@ export function BulkPasteDialog({
                 type="button"
                 disabled={chosen.length === 0 || tooLong || tooMany || pending}
                 onClick={async () => {
-                  if (await onSubmit(chosen.map((r) => r.name.trim()))) onClose();
+                  if (await onSubmit(chosen.map((r) => r.name.trim()), referrer.trim() || null)) onClose();
                 }}
               >
                 {chosen.length}人を足す
