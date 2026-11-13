@@ -72,7 +72,7 @@ beforeEach(() => {
     careerInterests: [{ value: "転職", count: 1 }],
   });
   api.candidates.mockResolvedValue({ persons: [makeCandidate()], total: 1 });
-  api.createOutreach.mockResolvedValue(makeOutreach());
+  api.createOutreach.mockResolvedValue({ outreach: makeOutreach(), created: true });
   api.updateOutreach.mockResolvedValue(makeOutreach({ stage: "link_sent" }));
   api.deleteOutreach.mockResolvedValue(null);
 });

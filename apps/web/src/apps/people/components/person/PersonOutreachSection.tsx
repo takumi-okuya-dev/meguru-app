@@ -1,9 +1,12 @@
 // 人のページの声かけの記録（誘う会・相談先ごとの進み具合と日時。specs/people/001-people-memo contracts/ui-routes.md 1、research.md R16）。
-// 001の作り手は1人なので、記録したのは作り手。「あなたが記録」と出す。
+// 001の作り手は1人なので、記録したのは作り手。「あなたが記録」と出す。進み具合のボタンと「声かけの記録を消す」も置く
+// （候補の行には最新の1件しか出ないので、前の相談先の声かけはここで直す）。
 import type { Outreach } from "@meguru/shared/people";
 import { useId } from "react";
 import { formatDateTime } from "@/lib/format";
 import { formatHeldOn } from "../format";
+import { ActionError, OutreachStageButtons } from "../outreach/OutreachControls";
+import { useOutreachActions } from "../outreach/use-outreach-actions";
 import { OUTREACH_STAGE_LABELS } from "./labels";
 
 /**
@@ -38,14 +41,34 @@ function outreachTitle(o: Outreach): string {
 }
 
 /**
- * 今の段の名前。
- * @param o - 声かけ
- * @returns 名前
+ * 声かけの記録の1つ（見出し・進み具合のボタン・各段の日時・「あなたが記録」）。前の相談先の声かけも、ここで進める・消せる。
+ * @param props - outreach：声かけ
+ * @returns 1つの記録
  */
-function stageLabel(o: Outreach): string {
-  return o.purpose === "invite"
-    ? OUTREACH_STAGE_LABELS.invite[o.stage as keyof typeof OUTREACH_STAGE_LABELS.invite]
-    : OUTREACH_STAGE_LABELS.work[o.stage as keyof typeof OUTREACH_STAGE_LABELS.work];
+function OutreachItem({ outreach }: { outreach: Outreach }) {
+  const actions = useOutreachActions();
+  const title = outreachTitle(outreach);
+  return (
+    <li className="space-y-2 px-4 py-3 text-sm">
+      <p className="font-medium break-words">{title}</p>
+      <OutreachStageButtons
+        outreach={outreach}
+        pending={actions.pending}
+        label={`進み具合：${title}`}
+        onChange={(stage) => actions.setStage(outreach.id, stage)}
+        onRemove={() => actions.drop(outreach.id)}
+      />
+      <ul className="text-muted-foreground">
+        {stageTimes(outreach).map((t) => (
+          <li key={t.label}>
+            {t.label}：{formatDateTime(t.at)}
+          </li>
+        ))}
+      </ul>
+      <p className="text-xs text-muted-foreground">あなたが記録</p>
+      <ActionError error={actions.failed?.error} />
+    </li>
+  );
 }
 
 /**
@@ -65,20 +88,7 @@ export function PersonOutreachSection({ outreaches }: { outreaches: Outreach[] }
       ) : (
         <ul className="divide-y rounded-2xl border bg-card">
           {outreaches.map((o) => (
-            <li key={o.id} className="space-y-1 px-4 py-3 text-sm">
-              <div className="flex flex-wrap items-baseline justify-between gap-x-2">
-                <span className="min-w-0 font-medium break-words">{outreachTitle(o)}</span>
-                <span className="shrink-0 rounded-full bg-muted px-2 py-0.5 text-xs">{stageLabel(o)}</span>
-              </div>
-              <ul className="text-muted-foreground">
-                {stageTimes(o).map((t) => (
-                  <li key={t.label}>
-                    {t.label}：{formatDateTime(t.at)}
-                  </li>
-                ))}
-              </ul>
-              <p className="text-xs text-muted-foreground">あなたが記録</p>
-            </li>
+            <OutreachItem key={o.id} outreach={o} />
           ))}
         </ul>
       )}

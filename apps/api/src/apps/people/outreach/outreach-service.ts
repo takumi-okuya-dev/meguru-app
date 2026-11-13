@@ -1,13 +1,13 @@
 // 声かけと進み具合（specs/people/001-people-memo contracts/api.md 5、research.md R16、tasks.md T077・T079）。
 // 同じ声かけは1つ（交流会への誘いは人と誘う会、仕事のつなぎは人と相談先）。その目的の同意がない人には始めない（FR-018）。
 // 相手の情報を外へ送る道は作らない（FR-023・FR-024）。声かけの行の user_id（作り手）が、判断した人（R16）。
-import { nameKey, OUTREACH_STAGES, type Outreach, type OutreachPurpose, type OutreachStage } from "@meguru/shared/people";
+import { nameKey, OUTREACH_STAGES, type Outreach, type OutreachCreateInput, type OutreachPurpose, type OutreachStage } from "@meguru/shared/people";
 import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { withTransaction, type TxDb } from "../../../kernel/db/client";
 import type { Env } from "../../../kernel/env";
 import { AppError, itemNotFound } from "../../../kernel/errors";
 import { isUuid } from "../../../kernel/validate";
-import { loadOwnedEvent, loadOwnedPerson, lockOwner, type PeopleDb } from "../access";
+import { loadOwnedEvent, loadOwnedPerson, lockActiveOwner, lockOwner, type PeopleDb } from "../access";
 import { attendanceSql } from "../persons/person-query";
 import { peopleEvents, peopleOutreaches } from "../schema";
 
@@ -51,7 +51,7 @@ async function selectOutreaches(db: PeopleDb, userId: string, where: ReturnType<
     .from(peopleOutreaches)
     .leftJoin(peopleEvents, eq(peopleEvents.id, peopleOutreaches.eventId))
     .where(and(eq(peopleOutreaches.userId, userId), where))
-    .orderBy(desc(peopleOutreaches.askedAt));
+    .orderBy(desc(peopleOutreaches.askedAt), desc(peopleOutreaches.id));
   return rows.map(toOutreach);
 }
 
@@ -92,13 +92,10 @@ export async function inviteOutreachesFor(db: PeopleDb, userId: string, eventId:
  * @param input - 人と、誘う会か相談先
  * @returns 声かけと、新しく作ったか
  */
-export async function createOutreach(
-  env: Env,
-  userId: string,
-  input: { personId: string; purpose: "invite"; eventId: string } | { personId: string; purpose: "work"; targetName: string },
-): Promise<{ outreach: Outreach; created: boolean }> {
+export async function createOutreach(env: Env, userId: string, input: OutreachCreateInput): Promise<{ outreach: Outreach; created: boolean }> {
   return withTransaction(env.DATABASE_URL, async (tx) => {
-    await lockOwner(tx, userId);
+    // 行を作る書き込みなので、退会の途中でないことをロックの中で確かめる
+    await lockActiveOwner(tx, env, userId);
     const p = await loadOwnedPerson(tx, userId, input.personId);
     let same;
     let values: typeof peopleOutreaches.$inferInsert;
@@ -133,11 +130,13 @@ export async function createOutreach(
  */
 export async function latestWorkOutreachesFor(db: PeopleDb, userId: string, personIds: readonly string[]): Promise<Map<string, Outreach>> {
   if (personIds.length === 0) return new Map();
-  // 並びは始めた時刻の新しい順なので、人ごとの最初のものが最新
-  const list = await selectOutreaches(db, userId, and(eq(peopleOutreaches.purpose, "work"), inArray(peopleOutreaches.personId, [...personIds])));
-  const out = new Map<string, Outreach>();
-  for (const o of list) if (!out.has(o.personId)) out.set(o.personId, o);
-  return out;
+  // 人ごとに1件だけ読む（始めた時刻 → 番号の新しい順。同じ時刻でも決まる）
+  const rows = await db
+    .selectDistinctOn([peopleOutreaches.personId], { o: peopleOutreaches })
+    .from(peopleOutreaches)
+    .where(and(eq(peopleOutreaches.userId, userId), eq(peopleOutreaches.purpose, "work"), inArray(peopleOutreaches.personId, [...personIds])))
+    .orderBy(peopleOutreaches.personId, desc(peopleOutreaches.askedAt), desc(peopleOutreaches.id));
+  return new Map(rows.map((r) => [r.o.personId, toOutreach({ o: r.o, event: null })]));
 }
 
 /**

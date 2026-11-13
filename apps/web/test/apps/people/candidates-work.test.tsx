@@ -25,6 +25,7 @@ vi.mock("@/apps/people/lib/api", async (orig) => {
 const { CandidatesPage } = await import("@/apps/people/pages/CandidatesPage");
 const { PersonPage } = await import("@/apps/people/pages/PersonPage");
 const { ApiError } = await import("@/lib/api-client");
+const { visibleStages } = await import("@/apps/people/components/outreach/OutreachControls");
 
 const ROUTES = [
   { path: "/people", element: <CandidatesPage /> },
@@ -49,6 +50,18 @@ async function firstRow() {
   return screen.getAllByRole("listitem").find((li) => li.textContent?.includes("山田はなこ"))!;
 }
 
+/**
+ * あとで返す約束（書いている途中を確かめる）。
+ * @returns 約束と、返す処理
+ */
+function deferred<T>() {
+  let resolve!: (v: T) => void;
+  const promise = new Promise<T>((res) => {
+    resolve = res;
+  });
+  return { promise, resolve };
+}
+
 beforeEach(() => {
   for (const f of Object.values(api)) f.mockReset();
   api.stats.mockResolvedValue({ repeaterCount: 0, repeaterGoal: null, nextOwnEvent: { id: EVENT_1213.id, name: EVENT_1213.name, heldOn: EVENT_1213.heldOn, isOwn: true } });
@@ -56,7 +69,7 @@ beforeEach(() => {
   api.events.mockResolvedValue([EVENT_1213]);
   api.facets.mockResolvedValue({ nextAttendance: [], wantedConnections: [], careerInterests: [] });
   api.candidates.mockResolvedValue({ persons: [makeCandidate({ consent: { invite: false, work: true } })], total: 1 });
-  api.createOutreach.mockResolvedValue(workOutreach());
+  api.createOutreach.mockResolvedValue({ outreach: workOutreach(), created: true });
   api.updateOutreach.mockResolvedValue(workOutreach({ stage: "approved" }));
   api.deleteOutreach.mockResolvedValue(null);
 });
@@ -138,7 +151,7 @@ describe("仕事の相談先へのつなぎ", () => {
   it("同じ人に別の相談先の声かけを足せる。記録を消せる", async () => {
     const user = userEvent.setup();
     api.candidates.mockResolvedValue({ persons: [makeCandidate({ outreach: workOutreach() })], total: 1 });
-    api.createOutreach.mockResolvedValue(workOutreach({ id: "w2", targetName: "鈴木さん" }));
+    api.createOutreach.mockResolvedValue({ outreach: workOutreach({ id: "w2", targetName: "鈴木さん" }), created: true });
     renderRoutes(ROUTES, "/people?purpose=work");
     const row = await firstRow();
     await user.click(within(row).getByRole("button", { name: /別の相談先を足す/ }));
@@ -150,7 +163,99 @@ describe("仕事の相談先へのつなぎ", () => {
   });
 });
 
+describe("「つないだ」を出す条件", () => {
+  it("段ではなく、OKをもらった日時（approvedAt）があるかで決める（サーバーと同じ条件）", () => {
+    expect(visibleStages({ purpose: "work", approvedAt: null })).toEqual(["asked", "approved"]);
+    expect(visibleStages({ purpose: "work", approvedAt: "2026-11-21T03:00:00.000Z" })).toEqual(["asked", "approved", "connected"]);
+    expect(visibleStages({ purpose: "invite", approvedAt: null })).toEqual(["asked", "link_sent", "attended"]);
+  });
+});
+
+describe("同じ相談先・書いている途中", () => {
+  it("もうある相談先を入れたら（created: false）、「この相談先は、もう記録があります」と出す", async () => {
+    const user = userEvent.setup();
+    api.candidates.mockResolvedValue({ persons: [makeCandidate({ outreach: workOutreach() })], total: 1 });
+    api.createOutreach.mockResolvedValue({ outreach: workOutreach(), created: false });
+    renderRoutes(ROUTES, "/people?purpose=work");
+    const row = await firstRow();
+    await user.click(within(row).getByRole("button", { name: /別の相談先を足す/ }));
+    await user.type(within(row).getByLabelText("相談先の名前"), "さとうさん");
+    await user.click(within(row).getByRole("button", { name: "声かけを始める" }));
+    expect(await within(row).findByRole("status")).toHaveTextContent("この相談先は、もう記録があります。");
+    expect(within(row).queryByLabelText("相談先の名前")).not.toBeInTheDocument();
+  });
+
+  it("行に出ている声かけとちがう前の記録が返ったら、どの相談先かを出す", async () => {
+    const user = userEvent.setup();
+    api.candidates.mockResolvedValue({ persons: [makeCandidate({ outreach: workOutreach({ id: "w2", targetName: "鈴木さん" }) })], total: 1 });
+    api.createOutreach.mockResolvedValue({ outreach: workOutreach({ id: "w1", targetName: "佐藤さん" }), created: false });
+    renderRoutes(ROUTES, "/people?purpose=work");
+    const row = await firstRow();
+    await user.click(within(row).getByRole("button", { name: /別の相談先を足す/ }));
+    await user.type(within(row).getByLabelText("相談先の名前"), "佐藤さん");
+    await user.click(within(row).getByRole("button", { name: "声かけを始める" }));
+    expect(await within(row).findByRole("status")).toHaveTextContent("相談先：佐藤さん（もう記録あり）");
+  });
+
+  it("進める・消すを書いている途中は、「別の相談先を足す」を押せない", async () => {
+    const user = userEvent.setup();
+    const later = deferred<ReturnType<typeof workOutreach>>();
+    api.candidates.mockResolvedValue({ persons: [makeCandidate({ outreach: workOutreach() })], total: 1 });
+    api.updateOutreach.mockReturnValue(later.promise);
+    renderRoutes(ROUTES, "/people?purpose=work");
+    const row = await firstRow();
+    expect(within(row).getByRole("button", { name: /別の相談先を足す/ })).toBeEnabled();
+    await user.click(within(row).getByRole("button", { name: "OKをもらった" }));
+    await waitFor(() => expect(within(row).getByRole("button", { name: /別の相談先を足す/ })).toBeDisabled());
+    later.resolve(workOutreach({ stage: "approved", approvedAt: "2026-11-21T03:00:00.000Z" }));
+    await waitFor(() => expect(within(row).getByRole("button", { name: /別の相談先を足す/ })).toBeEnabled());
+  });
+
+  it("進める・消すを書いている途中は、まだ声かけのない行の「声かけを始める」も押せない（消したあとの行）", async () => {
+    const user = userEvent.setup();
+    const later = deferred<null>();
+    api.candidates.mockResolvedValue({ persons: [makeCandidate({ outreach: workOutreach() })], total: 1 });
+    api.deleteOutreach.mockReturnValue(later.promise);
+    renderRoutes(ROUTES, "/people?purpose=work");
+    const row = await firstRow();
+    await user.click(within(row).getByRole("button", { name: "声かけの記録を消す" }));
+    await waitFor(() => expect(within(row).getByRole("button", { name: /別の相談先を足す/ })).toBeDisabled());
+    api.candidates.mockResolvedValue({ persons: [makeCandidate()], total: 1 });
+    later.resolve(null);
+    await waitFor(() => expect(within(row).getByRole("button", { name: "声かけを始める" })).toBeEnabled());
+  });
+});
+
 describe("人のページの仕事のつなぎの記録", () => {
+  it("前の相談先の声かけも、人のページで進める・消せる（OKの前は「つないだ」を出さない）", async () => {
+    const user = userEvent.setup();
+    api.person.mockResolvedValue(
+      makeDetail({
+        outreaches: [workOutreach({ id: "w2", targetName: "鈴木さん", stage: "approved", approvedAt: "2026-11-21T03:00:00.000Z" }), workOutreach()],
+      }),
+    );
+    renderRoutes(ROUTES, "/people/list/p1");
+    const older = await screen.findByRole("group", { name: "進み具合：仕事の相談先へのつなぎ（相談先：佐藤さん）" });
+    expect(within(older).getAllByRole("button").map((b) => b.textContent)).toEqual(["本人に聞いた", "OKをもらった"]);
+    const newer = screen.getByRole("group", { name: "進み具合：仕事の相談先へのつなぎ（相談先：鈴木さん）" });
+    expect(within(newer).getByRole("button", { name: "つないだ" })).toBeInTheDocument();
+    await user.click(within(older).getByRole("button", { name: "OKをもらった" }));
+    expect(api.updateOutreach).toHaveBeenCalledWith("w1", "approved");
+    const olderItem = older.closest("li")!;
+    await user.click(within(olderItem as HTMLElement).getByRole("button", { name: "声かけの記録を消す" }));
+    expect(api.deleteOutreach).toHaveBeenCalledWith("w1");
+  });
+
+  it("交流会への誘いの記録にも、進み具合のボタンを出す", async () => {
+    const user = userEvent.setup();
+    api.person.mockResolvedValue(makeDetail({ outreaches: [makeOutreach()] }));
+    renderRoutes(ROUTES, "/people/list/p1");
+    const group = await screen.findByRole("group", { name: /進み具合：.*IT交流会 12\/13への誘い/ });
+    expect(within(group).getAllByRole("button").map((b) => b.textContent)).toEqual(["興味を聞いた", "参加リンクを送った", "来た"]);
+    await user.click(within(group).getByRole("button", { name: "参加リンクを送った" }));
+    expect(api.updateOutreach).toHaveBeenCalledWith("o1", "link_sent");
+  });
+
   it("いつ・どの相談先へ・進み具合・「あなたが記録」を出し、交流会への誘いと並べる", async () => {
     api.person.mockResolvedValue(
       makeDetail({

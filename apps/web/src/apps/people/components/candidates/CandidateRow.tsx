@@ -4,27 +4,23 @@
 import { countChars } from "@meguru/shared";
 import {
   buildInviteMessage,
-  OUTREACH_STAGES,
   PERSON_NAME_MAX,
   type AnswerSummary,
   type CandidateItem,
+  type Outreach,
   type OutreachPurpose,
-  type OutreachStage,
   type PeopleEvent,
 } from "@meguru/shared/people";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { CopyIcon, PlusIcon, XIcon } from "lucide-react";
+import { CopyIcon, PlusIcon } from "lucide-react";
 import { useId, useState, type FormEvent } from "react";
 import { Link } from "react-router";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { describeError } from "@/lib/api-client";
 import { cn } from "@/lib/utils";
-import { peopleApi, type OutreachCreateInput } from "../../lib/api";
 import { fieldClass } from "../EventForm";
 import { personPath } from "../../lib/paths";
-import { refreshOutreaches } from "../../lib/refresh";
-import { OUTREACH_STAGE_LABELS } from "../person/labels";
+import { ActionError, OutreachStageButtons } from "../outreach/OutreachControls";
+import { useOutreachActions } from "../outreach/use-outreach-actions";
 import { lastMetLabel } from "../person/PersonRow";
 import { copyText } from "./copy-text";
 
@@ -49,122 +45,6 @@ function AnswerBadges({ answers }: { answers: AnswerSummary | null }) {
         </li>
       ))}
     </ul>
-  );
-}
-
-/**
- * 進み具合のボタン。今の段を濃く出し、押すとその段にする（戻すのは押し間違いを直すため）。
- * 仕事のつなぎでは、「OKをもらった」の前に「つないだ」を出さない（本人のOKのあとでつなぐ。FR-023）。
- * @param props - purpose：目的、stage：今の段、pending：書いている途中、onChange：段を選んだとき、onRemove：記録を消す
- * @returns ボタンの並び
- */
-function StageButtons({
-  purpose,
-  stage,
-  pending,
-  onChange,
-  onRemove,
-}: {
-  purpose: OutreachPurpose;
-  stage: OutreachStage;
-  pending: boolean;
-  onChange: (stage: OutreachStage) => void;
-  onRemove: () => void;
-}) {
-  const labels: Record<string, string> = OUTREACH_STAGE_LABELS[purpose];
-  const stages: readonly OutreachStage[] =
-    purpose === "work" && stage === "asked" ? OUTREACH_STAGES.work.filter((s) => s !== "connected") : OUTREACH_STAGES[purpose];
-  return (
-    <div className="flex flex-wrap items-center gap-1.5">
-      <div role="group" aria-label="進み具合" className="flex flex-wrap gap-1.5">
-        {stages.map((s) => {
-          const on = s === stage;
-          return (
-            <button
-              key={s}
-              type="button"
-              aria-pressed={on}
-              disabled={pending}
-              className={cn(
-                "min-h-11 rounded-full border px-3 text-sm disabled:opacity-60 md:min-h-8",
-                on ? "border-foreground bg-foreground text-background" : "bg-card hover:bg-accent",
-              )}
-              onClick={() => !on && onChange(s)}
-            >
-              {labels[s]}
-            </button>
-          );
-        })}
-      </div>
-      <Button type="button" variant="ghost" size="icon" className="size-11 rounded-full md:size-8" aria-label="声かけの記録を消す" disabled={pending} onClick={onRemove}>
-        <XIcon className="size-4" />
-      </Button>
-    </div>
-  );
-}
-
-/**
- * 1人の声かけの書き込み（始める・進める・消す）。出すエラーは最後の操作のものだけ。
- * @param options - locked：前の行を出したまま読み直している（押せなくする）、onStarted：始めたあと、onRemoved：消したあと
- * @returns 書き込みと、押せない・エラーの状態
- */
-function useOutreachActions({ locked, onStarted, onRemoved }: { locked: boolean; onStarted?: () => void; onRemoved?: () => void }) {
-  const queryClient = useQueryClient();
-  const start = useMutation({
-    mutationFn: (input: OutreachCreateInput) => peopleApi.createOutreach(input),
-    onSuccess: async () => {
-      await refreshOutreaches(queryClient);
-      onStarted?.();
-    },
-  });
-  const move = useMutation({
-    mutationFn: ({ id, stage }: { id: string; stage: OutreachStage }) => peopleApi.updateOutreach(id, stage),
-    onSuccess: () => refreshOutreaches(queryClient),
-  });
-  const remove = useMutation({
-    mutationFn: (id: string) => peopleApi.deleteOutreach(id),
-    onSuccess: async () => {
-      onRemoved?.();
-      await refreshOutreaches(queryClient);
-    },
-  });
-  const all = [start, move, remove];
-  /**
-   * 1つの操作を始める前に、ほかの操作の結果（古いエラー）を消す。
-   * @param keep - これから始める操作
-   */
-  const clearOthers = (keep: { reset: () => void }) => {
-    for (const m of all) if (m !== keep) m.reset();
-  };
-  return {
-    pending: locked || all.some((m) => m.isPending),
-    failed: all.find((m) => m.isError),
-    begin: (input: OutreachCreateInput) => {
-      clearOthers(start);
-      start.mutate(input);
-    },
-    setStage: (id: string, stage: OutreachStage) => {
-      clearOthers(move);
-      move.mutate({ id, stage });
-    },
-    drop: (id: string) => {
-      clearOthers(remove);
-      remove.mutate(id);
-    },
-  };
-}
-
-/**
- * 操作のエラーの文言。
- * @param props - error：エラー（なければ何も出さない）
- * @returns 文言
- */
-function ActionError({ error }: { error: unknown }) {
-  if (!error) return null;
-  return (
-    <p role="alert" className="text-[13px] text-destructive">
-      {describeError(error)}
-    </p>
   );
 }
 
@@ -224,9 +104,8 @@ function InviteActions({
         )}
       </div>
       {outreach !== null && (
-        <StageButtons
-          purpose="invite"
-          stage={outreach.stage}
+        <OutreachStageButtons
+          outreach={outreach}
           pending={actions.pending}
           onChange={(stage) => actions.setStage(outreach.id, stage)}
           onRemove={() => actions.drop(outreach.id)}
@@ -282,6 +161,17 @@ function WorkTargetForm({ pending, onSubmit, onCancel }: { pending: boolean; onS
 }
 
 /**
+ * 同じ相談先の声かけがもうあったときの文。行に出ている声かけとちがうものなら、どの相談先かも書く。
+ * @param existing - 返ってきた（もうある）声かけ
+ * @param shownId - 行に出ている声かけのID
+ * @returns 文
+ */
+function alreadyRecordedNotice(existing: Outreach, shownId: string | undefined): string {
+  if (existing.id === shownId) return "この相談先は、もう記録があります。";
+  return `この相談先は、もう記録があります（相談先：${existing.targetName ?? ""}（もう記録あり））。進み具合は人のページで変えられます。`;
+}
+
+/**
  * 仕事の相談先へのつなぎの操作（声かけを始める・進み具合・別の相談先を足す）。行には最新の声かけが出る。
  * @param props - person：候補、locked：前の行を出したまま読み直している（押せなくする）
  * @returns 操作
@@ -290,14 +180,20 @@ function WorkActions({ person, locked }: { person: CandidateItem; locked: boolea
   const outreach = person.outreach;
   const [adding, setAdding] = useState(false);
   const [opened, setOpened] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
   const actions = useOutreachActions({
     locked,
-    onStarted: () => {
+    onStarted: ({ outreach: result, created }) => {
       setAdding(false);
       setOpened(false);
+      // 同じ相談先（nameKey が同じ）がもうあれば、黙らずに知らせる
+      if (!created) setNotice(alreadyRecordedNotice(result, outreach?.id));
     },
   });
-  const begin = (targetName: string) => actions.begin({ personId: person.id, purpose: "work", targetName });
+  const begin = (targetName: string) => {
+    setNotice(null);
+    actions.begin({ personId: person.id, purpose: "work", targetName });
+  };
 
   return (
     <div className="space-y-2">
@@ -305,7 +201,7 @@ function WorkActions({ person, locked }: { person: CandidateItem; locked: boolea
         opened ? (
           <WorkTargetForm pending={actions.pending} onSubmit={begin} onCancel={() => setOpened(false)} />
         ) : (
-          <Button type="button" variant="outline" className="h-11 rounded-full md:h-9" disabled={locked} onClick={() => setOpened(true)}>
+          <Button type="button" variant="outline" className="h-11 rounded-full md:h-9" disabled={actions.pending} onClick={() => setOpened(true)}>
             声かけを始める
           </Button>
         )
@@ -315,21 +211,31 @@ function WorkActions({ person, locked }: { person: CandidateItem; locked: boolea
             <span className="text-muted-foreground">相談先：</span>
             <span className="break-words">{outreach.targetName}</span>
           </p>
-          <StageButtons
-            purpose="work"
-            stage={outreach.stage}
+          <OutreachStageButtons
+            outreach={outreach}
             pending={actions.pending}
-            onChange={(stage) => actions.setStage(outreach.id, stage)}
-            onRemove={() => actions.drop(outreach.id)}
+            onChange={(stage) => {
+              setNotice(null);
+              actions.setStage(outreach.id, stage);
+            }}
+            onRemove={() => {
+              setNotice(null);
+              actions.drop(outreach.id);
+            }}
           />
           {adding ? (
             <WorkTargetForm pending={actions.pending} onSubmit={begin} onCancel={() => setAdding(false)} />
           ) : (
-            <Button type="button" variant="ghost" className="h-11 rounded-full px-3 md:h-9" disabled={locked} onClick={() => setAdding(true)}>
+            <Button type="button" variant="ghost" className="h-11 rounded-full px-3 md:h-9" disabled={actions.pending} onClick={() => setAdding(true)}>
               <PlusIcon /> 別の相談先を足す
             </Button>
           )}
         </>
+      )}
+      {notice && (
+        <p role="status" className="text-[13px] text-muted-foreground">
+          {notice}
+        </p>
       )}
       <ActionError error={actions.failed?.error} />
     </div>

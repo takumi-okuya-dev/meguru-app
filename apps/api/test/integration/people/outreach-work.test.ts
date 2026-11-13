@@ -63,13 +63,14 @@ describe("声かけを始める", () => {
     const [s1, b1] = await start(hanako, "ミナト");
     expect([s1, b1.outreach.purpose, b1.outreach.targetName, b1.outreach.event, b1.outreach.stage]).toEqual([201, "work", "ミナト", null, "asked"]);
     const [s2, b2] = await start(hanako, " みなと ");
-    expect([s2, b2.outreach.id]).toEqual([200, b1.outreach.id]);
+    expect([s2, b2.outreach.id, (b2 as { created?: boolean }).created, (b1 as { created?: boolean }).created]).toEqual([200, b1.outreach.id, false, true]);
   });
 
   it("同意がなければ 409 OUTREACH_NO_CONSENT。相談先が空・101文字は 400", async () => {
     expect((await start(taro, "相談先"))[1].error?.code).toBe("OUTREACH_NO_CONSENT");
     expect((await start(jiro, "相談先"))[1].error?.code).toBe("OUTREACH_NO_CONSENT");
     expect((await start(hanako, ""))[0]).toBe(400);
+    expect((await start(hanako, "\u200b"))[0]).toBe(400);
     expect((await start(hanako, "あ".repeat(101)))[0]).toBe(400);
     expect((await start(hanako, "🌸".repeat(100)))[0]).toBe(201);
   });
