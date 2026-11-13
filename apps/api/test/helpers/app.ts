@@ -82,16 +82,22 @@ async function retryOnDeadlock(run: () => Promise<unknown>): Promise<void> {
 let appTables: Promise<string[]> | undefined;
 
 /**
- * アプリのスキーマ（public・drizzle のほか）のすべての表を読む。アプリや表を足しても、ここを直さずに済む（specs/meguru/031）。
+ * アプリのスキーマのすべての表を読む。アプリのスキーマ＝受け取った出来事の表（received_events）を持つスキーマ（どのアプリも持つ。
+ * docs/module-map.md 6）。アプリや表を足しても、ここを直さずに済む（specs/meguru/031）。拡張機能など外のスキーマは空にしない。
  * @param sql - DBの問い合わせ
  * @returns 「スキーマ.表」の一覧
  */
 function loadAppTables(sql: ReturnType<typeof neon<false, false>>): Promise<string[]> {
   appTables ??= sql
     .query(
-      "SELECT quote_ident(schemaname) || '.' || quote_ident(tablename) AS name FROM pg_tables WHERE schemaname NOT IN ('public', 'drizzle', 'pg_catalog', 'information_schema') ORDER BY 1",
+      "SELECT quote_ident(schemaname) || '.' || quote_ident(tablename) AS name FROM pg_tables WHERE schemaname IN (SELECT schemaname FROM pg_tables WHERE tablename = 'received_events' AND schemaname NOT IN ('public', 'drizzle')) ORDER BY 1",
     )
-    .then((rows) => (rows as { name: string }[]).map((r) => r.name));
+    .then((rows) => (rows as { name: string }[]).map((r) => r.name))
+    .catch((err: unknown) => {
+      // 失敗を覚え続けない（次の resetDb で読み直す）
+      appTables = undefined;
+      throw err;
+    });
   return appTables;
 }
 

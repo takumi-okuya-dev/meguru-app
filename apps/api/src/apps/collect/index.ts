@@ -11,15 +11,13 @@ import { settingsRoutes } from "./settings/settings-routes";
 import { registerCollect } from "./register";
 import { recountCollectUsage } from "./usage/usage";
 
-export { registerCollect, recountCollectUsage };
-
 /**
  * 集金管理の主催者の道筋（/api/collect の下。specs/collect/001-event-day-collection contracts/api.md 1〜3・7）。
  * どの道筋にも、ログインと集金管理の利用の許可の関所を付ける（手伝う人のログインのいらない道筋は PR2 で別に足す）。
  * @param authed - ログインのミドルウェア
  * @returns Hono のアプリ（app.ts が /api/collect につなぐ）
  */
-export function collectRoutes(authed: MiddlewareHandler<AppEnv>) {
+function collectRoutes(authed: MiddlewareHandler<AppEnv>) {
   const owner = collectOwner(authed);
   return new Hono<AppEnv>()
     .route("/", collectMeRoutes(owner))

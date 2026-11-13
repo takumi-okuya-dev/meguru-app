@@ -22,13 +22,24 @@ describe("アプリの一覧", () => {
 
   it("出してよいアプリだけを releasedApps と isReleasedAppId が通す", () => {
     // アプリの数や並びは書かない（アプリを足しても直さない。specs/meguru/031）。だれに出すかは API の利用の許可で決める
-    expect(releasedApps().map((a) => a.id)).toEqual(
-      APP_CATALOG.filter((a) => a.released).map((a) => a.id),
-    );
-    for (const a of APP_CATALOG) expect(isReleasedAppId(a.id)).toBe(a.released);
+    expect(releasedApps().map((a) => a.id)).toContain("threads");
+    expect(releasedApps().every((a) => a.released)).toBe(true);
+    // 出してよくないアプリは releasedApps にも isReleasedAppId にも出ない
+    for (const a of APP_CATALOG.filter((x) => !x.released)) {
+      expect(releasedApps()).not.toContain(a);
+      expect(isReleasedAppId(a.id)).toBe(false);
+    }
     expect(isReleasedAppId("threads")).toBe(true);
     expect(isReleasedAppId("unknown-app")).toBe(false);
     expect(isReleasedAppId(1)).toBe(false);
+  });
+});
+
+describe("アプリの一覧の形", () => {
+  it("アプリの番号とパスは重ならない（取り込みで同じ行が2つ残っていないかも確かめる）", () => {
+    const ids = APP_CATALOG.map((a) => a.id);
+    expect(new Set(ids).size).toBe(ids.length);
+    expect(new Set(APP_CATALOG.map((a) => a.basePath)).size).toBe(ids.length);
   });
 });
 

@@ -185,7 +185,7 @@ ESLintで止められる違反は0件にする。今すぐ直せないものは�
 2作目（例：`people`）を足すときの手順。パターン①（[docs/app-separation.md](./app-separation.md)）で作り、Threadsを実例にしてなぞる。
 
 1. `apps/api/src/apps/<名前>/`を作り、次を置く。
-   - `schema.ts`：そのアプリの表。`pgSchema("<名前>")`でアプリ専用のスキーマに置き、共通の表（`platform/schema`）は参照しない。利用者のIDは`user_id`に値として持つ（外部キーなし。[docs/app-separation.md](./app-separation.md) 4）。共通の部品は`../../kernel/db/columns`。受け取った出来事の表（`received_events`）も置く（Threads：`apps/threads/schema.ts`）。
+   - `schema.ts`：そのアプリの表。`pgSchema("<名前>")`でアプリ専用のスキーマに置き、共通の表（`platform/schema`）は参照しない。利用者のIDは`user_id`に値として持つ（外部キーなし。[docs/app-separation.md](./app-separation.md) 4）。共通の部品は`../../kernel/db/columns`。受け取った出来事の表（`received_events`）も必ず置く（Threads：`apps/threads/schema.ts`。結合テストとE2EのDBの片づけは、この表を持つスキーマをアプリのスキーマとみなして空にする）。
    - 小分けのフォルダー（処理と`*-routes.ts`）。
    - `registry.ts`：アプリの番号と、機能・上限の名前・表示名・範囲（Threads：`apps/threads/registry.ts`）。
    - `register.ts`：`registerXxx()`。`registerModule("<名前>", …)`の中で、`registerAppFeatures`・`registerAppLimits`・`registerAppAccess`・`registerConsumer`を呼ぶ（Threads：`apps/threads/register.ts`の`registerThreads()`）。

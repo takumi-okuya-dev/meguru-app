@@ -15,8 +15,8 @@ import {
   purgeOldActivity,
   recountThreadsUsage,
 } from "../apps/threads";
-import { appDailyJobs, registerApps } from "../app-modules";
-import { purgeDeliveredEvents, reconcileSubscriptions, clerkUserDeleter, resumeWithdrawals } from "../platform";
+import { API_APPS } from "../app-modules";
+import { appDailyJobs, purgeDeliveredEvents, reconcileSubscriptions, clerkUserDeleter, registerAppModules, resumeWithdrawals } from "../platform";
 
 /**
  * 日次の定期処理をまとめて行う（contracts/api.md「定期処理」）。1つの処理の失敗で全体を止めない。
@@ -25,7 +25,7 @@ import { purgeDeliveredEvents, reconcileSubscriptions, clerkUserDeleter, resumeW
  */
 export async function runDailyJobs(env: Env, now: Date = new Date()) {
   // 退会のやり直しなどで共通の処理が出来事を出すので、アプリの受け取りを登録しておく（何度呼んでも1回だけ。specs/meguru/029）
-  registerApps();
+  registerAppModules(API_APPS);
   const steps: (readonly [string, () => Promise<unknown>])[] = [
     ["token refresh", () => refreshExpiringTokens(env, createThreadsClient(env), now)],
     ["expired oauth states", () => cleanupExpiredOauthStates(env, now)],
@@ -38,7 +38,7 @@ export async function runDailyJobs(env: Env, now: Date = new Date()) {
     // Threadsの利用の数を数え直して共通へ伝える（伝え損ねた分を直す。specs/meguru/029 research.md R6）。料金の合わせ直しの前に行う
     ["threads usage recount", () => recountThreadsUsage(env)],
     // アプリの毎日の処理（利用の数の数え直しなど。アプリの一覧 app-modules.ts の順。specs/meguru/031）。料金の合わせ直しの前に行う
-    ...appDailyJobs(env, now),
+    ...appDailyJobs(API_APPS, env, now),
     // 契約の状態とアカウントの数を、Stripeと合わせ直す（specs/013 research.md R5・R6）。データ削除の後に行う
     ["billing reconcile", () => reconcileSubscriptions(env)],
     // 退会の続き（契約を止める・データを消す・ログインの情報を消す。specs/013 research.md R10）

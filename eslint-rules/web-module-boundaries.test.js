@@ -1,39 +1,8 @@
 // web-module-boundaries のテスト（specs/028-meguru-shell contracts/web-module-boundaries.md 3、T003・T059）。node --test eslint-rules/ で動かす。
-import { describe, it } from "node:test";
-import { RuleTester } from "eslint";
-import tseslint from "typescript-eslint";
 import rule from "./web-module-boundaries.js";
+import { ruleTester } from "./rule-test-helpers.js";
 
-// RuleTester を node:test の describe・it で動かす
-RuleTester.describe = describe;
-RuleTester.it = it;
-RuleTester.itOnly = it.only;
-
-const tester = new RuleTester({
-  languageOptions: {
-    parser: tseslint.parser,
-    ecmaVersion: 2022,
-    sourceType: "module",
-    parserOptions: { ecmaFeatures: { jsx: true } },
-  },
-});
-
-const SRC = "/repo/apps/web/src";
-/**
- * テストの1件を作る。
- * @param file - src からのファイルのパス
- * @param code - コード
- * @returns RuleTester のテストの1件
- */
-const at = (file, code) => ({ filename: `${SRC}/${file}`, code });
-/**
- * 違反するテストの1件を作る。
- * @param file - src からのファイルのパス
- * @param code - コード
- * @param messageId - 期待するメッセージ
- * @returns RuleTester のテストの1件
- */
-const bad = (file, code, messageId) => ({ ...at(file, code), errors: [{ messageId }] });
+const { tester, at, bad } = ruleTester("apps/web/src");
 /** ⑦を確かめるときのオプション。 */
 const strict = [{ strictPlacement: true }];
 

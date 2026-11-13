@@ -7,6 +7,7 @@ import { validateConfig } from "./kernel/config";
 import { AppError } from "./kernel/errors";
 import { logger, setLogAppEnv } from "./kernel/logger";
 import {
+  registerAppModules,
   authMiddleware,
   optionalAuthMiddleware,
   clerkVerifier,
@@ -53,7 +54,7 @@ import {
   activityRoutes,
   threadsMeRoutes,
 } from "./apps/threads";
-import { API_APPS, registerApps } from "./app-modules";
+import { API_APPS } from "./app-modules";
 
 /** アプリに差し込む依存。テストでは偽の認証を渡す。 */
 export type AppDeps = {
@@ -79,7 +80,7 @@ export const defaultDeps: AppDeps = {
  */
 export function createApp(deps: AppDeps = defaultDeps) {
   // アプリの登録（機能・上限・利用の決まり・出来事の受け取り）をする（specs/027・specs/meguru/031。何度呼んでも1回だけ）
-  registerApps();
+  registerAppModules(API_APPS);
   const app = new Hono<AppEnv>();
 
   app.use("/api/*", async (c, next) => {
