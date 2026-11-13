@@ -1,5 +1,5 @@
 {
-  "id": "77bd1f63-9a6f-4204-8a5a-a8920941c53d",
+  "id": "ce34fedb-1e17-46fc-bec6-fd292d65e00f",
   "prevId": "d581a1c8-b5c8-4faf-9c30-3b5e1ae1008d",
   "version": "7",
   "dialect": "postgresql",
@@ -7790,126 +7790,6 @@
       },
       "isRLSEnabled": false
     },
-    "collect.threads_event_candidates": {
-      "name": "threads_event_candidates",
-      "schema": "collect",
-      "columns": {
-        "promotion_id": {
-          "name": "promotion_id",
-          "type": "text",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "threads_account_id": {
-          "name": "threads_account_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "owner_user_id": {
-          "name": "owner_user_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "name": {
-          "name": "name",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "starts_at": {
-          "name": "starts_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "ends_at": {
-          "name": "ends_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "venue": {
-          "name": "venue",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "capacity": {
-          "name": "capacity",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "fee_amount": {
-          "name": "fee_amount",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "fee_note": {
-          "name": "fee_note",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "posted_media": {
-          "name": "posted_media",
-          "type": "text[]",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "ARRAY[]::text[]"
-        },
-        "deleted_at": {
-          "name": "deleted_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "details_occurred_at": {
-          "name": "details_occurred_at",
-          "type": "timestamp (6) with time zone",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "media_occurred_at": {
-          "name": "media_occurred_at",
-          "type": "timestamp (6) with time zone",
-          "primaryKey": false,
-          "notNull": false
-        }
-      },
-      "indexes": {
-        "threads_event_candidates_owner_idx": {
-          "name": "threads_event_candidates_owner_idx",
-          "columns": [
-            {
-              "expression": "owner_user_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "starts_at",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {},
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
     "people.choice_mappings": {
       "name": "choice_mappings",
       "schema": "people",
@@ -8676,6 +8556,295 @@
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "people.outreaches": {
+      "name": "outreaches",
+      "schema": "people",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "person_id": {
+          "name": "person_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "purpose": {
+          "name": "purpose",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "event_id": {
+          "name": "event_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "target_name": {
+          "name": "target_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "target_key": {
+          "name": "target_key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "stage": {
+          "name": "stage",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "asked_at": {
+          "name": "asked_at",
+          "type": "timestamp (6) with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "link_sent_at": {
+          "name": "link_sent_at",
+          "type": "timestamp (6) with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "attended_at": {
+          "name": "attended_at",
+          "type": "timestamp (6) with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "approved_at": {
+          "name": "approved_at",
+          "type": "timestamp (6) with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "connected_at": {
+          "name": "connected_at",
+          "type": "timestamp (6) with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "people_outreaches_invite_unique": {
+          "name": "people_outreaches_invite_unique",
+          "columns": [
+            {
+              "expression": "person_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "event_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"people\".\"outreaches\".\"purpose\" = 'invite'",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "people_outreaches_work_unique": {
+          "name": "people_outreaches_work_unique",
+          "columns": [
+            {
+              "expression": "person_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "target_key",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"people\".\"outreaches\".\"purpose\" = 'work'",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "people_outreaches_user_idx": {
+          "name": "people_outreaches_user_idx",
+          "columns": [
+            {
+              "expression": "user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "people_outreaches_person_idx": {
+          "name": "people_outreaches_person_idx",
+          "columns": [
+            {
+              "expression": "person_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "people_outreaches_event_idx": {
+          "name": "people_outreaches_event_idx",
+          "columns": [
+            {
+              "expression": "event_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "outreaches_person_id_persons_id_fk": {
+          "name": "outreaches_person_id_persons_id_fk",
+          "tableFrom": "outreaches",
+          "tableTo": "persons",
+          "schemaTo": "people",
+          "columnsFrom": [
+            "person_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "outreaches_event_id_events_id_fk": {
+          "name": "outreaches_event_id_events_id_fk",
+          "tableFrom": "outreaches",
+          "tableTo": "events",
+          "schemaTo": "people",
+          "columnsFrom": [
+            "event_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "people_outreaches_purpose": {
+          "name": "people_outreaches_purpose",
+          "value": "\"people\".\"outreaches\".\"purpose\" IN ('invite', 'work')"
+        },
+        "people_outreaches_target": {
+          "name": "people_outreaches_target",
+          "value": "(\"people\".\"outreaches\".\"purpose\" = 'invite' AND \"people\".\"outreaches\".\"event_id\" IS NOT NULL AND \"people\".\"outreaches\".\"target_name\" IS NULL AND \"people\".\"outreaches\".\"target_key\" IS NULL)\n        OR (\"people\".\"outreaches\".\"purpose\" = 'work' AND \"people\".\"outreaches\".\"event_id\" IS NULL AND \"people\".\"outreaches\".\"target_name\" IS NOT NULL AND char_length(\"people\".\"outreaches\".\"target_name\") BETWEEN 1 AND 100 AND \"people\".\"outreaches\".\"target_key\" IS NOT NULL)"
+        },
+        "people_outreaches_stage": {
+          "name": "people_outreaches_stage",
+          "value": "(\"people\".\"outreaches\".\"purpose\" = 'invite' AND \"people\".\"outreaches\".\"stage\" IN ('asked', 'link_sent', 'attended')) OR (\"people\".\"outreaches\".\"purpose\" = 'work' AND \"people\".\"outreaches\".\"stage\" IN ('asked', 'approved', 'connected'))"
+        },
+        "people_outreaches_connected_after_approved": {
+          "name": "people_outreaches_connected_after_approved",
+          "value": "\"people\".\"outreaches\".\"stage\" <> 'connected' OR \"people\".\"outreaches\".\"approved_at\" IS NOT NULL"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "people.owner_settings": {
+      "name": "owner_settings",
+      "schema": "people",
+      "columns": {
+        "user_id": {
+          "name": "user_id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "invite_template": {
+          "name": "invite_template",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "repeater_goal": {
+          "name": "repeater_goal",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp (6) with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "people_owner_settings_invite_template": {
+          "name": "people_owner_settings_invite_template",
+          "value": "\"people\".\"owner_settings\".\"invite_template\" IS NULL OR char_length(\"people\".\"owner_settings\".\"invite_template\") BETWEEN 1 AND 500"
+        },
+        "people_owner_settings_repeater_goal": {
+          "name": "people_owner_settings_repeater_goal",
+          "value": "\"people\".\"owner_settings\".\"repeater_goal\" IS NULL OR \"people\".\"owner_settings\".\"repeater_goal\" BETWEEN 1 AND 10000"
+        }
+      },
       "isRLSEnabled": false
     },
     "people.persons": {

@@ -264,8 +264,15 @@
     {
       "idx": 37,
       "version": "7",
-      "when": 1794556500375,
-      "tag": "0037_collect_threads_candidates",
+      "when": 1794554823070,
+      "tag": "0037_people_outreach",
+      "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "7",
+      "when": 1794556754207,
+      "tag": "0038_collect_threads_candidates",
       "breakpoints": true
     }
   ]
