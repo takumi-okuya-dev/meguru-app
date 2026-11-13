@@ -1,7 +1,7 @@
 // 「この人と同じ人」：名前で探して選び、確かめてから、今の人にまとめる（specs/people/001-people-memo research.md R15、US2 AS3）。
 // 今開いている人を残し、選んだ人の回答・会ったイベント・同意の記録・メモを移して、選んだ人を消す。
 import type { PersonListItem, PersonSummary } from "@meguru/shared/people";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useInfiniteQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { ChevronRightIcon } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -23,12 +23,18 @@ import { useDebouncedValue } from "./use-debounced-value";
 function PickStep({ person, onPick }: { person: PersonSummary; onPick: (other: PersonListItem) => void }) {
   const [text, setText] = useState("");
   const q = useDebouncedValue(text.trim());
-  const found = useQuery({
-    queryKey: peopleQueryKeys.personList({ q }),
-    queryFn: () => peopleApi.persons({ q }),
+  // 100人を超えて当たっても全員を選べるように、「もっと見る」で続きを読む（PR #119 の Codex レビュー）
+  const found = useInfiniteQuery({
+    queryKey: [...peopleQueryKeys.personList({ q }), "pages"],
+    queryFn: ({ pageParam }) => peopleApi.persons({ q, offset: pageParam }),
+    initialPageParam: 0,
+    getNextPageParam: (last, pages) => {
+      const loaded = pages.reduce((n, p) => n + p.persons.length, 0);
+      return loaded < last.total && last.persons.length > 0 ? loaded : undefined;
+    },
     enabled: q !== "",
   });
-  const others = (found.data?.persons ?? []).filter((p) => p.id !== person.id);
+  const others = (found.data?.pages ?? []).flatMap((page) => page.persons).filter((p) => p.id !== person.id);
   return (
     <div className="space-y-3">
       <PersonSearchBox value={text} onChange={setText} label="同じ人を名前で探す" placeholder="名前・LINE名で探す" autoFocus />
@@ -56,6 +62,18 @@ function PickStep({ person, onPick }: { person: PersonSummary; onPick: (other: P
               </button>
             </li>
           ))}
+          {found.hasNextPage && (
+            <li>
+              <button
+                type="button"
+                className="flex min-h-11 w-full items-center justify-center px-3 text-sm text-muted-foreground hover:bg-accent"
+                disabled={found.isFetchingNextPage}
+                onClick={() => void found.fetchNextPage()}
+              >
+                {found.isFetchingNextPage ? "読んでいます…" : "もっと見る"}
+              </button>
+            </li>
+          )}
         </ul>
       )}
     </div>

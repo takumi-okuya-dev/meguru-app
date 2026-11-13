@@ -87,7 +87,7 @@ describe("この人と同じ人（まとめる）", () => {
     await user.click(await screen.findByRole("button", { name: /この人と同じ人/ }));
     const dialog = await screen.findByRole("dialog");
     await user.type(within(dialog).getByLabelText("同じ人を名前で探す"), "はなこ");
-    await waitFor(() => expect(api.persons).toHaveBeenLastCalledWith({ q: "はなこ" }));
+    await waitFor(() => expect(api.persons).toHaveBeenLastCalledWith({ q: "はなこ", offset: 0 }));
     const found = await within(dialog).findByRole("list", { name: "見つかった人" });
     // 今の人は候補に出さない
     expect(within(found).getAllByRole("button")).toHaveLength(1);
@@ -101,6 +101,22 @@ describe("この人と同じ人（まとめる）", () => {
     await waitFor(() => expect(api.mergePerson).toHaveBeenCalledWith("p1", "p3"));
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
     expect(router.state.location.pathname).toBe("/people/list/p1");
+  });
+
+  it("100人を超えて当たったら「もっと見る」で続きを読み、101人目も選べる", async () => {
+    const user = userEvent.setup();
+    const page1 = Array.from({ length: 100 }, (_, i) => makeListItem({ id: `q${i}`, displayName: `はな${i}` }));
+    api.persons.mockImplementation(async (params: { offset?: number }) =>
+      params.offset ? { persons: [makeListItem({ id: "q100", displayName: "はな100" })], total: 101 } : { persons: page1, total: 101 },
+    );
+    renderRoutes(ROUTES, "/people/list/p1");
+    await user.click(await screen.findByRole("button", { name: /この人と同じ人/ }));
+    const dialog = await screen.findByRole("dialog");
+    await user.type(within(dialog).getByLabelText("同じ人を名前で探す"), "はな");
+    await user.click(await within(dialog).findByRole("button", { name: "もっと見る" }));
+    await waitFor(() => expect(api.persons).toHaveBeenLastCalledWith({ q: "はな", offset: 100 }));
+    expect(await within(dialog).findByRole("button", { name: /はな100/ })).toBeInTheDocument();
+    expect(within(dialog).queryByRole("button", { name: "もっと見る" })).not.toBeInTheDocument();
   });
 
   it("確かめの画面から「戻る」で選び直せる", async () => {

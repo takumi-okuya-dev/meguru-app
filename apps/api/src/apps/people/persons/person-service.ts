@@ -1,7 +1,7 @@
 // 人のページ・直す・同意を直す（specs/people/001-people-memo contracts/api.md 4、research.md R10・R11、tasks.md T053）。
 import { nameKey, type PersonConsent, type PersonDetail, type PersonResponse, type PersonSummary } from "@meguru/shared/people";
 import { and, desc, eq, sql } from "drizzle-orm";
-import { withTransaction, type Db } from "../../../kernel/db/client";
+import { withTransaction } from "../../../kernel/db/client";
 import type { Env } from "../../../kernel/env";
 import { AppError } from "../../../kernel/errors";
 import { displayNameOf, loadOwnedPerson, lockOwner, type PeopleDb } from "../access";
@@ -151,34 +151,37 @@ function otherLineNamesOf(p: typeof peoplePersons.$inferSelect, responseLineName
 }
 
 /**
- * 本名・メモを直す（FR-015）。
- * @param db - データベース
+ * 本名・メモを直す（FR-015）。作り手のロックの中で読んで書く（同時のまとめるで、直したメモが上書きされないように。PR #119 の Codex レビュー）。
+ * @param env - Workers のバインディング
  * @param userId - 作り手
  * @param personId - 人
  * @param input - 直す項目（メモの空は null にしてある）
  * @returns 人
  */
 export async function updatePerson(
-  db: Db,
+  env: Env,
   userId: string,
   personId: string,
   input: { realName?: string | null; memoAppearance?: string | null; memoTalk?: string | null },
 ): Promise<PersonSummary> {
-  const p = await loadOwnedPerson(db, userId, personId);
-  // 名前が1つもなくなる直し（LINE名のない人の本名を消す）はできない
-  if (input.realName === null && p.lineName === null) throw new AppError("VALIDATION_FAILED", 400, "invalid request", undefined, ["realName"]);
-  const set: Partial<typeof peoplePersons.$inferInsert> = { updatedAt: new Date() };
-  if (input.realName !== undefined) {
-    set.realName = input.realName;
-    set.realNameKey = input.realName === null ? null : nameKey(input.realName);
-  }
-  if (input.memoAppearance !== undefined) set.memoAppearance = input.memoAppearance;
-  if (input.memoTalk !== undefined) set.memoTalk = input.memoTalk;
-  await db
-    .update(peoplePersons)
-    .set(set)
-    .where(and(eq(peoplePersons.id, p.id), eq(peoplePersons.userId, userId)));
-  return personSummary(db, userId, p.id);
+  return withTransaction(env.DATABASE_URL, async (tx) => {
+    await lockOwner(tx, userId);
+    const p = await loadOwnedPerson(tx, userId, personId);
+    // 名前が1つもなくなる直し（LINE名のない人の本名を消す）はできない
+    if (input.realName === null && p.lineName === null) throw new AppError("VALIDATION_FAILED", 400, "invalid request", undefined, ["realName"]);
+    const set: Partial<typeof peoplePersons.$inferInsert> = { updatedAt: new Date() };
+    if (input.realName !== undefined) {
+      set.realName = input.realName;
+      set.realNameKey = input.realName === null ? null : nameKey(input.realName);
+    }
+    if (input.memoAppearance !== undefined) set.memoAppearance = input.memoAppearance;
+    if (input.memoTalk !== undefined) set.memoTalk = input.memoTalk;
+    await tx
+      .update(peoplePersons)
+      .set(set)
+      .where(and(eq(peoplePersons.id, p.id), eq(peoplePersons.userId, userId)));
+    return personSummary(tx, userId, p.id);
+  });
 }
 
 /**

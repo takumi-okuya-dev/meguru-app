@@ -37,7 +37,7 @@ export function personRoutes() {
     .get("/persons/:personId", async (c) => c.json(await personDetail(createDb(c.env.DATABASE_URL), c.get("user").id, c.req.param("personId"))))
     .patch("/persons/:personId", async (c) => {
       const input = await parseBody(personUpdateSchema, c.req.json());
-      return c.json({ person: await updatePerson(createDb(c.env.DATABASE_URL), c.get("user").id, c.req.param("personId"), input) });
+      return c.json({ person: await updatePerson(c.env, c.get("user").id, c.req.param("personId"), input) });
     })
     .put("/persons/:personId/consent", async (c) => {
       const input = await parseBody(consentUpdateSchema, c.req.json());
