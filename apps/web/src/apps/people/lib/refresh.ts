@@ -26,3 +26,37 @@ export async function refreshAllPeople(queryClient: QueryClient, removedPersonId
   for (const id of removedPersonIds) queryClient.removeQueries({ queryKey: peopleQueryKeys.person(id) });
   await queryClient.invalidateQueries({ queryKey: peopleQueryKeys.all });
 }
+
+/**
+ * 声かけを始める・進める・消したあと：誘う候補の行と人のページ（どちらも ["people", "persons"] の下）を読み直す。
+ * 数字（リピーター・次の自分の会）は声かけでは変わらないので読み直さない。
+ * @param queryClient - クエリのクライアント
+ * @returns 読み直しが終わるまでの Promise
+ */
+export async function refreshOutreaches(queryClient: QueryClient): Promise<void> {
+  await queryClient.invalidateQueries({ queryKey: peopleQueryKeys.persons });
+}
+
+/**
+ * 誘いの文の型・リピーターの目標を直したあと：設定と、上の段の数字を読み直す。
+ * @param queryClient - クエリのクライアント
+ * @returns 読み直しが終わるまでの Promise
+ */
+export async function refreshSettings(queryClient: QueryClient): Promise<void> {
+  await Promise.all([
+    queryClient.invalidateQueries({ queryKey: peopleQueryKeys.settings }),
+    queryClient.invalidateQueries({ queryKey: peopleQueryKeys.stats }),
+  ]);
+}
+
+/**
+ * イベントを作ったあと：イベントの一覧と、数字（次の自分の会＝誘う会の初めの値）を読み直す。
+ * @param queryClient - クエリのクライアント
+ * @returns 読み直しが終わるまでの Promise
+ */
+export async function refreshEvents(queryClient: QueryClient): Promise<void> {
+  await Promise.all([
+    queryClient.invalidateQueries({ queryKey: peopleQueryKeys.events }),
+    queryClient.invalidateQueries({ queryKey: peopleQueryKeys.stats }),
+  ]);
+}

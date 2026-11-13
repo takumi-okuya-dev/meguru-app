@@ -69,9 +69,9 @@ describe("人を消す", () => {
 
   it("その会の取り込みを取り消すと、消した人の分も数から抜ける", async () => {
     await callPeople("DELETE", `/persons/${taro}`, "u1", { confirmName: "たろう" });
-    expect(await stats(oct)).toEqual({ attendeeCount: 2, erasedCount: 1 });
+    expect(await stats(oct)).toEqual({ attendeeCount: 2, erasedCount: 1, firstTimeCount: 1, returningCount: 0 });
     expect((await callPeople("DELETE", `/imports/${octImport}`, "u1", { keepPeopleWithNotes: false })).status).toBe(200);
-    expect(await stats(oct)).toEqual({ attendeeCount: 0, erasedCount: 0 });
+    expect(await stats(oct)).toEqual({ attendeeCount: 0, erasedCount: 0, firstTimeCount: 0, returningCount: 0 });
   });
 
   it("同じCSVをもう一度プレビューすると、消した人の行は erased になる。別のイベントの回答は新しい人として入る", async () => {

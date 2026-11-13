@@ -8,6 +8,7 @@ import { displayNameOf, loadOwnedPerson, lockOwner, type PeopleDb } from "../acc
 import { peopleConsentChanges, peopleEvents, peopleManualAttendances, peoplePersons, peopleResponses } from "../schema";
 import { derivePersons, newerResponse, recordManualConsent } from "./person-derive";
 import { personStatsSql } from "./person-query";
+import { outreachesOfPerson } from "../outreach/outreach-service";
 
 /**
  * 回答を、人のページの形にする。
@@ -38,7 +39,7 @@ function toResponse(r: typeof peopleResponses.$inferSelect): PersonResponse {
  */
 export async function personDetail(db: PeopleDb, userId: string, personId: string): Promise<PersonDetail> {
   const p = await loadOwnedPerson(db, userId, personId);
-  const [responses, manuals, changes] = await Promise.all([
+  const [responses, manuals, changes, outreaches] = await Promise.all([
     db
       .select({ r: peopleResponses, event: peopleEvents })
       .from(peopleResponses)
@@ -54,6 +55,7 @@ export async function personDetail(db: PeopleDb, userId: string, personId: strin
       .from(peopleConsentChanges)
       .where(and(eq(peopleConsentChanges.personId, p.id), eq(peopleConsentChanges.userId, userId)))
       .orderBy(desc(peopleConsentChanges.changedAt)),
+    outreachesOfPerson(db, userId, p.id),
   ]);
 
   const key = (x: (typeof responses)[number]) => ({ id: x.r.id, heldOn: x.event.heldOn, submittedAt: x.r.submittedAt, createdAt: x.r.createdAt });
@@ -80,7 +82,7 @@ export async function personDetail(db: PeopleDb, userId: string, personId: strin
       basisOn: c.basisOn,
       changedAt: c.changedAt.toISOString(),
     })),
-    outreaches: [],
+    outreaches,
   };
 }
 

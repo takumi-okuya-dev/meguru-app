@@ -5,7 +5,9 @@ import { requireAppAccess, type AppEnv } from "../../platform";
 import { eventRoutes } from "./events/event-routes";
 import { importRoutes } from "./imports/import-routes";
 import { peopleMeRoutes } from "./me/me-routes";
+import { outreachRoutes } from "./outreach/outreach-routes";
 import { personRoutes } from "./persons/person-routes";
+import { settingsRoutes } from "./settings/settings-routes";
 import { PEOPLE_APP } from "./registry";
 
 /**
@@ -19,5 +21,7 @@ export function peopleRoutes(authed: MiddlewareHandler<AppEnv>) {
     .route("/", peopleMeRoutes())
     .route("/", eventRoutes())
     .route("/", importRoutes())
-    .route("/", personRoutes());
+    .route("/", personRoutes())
+    .route("/", outreachRoutes())
+    .route("/", settingsRoutes());
 }

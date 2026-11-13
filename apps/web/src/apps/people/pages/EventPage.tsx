@@ -1,5 +1,6 @@
 // 「/people/events/:eventId」：イベントのページ（specs/people/001-people-memo contracts/ui-routes.md 1、research.md R14）。
-// 参加者数（消した人の数も）・来た人の一覧（押すと人のページ）・取り込みの一覧と「取り消す」・直す・消す。
+// 参加者数（自分の会は初めて・前にも来た。消した人の数も）・来た人の一覧（押すと人のページ。自分の会は「初めて」の印）・
+// 取り込みの一覧と「取り消す」・直す・消す。
 import type { UndoResult } from "@meguru/shared/people";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ChevronRightIcon, PencilIcon, Trash2Icon } from "lucide-react";
@@ -46,7 +47,8 @@ export function EventPage() {
     mutationFn: (input: Parameters<typeof peopleApi.updateEvent>[1]) => peopleApi.updateEvent(eventId, input),
     onSuccess: async () => {
       setEditing(false);
-      await queryClient.invalidateQueries({ queryKey: peopleQueryKeys.events });
+      // 開催日・自分の会かが変わると、初めて・前にも来た・リピーター・次の自分の会・「前に来た」の候補も変わる
+      await queryClient.invalidateQueries({ queryKey: peopleQueryKeys.all });
     },
   });
 
@@ -77,6 +79,12 @@ export function EventPage() {
           <p className="text-2xl font-semibold tabular-nums">
             参加者 {stats.attendeeCount}人
           </p>
+          {event.isOwn && stats.firstTimeCount !== undefined && stats.returningCount !== undefined && (
+            <p className="flex flex-wrap gap-x-3 text-sm tabular-nums">
+              <span>初めて {stats.firstTimeCount}人</span>
+              <span>前にも来た {stats.returningCount}人</span>
+            </p>
+          )}
           {stats.erasedCount > 0 && <p className="text-sm text-muted-foreground">消した人 {stats.erasedCount}人</p>}
         </section>
 
@@ -98,6 +106,7 @@ export function EventPage() {
                 <li key={a.personId}>
                   <Link to={personPath(a.personId)} className="flex min-h-11 items-center gap-2 px-4 py-2 text-sm hover:bg-accent">
                     <span className="min-w-0 flex-1 truncate">{a.displayName}</span>
+                    {a.firstTime === true && <span className="shrink-0 rounded-full bg-muted px-2 py-0.5 text-xs">初めて</span>}
                     {a.lineName && a.lineName !== a.displayName && <span className="min-w-0 truncate text-muted-foreground">LINE：{a.lineName}</span>}
                     <ChevronRightIcon className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
                   </Link>
@@ -180,7 +189,8 @@ export function EventPage() {
             setDeleting(false);
             toast.success(`イベントを消しました。${undoMessage(r)}`);
             queryClient.removeQueries({ queryKey: peopleQueryKeys.event(eventId) });
-            void queryClient.invalidateQueries({ queryKey: peopleQueryKeys.events });
+            // 消した会の声かけも消えるので、人物メモのデータをすべて読み直す
+            void queryClient.invalidateQueries({ queryKey: peopleQueryKeys.all });
             void navigate(eventsPath(), { replace: true });
           }}
           onCancel={() => setDeleting(false)}
