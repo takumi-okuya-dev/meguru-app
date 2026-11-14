@@ -54,7 +54,7 @@
 - [x] T028 [US5] 利用の許可のない人の「使えません」の画面に、つながったイベントがあれば入口を出す（apps/web/src/apps/collect/routes.tsx）
 - [x] T029 Web のテスト apps/web/test/collect/sharing-invites.test.tsx
 - [x] T030 E2E e2e/tests/collect-sharing.spec.ts（主催者：経費・運営メンバー・分配 → 招待 → 別の利用者が受けて見る・名簿が見えない）
-- [ ] T031 docs/apps/collect-guide.md に分配と招待の使い方（collect-guide.md を入れる #123 のあとで足す）
+- [x] T031 docs/apps/collect-guide.md に分配と招待の使い方（collect-guide.md を入れる #123 のあとで足す）→ #145 で 9〜11 章に書いた。
 
 ## Phase 8: 精算の手順（PR4。User Story 4）
 

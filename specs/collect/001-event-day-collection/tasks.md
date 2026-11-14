@@ -274,8 +274,8 @@ description: "Task list for collect 001 event-day collection"
 ## Phase 10：文書と仕上げ（各PRで、そのPRの分を直す）
 
 - [x] T079 [P] `docs/module-map.md`に集金管理（`apps/collect`の表・入口・道筋・Durable Object・Webのフォルダー）を足す（PR1で土台、PR2で受付・手伝い・Durable Object、PR3で締めなど）。（**2026-11-13**：031のあと、アプリの地図は`docs/apps/collect.md`に置く決まりになったので、そこに書いた（PR1〜PR3））
-- [ ] T080 [P] `docs/product-structure.md`・`README.md`・`docs/architecture.md`に、2作目として集金管理を足し、Durable Objectと`COLLECT_LIVE_SECRET`を書く。`docs/external-services-setup.md`に、ステージングと本番で`wrangler secret put COLLECT_LIVE_SECRET --env …`を入れる手順を足す（PR2）。
-- [ ] T081 [P] `docs/user-guide.md`に、集金管理の使い方（名簿・受付・手伝い・締め・振込）を足す（PR3）。
+- [x] T080 [P] `docs/product-structure.md`・`README.md`・`docs/architecture.md`に、2作目として集金管理を足し、Durable Objectと`COLLECT_LIVE_SECRET`を書く。`docs/external-services-setup.md`に、ステージングと本番で`wrangler secret put COLLECT_LIVE_SECRET --env …`を入れる手順を足す（PR2）。
+- [x] T081 [P] `docs/user-guide.md`に、集金管理の使い方（名簿・受付・手伝い・締め・振込）を足す（PR3）。→ Threads の使い方と分けて `docs/apps/collect-guide.md` に書いた（#123）。
 - [ ] T082 `specs/collect/001-event-day-collection/quickstart.md`の1〜6を、各PRのマージのあとにテスト版で手で確かめ、確かめた日と結果を`specs/collect/001-event-day-collection/checklists/manual-check.md`に残す。あわせて時間を測って同じファイルに書く：受付の1人（名簿50人で10秒以内。SC-001）、名簿30人を手で入れる（5分以内）・画面写真から貼る（1分以内。SC-002）、受付をした人が3人のときの締め（5分以内。SC-003）、手伝う人がリンクを開いてから受付を始めるまで（30秒以内。SC-007）。
 - [x] T083 [P] スマートフォン（390px幅）で、受付・手伝う人の受付・締めの画面が横にスクロールしないこと、押すところが44px以上であることを確かめる（spec Edge Cases）。（**2026-11-13**：`e2e/tests/collect-phone-width.spec.ts`で確かめた）
 - [ ] T084 Durable Objectsの無料枠の使い方を、テスト版で1回のイベントのあとにCloudflareの画面で確かめ、research.md R4に実際の数を1行で足す。
