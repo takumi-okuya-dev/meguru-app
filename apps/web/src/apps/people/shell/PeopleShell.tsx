@@ -53,8 +53,8 @@ export function PeopleShell({ children }: { children: ReactNode }) {
       {children}
       {!isWide && (
         <>
-          {/* 下のバーの分だけ、中身の下に余白をとる（最後の行が隠れない） */}
-          <div aria-hidden="true" className="h-[calc(3.5rem+env(safe-area-inset-bottom))] shrink-0" />
+          {/* 下のバー（高さ3.5rem＋上の線1px）の分だけ、中身の下に余白をとる（最後の行が隠れない） */}
+          <div aria-hidden="true" className="h-[calc(3.5rem+1px+env(safe-area-inset-bottom))] shrink-0" />
           <PeopleBottomBar />
         </>
       )}
