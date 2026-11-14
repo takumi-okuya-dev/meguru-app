@@ -36,6 +36,19 @@ async function emitOne() {
 }
 
 describe("書く", () => {
+  it("アプリがほかのアプリに伝える出来事は、allowNoConsumers なら届け先がなくても書かずに null（あれば書く）", async () => {
+    const payload = { promotionId: "p1", occurredAt: "2026-11-13T00:00:00.000Z" };
+    const none = await withTransaction(testEnv.DATABASE_URL, (tx) => emitEvent(tx, "threads.promotion_event.deleted", payload, { allowNoConsumers: true }));
+    expect(none).toBeNull();
+    const [count] = (await db().execute(sql`SELECT count(*)::int AS n FROM platform_events`)).rows as { n: number }[];
+    expect(count!.n).toBe(0);
+    // allowNoConsumers がなければ、今までどおり例外
+    await expect(withTransaction(testEnv.DATABASE_URL, (tx) => emitEvent(tx, "threads.promotion_event.deleted", payload))).rejects.toThrow(/登録されていません/);
+    registerConsumer("collect", "threads.promotion_event.deleted", async () => {});
+    const id = await withTransaction(testEnv.DATABASE_URL, (tx) => emitEvent(tx, "threads.promotion_event.deleted", payload, { allowNoConsumers: true }));
+    expect((await deliveriesOf(db(), [id!])).map((r) => r.consumer)).toEqual(["collect"]);
+  });
+
   it("届け先ごとに pending の行ができる", async () => {
     registerConsumer("threads", "user.withdrawn", async () => {});
     registerConsumer("people", "user.withdrawn", async () => {});

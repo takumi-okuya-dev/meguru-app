@@ -9,12 +9,39 @@ import { logger } from "../../kernel/logger";
 import { wakeEventDelivery } from "./delivery-gate";
 import { platformEventDeliveries, platformEvents } from "../schema";
 
-/** 出来事の種類と中身。中身に入れるのは番号だけ（メールアドレス・名前・本文は入れない）。 */
+/** Threads の宣伝内容のイベントの情報（集金管理の候補になる。specs/collect/001-event-day-collection contracts/events.md 2）。 */
+export type ThreadsPromotionEventSaved = {
+  promotionId: string;
+  threadsAccountId: string;
+  /** そのThreadsのアカウントの持ち主（候補を見せる人） */
+  ownerUserId: string;
+  name: string;
+  /** 開始の時刻（ISO 8601。Threadsの画面の日本時間を時差つきにしたもの） */
+  startsAt: string;
+  endsAt: string | null;
+  venue: string | null;
+  capacity: number | null;
+  feeAmount: number | null;
+  feeNote: string | null;
+  /** 起きた時刻（ISO 8601。受け取りは、持っている時刻より古いものを捨てる） */
+  occurredAt: string;
+};
+
+/**
+ * 出来事の種類と中身。共通で起きたこと（退会など）と、アプリがほかのアプリに伝えること（Threads → 集金管理）。
+ * 中身に入れるのは番号と、受け取る側が自分の表に写すのに要る値だけ（メールアドレスは入れない）。
+ */
 export type PlatformEventPayloads = {
   /** 利用者が退会した */
   "user.withdrawn": { userId: string };
   /** 運営者が上限を変えた（userId がなければ既定の値の変更） */
   "limits.changed": { app: string; userId?: string };
+  /** Threads：宣伝内容のイベントの情報を保存した（開催日時があるときだけ） */
+  "threads.promotion_event.saved": ThreadsPromotionEventSaved;
+  /** Threads：宣伝内容のイベントの情報を消した（宣伝内容・アカウントを消したときも） */
+  "threads.promotion_event.deleted": { promotionId: string; occurredAt: string };
+  /** Threads：外部媒体の掲載の状況を変えた。postedMedia は掲載済みの媒体（Threadsの媒体の名前。受け取る側が自分の値に直す） */
+  "threads.listing_status.changed": { promotionId: string; postedMedia: string[]; occurredAt: string };
 };
 
 /** 出来事の種類。 */
@@ -68,21 +95,35 @@ export function resetConsumers(): void {
 }
 
 /**
- * 出来事を書く。共通の表の変更と同じトランザクションで呼ぶ（戻れば出来事も残らない）。
+ * 出来事を書く。出す側の表の変更と同じトランザクションで呼ぶ（戻れば出来事も残らない）。書いたら、トランザクションのあとで
+ * deliverPendingEvents を eventIds つきで呼ぶ（書いた直後の届け）。
  * 届け先が1つも登録されていなければ例外にする（組み立てが登録を忘れたまま、アプリの片づけを黙って飛ばさないため）。
- * @param tx - 共通のトランザクション
+ * アプリがほかのアプリに伝える出来事は、受け取るアプリがまだない（入っていない）こともあるので、allowNoConsumers で何もしないで戻れる。
+ * @param tx - 出す側のトランザクション
  * @param type - 種類
  * @param payload - 中身
- * @returns 出来事の番号
- * @throws Error 届け先が登録されていないとき
+ * @param opts - allowNoConsumers：届け先がなければ書かずに null を返す
+ * @returns 出来事の番号（書かなかったら null）
+ * @throws Error 届け先が登録されていないとき（allowNoConsumers がないとき）
  */
 export async function emitEvent<K extends PlatformEventType>(
   tx: Db | TxDb,
   type: K,
   payload: PlatformEventPayloads[K],
-): Promise<string> {
+  opts: { allowNoConsumers: true },
+): Promise<string | null>;
+export async function emitEvent<K extends PlatformEventType>(tx: Db | TxDb, type: K, payload: PlatformEventPayloads[K]): Promise<string>;
+export async function emitEvent<K extends PlatformEventType>(
+  tx: Db | TxDb,
+  type: K,
+  payload: PlatformEventPayloads[K],
+  opts: { allowNoConsumers?: boolean } = {},
+): Promise<string | null> {
   const targets = consumersOf(type);
-  if (targets.length === 0) throw new Error(`出来事「${type}」の受け取りが登録されていません（組み立てで registerConsumer を呼んでください）`);
+  if (targets.length === 0) {
+    if (opts.allowNoConsumers) return null;
+    throw new Error(`出来事「${type}」の受け取りが登録されていません（組み立てで registerConsumer を呼んでください）`);
+  }
   const id = crypto.randomUUID();
   // 時刻は、届ける側（deliverPendingEvents）と同じ Workers の時計で入れる。DBの now() は Workers の時計と少しずれることがあり、
   // 書いた直後に届けようとしても「まだ時刻が来ていない」になるため
