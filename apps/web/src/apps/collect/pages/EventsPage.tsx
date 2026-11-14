@@ -41,9 +41,9 @@ export function EventsPage() {
           <div className="rounded-xl border bg-muted/40 px-4 py-3 text-sm">
             受付でPayPayのQRや振込先をすぐ出せるよう、
             <Link to={collectSettingsPath()} className="underline underline-offset-4">
-              PayPay・振込先の設定
+              このアプリの設定
             </Link>
-            を先に済ませておくと便利です。
+            で先に入れておくと便利です。
           </div>
         )}
         {list.length === 0 ? (

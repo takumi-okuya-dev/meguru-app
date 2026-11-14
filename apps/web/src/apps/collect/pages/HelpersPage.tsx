@@ -29,6 +29,7 @@ const HELPER_LINK_TEXTS: LinkTexts = {
  */
 export function HelpersPage() {
   const { eventId = "" } = useParams<{ eventId: string }>();
+  const event = useQuery({ queryKey: collectQueryKeys.event(eventId), queryFn: () => collectApi.event(eventId) });
   const workers = useQuery({ queryKey: collectQueryKeys.workers(eventId), queryFn: () => collectApi.workers(eventId), refetchInterval: 30_000 });
   const linkApi = useMemo<LinkApi>(
     () => ({
@@ -51,6 +52,7 @@ export function HelpersPage() {
         }
       />
       <PageBody className="space-y-8">
+        {event.data && <p className="truncate font-medium">{event.data.name}</p>}
         <section className="space-y-3" aria-labelledby="link-title">
           <h2 id="link-title" className="font-medium">
             受付用リンク

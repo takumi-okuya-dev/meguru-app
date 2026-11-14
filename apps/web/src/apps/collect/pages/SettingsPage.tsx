@@ -1,4 +1,4 @@
-// PayPay・振込先の設定（/collect/settings。specs/collect/001-event-day-collection FR-013、research.md R10、tasks.md T031）。
+// このアプリの設定（PayPay の受け取り用 QR・振込先の案内。/collect/settings。specs/collect/001-event-day-collection FR-013、research.md R10、tasks.md T031）。
 // QRの画像は画面で縮めてから送る（長い辺1,000px以内・300KB以内）。振込先の案内は300文字まで。どのイベントでも使う。
 import { COLLECT_LIMITS, type CollectSettings } from "@meguru/shared";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -34,7 +34,7 @@ function QrPreview() {
 }
 
 /**
- * PayPay・振込先の設定の画面。
+ * このアプリの設定の画面（PayPay の受け取り用 QR・振込先の案内）。
  * @returns 画面
  */
 export function SettingsPage() {
@@ -84,7 +84,7 @@ export function SettingsPage() {
   const tooLong = [...text].length > COLLECT_LIMITS.bankText;
   return (
     <>
-      <PageHeader title="PayPay・振込先の設定" />
+      <PageHeader title="このアプリの設定" />
       <PageBody className="space-y-8">
         <section className="space-y-3" aria-labelledby="qr-title">
           <h2 id="qr-title" className="font-medium">
