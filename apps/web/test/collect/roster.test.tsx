@@ -61,6 +61,7 @@ const person = (over: Partial<RosterPerson>): RosterPerson => ({
   media: "peatix",
   priceTierId: "t1",
   memo: null,
+  referrer: null,
   createdAt: "2026-11-13T00:00:00.000Z",
   ...over,
 });

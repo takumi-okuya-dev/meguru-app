@@ -1,10 +1,11 @@
 // 名簿（specs/collect/001-event-day-collection contracts/api.md 3、FR-020〜FR-026、research.md R8・R9、tasks.md T025）。
 // 受付番号は、イベントの next_number を同じトランザクションで UPDATE … RETURNING して取る（同時に足しても重ならない。消しても戻さない）。
-// 名簿を変えたら、イベントの版を1上げる（会場の共有は PR2 でつなぐ）。
+// 名簿を変えたら、イベントの版を1上げる（会場の共有は PR2 でつなぐ）。紹介した人（specs/collect/003 FR-020）も名簿の人に持つ。
 import {
   COLLECT_LIMITS,
   cleanPastedLine,
   nameKey,
+  referrerKey,
   type AddRosterPersonRequest,
   type BulkAddRosterRequest,
   type CollectMedia,
@@ -34,8 +35,18 @@ export function toPerson(row: PersonRow): RosterPerson {
     media: row.media as CollectMedia,
     priceTierId: row.priceTierId,
     memo: row.memo,
+    referrer: row.referrer,
     createdAt: row.createdAt.toISOString(),
   };
+}
+
+/**
+ * 紹介した人の列（名前と見比べるための形。specs/collect/003 research.md R4）。
+ * @param referrer - 紹介した人（空は null）
+ * @returns referrer と referrer_key
+ */
+export function referrerColumns(referrer: string | null | undefined): { referrer: string | null; referrerKey: string | null } {
+  return referrer ? { referrer, referrerKey: referrerKey(referrer) } : { referrer: null, referrerKey: null };
 }
 
 /**
@@ -141,6 +152,7 @@ export async function addPerson(
         media: input.media,
         priceTierId: input.priceTierId,
         memo: input.memo,
+        ...referrerColumns(input.referrer),
       })
       .returning();
     return {
@@ -185,6 +197,7 @@ export async function addPeopleBulk(
           nameKey: nameKey(name),
           media: input.media,
           priceTierId: input.priceTierId,
+          ...referrerColumns(input.referrer),
         })),
       )
       .returning();
@@ -221,6 +234,7 @@ export async function updatePerson(
         ...(input.media !== undefined ? { media: input.media } : {}),
         ...(input.priceTierId !== undefined ? { priceTierId: input.priceTierId } : {}),
         ...(input.memo !== undefined ? { memo: input.memo } : {}),
+        ...(input.referrer !== undefined ? referrerColumns(input.referrer) : {}),
       })
       .where(and(eq(collectRosterPeople.id, personId), eq(collectRosterPeople.eventId, event.id)))
       .returning();

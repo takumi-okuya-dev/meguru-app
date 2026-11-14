@@ -34,11 +34,11 @@ describe("export.csv", () => {
     expect([...bytes.slice(0, 3)]).toEqual([0xef, 0xbb, 0xbf]);
     const text = new TextDecoder().decode(bytes);
     const lines = text.split("\r\n");
-    expect(lines[0]).toBe("受付番号,名前,ふりがな,媒体,料金の区分,来場,払い方,金額,受け取った人,記録した時刻,入金を確かめた日,メモ");
-    expect(lines[1]).toMatch(/^1,松本 れい,まつもと れい,Peatix,早割,来場,現金,2500,主催者,\d{4}-\d{2}-\d{2} \d{2}:\d{2},,"紹介,""井上""さん"$/);
+    expect(lines[0]).toBe("受付番号,名前,ふりがな,媒体,料金の区分,来場,払い方,金額,受け取った人,記録した時刻,入金を確かめた日,紹介した人,メモ");
+    expect(lines[1]).toMatch(/^1,松本 れい,まつもと れい,Peatix,早割,来場,現金,2500,主催者,\d{4}-\d{2}-\d{2} \d{2}:\d{2},,,"紹介,""井上""さん"$/);
     // 式として読まれる頭の文字は ' を付ける
-    expect(lines[2]).toBe("2,'=来ない人,,港,通常,,,,,,,");
-    expect(lines[3]).toMatch(/^3,木村,,Peatix,通常,来場,振込（後日）,3000,主催者,[\d: -]+,\d{4}-\d{2}-\d{2},$/);
+    expect(lines[2]).toBe("2,'=来ない人,,港,通常,,,,,,,,");
+    expect(lines[3]).toMatch(/^3,木村,,Peatix,通常,来場,振込（後日）,3000,主催者,[\d: -]+,\d{4}-\d{2}-\d{2},,$/);
     expect(lines[4]).toBe("");
   });
 

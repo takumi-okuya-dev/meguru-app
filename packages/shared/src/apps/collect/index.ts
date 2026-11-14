@@ -7,3 +7,5 @@ export * from "./closing";
 export * from "./messages";
 export * from "./threads-candidates";
 export * from "./self-check-in";
+export * from "./distribution";
+export * from "./sharing";

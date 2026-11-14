@@ -69,3 +69,13 @@ export function looksLikeNonName(line: string): boolean {
   if (!/[\p{L}]/u.test(s)) return true;
   return NON_NAME_PATTERNS.some((p) => p.test(s));
 }
+
+/**
+ * 紹介した人を見比べるための形（specs/collect/003-revenue-sharing research.md R4、spec FR-022）。敬称を除いてから nameKey にする。
+ * 「井上さん」と「イノウエ」は別（漢字とかなはそろえない）、「井上さん」と「井上」は同じ。
+ * @param name - 紹介した人の名前
+ * @returns 見比べるための形（空なら空）
+ */
+export function referrerKey(name: string): string {
+  return nameKey(name.normalize("NFKC").replace(HONORIFIC, ""));
+}

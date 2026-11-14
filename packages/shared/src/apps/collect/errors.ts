@@ -13,6 +13,10 @@ export const COLLECT_ERROR_CODES = [
   "NOT_AWAITING_CONFIRMATION",
   "REQUEST_PENDING",
   "REQUEST_RESOLVED",
+  // 003 分配（specs/collect/003-revenue-sharing contracts/api.md 3）
+  "RATIO_TOO_HIGH",
+  "ALREADY_LINKED",
+  "INVITE_INACTIVE",
 ] as const;
 
 /** 集金管理のエラーの文言。 */
@@ -30,4 +34,7 @@ export const COLLECT_ERROR_MESSAGES: Record<(typeof COLLECT_ERROR_CODES)[number]
   NOT_AWAITING_CONFIRMATION: { message: "この人の受付は、もう確かめ済みか、取り消されています。", action: "reload" },
   REQUEST_PENDING: { message: "申し出は受付の人が確かめています。少し待ってください。", action: "none" },
   REQUEST_RESOLVED: { message: "この申し出は、ほかの人がもう片付けました。", action: "reload" },
+  RATIO_TOO_HIGH: { message: "リーダーの倍率の合計が大きすぎて、メンバーの分がなくなります。倍率を下げてください。", action: "none" },
+  ALREADY_LINKED: { message: "この運営メンバーは、もうめぐるの利用者とつながっています。", action: "reload" },
+  INVITE_INACTIVE: { message: "この招待のリンクは使えません。主催者に聞いてください。", action: "none" },
 };

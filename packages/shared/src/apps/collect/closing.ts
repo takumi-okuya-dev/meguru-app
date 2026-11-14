@@ -120,6 +120,10 @@ export const eventSummarySchema = z.object({
   byMethod: byMethodSchema,
   byMedia: z.array(mediaStatsSchema),
   awaitingTransfer: countAmountSchema,
+  /** 経費の合計（specs/collect/003 FR-003。前の版の API には無いので既定0） */
+  expenseTotal: z.number().int().default(0),
+  /** 紹介ありの人数と売上（名前は残さない。specs/collect/003 FR-023） */
+  referred: z.object({ count: z.number().int(), paid: z.number().int(), awaiting: z.number().int() }).default({ count: 0, paid: 0, awaiting: 0 }),
   eventDeletedAt: z.string(),
 });
 /** イベントのまとめ。 */

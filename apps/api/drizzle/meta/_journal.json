@@ -288,6 +288,13 @@
       "when": 1794567506215,
       "tag": "0040_collect_self_check_in",
       "breakpoints": true
+    },
+    {
+      "idx": 41,
+      "version": "7",
+      "when": 1794600276940,
+      "tag": "0041_collect_revenue_sharing",
+      "breakpoints": true
     }
   ]
 }

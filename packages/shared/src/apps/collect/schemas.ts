@@ -25,6 +25,8 @@ export const COLLECT_LIMITS = {
   personName: 50,
   kana: 50,
   memo: 200,
+  /** 紹介した人（specs/collect/003 FR-020） */
+  referrer: 40,
   bulkMax: 300,
   bankText: 300,
   /** PayPayのQRの画像の上限（バイト。R10） */
@@ -178,6 +180,8 @@ const personFields = {
   media: z.enum(COLLECT_MEDIA),
   priceTierId: z.uuid(),
   memo: optional(COLLECT_LIMITS.memo),
+  /** 紹介した人（specs/collect/003 FR-020。40文字まで） */
+  referrer: optional(COLLECT_LIMITS.referrer).optional(),
 };
 
 /** POST /api/collect/events/:eventId/roster の入力（FR-020）。 */
@@ -190,6 +194,8 @@ export const bulkAddRosterRequestSchema = z.object({
   names: z.array(z.string().max(500)).min(1).max(COLLECT_LIMITS.bulkMax),
   media: z.enum(COLLECT_MEDIA),
   priceTierId: z.uuid(),
+  /** 貼った人みなに付ける紹介した人（specs/collect/003 FR-020） */
+  referrer: optional(COLLECT_LIMITS.referrer).optional(),
 });
 /** POST /api/collect/events/:eventId/roster/bulk の入力。 */
 export type BulkAddRosterRequest = z.infer<typeof bulkAddRosterRequestSchema>;
@@ -202,6 +208,7 @@ export const updateRosterPersonRequestSchema = z
     media: personFields.media.optional(),
     priceTierId: personFields.priceTierId.optional(),
     memo: personFields.memo.optional(),
+    referrer: personFields.referrer,
   })
   .refine((v) => Object.values(v).some((x) => x !== undefined), { message: "nothing to update", path: ["name"] });
 /** PATCH /api/collect/events/:eventId/roster/:personId の入力。 */
@@ -216,6 +223,8 @@ export const rosterPersonSchema = z.object({
   media: z.enum(COLLECT_MEDIA),
   priceTierId: z.string(),
   memo: z.string().nullable(),
+  /** 紹介した人（specs/collect/003。前の版の API には無いので既定は null） */
+  referrer: z.string().nullable().default(null),
   createdAt: z.string(),
 });
 /** 名簿の人。 */

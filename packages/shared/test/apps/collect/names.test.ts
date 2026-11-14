@@ -1,6 +1,6 @@
 // 集金管理の名前の扱い（specs/collect/001-event-day-collection research.md R9、tasks.md T008）。
 import { describe, expect, it } from "vitest";
-import { cleanPastedLine, looksLikeNonName, nameKey } from "../../../src";
+import { cleanPastedLine, looksLikeNonName, nameKey, referrerKey } from "../../../src";
 
 describe("nameKey", () => {
   it("全角と半角・カタカナとひらがな・空白・大文字と小文字の違いをそろえる", () => {
@@ -69,5 +69,17 @@ describe("looksLikeNonName", () => {
     expect(looksLikeNonName("円山 花子")).toBe(false);
     expect(looksLikeNonName("𠮷".repeat(30))).toBe(false);
     expect(looksLikeNonName("Taro Yamada")).toBe(false);
+  });
+});
+
+describe("referrerKey", () => {
+  it("敬称を除き、かなと全角半角をそろえる", () => {
+    expect(referrerKey("井上さん")).toBe(referrerKey("井上"));
+    expect(referrerKey("イノウエ 様")).toBe(referrerKey("いのうえ"));
+    expect(referrerKey("ｲﾉｳｴ")).toBe("いのうえ");
+  });
+
+  it("名前の一部の「さん」は消さない", () => {
+    expect(referrerKey("さんぺい")).toBe("さんぺい");
   });
 });
