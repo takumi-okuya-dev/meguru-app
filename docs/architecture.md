@@ -46,6 +46,7 @@ flowchart LR
 | API | Cloudflare Workers + Hono | 無料で1日10万リクエスト。サーバーの管理が要らず、定期処理（Cron Triggers）も同じ場所で動く |
 | データベース | Neon（Postgres 17）+ Drizzle ORM | 問い合わせがないと5分で止まり、止まっている間は費用0。履歴から時刻を指定して戻せる |
 | 小さな記録 | Cloudflare KV | 自動投稿の「関所」。用のない回はDBを起こさずに終える |
+| 会場の共有 | Cloudflare Durable Objects（WebSocketの休止） | 集金管理の受付を、5秒以内に会場のほかの画面へ配る。知らせを配るだけで何も保存せず、DBを起こさない。休止中のWebSocketは時間で課金されない。入場券の署名は`COLLECT_LIVE_SECRET` |
 | ログイン | Clerk（Googleだけ） | ログインだけを任せる。チームはClerkではなくアプリのDBで持つ |
 | 決済 | Stripe（Billing + Checkout） | 月額の契約・支払いの失敗を任せられる（無料体験は2026-11-08にやめた） |
 | 外部API | Threads API | 投稿（作成 → 公開の2段階）と、反応・フォロワー数の取り込み |
