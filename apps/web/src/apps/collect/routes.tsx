@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { api } from "@/lib/api-client";
 import { queryKeys } from "@/lib/query";
 import { CenteredLayout } from "@/shell";
-import { COLLECT_BASE, HELPER_RECEPTION_ROUTE } from "./lib/paths";
+import { COLLECT_BASE, HELPER_RECEPTION_ROUTE, SELF_CHECK_IN_ROUTE } from "./lib/paths";
 import { ClosingPage } from "./pages/ClosingPage";
 import { EventEditPage } from "./pages/EventEditPage";
 import { EventNewPage } from "./pages/EventNewPage";
@@ -17,6 +17,8 @@ import { HelperReceptionPage } from "./pages/HelperReceptionPage";
 import { HelpersPage } from "./pages/HelpersPage";
 import { ReceptionPage } from "./pages/ReceptionPage";
 import { RosterPage } from "./pages/RosterPage";
+import { SelfCheckInPage } from "./pages/SelfCheckInPage";
+import { SelfCheckInPublicPage } from "./pages/SelfCheckInPublicPage";
 import { SettingsPage } from "./pages/SettingsPage";
 import { SummariesPage } from "./pages/SummariesPage";
 import { TransfersPage } from "./pages/TransfersPage";
@@ -61,6 +63,7 @@ export const collectRoutes: RouteObject[] = [
       { path: `${COLLECT_BASE}/events/:eventId/roster`, element: <RosterPage /> },
       { path: `${COLLECT_BASE}/events/:eventId/reception`, element: <ReceptionPage /> },
       { path: `${COLLECT_BASE}/events/:eventId/helpers`, element: <HelpersPage /> },
+      { path: `${COLLECT_BASE}/events/:eventId/self`, element: <SelfCheckInPage /> },
       { path: `${COLLECT_BASE}/events/:eventId/closing`, element: <ClosingPage /> },
       { path: `${COLLECT_BASE}/transfers`, element: <TransfersPage /> },
       { path: `${COLLECT_BASE}/summaries`, element: <SummariesPage /> },
@@ -69,5 +72,8 @@ export const collectRoutes: RouteObject[] = [
   },
 ];
 
-/** ログインのいらないルート（手伝う人の受付。specs/collect/001 contracts/ui-routes.md）。 */
-export const collectPublicRoutes: RouteObject[] = [{ path: HELPER_RECEPTION_ROUTE, element: <HelperReceptionPage /> }];
+/** ログインのいらないルート（手伝う人の受付。specs/collect/001 contracts/ui-routes.md。参加者のセルフ受付。specs/collect/002）。 */
+export const collectPublicRoutes: RouteObject[] = [
+  { path: HELPER_RECEPTION_ROUTE, element: <HelperReceptionPage /> },
+  { path: SELF_CHECK_IN_ROUTE, element: <SelfCheckInPublicPage /> },
+];

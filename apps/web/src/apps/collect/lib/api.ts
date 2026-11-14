@@ -22,9 +22,12 @@ import {
   receptionSnapshotSchema,
   receptionWorkersResponseSchema,
   recordReceptionResponseSchema,
+  resolveSelfRequestResponseSchema,
   versionResponseSchema,
   walkInResponseSchema,
+  type ConfirmReceptionRequest,
   type RecordReceptionRequest,
+  type SelfRequestAction,
   type WalkInRequest,
   rosterListSchema,
   rosterPersonSchema,
@@ -93,6 +96,19 @@ export const collectApi = {
     request(`${ev(eventId)}/link`, receptionLinkResponseSchema, json("POST", expiresAt ? { expiresAt } : {})),
   updateLink: (eventId: string, expiresAt: string) => request(`${ev(eventId)}/link`, receptionLinkResponseSchema, json("PATCH", { expiresAt })),
   stopLink: (eventId: string) => request(`${ev(eventId)}/link/stop`, receptionLinkResponseSchema, { method: "POST" }),
+  // セルフ受付（specs/collect/002 contracts/api.md）
+  selfLink: (eventId: string) => request(`${ev(eventId)}/self-link`, receptionLinkResponseSchema),
+  createSelfLink: (eventId: string) => request(`${ev(eventId)}/self-link`, receptionLinkResponseSchema, json("POST", {})),
+  updateSelfLink: (eventId: string, expiresAt: string) => request(`${ev(eventId)}/self-link`, receptionLinkResponseSchema, json("PATCH", { expiresAt })),
+  stopSelfLink: (eventId: string) => request(`${ev(eventId)}/self-link/stop`, receptionLinkResponseSchema, { method: "POST" }),
+  confirm: (eventId: string, personId: string, input: ConfirmReceptionRequest) =>
+    request(`${ev(eventId)}/reception/${encodeURIComponent(personId)}/confirm`, recordReceptionResponseSchema, json("POST", input)),
+  resolveRequest: (eventId: string, requestId: string, action: SelfRequestAction, personId?: string) =>
+    request(
+      `${ev(eventId)}/self-requests/${encodeURIComponent(requestId)}/${action}`,
+      resolveSelfRequestResponseSchema,
+      json("POST", personId ? { personId } : {}),
+    ),
   workers: (eventId: string) => request(`${ev(eventId)}/helpers`, receptionWorkersResponseSchema),
   // ---- 締め ----
   closing: (eventId: string) => request(`${ev(eventId)}/closing`, closingSnapshotSchema),

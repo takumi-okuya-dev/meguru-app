@@ -91,6 +91,9 @@ export const selfRequestCreateSchema = z.object({
 /** POST /api/collect/s/:token/requests の入力。 */
 export type SelfRequestCreate = z.infer<typeof selfRequestCreateSchema>;
 
+/** POST /api/collect/s/:token/requests の応答。 */
+export const selfRequestCreatedSchema = z.object({ requestId: z.string() });
+
 /** 飛び入りの申し出の状態。 */
 export const SELF_REQUEST_STATUSES = ["pending", "accepted", "matched", "rejected"] as const;
 

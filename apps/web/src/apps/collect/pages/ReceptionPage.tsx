@@ -26,6 +26,8 @@ export function ReceptionPage() {
       record: (personId, input) => collectApi.record(eventId, personId, input),
       undo: (personId) => collectApi.undo(eventId, personId),
       walkIn: (input) => collectApi.walkIn(eventId, input),
+      confirm: (personId, input) => collectApi.confirm(eventId, personId, input),
+      resolveRequest: (requestId, action, personId) => collectApi.resolveRequest(eventId, requestId, action, personId),
       liveTicket: () => collectApi.liveTicket(eventId),
     }),
     [eventId],

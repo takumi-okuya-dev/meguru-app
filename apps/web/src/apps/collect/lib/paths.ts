@@ -62,6 +62,18 @@ export function helpersPath(eventId: string): string {
   return `${COLLECT_BASE}/events/${encodeURIComponent(eventId)}/helpers`;
 }
 
+/**
+ * セルフ受付の画面（主催者。QRを出す。specs/collect/002）。
+ * @param eventId - イベントの番号
+ * @returns URL
+ */
+export function selfCheckInPath(eventId: string): string {
+  return `${COLLECT_BASE}/events/${encodeURIComponent(eventId)}/self`;
+}
+
+/** 参加者のセルフ受付の画面のルート（ログインなし。specs/collect/002）。 */
+export const SELF_CHECK_IN_ROUTE = `${COLLECT_BASE}/s/:token`;
+
 /** 手伝う人の受付の画面のルート（ログインなし）。 */
 export const HELPER_RECEPTION_ROUTE = `${COLLECT_BASE}/r/:token`;
 

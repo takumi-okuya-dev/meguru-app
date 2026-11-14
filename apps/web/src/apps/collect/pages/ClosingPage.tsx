@@ -17,7 +17,7 @@ import { saveFile } from "@/lib/save-file";
 import { PageBody, PageHeader } from "@/shell";
 import { collectApi } from "../lib/api";
 import { collectErrorText } from "../lib/errors";
-import { transfersPath } from "../lib/paths";
+import { receptionPath, transfersPath } from "../lib/paths";
 import { useLive } from "../lib/live";
 import { collectQueryKeys } from "../lib/query-keys";
 import { yen } from "../lib/reception-model";
@@ -165,6 +165,23 @@ export function ClosingPage() {
             <p role="status" className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-sm">
               締めたあとで受付の記録が変わりました。確かめてから、もう一度締めてください。
             </p>
+          )}
+          {c.awaitingConfirmation.count > 0 && (
+            <div role="status" className="space-y-1 rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-sm">
+              <p>
+                確かめ待ちの本人の申告が {c.awaitingConfirmation.count}件（{yen(c.awaitingConfirmation.amount)}）あります。下の現金・PayPayの合計には入っていません。受付の画面で「受け取った」か「取り消す」をしてから締めてください。
+              </p>
+              <ul className="text-xs text-muted-foreground">
+                {c.awaitingConfirmation.people.map((p) => (
+                  <li key={p.personId}>
+                    No.{p.number} {p.name}・{p.method === "paypay" ? "PayPay" : "現金"} {yen(p.amount)}
+                  </li>
+                ))}
+              </ul>
+              <Link to={receptionPath(eventId)} className="text-sm underline">
+                受付の画面へ
+              </Link>
+            </div>
           )}
         </div>
 

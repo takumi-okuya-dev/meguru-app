@@ -63,6 +63,7 @@ export function ReceptionRow({
           {COLLECT_MEDIA_LABELS[person.media]}・{done ? `${RECEPTION_METHOD_LABELS[record.method]} ${yen(record.amount)}` : tierLabel}
           {done && receiverName && `・受け取り：${receiverName}`}
           {done && record.paymentStatus === "awaiting_transfer" && "・振込待ち"}
+          {done && record.paymentStatus === "awaiting_confirmation" && <span className="font-medium text-amber-700 dark:text-amber-400">・確かめ待ち</span>}
           {person.memo && <span className="block truncate">メモ：{person.memo}</span>}
         </div>
       </div>

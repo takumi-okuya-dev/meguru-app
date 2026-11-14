@@ -196,6 +196,11 @@ export type ConfirmReceptionRequest = z.infer<typeof confirmReceptionRequestSche
 /** POST …/self-requests/:requestId/match の入力（名簿の人に当てる）。 */
 export const matchSelfRequestSchema = z.object({ personId: z.uuid() });
 
+/** POST …/self-requests/:requestId/accept|match|reject の応答（名簿に入れたときは person）。 */
+export const resolveSelfRequestResponseSchema = z.object({ version: z.number().int(), person: receptionPersonSchema.optional() });
+/** 申し出の片付け方。 */
+export type SelfRequestAction = "accept" | "match" | "reject";
+
 /** 受付用リンク（GET・POST・PATCH …/link の応答。ない・止めたあとは null）。 */
 export const receptionLinkSchema = z.object({ url: z.string(), expiresAt: z.string(), stoppedAt: z.string().nullable() });
 /** 受付用リンク。 */

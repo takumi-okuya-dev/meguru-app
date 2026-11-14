@@ -3,7 +3,7 @@ import type { ReceptionStats } from "@meguru/shared";
 import { yen } from "../../lib/reception-model";
 
 /**
- * 数字の段：来場・現金・PayPay・振込待ち・あなたが受け取った現金。
+ * 数字の段：来場・現金・PayPay・振込待ち・あなたが受け取った現金（確かめ待ちがあれば確かめ待ち）。
  * @param props - stats：数字
  * @returns 数字の段
  */
@@ -14,9 +14,13 @@ export function StatsBar({ stats }: { stats: ReceptionStats }) {
     { label: "PayPay", value: yen(stats.paypay) },
     { label: "振込待ち", value: `${stats.awaitingTransferCount}件・${yen(stats.awaitingTransferAmount)}` },
     { label: "あなたが受け取った現金", value: yen(stats.mine) },
+    // 本人の申告の確かめ待ち（あるときだけ。現金・PayPayの合計には入っていない。specs/collect/002）
+    ...(stats.awaitingConfirmationCount > 0
+      ? [{ label: "確かめ待ち", value: `${stats.awaitingConfirmationCount}件・${yen(stats.awaitingConfirmationAmount)}` }]
+      : []),
   ];
   return (
-    <dl aria-label="受付の数字" className="grid grid-cols-2 gap-2 sm:grid-cols-5">
+    <dl aria-label="受付の数字" className={items.length > 5 ? "grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6" : "grid grid-cols-2 gap-2 sm:grid-cols-5"}>
       {items.map((item) => (
         <div key={item.label} className="rounded-lg border bg-card px-3 py-2">
           <dt className="text-xs text-muted-foreground">{item.label}</dt>

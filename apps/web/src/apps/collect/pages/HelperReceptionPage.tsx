@@ -144,6 +144,8 @@ export function HelperReceptionPage() {
       record: (personId, input) => helperApi.record(token, secret, personId, input),
       undo: (personId) => helperApi.undo(token, secret, personId),
       walkIn: (input) => helperApi.walkIn(token, secret, input),
+      confirm: (personId, input) => helperApi.confirm(token, secret, personId, input),
+      resolveRequest: (requestId, action, personId) => helperApi.resolveRequest(token, secret, requestId, action, personId),
       liveTicket: () => helperApi.liveTicket(token, secret),
       onLinkStopped: () => setStopped(true),
     }),
