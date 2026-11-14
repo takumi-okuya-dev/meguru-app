@@ -16,14 +16,14 @@
 | `reception/`（受付） | `reception_records` | `reception-service.ts`（記録は名簿の人1人に1行・`clientRequestId`の送り直し・取り消し・飛び入り・本人の申告を確かめる`confirmReception`・スナップショットと数字。確かめ待ちは現金・PayPayの合計に入れない）・`reception-routes.ts` |
 | `helpers/`（受付の手伝い） | `reception_links`・`helpers`・`helper_devices` | `link-service.ts`（受付用リンク。種類`helper`（`cr_`）と`self`（`cs_`）。トークンはハッシュと暗号文）・`link-tokens.ts`（鍵の入れ替え。入口の`tokenKeys`）・`helper-service.ts`（参加・端末の印の確かめ・受付をしている人の一覧）・`helper-routes.ts`（主催者の道筋と、ログインのいらない`/r/:token/…`） |
 | `self-check-in/`（セルフ受付。002） | `self_check_in_requests`・`self_check_in_devices` | `self-service.ts`（参加者が探す（名前・ふりがな・受付番号の完全一致だけ）・本人の申告（現金とPayPayは確かめ待ち、振込は振込待ち）・自分の状態・探す回数の上限）・`request-service.ts`（名簿にいない人の申し出と、名簿に入れる・当てる・断る）・`self-routes.ts`（参加者の`/s/:token/…`、セルフ受付のリンク`…/self-link`、確かめる`…/reception/:personId/confirm`、申し出の片付け。主催者と手伝う人） |
-| `sharing/`（経費・運営メンバー・分配・紹介。003） | `expenses`・`sharing_members`・`sharing_invites` | `sharing-service.ts`（分配の画面・経費・運営メンバー。分配は毎回`computeDistribution`（共通のパッケージ）で計算。はじめて開くと主催者の行を作る。傾斜の上限は保存のたびに確かめる）・`invite-service.ts`（招待のリンク`ci_`。ハッシュだけを持ち7日。受ける・つながった人の一覧と読むだけの分配）・`referral-service.ts`（紹介経由の売上・紹介した人の候補。分配には使わない）・`money.ts`（売上と紹介の数え方）・`sharing-routes.ts`（主催者の道筋と、ログインだけの`/invites/…`・`/shares…`） |
+| `sharing/`（経費・運営メンバー・分配・紹介。003） | `expenses`・`sharing_members`・`sharing_invites`・`settlement_transfers`・`settlement_holders` | `sharing-service.ts`（分配の画面・経費・運営メンバー。分配は毎回`computeDistribution`（共通のパッケージ）で計算。はじめて開くと主催者の行を作る。傾斜の上限は保存のたびに確かめる）・`invite-service.ts`（招待のリンク`ci_`。ハッシュだけを持ち7日。受ける・つながった人の一覧と読むだけの分配）・`referral-service.ts`（紹介経由の売上・紹介した人の候補。分配には使わない）・`settlement-service.ts`（精算の手順。持っている額と受け取る合計から毎回`settlementSteps`（共通のパッケージ）で出す。持つのは「渡した」ものと、手伝う人と運営メンバーの対応だけ）・`money.ts`（売上と紹介の数え方）・`sharing-routes.ts`（主催者の道筋と、ログインだけの`/invites/…`・`/shares…`） |
 | `live/`（会場の共有） | — | `live-room.ts`（Durable Object`CollectLiveRoom`。知らせを配るだけで保存しない。組み立ての`durable-objects.ts`が書き出す）・`live-ticket.ts`（入場券の署名。`COLLECT_LIVE_SECRET`）・`notify.ts`（保存のあと`waitUntil`で知らせる）・`live-routes.ts` |
 | `closing/`（締め・書き出し） | `settlements` | `tally.ts`（締めとまとめの数え方。確かめ待ちは来場に数え、お金の合計の外）・`closing-service.ts`（受け取った人ごとの精算・PayPayの確かめ・締める。締めたときの版を残し、あとで版が上がったら「締めのあとで変わった」）・`export-csv.ts`（UTF-8のBOMつき・CRLF）・`closing-routes.ts` |
 | `transfers/`（振込待ち） | — | `transfer-service.ts`（すべてのイベントの振込待ちと確かめた記録・確かめる・戻す。受付の画面の版は上げない）・`transfer-routes.ts` |
 | `summaries/`（消す・まとめ） | `event_summaries` | `summary-service.ts`（同じトランザクションで数字だけのまとめを書いてからイベントを消す。名前は入れない）・`summary-routes.ts` |
 | `threads-candidates/`（Threadsのイベントの候補） | `threads_event_candidates` | `candidate-service.ts`（持ち主にだけ見せる・イベントを作るときの元の確かめ・掲載済みの媒体）・`candidate-routes.ts`（`GET /api/collect/threads-candidates`） |
 | `inbox/`（出来事の受け取り） | `received_events` | `received-events.ts`（`user.withdrawn`：その主催者のイベント・まとめ・既定値・候補をすべて消し、ほかの主催者の運営メンバーへのつながりを外す）・`threads-candidates.ts`（Threads の `threads.promotion_event.saved`・`.deleted`・`threads.listing_status.changed` を候補に写し、作ったイベントに「元が変わった・消された」を付ける） |
-| （直下） | — | `index.ts`（入口`collectModule`。道筋・毎日の処理・`tokenKeys`）・`schema.ts`（17表。スキーマ`collect`）・`access.ts`（関所とイベントの持ち主の確かめ）・`register.ts`（`registerCollect()`：利用の決まりと出来事の受け取りの登録） |
+| （直下） | — | `index.ts`（入口`collectModule`。道筋・毎日の処理・`tokenKeys`）・`schema.ts`（19表。スキーマ`collect`）・`access.ts`（関所とイベントの持ち主の確かめ）・`register.ts`（`registerCollect()`：利用の決まりと出来事の受け取りの登録） |
 
 ## 2. Web
 

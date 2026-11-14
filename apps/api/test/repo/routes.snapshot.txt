@@ -9,6 +9,7 @@ DELETE /api/collect/events/:eventId/members/:memberId/invite ×2
 DELETE /api/collect/events/:eventId/members/:memberId/link ×2
 DELETE /api/collect/events/:eventId/reception/:personId ×2
 DELETE /api/collect/events/:eventId/roster/:personId ×2
+DELETE /api/collect/events/:eventId/settlement/transfers/:transferId ×2
 DELETE /api/collect/r/:token/reception/:personId ×1
 DELETE /api/collect/settings/paypay-qr ×2
 DELETE /api/collect/summaries/:summaryId ×2
@@ -47,6 +48,7 @@ GET /api/collect/events/:eventId/reception ×2
 GET /api/collect/events/:eventId/referrals ×2
 GET /api/collect/events/:eventId/roster ×2
 GET /api/collect/events/:eventId/self-link ×2
+GET /api/collect/events/:eventId/settlement ×2
 GET /api/collect/events/:eventId/sharing ×2
 GET /api/collect/invites/:token ×2
 GET /api/collect/live ×1
@@ -176,6 +178,7 @@ POST /api/collect/events/:eventId/self-link/stop ×2
 POST /api/collect/events/:eventId/self-requests/:requestId/accept ×2
 POST /api/collect/events/:eventId/self-requests/:requestId/match ×2
 POST /api/collect/events/:eventId/self-requests/:requestId/reject ×2
+POST /api/collect/events/:eventId/settlement/transfers ×2
 POST /api/collect/events/:eventId/walk-ins ×2
 POST /api/collect/invites/:token/accept ×2
 POST /api/collect/r/:token/join ×1
@@ -246,6 +249,7 @@ POST /api/threads/token-connect ×3
 POST /api/threads/webhooks/data-deletion ×2
 POST /api/threads/webhooks/uninstall ×2
 PUT /api/collect/events/:eventId/reception/:personId ×2
+PUT /api/collect/events/:eventId/settlement/helpers/:helperId ×2
 PUT /api/collect/events/:eventId/settlements/:receiverKey ×2
 PUT /api/collect/r/:token/reception/:personId ×1
 PUT /api/collect/settings ×2
