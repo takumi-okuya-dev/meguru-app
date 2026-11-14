@@ -1,5 +1,6 @@
 // 「/people/settings」：誘いの文と目標（specs/people/001-people-memo contracts/ui-routes.md 1、research.md R17、spec US5）。
 // 誘いの文の型（差し込みの説明・見本・初めの型に戻す）と、リピーターの目標（1〜10,000人。空なら目標なし）。
+// 002：タグ（名前を直す・消す）と自由な項目（足す・直す・並べ替える・消す）も、ここで直す（specs/people/002-sales-list）。
 import {
   buildInviteMessage,
   DEFAULT_INVITE_TEMPLATE,
@@ -19,6 +20,8 @@ import { describeError } from "@/lib/api-client";
 import { cn } from "@/lib/utils";
 import { PageBody, PageHeader } from "@/shell";
 import { fieldClass } from "../components/EventForm";
+import { FieldSettingsSection } from "../components/settings/FieldSettingsSection";
+import { TagSettingsSection } from "../components/settings/TagSettingsSection";
 import { peopleApi, type SettingsUpdateInput } from "../lib/api";
 import { peopleQueryKeys } from "../lib/query-keys";
 import { refreshSettings } from "../lib/refresh";
@@ -205,6 +208,10 @@ export function SettingsPage() {
         <TemplateSection template={data.inviteTemplate} />
         <div className="border-t" />
         <GoalSection goal={data.repeaterGoal} />
+        <div className="border-t" />
+        <TagSettingsSection />
+        <div className="border-t" />
+        <FieldSettingsSection />
       </PageBody>
     </>
   );

@@ -17,8 +17,10 @@ vi.mock("@/apps/collect/lib/live", () => ({
   },
 }));
 vi.mock("sonner", () => ({ toast: { info: vi.fn(), error: vi.fn(), success: vi.fn() } }));
+const saveFile = vi.hoisted(() => vi.fn());
+vi.mock("@/lib/save-file", () => ({ saveFile }));
 
-const { ClosingPage, diffText } = await import("@/apps/collect/pages/ClosingPage");
+const { ClosingPage, diffText, fallbackCsvName } = await import("@/apps/collect/pages/ClosingPage");
 
 const zero = { count: 0, amount: 0 };
 /**
@@ -61,6 +63,7 @@ function renderClosing() {
 
 beforeEach(() => {
   for (const m of Object.values(mocks)) m.mockReset();
+  saveFile.mockReset();
   mocks.closing.mockResolvedValue(snapshot());
 });
 
@@ -125,5 +128,22 @@ describe("締め", () => {
     mocks.closing.mockResolvedValue(snapshot({ paypay: { ...snapshot().paypay, count: 2, amount: 5000 } }));
     act(() => live.onMessage!());
     expect(await screen.findByRole("heading", { name: /PayPay 2件・5,000円/ })).toBeInTheDocument();
+  });
+
+  it("CSV は API のファイル名で、共通の saveFile で保存する", async () => {
+    const blob = new Blob(["a"], { type: "text/csv" });
+    mocks.exportCsv.mockResolvedValue({ blob, filename: "集金_2026-11-20_IT交流会.csv", truncated: null, headers: new Headers() });
+    renderClosing();
+    await userEvent.click(await screen.findByRole("button", { name: /CSV/ }));
+    await waitFor(() => expect(saveFile).toHaveBeenCalledWith(blob, "集金_2026-11-20_IT交流会.csv"));
+  });
+
+  it("API のファイル名が読めないときは、API と同じ置き換えで名前を作る", async () => {
+    expect(fallbackCsvName({ name: "港/IT:交流会", startsAt: "2026-11-20T16:00:00.000Z" })).toBe("集金_2026-11-21_港_IT_交流会.csv");
+    const blob = new Blob(["a"]);
+    mocks.exportCsv.mockResolvedValue({ blob, filename: null, truncated: null, headers: new Headers() });
+    renderClosing();
+    await userEvent.click(await screen.findByRole("button", { name: /CSV/ }));
+    await waitFor(() => expect(saveFile).toHaveBeenCalledWith(blob, "集金_2026-11-20_IT交流会.csv"));
   });
 });

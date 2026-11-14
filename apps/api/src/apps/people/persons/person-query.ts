@@ -14,14 +14,14 @@ export function attendanceSql(userId: string): SQL {
 }
 
 /**
- * 人ごとの最後に会った日と自分の会の回数（R12）。列は person_id・last_met_on・own_count。
+ * 人ごとの最後に会った日・初めて会った日・自分の会の回数（R12）。列は person_id・last_met_on・first_met_on・own_count。
  * @param userId - 作り手
  * @param attendance - もう組んだ来た記録の CTE の名前（省くと、ここで組む）
  * @returns 副問い合わせ
  */
 export function personStatsSql(userId: string, attendance?: SQL): SQL {
   const from = attendance ?? sql`(${attendanceSql(userId)})`;
-  return sql`SELECT a.person_id, max(e.held_on) AS last_met_on, (count(*) FILTER (WHERE e.is_own))::int AS own_count
+  return sql`SELECT a.person_id, max(e.held_on) AS last_met_on, min(e.held_on) AS first_met_on, (count(*) FILTER (WHERE e.is_own))::int AS own_count
     FROM ${from} a JOIN ${peopleEvents} e ON e.id = a.event_id GROUP BY a.person_id`;
 }
 

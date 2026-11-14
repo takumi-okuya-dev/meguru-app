@@ -7,4 +7,5 @@ export * from "./fields";
 export * from "./invite";
 export * from "./names";
 export * from "./presets";
+export * from "./sales";
 export * from "./schemas";

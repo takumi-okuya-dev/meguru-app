@@ -3,7 +3,7 @@
 // 取り込みの一覧と「取り消す」・直す・消す。
 import type { UndoResult } from "@meguru/shared/people";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ChevronRightIcon, PencilIcon, Trash2Icon } from "lucide-react";
+import { ChevronRightIcon, MegaphoneIcon, PencilIcon, Trash2Icon } from "lucide-react";
 import { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
 import { toast } from "sonner";
@@ -18,7 +18,7 @@ import { EventForm } from "../components/EventForm";
 import { formatHeldOn } from "../components/format";
 import { UndoConfirmDialog } from "../components/UndoConfirmDialog";
 import { peopleApi } from "../lib/api";
-import { eventsPath, importPath, personPath } from "../lib/paths";
+import { eventsPath, importPath, outreachBoardPath, personPath } from "../lib/paths";
 import { peopleQueryKeys } from "../lib/query-keys";
 
 /**
@@ -86,6 +86,13 @@ export function EventPage() {
             </p>
           )}
           {stats.erasedCount > 0 && <p className="text-sm text-muted-foreground">消した人 {stats.erasedCount}人</p>}
+          {event.isOwn && (
+            <Button asChild variant="outline" className="mt-2 h-11 rounded-full md:h-9">
+              <Link to={outreachBoardPath(event.id)}>
+                <MegaphoneIcon /> 声かけの一覧
+              </Link>
+            </Button>
+          )}
         </section>
 
         <section className="space-y-2" aria-labelledby="attendees-heading">

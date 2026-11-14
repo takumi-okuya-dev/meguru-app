@@ -36,9 +36,9 @@ description: "Task list for collect 001 event-day collection"
 
 **2026-11-13 追記**：PR0は[specs/meguru/030-app-access](../../meguru/030-app-access/spec.md)で入れた。**機能のON/OFF（019）に項目を足すのではなく、共通に「アプリの利用の許可」を作った**（029のあと、機能のON/OFFはThreadsだけが持つ仕組みになったため）。集金管理は、PR1で`APP_CATALOG`に`collect`を足し、組み立てで`registerAppAccess("collect", "granted")`を呼び、道筋に`requireAppAccess("collect")`を付ける。運営者は、設定 > 運営の「使える機能」（人）と「グループ」の「アプリの利用」で開く・閉じる。T001・T002は030で別の形で済んだ。T003のうち`available`・`last`・`landing`の絞り込みと`PUT /api/me/last-app`の400は030で済み、`APP_CATALOG`への`collect`の追加と`registerAppAccess`はPR1でする。
 
-- [ ] T001 共通の機能のON/OFF（`api/platform/features/`、029のあとは029が決めた置き場所）に、**既定でOFF**の項目を持てるようにするテストを先に書く：運営者が人ごと・テストのグループごとにONにした人だけが「使える」、ほかの人は「使えない」、今の項目（自動投稿・戦略・チーム。既定でON）の結果は変わらない（research.md R3）。
-- [ ] T002 T001を通す：既定でOFFの項目「集金管理」（キーは`collect`）を足し、運営の画面（機能のON/OFF）に出す。名前と意味はアプリ側が決める形（029 FR-012）。共通の入口の関数の利用権が、この項目を見て`collect`の使える・使えないを返す。
-- [ ] T003 `/api/me`の`available`を人ごとにする：`shared/apps.ts`の`APP_CATALOG`に`collect`（名前「めぐる 集金」・`basePath: "/collect"`・説明・料金の文言「テスト版（料金なし）」・`released: true`）を足し、`api/platform/identity/me-routes.ts`の`available`を「出してよいアプリ」かつ「その人に利用権がある」で絞る。テスト：利用権のない人の`available`に`collect`が出ない、ONにした人には出る、`PUT /api/me/last-app`は利用権のないアプリを400にする、Threadsだけの人の画面と応答は変わらない。
+- [x] T001 共通の機能のON/OFF（`api/platform/features/`、029のあとは029が決めた置き場所）に、**既定でOFF**の項目を持てるようにするテストを先に書く：運営者が人ごと・テストのグループごとにONにした人だけが「使える」、ほかの人は「使えない」、今の項目（自動投稿・戦略・チーム。既定でON）の結果は変わらない（research.md R3）。（**2026-11-13**：030（アプリの利用の許可。specs/meguru/030-app-access、#112）で、機能のON/OFFではなく、運営者が人ごと・テストのグループごとに開く形で済んだ）
+- [x] T002 T001を通す：既定でOFFの項目「集金管理」（キーは`collect`）を足し、運営の画面（機能のON/OFF）に出す。名前と意味はアプリ側が決める形（029 FR-012）。共通の入口の関数の利用権が、この項目を見て`collect`の使える・使えないを返す。（**2026-11-13**：030で済んだ。集金管理は`registerAppAccess("collect", "granted")`で登録する）
+- [x] T003 `/api/me`の`available`を人ごとにする：`shared/apps.ts`の`APP_CATALOG`に`collect`（名前「めぐる 集金」・`basePath: "/collect"`・説明・料金の文言「テスト版（料金なし）」・`released: true`）を足し、`api/platform/identity/me-routes.ts`の`available`を「出してよいアプリ」かつ「その人に利用権がある」で絞る。テスト：利用権のない人の`available`に`collect`が出ない、ONにした人には出る、`PUT /api/me/last-app`は利用権のないアプリを400にする、Threadsだけの人の画面と応答は変わらない。（**2026-11-13**：030と PR1b（#114）で済んだ。`APP_CATALOG`の行は031のあと`apps/collect/catalog-entry.ts`）
 
 ---
 
@@ -273,11 +273,11 @@ description: "Task list for collect 001 event-day collection"
 
 ## Phase 10：文書と仕上げ（各PRで、そのPRの分を直す）
 
-- [ ] T079 [P] `docs/module-map.md`に集金管理（`apps/collect`の表・入口・道筋・Durable Object・Webのフォルダー）を足す（PR1で土台、PR2で受付・手伝い・Durable Object、PR3で締めなど）。
+- [x] T079 [P] `docs/module-map.md`に集金管理（`apps/collect`の表・入口・道筋・Durable Object・Webのフォルダー）を足す（PR1で土台、PR2で受付・手伝い・Durable Object、PR3で締めなど）。（**2026-11-13**：031のあと、アプリの地図は`docs/apps/collect.md`に置く決まりになったので、そこに書いた（PR1〜PR3））
 - [ ] T080 [P] `docs/product-structure.md`・`README.md`・`docs/architecture.md`に、2作目として集金管理を足し、Durable Objectと`COLLECT_LIVE_SECRET`を書く。`docs/external-services-setup.md`に、ステージングと本番で`wrangler secret put COLLECT_LIVE_SECRET --env …`を入れる手順を足す（PR2）。
 - [ ] T081 [P] `docs/user-guide.md`に、集金管理の使い方（名簿・受付・手伝い・締め・振込）を足す（PR3）。
 - [ ] T082 `specs/collect/001-event-day-collection/quickstart.md`の1〜6を、各PRのマージのあとにテスト版で手で確かめ、確かめた日と結果を`specs/collect/001-event-day-collection/checklists/manual-check.md`に残す。あわせて時間を測って同じファイルに書く：受付の1人（名簿50人で10秒以内。SC-001）、名簿30人を手で入れる（5分以内）・画面写真から貼る（1分以内。SC-002）、受付をした人が3人のときの締め（5分以内。SC-003）、手伝う人がリンクを開いてから受付を始めるまで（30秒以内。SC-007）。
-- [ ] T083 [P] スマートフォン（390px幅）で、受付・手伝う人の受付・締めの画面が横にスクロールしないこと、押すところが44px以上であることを確かめる（spec Edge Cases）。
+- [x] T083 [P] スマートフォン（390px幅）で、受付・手伝う人の受付・締めの画面が横にスクロールしないこと、押すところが44px以上であることを確かめる（spec Edge Cases）。（**2026-11-13**：`e2e/tests/collect-phone-width.spec.ts`で確かめた）
 - [ ] T084 Durable Objectsの無料枠の使い方を、テスト版で1回のイベントのあとにCloudflareの画面で確かめ、research.md R4に実際の数を1行で足す。
 
 ---

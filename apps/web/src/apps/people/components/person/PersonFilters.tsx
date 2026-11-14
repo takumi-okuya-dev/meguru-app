@@ -1,12 +1,13 @@
 // 人の一覧の絞り込み（来たイベント・次回参加・欲しいつながり・キャリアの興味・最後に会った日。specs/people/001-people-memo research.md R22）。
 // 答えの値は、いちばん新しい回答に出てくる値（GET /api/people/facets）をチップで出す。
 // 誘う候補の画面でも使う（来たイベントの代わりに「前に来た」を頭に置く）。
-import type { FacetValue, PeopleEvent, PeopleFacets } from "@meguru/shared/people";
+import type { FacetValue, PeopleEvent, PeopleFacets, PeopleTag } from "@meguru/shared/people";
 import { useId, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { fieldClass } from "../EventForm";
 import { formatHeldOn } from "../format";
+import { LIKELIHOOD_CHOICES } from "./labels";
 
 /** 絞り込みの値（省いた項目は絞らない）。 */
 export type PersonFilterValue = {
@@ -16,10 +17,13 @@ export type PersonFilterValue = {
   career: string[];
   lastMetFrom?: string;
   lastMetTo?: string;
+  /** 002：タグ（どれかを持つ）・来てくれそう度（3・2・1・none） */
+  tag: string[];
+  likelihood: string[];
 };
 
 /** 何も絞らない値。 */
-export const EMPTY_FILTERS: PersonFilterValue = { next: [], wanted: [], career: [] };
+export const EMPTY_FILTERS: PersonFilterValue = { next: [], wanted: [], career: [], tag: [], likelihood: [] };
 
 /**
  * 絞り込んでいる項目の数。
@@ -27,7 +31,16 @@ export const EMPTY_FILTERS: PersonFilterValue = { next: [], wanted: [], career: 
  * @returns 数
  */
 export function activeFilterCount(v: PersonFilterValue): number {
-  return (v.eventId ? 1 : 0) + v.next.length + v.wanted.length + v.career.length + (v.lastMetFrom ? 1 : 0) + (v.lastMetTo ? 1 : 0);
+  return (
+    (v.eventId ? 1 : 0) +
+    v.next.length +
+    v.wanted.length +
+    v.career.length +
+    (v.lastMetFrom ? 1 : 0) +
+    (v.lastMetTo ? 1 : 0) +
+    v.tag.length +
+    v.likelihood.length
+  );
 }
 
 /** 答えの項目（facets の項目と、絞り込みの値の項目）。 */
@@ -109,7 +122,7 @@ function ChipGroup({
 
 /**
  * 人の一覧の絞り込み。
- * @param props - value：絞り込みの値、onChange：変わったとき、facets：選べる答えの値、events：選べるイベント、showEvent：「来たイベント」を出すか、
+ * @param props - value：絞り込みの値、onChange：変わったとき、facets：選べる答えの値、events：選べるイベント、tags：選べるタグ、showEvent：「来たイベント」を出すか、
  *   showCounts：チップに人数（全員の中の数）を出すか、lead：頭に置くほかの絞り込み、extraCount：lead で絞っている数、
  *   onClear：「絞り込みを外す」（省くと value だけを空にする）
  * @returns 絞り込み
@@ -119,6 +132,7 @@ export function PersonFilters({
   onChange,
   facets,
   events,
+  tags,
   showEvent = true,
   showCounts = true,
   lead,
@@ -129,6 +143,7 @@ export function PersonFilters({
   onChange: (value: PersonFilterValue) => void;
   facets: PeopleFacets | undefined;
   events?: PeopleEvent[] | undefined;
+  tags?: PeopleTag[] | undefined;
   showEvent?: boolean;
   showCounts?: boolean;
   lead?: ReactNode;
@@ -159,6 +174,29 @@ export function PersonFilters({
           </select>
         </div>
       )}
+      {(tags ?? []).length > 0 || value.tag.length > 0 ? (
+        <fieldset className="space-y-1.5">
+          <legend className="text-sm font-medium">タグ</legend>
+          <div className="flex flex-wrap gap-2">
+            {/* 選んだタグを消したあとも外せるよう、選んだものは残す */}
+            {[...(tags ?? []), ...value.tag.filter((t) => !(tags ?? []).some((x) => x.id === t)).map((t) => ({ id: t, name: "（消したタグ）", personCount: 0 }))].map((t) => (
+              <FilterChip key={t.id} pressed={value.tag.includes(t.id)} onClick={() => onChange({ ...value, tag: toggle(value.tag, t.id) })}>
+                <span className="truncate">#{t.name}</span>
+              </FilterChip>
+            ))}
+          </div>
+        </fieldset>
+      ) : null}
+      <fieldset className="space-y-1.5">
+        <legend className="text-sm font-medium">来てくれそう度</legend>
+        <div className="flex flex-wrap gap-2">
+          {LIKELIHOOD_CHOICES.map((c) => (
+            <FilterChip key={c.value} pressed={value.likelihood.includes(c.value)} onClick={() => onChange({ ...value, likelihood: toggle(value.likelihood, c.value) })}>
+              {c.label}
+            </FilterChip>
+          ))}
+        </div>
+      </fieldset>
       {FACET_GROUPS.map((g) => (
         <ChipGroup
           key={g.key}

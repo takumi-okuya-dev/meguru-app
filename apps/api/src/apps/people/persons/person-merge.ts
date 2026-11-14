@@ -1,11 +1,21 @@
 // まとめる・分ける（specs/people/001-people-memo contracts/api.md 4、research.md R15、tasks.md T061・T062）。
-import { MEMO_APPEARANCE_MAX, MEMO_TALK_MAX, nameKey, type PersonSummary } from "@meguru/shared/people";
+import { MEMO_APPEARANCE_MAX, MEMO_TALK_MAX, nameKey, TAGS_PER_PERSON_MAX, type PersonSummary } from "@meguru/shared/people";
 import { and, count, eq, sql } from "drizzle-orm";
 import { withTransaction, type TxDb } from "../../../kernel/db/client";
 import type { Env } from "../../../kernel/env";
 import { AppError } from "../../../kernel/errors";
 import { loadOwnedPerson, loadOwnedResponse, lockOwner } from "../access";
-import { peopleConsentChanges, peopleManualAttendances, peoplePersons, peopleResponses } from "../schema";
+import {
+  peopleConsentChanges,
+  peopleContactLogs,
+  peopleManualAttendances,
+  peoplePersonFieldValues,
+  peoplePersonLinks,
+  peoplePersons,
+  peoplePersonTags,
+  peopleResponses,
+  peopleTags,
+} from "../schema";
 import { markInviteAttended, mergeOutreaches, resetInviteAttended } from "../outreach/outreach-service";
 import { derivePersons } from "./person-derive";
 import { attendanceSql } from "./person-query";
@@ -60,6 +70,17 @@ export async function mergePersons(env: Env, userId: string, personId: string, o
     const enteredLineName = keep.enteredLineName ?? other.enteredLineName;
     // 声かけを移す（同じ声かけは進み具合の先の方を残す）。相手を消す前に行う（消すと声かけも外部キーで消える）
     await mergeOutreaches(tx, userId, keep.id, other.id);
+    // 002：タグは合わせ、連絡の記録は移す。自由な項目の値とリンクは、残す人になければ相手のもの（specs/people/002 Edge Cases）
+    await tx.execute(sql`INSERT INTO ${peoplePersonTags} (person_id, tag_id, user_id)
+      SELECT ${keep.id}, t.tag_id, t.user_id FROM ${peoplePersonTags} t WHERE t.person_id = ${other.id} ON CONFLICT DO NOTHING`);
+    await tx.update(peopleContactLogs).set({ personId: keep.id }).where(and(eq(peopleContactLogs.personId, other.id), eq(peopleContactLogs.userId, userId)));
+    await tx.execute(sql`INSERT INTO ${peoplePersonFieldValues} (person_id, field_id, user_id, value)
+      SELECT ${keep.id}, v.field_id, v.user_id, v.value FROM ${peoplePersonFieldValues} v WHERE v.person_id = ${other.id} ON CONFLICT DO NOTHING`);
+    await tx.execute(sql`INSERT INTO ${peoplePersonLinks} (person_id, kind, user_id, url)
+      SELECT ${keep.id}, l.kind, l.user_id, l.url FROM ${peoplePersonLinks} l WHERE l.person_id = ${other.id} ON CONFLICT DO NOTHING`);
+    // 1人に付けられるタグの数を超えたら、超えた分は外す（名前の順で後ろのもの）
+    await tx.execute(sql`DELETE FROM ${peoplePersonTags} pt WHERE pt.person_id = ${keep.id} AND pt.tag_id NOT IN (
+      SELECT t.tag_id FROM ${peoplePersonTags} t JOIN ${peopleTags} g ON g.id = t.tag_id WHERE t.person_id = ${keep.id} ORDER BY g.name_key LIMIT ${TAGS_PER_PERSON_MAX})`);
     // 相手を先に消す（手で足した会ったイベントは外部キーで一緒に消える。移した分は上で写した）
     await tx.delete(peoplePersons).where(and(eq(peoplePersons.id, other.id), eq(peoplePersons.userId, userId)));
     await tx
@@ -71,6 +92,11 @@ export async function mergePersons(env: Env, userId: string, personId: string, o
         enteredLineNameKey: enteredLineName ? nameKey(enteredLineName) : null,
         memoAppearance: joinMemo(keep.memoAppearance, other.memoAppearance, MEMO_APPEARANCE_MAX),
         memoTalk: joinMemo(keep.memoTalk, other.memoTalk, MEMO_TALK_MAX),
+        // 002：残す人にあればそれ、なければ相手のもの（次にやることは日付と文を一緒に）
+        nextActionOn: keep.nextActionOn ?? other.nextActionOn,
+        nextActionNote: keep.nextActionOn ? keep.nextActionNote : other.nextActionNote,
+        birthdayMd: keep.birthdayMd ?? other.birthdayMd,
+        likelihood: keep.likelihood ?? other.likelihood,
         updatedAt: new Date(),
       })
       .where(and(eq(peoplePersons.id, keep.id), eq(peoplePersons.userId, userId)));

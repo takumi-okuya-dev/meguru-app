@@ -12,7 +12,7 @@ import {
 import { and, count, eq, sql } from "drizzle-orm";
 import { Hono, type MiddlewareHandler } from "hono";
 import type { AppEnv } from "../../../platform";
-import { createDb, type Db, type TxDb } from "../../../kernel/db/client";
+import { createDb, withTransaction, type Db, type TxDb } from "../../../kernel/db/client";
 import { promotions } from "../schema";
 import { accounts } from "../schema";
 import { authorizeAccount } from "../access/access";
@@ -20,6 +20,7 @@ import { recordActivity, updatedByOf, withActivityTx } from "../activity/activit
 import { AppError, notFound } from "../../../kernel/errors";
 import { parseBody } from "../../../kernel/validate";
 import { touchMaterials } from "./materials";
+import { deliverPromotionEvents, emitPromotionEventChange } from "./promotion-events";
 import { assertItemId, insertWithLimit, updateWithVersion } from "./item-service";
 
 type PromotionRow = typeof promotions.$inferSelect;
@@ -159,6 +160,8 @@ export function promotionRoutes(authed: MiddlewareHandler<AppEnv>) {
       const access = await authorizeAccount(db, user, c.req.param("accountId"), "content", { feature: "strategy" });
       const account = access.account;
       const input = await parseBody(promotionInputSchema, c.req.json());
+      // イベントの情報があれば、集金管理などに出来事で伝える（同じトランザクション。specs/collect/001 contracts/events.md 2）
+      let eventIds: string[] = [];
       const row = await insertWithLimit(
         c.env,
         account.id,
@@ -171,9 +174,16 @@ export function promotionRoutes(authed: MiddlewareHandler<AppEnv>) {
             .values({ accountId: account.id, ...toColumns(input), updatedByUserId: access.actor.id })
             .returning();
           await recordActivity(tx, access, { kind: "content", action: "promotion_added", summary: inserted!.title });
+          eventIds = await emitPromotionEventChange(tx, null, inserted!, {
+            promotionId: inserted!.id,
+            threadsAccountId: account.id,
+            ownerUserId: access.owner.id,
+            now: new Date(),
+          });
           return inserted!;
         },
       );
+      await deliverPromotionEvents(c.env, eventIds);
       await touchMaterials(db, account.id, "promotions");
       return c.json(toPromotion(row, new Date()), 201);
     })
@@ -185,8 +195,10 @@ export function promotionRoutes(authed: MiddlewareHandler<AppEnv>) {
       const id = assertItemId(c.req.param("promotionId"));
       const { expectedVersion, ...input } = await parseBody(updatePromotionRequestSchema, c.req.json());
       const now = new Date();
-      // 保存と操作の記録を同じトランザクションにする（PR #9 のCodexレビュー）
-      const row = await withActivityTx(c.env.DATABASE_URL, db, access, async (q) => {
+      // 保存と操作の記録と出来事（集金管理などへ。specs/collect/001 contracts/events.md 2）を同じトランザクションにする（PR #9 のCodexレビュー）
+      let eventIds: string[] = [];
+      const row = await withTransaction(c.env.DATABASE_URL, async (q) => {
+        const before = await findPromotion(q, account.id, id);
         const updated = await updateWithVersion(
           () =>
             q
@@ -199,8 +211,15 @@ export function promotionRoutes(authed: MiddlewareHandler<AppEnv>) {
           (current) => updatedByOf(q, current.updatedByUserId),
         );
         await recordActivity(q, access, { kind: "content", action: "promotion_updated", summary: updated.title });
+        eventIds = await emitPromotionEventChange(q, before ?? null, updated, {
+          promotionId: id,
+          threadsAccountId: account.id,
+          ownerUserId: access.owner.id,
+          now,
+        });
         return updated;
       });
+      await deliverPromotionEvents(c.env, eventIds);
       await touchMaterials(db, account.id, "promotions");
       return c.json(toPromotion(row, now));
     })
@@ -211,14 +230,24 @@ export function promotionRoutes(authed: MiddlewareHandler<AppEnv>) {
       const account = access.account;
       const id = assertItemId(c.req.param("promotionId"));
       // すでに消えていても成功とする（contracts/api.md）
-      // 削除と操作の記録を同じトランザクションにする（PR #9 のCodexレビュー）
-      await withActivityTx(c.env.DATABASE_URL, db, access, async (q) => {
+      // 削除と操作の記録と出来事を同じトランザクションにする（PR #9 のCodexレビュー）
+      let eventIds: string[] = [];
+      await withTransaction(c.env.DATABASE_URL, async (q) => {
         const removed = await q
           .delete(promotions)
           .where(and(eq(promotions.id, id), eq(promotions.accountId, account.id)))
           .returning();
-        if (removed[0]) await recordActivity(q, access, { kind: "content", action: "promotion_deleted", summary: removed[0].title });
+        if (removed[0]) {
+          await recordActivity(q, access, { kind: "content", action: "promotion_deleted", summary: removed[0].title });
+          eventIds = await emitPromotionEventChange(q, removed[0], null, {
+            promotionId: id,
+            threadsAccountId: account.id,
+            ownerUserId: access.owner.id,
+            now: new Date(),
+          });
+        }
       });
+      await deliverPromotionEvents(c.env, eventIds);
       await touchMaterials(db, account.id, "promotions");
       return c.body(null, 204);
     });

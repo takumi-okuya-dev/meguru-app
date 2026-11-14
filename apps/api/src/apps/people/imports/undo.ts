@@ -8,7 +8,18 @@ import { AppError } from "../../../kernel/errors";
 import { displayNameOf, type PeopleDb } from "../access";
 import { resetInviteAttended } from "../outreach/outreach-service";
 import { derivePersons } from "../persons/person-derive";
-import { peopleConsentChanges, peopleImports, peopleManualAttendances, peopleOutreaches, peoplePersons, peopleResponses } from "../schema";
+import {
+  peopleConsentChanges,
+  peopleContactLogs,
+  peopleImports,
+  peopleManualAttendances,
+  peopleOutreaches,
+  peoplePersonFieldValues,
+  peoplePersonLinks,
+  peoplePersons,
+  peoplePersonTags,
+  peopleResponses,
+} from "../schema";
 
 /** 取り消しの見積もり。 */
 export type UndoPlan = {
@@ -40,7 +51,19 @@ export async function planUndo(db: PeopleDb, userId: string, importIds: readonly
       .where(and(eq(peopleResponses.userId, userId), inArray(peopleResponses.importId, ids))),
     // その取り込みで作られ、ほかの取り込みの回答も手で足した会ったイベントもない人
     db
-      .select({ id: peoplePersons.id, realName: peoplePersons.realName, lineName: peoplePersons.lineName, memoAppearance: peoplePersons.memoAppearance, memoTalk: peoplePersons.memoTalk })
+      .select({
+        id: peoplePersons.id,
+        realName: peoplePersons.realName,
+        lineName: peoplePersons.lineName,
+        memoAppearance: peoplePersons.memoAppearance,
+        memoTalk: peoplePersons.memoTalk,
+        // 002 の書き足し（次にやること・誕生日・来てくれそう度、タグ・連絡の記録・自由な項目・SNS のリンク）があるか
+        sales: sql<boolean>`(${peoplePersons.nextActionOn} IS NOT NULL OR ${peoplePersons.birthdayMd} IS NOT NULL OR ${peoplePersons.likelihood} IS NOT NULL
+          OR EXISTS (SELECT 1 FROM ${peoplePersonTags} t WHERE t.person_id = ${peoplePersons.id})
+          OR EXISTS (SELECT 1 FROM ${peopleContactLogs} c WHERE c.person_id = ${peoplePersons.id})
+          OR EXISTS (SELECT 1 FROM ${peoplePersonFieldValues} v WHERE v.person_id = ${peoplePersons.id})
+          OR EXISTS (SELECT 1 FROM ${peoplePersonLinks} l WHERE l.person_id = ${peoplePersons.id}))`,
+      })
       .from(peoplePersons)
       .where(
         and(
@@ -97,6 +120,7 @@ export async function planUndo(db: PeopleDb, userId: string, importIds: readonly
       const notes: PersonNote[] = [];
       if (p.memoAppearance || p.memoTalk) notes.push("memo");
       if (outreach.has(p.id)) notes.push("outreach");
+      if (p.sales) notes.push("sales");
       if (manualConsent.has(p.id)) notes.push("manual_consent");
       if (manualAttendance.has(p.id)) notes.push("manual_attendance");
       return { personId: p.id, displayName: displayNameOf(p), notes };

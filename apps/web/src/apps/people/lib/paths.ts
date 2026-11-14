@@ -76,3 +76,12 @@ export function personPath(personId: string): string {
 export function settingsPath(): string {
   return `${PEOPLE_BASE}/settings`;
 }
+
+/**
+ * 会ごとの声かけの一覧（自分の会だけ。specs/people/002-sales-list FR-108）。
+ * @param eventId - イベントのID
+ * @returns URL
+ */
+export function outreachBoardPath(eventId: string): string {
+  return `${eventPath(eventId)}/outreach`;
+}

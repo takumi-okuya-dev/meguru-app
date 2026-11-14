@@ -241,7 +241,7 @@ Webのコード（`apps/web/src`）を、外枠（めぐるの共通の画面の
 | `shell/` | `app-module.ts`（`AppModule`・`AppRegistryProvider`・`useCurrentApp`・`useEntryAppHome`・`defineWithdrawalPreview`）・`routes.tsx`（`buildRoutes`）・`layout/`（`AppShell`・サイドバーの枠・`AppSwitcher`・`UserMenu`・`PageHeader`・`EnvBanner`）・`pages/`（入口の振り分け・すべてのアプリ・前のURLの転送・ログイン・利用規約・特定商取引法の表記・テスト用のグループの招待・紹介・見つかりません）・`settings/`（共通の設定。退会のダイアログ`WithdrawDialog.tsx`は、アプリの`withdrawalPreview`を並べて出す。運営の機能・上限・グループの画面は、名前と範囲を`GET /api/operator/app-registry`の一覧から出す）・`guards/`（関所）・`lib/`（`seller-info`・`use-last-app`） |
 | `apps/threads/` | `index.ts`（`threadsApp`）・`routes.tsx`・`sidebar/`（アカウントの切り替え・機能の一覧・チーム・`ThreadsShell`）・`pages/`（アカウント・チーム・接続から戻る画面・チームの招待・トークンの作り方・データ削除の確認・運営の「テスター招待」「アカウント一覧」）・`components/`・`lib/`（`api.ts`の`threadsApi`・`query-keys.ts`の`threadsQueryKeys`・`use-threads-me.ts`の`useThreadsMe`（`/api/threads/me`）・`paths.ts`・`use-account-access` など） |
 | `apps/<名前>/`（2作目から） | アプリごとの置き場所は`docs/apps/<名前>.md`の「Web」 |
-| `components/`・`lib/` | `components/ui`・`ApiErrorScreen`・`LoadingSkeleton`・`FeatureUnavailableNotice`・`ConfirmDialog`・`billing/`・`lib/api-client.ts`（`request`・ファイルを受け取る`requestBlob`）・`query.ts`（どちらも共通のAPIだけ）・`feature-defs.ts`・`limit-defs.ts`（運営の画面が使う登録の一覧）・`home-link.ts`・`invite-return.ts`・`referral-store.ts`・`use-logout.ts` など |
+| `components/`・`lib/` | `components/ui`・`ApiErrorScreen`・`LoadingSkeleton`・`FeatureUnavailableNotice`・`ConfirmDialog`・`billing/`・`lib/api-client.ts`（`request`・ファイルを受け取る`requestBlob`・ファイル名と見出しも返す`requestFile`）・ファイルを保存する`lib/save-file.ts`（どのアプリの書き出しもこれを使う）・`query.ts`（どちらも共通のAPIだけ）・`feature-defs.ts`・`limit-defs.ts`（運営の画面が使う登録の一覧）・`home-link.ts`・`invite-return.ts`・`referral-store.ts`・`use-logout.ts` など |
 
 ### 7-4. URLの決まり
 

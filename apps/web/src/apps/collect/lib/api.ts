@@ -1,6 +1,6 @@
 // 集金管理のAPIの呼び出し（specs/collect/001-event-day-collection contracts/api.md 1〜7）。道筋は /api/collect/…。
 // 手伝う人（ログインなし）の呼び出しは helper-api.ts。003 の分配（specs/collect/003-revenue-sharing contracts/api.md）もここ。
-// APIの基本のURL・認証のトークン・エラーの扱いは、共通の部品（lib/api-client.ts の request・requestBlob）を使う。
+// APIの基本のURL・認証のトークン・エラーの扱いは、共通の部品（lib/api-client.ts の request・requestBlob・requestFile）を使う。
 import {
   addRosterPersonResponseSchema,
   memberSharingViewSchema,
@@ -47,7 +47,7 @@ import {
   type CollectMethod,
 } from "@meguru/shared";
 import { z } from "zod";
-import { request, requestBlob } from "@/lib/api-client";
+import { request, requestBlob, requestFile } from "@/lib/api-client";
 
 /** イベントを作る・直すときの入力（画面の値）。 */
 export type EventInput = {
@@ -128,7 +128,8 @@ export const collectApi = {
     request(`${ev(eventId)}/settlements/${encodeURIComponent(receiverKey)}`, closingSnapshotSchema, json("PUT", input)),
   checkPaypay: (eventId: string) => request(`${ev(eventId)}/paypay-check`, closingSnapshotSchema, { method: "POST" }),
   close: (eventId: string) => request(`${ev(eventId)}/close`, closeResponseSchema, { method: "POST" }),
-  exportCsv: (eventId: string) => requestBlob(`${ev(eventId)}/export.csv`),
+  // CSV（ファイル名は API の Content-Disposition のもの）
+  exportCsv: (eventId: string) => requestFile(`${ev(eventId)}/export.csv`),
   // ---- 振込待ち ----
   transfers: (q: string) => request(`/api/collect/transfers${q ? `?${new URLSearchParams({ q })}` : ""}`, transferListSchema),
   confirmTransfer: (personId: string) => request(`/api/collect/transfers/${encodeURIComponent(personId)}/confirm`, transferItemSchema, { method: "POST" }),

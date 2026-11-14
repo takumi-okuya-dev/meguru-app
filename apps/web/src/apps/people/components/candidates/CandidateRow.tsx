@@ -21,6 +21,7 @@ import { fieldClass } from "../EventForm";
 import { personPath } from "../../lib/paths";
 import { ActionError, OutreachStageButtons } from "../outreach/OutreachControls";
 import { useOutreachActions } from "../outreach/use-outreach-actions";
+import { PersonBadges } from "../person/PersonBadges";
 import { lastMetLabel } from "../person/PersonRow";
 import { copyText } from "./copy-text";
 
@@ -273,6 +274,7 @@ export function CandidateRow({
         </div>
         <div className="text-sm text-muted-foreground">{lastMetLabel(person.lastMetOn)}</div>
       </Link>
+      <PersonBadges tags={person.tags} likelihood={person.likelihood} nextAction={person.nextAction} />
       <AnswerBadges answers={person.latestAnswers} />
       {purpose === "invite" ? (
         <InviteActions person={person} inviteEvent={inviteEvent} template={template} locked={locked} onFallback={onFallback} />

@@ -102,6 +102,10 @@ export function makeListItem(over: Partial<PersonListItem> = {}): PersonListItem
     ownEventCount: 1,
     latestAnswers: ANSWERS,
     consent: { invite: true, work: false },
+    tags: [],
+    likelihood: null,
+    nextAction: null,
+    firstMetOn: "2026-10-11",
     ...over,
   };
 }
@@ -147,6 +151,10 @@ export function makeSummary(over: Partial<PersonSummary> = {}): PersonSummary {
     memoTalk: null,
     consent: { invite: true, work: false, source: "response", basisOn: "2026-10-11" },
     lastMetOn: "2026-11-25",
+    tags: [],
+    likelihood: null,
+    nextAction: null,
+    birthdayMd: null,
     ...over,
   };
 }
@@ -165,6 +173,9 @@ export function makeDetail(over: Partial<PersonDetail> = {}): PersonDetail {
     ],
     consentChanges: [{ invite: true, work: false, source: "response", basisOn: "2026-10-11", changedAt: "2026-10-12T03:00:00.000Z" }],
     outreaches: [],
+    contactLogs: [],
+    fields: [],
+    links: {},
     ...over,
   };
 }

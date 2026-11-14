@@ -1,9 +1,10 @@
-// 人の一覧の1行（名前・LINE名・最後に会った日。specs/people/001-people-memo contracts/ui-routes.md 1）。押すと人のページへ。
+// 人の一覧の1行（名前・LINE名・最後に会った日・タグ・来てくれそう度・次にやること。specs/people/001-people-memo contracts/ui-routes.md 1）。押すと人のページへ。
 import type { PersonListItem } from "@meguru/shared/people";
 import { ChevronRightIcon } from "lucide-react";
 import { Link } from "react-router";
 import { personPath } from "../../lib/paths";
 import { formatHeldOn } from "../format";
+import { PersonBadges } from "./PersonBadges";
 
 /**
  * 最後に会った日の文。
@@ -30,6 +31,9 @@ export function PersonRow({ person }: { person: PersonListItem }) {
             {showLine && <span className="truncate text-sm text-muted-foreground">LINE：{person.lineName}</span>}
           </div>
           <div className="text-sm text-muted-foreground">{lastMetLabel(person.lastMetOn)}</div>
+          <div className="mt-1 empty:hidden">
+            <PersonBadges tags={person.tags} likelihood={person.likelihood} nextAction={person.nextAction} />
+          </div>
         </div>
         <ChevronRightIcon className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
       </Link>

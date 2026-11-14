@@ -50,7 +50,8 @@ export async function refreshSettings(queryClient: QueryClient): Promise<void> {
 }
 
 /**
- * イベントを作ったあと：イベントの一覧と、数字（次の自分の会＝誘う会の初めの値）を読み直す。
+ * イベントを作ったあと：イベントの一覧と、数字（次の自分の会）を読み直す。誘う候補は捨てる（誘う会の初めの値を API が
+ * 選び直す。候補のキーは「次の自分の会」のままで変わらないので、捨てないと前の会の声かけの行を出したままになる）。
  * @param queryClient - クエリのクライアント
  * @returns 読み直しが終わるまでの Promise
  */
@@ -58,5 +59,30 @@ export async function refreshEvents(queryClient: QueryClient): Promise<void> {
   await Promise.all([
     queryClient.invalidateQueries({ queryKey: peopleQueryKeys.events }),
     queryClient.invalidateQueries({ queryKey: peopleQueryKeys.stats }),
+  ]);
+  queryClient.removeQueries({ queryKey: peopleQueryKeys.candidatesAll });
+}
+
+/**
+ * 人のタグを付け外ししたあと：人の並び（一覧・候補・ホーム・人のページ）と、タグの一覧（人数）を読み直す。
+ * @param queryClient - クエリのクライアント
+ * @returns 読み直しが終わるまでの Promise
+ */
+export async function refreshTags(queryClient: QueryClient): Promise<void> {
+  await Promise.all([
+    queryClient.invalidateQueries({ queryKey: peopleQueryKeys.persons }),
+    queryClient.invalidateQueries({ queryKey: peopleQueryKeys.tags }),
+  ]);
+}
+
+/**
+ * 自由な項目を足す・直す・並べ替える・消したあと：項目の一覧と、人のページ（項目の値）を読み直す。
+ * @param queryClient - クエリのクライアント
+ * @returns 読み直しが終わるまでの Promise
+ */
+export async function refreshFields(queryClient: QueryClient): Promise<void> {
+  await Promise.all([
+    queryClient.invalidateQueries({ queryKey: peopleQueryKeys.fields }),
+    queryClient.invalidateQueries({ queryKey: peopleQueryKeys.persons }),
   ]);
 }

@@ -7,7 +7,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderRoutes } from "./helpers";
 
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
-const api = { settings: vi.fn(), updateSettings: vi.fn() };
+const api = { settings: vi.fn(), updateSettings: vi.fn(), tags: vi.fn(async () => []), fields: vi.fn(async () => []) };
 vi.mock("@/apps/people/lib/api", async (orig) => {
   const actual = await orig<typeof import("@/apps/people/lib/api")>();
   return { ...actual, peopleApi: { ...actual.peopleApi, ...api } };

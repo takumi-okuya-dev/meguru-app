@@ -251,7 +251,7 @@ description: "Task list for people 001 people memo"
 - [x] T093 [P] `docs/product-structure.md`・`README.md`・`docs/architecture.md`に、めぐるのアプリとして人物メモを足す。`docs/ui-design.md`「5. 画面幅ごとの振る舞い」に、人物メモの下のバー（767px以下・4つ・アプリの切り替えは上部バーの左）を1行足す（research.md R20。PR1）。
 - [x] T094 [P] （共通の文書は直さず、`docs/apps/people.md` 4章に書いた。docs/parallel-development.md 11）`docs/user-guide.md`に、人物メモの使い方（取り込み・同じ人・人のページ・誘う候補・声かけ・消す）を足す（PR3・PR4）。
 - [ ] T095 `specs/people/001-people-memo/quickstart.md`の1〜6を、各PRのマージのあとにテスト版で手で確かめ、確かめた日と結果を`specs/people/001-people-memo/checklists/manual-check.md`に残す。あわせて時間を測って同じファイルに書く：20行のCSVの初めての取り込み（5分以内）と2回目（2分以内。SC-001）、2回分を取り込んだあと12月の会の候補を出すまで（1分以内。SC-002）、同じ人の候補1組を見分けて選ぶ（10秒以内。SC-004）、スマートフォンで誘う候補から文のコピーまで（3回のタップ以内。SC-005）。作り手が実際の会で使い、SC-007の3つを満たしたかを同じファイルに書く。
-- [ ] T096 [P] スマートフォン（390px幅）で、取り込み（列の対応・候補のカード）・人の一覧・人のページ・誘う候補が横にスクロールしないこと、押すところが44px以上であること、下のバーで中身の最後が隠れないことを確かめる（spec Edge Cases「スマートフォンでの取り込み」）。
+- [x] T096 [P] スマートフォン（390px幅）で、取り込み（列の対応・候補のカード）・人の一覧・人のページ・誘う候補が横にスクロールしないこと、押すところが44px以上であること、下のバーで中身の最後が隠れないことを確かめる（spec Edge Cases「スマートフォンでの取り込み」）。→ `e2e/tests/people-phone-width.spec.ts` で自動で確かめる（2026-11-14。結果は `checklists/manual-check.md` の3）。
 
 ---
 

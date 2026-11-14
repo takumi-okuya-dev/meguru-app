@@ -6,7 +6,7 @@ import type { Env } from "../../../kernel/env";
 import { logger } from "../../../kernel/logger";
 import type { PlatformEvent } from "../../../platform";
 import { lockOwner } from "../access";
-import { peopleChoiceMappings, peopleColumnMappings, peopleEvents, peopleOwnerSettings, peoplePersons, peopleReceivedEvents } from "../schema";
+import { peopleChoiceMappings, peopleColumnMappings, peopleCustomFields, peopleEvents, peopleOwnerSettings, peoplePersons, peopleReceivedEvents, peopleTags } from "../schema";
 
 /**
  * 退会した人の人物メモのデータを消す（イベント・取り込み・回答・人・同意の記録・声かけ・設定・列と選択肢の対応・消した人の数と印）。
@@ -28,6 +28,9 @@ export async function onUserWithdrawn(event: PlatformEvent<"user.withdrawn">, en
     await tx.delete(peopleColumnMappings).where(eq(peopleColumnMappings.userId, userId));
     await tx.delete(peopleChoiceMappings).where(eq(peopleChoiceMappings.userId, userId));
     await tx.delete(peopleOwnerSettings).where(eq(peopleOwnerSettings.userId, userId));
+    // 002：作り手のタグと自由な項目（人に付いたもの・値・記録・リンクは、人と一緒に消えた）
+    await tx.delete(peopleTags).where(eq(peopleTags.userId, userId));
+    await tx.delete(peopleCustomFields).where(eq(peopleCustomFields.userId, userId));
     return { events: events.length, persons: persons.length };
   });
   // ログには出来事の番号と消した行の数だけ（名前を出さない。R18）

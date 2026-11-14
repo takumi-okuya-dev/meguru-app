@@ -14,6 +14,7 @@ import { withdrawForAccountDeletion } from "../tester-invites/tester-application
 import { trySyncThreadsUsage } from "./usage";
 import { recordActivity } from "../activity/activity-log";
 import { beforeAccountDeleted } from "../teams/team-service";
+import { deliverPromotionEvents, emitPromotionEventsDeletedForAccount } from "../strategy/promotion-events";
 
 // ---- 登録数の上限（specs/013 research.md R9。001 FR-015〜FR-017 を置き換えた） ----
 
@@ -270,6 +271,7 @@ export async function deleteAccount(
   accountId: string,
   confirmName: string,
 ) {
+  let eventIds: string[] = [];
   await withTransaction(env.DATABASE_URL, async (tx) => {
     await lockThreadsMember(tx, userId);
     const { account } = await authorizeAccount(
@@ -286,8 +288,11 @@ export async function deleteAccount(
     // テスター招待の申し込みを取り下げ、枠を使っていれば「外してよい」にする（specs/024 data-model.md 5）
     await withdrawForAccountDeletion(tx, account.id);
     await markAccountDeleted(tx, userId, new Date());
+    // イベントの情報のある宣伝内容は「消した」と集金管理などに伝える（宣伝内容は CASCADE で消える。specs/collect/001 contracts/events.md 2）
+    eventIds = await emitPromotionEventsDeletedForAccount(tx, account.id, new Date());
     await tx.delete(accounts).where(eq(accounts.id, account.id));
   });
+  await deliverPromotionEvents(env, eventIds);
   // 利用の数を共通へ伝え、次の請求から数を減らす（日割りの返金はしない。specs/013 FR-030）。失敗しても削除は成功のまま
   await trySyncThreadsUsage(createDb(env.DATABASE_URL), userId);
   await syncQuantity(env, userId);
@@ -300,12 +305,14 @@ export async function deleteAccount(
  * @param tx - トランザクション
  * @param threadsUserId - accounts.threads_user_id
  * @param now - 削除の時刻
+ * @param eventIds - 書いた出来事の番号を足す先（宣伝内容のイベントの情報を消した。呼んだ側がトランザクションのあとで届ける）
  * @returns 消したアカウントの持ち主の users.id
  */
 export async function deleteAccountsOfThreadsUser(
   tx: TxDb,
   threadsUserId: string,
   now: Date,
+  eventIds: string[] = [],
 ): Promise<string[]> {
   const owners = await tx
     .select({ userId: memberships.userId, accountId: accounts.id })
@@ -322,6 +329,8 @@ export async function deleteAccountsOfThreadsUser(
     // テスター招待の取り下げ（specs/024 data-model.md 5、PR #71 のCodexレビュー）
     await withdrawForAccountDeletion(tx, o.accountId);
     await markAccountDeleted(tx, o.userId, now);
+    // イベントの情報のある宣伝内容は「消した」と伝える（届けるのは呼んだ側。トランザクションのあと）
+    eventIds.push(...(await emitPromotionEventsDeletedForAccount(tx, o.accountId, now)));
   }
   await tx.delete(accounts).where(eq(accounts.threadsUserId, threadsUserId));
   // 持ち主（トランザクションのあとで、呼んだ側が利用の数を共通へ伝える。specs/meguru/029 research.md R6）

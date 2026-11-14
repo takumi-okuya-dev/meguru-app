@@ -10,12 +10,16 @@ specs/people/001-people-memo。運営者が開いた人だけが使える（`reg
 |---|---|---|
 | `events/`（イベント） | `events` | `event-service.ts`（作る・直す・一覧・数字・来た人・消す。参加者数は毎回数える）・`event-routes.ts` |
 | `imports/`（取り込み） | `imports`・`column_mappings`・`choice_mappings`・`responses`・`erased_responses` | `mapping.ts`（列と同意の選択肢の対応・覚える）・`classify.ts`（行の判定・二重の印）・`candidates.ts`（同じ人の候補）・`import-service.ts`（プレビューと書く）・`undo.ts`（取り消し・イベントを消すときの取り消し）・`import-routes.ts` |
-| `persons/`（人） | `persons`・`manual_attendances`・`consent_changes`・`erased_attendances` | `person-derive.ts`（今のLINE名と同意を決め直す）・`person-query.ts`（来た記録・最後に会った日・いちばん新しい回答の問い合わせの部品）・`person-list.ts`（人の一覧・選べる値）・`person-service.ts`（人のページ・直す・同意を直す）・`person-create.ts`（手で足す・会ったイベント）・`person-merge.ts`（まとめる・分ける）・`person-delete.ts`（人を消す。数と回答の印は残す）・`person-routes.ts` |
-| `outreach/`（誘う候補・声かけ） | `outreaches` | `candidate-service.ts`（誘う候補。目的の同意を問い合わせの条件に入れる）・`outreach-service.ts`（始める・進み具合・消す・自動で「来た」・まとめるときの移し替え）・`outreach-routes.ts` |
+| `persons/`（人） | `persons`・`manual_attendances`・`consent_changes`・`erased_attendances` | `person-derive.ts`（今のLINE名と同意を決め直す）・`person-query.ts`（来た記録・最後に会った日・いちばん新しい回答の問い合わせの部品）・`person-list.ts`（人の一覧・選べる値）・`person-service.ts`（人のページ・直す・同意を直す）・`person-create.ts`（手で足す・会ったイベント）・`person-merge.ts`（まとめる・分ける）・`person-delete.ts`（人を消す。数と回答の印は残す）・`person-export.ts`（CSV の書き出し。002）・`person-routes.ts` |
+| `outreach/`（誘う候補・声かけ） | `outreaches` | `candidate-service.ts`（誘う候補。目的の同意を問い合わせの条件に入れる）・`outreach-service.ts`（始める・進み具合・消す・自動で「来た」・まとめるときの移し替え）・`outreach-board.ts`（会ごとの声かけの一覧。002）・`outreach-routes.ts` |
+| `tags/`（タグ。002） | `tags`・`person_tags` | `tag-service.ts`・`tag-routes.ts` |
+| `contact/`（連絡の記録・次にやることを終える。002） | `contact_logs` | `contact-log-service.ts`・`contact-log-routes.ts` |
+| `fields/`（自由な項目・SNS のリンク。002） | `custom_fields`・`person_field_values`・`person_links` | `field-service.ts`・`field-routes.ts` |
+| `home/`（今日やること・過ぎたもの・近い誕生日。002） | — | `home-service.ts`・`home-routes.ts` |
 | `settings/`（設定と数字） | `owner_settings` | `settings-service.ts`（誘いの文の型・リピーターの目標・リピーターの数・次の自分の会）・`settings-routes.ts` |
 | `me/`（人物メモの「自分」） | — | `me-routes.ts`（`GET /api/people/me`） |
 | `inbox/`（出来事の受け取り） | `received_events` | `withdrawal.ts`（`user.withdrawn`の受け取り） |
-| （直下） | — | `index.ts`（入口）・`schema.ts`（13表。スキーマ`people`）・`register.ts`（`registerPeople()`）・`registry.ts`（アプリの番号）・`access.ts`（持ち主の確かめ・作り手のロック）・`usage.ts`（`reportUsage`。数はいつも0）・`routes.ts`（`/api/people`の関所と道筋） |
+| （直下） | — | `index.ts`（入口）・`schema.ts`（19表。スキーマ`people`）・`register.ts`（`registerPeople()`）・`registry.ts`（アプリの番号）・`access.ts`（持ち主の確かめ・作り手のロック）・`usage.ts`（`reportUsage`。数はいつも0）・`routes.ts`（`/api/people`の関所と道筋） |
 
 ## 2. 2作目の実例として（docs/app-separation.md 5 の Threads の表と同じ見方）
 
@@ -32,7 +36,7 @@ specs/people/001-people-memo。運営者が開いた人だけが使える（`reg
 
 | モジュール | 主な中身 |
 |---|---|
-| `apps/people/` | `index.ts`（`peopleApp`）・`routes.tsx`・`shell/`（`PeopleShell`：サイドバーの中身と、767px以下の下のバー）・`pages/`（誘う候補・取り込み・イベント・人の一覧・人のページ・人を足す・誘いの文と目標）・`components/`（取り込みの段・同じ人の候補のカード・`person/`（探す欄・絞り込み・人の行・人のページの各段・まとめる・消す・声かけの記録）・`candidates/`（誘う会の選択・目的の切り替え・候補の行と文のコピー・リピーターの段））・`lib/`（`api.ts`・`query-keys.ts`・`paths.ts`・`refresh.ts`・`read-csv-file.ts`） |
+| `apps/people/` | 002 で足したもの：`components/home/`（今日の声かけ）・`components/person/`（タグ・声かけの予定・連絡の記録・自由な項目・SNS のリンク・行の印・まとめた表示）・`components/settings/`（タグと自由な項目の設定）・`pages/OutreachBoardPage.tsx`（会ごとの声かけの一覧）。書き出しの保存は共通の `lib/save-file.ts`。`index.ts`（`peopleApp`）・`routes.tsx`・`shell/`（`PeopleShell`：サイドバーの中身と、767px以下の下のバー）・`pages/`（誘う候補・取り込み・イベント・人の一覧・人のページ・人を足す・誘いの文と目標）・`components/`（取り込みの段・同じ人の候補のカード・`person/`（探す欄・絞り込み・人の行・人のページの各段・まとめる・消す・声かけの記録）・`candidates/`（誘う会の選択・目的の切り替え・候補の行と文のコピー・リピーターの段））・`lib/`（`api.ts`・`query-keys.ts`・`paths.ts`・`refresh.ts`・`read-csv-file.ts`） |
 
 ## 4. 使い方（主催者向け）
 
@@ -69,6 +73,17 @@ specs/people/001-people-memo。運営者が開いた人だけが使える（`reg
 
 - 上の段に、リピーター（自分の会に2回以上来た人）の数と目標が出ます。目標は「誘いの文と目標」で決めます。
 - 自分の会のページに、参加者・初めて・前にも来た人の数が出ます。
+
+### 4-3b. 声かけリストとして使う（specs/people/002）
+
+- **今日の声かけ**：誘う候補の上に「過ぎたもの・今日やること・近い誕生日」が出ます。人のページで「次にやること」（日付と内容）を決めると、その日に出ます。終わったら「終わった」を押し、連絡の記録に残すかを選びます。
+- **タグ**：人のページで「常連」「登壇してくれそう」などのタグを付け、人の一覧と誘う候補で絞れます。名前を直す・消すのは「誘いの文と目標」の画面から。
+- **来てくれそう度**：人ごとに高・中・低を付け、誘う候補を来てくれそう度の順に並べたり、絞ったりできます。
+- **並べ方とまとめ方**：人の一覧で、最後に会った順・初めて会った順・更新順・あいうえお順・来てくれそう度順と、年月ごと・タグごと・あいうえおの行ごとのまとめ方を選べます。選んだものは覚えます（どの端末でも同じ）。
+- **連絡の記録**：いつ・何で（LINE・会場で・そのほか）・何を話したかを、人のページに日付つきで残せます。探す欄で記録の言葉からも探せます。
+- **会ごとの声かけの一覧**：自分の会のページの「声かけの一覧」で、興味を聞いた・参加リンクを送った・来た の人数と人が並びます。そこから進み具合を変えられます。
+- **自由な項目と SNS のリンク**：「好きなもの」などの項目を足して人ごとに値を入れられます。Instagram・X・Facebook のプロフィールの URL を入れると、開くボタンが出ます。
+- **書き出す**：人の一覧の「書き出す」で、今の絞り込みに合う人を CSV（Excel で開ける）で保存できます。消した人は入りません。
 
 ### 4-4. 仕事の相談先へのつなぎ
 
