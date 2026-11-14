@@ -58,7 +58,7 @@ export function PaypaySheet({
         <DialogDescription id="paypay-desc">{yen(amount)}を、このQRに送ってもらってください。</DialogDescription>
         <div className="flex justify-center">
           {!hasQr ? (
-            <p className="text-sm text-muted-foreground">QRの画像がまだありません（主催者の「PayPay・振込先の設定」で入れられます）。</p>
+            <p className="text-sm text-muted-foreground">QRの画像がまだありません（主催者の「このアプリの設定」で入れられます）。</p>
           ) : url ? (
             <img src={url} alt="PayPayの受け取り用QR" className="aspect-square w-full max-w-80 rounded-lg border object-contain" />
           ) : qr.isError ? (
@@ -109,7 +109,7 @@ export function TransferSheet({
         <DialogDescription id="transfer-desc">
           {yen(amount)}。振込の名義の前に、受付番号「{number}」を入れてもらってください（例：{number}ヤマダタロウ）。
         </DialogDescription>
-        <div className="rounded-lg border bg-muted/40 p-3 text-sm whitespace-pre-wrap">{bankText ?? "振込先の案内がまだありません（主催者の「PayPay・振込先の設定」で入れられます）。"}</div>
+        <div className="rounded-lg border bg-muted/40 p-3 text-sm whitespace-pre-wrap">{bankText ?? "振込先の案内がまだありません（主催者の「このアプリの設定」で入れられます）。"}</div>
         <div className="grid grid-cols-2 gap-2">
           <Button type="button" className="h-11" onClick={() => onChoose("transfer_today")}>
             今日振り込む

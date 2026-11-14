@@ -37,7 +37,7 @@ export function rosterPath(eventId: string): string {
 }
 
 /**
- * PayPay・振込先の設定の画面。
+ * このアプリの設定（PayPay・振込先）の画面。
  * @returns URL
  */
 export function collectSettingsPath(): string {

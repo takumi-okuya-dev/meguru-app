@@ -52,6 +52,7 @@ export function SelfCheckInPage() {
         }
       />
       <PageBody className="space-y-8">
+        {snap.data && <p className="truncate font-medium">{snap.data.event.name}</p>}
         <section className="space-y-3" aria-labelledby="self-link-title">
           <h2 id="self-link-title" className="font-medium">
             セルフ受付のQR

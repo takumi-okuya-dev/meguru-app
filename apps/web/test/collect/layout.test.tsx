@@ -1,5 +1,6 @@
 // 集金管理の骨格（specs/collect/001-event-day-collection contracts/ui-routes.md 1、tasks.md T018・T019）。
-// 利用の許可のない人には「使えない」の案内だけを出す。ある人には、サイドバー（イベント・作る・開いているイベントの名簿・設定）を出す。
+// 利用の許可のない人には「使えない」の案内だけを出す。ある人には、サイドバー（イベント・作る・振込待ち・まとめ・このアプリの設定）を出す。
+// イベントを開いているときは、そのイベントの画面を画面の下のタブバーで切り替える（サイドバーには出さない）。
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen, within } from "@testing-library/react";
 import { createMemoryRouter, RouterProvider } from "react-router";
@@ -67,10 +68,11 @@ describe("集金管理の骨格", () => {
     expect(within(nav).getByRole("link", { name: "まとめ" })).toHaveAttribute("href", "/collect/summaries");
     expect(within(nav).queryByRole("link", { name: "名簿" })).toBeNull();
     expect(within(nav).queryByRole("link", { name: /受付|締め/ })).toBeNull();
-    expect(screen.getByRole("link", { name: "PayPay・振込先の設定" })).toHaveAttribute("href", "/collect/settings");
+    expect(screen.getByRole("link", { name: "このアプリの設定" })).toHaveAttribute("href", "/collect/settings");
+    expect(screen.queryByRole("navigation", { name: "このイベント" })).toBeNull();
   });
 
-  it("イベントを開いているときは、そのイベントの名簿をサイドバーに出す", async () => {
+  it("イベントを開いているときは、画面の下のタブバーでそのイベントの画面を切り替え、サイドバーには出さない（「イベント」を選んだ状態）", async () => {
     mocks.me.mockResolvedValue(meWith(["collect"]));
     mocks.event.mockResolvedValue({
       id: "e1",
@@ -91,8 +93,20 @@ describe("集金管理の骨格", () => {
     });
     mocks.roster.mockResolvedValue({ people: [], version: 0 });
     renderAt("/collect/events/e1/roster");
-    const nav = await screen.findByRole("navigation", { name: "集金管理" });
-    expect(await within(nav).findByText("IT交流会")).toBeInTheDocument();
-    expect(within(nav).getByRole("link", { name: "名簿" })).toHaveAttribute("href", "/collect/events/e1/roster");
+    const tabs = await screen.findByRole("navigation", { name: "このイベント" });
+    const expected: [string, string][] = [
+      ["名簿", "/collect/events/e1/roster"],
+      ["受付", "/collect/events/e1/reception"],
+      ["受付の手伝い", "/collect/events/e1/helpers"],
+      ["セルフ受付", "/collect/events/e1/self"],
+      ["締め", "/collect/events/e1/closing"],
+      ["分配", "/collect/events/e1/sharing"],
+    ];
+    expect(within(tabs).getAllByRole("link").map((a) => [a.getAttribute("aria-label") ?? a.textContent, a.getAttribute("href")])).toEqual(expected);
+    expect(within(tabs).getByRole("link", { name: "名簿" })).toHaveAttribute("aria-current", "page");
+    const nav = screen.getByRole("navigation", { name: "集金管理" });
+    expect(within(nav).queryByRole("link", { name: "名簿" })).toBeNull();
+    expect(within(nav).queryByText("IT交流会")).toBeNull();
+    expect(within(nav).getByRole("link", { name: "イベント" })).toHaveClass("bg-accent");
   });
 });
