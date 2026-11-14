@@ -58,10 +58,10 @@
 
 ## Phase 8: 精算の手順（PR4。User Story 4）
 
-- [ ] T032 [US4] 共通の計算 packages/shared/src/apps/collect/settlement.ts（`settlementSteps`：運営メンバーでない人は主催者へ・同じ額の組を先に・差の大きい順。差の合計が0でなければ `mismatch`）と形・単体テスト packages/shared/test/apps/collect/settlement.test.ts
-- [ ] T033 [US4] マイグレーション apps/api/drizzle/NNNN_collect_settlement.sql と schema.ts（`settlement_transfers`：from_key・to_key 1〜80文字・名前 1〜40文字・amount 1〜99,999,999・`from_key <> to_key`。`settlement_holders`：helper_id 主キー・member_id null は「運営メンバーでない」）
-- [ ] T034 [US4] apps/api/src/apps/collect/sharing/settlement-service.ts：持っている額（PayPay・振込・主催者の現金・001 で精算した分・立て替えた人のない経費）・受け取る合計・手伝う人の対応（名前の形が同じ1人なら自動）・渡したもの（200件まで）
-- [ ] T035 [US4] 道筋 `GET …/settlement`・`PUT …/settlement/helpers/:helperId`・`POST`/`DELETE …/settlement/transfers` を sharing-routes.ts に（主催者だけ）
-- [ ] T036 [US4] 結合テスト apps/api/test/integration/collect/settlement.test.ts（spec の例：主催者 PayPay 15,000・井上 現金 9,000 → 全員の受け取りが合う）と routes.snapshot.txt
-- [ ] T037 [US4] 分配の画面に「精算の手順」の段 apps/web/src/apps/collect/components/sharing/SettlementSteps.tsx（持っている額・手伝う人の対応・手順と「渡した」・渡したもの（時刻・取り消す））
-- [ ] T038 [US4] Web のテスト（apps/web/test/collect/sharing.test.tsx に「精算の手順」を足す）
+- [x] T032 [US4] 共通の計算 packages/shared/src/apps/collect/settlement.ts（`settlementSteps`：運営メンバーでない人は主催者へ・同じ額の組を先に・差の大きい順。差の合計が0でなければ `mismatch`）と形・単体テスト packages/shared/test/apps/collect/settlement.test.ts
+- [x] T033 [US4] マイグレーション apps/api/drizzle/NNNN_collect_settlement.sql と schema.ts（`settlement_transfers`：from_key・to_key 1〜80文字・名前 1〜40文字・amount 1〜99,999,999・`from_key <> to_key`。`settlement_holders`：helper_id 主キー・member_id null は「運営メンバーでない」）
+- [x] T034 [US4] apps/api/src/apps/collect/sharing/settlement-service.ts：持っている額（PayPay・振込・主催者の現金・001 で精算した分・立て替えた人のない経費）・受け取る合計・手伝う人の対応（名前の形が同じ1人なら自動）・渡したもの（200件まで）
+- [x] T035 [US4] 道筋 `GET …/settlement`・`PUT …/settlement/helpers/:helperId`・`POST`/`DELETE …/settlement/transfers` を sharing-routes.ts に（主催者だけ）
+- [x] T036 [US4] 結合テスト apps/api/test/integration/collect/settlement.test.ts（spec の例：主催者 PayPay 15,000・井上 現金 9,000 → 全員の受け取りが合う）と routes.snapshot.txt
+- [x] T037 [US4] 分配の画面に「精算の手順」の段 apps/web/src/apps/collect/components/sharing/SettlementSteps.tsx（持っている額・手伝う人の対応・手順と「渡した」・渡したもの（時刻・取り消す））
+- [x] T038 [US4] Web のテスト（apps/web/test/collect/sharing.test.tsx に「精算の手順」を足す）
