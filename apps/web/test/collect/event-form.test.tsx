@@ -35,4 +35,19 @@ describe("イベントの入力欄", () => {
     await user.click(screen.getByRole("button", { name: "作る" }));
     expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ startsAt: "2026-11-20T10:00:00.000Z", endsAt: "2026-11-20T16:00:00.000Z" }));
   });
+
+  it("受付のしかたは、作るときは名簿なしが選ばれていて、名簿ありに変えられる（specs/collect/004 FR-001、tasks.md T033）", async () => {
+    const onSubmit = vi.fn();
+    const user = userEvent.setup();
+    render(<EventForm submitLabel="作る" pending={false} onSubmit={onSubmit} />);
+    expect(screen.getByRole("radio", { name: /名簿なし/ })).toHaveAttribute("aria-checked", "true");
+    await user.type(screen.getByLabelText("イベント名"), "IT交流会");
+    await user.type(screen.getByLabelText("開催日"), "2026-11-20");
+    await user.type(screen.getByLabelText("区分1の金額"), "3000");
+    await user.click(screen.getByRole("button", { name: "作る" }));
+    expect(onSubmit).toHaveBeenLastCalledWith(expect.objectContaining({ checkInMode: "rosterless" }));
+    await user.click(screen.getByRole("radio", { name: /名簿あり/ }));
+    await user.click(screen.getByRole("button", { name: "作る" }));
+    expect(onSubmit).toHaveBeenLastCalledWith(expect.objectContaining({ checkInMode: "roster" }));
+  });
 });

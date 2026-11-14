@@ -2,7 +2,7 @@
 // 手伝う人の画面で：受け取った・払い方を変えて受け取った・取り消す・名簿に入れる・名簿の人に当てる・断る・会場の共有の知らせ・数字。
 import type { LiveMessage, ReceptionRecord, ReceptionSnapshot } from "@meguru/shared";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { act, render, screen, within } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -12,6 +12,7 @@ const mocks = vi.hoisted(() => ({
   confirm: vi.fn(),
   resolveRequest: vi.fn(),
   undo: vi.fn(),
+  removeEntry: vi.fn(),
   live: { onMessage: null as null | ((m: LiveMessage) => void) },
 }));
 vi.mock("@/apps/collect/lib/helper-api", async (orig) => {
@@ -29,6 +30,7 @@ vi.mock("@/apps/collect/lib/helper-api", async (orig) => {
       liveTicket: vi.fn(),
       confirm: mocks.confirm,
       resolveRequest: mocks.resolveRequest,
+      removeEntry: mocks.removeEntry,
     },
   };
 });
@@ -105,7 +107,7 @@ function renderHelper() {
 
 beforeEach(() => {
   window.localStorage.clear();
-  for (const m of [mocks.reception, mocks.confirm, mocks.resolveRequest, mocks.undo]) m.mockReset();
+  for (const m of [mocks.reception, mocks.confirm, mocks.resolveRequest, mocks.undo, mocks.removeEntry]) m.mockReset();
   mocks.reception.mockResolvedValue(snapshot());
 });
 
@@ -178,5 +180,74 @@ describe("申し出", () => {
     );
     expect(await screen.findByRole("listitem", { name: "申し出 遅れた人" })).toBeInTheDocument();
     expect(screen.queryByRole("listitem", { name: "申し出 飛び入り 花子" })).toBeNull();
+  });
+});
+
+describe("名簿なし（specs/collect/004 User Story 2・4、tasks.md T030・T035）", () => {
+  /**
+   * 名簿なしのスナップショット（区分2つ。No.1 は区分が未定の現金の確かめ待ち。No.2・No.3 は同じ名前で記録なし）。
+   * @returns スナップショット
+   */
+  function rosterless(): ReceptionSnapshot {
+    const base = snapshot();
+    const p = (id: string, number: number, name: string) => ({
+      id,
+      number,
+      name,
+      kana: null,
+      media: "peatix" as const,
+      priceTierId: "t2",
+      tierUndecided: true,
+      sameName: false,
+      selfEntered: true,
+    });
+    return {
+      ...base,
+      event: {
+        ...base.event,
+        checkInMode: "rosterless",
+        tiers: [
+          { id: "t1", name: "通常", amount: 3000, position: 0 },
+          { id: "t2", name: "早割", amount: 2500, position: 1 },
+        ],
+      },
+      people: [
+        { person: p("p1", 1, "松本 れい"), record: self("p1", "cash", { priceTierId: "t2", amount: 2500 }) },
+        { person: p("p2", 2, "佐藤 けい"), record: null },
+        { person: p("p3", 3, "佐藤　ケイ"), record: null },
+      ],
+      selfRequests: [],
+    };
+  }
+
+  it("区分が未定の確かめ待ちは「区分を確かめる」。「受け取った」で区分を選ぶまで確かめない", async () => {
+    mocks.reception.mockResolvedValue(rosterless());
+    mocks.confirm.mockResolvedValue({ record: self("p1", "cash", { receiverKind: "helper", receiverHelperId: "h1", paymentStatus: "paid", priceTierId: "t1", amount: 3000 }), version: 6 });
+    const user = userEvent.setup();
+    renderHelper();
+    const row = await screen.findByRole("listitem", { name: "No.1 松本 れい（確かめ待ち）" });
+    expect(row).toHaveTextContent("区分を確かめる");
+    await user.click(within(row).getByRole("button", { name: "受け取った" }));
+    expect(mocks.confirm).not.toHaveBeenCalled();
+    const group = await screen.findByRole("group", { name: "料金の区分" });
+    await user.click(within(group).getByRole("button", { name: /通常/ }));
+    expect(mocks.confirm).toHaveBeenCalledWith(TOKEN, "cd_saved", "p1", { priceTierId: "t1" });
+  });
+
+  it("同じ名前の人には知らせが出る。記録のない名簿なしの人は「名簿から外す」で外せる", async () => {
+    mocks.reception.mockResolvedValue(rosterless());
+    mocks.removeEntry.mockResolvedValue({ version: 6 });
+    const user = userEvent.setup();
+    renderHelper();
+    const list = await screen.findByRole("list", { name: "受付の名簿" });
+    const second = within(list).getByRole("listitem", { name: "No.2 佐藤 けい" });
+    expect(second).toHaveTextContent("同じ名前の人がいます");
+    expect(within(list).getByRole("listitem", { name: "No.3 佐藤　ケイ" })).toHaveTextContent("同じ名前の人がいます");
+    expect(within(list).getByRole("listitem", { name: /松本 れい/ })).not.toHaveTextContent("同じ名前の人がいます");
+    await user.click(within(second).getByRole("button", { name: "名簿から外す" }));
+    await user.click(await screen.findByRole("button", { name: "名簿から外す" }));
+    expect(mocks.removeEntry).toHaveBeenCalledWith(TOKEN, "cd_saved", "p2");
+    await waitFor(() => expect(screen.queryByRole("listitem", { name: "No.2 佐藤 けい" })).toBeNull());
+    expect(screen.getByRole("listitem", { name: "No.3 佐藤　ケイ" })).not.toHaveTextContent("同じ名前の人がいます");
   });
 });

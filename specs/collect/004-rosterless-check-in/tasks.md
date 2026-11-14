@@ -109,39 +109,39 @@
 ### PR1 の仕上げ
 
 - [x] T023 `docs/apps/collect.md` に、表の列（`check_in_mode`・`tier_undecided`・`self_entered_at`・`client_request_id`）と `entry-service.ts` を足す。
-- [ ] T024 PR1 の確かめ：API の全テスト・共通のテスト・型チェック・eslint を通し、セルフレビューして PR を出す（`run-ci` を付ける）。
+- [x] T024 PR1 の確かめ：API の全テスト・共通のテスト・型チェック・eslint を通し、セルフレビューして PR を出す（`run-ci` を付ける）。
 
 ## Phase 7：画面（PR2）
 
 ### User Story 1
 
-- [ ] T025 [P] [US1] `apps/web/src/apps/collect/lib/self-api.ts` に `entry(token, input)` を足す。
-- [ ] T026 [US1] `apps/web/src/apps/collect/pages/SelfCheckInPublicPage.tsx`：`checkInMode === "rosterless"` なら、探す欄の代わりに入れる欄（名前・ふりがな（任意）・「どこで申し込みましたか」（`info.media` をボタンで。必須）・紹介してくれた人（任意。候補は出さない））。送ったら 002 の「名簿に入りました」→ 払い方の選択へ。`tierUndecided` の人には、払い方の選択と案内に区分ごとの金額（`info.tiers`）と「受付の人が区分を確かめます」を出す。上限の 429 は「受付が混んでいます。受付の人に声をかけてください」。外されたとき（`request.person` が null）は「受付の人に声をかけてください」。
-- [ ] T027 [P] [US1] Web のテスト `apps/web/test/collect/self-check-in.test.tsx` に足す：名簿なしの入れる画面・媒体が必須・区分ごとの金額・送ったあと払い方の選択・429 の文。
+- [x] T025 [P] [US1] `apps/web/src/apps/collect/lib/self-api.ts` に `entry(token, input)` を足す。
+- [x] T026 [US1] `apps/web/src/apps/collect/pages/SelfCheckInPublicPage.tsx`：`checkInMode === "rosterless"` なら、探す欄の代わりに入れる欄（名前・ふりがな（任意）・「どこで申し込みましたか」（`info.media` をボタンで。必須）・紹介してくれた人（任意。候補は出さない））。送ったら 002 の「名簿に入りました」→ 払い方の選択へ。`tierUndecided` の人には、払い方の選択と案内に区分ごとの金額（`info.tiers`）と「受付の人が区分を確かめます」を出す。上限の 429 は「受付が混んでいます。受付の人に声をかけてください」。外されたとき（`request.person` が null）は「受付の人に声をかけてください」。
+- [x] T027 [P] [US1] Web のテスト `apps/web/test/collect/self-check-in.test.tsx` に足す：名簿なしの入れる画面・媒体が必須・区分ごとの金額・送ったあと払い方の選択・429 の文。
 
 ### User Story 2
 
-- [ ] T028 [US2] `apps/web/src/apps/collect/components/reception/SelfPanel.tsx`（確かめ待ち）で、`tierUndecided` の人は「区分を確かめる」を出し、「受け取った」で区分を選ぶ段を出してから確かめる（区分1つなら今のまま1回）。`TIER_REQUIRED` の文を足す。
-- [ ] T029 [US2] `apps/web/src/apps/collect/pages/TransfersPage.tsx` で、`tierUndecided` の人の「入金を確かめた」で区分を選ぶ。
-- [ ] T030 [P] [US2] Web のテスト `apps/web/test/collect/self-confirm.test.tsx`・`transfers.test.tsx` に足す（区分を選ぶ段・選ぶまで確かめない・区分1つは1回）。
+- [x] T028 [US2] `apps/web/src/apps/collect/components/reception/SelfPanel.tsx`（確かめ待ち）で、`tierUndecided` の人は「区分を確かめる」を出し、「受け取った」で区分を選ぶ段を出してから確かめる（区分1つなら今のまま1回）。`TIER_REQUIRED` の文を足す。
+- [x] T029 [US2] `apps/web/src/apps/collect/pages/TransfersPage.tsx` で、`tierUndecided` の人の「入金を確かめた」で区分を選ぶ。
+- [x] T030 [P] [US2] Web のテスト `apps/web/test/collect/self-confirm.test.tsx`・`transfers.test.tsx` に足す（区分を選ぶ段・選ぶまで確かめない・区分1つは1回）。
 
 ### User Story 3
 
-- [ ] T031 [US3] `apps/web/src/apps/collect/components/EventForm.tsx` に受付のしかた（名簿なし・名簿あり）を足す。作る画面の初めの値は `NEW_EVENT_CHECK_IN_MODE`（Threads のイベントから選んで作るときも）。`apps/web/src/apps/collect/pages/EventNewPage.tsx` で、名簿なしで作ったらセルフ受付の画面（`selfCheckInPath`）へ移る。
-- [ ] T032 [US3] `apps/web/src/apps/collect/pages/RosterPage.tsx` で、名簿なしのイベントに「参加者がセルフ受付で入れると、ここに増えます」、未定の人に「区分を確かめる」を出す。`apps/web/src/apps/collect/pages/ClosingPage.tsx` で、名簿なしでは来なかった人の段の代わりに「受付の記録がない人 N人」。
-- [ ] T033 [P] [US3] Web のテスト `apps/web/test/collect/event-form.test.tsx`・`roster.test.tsx`・`closing.test.tsx` に足す（既定が名簿なし・作ったあとセルフ受付へ・締めの段）。
+- [x] T031 [US3] `apps/web/src/apps/collect/components/EventForm.tsx` に受付のしかた（名簿なし・名簿あり）を足す。作る画面の初めの値は `NEW_EVENT_CHECK_IN_MODE`（Threads のイベントから選んで作るときも）。`apps/web/src/apps/collect/pages/EventNewPage.tsx` で、名簿なしで作ったらセルフ受付の画面（`selfCheckInPath`）へ移る。
+- [x] T032 [US3] `apps/web/src/apps/collect/pages/RosterPage.tsx` で、名簿なしのイベントに「参加者がセルフ受付で入れると、ここに増えます」、未定の人に「区分を確かめる」を出す。`apps/web/src/apps/collect/pages/ClosingPage.tsx` で、名簿なしでは来なかった人の段の代わりに「受付の記録がない人 N人」。
+- [x] T033 [P] [US3] Web のテスト `apps/web/test/collect/event-form.test.tsx`・`roster.test.tsx`・`closing.test.tsx` に足す（既定が名簿なし・作ったあとセルフ受付へ・締めの段）。
 
 ### User Story 4
 
-- [ ] T034 [US4] `apps/web/src/apps/collect/components/reception/ReceptionRow.tsx` で、`sameName` の行に「同じ名前の人がいます」、`selfEntered` で記録のない行に「名簿から外す」（確かめの段を挟む）。主催者と手伝う人の両方（`apps/web/src/apps/collect/lib/api.ts`・`helper-api.ts` に `removeEntry`）。
-- [ ] T035 [P] [US4] Web のテスト `apps/web/test/collect/reception.test.tsx`・`helper-reception.test.tsx` に足す（同じ名前の知らせ・名簿から外す）。
+- [x] T034 [US4] `apps/web/src/apps/collect/components/reception/ReceptionRow.tsx` で、`sameName` の行に「同じ名前の人がいます」、`selfEntered` で記録のない行に「名簿から外す」（確かめの段を挟む）。主催者と手伝う人の両方（`apps/web/src/apps/collect/lib/api.ts`・`helper-api.ts` に `removeEntry`）。
+- [x] T035 [P] [US4] Web のテスト `apps/web/test/collect/reception.test.tsx`・`helper-reception.test.tsx` に足す（同じ名前の知らせ・名簿から外す）。
 
 ## Phase 8：Polish（PR2）
 
-- [ ] T036 E2E `e2e/tests/collect-rosterless.spec.ts`：主催者が名簿なしで作る（区分2つ）→ 参加者（390px・ログインなし）が名前と媒体を入れて現金を選ぶ → 主催者の受付の画面に5秒以内に確かめ待ち → 区分を選んで受け取る → 参加者の画面が「受付が済みました」。参加者の画面がはみ出さない。
-- [ ] T037 [P] `docs/apps/collect-guide.md` に「名簿なしで受付する」を書く（受付のしかたの選び方・参加者が入れること・区分を確かめる・同じ名前と外す・締めの違い）。
-- [ ] T038 [P] `docs/apps/collect.md`・`specs/collect/001-event-day-collection/contracts/ui-routes.md` に画面の変更を足す。
-- [ ] T039 PR2 の確かめ：Web の全テスト・E2E・型チェック・eslint を通し、390px の画面写真で見え方を確かめ、セルフレビューして PR を出す（CI は流さない）。
+- [x] T036 E2E `e2e/tests/collect-rosterless.spec.ts`：主催者が名簿なしで作る（区分2つ）→ 参加者（390px・ログインなし）が名前と媒体を入れて現金を選ぶ → 主催者の受付の画面に5秒以内に確かめ待ち → 区分を選んで受け取る → 参加者の画面が「受付が済みました」。参加者の画面がはみ出さない。
+- [x] T037 [P] `docs/apps/collect-guide.md` に「名簿なしで受付する」を書く（受付のしかたの選び方・参加者が入れること・区分を確かめる・同じ名前と外す・締めの違い）。
+- [x] T038 [P] `docs/apps/collect.md`・`specs/collect/001-event-day-collection/contracts/ui-routes.md` に画面の変更を足す。
+- [x] T039 PR2 の確かめ：Web の全テスト・E2E・型チェック・eslint を通し、390px の画面写真で見え方を確かめ、セルフレビューして PR を出す（CI は流さない）。
 - [ ] T040 マージのあと、ステージングで [quickstart.md](./quickstart.md) の1〜6を確かめる。
 
 ## Dependencies & Execution Order
