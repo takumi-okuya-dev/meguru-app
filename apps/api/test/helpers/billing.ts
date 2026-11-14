@@ -1,6 +1,6 @@
 // 決済のテストの部品（specs/013-billing tasks.md）：決済ONの環境、偽のStripeの操作、署名つきのWebhook
-import type { Env } from "../../src/env";
-import { signWebhook } from "../../src/lib/stripe-client";
+import type { Env } from "../../src/kernel/env";
+import { signWebhook } from "../../src/adapters/stripe/stripe-client";
 import { TEST_STRIPE_WEBHOOK_SECRET } from "../env";
 import { call, testEnv, type TestApp } from "./app";
 
@@ -36,7 +36,7 @@ export type FakeStripeSubscription = {
   created: number;
   cancel_at_period_end: boolean;
   trial_end: number | null;
-  items: { data: { id: string; quantity: number; current_period_end: number }[] };
+  items: { data: { id: string; quantity: number; current_period_end: number; price: { id: string } }[] };
 };
 export type FakeStripeRequest = { method: string; path: string; params: Record<string, string> };
 
@@ -49,7 +49,10 @@ export const fakeStripe = {
   subscriptions: async () => ((await control("subscriptions")) as { subscriptions: FakeStripeSubscription[] }).subscriptions,
   fail: (prefix: string, opts: { method?: string; times?: number; status?: number } = {}) =>
     control("fail", { body: { prefix, ...opts } }),
-  createSubscription: async (customer: string, opts: { quantity?: number; status?: string; trialEnd?: number | null } = {}) =>
+  createSubscription: async (
+    customer: string,
+    opts: { quantity?: number; status?: string; trialEnd?: number | null; priceId?: string } = {},
+  ) =>
     (await control("subscriptions", { body: { customer, ...opts } })) as FakeStripeSubscription,
   setStatus: async (
     target: { id?: string; customer?: string },

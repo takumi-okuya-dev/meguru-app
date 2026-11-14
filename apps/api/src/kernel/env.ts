@@ -1,0 +1,56 @@
+/** Workers のバインディング（環境変数・Secret）。一覧と意味は contracts/api.md「環境変数・Secret」。 */
+export interface Env {
+  /** どの環境で動いているか（specs/015-deploy-environments contracts/environments.md 2）。手元は development */
+  APP_ENV: "production" | "staging" | "development";
+  CLERK_SECRET_KEY: string;
+  CLERK_PUBLISHABLE_KEY: string;
+  THREADS_APP_ID: string;
+  THREADS_APP_SECRET: string;
+  THREADS_REDIRECT_URI: string;
+  THREADS_AUTH_BASE_URL: string;
+  THREADS_GRAPH_BASE_URL: string;
+  TOKEN_ENCRYPTION_KEYS: string;
+  TOKEN_ENCRYPTION_KEY_VERSION: string;
+  IDENTIFIER_HASH_KEY: string;
+  DATABASE_URL: string;
+  WEB_ORIGIN: string;
+  /** 自動投稿の関所（specs/005-auto-post research.md R3） */
+  AUTOPOST_KV: KVNamespace;
+  /** Threads連携の公開範囲。未設定は testers（specs/002-strategy-profile research.md R15） */
+  THREADS_ACCESS_MODE?: "testers" | "public";
+  /**
+   * つなぐ方法のうち、どれを出すか（既定は両方）。
+   * `app` はこのアプリのMetaアプリで許可する方法（OAuth）、`token` は利用者が自分の
+   * Metaアプリで作ったトークンを貼る方法。App Review を通すまでは `token` だけにして、
+   * 通らなかった場合も `token` で運用を続けられるようにするための切り替え。
+   */
+  THREADS_CONNECT_METHODS?: string;
+  /** 決済のON/OFF（"true" か "false"。必須。specs/013-billing research.md R11） */
+  BILLING_ENABLED: string;
+  /** テスト用のグループのON/OFF（"true" か "false"。必須。specs/016-test-groups research.md R1） */
+  TEST_GROUPS_ENABLED: string;
+  /**
+   * 運営者のClerkのユーザーID（カンマ区切り。Secretで入れる。specs/016 research.md R1）。機能の設定の画面はいつも使え、
+   * テスト版に入れる・料金なしは TEST_GROUPS_ENABLED がONのときだけ（specs/019 research.md R5）
+   */
+  OPERATOR_CLERK_USER_IDS?: string;
+  /** Stripeの秘密の鍵（決済ONのとき必須。本番 sk_live_、ステージング・手元 sk_test_） */
+  STRIPE_SECRET_KEY?: string;
+  /** Webhookの署名の秘密（決済ONのとき必須。whsec_） */
+  STRIPE_WEBHOOK_SECRET?: string;
+  /** 段階制の料金のID（決済ONのとき必須。price_。specs/013 research.md R3） */
+  STRIPE_PRICE_ID?: string;
+  /** StripeのAPIの接続先。既定 https://api.stripe.com（テストと手元は偽のStripe） */
+  STRIPE_API_BASE_URL?: string;
+  /** カスタマーポータルの設定（bpc_。なければStripeの既定の設定） */
+  STRIPE_PORTAL_CONFIGURATION_ID?: string;
+  /** 適格請求書の登録をしたときの10%（内税）の税率（txr_） */
+  STRIPE_TAX_RATE_ID?: string;
+  /** 集金管理の会場の共有（Durable Object CollectLiveRoom。specs/collect/001 research.md R4） */
+  COLLECT_LIVE: DurableObjectNamespace;
+  /**
+   * 会場の共有の入場券に署名する秘密（Secretで入れる。R5）。入れていない間は、会場の共有だけが使えない
+   * （入場券の道筋が 503 CONFIG_ERROR。画面は15秒ごとの読み直しで動く）。ほかの道筋は止めない
+   */
+  COLLECT_LIVE_SECRET?: string;
+}

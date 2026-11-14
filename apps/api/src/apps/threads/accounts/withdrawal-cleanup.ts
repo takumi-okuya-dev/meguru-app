@@ -1,0 +1,136 @@
+// 退会したときの、Threadsの片づけ（specs/013-billing research.md R10、specs/011 FR-046、specs/024 research.md R15）。
+// 029 で共通の退会の処理から移した（specs/meguru/029-threads-pattern1 research.md R8）。出来事（user.withdrawn）の受け取りから、
+// Threadsのトランザクションの中で呼ぶ（events/received-events.ts）。共通は、この片づけが届いたあとで users の行を消す。
+import { and, asc, eq, inArray, ne, sql } from "drizzle-orm";
+import type { PgColumn, PgTable } from "drizzle-orm/pg-core";
+import type { TxDb } from "../../../kernel/db/client";
+import { lockThreadsUser } from "../../../kernel/db/locks";
+import { WITHDRAWN_ACTOR_NAME } from "../../../platform";
+import {
+  accounts,
+  activityLogs,
+  analysisSettings,
+  mediaDefaults,
+  memberships,
+  mentionSettings,
+  oauthStates,
+  postClassifications,
+  postDrafts,
+  postingSchedules,
+  postMentions,
+  postMetrics,
+  promotionListings,
+  promotions,
+  referencePosts,
+  researchKeywords,
+  strategyDesigns,
+  teamAccounts,
+  teamMembers,
+  teams,
+  threadsDeletionRequests,
+  threadsUserStates,
+  tokenCheckFailures,
+} from "../schema";
+import { beforeAccountDeleted, chooseSuccessor } from "../teams/team-service";
+import { purgeForWithdrawal } from "../tester-invites/tester-application-service";
+import { lockThreadsMember } from "../access/locks";
+
+/**
+ * 作った人・直した人の欄（表示のための記録）。退会したら空にする。以前は users への外部キーの set null が空にしていたが、
+ * 029 の PR3 で外部キーを外したので、退会の出来事のときに Threads が空にする（specs/meguru/029-threads-pattern1 research.md R3）。
+ * 利用者の番号の列を足したら、ここか退会の片づけのどこかに入れる（入れ忘れはテストが知らせる。withdrawal-events.test.ts）。
+ */
+export const EDITOR_COLUMNS: { table: PgTable; columns: PgColumn[] }[] = [
+  { table: accounts, columns: [accounts.coreRulesUpdatedByUserId, accounts.promotionRatioUpdatedByUserId, accounts.promptPostCountUpdatedByUserId] },
+  { table: teamAccounts, columns: [teamAccounts.addedByUserId] },
+  { table: strategyDesigns, columns: [strategyDesigns.updatedByUserId] },
+  { table: promotions, columns: [promotions.updatedByUserId] },
+  { table: referencePosts, columns: [referencePosts.updatedByUserId] },
+  { table: researchKeywords, columns: [researchKeywords.updatedByUserId] },
+  { table: postDrafts, columns: [postDrafts.createdByUserId, postDrafts.editedByUserId] },
+  { table: postingSchedules, columns: [postingSchedules.updatedByUserId] },
+  { table: postMetrics, columns: [postMetrics.feedbackUpdatedByUserId] },
+  { table: promotionListings, columns: [promotionListings.updatedByUserId] },
+  { table: mediaDefaults, columns: [mediaDefaults.updatedByUserId] },
+  { table: analysisSettings, columns: [analysisSettings.updatedByUserId] },
+  { table: postClassifications, columns: [postClassifications.updatedByUserId] },
+  { table: mentionSettings, columns: [mentionSettings.updatedByUserId] },
+  { table: postMentions, columns: [postMentions.createdByUserId] },
+];
+
+/**
+ * 1つの表の、退会する人の番号が入った欄を空にする（表ごとに1回だけ読み通す。列の名前は列の定義から取る）。
+ * @param tx - トランザクション
+ * @param table - 表
+ * @param columns - 空にする列
+ * @param userId - 退会する人の users.id
+ */
+async function clearEditorColumns(tx: TxDb, table: PgTable, columns: PgColumn[], userId: string): Promise<void> {
+  const sets = columns.map((c) => sql`${sql.identifier(c.name)} = CASE WHEN ${sql.identifier(c.name)} = ${userId} THEN NULL ELSE ${sql.identifier(c.name)} END`);
+  const where = columns.map((c) => sql`${sql.identifier(c.name)} = ${userId}`);
+  await tx.execute(sql`UPDATE ${table} SET ${sql.join(sets, sql`, `)} WHERE ${sql.join(where, sql` OR `)}`);
+}
+
+/**
+ * 退会する人のThreadsのデータを片づける。持ち主のアカウントを消し（アカウントの削除と同じ。001 FR-022）、チームは抜ける
+ * （管理者なら引き継ぐか、チームを消す。011 FR-046）。ほかの人のアカウントの記録の名前は「退会した人」にする。
+ * @param tx - トランザクション
+ * @param userId - 退会する人の users.id
+ * @param now - 今の時刻
+ */
+export async function cleanupForWithdrawal(tx: TxDb, userId: string, now: Date = new Date()): Promise<void> {
+  // ロックは、ほかの処理と同じ順番「Threadsユーザー → 利用者」で取る（specs/010 research.md R6）。Metaのデータ削除は
+  // Threadsユーザーのロック → 削除の求めの行 → 利用者のロックの順なので、先に利用者のロックを取ると互いに待ち合う（PR #97 のCodexレビュー）
+  const threadsUsers = await tx
+    .selectDistinct({ threadsUserId: accounts.threadsUserId })
+    .from(accounts)
+    .innerJoin(memberships, and(eq(memberships.accountId, accounts.id), eq(memberships.role, "owner")))
+    .where(eq(memberships.userId, userId));
+  for (const t of threadsUsers.flatMap((r) => (r.threadsUserId ? [r.threadsUserId] : [])).sort()) await lockThreadsUser(tx, t);
+  // その人のアカウントの作成・削除・接続の確定・最後に開いたアカウントの記録と直列にする（PR #97 のセルフレビュー）
+  await lockThreadsMember(tx, userId);
+  // 招待の申し込みを片づける（枠を使っていない行は消し、使っている行はユーザー名だけを残す。specs/024 research.md R15）
+  await purgeForWithdrawal(tx, userId);
+  const owned = await tx
+    .select({ id: accounts.id, threadsUserId: accounts.threadsUserId })
+    .from(accounts)
+    .innerJoin(memberships, and(eq(memberships.accountId, accounts.id), eq(memberships.role, "owner")))
+    .where(eq(memberships.userId, userId))
+    .orderBy(asc(accounts.id));
+  for (const a of owned) {
+    // チームから外す（テスター招待は上で片づけ済み）
+    await beforeAccountDeleted(tx, a.id, userId);
+    await tx.delete(accounts).where(eq(accounts.id, a.id));
+  }
+  // Threads側からのデータ削除の求めが処理中なら、退会で消したので完了にする（spec Edge Cases）
+  const threadsIds = owned.flatMap((a) => (a.threadsUserId ? [a.threadsUserId] : []));
+  if (threadsIds.length > 0) {
+    await tx
+      .update(threadsDeletionRequests)
+      .set({ status: "completed", completedAt: now, threadsUserId: null })
+      .where(and(inArray(threadsDeletionRequests.threadsUserId, threadsIds), inArray(threadsDeletionRequests.status, ["pending", "failed"])));
+  }
+  // まだ管理者のチームがあれば引き継ぐ（teams.admin_user_id は ON DELETE RESTRICT）
+  const adminOf = await tx.select({ id: teams.id }).from(teams).where(eq(teams.adminUserId, userId)).for("update");
+  for (const t of adminOf) {
+    const next = await chooseSuccessor(tx, t.id, userId, { lock: true });
+    if (!next) {
+      await tx.delete(teams).where(eq(teams.id, t.id));
+      continue;
+    }
+    await tx.update(teamMembers).set({ role: "member" }).where(and(eq(teamMembers.teamId, t.id), eq(teamMembers.userId, userId)));
+    await tx.update(teamMembers).set({ role: "admin" }).where(and(eq(teamMembers.teamId, t.id), eq(teamMembers.userId, next.userId)));
+    await tx.update(teams).set({ adminUserId: next.userId, updatedAt: now }).where(eq(teams.id, t.id));
+  }
+  // ほかの人のアカウントの担当と、チームの人から外す（以前は users の行を消すと外部キーで消えた。029 の PR3 で外部キーを外した）
+  await tx.delete(memberships).where(and(eq(memberships.userId, userId), ne(memberships.role, "owner")));
+  await tx.delete(teamMembers).where(eq(teamMembers.userId, userId));
+  // 利用者ごとの状態（最後に開いたアカウント。specs/meguru/029 tasks.md T071）と、その人の接続の途中の記録
+  // （以前は users の外部キーの cascade が消していた。029 の PR3 で外部キーを外したので自分で消す。research.md R3）
+  await tx.delete(threadsUserStates).where(eq(threadsUserStates.userId, userId));
+  await tx.delete(tokenCheckFailures).where(eq(tokenCheckFailures.userId, userId));
+  await tx.delete(oauthStates).where(eq(oauthStates.userId, userId));
+  // ほかの人のアカウントの操作の記録は残し、名前を「退会した人」にして、利用者の番号を空にする（FR-053）
+  await tx.update(activityLogs).set({ actorName: WITHDRAWN_ACTOR_NAME, actorUserId: null }).where(eq(activityLogs.actorUserId, userId));
+  for (const { table, columns } of EDITOR_COLUMNS) await clearEditorColumns(tx, table, columns, userId);
+}

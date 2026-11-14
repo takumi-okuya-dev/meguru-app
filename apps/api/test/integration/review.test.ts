@@ -17,7 +17,7 @@ beforeEach(async () => {
   await resetDb();
 });
 
-const base = (accountId: string) => `/api/accounts/${accountId}`;
+const base = (accountId: string) => `/api/threads/accounts/${accountId}`;
 
 type PostDraft = {
   id: string;
@@ -61,7 +61,7 @@ const items = (...ds: PostDraft[]) => ds.map((d) => ({ id: d.id, expectedVersion
 
 async function addNgWord(accountId: string, word: string, normalized = word) {
   const sql = neon(testEnv.DATABASE_URL);
-  await sql`INSERT INTO ng_words (account_id, word, normalized) VALUES (${accountId}, ${word}, ${normalized})`;
+  await sql`INSERT INTO threads.ng_words (account_id, word, normalized) VALUES (${accountId}, ${word}, ${normalized})`;
 }
 
 /** 状態の下書きを n 件、SQL で直接作る（49件ずつのまとまり） */
@@ -70,15 +70,15 @@ async function seed(accountId: string, n: number, status: "needs_review" | "appr
   for (let done = 0; done < n; done += 49) {
     const size = Math.min(49, n - done);
     const [b] = (await sql`
-      INSERT INTO draft_batches (account_id, client_request_id, draft_count, delimiter_found)
+      INSERT INTO threads.draft_batches (account_id, client_request_id, draft_count, delimiter_found)
       VALUES (${accountId}, gen_random_uuid(), ${size}, true) RETURNING id`) as [{ id: string }];
     if (status === "approved") {
       await sql`
-        INSERT INTO post_drafts (account_id, batch_id, position, body, status, reviewed_at)
+        INSERT INTO threads.post_drafts (account_id, batch_id, position, body, status, reviewed_at)
         SELECT ${accountId}, ${b.id}, g, 'seed ' || g, 'approved', now() FROM generate_series(0, ${size - 1}) AS g`;
     } else {
       await sql`
-        INSERT INTO post_drafts (account_id, batch_id, position, body)
+        INSERT INTO threads.post_drafts (account_id, batch_id, position, body)
         SELECT ${accountId}, ${b.id}, g, 'seed ' || g FROM generate_series(0, ${size - 1}) AS g`;
     }
   }
@@ -325,18 +325,18 @@ describe("理由のない却下と入力の検証（FR-003、Constitution原則I
     const [a] = await register(accountId, ["A"]);
     const sql = neon(testEnv.DATABASE_URL);
     await expect(
-      sql`UPDATE post_drafts SET status = 'rejected', reviewed_at = now() WHERE id = ${a!.id}`,
+      sql`UPDATE threads.post_drafts SET status = 'rejected', reviewed_at = now() WHERE id = ${a!.id}`,
     ).rejects.toThrow(/post_drafts_review_state/);
     await expect(
-      sql`UPDATE post_drafts SET status = 'rejected', reviewed_at = now(), reject_reasons = '{}' WHERE id = ${a!.id}`,
+      sql`UPDATE threads.post_drafts SET status = 'rejected', reviewed_at = now(), reject_reasons = '{}' WHERE id = ${a!.id}`,
     ).rejects.toThrow(/post_drafts_(review_state|reject_reasons_valid)/);
     await expect(
-      sql`UPDATE post_drafts SET status = 'approved' WHERE id = ${a!.id}`,
+      sql`UPDATE threads.post_drafts SET status = 'approved' WHERE id = ${a!.id}`,
     ).rejects.toThrow(/post_drafts_review_state/);
     // 実質空の理由（空文字・NULLの要素・知らないコード）も入らない（PR #5 のCodexレビュー）
     for (const reasons of [[""], [null], ["unknown"], ["tone", null]]) {
       await expect(
-        sql`UPDATE post_drafts SET status = 'rejected', reviewed_at = now(), reject_reasons = ${reasons} WHERE id = ${a!.id}`,
+        sql`UPDATE threads.post_drafts SET status = 'rejected', reviewed_at = now(), reject_reasons = ${reasons} WHERE id = ${a!.id}`,
       ).rejects.toThrow(/post_drafts_reject_reasons_valid/);
     }
   });
@@ -430,7 +430,7 @@ describe("005：投稿に失敗した下書きへの操作", () => {
   async function failed(accountId: string) {
     const [d] = await register(accountId, ["失敗した本文"]);
     const sql = neon(testEnv.DATABASE_URL);
-    await sql`UPDATE post_drafts SET status = 'publish_failed', reviewed_at = '2026-01-01T00:00:00Z', publish_failed_at = now(), publish_error = 'network' WHERE id = ${d!.id}`;
+    await sql`UPDATE threads.post_drafts SET status = 'publish_failed', reviewed_at = '2026-01-01T00:00:00Z', publish_failed_at = now(), publish_error = 'network' WHERE id = ${d!.id}`;
     return d!;
   }
   it("requeueで元の承認日時を保ち、失敗を消して先頭に入れる。同じrequestIdは成功を返す", async () => {

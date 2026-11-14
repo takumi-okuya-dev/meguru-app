@@ -1,8 +1,26 @@
 // /api/me の決済の部分のテスト用の値（specs/013）。既定は決済OFF（001〜012の画面のテストは今のまま）。
-import type { MeBilling } from "@threads-grower/shared";
+import { FEATURES, type MeBilling, type MeResponse, type ThreadsMeResponse } from "@meguru/shared";
 
-/** 決済OFFの環境の /api/me の billing と、退会の途中でないこと。 */
-export const ME_BILLING_OFF: { billing: MeBilling; withdrawalInProgress: boolean } = {
+/**
+ * テストの「自分」：共通の /api/me と、Threadsの /api/threads/me の中身を1つにしたもの（同じ値を両方の置き換えに渡す。
+ * specs/meguru/029 PR5 で /api/me から Threads の中身を消した）。
+ */
+export type MeWithThreads = MeResponse & ThreadsMeResponse;
+
+/** テスト用のグループがOFFの環境の /api/me の testGroups（specs/016）。 */
+export const ME_TEST_GROUPS_OFF: MeResponse["testGroups"] = { enabled: false, admitted: true, operator: false };
+
+/** 決済OFFの環境の /api/me の billing と、退会の途中でないこと。テスト用のグループもOFF（specs/016）。運営者ではない（specs/019）。Threadsだけを使っている（specs/028）。 */
+export const ME_BILLING_OFF: {
+  billing: MeBilling;
+  withdrawalInProgress: boolean;
+  testGroups: MeResponse["testGroups"];
+  operator: boolean;
+  features: ThreadsMeResponse["features"];
+  dailyPostLimit: ThreadsMeResponse["dailyPostLimit"];
+  testerInvites: ThreadsMeResponse["testerInvites"];
+  apps: MeResponse["apps"];
+} = {
   billing: {
     mode: "disabled",
     state: "billing_disabled",
@@ -11,6 +29,14 @@ export const ME_BILLING_OFF: { billing: MeBilling; withdrawalInProgress: boolean
     trialDaysLeft: null,
   },
   withdrawalInProgress: false,
+  testGroups: ME_TEST_GROUPS_OFF,
+  operator: false,
+  features: [...FEATURES],
+  // 上限の既定値と、招待の管理OFF（specs/024。001〜023の画面のテストは今のまま）
+  dailyPostLimit: 10,
+  testerInvites: { enabled: false },
+  // Threadsを使っている人（specs/028。001〜027の画面のテストは今のまま）
+  apps: { available: ["threads"], using: ["threads"], last: "threads", landing: "threads" },
 };
 
 /**

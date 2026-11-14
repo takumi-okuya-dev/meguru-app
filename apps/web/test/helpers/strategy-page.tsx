@@ -2,7 +2,7 @@
 // api-client の差し替え（vi.mock）は、各テストのファイルで行う。
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render } from "@testing-library/react";
-import { emptyStrategyValues, type AccountSummary, type Strategy } from "@threads-grower/shared";
+import { emptyStrategyValues, type AccountSummary, type Strategy } from "@meguru/shared";
 import type { ComponentType, ReactNode } from "react";
 import { createMemoryRouter, Link, Outlet, RouterProvider } from "react-router";
 
@@ -46,15 +46,15 @@ export function strategyOf(overrides: Partial<Strategy> = {}): Strategy {
 export function renderStrategyPage(
   Page: ComponentType,
   Provider: ComponentType<{ children: ReactNode }>,
-  initialEntry = "/accounts/a1/strategy",
+  initialEntry = "/threads/accounts/a1/strategy",
 ) {
   const router = createMemoryRouter(
     [
       {
-        path: "/accounts/:accountId",
+        path: "/threads/accounts/:accountId",
         element: (
           <>
-            <Link to="/accounts/a1">ホームへ</Link>
+            <Link to="/threads/accounts/a1">ホームへ</Link>
             <Provider>
               <Outlet context={{ account: testAccount }} />
             </Provider>

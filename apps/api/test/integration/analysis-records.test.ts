@@ -4,7 +4,7 @@ import { call, createUserWithAccount, fake, makeApp, resetDb } from "../helpers/
 import { addMin, approvedDrafts, connectedAccount, db, draftRow, jst, run, setSchedule } from "../helpers/auto-post";
 
 const app = makeApp();
-const base = (accountId: string) => `/api/accounts/${accountId}`;
+const base = (accountId: string) => `/api/threads/accounts/${accountId}`;
 
 beforeEach(async () => {
   await resetDb();
@@ -32,7 +32,7 @@ async function register(accountId: string, text: string) {
  * @returns 3つの日時
  */
 async function changedAt(accountId: string) {
-  const [r] = (await db()`SELECT promotions_changed_at, research_changed_at, core_rules_changed_at FROM accounts WHERE id = ${accountId}`) as [
+  const [r] = (await db()`SELECT promotions_changed_at, research_changed_at, core_rules_changed_at FROM threads.accounts WHERE id = ${accountId}`) as [
     Record<string, string | null>,
   ];
   return r;
@@ -80,7 +80,7 @@ describe("プロンプトの材料の版（FR-002g）", () => {
 
     expect((await call(app, "POST", `${base(accountId)}/reference-posts`, { user: "u1", body: { body: "伸びた投稿" } })).status).toBe(201);
     expect((await changedAt(accountId)).research_changed_at).not.toBeNull();
-    await db()`UPDATE accounts SET research_changed_at = NULL WHERE id = ${accountId}`;
+    await db()`UPDATE threads.accounts SET research_changed_at = NULL WHERE id = ${accountId}`;
     expect((await call(app, "POST", `${base(accountId)}/research-keywords`, { user: "u1", body: { keyword: "AI" } })).status).toBe(201);
     expect((await changedAt(accountId)).research_changed_at).not.toBeNull();
 
@@ -92,12 +92,12 @@ describe("プロンプトの材料の版（FR-002g）", () => {
 
   it("バッチの登録で、その時点の4つの日時を写す", async () => {
     const { accountId } = await createUserWithAccount("u1");
-    await db()`INSERT INTO strategy_designs (account_id, final_action, updated_at) VALUES (${accountId}, '参加', '2026-09-01T00:00:00Z')`;
-    await db()`UPDATE accounts SET promotions_changed_at = '2026-09-02T00:00:00Z', research_changed_at = '2026-09-03T00:00:00Z',
+    await db()`INSERT INTO threads.strategy_designs (account_id, final_action, updated_at) VALUES (${accountId}, '参加', '2026-09-01T00:00:00Z')`;
+    await db()`UPDATE threads.accounts SET promotions_changed_at = '2026-09-02T00:00:00Z', research_changed_at = '2026-09-03T00:00:00Z',
       core_rules_changed_at = '2026-09-04T00:00:00Z' WHERE id = ${accountId}`;
     const { batchId } = await register(accountId, "A");
     const [b] = (await db()`SELECT strategy_updated_at, promotions_changed_at, research_changed_at, core_rules_changed_at
-      FROM draft_batches WHERE id = ${batchId}`) as [Record<string, string>];
+      FROM threads.draft_batches WHERE id = ${batchId}`) as [Record<string, string>];
     expect(Object.values(b).map((v) => new Date(v).toISOString())).toEqual([
       "2026-09-01T00:00:00.000Z",
       "2026-09-02T00:00:00.000Z",
@@ -111,7 +111,7 @@ describe("公開した時点の情報（FR-002f）", () => {
   it("公開の成功で、時刻の枠・持ち越し・「次に投稿する」を記録する", async () => {
     const { accountId } = await connectedAccount("u1", app);
     const [first, second] = await approvedDrafts(accountId, ["A", "B"]);
-    await db()`UPDATE post_drafts SET prioritized_at = now() WHERE id = ${second!}`;
+    await db()`UPDATE threads.post_drafts SET prioritized_at = now() WHERE id = ${second!}`;
     await setSchedule(accountId, { slotMinutes: [720] });
     await run(addMin(jst("2030-01-10 12:00"), 1));
     expect(await draftRow(second!)).toMatchObject({

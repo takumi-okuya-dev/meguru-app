@@ -26,7 +26,7 @@ describe("GET /api/billing", () => {
       trialDaysLeft: null,
       ownedAccountCount: null,
       subscription: null,
-      prices: { base: 1000, extra: 500 },
+      prices: { perAccount: 1000 },
     });
   });
 
@@ -43,7 +43,7 @@ describe("GET /api/billing", () => {
     expect(await summary("u1")).toMatchObject({ state: "exempt", subscription: null });
   });
 
-  it("契約中：次の請求日と見込み（2件なら1,500円、0件でも1,000円）", async () => {
+  it("契約中：次の請求日と見込み（2件なら2,000円、0件でも1,000円。specs/024 FR-030）", async () => {
     const { userId } = await createUserWithAccount("u1");
     await createUserWithAccount("u1");
     await endTrial(userId);
@@ -54,7 +54,7 @@ describe("GET /api/billing", () => {
       currentPeriodEnd: end.toISOString(),
       cancelAtPeriodEnd: false,
       nextInvoiceAt: end.toISOString(),
-      nextInvoiceAmount: 1500,
+      nextInvoiceAmount: 2000,
     });
   });
 

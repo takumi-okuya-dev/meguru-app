@@ -9,7 +9,7 @@ beforeEach(async () => {
   await resetDb();
 });
 
-const base = (accountId: string) => `/api/accounts/${accountId}`;
+const base = (accountId: string) => `/api/threads/accounts/${accountId}`;
 type PromptBody = { prompt: string; length: number; summary: { length: number } };
 
 /** 今日（日本時間）から days 日後の日付。 */
@@ -28,8 +28,8 @@ describe("投稿のプロンプトの014の材料", () => {
     const { accountId } = await createUserWithAccount("u1");
     const q = neon(testEnv.DATABASE_URL);
     const until = daysLater(5);
-    await q`INSERT INTO promotions (account_id, title, content, valid_until) VALUES (${accountId}, '秋の交流会', '交流会の案内', ${until})`;
-    await q`INSERT INTO promotions (account_id, title, content) VALUES (${accountId}, '個別相談', 'いつでも相談')`;
+    await q`INSERT INTO threads.promotions (account_id, title, content, valid_until) VALUES (${accountId}, '秋の交流会', '交流会の案内', ${until})`;
+    await q`INSERT INTO threads.promotions (account_id, title, content) VALUES (${accountId}, '個別相談', 'いつでも相談')`;
     const { prompt } = await getPrompt(accountId);
     expect(prompt).toContain(`1. 【秋の交流会】(掲載期限: ${until}・残り5日) 交流会の案内`);
     expect(prompt).toContain("2. 【個別相談】(期限なし) いつでも相談");
@@ -39,7 +39,7 @@ describe("投稿のプロンプトの014の材料", () => {
   it("目的とプロフィール・固定投稿の下書きが入る（FR-053・FR-113）", async () => {
     const { accountId } = await createUserWithAccount("u1");
     await neon(testEnv.DATABASE_URL)`
-      INSERT INTO strategy_designs (account_id, purpose_origin, profile_bio_draft, pinned_post_draft_3)
+      INSERT INTO threads.strategy_designs (account_id, purpose_origin, profile_bio_draft, pinned_post_draft_3)
       VALUES (${accountId}, '上京して寂しかった', '東京で友だちをつくる会', '固定投稿の案')`;
     const { prompt } = await getPrompt(accountId);
     expect(prompt).toContain("- 活動を始めたきっかけ: 上京して寂しかった");
@@ -60,7 +60,7 @@ describe("投稿のプロンプトの014の材料", () => {
   it("アカウントの文字数と割合を使い、length は全文の文字数", async () => {
     const { accountId } = await createUserWithAccount("u1");
     await neon(testEnv.DATABASE_URL)`
-      UPDATE accounts SET post_length_target = 200, long_length = 200, short_ratio = 50, medium_ratio = 30, long_ratio = 20
+      UPDATE threads.accounts SET post_length_target = 200, long_length = 200, short_ratio = 50, medium_ratio = 30, long_ratio = 20
       WHERE id = ${accountId}`;
     const body = await getPrompt(accountId);
     expect(body.prompt).toContain("10件の内訳: 短文5件・中文3件・長文2件(割合は50:30:20)。");
@@ -103,14 +103,14 @@ describe("GET /prompt の materials（FR-121・FR-123、SC-017）", () => {
   it("課題の判定と文字数、下書きのあり・なし、宣伝（公開中で期限内・行動喚起が空）、リサーチの件数", async () => {
     const { accountId } = await createUserWithAccount("u1");
     const q = neon(testEnv.DATABASE_URL);
-    await q`INSERT INTO strategy_designs (account_id, target_persona, purpose_origin, activity_axis, pinned_post_draft_2)
+    await q`INSERT INTO threads.strategy_designs (account_id, target_persona, purpose_origin, activity_axis, pinned_post_draft_2)
       VALUES (${accountId}, '20代', ${"上京して寂しかった。".repeat(10)}, 'ひとりにしない', '固定投稿の案')`;
-    await q`INSERT INTO promotions (account_id, title, content, cta) VALUES (${accountId}, 'A', 'A', 'DMで')`;
-    await q`INSERT INTO promotions (account_id, title, content) VALUES (${accountId}, 'B', 'B')`;
-    await q`INSERT INTO promotions (account_id, title, content, status) VALUES (${accountId}, 'C', 'C', 'paused')`;
-    await q`INSERT INTO promotions (account_id, title, content, valid_until) VALUES (${accountId}, 'D', 'D', '2020-01-01')`;
+    await q`INSERT INTO threads.promotions (account_id, title, content, cta) VALUES (${accountId}, 'A', 'A', 'DMで')`;
+    await q`INSERT INTO threads.promotions (account_id, title, content) VALUES (${accountId}, 'B', 'B')`;
+    await q`INSERT INTO threads.promotions (account_id, title, content, status) VALUES (${accountId}, 'C', 'C', 'paused')`;
+    await q`INSERT INTO threads.promotions (account_id, title, content, valid_until) VALUES (${accountId}, 'D', 'D', '2020-01-01')`;
     for (let i = 0; i < 12; i++) {
-      await q`INSERT INTO reference_posts (account_id, body, why_good) VALUES (${accountId}, ${`参考${i}`}, ${i < 4 ? "解説" : null})`;
+      await q`INSERT INTO threads.reference_posts (account_id, body, why_good) VALUES (${accountId}, ${`参考${i}`}, ${i < 4 ? "解説" : null})`;
     }
     const { materials } = (await getPrompt(accountId)) as PromptBody & { materials: Materials };
     const item = (key: string) => materials.strategy.items.find((i) => i.key === key);
@@ -126,8 +126,8 @@ describe("GET /prompt の materials（FR-121・FR-123、SC-017）", () => {
   it("宣伝の割合が0%なら、宣伝はプロンプトに入らないので0件", async () => {
     const { accountId } = await createUserWithAccount("u1");
     const q = neon(testEnv.DATABASE_URL);
-    await q`UPDATE accounts SET promotion_ratio_percent = 0 WHERE id = ${accountId}`;
-    await q`INSERT INTO promotions (account_id, title, content) VALUES (${accountId}, 'A', 'A')`;
+    await q`UPDATE threads.accounts SET promotion_ratio_percent = 0 WHERE id = ${accountId}`;
+    await q`INSERT INTO threads.promotions (account_id, title, content) VALUES (${accountId}, 'A', 'A')`;
     const { materials } = (await getPrompt(accountId)) as PromptBody & { materials: Materials };
     expect(materials.promotions).toEqual({ included: 0, missingCta: 0 });
   });
@@ -143,7 +143,7 @@ describe("GET /prompt の parts と splitRecommended（specs/014 FR-150・FR-152
     expect(short.parts[1]).toContain("【2/2つ目(最後)】");
     const q = neon(testEnv.DATABASE_URL);
     for (let i = 0; i < 10; i++) {
-      await q`INSERT INTO reference_posts (account_id, body) VALUES (${accountId}, ${`長い参考投稿${i}`.padEnd(1500, "あ")})`;
+      await q`INSERT INTO threads.reference_posts (account_id, body) VALUES (${accountId}, ${`長い参考投稿${i}`.padEnd(1500, "あ")})`;
     }
     const long = (await getPrompt(accountId)) as PromptBody & { splitRecommended: boolean };
     expect(long.length).toBeGreaterThan(12000);

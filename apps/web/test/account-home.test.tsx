@@ -1,13 +1,15 @@
 // US4：Accountのホーム（specs/002 FR-017・FR-024b、contracts/ui-routes.md「ホーム」、research.md R11）
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen } from "@testing-library/react";
-import type { AccountSummary, ProfileStatus, AutoPostStatus } from "@threads-grower/shared";
+import { render, screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import type { AccountSummary, ProfileStatus, AutoPostStatus } from "@meguru/shared";
 import { createMemoryRouter, Outlet, RouterProvider } from "react-router";
 import { describe, expect, it, vi } from "vitest";
 import { OWNER_ACCESS } from "./helpers/access";
 
 let current: ProfileStatus | Error;
 let approved = 0;
+let referral: () => Promise<{ url: string; referredCount: number }> = async () => ({ url: "https://app.example/r/r_abcdefghijklmnopqrstuv", referredCount: 2 });
 let auto: AutoPostStatus = { autoPost: { enabled: false, slotCount: 0, stoppedReason: null }, next: null, approvedCount: 0, daysLeft: null, notices: [] };
 vi.mock("@/lib/api-client", async (orig) => {
   const actual = await orig<typeof import("@/lib/api-client")>();
@@ -15,17 +17,27 @@ vi.mock("@/lib/api-client", async (orig) => {
     ...actual,
     api: {
       ...actual.api,
+      // 「はじめに読んでほしいこと」は利用者が分かってから出す（specs/014 FR-061）。ここでは出さない
+      me: () => new Promise(() => {}),
+      referral: () => referral(),
+    },
+  };
+});
+vi.mock("@/apps/threads/lib/api", async (orig) => {
+  const actual = await orig<typeof import("@/apps/threads/lib/api")>();
+  return {
+    ...actual,
+    threadsApi: {
+      ...actual.threadsApi,
       getAutoPost: async () => auto,
       getDraftCounts: async () => ({ needsReview: 0, approved, rejected: 0, published: 0, publishFailed: 0 }),
       accountAccess: async () => OWNER_ACCESS,
-      // 「はじめに読んでほしいこと」は利用者が分かってから出す（specs/014 FR-061）。ここでは出さない
-      me: () => new Promise(() => {}),
       getProfileStatus: () => (current instanceof Error ? Promise.reject(current) : Promise.resolve(current)),
     },
   };
 });
 
-const { AccountHome } = await import("@/pages/account-home");
+const { AccountHome } = await import("@/apps/threads/pages/account-home");
 
 const account: AccountSummary = {
   id: "a1",
@@ -52,8 +64,8 @@ function status(overrides: Partial<ProfileStatus> = {}): ProfileStatus {
 function renderHome(s: ProfileStatus | Error, acc: AccountSummary = account) {
   current = s;
   const router = createMemoryRouter(
-    [{ path: "/accounts/:accountId", element: <Outlet context={{ account: acc }} />, children: [{ index: true, element: <AccountHome /> }] }],
-    { initialEntries: ["/accounts/a1"] },
+    [{ path: "/threads/accounts/:accountId", element: <Outlet context={{ account: acc }} />, children: [{ index: true, element: <AccountHome /> }] }],
+    { initialEntries: ["/threads/accounts/a1"] },
   );
   render(
     <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
@@ -66,9 +78,9 @@ describe("Accountのホーム", () => {
   it("何も入力していなければ「まずは「課題」から埋めましょう」と3枚のカードが出る", async () => {
     renderHome(status());
     expect(await screen.findByRole("heading", { name: "まずは「課題」から埋めましょう" })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /課題.*0\/16 入力済み/ })).toHaveAttribute("href", "/accounts/a1/strategy");
-    expect(screen.getByRole("link", { name: /宣伝内容.*宣伝の対象 0件/ })).toHaveAttribute("href", "/accounts/a1/promotions");
-    expect(screen.getByRole("link", { name: /リサーチ.*参考投稿 0件/ })).toHaveAttribute("href", "/accounts/a1/research");
+    expect(screen.getByRole("link", { name: /課題.*0\/16 入力済み/ })).toHaveAttribute("href", "/threads/accounts/a1/strategy");
+    expect(screen.getByRole("link", { name: /宣伝内容.*宣伝の対象 0件/ })).toHaveAttribute("href", "/threads/accounts/a1/promotions");
+    expect(screen.getByRole("link", { name: /リサーチ.*参考投稿 0件/ })).toHaveAttribute("href", "/threads/accounts/a1/research");
   });
 
   it("課題だけ入力済みなら「次は「宣伝内容」を登録しましょう」", async () => {
@@ -93,7 +105,7 @@ describe("Accountのホーム", () => {
     expect(
       screen.getByText("プロンプトをChatGPTやClaudeに送り、返ってきた投稿案を投稿ストックに登録します。"),
     ).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "投稿をつくる" })).toHaveAttribute("href", "/accounts/a1/create");
+    expect(screen.getByRole("link", { name: "投稿をつくる" })).toHaveAttribute("href", "/threads/accounts/a1/create");
   });
 
   it("無料体験中は「無料体験中：{YYYY年M月D日}まで、すべての機能を使えます」が出る（FR-024b）", async () => {
@@ -121,7 +133,7 @@ describe("005：次の投稿", () => {
   it("オフでは設定を案内する", async () => {
     renderHome(status());
     expect(await screen.findByText("自動投稿はオフです")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "投稿のスケジュールを設定する" })).toHaveAttribute("href", "/accounts/a1/settings");
+    expect(screen.getByRole("link", { name: "投稿のスケジュールを設定する" })).toHaveAttribute("href", "/threads/accounts/a1/settings");
   });
   it("予定と書き出し・残りの日数を出す", async () => {
     auto = { autoPost: { enabled: true, slotCount: 3, stoppedReason: null }, next: { at: "2026-10-08T03:00:00Z", draft: { id: "d", excerpt: "次の本文" } }, approvedCount: 5, daysLeft: 1, notices: [] };
@@ -158,7 +170,7 @@ describe("未接続のアカウントのホーム（specs/012 US4、Clarificatio
     renderHome(status(), unconnected);
     const banner = await screen.findByRole("region", { name: "Threadsとの接続" });
     expect(banner).toHaveTextContent("未接続：Threadsにつなぐと、承認した案を自動で投稿し、反応を分析できます");
-    expect(await screen.findByRole("link", { name: "Threadsにつなぐ" })).toHaveAttribute("href", "/accounts/a1/settings#threads");
+    expect(await screen.findByRole("link", { name: "Threadsにつなぐ" })).toHaveAttribute("href", "/threads/accounts/a1/settings#threads");
     expect(screen.getByRole("heading", { name: "カフェの公式" })).toBeInTheDocument();
     expect(document.body.textContent).not.toMatch(/@null|@undefined/);
     // 承認済みが0件なら、次にやることは今までどおり
@@ -170,7 +182,7 @@ describe("未接続のアカウントのホーム（specs/012 US4、Clarificatio
     renderHome(status(), unconnected);
     expect(await screen.findByRole("heading", { name: "Threadsにつないで自動投稿を始めましょう" })).toBeInTheDocument();
     const links = screen.getAllByRole("link", { name: "Threadsにつなぐ" });
-    expect(links.every((l) => l.getAttribute("href") === "/accounts/a1/settings#threads")).toBe(true);
+    expect(links.every((l) => l.getAttribute("href") === "/threads/accounts/a1/settings#threads")).toBe(true);
   });
 
   it("つないだアカウントには帯も「つなぐ」も出さない", async () => {
@@ -180,5 +192,64 @@ describe("未接続のアカウントのホーム（specs/012 US4、Clarificatio
     await screen.findByRole("heading", { name: "まずは「課題」から埋めましょう" });
     expect(screen.queryByRole("region", { name: "Threadsとの接続" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Threadsにつなぐ" })).not.toBeInTheDocument();
+  });
+});
+
+describe("017：アプリを紹介する", () => {
+  it("紹介リンクをコピーでき、紹介した人数は設定 › 紹介 へ案内する", async () => {
+    const user = userEvent.setup();
+    renderHome(status());
+    const card = await screen.findByRole("region", { name: "アプリを紹介する" });
+    await user.click(within(card).getByRole("button", { name: "リンクをコピー" }));
+    await expect(navigator.clipboard.readText()).resolves.toBe("https://app.example/r/r_abcdefghijklmnopqrstuv");
+    expect(within(card).getByRole("button", { name: "コピーしました" })).toBeInTheDocument();
+    expect(within(card).getByRole("link", { name: "紹介した人数を見る" })).toHaveAttribute("href", "/settings/referral");
+    // 人数はホームには出さない
+    expect(within(card).queryByText(/2人/)).not.toBeInTheDocument();
+  });
+
+  it("共有できる端末では「共有する」で紹介リンクを渡す", async () => {
+    const share = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "share", { value: share, configurable: true });
+    try {
+      const user = userEvent.setup();
+      renderHome(status());
+      const card = await screen.findByRole("region", { name: "アプリを紹介する" });
+      await user.click(within(card).getByRole("button", { name: "共有する" }));
+      expect(share).toHaveBeenCalledWith(expect.objectContaining({ url: "https://app.example/r/r_abcdefghijklmnopqrstuv" }));
+    } finally {
+      // @ts-expect-error テストで足したものを消す
+      delete navigator.share;
+    }
+  });
+
+  it("共有できない端末では「共有する」を出さない", async () => {
+    renderHome(status());
+    const card = await screen.findByRole("region", { name: "アプリを紹介する" });
+    expect(within(card).queryByRole("button", { name: "共有する" })).not.toBeInTheDocument();
+  });
+
+  it("コピーできなければ、リンクを選んだ状態で出す", async () => {
+    const user = userEvent.setup();
+    renderHome(status());
+    const card = await screen.findByRole("region", { name: "アプリを紹介する" });
+    vi.spyOn(navigator.clipboard, "writeText").mockRejectedValueOnce(new Error("denied"));
+    await user.click(within(card).getByRole("button", { name: "リンクをコピー" }));
+    expect(await within(card).findByRole("alert")).toHaveTextContent("コピーできませんでした");
+    const input = within(card).getByRole("textbox", { name: "紹介リンク" });
+    expect(input).toHaveValue("https://app.example/r/r_abcdefghijklmnopqrstuv");
+    await vi.waitFor(() => expect(input).toHaveFocus());
+  });
+
+  it("紹介リンクを読めなければ、カードを出さずにホームの残りは出す", async () => {
+    const { ApiError } = await import("@/lib/api-client");
+    referral = () => Promise.reject(new ApiError("INTERNAL_ERROR", 500));
+    try {
+      renderHome(status());
+      expect(await screen.findByRole("heading", { name: "まずは「課題」から埋めましょう" })).toBeInTheDocument();
+      expect(screen.queryByRole("region", { name: "アプリを紹介する" })).not.toBeInTheDocument();
+    } finally {
+      referral = async () => ({ url: "https://app.example/r/r_abcdefghijklmnopqrstuv", referredCount: 2 });
+    }
   });
 });

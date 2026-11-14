@@ -2,21 +2,21 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import type { AccountSummary, PerformanceItem, PerformancePage, PerformanceSummary } from "@threads-grower/shared";
+import type { AccountSummary, PerformanceItem, PerformancePage, PerformanceSummary } from "@meguru/shared";
 import { createMemoryRouter, Outlet, RouterProvider } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const getPerformance = vi.fn();
 const updateFeedback = vi.fn();
 const exportPerformance = vi.fn();
-vi.mock("@/lib/api-client", async (orig) => {
-  const actual = await orig<typeof import("@/lib/api-client")>();
-  return { ...actual, api: { ...actual.api, getPerformance, updateFeedback, exportPerformance } };
+vi.mock("@/apps/threads/lib/api", async (orig) => {
+  const actual = await orig<typeof import("@/apps/threads/lib/api")>();
+  return { ...actual, threadsApi: { ...actual.threadsApi, getPerformance, updateFeedback, exportPerformance } };
 });
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
 const { ApiError } = await import("@/lib/api-client");
-const { PerformancePage: Page } = await import("@/pages/performance");
+const { PerformancePage: Page } = await import("@/apps/threads/pages/performance");
 
 const account: AccountSummary = {
   id: "a1",
@@ -76,12 +76,12 @@ function renderPage() {
   const router = createMemoryRouter(
     [
       {
-        path: "/accounts/:accountId",
+        path: "/threads/accounts/:accountId",
         element: <Outlet context={{ account }} />,
         children: [{ path: "performance", element: <Page /> }],
       },
     ],
-    { initialEntries: ["/accounts/a1/performance"] },
+    { initialEntries: ["/threads/accounts/a1/performance"] },
   );
   render(
     <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>

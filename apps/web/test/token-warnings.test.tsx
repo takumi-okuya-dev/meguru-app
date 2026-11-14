@@ -2,12 +2,12 @@
 import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { describe, expect, it } from "vitest";
-import { TokenWarnings } from "@/components/connect/TokenWarnings";
+import { TokenWarnings } from "@/apps/threads/components/connect/TokenWarnings";
 
 describe("TokenWarnings", () => {
   it("URL の warn を読み、投稿・反応数の案内を出す", () => {
     render(
-      <MemoryRouter initialEntries={["/accounts/a1?connected=new&warn=publish,insights"]}>
+      <MemoryRouter initialEntries={["/threads/accounts/a1?connected=new&warn=publish,insights"]}>
         <TokenWarnings />
       </MemoryRouter>,
     );
@@ -17,7 +17,7 @@ describe("TokenWarnings", () => {
 
   it("warn がなければ何も出さない。渡した warnings はそのまま出す", () => {
     const { container } = render(
-      <MemoryRouter initialEntries={["/accounts/a1"]}>
+      <MemoryRouter initialEntries={["/threads/accounts/a1"]}>
         <TokenWarnings />
       </MemoryRouter>,
     );

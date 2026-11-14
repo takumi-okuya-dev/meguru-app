@@ -4,10 +4,10 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import type { AccountSummary, MeResponse } from "@threads-grower/shared";
+import type { AccountSummary } from "@meguru/shared";
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { ME_BILLING_OFF } from "./helpers/billing";
+import { ME_BILLING_OFF, type MeWithThreads } from "./helpers/billing";
 
 const mocks = vi.hoisted(() => ({ me: vi.fn(), needsReviewCounts: vi.fn() }));
 vi.mock("@clerk/react", () => ({
@@ -16,11 +16,15 @@ vi.mock("@clerk/react", () => ({
 }));
 vi.mock("@/lib/api-client", async (importOriginal) => {
   const original = await importOriginal<typeof import("@/lib/api-client")>();
-  return { ...original, api: { ...original.api, me: mocks.me, needsReviewCounts: mocks.needsReviewCounts } };
+  return { ...original, api: { ...original.api, me: mocks.me } };
+});
+vi.mock("@/apps/threads/lib/api", async (orig) => {
+  const actual = await orig<typeof import("@/apps/threads/lib/api")>();
+  return { ...actual, threadsApi: { ...actual.threadsApi, me: mocks.me, needsReviewCounts: mocks.needsReviewCounts } };
 });
 
-const { AccountSwitcher } = await import("@/components/layout/AccountSwitcher");
-const { AccountAvatar } = await import("@/components/AccountAvatar");
+const { AccountSwitcher } = await import("@/apps/threads/sidebar/AccountSwitcher");
+const { AccountAvatar } = await import("@/apps/threads/components/AccountAvatar");
 
 const unconnected: AccountSummary = {
   id: "a1",
@@ -43,7 +47,7 @@ const connected: AccountSummary = {
   connectionStatus: "connected",
   connectionMethod: "app",
 };
-const me: MeResponse = {
+const me: MeWithThreads = {
   user: { id: "user", email: "user@example.com", displayName: "User" },
   accounts: [unconnected, connected],
   landingAccountId: "a1",
@@ -60,8 +64,8 @@ beforeEach(() => {
 });
 
 function renderSwitcher() {
-  const router = createMemoryRouter([{ path: "/accounts/:accountId", element: <AccountSwitcher /> }], {
-    initialEntries: ["/accounts/a1"],
+  const router = createMemoryRouter([{ path: "/threads/accounts/:accountId", element: <AccountSwitcher /> }], {
+    initialEntries: ["/threads/accounts/a1"],
   });
   render(
     <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>

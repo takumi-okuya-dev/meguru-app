@@ -1,7 +1,7 @@
 // 関わり×APIの表のテスト（specs/011-team-revision contracts/permissions.md、SC-002・FR-060）。
 // すべてのAccountのAPIを、関わりごとに呼び、許される／403 ROLE_FORBIDDEN／404 ACCOUNT_NOT_FOUND を確かめる。
 // 各APIは「権限 → 入力の検証」の順で確かめるので、空の本文で呼ぶと、許された人は 400 VALIDATION_FAILED などになる。
-import { permissionsFor, type Relation } from "@threads-grower/shared";
+import { permissionsFor, type Relation } from "@meguru/shared";
 import { beforeAll, describe, expect, it } from "vitest";
 import { call, createUnconnectedAccount, createUserWithAccount, makeApp, resetDb } from "../helpers/app";
 import { ACCOUNT_ROUTES } from "../helpers/routes";
@@ -98,7 +98,8 @@ describe("関わり×APIの表（SC-002）", () => {
     const registered = new Set(
       app.routes
         .filter((r) => ["GET", "POST", "PUT", "PATCH", "DELETE"].includes(r.method))
-        .filter((r) => r.path.includes("/accounts/:accountId") || r.path.startsWith("/api/teams") || r.path.startsWith("/api/team/"))
+        // Account（/api/threads/accounts/:accountId/…）とチーム（/api/threads/teams/…）の道筋を、上の表と突き合わせる
+        .filter((r) => r.path.includes("/accounts/:accountId") || r.path.startsWith("/api/threads/teams"))
         .map((r) => `${r.method} ${r.path}`),
     );
     const missing = [...registered].filter((k) => !known.has(k));
@@ -142,23 +143,25 @@ describe("トークンでの接続し直しの表（specs/010 FR-034）", () => 
  * 許される人での成功は、各Storyのテスト（teams・team-roles・team-share・team-leave）で確かめる。
  */
 const TEAM_ROUTES: [string, string, "member" | "admin" | "login"][] = [
-  ["POST", "/api/teams", "login"],
-  ["GET", "/api/teams/:teamId", "member"],
-  ["PATCH", "/api/teams/:teamId", "admin"],
-  ["DELETE", "/api/teams/:teamId", "admin"],
-  ["GET", "/api/teams/:teamId/invite", "admin"],
-  ["POST", "/api/teams/:teamId/invite/rotate", "admin"],
-  ["PATCH", "/api/teams/:teamId/members/:userId", "admin"],
-  ["DELETE", "/api/teams/:teamId/members/:userId", "admin"],
-  ["POST", "/api/teams/:teamId/members/:userId/joined-notice/dismiss", "admin"],
-  ["POST", "/api/teams/:teamId/leave", "member"],
-  ["POST", "/api/teams/:teamId/admin", "admin"],
-  ["POST", "/api/teams/:teamId/accounts", "member"],
-  ["PATCH", "/api/teams/:teamId/accounts/:accountId", "member"],
-  ["DELETE", "/api/teams/:teamId/accounts/:accountId", "member"],
-  ["GET", "/api/teams/:teamId/assignments", "admin"],
-  ["PUT", "/api/teams/:teamId/assignments/:userId/accounts/:accountId", "admin"],
-  ["DELETE", "/api/teams/:teamId/assignments/:userId/accounts/:accountId", "admin"],
+  ["POST", "/api/threads/teams", "login"],
+  ["GET", "/api/threads/teams/:teamId", "member"],
+  ["PATCH", "/api/threads/teams/:teamId", "admin"],
+  ["DELETE", "/api/threads/teams/:teamId", "admin"],
+  ["GET", "/api/threads/teams/:teamId/invite", "admin"],
+  ["POST", "/api/threads/teams/:teamId/invite/rotate", "admin"],
+  ["PATCH", "/api/threads/teams/:teamId/members/:userId", "admin"],
+  ["DELETE", "/api/threads/teams/:teamId/members/:userId", "admin"],
+  ["POST", "/api/threads/teams/:teamId/members/:userId/joined-notice/dismiss", "admin"],
+  ["POST", "/api/threads/teams/:teamId/leave", "member"],
+  ["POST", "/api/threads/teams/:teamId/admin", "admin"],
+  ["POST", "/api/threads/teams/:teamId/accounts", "member"],
+  ["PATCH", "/api/threads/teams/:teamId/accounts/:accountId", "member"],
+  ["DELETE", "/api/threads/teams/:teamId/accounts/:accountId", "member"],
+  ["GET", "/api/threads/teams/:teamId/assignments", "admin"],
+  ["PUT", "/api/threads/teams/:teamId/assignments/:userId/accounts/:accountId", "admin"],
+  ["DELETE", "/api/threads/teams/:teamId/assignments/:userId/accounts/:accountId", "admin"],
+  // 運用状況（specs/020）。管理者と担当のある編集者。メンバーが断られることは team-status.test.ts で確かめる
+  ["GET", "/api/threads/teams/:teamId/status", "member"],
 ];
 
 describe("チームのAPIの表（SC-002、research.md R4）", () => {
@@ -185,9 +188,9 @@ describe("チームのAPIの表（SC-002、research.md R4）", () => {
     expect([res.status, await errorCode(res)]).toEqual([404, "TEAM_NOT_FOUND"]);
   });
 
-  it("GET /api/teams/:teamId は、チームの人なら誰でも読める", async () => {
+  it("GET /api/threads/teams/:teamId は、チームの人なら誰でも読める", async () => {
     for (const user of ["admin1", "owner1", "editor1", "viewer1"]) {
-      const res = await call(app, "GET", `/api/teams/${teamId}`, { user });
+      const res = await call(app, "GET", `/api/threads/teams/${teamId}`, { user });
       expect(res.status, user).toBe(200);
     }
   });

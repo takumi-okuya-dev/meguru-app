@@ -13,13 +13,13 @@ const listReferencePosts = vi.fn();
 const listResearchKeywords = vi.fn();
 const createReferencePostsBatch = vi.fn();
 const toastSuccess = vi.fn();
-vi.mock("@/lib/api-client", async (orig) => {
-  const actual = await orig<typeof import("@/lib/api-client")>();
-  return { ...actual, api: { ...actual.api, listReferencePosts, listResearchKeywords, createReferencePostsBatch } };
+vi.mock("@/apps/threads/lib/api", async (orig) => {
+  const actual = await orig<typeof import("@/apps/threads/lib/api")>();
+  return { ...actual, threadsApi: { ...actual.threadsApi, listReferencePosts, listResearchKeywords, createReferencePostsBatch } };
 });
 vi.mock("sonner", () => ({ toast: { success: toastSuccess, error: vi.fn() } }));
 
-const { ResearchPage } = await import("@/pages/research");
+const { ResearchPage } = await import("@/apps/threads/pages/research");
 
 function posts(n: number, over = {}) {
   return Array.from({ length: n }, (_, i) =>
@@ -192,8 +192,8 @@ describe("参考投稿を追加（ためて登録）", () => {
       );
     }
     const router = createMemoryRouter(
-      [{ path: "/accounts/:accountId", element: <Layout />, children: [{ path: "research", element: <ResearchPage /> }] }],
-      { initialEntries: ["/accounts/a1/research"] },
+      [{ path: "/threads/accounts/:accountId", element: <Layout />, children: [{ path: "research", element: <ResearchPage /> }] }],
+      { initialEntries: ["/threads/accounts/a1/research"] },
     );
     render(
       <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>

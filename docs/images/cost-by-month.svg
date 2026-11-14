@@ -1,0 +1,81 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="420" viewBox="0 0 800 420" role="img" aria-label="利用者の増え方ごとの、毎月の総コスト（12か月）">
+<rect width="800" height="420" fill="#fcfcfb" rx="8"/>
+<text x="24" y="34" font-family="'Hiragino Sans','Noto Sans JP','Yu Gothic',sans-serif" font-size="17" font-weight="600" fill="#0b0b0b">利用者の増え方ごとの、毎月の総コスト（12か月）</text>
+<text x="24" y="56" font-family="'Hiragino Sans','Noto Sans JP','Yu Gothic',sans-serif" font-size="12" fill="#52514e">線＝毎月の総コスト（円・消費税なし）。右の数字は12か月目の利用者と費用</text>
+<line x1="70" x2="640" y1="350.0" y2="350.0" stroke="#e4e3df" stroke-width="1"/>
+<text x="62" y="354.0" text-anchor="end" font-family="'Hiragino Sans','Noto Sans JP','Yu Gothic',sans-serif" font-size="11" fill="#52514e">0</text>
+<line x1="70" x2="640" y1="296.0" y2="296.0" stroke="#e4e3df" stroke-width="1"/>
+<text x="62" y="300.0" text-anchor="end" font-family="'Hiragino Sans','Noto Sans JP','Yu Gothic',sans-serif" font-size="11" fill="#52514e">1,000</text>
+<line x1="70" x2="640" y1="242.0" y2="242.0" stroke="#e4e3df" stroke-width="1"/>
+<text x="62" y="246.0" text-anchor="end" font-family="'Hiragino Sans','Noto Sans JP','Yu Gothic',sans-serif" font-size="11" fill="#52514e">2,000</text>
+<line x1="70" x2="640" y1="188.0" y2="188.0" stroke="#e4e3df" stroke-width="1"/>
+<text x="62" y="192.0" text-anchor="end" font-family="'Hiragino Sans','Noto Sans JP','Yu Gothic',sans-serif" font-size="11" fill="#52514e">3,000</text>
+<line x1="70" x2="640" y1="134.0" y2="134.0" stroke="#e4e3df" stroke-width="1"/>
+<text x="62" y="138.0" text-anchor="end" font-family="'Hiragino Sans','Noto Sans JP','Yu Gothic',sans-serif" font-size="11" fill="#52514e">4,000</text>
+<line x1="70" x2="640" y1="80.0" y2="80.0" stroke="#e4e3df" stroke-width="1"/>
+<text x="62" y="84.0" text-anchor="end" font-family="'Hiragino Sans','Noto Sans JP','Yu Gothic',sans-serif" font-size="11" fill="#52514e">5,000</text>
+<text x="70.0" y="370" text-anchor="middle" font-family="'Hiragino Sans','Noto Sans JP','Yu Gothic',sans-serif" font-size="12" fill="#52514e">1</text>
+<text x="121.8" y="370" text-anchor="middle" font-family="'Hiragino Sans','Noto Sans JP','Yu Gothic',sans-serif" font-size="12" fill="#52514e">2</text>
+<text x="173.6" y="370" text-anchor="middle" font-family="'Hiragino Sans','Noto Sans JP','Yu Gothic',sans-serif" font-size="12" fill="#52514e">3</text>
+<text x="225.5" y="370" text-anchor="middle" font-family="'Hiragino Sans','Noto Sans JP','Yu Gothic',sans-serif" font-size="12" fill="#52514e">4</text>
+<text x="277.3" y="370" text-anchor="middle" font-family="'Hiragino Sans','Noto Sans JP','Yu Gothic',sans-serif" font-size="12" fill="#52514e">5</text>
+<text x="329.1" y="370" text-anchor="middle" font-family="'Hiragino Sans','Noto Sans JP','Yu Gothic',sans-serif" font-size="12" fill="#52514e">6</text>
+<text x="380.9" y="370" text-anchor="middle" font-family="'Hiragino Sans','Noto Sans JP','Yu Gothic',sans-serif" font-size="12" fill="#52514e">7</text>
+<text x="432.7" y="370" text-anchor="middle" font-family="'Hiragino Sans','Noto Sans JP','Yu Gothic',sans-serif" font-size="12" fill="#52514e">8</text>
+<text x="484.5" y="370" text-anchor="middle" font-family="'Hiragino Sans','Noto Sans JP','Yu Gothic',sans-serif" font-size="12" fill="#52514e">9</text>
+<text x="536.4" y="370" text-anchor="middle" font-family="'Hiragino Sans','Noto Sans JP','Yu Gothic',sans-serif" font-size="12" fill="#52514e">10</text>
+<text x="588.2" y="370" text-anchor="middle" font-family="'Hiragino Sans','Noto Sans JP','Yu Gothic',sans-serif" font-size="12" fill="#52514e">11</text>
+<text x="640.0" y="370" text-anchor="middle" font-family="'Hiragino Sans','Noto Sans JP','Yu Gothic',sans-serif" font-size="12" fill="#52514e">12</text>
+<line x1="70" x2="640" y1="350" y2="350" stroke="#52514e" stroke-width="1"/>
+<line x1="70" x2="640" y1="304.1" y2="304.1" stroke="#52514e" stroke-width="2" stroke-dasharray="6 4"/>
+<text x="640" y="320.1" text-anchor="end" font-family="'Hiragino Sans','Noto Sans JP','Yu Gothic',sans-serif" font-size="11" fill="#52514e">固定費 850円</text>
+<polyline points="70.0,296.0 121.8,271.7 173.6,247.4 225.5,193.4 277.3,159.2 329.1,138.3 380.9,123.2 432.7,119.8 484.5,116.4 536.4,113.1 588.2,109.7 640.0,95.4" fill="none" stroke="#2a78d6" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
+<circle cx="70.0" cy="296.0" r="4" fill="#2a78d6" stroke="#fcfcfb" stroke-width="2"/>
+<circle cx="121.8" cy="271.7" r="4" fill="#2a78d6" stroke="#fcfcfb" stroke-width="2"/>
+<circle cx="173.6" cy="247.4" r="4" fill="#2a78d6" stroke="#fcfcfb" stroke-width="2"/>
+<circle cx="225.5" cy="193.4" r="4" fill="#2a78d6" stroke="#fcfcfb" stroke-width="2"/>
+<circle cx="277.3" cy="159.2" r="4" fill="#2a78d6" stroke="#fcfcfb" stroke-width="2"/>
+<circle cx="329.1" cy="138.3" r="4" fill="#2a78d6" stroke="#fcfcfb" stroke-width="2"/>
+<circle cx="380.9" cy="123.2" r="4" fill="#2a78d6" stroke="#fcfcfb" stroke-width="2"/>
+<circle cx="432.7" cy="119.8" r="4" fill="#2a78d6" stroke="#fcfcfb" stroke-width="2"/>
+<circle cx="484.5" cy="116.4" r="4" fill="#2a78d6" stroke="#fcfcfb" stroke-width="2"/>
+<circle cx="536.4" cy="113.1" r="4" fill="#2a78d6" stroke="#fcfcfb" stroke-width="2"/>
+<circle cx="588.2" cy="109.7" r="4" fill="#2a78d6" stroke="#fcfcfb" stroke-width="2"/>
+<circle cx="640.0" cy="95.4" r="4" fill="#2a78d6" stroke="#fcfcfb" stroke-width="2"/>
+<circle cx="654" cy="91.4" r="5" fill="#2a78d6"/>
+<text x="664" y="95.4" font-family="'Hiragino Sans','Noto Sans JP','Yu Gothic',sans-serif" font-size="13" font-weight="600" fill="#0b0b0b">はやい</text>
+<text x="664" y="111.4" font-family="'Hiragino Sans','Noto Sans JP','Yu Gothic',sans-serif" font-size="11" fill="#52514e">400人・4,710円</text>
+<polyline points="70.0,296.0 121.8,283.9 173.6,271.7 225.5,247.4 277.3,220.4 329.1,193.4 380.9,176.3 432.7,159.2 484.5,142.1 536.4,138.3 588.2,130.8 640.0,123.2" fill="none" stroke="#eb6834" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
+<circle cx="70.0" cy="296.0" r="4" fill="#eb6834" stroke="#fcfcfb" stroke-width="2"/>
+<circle cx="121.8" cy="283.9" r="4" fill="#eb6834" stroke="#fcfcfb" stroke-width="2"/>
+<circle cx="173.6" cy="271.7" r="4" fill="#eb6834" stroke="#fcfcfb" stroke-width="2"/>
+<circle cx="225.5" cy="247.4" r="4" fill="#eb6834" stroke="#fcfcfb" stroke-width="2"/>
+<circle cx="277.3" cy="220.4" r="4" fill="#eb6834" stroke="#fcfcfb" stroke-width="2"/>
+<circle cx="329.1" cy="193.4" r="4" fill="#eb6834" stroke="#fcfcfb" stroke-width="2"/>
+<circle cx="380.9" cy="176.3" r="4" fill="#eb6834" stroke="#fcfcfb" stroke-width="2"/>
+<circle cx="432.7" cy="159.2" r="4" fill="#eb6834" stroke="#fcfcfb" stroke-width="2"/>
+<circle cx="484.5" cy="142.1" r="4" fill="#eb6834" stroke="#fcfcfb" stroke-width="2"/>
+<circle cx="536.4" cy="138.3" r="4" fill="#eb6834" stroke="#fcfcfb" stroke-width="2"/>
+<circle cx="588.2" cy="130.8" r="4" fill="#eb6834" stroke="#fcfcfb" stroke-width="2"/>
+<circle cx="640.0" cy="123.2" r="4" fill="#eb6834" stroke="#fcfcfb" stroke-width="2"/>
+<circle cx="654" cy="125.4" r="5" fill="#eb6834"/>
+<text x="664" y="129.4" font-family="'Hiragino Sans','Noto Sans JP','Yu Gothic',sans-serif" font-size="13" font-weight="600" fill="#0b0b0b">ふつう</text>
+<text x="664" y="145.4" font-family="'Hiragino Sans','Noto Sans JP','Yu Gothic',sans-serif" font-size="11" fill="#52514e">100人・4,200円</text>
+<polyline points="70.0,296.0 121.8,289.9 173.6,283.9 225.5,271.7 277.3,262.0 329.1,247.4 380.9,236.6 432.7,220.4 484.5,209.6 536.4,193.4 588.2,190.0 640.0,184.8" fill="none" stroke="#1baf7a" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
+<circle cx="70.0" cy="296.0" r="4" fill="#1baf7a" stroke="#fcfcfb" stroke-width="2"/>
+<circle cx="121.8" cy="289.9" r="4" fill="#1baf7a" stroke="#fcfcfb" stroke-width="2"/>
+<circle cx="173.6" cy="283.9" r="4" fill="#1baf7a" stroke="#fcfcfb" stroke-width="2"/>
+<circle cx="225.5" cy="271.7" r="4" fill="#1baf7a" stroke="#fcfcfb" stroke-width="2"/>
+<circle cx="277.3" cy="262.0" r="4" fill="#1baf7a" stroke="#fcfcfb" stroke-width="2"/>
+<circle cx="329.1" cy="247.4" r="4" fill="#1baf7a" stroke="#fcfcfb" stroke-width="2"/>
+<circle cx="380.9" cy="236.6" r="4" fill="#1baf7a" stroke="#fcfcfb" stroke-width="2"/>
+<circle cx="432.7" cy="220.4" r="4" fill="#1baf7a" stroke="#fcfcfb" stroke-width="2"/>
+<circle cx="484.5" cy="209.6" r="4" fill="#1baf7a" stroke="#fcfcfb" stroke-width="2"/>
+<circle cx="536.4" cy="193.4" r="4" fill="#1baf7a" stroke="#fcfcfb" stroke-width="2"/>
+<circle cx="588.2" cy="190.0" r="4" fill="#1baf7a" stroke="#fcfcfb" stroke-width="2"/>
+<circle cx="640.0" cy="184.8" r="4" fill="#1baf7a" stroke="#fcfcfb" stroke-width="2"/>
+<circle cx="654" cy="180.8" r="5" fill="#1baf7a"/>
+<text x="664" y="184.8" font-family="'Hiragino Sans','Noto Sans JP','Yu Gothic',sans-serif" font-size="13" font-weight="600" fill="#0b0b0b">ゆっくり</text>
+<text x="664" y="200.8" font-family="'Hiragino Sans','Noto Sans JP','Yu Gothic',sans-serif" font-size="11" fill="#52514e">25人・3,060円</text>
+<text x="355.0" y="406" text-anchor="middle" font-family="'Hiragino Sans','Noto Sans JP','Yu Gothic',sans-serif" font-size="12" fill="#52514e">公開してからの月</text>
+</svg>

@@ -2,11 +2,10 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import type { MeResponse } from "@threads-grower/shared";
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { resetViewport, setViewport } from "./helpers/viewport";
-import { ME_BILLING_OFF } from "./helpers/billing";
+import { ME_BILLING_OFF, type MeWithThreads } from "./helpers/billing";
 
 vi.mock("@clerk/react", () => ({
   useUser: () => ({ user: { fullName: "Takumi", primaryEmailAddress: { emailAddress: "t@example.com" } } }),
@@ -16,7 +15,7 @@ vi.mock("@clerk/react", () => ({
 function account(id: string, username: string, connectionStatus: "connected" | "needs_reconnect" = "connected") {
   return { id, name: username, username, displayName: username, profilePictureUrl: null, connectionStatus, lastUsedAt: null, role: "owner" as const, ownerName: null };
 }
-const meResponse: MeResponse = {
+const meResponse: MeWithThreads = {
   user: { id: "u", email: "t@example.com", displayName: "Takumi" },
   accounts: [account("a1", "takumi"), account("a2", "aibu", "needs_reconnect")],
   landingAccountId: "a1",
@@ -29,29 +28,35 @@ const meResponse: MeResponse = {
 const getDraftCounts = vi.fn();
 vi.mock("@/lib/api-client", async (orig) => {
   const actual = await orig<typeof import("@/lib/api-client")>();
-  return { ...actual, api: { ...actual.api, me: () => Promise.resolve(meResponse), getDraftCounts } };
+  return { ...actual, api: { ...actual.api, me: () => Promise.resolve(meResponse) } };
+});
+vi.mock("@/apps/threads/lib/api", async (orig) => {
+  const actual = await orig<typeof import("@/apps/threads/lib/api")>();
+  // サイドバーは /access の features（specs/019）を見てから件数を読む
+  const { OWNER_ACCESS } = await import("./helpers/access");
+  return { ...actual, threadsApi: { ...actual.threadsApi, me: () => Promise.resolve(meResponse), getDraftCounts, accountAccess: async () => OWNER_ACCESS } };
 });
 
-const { AppShell } = await import("@/components/layout/AppShell");
-const { PageHeader } = await import("@/components/layout/PageHeader");
-const { SettingsLayout, SettingsIndex } = await import("@/pages/settings/settings-layout");
-const { AppearanceSettings } = await import("@/pages/settings/appearance");
+const { ThreadsShell } = await import("@/apps/threads/sidebar");
+const { PageHeader } = await import("@/shell/layout/PageHeader");
+const { SettingsLayout, SettingsIndex } = await import("@/shell/settings/settings-layout");
+const { AppearanceSettings } = await import("@/shell/settings/appearance");
 
 function renderShell() {
   const router = createMemoryRouter(
     [
       {
-        path: "/accounts/:accountId",
+        path: "/threads/accounts/:accountId",
         element: (
-          <AppShell>
+          <ThreadsShell>
             <PageHeader title="ホーム" />
             <p>中身</p>
-          </AppShell>
+          </ThreadsShell>
         ),
       },
-      { path: "/accounts/new", element: <p>アカウント追加画面</p> },
+      { path: "/threads/accounts/new", element: <p>アカウント追加画面</p> },
     ],
-    { initialEntries: ["/accounts/a1"] },
+    { initialEntries: ["/threads/accounts/a1"] },
   );
   render(
     <QueryClientProvider client={new QueryClient()}>

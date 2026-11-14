@@ -1,20 +1,20 @@
 // US3：AIと深掘りする（specs/014-strategy-guidance FR-030〜FR-035・FR-070、SC-004・SC-005・SC-008）
 import { screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { FINAL_BEGIN, FINAL_END } from "@threads-grower/shared";
+import { FINAL_BEGIN, FINAL_END } from "@meguru/shared";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderStrategyPage, strategyOf } from "./helpers/strategy-page";
 
 const getStrategy = vi.fn();
 const putStrategy = vi.fn();
-vi.mock("@/lib/api-client", async (orig) => {
-  const actual = await orig<typeof import("@/lib/api-client")>();
-  return { ...actual, api: { ...actual.api, getStrategy, putStrategy } };
+vi.mock("@/apps/threads/lib/api", async (orig) => {
+  const actual = await orig<typeof import("@/apps/threads/lib/api")>();
+  return { ...actual, threadsApi: { ...actual.threadsApi, getStrategy, putStrategy } };
 });
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
 const { UnsavedChangesProvider } = await import("@/components/UnsavedChangesProvider");
-const { StrategyPage } = await import("@/pages/strategy");
+const { StrategyPage } = await import("@/apps/threads/pages/strategy");
 
 async function field(key: string) {
   await screen.findByRole("heading", { name: "営業導線設計" });
@@ -39,13 +39,13 @@ describe("AIと深掘りする", () => {
     getStrategy.mockResolvedValue(strategyOf());
     renderStrategyPage(StrategyPage, UnsavedChangesProvider);
     const target = await field("targetPersona");
-    await userEvent.click(target.getByRole("button", { name: "この項目をAIと深掘りする" }));
+    await userEvent.click(target.getByRole("button", { name: "AIと深掘り" }));
     expect(target.getByRole("button", { name: "プロンプトをコピーする" })).toBeInTheDocument();
     expect(target.getByLabelText("AIの答えを貼り付ける")).toBeInTheDocument();
     expect(target.getByText(/ChatGPTやClaudeに貼り付けて送り、AIの質問に答える/)).toBeInTheDocument();
 
     const worries = await field("realWorries");
-    await userEvent.click(worries.getByRole("button", { name: "この項目をAIと深掘りする" }));
+    await userEvent.click(worries.getByRole("button", { name: "AIと深掘り" }));
     expect(worries.getByLabelText("AIの答えを貼り付ける")).toBeInTheDocument();
     expect(target.queryByLabelText("AIの答えを貼り付ける")).not.toBeInTheDocument();
   });
@@ -57,7 +57,7 @@ describe("AIと深掘りする", () => {
     renderStrategyPage(StrategyPage, UnsavedChangesProvider);
     const f = await field("targetPersona");
     await user.type(f.getByRole("textbox"), "20代会社員");
-    await user.click(f.getByRole("button", { name: "この項目をAIと深掘りする" }));
+    await user.click(f.getByRole("button", { name: "AIと深掘り" }));
     await user.click(f.getByRole("button", { name: "プロンプトをコピーする" }));
     expect(writeText).toHaveBeenCalledTimes(1);
     const copied = writeText.mock.calls[0]![0];
@@ -72,7 +72,7 @@ describe("AIと深掘りする", () => {
     vi.spyOn(navigator.clipboard, "writeText").mockRejectedValue(new Error("denied"));
     renderStrategyPage(StrategyPage, UnsavedChangesProvider);
     const f = await field("finalAction");
-    await user.click(f.getByRole("button", { name: "この項目をAIと深掘りする" }));
+    await user.click(f.getByRole("button", { name: "AIと深掘り" }));
     await user.click(f.getByRole("button", { name: "プロンプトをコピーする" }));
     expect(f.getByText("コピーできませんでした。全体を選んでコピーしてください")).toBeInTheDocument();
     expect((f.getByLabelText("プロンプト") as HTMLTextAreaElement).value).toContain("「最終的に読者に取ってほしい行動」");
@@ -82,7 +82,7 @@ describe("AIと深掘りする", () => {
     getStrategy.mockResolvedValue(strategyOf({ realWorries: "将来が不安" }));
     renderStrategyPage(StrategyPage, UnsavedChangesProvider);
     const f = await field("realWorries");
-    await userEvent.click(f.getByRole("button", { name: "この項目をAIと深掘りする" }));
+    await userEvent.click(f.getByRole("button", { name: "AIと深掘り" }));
     await paste(f.getByLabelText("AIの答えを貼り付ける"), `まとめました。\n${FINAL_BEGIN}\n会社と家の往復で出会いが減った\n${FINAL_END}\nどうですか？`);
     expect(f.getByText(/目印「【完成版ここから】」の内側/)).toBeInTheDocument();
     await userEvent.click(f.getByRole("button", { name: "この内容を反映する" }));
@@ -100,7 +100,7 @@ describe("AIと深掘りする", () => {
     getStrategy.mockResolvedValue(strategyOf());
     renderStrategyPage(StrategyPage, UnsavedChangesProvider);
     const f = await field("finalAction");
-    await userEvent.click(f.getByRole("button", { name: "この項目をAIと深掘りする" }));
+    await userEvent.click(f.getByRole("button", { name: "AIと深掘り" }));
     expect(f.getByRole("button", { name: "この内容を反映する" })).toBeDisabled();
     await paste(f.getByLabelText("AIの答えを貼り付ける"), "  公式LINEに登録してもらう  ");
     expect(f.getByText("目印が見つからないので、貼り付けた文の全体を反映します")).toBeInTheDocument();
@@ -112,7 +112,7 @@ describe("AIと深掘りする", () => {
     getStrategy.mockResolvedValue(strategyOf());
     renderStrategyPage(StrategyPage, UnsavedChangesProvider);
     const f = await field("finalAction");
-    await userEvent.click(f.getByRole("button", { name: "この項目をAIと深掘りする" }));
+    await userEvent.click(f.getByRole("button", { name: "AIと深掘り" }));
     await paste(f.getByLabelText("AIの答えを貼り付ける"), "あ".repeat(2001));
     expect(f.getByText("2000文字を超えています。反映した後に短くしてください")).toBeInTheDocument();
     await userEvent.click(f.getByRole("button", { name: "この内容を反映する" }));
@@ -123,7 +123,7 @@ describe("AIと深掘りする", () => {
     getStrategy.mockResolvedValue(strategyOf({ canEdit: false }));
     renderStrategyPage(StrategyPage, UnsavedChangesProvider);
     await field("finalAction");
-    expect(screen.queryByRole("button", { name: "この項目をAIと深掘りする" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "AIと深掘り" })).not.toBeInTheDocument();
   });
 
   it("近い人間性と下書きには「AIと深掘りする」がない（FR-030）", async () => {
@@ -176,7 +176,7 @@ describe("深掘りの貼り付けを捨てる前の確認（PR #17 のCodexレ�
     getStrategy.mockResolvedValue(strategyOf());
     renderStrategyPage(StrategyPage, UnsavedChangesProvider);
     const f = await field("realWorries");
-    await userEvent.click(f.getByRole("button", { name: "この項目をAIと深掘りする" }));
+    await userEvent.click(f.getByRole("button", { name: "AIと深掘り" }));
     await paste(f.getByLabelText("AIの答えを貼り付ける"), "AIの答え");
     await userEvent.click(f.getByRole("button", { name: "閉じる" }));
     expect(await screen.findByText("貼り付けたAIの答えがあります。破棄しますか？")).toBeInTheDocument();
@@ -191,10 +191,10 @@ describe("深掘りの貼り付けを捨てる前の確認（PR #17 のCodexレ�
     getStrategy.mockResolvedValue(strategyOf());
     renderStrategyPage(StrategyPage, UnsavedChangesProvider);
     const f = await field("realWorries");
-    await userEvent.click(f.getByRole("button", { name: "この項目をAIと深掘りする" }));
+    await userEvent.click(f.getByRole("button", { name: "AIと深掘り" }));
     await paste(f.getByLabelText("AIの答えを貼り付ける"), "AIの答え");
     const other = await field("targetPersona");
-    await userEvent.click(other.getByRole("button", { name: "この項目をAIと深掘りする" }));
+    await userEvent.click(other.getByRole("button", { name: "AIと深掘り" }));
     expect(await screen.findByText("貼り付けたAIの答えがあります。破棄しますか？")).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "破棄して閉じる" }));
     expect(other.getByLabelText("AIの答えを貼り付ける")).toHaveValue("");
@@ -205,7 +205,7 @@ describe("深掘りの貼り付けを捨てる前の確認（PR #17 のCodexレ�
     getStrategy.mockResolvedValue(strategyOf());
     renderStrategyPage(StrategyPage, UnsavedChangesProvider);
     const f = await field("realWorries");
-    await userEvent.click(f.getByRole("button", { name: "この項目をAIと深掘りする" }));
+    await userEvent.click(f.getByRole("button", { name: "AIと深掘り" }));
     await paste(f.getByLabelText("AIの答えを貼り付ける"), "AIの答え");
     await userEvent.click(screen.getByRole("link", { name: "ホームへ" }));
     expect(await screen.findByText("保存していない変更があります")).toBeInTheDocument();

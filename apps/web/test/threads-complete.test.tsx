@@ -7,8 +7,8 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { api } from "@/lib/api-client";
-import { ThreadsComplete } from "@/pages/threads-complete";
+import { threadsApi } from "@/apps/threads/lib/api";
+import { ThreadsComplete } from "@/apps/threads/pages/threads-complete";
 
 const navigate = vi.fn();
 vi.mock("react-router", async () => {
@@ -49,54 +49,54 @@ describe("完了の画面のルート", () => {
 describe("Threads から戻ってきたとき", () => {
   it("state と code をログイン済みのPOSTで送り、サーバーが決めた行き先へ進む", async () => {
     const complete = vi
-      .spyOn(api, "completeConnect")
-      .mockResolvedValue({ redirectTo: "/accounts/a1/settings?connected=connect" });
+      .spyOn(threadsApi, "completeConnect")
+      .mockResolvedValue({ redirectTo: "/threads/accounts/a1/settings?connected=connect" });
     renderAt("?state=s1&code=c1");
     expect(screen.getByRole("heading", { name: "Threadsにつないでいます" })).toBeInTheDocument();
     await waitFor(() => expect(complete).toHaveBeenCalledWith({ state: "s1", code: "c1" }));
     await waitFor(() =>
-      expect(navigate).toHaveBeenCalledWith("/accounts/a1/settings?connected=connect", { replace: true }),
+      expect(navigate).toHaveBeenCalledWith("/threads/accounts/a1/settings?connected=connect", { replace: true }),
     );
   });
 
   it("履歴に残さない（戻るボタンで、使い終わった state と code のURLに戻らない）", async () => {
-    vi.spyOn(api, "completeConnect").mockResolvedValue({ redirectTo: "/accounts/a1/settings?connected=connect" });
+    vi.spyOn(threadsApi, "completeConnect").mockResolvedValue({ redirectTo: "/threads/accounts/a1/settings?connected=connect" });
     renderAt("?state=s1&code=c1");
     await waitFor(() => expect(navigate).toHaveBeenCalled());
     expect(navigate.mock.calls[0]?.[1]).toEqual({ replace: true });
   });
 
   it("完了が断られたら、振り分けへ戻して理由を出す", async () => {
-    vi.spyOn(api, "completeConnect").mockRejectedValue(new Error("nope"));
+    vi.spyOn(threadsApi, "completeConnect").mockRejectedValue(new Error("nope"));
     renderAt("?state=s1&code=c1");
-    await waitFor(() => expect(navigate).toHaveBeenCalledWith("/?error=OAUTH_STATE_INVALID", { replace: true }));
+    await waitFor(() => expect(navigate).toHaveBeenCalledWith("/threads?error=OAUTH_STATE_INVALID", { replace: true }));
   });
 
   it("利用者が許可しなかったときは、POSTせずに理由を出す", async () => {
-    const complete = vi.spyOn(api, "completeConnect");
+    const complete = vi.spyOn(threadsApi, "completeConnect");
     renderAt("?error=THREADS_AUTH_CANCELLED");
-    await waitFor(() => expect(navigate).toHaveBeenCalledWith("/?error=THREADS_AUTH_CANCELLED", { replace: true }));
+    await waitFor(() => expect(navigate).toHaveBeenCalledWith("/threads?error=THREADS_AUTH_CANCELLED", { replace: true }));
     expect(complete).not.toHaveBeenCalled();
   });
 
   it("state か code が無ければ、POSTせずに理由を出す", async () => {
-    const complete = vi.spyOn(api, "completeConnect");
+    const complete = vi.spyOn(threadsApi, "completeConnect");
     renderAt("?state=s1");
-    await waitFor(() => expect(navigate).toHaveBeenCalledWith("/?error=THREADS_AUTH_FAILED", { replace: true }));
+    await waitFor(() => expect(navigate).toHaveBeenCalledWith("/threads?error=THREADS_AUTH_FAILED", { replace: true }));
     expect(complete).not.toHaveBeenCalled();
   });
 
   it("アプリの外へ向かう行き先は使わない", async () => {
     // サーバーは相対パスしか返さないが、万一にも外部へ飛ばさない
-    vi.spyOn(api, "completeConnect").mockResolvedValue({ redirectTo: "//evil.example.com" } as never);
+    vi.spyOn(threadsApi, "completeConnect").mockResolvedValue({ redirectTo: "//evil.example.com" } as never);
     renderAt("?state=s1&code=c1");
-    await waitFor(() => expect(navigate).toHaveBeenCalledWith("/", { replace: true }));
+    await waitFor(() => expect(navigate).toHaveBeenCalledWith("/threads", { replace: true }));
   });
 
   it("二重に送らない", async () => {
     const complete = vi
-      .spyOn(api, "completeConnect")
-      .mockResolvedValue({ redirectTo: "/accounts/a1/settings?connected=connect" });
+      .spyOn(threadsApi, "completeConnect")
+      .mockResolvedValue({ redirectTo: "/threads/accounts/a1/settings?connected=connect" });
     renderAt("?state=s1&code=c1");
     await waitFor(() => expect(complete).toHaveBeenCalled());
     expect(complete).toHaveBeenCalledTimes(1);

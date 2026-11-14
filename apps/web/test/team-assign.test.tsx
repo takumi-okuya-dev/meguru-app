@@ -2,7 +2,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import type { TeamAssignments } from "@threads-grower/shared";
+import type { TeamAssignments } from "@meguru/shared";
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -11,11 +11,15 @@ vi.mock("@/lib/api-client", async (orig) => {
   const actual = await orig<typeof import("@/lib/api-client")>();
   return { ...actual, api: { ...actual.api, ...mocks } };
 });
+vi.mock("@/apps/threads/lib/api", async (orig) => {
+  const actual = await orig<typeof import("@/apps/threads/lib/api")>();
+  return { ...actual, threadsApi: { ...actual.threadsApi, ...mocks } };
+});
 const toast = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn(), dismiss: vi.fn() }));
 vi.mock("sonner", () => ({ toast }));
 
 const { ApiError } = await import("@/lib/api-client");
-const { TeamAssignPage } = await import("@/pages/team-assign");
+const { TeamAssignPage } = await import("@/apps/threads/pages/team-assign");
 
 const table: TeamAssignments = {
   accounts: [
@@ -32,10 +36,10 @@ const table: TeamAssignments = {
 function renderPage() {
   const router = createMemoryRouter(
     [
-      { path: "/teams/:teamId/assign", element: <TeamAssignPage /> },
-      { path: "/teams/:teamId", element: <p>チームの画面</p> },
+      { path: "/threads/teams/:teamId/assign", element: <TeamAssignPage /> },
+      { path: "/threads/teams/:teamId", element: <p>チームの画面</p> },
     ],
-    { initialEntries: ["/teams/t1/assign"] },
+    { initialEntries: ["/threads/teams/t1/assign"] },
   );
   render(
     <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
@@ -65,7 +69,7 @@ describe("担当を決める", () => {
     expect(within(rows[2]!).getByText("自分")).toBeInTheDocument();
     expect(screen.getByRole("checkbox", { name: "佐藤 美咲をカフェ B店（@cafe_b）の担当にする" })).toHaveAttribute("aria-checked", "true");
     expect(screen.getByRole("checkbox", { name: "田中 健をカフェ B店（@cafe_b）の担当にする" })).toHaveAttribute("aria-checked", "false");
-    expect(screen.getByRole("link", { name: "チームの画面に戻る" })).toHaveAttribute("href", "/teams/t1");
+    expect(screen.getByRole("link", { name: "チームの画面に戻る" })).toHaveAttribute("href", "/threads/teams/t1");
   });
 
   it("押すとすぐ切り替え、失敗したら元に戻す（44pxの role=checkbox のボタン）", async () => {

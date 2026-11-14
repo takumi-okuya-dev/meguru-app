@@ -1,11 +1,11 @@
 import { and, eq } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
 import { accounts, memberships } from "../../src/db/schema";
-import { call, connectNew, createUserWithAccount, db, fake, makeApp, resetDb } from "../helpers/app";
+import { call, connectNew, createUserWithAccount, db, fake, makeApp, resetDb, setDefaultLimit } from "../helpers/app";
 import { makeTeam, putInTeam } from "../helpers/team";
 
 const app = makeApp();
-const endpoint = "/api/me/needs-review-counts";
+const endpoint = "/api/threads/me/needs-review-counts";
 
 beforeEach(async () => {
   await resetDb();
@@ -16,7 +16,7 @@ beforeEach(async () => {
 async function addAccount(owner: string, fakeId: string) {
   const { callbackRes } = await connectNew(app, owner, fakeId);
   expect(callbackRes?.status).toBe(302);
-  const me = (await (await call(app, "GET", "/api/me", { user: owner })).json()) as {
+  const me = (await (await call(app, "GET", "/api/threads/me", { user: owner })).json()) as {
     accounts: { id: string; username: string }[];
   };
   return me.accounts.find((account) => account.username === `review${fakeId.at(-1)}`)!.id;
@@ -25,14 +25,14 @@ async function addAccount(owner: string, fakeId: string) {
 async function addDrafts(accountId: string, count: number) {
   if (count === 0) return;
   const text = Array.from({ length: count }, (_, i) => `下書き ${i + 1}`).join("\n@@@\n");
-  const res = await call(app, "POST", `/api/accounts/${accountId}/draft-batches`, {
+  const res = await call(app, "POST", `/api/threads/accounts/${accountId}/draft-batches`, {
     user: "u1",
     body: { clientRequestId: crypto.randomUUID(), text },
   });
   expect(res.status).toBe(201);
 }
 
-describe("GET /api/me/needs-review-counts", () => {
+describe("GET /api/threads/me/needs-review-counts", () => {
   it("未認証は401、Accountを持たないユーザーは空配列", async () => {
     expect((await call(app, "GET", endpoint)).status).toBe(401);
     const res = await call(app, "GET", endpoint, { user: "empty" });
@@ -42,6 +42,8 @@ describe("GET /api/me/needs-review-counts", () => {
   });
 
   it("ownerの3件を5・2・0件で返し、他人とowner以外を除き、要再接続も数える", async () => {
+    // 4件作るので、上限の既定値（3件。specs/024）を上げる
+    await setDefaultLimit("accounts", 10);
     const first = await addAccount("u1", "7001");
     const second = await addAccount("u1", "7002");
     const third = await addAccount("u1", "7003");
@@ -61,7 +63,7 @@ describe("GET /api/me/needs-review-counts", () => {
       .update(memberships)
       .set({ role: "member", teamId: legacyTeam })
       .where(and(eq(memberships.accountId, memberOnly), eq(memberships.role, "owner")));
-    const otherRes = await call(app, "POST", `/api/accounts/${other}/draft-batches`, {
+    const otherRes = await call(app, "POST", `/api/threads/accounts/${other}/draft-batches`, {
       user: "u2",
       body: { clientRequestId: crypto.randomUUID(), text: "他人の投稿" },
     });
@@ -77,7 +79,7 @@ describe("GET /api/me/needs-review-counts", () => {
       [third]: 0,
     });
     for (const row of body.counts) {
-      const own = await call(app, "GET", `/api/accounts/${row.accountId}/post-drafts/counts`, {
+      const own = await call(app, "GET", `/api/threads/accounts/${row.accountId}/post-drafts/counts`, {
         user: "u1",
       });
       expect((await own.json()) as { needsReview: number }).toMatchObject({
@@ -86,7 +88,7 @@ describe("GET /api/me/needs-review-counts", () => {
     }
 
     const stock = (await (
-      await call(app, "GET", `/api/accounts/${first}/post-drafts`, { user: "u1" })
+      await call(app, "GET", `/api/threads/accounts/${first}/post-drafts`, { user: "u1" })
     ).json()) as {
       needsReview: { id: string; version: number }[];
     };
@@ -95,7 +97,7 @@ describe("GET /api/me/needs-review-counts", () => {
       ["approve", approve],
       ["reject", reject],
     ] as const) {
-      const reviewed = await call(app, "POST", `/api/accounts/${first}/post-drafts/review`, {
+      const reviewed = await call(app, "POST", `/api/threads/accounts/${first}/post-drafts/review`, {
         user: "u1",
         body: {
           requestId: crypto.randomUUID(),
@@ -125,14 +127,14 @@ describe("GET /api/me/needs-review-counts", () => {
 });
 
 // ---- チーム：担当のアカウントの件数も数える（specs/008 /speckit-analyze O1、specs/011 T008）----
-describe("GET /api/me/needs-review-counts（チーム）", () => {
+describe("GET /api/threads/me/needs-review-counts（チーム）", () => {
   it("担当の編集者には担当のアカウントの件数も返り、見せてもらっている・関係のないアカウントは返らない", async () => {
     const { accountId: helped } = await createUserWithAccount("o1");
     const { accountId: unrelated } = await createUserWithAccount("o2");
     await putInTeam(helped, "o1", { editor: "e1", shared: true });
     for (const accountId of [helped, unrelated]) {
       const owner = accountId === helped ? "o1" : "o2";
-      const res = await call(app, "POST", `/api/accounts/${accountId}/draft-batches`, {
+      const res = await call(app, "POST", `/api/threads/accounts/${accountId}/draft-batches`, {
         user: owner,
         body: { clientRequestId: crypto.randomUUID(), text: "案1\n@@@\n案2" },
       });

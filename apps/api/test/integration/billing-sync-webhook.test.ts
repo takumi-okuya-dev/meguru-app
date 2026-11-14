@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { subscriptions } from "../../src/db/schema";
 import { createUserWithAccount, db, makeApp, resetDb, testEnv } from "../helpers/app";
 import { billingEnv, callBilling, fakeStripe, sendWebhook } from "../helpers/billing";
-import { syncCustomer } from "../../src/services/billing-service";
+import { syncCustomer } from "../../src/platform/billing/billing-service";
 
 const app = makeApp();
 

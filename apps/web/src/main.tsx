@@ -1,7 +1,7 @@
 import { ClerkProvider, useAuth } from "@clerk/react";
 import { jaJP } from "@clerk/localizations";
 import { QueryClientProvider } from "@tanstack/react-query";
-import { errorMessage } from "@threads-grower/shared";
+import { errorMessage } from "@meguru/shared";
 import { StrictMode, useEffect } from "react";
 import { createRoot } from "react-dom/client";
 import { RouterProvider } from "react-router";

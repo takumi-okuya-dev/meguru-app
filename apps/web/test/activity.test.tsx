@@ -2,18 +2,18 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import type { AccountAccessResponse, AccountSummary, ActivityList } from "@threads-grower/shared";
+import type { AccountAccessResponse, AccountSummary, ActivityList } from "@meguru/shared";
 import { createMemoryRouter, Outlet, RouterProvider } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ADMIN_ACCESS, EDITOR_ACCESS } from "./helpers/access";
 
 const listActivity = vi.fn();
 let access: AccountAccessResponse;
-vi.mock("@/lib/api-client", async (orig) => {
-  const actual = await orig<typeof import("@/lib/api-client")>();
-  return { ...actual, api: { ...actual.api, listActivity, accountAccess: () => Promise.resolve(access) } };
+vi.mock("@/apps/threads/lib/api", async (orig) => {
+  const actual = await orig<typeof import("@/apps/threads/lib/api")>();
+  return { ...actual, threadsApi: { ...actual.threadsApi, listActivity, accountAccess: () => Promise.resolve(access) } };
 });
-const { ActivityPage, actionText } = await import("@/pages/activity");
+const { ActivityPage, actionText } = await import("@/apps/threads/pages/activity");
 
 const account: AccountSummary = {
   id: "a1",
@@ -61,7 +61,7 @@ function renderPage() {
   const router = createMemoryRouter(
     [
       {
-        path: "/accounts/:accountId",
+        path: "/threads/accounts/:accountId",
         element: <Outlet context={{ account }} />,
         children: [
           { index: true, element: <p>ホームの中身</p> },
@@ -69,7 +69,7 @@ function renderPage() {
         ],
       },
     ],
-    { initialEntries: ["/accounts/a1/activity"] },
+    { initialEntries: ["/threads/accounts/a1/activity"] },
   );
   render(
     <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>

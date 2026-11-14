@@ -1,10 +1,11 @@
 // 結合テストの共通部品：偽の認証で動くアプリ、DBの初期化、偽のThreadsサーバーの操作、認可〜callbackの一連の流れ
+import { syncThreadsUsage } from "../../src/apps/threads/accounts/usage";
 import { env } from "cloudflare:test";
 import { neon } from "@neondatabase/serverless";
 import { createApp } from "../../src/app";
-import { createDb } from "../../src/db/client";
-import type { Env } from "../../src/env";
-import type { AuthVerifier } from "../../src/middleware/auth";
+import { createDb } from "../../src/kernel/db/client";
+import type { Env } from "../../src/kernel/env";
+import type { AuthVerifier } from "../../src/platform/identity/auth";
 
 export const testEnv = env as unknown as Env;
 
@@ -60,10 +61,57 @@ export function call(
   return app.request(path, { method, headers, body }, opts.env ?? testEnv);
 }
 
+/**
+ * DBの処理を、行き詰まり（deadlock。Postgres の 40P01）のときだけ数回やり直す。TRUNCATE は多くの表をまとめてロックするので、
+ * 前のテストの裏で終わりきっていない処理とぶつかることがある。行き詰まりでは Postgres が片方を取り消すので、やり直してよい。
+ * @param run - 処理
+ */
+async function retryOnDeadlock(run: () => Promise<unknown>): Promise<void> {
+  for (let attempt = 1; ; attempt++) {
+    try {
+      await run();
+      return;
+    } catch (err) {
+      if ((err as { code?: string }).code !== "40P01" || attempt >= 5) throw err;
+      await new Promise((r) => setTimeout(r, 100 * attempt));
+    }
+  }
+}
+
+/** アプリのスキーマの表（1回だけ読む）。 */
+let appTables: Promise<string[]> | undefined;
+
+/**
+ * アプリのスキーマのすべての表を読む。アプリのスキーマ＝受け取った出来事の表（received_events）を持つスキーマ（どのアプリも持つ。
+ * docs/module-map.md 6）。アプリや表を足しても、ここを直さずに済む（specs/meguru/031）。拡張機能など外のスキーマは空にしない。
+ * @param sql - DBの問い合わせ
+ * @returns 「スキーマ.表」の一覧
+ */
+function loadAppTables(sql: ReturnType<typeof neon<false, false>>): Promise<string[]> {
+  appTables ??= sql
+    .query(
+      "SELECT quote_ident(schemaname) || '.' || quote_ident(tablename) AS name FROM pg_tables WHERE schemaname IN (SELECT schemaname FROM pg_tables WHERE tablename = 'received_events' AND schemaname NOT IN ('public', 'drizzle')) ORDER BY 1",
+    )
+    .then((rows) => (rows as { name: string }[]).map((r) => r.name))
+    .catch((err: unknown) => {
+      // 失敗を覚え続けない（次の resetDb で読み直す）
+      appTables = undefined;
+      throw err;
+    });
+  return appTables;
+}
+
 export async function resetDb() {
   const sql = neon(testEnv.DATABASE_URL);
   createDb(testEnv.DATABASE_URL); // ローカルプロキシの設定を有効にする
-  await sql`TRUNCATE users, accounts, memberships, threads_connections, oauth_states, threads_deletion_requests, threads_revocations, strategy_designs, promotions, reference_posts, research_keywords, draft_batches, post_drafts, ng_words, posting_schedules, publish_attempts, teams, team_members, team_accounts, activity_logs, token_check_failures, subscriptions, withdrawn_users CASCADE`;
+  // 共通（public）は決めた表だけ、アプリのスキーマはすべての表を空にする
+  const tables = ["users", "subscriptions", "withdrawn_users", "platform_events", "app_usage", "user_app_limits", ...(await loadAppTables(sql))];
+  await retryOnDeadlock(() => sql.query(`TRUNCATE ${tables.join(", ")} CASCADE`));
+  // 上限の既定の値を初めの値に戻す（specs/024、specs/meguru/029 research.md R7）
+  await sql`INSERT INTO app_limit_defaults (app, key, value) VALUES ('threads', 'accounts', 3), ('threads', 'daily_posts', 10)
+    ON CONFLICT (app, key) DO UPDATE SET value = EXCLUDED.value`;
+  // Threadsの運営の設定（テスター招待の枠。specs/meguru/029 tasks.md T024）
+  await sql`INSERT INTO threads.settings (id, tester_slot_capacity) VALUES (1, 25) ON CONFLICT (id) DO UPDATE SET tester_slot_capacity = 25`;
 }
 
 export function db() {
@@ -149,14 +197,15 @@ export const fake = {
  *
  * @param app - テストのアプリ
  * @param authorizeUrl - connect が返した認可URL
- * @param opts - 偽の認可画面の挙動と、完了を行う利用者（既定は state の作成者）
+ * @param opts - 偽の認可画面の挙動と、完了を行う利用者（既定は state の作成者）、環境（既定は testEnv）
  * @returns 302 の応答（Location は以前の callback と同じ行き先）
  */
 export async function authorizeAndCallback(
   app: TestApp,
   authorizeUrl: string,
-  opts: { fakeUser?: string; action?: "allow" | "deny"; user?: string } = {},
+  opts: { fakeUser?: string; action?: "allow" | "deny"; user?: string; env?: Env } = {},
 ) {
+  const env = opts.env ?? testEnv;
   const url = new URL(authorizeUrl);
   url.searchParams.set("fake_action", opts.action ?? "allow");
   if (opts.fakeUser) url.searchParams.set("fake_user", opts.fakeUser);
@@ -165,7 +214,7 @@ export async function authorizeAndCallback(
   if (!location) throw new Error(`fake authorize did not redirect: ${res.status}`);
   const cb = new URL(location);
   // callback は転送するだけ（DBにも Threads にも触らない）
-  const hop = await app.request(`${cb.pathname}${cb.search}`, { method: "GET" }, testEnv);
+  const hop = await app.request(`${cb.pathname}${cb.search}`, { method: "GET" }, env);
   const next = new URL(hop.headers.get("Location")!);
   const state = next.searchParams.get("state");
   const code = next.searchParams.get("code");
@@ -176,7 +225,7 @@ export async function authorizeAndCallback(
   const user = opts.user ?? (await stateOwner(state));
   // 許可しなかったときも state を渡して、元のアカウントの画面へ戻してもらう
   const body = error ? { state, error } : { state, code };
-  const done = await call(app, "POST", "/api/threads/complete", { user, body });
+  const done = await call(app, "POST", "/api/threads/complete", { user, body, env });
   if (!done.ok) return done;
   const { redirectTo } = (await done.json()) as { redirectTo: string };
   return redirectResponse(redirectTo);
@@ -191,7 +240,7 @@ async function stateOwner(state: string): Promise<string> {
   const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(state));
   const hash = [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, "0")).join("");
   const rows = (await neon(testEnv.DATABASE_URL)`
-    SELECT u.clerk_user_id FROM oauth_states s JOIN users u ON u.id = s.user_id
+    SELECT u.clerk_user_id FROM threads.oauth_states s JOIN users u ON u.id = s.user_id
     WHERE s.state_hash = ${hash}`) as { clerk_user_id: string }[];
   if (!rows[0]) throw new Error("state が見つかりません（作成者を引けません）");
   return rows[0].clerk_user_id;
@@ -206,11 +255,11 @@ const redirectResponse = (to: string) =>
   new Response(null, { status: 302, headers: { Location: `${testEnv.WEB_ORIGIN.replace(/\/$/, "")}${to}` } });
 
 /**
- * 名前だけでアカウントを作る（POST /api/accounts。specs/012）。
+ * 名前だけでアカウントを作る（POST /api/threads/accounts。specs/012）。
  * @returns 作ったアカウントのID。作れなければ（上限など）NULL と応答
  */
 export async function createAccountVia(app: TestApp, user: string, name = "テストのアカウント") {
-  const res = await call(app, "POST", "/api/accounts", { user, body: { name } });
+  const res = await call(app, "POST", "/api/threads/accounts", { user, body: { name } });
   if (res.status !== 201) return { accountId: null as string | null, res };
   return { accountId: ((await res.clone().json()) as { id: string }).id, res };
 }
@@ -289,10 +338,12 @@ export async function createUserWithAccount(
   const threadsUserId = `tu_${user}_${Date.now()}_${accountSeq}`;
   const username = `${user}_${accountSeq}`;
   const [a] = (await sql`
-    INSERT INTO accounts (name, threads_user_id, username)
+    INSERT INTO threads.accounts (name, threads_user_id, username)
     VALUES (${opts.name ?? username}, ${threadsUserId}, ${username})
     RETURNING id`) as [{ id: string }];
-  await sql`INSERT INTO memberships (user_id, account_id, role) VALUES (${u.id}, ${a.id}, 'owner')`;
+  await sql`INSERT INTO threads.memberships (user_id, account_id, role) VALUES (${u.id}, ${a.id}, 'owner')`;
+  // 本物のアカウントの作成と同じく、利用の数を共通へ伝える（specs/meguru/029 research.md R6）
+  await syncThreadsUsage(createDb(testEnv.DATABASE_URL), u.id);
   return { userId: u.id, accountId: a.id };
 }
 
@@ -314,10 +365,12 @@ export async function createUnconnectedAccount(
     ON CONFLICT (clerk_user_id) DO UPDATE SET updated_at = users.updated_at
     RETURNING id`) as [{ id: string }];
   const [a] = (await sql`
-    INSERT INTO accounts (name, connection_status, connection_method)
+    INSERT INTO threads.accounts (name, connection_status, connection_method)
     VALUES (${opts.name ?? "未接続のアカウント"}, 'not_connected', NULL)
     RETURNING id`) as [{ id: string }];
-  await sql`INSERT INTO memberships (user_id, account_id, role) VALUES (${u.id}, ${a.id}, 'owner')`;
+  await sql`INSERT INTO threads.memberships (user_id, account_id, role) VALUES (${u.id}, ${a.id}, 'owner')`;
+  // 本物のアカウントの作成と同じく、利用の数を共通へ伝える（specs/meguru/029 research.md R6）
+  await syncThreadsUsage(createDb(testEnv.DATABASE_URL), u.id);
   return { userId: u.id, accountId: a.id };
 }
 
@@ -326,7 +379,7 @@ export async function setAccount(accountId: string, values: { connectionStatus?:
   const sql = neon(testEnv.DATABASE_URL);
   createDb(testEnv.DATABASE_URL);
   if (values.connectionStatus) {
-    await sql`UPDATE accounts SET connection_status = ${values.connectionStatus} WHERE id = ${accountId}`;
+    await sql`UPDATE threads.accounts SET connection_status = ${values.connectionStatus} WHERE id = ${accountId}`;
   }
 }
 
@@ -386,5 +439,38 @@ export async function insertSubscription(
 export async function endTrial(userId: string) {
   const sql = neon(testEnv.DATABASE_URL);
   createDb(testEnv.DATABASE_URL);
-  await sql`UPDATE users SET created_at = ${AFTER_TRIAL().toISOString()} WHERE id = ${userId}`;
+  // 無料体験が終わるのは、024の前からいた人だけ（specs/024 research.md R8）
+  await sql`UPDATE users SET created_at = ${AFTER_TRIAL().toISOString()}, legacy_trial = true WHERE id = ${userId}`;
+}
+
+// ---- 上限（運営者が決める値）をテストで直接変える ----
+
+/**
+ * 人ごとの上限を書く（user_app_limits。運営の画面と同じ。specs/meguru/029 research.md R7）。
+ * @param who - clerkUserId か userId
+ * @param key - accounts（アカウントの数）か daily_posts（1日の投稿数）
+ * @param n - 値（null は既定の値に戻す）
+ */
+export async function setUserLimit(who: { clerkUserId: string } | { userId: string }, key: "accounts" | "daily_posts", n: number | null) {
+  const sql = neon(testEnv.DATABASE_URL);
+  createDb(testEnv.DATABASE_URL);
+  const [row] = (
+    "userId" in who ? await sql`SELECT id FROM users WHERE id = ${who.userId}` : await sql`SELECT id FROM users WHERE clerk_user_id = ${who.clerkUserId}`
+  ) as { id: string }[];
+  if (!row) throw new Error("user not found");
+  if (n === null) await sql`DELETE FROM user_app_limits WHERE user_id = ${row.id} AND app = 'threads' AND key = ${key}`;
+  else
+    await sql`INSERT INTO user_app_limits (user_id, app, key, value) VALUES (${row.id}, 'threads', ${key}, ${n})
+      ON CONFLICT (user_id, app, key) DO UPDATE SET value = EXCLUDED.value`;
+}
+
+/**
+ * 既定の上限を書く（app_limit_defaults）。
+ * @param key - accounts か daily_posts
+ * @param n - 値
+ */
+export async function setDefaultLimit(key: "accounts" | "daily_posts", n: number) {
+  const sql = neon(testEnv.DATABASE_URL);
+  createDb(testEnv.DATABASE_URL);
+  await sql`INSERT INTO app_limit_defaults (app, key, value) VALUES ('threads', ${key}, ${n}) ON CONFLICT (app, key) DO UPDATE SET value = EXCLUDED.value`;
 }

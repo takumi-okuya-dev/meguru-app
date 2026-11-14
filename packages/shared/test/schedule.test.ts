@@ -45,6 +45,14 @@ describe("投稿の設定の検証（FR-001・FR-001a・FR-002）", () => {
     expect(validatePostingSchedule({ ...base, slotTimes })).toMatchObject({ ok: false, reason: "too_many" });
   });
 
+  it("上限は maxSlots で決める（オーナーの1日の投稿数の上限。specs/024 FR-019）", () => {
+    const slotTimes = Array.from({ length: 5 }, (_, i) => minutesToTime(i * 60));
+    expect(validatePostingSchedule({ ...base, slotTimes }, { maxSlots: 4 })).toMatchObject({ ok: false, reason: "too_many" });
+    expect(validatePostingSchedule({ ...base, slotTimes }, { maxSlots: 5 })).toMatchObject({ ok: true });
+    const many = Array.from({ length: 12 }, (_, i) => minutesToTime(i * 60));
+    expect(validatePostingSchedule({ ...base, slotTimes: many }, { maxSlots: 250 })).toMatchObject({ ok: true });
+  });
+
   it("同じ時刻は duplicate", () => {
     expect(validatePostingSchedule({ ...base, slotTimes: ["07:30", "07:30"] })).toMatchObject({
       ok: false,

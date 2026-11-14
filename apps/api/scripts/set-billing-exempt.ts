@@ -3,8 +3,8 @@
 // 付けるときに終わっていない契約があれば、重ねて請求しないよう止める（--force で付ける。契約は支払いの画面で解約してもらう）。
 import { neonConfig } from "@neondatabase/serverless";
 import ws from "ws";
-import { createDb } from "../src/db/client";
-import { setBillingExemptByEmail } from "../src/services/billing-service";
+import { createDb } from "../src/kernel/db/client";
+import { setBillingExemptByEmail } from "../src/platform/billing/billing-service";
 
 neonConfig.webSocketConstructor = ws;
 

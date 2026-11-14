@@ -4,12 +4,15 @@
 //   件数を指定すると、その件数の確定した投稿済みを作る（表示の速さの確認用。例：500）。
 // 接続先: DATABASE_URL_DIRECT（既定はローカルの docker compose）。localhost 以外には書き込まない。
 import pg from "pg";
+import { loadWorktreeEnv } from "./worktree-env";
 
 const [accountId, countArg] = process.argv.slice(2);
 if (!accountId) {
   console.error("使い方: seed:performance <accountId> [件数]");
   process.exit(1);
 }
+// 作業場所を分けているときは、その作業場所のDB（scripts/worktree-env.ts）
+loadWorktreeEnv();
 const url = process.env.DATABASE_URL_DIRECT ?? "postgres://postgres:postgres@localhost:5432/threads_grower";
 const host = new URL(url).hostname;
 if (!["localhost", "127.0.0.1", "db.localtest.me"].includes(host)) {
@@ -32,13 +35,13 @@ async function published(items: { body: string; hours: number }[]): Promise<stri
   for (let i = 0; i < items.length; i += 50) {
     const chunk = items.slice(i, i + 50);
     const b = await client.query(
-      `INSERT INTO draft_batches (account_id, client_request_id, draft_count, delimiter_found)
+      `INSERT INTO threads.draft_batches (account_id, client_request_id, draft_count, delimiter_found)
        VALUES ($1, gen_random_uuid(), $2, true) RETURNING id`,
       [accountId, chunk.length],
     );
     for (const [j, it] of chunk.entries()) {
       const r = await client.query(
-        `INSERT INTO post_drafts (account_id, batch_id, position, body, status, reviewed_at, published_at, threads_media_id, threads_permalink)
+        `INSERT INTO threads.post_drafts (account_id, batch_id, position, body, status, reviewed_at, published_at, threads_media_id, threads_permalink)
          VALUES ($1, $2, $3, $4, 'published', $5, $5, $6, $7) RETURNING id`,
         [accountId, b.rows[0].id, j, it.body, ago(it.hours), `seed_${Date.now()}_${i + j}`, `https://www.threads.com/@seed/post/${i + j}`],
       );
@@ -57,7 +60,7 @@ async function published(items: { body: string; hours: number }[]): Promise<stri
  */
 async function confirmed(id: string, views: number, state = "confirmed", hours = 168) {
   await client.query(
-    `INSERT INTO post_metrics (draft_id, account_id, state, views, likes, replies, reposts, quotes, shares,
+    `INSERT INTO threads.post_metrics (draft_id, account_id, state, views, likes, replies, reposts, quotes, shares,
        last_fetched_at, last_elapsed_minutes, last_kind, confirmed_at)
      VALUES ($1, $2, $3, $4, $5, 0, 0, 0, 0, now(), $6, $7, now())`,
     [id, accountId, state, views, Math.floor(views / 30), hours * 60, state === "confirmed" ? "d7" : "late"],
@@ -77,7 +80,7 @@ try {
       { body: "72時間前の投稿", hours: 72 },
     ]);
     await client.query(
-      `INSERT INTO post_metrics (draft_id, account_id, state, views, likes, last_fetched_at, last_elapsed_minutes, last_kind)
+      `INSERT INTO threads.post_metrics (draft_id, account_id, state, views, likes, last_fetched_at, last_elapsed_minutes, last_kind)
        VALUES ($1, $3, 'updating', 41, 1, now(), 1440, 'h24'), ($2, $3, 'updating', 66, 2, now(), 4320, 'd3')`,
       [h24, h72, accountId],
     );
@@ -91,11 +94,11 @@ try {
   // metrics-runner と同じ規則で判定する（research.md R5）
   await client.query(
     `WITH base AS (
-       SELECT pm.views FROM post_metrics pm JOIN post_drafts d ON d.id = pm.draft_id
+       SELECT pm.views FROM threads.post_metrics pm JOIN threads.post_drafts d ON d.id = pm.draft_id
        WHERE pm.account_id = $1 AND pm.state = 'confirmed' AND pm.views IS NOT NULL
        ORDER BY d.published_at DESC LIMIT 30
      ), b AS (SELECT count(*) n, percentile_cont(0.5) WITHIN GROUP (ORDER BY views) median FROM base)
-     UPDATE post_metrics pm SET judgment = (CASE WHEN pm.views / b.median >= 2 THEN 'good'
+     UPDATE threads.post_metrics pm SET judgment = (CASE WHEN pm.views / b.median >= 2 THEN 'good'
          WHEN pm.views / b.median <= 0.5 THEN 'poor' ELSE 'normal' END)::judgment,
        judgment_ratio = pm.views / b.median, judgment_baseline = b.median, judged_at = now()
      FROM b WHERE pm.account_id = $1 AND pm.state IN ('confirmed','late_confirmed') AND pm.judgment IS NULL

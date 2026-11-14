@@ -2,7 +2,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import type { AccountSummary } from "@threads-grower/shared";
+import type { AccountSummary } from "@meguru/shared";
 import { createMemoryRouter, Outlet, RouterProvider } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -11,18 +11,25 @@ const listResearchKeywords = vi.fn();
 const createReferencePost = vi.fn();
 const createReferencePostsBatch = vi.fn();
 const createResearchKeyword = vi.fn();
-vi.mock("@/lib/api-client", async (orig) => {
-  const actual = await orig<typeof import("@/lib/api-client")>();
+vi.mock("@/apps/threads/lib/api", async (orig) => {
+  const actual = await orig<typeof import("@/apps/threads/lib/api")>();
   return {
     ...actual,
-    api: { ...actual.api, listReferencePosts, listResearchKeywords, createReferencePost, createReferencePostsBatch, createResearchKeyword },
+    threadsApi: {
+      ...actual.threadsApi,
+      listReferencePosts,
+      listResearchKeywords,
+      createReferencePost,
+      createReferencePostsBatch,
+      createResearchKeyword,
+    },
   };
 });
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
 const { ApiError } = await import("@/lib/api-client");
 const { refPost } = await import("./helpers/research");
-const { ResearchPage } = await import("@/pages/research");
+const { ResearchPage } = await import("@/apps/threads/pages/research");
 
 const account: AccountSummary = {
   id: "a1",
@@ -38,11 +45,11 @@ const account: AccountSummary = {
 
 const meta = { version: 1, createdAt: "2026-10-03T00:00:00.000Z", updatedAt: "2026-10-03T00:00:00.000Z" };
 
-function renderPage(path = "/accounts/a1/research") {
+function renderPage(path = "/threads/accounts/a1/research") {
   const router = createMemoryRouter(
     [
       {
-        path: "/accounts/:accountId",
+        path: "/threads/accounts/:accountId",
         element: <Outlet context={{ account }} />,
         children: [{ path: "research", element: <ResearchPage /> }],
       },
@@ -87,7 +94,7 @@ describe("リサーチの画面", () => {
   });
 
   it("重複したキーワードを入力すると、保存する前に「同じキーワードがすでに登録されています」が出る（FR-014）", async () => {
-    renderPage("/accounts/a1/research?tab=keywords");
+    renderPage("/threads/accounts/a1/research?tab=keywords");
     await userEvent.click(await screen.findByRole("button", { name: /キーワードを追加/ }));
     await userEvent.type(await screen.findByRole("textbox", { name: "キーワード" }), "ＡＩ");
     expect(screen.getByText("同じキーワードがすでに登録されています")).toBeInTheDocument();

@@ -1,10 +1,12 @@
 // US4：暗号鍵のローテーション（research.md R5、quickstart.md の「鍵のローテーション」）
 import { beforeEach, describe, expect, it } from "vitest";
 import { threadsConnections } from "../../src/db/schema";
-import { createTokenCipher, KeyRingError } from "../../src/lib/crypto";
-import { rotateTokenKeys } from "../../src/services/key-rotation";
+import { createTokenCipher, KeyRingError } from "../../src/kernel/crypto";
+import { rotateTokenKeys } from "../../src/jobs/key-rotation";
 import { createApp } from "../../src/app";
 import { call, connectNew, createUserWithAccount, db, fake, fakeVerifier, makeApp, resetDb, testEnv } from "../helpers/app";
+import { OPERATOR, createGroup, groupsEnv } from "../helpers/test-groups";
+import { testGroups } from "../../src/db/schema";
 
 const app = makeApp();
 const KEY2 = btoa(String.fromCharCode(...new Uint8Array(32).fill(42)));
@@ -47,23 +49,72 @@ describe("rotateTokenKeys", () => {
 
   it("チームの招待リンクの暗号化した写しも入れ替え、入れ替えた後も同じリンクを表示できる（specs/011 data-model.md）", async () => {
     const { accountId } = await createUserWithAccount("a1");
-    const created = await call(app, "POST", "/api/teams", { user: "a1", body: { name: "飲食チーム", accountIds: [accountId] } });
+    const created = await call(app, "POST", "/api/threads/teams", { user: "a1", body: { name: "飲食チーム", accountIds: [accountId] } });
     const { teamId } = (await created.json()) as { teamId: string };
-    const before = ((await (await call(app, "GET", `/api/teams/${teamId}/invite`, { user: "a1" })).json()) as { url: string }).url;
+    const before = ((await (await call(app, "GET", `/api/threads/teams/${teamId}/invite`, { user: "a1" })).json()) as { url: string }).url;
     const ring = { ...JSON.parse(testEnv.TOKEN_ENCRYPTION_KEYS), "2": KEY2 };
     const env = { ...testEnv, TOKEN_ENCRYPTION_KEYS: JSON.stringify(ring), TOKEN_ENCRYPTION_KEY_VERSION: "2" };
     expect(await rotateTokenKeys(env)).toEqual({ rotated: 1, skipped: 0, remainingOldVersionRows: 0 });
     // 旧鍵を外しても、入れ替えた写しから同じリンクを読める
     const onlyNew = createApp({ verifyAuth: () => fakeVerifier });
     const newEnv = { ...testEnv, TOKEN_ENCRYPTION_KEYS: JSON.stringify({ "2": KEY2 }), TOKEN_ENCRYPTION_KEY_VERSION: "2" };
-    const res = await onlyNew.request(`/api/teams/${teamId}/invite`, { headers: { Authorization: "Bearer test:a1" } }, newEnv);
+    const res = await onlyNew.request(`/api/threads/teams/${teamId}/invite`, { headers: { Authorization: "Bearer test:a1" } }, newEnv);
     expect(((await res.json()) as { url: string }).url).toBe(before);
+  });
+
+  it("テストのグループの招待リンクの暗号化した写しも入れ替え、旧鍵を外しても同じリンクを表示できる（specs/016 research.md R8）", async () => {
+    const { id, token } = await createGroup(app);
+    const ring = { ...JSON.parse(testEnv.TOKEN_ENCRYPTION_KEYS), "2": KEY2 };
+    const env = { ...testEnv, TOKEN_ENCRYPTION_KEYS: JSON.stringify(ring), TOKEN_ENCRYPTION_KEY_VERSION: "2" };
+    expect(await rotateTokenKeys(env)).toEqual({ rotated: 1, skipped: 0, remainingOldVersionRows: 0 });
+    const [row] = await db().select().from(testGroups);
+    expect(row!.inviteKeyVersion).toBe(2);
+    // 旧鍵を外しても、入れ替えた写しから同じリンクを読める
+    const onlyNew = createApp({ verifyAuth: () => fakeVerifier });
+    const newEnv = groupsEnv({ TOKEN_ENCRYPTION_KEYS: JSON.stringify({ "2": KEY2 }), TOKEN_ENCRYPTION_KEY_VERSION: "2" });
+    const res = await onlyNew.request(`/api/operator/test-groups/${id}`, { headers: { Authorization: `Bearer test:${OPERATOR}` } }, newEnv);
+    expect(res.status).toBe(200);
+    expect(((await res.json()) as { inviteUrl: string }).inviteUrl.split("/test-invite/")[1]).toBe(token);
+  });
+
+  it("テストのグループの招待リンクに鍵が欠けているバージョンがあれば開始しない", async () => {
+    await createGroup(app);
+    const env = { ...testEnv, TOKEN_ENCRYPTION_KEYS: JSON.stringify({ "2": KEY2 }), TOKEN_ENCRYPTION_KEY_VERSION: "2" };
+    await expect(rotateTokenKeys(env)).rejects.toBeInstanceOf(KeyRingError);
+    const [row] = await db().select().from(testGroups);
+    expect(row!.inviteKeyVersion).toBe(1);
   });
 
   it("招待リンクに鍵が欠けているバージョンがあれば開始しない", async () => {
     const { accountId } = await createUserWithAccount("a1");
-    await call(app, "POST", "/api/teams", { user: "a1", body: { name: "飲食チーム", accountIds: [accountId] } });
+    await call(app, "POST", "/api/threads/teams", { user: "a1", body: { name: "飲食チーム", accountIds: [accountId] } });
     const env = { ...testEnv, TOKEN_ENCRYPTION_KEYS: JSON.stringify({ "2": KEY2 }), TOKEN_ENCRYPTION_KEY_VERSION: "2" };
     await expect(rotateTokenKeys(env)).rejects.toBeInstanceOf(KeyRingError);
+  });
+
+  it("アプリの tokenKeys も、鍵の確かめ・入れ替え・残りの数に入る（specs/collect/001 の受付用リンクなど）", async () => {
+    const calls: string[] = [];
+    const app = {
+      id: "collect" as const,
+      register: () => {},
+      tokenKeys: {
+        versionsInUse: async () => [1],
+        rotate: async (_env: unknown, cipher: { currentVersion: number }) => {
+          calls.push(`rotate:${cipher.currentVersion}`);
+          return { rotated: 2, skipped: 1 };
+        },
+        remaining: async (_env: unknown, current: number) => {
+          calls.push(`remaining:${current}`);
+          return 3;
+        },
+      },
+    };
+    const ring = { ...JSON.parse(testEnv.TOKEN_ENCRYPTION_KEYS), "2": KEY2 };
+    const env = { ...testEnv, TOKEN_ENCRYPTION_KEYS: JSON.stringify(ring), TOKEN_ENCRYPTION_KEY_VERSION: "2" };
+    expect(await rotateTokenKeys(env, [app])).toEqual({ rotated: 2, skipped: 1, remainingOldVersionRows: 3 });
+    expect(calls).toEqual(["rotate:2", "remaining:2"]);
+    // アプリが使っている版の鍵が欠けていれば始めない
+    const onlyNew = { ...testEnv, TOKEN_ENCRYPTION_KEYS: JSON.stringify({ "2": KEY2 }), TOKEN_ENCRYPTION_KEY_VERSION: "2" };
+    await expect(rotateTokenKeys(onlyNew, [app])).rejects.toBeInstanceOf(KeyRingError);
   });
 });

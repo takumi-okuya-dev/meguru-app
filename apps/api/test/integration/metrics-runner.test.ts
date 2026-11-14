@@ -91,9 +91,9 @@ describe("補い（毎日の処理。FR-002・FR-004）", () => {
       { publishedAt: hoursAgo(50), mediaId: null },
     ]);
     // 80時間の投稿は24時間を取ってある
-    await db()`INSERT INTO post_metric_snapshots (draft_id, account_id, kind, method, fetched_at, elapsed_minutes, views)
+    await db()`INSERT INTO threads.post_metric_snapshots (draft_id, account_id, kind, method, fetched_at, elapsed_minutes, views)
       VALUES (${p80!.id}, ${accountId}, 'h24', 'slot', ${hoursAgo(56).toISOString()}, 1440, 5)`;
-    await db()`INSERT INTO post_metrics (draft_id, account_id, state, views, last_fetched_at, last_elapsed_minutes, last_kind)
+    await db()`INSERT INTO threads.post_metrics (draft_id, account_id, state, views, last_fetched_at, last_elapsed_minutes, last_kind)
       VALUES (${p80!.id}, ${accountId}, 'updating', 5, ${hoursAgo(56).toISOString()}, 1440, 'h24')`;
     await fake.setInsights(p10d!.mediaId!, { views: 900 });
 
@@ -132,7 +132,7 @@ describe("補い（毎日の処理。FR-002・FR-004）", () => {
     expect(await testEnv.AUTOPOST_KV.get("metrics:catchup")).toBeNull();
     await run(addMin(NOON, 5));
     expect(await testEnv.AUTOPOST_KV.get("metrics:catchup")).toBe(TODAY);
-    const [{ n }] = (await db()`SELECT count(*)::int AS n FROM post_metric_snapshots WHERE account_id = ${accountId}`) as [
+    const [{ n }] = (await db()`SELECT count(*)::int AS n FROM threads.post_metric_snapshots WHERE account_id = ${accountId}`) as [
       { n: number },
     ];
     expect(n).toBe(30);
@@ -149,7 +149,7 @@ describe("補い（毎日の処理。FR-002・FR-004）", () => {
     await run(NOON);
     await run(addMin(NOON, 5));
 
-    const rows = (await db()`SELECT account_id, snapshot_date::text AS d, followers_count FROM follower_snapshots`) as {
+    const rows = (await db()`SELECT account_id, snapshot_date::text AS d, followers_count FROM threads.follower_snapshots`) as {
       account_id: string;
       d: string;
       followers_count: number;
@@ -232,9 +232,9 @@ describe("失敗の扱い（research.md R11）", () => {
     const { accountId } = await growerAccount("u1");
     await markCatchupDone(TODAY);
     const [p] = await publishedDrafts(accountId, [{ publishedAt: hoursAgo(72) }]);
-    await db()`INSERT INTO post_metric_snapshots (draft_id, account_id, kind, method, fetched_at, elapsed_minutes, views)
+    await db()`INSERT INTO threads.post_metric_snapshots (draft_id, account_id, kind, method, fetched_at, elapsed_minutes, views)
       VALUES (${p!.id}, ${accountId}, 'h24', 'slot', ${hoursAgo(48).toISOString()}, 1440, 10)`;
-    await db()`INSERT INTO post_metrics (draft_id, account_id, state, views, last_fetched_at, last_elapsed_minutes, last_kind)
+    await db()`INSERT INTO threads.post_metrics (draft_id, account_id, state, views, last_fetched_at, last_elapsed_minutes, last_kind)
       VALUES (${p!.id}, ${accountId}, 'updating', 10, ${hoursAgo(48).toISOString()}, 1440, 'h24')`;
     await fake.insightsFail(p!.mediaId!, "not_found", -1);
 
@@ -254,7 +254,7 @@ describe("失敗の扱い（research.md R11）", () => {
 
     await run(NOON);
 
-    const [acc] = (await db()`SELECT insights_denied_at FROM accounts WHERE id = ${denied.accountId}`) as [
+    const [acc] = (await db()`SELECT insights_denied_at FROM threads.accounts WHERE id = ${denied.accountId}`) as [
       { insights_denied_at: string | null },
     ];
     expect(acc.insights_denied_at).not.toBeNull();
@@ -272,7 +272,7 @@ describe("失敗の扱い（research.md R11）", () => {
     await publishedDrafts(accountId, [{ publishedAt: hoursAgo(24) }]);
     await fake.insightsFail(`user:${threadsUserId}`, "auth", -1);
     await run(NOON);
-    const [acc] = (await db()`SELECT connection_status FROM accounts WHERE id = ${accountId}`) as [
+    const [acc] = (await db()`SELECT connection_status FROM threads.accounts WHERE id = ${accountId}`) as [
       { connection_status: string },
     ];
     expect(acc.connection_status).toBe("needs_reconnect");
@@ -299,7 +299,7 @@ describe("失敗の扱い（research.md R11）", () => {
 describe("対象のAccount（FR-005）", () => {
   it("要再接続のAccountは取り込まない（読むだけのオーナーは specs/013 で確かめる）", async () => {
     const recon = await growerAccount("u1");
-    await db()`UPDATE accounts SET connection_status = 'needs_reconnect' WHERE id = ${recon.accountId}`;
+    await db()`UPDATE threads.accounts SET connection_status = 'needs_reconnect' WHERE id = ${recon.accountId}`;
     await publishedDrafts(recon.accountId, [{ publishedAt: hoursAgo(24) }]);
     await run(NOON);
     expect(await fake.callCounts()).toMatchObject({ insights: 0, followers: 0 });
@@ -338,11 +338,11 @@ describe("オーナーが読むだけ（決済ON）", () => {
   async function runOn(now: Date) {
     const env = billingEnv();
     await env.AUTOPOST_KV.delete("autopost:gate");
-    const { runAutoPost } = await import("../../src/services/auto-post-runner");
+    const { runAutoPost } = await import("../../src/apps/threads/publish/auto-post-runner");
     return runAutoPost(env, now, undefined, () => now);
   }
   async function ownerOf(accountId: string) {
-    const [r] = (await db()`SELECT user_id FROM memberships WHERE account_id = ${accountId} AND role = 'owner'`) as [{ user_id: string }];
+    const [r] = (await db()`SELECT user_id FROM threads.memberships WHERE account_id = ${accountId} AND role = 'owner'`) as [{ user_id: string }];
     return r.user_id;
   }
 

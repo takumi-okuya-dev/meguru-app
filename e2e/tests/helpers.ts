@@ -2,9 +2,12 @@
 import { clerk, setupClerkTestingToken } from "@clerk/testing/playwright";
 import type { Page } from "@playwright/test";
 import pg from "pg";
+import { portOffset, worktreeDbName } from "../env";
 
-export const FAKE_THREADS = process.env.FAKE_THREADS_URL ?? "http://localhost:8790";
-const DIRECT_DB = process.env.E2E_DATABASE_URL_DIRECT ?? "postgres://postgres:postgres@localhost:5432/threads_grower";
+// 作業場所を分けているときは、ずらし幅を足す（../env.ts の portOffset）
+export const FAKE_THREADS = process.env.FAKE_THREADS_URL ?? `http://localhost:${8790 + portOffset()}`;
+// 作業場所を分けているときは、その作業場所のDB（API の apps/api/.dev.vars の DATABASE_URL と同じ名前）
+const DIRECT_DB = process.env.E2E_DATABASE_URL_DIRECT ?? `postgres://postgres:postgres@localhost:5432/${worktreeDbName()}`;
 
 /** Clerk の開発用インスタンスに用意したテスト用ユーザーのメールアドレス */
 export function testUserEmail(): string {
@@ -52,9 +55,10 @@ export async function resetAll() {
   const client = new pg.Client({ connectionString: DIRECT_DB });
   await client.connect();
   try {
-    // 表を足しても漏れないよう、public のすべての表を空にする（マイグレーションの記録は drizzle スキーマにあるので残る）
+    // 表やアプリ（スキーマ）を足しても漏れないよう、共通（public）とすべてのアプリのスキーマの表を空にする（specs/meguru/031）。
+    // アプリのスキーマ＝受け取った出来事の表（received_events）を持つスキーマ。拡張機能など外のスキーマと、マイグレーションの記録（drizzle）は残す
     const { rows } = await client.query<{ name: string }>(
-      "SELECT quote_ident(tablename) AS name FROM pg_tables WHERE schemaname = 'public'",
+      "SELECT quote_ident(schemaname) || '.' || quote_ident(tablename) AS name FROM pg_tables WHERE schemaname = 'public' OR schemaname IN (SELECT schemaname FROM pg_tables WHERE tablename = 'received_events' AND schemaname <> 'drizzle')",
     );
     if (rows.length > 0) await client.query(`TRUNCATE ${rows.map((r) => r.name).join(", ")} CASCADE`);
   } finally {
@@ -101,7 +105,7 @@ export async function signOut(page: Page) {
 // ---- アカウントを作ってからつなぐ（specs/012-accounts-before-connect）----
 
 /** アカウントの画面のURL（IDを取り出す）。 */
-export const ACCOUNT_URL = /\/accounts\/([0-9a-f-]{36})(?:\/|\?|#|$)/;
+export const ACCOUNT_URL = /\/threads\/accounts\/([0-9a-f-]{36})(?:\/|\?|#|$)/;
 
 /**
  * 「アカウントを作る」で名前だけのアカウントを作り、そのホームへ移るのを待つ。
@@ -110,10 +114,10 @@ export const ACCOUNT_URL = /\/accounts\/([0-9a-f-]{36})(?:\/|\?|#|$)/;
  * @returns 作ったアカウントのID
  */
 export async function createAccount(page: Page, name: string): Promise<string> {
-  await page.goto("/accounts/new");
+  await page.goto("/threads/accounts/new");
   await page.getByLabel("アカウントの名前").fill(name);
   await page.getByRole("button", { name: "作る", exact: true }).click();
-  await page.waitForURL(/\/accounts\/[0-9a-f-]{36}$/);
+  await page.waitForURL(/\/threads\/accounts\/[0-9a-f-]{36}$/);
   return ACCOUNT_URL.exec(page.url())![1]!;
 }
 
@@ -124,10 +128,10 @@ export async function createAccount(page: Page, name: string): Promise<string> {
  * @param allow - 認可画面のボタン（既定は最初のユーザーの「許可する」。ほかは「#allow-<id>」）
  */
 export async function connectWithApp(page: Page, accountId: string, allow = "#allow") {
-  await page.goto(`/accounts/${accountId}/settings`);
+  await page.goto(`/threads/accounts/${accountId}/settings`);
   await page.getByRole("button", { name: "Threadsで許可する" }).click();
   await page.locator(allow).click();
-  await page.waitForURL(new RegExp(`/accounts/${accountId}/settings`));
+  await page.waitForURL(new RegExp(`/threads/accounts/${accountId}/settings`));
 }
 
 /**
@@ -152,7 +156,7 @@ export async function makeToken(page: Page, user: string, appScope = "myapp"): P
  * @param token - トークン
  */
 export async function connectWithToken(page: Page, accountId: string, token: string) {
-  await page.goto(`/accounts/${accountId}/settings`);
+  await page.goto(`/threads/accounts/${accountId}/settings`);
   await page.getByRole("button", { name: "自分のMetaアプリのトークンでつなぐ" }).click();
   await page.getByLabel("アクセストークン").fill(token);
   await page.getByRole("button", { name: "つなぐ", exact: true }).click();
@@ -160,7 +164,7 @@ export async function connectWithToken(page: Page, accountId: string, token: str
 
 // ---- 決済（specs/013-billing T060）----
 
-export const FAKE_STRIPE = process.env.FAKE_STRIPE_URL ?? "http://localhost:8791";
+export const FAKE_STRIPE = process.env.FAKE_STRIPE_URL ?? `http://localhost:${8791 + portOffset()}`;
 
 /**
  * 偽のStripeを操作する。

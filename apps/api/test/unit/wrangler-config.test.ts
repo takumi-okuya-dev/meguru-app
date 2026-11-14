@@ -63,6 +63,7 @@ const REQUIRED_VARS = [
   "WEB_ORIGIN",
   "TOKEN_ENCRYPTION_KEY_VERSION",
   "BILLING_ENABLED",
+  "TEST_GROUPS_ENABLED",
   "STRIPE_PRICE_ID",
 ];
 
@@ -105,14 +106,40 @@ describe("wrangler.toml の環境ごとの設定", () => {
     expect(one(`env.${env}.vars`)?.BILLING_ENABLED).toMatch(/^"(true|false)"$/);
   });
 
+  // テスト用のグループは、テスト環境だけON。本番で誤ってONにすると、招待のない人が使えなくなる（specs/016 FR-012）
+  it("[env.*.vars] の TEST_GROUPS_ENABLED は、ステージングが true、本番が false", () => {
+    expect(one("env.staging.vars")?.TEST_GROUPS_ENABLED).toBe('"true"');
+    expect(one("env.production.vars")?.TEST_GROUPS_ENABLED).toBe('"false"');
+  });
+
   it.each(ENVS)("[env.%s.vars] の THREADS_ACCESS_MODE が testers か public のどちらかである", (env) => {
     expect(one(`env.${env}.vars`)?.THREADS_ACCESS_MODE).toMatch(/^"(testers|public)"$/);
+  });
+
+  // 審査の前は両方とも「テスター招待」で「Threadsで許可する」を使う（specs/024 FR-028）。つなぐ方法は両方（書かない）
+  it.each(ENVS)("[env.%s.vars] は審査の前（testers）で、つなぐ方法を絞らない", (env) => {
+    expect(one(`env.${env}.vars`)?.THREADS_ACCESS_MODE).toBe('"testers"');
+    expect(one(`env.${env}.vars`)?.THREADS_CONNECT_METHODS).toBeUndefined();
+  });
+
+  it("テスト版の THREADS_APP_ID は ThreadsAutomation の数字のID", () => {
+    expect(one("env.staging.vars")?.THREADS_APP_ID).toMatch(/^"\d+"$/);
+    expect(one("env.staging.vars")?.THREADS_APP_ID).not.toBe('"000000000000000"');
+  });
+
+  // 集金管理の会場の共有（specs/collect/001-event-day-collection contracts/realtime.md 5）。Durable Object の結びつけと
+  // マイグレーションは名前付きの環境に受け継がれないので、3か所すべてにあることを確かめる
+  it.each(["", "env.staging.", "env.production."])("[[%sdurable_objects.bindings]] と migrations に CollectLiveRoom がある", (prefix) => {
+    const binding = all(`${prefix}durable_objects.bindings`).find((b) => b.name === '"COLLECT_LIVE"');
+    expect(binding?.class_name, `${prefix || "一番上の"} COLLECT_LIVE の結びつけがない`).toBe('"CollectLiveRoom"');
+    const migration = all(`${prefix}migrations`).find((m) => m.new_sqlite_classes?.includes('"CollectLiveRoom"'));
+    expect(migration, `${prefix || "一番上の"} CollectLiveRoom のマイグレーションがない`).toBeDefined();
   });
 
   it("秘密情報は wrangler.toml に書かれていない", () => {
     expect(toml).not.toMatch(/sk_(live|test)_[A-Za-z0-9]{10,}/);
     expect(toml).not.toMatch(/whsec_[A-Za-z0-9]{10,}/);
     expect(toml).not.toMatch(/postgres(ql)?:\/\//);
-    expect(toml).not.toMatch(/^\s*(TOKEN_ENCRYPTION_KEYS|IDENTIFIER_HASH_KEY|THREADS_APP_SECRET|CLERK_SECRET_KEY)\s*=/m);
+    expect(toml).not.toMatch(/^\s*(TOKEN_ENCRYPTION_KEYS|IDENTIFIER_HASH_KEY|THREADS_APP_SECRET|CLERK_SECRET_KEY|COLLECT_LIVE_SECRET)\s*=/m);
   });
 });

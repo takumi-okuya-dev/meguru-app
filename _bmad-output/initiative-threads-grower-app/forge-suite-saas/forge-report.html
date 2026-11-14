@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>スイート構想の鍛錬記録</title>
+<style>
+:root {
+  --bg: #f7f3ec; --surface: #fffdf8; --text: #2b2620; --muted: #6f665b;
+  --line: #e2d9cb; --accent: #8c2f24; --accent-soft: #f3e3df;
+  --ok: #2f6b45; --ok-soft: #e3f0e7; --warn: #8a5a12; --warn-soft: #f7ecd8;
+  --kill: #5d5a55; --kill-soft: #ece9e4;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #1b1916; --surface: #24211d; --text: #eee7dc; --muted: #a99f92;
+    --line: #3a352e; --accent: #d9776a; --accent-soft: #3a2522;
+    --ok: #7cc495; --ok-soft: #1f3327; --warn: #e0b462; --warn-soft: #3a2f1b;
+    --kill: #b5b0a8; --kill-soft: #2e2b27;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #1b1916; --surface: #24211d; --text: #eee7dc; --muted: #a99f92;
+  --line: #3a352e; --accent: #d9776a; --accent-soft: #3a2522;
+  --ok: #7cc495; --ok-soft: #1f3327; --warn: #e0b462; --warn-soft: #3a2f1b;
+  --kill: #b5b0a8; --kill-soft: #2e2b27;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text);
+  font-family: "Hiragino Sans", "Noto Sans JP", system-ui, sans-serif; line-height: 1.75; }
+main { max-width: 860px; margin: 0 auto; padding: 40px 16px 64px; }
+header { display: flex; gap: 28px; align-items: center; flex-wrap: wrap; margin-bottom: 32px; }
+header .titles { flex: 1 1 320px; }
+.eyebrow { color: var(--muted); font-size: 13px; letter-spacing: .08em; margin: 0; }
+h1 { font-size: 28px; line-height: 1.4; margin: 6px 0 10px; }
+.lead { color: var(--muted); margin: 0; }
+.seal { flex: 0 0 auto; width: 168px; height: 168px; }
+section { background: var(--surface); border: 1px solid var(--line); border-radius: 12px;
+  padding: 20px 22px; margin-bottom: 18px; }
+h2 { font-size: 18px; margin: 0 0 12px; }
+ul { margin: 0; padding-left: 1.2em; }
+li { margin: 4px 0; }
+.shift { width: 100%; border-collapse: collapse; font-size: 14px; }
+.shift th, .shift td { border-bottom: 1px solid var(--line); padding: 8px 10px; text-align: left; vertical-align: top; }
+.shift th { color: var(--muted); font-weight: 600; white-space: nowrap; }
+.shift td:last-child { font-weight: 600; }
+.flow { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 4px 0 2px; font-size: 14px; }
+.flow span.step { background: var(--accent-soft); color: var(--accent); border-radius: 999px; padding: 3px 12px; font-weight: 600; }
+.flow span.arrow { color: var(--muted); }
+.tag { display: inline-block; font-size: 12px; font-weight: 700; border-radius: 6px; padding: 1px 8px; margin-right: 6px; }
+.tag.lock { background: var(--ok-soft); color: var(--ok); }
+.tag.kill { background: var(--kill-soft); color: var(--kill); }
+.tag.open { background: var(--warn-soft); color: var(--warn); }
+.cast { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 10px; }
+.member { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; font-size: 14px; }
+.member .who { font-weight: 700; }
+.member .voice { color: var(--muted); font-size: 13px; margin-top: 2px; }
+.scroll { overflow-x: auto; }
+footer { color: var(--muted); font-size: 13px; margin-top: 24px; }
+@media (max-width: 520px) { h1 { font-size: 23px; } .seal { width: 132px; height: 132px; } }
+</style>
+</head>
+<body>
+<main>
+<header>
+  <div class="titles">
+    <p class="eyebrow">FORGE REPORT · 2026-11-11</p>
+    <h1>個人開発版Google Workspace構想<br>（スイート型SaaS）</h1>
+    <p class="lead">「成り立つか試す」という目的で壁打ちした。Google Workspace型の「アプリの束」は崩れた。代わりに「イベント・コミュニティの流れを、自分の痛みから順に埋める」という形が残った。証拠はまだゼロで、これから実験で確かめる。</p>
+  </div>
+  <svg class="seal" viewBox="0 0 200 200" role="img" aria-label="HARDENED の封蝋">
+    <defs>
+      <radialGradient id="wax" cx="40%" cy="35%" r="70%">
+        <stop offset="0%" stop-color="#c4493a"/>
+        <stop offset="70%" stop-color="#8c2f24"/>
+        <stop offset="100%" stop-color="#5e1c15"/>
+      </radialGradient>
+      <path id="ring" d="M100,100 m-64,0 a64,64 0 1,1 128,0 a64,64 0 1,1 -128,0"/>
+    </defs>
+    <path fill="url(#wax)" d="M100 8 C118 10 128 4 142 14 C156 24 170 22 178 38 C186 54 196 62 192 80 C188 98 198 110 190 126 C182 142 186 158 170 168 C154 178 148 192 128 192 C108 192 98 200 80 192 C62 184 46 188 34 174 C22 160 8 154 8 134 C8 114 0 104 8 86 C16 68 10 54 24 40 C38 26 44 14 64 10 C84 6 84 6 100 8 Z"/>
+    <circle cx="100" cy="100" r="74" fill="none" stroke="#f3d9c9" stroke-opacity=".55" stroke-width="2"/>
+    <circle cx="100" cy="100" r="52" fill="none" stroke="#f3d9c9" stroke-opacity=".55" stroke-width="1.5"/>
+    <text font-size="11" letter-spacing="3" fill="#f7e6da" font-weight="700" font-family="system-ui, sans-serif">
+      <textPath href="#ring" startOffset="0">· FORGED IDEA · SUITE SAAS · 2026 ·</textPath>
+    </text>
+    <text x="100" y="98" text-anchor="middle" font-size="19" font-weight="800" fill="#fff4ec" font-family="system-ui, sans-serif" letter-spacing="1">HARDENED</text>
+    <text x="100" y="118" text-anchor="middle" font-size="12" fill="#f7e6da" font-family="'Hiragino Sans', sans-serif">方向が定まった</text>
+  </svg>
+</header>
+
+<section>
+  <h2>構想の芯</h2>
+  <div class="flow">
+    <span class="step">告知・集客（Threads ✓）</span><span class="arrow">→</span>
+    <span class="step">申込・集金</span><span class="arrow">→</span>
+    <span class="step">当日</span><span class="arrow">→</span>
+    <span class="step">人の記録</span><span class="arrow">→</span>
+    <span class="step">次回の告知</span>
+  </div>
+  <p style="margin:10px 0 0">あなたが私生活で困っていること（人物管理・集金管理）は、イベントを主催・運営する人としての困りごとだった。そのため、「生活アプリの筋」と「港・集客の筋」は1本につながった。</p>
+</section>
+
+<section>
+  <h2>何が変わったか</h2>
+  <div class="scroll">
+  <table class="shift">
+    <tr><th></th><th>元の構想ノート</th><th>壁打ちの後</th></tr>
+    <tr><th>中心</th><td>日常の課題から作ったアプリをWorkspaceのように束ねる</td><td>イベント・コミュニティの流れを、自分の痛みから順に埋める</td></tr>
+    <tr><th>儲け</th><td>スイートの月額（1,000円・1,500円・2,000円）</td><td>港への送客（1人約3,000円）＋フリーミアム＋外販の月額</td></tr>
+    <tr><th>港</th><td>登場しない</td><td>最初の顧客・検証の場・売り場・共同事業者</td></tr>
+    <tr><th>次のアプリ</th><td>バドミントン試合表</td><td>人物メモ か 集金管理</td></tr>
+  </table>
+  </div>
+</section>
+
+<section>
+  <h2>決めたこと</h2>
+  <ul>
+    <li><span class="tag lock">決定</span>狙うのは買い手がまとめて使う価値。成り立つのは、流れの複数の段を担う主催者・運営者に対してだけ。</li>
+    <li><span class="tag lock">決定</span>港の外販はリーダーの許可あり（都度確認）。港経由の客の売上の数%を港へ納める。</li>
+    <li><span class="tag lock">決定</span>外販版のコードは、港のアプリを参考にあなたが作り直す。権利と保守はあなたが持つ。</li>
+    <li><span class="tag lock">決定</span>送客の実験と、今のThreadsアプリ（集客・外部媒体展開・紹介リンク）を港と関係者に使ってもらう検証を並行する。準備は済んだ。</li>
+    <li><span class="tag lock">決定</span>人物メモはLINE・Instagramを置き換えない。顔・会った場所・話した内容・検索を足す。入れ方は、その場でデジタル名刺のQRを相手に読んでもらう形と、後から自分で入れる形。</li>
+  </ul>
+</section>
+
+<section>
+  <h2>外したこと</h2>
+  <ul>
+    <li><span class="tag kill">外す</span><strong>バドミントン試合表を2作目にすること</strong>：収益イベントの主催者には効かない。</li>
+    <li><span class="tag kill">外す</span><strong>港のアプリをもう1本作り直すこと（今は）</strong>：外部媒体展開はもう021にある。誰が払うかが見えてからにする。</li>
+    <li><span class="tag kill">外す</span><strong>広告での収益化</strong>：個人開発の規模では利用者が足りない。</li>
+    <li><span class="tag kill">後回し</span><strong>まとめ買いの料金（1,500円・2,000円）</strong>：払う人が出てから決める。</li>
+  </ul>
+</section>
+
+<section>
+  <h2>生き残った弱点</h2>
+  <ul>
+    <li><span class="tag open">未決</span><strong>証拠がゼロ</strong>：あなた経由の港への加入は、まだ0人。</li>
+    <li><span class="tag open">未決</span><strong>成功と失敗の基準</strong>：叩き台は、2027-01-11に判定する・送客5人以上・4週後も週1回以上使う人が3人以上で、そのうち1人以上が月1,000円を払う。</li>
+    <li><span class="tag open">未決</span><strong>外販の買い手</strong>：コミュニティ運営事業者か、個人の収益イベント主催者か。</li>
+    <li><span class="tag open">未決</span><strong>「あなた経由」の数え方と、港との書面での取り決め</strong>：これがないと、実験で加入者が出ても数えられない。</li>
+    <li><span class="tag open">未決</span><strong>人物メモ</strong>：他人の写真・会話メモの法務。デジタル名刺の競合（プレーリーカード等）との差は「受け取った側の記録」にある。</li>
+  </ul>
+</section>
+
+<section>
+  <h2>鍛えた人たち</h2>
+  <div class="cast">
+    <div class="member"><div class="who">😤 Grumbal（反対役）</div><div class="voice">「負けの条件を先に書け。後から決めると、人は基準を下げる」</div></div>
+    <div class="member"><div class="who">📋 John（PM）</div><div class="voice">「まだ誰にも売っていないのに2本目を作るのは早い。今あるものを売れ」</div></div>
+    <div class="member"><div class="who">📊 Mary（分析）</div><div class="voice">「価値はアプリとアプリの間にある。送客はYの売り文句づくりにもなる」</div></div>
+    <div class="member"><div class="who">🏗️ Winston（設計）</div><div class="voice">「外部媒体展開が2か所にある。港に使ってもらえば最初の外部ユーザーになる」</div></div>
+    <div class="member"><div class="who">🎨 Sally（UX）</div><div class="voice">「自分用のメモと主催者の参加者の管理は、別の製品」</div></div>
+    <div class="member"><div class="who">🔒 Vex（セキュリティ）</div><div class="voice">「相手がQRで自分で登録すれば、顔写真の同意は自然に取れる」</div></div>
+    <div class="member"><div class="who">🏸 佐藤さん（バドミントン幹事）</div><div class="voice">「Threadsとセットで1,500円と言われても、私に関係あるのは試合表だけ」</div></div>
+    <div class="member"><div class="who">🎫 田中さん（有料勉強会の主催者）</div><div class="voice">「申込と集金はPeatixで足りる。困っているのは、人が来ないこと」</div></div>
+    <div class="member"><div class="who">💼 木村さん（経理担当）</div><div class="voice">「売ってよいという許可と、権利を譲ることは別物」</div></div>
+    <div class="member"><div class="who">🏢 森さん（営業職）</div><div class="voice">「名刺を出さない場で会った人は、3か月後には誰だかわからない」</div></div>
+  </div>
+</section>
+
+<footer>記録：forge-suite-saas/.memlog.md ・ 鍛えた構想：forge-suite-saas/forge-suite-saas.md</footer>
+</main>
+</body>
+</html>

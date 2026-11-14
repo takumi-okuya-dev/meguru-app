@@ -1,7 +1,7 @@
 // 設定の確認（誤りがあれば項目名だけを返す。値は返さない）
 import { describe, expect, it } from "vitest";
-import { billingModeOf, connectMethodsOf, validateConfig } from "../../src/lib/config";
-import type { Env } from "../../src/env";
+import { billingModeOf, connectMethodsOf, operatorIdsOf, testerInvitesEnabledOf, threadsAppIdOf, validateConfig } from "../../src/kernel/config";
+import type { Env } from "../../src/kernel/env";
 import { testBindings } from "../env";
 
 const good = {
@@ -52,6 +52,30 @@ describe("validateConfig", () => {
       THREADS_REDIRECT_URI: "https://api-dev.example.com/api/threads/callback",
     } as Env;
     expect(validateConfig(env)).toEqual(["THREADS_APP_ID", "THREADS_APP_SECRET", "THREADS_REDIRECT_URI"]);
+  });
+
+  it("本物のThreadsでも、トークンを貼る方法だけなら、Threadsの3項目は求めない（審査前の運用）", () => {
+    const real = {
+      ...good,
+      THREADS_AUTH_BASE_URL: "https://threads.com",
+      THREADS_GRAPH_BASE_URL: "https://graph.threads.com",
+      THREADS_APP_ID: "000000000000000",
+      THREADS_APP_SECRET: undefined,
+      THREADS_REDIRECT_URI: "https://api-dev.example.com/api/threads/callback",
+    } as unknown as Env;
+    expect(validateConfig({ ...real, THREADS_CONNECT_METHODS: "token" } as Env)).toEqual([]);
+    // 「Threadsで許可する」も出すなら（審査後）、また求める
+    expect(validateConfig({ ...real, THREADS_CONNECT_METHODS: "app,token" } as Env)).toEqual([
+      "THREADS_APP_ID",
+      "THREADS_APP_SECRET",
+      "THREADS_REDIRECT_URI",
+    ]);
+  });
+
+  it("TEST_GROUPS_ENABLED は true か false が必須（specs/016 research.md R1）", () => {
+    expect(validateConfig({ ...good, TEST_GROUPS_ENABLED: undefined } as unknown as Env)).toEqual(["TEST_GROUPS_ENABLED"]);
+    expect(validateConfig({ ...good, TEST_GROUPS_ENABLED: "on" } as Env)).toEqual(["TEST_GROUPS_ENABLED"]);
+    expect(validateConfig({ ...good, TEST_GROUPS_ENABLED: "true" } as Env)).toEqual([]);
   });
 
   it("BILLING_ENABLED は true か false が必須（specs/013 FR-063）", () => {
@@ -128,11 +152,33 @@ describe("billingModeOf", () => {
     ["true", true],
     ["false", false],
   ])("%j は、そのまま読む", (value, expected) => {
-    expect(billingModeOf({ BILLING_ENABLED: value } as Env).enabled).toBe(expected);
+    expect(billingModeOf({ BILLING_ENABLED: value, TEST_GROUPS_ENABLED: "false" } as Env).enabled).toBe(expected);
   });
 
   it.each(["TRUE", "True", "1", "yes", "", undefined])("%j は、黙って課金オフにせず落ちる", (value) => {
-    expect(() => billingModeOf({ BILLING_ENABLED: value } as Env)).toThrow(/BILLING_ENABLED/);
+    expect(() => billingModeOf({ BILLING_ENABLED: value, TEST_GROUPS_ENABLED: "false" } as Env)).toThrow(/BILLING_ENABLED/);
+  });
+
+  it.each([
+    ["true", true],
+    ["false", false],
+  ])("TEST_GROUPS_ENABLED の %j は、そのまま testGroups に読む（specs/016）", (value, expected) => {
+    expect(billingModeOf({ BILLING_ENABLED: "false", TEST_GROUPS_ENABLED: value } as Env).testGroups).toBe(expected);
+  });
+
+  it.each(["TRUE", "1", "", undefined])("TEST_GROUPS_ENABLED の %j は、黙ってOFFにせず落ちる（specs/016）", (value) => {
+    expect(() => billingModeOf({ BILLING_ENABLED: "false", TEST_GROUPS_ENABLED: value } as Env)).toThrow(/TEST_GROUPS_ENABLED/);
+  });
+});
+
+describe("operatorIdsOf（specs/016 research.md R1）", () => {
+  it("カンマ区切りを読み、前後の空白と空の項目を捨てる", () => {
+    expect(operatorIdsOf({ OPERATOR_CLERK_USER_IDS: " user_a , ,user_b," } as Env)).toEqual(["user_a", "user_b"]);
+  });
+
+  it("未設定・空なら運営者はいない", () => {
+    expect(operatorIdsOf({} as Env)).toEqual([]);
+    expect(operatorIdsOf({ OPERATOR_CLERK_USER_IDS: "" } as Env)).toEqual([]);
   });
 });
 
@@ -155,5 +201,30 @@ describe("connectMethodsOf", () => {
 
   it("知らない語だけなら、両方に戻す（打ち間違いで「つなげない製品」にしない）", () => {
     expect(connectMethodsOf({ THREADS_CONNECT_METHODS: "oauth,paste" } as Env)).toEqual(["app", "token"]);
+  });
+});
+
+// 招待の管理のON/OFF（specs/024-tester-invite-connect research.md R4）。審査の前（testers）で、app を出しているときだけON
+describe("testerInvitesEnabledOf", () => {
+  it.each([
+    [{}, true],
+    [{ THREADS_ACCESS_MODE: "testers" }, true],
+    [{ THREADS_ACCESS_MODE: "testers", THREADS_CONNECT_METHODS: "app,token" }, true],
+    [{ THREADS_ACCESS_MODE: "public" }, false],
+    [{ THREADS_ACCESS_MODE: "testers", THREADS_CONNECT_METHODS: "token" }, false],
+  ])("%j は %j", (env, expected) => {
+    expect(testerInvitesEnabledOf(env as Env)).toBe(expected);
+  });
+});
+
+// 「Metaでテスターを加える」のリンクに使うアプリID（specs/024 contracts/api.md）。見本の値・未設定なら null
+describe("threadsAppIdOf", () => {
+  it.each([
+    [{ THREADS_APP_ID: "1367107908637398" }, "1367107908637398"],
+    [{ THREADS_APP_ID: "000000000000000" }, null],
+    [{ THREADS_APP_ID: "" }, null],
+    [{}, null],
+  ])("%j は %j", (env, expected) => {
+    expect(threadsAppIdOf(env as Env)).toBe(expected);
   });
 });

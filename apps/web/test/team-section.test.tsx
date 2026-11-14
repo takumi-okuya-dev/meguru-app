@@ -3,11 +3,11 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import type { AccountTeam, MeResponse } from "@threads-grower/shared";
+import type { AccountTeam } from "@meguru/shared";
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { EDITOR_ACCESS, OWNER_ACCESS } from "./helpers/access";
-import { ME_BILLING_OFF } from "./helpers/billing";
+import { ME_BILLING_OFF, type MeWithThreads } from "./helpers/billing";
 
 const accountTeam = vi.fn();
 const setTeamShared = vi.fn();
@@ -15,12 +15,16 @@ const createTeam = vi.fn();
 const me = vi.fn();
 vi.mock("@/lib/api-client", async (orig) => {
   const actual = await orig<typeof import("@/lib/api-client")>();
-  return { ...actual, api: { ...actual.api, accountTeam, setTeamShared, createTeam, me } };
+  return { ...actual, api: { ...actual.api, me } };
+});
+vi.mock("@/apps/threads/lib/api", async (orig) => {
+  const actual = await orig<typeof import("@/apps/threads/lib/api")>();
+  return { ...actual, threadsApi: { ...actual.threadsApi, me, accountTeam, setTeamShared, createTeam } };
 });
 const toastError = vi.fn();
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: toastError, dismiss: vi.fn() } }));
 
-const { TeamSection } = await import("@/components/team/TeamSection");
+const { TeamSection } = await import("@/apps/threads/components/team/TeamSection");
 
 const TEAM_ACCESS = { ...OWNER_ACCESS, hasTeam: true, team: { id: "t1", name: "飲食チーム", myRole: "member" as const } };
 const inTeam: AccountTeam = {
@@ -32,7 +36,7 @@ const inTeam: AccountTeam = {
     { userId: "u-a", name: "田中 健", role: "admin" },
   ],
 };
-const meData: MeResponse = {
+const meData: MeWithThreads = {
   user: { id: "o1", email: "o1@example.com", displayName: "鈴木 花子" },
   accounts: [
     {
@@ -59,8 +63,8 @@ function renderSection(access = OWNER_ACCESS) {
   const router = createMemoryRouter(
     [
       { path: "/", element: <TeamSection accountId="a1" access={access} /> },
-      { path: "/teams/:teamId", element: <p>チームの画面</p> },
-      { path: "/accounts/:accountId/settings", element: <p>設定の画面</p> },
+      { path: "/threads/teams/:teamId", element: <p>チームの画面</p> },
+      { path: "/threads/accounts/:accountId/settings", element: <p>設定の画面</p> },
     ],
     { initialEntries: ["/"] },
   );
@@ -93,7 +97,8 @@ describe("TeamSection（チームに入っていないオーナー）", () => {
     const router = renderSection();
     await user.click(screen.getByRole("button", { name: "チームを作る" }));
     const dialog = await screen.findByRole("dialog", { name: "チームを作る" });
-    const submit = within(dialog).getByRole("button", { name: "作る" });
+    // 「作る」はスマートフォンの右上とPCの下の2つ（FormDialogFrame）。PCの方で確かめる
+    const submit = within(dialog).getAllByRole("button", { name: "作る" }).at(-1)!;
     expect(submit).toBeDisabled();
     expect(await within(dialog).findByRole("checkbox")).toBeChecked();
     await user.type(within(dialog).getByLabelText("チーム名"), "あ".repeat(51));
@@ -104,7 +109,7 @@ describe("TeamSection（チームに入っていないオーナー）", () => {
     await user.click(submit);
     expect(createTeam).toHaveBeenCalledWith({ name: "飲食チーム", accountIds: ["a1"] });
     expect(await screen.findByText("チームの画面")).toBeInTheDocument();
-    expect(router.state.location.pathname).toBe("/teams/t-new");
+    expect(router.state.location.pathname).toBe("/threads/teams/t-new");
   });
 
   it("未接続のアカウントだけなら「先にThreadsにつないでください」で、選べず作れない（specs/012 FR-050・FR-051）", async () => {
@@ -122,10 +127,10 @@ describe("TeamSection（チームに入っていないオーナー）", () => {
     expect(box).not.toBeChecked();
     expect(within(dialog).getByText("Threadsにつなぐと入れられます")).toBeInTheDocument();
     await user.type(within(dialog).getByLabelText("チーム名"), "飲食チーム");
-    expect(within(dialog).getByRole("button", { name: "作る" })).toBeDisabled();
+    for (const b of within(dialog).getAllByRole("button", { name: "作る" })) expect(b).toBeDisabled();
     // 「Threadsとの接続」へ進む入口を添える（PR #15 のCodexレビュー）
     const link = within(dialog).getByRole("link", { name: "「カフェの公式」をThreadsにつなぐ" });
-    expect(link).toHaveAttribute("href", "/accounts/a1/settings#threads");
+    expect(link).toHaveAttribute("href", "/threads/accounts/a1/settings#threads");
     await user.click(link);
     expect(screen.queryByRole("dialog", { name: "チームを作る" })).not.toBeInTheDocument();
   });
@@ -145,7 +150,7 @@ describe("TeamSection（チームに入っていないオーナー）", () => {
     const dialog = await screen.findByRole("dialog", { name: "チームを作る" });
     expect(await within(dialog).findByRole("link", { name: "「カフェの公式」をThreadsにつなぐ" })).toHaveAttribute(
       "href",
-      "/accounts/a1/settings#threads",
+      "/threads/accounts/a1/settings#threads",
     );
   });
 
@@ -164,7 +169,7 @@ describe("TeamSection（チームに入っている）", () => {
     accountTeam.mockResolvedValue(inTeam);
     renderSection(TEAM_ACCESS);
     const link = await screen.findByRole("link", { name: /飲食チーム/ });
-    expect(link).toHaveAttribute("href", "/teams/t1");
+    expect(link).toHaveAttribute("href", "/threads/teams/t1");
     expect(screen.getByText("管理者：田中 健")).toBeInTheDocument();
     expect(screen.getByRole("switch", { name: "このアカウントをチームに見せる" })).not.toBeChecked();
     expect(screen.getByText("チームの人には、名前だけが出ます")).toBeInTheDocument();

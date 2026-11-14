@@ -11,7 +11,7 @@
 // 「読み終えてから測らず、読みながら上限を当てる」という自分で決めた規則まであるのに、
 // 無認証の3本には付いていなかった。
 import { describe, expect, it } from "vitest";
-import type { Env } from "../../src/env";
+import type { Env } from "../../src/kernel/env";
 import { makeApp, testEnv } from "../helpers/app";
 
 const app = makeApp();

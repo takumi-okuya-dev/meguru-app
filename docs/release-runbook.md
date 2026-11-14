@@ -21,6 +21,16 @@ feature/* ──PR──▶ develop ──自動──▶ ステージング（�
 
 - **PRは小さく**。1つのリリースに混ざる変更が少ないほど、壊れたときに原因を探しやすく、戻しやすい。
 - PRの説明の「チェック」の欄（[.github/pull_request_template.md](../.github/pull_request_template.md)）を埋める。
+- **レビューは「セルフレビュー → Codexレビュー」の順**（2026-11-12に決めた）。Codex（`chatgpt-codex-connector`）はPRを開くと自動でレビューを始めるので、先にセルフレビューで見つかるものを直してから回す。
+  1. PRは**下書き（draft）**で出す（`gh pr create --draft`）。下書きのあいだはCodexは動かない。
+  2. セルフレビュー（Claude Codeの`/code-review`など）をして、指摘を直してpushする。
+  3. **「Ready for review」**にする（`gh pr ready <番号>`）。ここでCodexのレビューが始まる。直したあとにもう一度見てもらうときは、PRに `@codex review` とコメントする。
+- **CIは、PRにラベル「run-ci」を付けると流れる**（付け直すと、もう一度流れる。[.github/workflows/ci.yml](../.github/workflows/ci.yml)）。付けないと流れない。
+  - **ラベルを付けるのは、コードを変えたPRだけ**。GitHubのCIは従量課金なので、結果が変わらないPRでは流さない（2026-10-31に[external-services-setup.md](external-services-setup.md) 9-12で決めた決まりを、2026-11-12にここへ書いた）。
+  - 流す：lint・型チェック・テストの結果が変わりうる変更。`apps/`・`packages/`・`e2e/`・`eslint-rules/`のコード、`package.json`・`pnpm-lock.yaml`、TypeScript・ESLint・Vitestの設定、`.github/workflows/`。
+  - 流さない：文書（`docs/`・`specs/`・`*.md`）・`.specify/`・スキルの本文だけのPR。CIの成功が要るブランチの規則は、管理者がPRから`gh pr merge --admin`でマージして通す（マージしてよいかは、いつもどおりユーザーが決める）。
+  - 迷ったら流す。
+- **デプロイも、出すものが変わらない変更だけなら動かない**。文書（`docs/`・`specs/`・`*.md`）・`.specify/`・AIのスキル・E2Eだけを変えたマージでは、ステージング・本番へのデプロイを飛ばす（`.github/workflows/deploy.yml`の`paths-ignore`）。1つでもほかのファイルを変えていれば、いつもどおり出る。出し直したいときは、Actionsの画面から手で動かす。
 - **大きな機能は、設定で止められるように作る**。`BILLING_ENABLED`・`THREADS_CONNECT_METHODS`と同じ形で、`apps/api/wrangler.toml`の環境ごとの`vars`で切り替える。
   1. 本番は「切」のまま出す。
   2. ステージングで「入」にして確かめる。
@@ -90,10 +100,17 @@ feature/* ──PR──▶ develop ──自動──▶ ステージング（�
 - [ ] マイグレーションがあるリリースでは、マージする直前の時刻（UTC）を控えた（6-3の1）。
 - [ ] 出したあと30分ほど、様子を見られる時間がある（夜遅くや出かける前に出さない）。
 
+### 4-1. 024（テスター招待・上限・無料体験の廃止）をはじめて本番に出すとき
+
+- [ ] 本番用のMetaアプリを作り、3つのコールバックのURLを登録した（[external-services-setup.md](external-services-setup.md) 9-8）。
+- [ ] 本番の`THREADS_APP_ID`と`STRIPE_PRICE_ID`（1件1,000円の料金。10-2）を、`apps/api/wrangler.toml`の`[env.production.vars]`を直すPRで入れた。
+- [ ] 本番の Secret に`THREADS_APP_SECRET`と、運営者の本番の Clerk のユーザーID（`OPERATOR_CLERK_USER_IDS`）を入れた。
+- [ ] 本番の`THREADS_ACCESS_MODE`が`testers`（審査の前）になっている。
+
 ## 5. リリースする
 
 1. `develop`→`main`のPRを作る（タイトルは「リリース：…」）。説明には、入る変更のPRを並べる。
-2. CIの成功を確かめてマージする。
+2. ラベル`run-ci`を付けてCIを流し、成功を確かめてマージする（リリースのPRはコードを含むので、必ず流す）。
 3. Actionsの「Deploy」（`main`）が成功したことを確かめる。
 4. 本番のURLで、変更が出ていることを確かめる。
 5. しばらくAPIのログを見る。エラーが続けて出ていないか。

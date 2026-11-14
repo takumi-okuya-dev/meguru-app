@@ -8,7 +8,7 @@
 //   （--headless を付けると、画面を出さずに準備までを確かめて終わる。スクリプト自体の確認用）
 import { clerkSetup } from "@clerk/testing/playwright";
 import { chromium, type Browser, type Page } from "@playwright/test";
-import { loadLocalEnv } from "../env.ts";
+import { loadLocalEnv, portOffset } from "../env.ts";
 import { registerFakeUsers, resetAll, signInAs, teamEmail, type TeamRole } from "../tests/helpers.ts";
 import {
   FAKE_ACCOUNTS,
@@ -20,7 +20,9 @@ import {
   readTeamInvite,
 } from "../tests/team-flow.ts";
 
-const WEB = "http://localhost:5173";
+// 作業場所を分けているときは、ずらし幅を足す（../env.ts の portOffset）
+const OFFSET = portOffset();
+const WEB = `http://localhost:${5173 + OFFSET}`;
 const ROLES: { role: TeamRole; label: string; color: string }[] = [
   { role: "admin", label: "管理者（田中役）", color: "#1d4ed8" },
   { role: "owner", label: "オーナー（鈴木役）", color: "#111827" },
@@ -76,8 +78,8 @@ async function main() {
   for (const role of ["admin", "owner", "editor"] as const) teamEmail(role); // 足りなければここで止める
   for (const [name, url] of [
     ["Web", WEB],
-    ["API", "http://localhost:8787/"],
-    ["偽のThreads", "http://localhost:8790/__control/posts"],
+    ["API", `http://localhost:${8787 + OFFSET}/`],
+    ["偽のThreads", `http://localhost:${8790 + OFFSET}/__control/posts`],
   ] as const) {
     const deadline = Date.now() + (wait ? 120_000 : 0);
     while (!(await isUp(url))) {
@@ -118,9 +120,9 @@ async function main() {
     await joinByLink(pages.editor, link, FAKE_ACCOUNTS.editor.name);
     await makeEditor(pages.admin, teamId, FAKE_ACCOUNTS.editor.name);
     await assignEditor(pages.admin, teamId, FAKE_ACCOUNTS.owner.name);
-    await pages.admin.goto(`/teams/${teamId}`);
-    await pages.owner.goto(`/teams/${teamId}`);
-    await pages.editor.goto(`/accounts/${ids.owner}`);
+    await pages.admin.goto(`/threads/teams/${teamId}`);
+    await pages.owner.goto(`/threads/teams/${teamId}`);
+    await pages.editor.goto(`/threads/accounts/${ids.owner}`);
   } else {
     for (const page of Object.values(pages)) await page.goto("/");
   }

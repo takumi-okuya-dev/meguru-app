@@ -1,5 +1,5 @@
 // US2：宣伝内容と宣伝投稿の割合（specs/002-strategy-profile FR-007〜FR-011・FR-020〜FR-025、research.md R3・R4・R6・R7）
-import { jstToday } from "@threads-grower/shared";
+import { jstToday } from "@meguru/shared";
 import { neon } from "@neondatabase/serverless";
 import { beforeEach, describe, expect, it } from "vitest";
 import { call, createUserWithAccount, makeApp, resetDb, setAccount, testEnv } from "../helpers/app";
@@ -10,7 +10,7 @@ beforeEach(async () => {
   await resetDb();
 });
 
-const base = (accountId: string) => `/api/accounts/${accountId}`;
+const base = (accountId: string) => `/api/threads/accounts/${accountId}`;
 
 function input(overrides: Record<string, unknown> = {}) {
   return {
@@ -130,7 +130,7 @@ describe("宣伝内容", () => {
   it("件数の上限の同時実行：49件のAccountに2つ同時に追加しても50件を超えない", async () => {
     const { accountId } = await createUserWithAccount("u1");
     const sql = neon(testEnv.DATABASE_URL);
-    await sql`INSERT INTO promotions (account_id, title, content)
+    await sql`INSERT INTO threads.promotions (account_id, title, content)
       SELECT ${accountId}, 't' || g, 'c' FROM generate_series(1, 49) AS g`;
     const results = await Promise.all(
       [1, 2].map(() => call(app, "POST", `${base(accountId)}/promotions`, { user: "u1", body: input() })),
@@ -190,6 +190,29 @@ describe("宣伝投稿の割合", () => {
     expect(((await put.json()) as { ratioPercent: number }).ratioPercent).toBe(30);
     for (const ratioPercent of [101, 1.5, -1]) {
       const res = await call(app, "PUT", `${base(accountId)}/promotion-settings`, { user: "u1", body: { ratioPercent, expectedVersion: 1 } });
+      expect(res.status).toBe(400);
+    }
+  });
+});
+
+describe("宣伝内容のイベントの情報（specs/021 FR-001、contracts/api.md）", () => {
+  const event = { startAt: "2026-11-25T20:00", endAt: "2026-11-25T22:00", format: "venue", venueName: "バー SHITEN", prefecture: "東京都", capacity: 25, feeYen: 5000 };
+
+  it("保存して返す。省くと今のまま、null で消える", async () => {
+    const { accountId } = await createUserWithAccount("u1");
+    const p = await create(accountId, { event });
+    const got = (await list(accountId)).items[0] as unknown as { event: Record<string, unknown> };
+    expect(got.event).toMatchObject({ startAt: "2026-11-25T20:00", venueName: "バー SHITEN", address: null });
+    const kept = await call(app, "PUT", `${base(accountId)}/promotions/${p.id}`, { user: "u1", body: { ...input({ title: "直した" }), expectedVersion: p.version } });
+    expect(((await kept.json()) as { event: unknown }).event).toMatchObject({ venueName: "バー SHITEN" });
+    const cleared = await call(app, "PUT", `${base(accountId)}/promotions/${p.id}`, { user: "u1", body: { ...input({ event: null }), expectedVersion: p.version + 1 } });
+    expect(((await cleared.json()) as { event: unknown }).event).toBeNull();
+  });
+
+  it("終了が開始より前・都道府県が違うと VALIDATION_FAILED", async () => {
+    const { accountId } = await createUserWithAccount("u1");
+    for (const bad of [{ ...event, endAt: "2026-11-25T19:00" }, { ...event, prefecture: "東京" }]) {
+      const res = await call(app, "POST", `${base(accountId)}/promotions`, { user: "u1", body: input({ event: bad }) });
       expect(res.status).toBe(400);
     }
   });

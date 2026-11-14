@@ -2,7 +2,7 @@
 import { eq } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
 import { subscriptions } from "../../src/db/schema";
-import { reconcileSubscriptions } from "../../src/services/billing-service";
+import { reconcileSubscriptions } from "../../src/platform/billing/billing-service";
 import { createUserWithAccount, db, makeApp, resetDb, testEnv } from "../helpers/app";
 import { billingEnv, callBilling, fakeStripe } from "../helpers/billing";
 
@@ -26,7 +26,7 @@ const stripeQuantity = async () => (await fakeStripe.subscriptions())[0]!.items.
 const quantityUpdates = async () =>
   (await fakeStripe.requests()).filter((r) => r.method === "POST" && r.path.startsWith("/v1/subscriptions/"));
 const rowOf = async (userId: string) => (await db().select().from(subscriptions).where(eq(subscriptions.userId, userId)))[0]!;
-const create = (user: string, name: string) => callBilling(app, "POST", "/api/accounts", { user, body: { name } });
+const create = (user: string, name: string) => callBilling(app, "POST", "/api/threads/accounts", { user, body: { name } });
 
 describe("アカウントを作る・削除する", () => {
   it("作ると数が増え、削除すると減る。日割りの請求・返金はしない。0件でも数は1", async () => {
@@ -40,10 +40,10 @@ describe("アカウントを作る・削除する", () => {
     expect(await rowOf(userId)).toMatchObject({ quantity: 2, quantitySyncNeeded: false });
 
     const second = ((await res.json()) as { id: string; name: string }).id;
-    await callBilling(app, "DELETE", `/api/accounts/${second}`, { user: "u1", body: { confirmName: "2件目" } });
+    await callBilling(app, "DELETE", `/api/threads/accounts/${second}`, { user: "u1", body: { confirmName: "2件目" } });
     expect(await stripeQuantity()).toBe(1);
-    const name = ((await (await callBilling(app, "GET", `/api/accounts/${accountId}`, { user: "u1" })).json()) as { name: string }).name;
-    await callBilling(app, "DELETE", `/api/accounts/${accountId}`, { user: "u1", body: { confirmName: name } });
+    const name = ((await (await callBilling(app, "GET", `/api/threads/accounts/${accountId}`, { user: "u1" })).json()) as { name: string }).name;
+    await callBilling(app, "DELETE", `/api/threads/accounts/${accountId}`, { user: "u1", body: { confirmName: name } });
     expect(await stripeQuantity()).toBe(1);
   });
 
@@ -62,8 +62,8 @@ describe("アカウントを作る・削除する", () => {
     await createUserWithAccount("u1");
     // 無料体験中は1件までなので、料金なしでない利用者で、作るのと削除を確かめる
     const { accountId } = await createUserWithAccount("u2");
-    const name = ((await (await callBilling(app, "GET", `/api/accounts/${accountId}`, { user: "u2" })).json()) as { name: string }).name;
-    await callBilling(app, "DELETE", `/api/accounts/${accountId}`, { user: "u2", body: { confirmName: name } });
+    const name = ((await (await callBilling(app, "GET", `/api/threads/accounts/${accountId}`, { user: "u2" })).json()) as { name: string }).name;
+    await callBilling(app, "DELETE", `/api/threads/accounts/${accountId}`, { user: "u2", body: { confirmName: name } });
     expect((await create("u2", "x")).status).toBe(201);
     expect(await fakeStripe.requests()).toHaveLength(0);
   });
@@ -83,5 +83,27 @@ describe("日次の合わせ直し", () => {
     const before = (await fakeStripe.requests()).length;
     expect(await reconcileSubscriptions(testEnv)).toEqual({ synced: 0, failed: 0 });
     expect((await fakeStripe.requests()).length).toBe(before);
+  });
+});
+
+describe("料金の切り替え（specs/024 research.md R10、T030）", () => {
+  it("契約の料金が STRIPE_PRICE_ID と違えば、数の合わせ直しで新しい料金にする（日割りなし）。同じなら替えない", async () => {
+    const { userId } = await subscribed("u1");
+    expect((await fakeStripe.subscriptions())[0]!.items.data[0]!.price.id).toBe(testEnv.STRIPE_PRICE_ID);
+    // 料金が同じで数も合っていれば、Stripeを呼ばない
+    const before = (await quantityUpdates()).length;
+    await db().update(subscriptions).set({ quantitySyncNeeded: true }).where(eq(subscriptions.userId, userId));
+    await reconcileSubscriptions(billingEnv());
+    expect((await quantityUpdates()).length).toBe(before);
+
+    // 1件1,000円の新しい料金に替えた環境
+    const env = billingEnv({ STRIPE_PRICE_ID: "price_NewPerAccount" });
+    expect(await reconcileSubscriptions(env)).toEqual({ synced: 1, failed: 0 });
+    expect((await fakeStripe.subscriptions())[0]!.items.data[0]!.price.id).toBe("price_NewPerAccount");
+    expect((await quantityUpdates()).at(-1)!.params).toMatchObject({
+      "items[0][price]": "price_NewPerAccount",
+      "items[0][quantity]": "1",
+      proration_behavior: "none",
+    });
   });
 });

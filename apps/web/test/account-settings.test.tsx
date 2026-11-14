@@ -2,7 +2,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import type { AccountSummary, NgWord, PostingRules, PostingSchedule } from "@threads-grower/shared";
+import type { AccountSummary, NgWord, PostingRules, PostingSchedule } from "@meguru/shared";
 import { createMemoryRouter, Outlet, RouterProvider } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { OWNER_ACCESS } from "./helpers/access";
@@ -17,12 +17,12 @@ const checkThreads = vi.fn();
 const getAutoPost = vi.fn();
 const connect = vi.fn();
 const accountAccess = vi.fn(async () => OWNER_ACCESS);
-vi.mock("@/lib/api-client", async (orig) => {
-  const actual = await orig<typeof import("@/lib/api-client")>();
+vi.mock("@/apps/threads/lib/api", async (orig) => {
+  const actual = await orig<typeof import("@/apps/threads/lib/api")>();
   return {
     ...actual,
-    api: {
-      ...actual.api,
+    threadsApi: {
+      ...actual.threadsApi,
       accountAccess,
       getPostingRules,
       addNgWords,
@@ -45,7 +45,7 @@ vi.mock("sonner", () => ({
 
 const { ApiError } = await import("@/lib/api-client");
 const { UnsavedChangesProvider } = await import("@/components/UnsavedChangesProvider");
-const { AccountSettings } = await import("@/pages/account-settings");
+const { AccountSettings } = await import("@/apps/threads/pages/account-settings");
 
 const account: AccountSummary = {
   id: "a1",
@@ -88,7 +88,7 @@ function renderPage() {
   const router = createMemoryRouter(
     [
       {
-        path: "/accounts/:accountId",
+        path: "/threads/accounts/:accountId",
         element: (
           <UnsavedChangesProvider>
             <Outlet context={{ account }} />
@@ -97,7 +97,7 @@ function renderPage() {
         children: [{ path: "settings", element: <AccountSettings /> }],
       },
     ],
-    { initialEntries: ["/accounts/a1/settings"] },
+    { initialEntries: ["/threads/accounts/a1/settings"] },
   );
   render(
     <QueryClientProvider
@@ -363,7 +363,7 @@ describe("投稿のスケジュールのダイアログ", () => {
     });
     const { user, dialog } = await openDialog();
     for (const t of ["21:00", "07:30", "12:00"]) await addTime(user, dialog, t);
-    expect(within(dialog).getByText("1日 3件 投稿します")).toBeInTheDocument();
+    expect(within(dialog).getByText("1日 3件 投稿します（10件まで）")).toBeInTheDocument();
     await user.click(within(dialog).getByRole("switch", { name: "自動投稿" }));
     await user.click(saveButton(dialog));
     expect(putPostingSchedule).toHaveBeenCalledWith("a1", {
@@ -403,7 +403,21 @@ describe("投稿のスケジュールのダイアログ", () => {
     );
     const { dialog } = await openDialog();
     expect(within(dialog).getByLabelText("追加する時刻")).toBeDisabled();
-    expect(within(dialog).getByText("時刻は10件まで登録できます")).toBeInTheDocument();
+    expect(within(dialog).getByText("1日に投稿できるのは10件までです。")).toBeInTheDocument();
+  });
+
+  it("上限はオーナーの1日の投稿数の上限。下がって超えた時刻は「投稿しません」と出し、注意を出す（specs/024 FR-019・FR-020、T046）", async () => {
+    getPostingSchedule.mockResolvedValue({
+      ...scheduleResponse({ slotTimes: ["07:30", "10:00", "12:00", "15:00", "18:00", "20:00", "22:00"] }),
+      overLimit: true,
+      limits: { slots: 5, minGapMinutes: 30, jitterMinutes: 10 },
+    });
+    const { dialog } = await openDialog();
+    expect(within(dialog).getByText("1日 5件 投稿します（5件まで）")).toBeInTheDocument();
+    expect(within(dialog).getByText("上限が5件に下がったため、6つ目からの時刻には投稿しません。")).toBeInTheDocument();
+    expect(within(dialog).getAllByText("投稿しません")).toHaveLength(2);
+    expect(within(dialog).getByLabelText("追加する時刻")).toBeDisabled();
+    expect(within(dialog).getByText("1日に投稿できるのは5件までです。")).toBeInTheDocument();
   });
 
   it("深夜（2:00〜4:59）の時刻にだけ案内が出て、保存はできる（FR-001b）", async () => {
@@ -507,5 +521,22 @@ describe("「接続を確かめる」（FR-002b）", () => {
     await user.click(await within(section).findByRole("button", { name: "接続を確かめる" }));
     expect(within(section).getByRole("button", { name: "確かめています…" })).toBeDisabled();
     await act(async () => resolve({ status: "ok", quotaUsage: 0, quotaTotal: 250 }));
+  });
+});
+
+describe("機能のまとまりがOFFのとき（specs/019 contracts/ui-routes.md 2）", () => {
+  it("自動投稿とチームを使えなければ、投稿のスケジュール・投稿のルール・チームの区分を出さず、そのAPIを呼ばない", async () => {
+    accountAccess.mockResolvedValue({ ...OWNER_ACCESS, features: ["strategy"] });
+    try {
+      renderPage();
+      expect(await screen.findByRole("heading", { name: "Threadsとの接続" })).toBeInTheDocument();
+      expect(screen.queryByRole("heading", { name: "投稿のスケジュール" })).toBeNull();
+      expect(screen.queryByRole("heading", { name: "投稿のルール" })).toBeNull();
+      expect(screen.queryByRole("heading", { name: "チーム" })).toBeNull();
+      expect(getPostingSchedule).not.toHaveBeenCalled();
+      expect(getPostingRules).not.toHaveBeenCalled();
+    } finally {
+      accountAccess.mockResolvedValue(OWNER_ACCESS);
+    }
   });
 });

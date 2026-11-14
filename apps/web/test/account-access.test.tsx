@@ -6,8 +6,9 @@ import { EDITOR_ACCESS } from "./helpers/access";
 const toastError = vi.fn();
 vi.mock("sonner", () => ({ toast: { error: toastError, success: vi.fn(), dismiss: vi.fn() } }));
 
-const { canDo, makeAccountAccessErrorHandler } = await import("@/lib/use-account-access");
+const { canDo, makeAccountAccessErrorHandler } = await import("@/apps/threads/lib/use-account-access");
 const { queryKeys } = await import("@/lib/query");
+const { threadsQueryKeys } = await import("@/apps/threads/lib/query-keys");
 
 const ID = "11111111-1111-4111-8111-111111111111";
 
@@ -37,17 +38,17 @@ describe("makeAccountAccessErrorHandler", () => {
   it("ROLE_FORBIDDEN：表示中のAccountのデータ（役割を含む）を読み直す。画面は移らない", () => {
     const { invalidate, navigate, handle } = setup();
     handle("ROLE_FORBIDDEN", ID);
-    expect(invalidate).toHaveBeenCalledWith({ queryKey: queryKeys.account(ID) });
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: threadsQueryKeys.account(ID) });
     expect(navigate).not.toHaveBeenCalled();
     expect(toastError).not.toHaveBeenCalled();
   });
 
-  it("ACCOUNT_NOT_FOUND：「このアカウントを開けなくなりました」と出して / へ移る", () => {
+  it("ACCOUNT_NOT_FOUND：「このアカウントを開けなくなりました」と出して Threadsのホーム（/threads）へ移る", () => {
     const { invalidate, navigate, handle } = setup();
     handle("ACCOUNT_NOT_FOUND", ID);
     expect(toastError).toHaveBeenCalledWith("このアカウントを開けなくなりました", { id: "account-access-lost" });
     expect(invalidate).toHaveBeenCalledWith({ queryKey: queryKeys.me });
-    expect(navigate).toHaveBeenCalledWith("/");
+    expect(navigate).toHaveBeenCalledWith("/threads");
   });
 
   it("別のAccountのエラーは扱わない", () => {

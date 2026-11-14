@@ -13,7 +13,7 @@ type Billing = {
   mode: string;
   state: string;
   readOnlyReason: string | null;
-  trialEndsAt: string;
+  trialEndsAt: string | null;
   trialDaysLeft: number | null;
 };
 
@@ -24,12 +24,24 @@ async function billingOf(user: string, on = true) {
 }
 
 describe("GET /api/me の billing", () => {
-  it("はじめての人は無料体験中で、残りの日数がある", async () => {
+  it("はじめての人は契約前（無料体験なし。specs/024 FR-029）", async () => {
     const me = await billingOf("new");
+    expect(me.billing).toEqual({
+      mode: "enabled",
+      state: "unsubscribed",
+      readOnlyReason: "not_subscribed",
+      trialEndsAt: null,
+      trialDaysLeft: null,
+    });
+    expect(me.withdrawalInProgress).toBe(false);
+  });
+
+  it("024の前からいた人は無料体験中で、残りの日数がある（FR-031）", async () => {
+    await createUserWithAccount("old");
+    const me = await billingOf("old");
     expect(me.billing).toMatchObject({ mode: "enabled", state: "trial", readOnlyReason: null });
     expect(me.billing.trialDaysLeft).toBeGreaterThanOrEqual(28);
-    expect(new Date(me.billing.trialEndsAt).getTime()).toBeGreaterThan(Date.now());
-    expect(me.withdrawalInProgress).toBe(false);
+    expect(new Date(me.billing.trialEndsAt!).getTime()).toBeGreaterThan(Date.now());
   });
 
   it("契約・料金なし・読むだけ・決済OFFの状態", async () => {

@@ -22,12 +22,12 @@ const add = async (token: string, user = "u1", name = "トークンのアカウ�
 const errorOf = async (res: Response) => ((await res.json()) as { error: { code: string; details?: string[] } }).error;
 /** Threadsにつながっているアカウントの数（二重のときに残る未接続のアカウントは数えない） */
 const accountCount = async () =>
-  ((await q()`SELECT count(*)::int AS n FROM accounts WHERE connection_status <> 'not_connected'`) as { n: number }[])[0]!.n;
+  ((await q()`SELECT count(*)::int AS n FROM threads.accounts WHERE connection_status <> 'not_connected'`) as { n: number }[])[0]!.n;
 
 describe("二重登録の3通り（SC-003）", () => {
   it("(a) このアプリで接続 → 同じアカウントの別のアプリのトークン：ACCOUNT_ALREADY_REGISTERED と、そのAccount", async () => {
     await connectNew(app, "u1", "9003");
-    const id = ((await q()`SELECT id FROM accounts WHERE connection_status = 'connected'`) as { id: string }[])[0]!.id;
+    const id = ((await q()`SELECT id FROM threads.accounts WHERE connection_status = 'connected'`) as { id: string }[])[0]!.id;
     const res = await add(await fake.issueToken({ user: "9003" }));
     expect(res.status).toBe(409);
     // 重なったアカウントのID・名前・ユーザー名を返す（specs/012 contracts/api.md）
@@ -39,11 +39,11 @@ describe("二重登録の3通り（SC-003）", () => {
     const created = (await (await add(await fake.issueToken({ user: "9003" }), "u1", "トークンで")).json()) as { accountId: string };
     const { accountId, callbackRes } = await connectNew(app, "u1", "9003");
     const target = redirectTarget(callbackRes!);
-    expect([target.pathname, target.searchParams.get("error")]).toEqual([`/accounts/${accountId}/settings`, "ACCOUNT_ALREADY_REGISTERED"]);
+    expect([target.pathname, target.searchParams.get("error")]).toEqual([`/threads/accounts/${accountId}/settings`, "ACCOUNT_ALREADY_REGISTERED"]);
     expect(target.searchParams.get("connected")).toBeNull();
     expect(await accountCount()).toBe(1);
     // つないであったアカウントは、トークンのまま変わらない
-    const [a] = (await q()`SELECT connection_method FROM accounts WHERE id = ${created.accountId}`) as Record<string, string>[];
+    const [a] = (await q()`SELECT connection_method FROM threads.accounts WHERE id = ${created.accountId}`) as Record<string, string>[];
     expect(a).toEqual({ connection_method: "token" });
   });
 
@@ -64,7 +64,7 @@ describe("二重登録の3通り（SC-003）", () => {
 
   it("(e) ユーザー名の大文字・小文字の違いでも一致する", async () => {
     await connectNew(app, "u1", "9003");
-    await q()`UPDATE accounts SET username = 'CAFE_B'`;
+    await q()`UPDATE threads.accounts SET username = 'CAFE_B'`;
     const res = await add(await fake.issueToken({ user: "9003" }));
     expect((await errorOf(res)).code).toBe("ACCOUNT_ALREADY_REGISTERED");
   });
@@ -88,7 +88,7 @@ describe("ユーザー名だけが一致したとき（FR-023）", () => {
     await fake.addUser("9005", "renamed_shop");
     const res = await add(await fake.issueToken({ user: "9003" }));
     expect(res.status).toBe(200);
-    const rows = (await q()`SELECT username FROM accounts ORDER BY username`) as { username: string }[];
+    const rows = (await q()`SELECT username FROM threads.accounts ORDER BY username`) as { username: string }[];
     expect(rows.map((r) => r.username)).toEqual(["cafe_b", "renamed_shop"]);
   });
 
@@ -115,7 +115,7 @@ describe("ユーザー名だけが一致したとき（FR-023）", () => {
   it("相手が要再接続で取り直せないときは、一致したものとして扱う", async () => {
     await fake.addUser("9005", "cafe_b");
     await add(await fake.issueToken({ user: "9005" }), "u2");
-    await q()`UPDATE accounts SET connection_status = 'needs_reconnect'`;
+    await q()`UPDATE threads.accounts SET connection_status = 'needs_reconnect'`;
     await fake.addUser("9005", "renamed_shop");
     const res = await add(await fake.issueToken({ user: "9003" }));
     expect((await errorOf(res)).code).toBe("THREADS_ACCOUNT_TAKEN");
@@ -133,25 +133,25 @@ describe("ユーザー名だけが一致したとき（FR-023）", () => {
 
 describe("日次のトークン更新でユーザー名が変わるとき（PR #12 のCodexレビュー）", () => {
   it("更新の後に、新しい名前を別のアプリで追加しようとしても、照合で見つかる", async () => {
-    const { refreshExpiringTokens } = await import("../../src/services/token-refresh");
-    const { createThreadsClient } = await import("../../src/lib/threads-client");
+    const { refreshExpiringTokens } = await import("../../src/apps/threads/connection/token-refresh");
+    const { createThreadsClient } = await import("../../src/adapters/threads-api/threads-client");
     await add(await fake.issueToken({ user: "9003" }));
     await fake.addUser("9003", "cafe_new");
-    await q()`UPDATE threads_connections SET expires_at = now() + interval '3 days', issued_at = now() - interval '2 days'`;
+    await q()`UPDATE threads.threads_connections SET expires_at = now() + interval '3 days', issued_at = now() - interval '2 days'`;
     expect((await refreshExpiringTokens(testEnv, createThreadsClient(testEnv), new Date())).refreshed).toBe(1);
-    expect(((await q()`SELECT username FROM accounts`) as { username: string }[])[0]!.username).toBe("cafe_new");
+    expect(((await q()`SELECT username FROM threads.accounts`) as { username: string }[])[0]!.username).toBe("cafe_new");
     const res = await add(await fake.issueToken({ user: "9003", appScope: "other" }));
     expect((await errorOf(res)).code).toBe("ACCOUNT_ALREADY_REGISTERED");
   });
 
   it("新しい名前が先に別のAccountで登録されていても、更新は止めない（警告だけ）", async () => {
-    const { refreshExpiringTokens } = await import("../../src/services/token-refresh");
-    const { createThreadsClient } = await import("../../src/lib/threads-client");
+    const { refreshExpiringTokens } = await import("../../src/apps/threads/connection/token-refresh");
+    const { createThreadsClient } = await import("../../src/adapters/threads-api/threads-client");
     await add(await fake.issueToken({ user: "9003" }));
     await fake.addUser("9007", "cafe_new");
     await add(await fake.issueToken({ user: "9007" }), "u2");
     await fake.addUser("9003", "cafe_new");
-    await q()`UPDATE threads_connections SET expires_at = now() + interval '3 days', issued_at = now() - interval '2 days'`;
+    await q()`UPDATE threads.threads_connections SET expires_at = now() + interval '3 days', issued_at = now() - interval '2 days'`;
     expect((await refreshExpiringTokens(testEnv, createThreadsClient(testEnv), new Date())).refreshed).toBe(2);
   });
 });

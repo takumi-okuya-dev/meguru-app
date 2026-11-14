@@ -125,7 +125,7 @@ export const SIMILARITY_EDIT_DISTANCE_MAX_LENGTH = 300;
 
 // ---- 自動投稿（specs/005-auto-post contracts/auto-post-job.md「定数」）----
 
-/** 1日に投稿する時刻の上限（FR-001）。 */
+/** 1日に投稿する時刻の上限（FR-001）。024で、運営者が決める上限の既定値（DEFAULT_DAILY_POST_LIMIT）に置き換える。 */
 export const AUTOPOST_SLOT_LIMIT = 10;
 /** 時刻をずらすときの、時刻どうしの間（分。FR-001a）。 */
 export const AUTOPOST_MIN_GAP_MINUTES = 30;
@@ -213,6 +213,23 @@ export const ACTIVITY_SUMMARY_CHARS = 30;
 export const TEAM_NAME_MAX = 50;
 /** 1チームの人数の上限（管理者・メンバー・編集者を合わせて。specs/011 Assumptions）。 */
 export const TEAM_MEMBER_LIMIT = 50;
+
+// ---- チームの運用状況（specs/020-team-monitoring data-model.md「定数」）----
+/** 「止まっている」の日数と、「この7日」の数の期間（FR-010・FR-011）。 */
+export const TEAM_STATUS_STOPPED_DAYS = 7;
+/** 伸びを比べる期間（日。直近とその前。FR-020）。 */
+export const TEAM_STATUS_GROWTH_WINDOW_DAYS = 30;
+/** 伸びの判定に要る、それぞれの期間の確定した投稿の数（006の判定を始める件数にそろえる。FR-020a）。 */
+export const TEAM_STATUS_GROWTH_MIN_POSTS = 5;
+/** この比以下で「伸びていない」（仮の値。research.md R4）。 */
+export const TEAM_STATUS_GROWTH_POOR_RATIO = 0.8;
+/** 人の動きに数える操作の記録（案を作る・直す・承認・却下。research.md R1）。 */
+export const TEAM_STATUS_ACTIVITY_ACTIONS = [
+  "drafts_registered",
+  "draft_edited",
+  "drafts_approved",
+  "drafts_rejected",
+] as const;
 /** 1人が管理者のチームの上限（specs/011 Assumptions）。 */
 export const TEAMS_PER_ADMIN = 20;
 /** 操作の記録の1回の件数（既定。FR-052）。 */
@@ -245,3 +262,76 @@ export const TOKEN_MAX_LENGTH = 2048;
 // ---- アカウントを先に作る（specs/012-accounts-before-connect data-model.md「定数」）----
 /** アカウントの名前の上限（文字。FR-002・FR-040）。 */
 export const ACCOUNT_NAME_MAX = 50;
+
+// テスト用のグループ（specs/016-test-groups data-model.md）
+/** グループ名の上限（文字）。 */
+export const TEST_GROUP_NAME_MAX = 50;
+/** グループの人数の上限の下限。 */
+export const TEST_GROUP_CAPACITY_MIN = 1;
+/** グループの人数の上限の上限。 */
+export const TEST_GROUP_CAPACITY_MAX = 1000;
+/** 運営者の画面に出す、グループの記録の件数（research.md R6）。 */
+export const TEST_GROUP_EVENTS_LIMIT = 50;
+
+// 紹介リンク（specs/017-referral-links research.md R2・R3）
+/** 紹介リンクを開いたことを、ブラウザに覚えておく日数。 */
+export const REFERRAL_REMEMBER_DAYS = 30;
+/** 紹介の文字列の形（「r_」＋16バイトの base64url 22文字）。画面とAPIで同じ形を使う。 */
+export const REFERRAL_CODE_PATTERN = /^r_[A-Za-z0-9_-]{22}$/;
+
+// アルゴリズムの解析（specs/022-algorithm-analysis data-model.md「共有の定数」）。しきい値は仮の値（spec Assumptions）
+/** 解析の期間（日。FR-001）。 */
+export const ANALYSIS_PERIOD_DAYS = 90;
+/** 表と傾向を出す最小の件数（research.md R11）。 */
+export const ANALYSIS_MIN_TOTAL = 20;
+/** 区切りの件数のしきい値（FR-011・FR-030）。 */
+export const ANALYSIS_MIN_BUCKET = 10;
+/** 傾向にする中央値の差（倍。FR-030）。 */
+export const ANALYSIS_TREND_RATIO = 1.5;
+/** おすすめに乗った目安の上位の割合（FR-020）。 */
+export const ANALYSIS_RECOMMENDED_TOP = 0.2;
+/** 傾向の数の上限（FR-040）。 */
+export const ANALYSIS_MAX_TRENDS = 5;
+/** 分類のプロンプトに入れる投稿の数（FR-051）。 */
+export const ANALYSIS_CLASSIFY_BATCH = 50;
+/** テーマの数の上限（FR-050）。 */
+export const ANALYSIS_THEMES_MAX = 10;
+/** テーマの名前の上限（文字）。 */
+export const ANALYSIS_THEME_NAME_MAX = 20;
+
+// 時間差のメンション（specs/023-delayed-mention data-model.md「共有の定数」）。人数・回数・期間は仮の値（spec Assumptions）
+/** メンションする人の上限。 */
+export const MENTION_PEOPLE_MAX = 20;
+/** 1つの返信で選べる人。 */
+export const MENTION_PER_REPLY_MAX = 5;
+/** ひとことの上限（文字）。 */
+export const MENTION_MESSAGE_MAX = 100;
+/** 呼び名の上限（文字）。 */
+export const MENTION_LABEL_MAX = 30;
+/** 時間差（分）。 */
+export const MENTION_DELAY_OPTIONS = [10, 30, 60, 180, 360, 720, 1440] as const;
+/** 時間差の初めの値（分）。 */
+export const MENTION_DELAY_DEFAULT = 30;
+/** 同じ人へのメンションの間隔（時間）。 */
+export const MENTION_SAME_PERSON_HOURS = 24;
+/** この時間を過ぎたら返信を出さない（時間）。 */
+export const MENTION_EXPIRE_HOURS = 24;
+/** 投稿済みの投稿に付けられる期間（日）。 */
+export const MENTION_PUBLISHED_DAYS = 7;
+/** 一時的な失敗の上限。 */
+export const MENTION_MAX_ATTEMPTS = 3;
+/** 1回の処理で出す返信の上限。 */
+export const MENTION_MAX_PER_TICK = 10;
+
+// ---- アカウントの数と1日の投稿数の上限（specs/024-tester-invite-connect data-model.md 3） ----
+
+/** アカウントの数の上限の、全員共通の既定値の初めの値（FR-016）。 */
+export const DEFAULT_ACCOUNT_LIMIT = 3;
+/** 1日の投稿数の上限（1アカウント）の、全員共通の既定値の初めの値。今までの1日10件と同じ（FR-016）。 */
+export const DEFAULT_DAILY_POST_LIMIT = AUTOPOST_SLOT_LIMIT;
+/** アカウントの数の上限の最大。 */
+export const ACCOUNT_LIMIT_MAX = 1000;
+/** 1日の投稿数の上限の最大（Threadsの24時間の上限）。運営者にはこの値をかける（research.md R7）。 */
+export const DAILY_POST_LIMIT_MAX = 250;
+/** 運営者の上限の記録を出す件数。 */
+export const LIMIT_EVENTS_LIMIT = 50;

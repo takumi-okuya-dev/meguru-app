@@ -113,6 +113,195 @@
       "when": 1792162606462,
       "tag": "0015_strategy_guidance",
       "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1793457695767,
+      "tag": "0016_test_groups",
+      "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1793500735193,
+      "tag": "0017_referral_links",
+      "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1793765053289,
+      "tag": "0018_feature_switches",
+      "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1793800182854,
+      "tag": "0019_external_media",
+      "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1793809357151,
+      "tag": "0020_algorithm_analysis",
+      "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1793842155306,
+      "tag": "0021_delayed_mention",
+      "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1794129567801,
+      "tag": "0022_tester_invites",
+      "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1794151178558,
+      "tag": "0023_connection_notice",
+      "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1794153249512,
+      "tag": "0024_tester_backfill_connected",
+      "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1794415227404,
+      "tag": "0025_last_app",
+      "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1794463685447,
+      "tag": "0026_app_foundation",
+      "breakpoints": true
+    },
+    {
+      "idx": 27,
+      "version": "7",
+      "when": 1794468698868,
+      "tag": "0027_recopy_usage",
+      "breakpoints": true
+    },
+    {
+      "idx": 28,
+      "version": "7",
+      "when": 1794475843058,
+      "tag": "0028_threads_received_events",
+      "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "7",
+      "when": 1794477280560,
+      "tag": "0029_threads_settings_user_states",
+      "breakpoints": true
+    },
+    {
+      "idx": 30,
+      "version": "7",
+      "when": 1794482406529,
+      "tag": "0030_threads_schema",
+      "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "7",
+      "when": 1794501436422,
+      "tag": "0031_drop_old_limit_columns",
+      "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1794509509764,
+      "tag": "0032_app_access_grants",
+      "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1794526825021,
+      "tag": "0033_collect_schema",
+      "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "7",
+      "when": 1794541267576,
+      "tag": "0034_people_schema",
+      "breakpoints": true
+    },
+    {
+      "idx": 35,
+      "version": "7",
+      "when": 1794548256085,
+      "tag": "0035_collect_reception",
+      "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "7",
+      "when": 1794550081945,
+      "tag": "0036_collect_closing",
+      "breakpoints": true
+    },
+    {
+      "idx": 37,
+      "version": "7",
+      "when": 1794554823070,
+      "tag": "0037_people_outreach",
+      "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "7",
+      "when": 1794564425151,
+      "tag": "0038_people_sales_list",
+      "breakpoints": true
+    },
+    {
+      "idx": 39,
+      "version": "7",
+      "when": 1794566462066,
+      "tag": "0039_collect_threads_candidates",
+      "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "7",
+      "when": 1794567506215,
+      "tag": "0040_collect_self_check_in",
+      "breakpoints": true
+    },
+    {
+      "idx": 41,
+      "version": "7",
+      "when": 1794600276940,
+      "tag": "0041_collect_revenue_sharing",
+      "breakpoints": true
+    },
+    {
+      "idx": 42,
+      "version": "7",
+      "when": 1794631375473,
+      "tag": "0042_collect_settlement",
+      "breakpoints": true
     }
   ]
 }

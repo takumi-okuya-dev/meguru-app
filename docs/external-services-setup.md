@@ -1,6 +1,6 @@
 # 外部サービスの準備手順
 
-feature 001「ログインとThreadsアカウント登録」を、本物のGoogle・Threadsでローカルから動かすための準備手順です。終わったら、[quickstart.md](../specs/001-login-account-setup/quickstart.md)の「手動での確認」に進めます。
+外部サービス（Clerk・Meta・Cloudflare・Neon・Stripe・GitHub）の準備手順です。1〜8章は、本物のGoogle・Threadsでローカルから動かすための準備（終わったら[001のquickstart.md](../specs/001-login-account-setup/quickstart.md)の「手動での確認」へ）、9章はステージングと本番を立てる準備、10章は決済（Stripe）です。
 
 各サービスの画面の項目名は、変更されることがあります。見つからないときは、手順の末尾にある公式ドキュメントを確認してください。
 
@@ -102,7 +102,7 @@ curl https://api-dev.example.com/api/health
 | Sign in options：Username | オフ | |
 | Sign in options：Google | **オン** | アプリのログイン手段はGoogleだけ（FR-001） |
 
-作成直後は**開発用インスタンス**（Development）になっています。開発用インスタンスでは、Clerkが用意した共有のGoogle認証情報が使われるので、Google Cloud側の設定は不要です（本番は「9. 本番公開時」を参照）。
+作成直後は**開発用インスタンス**（Development）になっています。開発用インスタンスでは、Clerkが用意した共有のGoogle認証情報が使われるので、Google Cloud側の設定は不要です（本番は9-7）。
 
 3. 作成すると「Add authentication to your app」という画面（Next.js・Reactなどを選び、AIエージェント向けのプロンプトをコピーする画面）が出ますが、**この画面の手順は飛ばします**。
    - このリポジトリにはClerkを組み込み済みです（Webは`@clerk/react`、APIは`@clerk/backend`）。
@@ -159,11 +159,12 @@ APIは、セッショントークンにメールアドレスが含まれてい�
 
 ### 3-2. 権限（スコープ）を追加する
 
-「ユースケース」→「Threads APIにアクセス」の「カスタマイズ」→「アクセス許可」で、次の3つを追加します（[research.md R3](../specs/001-login-account-setup/research.md)）。
+「ユースケース」→「Threads APIにアクセス」の「カスタマイズ」→「アクセス許可」で、次の4つを追加します（[research.md R3](../specs/001-login-account-setup/research.md)）。
 
 - `threads_basic`（必須）
 - `threads_content_publish`（自動投稿で使う）
 - `threads_manage_insights`（分析で使う）
+- `threads_manage_replies`（時間差のメンションの返信で使う。specs/023）
 
 ### 3-3. 戻り先URLと通知先URLを登録する
 
@@ -241,6 +242,8 @@ cp apps/api/.dev.vars.example apps/api/.dev.vars
 | `DATABASE_URL` | `postgres://postgres:postgres@db.localtest.me:5432/threads_grower` | ローカルのDB（`local-neon-http-proxy`経由） |
 | `WEB_ORIGIN` | `http://localhost:5173` | Webの開発サーバー |
 | `BILLING_ENABLED` | `false`（決済を試すときは`true`） | 必須。10 |
+| `TEST_GROUPS_ENABLED` | `false`（テスト用のグループを試すときは`true`） | 必須（specs/016） |
+| `OPERATOR_CLERK_USER_IDS` | 自分のClerkのユーザーID（`user_…`。カンマ区切りで複数） | テスト用のグループを試すとき |
 
 `THREADS_AUTH_BASE_URL`と`THREADS_GRAPH_BASE_URL`は、本物のThreadsにつなぐ場合は書きません（`wrangler.toml`の既定値が使われます）。
 
@@ -281,21 +284,7 @@ cloudflared tunnel run threads-grower-dev
 
 ## 7. E2Eテストを動かす場合（任意）
 
-E2Eでは、Threadsは偽のサーバーに置き換わるので、Metaの設定は不要です。必要なのはClerkだけです。
-
-1. Clerkのダッシュボードの「Users」→「Create user」で、テスト用のユーザーを作る（メールアドレスだけでよい。例：`e2e@example.com`）。
-2. 次の環境変数を設定して実行する。
-
-```bash
-export CLERK_PUBLISHABLE_KEY=pk_test_...
-export CLERK_SECRET_KEY=sk_test_...
-export E2E_CLERK_USER_EMAIL=e2e@example.com
-pnpm --filter e2e exec playwright install chromium   # 初回のみ
-pnpm e2e
-```
-
-- テスト用ユーザーへのログインは、Clerkの`@clerk/testing`がメール確認などを経ずに行います。Googleのアカウントは不要です。
-- E2EはDBを毎回空にします。手動確認で作ったデータも消えるので注意してください。
+READMEの「テスト」→「E2E」にあります（ログインする人のメールアドレスは`e2e/.env.local`に書く）。E2Eでは、Threadsは偽のサーバーに置き換わるので、Metaの設定は要りません。
 
 ---
 
@@ -327,34 +316,39 @@ pnpm e2e
 
 ### 9-0. 先に知っておくこと
 
-- **このリポジトリは、まだ一度もデプロイしていません**。Cloudflare上にWorkerもPagesのプロジェクトも「ありません」。9-4で作ります。
-- `apps/api/wrangler.toml`の`[env.staging]`・`[env.production]`には、**見本の値**（`pk_test_xxx`・`https://api.example.com`など）が入っています。本物に差し替えるまで、デプロイできてもAPIは`CONFIG_ERROR`で止まります（入れ忘れに気づくための仕掛けです）。
+- **ステージングは2026-10-31に立てました**（[ステージングの構築記録](staging-setup-record.md)）。**本番はまだ立てていません**。本番のWorker・Neonのプロジェクト・Clerkの本番インスタンスはまだなく、KVの箱とPagesのプロジェクト（ステージングと共用）だけがあります。
+- `apps/api/wrangler.toml`の`[env.production]`には、**見本の値**（`pk_test_xxx`・`https://api.example.com`など）が入っています。本物に差し替えるまで、デプロイできてもAPIは`CONFIG_ERROR`で止まります（入れ忘れに気づくための仕掛けです）。
 - **ドメインが決まるまで**は、Cloudflareの既定のURL（`*.pages.dev`・`*.workers.dev`）でステージングまで進められます。独自ドメインが要るのは、Clerkの本番インスタンス（9-7）だけです。
-- **GitHubはProのプランが要ります**（このリポジトリは非公開のため）。無料のプランでは、非公開のリポジトリで次が使えません。9-11・9-12の前に、GitHubのSettings → Billing and plansでProにしてください。
+- **GitHubは有料のプランが要ります**（このリポジトリは非公開のため）。無料のプランでは、非公開のリポジトリで次が使えません。このリポジトリは、Teamのプランを契約したOrganization`takumi-okuya-dev`に置いています（2026-10-31に個人のアカウントから移した）。個人のアカウントに置く場合は、Proでも同じものが使えます。
   - Environmentの秘密の値と変数（9-11）。使えないと`deploy.yml`の「設定がそろっているか見る」が全部を空と見て、**警告だけ出して何もデプロイせずに成功で終わります**。
   - EnvironmentのDeployment branches and tags（9-11）
   - ブランチの保護とルールセット（9-12）
-- 増える固定費は**ドメイン代（年に数千円）とGitHub Proの料金**です（[docs/cost-estimate.md](./cost-estimate.md)）。
+- 増える固定費は**ドメイン代（年に数千円）とGitHub Teamの料金**です（[docs/cost-estimate.md](./cost-estimate.md)）。
 - **まずステージングだけ立てる場合は、9章を上から通さず、次の9-0-1の順で進めてください。**
 
 ### 9-0-1. ステージングだけ先に立てる場合の順番
 
 テストユーザーにだけ使ってもらう段階なら、**ドメインを買わずにここまで進められます**。9章は本番まで通す順に並んでいるので、ステージングだけなら次の順で、該当する節の中のステージング側だけを行ってください。
 
+2026-10-31にこの順でステージングを立てました。作ったもの・秘密の値の置き場所・実際に使ったコマンドは[ステージングの構築記録](./staging-setup-record.md)にあります。
+
 | 順 | やること | 節 | 作業ID |
 |---|---|---|---|
-| 1 | CloudflareのAPIトークンとアカウントIDを控える | 9-2 | T010 |
-| 2 | ステージングのKVを作り、`id`を`wrangler.toml`に入れる（`main`へのPR） | 9-3 | T020 |
-| 3 | Neonのステージングのプロジェクトを作り、マイグレーションを当てる | 9-5 | T019 |
-| 4 | **最初のデプロイを手で1回**（Pagesのプロジェクト＋ステージングのWorker） | 9-4 | T022 |
-| 5 | 決まったURLを`[env.staging].vars`に入れる（`WEB_ORIGIN`・`THREADS_REDIRECT_URI`。`main`へのPR） | 9-6の末尾 | T022の続き |
-| 6 | Stripeのテスト用環境：`STRIPE_PRICE_ID`を入れ、WebhookをステージングのAPIに向ける | 9-10 | T039・T040のステージング分 |
-| 7 | ステージングのCloudflareのシークレットを入れる | 9-6 | T021 |
-| 8 | Metaのアプリに、ステージングのコールバックURLを足す | 9-8 | T025 |
-| 9 | Clerkの開発用インスタンスをAllowlistにし、テストユーザーを招く | 9-7のステージング | T024 |
-| 10 | GitHubのEnvironment`staging`を作る（変数・Secret・保護規則） | 9-11 | T011 |
-| 11 | `develop`ブランチを作り、ブランチとタグの規則を付け、既定のブランチを`develop`にする | 9-12 | T013・T012 |
-| 12 | `develop`へマージして、自動デプロイと動きを確かめる | 9-13 | T026 |
+| 1 | `develop`ブランチを`main`と同じ内容で作る | — | — |
+| 2 | CloudflareのAPIトークンとアカウントIDを控える | 9-2 | T010 |
+| 3 | ステージングのKVを作り、`id`を`wrangler.toml`に入れる（`develop`へのPR） | 9-3 | T020 |
+| 4 | Neonのステージングのプロジェクトを作り、マイグレーションを当てる | 9-5 | T019 |
+| 5 | **最初のデプロイを手で1回**（Pagesのプロジェクト＋ステージングのWorker） | 9-4 | T022 |
+| 6 | 決まったURLを`[env.staging].vars`に入れる（`WEB_ORIGIN`・`THREADS_REDIRECT_URI`。`develop`へのPR） | 9-6の末尾 | T022の続き |
+| 7 | Stripeのテスト用環境：`STRIPE_PRICE_ID`を入れ、WebhookをステージングのAPIに向ける | 9-10 | T039・T040のステージング分 |
+| 8 | ステージングのCloudflareのシークレットを入れる | 9-6 | T021 |
+| 9 | Metaのアプリに、ステージングのコールバックURLを足す | 9-8 | T025 |
+| 10 | Clerkの開発用インスタンスをAllowlistにし、テストユーザーを招く | 9-7のステージング | T024 |
+| 11 | GitHubのEnvironment`staging`を作る（変数・Secret・保護規則） | 9-11 | T011 |
+| 12 | ブランチとタグの規則を付け、既定のブランチを`develop`にする | 9-12 | T013・T012 |
+| 13 | `develop`へマージして、自動デプロイと動きを確かめる | 9-13 | T026 |
+
+`develop`を作るタイミングは2026-10-31に見直した。前は11番目だったが、理由（下の「順番を入れ替えると詰まるところ」）が誤りだった。
 
 **飛ばす節**：9-1（ドメイン）・9-7の本番・9-9（独自ドメイン）・9-14（公開の判断）と、各節の本番側（T027〜T032、Stripeの本番分）。ドメインを買って公開すると決めたときに、9章を上から通してください。
 
@@ -367,13 +361,15 @@ pnpm e2e
 
 **順番を入れ替えると詰まるところ**（この順にしてある理由です）
 
-- **2は4より先**。`wrangler.toml`に書いた`id`のKVが無いと、デプロイが拒まれます。
-- **5・6・8は4より後**。ステージングのURLは、4で実体ができるまで確かめられません（上の表のとおり推測はできますが、4で表示される値が確実です）。
-- **`develop`を作るのは11**。先に作ると、2・5の`wrangler.toml`のPRを`develop`にマージした時点で自動デプロイが走り、まだ設定が無いので失敗します。10まで`main`へのPRで進め、最後に`develop`を`main`から分けると、`develop`は最初から整った状態になります。
-- **10を飛ばさない**。`CLOUDFLARE_API_TOKEN`などが無いと、12の自動デプロイはその場で落ちます。
-- **4の時点でAPIは`CONFIG_ERROR`です**。シークレット（7）がまだなので、これで正しい動きです。消えるのは7が済んでからです。
-- ステージングは`BILLING_ENABLED = "true"`です。Stripeのテスト用環境の鍵（7）と`STRIPE_PRICE_ID`（6）まで入れないと、`CONFIG_ERROR`は消えません。テストユーザーには料金なしの印を付けます（10-7）。
-- Threadsにつなぐ方法（トークンを貼る／Metaの審査後）は、環境の設定で切り替えられます。審査前のステージングでの決め方は「つなぐ方法の切り替え（`THREADS_CONNECT_METHODS`）」を見てください。
+- **1は早くてよい**。`develop`を作って`main`と揃えておいても困りません。`deploy.yml`は、GitHubのEnvironmentの秘密の値・変数が1つも入っていないとき、**警告を出すだけで何もデプロイせずに成功で終わります**（「設定がそろっているか見る」の`if [ -z "$filled" ]`の分岐。止まる＝`exit 1`になるのは「一部だけ入っている」ときだけ）。実際に`develop`を作った直後のDeployの実行で確かめ済み（2026-10-31）。
+- **3は5より先**。`wrangler.toml`に書いた`id`のKVが無いと、デプロイが拒まれます。
+- **6・7・9は5より後**。ステージングのURLは、5で実体ができるまで確かめられません（上の表のとおり推測はできますが、5で表示される値が確実です）。
+- **11を飛ばさない**。`CLOUDFLARE_API_TOKEN`などが無いと、13の自動デプロイはその場で落ちます。
+- **5の時点でAPIは`CONFIG_ERROR`です**。シークレット（8）がまだなので、これで正しい動きです。消えるのは8が済んでからです。
+- ステージングは`BILLING_ENABLED = "true"`です。Stripeのテスト用環境の鍵（8）と`STRIPE_PRICE_ID`（7）まで入れないと、`CONFIG_ERROR`は消えません。テストユーザーには料金なしの印を付けます（10-7）。
+- ステージングは`TEST_GROUPS_ENABLED = "true"`です（specs/016）。テスト版は、運営者が作ったグループの招待リンクから入った人と、この機能の前からいた人だけが使えます。グループで入った人には料金なしの印が自動で付きます。運営者（グループを作る人）は、Clerkのダッシュボードの「Users」で自分のIDを見て、`printf '%s' 'user_…' | npx wrangler secret put OPERATOR_CLERK_USER_IDS --env staging`で入れます。本番は`"false"`（誰でも登録できる）。
+- **12（ブランチの保護）は、1より後でよい**。保護がない間は`develop`・`main`とも直接pushできてしまうが、これは`develop`を作る前から`main`にあった状態と同じで、新たに増えるリスクではない。設定の値（2〜10）が出そろってから、まとめて付ける。
+- Threadsにつなぐ方法（トークンを貼る／Metaの審査後）は、環境の設定で切り替えられます。決め方は9-15「つなぐ方法の切り替え（`THREADS_CONNECT_METHODS`）」を見てください（024から、テスト版も本番も両方を出します）。
 
 ### 9-1. ドメインを買い、Cloudflareに載せる（T027）
 
@@ -423,13 +419,18 @@ pnpm --filter api exec wrangler kv namespace create AUTOPOST_KV --env production
 
 ```bash
 # 1) Pagesのプロジェクト（Webの置き場所）。本番のブランチは main
-#    wrangler は apps/api の開発用の依存なので、--filter api から呼びます
-pnpm --filter api exec wrangler pages project create threads-grower-web --production-branch main
+#    wrangler は apps/api の開発用の依存。設定ファイルのない空のフォルダーで動かす
+REPO=$(pwd)   # リポジトリの一番上で実行する
+mkdir -p /tmp/empty && cd /tmp/empty
+"$REPO/apps/api/node_modules/.bin/wrangler" pages project create threads-grower-web --production-branch main --force
+cd "$REPO"
 
 # 2) ステージングのWorker（APIの置き場所）。最初のデプロイで作られる
 pnpm --filter api deploy:staging
 ```
 
+- **1)は`--force`を付け、空のフォルダーで動かします。** wrangler 4.146（2026-10）から、新しいPagesのプロジェクトを作ろうとすると、Workers側へ処理が回されます（Cloudflareが「新しいプロジェクトはWorkersで」と勧めているため）。そのとき今いるフォルダーの`wrangler.toml`を読むので、`apps/api`で動かすと、**APIのコードを`threads-grower-web`という名前のWorkerとして出そうとします**（2026-10-31に実際に起き、KVが見つからずに止まった）。`--force`を付けると、これまでのPagesのプロジェクトとして作られます。一度できれば、以後の`pages deploy`（`deploy.yml`）はふつうのPagesに向かうので、`--force`はこの1回だけです。
+- PagesとWorkers（静的アセット）は、どちらも画面のファイルの配信は無料・無制限です。このアプリのWebはファイルを配るだけなので、費用は変わりません。今の設計（`deploy.yml`・URL）に合わせてPagesにしています。
 - 2)の時点では、環境変数が見本の値のままなので、APIを開いても`CONFIG_ERROR`になります。9-5以降で直します。
 - **PagesのGit連携は使いません**（GitHub Actionsからだけ出します）。画面から作ってGit連携を付けてしまった場合は、Pagesの Settings → Builds & deployments で切ってください。
 
@@ -459,6 +460,11 @@ done
 
 - `TOKEN_ENCRYPTION_KEYS`・`IDENTIFIER_HASH_KEY`は、**環境ごとに別の値**を作ります（作り方は「4. 鍵を作る」）。
 - 秘密でない値（`WEB_ORIGIN`・`THREADS_REDIRECT_URI`・`CLERK_PUBLISHABLE_KEY`・`THREADS_APP_ID`・`STRIPE_PRICE_ID`など）は、`wrangler.toml`の`[env.*].vars`を直してPRでマージします。
+- 集金管理の会場の共有（specs/collect/001-event-day-collection research.md R5）の入場券に署名する秘密`COLLECT_LIVE_SECRET`も、環境ごとに別の値で入れます。入れなくてもAPIは動き、会場の共有だけが使えません（受付の画面は15秒ごとの読み直しで動き、ほかの人の記録が出るのが遅れます）。
+
+  ```bash
+  openssl rand -base64 32 | tr -d '\n' | pnpm --filter api exec wrangler secret put COLLECT_LIVE_SECRET --env staging   # 本番は --env production
+  ```
 
 ### 9-7. Clerk（T024・T031）
 
@@ -474,16 +480,38 @@ done
 3. **GoogleのOAuthを自分の認証情報にします**：Google Cloud ConsoleでOAuthクライアント（種類は「ウェブアプリケーション」）を作り、ClerkのGoogle接続で「Use custom credentials」をオンにします。Clerkの画面に出る「Authorized Redirect URI」を、Google側の「承認済みのリダイレクトURI」に登録します。
 4. 本番の`CLERK_SECRET_KEY`（9-6）と`CLERK_PUBLISHABLE_KEY`（`wrangler.toml`とGitHubの変数）を、本番インスタンスのものにします。
 
-### 9-8. Meta（Threads）のコールバックURL（T025・T032）
+### 9-8. Meta（Threads）のアプリとコールバックURL（T025・T032。specs/024 で改めた）
 
-**Metaのアプリは1つのまま**で、戻り先URLを両方登録します（アプリの設定 → Threads API → Redirect Callback URLs）。
+**Metaのアプリは環境ごとに分けます**（specs/024 research.md R12）。
 
-| 環境 | 登録するURL |
+| 環境 | Metaのアプリ |
 |---|---|
-| ステージング | `https://<ステージングのAPIのURL>/api/threads/callback` |
-| 本番 | `https://api.<ドメイン>/api/threads/callback` |
+| ステージング | 「ThreadsAutomation」（今の個人のアプリ。アプリID `1367107908637398`） |
+| 本番 | 本番用に新しく作るアプリ（3-1〜3-4と同じ手順） |
 
-同じ値を、`wrangler.toml`の各環境の`THREADS_REDIRECT_URI`にも入れます（**完全一致**でないとMetaが拒否します）。
+それぞれのアプリの「ユースケース」→「Threads APIにアクセス」→「カスタマイズ」→「設定」で、次の3つを登録します（3-3）。
+
+| 項目 | ステージング | 本番 |
+|---|---|---|
+| リダイレクトコールバックURL | `https://threads-grower-api-staging.marron-taku.workers.dev/api/threads/callback` | `https://api.<ドメイン>/api/threads/callback` |
+| アンインストールコールバックURL | `https://threads-grower-api-staging.marron-taku.workers.dev/api/threads/webhooks/uninstall` | `https://api.<ドメイン>/api/threads/webhooks/uninstall` |
+| 削除コールバックURL | `https://threads-grower-api-staging.marron-taku.workers.dev/api/threads/webhooks/data-deletion` | `https://api.<ドメイン>/api/threads/webhooks/data-deletion` |
+
+- リダイレクトの値は、`wrangler.toml`の各環境の`THREADS_REDIRECT_URI`と**完全一致**させます（違うとMetaが拒否します）。
+- アプリIDは`wrangler.toml`の`THREADS_APP_ID`に、シークレットは Secret に入れます：`printf '%s' '<シークレット>' | pnpm --filter api exec wrangler secret put THREADS_APP_SECRET --env staging`（本番は`--env production`）。
+- **ステージングは、`THREADS_APP_SECRET`を入れてから024を`develop`にマージします**。`app`を出す環境でシークレットがないと、APIが設定の誤り（`CONFIG_ERROR`）で止まります。
+
+#### テスター招待の運用（specs/024）
+
+審査の前は、テスターに入っていて招待を承認したThreadsアカウントだけが「Threadsで許可する」でつなげます。アプリの中で、次の流れで管理します。
+
+1. 利用者が、つなぐ前のアカウントの「Threadsにつなぐ」で、Threadsのユーザー名を書いて申し込みます。
+2. 運営者が、設定の「運営 › テスター招待」を開き、「Metaでテスターを加える」からMetaのアプリの「アプリの役割」→「役割」で、そのユーザー名を「Threadsテスター」に加えます（3-5）。
+3. アプリに戻り、その申し込みの「招待した」を押します。
+4. 利用者がThreadsのアプリで招待を承認し、「Threadsで許可する」でつなぎます。つながると、申し込みは自動で「接続済み」になります。
+5. アカウントが消された・退会した・取り下げられたなどで「外してよい」に出たら、Metaのテスターから外し、「外した」を押します。
+
+運営者はトークンを作りません（Metaのユーザートークン生成ツールは、そのThreadsアカウントへのログインが要るため）。テスター枠の数は、画面の「枠の数を変える」で、Metaのアプリの上限に合わせます。
 
 ### 9-9. Pagesに独自ドメインを当てる（T023・T032）
 
@@ -533,7 +561,7 @@ Settings → Environments で`staging`と`production`を作り、それぞれに
 |---|---|---|
 | Deployment branches and tags | **Selected** → `develop`（ブランチのみ） | **Selected** → `main`（ブランチのみ） |
 
-> Required reviewers（本番に出すたびに自分の承認を挟む設定）は、**Proでも非公開のリポジトリでは使えません**（公開のリポジトリか、Enterpriseのプランだけ）。そのため本番の前の確認は、リリースのPRの中で[リリースの手順書](./release-runbook.md) 4のチェックを通すことで行います。
+> Required reviewers（本番に出すたびに自分の承認を挟む設定）は、**TeamやProでも非公開のリポジトリでは使えません**（公開のリポジトリか、Enterpriseのプランだけ）。そのため本番の前の確認は、リリースのPRの中で[リリースの手順書](./release-runbook.md) 4のチェックを通すことで行います。
 
 **この設定を飛ばさないでください。** `deploy.yml`の中にも出す先を決める関所（`guard`ジョブ）がありますが、Actionsの画面から手で動かすとき（`workflow_dispatch`）は**選んだブランチにあるワークフローの定義が動く**ので、ファイルの中の判定は書き換えられます。「`main`以外から本番の秘密を渡さない」を本当に守れるのは、**リポジトリの外側にあるこの設定だけ**です。
 
@@ -546,11 +574,17 @@ git checkout main && git pull && git checkout -b develop && git push -u origin d
 ```
 
 2. Settings → General → Default branch を**`develop`**にします（新しいPRの行き先が既定で`develop`になります）。
-3. Settings → Rules → Rulesets で、`main`と`develop`に同じ規則を付けます（非公開のリポジトリでは**GitHub Proが要ります**。9-0）。
+3. Settings → Rules → Rulesets で、`main`と`develop`に同じ規則を付けます（非公開のリポジトリでは**GitHubのTeamかProが要ります**。9-0）。
 
 - Restrict deletions
-- Require a pull request before merging（直接のpushを禁止）
+- Block force pushes
+- Require a pull request before merging（直接のpushを禁止。承認の数は0）
 - Require status checks to pass → `check`（`ci.yml`のジョブ）
+- Bypass list → **Repository admin** を「**For pull requests only**」で足す
+
+最後の例外は、**コードを変えないPR（文書だけなど）を、CIを待たずにマージするため**です（2026-10-31に決めた運用）。どの変更でCIを流すかは[リリースの手順書](release-runbook.md) 2が正本です。管理者がPRから`gh pr merge --admin`（画面なら「Merge without waiting for requirements」）でマージできます。PRを通さない直接のpushは、管理者でもできません。コードを変えるPRは、これまでどおりCIの成功を待ってからマージします。
+
+2026-10-31に、この設定（ルールセット`main と develop を守る`）と4のタグの規則を、APIで作りました。
 
 4. **タグにも規則を付けます。** Ruleset の Target を **Tags** にして、`main`と`develop`という名前のタグを作れないようにします（Restrict creations、または `main`・`develop` を名指しで保護）。
 
@@ -565,8 +599,11 @@ git checkout main && git pull && git checkout -b develop && git push -u origin d
 ここまでで「公開できる状態」になります。実際に公開する（本番のURLを配る）前に、次が要ります。
 
 - **Meta**：App Review（各権限の用途の説明）と、必要に応じてビジネス認証。データ削除の状況確認ページの中身も見直す（[001 research.md R7](../specs/001-login-account-setup/research.md)）。通ったら、`wrangler.toml`の本番の`THREADS_ACCESS_MODE`を`public`にします。
+  - **`THREADS_ACCESS_MODE`を`public`にする前に**：Threads接続の完了は`POST /api/threads/complete`（ログイン済み）で行い、`state`を作った人と呼び出し元の一致を要求しています（セキュリティ監査run-1）。この仕組みが入っていることを確かめてから`public`にしてください。
+- **適格請求書（インボイス）**：適格請求書発行事業者に登録するかを決めます。登録したら、Stripeの本番の領収書・請求書の設定に登録番号（T＋13桁）を入れ、税率ごとの消費税の額が出ることを、テスト用環境の領収書で確かめます。登録しないなら、登録番号は載せません。どちらでも、アプリのコードと料金（税込み）は変わりません。
+- **特定商取引法に基づく表記**：販売者の名前・住所・連絡先などを決め、`apps/web/src/shell/lib/seller-info.ts`に入れます（013 FR-071）。住所・電話番号は「請求があれば遅滞なく開示します」と書く形も選べます。
 
-### つなぐ方法の切り替え（`THREADS_CONNECT_METHODS`）
+### 9-15. つなぐ方法の切り替え（`THREADS_CONNECT_METHODS`）
 
 App Reviewを通すまで、または通らなかったときは、**利用者が自分のMetaアプリで作ったトークンを貼る方法だけ**で運用できます。`wrangler.toml`の`[env.*.vars]`で切り替えます。
 
@@ -582,10 +619,9 @@ App Reviewを通すまで、または通らなかったときは、**利用者�
 
 - 公開権限（`threads_content_publish`）が無いトークンでも**接続自体は通り、警告だけ出ます**。利用者が付け忘れると、繋がったように見えて自動投稿だけ失敗します。
 - アンインストール・データ削除の通知は利用者のMetaアプリに届くので、このアプリには届きません。次の問い合わせの認証エラーで「要再接続」になります（[specs/010 spec.md](../specs/010-token-account-add/spec.md)に受容済みとして記録）。
-
-**`THREADS_ACCESS_MODE`を`public`にする前に**：Threads接続の完了は`POST /api/threads/complete`（ログイン済み）で行い、`state`を作った人と呼び出し元の一致を要求しています（セキュリティ監査run-1）。この仕組みが入っていることを確かめてから`public`にしてください。
-- **適格請求書（インボイス）**：適格請求書発行事業者に登録するかを決めます。登録したら、Stripeの本番の領収書・請求書の設定に登録番号（T＋13桁）を入れ、税率ごとの消費税の額が出ることを、テスト用環境の領収書で確かめます。登録しないなら、登録番号は載せません。どちらでも、アプリのコードと料金（税込み）は変わりません。
-- **特定商取引法に基づく表記**：販売者の名前・住所・連絡先などを決め、`apps/web/src/lib/seller-info.ts`に入れます（013 FR-071）。住所・電話番号は「請求があれば遅滞なく開示します」と書く形も選べます。
+- **`token`だけなら、このアプリのMetaアプリ（`THREADS_APP_ID`・`THREADS_APP_SECRET`・`THREADS_REDIRECT_URI`）は要りません**。設定の確認（`validateConfig`）は、`app`を出すときだけこの3つを求めます。シークレットを入れていない間は、アンインストール・データ削除の通知の窓口が、署名を見る前にすべて400で断ります（空や見本の鍵の署名は誰でも作れるため。2026-10-31）。
+- **024から、テスト版も本番も`app`と`token`の両方を出します**（審査の前は、テスター招待のあと「Threadsで許可する」でつなぐ。9-8）。3つの値を入れ、Metaのアプリにコールバックの3つのURL（3-3・9-8）を登録してから出します。
+- トークンは、利用者が自分で作ったMetaアプリでも、チームのオーナーが作ったMetaアプリ（利用者をThreadsテスターに招いて作る）でも構いません。審査後も、この方法は残します。
 
 ---
 
@@ -609,12 +645,13 @@ Stripeのダッシュボードの左上で「テスト環境」（sandbox）と�
 
 「商品カタログ」→「商品を追加」で、商品「ThreadsGrower」を作り、料金を次のとおりにします（research.md R3）。
 
-- 料金体系：**段階制（graduated）**、毎月、JPY
-- 1段目：1〜1件 **1,000円**
-- 2段目：2件〜 **1件につき500円**
+- 料金体系：**標準の料金（1件あたりの定額）**、毎月、JPY
+- 金額：**1件につき1,000円**（数＝アカウントの数）
 - 税：**内税（税込み）**
 
-できた料金のID（`price_…`）を`STRIPE_PRICE_ID`に入れます。金額は`packages/shared/src/billing.ts`の`BILLING_BASE_PRICE_JPY`・`BILLING_EXTRA_PRICE_JPY`と同じ値にします。金額を変えるときは、両方と利用規約を直し、利用者に告知します。
+できた料金のID（`price_…`）を`STRIPE_PRICE_ID`に入れます。金額は`packages/shared/src/billing.ts`の`BILLING_UNIT_PRICE_JPY`と同じ値にします。金額を変えるときは、定数・利用規約・特定商取引法に基づく表記を直し、利用者に告知します。
+
+**2026-11-08の料金の変更（specs/024）**：「1件目1,000円・2件目から500円」の段階制から、1件につき1,000円に改めました。Stripeの料金は金額を変えられないので、テスト用環境と本番のそれぞれで、上の形の料金を**新しく作り**、`STRIPE_PRICE_ID`を替えます。すでにある契約は、次の数の合わせ直し（アカウントを足す・消す、または日次の処理）で、新しい料金に切り替わります（日割りなし。次の請求から）。
 
 ### 10-3. Webhookの宛先を登録する
 
@@ -663,7 +700,7 @@ stripe listen --forward-to localhost:8787/api/stripe/webhook
 
 ### 10-7. 料金なしの印
 
-開発者・テストユーザー・公開の前からの利用者には、料金なしの印を付けます（登録から1か月を過ぎた人は、印がないと読むだけになります）。
+開発者・テストユーザー・公開の前からの利用者には、料金なしの印を付けます（印がないと、契約するまで使えません。無料体験は specs/024 でなくしました）。
 
 ```bash
 DATABASE_URL=… pnpm --filter api admin:set-billing-exempt <email> on   # 外すときは off

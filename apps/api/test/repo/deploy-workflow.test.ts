@@ -152,3 +152,13 @@ describe("ワークフローの権限", () => {
     expect(text).toMatch(/^permissions:/m);
   });
 });
+
+describe("deploy.yml の wrangler の動かし方", () => {
+  it("wrangler-action はどれも apps/api で動かす（wrangler はそこの依存にしかない）", () => {
+    // リポジトリの一番上で動かすと、wrangler-action が一番上に wrangler を足そうとして
+    // pnpm に断られ、Web だけ出ない（2026-10-31 に起きた）
+    const steps = withoutComments(deploy).split(/\n(?=\s*- name:)/).filter((s) => s.includes("wrangler-action"));
+    expect(steps.length).toBeGreaterThanOrEqual(2);
+    for (const s of steps) expect(s, s).toMatch(/workingDirectory:\s*apps\/api\s*$/m);
+  });
+});

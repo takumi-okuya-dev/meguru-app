@@ -7,20 +7,20 @@ import { listResponse, promptResponse, renderAccountRoutes } from "./helpers/sto
 
 const listPostDrafts = vi.fn();
 const getPrompt = vi.fn();
-vi.mock("@/lib/api-client", async (orig) => {
-  const actual = await orig<typeof import("@/lib/api-client")>();
-  return { ...actual, api: { ...actual.api, accountAccess: async () => OWNER_ACCESS, listPostDrafts, getPrompt } };
+vi.mock("@/apps/threads/lib/api", async (orig) => {
+  const actual = await orig<typeof import("@/apps/threads/lib/api")>();
+  return { ...actual, threadsApi: { ...actual.threadsApi, accountAccess: async () => OWNER_ACCESS, listPostDrafts, getPrompt } };
 });
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn(), info: vi.fn() } }));
 
-const { CreatePage } = await import("@/pages/create");
+const { CreatePage } = await import("@/apps/threads/pages/create");
 
 const MODE_KEY = "threads-grower:prompt-send-mode";
 const LONG = { ...promptResponse(), prompt: "全文", parts: ["1つ目の全文", "2つ目の全文"] as [string, string], length: 15000, splitRecommended: true };
 const SHORT = { ...promptResponse(), prompt: "全文", parts: ["1つ目の全文", "2つ目の全文"] as [string, string], length: 8000, splitRecommended: false };
 
 function renderCreate() {
-  return renderAccountRoutes([{ path: "create", element: <CreatePage /> }], "/accounts/a1/create");
+  return renderAccountRoutes([{ path: "create", element: <CreatePage /> }], "/threads/accounts/a1/create");
 }
 
 beforeEach(() => {
