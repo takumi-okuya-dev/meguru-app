@@ -142,6 +142,8 @@ export const collectEventSchema = z.object({
   sourceThreadsPromotionId: z.string().nullable(),
   sourceChangedAt: z.string().nullable(),
   sourceDeletedAt: z.string().nullable(),
+  /** Threads から作ったイベントの、元の宣伝内容で掲載済みの媒体（名簿の媒体のボタンで先に並べる。FR-064）。GET …/:eventId だけ */
+  threadsPostedMedia: z.array(z.enum(COLLECT_MEDIA)).optional(),
   version: z.number().int(),
   createdAt: z.string(),
   updatedAt: z.string(),

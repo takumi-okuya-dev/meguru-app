@@ -50,6 +50,7 @@ GET /api/collect/r/:token/reception ×1
 GET /api/collect/settings ×2
 GET /api/collect/settings/paypay-qr ×2
 GET /api/collect/summaries ×2
+GET /api/collect/threads-candidates ×2
 GET /api/collect/transfers ×2
 GET /api/data-deletion/:confirmationCode ×1
 GET /api/health ×1

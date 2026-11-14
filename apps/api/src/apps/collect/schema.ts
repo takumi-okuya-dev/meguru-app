@@ -2,7 +2,7 @@
 // 表はスキーマ collect に置き、共通の表（users など）への外部キーは張らない。主催者は owner_user_id に値として持ち、
 // 退会の片づけは出来事（user.withdrawn）で集金管理が行う（docs/app-separation.md 4）。外部キーは集金管理の表の中だけに張る。
 // PR1 の分（イベント・料金の区分・名簿・主催者の既定値・受け取った出来事）、PR2 の分（受付の記録・受付用リンク・手伝う人・端末）、
-// PR3 の分（精算・イベントのまとめ）。
+// PR3 の分（精算・イベントのまとめ）、PR4 の分（Threadsのイベントの候補）。
 import { sql } from "drizzle-orm";
 import { bigint, boolean, check, index, integer, jsonb, pgSchema, primaryKey, smallint, text, timestamp, uniqueIndex, uuid, type AnyPgColumn } from "drizzle-orm/pg-core";
 import {
@@ -283,4 +283,31 @@ export const collectEventSummaries = collectSchema.table(
     eventDeletedAt: timestamp("event_deleted_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [index("event_summaries_owner_idx").on(t.ownerUserId, t.startsAt)],
+);
+
+/**
+ * Threads のイベントの候補（data-model.md 2-10、research.md R15）。Threads の出来事を受け取って写す。元の宣伝内容の番号が主キー。
+ * 見せるのは、そのThreadsのアカウントの持ち主（owner_user_id）だけ。順番が入れ替わって届くので、イベントの情報と掲載の状況の
+ * それぞれに「起きた時刻」を持ち、それより古い出来事は捨てる（data-model.md の last_occurred_at を2つに分けた）。
+ */
+export const collectThreadsEventCandidates = collectSchema.table(
+  "threads_event_candidates",
+  {
+    promotionId: text("promotion_id").primaryKey(),
+    threadsAccountId: text("threads_account_id").notNull(),
+    ownerUserId: uuid("owner_user_id").notNull(),
+    name: text("name").notNull(),
+    startsAt: timestamp("starts_at", { withTimezone: true }).notNull(),
+    endsAt: timestamp("ends_at", { withTimezone: true }),
+    venue: text("venue"),
+    capacity: integer("capacity"),
+    feeAmount: integer("fee_amount"),
+    feeNote: text("fee_note"),
+    // 掲載済みの媒体（roster_people.media と同じ値）
+    postedMedia: text("posted_media").array().notNull().default(sql`ARRAY[]::text[]`),
+    deletedAt: timestamp("deleted_at", { withTimezone: true }),
+    detailsOccurredAt: timestamp("details_occurred_at", { withTimezone: true, precision: 6 }).notNull(),
+    mediaOccurredAt: timestamp("media_occurred_at", { withTimezone: true, precision: 6 }),
+  },
+  (t) => [index("threads_event_candidates_owner_idx").on(t.ownerUserId, t.startsAt)],
 );
