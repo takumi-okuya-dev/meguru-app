@@ -6,10 +6,12 @@ import {
   COLLECT_SELF_DEVICE_HEADER,
   errorResponseSchema,
   selfDeclareResponseSchema,
+  selfEntryResponseSchema,
   selfLinkInfoSchema,
   selfMeSchema,
   selfRequestCreatedSchema,
   selfSearchResponseSchema,
+  type SelfEntryRequest,
   type SelfMethod,
   type SelfRequestCreate,
 } from "@meguru/shared";
@@ -91,6 +93,8 @@ export const selfApi = {
   declare: (token: string, personId: string, method: SelfMethod | undefined, clientRequestId: string) =>
     call(selfDeclareResponseSchema, token, "/declare", post({ personId, ...(method ? { method } : {}), clientRequestId })),
   request: (token: string, input: SelfRequestCreate) => call(selfRequestCreatedSchema, token, "/requests", post(input)),
+  // 名簿なしで名簿に入る（specs/collect/004 contracts/api.md 2-2）。送り直しても同じ人（clientRequestId）
+  entry: (token: string, input: SelfEntryRequest) => call(selfEntryResponseSchema, token, "/entries", post(input)),
   me: (token: string) => call(selfMeSchema, token, "/me"),
   paypayQr: async (token: string) => (await send(token, "/paypay-qr")).blob(),
 };

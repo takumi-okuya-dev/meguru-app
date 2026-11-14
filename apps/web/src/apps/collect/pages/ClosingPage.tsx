@@ -276,23 +276,33 @@ export function ClosingPage() {
           </div>
         </section>
 
-        <section className={section} aria-labelledby="absent-title">
-          <h2 id="absent-title" className="font-medium">
-            来なかった人 {c.absent.length}人
-          </h2>
-          {c.absent.length > 0 && (
-            <ul className="divide-y rounded-lg border text-sm" aria-label="来なかった人">
-              {c.absent.map((p) => (
-                <li key={p.personId} className="flex justify-between gap-2 px-3 py-2">
-                  <span>
-                    No.{p.number} {p.name}
-                  </span>
-                  <span className="text-muted-foreground">{COLLECT_MEDIA_LABELS[p.media]}</span>
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
+        {c.checkInMode === "rosterless" ? (
+          // 名簿なしでは、記録のない人は「来なかった人」ではない（取り消した人・先に入れた人。specs/collect/004 FR-030）
+          <section className={section} aria-labelledby="unrecorded-title">
+            <h2 id="unrecorded-title" className="font-medium">
+              受付の記録がない人 {c.unrecordedCount}人
+            </h2>
+            <p className="text-sm text-muted-foreground">名簿なしの受付なので、来なかった人は出しません。記録を取り消した人や、先に名簿に入れた人の数です。</p>
+          </section>
+        ) : (
+          <section className={section} aria-labelledby="absent-title">
+            <h2 id="absent-title" className="font-medium">
+              来なかった人 {c.absent.length}人
+            </h2>
+            {c.absent.length > 0 && (
+              <ul className="divide-y rounded-lg border text-sm" aria-label="来なかった人">
+                {c.absent.map((p) => (
+                  <li key={p.personId} className="flex justify-between gap-2 px-3 py-2">
+                    <span>
+                      No.{p.number} {p.name}
+                    </span>
+                    <span className="text-muted-foreground">{COLLECT_MEDIA_LABELS[p.media]}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+        )}
 
         <div className="flex justify-end">
           <Button type="button" className="h-11" disabled={close.isPending} onClick={() => (unsettled.length > 0 ? setConfirmClose(true) : close.mutate())}>

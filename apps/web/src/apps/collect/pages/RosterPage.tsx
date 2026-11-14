@@ -118,6 +118,11 @@ export function RosterPage() {
           </Link>
         </div>
         <SourceNotice sourceChangedAt={event.data.sourceChangedAt} sourceDeletedAt={event.data.sourceDeletedAt} />
+        {event.data.checkInMode === "rosterless" && (
+          <p className="rounded-xl border bg-muted/40 px-4 py-3 text-sm">
+            名簿なしの受付です。参加者がセルフ受付で名前を入れると、ここに増えます（先に入れておく人だけ、下の欄で足してください）。
+          </p>
+        )}
         <QuickAdd
           eventId={eventId}
           tiers={tiers}
@@ -134,7 +139,11 @@ export function RosterPage() {
             名簿 {people.length}人
           </h2>
           {people.length === 0 ? (
-            <p className="rounded-xl border px-4 py-6 text-center text-sm text-muted-foreground">まだだれもいません。上の欄に名前を入れるか、申込の一覧を「まとめて貼る」で入れてください。</p>
+            <p className="rounded-xl border px-4 py-6 text-center text-sm text-muted-foreground">
+              {event.data.checkInMode === "rosterless"
+                ? "まだだれもいません。参加者がセルフ受付で入れると、ここに増えます。"
+                : "まだだれもいません。上の欄に名前を入れるか、申込の一覧を「まとめて貼る」で入れてください。"}
+            </p>
           ) : (
             <div className="overflow-x-auto rounded-xl border">
               <table className="w-full text-sm">
@@ -162,7 +171,13 @@ export function RosterPage() {
                         )}
                       </td>
                       <td className="px-3 py-2 whitespace-nowrap">{COLLECT_MEDIA_LABELS[p.media]}</td>
-                      <td className="px-3 py-2 whitespace-nowrap">{tierName.get(p.priceTierId) ?? ""}</td>
+                      <td className="px-3 py-2 whitespace-nowrap">
+                        {p.tierUndecided && tiers.length > 1 ? (
+                          <span className="text-amber-700 dark:text-amber-400">区分を確かめる</span>
+                        ) : (
+                          (tierName.get(p.priceTierId) ?? "")
+                        )}
+                      </td>
                       <td className="px-1 py-1 text-right whitespace-nowrap">
                         <Button variant="ghost" size="icon" aria-label={`No.${p.number} ${p.name}を直す`} onClick={() => setEditing(p)}>
                           <PencilIcon className="size-4" />

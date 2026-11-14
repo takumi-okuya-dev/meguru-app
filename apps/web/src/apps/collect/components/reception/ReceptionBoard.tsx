@@ -1,7 +1,7 @@
 // 受付の画面の中身（specs/collect/001-event-day-collection User Story 2・3、FR-030〜FR-039、tasks.md T042）。
 // 主催者の画面と手伝う人の画面で同じものを使う。上に数字の段と会場の共有の状態、検索、受付の行、飛び入り。
 // 受付の1人は「探す → 払い方 →（PayPay・振込ならシートの1回）」で終わる（SC-001）。
-import type { ReceptionPerson, ReceptionRecord, ReceptionSnapshot } from "@meguru/shared";
+import { sameNameIds, type ReceptionPerson, type ReceptionRecord, type ReceptionSnapshot } from "@meguru/shared";
 import { SearchIcon, UserPlusIcon } from "lucide-react";
 import { useState } from "react";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
@@ -15,6 +15,7 @@ import { PaypaySheet, TransferSheet } from "./PaySheets";
 import { ReceptionRow, type PayButton } from "./ReceptionRow";
 import { SelfPanel } from "./SelfPanel";
 import { StatsBar } from "./StatsBar";
+import { TierChoiceDialog } from "./TierChoiceDialog";
 import { WalkInDialog } from "./WalkInDialog";
 
 const LIVE_TEXT: Record<LiveStatus, string> = {
@@ -59,12 +60,19 @@ export function ReceptionBoard({
   const [paying, setPaying] = useState<{ person: ReceptionPerson; kind: "paypay" | "transfer" } | null>(null);
   const [undoing, setUndoing] = useState<ReceptionPerson | null>(null);
   const [walkIn, setWalkIn] = useState(false);
+  // 区分を選んでから記録する人（名簿なしで区分が未定。specs/collect/004 FR-021）
+  const [tierFirst, setTierFirst] = useState<{ person: ReceptionPerson; button: "cash" | "paypay" } | null>(null);
+  const [removing, setRemoving] = useState<ReceptionPerson | null>(null);
 
   const tiers = snap.event.tiers;
   const tierById = new Map(tiers.map((t) => [t.id, t]));
   const helperName = new Map(snap.helpers.map((h) => [h.id, h.name]));
   const buttons: PayButton[] = [...(["cash", "paypay", "transfer"] as const).filter((m) => snap.event.methods.includes(m)), "none"];
   const shown = snap.people.filter((p) => matchesQuery(p.person, query));
+  // 名簿なしでは、別の端末から同じ名前が入ったことを知らせる（会場の共有で人が増えても出し直せるよう、画面で数える。research R4）
+  const sameName = snap.event.checkInMode === "rosterless" ? sameNameIds(snap.people.map((p) => p.person)) : new Set<string>();
+  // 区分が未定で、まだ受付で区分を選んでいない（区分が2つ以上のときだけ）
+  const needsTier = (person: ReceptionPerson) => person.tierUndecided && tiers.length > 1 && !adjustments[person.id];
 
   // 区分・金額（受付で変えたもの。なければ名簿の区分）。
   const adjustmentOf = (person: ReceptionPerson): Adjustment => adjustments[person.id] ?? { priceTierId: person.priceTierId };
@@ -122,12 +130,17 @@ export function ReceptionBoard({
                 record={rec}
                 pending={state.pending[person.id]}
                 buttons={buttons}
-                tierLabel={`${tier?.name ?? "区分なし"} ${yen(amountOf(person))}`}
+                tierLabel={needsTier(person) ? "区分を確かめる" : `${tier?.name ?? "区分なし"} ${yen(amountOf(person))}`}
+                sameName={sameName.has(person.id)}
+                canRemove={person.selfEntered && rec === null && !state.pending[person.id]}
+                tierPending={rec !== null && rec.paymentStatus !== "paid" && person.tierUndecided && tiers.length > 1}
+                onRemove={() => setRemoving(person)}
                 adjusted={Boolean(adjustments[person.id])}
                 receiverName={rec ? receiverNameOf(rec, helperName) : null}
                 canUndo={rec !== null && (viewer.kind === "owner" || isMine(rec, viewer) || (rec.receiverKind === "self" && rec.transferConfirmedAt === null))}
                 onPay={(b) => {
-                  if (b === "paypay" || b === "transfer") setPaying({ person, kind: b });
+                  if ((b === "cash" || b === "paypay") && needsTier(person)) setTierFirst({ person, button: b });
+                  else if (b === "paypay" || b === "transfer") setPaying({ person, kind: b });
                   else record(person, b);
                 }}
                 onAdjust={() => setAdjusting(person)}
@@ -174,12 +187,47 @@ export function ReceptionBoard({
           tiers={tiers}
           value={adjustmentOf(adjusting)}
           onSave={(value) => {
-            const unchanged = value.priceTierId === adjusting.priceTierId && value.amount === undefined;
+            // 区分が未定の人は、仮の区分と同じものを選んでも「決めた」として持つ
+            const unchanged = value.priceTierId === adjusting.priceTierId && value.amount === undefined && !adjusting.tierUndecided;
             setAdjustments(({ [adjusting.id]: _old, ...rest }) => (unchanged ? rest : { ...rest, [adjusting.id]: value }));
             setAdjusting(null);
           }}
           onClose={() => setAdjusting(null)}
         />
+      )}
+      {tierFirst && (
+        <TierChoiceDialog
+          title={`No.${tierFirst.person.number} ${tierFirst.person.name}の区分`}
+          tiers={tiers}
+          onChoose={(priceTierId) => {
+            const { person, button } = tierFirst;
+            setTierFirst(null);
+            setAdjustments((prev) => ({ ...prev, [person.id]: { priceTierId } }));
+            if (button === "paypay") setPaying({ person, kind: "paypay" });
+            else {
+              void state.record(person.id, { method: "cash", priceTierId });
+              setAdjustments(({ [person.id]: _used, ...rest }) => rest);
+              setQuery("");
+            }
+          }}
+          onClose={() => setTierFirst(null)}
+        />
+      )}
+      {removing && (
+        <ConfirmDialog
+          title="名簿から外しますか？"
+          confirmLabel="名簿から外す"
+          destructive
+          onConfirm={() => {
+            void state.removeEntry(removing.id);
+            setRemoving(null);
+          }}
+          onCancel={() => setRemoving(null)}
+        >
+          <p>
+            No.{removing.number} {removing.name}を名簿から外します（同じ人が二重に入ったときなど）。受付番号は詰めません。
+          </p>
+        </ConfirmDialog>
       )}
       {undoing && (
         <ConfirmDialog

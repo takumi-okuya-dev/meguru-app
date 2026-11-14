@@ -7,7 +7,7 @@ import userEvent from "@testing-library/user-event";
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const mocks = vi.hoisted(() => ({ info: vi.fn(), search: vi.fn(), declare: vi.fn(), request: vi.fn(), me: vi.fn(), paypayQr: vi.fn() }));
+const mocks = vi.hoisted(() => ({ info: vi.fn(), search: vi.fn(), declare: vi.fn(), request: vi.fn(), entry: vi.fn(), me: vi.fn(), paypayQr: vi.fn() }));
 vi.mock("@/apps/collect/lib/self-api", async (orig) => {
   const actual = await orig<typeof import("@/apps/collect/lib/self-api")>();
   return { ...actual, selfApi: mocks };
@@ -162,5 +162,62 @@ describe("止められたリンク", () => {
     mocks.info.mockRejectedValue(new ApiError("ITEM_NOT_FOUND", 404));
     renderSelf();
     expect(await screen.findByRole("heading", { name: "このQRは使えません" })).toBeInTheDocument();
+  });
+});
+
+describe("名簿なし（specs/collect/004 User Story 1、tasks.md T027）", () => {
+  const rosterless = (tiers: { name: string; amount: number }[] = []) => ({
+    ...info(),
+    checkInMode: "rosterless",
+    media: ["peatix", "minato", "kokuchpro", "tunagate", "jimoty", "youtrust", "walk_in", "other"],
+    tiers,
+  });
+  const ENTERED = { ...PERSON, number: 1, tierName: "早割", amount: 2500, tierUndecided: true };
+
+  it("探す欄の代わりに入れる欄が出る。名前と媒体を入れるまで送れない。送ると払い方の選択に進み、区分ごとの金額を並べる", async () => {
+    mocks.info.mockResolvedValue(rosterless([{ name: "通常", amount: 3000 }, { name: "早割", amount: 2500 }]));
+    mocks.entry.mockResolvedValue({ requestId: "r1", person: ENTERED });
+    const user = userEvent.setup();
+    renderSelf();
+    expect(await screen.findByRole("heading", { name: "受付をする" })).toBeInTheDocument();
+    expect(screen.queryByRole("textbox", { name: "名前か受付番号" })).toBeNull();
+    const submit = screen.getByRole("button", { name: "受付をする" });
+    await user.type(screen.getByRole("textbox", { name: "名前" }), "松本 れい");
+    expect(submit).toBeDisabled();
+    await user.click(screen.getByRole("radio", { name: "Peatix" }));
+    await user.type(screen.getByRole("textbox", { name: "紹介してくれた人（なくてもよい）" }), "井上");
+    await user.click(submit);
+    expect(mocks.entry).toHaveBeenCalledWith(TOKEN, expect.objectContaining({ name: "松本 れい", kana: null, media: "peatix", referrer: "井上", clientRequestId: expect.any(String) }));
+    expect(await screen.findByRole("heading", { name: "払い方を選んでください" })).toBeInTheDocument();
+    expect(screen.getByText("通常 3,000円・早割 2,500円")).toBeInTheDocument();
+    expect(screen.getByText("受付の人が区分を確かめます。")).toBeInTheDocument();
+  });
+
+  it("区分が未定のまま現金を選ぶと、金額の代わりに区分ごとの金額で案内する", async () => {
+    mocks.info.mockResolvedValue(rosterless([{ name: "通常", amount: 3000 }, { name: "早割", amount: 2500 }]));
+    mocks.me.mockResolvedValue(me({ declaration: { person: ENTERED, record: { method: "cash", paymentStatus: "awaiting_confirmation", amount: 2500 } } }));
+    renderSelf();
+    expect(await screen.findByRole("heading", { name: "受付で払ってください（通常 3,000円・早割 2,500円）" })).toBeInTheDocument();
+  });
+
+  it("上限を超えたら「受付が混んでいます。受付の人に声をかけてください」", async () => {
+    mocks.info.mockResolvedValue(rosterless());
+    mocks.entry.mockRejectedValue(new ApiError("RATE_LIMITED", 429));
+    const user = userEvent.setup();
+    renderSelf();
+    await user.type(await screen.findByRole("textbox", { name: "名前" }), "松本 れい");
+    await user.click(screen.getByRole("radio", { name: "港" }));
+    await user.click(screen.getByRole("button", { name: "受付をする" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("受付が混んでいます。受付の人に声をかけてください。");
+  });
+
+  it("名簿に入ったあとで外されたら、声をかける案内と、最初からやり直すボタン", async () => {
+    mocks.info.mockResolvedValue(rosterless());
+    mocks.me.mockResolvedValue(me({ request: { id: "r1", status: "accepted", person: null } }));
+    const user = userEvent.setup();
+    renderSelf();
+    expect(await screen.findByRole("heading", { name: "受付の人に声をかけてください" })).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "最初からやり直す" }));
+    expect(await screen.findByRole("heading", { name: "受付をする" })).toBeInTheDocument();
   });
 });

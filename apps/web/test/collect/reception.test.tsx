@@ -138,6 +138,24 @@ describe("探す", () => {
 });
 
 describe("記録する", () => {
+  it("名簿なしで区分が未定の人は「区分を確かめる」。現金を押すと区分を選んでから記録する（specs/collect/004 FR-021、tasks.md T035）", async () => {
+    const snap = snapshot();
+    mocks.reception.mockResolvedValue({
+      ...snap,
+      event: { ...snap.event, checkInMode: "rosterless" },
+      people: snap.people.map((p, i) => (i === 0 ? { ...p, person: { ...p.person, tierUndecided: true, selfEntered: true, priceTierId: "t2" } } : p)),
+    });
+    mocks.record.mockResolvedValue({ record: recordOf("p1", "cash"), version: 6 });
+    const user = userEvent.setup();
+    renderReception();
+    const target = await screen.findByRole("listitem", { name: /松本 れい/ });
+    expect(target).toHaveTextContent("区分を確かめる");
+    await user.click(within(target).getByRole("button", { name: "現金" }));
+    expect(mocks.record).not.toHaveBeenCalled();
+    await user.click(within(await screen.findByRole("group", { name: "料金の区分" })).getByRole("button", { name: /通常/ }));
+    await waitFor(() => expect(mocks.record).toHaveBeenCalledWith("e1", "p1", { method: "cash", priceTierId: "t1", clientRequestId: expect.any(String) }));
+  });
+
   it("現金を押すと記録の呼び出し1回。受付済みになり、数字が増え、払い方のボタンが消える", async () => {
     mocks.record.mockResolvedValue({ record: recordOf("p1", "cash"), version: 6 });
     const user = userEvent.setup();

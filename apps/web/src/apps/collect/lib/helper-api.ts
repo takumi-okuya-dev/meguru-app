@@ -94,4 +94,6 @@ export const helperApi = {
     call(recordReceptionResponseSchema, token, `${person(personId)}/confirm`, device, json("POST", input)),
   resolveRequest: (token: string, device: string, requestId: string, action: SelfRequestAction, personId?: string) =>
     call(resolveSelfRequestResponseSchema, token, `/self-requests/${encodeURIComponent(requestId)}/${action}`, device, json("POST", personId ? { personId } : {})),
+  // 名簿なしで入った人を名簿から外す（specs/collect/004）
+  removeEntry: (token: string, device: string, personId: string) => call(versionResponseSchema, token, `${person(personId)}/entry`, device, { method: "DELETE" }),
 };
