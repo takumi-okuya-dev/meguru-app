@@ -38,7 +38,8 @@ async function loadClosingRows(db: Db, event: CollectEventRow) {
 function cashReceivers(rows: Awaited<ReturnType<typeof loadClosingRows>>): CashReceiver[] {
   const sums = new Map<string, { count: number; amount: number }>();
   for (const r of rows.records) {
-    if (r.method !== "cash") continue;
+    // 本人の申告の確かめ待ちは、まだだれも受け取っていない（specs/collect/002）
+    if (r.method !== "cash" || r.paymentStatus === "awaiting_confirmation") continue;
     const key = r.receiverHelperId ?? OWNER_KEY;
     const s = sums.get(key) ?? { count: 0, amount: 0 };
     s.count += 1;
@@ -79,7 +80,7 @@ export async function closingSnapshot(db: Db, ownerUserId: string, eventId: stri
   const helperName = new Map(rows.helpers.map((h) => [h.id, h.name]));
   const recorded = new Set(rows.records.map((r) => r.rosterPersonId));
   const paypay = rows.records
-    .filter((r) => r.method === "paypay")
+    .filter((r) => r.method === "paypay" && r.paymentStatus !== "awaiting_confirmation")
     .sort((a, b) => a.recordedAt.getTime() - b.recordedAt.getTime())
     .map((r) => ({
       personId: r.rosterPersonId,
@@ -95,6 +96,19 @@ export async function closingSnapshot(db: Db, ownerUserId: string, eventId: stri
     closedAt: event.closedAt?.toISOString() ?? null,
     changedAfterClose: event.closedAt !== null && event.closedVersion !== event.version,
     attendance: t.attendance,
+    awaitingConfirmation: {
+      ...t.awaitingConfirmation,
+      people: rows.records
+        .filter((r) => r.paymentStatus === "awaiting_confirmation")
+        .map((r) => ({
+          personId: r.rosterPersonId,
+          number: personById.get(r.rosterPersonId)?.number ?? 0,
+          name: personById.get(r.rosterPersonId)?.name ?? "",
+          method: r.method,
+          amount: r.amount,
+        }))
+        .sort((a, b) => a.number - b.number),
+    },
     byMethod: t.byMethod,
     cashByReceiver: cashReceivers(rows),
     paypay: { count: t.byMethod.paypay.count, amount: t.byMethod.paypay.amount, checkedAt: event.paypayCheckedAt?.toISOString() ?? null, records: paypay },

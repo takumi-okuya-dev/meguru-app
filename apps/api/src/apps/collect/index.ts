@@ -11,6 +11,7 @@ import { liveRoutes } from "./live/live-routes";
 import { receptionRoutes } from "./reception/reception-routes";
 import { collectMeRoutes } from "./me/collect-me";
 import { rosterRoutes } from "./roster/roster-routes";
+import { selfPublicRoutes, selfStaffRoutes } from "./self-check-in/self-routes";
 import { settingsRoutes } from "./settings/settings-routes";
 import { summaryRoutes } from "./summaries/summary-routes";
 import { candidateRoutes } from "./threads-candidates/candidate-routes";
@@ -25,7 +26,7 @@ import { recountCollectUsage } from "./usage/usage";
 /**
  * 集金管理の道筋（/api/collect の下。specs/collect/001-event-day-collection contracts/api.md）。
  * 主催者の道筋にはどれも、ログインと集金管理の利用の許可の関所を付ける。関所の外にあるのは、手伝う人の /r/:token/…（受付用リンクと
- * 端末の印で確かめる）と、会場の共有の /live（入場券で確かめる）だけ。
+ * 端末の印で確かめる）・参加者のセルフ受付の /s/:token/…（セルフ受付のリンク）・会場の共有の /live（入場券で確かめる）だけ。
  * @param authed - ログインのミドルウェア
  * @returns Hono のアプリ（app.ts が /api/collect につなぐ）
  */
@@ -43,6 +44,8 @@ function collectRoutes(authed: MiddlewareHandler<AppEnv>) {
     .route("/", transferRoutes(owner))
     .route("/", summaryRoutes(owner))
     .route("/", candidateRoutes(owner))
+    .route("/", selfStaffRoutes(owner))
+    .route("/", selfPublicRoutes())
     .route("/", helperPublicRoutes());
 }
 

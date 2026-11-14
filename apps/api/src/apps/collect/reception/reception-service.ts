@@ -15,6 +15,7 @@ import {
   type ReceptionRecord,
   type ReceptionSnapshot,
   type ReceptionStats,
+  type ConfirmReceptionRequest,
   type RecordReceptionRequest,
   type WalkInRequest,
 } from "@meguru/shared";
@@ -30,6 +31,7 @@ import {
   collectReceptionRecords,
   collectRosterPeople,
   collectEvents,
+  collectSelfCheckInRequests,
 } from "../schema";
 
 type RecordRow = typeof collectReceptionRecords.$inferSelect;
@@ -52,6 +54,8 @@ export function toRecord(row: RecordRow): ReceptionRecord {
     paymentStatus: row.paymentStatus as ReceptionRecord["paymentStatus"],
     transferConfirmedAt: row.transferConfirmedAt?.toISOString() ?? null,
     recordedAt: row.recordedAt.toISOString(),
+    selfReported: row.selfReported,
+    confirmedAt: row.confirmedAt?.toISOString() ?? null,
   };
 }
 
@@ -188,16 +192,78 @@ export async function undoReception(databaseUrl: string, actor: ReceptionActor, 
   return withTransaction(databaseUrl, async (tx) => {
     const event = await loadActorEvent(tx, actor, eventId, { forUpdate: true });
     const [record] = await tx
-      .select({ receiverHelperId: collectReceptionRecords.receiverHelperId })
+      .select({
+        receiverHelperId: collectReceptionRecords.receiverHelperId,
+        receiverKind: collectReceptionRecords.receiverKind,
+        transferConfirmedAt: collectReceptionRecords.transferConfirmedAt,
+      })
       .from(collectReceptionRecords)
       .where(and(eq(collectReceptionRecords.rosterPersonId, personId), eq(collectReceptionRecords.eventId, event.id)))
       .limit(1);
     if (!record) throw personNotFound();
-    if (actor.kind === "helper" && record.receiverHelperId !== actor.helperId) {
+    // 手伝う人が取り消せるのは、自分が受け取った記録と、まだだれも確かめていない本人の申告（振込の入金を確かめたものは除く。
+    // specs/collect/002 FR-032）
+    const unconfirmedSelf = record.receiverKind === "self" && record.transferConfirmedAt === null;
+    if (actor.kind === "helper" && !unconfirmedSelf && record.receiverHelperId !== actor.helperId) {
       throw new AppError("RECORD_NOT_YOURS", 403, "record received by someone else");
     }
     await tx.delete(collectReceptionRecords).where(eq(collectReceptionRecords.rosterPersonId, personId));
     return { version: await bumpVersion(tx, event.id) };
+  });
+}
+
+/**
+ * 本人の申告の確かめ待ちを、支払い済みにする（specs/collect/002 FR-031）。受け取った人は呼んだ人。払い方（現金・PayPay）・
+ * 区分・金額を直してから確かめられる。
+ * @param databaseUrl - 接続文字列
+ * @param actor - 受付をする人（受け取った人になる）
+ * @param eventId - イベントの番号
+ * @param personId - 名簿の人の番号
+ * @param input - 直す払い方・区分・金額（省けば申告のまま）
+ * @returns 記録と新しい版
+ * @throws AppError ITEM_NOT_FOUND・NOT_AWAITING_CONFIRMATION・VALIDATION_FAILED
+ */
+export async function confirmReception(
+  databaseUrl: string,
+  actor: ReceptionActor,
+  eventId: string,
+  personId: string,
+  input: ConfirmReceptionRequest,
+): Promise<{ record: ReceptionRecord; version: number }> {
+  if (!isUuid(personId)) throw personNotFound();
+  return withTransaction(databaseUrl, async (tx) => {
+    const event = await loadActorEvent(tx, actor, eventId, { forUpdate: true });
+    const [current] = await tx
+      .select()
+      .from(collectReceptionRecords)
+      .where(and(eq(collectReceptionRecords.rosterPersonId, personId), eq(collectReceptionRecords.eventId, event.id)))
+      .limit(1);
+    if (!current) throw personNotFound();
+    if (current.paymentStatus !== "awaiting_confirmation") throw new AppError("NOT_AWAITING_CONFIRMATION", 409, "not awaiting confirmation");
+    const method = input.method ?? (current.method as "cash" | "paypay");
+    if (!isReceptionMethodAllowed(method, event.methods)) throw new AppError("VALIDATION_FAILED", 400, "method not used in this event", undefined, ["method"]);
+    const tierId = input.priceTierId ?? current.priceTierId;
+    const [tier] = await tx
+      .select({ id: collectPriceTiers.id, amount: collectPriceTiers.amount })
+      .from(collectPriceTiers)
+      .where(and(eq(collectPriceTiers.id, tierId), eq(collectPriceTiers.eventId, event.id)))
+      .limit(1);
+    if (!tier) throw new AppError("VALIDATION_FAILED", 400, "unknown tier", undefined, ["priceTierId"]);
+    const amount = input.amount ?? (input.priceTierId ? tier.amount : current.amount);
+    const [row] = await tx
+      .update(collectReceptionRecords)
+      .set({
+        method,
+        priceTierId: tier.id,
+        amount,
+        amountOverridden: amount !== tier.amount,
+        ...receiverOf(actor),
+        paymentStatus: "paid",
+        confirmedAt: new Date(),
+      })
+      .where(eq(collectReceptionRecords.rosterPersonId, personId))
+      .returning();
+    return { record: toRecord(row!), version: await bumpVersion(tx, event.id) };
   });
 }
 
@@ -260,8 +326,24 @@ export async function addWalkIn(
  * @returns 数字
  */
 export function computeStats(rosterCount: number, records: ReceptionRecord[], actor: ReceptionActor): ReceptionStats {
-  const stats: ReceptionStats = { arrived: records.length, rosterCount, cash: 0, paypay: 0, awaitingTransferCount: 0, awaitingTransferAmount: 0, mine: 0 };
+  const stats: ReceptionStats = {
+    arrived: records.length,
+    rosterCount,
+    cash: 0,
+    paypay: 0,
+    awaitingTransferCount: 0,
+    awaitingTransferAmount: 0,
+    mine: 0,
+    awaitingConfirmationCount: 0,
+    awaitingConfirmationAmount: 0,
+  };
   for (const r of records) {
+    // 本人の申告の確かめ待ちは、現金・PayPayの合計と「あなたが受け取った現金」に入れない（specs/collect/002 research.md R3）
+    if (r.paymentStatus === "awaiting_confirmation") {
+      stats.awaitingConfirmationCount += 1;
+      stats.awaitingConfirmationAmount += r.amount;
+      continue;
+    }
     if (r.method === "cash") {
       stats.cash += r.amount;
       const mine = actor.kind === "owner" ? r.receiverKind === "owner" : r.receiverHelperId === actor.helperId;
@@ -300,7 +382,7 @@ export async function listReceptionHelpers(db: Db | TxDb, eventId: string): Prom
  */
 export async function receptionSnapshot(db: Db, actor: ReceptionActor, eventId: string): Promise<ReceptionSnapshot> {
   const event: CollectEventRow = await loadActorEvent(db, actor, eventId);
-  const [tiers, people, recordRows, helpers, settingsRows] = await Promise.all([
+  const [tiers, people, recordRows, helpers, settingsRows, requestRows] = await Promise.all([
     db.select().from(collectPriceTiers).where(eq(collectPriceTiers.eventId, event.id)).orderBy(asc(collectPriceTiers.position)),
     db.select().from(collectRosterPeople).where(eq(collectRosterPeople.eventId, event.id)).orderBy(asc(collectRosterPeople.number)),
     db.select().from(collectReceptionRecords).where(eq(collectReceptionRecords.eventId, event.id)),
@@ -310,6 +392,11 @@ export async function receptionSnapshot(db: Db, actor: ReceptionActor, eventId: 
       .from(collectOwnerSettings)
       .where(eq(collectOwnerSettings.ownerUserId, event.ownerUserId))
       .limit(1),
+    db
+      .select({ id: collectSelfCheckInRequests.id, name: collectSelfCheckInRequests.name, kana: collectSelfCheckInRequests.kana, createdAt: collectSelfCheckInRequests.createdAt })
+      .from(collectSelfCheckInRequests)
+      .where(and(eq(collectSelfCheckInRequests.eventId, event.id), eq(collectSelfCheckInRequests.status, "pending")))
+      .orderBy(asc(collectSelfCheckInRequests.createdAt)),
   ]);
   const records = recordRows.map(toRecord);
   const byPerson = new Map(records.map((r) => [r.personId, r]));
@@ -329,5 +416,6 @@ export async function receptionSnapshot(db: Db, actor: ReceptionActor, eventId: 
     stats: computeStats(people.length, records, actor),
     helpers,
     settings: { hasPaypayQr: settingsRows[0]?.hasPaypayQr ?? false, bankText: settingsRows[0]?.bankText ?? null },
+    selfRequests: requestRows.map((r) => ({ id: r.id, name: r.name, kana: r.kana, createdAt: r.createdAt.toISOString() })),
   };
 }

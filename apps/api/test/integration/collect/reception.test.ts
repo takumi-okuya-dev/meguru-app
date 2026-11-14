@@ -20,7 +20,7 @@ type Rec = {
 type Snapshot = {
   version: number;
   people: { person: { id: string; number: number; name: string; media: string; priceTierId: string; memo?: string | null }; record: Rec | null }[];
-  stats: { arrived: number; rosterCount: number; cash: number; paypay: number; awaitingTransferCount: number; awaitingTransferAmount: number; mine: number };
+  stats: { arrived: number; rosterCount: number; cash: number; paypay: number; awaitingTransferCount: number; awaitingTransferAmount: number; mine: number; awaitingConfirmationCount: number; awaitingConfirmationAmount: number };
   settings: { hasPaypayQr: boolean; bankText: string | null };
 };
 
@@ -179,7 +179,7 @@ describe("スナップショット", () => {
     await record(b, { method: "paypay" });
     await record(c, { method: "transfer_today" });
     const snap = await snapshot();
-    expect(snap.stats).toEqual({ arrived: 3, rosterCount: 4, cash: 3000, paypay: 2500, awaitingTransferCount: 1, awaitingTransferAmount: 3000, mine: 3000 });
+    expect(snap.stats).toEqual({ arrived: 3, rosterCount: 4, cash: 3000, paypay: 2500, awaitingTransferCount: 1, awaitingTransferAmount: 3000, mine: 3000, awaitingConfirmationCount: 0, awaitingConfirmationAmount: 0 });
     expect(snap.people[0]!.person.memo).toBe("紹介：井上さん");
     expect(snap.people.map((p) => p.person.number)).toEqual([1, 2, 3, 4]);
     expect(snap.settings).toEqual({ hasPaypayQr: false, bankText: null });

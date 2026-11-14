@@ -28,7 +28,12 @@ const linkNotFound = () => new AppError("ITEM_NOT_FOUND", 404, "link not found")
  */
 async function linkByToken(db: Db | TxDb, token: string): Promise<LinkRow | undefined> {
   if (!token.startsWith("cr_") || token.length > 100) return undefined;
-  const [row] = await db.select().from(collectReceptionLinks).where(eq(collectReceptionLinks.tokenHash, await sha256Hex(token))).limit(1);
+  // 手伝う人の道筋は、手伝う人の受付用リンクだけを受ける（セルフ受付のリンクでは入れない。specs/collect/002 research.md R1）
+  const [row] = await db
+    .select()
+    .from(collectReceptionLinks)
+    .where(and(eq(collectReceptionLinks.tokenHash, await sha256Hex(token)), eq(collectReceptionLinks.kind, "helper")))
+    .limit(1);
   return row;
 }
 

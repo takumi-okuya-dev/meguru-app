@@ -47,6 +47,14 @@ export const closingSnapshotSchema = z.object({
   closedAt: z.string().nullable(),
   changedAfterClose: z.boolean(),
   attendance: z.object({ arrived: z.number().int(), rosterCount: z.number().int() }),
+  /** 本人の申告の確かめ待ち（現金・PayPayの合計に入れない。締める前に知らせる。specs/collect/002 FR-040） */
+  awaitingConfirmation: z
+    .object({
+      count: z.number().int(),
+      amount: z.number().int(),
+      people: z.array(z.object({ personId: z.string(), number: z.number().int(), name: z.string(), method: z.string(), amount: z.number().int() })),
+    })
+    .default({ count: 0, amount: 0, people: [] }),
   byMethod: byMethodSchema,
   cashByReceiver: z.array(cashReceiverSchema),
   paypay: z.object({

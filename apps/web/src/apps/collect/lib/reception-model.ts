@@ -22,10 +22,26 @@ export function isMine(record: ReceptionRecord, viewer: ReceptionViewer): boolea
  * @returns 数字
  */
 export function statsOf(people: ReceptionSnapshot["people"], viewer: ReceptionViewer): ReceptionStats {
-  const stats: ReceptionStats = { arrived: 0, rosterCount: people.length, cash: 0, paypay: 0, awaitingTransferCount: 0, awaitingTransferAmount: 0, mine: 0 };
+  const stats: ReceptionStats = {
+    arrived: 0,
+    rosterCount: people.length,
+    cash: 0,
+    paypay: 0,
+    awaitingTransferCount: 0,
+    awaitingTransferAmount: 0,
+    mine: 0,
+    awaitingConfirmationCount: 0,
+    awaitingConfirmationAmount: 0,
+  };
   for (const { record } of people) {
     if (!record) continue;
     stats.arrived += 1;
+    // 本人の申告の確かめ待ちは、現金・PayPayの合計に入れない（specs/collect/002）
+    if (record.paymentStatus === "awaiting_confirmation") {
+      stats.awaitingConfirmationCount += 1;
+      stats.awaitingConfirmationAmount += record.amount;
+      continue;
+    }
     if (record.method === "cash") {
       stats.cash += record.amount;
       if (isMine(record, viewer)) stats.mine += record.amount;

@@ -6,3 +6,4 @@ export * from "./reception";
 export * from "./closing";
 export * from "./messages";
 export * from "./threads-candidates";
+export * from "./self-check-in";

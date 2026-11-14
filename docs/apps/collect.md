@@ -4,7 +4,7 @@
 
 ## 1. API：集金管理（apps/collect）
 
-パターン①の最初の2作目（specs/collect/001-event-day-collection）。運営者が開いた人だけが使う（`registerAppAccess("collect", "granted")`。specs/meguru/030-app-access）。道筋はすべて`/api/collect`の下。主催者の道筋には、ログインと利用の許可の関所（`access.ts`の`collectOwner`）を付ける。関所の外にあるのは、手伝う人の`/api/collect/r/:token/…`（受付用リンクと端末の印`X-Collect-Device`で確かめる）と、会場の共有の`/api/collect/live`（60秒の入場券で確かめる）だけ。今は PR1〜PR4 の分（イベント・料金の区分・名簿・既定値・受付・受付の手伝い・会場の共有・締め・振込待ち・まとめ・書き出し・Threadsのイベントの候補）。
+パターン①の最初の2作目（specs/collect/001-event-day-collection）。運営者が開いた人だけが使う（`registerAppAccess("collect", "granted")`。specs/meguru/030-app-access）。道筋はすべて`/api/collect`の下。主催者の道筋には、ログインと利用の許可の関所（`access.ts`の`collectOwner`）を付ける。関所の外にあるのは、手伝う人の`/api/collect/r/:token/…`（受付用リンクと端末の印`X-Collect-Device`で確かめる）、参加者のセルフ受付の`/api/collect/s/:token/…`（セルフ受付のリンク。端末の印は同じ見出しの名前で、回数の上限にだけ使う）、会場の共有の`/api/collect/live`（60秒の入場券で確かめる）だけ。今は 001 の PR1〜PR4 の分（イベント・料金の区分・名簿・既定値・受付・受付の手伝い・会場の共有・締め・振込待ち・まとめ・書き出し・Threadsのイベントの候補）と、002 のセルフ受付の API（specs/collect/002-self-check-in）。
 
 | 小分け | 表 | 処理とAPIの入口 |
 |---|---|---|
@@ -13,15 +13,16 @@
 | `settings/`（主催者の既定値） | `owner_settings` | `settings-service.ts`（PayPayのQRの画像・振込先の案内）・`settings-routes.ts` |
 | `me/`（集金管理の「自分」） | — | `collect-me.ts`（`GET /api/collect/me`） |
 | `usage/`（利用の値） | — | `usage.ts`（料金の数は0、イベントがあれば「使っている」を`reportUsage`で伝える。毎日の数え直し） |
-| `reception/`（受付） | `reception_records` | `reception-service.ts`（記録は名簿の人1人に1行・`clientRequestId`の送り直し・取り消し・飛び入り・スナップショットと数字）・`reception-routes.ts` |
-| `helpers/`（受付の手伝い） | `reception_links`・`helpers`・`helper_devices` | `link-service.ts`（受付用リンク。トークンはハッシュと暗号文）・`link-tokens.ts`（鍵の入れ替え。入口の`tokenKeys`）・`helper-service.ts`（参加・端末の印の確かめ・受付をしている人の一覧）・`helper-routes.ts`（主催者の道筋と、ログインのいらない`/r/:token/…`） |
+| `reception/`（受付） | `reception_records` | `reception-service.ts`（記録は名簿の人1人に1行・`clientRequestId`の送り直し・取り消し・飛び入り・本人の申告を確かめる`confirmReception`・スナップショットと数字。確かめ待ちは現金・PayPayの合計に入れない）・`reception-routes.ts` |
+| `helpers/`（受付の手伝い） | `reception_links`・`helpers`・`helper_devices` | `link-service.ts`（受付用リンク。種類`helper`（`cr_`）と`self`（`cs_`）。トークンはハッシュと暗号文）・`link-tokens.ts`（鍵の入れ替え。入口の`tokenKeys`）・`helper-service.ts`（参加・端末の印の確かめ・受付をしている人の一覧）・`helper-routes.ts`（主催者の道筋と、ログインのいらない`/r/:token/…`） |
+| `self-check-in/`（セルフ受付。002） | `self_check_in_requests`・`self_check_in_devices` | `self-service.ts`（参加者が探す（名前・ふりがな・受付番号の完全一致だけ）・本人の申告（現金とPayPayは確かめ待ち、振込は振込待ち）・自分の状態・探す回数の上限）・`request-service.ts`（名簿にいない人の申し出と、名簿に入れる・当てる・断る）・`self-routes.ts`（参加者の`/s/:token/…`、セルフ受付のリンク`…/self-link`、確かめる`…/reception/:personId/confirm`、申し出の片付け。主催者と手伝う人） |
 | `live/`（会場の共有） | — | `live-room.ts`（Durable Object`CollectLiveRoom`。知らせを配るだけで保存しない。組み立ての`durable-objects.ts`が書き出す）・`live-ticket.ts`（入場券の署名。`COLLECT_LIVE_SECRET`）・`notify.ts`（保存のあと`waitUntil`で知らせる）・`live-routes.ts` |
-| `closing/`（締め・書き出し） | `settlements` | `tally.ts`（締めとまとめの数え方）・`closing-service.ts`（受け取った人ごとの精算・PayPayの確かめ・締める。締めたときの版を残し、あとで版が上がったら「締めのあとで変わった」）・`export-csv.ts`（UTF-8のBOMつき・CRLF）・`closing-routes.ts` |
+| `closing/`（締め・書き出し） | `settlements` | `tally.ts`（締めとまとめの数え方。確かめ待ちは来場に数え、お金の合計の外）・`closing-service.ts`（受け取った人ごとの精算・PayPayの確かめ・締める。締めたときの版を残し、あとで版が上がったら「締めのあとで変わった」）・`export-csv.ts`（UTF-8のBOMつき・CRLF）・`closing-routes.ts` |
 | `transfers/`（振込待ち） | — | `transfer-service.ts`（すべてのイベントの振込待ちと確かめた記録・確かめる・戻す。受付の画面の版は上げない）・`transfer-routes.ts` |
 | `summaries/`（消す・まとめ） | `event_summaries` | `summary-service.ts`（同じトランザクションで数字だけのまとめを書いてからイベントを消す。名前は入れない）・`summary-routes.ts` |
 | `threads-candidates/`（Threadsのイベントの候補） | `threads_event_candidates` | `candidate-service.ts`（持ち主にだけ見せる・イベントを作るときの元の確かめ・掲載済みの媒体）・`candidate-routes.ts`（`GET /api/collect/threads-candidates`） |
 | `inbox/`（出来事の受け取り） | `received_events` | `received-events.ts`（`user.withdrawn`：その主催者のイベント・まとめ・既定値・候補をすべて消す）・`threads-candidates.ts`（Threads の `threads.promotion_event.saved`・`.deleted`・`threads.listing_status.changed` を候補に写し、作ったイベントに「元が変わった・消された」を付ける） |
-| （直下） | — | `index.ts`（入口`collectModule`。道筋・毎日の処理・`tokenKeys`）・`schema.ts`（12表。スキーマ`collect`）・`access.ts`（関所とイベントの持ち主の確かめ）・`register.ts`（`registerCollect()`：利用の決まりと出来事の受け取りの登録） |
+| （直下） | — | `index.ts`（入口`collectModule`。道筋・毎日の処理・`tokenKeys`）・`schema.ts`（14表。スキーマ`collect`）・`access.ts`（関所とイベントの持ち主の確かめ）・`register.ts`（`registerCollect()`：利用の決まりと出来事の受け取りの登録） |
 
 ## 2. Web
 

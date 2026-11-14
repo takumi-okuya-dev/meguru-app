@@ -281,6 +281,13 @@
       "when": 1794566462066,
       "tag": "0039_collect_threads_candidates",
       "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "7",
+      "when": 1794567506215,
+      "tag": "0040_collect_self_check_in",
+      "breakpoints": true
     }
   ]
 }

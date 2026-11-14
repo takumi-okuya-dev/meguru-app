@@ -10,6 +10,8 @@ export type TallyRecord = { rosterPersonId: string; method: string; amount: numb
 /** 数字。 */
 export type Tally = {
   attendance: { arrived: number; rosterCount: number };
+  /** 本人の申告の確かめ待ち（払い方ごと・媒体ごとの売上には入れない。specs/collect/002 research.md R3） */
+  awaitingConfirmation: CountAmount;
   byMethod: ByMethod;
   byMedia: MediaStats[];
   transfers: { paid: CountAmount; awaiting: CountAmount };
@@ -24,6 +26,7 @@ export type Tally = {
 export function tally(people: readonly TallyPerson[], records: readonly TallyRecord[]): Tally {
   const byMethod = Object.fromEntries(RECEPTION_METHODS.map((m) => [m, { count: 0, amount: 0 }])) as ByMethod;
   const transfers = { paid: { count: 0, amount: 0 }, awaiting: { count: 0, amount: 0 } };
+  const awaitingConfirmation = { count: 0, amount: 0 };
   const media = new Map<CollectMedia, MediaStats>();
   const mediaOf = new Map(people.map((p) => [p.id, p.media as CollectMedia]));
   for (const p of people) {
@@ -33,6 +36,14 @@ export function tally(people: readonly TallyPerson[], records: readonly TallyRec
     media.set(m, row);
   }
   for (const r of records) {
+    if (r.paymentStatus === "awaiting_confirmation") {
+      // 来場には数えるが、お金はまだ受け取っていない
+      awaitingConfirmation.count += 1;
+      awaitingConfirmation.amount += r.amount;
+      const row = media.get(mediaOf.get(r.rosterPersonId)!);
+      if (row) row.attended += 1;
+      continue;
+    }
     const slot = byMethod[r.method as ReceptionMethod];
     slot.count += 1;
     slot.amount += r.amount;
@@ -52,6 +63,7 @@ export function tally(people: readonly TallyPerson[], records: readonly TallyRec
   }
   return {
     attendance: { arrived: records.length, rosterCount: people.length },
+    awaitingConfirmation,
     byMethod,
     byMedia: COLLECT_MEDIA.flatMap((m) => (media.has(m) ? [media.get(m)!] : [])),
     transfers,

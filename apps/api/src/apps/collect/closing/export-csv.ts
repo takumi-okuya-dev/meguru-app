@@ -32,6 +32,22 @@ export function csvCell(value: string | number): string {
 }
 
 /**
+ * 受け取った人の欄（本人の申告は、確かめ待ちか、だれが確かめたかが分かるように。specs/collect/002 FR-041）。
+ * @param r - 受付の記録
+ * @param helperName - 手伝う人の名前
+ * @returns 受け取った人の欄
+ */
+function receiverLabel(
+  r: { receiverKind: string; receiverHelperId: string | null; selfReported: boolean; paymentStatus: string },
+  helperName: Map<string, string>,
+): string {
+  // 振込・0円の本人の申告は、受付をする人が受け取らない（振込は入金の確かめで、支払いの欄に出る）
+  if (r.receiverKind === "self") return r.paymentStatus === "awaiting_confirmation" ? "本人の申告（確かめ待ち）" : "本人の申告";
+  const who = r.receiverHelperId ? (helperName.get(r.receiverHelperId) ?? "手伝う人") : "主催者";
+  return r.selfReported ? `本人の申告→${who}` : who;
+}
+
+/**
  * イベントの名簿と受付の記録を CSV にする。
  * @param db - データベース
  * @param ownerUserId - 主催者
@@ -60,7 +76,7 @@ export async function exportCsv(db: Db, ownerUserId: string, eventId: string): P
       r ? "来場" : "",
       r ? RECEPTION_METHOD_LABELS[r.method as ReceptionMethod] : "",
       r ? r.amount : "",
-      r ? (r.receiverHelperId ? (helperName.get(r.receiverHelperId) ?? "手伝う人") : "主催者") : "",
+      r ? receiverLabel(r, helperName) : "",
       r ? jst(r.recordedAt, true) : "",
       r?.transferConfirmedAt ? jst(r.transferConfirmedAt, false) : "",
       p.memo ?? "",
