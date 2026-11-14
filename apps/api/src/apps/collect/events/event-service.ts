@@ -42,6 +42,7 @@ export function toEvent(row: CollectEventRow, tiers: TierRow[]): CollectEvent {
     capacity: row.capacity,
     methods: row.methods as CollectEvent["methods"],
     tiers: tiers.map(toTier),
+    checkInMode: row.checkInMode as CollectEvent["checkInMode"],
     closedAt: row.closedAt?.toISOString() ?? null,
     sourceThreadsPromotionId: row.sourceThreadsPromotionId,
     sourceChangedAt: row.sourceChangedAt?.toISOString() ?? null,
@@ -185,6 +186,8 @@ export async function createEvent(databaseUrl: string, ownerUserId: string, inpu
         capacity: input.capacity,
         methods: input.methods,
         sourceThreadsPromotionId: input.sourceThreadsPromotionId,
+        // 省いたら名簿あり（前からの呼び方を変えない。新しいイベントの既定の名簿なしは画面が渡す。specs/collect/004 research.md R1）
+        checkInMode: input.checkInMode ?? "roster",
       })
       .returning();
     await insertTiers(tx, row!.id, input.tiers.map((t, i) => ({ name: t.name, amount: t.amount, position: i })));
@@ -266,6 +269,7 @@ export async function updateEvent(
         ...(input.venue !== undefined ? { venue: input.venue } : {}),
         ...(input.capacity !== undefined ? { capacity: input.capacity } : {}),
         ...(input.methods !== undefined ? { methods: input.methods } : {}),
+        ...(input.checkInMode !== undefined ? { checkInMode: input.checkInMode } : {}),
         version: sql`${collectEvents.version} + 1`,
         updatedAt: new Date(),
       })

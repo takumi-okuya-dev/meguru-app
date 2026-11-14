@@ -35,6 +35,8 @@ function snapshot(over: Partial<ClosingSnapshot> = {}): ClosingSnapshot {
     closedAt: null,
     changedAfterClose: false,
     attendance: { arrived: 5, rosterCount: 6 },
+    checkInMode: "roster",
+    unrecordedCount: 1,
     awaitingConfirmation: { count: 0, amount: 0, people: [] },
     byMethod: { cash: { count: 2, amount: 6000 }, paypay: { count: 1, amount: 2500 }, transfer_today: { count: 1, amount: 3000 }, transfer_later: { count: 1, amount: 3000 }, none: zero },
     cashByReceiver: [

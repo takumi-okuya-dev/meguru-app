@@ -40,7 +40,7 @@ vi.mock("sonner", () => ({ toast: { info: vi.fn(), error: vi.fn(), success: vi.f
 const { ReceptionPage } = await import("@/apps/collect/pages/ReceptionPage");
 
 const person = (id: string, number: number, name: string, kana: string | null = null) => ({
-  person: { id, number, name, kana, media: "peatix" as const, priceTierId: "t1", memo: null },
+  person: { id, number, name, kana, media: "peatix" as const, priceTierId: "t1", memo: null, tierUndecided: false, sameName: false, selfEntered: false },
   record: null,
 });
 
@@ -64,6 +64,7 @@ function snapshot(over: Partial<ReceptionSnapshot> = {}): ReceptionSnapshot {
         { id: "t2", name: "早割", amount: 2500, position: 1 },
       ],
       closedAt: null,
+      checkInMode: "roster",
     },
     people: [person("p1", 1, "松本 れい", "まつもと れい"), person("p2", 2, "井上 そら", "いのうえ そら"), person("p3", 12, "木村 ゆうき")],
     stats: { arrived: 0, rosterCount: 3, cash: 0, paypay: 0, awaitingTransferCount: 0, awaitingTransferAmount: 0, mine: 0, awaitingConfirmationCount: 0, awaitingConfirmationAmount: 0 },
@@ -241,7 +242,7 @@ describe("会場の共有", () => {
         version: 6,
         at: "",
         personId: "p9",
-        person: { id: "p9", number: 13, name: "飛び入り 太郎", kana: null, media: "walk_in", priceTierId: "t1" },
+        person: { id: "p9", number: 13, name: "飛び入り 太郎", kana: null, media: "walk_in", priceTierId: "t1", tierUndecided: false, sameName: false, selfEntered: false },
       }),
     );
     expect(await screen.findByRole("listitem", { name: "No.13 飛び入り 太郎" })).toBeInTheDocument();

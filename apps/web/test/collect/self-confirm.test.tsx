@@ -64,7 +64,7 @@ const self = (personId: string, method: "cash" | "paypay", over: Partial<Recepti
  * @returns スナップショット
  */
 function snapshot(): ReceptionSnapshot {
-  const p = (id: string, number: number, name: string) => ({ id, number, name, kana: null, media: "peatix" as const, priceTierId: "t1" });
+  const p = (id: string, number: number, name: string) => ({ id, number, name, kana: null, media: "peatix" as const, priceTierId: "t1", tierUndecided: false, sameName: false, selfEntered: false });
   return {
     version: 5,
     event: {
@@ -76,6 +76,7 @@ function snapshot(): ReceptionSnapshot {
       methods: ["cash", "paypay"],
       tiers: [{ id: "t1", name: "通常", amount: 3000, position: 0 }],
       closedAt: null,
+      checkInMode: "roster",
     },
     people: [
       { person: p("p1", 1, "松本 れい"), record: self("p1", "cash") },
