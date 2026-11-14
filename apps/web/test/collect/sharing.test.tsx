@@ -16,10 +16,14 @@ const mocks = vi.hoisted(() => ({
   addMember: vi.fn(),
   updateMember: vi.fn(),
   deleteMember: vi.fn(),
+  createInvite: vi.fn(),
+  stopInvite: vi.fn(),
+  unlinkMember: vi.fn(),
 }));
 vi.mock("@/apps/collect/lib/api", () => ({ collectApi: mocks }));
 const toast = vi.hoisted(() => ({ info: vi.fn(), error: vi.fn(), success: vi.fn() }));
 vi.mock("sonner", () => ({ toast }));
+vi.mock("@/apps/collect/components/QrCode", () => ({ QrCode: ({ value }: { value: string }) => <div data-testid="qr">{value}</div> }));
 
 const { SharingPage } = await import("@/apps/collect/pages/SharingPage");
 
@@ -148,5 +152,33 @@ describe("分配の画面", () => {
     expect(within(table).getByText("井上")).toBeInTheDocument();
     expect(within(table).getByText("紹介なし")).toBeInTheDocument();
     expect(within(table).getByText("6,000円")).toBeInTheDocument();
+  });
+
+  it("招待：リンクと QR と期限を出す。招待中の人は止められる。つながった人は外せる。主催者の行には出さない", async () => {
+    mocks.sharing.mockResolvedValue(
+      snapshot({
+        members: [
+          owner,
+          { ...member("a", "井上"), invite: { expiresAt: "2026-11-21T10:00:00.000Z" } },
+          member("b", "木村"),
+          { ...member("c", "佐藤"), linked: true },
+        ],
+      }),
+    );
+    mocks.createInvite.mockResolvedValue({ url: "https://example.test/collect/join/ci_x", expiresAt: "2026-11-21T10:00:00.000Z" });
+    mocks.unlinkMember.mockResolvedValue(snapshot());
+    renderPage();
+    const ownerRow = await screen.findByRole("listitem", { name: "運営メンバー 主催者" });
+    expect(within(ownerRow).queryByRole("button", { name: /招待/ })).toBeNull();
+    expect(within(screen.getByRole("listitem", { name: "運営メンバー 井上" })).getByText(/招待中/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "井上の招待を止める" })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "木村の招待のリンクを出す" }));
+    const dialog = await screen.findByRole("dialog", { name: "木村さんへの招待のリンク" });
+    expect(within(dialog).getByTestId("qr")).toHaveTextContent("ci_x");
+    expect(mocks.createInvite).toHaveBeenCalledWith("e1", "b");
+    await userEvent.keyboard("{Escape}");
+    await userEvent.click(within(screen.getByRole("listitem", { name: "運営メンバー 佐藤" })).getByRole("button", { name: /外す/ }));
+    await userEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "外す" }));
+    await waitFor(() => expect(mocks.unlinkMember).toHaveBeenCalledWith("e1", "c"));
   });
 });
