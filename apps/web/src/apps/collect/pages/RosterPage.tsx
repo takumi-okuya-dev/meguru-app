@@ -10,7 +10,7 @@ import { ApiErrorScreen } from "@/components/ApiErrorScreen";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { LoadingSkeleton } from "@/components/LoadingSkeleton";
 import { Button } from "@/components/ui/button";
-import { formatJstWithWeekday } from "@/lib/format";
+import { formatJstShort, formatJstWithWeekday } from "@/lib/format";
 import { PageBody, PageHeader } from "@/shell";
 import { BulkPasteDialog } from "../components/roster/BulkPasteDialog";
 import { PersonDialog } from "../components/roster/PersonDialog";
@@ -19,6 +19,22 @@ import { collectApi, type PersonInput } from "../lib/api";
 import { collectErrorText } from "../lib/errors";
 import { eventEditPath } from "../lib/paths";
 import { collectQueryKeys } from "../lib/query-keys";
+
+/**
+ * Threads から作ったイベントで、元の宣伝内容が直された・消されたことの知らせ（集金管理のイベントは自動で変えない。FR-063）。
+ * @param props - sourceChangedAt・sourceDeletedAt：元が直された・消された時刻
+ * @returns 知らせ（どちらもなければ何も出さない）
+ */
+export function SourceNotice({ sourceChangedAt, sourceDeletedAt }: { sourceChangedAt: string | null; sourceDeletedAt: string | null }) {
+  if (!sourceChangedAt && !sourceDeletedAt) return null;
+  return (
+    <p role="status" className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-sm">
+      {sourceDeletedAt
+        ? "元の Threads の宣伝内容のイベントの情報が消されました。このイベントはそのまま残ります。"
+        : `元の Threads の宣伝内容が直されました（${formatJstShort(sourceChangedAt!)}）。必要なら「イベントを直す」で合わせてください。`}
+    </p>
+  );
+}
 
 /**
  * 名簿の画面。
@@ -98,10 +114,12 @@ export function RosterPage() {
             イベントを直す
           </Link>
         </div>
+        <SourceNotice sourceChangedAt={event.data.sourceChangedAt} sourceDeletedAt={event.data.sourceDeletedAt} />
         <QuickAdd
           eventId={eventId}
           tiers={tiers}
           media={media}
+          postedMedia={event.data.threadsPostedMedia}
           tierId={tierId}
           onMediaChange={setMedia}
           onTierChange={setChosenTier}

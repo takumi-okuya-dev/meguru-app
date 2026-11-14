@@ -14,6 +14,7 @@ import {
   eventSummaryListSchema,
   liveTicketResponseSchema,
   transferItemSchema,
+  threadsCandidateListSchema,
   transferListSchema,
   type PutSettlementRequest,
   pastAttendeesResponseSchema,
@@ -42,6 +43,8 @@ export type EventInput = {
   capacity: number | null;
   methods: CollectMethod[];
   tiers: { id?: string; name: string; amount: number }[];
+  /** Threads の候補から作るときの、元の宣伝内容の番号（作るときだけ） */
+  sourceThreadsPromotionId?: string | null;
 };
 
 /** 名簿の人を足す・直すときの入力。 */
@@ -106,5 +109,7 @@ export const collectApi = {
   // ---- 消す・まとめ ----
   deleteEvent: (eventId: string) => request(ev(eventId), deleteEventResponseSchema, { method: "DELETE" }),
   summaries: () => request("/api/collect/summaries", eventSummaryListSchema),
+  // ---- Threads のイベントの候補 ----
+  threadsCandidates: () => request("/api/collect/threads-candidates", threadsCandidateListSchema),
   deleteSummary: (summaryId: string) => request(`/api/collect/summaries/${encodeURIComponent(summaryId)}`, null, { method: "DELETE" }),
 };

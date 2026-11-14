@@ -1,6 +1,6 @@
 // イベントを作る・直す入力欄（specs/collect/001-event-day-collection FR-010・FR-011、tasks.md T029）。
 // 名前・開催日・始まりと終わりの時刻・会場・定員・使う払い方・料金の区分（名前と金額。1つ以上・並べ替えられる）。
-import { COLLECT_LIMITS, COLLECT_METHODS, COLLECT_METHOD_LABELS, type CollectEvent, type CollectMethod } from "@meguru/shared";
+import { COLLECT_LIMITS, COLLECT_METHODS, COLLECT_METHOD_LABELS, type CollectEvent, type CollectMethod, type ThreadsCandidate } from "@meguru/shared";
 import { ArrowDownIcon, ArrowUpIcon, PlusIcon, Trash2Icon } from "lucide-react";
 import { useState, type FormEvent } from "react";
 import { Button } from "@/components/ui/button";
@@ -25,11 +25,25 @@ let tierSeq = 0;
 const newTier = (name = "", amount = ""): TierDraft => ({ key: `t${++tierSeq}`, name, amount });
 
 /**
- * 直すイベントから、入力欄の初めの値を作る（作るときは空）。
+ * 直すイベントか、Threads の候補（下書き）から、入力欄の初めの値を作る（どちらもなければ空）。
  * @param event - 直すイベント
+ * @param draft - Threads の候補（名前・日時・会場・定員と、参加費を料金の区分の下書きに。FR-062）
  * @returns 初めの値
  */
-function initialOf(event?: CollectEvent) {
+function initialOf(event?: CollectEvent, draft?: ThreadsCandidate) {
+  if (!event && draft) {
+    const starts = toJstParts(draft.startsAt);
+    return {
+      name: draft.name.slice(0, COLLECT_LIMITS.eventName),
+      date: starts.date,
+      start: starts.time,
+      end: draft.endsAt ? toJstParts(draft.endsAt).time : "",
+      venue: (draft.venue ?? "").slice(0, COLLECT_LIMITS.venue),
+      capacity: draft.capacity === null ? "" : String(draft.capacity),
+      methods: [...COLLECT_METHODS] as CollectMethod[],
+      tiers: [newTier("通常", draft.feeAmount === null ? "" : String(draft.feeAmount))],
+    };
+  }
   if (!event) {
     return { name: "", date: "", start: "19:00", end: "21:00", venue: "", capacity: "", methods: [...COLLECT_METHODS] as CollectMethod[], tiers: [newTier("通常")] };
   }
@@ -48,21 +62,24 @@ function initialOf(event?: CollectEvent) {
 
 /**
  * イベントの入力欄。
- * @param props - event：直すイベント（作るときは省く）、submitLabel：保存のボタンの文言、pending：保存中か、onSubmit：検証した入力を渡す
+ * @param props - event：直すイベント（作るときは省く）、draft：Threads の候補の下書き（作るときだけ）、submitLabel：保存のボタンの文言、
+ *   pending：保存中か、onSubmit：検証した入力を渡す
  * @returns 入力欄
  */
 export function EventForm({
   event,
+  draft,
   submitLabel,
   pending,
   onSubmit,
 }: {
   event?: CollectEvent;
+  draft?: ThreadsCandidate;
   submitLabel: string;
   pending: boolean;
   onSubmit: (input: EventInput) => void;
 }) {
-  const [v, setV] = useState(() => initialOf(event));
+  const [v, setV] = useState(() => initialOf(event, draft));
   const [errors, setErrors] = useState<string[]>([]);
   const set = <K extends keyof typeof v>(key: K, value: (typeof v)[K]) => setV((cur) => ({ ...cur, [key]: value }));
   const setTier = (key: string, patch: Partial<TierDraft>) => set("tiers", v.tiers.map((t) => (t.key === key ? { ...t, ...patch } : t)));

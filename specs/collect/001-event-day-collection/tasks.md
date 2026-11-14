@@ -258,14 +258,14 @@ description: "Task list for collect 001 event-day collection"
 ### Tests for User Story 6 ⚠️
 
 - [x] T073 [P] [US6] `api-test/integration/collect/threads-candidates.test.ts`：`saved`で候補ができる・上書き、`deleted`で消された印、`listing_status.changed`で掲載済みの媒体（021の名前→集金管理の値）、`occurredAt`の古い出来事は捨てる、2回届いても同じ結果、候補は`ownerUserId`の人にだけ返る、そこから作ったイベントに`source_changed_at`・`source_deleted_at`が付く（イベントの中身は変わらない）。research.md R15。
-- [ ] T074 [P] [US6] `web-test/apps/collect/event-new-threads.test.tsx`：「Threadsのイベントから選ぶ」→ 候補 → 選ぶと名前・日時・会場・定員と区分の下書きが入る、保存するまでできない、候補がない・Threadsを使っていない人には出さないか理由を1行、名簿の媒体で掲載済みが先に並ぶ、「元が変わりました」の表示。
+- [x] T074 [P] [US6] `web-test/apps/collect/event-new-threads.test.tsx`：「Threadsのイベントから選ぶ」→ 候補 → 選ぶと名前・日時・会場・定員と区分の下書きが入る、保存するまでできない、候補がない・Threadsを使っていない人には出さないか理由を1行、名簿の媒体で掲載済みが先に並ぶ、「元が変わりました」の表示。
 
 ### Implementation for User Story 6
 
 - [x] T075 [US6] `collect/schema.ts`に`threads_event_candidates`（data-model.md 2-10）を足す。マイグレーションを作り、SQLを読んでからコミットする。
 - [x] T076 [US6] `collect/inbox/threads-candidates.ts`：3つの出来事の受け取り（contracts/events.md 2・3）を登録する。T071の退会の受け取りで候補も消す。
 - [x] T077 [US6] 道筋`GET /api/collect/threads-candidates`と、イベントを作るときの`sourceThreadsPromotionId`の保存。`GET /api/collect/events/:eventId`の`sourceChangedAt`・`sourceDeletedAt`。名簿の画面に返す`postedMedia`。`routes.snapshot.txt`を更新する。
-- [ ] T078 [US6] `wcollect/pages/EventNewPage.tsx`に「Threadsのイベントから選ぶ」、`wcollect/components/roster/`の媒体のボタンに「掲載済み」を先に並べる、イベントの画面に「元が変わりました／消されました」。T074を通す。
+- [x] T078 [US6] `wcollect/pages/EventNewPage.tsx`に「Threadsのイベントから選ぶ」、`wcollect/components/roster/`の媒体のボタンに「掲載済み」を先に並べる、イベントの画面に「元が変わりました／消されました」。T074を通す。
 
 **Checkpoint（PR4を出せる）**：quickstart.md 6 が通る。
 
