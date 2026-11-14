@@ -4,7 +4,9 @@
 import {
   SELF_CHECK_IN_LIMITS,
   isReceptionMethodAllowed,
+  mediaInOrder,
   nameKey,
+  tierUndecidedFor,
   type ReceptionRecord,
   type SelfDeclareRequest,
   type SelfLinkInfo,
@@ -18,6 +20,7 @@ import { AppError } from "../../../kernel/errors";
 import { sha256Hex } from "../../../kernel/identifier-hash";
 import { isUuid } from "../../../kernel/validate";
 import { toRecord } from "../reception/reception-service";
+import { postedMediaOf } from "../threads-candidates/candidate-service";
 import {
   collectEvents,
   collectOwnerSettings,
@@ -121,6 +124,8 @@ export async function selfLinkInfo(db: Db, token: string, now: Date): Promise<Se
       venue: collectEvents.venue,
       methods: collectEvents.methods,
       ownerUserId: collectEvents.ownerUserId,
+      checkInMode: collectEvents.checkInMode,
+      sourceThreadsPromotionId: collectEvents.sourceThreadsPromotionId,
     })
     .from(collectEvents)
     .where(eq(collectEvents.id, link.eventId))
@@ -131,10 +136,22 @@ export async function selfLinkInfo(db: Db, token: string, now: Date): Promise<Se
     .from(collectOwnerSettings)
     .where(eq(collectOwnerSettings.ownerUserId, event.ownerUserId))
     .limit(1);
+  const rosterless = event.checkInMode === "rosterless";
+  // 名簿なしで区分が2つ以上なら、参加者に区分ごとの金額を並べる（0円の区分は出さない。specs/collect/004 research.md R3）
+  const tiers = rosterless
+    ? await db
+        .select({ name: collectPriceTiers.name, amount: collectPriceTiers.amount, position: collectPriceTiers.position })
+        .from(collectPriceTiers)
+        .where(eq(collectPriceTiers.eventId, link.eventId))
+        .orderBy(collectPriceTiers.position)
+    : [];
   return {
     status: statusOf(link, now),
     event: { name: event.name, startsAt: event.startsAt.toISOString(), venue: event.venue, methods: event.methods as SelfLinkInfo["event"]["methods"] },
     settings: { hasPaypayQr: settings?.hasPaypayQr ?? false, bankText: settings?.bankText ?? null },
+    checkInMode: event.checkInMode as SelfLinkInfo["checkInMode"],
+    media: rosterless ? mediaInOrder(event.sourceThreadsPromotionId ? await postedMediaOf(db, event.sourceThreadsPromotionId) : []) : [],
+    tiers: tierUndecidedFor(tiers) ? tiers.filter((t) => t.amount > 0).map((t) => ({ name: t.name, amount: t.amount })) : [],
   };
 }
 
@@ -176,7 +193,14 @@ async function countSearch(db: Db, link: SelfLinkRow, deviceHash: string, now: D
  */
 export async function selfPersonOf(db: Db | TxDb, personId: string, eventId: string): Promise<SelfPerson | undefined> {
   const [row] = await db
-    .select({ id: collectRosterPeople.id, number: collectRosterPeople.number, name: collectRosterPeople.name, tierName: collectPriceTiers.name, amount: collectPriceTiers.amount })
+    .select({
+      id: collectRosterPeople.id,
+      number: collectRosterPeople.number,
+      name: collectRosterPeople.name,
+      tierName: collectPriceTiers.name,
+      amount: collectPriceTiers.amount,
+      tierUndecided: collectRosterPeople.tierUndecided,
+    })
     .from(collectRosterPeople)
     .innerJoin(collectPriceTiers, eq(collectPriceTiers.id, collectRosterPeople.priceTierId))
     .where(and(eq(collectRosterPeople.id, personId), eq(collectRosterPeople.eventId, eventId)))

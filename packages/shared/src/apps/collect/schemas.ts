@@ -79,6 +79,13 @@ const methodsSchema = z
   .min(1)
   .transform((ms) => COLLECT_METHODS.filter((m) => ms.includes(m)));
 
+/** 受付のしかた（specs/collect/004 research.md R1）。roster＝名簿あり（先に名簿を入れる）、rosterless＝名簿なし（参加者がセルフ受付で入れる）。 */
+export const CHECK_IN_MODES = ["roster", "rosterless"] as const;
+/** 受付のしかた。 */
+export type CheckInMode = (typeof CHECK_IN_MODES)[number];
+/** 新しく作るイベントの受付のしかたの初めの値（画面の作る画面で使う。API は省かれたら roster。research R1）。 */
+export const NEW_EVENT_CHECK_IN_MODE: CheckInMode = "rosterless";
+
 const eventFields = {
   name: required(COLLECT_LIMITS.eventName),
   startsAt: isoDateTime,
@@ -99,7 +106,12 @@ const endsAfterStart = (v: { startsAt?: string; endsAt?: string | null }) =>
 
 /** POST /api/collect/events の入力（FR-010）。区分の id は無視する。 */
 export const createCollectEventRequestSchema = z
-  .object({ ...eventFields, sourceThreadsPromotionId: z.string().max(100).nullish().transform((s) => s ?? null) })
+  .object({
+    ...eventFields,
+    sourceThreadsPromotionId: z.string().max(100).nullish().transform((s) => s ?? null),
+    /** 省いたら roster（前からの呼び方を変えない。specs/collect/004 research.md R1） */
+    checkInMode: z.enum(CHECK_IN_MODES).optional(),
+  })
   .refine(endsAfterStart, { message: "endsAt must be after startsAt", path: ["endsAt"] });
 /** POST /api/collect/events の入力。 */
 export type CreateCollectEventRequest = z.infer<typeof createCollectEventRequestSchema>;
@@ -117,6 +129,7 @@ export const updateCollectEventRequestSchema = z
     capacity: eventFields.capacity.optional(),
     methods: methodsSchema.optional(),
     tiers: eventFields.tiers.optional(),
+    checkInMode: z.enum(CHECK_IN_MODES).optional(),
   })
   .refine((v) => {
     const ids = (v.tiers ?? []).flatMap((t) => (t.id ? [t.id] : []));
@@ -140,6 +153,8 @@ export const collectEventSchema = z.object({
   capacity: z.number().int().nullable(),
   methods: z.array(z.enum(COLLECT_METHODS)),
   tiers: z.array(collectTierSchema),
+  /** 受付のしかた（前の版の API にはないので roster とみなす） */
+  checkInMode: z.enum(CHECK_IN_MODES).default("roster"),
   closedAt: z.string().nullable(),
   sourceThreadsPromotionId: z.string().nullable(),
   sourceChangedAt: z.string().nullable(),
@@ -225,6 +240,10 @@ export const rosterPersonSchema = z.object({
   memo: z.string().nullable(),
   /** 紹介した人（specs/collect/003。前の版の API には無いので既定は null） */
   referrer: z.string().nullable().default(null),
+  /** 区分がまだ決まっていない（名簿なし・区分が2つ以上。specs/collect/004 research.md R3） */
+  tierUndecided: z.boolean().default(false),
+  /** 名簿なしのセルフ受付で入った */
+  selfEntered: z.boolean().default(false),
   createdAt: z.string(),
 });
 /** 名簿の人。 */

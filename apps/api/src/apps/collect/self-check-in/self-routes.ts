@@ -9,6 +9,7 @@ import {
   createReceptionLinkRequestSchema,
   matchSelfRequestSchema,
   selfDeclareRequestSchema,
+  selfEntryRequestSchema,
   selfRequestCreateSchema,
   selfSearchRequestSchema,
   updateReceptionLinkRequestSchema,
@@ -27,6 +28,7 @@ import { ownerActor } from "../reception/reception-routes";
 import { confirmReception } from "../reception/reception-service";
 import { collectEvents } from "../schema";
 import { loadQr } from "../settings/settings-service";
+import { createEntry, removeEntry } from "./entry-service";
 import { acceptRequest, createRequest, matchRequest, rejectRequest } from "./request-service";
 import { activeSelfLink, declareSelf, deviceHashOf, loadSelfLink, searchSelf, selfLinkInfo, selfMe } from "./self-service";
 
@@ -70,6 +72,19 @@ async function handleResolve(c: Context<AppEnv>, actor: ReceptionActor, eventId:
 }
 
 /**
+ * 名簿なしで入った人を名簿から外す（specs/collect/004 contracts/api.md 3-3）。名簿の人を消したときと同じ知らせを送る。
+ * @param c - Hono のコンテキスト
+ * @param actor - 受付をする人
+ * @param eventId - イベントの番号
+ * @returns 応答（新しい版）
+ */
+async function handleRemoveEntry(c: Context<AppEnv>, actor: ReceptionActor, eventId: string) {
+  const { version } = await removeEntry(c.env.DATABASE_URL, actor, eventId, c.req.param("personId") ?? "");
+  await notifyLive(c, eventId, { type: "roster.changed", version });
+  return c.json({ version });
+}
+
+/**
  * 手伝う人を確かめる（リンク → 端末の印）。
  * @param c - Hono のコンテキスト
  * @returns 受付をする人（手伝う人）
@@ -109,6 +124,7 @@ export function selfStaffRoutes(owner: MiddlewareHandler<AppEnv>) {
       .post("/events/:eventId/self-requests/:requestId/accept", owner, (c) => handleResolve(c, ownerActor(c), c.req.param("eventId"), "accept"))
       .post("/events/:eventId/self-requests/:requestId/match", owner, (c) => handleResolve(c, ownerActor(c), c.req.param("eventId"), "match"))
       .post("/events/:eventId/self-requests/:requestId/reject", owner, (c) => handleResolve(c, ownerActor(c), c.req.param("eventId"), "reject"))
+      .delete("/events/:eventId/reception/:personId/entry", owner, (c) => handleRemoveEntry(c, ownerActor(c), c.req.param("eventId")))
       // ---- 確かめる・申し出（手伝う人。ログインの関所の外） ----
       .post("/r/:token/reception/:personId/confirm", async (c) => {
         const actor = await helperActor(c);
@@ -125,6 +141,10 @@ export function selfStaffRoutes(owner: MiddlewareHandler<AppEnv>) {
       .post("/r/:token/self-requests/:requestId/reject", async (c) => {
         const actor = await helperActor(c);
         return handleResolve(c, actor, actor.eventId, "reject");
+      })
+      .delete("/r/:token/reception/:personId/entry", async (c) => {
+        const actor = await helperActor(c);
+        return handleRemoveEntry(c, actor, actor.eventId);
       })
   );
 }
@@ -159,6 +179,15 @@ export function selfPublicRoutes() {
       const { requestId, version, requests } = await createRequest(c.env.DATABASE_URL, link, await device(c), input);
       await notifyLive(c, link.eventId, { type: "self_requests.changed", version, selfRequests: requests });
       return c.json({ requestId }, 201);
+    })
+    .post("/s/:token/entries", async (c) => {
+      // 名簿なしで名簿に入る（specs/collect/004 contracts/api.md 2-2）
+      const now = new Date();
+      const link = await activeSelfLink(createDb(c.env.DATABASE_URL), c.req.param("token"), now);
+      const input = await parseBody(selfEntryRequestSchema, c.req.json());
+      const { response, version, replayed, person } = await createEntry(c.env.DATABASE_URL, link, await device(c), input, now);
+      if (!replayed && person) await notifyLive(c, link.eventId, { type: "roster.changed", version, personId: person.id, person });
+      return c.json(response, replayed ? 200 : 201);
     })
     .get("/s/:token/me", async (c) => {
       const db = createDb(c.env.DATABASE_URL);

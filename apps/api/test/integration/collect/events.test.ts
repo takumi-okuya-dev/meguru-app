@@ -29,6 +29,22 @@ describe("イベントを作る", () => {
     expect(await errorOf(await call(app, "POST", "/api/collect/events", { user: "o1", body: { ...EVENT_INPUT, methods: [] } }))).toEqual([400, "VALIDATION_FAILED"]);
   });
 
+  it("受付のしかたは、省くと名簿あり。名簿なしで作れ、直せる（specs/collect/004 research.md R1、tasks.md T007）", async () => {
+    const plain = await createCollectEvent(app, "o1");
+    expect(plain).toMatchObject({ checkInMode: "roster" });
+    const rosterless = await createCollectEvent(app, "o1", { checkInMode: "rosterless" });
+    expect(rosterless).toMatchObject({ checkInMode: "rosterless" });
+    const got = await call(app, "GET", `/api/collect/events/${rosterless.id}`, { user: "o1" });
+    expect(await got.json()).toMatchObject({ checkInMode: "rosterless" });
+    const changed = await call(app, "PATCH", `/api/collect/events/${rosterless.id}`, { user: "o1", body: { checkInMode: "roster" } });
+    expect(changed.status).toBe(200);
+    expect(await changed.json()).toMatchObject({ checkInMode: "roster", version: 1 });
+    // ほかの項目だけを直しても、受付のしかたは変わらない
+    const renamed = await call(app, "PATCH", `/api/collect/events/${rosterless.id}`, { user: "o1", body: { name: "名前を直した" } });
+    expect(await renamed.json()).toMatchObject({ checkInMode: "roster" });
+    expect(await errorOf(await call(app, "POST", "/api/collect/events", { user: "o1", body: { ...EVENT_INPUT, checkInMode: "auto" } }))).toEqual([400, "VALIDATION_FAILED"]);
+  });
+
   it("作ると、共通の利用の記録で「使っている」になる（料金の数は0）", async () => {
     const userId = await grantCollect(app, "o1");
     await createCollectEvent(app, "o1");

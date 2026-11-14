@@ -6,7 +6,7 @@
 
 ## 1. イベント（主催者）
 
-### 1-1. `POST /api/collect/events`・`PUT /api/collect/events/:eventId`
+### 1-1. `POST /api/collect/events`・`PATCH /api/collect/events/:eventId`
 
 - 入力に `checkInMode`（`"roster"`・`"rosterless"`）を足す。作るときに省いたら `"roster"`（research R1）。直すときに省いたら変えない。
 - 応答のイベント（`GET /api/collect/events/:eventId` も）に `checkInMode` を足す。

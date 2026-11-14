@@ -42,6 +42,10 @@ describe("リンク（主催者）", () => {
       status: "active",
       event: { name: "IT交流会", startsAt: expect.any(String), venue: "渋谷", methods: ["cash", "paypay", "transfer"] },
       settings: { hasPaypayQr: false, bankText: null },
+      // 名簿ありのイベントでは、名簿なしの入れる欄のための媒体・区分は空（specs/collect/004）
+      checkInMode: "roster",
+      media: [],
+      tiers: [],
     });
     await call(app, "PUT", "/api/collect/settings", { user: "o1", body: { bankText: "めぐる銀行 渋谷支店 普通 1234567" } });
     expect(((await (await call(app, "GET", s())).json()) as { settings: unknown }).settings).toEqual({ hasPaypayQr: false, bankText: "めぐる銀行 渋谷支店 普通 1234567" });
@@ -79,7 +83,7 @@ describe("探す（完全に一致した1人だけ）", () => {
     for (const q of ["松本 れい", "まつもとれい", "マツモト　レイ", "松本れい さん", "1", "１"]) {
       const res = (await (await search(q)).json()) as { result: string; person?: Record<string, unknown> };
       expect(res.result, q).toBe("found");
-      expect(res.person).toEqual({ id: ids["松本 れい"], number: 1, name: "松本 れい", tierName: "通常", amount: 3000 });
+      expect(res.person).toEqual({ id: ids["松本 れい"], number: 1, name: "松本 れい", tierName: "通常", amount: 3000, tierUndecided: false });
     }
     // メモ・媒体は返さない
     expect(JSON.stringify(await (await search("松本 れい")).json())).not.toContain("紹介");

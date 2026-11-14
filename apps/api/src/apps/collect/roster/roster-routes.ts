@@ -27,6 +27,9 @@ const receptionPersonOf = (person: RosterPerson): ReceptionPerson => ({
   kana: person.kana,
   media: person.media,
   priceTierId: person.priceTierId,
+  tierUndecided: person.tierUndecided,
+  sameName: false,
+  selfEntered: person.selfEntered,
 });
 
 /**

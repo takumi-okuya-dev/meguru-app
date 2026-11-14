@@ -1,8 +1,8 @@
 // 振込待ちの道筋（specs/collect/001-event-day-collection contracts/api.md 7。主催者だけ）。
-import { transferQuerySchema } from "@meguru/shared";
+import { confirmTransferRequestSchema, transferQuerySchema } from "@meguru/shared";
 import { Hono, type MiddlewareHandler } from "hono";
 import { createDb } from "../../../kernel/db/client";
-import { parseQuery } from "../../../kernel/validate";
+import { parseBody, parseQuery } from "../../../kernel/validate";
 import type { AppEnv } from "../../../platform";
 import { listTransfers, setTransferConfirmed } from "./transfer-service";
 
@@ -18,7 +18,10 @@ export function transferRoutes(owner: MiddlewareHandler<AppEnv>) {
       return c.json(await listTransfers(createDb(c.env.DATABASE_URL), c.get("user").id, q));
     })
     .post("/transfers/:personId/confirm", owner, async (c) => {
-      return c.json(await setTransferConfirmed(createDb(c.env.DATABASE_URL), c.get("user").id, c.req.param("personId"), true));
+      const { priceTierId } = await parseBody(confirmTransferRequestSchema, c.req.json().catch(() => ({})));
+      return c.json(
+        await setTransferConfirmed(createDb(c.env.DATABASE_URL), c.get("user").id, c.req.param("personId"), true, { databaseUrl: c.env.DATABASE_URL, priceTierId }),
+      );
     })
     .delete("/transfers/:personId/confirm", owner, async (c) => {
       return c.json(await setTransferConfirmed(createDb(c.env.DATABASE_URL), c.get("user").id, c.req.param("personId"), false));

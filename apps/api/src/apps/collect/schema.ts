@@ -25,6 +25,7 @@ import {
   type ByMethod,
   type CountAmount,
   type MediaStats,
+  CHECK_IN_MODES,
   COLLECT_LIMITS,
   COLLECT_MEDIA,
   COLLECT_METHODS,
@@ -70,6 +71,8 @@ export const collectEvents = collectSchema.table(
     sourceThreadsPromotionId: text("source_threads_promotion_id"),
     sourceChangedAt: timestamp("source_changed_at", { withTimezone: true }),
     sourceDeletedAt: timestamp("source_deleted_at", { withTimezone: true }),
+    // 受付のしかた（roster＝名簿あり・rosterless＝名簿なし。前からあるイベントは roster。specs/collect/004 data-model.md 2-1）
+    checkInMode: text("check_in_mode").notNull().default("roster"),
     ...timestamps,
   },
   (t) => [
@@ -92,6 +95,7 @@ export const collectEvents = collectSchema.table(
       sql`cardinality(${t.methods}) >= 1 AND ${t.methods} <@ ARRAY[${inList(COLLECT_METHODS)}]::text[]`,
     ),
     check("events_next_number_positive", sql`${t.nextNumber} >= 1`),
+    check("events_check_in_mode_valid", sql`${t.checkInMode} IN (${inList(CHECK_IN_MODES)})`),
   ],
 );
 
@@ -150,6 +154,10 @@ export const collectRosterPeople = collectSchema.table(
     }),
     // 飛び入りの送り直しで二重にしない（R6。飛び入りのときだけ入る）
     clientRequestId: uuid("client_request_id").unique(),
+    // 区分がまだ決まっていない（名簿なし・区分が2つ以上。price_tier_id は仮の区分。specs/collect/004 data-model.md 2-2）
+    tierUndecided: boolean("tier_undecided").notNull().default(false),
+    // 名簿なしのセルフ受付で入った時刻（主催者・手伝う人が入れた人は空）
+    selfEnteredAt: timestamp("self_entered_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
@@ -176,6 +184,8 @@ export const collectRosterPeople = collectSchema.table(
       sql`char_length(${t.referrer}) <= ${sql.raw(String(COLLECT_LIMITS.referrer))}`,
     ),
     check("roster_people_referrer_pair", sql`(${t.referrer} IS NULL) = (${t.referrerKey} IS NULL)`),
+    // 区分が未定になるのは、名簿なしの入口で入った人だけ
+    check("roster_people_tier_undecided_self", sql`NOT ${t.tierUndecided} OR ${t.selfEnteredAt} IS NOT NULL`),
   ],
 );
 
@@ -452,6 +462,8 @@ export const collectSelfCheckInRequests = collectSchema.table(
     }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     resolvedAt: timestamp("resolved_at", { withTimezone: true }),
+    // 名簿なしの入口で作った行だけに入る（送り直しで二重にしない・入れた人数を数える。specs/collect/004 data-model.md 2-3）
+    clientRequestId: uuid("client_request_id").unique(),
   },
   (t) => [
     index("self_check_in_requests_event_idx").on(t.eventId, t.status),
