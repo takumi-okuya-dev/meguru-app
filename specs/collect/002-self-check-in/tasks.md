@@ -57,7 +57,7 @@
 - [x] T019 [US2・US4] `web/components/reception/`：受付の画面の上に「確かめ待ち」（受け取った・払い方を変えて受け取る・申告を取り消す）と「申し出」（名簿に入れる・名簿の人に当てる・断る）。数字の段に確かめ待ち。締めの画面に確かめ待ちの知らせ。
 - [x] T020 [P] `web-test/self-check-in.test.tsx`・`web-test/self-confirm.test.tsx`。
 - [x] T021 `e2e/tests/collect-self-check-in.spec.ts`：参加者と主催者の2つのブラウザ。参加者が探して PayPay を選ぶ → 5秒以内に主催者の確かめ待ち → 受け取った → 参加者の画面が「済みました」。申し出 → 名簿に入れる → 払い方へ。390px ではみ出さない。
-- [x] T022 `docs/apps/collect.md`、tasks.md の印。（`docs/apps/collect-guide.md` の使い方は、#123 が入ってから足す）
+- [x] T022 `docs/apps/collect.md`、tasks.md の印。（`docs/apps/collect-guide.md` の使い方は、#145 で 5 章に足した）
 
 ## Dependencies
 
