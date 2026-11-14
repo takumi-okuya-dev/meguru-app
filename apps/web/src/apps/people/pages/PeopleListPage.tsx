@@ -214,7 +214,7 @@ export function PeopleListPage() {
 
   const filterCount = activeFilterCount(filters);
   const add = (
-    <Button asChild size="sm" className="h-9 rounded-full">
+    <Button asChild size="sm" className="h-11 rounded-full md:h-9">
       <Link to={newPersonPath()}>
         <PlusIcon /> 人を足す
       </Link>

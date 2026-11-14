@@ -18,7 +18,7 @@ import { peopleQueryKeys } from "../lib/query-keys";
 export function EventsPage() {
   const events = useQuery({ queryKey: peopleQueryKeys.events, queryFn: peopleApi.events });
   const create = (
-    <Button asChild size="sm" className="h-9 rounded-full">
+    <Button asChild size="sm" className="h-11 rounded-full md:h-9">
       <Link to={newEventPath()}>
         <PlusIcon /> イベントを作る
       </Link>

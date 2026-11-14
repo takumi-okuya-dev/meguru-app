@@ -57,7 +57,7 @@ export function PersonConsentSection({ personId, consent, changes }: { personId:
       <div className="divide-y rounded-2xl border bg-card">
         {CONSENT_KEYS.map((k) => (
           <div key={k} className="flex min-h-14 items-center gap-3 px-4 py-2">
-            <label htmlFor={`${id}-${k}`} className="min-w-0 flex-1 cursor-pointer py-2 text-sm">
+            <label htmlFor={`${id}-${k}`} className="flex min-h-11 min-w-0 flex-1 cursor-pointer items-center text-sm">
               {CONSENT_LABELS[k]}
             </label>
             <Switch
