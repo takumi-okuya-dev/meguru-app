@@ -1,8 +1,20 @@
 // 集金管理のAPIの呼び出し（specs/collect/001-event-day-collection contracts/api.md 1〜7）。道筋は /api/collect/…。
-// 手伝う人（ログインなし）の呼び出しは helper-api.ts。
+// 手伝う人（ログインなし）の呼び出しは helper-api.ts。003 の分配（specs/collect/003-revenue-sharing contracts/api.md）もここ。
 // APIの基本のURL・認証のトークン・エラーの扱いは、共通の部品（lib/api-client.ts の request・requestBlob・requestFile）を使う。
 import {
   addRosterPersonResponseSchema,
+  memberSharingViewSchema,
+  referralListSchema,
+  referrerSuggestionsSchema,
+  sharedEventListSchema,
+  sharingInviteAcceptedSchema,
+  sharingInviteCreatedSchema,
+  sharingInviteInfoSchema,
+  sharingSnapshotSchema,
+  type CreateExpenseRequest,
+  type CreateSharingMemberRequest,
+  type UpdateExpenseRequest,
+  type UpdateSharingMemberRequest,
   bulkAddRosterResponseSchema,
   collectEventListSchema,
   collectEventSchema,
@@ -51,7 +63,7 @@ export type EventInput = {
 };
 
 /** 名簿の人を足す・直すときの入力。 */
-export type PersonInput = { name: string; kana?: string | null; media: CollectMedia; priceTierId: string; memo?: string | null };
+export type PersonInput = { name: string; kana?: string | null; media: CollectMedia; priceTierId: string; memo?: string | null; referrer?: string | null };
 
 const json = (method: string, body: unknown): RequestInit => ({ method, body: JSON.stringify(body) });
 const ev = (eventId: string) => `/api/collect/events/${encodeURIComponent(eventId)}`;
@@ -67,7 +79,7 @@ export const collectApi = {
   // ---- 名簿 ----
   roster: (eventId: string) => request(`${ev(eventId)}/roster`, rosterListSchema),
   addPerson: (eventId: string, input: PersonInput) => request(`${ev(eventId)}/roster`, addRosterPersonResponseSchema, json("POST", input)),
-  addPeopleBulk: (eventId: string, input: { names: string[]; media: CollectMedia; priceTierId: string }) =>
+  addPeopleBulk: (eventId: string, input: { names: string[]; media: CollectMedia; priceTierId: string; referrer?: string | null }) =>
     request(`${ev(eventId)}/roster/bulk`, bulkAddRosterResponseSchema, json("POST", input)),
   updatePerson: (eventId: string, personId: string, input: Partial<PersonInput>) =>
     request(`${ev(eventId)}/roster/${encodeURIComponent(personId)}`, z.object({ person: rosterPersonSchema, version: z.number() }), json("PATCH", input)),
@@ -128,4 +140,27 @@ export const collectApi = {
   // ---- Threads のイベントの候補 ----
   threadsCandidates: () => request("/api/collect/threads-candidates", threadsCandidateListSchema),
   deleteSummary: (summaryId: string) => request(`/api/collect/summaries/${encodeURIComponent(summaryId)}`, null, { method: "DELETE" }),
+  // ---- 分配（specs/collect/003） ----
+  sharing: (eventId: string) => request(`${ev(eventId)}/sharing`, sharingSnapshotSchema),
+  addExpense: (eventId: string, input: CreateExpenseRequest) => request(`${ev(eventId)}/expenses`, sharingSnapshotSchema, json("POST", input)),
+  updateExpense: (eventId: string, expenseId: string, input: UpdateExpenseRequest) =>
+    request(`${ev(eventId)}/expenses/${encodeURIComponent(expenseId)}`, sharingSnapshotSchema, json("PATCH", input)),
+  deleteExpense: (eventId: string, expenseId: string) => request(`${ev(eventId)}/expenses/${encodeURIComponent(expenseId)}`, sharingSnapshotSchema, { method: "DELETE" }),
+  addMember: (eventId: string, input: CreateSharingMemberRequest) => request(`${ev(eventId)}/members`, sharingSnapshotSchema, json("POST", input)),
+  updateMember: (eventId: string, memberId: string, input: UpdateSharingMemberRequest) =>
+    request(`${ev(eventId)}/members/${encodeURIComponent(memberId)}`, sharingSnapshotSchema, json("PATCH", input)),
+  deleteMember: (eventId: string, memberId: string) => request(`${ev(eventId)}/members/${encodeURIComponent(memberId)}`, sharingSnapshotSchema, { method: "DELETE" }),
+  unlinkMember: (eventId: string, memberId: string) =>
+    request(`${ev(eventId)}/members/${encodeURIComponent(memberId)}/link`, sharingSnapshotSchema, { method: "DELETE" }),
+  createInvite: (eventId: string, memberId: string) =>
+    request(`${ev(eventId)}/members/${encodeURIComponent(memberId)}/invite`, sharingInviteCreatedSchema, { method: "POST" }),
+  stopInvite: (eventId: string, memberId: string) =>
+    request(`${ev(eventId)}/members/${encodeURIComponent(memberId)}/invite`, sharingSnapshotSchema, { method: "DELETE" }),
+  referrals: (eventId: string) => request(`${ev(eventId)}/referrals`, referralListSchema),
+  referrers: () => request("/api/collect/referrers", referrerSuggestionsSchema),
+  // ---- 招待を受ける人・つながった運営メンバー（集金管理の利用の許可はいらない） ----
+  invite: (token: string) => request(`/api/collect/invites/${encodeURIComponent(token)}`, sharingInviteInfoSchema),
+  acceptInvite: (token: string) => request(`/api/collect/invites/${encodeURIComponent(token)}/accept`, sharingInviteAcceptedSchema, { method: "POST" }),
+  shares: () => request("/api/collect/shares", sharedEventListSchema),
+  share: (eventId: string) => request(`/api/collect/shares/${encodeURIComponent(eventId)}`, memberSharingViewSchema),
 };

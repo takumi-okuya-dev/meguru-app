@@ -58,7 +58,10 @@ export function RosterPage() {
     void queryClient.invalidateQueries({ queryKey: collectQueryKeys.pastAttendeesOf(eventId) });
   };
   const add = useMutation({ mutationFn: (input: PersonInput) => collectApi.addPerson(eventId, input), onSuccess: refresh });
-  const bulk = useMutation({ mutationFn: (names: string[]) => collectApi.addPeopleBulk(eventId, { names, media, priceTierId: tierId }), onSuccess: refresh });
+  const bulk = useMutation({
+    mutationFn: ({ names, referrer }: { names: string[]; referrer: string | null }) => collectApi.addPeopleBulk(eventId, { names, media, priceTierId: tierId, referrer }),
+    onSuccess: refresh,
+  });
   const update = useMutation({ mutationFn: ({ id, input }: { id: string; input: PersonInput }) => collectApi.updatePerson(eventId, id, input), onSuccess: refresh });
   const remove = useMutation({ mutationFn: (id: string) => collectApi.deletePerson(eventId, id), onSuccess: refresh });
 
@@ -152,11 +155,9 @@ export function RosterPage() {
                       <td className="px-3 py-2 tabular-nums">{p.number}</td>
                       <td className="px-3 py-2">
                         <div>{p.name}</div>
-                        {(p.kana || p.memo) && (
+                        {(p.kana || p.memo || p.referrer) && (
                           <div className="text-xs text-muted-foreground">
-                            {p.kana}
-                            {p.kana && p.memo ? "・" : ""}
-                            {p.memo}
+                            {[p.kana, p.referrer && `紹介：${p.referrer}`, p.memo].filter(Boolean).join("・")}
                           </div>
                         )}
                       </td>
@@ -184,9 +185,9 @@ export function RosterPage() {
           tier={tiers.find((t) => t.id === tierId)}
           pending={bulk.isPending}
           onClose={() => setPasting(false)}
-          onSubmit={async (names) => {
+          onSubmit={async (names, referrer) => {
             try {
-              const res = await bulk.mutateAsync(names);
+              const res = await bulk.mutateAsync({ names, referrer });
               toast.success(`${res.people.length}人を足しました。`);
               return true;
             } catch (err) {

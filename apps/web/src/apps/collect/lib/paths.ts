@@ -101,3 +101,32 @@ export function transfersPath(): string {
 export function summariesPath(): string {
   return `${COLLECT_BASE}/summaries`;
 }
+
+/**
+ * 分配の画面（主催者。specs/collect/003）。
+ * @param eventId - イベントの番号
+ * @returns URL
+ */
+export function sharingPath(eventId: string): string {
+  return `${COLLECT_BASE}/events/${encodeURIComponent(eventId)}/sharing`;
+}
+
+/** 招待を受ける画面のルート（ログインなしで開ける。specs/collect/003 research.md R6）。 */
+export const JOIN_ROUTE = `${COLLECT_BASE}/join/:token`;
+
+/**
+ * つながったイベントの一覧（運営メンバー）。
+ * @returns URL
+ */
+export function sharesPath(): string {
+  return `${COLLECT_BASE}/shares`;
+}
+
+/**
+ * つながったイベントの分配（運営メンバー。読むだけ）。
+ * @param eventId - イベントの番号
+ * @returns URL
+ */
+export function sharePath(eventId: string): string {
+  return `${COLLECT_BASE}/shares/${encodeURIComponent(eventId)}`;
+}
