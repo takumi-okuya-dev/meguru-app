@@ -1,5 +1,6 @@
 // 宣伝内容のイベントの情報を、出来事でほかのアプリに伝える（specs/collect/001-event-day-collection contracts/events.md 2、docs/module-map.md 1-4）。
-// 受け取りは集金管理が登録する。ここでは仮の受け取りを登録して、Threads が書く出来事の中身を確かめる。
+// 受け取りは集金管理が登録する。ここでは集金管理とは別の名前で仮の受け取りを登録して、Threads が書く出来事の中身を確かめる
+// （同じ名前・同じ種類は先の登録が残るので、"collect" の名前だと集金管理の本物の受け取りに隠れる）。
 import { beforeEach, describe, expect, it } from "vitest";
 import { registerConsumer, resetConsumers, type PlatformEvent } from "../../src/platform/events/events";
 import { call, createUserWithAccount, makeApp, resetDb } from "../helpers/app";
@@ -14,7 +15,7 @@ const EVENT = { startAt: "2026-11-25T19:00", endAt: "2026-11-25T22:00", format: 
  */
 function listen() {
   for (const type of ["threads.promotion_event.saved", "threads.promotion_event.deleted", "threads.listing_status.changed"] as const) {
-    registerConsumer("collect", type, async (e) => {
+    registerConsumer("test-listener", type, async (e) => {
       received.push(e as PlatformEvent);
     });
   }
