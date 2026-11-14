@@ -5,7 +5,22 @@
 // PR3 の分（精算・イベントのまとめ）、PR4 の分（Threadsのイベントの候補）、002 の分（セルフ受付：本人の申告・申し出・端末）、
 // 003 の分（経費・運営メンバー・招待・紹介した人・まとめの経費と紹介）。
 import { sql } from "drizzle-orm";
-import { bigint, boolean, check, index, integer, jsonb, pgSchema, primaryKey, smallint, text, timestamp, uniqueIndex, uuid, type AnyPgColumn } from "drizzle-orm/pg-core";
+import {
+  bigint,
+  boolean,
+  check,
+  index,
+  integer,
+  jsonb,
+  pgSchema,
+  primaryKey,
+  smallint,
+  text,
+  timestamp,
+  uniqueIndex,
+  uuid,
+  type AnyPgColumn,
+} from "drizzle-orm/pg-core";
 import {
   type ByMethod,
   type CountAmount,
@@ -21,6 +36,7 @@ import {
   SHARING_LIMITS,
   SHARING_ROLES,
   RATIO_TENTHS,
+  SETTLEMENT_LIMITS,
 } from "@meguru/shared";
 import { bytea, inList, timestamps } from "../../kernel/db/columns";
 
@@ -39,7 +55,10 @@ export const collectEvents = collectSchema.table(
     endsAt: timestamp("ends_at", { withTimezone: true }),
     venue: text("venue"),
     capacity: integer("capacity"),
-    methods: text("methods").array().notNull().default(sql`ARRAY['cash','paypay','transfer']::text[]`),
+    methods: text("methods")
+      .array()
+      .notNull()
+      .default(sql`ARRAY['cash','paypay','transfer']::text[]`),
     // 次に振る受付番号（R8。名簿に足すトランザクションの中で UPDATE … RETURNING して取る）
     nextNumber: integer("next_number").notNull().default(1),
     // 受付の画面に関わる変更のたびに1上げる（R4。会場の共有は PR2）
@@ -55,9 +74,18 @@ export const collectEvents = collectSchema.table(
   },
   (t) => [
     index("events_owner_idx").on(t.ownerUserId, t.startsAt),
-    check("events_name_length", sql`char_length(${t.name}) BETWEEN 1 AND ${sql.raw(String(COLLECT_LIMITS.eventName))}`),
-    check("events_venue_length", sql`char_length(${t.venue}) <= ${sql.raw(String(COLLECT_LIMITS.venue))}`),
-    check("events_capacity_range", sql`${t.capacity} BETWEEN 1 AND ${sql.raw(String(COLLECT_LIMITS.capacityMax))}`),
+    check(
+      "events_name_length",
+      sql`char_length(${t.name}) BETWEEN 1 AND ${sql.raw(String(COLLECT_LIMITS.eventName))}`,
+    ),
+    check(
+      "events_venue_length",
+      sql`char_length(${t.venue}) <= ${sql.raw(String(COLLECT_LIMITS.venue))}`,
+    ),
+    check(
+      "events_capacity_range",
+      sql`${t.capacity} BETWEEN 1 AND ${sql.raw(String(COLLECT_LIMITS.capacityMax))}`,
+    ),
     check("events_ends_after_starts", sql`${t.endsAt} IS NULL OR ${t.endsAt} > ${t.startsAt}`),
     check(
       "events_methods_valid",
@@ -81,8 +109,14 @@ export const collectPriceTiers = collectSchema.table(
   },
   (t) => [
     index("price_tiers_event_idx").on(t.eventId, t.position),
-    check("price_tiers_name_length", sql`char_length(${t.name}) BETWEEN 1 AND ${sql.raw(String(COLLECT_LIMITS.tierName))}`),
-    check("price_tiers_amount_range", sql`${t.amount} BETWEEN 0 AND ${sql.raw(String(COLLECT_LIMITS.tierAmountMax))}`),
+    check(
+      "price_tiers_name_length",
+      sql`char_length(${t.name}) BETWEEN 1 AND ${sql.raw(String(COLLECT_LIMITS.tierName))}`,
+    ),
+    check(
+      "price_tiers_amount_range",
+      sql`${t.amount} BETWEEN 0 AND ${sql.raw(String(COLLECT_LIMITS.tierAmountMax))}`,
+    ),
   ],
 );
 
@@ -111,7 +145,9 @@ export const collectRosterPeople = collectSchema.table(
     referrer: text("referrer"),
     referrerKey: text("referrer_key"),
     // 飛び入りを手伝う人が足したとき（手伝う人を消したら空にする）
-    addedByHelperId: uuid("added_by_helper_id").references((): AnyPgColumn => collectHelpers.id, { onDelete: "set null" }),
+    addedByHelperId: uuid("added_by_helper_id").references((): AnyPgColumn => collectHelpers.id, {
+      onDelete: "set null",
+    }),
     // 飛び入りの送り直しで二重にしない（R6。飛び入りのときだけ入る）
     clientRequestId: uuid("client_request_id").unique(),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
@@ -121,12 +157,24 @@ export const collectRosterPeople = collectSchema.table(
     index("roster_people_event_name_key_idx").on(t.eventId, t.nameKey),
     index("roster_people_price_tier_idx").on(t.priceTierId),
     index("roster_people_event_referrer_idx").on(t.eventId, t.referrerKey),
-    check("roster_people_name_length", sql`char_length(${t.name}) BETWEEN 1 AND ${sql.raw(String(COLLECT_LIMITS.personName))}`),
-    check("roster_people_kana_length", sql`char_length(${t.kana}) <= ${sql.raw(String(COLLECT_LIMITS.kana))}`),
-    check("roster_people_memo_length", sql`char_length(${t.memo}) <= ${sql.raw(String(COLLECT_LIMITS.memo))}`),
+    check(
+      "roster_people_name_length",
+      sql`char_length(${t.name}) BETWEEN 1 AND ${sql.raw(String(COLLECT_LIMITS.personName))}`,
+    ),
+    check(
+      "roster_people_kana_length",
+      sql`char_length(${t.kana}) <= ${sql.raw(String(COLLECT_LIMITS.kana))}`,
+    ),
+    check(
+      "roster_people_memo_length",
+      sql`char_length(${t.memo}) <= ${sql.raw(String(COLLECT_LIMITS.memo))}`,
+    ),
     check("roster_people_media_valid", sql`${t.media} IN (${inList(COLLECT_MEDIA)})`),
     check("roster_people_number_positive", sql`${t.number} >= 1`),
-    check("roster_people_referrer_length", sql`char_length(${t.referrer}) <= ${sql.raw(String(COLLECT_LIMITS.referrer))}`),
+    check(
+      "roster_people_referrer_length",
+      sql`char_length(${t.referrer}) <= ${sql.raw(String(COLLECT_LIMITS.referrer))}`,
+    ),
     check("roster_people_referrer_pair", sql`(${t.referrer} IS NULL) = (${t.referrerKey} IS NULL)`),
   ],
 );
@@ -142,10 +190,22 @@ export const collectOwnerSettings = collectSchema.table(
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
-    check("owner_settings_paypay_qr_size", sql`octet_length(${t.paypayQr}) <= ${sql.raw(String(COLLECT_LIMITS.paypayQrBytes))}`),
-    check("owner_settings_paypay_qr_type_valid", sql`${t.paypayQrType} IN (${inList(PAYPAY_QR_TYPES)})`),
-    check("owner_settings_paypay_qr_pair", sql`(${t.paypayQr} IS NULL) = (${t.paypayQrType} IS NULL)`),
-    check("owner_settings_bank_text_length", sql`char_length(${t.bankText}) <= ${sql.raw(String(COLLECT_LIMITS.bankText))}`),
+    check(
+      "owner_settings_paypay_qr_size",
+      sql`octet_length(${t.paypayQr}) <= ${sql.raw(String(COLLECT_LIMITS.paypayQrBytes))}`,
+    ),
+    check(
+      "owner_settings_paypay_qr_type_valid",
+      sql`${t.paypayQrType} IN (${inList(PAYPAY_QR_TYPES)})`,
+    ),
+    check(
+      "owner_settings_paypay_qr_pair",
+      sql`(${t.paypayQr} IS NULL) = (${t.paypayQrType} IS NULL)`,
+    ),
+    check(
+      "owner_settings_bank_text_length",
+      sql`char_length(${t.bankText}) <= ${sql.raw(String(COLLECT_LIMITS.bankText))}`,
+    ),
   ],
 );
 
@@ -174,7 +234,9 @@ export const collectReceptionRecords = collectSchema.table(
     amountOverridden: boolean("amount_overridden").notNull().default(false),
     receiverKind: text("receiver_kind").notNull(),
     // 手伝う人が受け取ったとき。イベントを消すときの CASCADE で止まらないよう NO ACTION（RESTRICT にしない）
-    receiverHelperId: uuid("receiver_helper_id").references((): AnyPgColumn => collectHelpers.id, { onDelete: "no action" }),
+    receiverHelperId: uuid("receiver_helper_id").references((): AnyPgColumn => collectHelpers.id, {
+      onDelete: "no action",
+    }),
     paymentStatus: text("payment_status").notNull(),
     transferConfirmedAt: timestamp("transfer_confirmed_at", { withTimezone: true }),
     recordedAt: timestamp("recorded_at", { withTimezone: true }).notNull().defaultNow(),
@@ -191,11 +253,23 @@ export const collectReceptionRecords = collectSchema.table(
     index("reception_records_price_tier_idx").on(t.priceTierId),
     index("reception_records_receiver_helper_idx").on(t.receiverHelperId),
     check("reception_records_method_valid", sql`${t.method} IN (${inList(RECEPTION_METHODS)})`),
-    check("reception_records_amount_range", sql`${t.amount} BETWEEN 0 AND ${sql.raw(String(COLLECT_LIMITS.tierAmountMax))}`),
+    check(
+      "reception_records_amount_range",
+      sql`${t.amount} BETWEEN 0 AND ${sql.raw(String(COLLECT_LIMITS.tierAmountMax))}`,
+    ),
     check("reception_records_none_is_free", sql`${t.method} <> 'none' OR ${t.amount} = 0`),
-    check("reception_records_receiver_kind_valid", sql`${t.receiverKind} IN (${inList(RECEIVER_KINDS)})`),
-    check("reception_records_receiver_pair", sql`(${t.receiverKind} = 'helper') = (${t.receiverHelperId} IS NOT NULL)`),
-    check("reception_records_payment_status_valid", sql`${t.paymentStatus} IN (${inList(PAYMENT_STATUSES)})`),
+    check(
+      "reception_records_receiver_kind_valid",
+      sql`${t.receiverKind} IN (${inList(RECEIVER_KINDS)})`,
+    ),
+    check(
+      "reception_records_receiver_pair",
+      sql`(${t.receiverKind} = 'helper') = (${t.receiverHelperId} IS NOT NULL)`,
+    ),
+    check(
+      "reception_records_payment_status_valid",
+      sql`${t.paymentStatus} IN (${inList(PAYMENT_STATUSES)})`,
+    ),
     // 振込待ちは振込だけ。確かめ待ちは、本人の申告（receiver_kind = self）の現金・PayPayだけ（specs/collect/002）
     check(
       "reception_records_payment_status_pair",
@@ -227,7 +301,9 @@ export const collectReceptionLinks = collectSchema.table(
   },
   // 使えるリンク（止めていないもの）は、イベントと種類ごとに1つだけ
   (t) => [
-    uniqueIndex("reception_links_one_active_key").on(t.eventId, t.kind).where(sql`${t.stoppedAt} IS NULL`),
+    uniqueIndex("reception_links_one_active_key")
+      .on(t.eventId, t.kind)
+      .where(sql`${t.stoppedAt} IS NULL`),
     check("reception_links_kind_valid", sql`${t.kind} IN ('helper', 'self')`),
   ],
 );
@@ -250,7 +326,10 @@ export const collectHelpers = collectSchema.table(
   (t) => [
     index("helpers_event_idx").on(t.eventId),
     index("helpers_link_name_key_idx").on(t.linkId, t.nameKey),
-    check("helpers_name_length", sql`char_length(${t.name}) BETWEEN 1 AND ${sql.raw(String(RECEPTION_LIMITS.helperName))}`),
+    check(
+      "helpers_name_length",
+      sql`char_length(${t.name}) BETWEEN 1 AND ${sql.raw(String(RECEPTION_LIMITS.helperName))}`,
+    ),
   ],
 );
 
@@ -288,7 +367,10 @@ export const collectSettlements = collectSchema.table(
   (t) => [
     primaryKey({ columns: [t.eventId, t.receiverKey] }),
     check("settlements_counted_amount_range", sql`${t.countedAmount} >= 0`),
-    check("settlements_settled_pair", sql`(${t.settledAt} IS NULL) = (${t.expectedAtSettle} IS NULL)`),
+    check(
+      "settlements_settled_pair",
+      sql`(${t.settledAt} IS NULL) = (${t.expectedAtSettle} IS NULL)`,
+    ),
   ],
 );
 
@@ -335,9 +417,15 @@ export const collectThreadsEventCandidates = collectSchema.table(
     feeAmount: integer("fee_amount"),
     feeNote: text("fee_note"),
     // 掲載済みの媒体（roster_people.media と同じ値）
-    postedMedia: text("posted_media").array().notNull().default(sql`ARRAY[]::text[]`),
+    postedMedia: text("posted_media")
+      .array()
+      .notNull()
+      .default(sql`ARRAY[]::text[]`),
     deletedAt: timestamp("deleted_at", { withTimezone: true }),
-    detailsOccurredAt: timestamp("details_occurred_at", { withTimezone: true, precision: 6 }).notNull(),
+    detailsOccurredAt: timestamp("details_occurred_at", {
+      withTimezone: true,
+      precision: 6,
+    }).notNull(),
     mediaOccurredAt: timestamp("media_occurred_at", { withTimezone: true, precision: 6 }),
   },
   (t) => [index("threads_event_candidates_owner_idx").on(t.ownerUserId, t.startsAt)],
@@ -359,17 +447,30 @@ export const collectSelfCheckInRequests = collectSchema.table(
     kana: text("kana"),
     deviceHash: text("device_hash").notNull(),
     status: text("status").notNull().default("pending"),
-    rosterPersonId: uuid("roster_person_id").references(() => collectRosterPeople.id, { onDelete: "set null" }),
+    rosterPersonId: uuid("roster_person_id").references(() => collectRosterPeople.id, {
+      onDelete: "set null",
+    }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     resolvedAt: timestamp("resolved_at", { withTimezone: true }),
   },
   (t) => [
     index("self_check_in_requests_event_idx").on(t.eventId, t.status),
     // 1つの端末が待てる申し出は1件
-    uniqueIndex("self_check_in_requests_one_pending_key").on(t.linkId, t.deviceHash).where(sql`${t.status} = 'pending'`),
-    check("self_check_in_requests_status_valid", sql`${t.status} IN ('pending', 'accepted', 'matched', 'rejected')`),
-    check("self_check_in_requests_name_length", sql`char_length(${t.name}) BETWEEN 1 AND ${sql.raw(String(COLLECT_LIMITS.personName))}`),
-    check("self_check_in_requests_kana_length", sql`char_length(${t.kana}) <= ${sql.raw(String(COLLECT_LIMITS.kana))}`),
+    uniqueIndex("self_check_in_requests_one_pending_key")
+      .on(t.linkId, t.deviceHash)
+      .where(sql`${t.status} = 'pending'`),
+    check(
+      "self_check_in_requests_status_valid",
+      sql`${t.status} IN ('pending', 'accepted', 'matched', 'rejected')`,
+    ),
+    check(
+      "self_check_in_requests_name_length",
+      sql`char_length(${t.name}) BETWEEN 1 AND ${sql.raw(String(COLLECT_LIMITS.personName))}`,
+    ),
+    check(
+      "self_check_in_requests_kana_length",
+      sql`char_length(${t.kana}) <= ${sql.raw(String(COLLECT_LIMITS.kana))}`,
+    ),
   ],
 );
 
@@ -381,7 +482,9 @@ export const collectSelfCheckInDevices = collectSchema.table(
       .notNull()
       .references(() => collectReceptionLinks.id, { onDelete: "cascade" }),
     deviceHash: text("device_hash").notNull(),
-    windowStartedAt: timestamp("window_started_at", { withTimezone: true, precision: 6 }).notNull().defaultNow(),
+    windowStartedAt: timestamp("window_started_at", { withTimezone: true, precision: 6 })
+      .notNull()
+      .defaultNow(),
     searchCount: integer("search_count").notNull().default(0),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
@@ -409,16 +512,25 @@ export const collectSharingMembers = collectSchema.table(
   (t) => [
     index("sharing_members_event_idx").on(t.eventId, t.position),
     // 1人が1つのイベントで2つの運営メンバーにならない
-    uniqueIndex("sharing_members_event_user_key").on(t.eventId, t.userId).where(sql`${t.userId} IS NOT NULL`),
-    uniqueIndex("sharing_members_event_owner_key").on(t.eventId).where(sql`${t.isOwner}`),
-    index("sharing_members_user_idx").on(t.userId).where(sql`${t.userId} IS NOT NULL`),
+    uniqueIndex("sharing_members_event_user_key")
+      .on(t.eventId, t.userId)
+      .where(sql`${t.userId} IS NOT NULL`),
+    uniqueIndex("sharing_members_event_owner_key")
+      .on(t.eventId)
+      .where(sql`${t.isOwner}`),
+    index("sharing_members_user_idx")
+      .on(t.userId)
+      .where(sql`${t.userId} IS NOT NULL`),
     check("sharing_members_role_valid", sql`${t.role} IN (${inList(SHARING_ROLES)})`),
     check(
       "sharing_members_ratio",
       sql`(${t.role} = 'leader' AND ${t.ratioTenths} BETWEEN ${sql.raw(String(RATIO_TENTHS.min))} AND ${sql.raw(String(RATIO_TENTHS.max))}) OR (${t.role} = 'member' AND ${t.ratioTenths} IS NULL)`,
     ),
     check("sharing_members_link_pair", sql`(${t.userId} IS NULL) = (${t.linkedAt} IS NULL)`),
-    check("sharing_members_name_length", sql`char_length(${t.name}) BETWEEN 1 AND ${sql.raw(String(SHARING_LIMITS.memberName))}`),
+    check(
+      "sharing_members_name_length",
+      sql`char_length(${t.name}) BETWEEN 1 AND ${sql.raw(String(SHARING_LIMITS.memberName))}`,
+    ),
   ],
 );
 
@@ -432,31 +544,90 @@ export const collectExpenses = collectSchema.table(
       .references(() => collectEvents.id, { onDelete: "cascade" }),
     name: text("name").notNull(),
     amount: integer("amount").notNull(),
-    payerMemberId: uuid("payer_member_id").references(() => collectSharingMembers.id, { onDelete: "set null" }),
+    payerMemberId: uuid("payer_member_id").references(() => collectSharingMembers.id, {
+      onDelete: "set null",
+    }),
     payerName: text("payer_name"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
     index("expenses_event_idx").on(t.eventId, t.createdAt),
     index("expenses_payer_member_idx").on(t.payerMemberId),
-    check("expenses_amount_range", sql`${t.amount} BETWEEN 1 AND ${sql.raw(String(SHARING_LIMITS.expenseAmountMax))}`),
-    check("expenses_name_length", sql`char_length(${t.name}) BETWEEN 1 AND ${sql.raw(String(SHARING_LIMITS.expenseName))}`),
-    check("expenses_payer_name_length", sql`char_length(${t.payerName}) BETWEEN 1 AND ${sql.raw(String(SHARING_LIMITS.memberName))}`),
+    check(
+      "expenses_amount_range",
+      sql`${t.amount} BETWEEN 1 AND ${sql.raw(String(SHARING_LIMITS.expenseAmountMax))}`,
+    ),
+    check(
+      "expenses_name_length",
+      sql`char_length(${t.name}) BETWEEN 1 AND ${sql.raw(String(SHARING_LIMITS.expenseName))}`,
+    ),
+    check(
+      "expenses_payer_name_length",
+      sql`char_length(${t.payerName}) BETWEEN 1 AND ${sql.raw(String(SHARING_LIMITS.memberName))}`,
+    ),
     check("expenses_payer_either", sql`${t.payerMemberId} IS NULL OR ${t.payerName} IS NULL`),
   ],
 );
 
 /** 運営メンバーの招待（specs/collect/003 data-model.md 1-3、research.md R6）。トークンはハッシュだけを持つ。 */
-export const collectSharingInvites = collectSchema.table(
-  "sharing_invites",
+export const collectSharingInvites = collectSchema.table("sharing_invites", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  memberId: uuid("member_id")
+    .notNull()
+    .unique()
+    .references(() => collectSharingMembers.id, { onDelete: "cascade" }),
+  tokenHash: text("token_hash").notNull().unique(),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+/**
+ * 精算の手順の「渡した」（specs/collect/003 data-model.md 1-4、research.md R10）。手順は毎回計算し、渡したものだけを持つ。
+ * 人は鍵（m:・h:・p:）と、そのときの名前で残す（消した運営メンバーでも名前が出る）。
+ */
+export const collectSettlementTransfers = collectSchema.table(
+  "settlement_transfers",
   {
     id: uuid("id").primaryKey().defaultRandom(),
-    memberId: uuid("member_id")
+    eventId: uuid("event_id")
       .notNull()
-      .unique()
-      .references(() => collectSharingMembers.id, { onDelete: "cascade" }),
-    tokenHash: text("token_hash").notNull().unique(),
-    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
-    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+      .references(() => collectEvents.id, { onDelete: "cascade" }),
+    fromKey: text("from_key").notNull(),
+    fromName: text("from_name").notNull(),
+    toKey: text("to_key").notNull(),
+    toName: text("to_name").notNull(),
+    amount: integer("amount").notNull(),
+    doneAt: timestamp("done_at", { withTimezone: true }).notNull().defaultNow(),
   },
+  (t) => [
+    index("settlement_transfers_event_idx").on(t.eventId, t.doneAt),
+    check(
+      "settlement_transfers_amount_range",
+      sql`${t.amount} BETWEEN 1 AND ${sql.raw(String(SETTLEMENT_LIMITS.amountMax))}`,
+    ),
+    check("settlement_transfers_not_self", sql`${t.fromKey} <> ${t.toKey}`),
+    check(
+      "settlement_transfers_key_length",
+      sql`char_length(${t.fromKey}) BETWEEN 3 AND ${sql.raw(String(SETTLEMENT_LIMITS.keyLength))} AND char_length(${t.toKey}) BETWEEN 3 AND ${sql.raw(String(SETTLEMENT_LIMITS.keyLength))}`,
+    ),
+    check(
+      "settlement_transfers_name_length",
+      sql`char_length(${t.fromName}) BETWEEN 1 AND ${sql.raw(String(SHARING_LIMITS.memberName))} AND char_length(${t.toName}) BETWEEN 1 AND ${sql.raw(String(SHARING_LIMITS.memberName))}`,
+    ),
+  ],
+);
+
+/** 手伝う人と運営メンバーの対応（specs/collect/003 data-model.md 1-5）。行がなければ名前の形で自動。member_id が null は「運営メンバーでない」。 */
+export const collectSettlementHolders = collectSchema.table(
+  "settlement_holders",
+  {
+    helperId: uuid("helper_id")
+      .primaryKey()
+      .references(() => collectHelpers.id, { onDelete: "cascade" }),
+    eventId: uuid("event_id")
+      .notNull()
+      .references(() => collectEvents.id, { onDelete: "cascade" }),
+    memberId: uuid("member_id").references(() => collectSharingMembers.id, { onDelete: "cascade" }),
+  },
+  (t) => [index("settlement_holders_event_idx").on(t.eventId)],
 );

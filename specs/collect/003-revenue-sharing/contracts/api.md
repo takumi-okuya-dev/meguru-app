@@ -62,6 +62,26 @@
 - CSV（001 の `export.csv`）に列「紹介した人」を足す（「メモ」の前）。
 - イベントのまとめ（001 の `GET /summaries`）の行に `expenseTotal`・`referred { count, paid, awaiting }` を足す。
 
+### 1-7. 精算の手順（User Story 4。PR4）
+
+- `GET /events/:eventId/settlement` → `SettlementSnapshot`
+
+```ts
+{
+  parties: { key: string, name: string, kind: "member" | "helper" | "payer" | "former", isOwner: boolean,
+             holding: number, target: number }[],       // holding＝渡したものを足し引きしたあと
+  helpers: { helperId: string, name: string, cash: number, memberId: string | null, chosen: boolean }[],
+  steps: { fromKey, fromName, toKey, toName, amount: number }[],   // 残りの手順
+  done: { id, fromKey, fromName, toKey, toName, amount: number, doneAt: string }[],
+  mismatch: number,                                     // 0 でなければ合わない（手順は空）
+}
+```
+
+- `PUT /events/:eventId/settlement/helpers/:helperId` `{ memberId: string | null }` → `SettlementSnapshot`（ほかのイベントの手伝う人・運営メンバーは 404）
+- `POST /events/:eventId/settlement/transfers` `{ fromKey, toKey, amount }` → `SettlementSnapshot`（今の人の鍵でなければ 404。同じ鍵は 400。201件めは 409 `ITEM_LIMIT_REACHED`）
+- `DELETE /events/:eventId/settlement/transfers/:transferId` → `SettlementSnapshot`
+- 主催者だけ。つながった運営メンバーの道筋には出さない。
+
 ## 2. 招待を受ける・つながった運営メンバー（ログインだけ。利用の許可は見ない）
 
 - `GET /invites/:token` → `{ event: { name, startsAt }, memberName: string, ownerIsYou: boolean, alreadyLinked: boolean }`（使えないリンクは 404 `INVITE_INACTIVE`）

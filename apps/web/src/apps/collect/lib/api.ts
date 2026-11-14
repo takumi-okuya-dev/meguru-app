@@ -11,7 +11,9 @@ import {
   sharingInviteCreatedSchema,
   sharingInviteInfoSchema,
   sharingSnapshotSchema,
+  settlementSnapshotSchema,
   type CreateExpenseRequest,
+  type CreateSettlementTransferRequest,
   type CreateSharingMemberRequest,
   type UpdateExpenseRequest,
   type UpdateSharingMemberRequest,
@@ -156,6 +158,12 @@ export const collectApi = {
   stopInvite: (eventId: string, memberId: string) =>
     request(`${ev(eventId)}/members/${encodeURIComponent(memberId)}/invite`, sharingSnapshotSchema, { method: "DELETE" }),
   referrals: (eventId: string) => request(`${ev(eventId)}/referrals`, referralListSchema),
+  settlement: (eventId: string) => request(`${ev(eventId)}/settlement`, settlementSnapshotSchema),
+  chooseSettlementHolder: (eventId: string, helperId: string, memberId: string | null) =>
+    request(`${ev(eventId)}/settlement/helpers/${encodeURIComponent(helperId)}`, settlementSnapshotSchema, json("PUT", { memberId })),
+  markSettlementTransfer: (eventId: string, input: CreateSettlementTransferRequest) => request(`${ev(eventId)}/settlement/transfers`, settlementSnapshotSchema, json("POST", input)),
+  undoSettlementTransfer: (eventId: string, transferId: string) =>
+    request(`${ev(eventId)}/settlement/transfers/${encodeURIComponent(transferId)}`, settlementSnapshotSchema, { method: "DELETE" }),
   referrers: () => request("/api/collect/referrers", referrerSuggestionsSchema),
   // ---- 招待を受ける人・つながった運営メンバー（集金管理の利用の許可はいらない） ----
   invite: (token: string) => request(`/api/collect/invites/${encodeURIComponent(token)}`, sharingInviteInfoSchema),

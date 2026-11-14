@@ -1,6 +1,6 @@
 # データモデル：売上・経費・紹介と、運営メンバーへの分配
 
-**対象**：[spec.md](./spec.md)・[research.md](./research.md) | すべて `collect` スキーマ（パターン①）。マイグレーションは1つ。
+**対象**：[spec.md](./spec.md)・[research.md](./research.md) | すべて `collect` スキーマ（パターン①）。マイグレーションは PR1 に1つ、精算の手順（PR4）に1つ。
 
 ## 1. 新しい表
 
@@ -49,6 +49,31 @@
 
 - 受けた・止めた・出し直した → 行を消す（出し直しは消してから作る）。
 
+### 1-4. `settlement_transfers`（精算の手順の「渡した」。spec FR-031、research R10。PR4）
+
+| 列 | 型 | 決まり |
+|---|---|---|
+| id | uuid | 主キー |
+| event_id | uuid | `events.id`、CASCADE |
+| from_key | text | 渡した人の鍵（`m:`・`h:`・`p:`。1〜80文字） |
+| from_name | text | そのときの名前（1〜40文字） |
+| to_key | text | 受け取った人の鍵 |
+| to_name | text | そのときの名前 |
+| amount | integer | 1〜99,999,999 |
+| done_at | timestamptz | 渡した時刻 |
+
+- check：`from_key <> to_key`。索引：`(event_id, done_at)`。1イベント200件まで（API で確かめる）。
+
+### 1-5. `settlement_holders`（手伝う人と運営メンバーの対応。spec FR-032。PR4）
+
+| 列 | 型 | 決まり |
+|---|---|---|
+| helper_id | uuid | 主キー。`helpers.id`、CASCADE |
+| event_id | uuid | `events.id`、CASCADE |
+| member_id | uuid null | `sharing_members.id`、CASCADE。null は「運営メンバーでない」 |
+
+- 行がない手伝う人は、名前の形が同じ運営メンバーが1人だけならその人とみなす（選んだら行ができる）。
+
 ## 2. 列を足す表
 
 ### 2-1. `roster_people`（spec FR-020・FR-022）
@@ -72,6 +97,7 @@
 - **分配**（`computeDistribution`、research R1）：A・N・M・リーダーごとの分・メンバーの分・端数と足した人・赤字か。
 - **立て替えの戻し**：運営メンバーごとの `expenses.amount` の合計（`payer_member_id`）。運営メンバーでない人の分は名前ごとに。
 - **受け取る合計**：分配額＋立て替えの戻し。
+- **精算の手順**（`settlementSteps`、research R10）：人ごとの持っている額・受け取る合計・差と、残りの手順（渡す人・受け取る人・額）。
 - **紹介経由の売上**：`referrer_key` ごとの人数・来場・支払い済み・振込待ち（tally と同じ数え方。確かめ待ちは来場に数え、売上に入れない）。
 
 ## 4. 版と会場の共有

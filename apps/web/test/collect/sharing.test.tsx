@@ -1,5 +1,5 @@
 // 分配の画面（specs/collect/003-revenue-sharing User Story 1〜3、tasks.md T024）。
-import { computeDistribution, type SharingSnapshot } from "@meguru/shared";
+import { computeDistribution, type SettlementSnapshot, type SharingSnapshot } from "@meguru/shared";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -19,6 +19,10 @@ const mocks = vi.hoisted(() => ({
   createInvite: vi.fn(),
   stopInvite: vi.fn(),
   unlinkMember: vi.fn(),
+  settlement: vi.fn(),
+  chooseSettlementHolder: vi.fn(),
+  markSettlementTransfer: vi.fn(),
+  undoSettlementTransfer: vi.fn(),
 }));
 vi.mock("@/apps/collect/lib/api", () => ({ collectApi: mocks }));
 const toast = vi.hoisted(() => ({ info: vi.fn(), error: vi.fn(), success: vi.fn() }));
@@ -56,6 +60,27 @@ function snapshot(over: Partial<SharingSnapshot> = {}): SharingSnapshot {
 }
 
 /**
+ * 精算の手順の数字を作る（spec の例：主催者 11,000・井上 9,000）。
+ * @param over - 変える分
+ * @returns 数字
+ */
+function settlementSnapshot(over: Partial<SettlementSnapshot> = {}): SettlementSnapshot {
+  const party = (key: string, name: string, holding: number, target: number, isOwner = false) => ({ key, name, kind: "member" as const, isOwner, holding, target });
+  return {
+    parties: [party("m:o", "主催者", 11000, 6002, true), party("m:a", "井上", 9000, 4666), party("m:b", "木村", 0, 4666), party("m:c", "佐藤", 0, 4666)],
+    helpers: [{ helperId: "h1", name: "井上", cash: 9000, memberId: "a", chosen: false }],
+    steps: [
+      { fromKey: "m:o", fromName: "主催者", toKey: "m:b", toName: "木村", amount: 4666 },
+      { fromKey: "m:a", fromName: "井上", toKey: "m:c", toName: "佐藤", amount: 4334 },
+      { fromKey: "m:o", fromName: "主催者", toKey: "m:c", toName: "佐藤", amount: 332 },
+    ],
+    done: [],
+    mismatch: 0,
+    ...over,
+  };
+}
+
+/**
  * 分配の画面を描く。
  */
 function renderPage() {
@@ -72,6 +97,7 @@ beforeEach(() => {
   mocks.sharing.mockResolvedValue(snapshot());
   mocks.referrals.mockResolvedValue({ rows: [{ name: "井上", people: 3, attended: 2, paid: 6000, awaiting: 3000 }, { name: null, people: 1, attended: 1, paid: 3000, awaiting: 0 }] });
   mocks.referrers.mockResolvedValue({ names: [] });
+  mocks.settlement.mockResolvedValue(settlementSnapshot());
 });
 
 describe("分配の画面", () => {
@@ -180,5 +206,60 @@ describe("分配の画面", () => {
     await userEvent.click(within(screen.getByRole("listitem", { name: "運営メンバー 佐藤" })).getByRole("button", { name: /外す/ }));
     await userEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "外す" }));
     await waitFor(() => expect(mocks.unlinkMember).toHaveBeenCalledWith("e1", "c"));
+  });
+});
+
+describe("精算の手順（User Story 4）", () => {
+  it("だれがだれにいくら渡すかを出し、「渡した」を押すと印と時刻が付く", async () => {
+    const after = settlementSnapshot({
+      steps: settlementSnapshot().steps.slice(1),
+      done: [{ id: "t1", fromKey: "m:o", fromName: "主催者", toKey: "m:b", toName: "木村", amount: 4666, doneAt: "2026-11-20T13:05:00.000Z" }],
+    });
+    mocks.markSettlementTransfer.mockResolvedValue(after);
+    renderPage();
+    const steps = await screen.findByRole("list", { name: "精算の手順" });
+    expect(within(steps).getAllByRole("listitem")).toHaveLength(3);
+    const first = within(steps).getByRole("listitem", { name: "主催者から木村へ" });
+    expect(within(first).getByText("4,666円")).toBeInTheDocument();
+    await userEvent.click(within(first).getByRole("button", { name: "渡した" }));
+    expect(mocks.markSettlementTransfer).toHaveBeenCalledWith("e1", { fromKey: "m:o", toKey: "m:b", amount: 4666 });
+    const done = await screen.findByRole("list", { name: "渡したもの" });
+    expect(within(done).getByText(/主催者 → 木村/)).toBeInTheDocument();
+    expect(within(done).getByText("11/20 22:05")).toBeInTheDocument();
+    expect(within(screen.getByRole("list", { name: "精算の手順" })).getAllByRole("listitem")).toHaveLength(2);
+  });
+
+  it("取り消すと API の数字で描き直す。全部渡したら終わりと出す", async () => {
+    mocks.settlement.mockResolvedValue(
+      settlementSnapshot({ steps: [], done: [{ id: "t1", fromKey: "m:o", fromName: "主催者", toKey: "m:b", toName: "木村", amount: 4666, doneAt: "2026-11-20T13:05:00.000Z" }] }),
+    );
+    mocks.undoSettlementTransfer.mockResolvedValue(settlementSnapshot());
+    renderPage();
+    expect(await screen.findByText(/精算は終わりました/)).toBeInTheDocument();
+    await userEvent.click(within(screen.getByRole("list", { name: "渡したもの" })).getByRole("button", { name: "取り消す" }));
+    expect(mocks.undoSettlementTransfer).toHaveBeenCalledWith("e1", "t1");
+    expect(await screen.findByRole("list", { name: "精算の手順" })).toBeInTheDocument();
+  });
+
+  it("手伝う人がどの運営メンバーかを選べる（名前が同じなら自動）", async () => {
+    mocks.chooseSettlementHolder.mockResolvedValue(settlementSnapshot({ helpers: [{ helperId: "h1", name: "井上", cash: 9000, memberId: null, chosen: true }] }));
+    renderPage();
+    expect(await screen.findByText("名前が同じなので、同じ人とみなしています")).toBeInTheDocument();
+    const select = screen.getByLabelText("井上はどの運営メンバーか");
+    expect(select).toHaveValue("a");
+    await userEvent.selectOptions(select, "運営メンバーでない");
+    expect(mocks.chooseSettlementHolder).toHaveBeenCalledWith("e1", "h1", null);
+    await waitFor(() => expect(screen.getByLabelText("井上はどの運営メンバーか")).toHaveValue("__none__"));
+    expect(screen.queryByText("名前が同じなので、同じ人とみなしています")).not.toBeInTheDocument();
+  });
+
+  it("経費を変えると、精算の手順を読み直す", async () => {
+    mocks.deleteExpense.mockResolvedValue(snapshot({ expenses: [], expenseTotal: 0 }));
+    renderPage();
+    await screen.findByRole("list", { name: "精算の手順" });
+    expect(mocks.settlement).toHaveBeenCalledTimes(1);
+    await userEvent.click(screen.getByRole("button", { name: "会場費を消す" }));
+    await userEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "消す" }));
+    await waitFor(() => expect(mocks.settlement).toHaveBeenCalledTimes(2));
   });
 });

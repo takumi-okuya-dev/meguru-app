@@ -1,6 +1,6 @@
 // 分配（/collect/events/:eventId/sharing。specs/collect/003-revenue-sharing User Story 1〜3、tasks.md T018）。
-// 売上と残る額 → 経費 → 運営メンバー → 分配 → 紹介経由の売上。変えるたびに API が返す数字で描き直す。
-import type { SharingSnapshot } from "@meguru/shared";
+// 売上と残る額 → 経費 → 運営メンバー → 分配 → 精算の手順（User Story 4） → 紹介経由の売上。変えるたびに API が返す数字で描き直す。
+import type { SettlementSnapshot, SharingSnapshot } from "@meguru/shared";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useParams } from "react-router";
 import { toast } from "sonner";
@@ -13,6 +13,7 @@ import { ExpenseList } from "../components/sharing/ExpenseList";
 import { InviteButton } from "../components/sharing/InviteButton";
 import { MemberList } from "../components/sharing/MemberList";
 import { ReferralTable } from "../components/sharing/ReferralTable";
+import { SettlementSteps } from "../components/sharing/SettlementSteps";
 import { collectApi } from "../lib/api";
 import { collectErrorText } from "../lib/errors";
 import { closingPath } from "../lib/paths";
@@ -27,6 +28,7 @@ export function SharingPage() {
   const queryClient = useQueryClient();
   const sharing = useQuery({ queryKey: collectQueryKeys.sharing(eventId), queryFn: () => collectApi.sharing(eventId) });
   const referrals = useQuery({ queryKey: collectQueryKeys.referrals(eventId), queryFn: () => collectApi.referrals(eventId) });
+  const settlement = useQuery({ queryKey: collectQueryKeys.settlement(eventId), queryFn: () => collectApi.settlement(eventId) });
 
   /**
    * 変える呼び出しをして、返った数字で描き直す。
@@ -36,6 +38,23 @@ export function SharingPage() {
   const run = async (task: () => Promise<SharingSnapshot>): Promise<boolean> => {
     try {
       queryClient.setQueryData(collectQueryKeys.sharing(eventId), await task());
+      // 経費・運営メンバーが変わると、精算の手順も変わる
+      void queryClient.invalidateQueries({ queryKey: collectQueryKeys.settlement(eventId) });
+      return true;
+    } catch (e) {
+      toast.error(collectErrorText(e));
+      return false;
+    }
+  };
+
+  /**
+   * 精算の手順を変える呼び出しをして、返った数字で描き直す。
+   * @param task - 呼び出し
+   * @returns 成功したら true
+   */
+  const settle = async (task: () => Promise<SettlementSnapshot>): Promise<boolean> => {
+    try {
+      queryClient.setQueryData(collectQueryKeys.settlement(eventId), await task());
       return true;
     } catch (e) {
       toast.error(collectErrorText(e));
@@ -111,6 +130,25 @@ export function SharingPage() {
           </h2>
           <DistributionTable snap={s} />
           <p className="text-xs text-muted-foreground">アプリはお金を動かしません。この額を見て、運営メンバーどうしで渡してください。</p>
+        </section>
+
+        <section aria-labelledby="settlement-title" className={section}>
+          <h2 id="settlement-title" className="text-sm font-medium">
+            精算の手順
+          </h2>
+          {settlement.isPending ? (
+            <div className="h-20 animate-pulse rounded-lg bg-muted" aria-busy="true" />
+          ) : settlement.isError ? (
+            <ApiErrorScreen error={settlement.error} onRetry={() => void settlement.refetch()} />
+          ) : (
+            <SettlementSteps
+              snap={settlement.data}
+              members={s.members}
+              onMark={(step) => settle(() => collectApi.markSettlementTransfer(eventId, { fromKey: step.fromKey, toKey: step.toKey, amount: step.amount }))}
+              onUndo={(id) => settle(() => collectApi.undoSettlementTransfer(eventId, id))}
+              onChooseHolder={(helperId, memberId) => settle(() => collectApi.chooseSettlementHolder(eventId, helperId, memberId))}
+            />
+          )}
         </section>
 
         <section aria-labelledby="referrals-title" className={section}>

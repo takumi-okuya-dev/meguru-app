@@ -2,7 +2,9 @@
 // sharingOwnerRoutes：主催者（ログイン＋集金管理の利用の許可）。sharingMemberRoutes：招待を受ける人・つながった運営メンバー（ログインだけ）。
 import {
   createExpenseRequestSchema,
+  createSettlementTransferRequestSchema,
   createSharingMemberRequestSchema,
+  putSettlementHolderRequestSchema,
   updateExpenseRequestSchema,
   updateSharingMemberRequestSchema,
 } from "@meguru/shared";
@@ -13,6 +15,7 @@ import { parseBody } from "../../../kernel/validate";
 import { allowBeforeSubscribe, type AppEnv } from "../../../platform";
 import { acceptInvite, createInvite, getInvite, listShares, memberSharingView, stopInvite } from "./invite-service";
 import { listReferrals, referrerSuggestions } from "./referral-service";
+import { addSettlementTransfer, deleteSettlementTransfer, putSettlementHolder, settlementSnapshot } from "./settlement-service";
 import { addExpense, addMember, deleteExpense, deleteMember, sharingSnapshot, unlinkMember, updateExpense, updateMember } from "./sharing-service";
 
 /**
@@ -65,6 +68,25 @@ export function sharingOwnerRoutes(owner: MiddlewareHandler<AppEnv>) {
     })
     .get("/referrers", owner, async (c) => {
       return c.json({ names: await referrerSuggestions(createDb(c.env.DATABASE_URL), c.get("user").id) });
+    })
+    // 精算の手順（User Story 4。主催者だけ）
+    .get("/events/:eventId/settlement", owner, async (c) => {
+      return c.json(await settlementSnapshot(createDb(c.env.DATABASE_URL), c.get("user").id, c.req.param("eventId"), new Date()));
+    })
+    .put("/events/:eventId/settlement/helpers/:helperId", owner, async (c) => {
+      const input = await parseBody(putSettlementHolderRequestSchema, c.req.json());
+      return c.json(
+        await putSettlementHolder(c.env.DATABASE_URL, createDb(c.env.DATABASE_URL), c.get("user").id, c.req.param("eventId"), c.req.param("helperId"), input.memberId, new Date()),
+      );
+    })
+    .post("/events/:eventId/settlement/transfers", owner, async (c) => {
+      const input = await parseBody(createSettlementTransferRequestSchema, c.req.json());
+      return c.json(await addSettlementTransfer(c.env.DATABASE_URL, createDb(c.env.DATABASE_URL), c.get("user").id, c.req.param("eventId"), input, new Date()), 201);
+    })
+    .delete("/events/:eventId/settlement/transfers/:transferId", owner, async (c) => {
+      return c.json(
+        await deleteSettlementTransfer(c.env.DATABASE_URL, createDb(c.env.DATABASE_URL), c.get("user").id, c.req.param("eventId"), c.req.param("transferId"), new Date()),
+      );
     });
 }
 
