@@ -23,6 +23,7 @@ import {
   type PromotionRow,
 } from "./external-media-service";
 import { assertItemId } from "../strategy/item-service";
+import { deliverPromotionEvents } from "../strategy/promotion-events";
 import { toPromotion } from "../strategy/promotion-routes";
 
 /**
@@ -141,6 +142,8 @@ export function externalMediaRoutes(authed: MiddlewareHandler<AppEnv>) {
       const r = await withTransaction(c.env.DATABASE_URL, (tx) =>
         updateListing(tx, access, promotionId, media, req),
       );
+      // 掲載済みの媒体が変わったときの出来事を、トランザクションのあとですぐ届ける
+      await deliverPromotionEvents(c.env, r.eventIds);
       return c.json(detail(r, media, true));
     })
     .get("/accounts/:accountId/media-defaults", authed, async (c) => {

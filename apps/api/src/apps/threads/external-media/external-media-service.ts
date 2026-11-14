@@ -17,6 +17,7 @@ import { mediaDefaults, promotionListings, promotions } from "../schema";
 import { AppError, itemNotFound } from "../../../kernel/errors";
 import type { AccountAccess } from "../access/access";
 import { recordActivity, updatedByOf } from "../activity/activity-log";
+import { emitListingStatusChange } from "../strategy/promotion-events";
 
 /** promotions の行。 */
 export type PromotionRow = typeof promotions.$inferSelect;
@@ -296,6 +297,9 @@ export async function updateListing(
   );
   const statusChanged =
     req.status !== undefined && req.status !== (listing?.status ?? "not_started");
+  // 掲載済みの媒体が変わったら、集金管理などに出来事で伝える（同じトランザクション。specs/collect/001 contracts/events.md 2）。
+  // 届けるのは呼んだ側（トランザクションのあと）
+  const eventIds = statusChanged ? await emitListingStatusChange(tx, promotionId, new Date()) : [];
   await recordActivity(tx, access, {
     kind: "content",
     action: statusChanged ? "listing_status_changed" : "listing_saved",
@@ -304,7 +308,7 @@ export async function updateListing(
       ? { details: { from: listing?.status ?? "not_started", to: req.status } }
       : {}),
   });
-  return { promotion, listing: row, defaults };
+  return { promotion, listing: row, defaults, eventIds };
 }
 
 /**
