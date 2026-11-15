@@ -30,6 +30,7 @@ feature/* ──PR──▶ develop ──自動──▶ ステージング（�
   - 流す：lint・型チェック・テストの結果が変わりうる変更。`apps/`・`packages/`・`e2e/`・`eslint-rules/`のコード、`package.json`・`pnpm-lock.yaml`、TypeScript・ESLint・Vitestの設定、`.github/workflows/`。
   - 流さない：文書（`docs/`・`specs/`・`*.md`）・`.specify/`・スキルの本文だけのPR。CIの成功が要るブランチの規則は、管理者がPRから`gh pr merge --admin`でマージして通す（マージしてよいかは、いつもどおりユーザーが決める）。
   - 迷ったら流す。
+  - **2026-11-13からは、さらに節約する**（GitHub Actionsが支払い・使える額の上限で止まったとき、ユーザーが決めた）。`run-ci`は、マイグレーションのあるPRなど慎重に入れるものと、手元で確かめられないもの（`.github/workflows/`・デプロイの流れ）だけに付ける。ほかのコードのPRは、手元で全部の確かめ（型チェック・lint・`eslint-rules`のテスト・共通・Web・APIの全テスト、E2Eは関わるもの）を流して結果をPRに書き、セルフレビューのあと`gh pr merge --merge --admin`でマージする（マージしてよいかは、いつもどおりユーザーが決める）。
 - **デプロイも、出すものが変わらない変更だけなら動かない**。文書（`docs/`・`specs/`・`*.md`）・`.specify/`・AIのスキル・E2Eだけを変えたマージでは、ステージング・本番へのデプロイを飛ばす（`.github/workflows/deploy.yml`の`paths-ignore`）。1つでもほかのファイルを変えていれば、いつもどおり出る。出し直したいときは、Actionsの画面から手で動かす。
 - **大きな機能は、設定で止められるように作る**。`BILLING_ENABLED`・`THREADS_CONNECT_METHODS`と同じ形で、`apps/api/wrangler.toml`の環境ごとの`vars`で切り替える。
   1. 本番は「切」のまま出す。

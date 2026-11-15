@@ -25,7 +25,7 @@
 
 | サービス | もの | 値・場所 |
 |---|---|---|
-| GitHub | リポジトリ | Organization `takumi-okuya-dev`（Teamのプラン）の`meguru-app`（2026-11-11に`threads-grower-app`から名前を変えた） |
+| GitHub | リポジトリ | Organization `takumi-okuya-dev`（Teamのプラン）の`meguru-app`（2026-11-11に`threads-grower-app`から名前を変えた。2026-11-13から、Actionsの支払いの問題でしばらく公開にしている） |
 | GitHub | ブランチ | `main`（本番）・`develop`（ステージング。既定のブランチ） |
 | GitHub | Environment | `staging`は`develop`だけ、`production`は`main`だけが使える |
 | GitHub | ルールセット | `main と develop を守る`（削除禁止・強制push禁止・PR必須・CIの`check`必須。管理者はPRからだけ例外にできる）。`main・develop という名前のタグを作らせない` |

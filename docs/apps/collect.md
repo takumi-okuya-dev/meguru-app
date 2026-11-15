@@ -4,7 +4,7 @@
 
 ## 1. API：集金管理（apps/collect）
 
-パターン①の最初の2作目（specs/collect/001-event-day-collection）。運営者が開いた人だけが使う（`registerAppAccess("collect", "granted")`。specs/meguru/030-app-access）。道筋はすべて`/api/collect`の下。主催者の道筋には、ログインと利用の許可の関所（`access.ts`の`collectOwner`）を付ける。関所の外にあるのは、手伝う人の`/api/collect/r/:token/…`（受付用リンクと端末の印`X-Collect-Device`で確かめる）、参加者のセルフ受付の`/api/collect/s/:token/…`（セルフ受付のリンク。端末の印は同じ見出しの名前で、回数の上限にだけ使う）、会場の共有の`/api/collect/live`（60秒の入場券で確かめる）と、招待を受ける人・つながった運営メンバーの`/api/collect/invites/…`・`/api/collect/shares…`（ログインだけ。利用の許可は見ない。運営メンバーにつながっているかで確かめる）だけ。今は 001 の PR1〜PR4 の分（イベント・料金の区分・名簿・既定値・受付・受付の手伝い・会場の共有・締め・振込待ち・まとめ・書き出し・Threadsのイベントの候補）と、002 のセルフ受付の API（specs/collect/002-self-check-in）と、003 の分配の API（specs/collect/003-revenue-sharing）。
+パターン①で作った新しいアプリの1つ（人物メモと並行して作った。specs/collect/001〜004）。運営者が開いた人だけが使う（`registerAppAccess("collect", "granted")`。specs/meguru/030-app-access）。道筋はすべて`/api/collect`の下。主催者の道筋には、ログインと利用の許可の関所（`access.ts`の`collectOwner`）を付ける。関所の外にあるのは、手伝う人の`/api/collect/r/:token/…`（受付用リンクと端末の印`X-Collect-Device`で確かめる）、参加者のセルフ受付の`/api/collect/s/:token/…`（セルフ受付のリンク。端末の印は同じ見出しの名前で、回数の上限にだけ使う）、会場の共有の`/api/collect/live`（60秒の入場券で確かめる）と、招待を受ける人・つながった運営メンバーの`/api/collect/invites/…`・`/api/collect/shares…`（ログインだけ。利用の許可は見ない。運営メンバーにつながっているかで確かめる）だけ。入っているのは、001（イベント・料金の区分・名簿・既定値・受付・受付の手伝い・会場の共有・締め・振込待ち・まとめ・書き出し・Threadsのイベントの候補）・002 セルフ受付（specs/collect/002-self-check-in）・003 経費・運営メンバー・分配・紹介・精算（specs/collect/003-revenue-sharing）・004 名簿なしで受付する（specs/collect/004-rosterless-check-in）の API と画面。マイグレーションは 0039〜0043。
 
 | 小分け | 表 | 処理とAPIの入口 |
 |---|---|---|

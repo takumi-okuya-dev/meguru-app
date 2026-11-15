@@ -2,7 +2,13 @@
 
 **出会いと挑戦が、めぐる。** イベント・コミュニティの流れ（告知・集客→申込・集金→当日→人の記録→次回の告知）を支えるアプリを、共通のアカウント・契約で束ねるスイート。全体の形は[プロダクトの構造](docs/product-structure.md)。
 
-今入っているアプリは**めぐる Threads**（旧ThreadsGrower）。Threadsアカウントを「投稿ストック→承認→自動投稿→分析→改善」のループで育てる。2作目として**めぐる 人物メモ**（`/people`。イベントのアンケートのCSVから会った人の一覧を作り、次の会に誘う。運営者が開いた人だけが使えるテスト版。specs/people/001-people-memo）を作っている。
+今入っているアプリは3つ。
+
+| アプリ | パス | 何をするか | 使える人 |
+|---|---|---|---|
+| **めぐる Threads**（旧ThreadsGrower） | `/threads` | Threadsアカウントを「投稿ストック→承認→自動投稿→分析→改善」のループで育てる | ログインした人（テスト版はグループの招待制） |
+| **めぐる 人物メモ** | `/people` | イベントのアンケートのCSVから会った人の一覧を作り、次の会に誘う。声かけリスト・連絡の記録・書き出しもある（`specs/people/001-people-memo`・`002-sales-list`） | 運営者が開いた人だけ（テスト版） |
+| **めぐる 集金** | `/collect` | イベント当日の受付と集金（現金・PayPay・振込）、セルフ受付、運営メンバーへの分配。お金は預からない（`specs/collect/001`〜`004`） | 運営者が開いた人だけ（テスト版） |
 
 - 2026-11-11、リポジトリ名を`threads-grower-app`から`meguru-app`に変えた。GitHubは古いURLを転送する。Cloudflare・Neonの名前（`threads-grower-api`・`threads-grower-web`など）とブラウザに保存する値の名前は、URLや保存した設定が変わらないよう、ドメインを移すときまで今のままにする。
 
@@ -18,16 +24,17 @@ Claude CodeとCodexで開発スキルを共用する手順と、利用制限時�
 
 人に見せる文書（[ご利用ガイド](docs/user-guide.md)・[開発のご報告](docs/project-report.md)・[技術ドキュメント](docs/architecture.md)）も、元はこのリポジトリに置き、ほかの文書と同じくPRで直す。
 
-- リポジトリは非公開なので、外の人に見せるときはClaude Docsに反映して、そのリンクを共有する。反映は自動ではなく、共有したいときにClaude Codeへ「共有用を更新して」と頼む。
+- 外の人に見せるときはClaude Docsに反映して、そのリンクを共有する（リポジトリは2026-11-13からしばらく公開にしているが、いずれ非公開に戻す前提で書く。下の「ブランチとデプロイ」）。反映は自動ではなく、共有したいときにClaude Codeへ「共有用を更新して」と頼む。
 - 図はMermaidで書く（GitHubでもClaude Docsでもそのまま表示される）。
 - 外の人に見せる前提なので、アカウントのID・テスト版のURL・秘密の値は書かない。
 - テスト版と本番で切り替えるスイッチを足す・値を変えるときは、同じPRで[環境ごとのスイッチ](docs/environment-switches.md)の表も直す。
 
 ## 今の状況
 
-- 機能：`specs/001`〜`028`を実装し、`develop`に入れた（ステージングに出ている）。2026-11-12からは、Threadsの改善と新しいアプリ（人物管理・集金管理）を並行して進める（[並行開発の手順](docs/parallel-development.md)）。
+- 機能：`specs/001`〜`028`と`specs/meguru/029`〜`031`（めぐるの外枠・アプリの利用の許可・並行開発の決まり）を実装し、`develop`に入れた（ステージングに出ている）。2026-11-12からは、Threadsの改善と新しいアプリ（人物メモ・集金）を並行して進めた（[並行開発の手順](docs/parallel-development.md)）。
 - 本番：まだ立ち上げていない。本番に出す前の準備は[リリースの手順書](docs/release-runbook.md) 4・4-1。
-- 集金管理（めぐる 集金・`/collect`）：当日の受付と集金（現金・PayPay・振込）、ログインなしの受付の手伝い、締め・振込待ち・まとめまで、テスト版に入った（運営者が開いた人だけ）。使い方は[集金の使い方](docs/apps/collect-guide.md)、地図は[docs/apps/collect.md](docs/apps/collect.md)。
+- 人物メモ（`/people`）：取り込み・同じ人の候補・誘う候補（001）と、タグ・声かけの予定・連絡の記録・会ごとの声かけの一覧（002）まで、テスト版に入った。地図は[docs/apps/people.md](docs/apps/people.md)。
+- 集金（`/collect`）：001 当日の受付と集金・ログインなしの受付の手伝い・締め・振込待ち・まとめ、002 セルフ受付、003 経費と運営メンバーへの分配・紹介・精算、004 名簿なしで受付する（セルフ受付で名簿を作る。新しいイベントの初めの値）まで、テスト版に入った。使い方は[集金の使い方](docs/apps/collect-guide.md)、地図は[docs/apps/collect.md](docs/apps/collect.md)。
 - 公開の判断（MetaのApp Review・事業者としての手続き）のメモは[次の機能のメモ](docs/next-features.md)。
 
 ## ブランチとデプロイ
@@ -43,12 +50,13 @@ Claude CodeとCodexで開発スキルを共用する手順と、利用制限時�
 - ふだんのPRは`feature/*`→`develop`に向ける。
 - リリースは`develop`→`main`のPR（タイトルは「リリース：…」）。
 - 本番の急ぎの修正は`main`から`fix/*`を分け、`main`へマージしたあと、同じ変更を`develop`にも戻す（`git log --oneline main ^develop`が空になること）。
-- `main`・`develop`への直接のpushは禁止（PR必須）。CIは、コードを変えたPRにラベル`run-ci`を付けたときだけ流し、その成功を待ってマージする。文書だけのPRはCIを流さずにマージする（[リリースの手順書](docs/release-runbook.md) 2）。
+- `main`・`develop`への直接のpushは禁止（PR必須）。CIは、ラベル`run-ci`を付けたPRだけで流れる。2026-11-13からは節約のため、マイグレーションのあるPRなど慎重に入れるものだけに付け、ほかは手元の全部のテストとセルフレビューで確かめてマージする。文書だけのPRはCIを流さない（[リリースの手順書](docs/release-runbook.md) 2）。
 - デプロイは[.github/workflows/deploy.yml](.github/workflows/deploy.yml)が自動で行う（**マイグレーション → API → Web**の順。1つでも失敗したらそこで止まる）。文書・仕様・AIのスキル・E2Eだけの変更では動かない（[手順書](docs/release-runbook.md)の2）。やり直しはActionsの画面から手で動かせる。
 - 環境の違いは**コードの分岐にせず、設定だけに置く**（`APP_ENV`・`VITE_APP_ENV`）。本番以外では、ログインの画面のいちばん上に環境の帯が、アプリの画面では左下のユーザー名の横に「テスト版」「開発版」の印が出る。
 - 機能を足すときの決まり（マイグレーションの書き方・リリースの前に確かめること・困ったときの戻し方）は[リリースの手順書](docs/release-runbook.md)。
 - ステージング（<https://develop.threads-grower-web.pages.dev>）で実際に作ったもの・秘密の値の置き場所・確かめ方は[ステージングの構築記録](docs/staging-setup-record.md)。
-- 非公開のリポジトリなので、Environmentの秘密の値とブランチの保護を使うには、GitHubの有料のプランが要る。Organization`takumi-okuya-dev`の**Team**のプランで使っている（[外部サービスの準備手順](docs/external-services-setup.md) 9-0）。
+- 非公開のリポジトリでEnvironmentの秘密の値とブランチの保護を使うには、GitHubの有料のプランが要る。Organization`takumi-okuya-dev`の**Team**のプランで使っている（[外部サービスの準備手順](docs/external-services-setup.md) 9-0）。
+- 2026-11-13に、GitHub Actionsが支払い・使える額の上限でジョブを始めなくなったため、リポジトリを**しばらく公開**にした（公開のリポジトリでは標準のランナーが無料）。公開の間は、秘密の値・本物の参加者のデータ・個人の情報をコミットしない。非公開に戻す前に、GitHubの支払い（Billing & plans）を直す（直さずに戻すと、CIもデプロイもまた止まる）。
 
 ## 構成
 
