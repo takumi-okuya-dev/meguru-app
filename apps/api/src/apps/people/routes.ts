@@ -12,6 +12,7 @@ import { outreachRoutes } from "./outreach/outreach-routes";
 import { personRoutes } from "./persons/person-routes";
 import { settingsRoutes } from "./settings/settings-routes";
 import { tagRoutes } from "./tags/tag-routes";
+import { candidateRoutes } from "./threads-candidates/candidate-routes";
 import { PEOPLE_APP } from "./registry";
 
 /**
@@ -31,5 +32,6 @@ export function peopleRoutes(authed: MiddlewareHandler<AppEnv>) {
     .route("/", tagRoutes())
     .route("/", contactLogRoutes())
     .route("/", fieldRoutes())
-    .route("/", homeRoutes());
+    .route("/", homeRoutes())
+    .route("/", candidateRoutes());
 }

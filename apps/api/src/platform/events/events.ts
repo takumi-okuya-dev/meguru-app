@@ -9,7 +9,7 @@ import { logger } from "../../kernel/logger";
 import { wakeEventDelivery } from "./delivery-gate";
 import { platformEventDeliveries, platformEvents } from "../schema";
 
-/** Threads の宣伝内容のイベントの情報（集金管理の候補になる。specs/collect/001-event-day-collection contracts/events.md 2）。 */
+/** Threads の宣伝内容のイベントの情報（集金管理と人物メモの候補になる。specs/collect/001-event-day-collection contracts/events.md 2、specs/people/003）。 */
 export type ThreadsPromotionEventSaved = {
   promotionId: string;
   threadsAccountId: string;
@@ -28,7 +28,7 @@ export type ThreadsPromotionEventSaved = {
 };
 
 /**
- * 出来事の種類と中身。共通で起きたこと（退会など）と、アプリがほかのアプリに伝えること（Threads → 集金管理）。
+ * 出来事の種類と中身。共通で起きたこと（退会など）と、アプリがほかのアプリに伝えること（Threads → 集金管理・人物メモ）。
  * 中身に入れるのは番号と、受け取る側が自分の表に写すのに要る値だけ（メールアドレスは入れない）。
  */
 export type PlatformEventPayloads = {

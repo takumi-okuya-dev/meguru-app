@@ -11,6 +11,8 @@ export const peopleQueryKeys = {
   event: (id: string) => ["people", "events", id] as const,
   attendees: (id: string) => ["people", "events", id, "attendees"] as const,
   eventDeletePreview: (id: string) => ["people", "events", id, "delete-preview"] as const,
+  // Threads のイベントの候補（specs/people/003）。イベントを作る・消すと「作った」が変わるので ["people", "events"] の下に置く
+  threadsCandidates: ["people", "events", "threads-candidates"] as const,
   undoPreview: (importId: string) => ["people", "imports", importId, "undo-preview"] as const,
   // 人（一覧・誘う候補・人のページ）。["people", "persons"] でまとめて読み直せる（名前・同意・声かけが変わると、どれも変わる）
   persons: ["people", "persons"] as const,

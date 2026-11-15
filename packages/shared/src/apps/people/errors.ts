@@ -11,6 +11,8 @@ export const PEOPLE_ERROR_CODES = [
   "OUTREACH_NO_CONSENT",
   // 002：タグ・自由な項目の名前が、もうある（nameKey で同じ）
   "PEOPLE_NAME_TAKEN",
+  // 003：同じ Threads の宣伝内容から、もうイベントを作ってある
+  "PEOPLE_THREADS_EVENT_USED",
 ] as const;
 
 /** 人物メモのエラーの文言。 */
@@ -41,4 +43,5 @@ export const PEOPLE_ERROR_MESSAGES: Record<(typeof PEOPLE_ERROR_CODES)[number], 
     action: "none",
   },
   PEOPLE_NAME_TAKEN: { message: "同じ名前がもうあります。", action: "none" },
+  PEOPLE_THREADS_EVENT_USED: { message: "このThreadsのイベントからは、もうイベントを作ってあります。", action: "none" },
 };

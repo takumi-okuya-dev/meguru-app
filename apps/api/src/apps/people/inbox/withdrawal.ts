@@ -6,10 +6,20 @@ import type { Env } from "../../../kernel/env";
 import { logger } from "../../../kernel/logger";
 import type { PlatformEvent } from "../../../platform";
 import { lockOwner } from "../access";
-import { peopleChoiceMappings, peopleColumnMappings, peopleCustomFields, peopleEvents, peopleOwnerSettings, peoplePersons, peopleReceivedEvents, peopleTags } from "../schema";
+import {
+  peopleChoiceMappings,
+  peopleColumnMappings,
+  peopleCustomFields,
+  peopleEvents,
+  peopleOwnerSettings,
+  peoplePersons,
+  peopleReceivedEvents,
+  peopleTags,
+  peopleThreadsEventCandidates,
+} from "../schema";
 
 /**
- * 退会した人の人物メモのデータを消す（イベント・取り込み・回答・人・同意の記録・声かけ・設定・列と選択肢の対応・消した人の数と印）。
+ * 退会した人の人物メモのデータを消す（イベント・取り込み・回答・人・同意の記録・声かけ・設定・列と選択肢の対応・消した人の数と印・Threads のイベントの候補）。
  * 利用の数は伝えない（共通が、届いたあとで利用の数の行も消す）。
  * @param event - 出来事（user.withdrawn）
  * @param env - Workers のバインディング
@@ -31,6 +41,8 @@ export async function onUserWithdrawn(event: PlatformEvent<"user.withdrawn">, en
     // 002：作り手のタグと自由な項目（人に付いたもの・値・記録・リンクは、人と一緒に消えた）
     await tx.delete(peopleTags).where(eq(peopleTags.userId, userId));
     await tx.delete(peopleCustomFields).where(eq(peopleCustomFields.userId, userId));
+    // 003：Threads のイベントの候補
+    await tx.delete(peopleThreadsEventCandidates).where(eq(peopleThreadsEventCandidates.userId, userId));
     return { events: events.length, persons: persons.length };
   });
   // ログには出来事の番号と消した行の数だけ（名前を出さない。R18）

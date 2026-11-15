@@ -3,6 +3,7 @@
 import { jstDate, type EventDeletePreview, type PeopleAttendee, type PeopleEvent, type PeopleEventDetail, type PeopleEventListItem, type UndoResult } from "@meguru/shared/people";
 import { and, asc, count, desc, eq, gte, sql, type SQL } from "drizzle-orm";
 import { withTransaction, type Db } from "../../../kernel/db/client";
+import { AppError, pgErrorCode } from "../../../kernel/errors";
 import type { Env } from "../../../kernel/env";
 import { logger } from "../../../kernel/logger";
 import { displayNameOf, loadOwnedEvent, lockActiveOwner, lockOwner, type PeopleDb } from "../access";
@@ -10,6 +11,7 @@ import { executeUndo, planUndo, toUndoPreview } from "../imports/undo";
 import { derivePersons } from "../persons/person-derive";
 import { peopleErasedAttendances, peopleEvents, peopleImports, peopleManualAttendances, peopleOutreaches, peoplePersons, peopleResponses } from "../schema";
 import { attendanceSql } from "../persons/person-query";
+import { assertOwnCandidate } from "../threads-candidates/candidate-service";
 import { reportPeopleUsage } from "../usage";
 
 /**
@@ -100,18 +102,47 @@ export async function listEvents(db: Db, userId: string): Promise<PeopleEventLis
 }
 
 /**
+ * 同じ宣伝内容から、もうイベントを作ってある（specs/people/003 FR-006）。
+ * @returns 409 PEOPLE_THREADS_EVENT_USED の AppError
+ */
+const threadsEventUsed = () => new AppError("PEOPLE_THREADS_EVENT_USED", 409, "threads promotion already used");
+
+/**
  * イベントを作る（作り手のロックの中で、退会の途中でないことを確かめてから作る）。
+ * Threads のイベントの候補から作るときは、その作り手の消されていない候補か・まだ作っていないかを確かめる（specs/people/003 R2）。
  * @param env - Workers のバインディング
  * @param db - データベース
  * @param userId - 作り手
- * @param input - 名前・開催日・自分の会か
+ * @param input - 名前・開催日・自分の会か・元の宣伝内容の番号（候補から作るときだけ）
  * @returns 作ったイベント
+ * @throws AppError VALIDATION_FAILED（知らない・ほかの人の候補）・PEOPLE_THREADS_EVENT_USED（もう作ってある）
  */
-export async function createEvent(env: Env, db: Db, userId: string, input: { name: string; heldOn: string; isOwn: boolean }): Promise<PeopleEvent> {
+export async function createEvent(
+  env: Env,
+  db: Db,
+  userId: string,
+  input: { name: string; heldOn: string; isOwn: boolean; sourceThreadsPromotionId?: string },
+): Promise<PeopleEvent> {
   const row = await withTransaction(env.DATABASE_URL, async (tx) => {
     await lockActiveOwner(tx, env, userId);
-    const [created] = await tx.insert(peopleEvents).values({ userId, ...input }).returning();
-    return created!;
+    const source = input.sourceThreadsPromotionId;
+    if (source !== undefined) {
+      await assertOwnCandidate(tx, userId, source);
+      const [used] = await tx
+        .select({ id: peopleEvents.id })
+        .from(peopleEvents)
+        .where(and(eq(peopleEvents.userId, userId), eq(peopleEvents.sourceThreadsPromotionId, source)))
+        .limit(1);
+      if (used) throw threadsEventUsed();
+    }
+    try {
+      const [created] = await tx.insert(peopleEvents).values({ userId, ...input }).returning();
+      return created!;
+    } catch (err) {
+      // 作り手のロックの中なので普通は当たらないが、一意の制約に当たったら同じく 409
+      if (pgErrorCode(err) === "23505") throw threadsEventUsed();
+      throw err;
+    }
   });
   await reportPeopleUsage(db, userId);
   return toEvent(row);

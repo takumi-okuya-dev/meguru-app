@@ -1,5 +1,6 @@
 // 人物メモを共通に登録する（組み立てが registerPeople() を呼ぶ。specs/people/001-people-memo research.md R3・R19）。
 import { registerAppAccess, registerConsumer, registerModule } from "../../platform";
+import { onPromotionEventDeleted, onPromotionEventSaved } from "./inbox/threads-candidates";
 import { onUserWithdrawn } from "./inbox/withdrawal";
 import { PEOPLE_APP } from "./registry";
 
@@ -10,5 +11,8 @@ export function registerPeople(): void {
     registerAppAccess(PEOPLE_APP, "granted");
     // 退会したら、その人の人物メモのデータを消す（contracts/events.md）
     registerConsumer(PEOPLE_APP, "user.withdrawn", onUserWithdrawn);
+    // Threads の宣伝内容のイベントを、イベントの候補に写す（specs/people/003）
+    registerConsumer(PEOPLE_APP, "threads.promotion_event.saved", onPromotionEventSaved);
+    registerConsumer(PEOPLE_APP, "threads.promotion_event.deleted", onPromotionEventDeleted);
   });
 }

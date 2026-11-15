@@ -98,6 +98,7 @@ GET /api/people/persons/:personId ×1
 GET /api/people/settings ×1
 GET /api/people/stats ×1
 GET /api/people/tags ×1
+GET /api/people/threads-candidates ×1
 GET /api/referral-page ×1
 GET /api/test-invites/:token ×2
 GET /api/threads/accounts/:accountId ×2
