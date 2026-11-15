@@ -24,6 +24,8 @@ const item = (over: Partial<TransferItem>): TransferItem => ({
   method: "transfer_later",
   recordedAt: "2026-11-20T10:05:00.000Z",
   transferConfirmedAt: null,
+  tierUndecided: false,
+  tiers: [],
   ...over,
 });
 

@@ -8,9 +8,11 @@ DELETE /api/collect/events/:eventId/members/:memberId ×2
 DELETE /api/collect/events/:eventId/members/:memberId/invite ×2
 DELETE /api/collect/events/:eventId/members/:memberId/link ×2
 DELETE /api/collect/events/:eventId/reception/:personId ×2
+DELETE /api/collect/events/:eventId/reception/:personId/entry ×2
 DELETE /api/collect/events/:eventId/roster/:personId ×2
 DELETE /api/collect/events/:eventId/settlement/transfers/:transferId ×2
 DELETE /api/collect/r/:token/reception/:personId ×1
+DELETE /api/collect/r/:token/reception/:personId/entry ×1
 DELETE /api/collect/settings/paypay-qr ×2
 DELETE /api/collect/summaries/:summaryId ×2
 DELETE /api/collect/transfers/:personId/confirm ×2
@@ -189,6 +191,7 @@ POST /api/collect/r/:token/self-requests/:requestId/match ×1
 POST /api/collect/r/:token/self-requests/:requestId/reject ×1
 POST /api/collect/r/:token/walk-ins ×1
 POST /api/collect/s/:token/declare ×1
+POST /api/collect/s/:token/entries ×1
 POST /api/collect/s/:token/requests ×1
 POST /api/collect/s/:token/search ×1
 POST /api/collect/transfers/:personId/confirm ×2

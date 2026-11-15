@@ -1,7 +1,8 @@
 // セルフ受付（参加者が自分で受付する）の入力と出力の形（specs/collect/002-self-check-in contracts/api.md 3）。
 import { z } from "zod";
 import { countChars } from "../../text";
-import { COLLECT_METHODS, COLLECT_LIMITS } from "./schemas";
+import { COLLECT_MEDIA } from "./media";
+import { CHECK_IN_MODES, COLLECT_METHODS, COLLECT_LIMITS } from "./schemas";
 import { PAYMENT_STATUSES, RECEPTION_LINK_STATUSES } from "./reception";
 
 /**
@@ -20,6 +21,12 @@ export const SELF_CHECK_IN_LIMITS = {
   pendingRequestsPerLink: 30,
   /** 参加者の画面が自分の状態を読む間隔（ミリ秒。research.md R5） */
   pollMs: 3000,
+  /** 名簿なしで、1つの端末から1つのリンクで名簿に入れられる人数（specs/collect/004 research.md R6。友だちの分も入れられるように） */
+  entriesPerDevicePerLink: 10,
+  /** 名簿なしで、リンク全体で1分に名簿に入れられる人数 */
+  entriesPerLinkPerMinute: 60,
+  /** 名簿なしで、リンク全体で名簿に入れられる人数（出し直すと数え直す） */
+  entriesPerLink: 1000,
 } as const;
 
 /** 参加者が選べる払い方（「来場のみ」は選べない。spec FR-014）。 */
@@ -33,12 +40,26 @@ export const selfLinkInfoSchema = z.object({
   event: z.object({ name: z.string(), startsAt: z.string(), venue: z.string().nullable(), methods: z.array(z.enum(COLLECT_METHODS)) }),
   /** PayPayのQRがあるか・振込先の案内（払い方を選んだあとの案内に出す。spec FR-015） */
   settings: z.object({ hasPaypayQr: z.boolean(), bankText: z.string().nullable() }),
+  /** 受付のしかた（specs/collect/004。前の版の API にはないので roster とみなす） */
+  checkInMode: z.enum(CHECK_IN_MODES).default("roster"),
+  /** 名簿なしで出す媒体の並び（Threads で掲載済みの媒体を先に） */
+  media: z.array(z.enum(COLLECT_MEDIA)).default([]),
+  /** 名簿なしで区分が2つ以上のときに並べる区分（0円を除く）。ほかは空 */
+  tiers: z.array(z.object({ name: z.string(), amount: z.number().int() })).default([]),
 });
 /** GET /api/collect/s/:token の応答。 */
 export type SelfLinkInfo = z.infer<typeof selfLinkInfoSchema>;
 
 /** 参加者に見せてよい本人の情報（名前・受付番号・区分と金額だけ）。 */
-export const selfPersonSchema = z.object({ id: z.string(), number: z.number().int(), name: z.string(), tierName: z.string(), amount: z.number().int() });
+export const selfPersonSchema = z.object({
+  id: z.string(),
+  number: z.number().int(),
+  name: z.string(),
+  tierName: z.string(),
+  amount: z.number().int(),
+  /** 区分がまだ決まっていない（名簿なし・区分が2つ以上。tierName・amount は仮。specs/collect/004 research.md R3） */
+  tierUndecided: z.boolean().default(false),
+});
 /** 参加者に見せてよい本人の情報。 */
 export type SelfPerson = z.infer<typeof selfPersonSchema>;
 
@@ -74,6 +95,34 @@ export type SelfDeclareRequest = z.infer<typeof selfDeclareRequestSchema>;
 
 /** POST /api/collect/s/:token/declare の応答。 */
 export const selfDeclareResponseSchema = z.object({ record: selfRecordSchema });
+
+/** POST /api/collect/s/:token/entries の入力（名簿なしで名簿に入る。specs/collect/004 contracts/api.md 2-2）。 */
+export const selfEntryRequestSchema = z.object({
+  name: z
+    .string()
+    .transform((s) => s.trim())
+    .refine((s) => s !== "", { message: "required" })
+    .refine((s) => countChars(s) <= COLLECT_LIMITS.personName, { message: "too long" }),
+  kana: z
+    .string()
+    .nullish()
+    .transform((s) => (s == null || s.trim() === "" ? null : s.trim()))
+    .refine((s) => s === null || countChars(s) <= COLLECT_LIMITS.kana, { message: "too long" }),
+  media: z.enum(COLLECT_MEDIA),
+  referrer: z
+    .string()
+    .nullish()
+    .transform((s) => (s == null || s.trim() === "" ? null : s.trim()))
+    .refine((s) => s === null || countChars(s) <= COLLECT_LIMITS.referrer, { message: "too long" }),
+  clientRequestId: z.uuid(),
+});
+/** POST /api/collect/s/:token/entries の入力。 */
+export type SelfEntryRequest = z.infer<typeof selfEntryRequestSchema>;
+
+/** POST /api/collect/s/:token/entries の応答。 */
+export const selfEntryResponseSchema = z.object({ requestId: z.string(), person: selfPersonSchema });
+/** POST /api/collect/s/:token/entries の応答。 */
+export type SelfEntryResponse = z.infer<typeof selfEntryResponseSchema>;
 
 /** POST /api/collect/s/:token/requests の入力（飛び入りの申し出）。 */
 export const selfRequestCreateSchema = z.object({

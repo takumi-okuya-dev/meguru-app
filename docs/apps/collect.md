@@ -8,14 +8,14 @@
 
 | 小分け | 表 | 処理とAPIの入口 |
 |---|---|---|
-| `events/`（イベント・料金の区分） | `events`・`price_tiers` | `event-service.ts`・`event-routes.ts` |
+| `events/`（イベント・料金の区分） | `events`・`price_tiers` | `event-service.ts`（受付のしかた`check_in_mode`：`roster`＝名簿あり・`rosterless`＝名簿なし。004）・`event-routes.ts` |
 | `roster/`（名簿・前回の参加者） | `roster_people` | `roster-service.ts`（受付番号は`events.next_number`から取る。紹介した人`referrer`と見比べる形`referrer_key`も持つ）・`past-attendees.ts`・`roster-routes.ts` |
 | `settings/`（主催者の既定値） | `owner_settings` | `settings-service.ts`（PayPayのQRの画像・振込先の案内）・`settings-routes.ts` |
 | `me/`（集金管理の「自分」） | — | `collect-me.ts`（`GET /api/collect/me`） |
 | `usage/`（利用の値） | — | `usage.ts`（料金の数は0、イベントがあれば「使っている」を`reportUsage`で伝える。毎日の数え直し） |
 | `reception/`（受付） | `reception_records` | `reception-service.ts`（記録は名簿の人1人に1行・`clientRequestId`の送り直し・取り消し・飛び入り・本人の申告を確かめる`confirmReception`・スナップショットと数字。確かめ待ちは現金・PayPayの合計に入れない）・`reception-routes.ts` |
 | `helpers/`（受付の手伝い） | `reception_links`・`helpers`・`helper_devices` | `link-service.ts`（受付用リンク。種類`helper`（`cr_`）と`self`（`cs_`）。トークンはハッシュと暗号文）・`link-tokens.ts`（鍵の入れ替え。入口の`tokenKeys`）・`helper-service.ts`（参加・端末の印の確かめ・受付をしている人の一覧）・`helper-routes.ts`（主催者の道筋と、ログインのいらない`/r/:token/…`） |
-| `self-check-in/`（セルフ受付。002） | `self_check_in_requests`・`self_check_in_devices` | `self-service.ts`（参加者が探す（名前・ふりがな・受付番号の完全一致だけ）・本人の申告（現金とPayPayは確かめ待ち、振込は振込待ち）・自分の状態・探す回数の上限）・`request-service.ts`（名簿にいない人の申し出と、名簿に入れる・当てる・断る）・`self-routes.ts`（参加者の`/s/:token/…`、セルフ受付のリンク`…/self-link`、確かめる`…/reception/:personId/confirm`、申し出の片付け。主催者と手伝う人） |
+| `self-check-in/`（セルフ受付。002・004） | `self_check_in_requests`（名簿なしの入口の行は`client_request_id`あり）・`self_check_in_devices` | `entry-service.ts`（004 名簿なしの入口：名前・媒体を入れると確かめなしで名簿に入れる（`roster_people.self_entered_at`）・区分が2つ以上なら仮の区分で`tier_undecided`・主催者が先に入れた人に当てる・端末とリンクの上限・名簿から外す`…/reception/:personId/entry`）・`self-service.ts`（参加者が探す（名前・ふりがな・受付番号の完全一致だけ）・本人の申告（現金とPayPayは確かめ待ち、振込は振込待ち）・自分の状態・探す回数の上限）・`request-service.ts`（名簿にいない人の申し出と、名簿に入れる・当てる・断る）・`self-routes.ts`（参加者の`/s/:token/…`、セルフ受付のリンク`…/self-link`、確かめる`…/reception/:personId/confirm`、申し出の片付け。主催者と手伝う人） |
 | `sharing/`（経費・運営メンバー・分配・紹介。003） | `expenses`・`sharing_members`・`sharing_invites`・`settlement_transfers`・`settlement_holders` | `sharing-service.ts`（分配の画面・経費・運営メンバー。分配は毎回`computeDistribution`（共通のパッケージ）で計算。はじめて開くと主催者の行を作る。傾斜の上限は保存のたびに確かめる）・`invite-service.ts`（招待のリンク`ci_`。ハッシュだけを持ち7日。受ける・つながった人の一覧と読むだけの分配）・`referral-service.ts`（紹介経由の売上・紹介した人の候補。分配には使わない）・`settlement-service.ts`（精算の手順。持っている額と受け取る合計から毎回`settlementSteps`（共通のパッケージ）で出す。持つのは「渡した」ものと、手伝う人と運営メンバーの対応だけ）・`money.ts`（売上と紹介の数え方）・`sharing-routes.ts`（主催者の道筋と、ログインだけの`/invites/…`・`/shares…`） |
 | `live/`（会場の共有） | — | `live-room.ts`（Durable Object`CollectLiveRoom`。知らせを配るだけで保存しない。組み立ての`durable-objects.ts`が書き出す）・`live-ticket.ts`（入場券の署名。`COLLECT_LIVE_SECRET`）・`notify.ts`（保存のあと`waitUntil`で知らせる）・`live-routes.ts` |
 | `closing/`（締め・書き出し） | `settlements` | `tally.ts`（締めとまとめの数え方。確かめ待ちは来場に数え、お金の合計の外）・`closing-service.ts`（受け取った人ごとの精算・PayPayの確かめ・締める。締めたときの版を残し、あとで版が上がったら「締めのあとで変わった」）・`export-csv.ts`（UTF-8のBOMつき・CRLF）・`closing-routes.ts` |

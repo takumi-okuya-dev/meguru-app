@@ -36,6 +36,8 @@ export function toPerson(row: PersonRow): RosterPerson {
     priceTierId: row.priceTierId,
     memo: row.memo,
     referrer: row.referrer,
+    tierUndecided: row.tierUndecided,
+    selfEntered: row.selfEnteredAt !== null,
     createdAt: row.createdAt.toISOString(),
   };
 }
@@ -232,7 +234,8 @@ export async function updatePerson(
         ...(input.name !== undefined ? { name: input.name, nameKey: nameKey(input.name) } : {}),
         ...(input.kana !== undefined ? { kana: input.kana, kanaKey: input.kana ? nameKey(input.kana) : null } : {}),
         ...(input.media !== undefined ? { media: input.media } : {}),
-        ...(input.priceTierId !== undefined ? { priceTierId: input.priceTierId } : {}),
+        // 主催者が区分を直したら、区分は決まったことにする（specs/collect/004 research.md R3）
+        ...(input.priceTierId !== undefined ? { priceTierId: input.priceTierId, tierUndecided: false } : {}),
         ...(input.memo !== undefined ? { memo: input.memo } : {}),
         ...(input.referrer !== undefined ? referrerColumns(input.referrer) : {}),
       })

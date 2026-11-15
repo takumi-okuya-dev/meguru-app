@@ -19,7 +19,7 @@ const { collectApp } = await import("@/apps/collect");
 const { selfDevice } = await import("@/apps/collect/lib/self-api");
 
 const TOKEN = "cs_abc";
-const PERSON = { id: "11111111-1111-4111-8111-111111111111", number: 12, name: "松本 れい", tierName: "通常", amount: 3000 };
+const PERSON = { id: "11111111-1111-4111-8111-111111111111", number: 12, name: "松本 れい", tierName: "通常", amount: 3000, tierUndecided: false };
 const info = (status = "active") => ({
   status,
   event: { name: "IT交流会", startsAt: "2026-11-20T10:00:00.000Z", venue: "渋谷", methods: ["cash", "paypay", "transfer"] },

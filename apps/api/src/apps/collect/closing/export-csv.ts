@@ -72,7 +72,8 @@ export async function exportCsv(db: Db, ownerUserId: string, eventId: string): P
       p.name,
       p.kana ?? "",
       COLLECT_MEDIA_LABELS[p.media as CollectMedia] ?? p.media,
-      tierName.get(r?.priceTierId ?? p.priceTierId) ?? "",
+      // 区分がまだ決まっていない人（名簿なし・区分が2つ以上）は「未定」（specs/collect/004 research.md R8）
+      p.tierUndecided ? "未定" : (tierName.get(r?.priceTierId ?? p.priceTierId) ?? ""),
       r ? "来場" : "",
       r ? RECEPTION_METHOD_LABELS[r.method as ReceptionMethod] : "",
       r ? r.amount : "",

@@ -17,6 +17,9 @@ export const COLLECT_ERROR_CODES = [
   "RATIO_TOO_HIGH",
   "ALREADY_LINKED",
   "INVITE_INACTIVE",
+  // 004 名簿なしで受付する（specs/collect/004-rosterless-check-in contracts/api.md）
+  "TIER_REQUIRED",
+  "CHECK_IN_MODE_MISMATCH",
 ] as const;
 
 /** 集金管理のエラーの文言。 */
@@ -37,4 +40,6 @@ export const COLLECT_ERROR_MESSAGES: Record<(typeof COLLECT_ERROR_CODES)[number]
   RATIO_TOO_HIGH: { message: "リーダーの倍率の合計が大きすぎて、メンバーの分がなくなります。倍率を下げてください。", action: "none" },
   ALREADY_LINKED: { message: "この運営メンバーは、もうめぐるの利用者とつながっています。", action: "reload" },
   INVITE_INACTIVE: { message: "この招待のリンクは使えません。主催者に聞いてください。", action: "none" },
+  TIER_REQUIRED: { message: "料金の区分を選んでください（この人の区分はまだ決まっていません）。", action: "none" },
+  CHECK_IN_MODE_MISMATCH: { message: "このイベントの受付のしかたが変わりました。画面を読み直してください。", action: "reload" },
 };

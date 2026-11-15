@@ -8,6 +8,8 @@
 import {
   isReceptionMethodAllowed,
   nameKey,
+  sameNameIds,
+  tierUndecidedFor,
   type CollectMedia,
   type ReceptionHelper,
   type ReceptionMethod,
@@ -74,6 +76,10 @@ export function toReceptionPerson(row: PersonRow, withMemo: boolean): ReceptionP
     media: row.media as CollectMedia,
     priceTierId: row.priceTierId,
     ...(withMemo ? { memo: row.memo } : {}),
+    tierUndecided: row.tierUndecided,
+    // 同じ名前の知らせは、受付の画面の全体を見て入れる（receptionSnapshot。specs/collect/004 research.md R4）
+    sameName: false,
+    selfEntered: row.selfEnteredAt !== null,
   };
 }
 
@@ -108,6 +114,29 @@ async function bumpVersion(tx: TxDb, eventId: string): Promise<number> {
 }
 
 /**
+ * 区分が決まっていない人（名簿なし・区分が2つ以上）の区分を、受け取るときに決める（specs/collect/004 research.md R3・FR-021）。
+ * イベントの区分が2つ以上なら priceTierId が要る（なければ TIER_REQUIRED）。1つならその区分。名簿の人の区分も変えて、決まったことにする。
+ * @param tx - トランザクション
+ * @param eventId - イベントの番号
+ * @param personId - 名簿の人の番号
+ * @param priceTierId - 選んだ区分（省けば、区分が1つのときだけ通る）
+ * @returns 決めた区分の番号
+ * @throws AppError TIER_REQUIRED・VALIDATION_FAILED（ほかのイベントの区分）
+ */
+async function decideUndecidedTier(tx: TxDb, eventId: string, personId: string, priceTierId: string | undefined): Promise<string> {
+  const tiers = await tx
+    .select({ id: collectPriceTiers.id, amount: collectPriceTiers.amount, position: collectPriceTiers.position })
+    .from(collectPriceTiers)
+    .where(eq(collectPriceTiers.eventId, eventId))
+    .orderBy(asc(collectPriceTiers.position));
+  if (tierUndecidedFor(tiers) && !priceTierId) throw new AppError("TIER_REQUIRED", 400, "price tier required", undefined, ["priceTierId"]);
+  const tier = priceTierId ? tiers.find((t) => t.id === priceTierId) : tiers[0];
+  if (!tier) throw new AppError("VALIDATION_FAILED", 400, "unknown tier", undefined, ["priceTierId"]);
+  await tx.update(collectRosterPeople).set({ priceTierId: tier.id, tierUndecided: false }).where(eq(collectRosterPeople.id, personId));
+  return tier.id;
+}
+
+/**
  * 受付を記録する（FR-031・FR-032・FR-035）。
  * @param databaseUrl - 接続文字列
  * @param actor - 受付をする人（受け取った人になる）
@@ -115,7 +144,7 @@ async function bumpVersion(tx: TxDb, eventId: string): Promise<number> {
  * @param personId - 名簿の人の番号
  * @param input - 検証済みの入力
  * @returns 記録と新しい版。replayed は同じ clientRequestId の送り直しだったとき（版は上げず、知らせも送らない）
- * @throws AppError ITEM_NOT_FOUND・VALIDATION_FAILED（使わない払い方・ほかのイベントの区分）・ALREADY_RECORDED（record に先の記録）
+ * @throws AppError ITEM_NOT_FOUND・VALIDATION_FAILED（使わない払い方・ほかのイベントの区分）・ALREADY_RECORDED（record に先の記録）・TIER_REQUIRED（区分が未定の人を現金・PayPay で記録するときに区分がない）
  */
 export async function recordReception(
   databaseUrl: string,
@@ -136,7 +165,7 @@ export async function recordReception(
       return { record: toRecord(replay), version: event.version, replayed: true };
     }
     const [person] = await tx
-      .select({ id: collectRosterPeople.id, priceTierId: collectRosterPeople.priceTierId })
+      .select({ id: collectRosterPeople.id, priceTierId: collectRosterPeople.priceTierId, tierUndecided: collectRosterPeople.tierUndecided })
       .from(collectRosterPeople)
       .where(and(eq(collectRosterPeople.id, personId), eq(collectRosterPeople.eventId, event.id)))
       .limit(1);
@@ -144,7 +173,9 @@ export async function recordReception(
     if (!isReceptionMethodAllowed(input.method, event.methods)) {
       throw new AppError("VALIDATION_FAILED", 400, "method not used in this event", undefined, ["method"]);
     }
-    const tierId = input.priceTierId ?? person.priceTierId;
+    // 区分が決まっていない人は、その場で受け取る（現金・PayPay）とき、または区分を選んだときに区分を決める（振込は入金を確かめるときでもよい）
+    const decides = person.tierUndecided && (input.priceTierId !== undefined || input.method === "cash" || input.method === "paypay");
+    const tierId = decides ? await decideUndecidedTier(tx, event.id, person.id, input.priceTierId) : (input.priceTierId ?? person.priceTierId);
     const [tier] = await tx
       .select({ id: collectPriceTiers.id, amount: collectPriceTiers.amount })
       .from(collectPriceTiers)
@@ -242,14 +273,17 @@ export async function confirmReception(
     if (current.paymentStatus !== "awaiting_confirmation") throw new AppError("NOT_AWAITING_CONFIRMATION", 409, "not awaiting confirmation");
     const method = input.method ?? (current.method as "cash" | "paypay");
     if (!isReceptionMethodAllowed(method, event.methods)) throw new AppError("VALIDATION_FAILED", 400, "method not used in this event", undefined, ["method"]);
-    const tierId = input.priceTierId ?? current.priceTierId;
+    const [person] = await tx.select({ tierUndecided: collectRosterPeople.tierUndecided }).from(collectRosterPeople).where(eq(collectRosterPeople.id, personId)).limit(1);
+    // 区分が決まっていない人は、受け取るときに区分を決める（specs/collect/004 FR-021）
+    const decided = person?.tierUndecided ? await decideUndecidedTier(tx, event.id, personId, input.priceTierId) : undefined;
+    const tierId = decided ?? input.priceTierId ?? current.priceTierId;
     const [tier] = await tx
       .select({ id: collectPriceTiers.id, amount: collectPriceTiers.amount })
       .from(collectPriceTiers)
       .where(and(eq(collectPriceTiers.id, tierId), eq(collectPriceTiers.eventId, event.id)))
       .limit(1);
     if (!tier) throw new AppError("VALIDATION_FAILED", 400, "unknown tier", undefined, ["priceTierId"]);
-    const amount = input.amount ?? (input.priceTierId ? tier.amount : current.amount);
+    const amount = input.amount ?? (input.priceTierId || decided ? tier.amount : current.amount);
     const [row] = await tx
       .update(collectReceptionRecords)
       .set({
@@ -400,6 +434,8 @@ export async function receptionSnapshot(db: Db, actor: ReceptionActor, eventId: 
   ]);
   const records = recordRows.map(toRecord);
   const byPerson = new Map(records.map((r) => [r.personId, r]));
+  // 名簿なしでは、別の端末から同じ名前が入ったことを知らせる（名簿ありは主催者が入れた名前なので出さない。research R4）
+  const sameName = event.checkInMode === "rosterless" ? sameNameIds(people) : new Set<string>();
   return {
     version: event.version,
     event: {
@@ -411,8 +447,12 @@ export async function receptionSnapshot(db: Db, actor: ReceptionActor, eventId: 
       methods: event.methods as ReceptionSnapshot["event"]["methods"],
       tiers: tiers.map((t) => ({ id: t.id, name: t.name, amount: t.amount, position: t.position })),
       closedAt: event.closedAt?.toISOString() ?? null,
+      checkInMode: event.checkInMode as ReceptionSnapshot["event"]["checkInMode"],
     },
-    people: people.map((p) => ({ person: toReceptionPerson(p, actor.kind === "owner"), record: byPerson.get(p.id) ?? null })),
+    people: people.map((p) => ({
+      person: { ...toReceptionPerson(p, actor.kind === "owner"), sameName: sameName.has(p.id) },
+      record: byPerson.get(p.id) ?? null,
+    })),
     stats: computeStats(people.length, records, actor),
     helpers,
     settings: { hasPaypayQr: settingsRows[0]?.hasPaypayQr ?? false, bankText: settingsRows[0]?.bankText ?? null },

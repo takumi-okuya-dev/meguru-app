@@ -3,7 +3,7 @@
 import { z } from "zod";
 import { COLLECT_MEDIA } from "./media";
 import { RECEPTION_METHODS } from "./reception";
-import { COLLECT_LIMITS } from "./schemas";
+import { CHECK_IN_MODES, COLLECT_LIMITS } from "./schemas";
 
 /** 件数と合計。 */
 export const countAmountSchema = z.object({ count: z.number().int(), amount: z.number().int() });
@@ -47,6 +47,10 @@ export const closingSnapshotSchema = z.object({
   closedAt: z.string().nullable(),
   changedAfterClose: z.boolean(),
   attendance: z.object({ arrived: z.number().int(), rosterCount: z.number().int() }),
+  /** 受付のしかた（名簿なしでは来なかった人を出さない。specs/collect/004 research.md R8） */
+  checkInMode: z.enum(CHECK_IN_MODES).default("roster"),
+  /** 受付の記録がない名簿の人の数（名簿なしで、来なかった人の代わりに出す） */
+  unrecordedCount: z.number().int().default(0),
   /** 本人の申告の確かめ待ち（現金・PayPayの合計に入れない。締める前に知らせる。specs/collect/002 FR-040） */
   awaitingConfirmation: z
     .object({
@@ -98,6 +102,10 @@ export const transferItemSchema = z.object({
   method: z.enum(["transfer_today", "transfer_later"]),
   recordedAt: z.string(),
   transferConfirmedAt: z.string().nullable(),
+  /** 区分がまだ決まっていない（入金を確かめるときに区分を選ぶ。specs/collect/004 research.md R3） */
+  tierUndecided: z.boolean().default(false),
+  /** そのイベントの区分（区分を選ぶため。区分が決まっていない人だけ。ほかは空） */
+  tiers: z.array(z.object({ id: z.string(), name: z.string(), amount: z.number().int() })).default([]),
 });
 /** 振込待ち・確かめた記録の1行。 */
 export type TransferItem = z.infer<typeof transferItemSchema>;
@@ -106,6 +114,11 @@ export type TransferItem = z.infer<typeof transferItemSchema>;
 export const transferListSchema = z.object({ awaiting: z.array(transferItemSchema), confirmed: z.array(transferItemSchema) });
 /** GET /api/collect/transfers の応答。 */
 export type TransferList = z.infer<typeof transferListSchema>;
+
+/** POST /api/collect/transfers/:personId/confirm の入力（区分が決まっていない人は区分を選ぶ。specs/collect/004 contracts/api.md 4-1）。 */
+export const confirmTransferRequestSchema = z.object({ priceTierId: z.uuid().optional() });
+/** POST /api/collect/transfers/:personId/confirm の入力。 */
+export type ConfirmTransferRequest = z.infer<typeof confirmTransferRequestSchema>;
 
 /** GET /api/collect/transfers のクエリ。 */
 export const transferQuerySchema = z.object({ q: z.string().max(COLLECT_LIMITS.personName).optional() });

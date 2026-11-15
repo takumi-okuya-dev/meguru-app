@@ -79,6 +79,7 @@ export async function closingSnapshot(db: Db, ownerUserId: string, eventId: stri
   const personById = new Map(rows.people.map((p) => [p.id, p]));
   const helperName = new Map(rows.helpers.map((h) => [h.id, h.name]));
   const recorded = new Set(rows.records.map((r) => r.rosterPersonId));
+  const unrecorded = rows.people.filter((p) => !recorded.has(p.id));
   const paypay = rows.records
     .filter((r) => r.method === "paypay" && r.paymentStatus !== "awaiting_confirmation")
     .sort((a, b) => a.recordedAt.getTime() - b.recordedAt.getTime())
@@ -96,6 +97,8 @@ export async function closingSnapshot(db: Db, ownerUserId: string, eventId: stri
     closedAt: event.closedAt?.toISOString() ?? null,
     changedAfterClose: event.closedAt !== null && event.closedVersion !== event.version,
     attendance: t.attendance,
+    checkInMode: event.checkInMode as ClosingSnapshot["checkInMode"],
+    unrecordedCount: unrecorded.length,
     awaitingConfirmation: {
       ...t.awaitingConfirmation,
       people: rows.records
@@ -114,9 +117,11 @@ export async function closingSnapshot(db: Db, ownerUserId: string, eventId: stri
     paypay: { count: t.byMethod.paypay.count, amount: t.byMethod.paypay.amount, checkedAt: event.paypayCheckedAt?.toISOString() ?? null, records: paypay },
     transfers: t.transfers,
     byMedia: t.byMedia,
-    absent: rows.people
-      .filter((p) => !recorded.has(p.id))
-      .map((p) => ({ personId: p.id, number: p.number, name: p.name, kana: p.kana, media: p.media as CollectMedia })),
+    // 名簿なしでは、記録のない人は「来なかった人」ではない（取り消した人・主催者が先に入れた人）ので出さない（specs/collect/004 research.md R8）
+    absent:
+      event.checkInMode === "rosterless"
+        ? []
+        : unrecorded.map((p) => ({ personId: p.id, number: p.number, name: p.name, kana: p.kana, media: p.media as CollectMedia })),
   };
 }
 

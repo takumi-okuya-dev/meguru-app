@@ -3,7 +3,7 @@
 import { z } from "zod";
 import { countChars } from "../../text";
 import { COLLECT_MEDIA } from "./media";
-import { COLLECT_LIMITS, COLLECT_METHODS, collectTierSchema } from "./schemas";
+import { CHECK_IN_MODES, COLLECT_LIMITS, COLLECT_METHODS, collectTierSchema } from "./schemas";
 
 /** 受付の払い方（data-model.md 2-4。`none`は「来場のみ」で0円）。 */
 export const RECEPTION_METHODS = ["cash", "paypay", "transfer_today", "transfer_later", "none"] as const;
@@ -102,6 +102,12 @@ export const receptionPersonSchema = z.object({
   media: z.enum(COLLECT_MEDIA),
   priceTierId: z.string(),
   memo: z.string().nullable().optional(),
+  /** 区分がまだ決まっていない（名簿なし・区分が2つ以上。specs/collect/004 research.md R3） */
+  tierUndecided: z.boolean().default(false),
+  /** 名簿なしで、同じ名前の人がほかにもいる（research R4） */
+  sameName: z.boolean().default(false),
+  /** 名簿なしのセルフ受付で入った（受付をする人が名簿から外せる。research R7） */
+  selfEntered: z.boolean().default(false),
 });
 /** 受付の画面の名簿の人。 */
 export type ReceptionPerson = z.infer<typeof receptionPersonSchema>;
@@ -137,6 +143,8 @@ export const receptionEventSchema = z.object({
   methods: z.array(z.enum(COLLECT_METHODS)),
   tiers: z.array(collectTierSchema),
   closedAt: z.string().nullable(),
+  /** 受付のしかた（名簿なしでは同じ名前を知らせる。specs/collect/004。前の版の API にはないので roster とみなす） */
+  checkInMode: z.enum(CHECK_IN_MODES).default("roster"),
 });
 /** 受付の画面のイベント。 */
 export type ReceptionEvent = z.infer<typeof receptionEventSchema>;

@@ -46,6 +46,7 @@ const EVENT: CollectEvent = {
     { id: "t1", name: "通常", amount: 3000, position: 0 },
     { id: "t2", name: "早割", amount: 2500, position: 1 },
   ],
+  checkInMode: "roster",
   closedAt: null,
   sourceThreadsPromotionId: null,
   sourceChangedAt: null,
@@ -64,6 +65,8 @@ const person = (over: Partial<RosterPerson>): RosterPerson => ({
   priceTierId: "t1",
   memo: null,
   referrer: null,
+  tierUndecided: false,
+  selfEntered: false,
   createdAt: "2026-11-13T00:00:00.000Z",
   ...over,
 });
