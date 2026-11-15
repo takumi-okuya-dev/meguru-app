@@ -305,7 +305,7 @@ shadcn/uiの色の変数（`apps/web/src/index.css`）を使う。画面イメ�
 | 利用規約 | `/terms` | 1カラムの読み物（ログイン不要） | 010 |
 | トークンの作り方 | `/guide/threads-token` | 1カラムの読み物（ログイン不要） | 010 |
 
-- 人物メモ（`/people/…`）と集金（`/collect/…`）の画面のURLは、この表に写さず、それぞれの画面契約を正本にする（[人物メモ](../specs/people/001-people-memo/contracts/ui-routes.md)・[集金](../specs/collect/001-event-day-collection/contracts/ui-routes.md)。あとの機能で足した画面は、その機能の`contracts/ui-routes.md`）。
+- 人物メモ（`/people/…`）と集金（`/collect/…`）の画面のURLは、この表に写さず、それぞれの画面契約を正本にする（[人物メモ](../specs/people/001-people-memo/contracts/ui-routes.md)・[集金](../specs/collect/001-event-day-collection/contracts/ui-routes.md)。人物メモは001の`ui-routes.md`にまとめている。集金であとの機能で足した画面は、その機能の`contracts/ui-routes.md`）。
 
 - **028で変えたもの**：Threadsの画面を`/threads/…`に移した（前の`/accounts/…`・`/teams/…`は転送する）。「すべてのアプリ」（`/apps`）と、ユーザーメニューの「すべてのアプリ」、アプリが2本以上の人のアプリの切り替えを足した。アプリが1本の人の見た目は変えない。詳しくは[028 contracts/ui-routes.md](../specs/028-meguru-shell/contracts/ui-routes.md)。
 - **018で足したもの**：課題の区分ごとの「AIと考える」とそのポップアップ（2026-11-04に、進み具合のカードの「AIと壁打ちして埋める」と欄から変えた）。ほかの画面は変えない。詳しくは[018 contracts/ui-routes.md](../specs/018-strategy-ai-sparring/contracts/ui-routes.md)。
