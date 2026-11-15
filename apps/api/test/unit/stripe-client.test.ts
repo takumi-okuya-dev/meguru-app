@@ -8,7 +8,7 @@ import {
   STRIPE_API_VERSION,
   StripeError,
   verifyWebhookSignature,
-} from "../../src/lib/stripe-client";
+} from "../../src/adapters/stripe/stripe-client";
 
 type Captured = { url: string; init: RequestInit };
 

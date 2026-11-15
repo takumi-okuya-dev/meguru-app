@@ -1,6 +1,6 @@
 // トークンを調べる呼び出し（specs/010-token-account-add research.md R3）
 import { beforeEach, describe, expect, it } from "vitest";
-import { ThreadsAuthError, ThreadsPermissionError, createThreadsClient } from "../../src/lib/threads-client";
+import { ThreadsAuthError, ThreadsPermissionError, createThreadsClient } from "../../src/adapters/threads-api/threads-client";
 import { fake, testEnv } from "../helpers/app";
 
 describe("debugToken", () => {
@@ -14,7 +14,7 @@ describe("debugToken", () => {
     const token = await fake.issueToken({ user: "9003" });
     const info = await threads.debugToken(token);
     expect(info.isValid).toBe(true);
-    expect(info.scopes).toEqual(["threads_basic", "threads_content_publish", "threads_manage_insights"]);
+    expect(info.scopes).toEqual(["threads_basic", "threads_content_publish", "threads_manage_insights", "threads_manage_replies"]);
     const days = (info.expiresAt!.getTime() - Date.now()) / 86_400_000;
     expect(days).toBeGreaterThan(59);
     expect(Math.abs(info.issuedAt!.getTime() - Date.now())).toBeLessThan(5_000);

@@ -5,6 +5,7 @@ import {
   entitlementOf,
   isInTrial,
   nextInvoiceAmount,
+  BILLING_UNIT_PRICE_JPY,
   trialDaysLeft,
   trialEndsAt,
   type EntitlementInput,
@@ -23,6 +24,8 @@ const base = (over: Partial<EntitlementInput> = {}): EntitlementInput => ({
   userCreatedAt: created,
   subscription: null,
   now: inTrial,
+  // 024の前からいた人（無料体験を使える）。024のあとの人は legacyTrial: false（specs/024 research.md R8）
+  legacyTrial: true,
   ...over,
 });
 const sub = (status: SubscriptionStatus, cancelAtPeriodEnd = false) => ({ status, cancelAtPeriodEnd });
@@ -141,7 +144,7 @@ describe("請求の数と金額（research.md R3）", () => {
   it("次の請求の見込みは 1,000円＋(max(n,1)−1)×500円", () => {
     expect(nextInvoiceAmount(0)).toBe(1000);
     expect(nextInvoiceAmount(1)).toBe(1000);
-    expect(nextInvoiceAmount(3)).toBe(2000);
+    expect(nextInvoiceAmount(3)).toBe(3000);
   });
 });
 
@@ -154,5 +157,45 @@ describe("trialDaysLeft（日本時間の日付で数え、終わる日を含ま
   });
   it("10日前は10", () => {
     expect(trialDaysLeft(end, new Date("2026-10-22T03:00:00.000Z"))).toBe(10);
+  });
+});
+
+describe("無料体験の廃止（specs/024 data-model.md 3、FR-029〜FR-031）", () => {
+  const fresh = (over: Partial<EntitlementInput> = {}) => base({ legacyTrial: false, ...over });
+
+  it("024のあとの人で契約がなければ unsubscribed（使えない・作れない）。登録から1か月の間でも同じ", () => {
+    for (const now of [inTrial, afterTrial]) {
+      expect(entitlementOf(fresh({ now }))).toMatchObject({
+        state: "unsubscribed",
+        fullAccess: false,
+        readOnlyReason: "not_subscribed",
+        accountLimit: 0,
+      });
+    }
+    for (const status of ["incomplete", "incomplete_expired"] as const) {
+      expect(entitlementOf(fresh({ subscription: sub(status) })).state).toBe("unsubscribed");
+    }
+  });
+
+  it("契約すれば使え、解約・支払いの失敗は今のとおり読むだけ", () => {
+    expect(entitlementOf(fresh({ subscription: sub("active") })).state).toBe("active");
+    expect(entitlementOf(fresh({ subscription: sub("canceled") }))).toMatchObject({ state: "read_only", readOnlyReason: "canceled" });
+    expect(entitlementOf(fresh({ subscription: sub("past_due") }))).toMatchObject({ state: "read_only", readOnlyReason: "payment_failed" });
+  });
+
+  it("料金なし・決済OFFは今のまま", () => {
+    expect(entitlementOf(fresh({ exempt: true })).state).toBe("exempt");
+    expect(entitlementOf(fresh({ billingEnabled: false })).state).toBe("billing_disabled");
+  });
+
+  it("前からの無料体験は、終わる日まで trial（上限1件）、終わったら trial_ended", () => {
+    expect(entitlementOf(base())).toMatchObject({ state: "trial", accountLimit: 1 });
+    expect(entitlementOf(base({ now: afterTrial }))).toMatchObject({ state: "read_only", readOnlyReason: "trial_ended" });
+  });
+
+  it("料金はアカウント1件につき月1,000円（0件でも1件分）", () => {
+    expect(BILLING_UNIT_PRICE_JPY).toBe(1000);
+    expect(nextInvoiceAmount(0)).toBe(1000);
+    expect(nextInvoiceAmount(2)).toBe(2000);
   });
 });

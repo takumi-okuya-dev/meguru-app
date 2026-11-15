@@ -1,7 +1,17 @@
-// 課題のAIのプロンプト（specs/014-strategy-guidance research.md R4、contracts/prompt-template.md 2〜4）。
+// 課題のAIのプロンプト（specs/014-strategy-guidance research.md R4、contracts/prompt-template.md 2〜4。
+// 壁打ちは specs/018-strategy-ai-sparring contracts/prompt-template.md 1）。
 // 画面の今の入力（未保存を含む）から作る。アプリはAIを呼ばない（Constitution原則III）。
-import { PURPOSE_KEYS, STRATEGY_FIELDS, STRATEGY_SECTIONS, TONE_PRESETS, type StrategyField, type StrategyValues } from "./strategy";
+import {
+  PURPOSE_KEYS,
+  STRATEGY_FIELDS,
+  STRATEGY_SECTIONS,
+  TONE_PRESETS,
+  strategyFieldOf as fieldOf,
+  type StrategyField,
+  type StrategyValues,
+} from "./strategy";
 import { HINTED_KEYS, hintOf, type HintedKey } from "./strategy-guidance";
+import { SPARRING_ITEM_END, sparringBeginLine, type SparringKey } from "./strategy-sparring";
 import { isBlank } from "./text";
 
 /** 完成版の始まりの目印。Markdown の見出し・区切り線にならない文字にする（research.md R4）。 */
@@ -11,12 +21,6 @@ export const FINAL_END = "【完成版ここまで】";
 
 /** 深掘りのプロンプトの文脈に入れる項目（数える16項目・目的の5問・活動の軸。下書きは入れない）。 */
 const CONTEXT_KEYS: readonly StrategyField["key"][] = [...HINTED_KEYS, "activityAxis"];
-
-function fieldOf(key: StrategyField["key"]): StrategyField {
-  const f = STRATEGY_FIELDS.find((x) => x.key === key);
-  if (!f) throw new Error(`unknown strategy field: ${key}`);
-  return f;
-}
 
 /**
  * 項目の値を、プロンプトに書く文字にする。近い人間性は選択肢の名前。空なら null。
@@ -149,3 +153,67 @@ export function buildAxisPrompt(values: StrategyValues): string {
     FINAL_END,
   ].join("\n");
 }
+
+/**
+ * 「AIと壁打ちして埋める」のプロンプト（specs/018 FR-006・FR-007）。質問の対象の項目をまとめて相談し、
+ * 最後に項目ごとの完成版を決まった目印で出してもらう。長さは削らない。
+ * @param values - 課題の今の値（未保存を含む）
+ * @param targets - 質問の対象（表示の順）
+ * @returns プロンプト
+ */
+export function buildSparringPrompt(values: StrategyValues, targets: readonly SparringKey[]): string {
+  const lines = [
+    `あなたは、SNS発信の設計を手伝う聞き役です。これから、私のThreadsアカウントの設計のうち、下の${targets.length}項目を、一緒に考えて完成させてください。`,
+    "",
+    "■一緒に考える項目",
+  ];
+  targets.forEach((key, i) => {
+    const field = fieldOf(key);
+    const hint = hintOf(key);
+    if (i > 0) lines.push("");
+    lines.push(`【${i + 1}】${field.label}`, `考えること: ${field.description}`);
+    if (hint) {
+      lines.push(
+        `コツ: ${hint.tip}`,
+        `悪い例: ${hint.bad}`,
+        `良い例: ${hint.good}`,
+        `足してみたい観点: ${hint.more.join("・")}`,
+        `こんな場合はどうだろう？: ${hint.whatIf}`,
+        `もっと良くするなら: ${hint.better}`,
+      );
+    }
+    lines.push(`今の私の答え: ${valueText(values, key) ?? "未入力"}`);
+  });
+  // 文脈は深掘りと同じ集まり（近い人間性を含み、下書きを含まない）から、質問の対象を除いたもの
+  const context = CONTEXT_KEYS.filter((k) => !(targets as readonly string[]).includes(k)).flatMap((k) => {
+    const v = valueText(values, k);
+    return v === null ? [] : [`- ${fieldOf(k).label}: ${v}`];
+  });
+  if (context.length > 0) {
+    lines.push("", "■ほかの項目に書いたこと(参考。食い違わないように)", ...context);
+  }
+  lines.push(
+    "",
+    "■進め方",
+    "1. 上の項目を順に、一度に1〜2問ずつ質問してください。質問は、答えやすい具体的な問いにしてください。",
+    "2. 私の答えにないこと(事実・数字・エピソード)は作らないでください。",
+    "3. 今の私の答えがある項目は、その文を生かして足したり直したりしてください。別の内容に書き換えないでください。",
+    "4. 項目どうしで、重なりや食い違いがないようにしてください。",
+    "5. すべての項目を聞き終えたら、項目ごとの完成版を、下の「完成版の形」で出してください。途中で私が「完成版を出して」と送ったら、その時点までの内容で出してください(材料が足りない項目は、出さなくてかまいません)。",
+  );
+  if (targets.includes("contentThemeMix")) {
+    lines.push(
+      "6. 「発信テーマの掛け合わせ」は、候補を3つ以上出し、それぞれの「集まりそうな人」を添えて、私と相談して1つに決めてください。",
+    );
+  }
+  lines.push(
+    "",
+    "■完成版の形",
+    "項目ごとに、始まりの目印の行・完成版・終わりの目印の行の順に書いてください。目印の行は、項目の名前も含めて、そのまま書き写してください。完成版のほかに説明を書くときは、目印の外に書いてください。",
+  );
+  for (const key of targets) {
+    lines.push("", sparringBeginLine(fieldOf(key).label), "(完成版)", SPARRING_ITEM_END);
+  }
+  return lines.join("\n");
+}
+

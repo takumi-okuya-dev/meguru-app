@@ -12,7 +12,7 @@ test("サイドバーの「投稿をつくる」で開き、プロンプトを�
   const accountId = await createAccount(page, "投稿をつくるアカウント");
 
   await page.getByRole("navigation", { name: "このアカウント" }).getByRole("link", { name: "投稿をつくる" }).click();
-  await expect(page).toHaveURL(new RegExp(`/accounts/${accountId}/create$`));
+  await expect(page).toHaveURL(new RegExp(`/threads/accounts/${accountId}/create$`));
   await expect(page.getByRole("region", { name: "投稿ができるまでの5つの手順" })).toBeVisible();
 
   // プロンプトに014の指示が入っている
@@ -29,7 +29,7 @@ test("サイドバーの「投稿をつくる」で開き、プロンプトを�
   await expect(page.getByText("2件を投稿ストックに登録しました")).toBeVisible();
 
   await page.getByRole("link", { name: "投稿ストックで確かめる" }).click();
-  await expect(page).toHaveURL(new RegExp(`/accounts/${accountId}/stock$`));
+  await expect(page).toHaveURL(new RegExp(`/threads/accounts/${accountId}/stock$`));
   await expect(page.getByText("朝のカフェの案")).toBeVisible();
   await expect(page.getByText("夜のカフェの案")).toBeVisible();
   await expect(page.getByText("```")).toHaveCount(0);

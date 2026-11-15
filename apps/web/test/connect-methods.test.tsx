@@ -3,22 +3,26 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import type { AccountSummary, MeResponse } from "@threads-grower/shared";
+import type { AccountSummary } from "@meguru/shared";
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { ME_BILLING_OFF } from "./helpers/billing";
+import { ME_BILLING_OFF, type MeWithThreads } from "./helpers/billing";
 
-let meResponse: MeResponse;
+let meResponse: MeWithThreads;
 const mocks = vi.hoisted(() => ({ tokenConnect: vi.fn(), connect: vi.fn(), assign: vi.fn() }));
 vi.mock("@/lib/api-client", async (orig) => {
   const actual = await orig<typeof import("@/lib/api-client")>();
   return {
     ...actual,
-    api: { ...actual.api, me: () => Promise.resolve(meResponse), connect: mocks.connect, tokenConnect: mocks.tokenConnect },
+    api: { ...actual.api, me: () => Promise.resolve(meResponse) },
   };
 });
+vi.mock("@/apps/threads/lib/api", async (orig) => {
+  const actual = await orig<typeof import("@/apps/threads/lib/api")>();
+  return { ...actual, threadsApi: { ...actual.threadsApi, me: () => Promise.resolve(meResponse), connect: mocks.connect, tokenConnect: mocks.tokenConnect } };
+});
 
-const { ConnectMethods } = await import("@/components/connect/ConnectMethods");
+const { ConnectMethods } = await import("@/apps/threads/components/connect/ConnectMethods");
 const { ApiError } = await import("@/lib/api-client");
 
 const TOKEN = "THAAG" + "x".repeat(60);
@@ -61,7 +65,7 @@ function renderIt(
   const router = createMemoryRouter(
     [
       {
-        path: "/accounts/:id/settings",
+        path: "/threads/accounts/:id/settings",
         element: (
           <ConnectMethods
             account={unconnected}
@@ -72,7 +76,7 @@ function renderIt(
         ),
       },
     ],
-    { initialEntries: ["/accounts/a1/settings"] },
+    { initialEntries: ["/threads/accounts/a1/settings"] },
   );
   render(
     <QueryClientProvider client={(client = new QueryClient({ defaultOptions: { queries: { retry: false } } }))}>
@@ -207,13 +211,16 @@ describe("自分の別のアカウントと重なったとき（US3-1）", () =>
     await user.type(screen.getByLabelText("アクセストークン"), TOKEN);
     await user.click(screen.getByRole("button", { name: "つなぐ" }));
     expect(await screen.findByText("@cafe_bは、あなたのアカウント『カフェ本店』につながっています。")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "『カフェ本店』を開く" })).toHaveAttribute("href", "/accounts/a9/settings");
+    expect(screen.getByRole("link", { name: "『カフェ本店』を開く" })).toHaveAttribute("href", "/threads/accounts/a9/settings");
   });
 
   it("このアプリの接続から戻ってきたとき（?error=…&account=…）も、名前とリンクを出す", async () => {
     renderIt({ initialError: { code: "ACCOUNT_ALREADY_REGISTERED", account: "a9" } });
     expect(await screen.findByText("@cafe_bは、あなたのアカウント『カフェ本店』につながっています。")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "『カフェ本店』を開く" })).toHaveAttribute("href", "/accounts/a9/settings");
+    expect(screen.getByRole("link", { name: "『カフェ本店』を開く" })).toHaveAttribute("href", "/threads/accounts/a9/settings");
+    // 取り違えから戻ったときの切り替えの手順も、リンクを残したまま出す（specs/025 US2・FR-006）
+    expect(screen.getByText("つなぎたいアカウントでログインし直す")).toBeInTheDocument();
+    expect(screen.getByText("このページに戻って、もう一度「Threadsで許可する」を押す")).toBeInTheDocument();
   });
 });
 

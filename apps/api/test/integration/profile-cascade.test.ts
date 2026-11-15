@@ -1,6 +1,6 @@
 // Accountの削除で戦略プロファイルと投稿ストック・投稿のルールも消える（specs/002 FR-026、specs/003 FR-026、specs/004 FR-036）
 import { eq } from "drizzle-orm";
-import { emptyStrategyValues } from "@threads-grower/shared";
+import { emptyStrategyValues } from "@meguru/shared";
 import { beforeEach, describe, expect, it } from "vitest";
 import {
   accounts,
@@ -33,7 +33,7 @@ beforeEach(async () => {
 async function accountWithProfile() {
   await connectNew(app, "u1", "1001");
   const [a] = await db().select().from(accounts);
-  const base = `/api/accounts/${a!.id}`;
+  const base = `/api/threads/accounts/${a!.id}`;
   await call(app, "PUT", `${base}/strategy`, {
     user: "u1",
     body: { ...emptyStrategyValues(), finalAction: "x", expectedVersion: 0 },
@@ -75,9 +75,9 @@ async function expectProfileGone() {
 }
 
 describe("Accountの削除と戦略プロファイル", () => {
-  it("DELETE /api/accounts/:id で、課題・宣伝内容・参考投稿・キーワード・登録のまとまり・下書きの行がすべて消える", async () => {
+  it("DELETE /api/threads/accounts/:id で、課題・宣伝内容・参考投稿・キーワード・登録のまとまり・下書きの行がすべて消える", async () => {
     const a = await accountWithProfile();
-    const res = await call(app, "DELETE", `/api/accounts/${a.id}`, { user: "u1", body: { confirmName: a.name } });
+    const res = await call(app, "DELETE", `/api/threads/accounts/${a.id}`, { user: "u1", body: { confirmName: a.name } });
     expect(res.status).toBe(204);
     await expectProfileGone();
   });

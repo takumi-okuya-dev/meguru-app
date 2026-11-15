@@ -372,6 +372,17 @@ export const STRATEGY_FIELDS: readonly StrategyField[] = [
 export const STRATEGY_TOTAL = 16;
 
 /**
+ * 項目のキーから、項目の定義を引く。
+ * @param key - 項目のキー
+ * @returns 項目の定義
+ */
+export function strategyFieldOf(key: StrategyField["key"]): StrategyField {
+  const f = STRATEGY_FIELDS.find((x) => x.key === key);
+  if (!f) throw new Error(`unknown strategy field: ${key}`);
+  return f;
+}
+
+/**
  * 全項目が空の課題を作る。
  * @returns テキストは ""、近い人間性は null の値
  */

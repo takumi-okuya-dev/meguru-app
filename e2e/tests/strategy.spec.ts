@@ -35,7 +35,7 @@ test("課題を保存すると再読み込みで復元され、未保存のま�
 test("目的の5問・考えるヒント・自動チェックが出て、AIの答えを貼って反映・保存できる", async ({ page }) => {
   await signIn(page);
   const accountId = await createAccount(page, "目的のアカウント");
-  await page.goto(`/accounts/${accountId}/strategy`);
+  await page.goto(`/threads/accounts/${accountId}/strategy`);
 
   // 目的の5問（区分の初め）
   const q1 = page.getByLabel("Q1：なぜ、この活動を始めようと思いましたか？");
@@ -51,7 +51,7 @@ test("目的の5問・考えるヒント・自動チェックが出て、AIの�
 
   // AIと深掘りする：AIの答え（偽）を貼り、目印の内側を反映する
   const worries = page.locator("#field-realWorries");
-  await worries.getByRole("button", { name: "この項目をAIと深掘りする" }).click();
+  await worries.getByRole("button", { name: "AIと深掘り" }).click();
   await worries
     .getByLabel("AIの答えを貼り付ける")
     .fill("まとめました。\n【完成版ここから】\n会社と家の往復で、新しい出会いがない\n【完成版ここまで】\nどうですか？");

@@ -28,7 +28,7 @@ describe("mode = reconnect", () => {
     const { authorizeUrl } = (await res.json()) as { authorizeUrl: string };
     const cb = await authorizeAndCallback(app, authorizeUrl, { fakeUser: "1001" });
     const target = redirectTarget(cb);
-    expect(target.pathname).toBe(`/accounts/${a!.id}/settings`);
+    expect(target.pathname).toBe(`/threads/accounts/${a!.id}/settings`);
     expect(target.searchParams.get("connected")).toBe("reconnect");
     const all = await db().select().from(accounts);
     expect(all).toHaveLength(1);
@@ -62,7 +62,7 @@ describe("mode = reconnect", () => {
     const { authorizeUrl } = (await (await startReconnect("u1", a!.id)).json()) as { authorizeUrl: string };
     const cb = await authorizeAndCallback(app, authorizeUrl, { fakeUser: "1002" });
     const target = redirectTarget(cb);
-    expect(target.pathname).toBe(`/accounts/${a!.id}/settings`);
+    expect(target.pathname).toBe(`/threads/accounts/${a!.id}/settings`);
     expect(target.searchParams.get("error")).toBe("RECONNECT_ACCOUNT_MISMATCH");
     const [connAfter] = await db().select().from(threadsConnections);
     expect(Buffer.from(connAfter!.accessTokenCiphertext).equals(Buffer.from(connBefore!.accessTokenCiphertext))).toBe(true);

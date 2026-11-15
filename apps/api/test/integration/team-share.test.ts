@@ -29,13 +29,13 @@ async function setup() {
 }
 
 const share = (teamId: string, accountId: string, user: string, shared: boolean) =>
-  call(app, "PATCH", `/api/teams/${teamId}/accounts/${accountId}`, { user, body: { shared } });
+  call(app, "PATCH", `/api/threads/teams/${teamId}/accounts/${accountId}`, { user, body: { shared } });
 
 beforeEach(async () => {
   await resetDb();
 });
 
-describe("PATCH /api/teams/:teamId/accounts/:accountId（チームに見せる。FR-030）", () => {
+describe("PATCH /api/threads/teams/:teamId/accounts/:accountId（チームに見せる。FR-030）", () => {
   it("そのアカウントのオーナーだけが切り替えられる（管理者も不可）。記録 team_share_changed", async () => {
     const { teamId, ownerAcc } = await setup();
     for (const user of ["a1", "m1", "e1"]) {
@@ -66,30 +66,30 @@ describe("PATCH /api/teams/:teamId/accounts/:accountId（チームに見せる�
   it("オフにした次の要求で拒まれる（担当の人は開けたまま）。別のチームの人は見せていても見えない", async () => {
     const { teamId, ownerAcc } = await setup();
     expect((await share(teamId, ownerAcc, "o1", true)).status).toBe(204);
-    expect((await call(app, "GET", `/api/accounts/${ownerAcc}/post-drafts`, { user: "m1" })).status).toBe(200);
-    expect((await call(app, "GET", `/api/accounts/${ownerAcc}/post-drafts`, { user: "x1" })).status).toBe(404);
+    expect((await call(app, "GET", `/api/threads/accounts/${ownerAcc}/post-drafts`, { user: "m1" })).status).toBe(200);
+    expect((await call(app, "GET", `/api/threads/accounts/${ownerAcc}/post-drafts`, { user: "x1" })).status).toBe(404);
     expect((await share(teamId, ownerAcc, "o1", false)).status).toBe(204);
     for (const user of ["m1", "a1"]) {
-      const res = await call(app, "GET", `/api/accounts/${ownerAcc}/post-drafts`, { user });
+      const res = await call(app, "GET", `/api/threads/accounts/${ownerAcc}/post-drafts`, { user });
       expect([res.status, await errorOf(res)], user).toEqual([404, "ACCOUNT_NOT_FOUND"]);
     }
-    expect((await call(app, "GET", `/api/accounts/${ownerAcc}/post-drafts`, { user: "e1" })).status).toBe(200);
+    expect((await call(app, "GET", `/api/threads/accounts/${ownerAcc}/post-drafts`, { user: "e1" })).status).toBe(200);
   });
 
   it("見せてもらっている人には、投稿の一覧にNGワード・作る件数を返さない（設定は見せない。FR-031）", async () => {
     const { teamId, ownerAcc } = await setup();
-    await call(app, "POST", `/api/accounts/${ownerAcc}/ng-words`, { user: "o1", body: { words: ["秘密の言葉"] } });
+    await call(app, "POST", `/api/threads/accounts/${ownerAcc}/ng-words`, { user: "o1", body: { words: ["秘密の言葉"] } });
     // ブロックされた下書きを1件作る。1件も無いとこの不変条件を検査できず、
     // 下書きに付く blockedWords（＝オーナーのNGワードそのもの）の漏れを見逃す（セキュリティ監査 run-1）
     const db = sql();
     const [batch] = (await db`
-      INSERT INTO draft_batches (account_id, client_request_id, draft_count, delimiter_found)
+      INSERT INTO threads.draft_batches (account_id, client_request_id, draft_count, delimiter_found)
       VALUES (${ownerAcc}, gen_random_uuid(), 1, true) RETURNING id`) as [{ id: string }];
     await db`
-      INSERT INTO post_drafts (account_id, batch_id, position, body, status, blocked_at, blocked_reason, blocked_words)
+      INSERT INTO threads.post_drafts (account_id, batch_id, position, body, status, blocked_at, blocked_reason, blocked_words)
       VALUES (${ownerAcc}, ${batch.id}, 0, '案', 'needs_review', now(), 'ng_word', ARRAY['秘密の言葉'])`;
     expect((await share(teamId, ownerAcc, "o1", true)).status).toBe(204);
-    const res = await call(app, "GET", `/api/accounts/${ownerAcc}/post-drafts`, { user: "m1" });
+    const res = await call(app, "GET", `/api/threads/accounts/${ownerAcc}/post-drafts`, { user: "m1" });
     const body = (await res.json()) as {
       ngWords: unknown[];
       canGeneratePrompt: boolean;
@@ -115,25 +115,25 @@ describe("PATCH /api/teams/:teamId/accounts/:accountId（チームに見せる�
 
   it("オーナー自身には blockedWords を返す（伏せるのは見せてもらっている人だけ）", async () => {
     const { teamId, ownerAcc } = await setup();
-    await call(app, "POST", `/api/accounts/${ownerAcc}/ng-words`, { user: "o1", body: { words: ["秘密の言葉"] } });
+    await call(app, "POST", `/api/threads/accounts/${ownerAcc}/ng-words`, { user: "o1", body: { words: ["秘密の言葉"] } });
     const db = sql();
     const [batch] = (await db`
-      INSERT INTO draft_batches (account_id, client_request_id, draft_count, delimiter_found)
+      INSERT INTO threads.draft_batches (account_id, client_request_id, draft_count, delimiter_found)
       VALUES (${ownerAcc}, gen_random_uuid(), 1, true) RETURNING id`) as [{ id: string }];
     await db`
-      INSERT INTO post_drafts (account_id, batch_id, position, body, status, blocked_at, blocked_reason, blocked_words)
+      INSERT INTO threads.post_drafts (account_id, batch_id, position, body, status, blocked_at, blocked_reason, blocked_words)
       VALUES (${ownerAcc}, ${batch.id}, 0, '案', 'needs_review', now(), 'ng_word', ARRAY['秘密の言葉'])`;
     expect((await share(teamId, ownerAcc, "o1", true)).status).toBe(204);
-    const res = await call(app, "GET", `/api/accounts/${ownerAcc}/post-drafts`, { user: "o1" });
+    const res = await call(app, "GET", `/api/threads/accounts/${ownerAcc}/post-drafts`, { user: "o1" });
     const body = (await res.json()) as { needsReview: { blockedWords: string[] }[] };
     expect(body.needsReview[0]?.blockedWords).toEqual(["秘密の言葉"]);
   });
 
   it("見せてもらっている人の GET /accounts/:id は、名前とアイコンだけが本当の値で、接続・最後に使った日時は伏せる（PR #14 のCodexレビュー）", async () => {
     const { teamId, ownerAcc } = await setup();
-    await sql()`UPDATE accounts SET connection_status = 'needs_reconnect', connection_method = 'token', last_used_at = now() WHERE id = ${ownerAcc}`;
+    await sql()`UPDATE threads.accounts SET connection_status = 'needs_reconnect', connection_method = 'token', last_used_at = now() WHERE id = ${ownerAcc}`;
     expect((await share(teamId, ownerAcc, "o1", true)).status).toBe(204);
-    const viewer = (await (await call(app, "GET", `/api/accounts/${ownerAcc}`, { user: "m1" })).json()) as Record<string, unknown>;
+    const viewer = (await (await call(app, "GET", `/api/threads/accounts/${ownerAcc}`, { user: "m1" })).json()) as Record<string, unknown>;
     expect(viewer).toMatchObject({
       id: ownerAcc,
       role: "viewer",
@@ -144,7 +144,7 @@ describe("PATCH /api/teams/:teamId/accounts/:accountId（チームに見せる�
       lastUsedAt: null,
     });
     // オーナーには本当の値
-    const owner = (await (await call(app, "GET", `/api/accounts/${ownerAcc}`, { user: "o1" })).json()) as Record<string, unknown>;
+    const owner = (await (await call(app, "GET", `/api/threads/accounts/${ownerAcc}`, { user: "o1" })).json()) as Record<string, unknown>;
     expect(owner).toMatchObject({ connectionStatus: "needs_reconnect", connectionMethod: "token" });
   });
 
@@ -152,37 +152,37 @@ describe("PATCH /api/teams/:teamId/accounts/:accountId（チームに見せる�
     const { teamId, ownerAcc } = await setup();
     expect((await share(teamId, ownerAcc, "o1", true)).status).toBe(204);
     for (const path of ["strategy", "promotions", "reference-posts", "research-keywords"]) {
-      const viewer = (await (await call(app, "GET", `/api/accounts/${ownerAcc}/${path}`, { user: "m1" })).json()) as { canEdit: boolean };
+      const viewer = (await (await call(app, "GET", `/api/threads/accounts/${ownerAcc}/${path}`, { user: "m1" })).json()) as { canEdit: boolean };
       expect(viewer.canEdit, `viewer ${path}`).toBe(false);
-      const owner = (await (await call(app, "GET", `/api/accounts/${ownerAcc}/${path}`, { user: "o1" })).json()) as { canEdit: boolean };
+      const owner = (await (await call(app, "GET", `/api/threads/accounts/${ownerAcc}/${path}`, { user: "o1" })).json()) as { canEdit: boolean };
       expect(owner.canEdit, `owner ${path}`).toBe(true);
-      const editor = (await (await call(app, "GET", `/api/accounts/${ownerAcc}/${path}`, { user: "e1" })).json()) as { canEdit: boolean };
+      const editor = (await (await call(app, "GET", `/api/threads/accounts/${ownerAcc}/${path}`, { user: "e1" })).json()) as { canEdit: boolean };
       expect(editor.canEdit, `editor ${path}`).toBe(true);
     }
   });
 });
 
-describe("POST・DELETE /api/teams/:teamId/accounts（自分のアカウントを足す・外す。FR-034・FR-046）", () => {
+describe("POST・DELETE /api/threads/teams/:teamId/accounts（自分のアカウントを足す・外す。FR-034・FR-046）", () => {
   it("自分のアカウントを足せる。他人のアカウント・ほかのチームのアカウントは足せない", async () => {
     const { teamId } = await setup();
     const { accountId: extra } = await createUserWithAccount("m1");
-    expect((await call(app, "POST", `/api/teams/${teamId}/accounts`, { user: "m1", body: { accountId: extra, shared: true } })).status).toBe(204);
-    const [row] = (await sql()`SELECT shared FROM team_accounts WHERE account_id = ${extra}`) as { shared: boolean }[];
+    expect((await call(app, "POST", `/api/threads/teams/${teamId}/accounts`, { user: "m1", body: { accountId: extra, shared: true } })).status).toBe(204);
+    const [row] = (await sql()`SELECT shared FROM threads.team_accounts WHERE account_id = ${extra}`) as { shared: boolean }[];
     expect(row!.shared).toBe(true);
     expect((await activityRows(extra)).map((r) => r.action)).toEqual(["team_account_added"]);
     const { accountId: others } = await createUserWithAccount("z1");
-    expect((await call(app, "POST", `/api/teams/${teamId}/accounts`, { user: "m1", body: { accountId: others } })).status).toBe(404);
-    const again = await call(app, "POST", `/api/teams/${teamId}/accounts`, { user: "m1", body: { accountId: extra } });
+    expect((await call(app, "POST", `/api/threads/teams/${teamId}/accounts`, { user: "m1", body: { accountId: others } })).status).toBe(404);
+    const again = await call(app, "POST", `/api/threads/teams/${teamId}/accounts`, { user: "m1", body: { accountId: extra } });
     expect([again.status, await errorOf(again)]).toEqual([409, "ACCOUNT_IN_OTHER_TEAM"]);
   });
 
   it("外すと、そのアカウントでの担当も消える。最後の1つは TEAM_LAST_ACCOUNT。外せるのはオーナーと管理者", async () => {
     const { teamId, ownerAcc, ownerAcc2, memberAcc } = await setup();
-    const del = (accountId: string, user: string) => call(app, "DELETE", `/api/teams/${teamId}/accounts/${accountId}`, { user });
+    const del = (accountId: string, user: string) => call(app, "DELETE", `/api/threads/teams/${teamId}/accounts/${accountId}`, { user });
     expect((await del(ownerAcc, "m1")).status).toBe(403);
     expect((await del(ownerAcc, "o1")).status).toBe(204);
-    expect((await call(app, "GET", `/api/accounts/${ownerAcc}/post-drafts`, { user: "e1" })).status).toBe(404);
-    const [assigned] = (await sql()`SELECT count(*)::int AS n FROM memberships WHERE account_id = ${ownerAcc} AND role = 'editor'`) as { n: number }[];
+    expect((await call(app, "GET", `/api/threads/accounts/${ownerAcc}/post-drafts`, { user: "e1" })).status).toBe(404);
+    const [assigned] = (await sql()`SELECT count(*)::int AS n FROM threads.memberships WHERE account_id = ${ownerAcc} AND role = 'editor'`) as { n: number }[];
     expect(assigned!.n).toBe(0);
     const last = await del(ownerAcc2, "o1");
     expect([last.status, await errorOf(last)]).toEqual([409, "TEAM_LAST_ACCOUNT"]);
@@ -190,6 +190,6 @@ describe("POST・DELETE /api/teams/:teamId/accounts（自分のアカウント�
     expect([lastByAdmin.status, await errorOf(lastByAdmin)]).toEqual([409, "TEAM_LAST_ACCOUNT"]);
     // 外したアカウントのデータと記録は残る
     expect((await activityRows(ownerAcc)).map((r) => r.action)).toContain("team_account_removed");
-    expect((await call(app, "GET", `/api/accounts/${ownerAcc}/post-drafts`, { user: "o1" })).status).toBe(200);
+    expect((await call(app, "GET", `/api/threads/accounts/${ownerAcc}/post-drafts`, { user: "o1" })).status).toBe(200);
   });
 });

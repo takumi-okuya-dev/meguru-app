@@ -1,48 +1,45 @@
-# ThreadsGrower App
+# めぐる（meguru-app）
 
-Threadsアカウントを「投稿ストック→承認→自動投稿→分析→改善」のループで育てるためのアプリ。
+**出会いと挑戦が、めぐる。** イベント・コミュニティの流れ（告知・集客→申込・集金→当日→人の記録→次回の告知）を支えるアプリを、共通のアカウント・契約で束ねるスイート。全体の形は[プロダクトの構造](docs/product-structure.md)。
+
+今入っているアプリは3つ。
+
+| アプリ | パス | 何をするか | 使える人 |
+|---|---|---|---|
+| **めぐる Threads**（旧ThreadsGrower） | `/threads` | Threadsアカウントを「投稿ストック→承認→自動投稿→分析→改善」のループで育てる | ログインした人（テスト版はグループの招待制） |
+| **めぐる 人物メモ** | `/people` | イベントのアンケートのCSVから会った人の一覧を作り、次の会に誘う。声かけリスト・連絡の記録・書き出しもある（`specs/people/001-people-memo`・`002-sales-list`） | 運営者が開いた人だけ（テスト版） |
+| **めぐる 集金** | `/collect` | イベント当日の受付と集金（現金・PayPay・振込）、セルフ受付、運営メンバーへの分配。お金は預からない（`specs/collect/001`〜`004`） | 運営者が開いた人だけ（テスト版） |
+
+- 2026-11-11、リポジトリ名を`threads-grower-app`から`meguru-app`に変えた。GitHubは古いURLを転送する。Cloudflare・Neonの名前（`threads-grower-api`・`threads-grower-web`など）とブラウザに保存する値の名前は、URLや保存した設定が変わらないよう、ドメインを移すときまで今のままにする。
 
 - 由来: Obsidian vault `Wiki/仕事/システム開発/アイデア/Threads自動投稿アプリ.md`
-- 既存の[threads-grower](https://github.com/MarronTaku/threads-grower)リポジトリ（spec-kit導入済み・実装進行中）とは**別プロジェクト**として並走する（2026-10-01、ユーザー確認済み）。
+- 既存の[threads-grower](https://github.com/takumi-okuya/threads-grower)リポジトリ（spec-kit導入済み・実装進行中）とは**別プロジェクト**として並走する（2026-10-01、ユーザー確認済み）。
 - 開発方法論: [BMAD-METHOD](https://github.com/bmad-code-org/BMAD-METHOD)でPRD/設計の叩き台を作成し、[spec-kit](https://github.com/github/spec-kit)で仕様→計画→タスク→実装を進める。
 
 Claude CodeとCodexで開発スキルを共用する手順と、利用制限時の引き継ぎ方法は[AIスキルの共用](docs/ai-skills.md)を参照。
 
-## 現在のフェーズ
+## 文書
 
-- [x] リポジトリ作成・ローカルクローン
-- [x] BMAD-METHODによるPRD/設計の叩き台作成
-- [x] spec-kit導入・Constitutionの制定
-- [x] feature 001「ログインとThreadsアカウント登録」：仕様・計画・タスク・実装（[specs/001-login-account-setup/](specs/001-login-account-setup/)）
-- [ ] 本物のGoogle・Threadsでの手動確認（[quickstart.md](specs/001-login-account-setup/quickstart.md)「手動での確認」）
-- [x] UI全体設計（ChatGPT風。[docs/ui-design.md](docs/ui-design.md)）
-- [x] feature 002「戦略プロファイル（課題・宣伝内容・リサーチ）」：仕様・計画・タスク・実装（[specs/002-strategy-profile/](specs/002-strategy-profile/)）
-- [x] feature 003〜009：プロンプト生成と一括登録・承認とNGワード・自動投稿・パフォーマンスと改善・複数アカウント・チーム運用・このアカウントのチーム（[specs/](specs/)）
-- [x] feature 010「自分のMetaアプリのトークンでアカウントを追加」（[specs/010-token-account-add/](specs/010-token-account-add/)）
-- [x] feature 011「チームの見直し」（[specs/011-team-revision/](specs/011-team-revision/)）
-- [x] feature 012〜014：アカウントを先に作る・退会 → 決済 → 課題の入力の手助け（[specs/](specs/)）
-- [ ] feature 015「公開のためのブランチと環境」（[specs/015-deploy-environments/](specs/015-deploy-environments/)。
-  コードと文書は実装済み。外部サービスの設定は[docs/external-services-setup.md](docs/external-services-setup.md)「9. 公開のための準備」）
-- [ ] 次：公開の判断（MetaのApp Review・事業者としての手続き。メモは[docs/next-features.md](docs/next-features.md)）
+**どの文書に何が書いてあるかは[文書の一覧](docs/README.md)**。迷ったらそこから探す。AIが守る決まりの入口は[CLAUDE.md](CLAUDE.md)、文書の置き場所と書き方は[文書の決まり](docs/rules/documents.md)。
+
+## 今の状況
+
+- 機能：`specs/001`〜`028`と`specs/meguru/029`〜`031`（めぐるの外枠・アプリの利用の許可・並行開発の決まり）を実装し、`develop`に入れた（ステージングに出ている）。2026-11-12からは、Threadsの改善と新しいアプリ（人物メモ・集金）を並行して進めた（[並行開発の決まりと手順](docs/rules/parallel-development.md)）。
+- 本番：まだ立ち上げていない。本番に出す前の準備は[リリースの手順書](docs/release-runbook.md) 4・4-1。
+- 人物メモ（`/people`）：取り込み・同じ人の候補・誘う候補（001）と、タグ・声かけの予定・連絡の記録・会ごとの声かけの一覧（002）まで、テスト版に入った。地図は[docs/apps/people.md](docs/apps/people.md)。
+- 集金（`/collect`）：001 当日の受付と集金・ログインなしの受付の手伝い・締め・振込待ち・まとめ、002 セルフ受付、003 経費と運営メンバーへの分配・紹介・精算、004 名簿なしで受付する（セルフ受付で名簿を作る。新しいイベントの初めの値）まで、テスト版に入った。使い方は[集金の使い方](docs/apps/collect-guide.md)、地図は[docs/apps/collect.md](docs/apps/collect.md)。
+- 公開の判断（MetaのApp Review・事業者としての手続き）のメモは[次の機能のメモ](docs/next-features.md)。
 
 ## ブランチとデプロイ
 
-`main`（本番）／`develop`（ステージング）／`feature/*`（追加実装）の3段構成（[Constitution](.specify/memory/constitution.md)「開発ワークフロー」、[contracts/deploy.md](specs/015-deploy-environments/contracts/deploy.md)）。
+`main`（本番）／`develop`（ステージング。既定のブランチ）／`feature/*`（開発）の3段構成。ふだんのPRは`feature/*`→`develop`に向け、マージすると自動でステージングに出る（**マイグレーション → API → Web**の順。文書・仕様・AIのスキル・E2Eだけの変更では動かない）。
 
-| ブランチ | 何の場所か | マージすると |
-|---|---|---|
-| `main` | 本番（一般のお客さま） | 本番に出る |
-| `develop` | ステージング（テストユーザー。**既定のブランチ**） | ステージングに出る |
-| `feature/*`・`fix/*` | 開発（手元） | — |
-
-- ふだんのPRは`feature/*`→`develop`に向ける。
-- リリースは`develop`→`main`のPR（タイトルは「リリース：…」）。
-- 本番の急ぎの修正は`main`から`fix/*`を分け、`main`へマージしたあと、同じ変更を`develop`にも戻す（`git log --oneline main ^develop`が空になること）。
-- `main`・`develop`への直接のpushは禁止（PR必須・CIの成功が必須）。
-- デプロイは[.github/workflows/deploy.yml](.github/workflows/deploy.yml)が自動で行う（**マイグレーション → API → Web**の順。1つでも失敗したらそこで止まる）。やり直しはActionsの画面から手で動かせる。
-- 環境の違いは**コードの分岐にせず、設定だけに置く**（`APP_ENV`・`VITE_APP_ENV`）。本番以外の画面には、いちばん上に環境の帯が出る。
-- 機能を足すときの決まり（マイグレーションの書き方・リリースの前に確かめること・困ったときの戻し方）は[リリースの手順書](docs/release-runbook.md)。
-- 非公開のリポジトリなので、Environmentの秘密の値とブランチの保護を使うには**GitHub Pro**が要る（[外部サービスの準備手順](docs/external-services-setup.md) 9-0）。
+- ブランチ・PR・レビュー・CI・マージの決まりは[開発の流れの決まり](docs/rules/development-flow.md)。AIが守る決まりの入口は[CLAUDE.md](CLAUDE.md)。
+- 本番に出す・戻す・急ぎの修正の手順は[リリースの手順書](docs/release-runbook.md)。
+- 環境の違いは**コードの分岐にせず、設定だけに置く**（`APP_ENV`・`VITE_APP_ENV`）。本番以外では、ログインの画面のいちばん上に環境の帯が、アプリの画面では左下のユーザー名の横に「テスト版」「開発版」の印が出る。
+- ステージング（<https://develop.threads-grower-web.pages.dev>）で実際に作ったもの・秘密の値の置き場所・確かめ方は[ステージングの構築記録](docs/staging-setup-record.md)。
+- 非公開のリポジトリでEnvironmentの秘密の値とブランチの保護を使うには、GitHubの有料のプランが要る。Organization`takumi-okuya-dev`の**Team**のプランで使っている（[外部サービスの準備手順](docs/external-services-setup.md) 9-0）。
+- 2026-11-13に、GitHub Actionsが支払い・使える額の上限でジョブを始めなくなったため、リポジトリを**しばらく公開**にした（公開のリポジトリでは標準のランナーが無料）。公開の間は、秘密の値・本物の参加者のデータ・個人の情報をコミットしない。非公開に戻す前に、GitHubの支払い（Billing & plans）を直す（直さずに戻すと、CIもデプロイもまた止まる）。
 
 ## 構成
 
@@ -142,10 +139,25 @@ pnpm team:demo
 - 手順の全体は[quickstart.md](specs/001-login-account-setup/quickstart.md)を参照。
 - チーム（管理者・メンバー・編集者のロール、担当、チームに見せる）は[docs/team-roles.md](docs/team-roles.md)。流れはE2Eで自動で確かめられる（`pnpm e2e -- team`。下の「E2E」）。手で触るときは、上の「チームを1回のコマンドで試す」（`pnpm team:demo`）。3人のメールアドレスは`e2e/.env.local`に書く（`e2e/.env.example`）。自分のブラウザで手で開くときは、Cookieが分かれるように開く（Chromeの別のプロファイル・別のブラウザ。シークレットウィンドウ同士はログインを共有するので不可）。チームの人は全員が自分のThreadsアカウントを1つ以上持つので、本物のThreadsで試すときは3人ともMetaのテスターの招待が要る。偽のThreadsの認可画面では「@partner_co で許可する」などで、それぞれ別のアカウントを接続できる。手順は[011 quickstart.md](specs/011-team-revision/quickstart.md)。
 
+### 手元で同時に進める（作業場所を分ける）
+
+Threadsの改善と別のアプリを手元で同時に進めるときは、`git worktree`で作業場所を分け、それぞれでClaude Codeを動かす。作業場所ごとにローカルのDBとポートが分かれる。**手順と仕組みは[並行開発の決まりと手順](docs/rules/parallel-development.md)**。
+
+```bash
+pnpm worktree:new people              # 作業場所 ../meguru-app-people を作る（ブランチを省くと feature/<名前>。develop の最新から）
+cd ../meguru-app-people && claude     # その作業場所で Claude Code を開く
+pnpm worktree:list                    # 作業場所の一覧（DBの名前とポート）
+pnpm worktree:remove people           # 片付ける（作業場所とそのDBを消す。ブランチは残す）
+pnpm worktree:reset-db --yes          # 今いる作業場所のDBを作り直す（マイグレーションを作り直したあと）
+```
+
+- 結合テストとE2Eは、作業場所をまたいで1つずつ流れる（ほかで流れていると「終わるまで待ちます…」と出る）。
+- 本物のThreads（Meta）の接続は、もとのクローンで試す。作業場所では偽のThreads（`pnpm dev:fake`）を使う。
+
 ## テスト
 
 ```bash
-pnpm --filter @threads-grower/shared test   # 共通パッケージ
+pnpm --filter @meguru/shared test   # 共通パッケージ
 pnpm --filter api test                      # API：unit と integration（Workers ランタイム上、ローカルDB、偽のThreadsサーバー）
 pnpm --filter web test                      # Web：ガード・再試行・上限の案内
 pnpm lint
@@ -160,32 +172,29 @@ pnpm typecheck
 Clerkの開発用インスタンスのキー（`apps/api/.dev.vars`と`apps/web/.env.local`）と、そのインスタンスに作ったテスト用ユーザーが必要。
 
 ```bash
-export CLERK_PUBLISHABLE_KEY=pk_test_...   # @clerk/testing が使う
-export CLERK_SECRET_KEY=sk_test_...
-export E2E_CLERK_USER_EMAIL=e2e@example.com
+cp e2e/.env.example e2e/.env.local   # 初回のみ。ログインする人のメールアドレスを書き換える（E2E_CLERK_USER_EMAIL など）
 pnpm --filter e2e exec playwright install chromium   # 初回のみ
 pnpm e2e
 ```
 
-- Playwrightが偽のThreadsサーバー（:8790）・API（Threadsを偽サーバーに向けた設定）・Webを起動する（`pnpm dev:fake`で起動中なら、それを使う）。DBはテストごとに空にする。ローカルの開発用のDBと同じなので、手で作ったデータも消える。
+- ログインする人のメールアドレス（`E2E_CLERK_USER_EMAIL`、チームの3人）は`e2e/.env.local`に書く。環境変数（`export E2E_CLERK_USER_EMAIL=…`）にあれば、そちらを使う。
+
+- Playwrightが偽のThreadsサーバー（:8790）・API（Threadsを偽サーバーに向けた設定）・Webを起動する（`pnpm dev:fake`で起動中なら、それを使う）。DBはテストごとに空にする。ローカルの開発用のDB（作業場所を分けているときは、その作業場所のDB）と同じなので、手で作ったデータも消える。
 - チーム（`pnpm e2e -- team`）は、管理者・オーナー（メンバー）・編集者の3人を別々のブラウザ（Cookieが別）でログインさせる。3人には、Clerk の開発用インスタンスに一度Googleでログインしたことのあるアカウントを使い、メールアドレスを`e2e/.env.local`の`E2E_PARTNER_EMAIL`（管理者）・`E2E_OWNER_EMAIL`・`E2E_EDITOR_EMAIL`に書く（`e2e/.env.example`をコピー。名前は008のまま）。`@clerk/testing`がメールアドレスからユーザーを探し、ログイン用のチケットで入るので、Googleのパスワードは使わない（Googleだけでログインする設定では、APIで作ったユーザーはチケットでログインできないため）。
 - Clerk のキーは、環境変数になければ`apps/api/.dev.vars`から読む。画面を見ながら流すときは`pnpm e2e -- team --headed`。
 - `pnpm team:open`（`e2e/scripts/team-open.ts`）は、同じ3人でログインしたブラウザを左から並べて開き、そのまま手で操作できる（右下に役割の印）。`--setup`でDBを空にして、3人の接続・チームの作成・参加・編集者と担当まで済ませてから開く。付けなければ今のデータのまま開く。`pnpm dev:fake`の起動が前提。`pnpm team:demo`は、DB・サーバーの起動と`--setup`をまとめて1回で行う。
 
 ## コードの書き方
 
-- 外部に公開している関数・クラス・型・定数には、JSDoc形式のドキュメントコメント（`/** … */`）を付ける。説明に加えて、引数は`@param`、戻り値は`@returns`、投げる例外は`@throws`で書く。
-- TypeScriptなので、JSDocには型（`{string}`など）を書かない（[TypeScriptのハンドブック](https://www.typescriptlang.org/ja/docs/handbook/jsdoc-supported-types.html)）。
-- `pnpm lint`（`eslint-plugin-jsdoc`）が付け忘れや`@param`の名前のずれを検出し、CIでも止まる。shadcn/uiから取り込んだ部品（`apps/web/src/components/ui/`）とテストは対象外。
-- マイグレーションは、前の版のアプリでも壊れない形（表や列を足す・既定値つき）だけにする。消す・名前を変える・型を変えるときは、何回かのリリースに分ける（列を消すなら、先に使うのをやめる版を出してから消す）。一度`develop`に入ったマイグレーションのファイルは書き換えない（[リリースの手順書](docs/release-runbook.md) 3）。
+JSDoc・設定と環境・マイグレーション・テストの決まりは[コードの書き方の決まり](docs/rules/coding.md)。
 
 ## 運営者用のスクリプト
 
 ```bash
-# プランを手動で変える（課金 feature ができるまで）。接続先は DATABASE_URL_DIRECT（既定はローカル）
-pnpm --filter api admin:set-plan <accountId> multi-account
+# 料金なしの印を付ける・外す（開発者・テストユーザーなど。docs/external-services-setup.md 10-7）
+DATABASE_URL=… pnpm --filter api admin:set-billing-exempt <メールアドレス> on|off
 
-# 暗号鍵のローテーション（research.md R5 の手順）
+# 暗号鍵のローテーション（research.md R5 の手順）。接続のトークンと、チーム・テストのグループの招待リンクの写しを、新しい鍵で暗号化し直す
 TOKEN_ENCRYPTION_KEYS='{"1":"…","2":"…"}' TOKEN_ENCRYPTION_KEY_VERSION=2 DATABASE_URL=… \
   pnpm --filter api admin:rotate-token-key
 ```

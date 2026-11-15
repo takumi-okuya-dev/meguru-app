@@ -6,7 +6,7 @@ import { postDrafts, publishAttempts } from "../../src/db/schema";
 import { call, db, makeApp, resetDb } from "../helpers/app";
 
 const app = makeApp();
-const base = (id: string) => `/api/accounts/${id}`;
+const base = (id: string) => `/api/threads/accounts/${id}`;
 
 async function json<T>(res: Response, status = 200): Promise<T> {
   expect(res.status, await res.clone().text()).toBe(status);
@@ -18,7 +18,7 @@ let accountId: string;
 beforeEach(async () => {
   await resetDb();
   const created = await json<{ id: string }>(
-    await call(app, "POST", "/api/accounts", { user: "u1", body: { name: "カフェの公式" } }),
+    await call(app, "POST", "/api/threads/accounts", { user: "u1", body: { name: "カフェの公式" } }),
     201,
   );
   accountId = created.id;

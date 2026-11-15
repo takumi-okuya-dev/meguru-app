@@ -1,20 +1,20 @@
 // US11：プロンプトに入っている情報（specs/014-strategy-guidance FR-120〜FR-122、contracts/ui-routes.md「投稿をつくる」）
 import { screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { HINTED_KEYS, type PromptMaterials } from "@threads-grower/shared";
+import { HINTED_KEYS, type PromptMaterials } from "@meguru/shared";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { OWNER_ACCESS } from "./helpers/access";
 import { listResponse, promptResponse, renderAccountRoutes } from "./helpers/stock";
 
 const listPostDrafts = vi.fn();
 const getPrompt = vi.fn();
-vi.mock("@/lib/api-client", async (orig) => {
-  const actual = await orig<typeof import("@/lib/api-client")>();
-  return { ...actual, api: { ...actual.api, accountAccess: async () => OWNER_ACCESS, listPostDrafts, getPrompt } };
+vi.mock("@/apps/threads/lib/api", async (orig) => {
+  const actual = await orig<typeof import("@/apps/threads/lib/api")>();
+  return { ...actual, threadsApi: { ...actual.threadsApi, accountAccess: async () => OWNER_ACCESS, listPostDrafts, getPrompt } };
 });
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn(), info: vi.fn() } }));
 
-const { CreatePage } = await import("@/pages/create");
+const { CreatePage } = await import("@/apps/threads/pages/create");
 
 function materials(over: Partial<PromptMaterials> = {}): PromptMaterials {
   const items: PromptMaterials["strategy"]["items"] = [
@@ -33,7 +33,7 @@ function materials(over: Partial<PromptMaterials> = {}): PromptMaterials {
 }
 
 function renderCreate() {
-  return renderAccountRoutes([{ path: "create", element: <CreatePage /> }], "/accounts/a1/create");
+  return renderAccountRoutes([{ path: "create", element: <CreatePage /> }], "/threads/accounts/a1/create");
 }
 
 beforeEach(() => {
@@ -42,11 +42,11 @@ beforeEach(() => {
 });
 
 describe("プロンプトに入っている情報", () => {
-  it("初めは閉じていて、1行のまとめ（課題・目的・下書き・宣伝内容・参考投稿）を出す（FR-120）", async () => {
+  it("初めは閉じていて、まとめの行は出さない（FR-120。文字を減らすため 2026-11-04）", async () => {
     renderCreate();
     const toggle = await screen.findByRole("button", { name: /プロンプトに入っている情報/ });
     expect(toggle).toHaveAttribute("aria-expanded", "false");
-    expect(toggle).toHaveTextContent("課題 15/16・目的 0/5・下書き 2/4・宣伝内容 2件・参考投稿 12件（解説あり 4件）");
+    expect(toggle).toHaveTextContent(/^プロンプトに入っている情報$/);
     expect(screen.queryByRole("region", { name: "課題" })).not.toBeInTheDocument();
   });
 
@@ -79,22 +79,22 @@ describe("プロンプトに入っている情報", () => {
     const strategy = within(screen.getByRole("region", { name: "課題" }));
     expect(within(strategy.getByRole("listitem", { name: "最終的に読者に取ってほしい行動" })).getByRole("link", { name: "編集" })).toHaveAttribute(
       "href",
-      "/accounts/a1/strategy#field-finalAction",
+      "/threads/accounts/a1/strategy#field-finalAction",
     );
     const drafts = within(screen.getByRole("region", { name: "プロフィール・固定投稿（下書き）" }));
     expect(within(drafts.getByRole("listitem", { name: "固定投稿②" })).getByRole("link", { name: "編集" })).toHaveAttribute(
       "href",
-      "/accounts/a1/strategy#field-pinnedPostDraft2",
+      "/threads/accounts/a1/strategy#field-pinnedPostDraft2",
     );
     expect(within(screen.getByRole("region", { name: "宣伝内容" })).getByRole("link", { name: "編集" })).toHaveAttribute(
       "href",
-      "/accounts/a1/promotions",
+      "/threads/accounts/a1/promotions",
     );
     const research = within(screen.getByRole("region", { name: "リサーチ" }));
-    expect(research.getByRole("link", { name: "編集" })).toHaveAttribute("href", "/accounts/a1/research");
+    expect(research.getByRole("link", { name: "編集" })).toHaveAttribute("href", "/threads/accounts/a1/research");
     expect(research.getByRole("link", { name: "解説がまだ8件 → まとめてAIに解説してもらう" })).toHaveAttribute(
       "href",
-      "/accounts/a1/research#explain",
+      "/threads/accounts/a1/research#explain",
     );
   });
 

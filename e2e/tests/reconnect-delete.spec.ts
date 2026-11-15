@@ -10,7 +10,7 @@ test("接続が切れたら要再接続になり、再接続で戻り、削除�
   await signIn(page);
   const accountId = await createAccount(page, "E2Eのアカウント");
   await connectWithApp(page, accountId);
-  const accountUrl = new URL(`/accounts/${accountId}`, page.url()).toString();
+  const accountUrl = new URL(`/threads/accounts/${accountId}`, page.url()).toString();
 
   // Threads側でトークンが無効になる → 画面を開いた時点で検知される（SC-007）
   await control("invalidate", { userId: "9001" });
@@ -34,5 +34,5 @@ test("接続が切れたら要再接続になり、再接続で戻り、削除�
   await expect(confirmButton).toBeDisabled();
   await page.getByLabel("確認のためのアカウントの名前").fill(" E2Eのアカウント ");
   await confirmButton.click();
-  await expect(page).toHaveURL(/\/accounts\/new$/);
+  await expect(page).toHaveURL(/\/threads\/accounts\/new$/);
 });

@@ -1,0 +1,566 @@
+// 契約と支払い（specs/013-billing research.md R1・R4〜R7）。Stripeとのやり取りは、このファイルと lib/stripe-client.ts の外に書かない。
+import {
+  BILLING_UNIT_PRICE_JPY,
+  SUBSCRIPTION_STATUSES,
+  billingQuantity,
+  checkoutTrialFor,
+  entitlementOf,
+  nextInvoiceAmount,
+  trialDaysLeft,
+  type BillingSummary,
+  type Entitlement,
+  type MeBilling,
+  type SubscriptionStatus,
+} from "@meguru/shared";
+import { and, eq, inArray, isNull, lt, notInArray, or, sql, type SQL } from "drizzle-orm";
+import type { Env } from "../../kernel/env";
+import { createDb, withTransaction, type Db, type TxDb } from "../../kernel/db/client";
+import { lockUserRow } from "../../kernel/db/locks";
+import { billingExemptSql, testAccessSql } from "../test-groups/test-group-service";
+import { subscriptions, testGroupMembers, users } from "../schema";
+import { billingQuantityOf } from "../usage/usage";
+import { billingModeOf, type BillingMode } from "../../kernel/config";
+import { AppError } from "../../kernel/errors";
+import { logger } from "../../kernel/logger";
+import { createStripeClient, periodEndOf, StripeError, type StripeClient } from "../../adapters/stripe";
+
+/** 判定に使う、利用者と契約の値（users・subscriptions の行の一部）。 */
+export type BillingFacts = {
+  createdAt: Date;
+  billingExempt: boolean;
+  status: string | null;
+  cancelAtPeriodEnd: boolean | null;
+  /** テスト版に入れるか（specs/016 research.md R4。testAccessSql の値）。読んでいなければ undefined */
+  testAccess?: boolean;
+  /** 024の前からいた人（無料体験を使える。specs/024 research.md R8） */
+  legacyTrial: boolean;
+};
+
+/**
+ * 利用者と契約の値から、使える状態を求める（research.md R1）。
+ * @param mode - 決済のモード
+ * @param facts - 登録日時・料金なしの印・契約の状態
+ * @param now - 今の時刻
+ * @returns 使える状態
+ */
+export function entitlementFromFacts(mode: BillingMode, facts: BillingFacts, now: Date = new Date()): Entitlement {
+  const e = entitlementOf({
+    billingEnabled: mode.enabled,
+    exempt: facts.billingExempt,
+    userCreatedAt: facts.createdAt,
+    subscription:
+      facts.status === null && facts.cancelAtPeriodEnd === null
+        ? null
+        : { status: (facts.status as SubscriptionStatus | null) ?? null, cancelAtPeriodEnd: facts.cancelAtPeriodEnd ?? false },
+    now,
+    legacyTrial: facts.legacyTrial,
+  });
+  // テスト用のグループがONで、テスト版に入れない人は読むだけ（specs/016 research.md R4）。
+  // 決済のどの状態よりも先に効かせ、自動投稿・反応の取り込みも013の仕組みのまま止まる
+  if (mode.testGroups && facts.testAccess === false) {
+    return { ...e, state: "read_only", fullAccess: false, readOnlyReason: "test_access", accountLimit: 0 };
+  }
+  return e;
+}
+
+/**
+ * 「オーナーがすべて使える」のSQLの条件（users・subscriptions を結合した問い合わせで使う）。entitlementOf と同じ条件で、
+ * 定期処理が件数の上限の前に読むだけの行を外すために使う（上限を読むだけの行が埋めて、ほかが進まないことを防ぐ。
+ * PR #16 のCodexレビュー）。entitlementOf と同じ結果になることは billing-sql-parity.test.ts で確かめる。決済OFFなら条件なし。
+ * 無料体験の終わりは、日本時間の暦で1か月後（月末は丸める。Postgres の interval '1 month' も同じ丸め）。
+ * @param mode - 決済のモード
+ * @param now - 今の時刻
+ * @returns 条件
+ */
+export function fullAccessSql(mode: BillingMode, now: Date): SQL | undefined {
+  // テスト用のグループがONなら、テスト版に入れることも条件に足す（specs/016 research.md R4。entitlementFromFacts と同じ）
+  const access = mode.testGroups ? testAccessSql(users, mode.operators) : undefined;
+  if (!mode.enabled) return access;
+  const trialEnd = sql`((${users.createdAt} AT TIME ZONE 'Asia/Tokyo') + interval '1 month') AT TIME ZONE 'Asia/Tokyo'`;
+  const billing = or(
+    billingExemptSql(users, mode),
+    inArray(subscriptions.status, ["trialing", "active"]),
+    and(
+      // 無料体験は024の前からいた人だけ（specs/024 research.md R8）
+      eq(users.legacyTrial, true),
+      or(isNull(subscriptions.status), notInArray(subscriptions.status, ["past_due", "unpaid", "paused"])),
+      sql`${trialEnd} > ${now.toISOString()}::timestamptz`,
+    ),
+  );
+  return access ? and(access, billing) : billing;
+}
+
+/**
+ * 使える状態の判定に読む列（users と subscriptions を結合した問い合わせで使う）。判定に使う値を足すときは、ここだけを直す
+ * （loadEntitlement とアプリ向けの利用権 loadAppEntitlements が同じ列を読む。specs/meguru/029 research.md R4）。
+ * @param mode - 決済のモード
+ * @returns select に渡す列
+ */
+export function billingFactsColumns(mode: BillingMode) {
+  return {
+    createdAt: users.createdAt,
+    billingExempt: billingExemptSql(users, mode),
+    legacyTrial: users.legacyTrial,
+    status: subscriptions.status,
+    cancelAtPeriodEnd: subscriptions.cancelAtPeriodEnd,
+    // OFFの環境では読まない（問い合わせを今と同じにする。specs/016 plan.md「性能の目標」）
+    testAccess: mode.testGroups ? testAccessSql(users, mode.operators) : sql<boolean>`true`,
+  };
+}
+
+/**
+ * 利用者の使える状態を読む（users と subscriptions を読んで entitlementOf する）。
+ * @param db - データベース（トランザクションの中でもよい）
+ * @param userId - users.id
+ * @param mode - 決済のモード
+ * @param now - 今の時刻
+ * @returns 使える状態。利用者がいなければ null
+ */
+export async function loadEntitlement(db: Db | TxDb, userId: string, mode: BillingMode, now: Date = new Date()) {
+  const [row] = await db
+    .select(billingFactsColumns(mode))
+    .from(users)
+    .leftJoin(subscriptions, eq(subscriptions.userId, users.id))
+    .where(eq(users.id, userId))
+    .limit(1);
+  if (!row) return null;
+  return entitlementFromFacts(mode, row, now);
+}
+
+/**
+ * 使える状態を、画面（/api/me の billing）に出す形にする。
+ * @param mode - 決済のモード
+ * @param e - 使える状態
+ * @param now - 今の時刻
+ * @returns /api/me の billing
+ */
+export function toMeBilling(mode: BillingMode, e: Entitlement, now: Date = new Date()): MeBilling {
+  return {
+    mode: mode.enabled ? "enabled" : "disabled",
+    state: e.state,
+    readOnlyReason: e.readOnlyReason,
+    // 無料体験の終わりは、前からの無料体験の人だけに出す（specs/024 contracts/api.md）
+    trialEndsAt: e.state === "unsubscribed" ? null : e.trialEndsAt.toISOString(),
+    trialDaysLeft: e.state === "trial" || e.state === "subscribed_trial" ? trialDaysLeft(e.trialEndsAt, now) : null,
+  };
+}
+
+// ---- 「契約と支払い」の内容（GET /api/billing。contracts/api.md「BillingSummary」） ----
+
+/** 契約が終わっている状態（数の合わせ直し・読み直しの対象にしない）。 */
+const ENDED_STATUSES = ["canceled", "incomplete_expired"] as const;
+/** 次の請求がある状態。 */
+const BILLED_STATUSES = ["trialing", "active", "past_due", "unpaid"];
+
+/**
+ * 「契約と支払い」の内容を作る。
+ * @param db - データベース
+ * @param user - 利用者（決済のモードを含む）
+ * @param now - 今の時刻
+ * @returns BillingSummary
+ */
+export async function billingSummary(db: Db, user: { id: string; billing: BillingMode }, now: Date = new Date()): Promise<BillingSummary> {
+  const prices = { perAccount: BILLING_UNIT_PRICE_JPY };
+  if (!user.billing.enabled) {
+    return {
+      mode: "disabled",
+      state: "billing_disabled",
+      readOnlyReason: null,
+      trialEndsAt: null,
+      trialDaysLeft: null,
+      ownedAccountCount: null,
+      subscription: null,
+      prices,
+    };
+  }
+  const [entitlement, row, owned] = await Promise.all([
+    loadEntitlement(db, user.id, user.billing, now),
+    db.select().from(subscriptions).where(eq(subscriptions.userId, user.id)).limit(1),
+    countOwned(db, user.id),
+  ]);
+  const e = entitlement!;
+  const sub = row[0];
+  const billed = sub?.status ? BILLED_STATUSES.includes(sub.status) && !sub.cancelAtPeriodEnd : false;
+  return {
+    mode: "enabled",
+    state: e.state,
+    readOnlyReason: e.readOnlyReason,
+    trialEndsAt: e.state === "unsubscribed" ? null : e.trialEndsAt.toISOString(),
+    trialDaysLeft: e.state === "trial" || e.state === "subscribed_trial" ? trialDaysLeft(e.trialEndsAt, now) : null,
+    ownedAccountCount: owned,
+    subscription: sub?.status
+      ? {
+          status: sub.status,
+          currentPeriodEnd: sub.currentPeriodEnd?.toISOString() ?? null,
+          cancelAtPeriodEnd: sub.cancelAtPeriodEnd,
+          nextInvoiceAt: billed ? (sub.currentPeriodEnd?.toISOString() ?? null) : null,
+          nextInvoiceAmount: billed ? nextInvoiceAmount(owned) : null,
+        }
+      : null,
+    prices,
+  };
+}
+
+/**
+ * その人の料金の数の元（アプリから伝えられた利用の数の合計。specs/meguru/029-threads-pattern1 research.md R6）。
+ * 029 の前は、持ち主としてのアカウントの数（memberships）を数えていた。
+ * @param db - データベース（トランザクションの中でもよい）
+ * @param userId - users.id
+ * @returns 数
+ */
+async function countOwned(db: Db | TxDb, userId: string): Promise<number> {
+  return billingQuantityOf(db, userId);
+}
+
+// ---- 契約する（research.md R4） ----
+
+/**
+ * Stripeの失敗を BILLING_UNAVAILABLE にする（鍵・本文は出さない）。
+ * @param err - 捕まえたエラー
+ * @returns AppError
+ */
+function unavailable(err: unknown): AppError {
+  logger.error("billing: stripe call failed", { err: err instanceof StripeError ? { status: err.status, code: err.code } : String(err) });
+  return new AppError("BILLING_UNAVAILABLE", 503, "billing unavailable");
+}
+
+/**
+ * Stripeの顧客を用意する（利用者に1つ。なければ作って subscriptions の行を作る）。
+ * @param env - Workers のバインディング
+ * @param stripe - Stripeのクライアント
+ * @param user - 利用者
+ * @returns 顧客のID
+ * @throws AppError BILLING_UNAVAILABLE
+ */
+async function ensureCustomer(env: Env, stripe: StripeClient, user: { id: string; email: string }): Promise<string> {
+  const db = createDb(env.DATABASE_URL);
+  const [existing] = await db.select().from(subscriptions).where(eq(subscriptions.userId, user.id)).limit(1);
+  if (existing) return existing.stripeCustomerId;
+  // 冪等キーで、同時に押しても・失敗してやり直しても顧客は1つ
+  const customer = await stripe.createCustomer({ userId: user.id, email: user.email }, `customer-${user.id}`).catch((err: unknown) => {
+    throw unavailable(err);
+  });
+  await db.insert(subscriptions).values({ userId: user.id, stripeCustomerId: customer.id }).onConflictDoNothing();
+  const [row] = await db.select().from(subscriptions).where(eq(subscriptions.userId, user.id)).limit(1);
+  return row!.stripeCustomerId;
+}
+
+/**
+ * Checkoutのセッションを作り、URLを返す（research.md R4）。契約中・支払いの失敗中は作らない。
+ * 開いているセッションが前にあれば期限切れにしてから作り、開いているセッションを1つにする（FR-022）。
+ * @param env - Workers のバインディング
+ * @param user - 利用者（決済のモードを含む）
+ * @param stripe - Stripeのクライアント
+ * @param now - 今の時刻
+ * @returns CheckoutのURL
+ * @throws AppError ALREADY_SUBSCRIBED・BILLING_UNAVAILABLE・WITHDRAWAL_IN_PROGRESS
+ */
+export async function startCheckout(
+  env: Env,
+  user: { id: string; email: string; billing: BillingMode },
+  stripe: StripeClient = createStripeClient(env),
+  now: Date = new Date(),
+): Promise<string> {
+  const before = await loadEntitlement(createDb(env.DATABASE_URL), user.id, user.billing, now);
+  assertCanSubscribe(before);
+  const customer = await ensureCustomer(env, stripe, user);
+  // 作る前にStripeの今の状態を読み直す（知らせが届かなかった完了済みのCheckoutがあれば、契約中と分かって止まる。
+  // PR #16 のCodexレビュー）
+  await syncCustomer(env, customer, stripe).catch((err: unknown) => {
+    throw unavailable(err);
+  });
+  return withTransaction(env.DATABASE_URL, async (tx) => {
+    await lockUserRow(tx, user.id);
+    // 退会を受け付けた後には作らない（退会の契約を止める処理より後にセッションが残らないように。退会の受け付けも
+    // 同じ利用者の行の鍵を取るので、鍵の中で読み直せば順番が決まる。PR #16 のCodexレビュー）
+    const [fresh] = await tx.select({ withdrawalRequestedAt: users.withdrawalRequestedAt }).from(users).where(eq(users.id, user.id));
+    if (fresh?.withdrawalRequestedAt) throw new AppError("WITHDRAWAL_IN_PROGRESS", 409, "withdrawal in progress");
+    const e = await loadEntitlement(tx, user.id, user.billing, now);
+    assertCanSubscribe(e);
+    const [row] = await tx.select().from(subscriptions).where(eq(subscriptions.userId, user.id)).limit(1);
+    if (row?.pendingCheckoutSessionId) {
+      // 前のセッションが読み直しの後に完了していたら、2つ目の契約を作らない（画面を読み直してもらう）
+      const prev = await stripe.retrieveCheckoutSession(row.pendingCheckoutSessionId).catch((err: unknown) => {
+        if (err instanceof StripeError && err.status === 404) return null;
+        throw unavailable(err);
+      });
+      if (prev?.status === "complete") throw new AppError("ALREADY_SUBSCRIBED", 409, "previous checkout completed");
+      // 期限切れのセッションは期限切れにできない（400）。それ以外の失敗は止める
+      if (prev?.status === "open") {
+        await stripe.expireCheckoutSession(row.pendingCheckoutSessionId).catch((err: unknown) => {
+          if (!(err instanceof StripeError && (err.status === 400 || err.status === 404))) throw unavailable(err);
+        });
+      }
+    }
+    const trial = e?.state === "trial" ? checkoutTrialFor(e.trialEndsAt, now) : null;
+    const session = await stripe
+      .createCheckoutSession({
+        customer,
+        priceId: env.STRIPE_PRICE_ID ?? "",
+        quantity: billingQuantity(await countOwned(tx, user.id)),
+        userId: user.id,
+        successUrl: `${env.WEB_ORIGIN}/settings/billing?checkout=success`,
+        cancelUrl: `${env.WEB_ORIGIN}/settings/billing?checkout=canceled`,
+        trialEnd: trial && "trialEnd" in trial ? trial.trialEnd : undefined,
+        trialPeriodDays: trial && "trialPeriodDays" in trial ? trial.trialPeriodDays : undefined,
+        taxRateId: env.STRIPE_TAX_RATE_ID || undefined,
+      })
+      .catch((err: unknown) => {
+        throw unavailable(err);
+      });
+    await tx
+      .update(subscriptions)
+      .set({ pendingCheckoutSessionId: session.id, updatedAt: now })
+      .where(eq(subscriptions.userId, user.id));
+    return session.url;
+  });
+}
+
+/**
+ * 契約できる状態かを確かめる。契約中（試用・解約の予約を含む）と支払いの失敗中は、新しい契約を作らない。
+ * @param e - 使える状態
+ * @throws AppError ALREADY_SUBSCRIBED
+ */
+function assertCanSubscribe(e: Entitlement | null) {
+  if (!e) throw new AppError("AUTH_REQUIRED", 401, "user not found");
+  if (e.state === "subscribed_trial" || e.state === "active" || e.state === "canceling" || e.readOnlyReason === "payment_failed") {
+    throw new AppError("ALREADY_SUBSCRIBED", 409, "already subscribed");
+  }
+}
+
+// ---- 状態の反映（research.md R5） ----
+
+/** 重複した契約のうち、どれを残すかの順（小さいほど残す。PR #16 のCodexレビュー）。 */
+const KEEP_RANK: Record<string, number> = { active: 0, trialing: 0, past_due: 1, unpaid: 1, paused: 1, incomplete: 2 };
+
+/**
+ * 顧客の契約をStripeから読み直して subscriptions に書く。知らせの中身は使わない（重複・順番の入れ替わりに強い）。
+ * 同じ顧客の読み直しは、顧客ごとの鍵で1つずつ行う（先に始めた読み直しが、後の読み直しの新しい結果を上書きしない。
+ * PR #16 のCodexレビュー）。終わっていない契約が2つ以上あれば、使える契約（active・trialing）を優先し、
+ * 同じなら古いものを残して、ほかを止めてログに残す（返金は運用が手で行う）。
+ * 契約がなく、開いていたCheckoutのセッションがもう開いていなければ、その記録を消す（日次の合わせ直しの対象から外す）。
+ * @param env - Workers のバインディング
+ * @param customerId - Stripeの顧客のID
+ * @param stripe - Stripeのクライアント
+ * @returns 反映した利用者のID。知らない顧客なら null
+ * @throws StripeError（呼び出し側で扱う）
+ */
+export async function syncCustomer(env: Env, customerId: string, stripe: StripeClient = createStripeClient(env)): Promise<string | null> {
+  return withTransaction(env.DATABASE_URL, async (tx) => {
+    await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${"billing_customer:" + customerId}, 0))`);
+    const [row] = await tx.select().from(subscriptions).where(eq(subscriptions.stripeCustomerId, customerId)).limit(1);
+    if (!row) return null;
+    const readAt = new Date();
+    const list = await stripe.listSubscriptions(customerId);
+    const live = list
+      .filter((s) => !(ENDED_STATUSES as readonly string[]).includes(s.status))
+      .sort((a, b) => (KEEP_RANK[a.status] ?? 3) - (KEEP_RANK[b.status] ?? 3) || a.created - b.created);
+    for (const extra of live.slice(1)) {
+      logger.error("billing: duplicate subscription canceled", { userId: row.userId, subscriptionId: extra.id, status: extra.status });
+      await stripe.cancelSubscription(extra.id).catch((err: unknown) => logger.error("billing: cancel duplicate failed", { err: String(err) }));
+    }
+    const chosen = live[0] ?? [...list].sort((a, b) => b.created - a.created)[0] ?? null;
+    const values = chosen
+      ? {
+          stripeSubscriptionId: chosen.id,
+          status: (SUBSCRIPTION_STATUSES as readonly string[]).includes(chosen.status) ? chosen.status : null,
+          currentPeriodEnd: periodEndOf(chosen),
+          trialEnd: chosen.trial_end ? new Date(chosen.trial_end * 1000) : null,
+          cancelAtPeriodEnd: chosen.cancel_at_period_end || chosen.cancel_at !== null,
+          quantity: chosen.items.data[0]?.quantity ?? null,
+        }
+      : {};
+    // 契約ができたら、開いていたセッションは要らない。契約がなければ、セッションがまだ開いているかを確かめる
+    let clearPending = Boolean(live[0]);
+    if (!live[0] && row.pendingCheckoutSessionId) {
+      const session = await stripe.retrieveCheckoutSession(row.pendingCheckoutSessionId).catch((err: unknown) => {
+        if (err instanceof StripeError && err.status === 404) return null;
+        throw err;
+      });
+      clearPending = session === null || session.status !== "open";
+    }
+    await tx
+      .update(subscriptions)
+      .set({
+        ...values,
+        ...(clearPending ? { pendingCheckoutSessionId: null } : {}),
+        stripeSyncedAt: readAt,
+        updatedAt: new Date(),
+      })
+      .where(
+        and(
+          eq(subscriptions.userId, row.userId),
+          or(isNull(subscriptions.stripeSyncedAt), lt(subscriptions.stripeSyncedAt, readAt)),
+        ),
+      );
+    return row.userId;
+  });
+}
+
+/**
+ * 利用者の契約を読み直す（顧客がなければ何もしない）。
+ * @param env - Workers のバインディング
+ * @param userId - users.id
+ * @param stripe - Stripeのクライアント
+ * @throws AppError BILLING_UNAVAILABLE
+ */
+export async function syncUser(env: Env, userId: string, stripe: StripeClient = createStripeClient(env)): Promise<void> {
+  const [row] = await createDb(env.DATABASE_URL).select().from(subscriptions).where(eq(subscriptions.userId, userId)).limit(1);
+  if (!row) return;
+  await syncCustomer(env, row.stripeCustomerId, stripe).catch((err: unknown) => {
+    throw unavailable(err);
+  });
+}
+
+// ---- カスタマーポータル（research.md R7） ----
+
+/**
+ * カスタマーポータルのURLを作る。
+ * @param env - Workers のバインディング
+ * @param userId - users.id
+ * @param stripe - Stripeのクライアント
+ * @returns ポータルのURL
+ * @throws AppError NO_SUBSCRIPTION・BILLING_UNAVAILABLE
+ */
+export async function openPortal(env: Env, userId: string, stripe: StripeClient = createStripeClient(env)): Promise<string> {
+  const [row] = await createDb(env.DATABASE_URL).select().from(subscriptions).where(eq(subscriptions.userId, userId)).limit(1);
+  if (!row) throw new AppError("NO_SUBSCRIPTION", 409, "no subscription");
+  const session = await stripe
+    .createPortalSession({
+      customer: row.stripeCustomerId,
+      returnUrl: `${env.WEB_ORIGIN}/settings/billing`,
+      configuration: env.STRIPE_PORTAL_CONFIGURATION_ID,
+    })
+    .catch((err: unknown) => {
+      throw unavailable(err);
+    });
+  return session.url;
+}
+
+// ---- アカウントの数の反映（research.md R6） ----
+
+/**
+ * Stripeの契約の数を、今のアカウントの数（max(n,1)）に合わせる。日割りの請求・返金はしない。
+ * 終わった契約・決済OFFでは何もしない。合ったら印を消す。
+ * @param env - Workers のバインディング
+ * @param userId - オーナーの users.id
+ * @param stripe - Stripeのクライアント
+ * @returns 合わせたなら true（何もしなかったときも true）
+ */
+export async function syncQuantity(env: Env, userId: string, stripe: StripeClient = createStripeClient(env)): Promise<boolean> {
+  if (!billingModeOf(env).enabled) return true;
+  try {
+    // 同じ利用者の数の反映は1つずつ行い、鍵の中で数え直す（古い数で新しい数を上書きしない。PR #16 のCodexレビュー）
+    return await withTransaction(env.DATABASE_URL, async (tx) => {
+      await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${"billing_quantity:" + userId}, 0))`);
+      const [row] = await tx.select().from(subscriptions).where(eq(subscriptions.userId, userId)).limit(1);
+      if (!row?.stripeSubscriptionId || !row.status || (ENDED_STATUSES as readonly string[]).includes(row.status)) {
+        if (row?.quantitySyncNeeded) await tx.update(subscriptions).set({ quantitySyncNeeded: false }).where(eq(subscriptions.userId, userId));
+        return true;
+      }
+      const quantity = billingQuantity(await countOwned(tx, userId));
+      const sub = (await stripe.listSubscriptions(row.stripeCustomerId)).find((x) => x.id === row.stripeSubscriptionId);
+      const item = sub?.items.data[0];
+      // 料金が今の STRIPE_PRICE_ID と違う（1件1,000円にする前の契約）なら、あわせて切り替える（specs/024 research.md R10）
+      const newPrice = env.STRIPE_PRICE_ID && item?.price?.id && item.price.id !== env.STRIPE_PRICE_ID ? env.STRIPE_PRICE_ID : undefined;
+      if (sub && item && (item.quantity !== quantity || newPrice)) {
+        await stripe.updateSubscriptionQuantity(sub.id, item.id, quantity, newPrice);
+      }
+      await tx
+        .update(subscriptions)
+        .set({ quantity, quantitySyncNeeded: false, updatedAt: new Date() })
+        .where(eq(subscriptions.userId, userId));
+      return true;
+    });
+  } catch (err) {
+    // 印は残し、日次の処理でやり直す
+    logger.error("billing: quantity sync failed", { userId, err: err instanceof StripeError ? { status: err.status, code: err.code } : String(err) });
+    return false;
+  }
+}
+
+/**
+ * 日次の契約の合わせ直し（research.md R5・R6）。終わっていない契約、数の合わせ直しが要る契約、開いたCheckoutのある行を読み直す。
+ * 1件の失敗で全体を止めない。決済OFFなら何もしない。
+ * @param env - Workers のバインディング
+ * @param stripe - Stripeのクライアント
+ * @returns 読み直した数と失敗の数
+ */
+export async function reconcileSubscriptions(env: Env, stripe: StripeClient = createStripeClient(env)) {
+  if (!billingModeOf(env).enabled) return { synced: 0, failed: 0 };
+  const rows = await createDb(env.DATABASE_URL)
+    .select({ userId: subscriptions.userId, customerId: subscriptions.stripeCustomerId })
+    .from(subscriptions)
+    .where(
+      or(
+        eq(subscriptions.quantitySyncNeeded, true),
+        // Checkoutを終えたのに、知らせも画面からの読み直しも届かなかった行も拾う（PR #16 のCodexレビュー）
+        sql`${subscriptions.pendingCheckoutSessionId} IS NOT NULL`,
+        and(sql`${subscriptions.status} IS NOT NULL`, notInArray(subscriptions.status, [...ENDED_STATUSES])),
+      ),
+    );
+  let synced = 0;
+  let failed = 0;
+  for (const r of rows) {
+    try {
+      await syncCustomer(env, r.customerId, stripe);
+      if (!(await syncQuantity(env, r.userId, stripe))) failed += 1;
+      else synced += 1;
+    } catch (err) {
+      failed += 1;
+      logger.error("billing: reconcile failed", { userId: r.userId, err: String(err) });
+    }
+  }
+  return { synced, failed };
+}
+
+/** 料金なしの印を付け・外した結果。 */
+export type ExemptResult =
+  // どの行を変えたかを出せるよう、id と clerk_user_id も返す（セキュリティ監査 run-1）
+  | { kind: "updated"; id: string; clerkUserId: string; email: string; before: boolean; after: boolean }
+  | { kind: "not_found" }
+  // 同じアドレスの行が2つ以上。何も書かずに止める
+  | { kind: "ambiguous"; count: number; users: { id: string; clerkUserId: string }[] }
+  | { kind: "has_subscription"; status: string };
+
+/**
+ * 料金なしの印を付け・外す（運用のスクリプト。specs/013 FR-062、research.md R11）。
+ * 付けるときに終わっていない契約があれば、重ねて請求しないよう止める（force で付ける）。
+ * @param db - データベース
+ * @param email - 利用者のメールアドレス（大文字・小文字を区別しない）
+ * @param on - 付けるなら true
+ * @param force - 契約があっても付ける
+ * @returns 結果
+ */
+export async function setBillingExemptByEmail(db: Db, email: string, on: boolean, force = false): Promise<ExemptResult> {
+  const needle = email.trim().toLowerCase();
+  // 空白だけの引数で、空文字列の行（Clerk にメールアドレスが無い利用者）に当たらないようにする
+  if (needle === "") return { kind: "not_found" };
+  // users.email には一意制約もインデックスも無い（schema.ts の users）。Clerk の user.updated の
+  // Webhook も無いので、本人が手放したアドレスが行に残り、後からそのアドレスを取った別人の行と
+  // 重なりうる。1行に決め打たず、2行目があるかどうかを見て止める（セキュリティ監査 run-1）。
+  // 同じ形の lower(accounts.username) は、このプロジェクト自身が一致を集合として扱っている
+  const found = await db
+    .select({ id: users.id, clerkUserId: users.clerkUserId, email: users.email, exempt: users.billingExempt })
+    .from(users)
+    .where(sql`lower(${users.email}) = ${needle}`)
+    .limit(2);
+  if (found.length === 0) return { kind: "not_found" };
+  if (found.length > 1) {
+    logger.error("billing: refusing to set billing_exempt for an ambiguous address", {
+      users: found.map((u) => u.id),
+    });
+    return { kind: "ambiguous", count: found.length, users: found.map((u) => ({ id: u.id, clerkUserId: u.clerkUserId })) };
+  }
+  const user = found[0]!;
+  if (on && !force) {
+    const [sub] = await db.select({ status: subscriptions.status }).from(subscriptions).where(eq(subscriptions.userId, user.id));
+    if (sub?.status && !(ENDED_STATUSES as readonly string[]).includes(sub.status)) return { kind: "has_subscription", status: sub.status };
+  }
+  await db.update(users).set({ billingExempt: on, updatedAt: new Date() }).where(eq(users.id, user.id));
+  // 手で付けた印は、グループを出ても残す（グループで付けた印の扱いから外す。specs/016 research.md R7）
+  if (on) await db.update(testGroupMembers).set({ grantedBillingExempt: false }).where(eq(testGroupMembers.userId, user.id));
+  // この経路は活動の記録を残さないので、せめてどの行を変えたかをログに残す
+  logger.info("billing: billing_exempt changed", { userId: user.id, before: user.exempt, after: on });
+  return { kind: "updated", id: user.id, clerkUserId: user.clerkUserId, email: user.email, before: user.exempt, after: on };
+}

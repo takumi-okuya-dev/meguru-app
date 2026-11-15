@@ -42,3 +42,12 @@ export function isBillingRequired(err: unknown): err is ApiError {
 export function billingReasonOf(err: unknown): string | null {
   return isBillingRequired(err) ? (err.details[0] ?? "trial_ended") : null;
 }
+
+/**
+ * 403 FEATURE_DISABLED（オーナーの設定で、その機能のまとまりがOFF）かを確かめる（specs/019）。
+ * @param err - 読み込み・保存の失敗
+ * @returns まとまりがOFFなら true
+ */
+export function isFeatureDisabled(err: unknown): err is ApiError {
+  return err instanceof ApiError && err.code === "FEATURE_DISABLED";
+}

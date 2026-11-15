@@ -1,10 +1,11 @@
 // US1：名前だけでアカウントを作る（specs/012 FR-002〜FR-004、research.md R3、contracts/api.md「アカウント」）
 import { and, eq } from "drizzle-orm";
-import { PROMOTION_RATIO_DEFAULT, PROMPT_COUNT_DEFAULT } from "@threads-grower/shared";
+import { PROMOTION_RATIO_DEFAULT, PROMPT_COUNT_DEFAULT } from "@meguru/shared";
 import { beforeEach, describe, expect, it } from "vitest";
 import { accounts, memberships, threadsConnections, users } from "../../src/db/schema";
 import { call, db, makeApp, resetDb } from "../helpers/app";
 import { callBilling } from "../helpers/billing";
+import { ensureUser } from "../helpers/team";
 
 const app = makeApp();
 
@@ -12,15 +13,15 @@ beforeEach(async () => {
   await resetDb();
 });
 
-const create = (user: string, name: unknown) => call(app, "POST", "/api/accounts", { user, body: { name } });
+const create = (user: string, name: unknown) => call(app, "POST", "/api/threads/accounts", { user, body: { name } });
 // 決済ONの環境（無料体験中は1件まで。specs/013 research.md R9）
-const createOn = (user: string, name: unknown) => callBilling(app, "POST", "/api/accounts", { user, body: { name } });
+const createOn = (user: string, name: unknown) => callBilling(app, "POST", "/api/threads/accounts", { user, body: { name } });
 
 async function errorCode(res: Response) {
   return ((await res.json()) as { error: { code: string; details?: string[] } }).error;
 }
 
-describe("POST /api/accounts", () => {
+describe("POST /api/threads/accounts", () => {
   it("名前だけで未接続のアカウントを作り、作った人がオーナーになる", async () => {
     const res = await create("u1", "  カフェの公式  ");
     expect(res.status).toBe(201);
@@ -74,6 +75,7 @@ describe("POST /api/accounts", () => {
   });
 
   it("未接続のアカウントも上限に数える。上限なら ACCOUNT_LIMIT_REACHED（決済ONの無料体験中は1件。specs/013 FR-010）", async () => {
+    await ensureUser("u1"); // 024の前からいた人（無料体験中）
     expect((await createOn("u1", "1つ目")).status).toBe(201);
     const res = await createOn("u1", "2つ目");
     expect(res.status).toBe(409);
@@ -82,6 +84,7 @@ describe("POST /api/accounts", () => {
   });
 
   it("同じ人が並べて送っても、上限を超えない（FR-004）", async () => {
+    await ensureUser("u1"); // 024の前からいた人（無料体験中）
     const results = await Promise.all([createOn("u1", "A"), createOn("u1", "B"), createOn("u1", "C")]);
     expect(results.map((r) => r.status).sort()).toEqual([201, 409, 409]);
     expect(await db().select().from(accounts)).toHaveLength(1);
@@ -89,7 +92,7 @@ describe("POST /api/accounts", () => {
 
   it("作ったアカウントは /api/me に出て、最後に使ったアカウントがなければ着地先になる", async () => {
     const created = (await (await create("u1", "カフェの公式")).json()) as { id: string };
-    const me = (await (await call(app, "GET", "/api/me", { user: "u1" })).json()) as {
+    const me = (await (await call(app, "GET", "/api/threads/me", { user: "u1" })).json()) as {
       accounts: { id: string; name: string; connectionStatus: string }[];
       landingAccountId: string | null;
       accountLimit: { used: number };
@@ -100,7 +103,7 @@ describe("POST /api/accounts", () => {
   });
 
   it("ログインしていなければ 401", async () => {
-    const res = await call(app, "POST", "/api/accounts", { body: { name: "x" } });
+    const res = await call(app, "POST", "/api/threads/accounts", { body: { name: "x" } });
     expect(res.status).toBe(401);
   });
 });

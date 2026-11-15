@@ -8,8 +8,8 @@ vi.mock("@clerk/react", () => ({
   useAuth: () => ({ isLoaded: true, isSignedIn: false }),
 }));
 
-const { TermsPage } = await import("@/pages/terms");
-const { SignInPage } = await import("@/pages/sign-in");
+const { TermsPage } = await import("@/shell/pages/terms");
+const { SignInPage } = await import("@/shell/pages/sign-in");
 const { routes } = await import("@/router");
 const { isPublicPath } = await import("./helpers/routes");
 
@@ -42,7 +42,9 @@ describe("利用規約", () => {
     for (const heading of ["料金と支払い", "無料体験", "解約", "未払いのとき", "退会"]) {
       expect(screen.getByRole("heading", { name: new RegExp(heading) })).toBeInTheDocument();
     }
-    expect(screen.getByText(/基本料金 月1,000円（アカウント1件目を含む）/)).toBeInTheDocument();
+    expect(screen.getByText(/アカウント1件につき月1,000円です（税込み）/)).toBeInTheDocument();
+    expect(screen.getByText(/無料体験はありません/)).toBeInTheDocument();
+    expect(screen.queryByText(/500円/)).not.toBeInTheDocument();
     expect(screen.getByText(/日割りの請求・返金はしません/)).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "特定商取引法に基づく表記" })).toHaveAttribute("href", "/legal/commerce");
   });

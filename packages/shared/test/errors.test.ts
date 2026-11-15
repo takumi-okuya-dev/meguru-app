@@ -1,6 +1,16 @@
 // トークンでの接続のエラー文言（specs/010-token-account-add contracts/api.md「文言」）
 import { describe, expect, it } from "vitest";
-import { errorMessage, isErrorCode } from "../src/errors";
+import { ERROR_CODES, errorMessage, isErrorCode } from "../src/errors";
+
+describe("エラーコードの一覧", () => {
+  it("同じコードが2つない（アプリのエラーコードが共通やほかのアプリと重なると、文言がだまって置き換わる。specs/meguru/031）", () => {
+    expect(new Set(ERROR_CODES).size).toBe(ERROR_CODES.length);
+  });
+
+  it("どのコードにも文言がある", () => {
+    for (const code of ERROR_CODES) expect(errorMessage(code).message).not.toBe("");
+  });
+});
 
 describe("トークンでの接続のエラー文言", () => {
   it("新しいコードはエラーコードとして扱える", () => {
@@ -111,11 +121,20 @@ describe("決済＋退会のエラー文言（specs/013 contracts/api.md）", ()
     expect(team.message).not.toContain("支払い");
   });
 
-  it("無料体験中の上限は1件で、2件目からの料金と契約を案内する", () => {
-    expect(errorMessage("ACCOUNT_LIMIT_REACHED", { max: 1 })).toEqual({
-      message: "無料体験中に作れるアカウントは1件までです。契約すると、2件目から1件につき月500円で足せます。",
+  it("アカウントの上限は、運営者への連絡を案内する（specs/024 FR-018）", () => {
+    expect(errorMessage("ACCOUNT_LIMIT_REACHED", { max: 3 })).toEqual({
+      message: "作れるアカウントは3件までです。増やしたいときは運営者に連絡してください。",
+      action: "none",
+    });
+  });
+
+  it("前からの無料体験の上限（1件）は、契約を案内し、月500円を出さない（specs/024 FR-031・SC-010）", () => {
+    const m = errorMessage("ACCOUNT_LIMIT_REACHED", { max: 1, details: ["trial"] });
+    expect(m).toEqual({
+      message: "無料体験中に作れるアカウントは1件までです。契約すると、2件目からも作れます。",
       action: "subscribe",
     });
+    expect(m.message).not.toContain("500");
   });
 
   it("そのほかの文言", () => {
@@ -126,5 +145,38 @@ describe("決済＋退会のエラー文言（specs/013 contracts/api.md）", ()
       action: "retry-later",
     });
     expect(errorMessage("WITHDRAWAL_IN_PROGRESS").message).toContain("退会の手続きの途中です");
+  });
+});
+
+describe("テスター招待・上限・契約前のエラー文言（specs/024 contracts/api.md）", () => {
+  it("新しいコードはエラーコードとして扱える", () => {
+    for (const code of [
+      "SUBSCRIPTION_REQUIRED",
+      "TESTER_APPLICATION_EXISTS",
+      "TESTER_APPLICATION_NOT_PENDING",
+      "TESTER_SLOTS_FULL",
+      "POSTING_SLOT_LIMIT",
+      "RATE_LIMITED",
+    ]) {
+      expect(isErrorCode(code)).toBe(true);
+    }
+  });
+
+  it("文言", () => {
+    expect(errorMessage("SUBSCRIPTION_REQUIRED")).toEqual({ message: "契約してから使い始めます。", action: "subscribe" });
+    expect(errorMessage("TESTER_APPLICATION_EXISTS").message).toBe("このアカウントは、すでに申し込んでいます。");
+    expect(errorMessage("TESTER_APPLICATION_NOT_PENDING").action).toBe("reload");
+    expect(errorMessage("TESTER_SLOTS_FULL", { details: ["25", "25"] }).message).toBe("テスター枠がいっぱいです（25 / 25）。");
+    expect(errorMessage("POSTING_SLOT_LIMIT", { max: 5 }).message).toBe("1日に投稿できるのは5件までです。");
+    expect(errorMessage("RATE_LIMITED").message).toBe("少し時間をおいてから、もう一度お試しください。");
+    // 契約前の人に「無料体験が終わりました」を出さない（PR #71 のセルフレビュー）
+    expect(errorMessage("BILLING_REQUIRED", { details: ["not_subscribed"] })).toEqual({ message: "契約してから使い始めます。", action: "subscribe" });
+  });
+});
+
+describe("アプリの利用の許可のエラー文言（specs/meguru/030-app-access FR-003）", () => {
+  it("新しいコードはエラーコードとして扱え、文言がある", () => {
+    expect(isErrorCode("APP_NOT_AVAILABLE")).toBe(true);
+    expect(errorMessage("APP_NOT_AVAILABLE")).toEqual({ message: "このアプリは今は使えません。", action: "none" });
   });
 });

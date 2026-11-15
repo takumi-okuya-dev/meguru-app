@@ -1,6 +1,15 @@
 // APIの入出力スキーマ（contracts/api.md「型」）。WebとAPIで共有する。
 import { z } from "zod";
+import { APP_ACCESS_MODES, meAppsSchema } from "./apps/catalog";
 import { ERROR_CODES } from "./errors";
+import { FEATURES } from "./apps/threads/features";
+import { FEATURE_EVENT_ACTIONS } from "./features";
+import {
+  OPERATOR_ACCOUNT_METHODS,
+  OPERATOR_ACCOUNT_TESTER_STATES,
+  OPERATOR_ACCOUNTS_CURSOR_RE,
+  OPERATOR_ACCOUNTS_QUERY_MAX,
+} from "./operator-accounts";
 import {
   ACCOUNT_NAME_MAX,
   PRIORITY_MAX,
@@ -21,9 +30,11 @@ import {
   REVIEW_MAX_ITEMS,
   FEEDBACK_MEMO_MAX,
   PERFORMANCE_PAGE_SIZE,
-  AUTOPOST_SLOT_LIMIT,
   PUBLISHED_PAGE_SIZE,
   TEAM_MEMBER_LIMIT,
+  TEST_GROUP_CAPACITY_MAX,
+  TEST_GROUP_CAPACITY_MIN,
+  TEST_GROUP_NAME_MAX,
   TEAM_NAME_MAX,
   REFERENCE_BATCH_MAX,
   EXPLAIN_BATCH_MAX,
@@ -38,8 +49,28 @@ import {
   POST_KIND_LENGTH_MAX,
   POST_KIND_LENGTH_STEP,
   POST_KIND_RATIO_STEP,
+  ANALYSIS_CLASSIFY_BATCH,
+  ANALYSIS_THEME_NAME_MAX,
+  ANALYSIS_THEMES_MAX,
+  MENTION_DELAY_OPTIONS,
+  MENTION_LABEL_MAX,
+  MENTION_MESSAGE_MAX,
+  MENTION_PER_REPLY_MAX,
+  DAILY_POST_LIMIT_MAX,
 } from "./limits";
+import {
+  DECLINE_REASON_MAX,
+  TESTER_APPLICATION_STATUSES,
+  TESTER_APPLICATION_VIEWS,
+  TESTER_REMOVAL_REASONS,
+  TESTER_SLOT_CAPACITY_MAX,
+  TESTER_SLOT_CAPACITY_MIN,
+} from "./tester";
 import { REJECT_REASON_CODES } from "./review";
+import { OPENING_TYPES } from "./analysis/types";
+import { MENTION_FAILURE_REASONS, MENTION_STATES } from "./mention";
+import { IMAGE_STYLES, LISTING_STATUSES, MEDIA } from "./media/types";
+import { EVENT_FORMATS, isEventDateTime, PREFECTURES } from "./promotion-event";
 import { isValidYmd, jstToday } from "./promotions";
 import { FRESHNESS_VALUES, POSTED_DATE_MODE_VALUES, REFERENCE_PLATFORM_VALUES } from "./research";
 import { PURPOSE_KEYS, STRATEGY_TEXT_KEYS, TONE_PRESET_VALUES, type PurposeKey, type StrategyTextKey } from "./strategy";
@@ -107,17 +138,18 @@ export const billingStateSchema = z.enum([
   "active",
   "canceling",
   "read_only",
+  "unsubscribed",
 ]);
 /** 読むだけの理由。 */
-export const readOnlyReasonSchema = z.enum(["trial_ended", "payment_failed", "canceled"]);
+export const readOnlyReasonSchema = z.enum(["trial_ended", "payment_failed", "canceled", "test_access", "not_subscribed"]);
 
 /** /api/me の、使える状態。 */
 export const meBillingSchema = z.object({
   mode: z.enum(["enabled", "disabled"]),
   state: billingStateSchema,
   readOnlyReason: readOnlyReasonSchema.nullable(),
-  /** 無料体験の終わる時刻（ISO 8601） */
-  trialEndsAt: z.string(),
+  /** 無料体験の終わる時刻（ISO 8601）。024の前からいた人だけ（それ以外は null。specs/024） */
+  trialEndsAt: z.string().nullable(),
   /** 無料体験の残りの日数（state が trial のときだけ。日本時間の日付で数え、終わる日を含まない） */
   trialDaysLeft: z.number().int().nullable(),
 });
@@ -141,7 +173,8 @@ export const billingSummarySchema = z.object({
       nextInvoiceAmount: z.number().int().nullable(),
     })
     .nullable(),
-  prices: z.object({ base: z.number().int(), extra: z.number().int() }),
+  /** 料金（アカウント1件につき。specs/024 research.md R10） */
+  prices: z.object({ perAccount: z.number().int() }),
 });
 /** 「契約と支払い」の内容。 */
 export type BillingSummary = z.infer<typeof billingSummarySchema>;
@@ -159,34 +192,34 @@ export const meTeamSchema = z.object({
 /** 入っているチーム。 */
 export type MeTeam = z.infer<typeof meTeamSchema>;
 
-/** GET /api/me のレスポンスのスキーマ。 */
+/**
+ * GET /api/me のレスポンスのスキーマ（共通の中身だけ。アプリの中身は各アプリの道筋。Threadsなら GET /api/threads/me の
+ * threadsMeResponseSchema。specs/meguru/029-threads-pattern1 contracts/api-routes.md 2）。
+ */
 export const meResponseSchema = z.object({
   user: z.object({
     id: z.string(),
     email: z.string(),
     displayName: z.string().nullable(),
   }),
-  accounts: z.array(accountSummarySchema),
-  landingAccountId: z.string().nullable(),
-  accountLimit: accountLimitSchema,
-  /** Threads連携の公開範囲（specs/002 FR-028）。testers の間は、アカウント追加画面に検証期間の案内を出す */
-  threadsAccessMode: z.enum(["testers", "public"]),
-  /**
-   * つなぐ方法のうち、画面に出すもの（既定は両方）。
-   * App Review を通すまで、または通らなかったときは `token` だけにできる。
-   */
-  threadsConnectMethods: z.array(connectionMethodSchema).min(1),
-  /** 入っているチーム（参加した順。入っていなければ空。specs/011 research.md R5） */
-  teams: z.array(meTeamSchema),
   /** 使える状態（帯とアカウントを作る画面に使う。specs/013 contracts/api.md） */
   billing: meBillingSchema,
   /** 退会の途中か（specs/013 research.md R10） */
   withdrawalInProgress: z.boolean(),
+  /**
+   * テスト用のグループ（specs/016 contracts/api.md「GET /api/me」）。enabled は仕組みがONか、admitted はテスト版に
+   * 入れるか（OFFなら常に true）、operator は運営者か（OFFなら常に false）
+   */
+  testGroups: z.object({ enabled: z.boolean(), admitted: z.boolean(), operator: z.boolean() }),
+  /** 運営者か（招待制に関わらない。機能の設定の画面に使う。specs/019 research.md R5） */
+  operator: z.boolean(),
+  /** 出せるアプリ・使っているアプリ・最後に使ったアプリ・入口の行き先（specs/028 contracts/api.md 1） */
+  apps: meAppsSchema,
 });
-/** GET /api/me のレスポンス。ログイン中のユーザー、Account一覧、ログイン後の遷移先、登録数上限。 */
+/** GET /api/me のレスポンス（共通の中身。ログイン中のユーザー・使える状態・テスト版・運営者・アプリ）。 */
 export type MeResponse = z.infer<typeof meResponseSchema>;
 
-/** GET /api/me/needs-review-counts の応答。所有Accountが0件なら空配列。 */
+/** GET /api/threads/me/needs-review-counts の応答。所有Accountが0件なら空配列。 */
 export const needsReviewCountsResponseSchema = z.object({
   counts: z.array(
     z.object({
@@ -222,7 +255,7 @@ export const tokenConnectResponseSchema = z.object({
   accountId: z.string(),
   kind: z.enum(["connect", "reconnect"]),
   username: z.string(),
-  warnings: z.array(z.enum(["no_publish_permission", "no_insights_permission"])),
+  warnings: z.array(z.enum(["no_publish_permission", "no_insights_permission", "no_replies_permission"])),
 });
 /** POST /api/threads/token-connect のレスポンス。 */
 export type TokenConnectResponse = z.infer<typeof tokenConnectResponseSchema>;
@@ -261,17 +294,17 @@ export const completeConnectResponseSchema = z.object({ redirectTo: z.string().s
 /** POST /api/threads/complete の応答。 */
 export type CompleteConnectResponse = z.infer<typeof completeConnectResponseSchema>;
 
-/** POST /api/accounts/:id/open のリクエストのスキーマ（research.md R10）。 */
+/** POST /api/threads/accounts/:id/open のリクエストのスキーマ（research.md R10）。 */
 export const openAccountRequestSchema = z.object({
   /** ページを読み込むたびに作る乱数ID（research.md R10） */
   clientId: z.string().min(1).max(100),
   /** そのページでAccountの画面を開くたびに増える連番 */
   openSeq: z.number().int().nonnegative(),
 });
-/** POST /api/accounts/:id/open のリクエスト。 */
+/** POST /api/threads/accounts/:id/open のリクエスト。 */
 export type OpenAccountRequest = z.infer<typeof openAccountRequestSchema>;
 
-/** DELETE /api/accounts/:id のリクエストのスキーマ。確認のためのアカウントの名前を受け取る（FR-022、specs/012 FR-043）。 */
+/** DELETE /api/threads/accounts/:id のリクエストのスキーマ。確認のためのアカウントの名前を受け取る（FR-022、specs/012 FR-043）。 */
 export const deleteAccountRequestSchema = z.object({
   confirmName: z.string().max(200),
 });
@@ -282,14 +315,14 @@ export const accountNameSchema = z
   .transform((v) => v.trim())
   .refine((v) => countChars(v) >= 1 && countChars(v) <= ACCOUNT_NAME_MAX, { message: "1-50 chars" });
 
-/** POST /api/accounts のリクエスト（specs/012 contracts/api.md）。 */
+/** POST /api/threads/accounts のリクエスト（specs/012 contracts/api.md）。 */
 export const createAccountRequestSchema = z.object({ name: accountNameSchema });
-/** POST /api/accounts のリクエスト。 */
+/** POST /api/threads/accounts のリクエスト。 */
 export type CreateAccountRequest = z.input<typeof createAccountRequestSchema>;
 
-/** PATCH /api/accounts/:id のリクエスト（specs/012 contracts/api.md）。 */
+/** PATCH /api/threads/accounts/:id のリクエスト（specs/012 contracts/api.md）。 */
 export const renameAccountRequestSchema = z.object({ name: accountNameSchema });
-/** PATCH /api/accounts/:id のリクエスト。 */
+/** PATCH /api/threads/accounts/:id のリクエスト。 */
 export type RenameAccountRequest = z.input<typeof renameAccountRequestSchema>;
 
 /** GET /api/data-deletion/:code のレスポンスのスキーマ。Metaのデータ削除要求の進み具合。 */
@@ -336,7 +369,7 @@ export const strategyValuesSchema = z.object({
 });
 
 /**
- * PUT /api/accounts/:id/strategy のリクエストのスキーマ。
+ * PUT /api/threads/accounts/:id/strategy のリクエストのスキーマ。
  * 目的の6キー（specs/014）は省略でき、省略したキーは保存で今の値を残す（FR-054。014の前の画面からの保存）。
  */
 export const putStrategyRequestSchema = strategyValuesSchema.extend({
@@ -346,7 +379,7 @@ export const putStrategyRequestSchema = strategyValuesSchema.extend({
   >),
   expectedVersion: z.number().int().nonnegative(),
 });
-/** PUT /api/accounts/:id/strategy のリクエスト。 */
+/** PUT /api/threads/accounts/:id/strategy のリクエスト。 */
 export type PutStrategyRequest = z.infer<typeof putStrategyRequestSchema>;
 
 /** 課題（GET・PUT のレスポンス）のスキーマ。 */
@@ -397,6 +430,34 @@ const itemMeta = { id: z.string(), version: z.number().int(), createdAt: z.strin
 /** 宣伝内容の状態のスキーマ。 */
 export const promotionStatusSchema = z.enum(["active", "paused", "ended"]);
 
+// 任意の文字（空・NULLは null にする）
+const nullableText = (max: number) =>
+  z
+    .string()
+    .nullable()
+    .transform((s) => (s === null || s.trim() === "" ? null : s.trim()))
+    .refine((s) => s === null || countChars(s) <= max, { message: `max ${max}` });
+
+/** 宣伝内容の「イベントの情報」（specs/021 data-model.md）。 */
+export const promotionEventSchema = z
+  .object({
+    startAt: z.string().refine(isEventDateTime, { message: "YYYY-MM-DDTHH:mm" }),
+    endAt: z.string().refine(isEventDateTime, { message: "YYYY-MM-DDTHH:mm" }).nullable().default(null),
+    format: z.enum(EVENT_FORMATS),
+    venueName: nullableText(100).default(null),
+    prefecture: z.enum(PREFECTURES).nullable().default(null),
+    address: nullableText(200).default(null),
+    building: nullableText(100).default(null),
+    station: nullableText(60).default(null),
+    capacity: z.number().int().min(1).max(100000).nullable().default(null),
+    feeYen: z.number().int().min(0).max(1000000).nullable().default(null),
+    feeNote: nullableText(500).default(null),
+    cancelPolicy: nullableText(1000).default(null),
+    audience: nullableText(300).default(null),
+    organizer: nullableText(100).default(null),
+  })
+  .refine((e) => e.endAt === null || e.endAt >= e.startAt, { message: "endAt before startAt", path: ["endAt"] });
+
 /** 宣伝内容の入力のスキーマ（contracts/api.md の PromotionInput）。 */
 export const promotionInputSchema = z.object({
   title: requiredText(SHORT_TEXT_MAX),
@@ -414,6 +475,8 @@ export const promotionInputSchema = z.object({
     .refine(isValidYmd, { message: "YYYY-MM-DD" })
     .nullable()
     .default(null),
+  /** イベントの情報（specs/021）。省けば今のまま、null で消す */
+  event: promotionEventSchema.nullable().optional(),
 });
 /** 宣伝内容の入力。 */
 export type PromotionInput = z.infer<typeof promotionInputSchema>;
@@ -425,6 +488,7 @@ export const updatePromotionRequestSchema = promotionInputSchema.extend({
 
 /** 宣伝内容（レスポンス）のスキーマ。 */
 export const promotionSchema = promotionInputSchema.extend({
+  event: promotionEventSchema.nullable(),
   ...itemMeta,
   isExpired: z.boolean(),
   isTargetable: z.boolean(),
@@ -604,7 +668,7 @@ export const keywordBatchResultSchema = z.object({ items: z.array(researchKeywor
 /** GET /research-keywords のレスポンスのスキーマ。 */
 export const researchKeywordListSchema = z.object({ items: z.array(researchKeywordSchema), ...listMeta });
 
-/** GET /api/accounts/:id/profile-status のレスポンスのスキーマ（ホームの入力状況。research.md R11・R14）。 */
+/** GET /api/threads/accounts/:id/profile-status のレスポンスのスキーマ（ホームの入力状況。research.md R11・R14）。 */
 export const profileStatusSchema = z.object({
   strategy: z.object({ filledCount: z.number().int(), totalCount: z.number().int() }),
   promotions: z.object({ targetableCount: z.number().int(), totalCount: z.number().int() }),
@@ -651,6 +715,20 @@ export type BlockedReason = z.infer<typeof blockedReasonSchema>;
 /** 却下理由の候補のコードのスキーマ（004 research.md R10）。 */
 export const rejectReasonCodeSchema = z.enum(REJECT_REASON_CODES);
 
+/** 下書きの時間差のメンション（specs/023 contracts/api.md「下書きの応答」）。 */
+export const postMentionSchema = z.object({
+  usernames: z.array(z.string()),
+  text: z.string(),
+  delayMinutes: z.number().int().nullable(),
+  state: z.enum(MENTION_STATES),
+  dueAt: z.string().nullable(),
+  sentAt: z.string().nullable(),
+  failureReason: z.enum(MENTION_FAILURE_REASONS).nullable(),
+  replyPermalink: z.string().nullable(),
+});
+/** 下書きの時間差のメンション。 */
+export type PostMention = z.infer<typeof postMentionSchema>;
+
 /** 下書き（レスポンス）のスキーマ。 */
 export const postDraftSchema = z.object({
   id: z.string(),
@@ -686,6 +764,8 @@ export const postDraftSchema = z.object({
   createdBy: z.string().nullable().default(null),
   editedBy: z.string().nullable().default(null),
   editedAt: z.string().nullable().default(null),
+  // 時間差のメンション（specs/023）。見せてもらっている人には null
+  mention: postMentionSchema.nullable().default(null),
   createdAt: z.string(),
   updatedAt: z.string(),
 });
@@ -884,6 +964,8 @@ export const promptSummarySchema = z.object({
   dailyPostCount: z.number().int(),
   /** 含めた反応が低かった投稿の件数（006） */
   poorPostCount: z.number().int(),
+  /** 含めた伸びた傾向の数（022） */
+  trendCount: z.number().int(),
 });
 /** プロンプトに実際に含めた内容の要約。 */
 export type PromptSummary = z.infer<typeof promptSummarySchema>;
@@ -948,7 +1030,8 @@ export const promptResponseSchema = z.object({
     version: z.number().int(),
   }),
   summary: promptSummarySchema,
-  materials: promptMaterialsSchema,
+  /** 戦略がOFFなら null（「プロンプトに入っている情報」を出さない。specs/019 FR-007） */
+  materials: promptMaterialsSchema.nullable(),
 });
 /** GET /prompt のレスポンス。 */
 export type PromptResponse = z.infer<typeof promptResponseSchema>;
@@ -1031,7 +1114,8 @@ export type PostingSchedule = z.infer<typeof postingScheduleSchema>;
 /** PUT /posting-schedule のリクエストのスキーマ。並び・重複・間の検証は validatePostingSchedule で行う。 */
 export const putPostingScheduleRequestSchema = z.object({
   enabled: z.boolean(),
-  slotTimes: z.array(slotTimeSchema).max(AUTOPOST_SLOT_LIMIT * 2),
+  // 上限の判定は保存の処理で行う（オーナーの1日の投稿数の上限。specs/024 FR-019）
+  slotTimes: z.array(slotTimeSchema).max(DAILY_POST_LIMIT_MAX * 2),
   jitter: z.boolean(),
   expectedVersion: z.number().int().min(0),
 });
@@ -1053,6 +1137,9 @@ export type ThreadsCheck = z.infer<typeof threadsCheckSchema>;
 /** GET /posting-schedule のレスポンスのスキーマ。 */
 export const postingScheduleResponseSchema = z.object({
   schedule: postingScheduleSchema,
+  /** 上限が下がって、登録した時刻の数が上限を超えている（specs/024 FR-020） */
+  overLimit: z.boolean().optional(),
+  /** slots はオーナーの1日の投稿数の上限（specs/024 FR-019） */
   limits: z.object({ slots: z.number().int(), minGapMinutes: z.number().int(), jitterMinutes: z.number().int() }),
 });
 /** GET /posting-schedule のレスポンス。 */
@@ -1110,6 +1197,9 @@ export const publishedPostSchema = z.object({
   publishedAt: z.string(),
   threadsMediaId: z.string().nullable(),
   threadsPermalink: z.string().nullable(),
+  // 時間差のメンション（specs/023）。付ける・やめるときの版と、見せてもらっている人には null のメンション
+  version: z.number().int().default(1),
+  mention: postMentionSchema.nullable().default(null),
 });
 /** 投稿済みの一覧の1件。 */
 export type PublishedPost = z.infer<typeof publishedPostSchema>;
@@ -1338,7 +1428,7 @@ export type ExportPage = z.infer<typeof exportPageSchema>;
 /** 見ている人のチーム（入っているチームの id・名前・自分のロール）。 */
 const accessTeamSchema = z.object({ id: z.string(), name: z.string(), myRole: teamRoleSchema });
 
-/** GET /api/accounts/:id/access の応答のスキーマ（contracts/permissions.md「画面での出し分け」）。 */
+/** GET /api/threads/accounts/:id/access の応答のスキーマ（contracts/permissions.md「画面での出し分け」）。 */
 export const accountAccessResponseSchema = z.object({
   relation: relationSchema,
   permissions: z.array(permissionSchema),
@@ -1350,7 +1440,9 @@ export const accountAccessResponseSchema = z.object({
   /** 担当の知らせ「（アカウント名）の担当になりました」を出すか（担当の人で、まだ閉じていない。research.md R9） */
   assignedNotice: z.boolean(),
   /** オーナーが読むだけなら、その理由（チームの人には owner_inactive だけ。specs/013 FR-045）。すべて使えるなら NULL */
-  readOnly: z.object({ reason: z.enum(["trial_ended", "payment_failed", "canceled", "owner_inactive"]) }).nullable(),
+  readOnly: z.object({ reason: z.enum(["trial_ended", "payment_failed", "canceled", "test_access", "owner_inactive"]) }).nullable(),
+  /** オーナーの設定でONの機能のまとまり（画面の出し分けに使う。specs/019 contracts/api.md） */
+  features: z.array(z.enum(FEATURES)),
 });
 /** Accountとの関わりと権限（画面の出し分けに使う）。 */
 export type AccountAccessResponse = z.infer<typeof accountAccessResponseSchema>;
@@ -1361,18 +1453,18 @@ export const teamNameSchema = z
   .transform((v) => v.trim())
   .refine((v) => countChars(v) >= 1 && countChars(v) <= TEAM_NAME_MAX, { message: "1-50 chars" });
 
-/** POST /api/teams のリクエスト（自分がオーナーのアカウントを1つ以上。0件はサービスで TEAM_NEEDS_ACCOUNT）。 */
+/** POST /api/threads/teams のリクエスト（自分がオーナーのアカウントを1つ以上。0件はサービスで TEAM_NEEDS_ACCOUNT）。 */
 export const teamCreateRequestSchema = z.object({
   name: teamNameSchema,
   accountIds: z.array(z.string().uuid()).max(TEAM_MEMBER_LIMIT),
 });
-/** POST /api/teams の応答。 */
+/** POST /api/threads/teams の応答。 */
 export const teamCreateResponseSchema = z.object({ teamId: z.string() });
 
-/** PATCH /api/teams/:teamId のリクエスト。 */
+/** PATCH /api/threads/teams/:teamId のリクエスト。 */
 export const teamRenameRequestSchema = z.object({ name: teamNameSchema });
 
-/** GET /api/teams/:teamId のメンバーの行のアカウント。開けないアカウントは名前だけ。 */
+/** GET /api/threads/teams/:teamId のメンバーの行のアカウント。開けないアカウントは名前だけ。 */
 export const teamMemberAccountSchema = z.object({
   id: z.string(),
   /** アカウントの名前（specs/012） */
@@ -1388,7 +1480,7 @@ export const teamMemberAccountSchema = z.object({
   /** 見ている人の関わり（開けなければNULL）。owner・assigned は Account の画面、shared_viewer は読むだけの画面で開く */
   relation: relationSchema.nullable(),
 });
-/** GET /api/teams/:teamId のメンバーの行。 */
+/** GET /api/threads/teams/:teamId のメンバーの行。 */
 export const teamMemberSchema = z.object({
   userId: z.string(),
   name: z.string(),
@@ -1402,7 +1494,7 @@ export const teamMemberSchema = z.object({
 /** チームのメンバーの行。 */
 export type TeamMember = z.infer<typeof teamMemberSchema>;
 
-/** GET /api/teams/:teamId の応答（contracts/api.md「GET /api/teams/:teamId の応答」）。 */
+/** GET /api/threads/teams/:teamId の応答（contracts/api.md「GET /api/threads/teams/:teamId の応答」）。 */
 export const teamDetailSchema = z.object({
   id: z.string(),
   name: z.string(),
@@ -1410,31 +1502,84 @@ export const teamDetailSchema = z.object({
   admin: z.object({ userId: z.string(), name: z.string() }),
   members: z.array(teamMemberSchema),
   limits: z.object({ members: z.number().int(), editors: z.number().int() }),
+  /** 運用状況を開けるか（管理者、または同じチーム経由の担当がある編集者。specs/020） */
+  statusVisible: z.boolean(),
 });
 /** チームの詳細。 */
 export type TeamDetail = z.infer<typeof teamDetailSchema>;
 
-/** GET /api/teams/:teamId/invite の応答。 */
+/** 運用状況の人の行（specs/020 contracts/api.md）。 */
+export const teamStatusPersonSchema = z.object({
+  userId: z.string(),
+  name: z.string(),
+  role: teamRoleSchema,
+  isMe: z.boolean(),
+  joinedAt: z.string(),
+  lastActiveAt: z.string().nullable(),
+  activeCount7d: z.number().int(),
+  stopped: z.boolean(),
+  /** 記録がなく、入って90日を過ぎている（操作の記録は90日で消える。research.md R2） */
+  retentionLimited: z.boolean(),
+});
+/** 運用状況のアカウントの伸び（research.md R4・R7）。 */
+export const teamStatusGrowthSchema = z.discriminatedUnion("state", [
+  z.object({ state: z.literal("metrics_off") }),
+  z.object({ state: z.literal("insufficient") }),
+  z.object({ state: z.literal("ok"), ratio: z.number(), recentMedian: z.number(), previousMedian: z.number() }),
+  z.object({ state: z.literal("poor"), ratio: z.number(), recentMedian: z.number(), previousMedian: z.number() }),
+]);
+/** 運用状況のアカウントの行。 */
+export const teamStatusAccountSchema = z.object({
+  accountId: z.string(),
+  name: z.string(),
+  username: z.string().nullable(),
+  displayName: z.string().nullable(),
+  profilePictureUrl: z.string().nullable(),
+  owner: z.object({ userId: z.string(), name: z.string(), isMe: z.boolean() }),
+  connection: z.enum(["connected", "disconnected"]),
+  addedAt: z.string(),
+  lastPostedAt: z.string().nullable(),
+  postCount7d: z.number().int(),
+  approvedCount: z.number().int(),
+  needsReviewCount: z.number().int(),
+  stopped: z.boolean(),
+  growth: teamStatusGrowthSchema,
+});
+/** GET /api/threads/teams/:teamId/status の応答（specs/020 contracts/api.md）。 */
+export const teamStatusSchema = z.object({
+  scope: z.enum(["all", "assigned"]),
+  generatedAt: z.string(),
+  /** 止まっている人とアカウントの数（チームの画面のボタンの印） */
+  stoppedCount: z.number().int(),
+  people: z.array(teamStatusPersonSchema),
+  accounts: z.array(teamStatusAccountSchema),
+});
+/** チームの運用状況。 */
+export type TeamStatus = z.infer<typeof teamStatusSchema>;
+/** 運用状況のアカウントの伸び。 */
+export type TeamStatusGrowth = z.infer<typeof teamStatusGrowthSchema>;
+
+/** GET /api/threads/teams/:teamId/invite の応答。 */
 export const teamInviteSchema = z.object({ url: z.string(), rotatedAt: z.string() });
 /** チームの招待リンク。 */
 export type TeamInvite = z.infer<typeof teamInviteSchema>;
 
-/** PATCH /api/teams/:teamId/members/:userId のリクエスト（管理者は切り替えられない）。 */
+/** PATCH /api/threads/teams/:teamId/members/:userId のリクエスト（管理者は切り替えられない）。 */
 export const teamRoleUpdateSchema = z.object({ role: z.enum(["member", "editor"]) });
 
-/** POST /api/teams/:teamId/leave のリクエスト（管理者は引き継ぐ人が必須）。 */
+/** POST /api/threads/teams/:teamId/leave のリクエスト（管理者は引き継ぐ人が必須）。 */
 export const teamLeaveRequestSchema = z.object({ newAdminUserId: z.string().uuid().optional() });
 
-/** POST /api/teams/:teamId/admin のリクエスト（抜けずに引き継ぐ）。 */
+/** POST /api/threads/teams/:teamId/admin のリクエスト（抜けずに引き継ぐ）。 */
 export const teamAdminTransferSchema = z.object({ userId: z.string().uuid() });
 
-/** POST /api/teams/:teamId/accounts のリクエスト（自分のアカウントを足す）。 */
+/** POST /api/threads/teams/:teamId/accounts のリクエスト（自分のアカウントを足す）。 */
 export const teamAccountAddSchema = z.object({ accountId: z.string().uuid(), shared: z.boolean().optional() });
 
-/** PATCH /api/teams/:teamId/accounts/:accountId のリクエスト（チームに見せる）。 */
+/** PATCH /api/threads/teams/:teamId/accounts/:accountId のリクエスト（チームに見せる）。 */
 export const teamShareUpdateSchema = z.object({ shared: z.boolean() });
 
-/** GET /api/teams/:teamId/assignments の応答（担当の表）。 */
+/** GET /api/threads/teams/:teamId/assignments の応答（担当の表）。 */
 export const teamAssignmentsSchema = z.object({
   /** 列：チームのアカウント */
   accounts: z.array(
@@ -1456,10 +1601,10 @@ export const teamAssignmentsSchema = z.object({
 /** 担当の表。 */
 export type TeamAssignments = z.infer<typeof teamAssignmentsSchema>;
 
-/** 招待リンクを開いた人の状態（contracts/api.md「GET /api/invites/:token」）。 */
+/** 招待リンクを開いた人の状態（contracts/api.md「GET /api/threads/invites/:token」）。 */
 export const inviteViewerStatusSchema = z.enum(["anonymous", "needs_account", "needs_connection", "ready", "already_member"]);
 
-/** GET /api/invites/:token の応答。 */
+/** GET /api/threads/invites/:token の応答。 */
 export const invitePreviewSchema = z.object({
   team: z.object({ name: z.string(), adminName: z.string(), memberCount: z.number().int() }),
   viewer: z.object({
@@ -1484,14 +1629,14 @@ export const invitePreviewSchema = z.object({
 /** 招待の確認画面の情報。 */
 export type InvitePreview = z.infer<typeof invitePreviewSchema>;
 
-/** POST /api/invites/:token/accept のリクエスト（0件はサービスで TEAM_NEEDS_ACCOUNT）。 */
+/** POST /api/threads/invites/:token/accept のリクエスト（0件はサービスで TEAM_NEEDS_ACCOUNT）。 */
 export const inviteAcceptRequestSchema = z.object({
   accounts: z.array(z.object({ id: z.string().uuid(), shared: z.boolean() })).max(TEAM_MEMBER_LIMIT),
 });
-/** POST /api/invites/:token/accept の応答。 */
+/** POST /api/threads/invites/:token/accept の応答。 */
 export const inviteAcceptResponseSchema = z.object({ teamId: z.string() });
 
-/** GET /api/accounts/:id/team の応答（009のカードを改めた。specs/011 FR-055）。 */
+/** GET /api/threads/accounts/:id/team の応答（009のカードを改めた。specs/011 FR-055）。 */
 export const accountTeamSchema = z.object({
   /** このアカウントが入っているチーム。入っていなければNULL */
   team: z
@@ -1509,7 +1654,7 @@ export type AccountTeam = z.infer<typeof accountTeamSchema>;
 
 /** 操作の記録の種類のスキーマ（specs/008 FR-052）。 */
 export const activityKindSchema = z.enum(["review", "draft", "content", "settings", "member"]);
-/** GET /api/accounts/:id/activity のクエリのスキーマ。 */
+/** GET /api/threads/accounts/:id/activity のクエリのスキーマ。 */
 export const activityQuerySchema = z.object({
   // カンマ区切りで複数を選べる（画面の「設定・戦略」は content と settings。PR #9 のCodexレビュー）
   kind: z
@@ -1535,7 +1680,7 @@ export const activityItemSchema = z.object({
 });
 /** 操作の記録の1行。 */
 export type ActivityItem = z.infer<typeof activityItemSchema>;
-/** GET /api/accounts/:id/activity の応答（contracts/api.md「操作の記録」）。 */
+/** GET /api/threads/accounts/:id/activity の応答（contracts/api.md「操作の記録」）。 */
 export const activityListSchema = z.object({
   items: z.array(activityItemSchema),
   actors: z.array(z.object({ userId: z.string(), name: z.string(), role: actorRoleSchema })),
@@ -1550,17 +1695,709 @@ export const withdrawRequestSchema = z.object({ confirmEmail: z.string().max(320
 /** GET /api/me/withdrawal-preview の応答（退会の確認の内容）。 */
 export const withdrawalPreviewSchema = z.object({
   email: z.string(),
-  ownedAccounts: z.array(z.object({ id: z.string(), name: z.string() })),
-  teams: z.array(
-    z.object({
-      id: z.string(),
-      name: z.string(),
-      isAdmin: z.boolean(),
-      outcome: z.enum(["transfer", "delete", "leave"]),
-      nextAdminName: z.string().nullable(),
-    }),
-  ),
   hasActiveSubscription: z.boolean(),
 });
 /** 退会の確認の内容。 */
 export type WithdrawalPreview = z.infer<typeof withdrawalPreviewSchema>;
+
+// ---- テスト用のグループ（specs/016-test-groups contracts/api.md）----
+
+/** GET /api/test-invites/:token の応答。viewer はログインしていなければ null。 */
+export const testInvitePreviewSchema = z.object({
+  group: z.object({ name: z.string() }),
+  /** テスト版（招待制がONの環境）か。false なら、テスト版のための注意を出さない（specs/019 FR-019） */
+  testVersion: z.boolean(),
+  /** 定員に達しているか */
+  full: z.boolean(),
+  viewer: z
+    .discriminatedUnion("state", [
+      z.object({ state: z.literal("can_join") }),
+      z.object({ state: z.literal("full") }),
+      z.object({ state: z.literal("already_member"), groupName: z.string() }),
+    ])
+    .nullable(),
+});
+/** グループの招待の確認。 */
+export type TestInvitePreview = z.infer<typeof testInvitePreviewSchema>;
+
+/** POST /api/test-invites/:token/join の応答。 */
+export const testInviteJoinResponseSchema = z.object({ groupId: z.string() });
+
+/** グループの記録の種類（data-model.md の test_group_events.action）。 */
+export const TEST_GROUP_EVENT_ACTIONS = [
+  "created",
+  "renamed",
+  "capacity_changed",
+  "invite_rotated",
+  "closed",
+  "member_joined",
+  "member_removed",
+] as const;
+/** グループの記録の種類。 */
+export type TestGroupEventAction = (typeof TEST_GROUP_EVENT_ACTIONS)[number];
+
+/** 運営者の画面のグループの行。 */
+export const testGroupSummarySchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  capacity: z.number().int(),
+  memberCount: z.number().int(),
+  /** 閉じていれば null */
+  inviteUrl: z.string().nullable(),
+  closedAt: z.string().nullable(),
+  createdAt: z.string(),
+});
+/** 運営者の画面のグループの行。 */
+export type TestGroupSummary = z.infer<typeof testGroupSummarySchema>;
+
+/** GET /api/operator/test-groups の応答。 */
+export const testGroupListSchema = z.object({ groups: z.array(testGroupSummarySchema) });
+
+/** 運営者の画面のグループの詳しい内容。 */
+export const testGroupDetailSchema = testGroupSummarySchema.extend({
+  /** グループの設定でOFFのまとまり（specs/019 FR-017。名前はアプリが登録したもの。specs/meguru/029 T070） */
+  disabled: z.array(z.string().regex(/^[a-z_]{1,30}$/)), // appKeySchema と同じ形（定義の順のため、ここでは書き下す）
+  /** このグループに開いている「運営者が開いた人だけ」のアプリ（specs/meguru/030-app-access FR-005。登録の順） */
+  appAccess: z.array(z.string()).default([]), // 前の版のAPI（030 の前）は返さない。デプロイの数分の間も画面が読めるように
+  /** 入っている人（入った順） */
+  members: z.array(z.object({ userId: z.string(), name: z.string(), email: z.string(), joinedAt: z.string() })),
+  /** 記録（新しい順に TEST_GROUP_EVENTS_LIMIT 件） */
+  events: z.array(
+    z.object({
+      action: z.enum(TEST_GROUP_EVENT_ACTIONS),
+      actorName: z.string(),
+      subjectName: z.string().nullable(),
+      details: z.unknown(),
+      createdAt: z.string(),
+    }),
+  ),
+});
+/** 運営者の画面のグループの詳しい内容。 */
+export type TestGroupDetail = z.infer<typeof testGroupDetailSchema>;
+
+const testGroupName = z.string().trim().min(1).max(TEST_GROUP_NAME_MAX);
+const testGroupCapacity = z.number().int().min(TEST_GROUP_CAPACITY_MIN).max(TEST_GROUP_CAPACITY_MAX);
+
+/** POST /api/operator/test-groups のリクエスト。 */
+export const testGroupCreateRequestSchema = z.object({ name: testGroupName, capacity: testGroupCapacity });
+
+/** PATCH /api/operator/test-groups/:groupId のリクエスト（少なくとも1つ）。 */
+export const testGroupUpdateRequestSchema = z
+  .object({ name: testGroupName.optional(), capacity: testGroupCapacity.optional() })
+  .refine((v) => v.name !== undefined || v.capacity !== undefined, { message: "nothing to update" });
+
+// ---- 紹介リンク（specs/017-referral-links contracts/api.md） ----
+
+/** GET /api/me/referral の応答。紹介された人が誰かわかるものは入れない（FR-007）。 */
+export const referralResponseSchema = z.object({
+  /** 本人の紹介リンク（WEB_ORIGIN/r/{code}） */
+  url: z.string(),
+  /** 本人の紹介で登録した人の数（退会した人は数えない） */
+  referredCount: z.number().int().nonnegative(),
+});
+/** 本人の紹介リンクと人数。 */
+export type ReferralResponse = z.infer<typeof referralResponseSchema>;
+
+/** GET /api/referral-page の応答（認証なし）。testGroups はテスト用のグループの仕組みがONか。 */
+export const referralPageSchema = z.object({ testGroups: z.boolean() });
+/** 紹介リンクの画面に出す注意のための情報。 */
+export type ReferralPage = z.infer<typeof referralPageSchema>;
+
+// ---- 機能のまとまりごとのON/OFF（specs/019-feature-switches contracts/api.md「運営者のAPI」） ----
+
+/**
+ * アプリが登録する機能・上限の名前の形（英小文字と _ の1〜30文字。機能の表の CHECK と、API の登録の確かめと同じ。
+ * 共通はアプリの名前を知らない。specs/meguru/029 tasks.md T070）。
+ */
+export const appKeySchema = z.string().regex(/^[a-z_]{1,30}$/);
+/** 機能のまとまりの名前。 */
+const featureSchema = appKeySchema;
+
+/** GET /api/operator/users?email= のクエリ（完全一致。前後の空白を除き、大文字・小文字を区別しない）。 */
+export const operatorUserQuerySchema = z.object({ email: z.string().trim().toLowerCase().pipe(z.email()) });
+
+/**
+ * 運営者の画面の、見つかった人と今の設定（disabled は人の設定、group.disabled はグループの設定。登録の順）。
+ * appAccess は人ごとに開いているアプリ、group.appAccess はグループに開いているアプリ（specs/meguru/030-app-access FR-005。登録の順）。
+ */
+export const operatorUserSchema = z.object({
+  userId: z.string(),
+  name: z.string(),
+  email: z.string(),
+  disabled: z.array(featureSchema),
+  appAccess: z.array(z.string()).default([]), // 前の版のAPI（030 の前）は返さない。デプロイの数分の間も画面が読めるように
+  /** 入っている閉じていないグループ（入っていなければ null） */
+  group: z.object({ id: z.string(), name: z.string(), disabled: z.array(featureSchema), appAccess: z.array(z.string()).default([]) }).nullable(),
+});
+/** 運営者の画面の、見つかった人と今の設定。 */
+export type OperatorUser = z.infer<typeof operatorUserSchema>;
+
+/**
+ * PUT /api/operator/feature-settings/:userId のリクエスト（登録したまとまりすべての値。名前 → ON/OFF）。
+ * 登録した名前とそろっているかは、API が登録の一覧で確かめる（specs/meguru/029 tasks.md T070）。
+ */
+export const featureSettingsRequestSchema = z.object({
+  features: z.record(featureSchema, z.boolean()),
+});
+/** 機能の設定の保存の値。 */
+export type FeatureSettingsRequest = z.infer<typeof featureSettingsRequestSchema>;
+
+/**
+ * 登録されたアプリの機能と上限の一覧（GET /api/operator/app-registry。運営者だけ）。運営の画面が、アプリの名前を
+ * 直接書かずに出すため（specs/meguru/029-threads-pattern1 tasks.md T069、contracts/api-routes.md 1）。
+ */
+export const operatorAppRegistrySchema = z.object({
+  apps: z.array(
+    z.object({
+      app: z.string(),
+      /** 利用の決まり（open：だれでも使える、granted：運営者が開いた人だけ。specs/meguru/030-app-access FR-001） */
+      access: z.enum(APP_ACCESS_MODES).default("open"), // 前の版のAPI（030 の前）は返さない
+      /** 機能のON/OFF（運営の「使える機能」の画面）を持つアプリか（今は1つだけ） */
+      featureSwitches: z.boolean(),
+      /** 運営の上限の画面が扱うアプリか（今は1つだけ） */
+      operatorLimits: z.boolean(),
+      features: z.array(z.object({ key: z.string(), label: z.string(), description: z.string().optional() })),
+      limits: z.array(
+        z.object({
+          key: z.string(),
+          label: z.string(),
+          min: z.number().int(),
+          max: z.number().int(),
+          operatorValue: z.number().int().nullable(),
+          /** 一覧に出す短い名前（例：アカウント） */
+          shortLabel: z.string().optional(),
+          /** 既定値の欄で、名前の後ろに括弧で添える文（例：1アカウント） */
+          note: z.string().optional(),
+          /** 利用の数を数える上限か */
+          countsUsage: z.boolean().optional(),
+        }),
+      ),
+    }),
+  ),
+});
+/** 登録されたアプリの機能と上限の一覧の型。 */
+export type OperatorAppRegistry = z.infer<typeof operatorAppRegistrySchema>;
+
+// ---- アプリの利用の許可（specs/meguru/030-app-access FR-005）----
+
+/**
+ * PUT /api/operator/app-access/users/:userId・/groups/:groupId のリクエスト（アプリ → 開く・閉じる。書いたアプリだけを変える）。
+ * 「運営者が開いた人だけ」で登録したアプリの名前かは、API が登録の一覧で確かめる。
+ */
+export const appAccessRequestSchema = z.object({
+  apps: z.record(z.string(), z.boolean()),
+});
+/** アプリの利用の許可の保存の値。 */
+export type AppAccessRequest = z.infer<typeof appAccessRequestSchema>;
+
+/** PUT /api/operator/app-access/… の応答（保存した後に、その人・グループに開いているアプリ。登録の順）。 */
+export const appAccessResponseSchema = z.object({ granted: z.array(z.string()) });
+/** アプリの利用の許可の保存の応答。 */
+export type AppAccessResponse = z.infer<typeof appAccessResponseSchema>;
+
+/** GET /api/operator/feature-settings の応答（FR-013・FR-014）。 */
+export const featureSettingsListSchema = z.object({
+  /** OFFのまとまりがある人。updatedAt は、その人の設定を最後に変えた日時（ONに戻した変更も含む）の新しい順 */
+  users: z.array(operatorUserSchema.omit({ group: true, appAccess: true }).extend({ updatedAt: z.string() })),
+  /** 最近の変更（新しい順に FEATURE_EVENTS_LIMIT 件まで） */
+  events: z.array(
+    z.object({
+      feature: featureSchema,
+      action: z.enum(FEATURE_EVENT_ACTIONS),
+      actorName: z.string(),
+      subjectName: z.string(),
+      /** 人の設定の変更か、グループの設定の変更か */
+      subjectKind: z.enum(["user", "group"]),
+      createdAt: z.string(),
+    }),
+  ),
+});
+/** 運営者の画面の、OFFの人の一覧と最近の変更。 */
+export type FeatureSettingsList = z.infer<typeof featureSettingsListSchema>;
+
+// ---- 外部媒体展開（specs/021-external-media contracts/api.md）----
+
+/** 媒体。 */
+export const mediaSchema = z.enum(MEDIA);
+/** 掲載の状況。 */
+export const listingStatusSchema = z.enum(LISTING_STATUSES);
+/** 自動で直した内容。 */
+export const listingFixSchema = z.object({ field: z.string(), excerpt: z.string(), reason: z.string() });
+
+/** GET /api/threads/accounts/:accountId/external-media の応答。 */
+export const externalMediaListSchema = z.object({
+  promotions: z.array(
+    z.object({
+      id: z.string(),
+      title: z.string(),
+      version: z.number().int(),
+      event: promotionEventSchema.nullable(),
+      listings: z.array(z.object({ media: mediaSchema, status: listingStatusSchema, postedUrl: z.string().nullable() })),
+    }),
+  ),
+  canEdit: z.boolean(),
+});
+/** 外部媒体展開の一覧。 */
+export type ExternalMediaList = z.infer<typeof externalMediaListSchema>;
+
+/** 媒体ごとの掲載内容と状況。 */
+export const listingSchema = z.object({
+  status: listingStatusSchema,
+  postedUrl: z.string().nullable(),
+  imageStyle: z.enum(IMAGE_STYLES),
+  fields: z.record(z.string(), z.string()).nullable(),
+  fixes: z.array(listingFixSchema),
+  generatedAt: z.string().nullable(),
+  sourceVersion: z.number().int().nullable(),
+  version: z.number().int().nullable(),
+});
+/** 掲載内容と状況。 */
+export type Listing = z.infer<typeof listingSchema>;
+
+/** GET /api/threads/accounts/:accountId/external-media/:promotionId/:media の応答。 */
+export const listingDetailSchema = z.object({
+  promotion: promotionSchema,
+  media: mediaSchema,
+  listing: listingSchema,
+  defaults: z.record(z.string(), z.string()),
+  sourceChanged: z.boolean(),
+  canEdit: z.boolean(),
+});
+/** 入力の画面の中身。 */
+export type ListingDetail = z.infer<typeof listingDetailSchema>;
+
+/** POST …/generate のリクエスト。 */
+export const listingGenerateRequestSchema = z.object({ expectedVersion: z.number().int().positive().nullable() });
+
+/** PUT …/:media のリクエスト（欄の key と上限は、APIが媒体の決まりで確かめる）。 */
+export const listingUpdateRequestSchema = z.object({
+  expectedVersion: z.number().int().positive().nullable(),
+  status: listingStatusSchema.optional(),
+  postedUrl: z
+    .string()
+    .nullable()
+    .optional()
+    .refine((s) => s === undefined || s === null || s === "" || (countChars(s) <= URL_MAX && isHttpUrl(s)), { message: "http(s) url" }),
+  imageStyle: z.enum(IMAGE_STYLES).optional(),
+  fields: z.record(z.string(), z.string()).optional(),
+});
+/** 掲載内容の保存のリクエスト。 */
+export type ListingUpdateRequest = z.infer<typeof listingUpdateRequestSchema>;
+
+/** 媒体の既定値（1つの媒体）。 */
+export const mediaDefaultsSchema = z.object({
+  media: mediaSchema,
+  values: z.record(z.string(), z.string()),
+  version: z.number().int().nullable(),
+});
+/** GET /api/threads/accounts/:accountId/media-defaults の応答。 */
+export const mediaDefaultsListSchema = z.object({ items: z.array(mediaDefaultsSchema), canEdit: z.boolean() });
+/** PUT /api/threads/accounts/:accountId/media-defaults/:media のリクエスト。 */
+export const mediaDefaultsUpdateSchema = z.object({
+  expectedVersion: z.number().int().positive().nullable(),
+  values: z.record(z.string(), z.string().max(500)),
+});
+
+// ---- アルゴリズムの解析（specs/022-algorithm-analysis contracts/api.md）----
+
+/** テーマのid（`t`＋英数字）。 */
+export const ANALYSIS_THEME_ID_PATTERN = /^t[0-9a-z]{1,8}$/;
+const themeIdSchema = z.string().regex(ANALYSIS_THEME_ID_PATTERN);
+/** 書き出しの型のスキーマ。 */
+export const openingTypeSchema = z.enum(OPENING_TYPES);
+const themeSchema = z.object({ id: themeIdSchema, name: z.string() });
+
+/** GET …/analysis のクエリ。 */
+export const analysisQuerySchema = z.object({ scope: z.enum(["all", "regular"]).default("all") });
+/** 解析の範囲（すべて・ふだんの投稿）。 */
+export type AnalysisScope = z.infer<typeof analysisQuerySchema>["scope"];
+
+/** テーマの一覧の入力（10個まで、名前は前後の空白を除いて1〜20文字、重ならない。data-model.md）。 */
+export const analysisThemesSchema = z
+  .array(
+    z.object({
+      id: themeIdSchema.optional(),
+      name: z
+        .string()
+        .transform((s) => s.trim())
+        .refine((s) => countChars(s) >= 1 && countChars(s) <= ANALYSIS_THEME_NAME_MAX, { message: `1-${ANALYSIS_THEME_NAME_MAX}` }),
+    }),
+  )
+  .max(ANALYSIS_THEMES_MAX)
+  .superRefine((items, ctx) => {
+    const names = new Set<string>();
+    const ids = new Set<string>();
+    items.forEach((t, i) => {
+      if (names.has(t.name)) ctx.addIssue({ code: "custom", path: [i, "name"], message: "duplicate" });
+      names.add(t.name);
+      if (t.id) {
+        if (ids.has(t.id)) ctx.addIssue({ code: "custom", path: [i, "id"], message: "duplicate" });
+        ids.add(t.id);
+      }
+    });
+  });
+
+/** 解析の設定（応答）。`version` が null＝まだ保存していない（初めの値）。 */
+export const analysisSettingsSchema = z.object({
+  trendsInPrompt: z.boolean(),
+  themes: z.array(themeSchema),
+  version: z.number().int().nullable(),
+});
+/** 解析の設定。 */
+export type AnalysisSettings = z.infer<typeof analysisSettingsSchema>;
+
+/** PATCH …/analysis/settings のリクエスト。 */
+export const analysisSettingsRequestSchema = z
+  .object({
+    expectedVersion: z.number().int().positive().nullable(),
+    trendsInPrompt: z.boolean().optional(),
+    themes: analysisThemesSchema.optional(),
+  })
+  .refine((v) => v.trendsInPrompt !== undefined || v.themes !== undefined, { message: "nothing to update" });
+/** 解析の設定の保存のリクエスト。 */
+export type AnalysisSettingsRequest = z.infer<typeof analysisSettingsRequestSchema>;
+/** PATCH …/analysis/settings の応答。 */
+export const analysisSettingsResponseSchema = z.object({ settings: analysisSettingsSchema });
+
+const bucketMarkSchema = z.enum(["few", "untried"]).nullable();
+const bucketRowSchema = z.object({
+  key: z.string(),
+  label: z.string(),
+  count: z.number().int(),
+  views: z.number().nullable(),
+  engagementRate: z.number().nullable(),
+  replyRate: z.number().nullable(),
+  mark: bucketMarkSchema,
+});
+const sideSchema = z.object({ count: z.number().int(), views: z.number().nullable() });
+const compareSchema = z.object({
+  count: z.number().int(),
+  firstSpeed: z.number().nullable(),
+  laterGrowth: z.number().nullable(),
+  replyRate: z.number().nullable(),
+  length: z.number().nullable(),
+  questionCount: z.number().int(),
+});
+
+/** GET …/analysis の応答。 */
+export const analysisResponseSchema = z.object({
+  period: z.object({ from: z.string(), to: z.string(), days: z.number().int() }),
+  scope: z.enum(["all", "regular"]),
+  totals: z.object({
+    confirmed: z.number().int(),
+    promo: z.number().int(),
+    withFollowers: z.number().int(),
+    classified: z.number().int(),
+  }),
+  needMore: z.number().int().nullable(),
+  trends: z.array(
+    z.object({
+      dimension: z.enum(["time", "day", "length", "feature", "opening", "theme"]),
+      key: z.string(),
+      text: z.string(),
+      count: z.number().int(),
+      views: z.number(),
+      otherCount: z.number().int(),
+      otherViews: z.number(),
+      ratio: z.number(),
+      promptable: z.boolean(),
+    }),
+  ),
+  time: z.array(bucketRowSchema),
+  day: z.array(bucketRowSchema),
+  length: z.array(bucketRowSchema),
+  features: z.array(
+    z.object({ key: z.string(), label: z.string(), with: sideSchema, without: sideSchema, ratio: z.number().nullable(), mark: bucketMarkSchema }),
+  ),
+  opening: z.array(bucketRowSchema),
+  theme: z.array(bucketRowSchema),
+  recommended: z.object({
+    available: z.boolean(),
+    posts: z.array(
+      z.object({
+        id: z.string(),
+        head: z.string(),
+        publishedAt: z.string(),
+        views: z.number(),
+        spread: z.number(),
+        firstSpeed: z.number().nullable(),
+        laterGrowth: z.number().nullable(),
+        replyRate: z.number().nullable(),
+      }),
+    ),
+    compare: z.object({ recommended: compareSchema, others: compareSchema }).nullable(),
+  }),
+  schedule: z.object({ slotTimes: z.array(z.string()) }),
+  settings: analysisSettingsSchema,
+  canEdit: z.boolean(),
+});
+/** 解析の画面のデータ。 */
+export type AnalysisResponse = z.infer<typeof analysisResponseSchema>;
+
+/** GET …/analysis/classifications のクエリ。 */
+export const classificationsQuerySchema = z.object({ mode: z.enum(["unclassified", "classified"]).default("unclassified") });
+
+/** GET …/analysis/classifications の応答。 */
+export const classificationsResponseSchema = z.object({
+  posts: z.array(
+    z.object({
+      draftId: z.string(),
+      body: z.string(),
+      publishedAt: z.string(),
+      openingType: openingTypeSchema.nullable(),
+      themeId: z.string().nullable(),
+    }),
+  ),
+  remaining: z.number().int(),
+  themes: z.array(themeSchema),
+});
+/** 分類する投稿の一覧。 */
+export type ClassificationsResponse = z.infer<typeof classificationsResponseSchema>;
+
+/** PUT …/analysis/classifications のリクエスト（1〜50件）。 */
+export const classificationsRequestSchema = z.object({
+  source: z.enum(["ai", "manual"]),
+  items: z
+    .array(z.object({ draftId: z.string().uuid(), openingType: openingTypeSchema, themeId: themeIdSchema.nullable() }))
+    .min(1)
+    .max(ANALYSIS_CLASSIFY_BATCH),
+});
+/** 分類の保存のリクエスト。 */
+export type ClassificationsRequest = z.infer<typeof classificationsRequestSchema>;
+/** PUT …/analysis/classifications の応答。 */
+export const classificationsSaveResponseSchema = z.object({ saved: z.number().int(), skipped: z.array(z.string()) });
+
+// ---- 時間差のメンション（specs/023-delayed-mention contracts/api.md）----
+
+const mentionDelaySchema = z.number().int().refine((v) => (MENTION_DELAY_OPTIONS as readonly number[]).includes(v), { message: "delay" });
+
+/** GET …/mention-settings の応答。 */
+export const mentionSettingsSchema = z.object({
+  message: z.string(),
+  delayMinutes: z.number().int(),
+  version: z.number().int().nullable(),
+  people: z.array(
+    z.object({ id: z.string(), username: z.string(), label: z.string(), always: z.boolean(), pendingCount: z.number().int() }),
+  ),
+  repliesDenied: z.boolean(),
+  /** 今は選べない人（予定に入っている・24時間以内に済み）。draftId はその予定・済みの下書き */
+  blocked: z.array(z.object({ username: z.string(), draftId: z.string(), reason: z.enum(["pending", "recent"]) })),
+  canEdit: z.boolean(),
+});
+/** メンションの設定。 */
+export type MentionSettings = z.infer<typeof mentionSettingsSchema>;
+
+/** PUT …/mention-settings のリクエスト。 */
+export const mentionSettingsRequestSchema = z.object({
+  expectedVersion: z.number().int().positive().nullable(),
+  message: z
+    .string()
+    .transform((s) => s.trim())
+    .refine((s) => countChars(s) <= MENTION_MESSAGE_MAX, { message: `max ${MENTION_MESSAGE_MAX}` }),
+  delayMinutes: mentionDelaySchema,
+});
+
+const labelSchema = z
+  .string()
+  .transform((s) => s.trim())
+  .refine((s) => countChars(s) >= 1 && countChars(s) <= MENTION_LABEL_MAX, { message: `1-${MENTION_LABEL_MAX}` });
+
+/** POST …/mention-people のリクエスト。 */
+export const mentionPersonRequestSchema = z.object({ username: z.string().max(40), label: labelSchema, always: z.boolean().optional() });
+/** PATCH …/mention-people/:personId のリクエスト。 */
+export const mentionPersonPatchSchema = z
+  .object({ label: labelSchema.optional(), always: z.boolean().optional() })
+  .refine((v) => v.label !== undefined || v.always !== undefined, { message: "nothing to update" });
+
+/** PUT …/post-drafts/:draftId/mention のリクエスト。 */
+export const mentionAttachRequestSchema = z.object({
+  expectedVersion: z.number().int().positive(),
+  usernames: z.array(z.string()).min(1).max(MENTION_PER_REPLY_MAX),
+  text: z
+    .string()
+    .refine((s) => s.trim() !== "" && countChars(s) <= 500, { message: "1-500" })
+    .optional(),
+});
+/** 付けるリクエスト。 */
+export type MentionAttachRequest = z.infer<typeof mentionAttachRequestSchema>;
+
+/** 今は選べない人（理由：pending＝ほかの投稿で予定、recent＝24時間以内に済み）。 */
+export const mentionBlockedSchema = z.array(z.object({ username: z.string(), reason: z.enum(["pending", "recent"]) }));
+/** PUT …/mention の応答。 */
+export const mentionAttachResponseSchema = z.object({ draft: postDraftSchema, blocked: mentionBlockedSchema });
+
+/** POST …/post-drafts/mentions のリクエスト。 */
+export const mentionBulkRequestSchema = z.object({
+  items: z.array(z.object({ id: z.string().uuid(), expectedVersion: z.number().int().positive() })).min(1).max(50),
+});
+/** POST …/post-drafts/mentions の応答。 */
+export const mentionBulkResponseSchema = z.object({
+  updated: z.array(postDraftSchema),
+  skipped: z.array(z.object({ id: z.string(), reason: z.string() })),
+});
+/** DELETE …/post-drafts/:draftId/mention のリクエスト。 */
+export const mentionDetachRequestSchema = z.object({ expectedVersion: z.number().int().positive().optional() });
+
+// ---- テスター招待・上限（specs/024-tester-invite-connect contracts/api.md） ----
+
+/** 申し込みの状態。 */
+export const testerApplicationStatusSchema = z.enum(TESTER_APPLICATION_STATUSES);
+/** 外してよい理由。 */
+export const testerRemovalReasonSchema = z.enum(TESTER_REMOVAL_REASONS);
+
+/** 利用者に見せる申し込み（GET・POST /api/threads/accounts/:id/tester-application）。 */
+export const testerApplicationSchema = z.object({
+  id: z.string(),
+  threadsUsername: z.string(),
+  status: testerApplicationStatusSchema,
+  declineReason: z.string().nullable(),
+  createdAt: z.string(),
+  statusChangedAt: z.string(),
+});
+/** 利用者に見せる申し込み。 */
+export type TesterApplication = z.infer<typeof testerApplicationSchema>;
+
+/** GET /api/threads/accounts/:id/tester-application の応答。 */
+export const testerApplicationResponseSchema = z.object({
+  enabled: z.boolean(),
+  application: testerApplicationSchema.nullable(),
+});
+/** GET /api/threads/accounts/:id/tester-application の応答。 */
+export type TesterApplicationResponse = z.infer<typeof testerApplicationResponseSchema>;
+
+/** POST /api/threads/accounts/:id/tester-application のリクエスト（形は API で normalizeThreadsUsername して確かめる）。 */
+export const testerApplyRequestSchema = z.object({ threadsUsername: z.string().max(100) });
+
+/** 運営者の一覧の見え方。 */
+export const testerApplicationViewSchema = z.enum(TESTER_APPLICATION_VIEWS);
+
+/** 運営者の一覧の1行。 */
+export const operatorTesterApplicationSchema = z.object({
+  id: z.string(),
+  threadsUsername: z.string(),
+  status: testerApplicationStatusSchema,
+  removalReason: testerRemovalReasonSchema.nullable(),
+  applicant: z.object({ userId: z.string(), name: z.string().nullable(), email: z.string() }).nullable(),
+  connectedUsername: z.string().nullable(),
+  declineReason: z.string().nullable(),
+  duplicate: z.boolean(),
+  alreadyConnected: z.boolean(),
+  createdAt: z.string(),
+  statusChangedAt: z.string(),
+});
+/** 運営者の一覧の1行。 */
+export type OperatorTesterApplication = z.infer<typeof operatorTesterApplicationSchema>;
+
+/** GET /api/threads/operator/tester-applications の応答。 */
+export const operatorTesterApplicationsSchema = z.object({
+  enabled: z.boolean(),
+  threadsAppId: z.string().nullable(),
+  slots: z.object({ used: z.number().int(), capacity: z.number().int() }),
+  counts: z.object({ pending: z.number().int(), invited: z.number().int(), connected: z.number().int(), removable: z.number().int() }),
+  items: z.array(operatorTesterApplicationSchema),
+});
+/** GET /api/threads/operator/tester-applications の応答。 */
+export type OperatorTesterApplications = z.infer<typeof operatorTesterApplicationsSchema>;
+
+/** POST /api/threads/operator/tester-applications/:id/invite のリクエスト。 */
+export const testerInviteRequestSchema = z.object({ force: z.boolean().optional() });
+/** POST /api/threads/operator/tester-applications/:id/decline のリクエスト。 */
+export const testerDeclineRequestSchema = z.object({ reason: z.string().trim().max(DECLINE_REASON_MAX).optional() });
+/** PUT /api/threads/operator/tester-settings のリクエスト。 */
+export const testerSettingsRequestSchema = z.object({
+  slotCapacity: z.number().int().min(TESTER_SLOT_CAPACITY_MIN).max(TESTER_SLOT_CAPACITY_MAX),
+});
+
+// 運営者の上限は「名前 → 値」の形（名前と範囲はアプリが登録したもの。共通はアプリの名前を知らない。specs/meguru/029 tasks.md T070）。
+// 名前が登録とそろっているか・範囲に入っているかは、API が登録の一覧で確かめる。
+
+/** 上限の名前。 */
+const limitKeySchema = appKeySchema;
+/** 上限の値（0以上の整数。DB の CHECK と同じ。アプリが登録した範囲は API が登録の一覧で確かめる）。 */
+const limitValueSchema = z.number().int().min(0);
+
+/** PUT /api/operator/limits のリクエスト（全員共通の既定値。登録した上限すべての値）。 */
+export const defaultLimitsRequestSchema = z.object({ limits: z.record(limitKeySchema, limitValueSchema) });
+/** 全員共通の既定値の保存の値。 */
+export type DefaultLimitsRequest = z.infer<typeof defaultLimitsRequestSchema>;
+
+/** PUT /api/operator/limits/users/:userId のリクエスト（登録した上限すべての値。null は既定値に戻す）。 */
+export const userLimitsRequestSchema = z.object({ limits: z.record(limitKeySchema, limitValueSchema.nullable()) });
+/** 利用者ごとの上限の保存の値。 */
+export type UserLimitsRequest = z.infer<typeof userLimitsRequestSchema>;
+
+/** 運営者の画面の、見つかった人の上限（GET /api/operator/limits/users）。 */
+export const operatorLimitUserSchema = z.object({
+  userId: z.string(),
+  name: z.string().nullable(),
+  email: z.string(),
+  operator: z.boolean(),
+  /** 名前ごとの、この人だけの上限（null は既定値） */
+  limits: z.record(z.string(), z.number().int().nullable()),
+  /** アプリから伝えられた利用の数（Threadsなら持ち主としてのアカウントの数） */
+  usage: z.number().int(),
+});
+/** 運営者の画面の、見つかった人の上限。 */
+export type OperatorLimitUser = z.infer<typeof operatorLimitUserSchema>;
+
+/** GET /api/operator/limits の応答。 */
+export const operatorLimitsSchema = z.object({
+  /** 名前ごとの全員共通の既定値 */
+  defaults: z.record(z.string(), z.number().int()),
+  overrides: z.array(
+    z.object({
+      userId: z.string(),
+      name: z.string().nullable(),
+      email: z.string(),
+      limits: z.record(z.string(), z.number().int().nullable()),
+    }),
+  ),
+  events: z.array(z.object({ at: z.string(), actor: z.string().nullable(), action: z.string(), detail: z.unknown() })),
+});
+/** GET /api/operator/limits の応答。 */
+export type OperatorLimits = z.infer<typeof operatorLimitsSchema>;
+
+// ---- 違うアカウントでつながった知らせ（specs/025-threads-account-guide contracts/api.md） ----
+
+/** GET /api/threads/accounts/:id/connection-notice の応答。 */
+export const connectionNoticeSchema = z.object({
+  otherAccount: z.object({ appliedUsername: z.string(), connectedUsername: z.string() }).nullable(),
+});
+/** 違うアカウントでつながった知らせ。 */
+export type ConnectionNotice = z.infer<typeof connectionNoticeSchema>;
+
+// ---- 運営者のアカウント一覧（specs/026-operator-accounts contracts/api.md） ----
+
+/** GET /api/threads/operator/accounts のクエリ。q は前後の空白を除き、空なら検索しない（research.md R3）。 */
+export const operatorAccountsQuerySchema = z
+  .object({
+    method: z.enum(OPERATOR_ACCOUNT_METHODS).default("all"),
+    q: z.string().trim().max(OPERATOR_ACCOUNTS_QUERY_MAX).optional(),
+    cursor: z.string().regex(OPERATOR_ACCOUNTS_CURSOR_RE).optional(),
+  })
+  .transform(({ q, ...rest }) => ({ ...rest, q: q || undefined }));
+/** GET /api/threads/operator/accounts のクエリ。 */
+export type OperatorAccountsQuery = z.infer<typeof operatorAccountsQuerySchema>;
+
+/** 運営者のアカウント一覧の1行（data-model.md 2）。 */
+export const operatorAccountSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  username: z.string().nullable(),
+  method: z.enum(["app", "token", "none"]),
+  status: connectionStatusSchema,
+  owner: z.object({ name: z.string().nullable(), email: z.string(), accountCount: z.number().int() }).nullable(),
+  tester: z.enum(OPERATOR_ACCOUNT_TESTER_STATES).nullable(),
+  createdAt: z.string(),
+});
+/** 運営者のアカウント一覧の1行。 */
+export type OperatorAccount = z.infer<typeof operatorAccountSchema>;
+
+/** GET /api/threads/operator/accounts の応答（件数は検索に左右されない。data-model.md 3）。 */
+export const operatorAccountsSchema = z.object({
+  counts: z.object({ all: z.number().int(), app: z.number().int(), token: z.number().int(), none: z.number().int() }),
+  items: z.array(operatorAccountSchema),
+  nextCursor: z.string().nullable(),
+});
+/** GET /api/threads/operator/accounts の応答。 */
+export type OperatorAccounts = z.infer<typeof operatorAccountsSchema>;

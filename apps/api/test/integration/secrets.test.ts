@@ -38,8 +38,8 @@ describe("秘密情報", () => {
     bodies.push(callbackRes!.headers.get("Location") ?? "", await callbackRes!.text());
     expect(connectRes.status).toBe(200);
 
-    const me = await call(app, "GET", "/api/me", { user: "u1" });
-    bodies.push(await me.text());
+    // 共通の「自分」と、Threadsの「自分」（アカウントの要約が入る。029 の PR5c）のどちらにも、トークンが出ない
+    for (const path of ["/api/me", "/api/threads/me"]) bodies.push(await (await call(app, "GET", path, { user: "u1" })).text());
 
     const tokens = await fake.issuedTokens();
     expect(tokens.length).toBeGreaterThan(0);
@@ -73,10 +73,10 @@ describe("秘密情報", () => {
       body: { mode: "reconnect", accountId, token: revoked },
     });
     bodies.push(await reconnect.text());
-    for (const path of ["/api/me", `/api/accounts/${accountId}`, `/api/accounts/${accountId}/activity`, `/api/accounts/${accountId}/performance/export`]) {
+    for (const path of ["/api/me", "/api/threads/me", `/api/threads/accounts/${accountId}`, `/api/threads/accounts/${accountId}/activity`, `/api/threads/accounts/${accountId}/performance/export`]) {
       bodies.push(await (await call(app, "GET", path, { user: "u1" })).text());
     }
-    const rows = await q()`SELECT * FROM activity_logs`;
+    const rows = await q()`SELECT * FROM threads.activity_logs`;
     const haystack = [...bodies, ...logs, JSON.stringify(rows)].join("\n");
     for (const t of [revoked, short, good]) expect(haystack).not.toContain(t);
   });

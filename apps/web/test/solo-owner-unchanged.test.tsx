@@ -6,11 +6,11 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import type { AccountAccessResponse, MeResponse } from "@threads-grower/shared";
+import type { AccountAccessResponse } from "@meguru/shared";
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ADMIN_ACCESS, EDITOR_ACCESS, OWNER_ACCESS } from "./helpers/access";
-import { ME_BILLING_OFF } from "./helpers/billing";
+import { ME_BILLING_OFF, type MeWithThreads } from "./helpers/billing";
 
 vi.mock("@clerk/react", () => ({
   useUser: () => ({ user: { fullName: "Takumi", primaryEmailAddress: { emailAddress: "t@example.com" } } }),
@@ -18,7 +18,7 @@ vi.mock("@clerk/react", () => ({
 }));
 
 let access: AccountAccessResponse = OWNER_ACCESS;
-const meResponse: MeResponse = {
+const meResponse: MeWithThreads = {
   user: { id: "u", email: "t@example.com", displayName: "Takumi" },
   accounts: [
     {
@@ -45,8 +45,15 @@ vi.mock("@/lib/api-client", async (orig) => {
   const actual = await orig<typeof import("@/lib/api-client")>();
   return {
     ...actual,
-    api: {
-      ...actual.api,
+    api: { ...actual.api, me: () => Promise.resolve(meResponse) },
+  };
+});
+vi.mock("@/apps/threads/lib/api", async (orig) => {
+  const actual = await orig<typeof import("@/apps/threads/lib/api")>();
+  return {
+    ...actual,
+    threadsApi: {
+      ...actual.threadsApi,
       me: () => Promise.resolve(meResponse),
       getDraftCounts: () => Promise.resolve({ needsReview: 0, approved: 0 }),
       needsReviewCounts: () => Promise.resolve({ counts: [{ accountId: "a1", needsReview: 0 }] }),
@@ -56,13 +63,13 @@ vi.mock("@/lib/api-client", async (orig) => {
   };
 });
 
-const { Sidebar } = await import("@/components/layout/Sidebar");
-const { AssignedNotice } = await import("@/components/team/AssignedNotice");
-const { TeamSection } = await import("@/components/team/TeamSection");
-const { AccountSwitcher } = await import("@/components/layout/AccountSwitcher");
+const { ThreadsSidebar } = await import("@/apps/threads/sidebar");
+const { AssignedNotice } = await import("@/apps/threads/components/team/AssignedNotice");
+const { TeamSection } = await import("@/apps/threads/components/team/TeamSection");
+const { AccountSwitcher } = await import("@/apps/threads/sidebar/AccountSwitcher");
 
 function renderAt(element: React.ReactNode) {
-  const router = createMemoryRouter([{ path: "/accounts/:accountId", element }], { initialEntries: ["/accounts/a1"] });
+  const router = createMemoryRouter([{ path: "/threads/accounts/:accountId", element }], { initialEntries: ["/threads/accounts/a1"] });
   render(
     <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
       <RouterProvider router={router} />
@@ -77,7 +84,7 @@ beforeEach(() => {
 
 describe("個人運用のオーナー", () => {
   it("サイドバーに立場の表示も「チーム」の見出しも、チームを作る入口も出ない", async () => {
-    renderAt(<Sidebar />);
+    renderAt(<ThreadsSidebar />);
     expect(await screen.findByRole("link", { name: /投稿ストック/ })).toBeInTheDocument();
     expect(screen.queryByText("担当しています")).not.toBeInTheDocument();
     expect(screen.queryByText("チーム")).not.toBeInTheDocument();
@@ -102,7 +109,7 @@ describe("個人運用のオーナー", () => {
 describe("担当の人", () => {
   it("編集者には、切り替えの下に「担当しています」とオーナーの名前が出る。操作の記録は出ない", async () => {
     access = EDITOR_ACCESS;
-    renderAt(<Sidebar />);
+    renderAt(<ThreadsSidebar />);
     expect(await screen.findByText("担当しています")).toBeInTheDocument();
     expect(screen.getByText("オーナー：鈴木 花子")).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: /操作の記録/ })).not.toBeInTheDocument();
@@ -110,8 +117,8 @@ describe("担当の人", () => {
 
   it("自分を担当にした管理者には「チーム > 操作の記録」が出る", async () => {
     access = ADMIN_ACCESS;
-    renderAt(<Sidebar />);
-    expect(await screen.findByRole("link", { name: /操作の記録/ })).toHaveAttribute("href", "/accounts/a1/activity");
+    renderAt(<ThreadsSidebar />);
+    expect(await screen.findByRole("link", { name: /操作の記録/ })).toHaveAttribute("href", "/threads/accounts/a1/activity");
     expect(screen.getByText("担当しています")).toBeInTheDocument();
   });
 });
@@ -125,7 +132,7 @@ describe("Threadsにつないだアカウントだけの人（specs/012 SC-007�
     await userEvent.click(trigger);
     const menu = await screen.findByRole("menu");
     expect(within(menu).queryByText("未接続")).not.toBeInTheDocument();
-    expect(within(menu).getByRole("menuitem", { name: /アカウントを作る/ })).toHaveAttribute("href", "/accounts/new");
+    expect(within(menu).getByRole("menuitem", { name: /アカウントを作る/ })).toHaveAttribute("href", "/threads/accounts/new");
   });
 });
 
@@ -139,7 +146,7 @@ describe("個人運用のオーナーと決済", () => {
   });
 
   it("「契約と支払い」に、チームの説明を出さない", async () => {
-    const { BillingSettingsPage } = await import("@/pages/settings/billing");
+    const { BillingSettingsPage } = await import("@/shell/settings/billing");
     const actual = await import("@/lib/api-client");
     vi.spyOn(actual.api, "billing").mockResolvedValue({
       mode: "enabled",
@@ -155,7 +162,7 @@ describe("個人運用のオーナーと決済", () => {
         nextInvoiceAt: "2026-12-01T03:00:00.000Z",
         nextInvoiceAmount: 1000,
       },
-      prices: { base: 1000, extra: 500 },
+      prices: { perAccount: 1000 },
     });
     vi.spyOn(actual.api, "syncBilling").mockImplementation(() => new Promise(() => {}));
     renderAt(<BillingSettingsPage />);

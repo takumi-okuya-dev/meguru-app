@@ -1,14 +1,14 @@
 // 投稿ストックと「投稿をつくる」の画面のテストの見本と組み立て（api-client の差し替えは各テストのファイルで行う）。
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render } from "@testing-library/react";
-import { POST_LENGTH_DEFAULTS } from "@threads-grower/shared";
+import { POST_LENGTH_DEFAULTS } from "@meguru/shared";
 import type {
   AccountSummary,
   DraftBatchResult,
   PostDraft,
   PostDraftList,
   PromptResponse,
-} from "@threads-grower/shared";
+} from "@meguru/shared";
 import type { ReactNode } from "react";
 import { createMemoryRouter, Outlet, RouterProvider, type RouteObject } from "react-router";
 import { UnsavedChangesProvider } from "@/components/UnsavedChangesProvider";
@@ -56,6 +56,7 @@ export function promptResponse(
       rejectedCount: 0,
       dailyPostCount: 0,
       poorPostCount: 0,
+      trendCount: 0,
       ...overrides,
     },
   };
@@ -85,6 +86,7 @@ export function draft(overrides: Partial<PostDraft> = {}): PostDraft {
     createdBy: null,
     editedBy: null,
     editedAt: null,
+    mention: null,
     createdAt: "2026-10-03T00:00:00.000Z",
     updatedAt: "2026-10-03T00:00:00.000Z",
     ...overrides,
@@ -159,7 +161,7 @@ export function renderAccountRoutes(
   const router = createMemoryRouter(
     [
       {
-        path: "/accounts/:accountId",
+        path: "/threads/accounts/:accountId",
         element: layout ?? (
           <UnsavedChangesProvider>
             <Outlet context={{ account }} />

@@ -22,13 +22,13 @@ vi.mock("@clerk/react", () => ({
     ),
 }));
 
-const { RequireAuth } = await import("@/components/guards");
+const { RequireAuth } = await import("@/shell/guards/RequireAuth");
 
 function renderAt(path: string) {
   const router = createMemoryRouter(
     [
       { path: "/sign-in", element: <p>ログイン画面</p> },
-      { element: <RequireAuth />, children: [{ path: "/accounts/:id", element: <p>保護された内容</p> }] },
+      { element: <RequireAuth />, children: [{ path: "/threads/accounts/:id", element: <p>保護された内容</p> }] },
     ],
     { initialEntries: [path] },
   );
@@ -42,7 +42,7 @@ describe("RequireAuth", () => {
   });
 
   it("未ログインなら内容を描画せずに /sign-in へ置き換え遷移する", async () => {
-    const router = renderAt("/accounts/a1");
+    const router = renderAt("/threads/accounts/a1");
     expect(await screen.findByText("ログイン画面")).toBeInTheDocument();
     expect(screen.queryByText("保護された内容")).not.toBeInTheDocument();
     expect(router.state.location.pathname).toBe("/sign-in");
@@ -52,26 +52,26 @@ describe("RequireAuth", () => {
 
   it("読み込み中は骨組みだけで、内容は出さない", () => {
     auth = { isLoaded: false, isSignedIn: false };
-    renderAt("/accounts/a1");
+    renderAt("/threads/accounts/a1");
     expect(screen.getByTestId("loading")).toBeInTheDocument();
     expect(screen.queryByText("保護された内容")).not.toBeInTheDocument();
   });
 
   it("ログイン済みなら内容を表示する", async () => {
     auth = { isLoaded: true, isSignedIn: true };
-    renderAt("/accounts/a1");
+    renderAt("/threads/accounts/a1");
     expect(await screen.findByText("保護された内容")).toBeInTheDocument();
   });
 
   it("ログアウトした後に「戻る」で保護された画面へ戻っても、内容は表示されない", async () => {
     auth = { isLoaded: true, isSignedIn: true };
-    const router = renderAt("/accounts/a1");
+    const router = renderAt("/threads/accounts/a1");
     expect(await screen.findByText("保護された内容")).toBeInTheDocument();
     // ログアウト：セッションが終わると、表示中の保護された画面も /sign-in へ置き換わる
     act(() => setAuth({ isSignedIn: false }));
     expect(await screen.findByText("ログイン画面")).toBeInTheDocument();
     // ブラウザの「戻る」で保護された画面のURLへ戻っても、内容は出ない
-    await act(() => router.navigate("/accounts/a1"));
+    await act(() => router.navigate("/threads/accounts/a1"));
     expect(await screen.findByText("ログイン画面")).toBeInTheDocument();
     expect(screen.queryByText("保護された内容")).not.toBeInTheDocument();
   });

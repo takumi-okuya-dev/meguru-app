@@ -1,7 +1,7 @@
 // US9：検索するキーワードの案をAIに出してもらう（specs/014-strategy-guidance FR-090〜FR-093）
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import type { ResearchKeyword } from "@threads-grower/shared";
+import type { ResearchKeyword } from "@meguru/shared";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderResearchPage } from "./helpers/research";
 
@@ -10,23 +10,29 @@ const listResearchKeywords = vi.fn();
 const getKeywordIdeaPrompt = vi.fn();
 const createKeywordsBatch = vi.fn();
 const toastSuccess = vi.fn();
-vi.mock("@/lib/api-client", async (orig) => {
-  const actual = await orig<typeof import("@/lib/api-client")>();
+vi.mock("@/apps/threads/lib/api", async (orig) => {
+  const actual = await orig<typeof import("@/apps/threads/lib/api")>();
   return {
     ...actual,
-    api: { ...actual.api, listReferencePosts, listResearchKeywords, getKeywordIdeaPrompt, createKeywordsBatch },
+    threadsApi: {
+      ...actual.threadsApi,
+      listReferencePosts,
+      listResearchKeywords,
+      getKeywordIdeaPrompt,
+      createKeywordsBatch,
+    },
   };
 });
 vi.mock("sonner", () => ({ toast: { success: toastSuccess, error: vi.fn() } }));
 
 const { ApiError } = await import("@/lib/api-client");
-const { ResearchPage } = await import("@/pages/research");
+const { ResearchPage } = await import("@/apps/threads/pages/research");
 
 const meta = { version: 1, createdAt: "2026-10-03T00:00:00.000Z", updatedAt: "2026-10-03T00:00:00.000Z" };
 const kw = (id: string, keyword: string, purpose = ""): ResearchKeyword => ({ id, keyword, purpose, ...meta });
 
 function renderKeywords() {
-  return renderResearchPage(ResearchPage, "/accounts/a1/research?tab=keywords");
+  return renderResearchPage(ResearchPage, "/threads/accounts/a1/research?tab=keywords");
 }
 
 beforeEach(() => {

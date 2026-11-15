@@ -3,7 +3,10 @@
 // 1つのファイルを1つのトランザクションで当て、「--> statement-breakpoint」で文を分ける。
 import { readFileSync } from "node:fs";
 import pg from "pg";
+import { loadWorktreeEnv } from "../../scripts/worktree-env";
 
+// 作業場所を分けているときは、その作業場所のDBの Postgres を使う（scripts/worktree-env.ts）
+loadWorktreeEnv();
 const DIRECT_URL = process.env.TEST_DATABASE_URL_DIRECT ?? "postgres://postgres:postgres@localhost:5432/threads_grower";
 // global-setup.ts と同じく pathname で読む（Workers の型と node:url の URL の型がぶつからないように）
 const DRIZZLE_DIR = new URL("../../drizzle/", import.meta.url).pathname;

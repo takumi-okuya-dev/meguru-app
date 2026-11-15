@@ -5,7 +5,7 @@ import { describe, expect, it, vi } from "vitest";
 
 vi.mock("@clerk/react", () => ({ SignIn: () => null, useAuth: () => ({ isLoaded: true, isSignedIn: false }) }));
 
-const { GuideThreadsTokenPage } = await import("@/pages/guide-threads-token");
+const { GuideThreadsTokenPage } = await import("@/apps/threads/pages/guide-threads-token");
 const { routes } = await import("@/router");
 const { isPublicPath } = await import("./helpers/routes");
 

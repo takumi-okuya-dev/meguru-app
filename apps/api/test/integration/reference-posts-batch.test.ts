@@ -11,18 +11,18 @@ beforeEach(async () => {
   await resetDb();
 });
 
-const batch = (accountId: string) => `/api/accounts/${accountId}/reference-posts/batch`;
+const batch = (accountId: string) => `/api/threads/accounts/${accountId}/reference-posts/batch`;
 type ErrorBody = { error: { code: string; details?: unknown } };
 
 async function count(accountId: string) {
-  const rows = (await neon(testEnv.DATABASE_URL)`SELECT count(*)::int AS n FROM reference_posts WHERE account_id = ${accountId}`) as {
+  const rows = (await neon(testEnv.DATABASE_URL)`SELECT count(*)::int AS n FROM threads.reference_posts WHERE account_id = ${accountId}`) as {
     n: number;
   }[];
   return rows[0]!.n;
 }
 
 async function fill(accountId: string, n: number) {
-  await neon(testEnv.DATABASE_URL)`INSERT INTO reference_posts (account_id, body) SELECT ${accountId}, '既存' FROM generate_series(1, ${n})`;
+  await neon(testEnv.DATABASE_URL)`INSERT INTO threads.reference_posts (account_id, body) SELECT ${accountId}, '既存' FROM generate_series(1, ${n})`;
 }
 
 describe("POST /reference-posts/batch", () => {

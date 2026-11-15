@@ -6,7 +6,7 @@ import {
   ThreadsRateLimitError,
   ThreadsTransientError,
   createThreadsClient,
-} from "../../src/lib/threads-client";
+} from "../../src/adapters/threads-api/threads-client";
 import { fake, testEnv } from "../helpers/app";
 
 const USER = "8101";

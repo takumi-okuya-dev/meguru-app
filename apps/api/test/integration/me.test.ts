@@ -20,15 +20,16 @@ type Me = {
   accountLimit: { max: number; used: number };
 };
 
-describe("GET /api/me", () => {
+describe("GET /api/threads/me（029 の PR5 までは /api/me。Accountの一覧と着地先）", () => {
   it("Clerkの新しいユーザーで呼ぶと users 行が作られ、Accountが0件なら landingAccountId は null", async () => {
-    const res = await call(app, "GET", "/api/me", { user: "new-user" });
+    const res = await call(app, "GET", "/api/threads/me", { user: "new-user" });
     expect(res.status).toBe(200);
     const me = (await res.json()) as Me;
     expect(me.landingAccountId).toBeNull();
     expect(me.accounts).toEqual([]);
     // 決済OFFの環境では上限なし（null）。決済ONの無料体験中は1（specs/013 account-limit-billing.test.ts）
-    expect(me.accountLimit).toEqual({ max: null, used: 0 });
+    // 上限は運営者が決める既定値（3件。specs/024 FR-016）
+    expect(me.accountLimit).toEqual({ max: 3, used: 0 });
     const rows = await db().select().from(users).where(eq(users.clerkUserId, "new-user"));
     expect(rows).toHaveLength(1);
     expect(rows[0]!.email).toBe("new-user@example.com");
@@ -36,15 +37,15 @@ describe("GET /api/me", () => {
 
   it("Accountを登録した後は、そのAccountが landingAccountId になる", async () => {
     await connectNew(app, "u1", "1001");
-    const me = (await (await call(app, "GET", "/api/me", { user: "u1" })).json()) as Me;
+    const me = (await (await call(app, "GET", "/api/threads/me", { user: "u1" })).json()) as Me;
     expect(me.accounts).toHaveLength(1);
     expect(me.landingAccountId).toBe(me.accounts[0]!.id);
-    expect(me.accountLimit).toEqual({ max: null, used: 1 });
+    expect(me.accountLimit).toEqual({ max: 3, used: 1 });
   });
 
   it("Accountの要約に接続の方法を出す。このアプリで接続したAccountは app、補いは NULL（specs/010）", async () => {
     await connectNew(app, "u1", "1001");
-    const me = (await (await call(app, "GET", "/api/me", { user: "u1" })).json()) as {
+    const me = (await (await call(app, "GET", "/api/threads/me", { user: "u1" })).json()) as {
       accounts: { connectionMethod: string; reconnectHint: string | null }[];
     };
     expect(me.accounts[0]).toMatchObject({ connectionMethod: "app", reconnectHint: null });
@@ -61,12 +62,12 @@ describe("GET /api/me", () => {
 });
 
 // ---- チーム（specs/011-team-revision research.md R5、contracts/api.md「/api/me」）----
-describe("GET /api/me（チーム）", () => {
+describe("GET /api/threads/me（チーム）", () => {
   type TeamMe = Omit<Me, "accounts"> & {
     accounts: { id: string; role: string; ownerName: string | null }[];
     teams: { id: string; name: string; memberCount: number; role: string }[];
   };
-  const me = async (user: string) => (await (await call(app, "GET", "/api/me", { user })).json()) as TeamMe;
+  const me = async (user: string) => (await (await call(app, "GET", "/api/threads/me", { user })).json()) as TeamMe;
 
   it("チームに入っていなければ teams は空", async () => {
     await createUserWithAccount("o1");
@@ -114,7 +115,7 @@ describe("GET /api/me（チーム）", () => {
     const { teamId } = await makeTeam("a1", [adminAcc]);
     await joinTeam(teamId, "o1", [accountId]);
     await assign(teamId, "a1", accountId);
-    const res = await call(app, "POST", `/api/accounts/${accountId}/open`, {
+    const res = await call(app, "POST", `/api/threads/accounts/${accountId}/open`, {
       user: "a1",
       body: { clientId: "c1", openSeq: 1 },
     });

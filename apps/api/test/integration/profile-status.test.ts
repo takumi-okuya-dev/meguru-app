@@ -1,5 +1,5 @@
 // US4：ホームの入力状況（specs/002-strategy-profile FR-017・FR-024b、research.md R11・R14）
-import { emptyStrategyValues, jstToday } from "@threads-grower/shared";
+import { emptyStrategyValues, jstToday } from "@meguru/shared";
 import { beforeEach, describe, expect, it } from "vitest";
 import { AFTER_TRIAL, call, createUserWithAccount, insertSubscription, makeApp, resetDb, setAccount } from "../helpers/app";
 import { billingEnv } from "../helpers/billing";
@@ -18,7 +18,7 @@ type Status = {
 };
 
 async function status(accountId: string, user = "u1", billing = false) {
-  const res = await call(app, "GET", `/api/accounts/${accountId}/profile-status`, { user, env: billing ? billingEnv() : undefined });
+  const res = await call(app, "GET", `/api/threads/accounts/${accountId}/profile-status`, { user, env: billing ? billingEnv() : undefined });
   expect(res.status).toBe(200);
   return (await res.json()) as Status;
 }
@@ -29,7 +29,7 @@ function yesterday() {
   return d.toISOString().slice(0, 10);
 }
 
-describe("GET /api/accounts/:id/profile-status", () => {
+describe("GET /api/threads/accounts/:id/profile-status", () => {
   it("何も入力していなければ、すべて0件", async () => {
     const { accountId } = await createUserWithAccount("u1");
     expect(await status(accountId)).toMatchObject({
@@ -41,7 +41,7 @@ describe("GET /api/accounts/:id/profile-status", () => {
 
   it("入力済み項目数・宣伝の対象の件数・全件数・参考投稿とキーワードの件数が正しい", async () => {
     const { accountId } = await createUserWithAccount("u1");
-    const base = `/api/accounts/${accountId}`;
+    const base = `/api/threads/accounts/${accountId}`;
     await call(app, "PUT", `${base}/strategy`, {
       user: "u1",
       body: { ...emptyStrategyValues(), finalAction: "a", realWorries: "b", profileBioDraft: "下書き", expectedVersion: 0 },
@@ -82,7 +82,7 @@ describe("GET /api/accounts/:id/profile-status", () => {
   it("他人のAccountは 404", async () => {
     const { accountId } = await createUserWithAccount("owner");
     await createUserWithAccount("other");
-    expect((await call(app, "GET", `/api/accounts/${accountId}/profile-status`, { user: "other" })).status).toBe(404);
+    expect((await call(app, "GET", `/api/threads/accounts/${accountId}/profile-status`, { user: "other" })).status).toBe(404);
   });
 
   it("needs_reconnect のAccountでも 200 で返る（FR-025）", async () => {

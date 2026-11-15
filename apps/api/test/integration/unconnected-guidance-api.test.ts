@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { call, createAccountVia, fake, makeApp, resetDb } from "../helpers/app";
 
 const app = makeApp();
-const base = (id: string) => `/api/accounts/${id}`;
+const base = (id: string) => `/api/threads/accounts/${id}`;
 
 let accountId: string;
 

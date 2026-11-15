@@ -3,7 +3,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { emptyStrategyValues, type AccountAccessResponse } from "@threads-grower/shared";
+import { emptyStrategyValues, type AccountAccessResponse } from "@meguru/shared";
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { EDITOR_ACCESS, VIEWER_ACCESS } from "./helpers/access";
@@ -23,11 +23,15 @@ vi.mock("@/lib/api-client", async (orig) => {
   const actual = await orig<typeof import("@/lib/api-client")>();
   return { ...actual, api: { ...actual.api, ...mocks } };
 });
+vi.mock("@/apps/threads/lib/api", async (orig) => {
+  const actual = await orig<typeof import("@/apps/threads/lib/api")>();
+  return { ...actual, threadsApi: { ...actual.threadsApi, ...mocks } };
+});
 const toast = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn(), dismiss: vi.fn() }));
 vi.mock("sonner", () => ({ toast }));
 
 const { ApiError } = await import("@/lib/api-client");
-const { TeamSharedAccountPage } = await import("@/pages/team-shared-account");
+const { TeamSharedAccountPage } = await import("@/apps/threads/pages/team-shared-account");
 
 const draft = (id: string, body: string, status: "approved" | "needs_review") => ({
   id,
@@ -43,12 +47,12 @@ const draft = (id: string, body: string, status: "approved" | "needs_review") =>
   updatedAt: "2026-10-13T00:00:00Z",
 });
 
-function renderPage(path = "/teams/team-1/accounts/acc-1") {
+function renderPage(path = "/threads/teams/team-1/accounts/acc-1") {
   const router = createMemoryRouter(
     [
-      { path: "/teams/:teamId/accounts/:accountId", element: <TeamSharedAccountPage /> },
-      { path: "/teams/:teamId", element: <p>チームの画面</p> },
-      { path: "/accounts/:accountId", element: <p>Accountの画面</p> },
+      { path: "/threads/teams/:teamId/accounts/:accountId", element: <TeamSharedAccountPage /> },
+      { path: "/threads/teams/:teamId", element: <p>チームの画面</p> },
+      { path: "/threads/accounts/:accountId", element: <p>Accountの画面</p> },
     ],
     { initialEntries: [path] },
   );
@@ -95,7 +99,7 @@ describe("見せてもらっているアカウント", () => {
   it("上部の帯（読むだけ・チーム名・チームに戻る）と、アカウント・オーナー。投稿ストックを読むだけで操作のボタンは出ない", async () => {
     renderPage();
     expect(await screen.findByRole("status")).toHaveTextContent("鈴木 花子さんのアカウントを見ています（読むだけ） · 飲食チーム");
-    expect(screen.getByRole("link", { name: "チームに戻る" })).toHaveAttribute("href", "/teams/team-1");
+    expect(screen.getByRole("link", { name: "チームに戻る" })).toHaveAttribute("href", "/threads/teams/team-1");
     expect(screen.getByRole("heading", { name: "さくらのパン日記" })).toBeInTheDocument();
     expect(screen.getByText("@sakura_pan · オーナー 鈴木 花子")).toBeInTheDocument();
     expect(await screen.findByText("朝いちばんの焼き上がりの話")).toBeInTheDocument();
@@ -104,12 +108,11 @@ describe("見せてもらっているアカウント", () => {
     for (const name of [/パフォーマンス/, /設定/, /操作の記録/]) expect(screen.queryByRole("link", { name })).not.toBeInTheDocument();
   });
 
-  it("本番以外では、環境の帯が画面のいちばん上に出る（specs/015。PR #19 のCodexレビュー）", async () => {
+  it("アプリの画面なので、本番以外でも環境の帯は出さない（specs/015 contracts/ui-routes.md 1。2026-10-31）", async () => {
     vi.stubEnv("VITE_APP_ENV", "staging");
     renderPage();
-    const env = await screen.findByText(/テスト環境です/);
-    const shared = await screen.findByText(/さんのアカウントを見ています/);
-    expect(env.compareDocumentPosition(shared) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    await screen.findByText(/さんのアカウントを見ています/);
+    expect(screen.queryByText(/テスト環境です/)).not.toBeInTheDocument();
     vi.unstubAllEnvs();
   });
 
@@ -124,7 +127,7 @@ describe("見せてもらっているアカウント", () => {
   });
 
   it("戦略のタブ：課題・宣伝内容・リサーチを読むだけ", async () => {
-    renderPage("/teams/team-1/accounts/acc-1?tab=strategy");
+    renderPage("/threads/teams/team-1/accounts/acc-1?tab=strategy");
     expect(await screen.findByText("来店してもらう")).toBeInTheDocument();
     expect(await screen.findByText("春の新作")).toBeInTheDocument();
     expect(await screen.findByText("パン屋")).toBeInTheDocument();
@@ -146,7 +149,7 @@ describe("見せてもらっているアカウント", () => {
   it("戦略のタブで宣伝内容・リサーチの読み込みに失敗したら、「まだありません」と出さずに失敗を出す（PR #14 のCodexレビュー）", async () => {
     mocks.listPromotions.mockRejectedValue(new ApiError("INTERNAL_ERROR", 500));
     mocks.listReferencePosts.mockRejectedValue(new ApiError("INTERNAL_ERROR", 500));
-    renderPage("/teams/team-1/accounts/acc-1?tab=strategy");
+    renderPage("/threads/teams/team-1/accounts/acc-1?tab=strategy");
     expect(await screen.findByText("来店してもらう")).toBeInTheDocument();
     expect(await screen.findAllByText("読み込めませんでした。")).toHaveLength(2);
     expect(screen.queryByText("まだありません。")).not.toBeInTheDocument();

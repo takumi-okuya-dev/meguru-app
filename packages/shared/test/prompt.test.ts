@@ -669,3 +669,79 @@ describe("件数が少ないときに矛盾した指示を出さない（PR #17 
   });
 });
 
+
+describe("宣伝内容のイベントの情報（specs/021 FR-001a・research.md R9）", () => {
+  const event = {
+    startAt: "2026-11-25T20:00",
+    endAt: "2026-11-25T22:00",
+    format: "venue" as const,
+    venueName: "バー SHITEN",
+    prefecture: "東京都" as const,
+    address: null,
+    building: null,
+    station: "御徒町駅 徒歩3分",
+    capacity: 25,
+    feeYen: 5000,
+    feeNote: null,
+    cancelPolicy: null,
+    audience: null,
+    organizer: null,
+  };
+
+  it("イベントの情報があるときだけ、日時・場所・参加費・定員の1行が入る", () => {
+    const withEvent = buildPrompt(input({ promotions: [promo("A", { event })] })).prompt;
+    expect(withEvent).toContain("(イベント: 日時: 2026年11月25日(水) 20:00 〜 22:00 / 場所: バー SHITEN（御徒町駅 徒歩3分） / 参加費: 5,000円 / 定員: 25名)");
+  });
+
+  it("イベントの情報がなければ、今と同じ文", () => {
+    const a = buildPrompt(input({ promotions: [promo("A")] })).prompt;
+    const b = buildPrompt(input({ promotions: [promo("A", { event: null })] })).prompt;
+    expect(a).toBe(b);
+    expect(a).not.toContain("(イベント:");
+  });
+});
+
+describe("伸びた傾向の節（specs/022 contracts/analysis.md「プロンプトの節」、T027）", () => {
+  const HEADING = "■伸びた傾向(取りためた反応数から見た傾向。合わせすぎず、人柄とCORE RULESを優先すること)";
+  const trends = [
+    { text: "最後に問いかけがある投稿が伸びやすい", count: 20, ratio: 1.92 },
+    { text: "「あるある」の書き出しが伸びやすい", count: 11, ratio: 1.68 },
+  ];
+
+  it("低調の節の後・リサーチの節の前に、件数と倍率つきで入る", () => {
+    const { prompt, summary } = buildPrompt(
+      input({
+        trends,
+        poorPosts: [{ body: "低調", memo: null }],
+        referencePosts: [{ body: "参考", keyword: "", whyGood: "" }],
+      }),
+    );
+    const at = prompt.indexOf(HEADING);
+    expect(at).toBeGreaterThan(prompt.indexOf("■反応が低かった投稿"));
+    expect(at).toBeLessThan(prompt.indexOf("■リサーチで見つけた"));
+    expect(prompt).toContain(
+      `${HEADING}\n・最後に問いかけがある投稿が伸びやすい(20件。閲覧の中央値が、ほかの投稿の1.9倍)\n・「あるある」の書き出しが伸びやすい(11件。閲覧の中央値が、ほかの投稿の1.7倍)`,
+    );
+    expect(summary.trendCount).toBe(2);
+  });
+
+  it("傾向が空・省略なら、文は本featureの前と同じ（SC-004）", () => {
+    expect(buildPrompt(input({ trends: [] })).prompt).toBe(buildPrompt(input()).prompt);
+    expect(buildPrompt(input()).prompt).not.toContain("■伸びた傾向");
+    expect(buildPrompt(input()).summary.trendCount).toBe(0);
+  });
+
+  it("長さの調整で減らさない", () => {
+    const long = "あ".repeat(800);
+    const { prompt, summary } = buildPrompt(
+      input({
+        trends,
+        recentDrafts: Array.from({ length: 20 }, () => long),
+        rejectedDrafts: Array.from({ length: 10 }, () => ({ body: long, reasonLabels: ["抽象的"], note: null })),
+        referencePosts: Array.from({ length: 10 }, () => ({ body: long, keyword: "", whyGood: "" })) }),
+    );
+    expect(summary.recentDraftCount).toBeLessThan(20);
+    expect(summary.trendCount).toBe(2);
+    expect(prompt).toContain(HEADING);
+  });
+});

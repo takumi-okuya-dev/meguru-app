@@ -13,7 +13,7 @@
 // （specs/013 FR-063 違反）。
 import { createExecutionContext, createScheduledController, waitOnExecutionContext } from "cloudflare:test";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { Env } from "../../src/env";
+import type { Env } from "../../src/kernel/env";
 import worker from "../../src/index";
 import { fake, resetDb, testEnv } from "../helpers/app";
 

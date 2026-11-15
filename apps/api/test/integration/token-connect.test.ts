@@ -2,7 +2,7 @@
 // specs/012 で「トークンでアカウントを作る」は「名前で作ったアカウントに、トークンではじめてつなぐ」（mode = connect）になった。
 import { neon } from "@neondatabase/serverless";
 import { beforeEach, describe, expect, it } from "vitest";
-import { runDailyJobs } from "../../src/services/daily-jobs";
+import { runDailyJobs } from "../../src/jobs/daily-jobs";
 import { call, createAccountVia, fake, makeApp, resetDb, testEnv } from "../helpers/app";
 
 const app = makeApp();
@@ -27,7 +27,7 @@ const codeOf = async (res: Response) => ((await res.json()) as { error: { code: 
  */
 async function targetFor(user: string): Promise<string> {
   const [row] = (await q()`
-    SELECT a.id FROM accounts a JOIN memberships m ON m.account_id = a.id AND m.role = 'owner' JOIN users u ON u.id = m.user_id
+    SELECT a.id FROM threads.accounts a JOIN threads.memberships m ON m.account_id = a.id AND m.role = 'owner' JOIN users u ON u.id = m.user_id
     WHERE u.clerk_user_id = ${user} AND a.connection_status = 'not_connected' ORDER BY a.created_at LIMIT 1`) as { id: string }[];
   if (row) return row.id;
   const { accountId } = await createAccountVia(app, user);
@@ -49,7 +49,7 @@ async function add(token: string, user = "u1") {
 async function accountRow(id: string) {
   const [a] = (await q()`
     SELECT a.*, c.expires_at, c.issued_at, c.recheck_at, c.scopes
-    FROM accounts a JOIN threads_connections c ON c.account_id = a.id WHERE a.id = ${id}`) as Record<string, unknown>[];
+    FROM threads.accounts a JOIN threads.threads_connections c ON c.account_id = a.id WHERE a.id = ${id}`) as Record<string, unknown>[];
   return a!;
 }
 
@@ -65,10 +65,10 @@ describe("トークンで追加する（US1）", () => {
     expect(a.threads_user_id).toBe("9003-myapp");
     expect((new Date(a.expires_at as string).getTime() - Date.now()) / DAY).toBeGreaterThan(59);
     expect(a.recheck_at).toBeNull();
-    const [m] = (await q()`SELECT role FROM memberships WHERE account_id = ${body.accountId}`) as { role: string }[];
+    const [m] = (await q()`SELECT role FROM threads.memberships WHERE account_id = ${body.accountId}`) as { role: string }[];
     expect(m!.role).toBe("owner");
     // 投稿の権限の確認（005）も通る
-    const check = await call(app, "POST", `/api/accounts/${body.accountId}/threads-check`, { user: "u1" });
+    const check = await call(app, "POST", `/api/threads/accounts/${body.accountId}/threads-check`, { user: "u1" });
     expect(((await check.json()) as { status: string }).status).toBe("ok");
   });
 
@@ -95,10 +95,25 @@ describe("トークンで追加する（US1）", () => {
   it("投稿・反応数の権限がないトークンでも作り、warnings と反応数の印を返す（US1-4・US1-5、FR-011）", async () => {
     const token = await fake.issueToken({ user: "9003", scopes: ["threads_basic"] });
     const body = (await (await add(token)).json()) as Ok;
-    expect(body.warnings).toEqual(["no_publish_permission", "no_insights_permission"]);
+    expect(body.warnings).toEqual(["no_publish_permission", "no_insights_permission", "no_replies_permission"]);
     const a = await accountRow(body.accountId);
     expect(a.insights_denied_at).not.toBeNull();
+    expect(a.replies_denied_at).not.toBeNull();
     expect(a.scopes).toEqual(["threads_basic"]);
+  });
+
+  it("返信の権限（threads_manage_replies）がないと分かれば印を付け、権限の一覧が読めなければ付けない（specs/023 research.md R1）", async () => {
+    const without = await fake.issueToken({
+      user: "9003",
+      scopes: ["threads_basic", "threads_content_publish", "threads_manage_insights"],
+    });
+    const body = (await (await add(without)).json()) as Ok;
+    expect(body.warnings).toEqual(["no_replies_permission"]);
+    expect((await accountRow(body.accountId)).replies_denied_at).not.toBeNull();
+    const unknown = await fake.issueToken({ user: "9004", debug: false });
+    const body2 = (await (await add(unknown)).json()) as Ok;
+    expect(body2.warnings).toEqual([]);
+    expect((await accountRow(body2.accountId)).replies_denied_at).toBeNull();
   });
 
   it("無効・短期・形の違う文字列では作らない（US1-6、FR-003・FR-012）", async () => {
@@ -109,7 +124,7 @@ describe("トークンで追加する（US1）", () => {
     expect(await codeOf(await add(short))).toBe("TOKEN_SHORT_LIVED");
     expect(await codeOf(await add("https://example.com/not-a-token"))).toBe("TOKEN_INVALID");
     // つながらず、未接続のまま（specs/012）
-    expect((await q()`SELECT count(*)::int AS n FROM accounts WHERE connection_status <> 'not_connected'`)[0]).toEqual({ n: 0 });
+    expect((await q()`SELECT count(*)::int AS n FROM threads.accounts WHERE connection_status <> 'not_connected'`)[0]).toEqual({ n: 0 });
   });
 
   it("Threadsの一時的な失敗は THREADS_UNAVAILABLE で、失敗に数えない", async () => {
@@ -117,7 +132,7 @@ describe("トークンで追加する（US1）", () => {
     await fake.fail("getProfile", 1, "server");
     const res = await add(token);
     expect([res.status, await codeOf(res)]).toEqual([503, "THREADS_UNAVAILABLE"]);
-    expect((await q()`SELECT count(*)::int AS n FROM token_check_failures`)[0]).toEqual({ n: 0 });
+    expect((await q()`SELECT count(*)::int AS n FROM threads.token_check_failures`)[0]).toEqual({ n: 0 });
   });
 
   it("同じトークンを同時に2回送っても、つながるのは1回で、後の方は ACCOUNT_ALREADY_CONNECTED（FR-014、specs/012 FR-018）", async () => {
@@ -126,7 +141,7 @@ describe("トークンで追加する（US1）", () => {
     const results = await Promise.all([add(token), add(token)]);
     expect(results.map((r) => r.status).sort()).toEqual([200, 409]);
     expect((await Promise.all(results.filter((r) => r.status === 409).map(codeOf)))).toEqual(["ACCOUNT_ALREADY_CONNECTED"]);
-    expect((await q()`SELECT count(*)::int AS n FROM accounts`)[0]).toEqual({ n: 1 });
+    expect((await q()`SELECT count(*)::int AS n FROM threads.accounts`)[0]).toEqual({ n: 1 });
   });
 
   it("2,048文字のトークン（形の上限）は、本文の上限に引っかからず確かめに進む。8KBを超える本文は VALIDATION_FAILED（PR #12 のCodexレビュー）", async () => {
@@ -163,16 +178,16 @@ describe("トークンで追加する（US1）", () => {
   });
 
   it("最初のプロフィールの取得で通信が失敗したら THREADS_UNAVAILABLE（503）にし、失敗に数えない（PR #12 のCodexレビュー）", async () => {
-    const { connectWithToken } = await import("../../src/services/token-connect");
-    const { createThreadsClient } = await import("../../src/lib/threads-client");
-    const { AppError } = await import("../../src/lib/errors");
+    const { connectWithToken } = await import("../../src/apps/threads/connection/token-connect");
+    const { createThreadsClient } = await import("../../src/adapters/threads-api/threads-client");
+    const { AppError } = await import("../../src/kernel/errors");
     await call(app, "GET", "/api/me", { user: "u1" });
     const id = ((await q()`SELECT id FROM users WHERE clerk_user_id = 'u1'`) as { id: string }[])[0]!.id;
     const broken = createThreadsClient(testEnv, () => Promise.reject(new TypeError("fetch failed: getaddrinfo ENOTFOUND")));
     const err = await connectWithToken(testEnv, broken, { id, billing: { enabled: false } }, { mode: "connect", accountId: await targetFor("u1"), token: "a".repeat(40) }).catch((e: unknown) => e);
     expect(err).toBeInstanceOf(AppError);
     expect(err).toMatchObject({ code: "THREADS_UNAVAILABLE", status: 503 });
-    expect((await q()`SELECT count(*)::int AS n FROM token_check_failures`)[0]).toEqual({ n: 0 });
+    expect((await q()`SELECT count(*)::int AS n FROM threads.token_check_failures`)[0]).toEqual({ n: 0 });
   });
 
   it("本文がなければ VALIDATION_FAILED、未ログインは 401", async () => {
@@ -194,7 +209,7 @@ describe("確認の失敗の待ち（FR-015、research.md R9）", () => {
     expect(Number(err.details[0])).toBeGreaterThan(9 * 60);
     expect(Number(err.details[0])).toBeLessThanOrEqual(10 * 60);
     // 待ちの間の要求は数えない（待ちが延び続けない）
-    expect((await q()`SELECT count(*)::int AS n FROM token_check_failures`)[0]).toEqual({ n: 5 });
+    expect((await q()`SELECT count(*)::int AS n FROM threads.token_check_failures`)[0]).toEqual({ n: 5 });
   });
 
   it("並べて送っても、確認中の要求も数えるので、5回を超えて確かめない（PR #12 のCodexレビュー）", async () => {
@@ -204,45 +219,45 @@ describe("確認の失敗の待ち（FR-015、research.md R9）", () => {
     const codes = await Promise.all(results.map(codeOf));
     expect(codes.filter((c) => c === "TOKEN_INVALID")).toHaveLength(5);
     expect(codes.filter((c) => c === "TOKEN_CHECK_LOCKED")).toHaveLength(3);
-    const rows = (await q()`SELECT reason FROM token_check_failures`) as { reason: string }[];
+    const rows = (await q()`SELECT reason FROM threads.token_check_failures`) as { reason: string }[];
     expect(rows.map((r) => r.reason)).toEqual(Array(5).fill("invalid"));
   });
 
   it("成功した確認の予約は残らない", async () => {
     await add(await fake.issueToken({ user: "9003" }));
-    expect((await q()`SELECT count(*)::int AS n FROM token_check_failures`)[0]).toEqual({ n: 0 });
+    expect((await q()`SELECT count(*)::int AS n FROM threads.token_check_failures`)[0]).toEqual({ n: 0 });
   });
 
   it("10分たてば確かめられる。成功しても失敗の数は消えない。他の人の失敗は数えない", async () => {
     for (let i = 0; i < 5; i++) await add("bad token " + i);
-    await q()`UPDATE token_check_failures SET failed_at = failed_at - interval '11 minutes'`;
+    await q()`UPDATE threads.token_check_failures SET failed_at = failed_at - interval '11 minutes'`;
     const res = await add(await fake.issueToken({ user: "9003" }));
     expect(res.status).toBe(200);
-    expect((await q()`SELECT count(*)::int AS n FROM token_check_failures`)[0]).toEqual({ n: 5 });
+    expect((await q()`SELECT count(*)::int AS n FROM threads.token_check_failures`)[0]).toEqual({ n: 5 });
     expect((await add("bad token", "u2")).status).toBe(400);
   });
 
   it("予約の後片付けに失敗しても、確定した結果・本来のエラーを上書きしない（PR #12 のCodexレビュー）", async () => {
     // 予約の行を消す・書き換えるとエラーになるようにする（この試験の間だけ）
     await q()`CREATE OR REPLACE FUNCTION tcf_fail() RETURNS trigger AS $$ BEGIN RAISE EXCEPTION 'settle failed'; END $$ LANGUAGE plpgsql`;
-    await q()`CREATE TRIGGER tcf_fail BEFORE DELETE OR UPDATE ON token_check_failures FOR EACH ROW EXECUTE FUNCTION tcf_fail()`;
+    await q()`CREATE TRIGGER tcf_fail BEFORE DELETE OR UPDATE ON threads.token_check_failures FOR EACH ROW EXECUTE FUNCTION tcf_fail()`;
     try {
       const ok = await add(await fake.issueToken({ user: "9003" }));
       expect(ok.status).toBe(200);
-      expect((await q()`SELECT count(*)::int AS n FROM accounts`)[0]).toEqual({ n: 1 });
+      expect((await q()`SELECT count(*)::int AS n FROM threads.accounts`)[0]).toEqual({ n: 1 });
       // 1件目をつないだ u1 には、もう未接続のアカウントがない（上限1件）ので、別の人で確かめる
       expect(await codeOf(await add("bad token", "u2"))).toBe("TOKEN_INVALID");
     } finally {
-      await q()`DROP TRIGGER tcf_fail ON token_check_failures`;
+      await q()`DROP TRIGGER tcf_fail ON threads.token_check_failures`;
       await q()`DROP FUNCTION tcf_fail()`;
     }
   });
 
   it("日次の処理で、1日より前の失敗を消す", async () => {
     await add("bad token");
-    await q()`UPDATE token_check_failures SET failed_at = now() - interval '25 hours'`;
+    await q()`UPDATE threads.token_check_failures SET failed_at = now() - interval '25 hours'`;
     await add("bad token 2");
     await runDailyJobs(testEnv);
-    expect((await q()`SELECT count(*)::int AS n FROM token_check_failures`)[0]).toEqual({ n: 1 });
+    expect((await q()`SELECT count(*)::int AS n FROM threads.token_check_failures`)[0]).toEqual({ n: 1 });
   });
 });

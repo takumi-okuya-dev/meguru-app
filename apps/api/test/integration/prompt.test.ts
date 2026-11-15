@@ -11,7 +11,7 @@ beforeEach(async () => {
   await resetDb();
 });
 
-const base = (accountId: string) => `/api/accounts/${accountId}`;
+const base = (accountId: string) => `/api/threads/accounts/${accountId}`;
 
 type PromptResponse = {
   prompt: string;
@@ -28,11 +28,11 @@ async function getPrompt(accountId: string, query = "", user = "u1") {
 async function addDrafts(accountId: string, bodies: string[], createdAt: string) {
   const sql = neon(testEnv.DATABASE_URL);
   const [b] = (await sql`
-    INSERT INTO draft_batches (account_id, client_request_id, draft_count, delimiter_found, created_at)
+    INSERT INTO threads.draft_batches (account_id, client_request_id, draft_count, delimiter_found, created_at)
     VALUES (${accountId}, gen_random_uuid(), ${bodies.length}, true, ${createdAt})
     RETURNING id`) as [{ id: string }];
   for (const [i, body] of bodies.entries()) {
-    await sql`INSERT INTO post_drafts (account_id, batch_id, position, body) VALUES (${accountId}, ${b.id}, ${i}, ${body})`;
+    await sql`INSERT INTO threads.post_drafts (account_id, batch_id, position, body) VALUES (${accountId}, ${b.id}, ${i}, ${body})`;
   }
 }
 
@@ -183,7 +183,7 @@ it("005：オフでも設定した時刻の数を宣伝の文面とsummaryに反
   expect((await getPrompt(accountId)).summary).toMatchObject({ dailyPostCount: 0 });
   await setSchedule(accountId, { slotMinutes: [450, 720, 1080, 1260], enabled: false });
   await call(app, "POST", `${base(accountId)}/promotions`, { user: "u1", body: { title: "サービス", content: "サービス内容" } });
-  await neon(testEnv.DATABASE_URL)`UPDATE accounts SET promotion_ratio_percent = 25 WHERE id = ${accountId}`;
+  await neon(testEnv.DATABASE_URL)`UPDATE threads.accounts SET promotion_ratio_percent = 25 WHERE id = ${accountId}`;
   const result = await getPrompt(accountId);
   expect(result.summary).toMatchObject({ dailyPostCount: 4 });
   expect(result.prompt).toContain("1日の投稿は4件の設定で、そのうち1件程度");
@@ -201,19 +201,19 @@ describe("反応が低かった投稿の反映（specs/006 FR-025〜FR-027、SC-
     );
     for (const [i, d] of poor.entries()) {
       await confirmedMetrics(accountId, d.id, 10, i === 6 ? "late_confirmed" : "confirmed");
-      await db()`UPDATE post_metrics SET judgment = 'poor', judgment_ratio = 0.2, judgment_baseline = 50 WHERE draft_id = ${d.id}`;
+      await db()`UPDATE threads.post_metrics SET judgment = 'poor', judgment_ratio = 0.2, judgment_baseline = 50 WHERE draft_id = ${d.id}`;
     }
-    await db()`UPDATE post_metrics SET feedback_memo = '前置きが長い' WHERE draft_id = ${poor[1]!.id}`;
-    await db()`UPDATE post_metrics SET include_in_prompt = false WHERE draft_id = ${poor[0]!.id}`;
+    await db()`UPDATE threads.post_metrics SET feedback_memo = '前置きが長い' WHERE draft_id = ${poor[1]!.id}`;
+    await db()`UPDATE threads.post_metrics SET include_in_prompt = false WHERE draft_id = ${poor[0]!.id}`;
     const [good, normal, pending] = await publishedDrafts(accountId, [
       { body: "好調", publishedAt: ago(150) },
       { body: "普通", publishedAt: ago(151) },
       { body: "確定待ち", publishedAt: ago(10) },
     ]);
     await confirmedMetrics(accountId, good!.id, 100);
-    await db()`UPDATE post_metrics SET judgment = 'good', judgment_ratio = 2, judgment_baseline = 50 WHERE draft_id = ${good!.id}`;
+    await db()`UPDATE threads.post_metrics SET judgment = 'good', judgment_ratio = 2, judgment_baseline = 50 WHERE draft_id = ${good!.id}`;
     await confirmedMetrics(accountId, normal!.id, 50);
-    await db()`UPDATE post_metrics SET judgment = 'normal', judgment_ratio = 1, judgment_baseline = 50 WHERE draft_id = ${normal!.id}`;
+    await db()`UPDATE threads.post_metrics SET judgment = 'normal', judgment_ratio = 1, judgment_baseline = 50 WHERE draft_id = ${normal!.id}`;
     void pending;
 
     const { prompt, summary } = (await getPrompt(accountId)) as PromptResponse & { summary: { poorPostCount: number } };
@@ -228,5 +228,18 @@ describe("反応が低かった投稿の反映（specs/006 FR-025〜FR-027、SC-
     const { accountId } = await createUserWithAccount("u1");
     const { prompt } = await getPrompt(accountId);
     expect(prompt).not.toContain("■反応が低かった投稿");
+  });
+});
+
+describe("宣伝内容のイベントの情報（specs/021 FR-001a）", () => {
+  it("イベントの情報があるときだけ、プロンプトの宣伝内容に1行が入る", async () => {
+    const { accountId } = await createUserWithAccount("u1");
+    await call(app, "POST", `${base(accountId)}/promotions`, {
+      user: "u1",
+      body: { title: "IT交流会", content: "飲み会です", event: { startAt: "2099-11-25T20:00", format: "venue", venueName: "バー", feeYen: 5000, capacity: 25 } },
+    });
+    const res = await call(app, "GET", `${base(accountId)}/prompt`, { user: "u1" });
+    const { prompt } = (await res.json()) as { prompt: string };
+    expect(prompt).toContain("(イベント: 日時: 2099年11月25日(水) 20:00 〜 / 場所: バー / 参加費: 5,000円 / 定員: 25名)");
   });
 });

@@ -1,12 +1,12 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import type { AccountSummary, MeResponse, NeedsReviewCountsResponse } from "@threads-grower/shared";
+import type { AccountSummary, NeedsReviewCountsResponse } from "@meguru/shared";
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { PageHeader } from "@/components/layout/PageHeader";
-import { queryKeys } from "@/lib/query";
-import { ME_BILLING_OFF } from "./helpers/billing";
+import { PageHeader } from "@/shell/layout/PageHeader";
+import { threadsQueryKeys } from "@/apps/threads/lib/query-keys";
+import { ME_BILLING_OFF, type MeWithThreads } from "./helpers/billing";
 
 const mocks = vi.hoisted(() => ({
   me: vi.fn(),
@@ -21,12 +21,18 @@ vi.mock("@clerk/react", () => ({
   }),
   useClerk: () => ({ signOut: vi.fn() }),
 }));
+// 共通の「自分」は、Accountの画面の契約の帯だけに使う（Accountの一覧は Threadsの「自分」。specs/meguru/029 tasks.md T051）
 vi.mock("@/lib/api-client", async (importOriginal) => {
   const original = await importOriginal<typeof import("@/lib/api-client")>();
+  const { ME_BILLING_OFF } = await import("./helpers/billing");
+  return { ...original, api: { ...original.api, me: async () => ME_BILLING_OFF } };
+});
+vi.mock("@/apps/threads/lib/api", async (orig) => {
+  const actual = await orig<typeof import("@/apps/threads/lib/api")>();
   return {
-    ...original,
-    api: {
-      ...original.api,
+    ...actual,
+    threadsApi: {
+      ...actual.threadsApi,
       me: mocks.me,
       needsReviewCounts: mocks.needsReviewCounts,
       account: mocks.account,
@@ -36,8 +42,8 @@ vi.mock("@/lib/api-client", async (importOriginal) => {
   };
 });
 
-const { AccountSwitcher, groupHeading } = await import("@/components/layout/AccountSwitcher");
-const { AccountLayout, useCurrentAccount } = await import("@/pages/account-layout");
+const { AccountSwitcher, groupHeading } = await import("@/apps/threads/sidebar/AccountSwitcher");
+const { AccountLayout, useCurrentAccount } = await import("@/apps/threads/pages/account-layout");
 
 const account = (
   id: string,
@@ -55,7 +61,7 @@ const account = (
 });
 
 const accounts = [account("a1"), account("a2"), account("a3")];
-const me = (rows: AccountSummary[]): MeResponse => ({
+const me = (rows: AccountSummary[]): MeWithThreads => ({
   user: { id: "user", email: "user@example.com", displayName: "User" },
   accounts: rows,
   landingAccountId: rows[0]?.id ?? null,
@@ -70,14 +76,14 @@ const counts = (rows: [string, number][]): NeedsReviewCountsResponse => ({
 });
 
 function renderSwitcher(
-  initial = "/accounts/a1",
+  initial = "/threads/accounts/a1",
   onNavigate?: () => void,
   client = new QueryClient({ defaultOptions: { queries: { retry: false } } }),
 ) {
   const router = createMemoryRouter(
     [
-      { path: "/accounts/:accountId", element: <AccountSwitcher onNavigate={onNavigate} /> },
-      { path: "/accounts/new", element: <p>追加画面</p> },
+      { path: "/threads/accounts/:accountId", element: <AccountSwitcher onNavigate={onNavigate} /> },
+      { path: "/threads/accounts/new", element: <p>追加画面</p> },
     ],
     { initialEntries: [initial] },
   );
@@ -115,7 +121,7 @@ function renderAccountRoutes() {
   const router = createMemoryRouter(
     [
       {
-        path: "/accounts/:accountId",
+        path: "/threads/accounts/:accountId",
         element: <AccountLayout />,
         children: [
           { index: true, element: <HomeFixture /> },
@@ -123,9 +129,9 @@ function renderAccountRoutes() {
           { path: "settings", element: <SettingsFixture /> },
         ],
       },
-      { path: "/accounts/new", element: <p>追加画面</p> },
+      { path: "/threads/accounts/new", element: <p>追加画面</p> },
     ],
-    { initialEntries: ["/accounts/a1/stock"] },
+    { initialEntries: ["/threads/accounts/a1/stock"] },
   );
   render(
     <QueryClientProvider
@@ -171,7 +177,7 @@ describe("AccountSwitcherの横断要確認件数", () => {
     expect(within(menu).getByText("要確認 2件")).toBeInTheDocument();
     expect(within(menu).getByText("要確認 0件")).toBeInTheDocument();
     await userEvent.click(within(menu).getByRole("menuitem", { name: /Account a2/ }));
-    expect(router.state.location.pathname).toBe("/accounts/a2");
+    expect(router.state.location.pathname).toBe("/threads/accounts/a2");
     expect(mocks.me).toHaveBeenCalledTimes(2); // 初期表示と開いたときの再取得
     expect(mocks.needsReviewCounts).toHaveBeenCalledTimes(1);
   });
@@ -184,10 +190,10 @@ describe("AccountSwitcherの横断要確認件数", () => {
     expect(within(menu).getAllByText("取得できません")).toHaveLength(3);
     expect(within(menu).queryByText("要確認 0件")).not.toBeInTheDocument();
     await userEvent.click(within(menu).getByRole("menuitem", { name: /Account a2/ }));
-    expect(router.state.location.pathname).toBe("/accounts/a2");
+    expect(router.state.location.pathname).toBe("/threads/accounts/a2");
     const secondMenu = await openMenu();
     await userEvent.click(within(secondMenu).getByRole("menuitem", { name: /アカウントを作る/ }));
-    expect(router.state.location.pathname).toBe("/accounts/new");
+    expect(router.state.location.pathname).toBe("/threads/accounts/new");
   });
 
   it("読み込み中は前回の数を表示せず、失敗から再試行できる", async () => {
@@ -261,22 +267,22 @@ describe("AccountSwitcherの横断要確認件数", () => {
   });
 
   it("先に始まった一覧の取得が後から終わっても、キャッシュを古い一覧に戻さない", async () => {
-    let finishOld: (value: MeResponse) => void = () => {};
+    let finishOld: (value: MeWithThreads) => void = () => {};
     mocks.me
       .mockImplementationOnce(
         () =>
-          new Promise<MeResponse>((resolve) => {
+          new Promise<MeWithThreads>((resolve) => {
             finishOld = resolve;
           }),
       )
       .mockResolvedValueOnce(me(accounts));
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-    renderSwitcher("/accounts/a1", undefined, client);
+    renderSwitcher("/threads/accounts/a1", undefined, client);
     const menu = await openMenu();
     expect(await within(menu).findByText("要確認 5件")).toBeInTheDocument();
     finishOld(me([...accounts, account("deleted")]));
     await new Promise((resolve) => setTimeout(resolve, 0));
-    expect(client.getQueryData<MeResponse>(queryKeys.me)?.accounts.map((a) => a.id)).toEqual([
+    expect(client.getQueryData<MeWithThreads>(threadsQueryKeys.me)?.accounts.map((a) => a.id)).toEqual([
       "a1",
       "a2",
       "a3",
@@ -284,19 +290,19 @@ describe("AccountSwitcherの横断要確認件数", () => {
   });
 
   it("一覧の取り直し中に後から始まった取得があれば、メニューとキャッシュはその新しい一覧を使う", async () => {
-    let finishMenu: (value: MeResponse) => void = () => {};
-    let finishTracked: (value: MeResponse) => void = () => {};
+    let finishMenu: (value: MeWithThreads) => void = () => {};
+    let finishTracked: (value: MeWithThreads) => void = () => {};
     mocks.me
       .mockResolvedValueOnce(me(accounts))
       .mockImplementationOnce(
         () =>
-          new Promise<MeResponse>((resolve) => {
+          new Promise<MeWithThreads>((resolve) => {
             finishMenu = resolve;
           }),
       )
       .mockImplementationOnce(
         () =>
-          new Promise<MeResponse>((resolve) => {
+          new Promise<MeWithThreads>((resolve) => {
             finishTracked = resolve;
           }),
       );
@@ -309,18 +315,18 @@ describe("AccountSwitcherの横断要確認件数", () => {
       ]),
     );
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-    renderSwitcher("/accounts/a1", undefined, client);
-    await waitFor(() => expect(client.getQueryData(queryKeys.me)).toBeDefined());
+    renderSwitcher("/threads/accounts/a1", undefined, client);
+    await waitFor(() => expect(client.getQueryData(threadsQueryKeys.me)).toBeDefined());
     const menu = await openMenu();
     await waitFor(() => expect(mocks.me).toHaveBeenCalledTimes(2));
-    void client.invalidateQueries({ queryKey: queryKeys.me, exact: true });
+    void client.invalidateQueries({ queryKey: threadsQueryKeys.me, exact: true });
     await waitFor(() => expect(mocks.me).toHaveBeenCalledTimes(3));
     finishMenu(me(accounts));
     finishTracked(me([...accounts, account("added")]));
     expect(
       await within(menu).findByRole("menuitem", { name: /Account added/ }),
     ).toHaveTextContent("要確認 1件");
-    expect(client.getQueryData<MeResponse>(queryKeys.me)?.accounts.map((a) => a.id)).toEqual([
+    expect(client.getQueryData<MeWithThreads>(threadsQueryKeys.me)?.accounts.map((a) => a.id)).toEqual([
       "a1",
       "a2",
       "a3",
@@ -330,27 +336,27 @@ describe("AccountSwitcherの横断要確認件数", () => {
 
   it("先に始まった取り直しが失敗しても、後から始まった取得を取り消さずにその一覧を表示する", async () => {
     let failMenu: (error: Error) => void = () => {};
-    let finishTracked: (value: MeResponse) => void = () => {};
+    let finishTracked: (value: MeWithThreads) => void = () => {};
     mocks.me
       .mockResolvedValueOnce(me(accounts))
       .mockImplementationOnce(
         () =>
-          new Promise<MeResponse>((_, reject) => {
+          new Promise<MeWithThreads>((_, reject) => {
             failMenu = reject;
           }),
       )
       .mockImplementationOnce(
         () =>
-          new Promise<MeResponse>((resolve) => {
+          new Promise<MeWithThreads>((resolve) => {
             finishTracked = resolve;
           }),
       );
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-    renderSwitcher("/accounts/a1", undefined, client);
-    await waitFor(() => expect(client.getQueryData(queryKeys.me)).toBeDefined());
+    renderSwitcher("/threads/accounts/a1", undefined, client);
+    await waitFor(() => expect(client.getQueryData(threadsQueryKeys.me)).toBeDefined());
     const menu = await openMenu();
     await waitFor(() => expect(mocks.me).toHaveBeenCalledTimes(2));
-    void client.invalidateQueries({ queryKey: queryKeys.me, exact: true });
+    void client.invalidateQueries({ queryKey: threadsQueryKeys.me, exact: true });
     await waitFor(() => expect(mocks.me).toHaveBeenCalledTimes(3));
     failMenu(new Error("network"));
     finishTracked(me(accounts.slice(0, 2)));
@@ -429,7 +435,7 @@ describe("AccountSwitcherの状態と操作", () => {
     expect(reconnect).toHaveTextContent("要再接続");
     expect(reconnect).toHaveTextContent("要確認 2件");
     await userEvent.click(reconnect);
-    expect(router.state.location.pathname).toBe("/accounts/a2");
+    expect(router.state.location.pathname).toBe("/threads/accounts/a2");
   });
 
   it("20件の末尾と追加操作がメニューにあり、スクロール可能な高さを持つ", async () => {
@@ -497,7 +503,7 @@ describe("AccountSwitcherの状態と操作", () => {
 
   it("ドロワーから行を選ぶとonNavigateを呼ぶ", async () => {
     const onNavigate = vi.fn();
-    renderSwitcher("/accounts/a1", onNavigate);
+    renderSwitcher("/threads/accounts/a1", onNavigate);
     const menu = await openMenu();
     await userEvent.click(await within(menu).findByRole("menuitem", { name: /Account a2/ }));
     expect(onNavigate).toHaveBeenCalledOnce();
@@ -521,19 +527,19 @@ describe("AccountSwitcherの状態と操作", () => {
     expect(await screen.findByText("投稿: Aの投稿")).toBeInTheDocument();
     const menu = await openMenu();
     await userEvent.click(await within(menu).findByRole("menuitem", { name: /Account a2/ }));
-    expect(router.state.location.pathname).toBe("/accounts/a2");
+    expect(router.state.location.pathname).toBe("/threads/accounts/a2");
     await waitFor(() => expect(mocks.account).toHaveBeenCalledWith("a2"));
     expect(await mocks.account.mock.results.at(-1)?.value).toMatchObject({
       connectionStatus: "needs_reconnect",
     });
     expect(await screen.findByRole("link", { name: "再接続" })).toHaveAttribute(
       "href",
-      "/accounts/a2/settings",
+      "/threads/accounts/a2/settings",
     );
-    await router.navigate("/accounts/a2/stock");
+    await router.navigate("/threads/accounts/a2/stock");
     expect(await screen.findByText("投稿: Bの投稿")).toBeInTheDocument();
     expect(screen.queryByText("投稿: Aの投稿")).not.toBeInTheDocument();
-    await router.navigate("/accounts/a2/settings");
+    await router.navigate("/threads/accounts/a2/settings");
     expect(await screen.findByText("設定: Bの設定")).toBeInTheDocument();
     expect(screen.queryByText("設定: Aの設定")).not.toBeInTheDocument();
   });

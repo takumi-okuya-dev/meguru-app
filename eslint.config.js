@@ -2,6 +2,8 @@ import js from "@eslint/js";
 import jsdoc from "eslint-plugin-jsdoc";
 import globals from "globals";
 import tseslint from "typescript-eslint";
+import moduleBoundaries from "./eslint-rules/module-boundaries.js";
+import webModuleBoundaries from "./eslint-rules/web-module-boundaries.js";
 
 export default tseslint.config(
   {
@@ -30,6 +32,20 @@ export default tseslint.config(
     rules: {
       "@typescript-eslint/no-unused-vars": ["error", { argsIgnorePattern: "^_", varsIgnorePattern: "^_" }],
     },
+  },
+  // APIのモジュールの境界（specs/027-modular-monolith、docs/module-map.md）。
+  // 土台・窓口・共通・アプリ・組み立ての依存の向きと、ほかのモジュールは入口から読む決まりを守る。テスト・scripts にはかけない。
+  {
+    files: ["apps/api/src/**/*.ts"],
+    plugins: { local: { rules: { "module-boundaries": moduleBoundaries } } },
+    rules: { "local/module-boundaries": ["error", { strictPlacement: true }] },
+  },
+  // Webのモジュールの境界（specs/028-meguru-shell、docs/module-map.md「Webの境界」）。
+  // 共通の部品・外枠・アプリ・組み立ての依存の向きと、ほかのモジュールは入口から読む決まりを守る。テストにはかけない。
+  {
+    files: ["apps/web/src/**/*.{ts,tsx}"],
+    plugins: { local: { rules: { "web-module-boundaries": webModuleBoundaries } } },
+    rules: { "local/web-module-boundaries": ["error", { strictPlacement: true }] },
   },
   // ドキュメントコメント（JSDoc）。外部に公開している関数・クラス・型には説明を付ける。
   // TypeScript では型はコードに書くので、JSDoc には型（{string} など）を書かない。

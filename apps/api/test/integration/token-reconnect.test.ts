@@ -19,7 +19,7 @@ const reconnectWithToken = (accountId: string, token: string, user = "u1") =>
   call(app, "POST", "/api/threads/token-connect", { user, body: { mode: "reconnect", accountId, token } });
 const errorOf = async (res: Response) => ((await res.json()) as { error: { code: string } }).error.code;
 const account = async () =>
-  ((await q()`SELECT a.*, c.recheck_at FROM accounts a JOIN threads_connections c ON c.account_id = a.id`) as Record<string, unknown>[])[0]!;
+  ((await q()`SELECT a.*, c.recheck_at FROM threads.accounts a JOIN threads.threads_connections c ON c.account_id = a.id`) as Record<string, unknown>[])[0]!;
 
 async function tokenAccount(user = "u1") {
   const { res } = await tokenConnectNew(app, user, await fake.issueToken({ user: "9003" }));
@@ -29,25 +29,25 @@ async function tokenAccount(user = "u1") {
 /** 件数の見本（SC-005）：投稿ストック・戦略・設定・NGワード・記録 */
 async function counts(accountId: string) {
   const [r] = (await q()`SELECT
-    (SELECT count(*)::int FROM post_drafts WHERE account_id = ${accountId}) AS drafts,
-    (SELECT count(*)::int FROM ng_words WHERE account_id = ${accountId}) AS ng,
-    (SELECT count(*)::int FROM posting_schedules WHERE account_id = ${accountId}) AS schedules,
-    (SELECT count(*)::int FROM activity_logs WHERE account_id = ${accountId} AND action <> 'threads_reconnected') AS logs,
-    (SELECT core_rules FROM accounts WHERE id = ${accountId}) AS rules`) as Record<string, unknown>[];
+    (SELECT count(*)::int FROM threads.post_drafts WHERE account_id = ${accountId}) AS drafts,
+    (SELECT count(*)::int FROM threads.ng_words WHERE account_id = ${accountId}) AS ng,
+    (SELECT count(*)::int FROM threads.posting_schedules WHERE account_id = ${accountId}) AS schedules,
+    (SELECT count(*)::int FROM threads.activity_logs WHERE account_id = ${accountId} AND action <> 'threads_reconnected') AS logs,
+    (SELECT core_rules FROM threads.accounts WHERE id = ${accountId}) AS rules`) as Record<string, unknown>[];
   return r;
 }
 
 async function seed(accountId: string) {
   await approvedDrafts(accountId, ["A", "B"]);
-  await q()`INSERT INTO ng_words (account_id, word, normalized) VALUES (${accountId}, '禁止', '禁止')`;
-  await q()`INSERT INTO posting_schedules (account_id, enabled, slot_minutes, jitter, effective_from) VALUES (${accountId}, true, ${[720]}, false, now())`;
-  await q()`UPDATE accounts SET core_rules = 'ルール' WHERE id = ${accountId}`;
+  await q()`INSERT INTO threads.ng_words (account_id, word, normalized) VALUES (${accountId}, '禁止', '禁止')`;
+  await q()`INSERT INTO threads.posting_schedules (account_id, enabled, slot_minutes, jitter, effective_from) VALUES (${accountId}, true, ${[720]}, false, now())`;
+  await q()`UPDATE threads.accounts SET core_rules = 'ルール' WHERE id = ${accountId}`;
 }
 
 describe("トークンで接続し直す（US3）", () => {
   it("要再接続から接続中に戻り、世代番号が増え、補いが消える。上限でも使える", async () => {
     const id = await tokenAccount();
-    await q()`UPDATE accounts SET connection_status = 'needs_reconnect', reconnect_hint = 'short_lived_token'`;
+    await q()`UPDATE threads.accounts SET connection_status = 'needs_reconnect', reconnect_hint = 'short_lived_token'`;
     const before = await account();
     const res = await reconnectWithToken(id, await fake.issueToken({ user: "9003" }));
     expect(res.status).toBe(200);
@@ -59,7 +59,7 @@ describe("トークンで接続し直す（US3）", () => {
 
   it("app → token → app と切り替えても、データの件数は同じで、ユーザーIDと方法が変わる（SC-005、FR-033）", async () => {
     await connectNew(app, "u1", "9003");
-    const id = ((await q()`SELECT id FROM accounts`) as { id: string }[])[0]!.id;
+    const id = ((await q()`SELECT id FROM threads.accounts`) as { id: string }[])[0]!.id;
     await seed(id);
     const start = await counts(id);
 
@@ -82,7 +82,7 @@ describe("トークンで接続し直す（US3）", () => {
     const res = await reconnectWithToken(id, await fake.issueToken({ user: "9004" }));
     expect([res.status, await errorOf(res)]).toEqual([409, "RECONNECT_ACCOUNT_MISMATCH"]);
     expect(await account()).toMatchObject({ username: "cafe_b", threads_user_id: "9003-myapp" });
-    expect(((await q()`SELECT reason FROM token_check_failures`) as { reason: string }[]).map((r) => r.reason)).toEqual([
+    expect(((await q()`SELECT reason FROM threads.token_check_failures`) as { reason: string }[]).map((r) => r.reason)).toEqual([
       "account_mismatch",
     ]);
   });

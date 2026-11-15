@@ -23,7 +23,7 @@ async function expectNoOverflow(page: Page, label: string) {
 test("375pxで、014で変えた画面が横にはみ出さない", async ({ page }) => {
   await signIn(page);
   const accountId = await createAccount(page, "スマートフォンのアカウント");
-  const base = `/accounts/${accountId}`;
+  const base = `/threads/accounts/${accountId}`;
 
   await page.goto(base);
   await expect(page.getByRole("region", { name: "はじめに読んでほしいこと" })).toBeVisible();
@@ -33,7 +33,7 @@ test("375pxで、014で変えた画面が横にはみ出さない", async ({ pag
   await expect(page.getByRole("region", { name: "進み具合" })).toBeVisible();
   const persona = page.locator("#field-targetPersona");
   await persona.getByRole("button", { name: /考えるヒント/ }).click();
-  await persona.getByRole("button", { name: "この項目をAIと深掘りする" }).click();
+  await persona.getByRole("button", { name: "AIと深掘り" }).click();
   await expectNoOverflow(page, "課題");
 
   await page.goto(`${base}/research`);
@@ -57,26 +57,22 @@ test("375pxで、014で変えた画面が横にはみ出さない", async ({ pag
   await expectNoOverflow(page, "投稿ストック");
 });
 
-// specs/015 T048：環境の帯が、375pxで横にはみ出さず、上部バーの操作に重ならない
-test("375pxで、環境の帯が上部バーの操作に重ならない", async ({ page }) => {
+// specs/015 T048：本番以外の環境を、375pxで横にはみ出さずに示す。
+// 2026-10-31 から、アプリの画面では帯を出さず、サイドバーのユーザー名の横の印で示す（帯は最初の画面と読みもののページだけ）。
+test("375pxで、環境はアプリの画面ではユーザー名の横の印、読みもののページでは帯で示し、はみ出さない", async ({ page }) => {
   await signIn(page);
   const accountId = await createAccount(page, "帯のアカウント");
-  await page.goto(`/accounts/${accountId}`);
+  await page.goto(`/threads/accounts/${accountId}`);
 
   // 手元で動かすので VITE_APP_ENV は development（apps/web/.env.local）
-  const banner = page.getByText("開発環境です（手元）");
-  await expect(banner).toBeVisible();
-  await expectNoOverflow(page, "環境の帯");
+  // アプリの画面には帯を出さない。サイドバー（狭い画面では引き出し）のユーザー名の横に「開発版」の印
+  await expect(page.getByRole("button", { name: "メニューを開く" })).toBeVisible();
+  await expect(page.getByText("開発環境です（手元）")).toHaveCount(0);
+  await page.getByRole("button", { name: "メニューを開く" }).click();
+  await expect(page.getByText("開発版", { exact: true })).toBeVisible();
+  await expectNoOverflow(page, "環境の印");
 
-  // 帯は画面のいちばん上（上部バーより上）にあり、メニューのボタンに重ならない
-  const menu = page.getByRole("button", { name: "メニューを開く" });
-  const menuBox = await menu.boundingBox();
-  const bannerBox = await banner.boundingBox();
-  expect(bannerBox, "帯の位置").not.toBeNull();
-  expect(menuBox, "メニューのボタンの位置").not.toBeNull();
-  expect(bannerBox!.y + bannerBox!.height, "帯の下端はメニューのボタンより上").toBeLessThanOrEqual(menuBox!.y);
-
-  // ログインの画面（骨格の外）でも、一番上に出る
+  // 読みもののページ（骨格の外）では、一番上に帯を出す
   await page.goto("/terms");
   await expect(page.getByText("開発環境です（手元）")).toBeVisible();
   await expectNoOverflow(page, "利用規約");

@@ -2,7 +2,7 @@
 import { focusManager, QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import type { AccountSummary, Promotion } from "@threads-grower/shared";
+import type { AccountSummary, Promotion } from "@meguru/shared";
 import { createMemoryRouter, Link, Outlet, RouterProvider } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -10,15 +10,26 @@ const listPromotions = vi.fn();
 const updatePromotion = vi.fn();
 const getPromotionSettings = vi.fn();
 const putPromotionSettings = vi.fn();
-vi.mock("@/lib/api-client", async (orig) => {
-  const actual = await orig<typeof import("@/lib/api-client")>();
-  return { ...actual, api: { ...actual.api, listPromotions, updatePromotion, getPromotionSettings, putPromotionSettings } };
+const createPromotion = vi.fn();
+vi.mock("@/apps/threads/lib/api", async (orig) => {
+  const actual = await orig<typeof import("@/apps/threads/lib/api")>();
+  return {
+    ...actual,
+    threadsApi: {
+      ...actual.threadsApi,
+      listPromotions,
+      updatePromotion,
+      getPromotionSettings,
+      putPromotionSettings,
+      createPromotion,
+    },
+  };
 });
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
 const { ApiError } = await import("@/lib/api-client");
 const { UnsavedChangesProvider } = await import("@/components/UnsavedChangesProvider");
-const { PromotionsPage } = await import("@/pages/promotions");
+const { PromotionsPage } = await import("@/apps/threads/pages/promotions");
 
 const account: AccountSummary = {
   id: "a1",
@@ -45,6 +56,7 @@ function promotion(overrides: Partial<Promotion> = {}): Promotion {
     priority: 0,
     status: "active",
     validUntil: null,
+    event: null,
     isExpired: false,
     isTargetable: true,
     version: 1,
@@ -58,10 +70,10 @@ function renderPage() {
   const router = createMemoryRouter(
     [
       {
-        path: "/accounts/:accountId",
+        path: "/threads/accounts/:accountId",
         element: (
           <>
-            <Link to="/accounts/a1">ホームへ</Link>
+            <Link to="/threads/accounts/a1">ホームへ</Link>
             <UnsavedChangesProvider>
               <Outlet context={{ account }} />
             </UnsavedChangesProvider>
@@ -73,7 +85,7 @@ function renderPage() {
         ],
       },
     ],
-    { initialEntries: ["/accounts/a1/promotions"] },
+    { initialEntries: ["/threads/accounts/a1/promotions"] },
   );
   render(
     <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
@@ -197,7 +209,63 @@ describe("宣伝内容の画面", () => {
     await userEvent.click(screen.getByRole("link", { name: "ホームへ" }));
     expect(await screen.findByText("保存していない変更があります")).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "編集に戻る" }));
-    expect(router.state.location.pathname).toBe("/accounts/a1/promotions");
+    expect(router.state.location.pathname).toBe("/threads/accounts/a1/promotions");
     expect(screen.getByLabelText("宣伝投稿の割合")).toHaveValue(30);
+  });
+});
+
+describe("宣伝内容のイベントの情報（specs/021 FR-001、contracts/ui-routes.md 5）", () => {
+  beforeEach(() => {
+    listPromotions.mockResolvedValue({ items: [], limit: 50, canEdit: true });
+    getPromotionSettings.mockResolvedValue({ ratioPercent: 20, version: 1, canEdit: true });
+    createPromotion.mockReset();
+    createPromotion.mockResolvedValue(promotion());
+  });
+
+  it("閉じた区分「イベントの情報（任意）」。入れずに保存すると event は null", async () => {
+    const user = userEvent.setup();
+    renderPage();
+    await user.click((await screen.findAllByRole("button", { name: "宣伝内容を追加" }))[0]!);
+    expect(screen.getByRole("button", { name: "イベントの情報（任意）" })).toHaveAttribute("aria-expanded", "false");
+    await user.type(screen.getByLabelText(/管理用タイトル/), "IT交流会");
+    await user.type(screen.getByLabelText(/宣伝したい内容/), "飲み会です");
+    await user.click(screen.getAllByRole("button", { name: "追加" }).at(-1)!);
+    await waitFor(() => expect(createPromotion).toHaveBeenCalledWith("a1", expect.objectContaining({ event: null })));
+  });
+
+  it("開くと欄が並び、入れると event が送られる。開始がないと保存できない", async () => {
+    const user = userEvent.setup();
+    renderPage();
+    await user.click((await screen.findAllByRole("button", { name: "宣伝内容を追加" }))[0]!);
+    await user.type(screen.getByLabelText(/管理用タイトル/), "IT交流会");
+    await user.type(screen.getByLabelText(/宣伝したい内容/), "飲み会です");
+    await user.click(screen.getByRole("button", { name: "イベントの情報（任意）" }));
+    await user.type(screen.getByLabelText("会場名"), "バー SHITEN");
+    await user.type(screen.getByLabelText("参加費（円）"), "5000");
+    await user.click(screen.getAllByRole("button", { name: "追加" }).at(-1)!);
+    expect(await screen.findByText("開始の日時を入れてください")).toBeInTheDocument();
+    expect(createPromotion).not.toHaveBeenCalled();
+    await user.type(screen.getByLabelText("開始"), "2026-11-25T20:00");
+    await user.click(screen.getAllByRole("button", { name: "追加" }).at(-1)!);
+    await waitFor(() =>
+      expect(createPromotion).toHaveBeenCalledWith(
+        "a1",
+        expect.objectContaining({ event: expect.objectContaining({ startAt: "2026-11-25T20:00", venueName: "バー SHITEN", feeYen: 5000, format: "venue" }) }),
+      ),
+    );
+  });
+
+  it("イベントの情報がある宣伝内容は、最初から開いている", async () => {
+    listPromotions.mockResolvedValue({
+      items: [promotion({ event: { startAt: "2026-11-25T20:00", endAt: null, format: "venue", venueName: "バー", prefecture: null, address: null, building: null, station: null, capacity: null, feeYen: null, feeNote: null, cancelPolicy: null, audience: null, organizer: null } })],
+      limit: 50,
+      canEdit: true,
+    });
+    const user = userEvent.setup();
+    renderPage();
+    await user.click(await screen.findByRole("button", { name: "10月11日 IT交流会の操作" }));
+    await user.click(await screen.findByRole("menuitem", { name: "編集" }));
+    expect(await screen.findByRole("button", { name: "イベントの情報（任意）" })).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByLabelText("会場名")).toHaveValue("バー");
   });
 });

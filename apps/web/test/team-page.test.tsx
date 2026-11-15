@@ -2,10 +2,10 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import type { MeResponse, TeamDetail } from "@threads-grower/shared";
+import type { TeamDetail } from "@meguru/shared";
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { ME_BILLING_OFF } from "./helpers/billing";
+import { ME_BILLING_OFF, type MeWithThreads } from "./helpers/billing";
 
 const mocks = vi.hoisted(() => ({
   getTeam: vi.fn(),
@@ -21,17 +21,22 @@ const mocks = vi.hoisted(() => ({
   renameTeam: vi.fn(),
   deleteTeam: vi.fn(),
   dismissJoinedNotice: vi.fn(),
+  teamStatus: vi.fn(),
   me: vi.fn(),
 }));
 vi.mock("@/lib/api-client", async (orig) => {
   const actual = await orig<typeof import("@/lib/api-client")>();
   return { ...actual, api: { ...actual.api, ...mocks } };
 });
+vi.mock("@/apps/threads/lib/api", async (orig) => {
+  const actual = await orig<typeof import("@/apps/threads/lib/api")>();
+  return { ...actual, threadsApi: { ...actual.threadsApi, ...mocks } };
+});
 const toast = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn(), dismiss: vi.fn() }));
 vi.mock("sonner", () => ({ toast }));
 
 const { ApiError } = await import("@/lib/api-client");
-const { TeamPage } = await import("@/pages/team");
+const { TeamPage } = await import("@/apps/threads/pages/team");
 
 const acc = (id: string, name: string, extra: Partial<TeamDetail["members"][number]["accounts"][number]> = {}) => ({
   id,
@@ -58,6 +63,7 @@ function adminView(): TeamDetail {
       { userId: "u-e", name: "佐藤 美咲", role: "editor", isMe: false, joinedAt: "", joinedNotice: false, accounts: [acc("a-e", "佐藤のおうちごはん")] },
     ],
     limits: { members: 50, editors: 10 },
+    statusVisible: true,
   };
 }
 
@@ -66,6 +72,7 @@ function memberView(): TeamDetail {
   return {
     ...t,
     myRole: "member",
+    statusVisible: false,
     members: t.members.map((m) => ({
       ...m,
       isMe: m.userId === "u-s",
@@ -75,7 +82,7 @@ function memberView(): TeamDetail {
   };
 }
 
-const meData: MeResponse = {
+const meData: MeWithThreads = {
   user: { id: "u-s", email: "s@example.com", displayName: "鈴木 花子" },
   accounts: [
     { id: "a-s", name: "カフェ B店", username: "a-s", displayName: "カフェ B店", profilePictureUrl: null, connectionStatus: "connected", lastUsedAt: null, role: "owner", ownerName: null },
@@ -92,13 +99,14 @@ const meData: MeResponse = {
 function renderPage() {
   const router = createMemoryRouter(
     [
-      { path: "/teams/:teamId", element: <TeamPage /> },
-      { path: "/teams/:teamId/assign", element: <p>担当の表</p> },
-      { path: "/teams/:teamId/accounts/:accountId", element: <p>見せてもらっているアカウント</p> },
-      { path: "/accounts/:accountId", element: <p>Accountの画面</p> },
-      { path: "/", element: <p>最初の画面</p> },
+      { path: "/threads/teams/:teamId", element: <TeamPage /> },
+      { path: "/threads/teams/:teamId/assign", element: <p>担当の表</p> },
+      { path: "/threads/teams/:teamId/status", element: <p>運用状況の画面</p> },
+      { path: "/threads/teams/:teamId/accounts/:accountId", element: <p>見せてもらっているアカウント</p> },
+      { path: "/threads/accounts/:accountId", element: <p>Accountの画面</p> },
+      { path: "/threads", element: <p>最初の画面</p> },
     ],
-    { initialEntries: ["/teams/t1"] },
+    { initialEntries: ["/threads/teams/t1"] },
   );
   render(
     <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
@@ -112,6 +120,7 @@ beforeEach(() => {
   for (const fn of Object.values(mocks)) fn.mockReset();
   for (const fn of Object.values(toast)) fn.mockReset();
   mocks.me.mockResolvedValue(meData);
+  mocks.teamStatus.mockResolvedValue({ scope: "all", generatedAt: "", stoppedCount: 3, people: [], accounts: [] });
   for (const fn of [mocks.setMemberRole, mocks.setTeamShared, mocks.removeTeamAccount, mocks.addTeamAccount, mocks.leaveTeam, mocks.removeMember, mocks.transferAdmin, mocks.renameTeam, mocks.deleteTeam, mocks.dismissJoinedNotice])
     fn.mockResolvedValue(undefined);
 });
@@ -123,14 +132,32 @@ describe("チームの画面（管理者）", () => {
     expect(await screen.findByRole("heading", { name: "飲食チーム" })).toBeInTheDocument();
     expect(screen.getByText(/メンバー 4人 · 管理者：田中 健/)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "メンバーを招待" })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "担当を決める" })).toHaveAttribute("href", "/teams/t1/assign");
+    expect(screen.getByRole("link", { name: "担当を決める" })).toHaveAttribute("href", "/threads/teams/t1/assign");
     const list = screen.getByRole("list", { name: "メンバーの一覧" });
     const rows = within(list).getAllByRole("listitem");
     expect(within(rows[0]!).getByText("あなた")).toBeInTheDocument();
     expect(within(rows[0]!).getByText("管理者（あなた）")).toBeInTheDocument();
-    expect(within(rows[1]!).getByRole("link", { name: "鈴木 花子さんのカフェ B店を見る" })).toHaveAttribute("href", "/teams/t1/accounts/a-s");
+    expect(within(rows[1]!).getByRole("link", { name: "鈴木 花子さんのカフェ B店を見る" })).toHaveAttribute("href", "/threads/teams/t1/accounts/a-s");
     expect(within(rows[2]!).getByText("ベーカリー E · 見せていません")).toBeInTheDocument();
-    expect(screen.getByLabelText("ロールの説明")).toBeInTheDocument();
+  });
+
+  it("ロールの説明は「ロールについて」で開き、箇条書きで出す。「チームを抜ける」は一番下（2026-11-04）", async () => {
+    mocks.getTeam.mockResolvedValue(adminView());
+    const user = userEvent.setup();
+    renderPage();
+    const toggle = await screen.findByRole("button", { name: "ロールについて" });
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByRole("region", { name: "ロールの説明" })).not.toBeInTheDocument();
+    await user.click(toggle);
+    const help = screen.getByRole("region", { name: "ロールの説明" });
+    expect(within(help).getByText("・担当のアカウントで、投稿の案を作る・直す")).toBeInTheDocument();
+    expect(toggle).toHaveTextContent(/^ロールについて$/);
+    // 「⋯」の中は、チーム名を直す・チームを削除するだけ
+    await user.click(screen.getByRole("button", { name: "チームの操作" }));
+    expect((await screen.findAllByRole("menuitem")).map((i) => i.textContent)).toEqual(["チーム名を直す", "チームを削除する"]);
+    await user.keyboard("{Escape}");
+    const buttons = screen.getAllByRole("button");
+    expect(buttons.at(-1)).toHaveTextContent("チームを抜ける");
   });
 
   it("ロールの切り替え（aria-pressed の2つのボタン）。管理者自身の行には出さない（T023）", async () => {
@@ -189,7 +216,7 @@ describe("チームの画面（管理者）", () => {
     await user.click(within(del).getByRole("button", { name: "チームを削除する" }));
     expect(mocks.deleteTeam).toHaveBeenCalledWith("t1");
     expect(await screen.findByText("最初の画面")).toBeInTheDocument();
-    expect(router.state.location.pathname).toBe("/");
+    expect(router.state.location.pathname).toBe("/threads");
   });
 
   it("「チームを抜ける」：引き継ぎ先を選ぶまで「引き継いで抜ける」は押せない（T035）", async () => {
@@ -239,7 +266,7 @@ describe("チームの画面（管理者）", () => {
 });
 
 describe("チームの画面（メンバー・編集者）", () => {
-  it("「管理者：・あなたのロール：」と「チームを抜ける」だけ。招待・担当・ロールの切り替え・⋯は出ない", async () => {
+  it("「管理者：・あなたのロール：」と「チームを抜ける」だけ。招待・担当・ロールの切り替え・⋯・ロールについては出ない", async () => {
     mocks.getTeam.mockResolvedValue(memberView());
     renderPage();
     expect(await screen.findByText(/管理者：田中 健 · あなたのロール：メンバー/)).toBeInTheDocument();
@@ -248,15 +275,15 @@ describe("チームの画面（メンバー・編集者）", () => {
     expect(screen.queryByRole("link", { name: "担当を決める" })).not.toBeInTheDocument();
     expect(screen.queryByRole("group", { name: /のロール$/ })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /の操作$/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "ロールについて" })).not.toBeInTheDocument();
   });
 
-  it("「チームに入れている、あなたのアカウント」の「チームに見せる」のスイッチ（T029）", async () => {
+  it("「あなたのアカウント」の「チームに見せる」のスイッチ（T029）", async () => {
     mocks.getTeam.mockResolvedValue(memberView());
     const user = userEvent.setup();
     renderPage();
     const sw = await screen.findByRole("switch", { name: "カフェ B店をチームに見せる" });
     expect(sw).toBeChecked();
-    expect(screen.getByText("チームの人が、投稿ストックと戦略を読めます")).toBeInTheDocument();
     await user.click(sw);
     expect(mocks.setTeamShared).toHaveBeenCalledWith("t1", "a-s", false);
     // 最後の1つには「チームから外す」を出さない
@@ -300,12 +327,54 @@ describe("チームの画面（メンバー・編集者）", () => {
     await user.click(within(dialog).getByRole("button", { name: "抜ける" }));
     expect(mocks.leaveTeam).toHaveBeenCalledWith("t1", undefined);
     expect(await screen.findByText("最初の画面")).toBeInTheDocument();
-    expect(router.state.location.pathname).toBe("/");
+    expect(router.state.location.pathname).toBe("/threads");
   });
 
   it("チームの人でなければ「チームが見つかりません」", async () => {
     mocks.getTeam.mockRejectedValue(new ApiError("TEAM_NOT_FOUND", 404));
     renderPage();
     expect(await screen.findByText("チームが見つかりません。")).toBeInTheDocument();
+  });
+});
+
+describe("運用状況のボタンと見える範囲（specs/020 T014・T023・T031）", () => {
+  it("statusVisible なら「担当を決める」の前に「運用状況」。止まっている数の印が付き、押すと運用状況の画面へ", async () => {
+    mocks.getTeam.mockResolvedValue(adminView());
+    const user = userEvent.setup();
+    const router = renderPage();
+    const link = await screen.findByRole("link", { name: /運用状況/ });
+    expect(link).toHaveAttribute("href", "/threads/teams/t1/status");
+    expect(await within(link).findByText("3")).toBeInTheDocument();
+    const links = screen.getAllByRole("link").map((l) => l.textContent);
+    expect(links.findIndex((t) => t?.includes("運用状況"))).toBeLessThan(links.indexOf("担当を決める"));
+    await user.click(link);
+    expect(router.state.location.pathname).toBe("/threads/teams/t1/status");
+  });
+
+  it("止まっている数が0なら印を付けない", async () => {
+    mocks.getTeam.mockResolvedValue(adminView());
+    mocks.teamStatus.mockResolvedValue({ scope: "all", generatedAt: "", stoppedCount: 0, people: [], accounts: [] });
+    renderPage();
+    const link = await screen.findByRole("link", { name: /運用状況/ });
+    await vi.waitFor(() => expect(mocks.teamStatus).toHaveBeenCalled());
+    expect(link.textContent).toBe("運用状況");
+  });
+
+  it("statusVisible でなければ、ボタンも運用状況の読み込みも出さない（メンバー）", async () => {
+    mocks.getTeam.mockResolvedValue(memberView());
+    renderPage();
+    expect(await screen.findByRole("heading", { name: "飲食チーム" })).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /運用状況/ })).not.toBeInTheDocument();
+    expect(mocks.teamStatus).not.toHaveBeenCalled();
+  });
+
+  it("閉じたトグル「チームで見えること」は全員に出て、開くと3つの箇条書き", async () => {
+    mocks.getTeam.mockResolvedValue(memberView());
+    const user = userEvent.setup();
+    renderPage();
+    await user.click(await screen.findByRole("button", { name: "チームで見えること" }));
+    const help = screen.getByRole("list", { name: "チームで見えること" });
+    expect(within(help).getAllByRole("listitem")).toHaveLength(3);
+    expect(within(help).getByText(/管理者と、担当の編集者は、運用状況/)).toBeInTheDocument();
   });
 });

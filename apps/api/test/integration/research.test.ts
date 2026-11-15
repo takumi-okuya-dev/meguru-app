@@ -9,7 +9,7 @@ beforeEach(async () => {
   await resetDb();
 });
 
-const base = (accountId: string) => `/api/accounts/${accountId}`;
+const base = (accountId: string) => `/api/threads/accounts/${accountId}`;
 type Item = { id: string; version: number; keyword: string; body?: string; whyGood?: string };
 type ErrorBody = { error: { code: string; details?: string[] } };
 
@@ -72,7 +72,7 @@ describe("参考投稿", () => {
   it("件数の上限は200件（FR-022）", async () => {
     const { accountId } = await createUserWithAccount("u1");
     const sql = neon(testEnv.DATABASE_URL);
-    await sql`INSERT INTO reference_posts (account_id, body) SELECT ${accountId}, 'b' || g FROM generate_series(1, 200) AS g`;
+    await sql`INSERT INTO threads.reference_posts (account_id, body) SELECT ${accountId}, 'b' || g FROM generate_series(1, 200) AS g`;
     const res = await post(accountId, "reference-posts", { body: "201件目" });
     expect(res.status).toBe(409);
     expect(((await res.json()) as ErrorBody).error.code).toBe("ITEM_LIMIT_REACHED");
@@ -115,7 +115,7 @@ describe("キーワード", () => {
   it("件数の上限は100件（FR-022）", async () => {
     const { accountId } = await createUserWithAccount("u1");
     const sql = neon(testEnv.DATABASE_URL);
-    await sql`INSERT INTO research_keywords (account_id, keyword, keyword_normalized)
+    await sql`INSERT INTO threads.research_keywords (account_id, keyword, keyword_normalized)
       SELECT ${accountId}, 'k' || g, 'k' || g FROM generate_series(1, 100) AS g`;
     const res = await post(accountId, "research-keywords", { keyword: "101件目" });
     expect(res.status).toBe(409);

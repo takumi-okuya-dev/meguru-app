@@ -1,25 +1,35 @@
-// US12：「投稿をつくる」の進め方の案内と、自分で1件書く入口（specs/014-strategy-guidance FR-130〜FR-132、research.md R15）
-import { screen, waitFor, within } from "@testing-library/react";
+// US12：「投稿をつくる」の進め方の案内（specs/014-strategy-guidance FR-130、research.md R15）。
+// コピーの注意（FR-131）と自分で1件書く入口（FR-132）は、文字を減らすため外した（2026-11-04）
+import { screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { OWNER_ACCESS } from "./helpers/access";
-import { batchResult, draft, listResponse, promptResponse, renderAccountRoutes } from "./helpers/stock";
+import { listResponse, promptResponse, renderAccountRoutes } from "./helpers/stock";
 
 const listPostDrafts = vi.fn();
 const getPrompt = vi.fn();
 const createDraftBatch = vi.fn();
-vi.mock("@/lib/api-client", async (orig) => {
-  const actual = await orig<typeof import("@/lib/api-client")>();
-  return { ...actual, api: { ...actual.api, accountAccess: async () => OWNER_ACCESS, listPostDrafts, getPrompt, createDraftBatch } };
+vi.mock("@/apps/threads/lib/api", async (orig) => {
+  const actual = await orig<typeof import("@/apps/threads/lib/api")>();
+  return {
+    ...actual,
+    threadsApi: {
+      ...actual.threadsApi,
+      accountAccess: async () => OWNER_ACCESS,
+      listPostDrafts,
+      getPrompt,
+      createDraftBatch,
+    },
+  };
 });
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn(), info: vi.fn() } }));
 
-const { CreatePage } = await import("@/pages/create");
+const { CreatePage } = await import("@/apps/threads/pages/create");
 
 const STEPS_KEY = "threads-grower:create-steps-collapsed";
 
 function renderCreate() {
-  return renderAccountRoutes([{ path: "create", element: <CreatePage /> }], "/accounts/a1/create");
+  return renderAccountRoutes([{ path: "create", element: <CreatePage /> }], "/threads/accounts/a1/create");
 }
 
 beforeEach(() => {
@@ -35,10 +45,10 @@ describe("投稿ができるまでの5つの手順（FR-130）", () => {
     renderCreate();
     const steps = within(await screen.findByRole("region", { name: "投稿ができるまでの5つの手順" }));
     expect(steps.getAllByRole("listitem").map((li) => li.textContent?.slice(0, 1))).toEqual(["①", "②", "③", "④", "⑤"]);
-    expect(steps.getByRole("link", { name: "課題" })).toHaveAttribute("href", "/accounts/a1/strategy");
-    expect(steps.getByRole("link", { name: "宣伝内容" })).toHaveAttribute("href", "/accounts/a1/promotions");
-    expect(steps.getByRole("link", { name: "リサーチ" })).toHaveAttribute("href", "/accounts/a1/research");
-    expect(steps.getByRole("link", { name: "投稿ストック" })).toHaveAttribute("href", "/accounts/a1/stock");
+    expect(steps.getByRole("link", { name: "課題" })).toHaveAttribute("href", "/threads/accounts/a1/strategy");
+    expect(steps.getByRole("link", { name: "宣伝内容" })).toHaveAttribute("href", "/threads/accounts/a1/promotions");
+    expect(steps.getByRole("link", { name: "リサーチ" })).toHaveAttribute("href", "/threads/accounts/a1/research");
+    expect(steps.getByRole("link", { name: "投稿ストック" })).toHaveAttribute("href", "/threads/accounts/a1/stock");
     const prompt = await screen.findByRole("region", { name: "プロンプト" });
     expect(
       screen.getByRole("region", { name: "投稿ができるまでの5つの手順" }).compareDocumentPosition(prompt) &
@@ -75,37 +85,21 @@ describe("投稿ができるまでの5つの手順（FR-130）", () => {
     expect(within(region).getAllByRole("listitem")).toHaveLength(5);
   });
 
-  it("プロンプトを作れない（読むだけ）ときは、手順と自分で1件書く入口を出さない", async () => {
+  it("プロンプトを作れない（読むだけ）ときは、手順を出さない", async () => {
     listPostDrafts.mockResolvedValue(listResponse({ canGeneratePrompt: false }));
     renderCreate();
     expect(await screen.findByText("今はAIプロンプトを作れません")).toBeInTheDocument();
     expect(screen.queryByRole("region", { name: "投稿ができるまでの5つの手順" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "自分で1件書く" })).not.toBeInTheDocument();
   });
 });
 
-describe("貼り付け欄の注意と、自分で1件書く（FR-131・FR-132）", () => {
-  it("答えのコピーボタンで全体をコピーするよう促す注意が出る", async () => {
+describe("貼り付け欄の案内（2026-11-04）", () => {
+  it("区切りの案内は欄の中に出し、コピーの注意と「自分で1件書く」は出さない", async () => {
     renderCreate();
-    expect(
-      await screen.findByText("AIの答えは、答えの下にあるコピーボタンで全体をコピーしてから貼り付けてください（マウスで選ぶと、区切りの行が抜けることがあります）"),
-    ).toBeInTheDocument();
-  });
-
-  it("「自分で1件書く」と「リサーチを見る」が出て、押すと欄に書ける。区切りがなくても注意を出さずに1件で登録する", async () => {
-    const user = userEvent.setup();
-    createDraftBatch.mockResolvedValue(batchResult([draft({ body: "自分で書いた投稿" })], { delimiterFound: false }));
-    renderCreate();
-    expect(await screen.findByText("自分で1件書く：AIを使わずに、1件の本文を書いて登録することもできます")).toBeInTheDocument();
-    expect(screen.getByText(/リサーチした投稿を、自分なりに真似して書いてみよう/)).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "リサーチを見る" })).toHaveAttribute("href", "/accounts/a1/research");
-    await user.click(screen.getByRole("button", { name: "自分で1件書く" }));
-    const box = screen.getByRole("textbox", { name: "AIの返信を貼り付ける欄" });
-    await waitFor(() => expect(box).toHaveFocus());
-    expect(box).toHaveAttribute("placeholder", "投稿の本文を1件書く…");
-    await user.type(box, "自分で書いた投稿");
-    await user.click(screen.getByRole("button", { name: "投稿ストックに登録する" }));
-    expect(await screen.findByText("1件を投稿ストックに登録しました")).toBeInTheDocument();
-    expect(screen.queryByText("区切り（@@@）が見つからなかったため、1件として登録しました")).not.toBeInTheDocument();
+    const box = await screen.findByRole("textbox", { name: "AIの返信を貼り付ける欄" });
+    expect(box).toHaveAttribute("placeholder", "AIの返信をここに貼り付け…\n「@@@」で区切られた投稿が、まとめて「要確認」に登録されます");
+    expect(screen.queryByText(/答えの下にあるコピーボタンで全体をコピー/)).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "自分で1件書く" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "リサーチを見る" })).not.toBeInTheDocument();
   });
 });

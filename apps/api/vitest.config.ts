@@ -30,6 +30,9 @@ export default defineConfig({
           // 同じDBを使うので、ファイルは順番に実行する
           fileParallelism: false,
           testTimeout: 30_000,
+          // 準備（beforeEach）も、表を空にしてから取り込みなどで中身を作るので、テストと同じ長さまで待つ
+          // （初めの値の10秒では、CI が混んでいると時間切れになることがあった。人物メモの outreach-work.test.ts）
+          hookTimeout: 30_000,
         },
       },
       {

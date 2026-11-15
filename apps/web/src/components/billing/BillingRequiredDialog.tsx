@@ -1,6 +1,6 @@
 // 保存の途中で 403 BILLING_REQUIRED を受けたときのダイアログ（specs/013 contracts/ui-routes.md「読むだけの帯」、T038）。
 // 画面を開いた後に無料体験が終わった・支払いが失敗したなど。入力した内容は画面に残す。
-import { errorMessage } from "@threads-grower/shared";
+import { errorMessage } from "@meguru/shared";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,

@@ -9,7 +9,7 @@ beforeEach(async () => {
   await resetDb();
 });
 
-const base = (accountId: string) => `/api/accounts/${accountId}`;
+const base = (accountId: string) => `/api/threads/accounts/${accountId}`;
 const DEFAULTS = { target: 150, shortLength: 55, mediumLength: 100, longLength: 135, shortRatio: 35, mediumRatio: 45, longRatio: 20 };
 const CUSTOM = { target: 200, shortLength: 70, mediumLength: 135, longLength: 180, shortRatio: 35, mediumRatio: 45, longRatio: 20 };
 type ErrorBody = { error: { code: string; details?: string[]; reason?: string }; latest?: unknown };

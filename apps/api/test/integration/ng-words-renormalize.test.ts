@@ -22,7 +22,7 @@ beforeEach(async () => {
  * @param staleNormalized - 古い正規化の値
  */
 async function insertStale(accountId: string, word: string, staleNormalized: string) {
-  await sql()`INSERT INTO ng_words (account_id, word, normalized) VALUES (${accountId}, ${word}, ${staleNormalized})`;
+  await sql()`INSERT INTO threads.ng_words (account_id, word, normalized) VALUES (${accountId}, ${word}, ${staleNormalized})`;
 }
 
 describe("登録済みのNGワードの normalized が古いとき", () => {
@@ -30,16 +30,16 @@ describe("登録済みのNGワードの normalized が古いとき", () => {
     const { accountId } = await createAccountVia(app, "u1");
     await insertStale(accountId!, "☀️", "☀️");
     // 本文は新しい正規化で「☀」になる。古い保存値をそのまま使うと当たらない
-    const res = await call(app, "POST", `/api/accounts/${accountId}/draft-batches`, {
+    const res = await call(app, "POST", `/api/threads/accounts/${accountId}/draft-batches`, {
       user: "u1",
       body: { clientRequestId: crypto.randomUUID(), text: "今日は☀です" },
     });
     expect(res.status).toBe(201);
-    const list = await call(app, "GET", `/api/accounts/${accountId}/post-drafts`, { user: "u1" });
+    const list = await call(app, "GET", `/api/threads/accounts/${accountId}/post-drafts`, { user: "u1" });
     const body = (await list.json()) as { needsReview: { id: string; version: number }[] };
     const draft = body.needsReview[0]!;
     // 承認しようとすると、NGワードで止まる
-    const review = await call(app, "POST", `/api/accounts/${accountId}/post-drafts/review`, {
+    const review = await call(app, "POST", `/api/threads/accounts/${accountId}/post-drafts/review`, {
       user: "u1",
       body: {
         requestId: crypto.randomUUID(),
@@ -54,7 +54,7 @@ describe("登録済みのNGワードの normalized が古いとき", () => {
   it("同じ語を足そうとすると、重複として扱う（二重に登録しない）", async () => {
     const { accountId } = await createAccountVia(app, "u1");
     await insertStale(accountId!, "☀️", "☀️");
-    const res = await call(app, "POST", `/api/accounts/${accountId}/ng-words`, {
+    const res = await call(app, "POST", `/api/threads/accounts/${accountId}/ng-words`, {
       user: "u1",
       body: { words: ["☀️"] },
     });
@@ -62,7 +62,7 @@ describe("登録済みのNGワードの normalized が古いとき", () => {
     const added = (await res.json()) as { added: unknown[]; duplicates: string[] };
     expect(added.added).toEqual([]);
     expect(added.duplicates).toEqual(["☀️"]);
-    const rows = (await sql()`SELECT count(*)::int AS n FROM ng_words WHERE account_id = ${accountId}`) as {
+    const rows = (await sql()`SELECT count(*)::int AS n FROM threads.ng_words WHERE account_id = ${accountId}`) as {
       n: number;
     }[];
     expect(rows[0]?.n).toBe(1);

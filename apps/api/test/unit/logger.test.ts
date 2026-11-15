@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createLogger, redact } from "../../src/lib/logger";
+import { createLogger, redact } from "../../src/kernel/logger";
 
 describe("ロガーのマスク（research.md R5、FR-010）", () => {
   it("秘密情報のキーの値をマスクする", () => {

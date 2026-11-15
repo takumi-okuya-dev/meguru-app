@@ -189,6 +189,32 @@ CSV（投稿ごと・取り込みごと）を使って「伸びやすい投稿�
 | フォロワーの属性（国・年齢など） | H | 取らない。今の値しか取れないが、分析への効果が小さい |
 | 運用のメモ（戦略の見直し・イベント・Threadsの仕様変更の日付） | H | アプリの外（スプレッドシート）で付ける |
 
+### 5.7 上位表示（おすすめ）に関わる学術的な研究（2026-11-05 追加）
+
+022（アルゴリズムの解析）のために調べた。Threadsそのものの研究はまだ少ないので、ほかのSNSの研究から、Threadsに当てはめられそうな考え方を拾った。
+
+| 研究 | 分かったこと | このアプリでの使い方 |
+|---|---|---|
+| [Cheng, Adamic, Dow, Kleinberg, Leskovec: Can cascades be predicted?（WWW 2014）](https://dl.acm.org/doi/10.1145/2566486.2567997) | Facebookの写真の共有の広がりは、初めの数件の広がり方から予測できる。**初めの「深さ」より「幅」（多くの別々の人に広がること）が、大きく広がる目印** | 24時間時点の値（初速）と、フォロワー数に比べた閲覧の広がりを、「おすすめに乗った目安」に使う |
+| [Szabo, Huberman: Predicting the popularity of online content（2010）](https://arxiv.org/abs/0811.0405) | 初期の閲覧数の対数と、長期の閲覧数の対数が強く相関する（既出。5.3 案F） | 24時間時点の値で7日後を読む |
+| [Lerman, Hogg: Using a model of social dynamics to predict popularity of news（WWW 2010）](https://arxiv.org/abs/1004.5354) | Diggで、初期の反応から人気を予測するとき、**「見える場所に出たか（可視性）」を分けて考える**と、初期の伸びをそのまま延ばすより当たる。投稿者のつながりの中だけで反応が集まった記事は、広く人気にならないことがある | 「フォロワーの中だけで伸びた」のか「フォロー外にも出た」のかを、閲覧÷フォロワー数で分ける |
+| [Huszár ほか: Algorithmic amplification of politics on Twitter（PNAS 2022）](https://www.pnas.org/doi/10.1073/pnas.2025334119) | 時系列のタイムラインの人（対照群）と、ランキングありの人を比べて、**アルゴリズムによる増幅の量**を測った | 「おすすめ」と「フォロー中（時系列）」を分けて考える根拠。おすすめに乗った分は、フォロワー数を超えた閲覧として表れる |
+| [Guess ほか: How do social media feed algorithms affect attitudes and behavior in an election campaign?（Science 2023）](https://www.science.org/doi/10.1126/science.abp9364) | Facebook・Instagramで、ランキングを外して時系列にすると、**利用時間と反応が大きく減った**。見る内容も変わった | ランキング（おすすめ）が反応を大きく左右することの裏付け |
+| [Twitterのおすすめの仕組みの公開（2023）](https://github.com/twitter/the-algorithm-ml/tree/main/projects/home/recap)と[Knight First Amendment Instituteの解説](https://knightcolumbia.org/content/twitter-showed-us-its-algorithm-what-does-it-tell-us) | 予測した反応ごとに重みを付けて足す形。2023年4月時点の説明では、**返信や「投稿者が返信した返信」の重みが、いいねよりずっと大きい**（重みはいつでも変わる、と書かれている） | Threadsも返信・返信の連なりを予測に使う（1章）。返信率と、自分が返信したかを見る |
+| [Gligorić, Anderson, West: Causal effects of brevity on style and success in social media（CSCW 2019）](https://arxiv.org/abs/1909.02565) | 同じ投稿を人に短くしてもらう実験で、**元より10〜20%短くした版が、平均でいちばん良い評価**。30〜40%を超えて削ると逆効果 | 文字数の分析は「短いほど良い」ではなく、ちょうどよい長さを探す |
+| [Berger, Milkman: What makes online content viral?（Journal of Marketing Research 2012）](https://faculty.wharton.upenn.edu/wp-content/uploads/2011/11/Virality.pdf) | 共有されやすいのは、**気持ちを強く動かす内容**（驚き・感嘆、怒り・不安）。悲しみのような気持ちが沈む内容は共有されにくい | 内容のラベル（案C）に「気持ちの強さ」を入れる候補 |
+| [Brady ほか: Emotion shapes the diffusion of moralized content in social networks（PNAS 2017）](https://www.pnas.org/doi/10.1073/pnas.1618923114) | 道徳と感情の両方を含む言葉が1つ増えるごとに、リツイートが約20%増えた（のちの総合では約12%）。広がりは考えの近い人の中が中心 | 強い言葉で伸ばすと、届く相手が偏りやすい。伸びの量だけで良し悪しを決めない |
+| [Rathje, Van Bavel, van der Linden: Out-group animosity drives engagement on social media（PNAS 2021）](https://www.pnas.org/doi/10.1073/pnas.2024292118) | 「相手側」を指す言葉が1つ増えるごとに、共有の見込みが67%上がった（相関で、原因とは言えない） | 伸びた傾向をそのまま真似させない。人柄・CORE RULES（原則I）と食い違う書き方は、傾向として出さない |
+| [Spasojevic ほか: When-To-Post on Social Networks（KDD 2015）](https://arxiv.org/abs/1506.02089) | 反応を最大にする投稿の時刻は、**人ごとに違い、全員に共通の正解はない**。十分なデータがあれば、その人の時刻の表を作れる | 時間帯・曜日は、一般論ではなく、そのAccountのデータで出す |
+| [Zhang ほか: The Emergence of Threads: The Birth of a New Social Network（arXiv 2024）](https://arxiv.org/abs/2406.19277) | Threadsの初期の研究。いいねが付きやすい話題を投稿する傾向、Instagramから話題が引き継がれる、週末に動きがそろう | Threadsそのものの研究はまだ少ない。結果は自分のAccountで確かめる |
+
+**まとめ（022の前提）**：
+- 上位表示（おすすめ）に乗ったかは直接は取れないが、**フォロワー数を超えた閲覧（広がり）**と**初速**で推し量れる（Cheng 2014、Lerman 2010、Huszár 2022）。
+- ランキングは、いいねより**返信・会話**を重く見る形が多い（Twitterの公開、Threadsのシステムカード）。
+- 時刻・長さ・内容の「正解」は、**そのAccountのデータで出す**（Spasojevic 2015、Gligorić 2019）。
+- 強い感情・対立の言葉は伸びやすいが、届く相手が偏り、人柄を損なうおそれがある（Brady 2017、Rathje 2021）。傾向として出すときは、CORE RULES・NGワードと食い違うものを外す。
+- どれも**相関**で、件数が少ないうちは偶然に振り回される（5.5）。
+
 ## 6. アプリの今後の機能への示唆
 
 - PRD §6.3の「パフォーマンスの傾向分析」「勝ちパターン」は、上の手順1〜3をアプリの中で自動化するもの。まずはCSVで手で解析し、効いた見方だけを機能にする。

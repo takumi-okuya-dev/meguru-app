@@ -42,7 +42,7 @@ describe("解約", () => {
     await fakeStripe.setStatus({ customer }, { cancelAtPeriodEnd: true });
     const s1 = (await (await callBilling(app, "POST", "/api/billing/sync", { user: "u1" })).json()) as { state: string };
     expect(s1.state).toBe("canceling");
-    const write = () => callBilling(app, "POST", `/api/accounts/${accountId}/research-keywords`, { user: "u1", body: { keyword: crypto.randomUUID() } });
+    const write = () => callBilling(app, "POST", `/api/threads/accounts/${accountId}/research-keywords`, { user: "u1", body: { keyword: crypto.randomUUID() } });
     expect((await write()).status).toBe(201);
 
     await fakeStripe.setStatus({ customer }, { status: "canceled" });

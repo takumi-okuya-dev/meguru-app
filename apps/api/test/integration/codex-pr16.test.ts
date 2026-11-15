@@ -1,12 +1,12 @@
 // PR #16 のCodexレビューへの対応（specs/013-billing）。決済ON・偽のStripe。
 import { and, eq } from "drizzle-orm";
-import { entitlementOf, type SubscriptionStatus } from "@threads-grower/shared";
+import { entitlementOf, type SubscriptionStatus } from "@meguru/shared";
 import { beforeEach, describe, expect, it } from "vitest";
 import { subscriptions, users } from "../../src/db/schema";
-import { readGate } from "../../src/services/auto-post-gate";
-import { runAutoPost } from "../../src/services/auto-post-runner";
-import { fullAccessSql, reconcileSubscriptions, syncCustomer } from "../../src/services/billing-service";
-import { call, createUserWithAccount, db, fake, fakeClerk, insertSubscription, makeApp, resetDb, setBillingExempt, testEnv } from "../helpers/app";
+import { readGate } from "../../src/apps/threads/publish/auto-post-gate";
+import { runAutoPost } from "../../src/apps/threads/publish/auto-post-runner";
+import { fullAccessSql, reconcileSubscriptions, syncCustomer } from "../../src/platform/billing/billing-service";
+import { call, createUserWithAccount, db, fake, fakeClerk, insertSubscription, makeApp, resetDb, setBillingExempt, testEnv, setUserLimit } from "../helpers/app";
 import { addMin, connectedAccount, jst, publishedDrafts, setSchedule, db as sqlDb } from "../helpers/auto-post";
 import { billingEnv, callBilling, fakeStripe } from "../helpers/billing";
 
@@ -126,9 +126,13 @@ describe("P1：読むだけの候補を、件数の上限の前に外す（SQL�
     ["incomplete_expired", false, 40],
     ["past_due", true, 40],
   ] as const)("契約 %s・料金なし %s・登録から%d日", async (status, exempt, daysAgo) => {
+    // 024の前からいた人（legacy_trial）と、024のあとの人（契約前）の両方で、SQLと関数の結果が同じ（specs/024 T029）
+    for (const legacy of [true, false]) {
+    await resetDb();
     const now = new Date();
     const created = new Date(now.getTime() - daysAgo * 86_400_000);
     const { userId } = await createUserWithAccount("u1", { userCreatedAt: created });
+    await db().update(users).set({ legacyTrial: legacy }).where(eq(users.id, userId));
     if (status) await insertSubscription(userId, { status });
     if (exempt) await setBillingExempt(userId, true);
     const mode = { enabled: true };
@@ -143,8 +147,10 @@ describe("P1：読むだけの候補を、件数の上限の前に外す（SQL�
       userCreatedAt: created,
       subscription: status ? { status: status as SubscriptionStatus, cancelAtPeriodEnd: false } : null,
       now,
+      legacyTrial: legacy,
     }).fullAccess;
-    expect(rows.length === 1).toBe(expected);
+    expect(rows.length === 1, `legacy ${legacy}`).toBe(expected);
+    }
   });
 
   it("月末の登録（1月31日）は2月の最終日まで（Postgres の1か月の丸めと同じ）", async () => {
@@ -166,7 +172,7 @@ describe("P1：読むだけの候補を、件数の上限の前に外す（SQL�
   it("読むだけの投稿が上限より多くても、契約中のアカウントの反応数を取る", async () => {
     const NOON = jst("2030-01-10 12:00");
     const ro = await connectedAccount("ro", app);
-    const roOwner = ((await sqlDb()`SELECT user_id FROM memberships WHERE account_id = ${ro.accountId}`) as [{ user_id: string }])[0].user_id;
+    const roOwner = ((await sqlDb()`SELECT user_id FROM threads.memberships WHERE account_id = ${ro.accountId}`) as [{ user_id: string }])[0].user_id;
     // 定期処理の「今」から10日前の登録で、支払いの失敗（大まかな条件なら入ってしまう）
     await sqlDb()`UPDATE users SET created_at = ${new Date(NOON.getTime() - 10 * 86_400_000).toISOString()} WHERE id = ${roOwner}`;
     await insertSubscription(roOwner, { status: "past_due" });
@@ -175,7 +181,7 @@ describe("P1：読むだけの候補を、件数の上限の前に外す（SQL�
       await publishedDrafts(ro.accountId, Array.from({ length: 35 }, () => ({ publishedAt: new Date(NOON.getTime() - 24 * 3_600_000) })));
     }
     const ok = await connectedAccount("ok", app);
-    const okOwner = ((await sqlDb()`SELECT user_id FROM memberships WHERE account_id = ${ok.accountId}`) as [{ user_id: string }])[0].user_id;
+    const okOwner = ((await sqlDb()`SELECT user_id FROM threads.memberships WHERE account_id = ${ok.accountId}`) as [{ user_id: string }])[0].user_id;
     await setBillingExempt(okOwner, true);
     await publishedDrafts(ok.accountId, [{ publishedAt: new Date(NOON.getTime() - 23.5 * 3_600_000) }]);
     const env = billingEnv();
@@ -200,10 +206,12 @@ describe("P2：同時の読み直し・数の反映", () => {
 
   it("アカウントを同時に作っても、Stripeの数は最後の件数になり、印が消える", async () => {
     const { userId } = await createUserWithAccount("u1");
+    // 4件まで作れるようにする（上限の既定値は3件。specs/024）
+    await setUserLimit({ userId }, "accounts", 10);
     const { url } = (await (await callBilling(app, "POST", "/api/billing/checkout", { user: "u1" })).json()) as { url: string };
     await fakeStripe.completeCheckout(url);
     await callBilling(app, "POST", "/api/billing/sync", { user: "u1" });
-    await Promise.all(["2", "3", "4"].map((name) => callBilling(app, "POST", "/api/accounts", { user: "u1", body: { name } })));
+    await Promise.all(["2", "3", "4"].map((name) => callBilling(app, "POST", "/api/threads/accounts", { user: "u1", body: { name } })));
     expect((await fakeStripe.subscriptions())[0]!.items.data[0]!.quantity).toBe(4);
     expect(await rowOf(userId)).toMatchObject({ quantity: 4, quantitySyncNeeded: false });
   });
@@ -233,7 +241,7 @@ describe("P1（3回目）：退会を受け付けた後は、Checkoutを作ら�
   it("退会の途中の利用者の「契約する」は 409 WITHDRAWAL_IN_PROGRESS で、セッションを作らない", async () => {
     const { userId } = await createUserWithAccount("u1");
     await db().update(users).set({ withdrawalRequestedAt: new Date() }).where(eq(users.id, userId));
-    const { startCheckout } = await import("../../src/services/billing-service");
+    const { startCheckout } = await import("../../src/platform/billing/billing-service");
     const err = await startCheckout(billingEnv(), { id: userId, email: "u1@example.com", billing: { enabled: true } }).catch((e: unknown) => e);
     expect(err).toMatchObject({ code: "WITHDRAWAL_IN_PROGRESS", status: 409 });
     expect(await fakeStripe.sessions()).toHaveLength(0);

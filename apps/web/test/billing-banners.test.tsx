@@ -1,7 +1,7 @@
 // 無料体験の終わりの帯と、読むだけの帯（specs/013-billing FR-045・FR-046、contracts/ui-routes.md「帯」、T021・T037）
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { jstToday } from "@threads-grower/shared";
+import { jstToday } from "@meguru/shared";
 import { MemoryRouter } from "react-router";
 import { beforeEach, describe, expect, it } from "vitest";
 import { ReadOnlyBanner } from "@/components/billing/ReadOnlyBanner";

@@ -5,7 +5,7 @@ import { connectedAccount, db } from "../helpers/auto-post";
 
 const app = makeApp();
 const check = (accountId: string, user = "u1") =>
-  call(app, "POST", `/api/accounts/${accountId}/threads-check`, { user });
+  call(app, "POST", `/api/threads/accounts/${accountId}/threads-check`, { user });
 
 beforeEach(async () => {
   await resetDb();
@@ -13,7 +13,7 @@ beforeEach(async () => {
 });
 
 async function connectionStatus(accountId: string) {
-  const [r] = (await db()`SELECT connection_status FROM accounts WHERE id = ${accountId}`) as [
+  const [r] = (await db()`SELECT connection_status FROM threads.accounts WHERE id = ${accountId}`) as [
     { connection_status: string },
   ];
   return r.connection_status;

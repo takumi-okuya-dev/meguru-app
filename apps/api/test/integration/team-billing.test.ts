@@ -19,7 +19,7 @@ describe("読むだけの人のチームの入口", () => {
   it("チームを作れない", async () => {
     const { userId, accountId } = await createUserWithAccount("u1");
     await endTrial(userId);
-    const res = await callBilling(app, "POST", "/api/teams", { user: "u1", body: { name: "チーム", accountIds: [accountId] } });
+    const res = await callBilling(app, "POST", "/api/threads/teams", { user: "u1", body: { name: "チーム", accountIds: [accountId] } });
     expect(res.status).toBe(403);
     expect(await code(res)).toBe("BILLING_REQUIRED");
   });
@@ -29,7 +29,7 @@ describe("読むだけの人のチームの入口", () => {
     const { teamId, token } = await makeTeam("a1", [admin.accountId]);
     const { userId, accountId } = await createUserWithAccount("m1");
     await endTrial(userId);
-    const accept = await callBilling(app, "POST", `/api/invites/${token}/accept`, { user: "m1", body: { accounts: [{ id: accountId, shared: false }] } });
+    const accept = await callBilling(app, "POST", `/api/threads/invites/${token}/accept`, { user: "m1", body: { accounts: [{ id: accountId, shared: false }] } });
     expect(await code(accept)).toBe("BILLING_REQUIRED");
 
     // 入った後に読むだけになった人が、もう1つ足す
@@ -37,7 +37,7 @@ describe("読むだけの人のチームの入口", () => {
     await joinTeam(teamId, "m2", [m2.accountId]);
     const extra = await createUserWithAccount("m2");
     await endTrial(m2.userId);
-    const add = await callBilling(app, "POST", `/api/teams/${teamId}/accounts`, { user: "m2", body: { accountId: extra.accountId } });
+    const add = await callBilling(app, "POST", `/api/threads/teams/${teamId}/accounts`, { user: "m2", body: { accountId: extra.accountId } });
     expect(await code(add)).toBe("BILLING_REQUIRED");
   });
 });
@@ -52,12 +52,12 @@ describe("読むだけの管理者のチームの操作（止めない）", () =
     const m2UserId = await joinTeam(teamId, "m2", [m2.accountId]);
     await endTrial(admin.userId);
 
-    const role = await callBilling(app, "PATCH", `/api/teams/${teamId}/members/${m1UserId}`, { user: "a1", body: { role: "editor" } });
+    const role = await callBilling(app, "PATCH", `/api/threads/teams/${teamId}/members/${m1UserId}`, { user: "a1", body: { role: "editor" } });
     expect(role.status).toBe(204);
-    expect((await callBilling(app, "POST", `/api/teams/${teamId}/invite/rotate`, { user: "a1" })).status).toBe(200);
-    expect((await callBilling(app, "PATCH", `/api/teams/${teamId}`, { user: "a1", body: { name: "新しい名前" } })).status).toBe(204);
-    const share = await callBilling(app, "PATCH", `/api/teams/${teamId}/accounts/${admin.accountId}`, { user: "a1", body: { shared: true } });
+    expect((await callBilling(app, "POST", `/api/threads/teams/${teamId}/invite/rotate`, { user: "a1" })).status).toBe(200);
+    expect((await callBilling(app, "PATCH", `/api/threads/teams/${teamId}`, { user: "a1", body: { name: "新しい名前" } })).status).toBe(204);
+    const share = await callBilling(app, "PATCH", `/api/threads/teams/${teamId}/accounts/${admin.accountId}`, { user: "a1", body: { shared: true } });
     expect(share.status).toBe(204);
-    expect((await callBilling(app, "DELETE", `/api/teams/${teamId}/members/${m2UserId}`, { user: "a1" })).status).toBe(204);
+    expect((await callBilling(app, "DELETE", `/api/threads/teams/${teamId}/members/${m2UserId}`, { user: "a1" })).status).toBe(204);
   });
 });

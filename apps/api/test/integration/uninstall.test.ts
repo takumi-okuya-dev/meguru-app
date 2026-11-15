@@ -2,7 +2,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { accounts, threadsConnections, threadsRevocations } from "../../src/db/schema";
 import { TEST_APP_SECRET } from "../env";
-import { call, connectNew, db, fake, makeApp, resetDb } from "../helpers/app";
+import { call, connectNew, db, fake, makeApp, resetDb, testEnv } from "../helpers/app";
 import { makeSignedRequest } from "../helpers/signed-request";
 
 const app = makeApp();
@@ -64,5 +64,20 @@ describe("POST /api/threads/webhooks/uninstall", () => {
   it("署名が違えば 400", async () => {
     const res = await postUninstall({ user_id: "1001" }, "wrong-secret");
     expect(res.status).toBe(400);
+  });
+
+  it("トークンを貼る方法だけでシークレットがなければ、見本の鍵の署名でも 400 で、接続を変えない", async () => {
+    await connectNew(app, "u1", "1001");
+    const sr = await makeSignedRequest("xxxxxxxx", { user_id: "1001", issued_at: Math.floor(Date.now() / 1000) + 1 });
+    for (const secret of [undefined, "xxxxxxxx"]) {
+      const res = await call(app, "POST", "/api/threads/webhooks/uninstall", {
+        body: new URLSearchParams({ signed_request: sr }),
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        env: { ...testEnv, THREADS_CONNECT_METHODS: "token", THREADS_APP_SECRET: secret } as typeof testEnv,
+      });
+      expect(res.status).toBe(400);
+    }
+    expect((await db().select().from(accounts))[0]!.connectionStatus).toBe("connected");
+    expect(await db().select().from(threadsRevocations)).toHaveLength(0);
   });
 });

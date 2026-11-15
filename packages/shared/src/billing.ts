@@ -5,10 +5,11 @@ const JST_OFFSET_MS = 9 * 60 * 60 * 1000;
 const DAY_MS = 24 * 60 * 60 * 1000;
 const HOUR_MS = 60 * 60 * 1000;
 
-/** 基本料金（月・税込み。アカウント1件目を含む）。Stripeの料金の1段目と同じ値にする（research.md R3）。 */
-export const BILLING_BASE_PRICE_JPY = 1000;
-/** 2件目以降のアカウント1件あたりの料金（月・税込み）。Stripeの料金の2段目と同じ値にする。 */
-export const BILLING_EXTRA_PRICE_JPY = 500;
+/**
+ * アカウント1件あたりの料金（月・税込み）。1件目も2件目以降も同じ。Stripeの料金（STRIPE_PRICE_ID）と同じ値にする
+ * （specs/024 research.md R10。2026-11-08に「基本料金1,000円＋2件目以降500円」から改めた）。
+ */
+export const BILLING_UNIT_PRICE_JPY = 1000;
 /** 無料体験中に持てるアカウントの数（PRD FR-2・FR-12）。 */
 export const TRIAL_ACCOUNT_LIMIT = 1;
 /** 無料体験の終わりの帯を出し始める日数（spec FR-046）。 */
@@ -38,10 +39,12 @@ export type BillingState =
   | "subscribed_trial"
   | "active"
   | "canceling"
-  | "read_only";
+  | "read_only"
+  /** 契約前（024のあとに登録し、まだ契約していない。使えない。specs/024 research.md R9） */
+  | "unsubscribed";
 
-/** 読むだけの理由。 */
-export type ReadOnlyReason = "trial_ended" | "payment_failed" | "canceled";
+/** 読むだけの理由。test_access はテスト用のグループがONの環境で、テスト版に入れない人（specs/016 research.md R4）。 */
+export type ReadOnlyReason = "trial_ended" | "payment_failed" | "canceled" | "test_access" | "not_subscribed";
 
 /** entitlementOf の入力。 */
 export type EntitlementInput = {
@@ -54,6 +57,8 @@ export type EntitlementInput = {
   /** 契約。Stripeの顧客がない・契約がまだないときは null か status が null */
   subscription: { status: SubscriptionStatus | null; cancelAtPeriodEnd: boolean } | null;
   now: Date;
+  /** 024の前からいた人（無料体験を使える。users.legacy_trial。specs/024 research.md R8） */
+  legacyTrial: boolean;
 };
 
 /** 利用者の使える状態。 */
@@ -130,9 +135,12 @@ export function entitlementOf(input: EntitlementInput): Entitlement {
   if (status === "active") return full(input.subscription?.cancelAtPeriodEnd ? "canceling" : "active", null);
   // 支払いの失敗は、無料体験の期間より先に見る（spec Clarifications：すぐに読むだけ）
   if (status === "past_due" || status === "unpaid" || status === "paused") return readOnly("payment_failed");
-  if (input.now.getTime() < ends.getTime()) return full("trial", TRIAL_ACCOUNT_LIMIT);
+  // 無料体験は024の前からいた人だけ（specs/024 FR-031）
+  if (input.legacyTrial && input.now.getTime() < ends.getTime()) return full("trial", TRIAL_ACCOUNT_LIMIT);
   if (status === "canceled") return readOnly("canceled");
-  return readOnly("trial_ended");
+  if (input.legacyTrial) return readOnly("trial_ended");
+  // 契約前（024のあとに登録し、まだ契約していない）。読むだけとは別の状態で、アプリを使えない（FR-029）
+  return { state: "unsubscribed", fullAccess: false, readOnlyReason: "not_subscribed", accountLimit: 0, trialEndsAt: ends };
 }
 
 /** Checkout の試用の指定（research.md R4）。 */
@@ -167,7 +175,7 @@ export function billingQuantity(ownedCount: number): number {
  * @returns 金額
  */
 export function nextInvoiceAmount(ownedCount: number): number {
-  return BILLING_BASE_PRICE_JPY + BILLING_EXTRA_PRICE_JPY * (billingQuantity(ownedCount) - 1);
+  return BILLING_UNIT_PRICE_JPY * billingQuantity(ownedCount);
 }
 
 /**

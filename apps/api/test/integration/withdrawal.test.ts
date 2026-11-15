@@ -1,7 +1,7 @@
 // 退会（specs/013-billing FR-050〜FR-056、SC-007、research.md R10、T047）。決済ON・偽のStripe・偽のClerk。
-import { emptyStrategyValues } from "@threads-grower/shared";
+import { emptyStrategyValues } from "@meguru/shared";
 import { beforeEach, describe, expect, it } from "vitest";
-import { resumeWithdrawals } from "../../src/services/withdrawal-service";
+import { resumeWithdrawals } from "../../src/platform/withdrawal/withdrawal-service";
 import { call, createUserWithAccount, fake, fakeClerk, makeApp, resetDb } from "../helpers/app";
 import { connectedAccount, db } from "../helpers/auto-post";
 import { billingEnv, callBilling, fakeStripe } from "../helpers/billing";
@@ -38,7 +38,7 @@ async function teamSetup() {
   await joinTeam(teamId, "m2", [m2.accountId]);
   await assign(teamId, "o1", m1.accountId);
   // o1 が担当として B の戦略を保存する（B の操作の記録に o1 の名前が残る）
-  const res = await call(app, "PUT", `/api/accounts/${m1.accountId}/strategy`, {
+  const res = await call(app, "PUT", `/api/threads/accounts/${m1.accountId}/strategy`, {
     user: "o1",
     body: { ...emptyStrategyValues(), finalAction: "来店", expectedVersion: 0 },
   });
@@ -50,14 +50,15 @@ describe("退会の確認の内容", () => {
   it("消えるアカウント・チームの行き先・契約中かを返す", async () => {
     const { teamId } = await teamSetup();
     await subscribe("o1");
+    // 共通の分は /api/me/withdrawal-preview、Threadsの分は /api/threads/me/withdrawal-preview（029 の PR5c）
     const res = await callBilling(app, "GET", "/api/me/withdrawal-preview", { user: "o1" });
-    expect(await res.json()).toEqual({
-      email: "o1@example.com",
+    expect(await res.json()).toEqual({ email: "o1@example.com", hasActiveSubscription: true });
+    const threads = await callBilling(app, "GET", "/api/threads/me/withdrawal-preview", { user: "o1" });
+    expect(await threads.json()).toEqual({
       ownedAccounts: [{ id: expect.any(String), name: "A" }],
       teams: [{ id: teamId, name: "o1のチーム", isAdmin: true, outcome: "transfer", nextAdminName: "m1" }],
-      hasActiveSubscription: true,
     });
-    const member = (await (await callBilling(app, "GET", "/api/me/withdrawal-preview", { user: "m1" })).json()) as { teams: unknown[] };
+    const member = (await (await callBilling(app, "GET", "/api/threads/me/withdrawal-preview", { user: "m1" })).json()) as { teams: unknown[] };
     expect(member.teams).toEqual([{ id: teamId, name: "o1のチーム", isAdmin: false, outcome: "leave", nextAdminName: null }]);
   });
 });
@@ -78,13 +79,13 @@ describe("POST /api/me/withdraw", () => {
     const res = await withdraw("o1", "  O1@Example.com ");
     expect(res.status).toBe(204);
     expect((await fakeStripe.subscriptions()).map((s) => s.status)).toEqual(["canceled"]);
-    expect(await count("accounts", `id = '${o1.accountId}'`)).toBe(0);
+    expect(await count("threads.accounts", `id = '${o1.accountId}'`)).toBe(0);
     expect(await count("users", "clerk_user_id = 'o1'")).toBe(0);
     expect(await count("subscriptions")).toBe(0);
-    expect(await count("memberships", `user_id = '${o1.userId}'`)).toBe(0);
-    const team = await one<{ admin_user_id: string }>(db()`SELECT admin_user_id FROM teams WHERE id = ${teamId}`);
+    expect(await count("threads.memberships", `user_id = '${o1.userId}'`)).toBe(0);
+    const team = await one<{ admin_user_id: string }>(db()`SELECT admin_user_id FROM threads.teams WHERE id = ${teamId}`);
     expect(team?.admin_user_id).toBe(m1.userId);
-    const logs = (await db()`SELECT actor_name, actor_user_id FROM activity_logs WHERE account_id = ${m1.accountId}`) as {
+    const logs = (await db()`SELECT actor_name, actor_user_id FROM threads.activity_logs WHERE account_id = ${m1.accountId}`) as {
       actor_name: string;
       actor_user_id: string | null;
     }[];
@@ -99,18 +100,18 @@ describe("POST /api/me/withdraw", () => {
     const o1 = await createUserWithAccount("o1");
     const { teamId } = await makeTeam("o1", [o1.accountId]);
     expect((await withdraw("o1", "o1@example.com")).status).toBe(204);
-    expect(await count("teams", `id = '${teamId}'`)).toBe(0);
+    expect(await count("threads.teams", `id = '${teamId}'`)).toBe(0);
   });
 
   it("Threadsのトークンが消え、処理中のデータ削除の求めは完了になる", async () => {
     const { accountId, threadsUserId } = await connectedAccount("o1", app);
-    await db()`INSERT INTO threads_deletion_requests (confirmation_code, request_fingerprint, threads_user_id, status, received_at, last_attempted_at)
+    await db()`INSERT INTO threads.threads_deletion_requests (confirmation_code, request_fingerprint, threads_user_id, status, received_at, last_attempted_at)
       VALUES ('code1', 'fp1', ${threadsUserId}, 'pending', now(), now())`;
-    expect(await count("threads_connections", `account_id = '${accountId}'`)).toBe(1);
+    expect(await count("threads.threads_connections", `account_id = '${accountId}'`)).toBe(1);
     expect((await withdraw("o1", "o1@example.com")).status).toBe(204);
-    expect(await count("threads_connections")).toBe(0);
+    expect(await count("threads.threads_connections")).toBe(0);
     const req = await one<{ status: string; threads_user_id: string | null }>(
-      db()`SELECT status, threads_user_id FROM threads_deletion_requests WHERE confirmation_code = 'code1'`,
+      db()`SELECT status, threads_user_id FROM threads.threads_deletion_requests WHERE confirmation_code = 'code1'`,
     );
     expect(req).toEqual({ status: "completed", threads_user_id: null });
   });
@@ -122,14 +123,16 @@ describe("POST /api/me/withdraw", () => {
     const res = await withdraw("o1", "o1@example.com");
     expect(res.status).toBe(503);
     expect(((await res.json()) as { error: { code: string } }).error.code).toBe("BILLING_UNAVAILABLE");
-    expect(await count("accounts", `id = '${accountId}'`)).toBe(1);
+    expect(await count("threads.accounts", `id = '${accountId}'`)).toBe(1);
     expect(await count("users", "clerk_user_id = 'o1' AND withdrawal_requested_at IS NOT NULL")).toBe(1);
-    const blocked = await callBilling(app, "GET", `/api/accounts/${accountId}`, { user: "o1" });
+    const blocked = await callBilling(app, "GET", `/api/threads/accounts/${accountId}`, { user: "o1" });
     expect(blocked.status).toBe(409);
     expect(((await blocked.json()) as { error: { code: string } }).error.code).toBe("WITHDRAWAL_IN_PROGRESS");
     const me = (await (await callBilling(app, "GET", "/api/me", { user: "o1" })).json()) as { withdrawalInProgress: boolean };
     expect(me.withdrawalInProgress).toBe(true);
     expect((await callBilling(app, "GET", "/api/me/withdrawal-preview", { user: "o1" })).status).toBe(200);
+    // 退会の確かめのThreadsの分も読める（退会のダイアログが読む。PR #104 のセルフレビュー）
+    expect((await callBilling(app, "GET", "/api/threads/me/withdrawal-preview", { user: "o1" })).status).toBe(200);
     expect((await withdraw("o1", "o1@example.com")).status).toBe(204);
     expect(await count("users", "clerk_user_id = 'o1'")).toBe(0);
   });

@@ -6,14 +6,14 @@ import { renderStrategyPage, strategyOf } from "./helpers/strategy-page";
 
 const getStrategy = vi.fn();
 const putStrategy = vi.fn();
-vi.mock("@/lib/api-client", async (orig) => {
-  const actual = await orig<typeof import("@/lib/api-client")>();
-  return { ...actual, api: { ...actual.api, getStrategy, putStrategy } };
+vi.mock("@/apps/threads/lib/api", async (orig) => {
+  const actual = await orig<typeof import("@/apps/threads/lib/api")>();
+  return { ...actual, threadsApi: { ...actual.threadsApi, getStrategy, putStrategy } };
 });
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
 const { UnsavedChangesProvider } = await import("@/components/UnsavedChangesProvider");
-const { StrategyPage } = await import("@/pages/strategy");
+const { StrategyPage } = await import("@/apps/threads/pages/strategy");
 
 /** 項目（id="field-<key>"）の中を探す。 */
 async function field(key: string) {
@@ -39,6 +39,8 @@ describe("考えるヒント", () => {
 
     await userEvent.click(button);
     expect(button).toHaveAttribute("aria-expanded", "true");
+    // 開いても文言は変えない（ボタンの幅が変わって、横のボタンが動かないように）
+    expect(button).toHaveTextContent(/^考えるヒント$/);
     expect(f.getByText(/年齢・職業で終わらせず/)).toBeInTheDocument();
     expect(f.getByText("20代会社員")).toBeInTheDocument();
     expect(f.getByText(/28歳前後の会社員。仕事は嫌いではないけれど/)).toBeInTheDocument();

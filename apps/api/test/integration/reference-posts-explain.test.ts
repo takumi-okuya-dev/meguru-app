@@ -11,19 +11,19 @@ beforeEach(async () => {
   await resetDb();
 });
 
-const base = (accountId: string) => `/api/accounts/${accountId}/reference-posts`;
+const base = (accountId: string) => `/api/threads/accounts/${accountId}/reference-posts`;
 type Prompt = { prompt: string; items: { id: string; shortId: string }[]; pendingCount: number };
 
 async function insert(accountId: string, body: string, whyGood: string | null, minutesAgo = 0, mode = "unknown") {
   const rows = (await neon(testEnv.DATABASE_URL)`
-    INSERT INTO reference_posts (account_id, body, why_good, posted_date_mode, created_at)
+    INSERT INTO threads.reference_posts (account_id, body, why_good, posted_date_mode, created_at)
     VALUES (${accountId}, ${body}, ${whyGood}, ${mode}, now() - make_interval(mins => ${minutesAgo}))
     RETURNING id`) as { id: string }[];
   return rows[0]!.id;
 }
 
 async function whyGoodOf(id: string) {
-  const rows = (await neon(testEnv.DATABASE_URL)`SELECT why_good, version FROM reference_posts WHERE id = ${id}`) as {
+  const rows = (await neon(testEnv.DATABASE_URL)`SELECT why_good, version FROM threads.reference_posts WHERE id = ${id}`) as {
     why_good: string | null;
     version: number;
   }[];

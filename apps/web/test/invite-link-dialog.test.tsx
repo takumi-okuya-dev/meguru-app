@@ -2,7 +2,7 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { InviteLinkDialog } from "@/components/team/InviteLinkDialog";
+import { InviteLinkDialog } from "@/apps/threads/components/team/InviteLinkDialog";
 
 const URL = "http://localhost:5173/invite/e_" + "c".repeat(43);
 

@@ -3,8 +3,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "wrangler dev --port 8787",
-    "dev:fake": "wrangler dev --port 8787 --var THREADS_AUTH_BASE_URL:http://localhost:8790 --var THREADS_GRAPH_BASE_URL:http://localhost:8790 --var THREADS_REDIRECT_URI:http://localhost:8787/api/threads/callback",
+    "dev": "tsx scripts/dev.ts",
+    "dev:fake": "tsx scripts/dev.ts --fake-threads",
     "fake-threads": "tsx test/fake-threads/serve.ts",
     "fake-stripe": "tsx test/fake-stripe/serve.ts",
     "deploy:staging": "wrangler deploy --env staging",
@@ -16,12 +16,13 @@
     "db:psql": "docker compose exec -T postgres psql -U postgres -d threads_grower",
     "admin:set-billing-exempt": "tsx scripts/set-billing-exempt.ts",
     "admin:rotate-token-key": "tsx scripts/rotate-token-key.ts",
-    "seed:performance": "tsx scripts/seed-performance.ts"
+    "seed:performance": "tsx scripts/seed-performance.ts",
+    "routes:snapshot": "tsx scripts/dump-routes.ts"
   },
   "dependencies": {
     "@clerk/backend": "^3.22.0",
     "@neondatabase/serverless": "^1.2.0",
-    "@threads-grower/shared": "workspace:^",
+    "@meguru/shared": "workspace:^",
     "drizzle-orm": "^0.45.3",
     "hono": "^4.13.12",
     "zod": "^4.6.5"

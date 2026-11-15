@@ -20,7 +20,7 @@ async function setup(): Promise<Setup> {
   return { ownerUserId: userId, accountId };
 }
 
-const base = (id: string) => `/api/accounts/${id}`;
+const base = (id: string) => `/api/threads/accounts/${id}`;
 
 /** 読む・見る・記録（読むだけでも通る） */
 const READS: [string, (id: string) => string][] = [
@@ -125,7 +125,7 @@ describe("オーナーが読むだけ（無料体験の後で契約なし）", (
 
 describe("状態ごとの結果（research.md R1）", () => {
   const write = (accountId: string, env?: ReturnType<typeof billingEnv>) =>
-    call(app, "POST", `/api/accounts/${accountId}/research-keywords`, { user: "o1", body: { keyword: crypto.randomUUID() }, env: env ?? billingEnv() });
+    call(app, "POST", `/api/threads/accounts/${accountId}/research-keywords`, { user: "o1", body: { keyword: crypto.randomUUID() }, env: env ?? billingEnv() });
 
   it.each([
     ["trialing", false, 201],

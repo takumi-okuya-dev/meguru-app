@@ -10,7 +10,7 @@ test("ためてまとめて登録し、まとめての解説を【ID】で結び
   await context.grantPermissions(["clipboard-read", "clipboard-write"]);
   await signIn(page);
   const accountId = await createAccount(page, "リサーチのアカウント");
-  await page.goto(`/accounts/${accountId}/research`);
+  await page.goto(`/threads/accounts/${accountId}/research`);
 
   // リサーチのやり方（初めは閉じる）
   await expect(page.getByRole("button", { name: /伸びる投稿を見つけるリサーチ/ })).toHaveAttribute("aria-expanded", "false");

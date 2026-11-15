@@ -1,5 +1,5 @@
 // US1：課題（specs/002-strategy-profile FR-001〜FR-006・FR-020・FR-021・FR-023〜FR-025、research.md R1〜R3・R14）
-import { emptyStrategyValues } from "@threads-grower/shared";
+import { emptyStrategyValues } from "@meguru/shared";
 import { beforeEach, describe, expect, it } from "vitest";
 import { AFTER_TRIAL, call, createUserWithAccount, makeApp, resetDb, setAccount } from "../helpers/app";
 import { putInTeam } from "../helpers/team";
@@ -10,7 +10,7 @@ beforeEach(async () => {
   await resetDb();
 });
 
-const path = (accountId: string) => `/api/accounts/${accountId}/strategy`;
+const path = (accountId: string) => `/api/threads/accounts/${accountId}/strategy`;
 
 function fullValues() {
   const v = emptyStrategyValues();
@@ -27,7 +27,7 @@ async function getStrategy(accountId: string, user = "u1") {
   return (await res.json()) as Record<string, unknown> & { version: number; filledCount: number; canEdit: boolean };
 }
 
-describe("GET・PUT /api/accounts/:id/strategy", () => {
+describe("GET・PUT /api/threads/accounts/:id/strategy", () => {
   it("保存前は全項目が空・version 0・updatedAt null で返る", async () => {
     const { accountId } = await createUserWithAccount("u1");
     const s = await getStrategy(accountId);

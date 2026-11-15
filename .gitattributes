@@ -1,0 +1,11 @@
+# 並行開発で、アプリを足すたびに1行ずつ足すだけのファイル（specs/meguru/031-conflict-free-composition、docs/parallel-development.md 11）。
+# 2つのブランチが同じ場所に1行ずつ足しても、ぶつからずに両方の行が残る（merge=union）。
+# そのため、これらのファイルは「1行に1つ」だけにし、ほかの中身を足さない。取り込んだあとは型チェックとテストで確かめる。
+apps/api/src/app-modules.ts merge=union
+apps/api/src/db/schema.ts merge=union
+apps/api/src/durable-objects.ts merge=union
+apps/api/test/repo/routes.snapshot.txt merge=union
+apps/web/src/app-list.ts merge=union
+packages/shared/src/apps/app-list.ts merge=union
+packages/shared/src/apps/app-errors.ts merge=union
+packages/shared/src/apps/index.ts merge=union

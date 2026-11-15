@@ -2,7 +2,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import type { MeResponse } from "@threads-grower/shared";
+import type { MeResponse } from "@meguru/shared";
 import { MemoryRouter } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { isUsablePublishableKey } from "@/lib/config-check";
@@ -15,10 +15,15 @@ vi.mock("@/lib/api-client", async (orig) => {
   const actual = await orig<typeof import("@/lib/api-client")>();
   return { ...actual, api: { ...actual.api, me: () => meImpl() } };
 });
+vi.mock("@/apps/threads/lib/api", async (orig) => {
+  const actual = await orig<typeof import("@/apps/threads/lib/api")>();
+  return { ...actual, threadsApi: { ...actual.threadsApi, me: () => meImpl() } };
+});
 
-const { ApiError, api } = await import("@/lib/api-client");
-const { Landing } = await import("@/pages/landing");
-const { RequireAuth } = await import("@/components/guards");
+const { ApiError } = await import("@/lib/api-client");
+const { threadsApi } = await import("@/apps/threads/lib/api");
+const { Landing } = await import("@/apps/threads/pages/home");
+const { RequireAuth } = await import("@/shell/guards/RequireAuth");
 
 function renderWithQuery(ui: React.ReactNode) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -89,7 +94,7 @@ describe("APIクライアント", () => {
 
   it("通信に失敗したら API_UNREACHABLE", async () => {
     vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new TypeError("Failed to fetch")));
-    await expect(api.account("a1")).rejects.toMatchObject({ code: "API_UNREACHABLE", status: 0 });
+    await expect(threadsApi.account("a1")).rejects.toMatchObject({ code: "API_UNREACHABLE", status: 0 });
   });
 
   it("CONFIG_ERROR の項目名を受け取る", async () => {
@@ -101,6 +106,6 @@ describe("APIクライアント", () => {
         }),
       ),
     );
-    await expect(api.account("a1")).rejects.toMatchObject({ code: "CONFIG_ERROR", details: ["WEB_ORIGIN"] });
+    await expect(threadsApi.account("a1")).rejects.toMatchObject({ code: "CONFIG_ERROR", details: ["WEB_ORIGIN"] });
   });
 });

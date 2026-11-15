@@ -1,8 +1,8 @@
-// US2：POST /api/accounts/:id/open（FR-007・FR-018、SC-004・SC-007、research.md R10・R14）
+// US2：POST /api/threads/accounts/:id/open（FR-007・FR-018、SC-004・SC-007、research.md R10・R14）
 import { eq } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
 import { accounts, users } from "../../src/db/schema";
-import { openAccount } from "../../src/services/account-service";
+import { openAccount } from "../../src/apps/threads/accounts/account-service";
 import { call, connectNew, db, fake, makeApp, resetDb, testEnv } from "../helpers/app";
 
 const app = makeApp();
@@ -10,7 +10,7 @@ const app = makeApp();
 type Me = { landingAccountId: string | null; accounts: { id: string; connectionStatus: string }[] };
 
 async function me(user: string) {
-  return (await (await call(app, "GET", "/api/me", { user })).json()) as Me;
+  return (await (await call(app, "GET", "/api/threads/me", { user })).json()) as Me;
 }
 
 async function twoAccounts(user: string) {
@@ -30,28 +30,28 @@ beforeEach(async () => {
   await fake.addUser("1002", "ai_bu");
 });
 
-describe("POST /api/accounts/:id/open", () => {
+describe("POST /api/threads/accounts/:id/open", () => {
   it("開いたAccountが landingAccountId になり、最新の AccountSummary を返す", async () => {
     const { a, b } = await twoAccounts("u1");
-    const res = await call(app, "POST", `/api/accounts/${a.id}/open`, { user: "u1", body: { clientId: "p1", openSeq: 1 } });
+    const res = await call(app, "POST", `/api/threads/accounts/${a.id}/open`, { user: "u1", body: { clientId: "p1", openSeq: 1 } });
     expect(res.status).toBe(200);
     expect(((await res.json()) as { id: string }).id).toBe(a.id);
     expect((await me("u1")).landingAccountId).toBe(a.id);
-    await call(app, "POST", `/api/accounts/${b.id}/open`, { user: "u1", body: { clientId: "p1", openSeq: 2 } });
+    await call(app, "POST", `/api/threads/accounts/${b.id}/open`, { user: "u1", body: { clientId: "p1", openSeq: 2 } });
     expect((await me("u1")).landingAccountId).toBe(b.id);
   });
 
   it("同じ clientId で古い openSeq のリクエストは記録を変えない（遅れて届いた再試行）", async () => {
     const { a, b } = await twoAccounts("u1");
-    await call(app, "POST", `/api/accounts/${b.id}/open`, { user: "u1", body: { clientId: "p1", openSeq: 5 } });
-    await call(app, "POST", `/api/accounts/${a.id}/open`, { user: "u1", body: { clientId: "p1", openSeq: 4 } });
+    await call(app, "POST", `/api/threads/accounts/${b.id}/open`, { user: "u1", body: { clientId: "p1", openSeq: 5 } });
+    await call(app, "POST", `/api/threads/accounts/${a.id}/open`, { user: "u1", body: { clientId: "p1", openSeq: 4 } });
     expect((await me("u1")).landingAccountId).toBe(b.id);
   });
 
   it("clientId が替われば openSeq が小さくても反映される（再読み込み）", async () => {
     const { a, b } = await twoAccounts("u1");
-    await call(app, "POST", `/api/accounts/${a.id}/open`, { user: "u1", body: { clientId: "page-1", openSeq: 12 } });
-    await call(app, "POST", `/api/accounts/${b.id}/open`, { user: "u1", body: { clientId: "page-2", openSeq: 1 } });
+    await call(app, "POST", `/api/threads/accounts/${a.id}/open`, { user: "u1", body: { clientId: "page-1", openSeq: 12 } });
+    await call(app, "POST", `/api/threads/accounts/${b.id}/open`, { user: "u1", body: { clientId: "page-2", openSeq: 1 } });
     expect((await me("u1")).landingAccountId).toBe(b.id);
   });
 
@@ -67,7 +67,7 @@ describe("POST /api/accounts/:id/open", () => {
   it("トークンが無効なら、そのレスポンスで needs_reconnect になり、GET /api/me にも反映される", async () => {
     const { a } = await twoAccounts("u1");
     await fake.invalidate("1001");
-    const res = await call(app, "POST", `/api/accounts/${a.id}/open`, { user: "u1", body: { clientId: "p1", openSeq: 1 } });
+    const res = await call(app, "POST", `/api/threads/accounts/${a.id}/open`, { user: "u1", body: { clientId: "p1", openSeq: 1 } });
     expect(((await res.json()) as { connectionStatus: string }).connectionStatus).toBe("needs_reconnect");
     expect((await me("u1")).accounts.find((x) => x.id === a.id)!.connectionStatus).toBe("needs_reconnect");
   });
@@ -75,7 +75,7 @@ describe("POST /api/accounts/:id/open", () => {
   it("認証エラー以外の失敗（Threads側の障害）では状態を変えない", async () => {
     const { a } = await twoAccounts("u1");
     await fake.fail("getProfile", 1, "server");
-    const res = await call(app, "POST", `/api/accounts/${a.id}/open`, { user: "u1", body: { clientId: "p1", openSeq: 1 } });
+    const res = await call(app, "POST", `/api/threads/accounts/${a.id}/open`, { user: "u1", body: { clientId: "p1", openSeq: 1 } });
     expect(res.status).toBe(200);
     expect(((await res.json()) as { connectionStatus: string }).connectionStatus).toBe("connected");
   });
@@ -83,7 +83,7 @@ describe("POST /api/accounts/:id/open", () => {
   it("確認に成功するとプロフィールを最新にする", async () => {
     const { a } = await twoAccounts("u1");
     await fake.addUser("1001", "takumi_renamed", "New Name");
-    const res = await call(app, "POST", `/api/accounts/${a.id}/open`, { user: "u1", body: { clientId: "p1", openSeq: 1 } });
+    const res = await call(app, "POST", `/api/threads/accounts/${a.id}/open`, { user: "u1", body: { clientId: "p1", openSeq: 1 } });
     const body = (await res.json()) as { username: string; displayName: string };
     expect(body.username).toBe("takumi_renamed");
     expect(body.displayName).toBe("New Name");
@@ -91,7 +91,7 @@ describe("POST /api/accounts/:id/open", () => {
 
   it("他人のAccountは404", async () => {
     const { a } = await twoAccounts("u1");
-    const res = await call(app, "POST", `/api/accounts/${a.id}/open`, { user: "intruder", body: { clientId: "x", openSeq: 1 } });
+    const res = await call(app, "POST", `/api/threads/accounts/${a.id}/open`, { user: "intruder", body: { clientId: "x", openSeq: 1 } });
     expect(res.status).toBe(404);
   });
 });

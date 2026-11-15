@@ -1,4 +1,4 @@
-// US5：アカウントの名前を直す（specs/012 FR-040、contracts/api.md「PATCH /api/accounts/:accountId」）
+// US5：アカウントの名前を直す（specs/012 FR-040、contracts/api.md「PATCH /api/threads/accounts/:accountId」）
 import { eq } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
 import { accounts } from "../../src/db/schema";
@@ -6,13 +6,13 @@ import { call, createUserWithAccount, db, makeApp, resetDb } from "../helpers/ap
 import { activityRows, assign, joinTeam, makeTeam, setRole, setShared } from "../helpers/team";
 
 const app = makeApp();
-const rename = (accountId: string, user: string, name: unknown) => call(app, "PATCH", `/api/accounts/${accountId}`, { user, body: { name } });
+const rename = (accountId: string, user: string, name: unknown) => call(app, "PATCH", `/api/threads/accounts/${accountId}`, { user, body: { name } });
 
 beforeEach(async () => {
   await resetDb();
 });
 
-describe("PATCH /api/accounts/:accountId", () => {
+describe("PATCH /api/threads/accounts/:accountId", () => {
   it("オーナーは名前を直せる（前後の空白は除く）。応答は AccountSummary", async () => {
     const { accountId } = await createUserWithAccount("u1", { name: "カフェ" });
     const res = await rename(accountId, "u1", "  カフェの公式  ");

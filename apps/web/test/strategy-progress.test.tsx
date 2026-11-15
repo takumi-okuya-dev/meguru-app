@@ -1,20 +1,20 @@
 // US2：自動チェックと進み具合（specs/014-strategy-guidance FR-012〜FR-018、SC-002・SC-003）
 import { act, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { HINTED_KEYS, STRATEGY_HINTS, emptyStrategyValues } from "@threads-grower/shared";
+import { HINTED_KEYS, STRATEGY_HINTS, emptyStrategyValues } from "@meguru/shared";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { renderStrategyPage, strategyOf } from "./helpers/strategy-page";
 
 const getStrategy = vi.fn();
 const putStrategy = vi.fn();
-vi.mock("@/lib/api-client", async (orig) => {
-  const actual = await orig<typeof import("@/lib/api-client")>();
-  return { ...actual, api: { ...actual.api, getStrategy, putStrategy } };
+vi.mock("@/apps/threads/lib/api", async (orig) => {
+  const actual = await orig<typeof import("@/apps/threads/lib/api")>();
+  return { ...actual, threadsApi: { ...actual.threadsApi, getStrategy, putStrategy } };
 });
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
 const { UnsavedChangesProvider } = await import("@/components/UnsavedChangesProvider");
-const { StrategyPage } = await import("@/pages/strategy");
+const { StrategyPage } = await import("@/apps/threads/pages/strategy");
 
 type ObserverCallback = (entries: { target: Element; isIntersecting: boolean; boundingClientRect: { top: number } }[]) => void;
 let observerCallbacks: ObserverCallback[] = [];
@@ -149,7 +149,7 @@ describe("自動チェックと進み具合", () => {
 describe("ほかの画面から項目へ移る（specs/014 FR-122）", () => {
   it("#field-<key> で開くと、その項目の入力欄にカーソルが入る", async () => {
     getStrategy.mockResolvedValue(strategyOf());
-    renderStrategyPage(StrategyPage, UnsavedChangesProvider, "/accounts/a1/strategy#field-targetPersona");
+    renderStrategyPage(StrategyPage, UnsavedChangesProvider, "/threads/accounts/a1/strategy#field-targetPersona");
     await screen.findByRole("heading", { name: "営業導線設計" });
     await vi.waitFor(() => expect(document.getElementById("strategy-targetPersona")).toHaveFocus());
   });

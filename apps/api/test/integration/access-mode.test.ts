@@ -1,6 +1,6 @@
 // Threads連携の公開範囲の切り替え（specs/002-strategy-profile FR-028、research.md R15）
 import { beforeEach, describe, expect, it } from "vitest";
-import type { Env } from "../../src/env";
+import type { Env } from "../../src/kernel/env";
 import { makeApp, resetDb, testEnv } from "../helpers/app";
 
 const app = makeApp();
@@ -10,7 +10,7 @@ beforeEach(async () => {
 });
 
 async function me(env: Env) {
-  return app.request("/api/me", { headers: { Authorization: "Bearer test:u1" } }, env);
+  return app.request("/api/threads/me", { headers: { Authorization: "Bearer test:u1" } }, env);
 }
 
 describe("THREADS_ACCESS_MODE", () => {

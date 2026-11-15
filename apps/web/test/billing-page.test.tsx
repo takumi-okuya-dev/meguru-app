@@ -2,7 +2,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import type { BillingSummary } from "@threads-grower/shared";
+import type { BillingSummary } from "@meguru/shared";
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -19,9 +19,9 @@ const toastError = vi.fn();
 vi.mock("sonner", () => ({ toast: { success: toastSuccess, error: toastError, dismiss: vi.fn() } }));
 
 const { ApiError } = await import("@/lib/api-client");
-const { BillingSettingsPage } = await import("@/pages/settings/billing");
+const { BillingSettingsPage } = await import("@/shell/settings/billing");
 
-const PRICES = { base: 1000, extra: 500 };
+const PRICES = { perAccount: 1000 };
 function summary(over: Partial<BillingSummary> = {}): BillingSummary {
   return {
     mode: "enabled",
@@ -82,11 +82,20 @@ describe("状態ごとの表示", () => {
     expect(screen.queryByRole("button")).not.toBeInTheDocument();
   });
 
+  it("料金なしでも、前からの契約が残っていれば、解約できるよう支払いの画面を開ける", async () => {
+    billing.mockResolvedValue(summary({ state: "exempt", subscription: sub() }));
+    renderPage();
+    expect(await screen.findByText("料金なし")).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: /支払い/ })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "契約する" })).not.toBeInTheDocument();
+  });
+
   it("無料体験中：終わる日と残りの日数、料金、規約へのリンク、「契約する」", async () => {
     billing.mockResolvedValue(summary());
     renderPage();
     expect(await screen.findByText("無料体験中：2026年11月15日まで（あと30日）")).toBeInTheDocument();
-    expect(screen.getByText(/基本料金 月1,000円（アカウント1件目を含む）／2件目から1件につき月500円（税込み）/)).toBeInTheDocument();
+    expect(screen.getByText(/アカウント1件につき月1,000円（税込み）/)).toBeInTheDocument();
+    expect(screen.queryByText(/500円/)).not.toBeInTheDocument();
     expect(screen.getByRole("link", { name: "利用規約" })).toHaveAttribute("href", "/terms");
     expect(screen.getByRole("link", { name: "特定商取引法に基づく表記" })).toHaveAttribute("href", "/legal/commerce");
     expect(screen.getByRole("button", { name: "契約する" })).toBeInTheDocument();

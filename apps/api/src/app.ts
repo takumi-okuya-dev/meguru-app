@@ -2,39 +2,59 @@
 // （本番コードにテスト用の抜け道は作らない）。
 import { Hono } from "hono";
 import { cors } from "hono/cors";
-import type { Env } from "./env";
-import { validateConfig } from "./lib/config";
-import { AppError } from "./lib/errors";
-import { logger, setLogAppEnv } from "./lib/logger";
+import type { Env } from "./kernel/env";
+import { validateConfig } from "./kernel/config";
+import { AppError } from "./kernel/errors";
+import { logger, setLogAppEnv } from "./kernel/logger";
 import {
+  registerAppModules,
   authMiddleware,
   optionalAuthMiddleware,
   clerkVerifier,
   type AuthVerifier,
-  type AuthVariables,
-} from "./middleware/auth";
-import { accountRoutes } from "./routes/accounts";
-import { billingRoutes } from "./routes/billing";
-import { stripeWebhookRoutes } from "./routes/stripe-webhook";
-import { accountTeamRoutes } from "./routes/account-team";
-import { inviteRoutes } from "./routes/invites";
-import { teamsRoutes } from "./routes/teams";
-import { activityRoutes } from "./routes/activity";
-import { dataDeletionRoutes } from "./routes/data-deletion";
-import { threadsWebhookRoutes } from "./routes/threads-webhooks";
-import { meRoutes } from "./routes/me";
-import { performanceRoutes } from "./routes/performance";
-import { postDraftRoutes } from "./routes/post-drafts";
-import { autoPostRoutes } from "./routes/auto-post";
-import { postingRulesRoutes } from "./routes/posting-rules";
-import { postingScheduleRoutes } from "./routes/posting-schedule";
-import { threadsCheckRoutes } from "./routes/threads-check";
-import { promotionRoutes } from "./routes/promotions";
-import { promptRoutes } from "./routes/prompt";
-import { researchRoutes } from "./routes/research";
-import { strategyRoutes } from "./routes/strategy";
-import { threadsConnectRoutes } from "./routes/threads-connect";
-import { clerkUserDeleter, type ClerkUserDeleter } from "./services/withdrawal-service";
+  type AppEnv,
+  billingRoutes,
+  stripeWebhookRoutes,
+  operatorFeatureRoutes,
+  operatorAppRegistryRoutes,
+  operatorTestGroupRoutes,
+  testInviteRoutes,
+  referralRoutes,
+  meRoutes,
+  operatorLimitRoutes,
+  operatorAppAccessRoutes,
+  clerkUserDeleter,
+  type ClerkUserDeleter,
+} from "./platform";
+import {
+  dataDeletionRoutes,
+  threadsWebhookRoutes,
+  needsReviewCountRoutes,
+  performanceRoutes,
+  postDraftRoutes,
+  autoPostRoutes,
+  postingRulesRoutes,
+  postingScheduleRoutes,
+  threadsCheckRoutes,
+  promotionRoutes,
+  promptRoutes,
+  researchRoutes,
+  strategyRoutes,
+  analysisRoutes,
+  mentionRoutes,
+  externalMediaRoutes,
+  threadsConnectRoutes,
+  testerApplicationRoutes,
+  operatorAccountRoutes,
+  operatorTesterInviteRoutes,
+  accountRoutes,
+  accountTeamRoutes,
+  inviteRoutes,
+  teamsRoutes,
+  activityRoutes,
+  threadsMeRoutes,
+} from "./apps/threads";
+import { API_APPS } from "./app-modules";
 
 /** アプリに差し込む依存。テストでは偽の認証を渡す。 */
 export type AppDeps = {
@@ -43,14 +63,15 @@ export type AppDeps = {
   deleteClerkUser?: (env: Env) => ClerkUserDeleter;
 };
 
+/** Hono のアプリの型引数（定義は共通の認証。027）。 */
+export type { AppEnv };
+
 /** 本番の依存。認証は Clerk で検証する。 */
 export const defaultDeps: AppDeps = {
   verifyAuth: (env) => clerkVerifier(env),
   deleteClerkUser: (env) => clerkUserDeleter(env),
 };
 
-/** Hono のアプリの型引数。バインディングと、認証済みのユーザー。 */
-export type AppEnv = { Bindings: Env; Variables: AuthVariables };
 
 /**
  * API の Hono アプリを組み立てる。CORS・設定の確認・エラーの形・各ルートをまとめる。
@@ -58,14 +79,21 @@ export type AppEnv = { Bindings: Env; Variables: AuthVariables };
  * @returns /api 以下のルートを持つアプリ
  */
 export function createApp(deps: AppDeps = defaultDeps) {
+  // アプリの登録（機能・上限・利用の決まり・出来事の受け取り）をする（specs/027・specs/meguru/031。何度呼んでも1回だけ）
+  registerAppModules(API_APPS);
   const app = new Hono<AppEnv>();
 
   app.use("/api/*", async (c, next) => {
     const corsMiddleware = cors({
       origin: c.env.WEB_ORIGIN,
-      allowHeaders: ["Authorization", "Content-Type"],
+      // X-Referral-Code：紹介リンクを開いた人の登録で、紹介した人を記録する（specs/017 research.md R4）
+      // X-Collect-Device：集金管理の手伝う人の端末の印（specs/collect/001 research.md R7）
+      allowHeaders: ["Authorization", "Content-Type", "X-Referral-Code", "X-Collect-Device"],
       // PATCH：チーム名・任せる範囲・改善メモ（specs/006・008。PR #9 のCodexレビュー）
       allowMethods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+      // 画面から読む応答の見出し（別のオリジンからは、ここに書いたものしか読めない）。ファイルの書き出しのファイル名と、
+      // 上限で切ったか（人物メモの書き出しなど。アプリの名前を付けない共通の見出しにする）
+      exposeHeaders: ["Content-Disposition", "X-Export-Truncated"],
       credentials: false,
     });
     return corsMiddleware(c, next);
@@ -102,7 +130,7 @@ export function createApp(deps: AppDeps = defaultDeps) {
       try {
         const web = new URL(c.env.WEB_ORIGIN).origin;
         return c.redirect(
-          `${web}/accounts/new?${new URLSearchParams({ error: "CONFIG_ERROR" })}`,
+          `${web}/threads/accounts/new?${new URLSearchParams({ error: "CONFIG_ERROR" })}`,
           302,
         );
       } catch {
@@ -152,6 +180,33 @@ export function createApp(deps: AppDeps = defaultDeps) {
   const authed = authMiddleware(deps.verifyAuth);
   const maybeAuthed = optionalAuthMiddleware(deps.verifyAuth) as unknown as typeof authed;
 
+  // Threadsの道筋（/api/threads/…。specs/meguru/029-threads-pattern1 contracts/api-routes.md 1）。古い道筋（/api/accounts/…・/api/teams/… など）は
+  // PR5 で消した。Metaに登録した /api/threads/… の6本と /api/data-deletion は、ここに入れず今のまま。
+  const threadsApi = new Hono<AppEnv>()
+    .route("/", needsReviewCountRoutes(authed))
+    .route("/", accountRoutes(authed))
+    .route("/", accountTeamRoutes(authed))
+    .route("/", inviteRoutes(authed, maybeAuthed))
+    // テスター招待（specs/024 contracts/api.md）
+    .route("/", testerApplicationRoutes(authed))
+    .route("/", operatorTesterInviteRoutes(authed))
+    .route("/", operatorAccountRoutes(authed))
+    .route("/", teamsRoutes(authed))
+    .route("/", activityRoutes(authed))
+    .route("/", strategyRoutes(authed))
+    .route("/", externalMediaRoutes(authed))
+    .route("/", analysisRoutes(authed))
+    .route("/", mentionRoutes(authed))
+    .route("/", promotionRoutes(authed))
+    .route("/", researchRoutes(authed))
+    .route("/", promptRoutes(authed))
+    .route("/", postDraftRoutes(authed))
+    .route("/", postingRulesRoutes(authed))
+    .route("/", postingScheduleRoutes(authed))
+    .route("/", threadsCheckRoutes(authed))
+    .route("/", autoPostRoutes(authed))
+    .route("/", performanceRoutes(authed));
+
   const routes = app
     .basePath("/api")
     .get("/health", (c) => {
@@ -163,26 +218,27 @@ export function createApp(deps: AppDeps = defaultDeps) {
       return c.json(c.env.APP_ENV === "development" ? { ok: false, configErrors } : { ok: false });
     })
     .route("/", meRoutes(authed, deps.deleteClerkUser ?? ((env) => clerkUserDeleter(env))))
-    .route("/", accountRoutes(authed))
-    .route("/", accountTeamRoutes(authed))
-    .route("/", inviteRoutes(authed, maybeAuthed))
-    .route("/", teamsRoutes(authed))
-    .route("/", activityRoutes(authed))
-    .route("/", strategyRoutes(authed))
-    .route("/", promotionRoutes(authed))
-    .route("/", researchRoutes(authed))
-    .route("/", promptRoutes(authed))
-    .route("/", postDraftRoutes(authed))
-    .route("/", postingRulesRoutes(authed))
-    .route("/", postingScheduleRoutes(authed))
-    .route("/", threadsCheckRoutes(authed))
-    .route("/", autoPostRoutes(authed))
-    .route("/", performanceRoutes(authed))
+    // Threadsの「自分」（specs/meguru/029 contracts/api-routes.md 2）
+    .route("/", threadsMeRoutes(authed))
+    // テスト用のグループ（specs/016 contracts/api.md）
+    .route("/", testInviteRoutes(authed, maybeAuthed))
+    .route("/", referralRoutes(authed))
+    .route("/", operatorTestGroupRoutes(authed))
+    .route("/", operatorFeatureRoutes(authed))
+    // 登録されたアプリの機能と上限の一覧（運営の画面のため。specs/meguru/029 tasks.md T069）
+    .route("/", operatorAppRegistryRoutes(authed))
+    // 上限（specs/024 contracts/api.md）
+    .route("/", operatorLimitRoutes(authed))
+    // アプリの利用の許可（specs/meguru/030-app-access FR-005）
+    .route("/", operatorAppAccessRoutes(authed))
+    .route("/threads", threadsApi)
     .route("/", threadsConnectRoutes(authed))
     .route("/", billingRoutes(authed))
     .route("/", stripeWebhookRoutes())
     .route("/", threadsWebhookRoutes())
     .route("/", dataDeletionRoutes());
+  // アプリの道筋は /api/<アプリの番号> の下につなぐ（アプリの一覧 app-modules.ts。specs/meguru/031）。どの道筋の関所も、アプリの側が付ける
+  for (const m of API_APPS) if (m.routes) routes.route(`/${m.id}`, m.routes(authed));
 
   return routes;
 }
