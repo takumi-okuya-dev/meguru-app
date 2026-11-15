@@ -30,14 +30,14 @@ Spec Kitの`$ARGUMENTS`がホストによって置換されない場合は、ス
 
 | # | やること | スキル | ユーザーがすること |
 |---|---|---|---|
-| 0 | developから`feature/<アプリ>-NNN-…`のブランチを作る（Spec Kitのgitフックは入れていないので、先に手で作る）。仕様の出し先`specs/<アプリ>/NNN-…`と番号の決め方は[product-structure.md](./product-structure.md)の6。セッションを分けて同時に進めるときは[parallel-development.md](./parallel-development.md) | なし | どのアプリの仕様か伝える |
+| 0 | developから`feature/<アプリ>-NNN-…`のブランチを作る（Spec Kitのgitフックは入れていないので、先に手で作る）。仕様の出し先`specs/<アプリ>/NNN-…`と番号の決め方は[仕様と名前の決まり](./rules/specs.md)。セッションを分けて同時に進めるときは[並行開発の決まりと手順](./rules/parallel-development.md) | なし | どのアプリの仕様か伝える |
 | 1 | やりたいことから仕様を書く | `/speckit-specify` | やりたいこと・決めていることを伝える |
 | 2 | あいまいな点を決める（最大5問） | `/speckit-clarify` | 質問に答える |
 | 3 | 技術の方針・データ・画面の取り決めを書く | `/speckit-plan` | なし |
 | 4 | 作業の一覧を作る（テストを先に書く） | `/speckit-tasks` | なし |
 | 5 | 仕様・方針・作業の一覧の食い違いを確かめて直す | `/speckit-analyze` | 直し方を選ぶ |
 | 6 | 作業の一覧のとおりに作る | `/speckit-implement` | なし |
-| 7 | PRを出し、セルフレビューして直す。コードを変えたPRだけ、マージの前にラベル「run-ci」でCIを流す（文書だけのPRは流さない。[release-runbook.md](./release-runbook.md)の2） | `/code-review` | なし |
+| 7 | PRを出し、セルフレビューして直す。マイグレーションなど慎重なPRだけ、マージの前にラベル「run-ci」でCIを流す（ほかは手元の全部のテスト。[開発の流れの決まり](./rules/development-flow.md) 3） | `/code-review` | なし |
 | 8 | マージする | なし | マージしてよいか答える |
 | 9 | テスト版で手で確かめ、確かめる作業に`[X]`を付ける | なし | テスト版で確かめる |
 

@@ -2,7 +2,7 @@
 
 **最終更新**：2026-11-12（仕様に移し終えた節を消した。移した先は各`specs/`。018・020・021・022・023など）
 
-**位置づけ**：ユーザーと話して決めたこと・まだ決めていないことを、`/speckit-specify`の前に残すメモ。各機能の仕様（`specs/<アプリ>/NNN-…/spec.md`。[product-structure.md](./product-structure.md)の6）を作るときの入力にし、移したらこのメモからは消す。決済のメモは[specs/013-billing/notes.md](../specs/013-billing/notes.md)。
+**位置づけ**：ユーザーと話して決めたこと・まだ決めていないことを、`/speckit-specify`の前に残すメモ。各機能の仕様（`specs/<アプリ>/NNN-…/spec.md`。[仕様と名前の決まり](./rules/specs.md)）を作るときの入力にし、移したらこのメモからは消す。決済のメモは[specs/013-billing/notes.md](../specs/013-billing/notes.md)。
 
 ## F. このアプリ専用のThreadsコンサルAIエージェント（2026-11-02）
 

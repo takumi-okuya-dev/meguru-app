@@ -148,7 +148,7 @@ flowchart TB
 | 名前 | 何に使ったか |
 | --- | --- |
 | Claude Code | 実装・テスト・レビューの指摘への対応・環境構築の大半。会話をまたいだ決定事項はメモリに残す |
-| Codex | PRのレビュー（セルフレビューのあと、Ready for reviewにしたときに動く。[リリースの手順書](release-runbook.md) 2）。Claude Codeが利用制限になったときの引き継ぎ先 |
+| Codex | PRのレビュー（セルフレビューのあと、Ready for reviewにしたときに動く。[開発の流れの決まり](rules/development-flow.md) 2）。Claude Codeが利用制限になったときの引き継ぎ先 |
 | [BMAD-METHOD](https://github.com/bmad-code-org/BMAD-METHOD)（30スキル） | 計画の段階だけで使用。Product Brief・PRDと設計の叩き台 |
 | [Spec Kit](https://github.com/github/spec-kit)（10スキル） | 実装の段階。憲法 → 仕様 → 計画 → タスク → 実装を、機能ごとに（001〜028） |
 | security-audit（スキル） | 公開前のセキュリティ監査 |

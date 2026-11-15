@@ -1,8 +1,8 @@
 # リリースの手順書
 
-公開したあとに機能を足すとき、**ステージングと本番を壊さないため**の決まりと手順です。
+ステージングと本番に出す・戻すときの手順です（運用手順書）。ふだんの開発の決まりは[docs/rules/](./rules/development-flow.md)。
 
-- ブランチの決まり（`main`・`develop`・`feature/*`）は[README](../README.md)「ブランチとデプロイ」と[Constitution](../.specify/memory/constitution.md)「開発ワークフロー」。
+- ブランチの決まり（`main`・`develop`・`feature/*`）は[開発の流れの決まり](./rules/development-flow.md) 1と[Constitution](../.specify/memory/constitution.md)「開発ワークフロー」。
 - ステージングと本番を最初に用意する手順は[外部サービスの準備手順](./external-services-setup.md)「9. 公開のための準備」。
 - デプロイの仕組み（何がどの順に動き、途中で止まると何が起きるか）は[contracts/deploy.md](../specs/015-deploy-environments/contracts/deploy.md) 2。
 
@@ -19,60 +19,11 @@ feature/* ──PR──▶ develop ──自動──▶ ステージング（�
 
 ## 2. ふだんの機能追加（`feature/*` → `develop`）
 
-- **PRは小さく**。1つのリリースに混ざる変更が少ないほど、壊れたときに原因を探しやすく、戻しやすい。
-- PRの説明の「チェック」の欄（[.github/pull_request_template.md](../.github/pull_request_template.md)）を埋める。
-- **レビューは「セルフレビュー → Codexレビュー」の順**（2026-11-12に決めた）。Codex（`chatgpt-codex-connector`）はPRを開くと自動でレビューを始めるので、先にセルフレビューで見つかるものを直してから回す。
-  1. PRは**下書き（draft）**で出す（`gh pr create --draft`）。下書きのあいだはCodexは動かない。
-  2. セルフレビュー（Claude Codeの`/code-review`など）をして、指摘を直してpushする。
-  3. **「Ready for review」**にする（`gh pr ready <番号>`）。ここでCodexのレビューが始まる。直したあとにもう一度見てもらうときは、PRに `@codex review` とコメントする。
-- **CIは、PRにラベル「run-ci」を付けると流れる**（付け直すと、もう一度流れる。[.github/workflows/ci.yml](../.github/workflows/ci.yml)）。付けないと流れない。
-  - **ラベルを付けるのは、コードを変えたPRだけ**。GitHubのCIは従量課金なので、結果が変わらないPRでは流さない（2026-10-31に[external-services-setup.md](external-services-setup.md) 9-12で決めた決まりを、2026-11-12にここへ書いた）。
-  - 流す：lint・型チェック・テストの結果が変わりうる変更。`apps/`・`packages/`・`e2e/`・`eslint-rules/`のコード、`package.json`・`pnpm-lock.yaml`、TypeScript・ESLint・Vitestの設定、`.github/workflows/`。
-  - 流さない：文書（`docs/`・`specs/`・`*.md`）・`.specify/`・スキルの本文だけのPR。CIの成功が要るブランチの規則は、管理者がPRから`gh pr merge --admin`でマージして通す（マージしてよいかは、いつもどおりユーザーが決める）。
-  - 迷ったら流す。
-  - **2026-11-13からは、さらに節約する**（GitHub Actionsが支払い・使える額の上限で止まったとき、ユーザーが決めた）。`run-ci`は、マイグレーションのあるPRなど慎重に入れるものと、手元で確かめられないもの（`.github/workflows/`・デプロイの流れ）だけに付ける。ほかのコードのPRは、手元で全部の確かめ（型チェック・lint・`eslint-rules`のテスト・共通・Web・APIの全テスト、E2Eは関わるもの）を流して結果をPRに書き、セルフレビューのあと`gh pr merge --merge --admin`でマージする（マージしてよいかは、いつもどおりユーザーが決める）。
-- **デプロイも、出すものが変わらない変更だけなら動かない**。文書（`docs/`・`specs/`・`*.md`）・`.specify/`・AIのスキル・E2Eだけを変えたマージでは、ステージング・本番へのデプロイを飛ばす（`.github/workflows/deploy.yml`の`paths-ignore`）。1つでもほかのファイルを変えていれば、いつもどおり出る。出し直したいときは、Actionsの画面から手で動かす。
-- **大きな機能は、設定で止められるように作る**。`BILLING_ENABLED`・`THREADS_CONNECT_METHODS`と同じ形で、`apps/api/wrangler.toml`の環境ごとの`vars`で切り替える。
-  1. 本番は「切」のまま出す。
-  2. ステージングで「入」にして確かめる。
-  3. 問題がなければ、本番も「入」にする（`[env.production.vars]`の1行を変えるPR）。
-
-  こうしておくと、出したあとに困っても**コードを戻さず、設定の1行で止められる**。
-- 環境ごとの違いを、コードの分岐（`if (APP_ENV === "production")`など）にしない。設定の値で分ける。
+ブランチ・PR・レビュー・CI・マージの決まりは、2026-11-15に[開発の流れの決まり](./rules/development-flow.md)へ移した。設定で止められるように作る決まりは[コードの書き方の決まり](./rules/coding.md) 2。
 
 ## 3. マイグレーションの決まり
 
-デプロイは**マイグレーション → API → Web**の順に動きます。マイグレーションが当たってから新しいAPIに切り替わるまでの間は、**前の版のAPIが新しいDBで動いています**。途中で止まったときや、APIを前の版に戻したとき（6-1）も同じです。だから、**マイグレーションは、そのとき本番で動いている前の版のAPIでも壊れない形だけ**にします（[research.md R4](../specs/015-deploy-environments/research.md)）。
-
-| 変更 | 出し方 |
-|---|---|
-| 表を足す | 1回でよい |
-| 列を足す（空を許す、または既定値つき） | 1回でよい |
-| 索引を足す | 1回でよい |
-| 列を足す（`NOT NULL`で既定値なし） | **だめ**。前の版のAPIの`INSERT`が失敗する。既定値を付けるか、空を許す |
-| 列や表を消す | **2回に分ける**。1回目：アプリがその列を読みも書きもしない版を出す（`NOT NULL`なら、ここで外す）。2回目：消す |
-| 列の名前を変える | まず、**DBの列の名前は変えずに、コードの中の名前だけ変える**（Drizzleなら`headline: text("title")`）。それで済まないときだけ、下の例の4回に分ける |
-| 列の型を変える | 新しい列を足して写す。下の例と同じ4回 |
-| 既存の行が通らないかもしれない制約（`UNIQUE`・`CHECK`・`NOT NULL`）を付ける | **2回に分ける**。1回目：違反する値を書かない版を出す。2回目：残っている行を直してから、制約を付ける |
-
-**列の名前を変える例**：`title`を`headline`に変える
-
-どのリリースでも「マイグレーションが当たるときに動いている版」と「戻す先の版」が、新しいDBで正しく動くように並べます。
-
-| リリース | マイグレーション | アプリ | 戻す先（1つ前の版）が困らない理由 |
-|---|---|---|---|
-| 1回目 | `headline`を足す（空を許す） | `title`と`headline`の**両方に書き**、`title`を読む | 前の版は`headline`を知らないだけ |
-| 2回目 | すべての行で`title`を`headline`に写す | 両方に書き、**`headline`を読む** | 写すときに動いている1回目の版は両方に書くので、取りこぼさない。1回目に戻しても、`title`は書かれ続けている |
-| 3回目 | `title`の`NOT NULL`を外す（付いていれば） | **`headline`だけに**書いて読む | 2回目の版は`headline`を読むので、`title`が古くなっても困らない |
-| 4回目 | `title`を消す | 変えない | 3回目の版は`title`を使わない |
-
-- 次のリリースは、前のリリースが本番で落ち着いてから出します。
-- 前の版に安全に戻せるのは**1つ前まで**です。2つ前の版に戻すと、DBと合わないことがあります。
-
-**そのほかの決まり**
-
-- マイグレーションは`pnpm --filter api db:generate`で作り、**できたSQLを読んでからコミットする**。Drizzleは、名前の変更を「消して足す」として書くことがある。
-- **一度`develop`に入ったマイグレーションのファイルは、書き換えない・消さない**。ステージングではもう当たっているので、書き換えてもステージングには当たり直さず、ステージングと本番のDBがずれる。直すときは、新しいマイグレーションを足す。
+2026-11-15に[コードの書き方の決まり](./rules/coding.md) 3へ移した（前の版のAPIでも壊れない形だけにする・消す/名前を変えるときは何回かに分ける・`develop`に入ったファイルは書き換えない）。
 
 ## 4. リリースの前に確かめること
 
@@ -88,7 +39,7 @@ feature/* ──PR──▶ develop ──自動──▶ ステージング（�
   - [ ] 決済（Stripeのテスト用カード）。このリリースで決済を変えた場合
   - [ ] このリリースで足した・変えた機能
 - [ ] 手元で`pnpm e2e`が通る（E2EはCIで動いていないため）。
-- [ ] このリリースに入るマイグレーションを読み、3の決まりに沿っている。
+- [ ] このリリースに入るマイグレーションを読み、[コードの書き方の決まり](./rules/coding.md) 3に沿っている。
 
   ```bash
   git fetch origin && git diff origin/main origin/develop -- apps/api/drizzle
@@ -128,7 +79,7 @@ feature/* ──PR──▶ develop ──自動──▶ ステージング（�
 
 | 何が起きたか | すること |
 |---|---|
-| 新しい機能だけがおかしい（設定で止められる作り） | その機能の設定を「切」にする（2） |
+| 新しい機能だけがおかしい（設定で止められる作り） | その機能の設定を「切」にする（[コードの書き方の決まり](./rules/coding.md) 2） |
 | APIがエラーを返す | APIを前の版に戻す（6-1） |
 | 画面が壊れている | Webを前の版に戻す（6-2） |
 | APIとWebの両方を変えたリリース | **両方を**前の版に戻す。片方だけ戻すと、APIとWebの組み合わせが合わなくなる |
@@ -148,7 +99,7 @@ pnpm --filter api exec wrangler deployments list --env production
 pnpm --filter api exec wrangler rollback <版のID> --env production --message "戻した理由"
 ```
 
-- 数秒で切り替わります。DB・KVの中身は戻りません（3の決まりを守っていれば、前の版のAPIでも動きます）。
+- 数秒で切り替わります。DB・KVの中身は戻りません（[マイグレーションの決まり](./rules/coding.md)を守っていれば、前の版のAPIでも動きます）。
 - Cloudflareの画面（Workers & Pages → `threads-grower-api` → Deployments）からも戻せます。
 
 ### 6-2. Webを前の版に戻す（Cloudflare Pages）
