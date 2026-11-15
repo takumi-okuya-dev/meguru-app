@@ -4,7 +4,7 @@
 
 **Created**: 2026-11-13
 
-**Status**: Draft
+**Status**: Implemented（2026-11-14 に develop へ）
 
 **Input**: 人物メモ（specs/people/001-people-memo）を、「人物メモ＋営業リスト（イベントに来てくれそうな人に声をかける）」として使えるようにする。似たアプリ「人記録」（人の管理のメモとプロフィール帳。iPhone）の機能のうち、作り手の使い方に合うものを取り込む。
 
