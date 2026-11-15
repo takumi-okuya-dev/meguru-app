@@ -2,7 +2,18 @@
 // 自分の名前か受付番号を入れる → 見つかったら払い方を選ぶ → 案内（現金は受付で払う・PayPayはQR・振込は振込先）。
 // 名簿にいなければ名前を送って申し出る。会場の共有にはつながず、画面が見えている間だけ3秒ごとに自分の状態を読む（research.md R5）。
 // ほかの参加者の名前は出さない（完全に一致した1人だけをAPIが返す）。
-import { COLLECT_LIMITS, SELF_CHECK_IN_LIMITS, type SelfLinkInfo, type SelfMe, type SelfMethod, type SelfPerson } from "@meguru/shared";
+// 名簿なしのイベント（specs/collect/004）では、探す代わりに名前・ふりがな・媒体・紹介してくれた人を入れて名簿に入り、払い方を選ぶ。
+// 区分が未定の人には、区分ごとの金額を並べる（区分は受付の人が確かめる）。
+import {
+  COLLECT_LIMITS,
+  COLLECT_MEDIA_LABELS,
+  SELF_CHECK_IN_LIMITS,
+  type CollectMedia,
+  type SelfLinkInfo,
+  type SelfMe,
+  type SelfMethod,
+  type SelfPerson,
+} from "@meguru/shared";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { CheckCircle2Icon, Loader2Icon } from "lucide-react";
 import { useState, type ReactNode } from "react";
@@ -21,6 +32,20 @@ import { selfApi } from "../lib/self-api";
 
 /** 払い方の言葉（参加者向け）。 */
 const METHOD_LABELS: Record<SelfMethod, string> = { cash: "現金", paypay: "PayPay", transfer_today: "振込（今日）", transfer_later: "振込（後日）" };
+
+/**
+ * 本人の料金の言い方。区分が未定なら区分ごとの金額を並べる（0円の区分は出さない。specs/collect/004 FR-012）。
+ * @param person - 本人
+ * @param link - リンク（区分ごとの金額）
+ * @returns 料金の言い方
+ */
+function priceText(person: SelfPerson, link: SelfLinkInfo): string {
+  if (!person.tierUndecided || link.tiers.length === 0) return `${person.tierName} ${yen(person.amount)}`;
+  return link.tiers.map((t) => `${t.name} ${yen(t.amount)}`).join("・");
+}
+
+/** 区分が未定の人に出す一言。 */
+const TIER_NOTE = "受付の人が区分を確かめます。";
 
 /**
  * 案内だけの画面。
@@ -98,7 +123,20 @@ export function SelfCheckInPublicPage() {
       </section>
     );
   } else if (request && !searching && request.status !== "rejected") {
-    body = <RequestState request={request} onChoose={setSelected} />;
+    body = <RequestState link={link} request={request} onChoose={setSelected} onRetry={() => setSearching(true)} />;
+  } else if (link.checkInMode === "rosterless") {
+    body = (
+      <EntryForm
+        token={token}
+        link={link}
+        onEntered={(person) => {
+          setSearching(false);
+          setSelected(person);
+          refreshMe();
+        }}
+        onModeChanged={() => void info.refetch()}
+      />
+    );
   } else {
     body = (
       <SearchStep
@@ -270,11 +308,126 @@ function RequestForm({ token, initialName, onDone, onBack }: { token: string; in
 }
 
 /**
+ * 名簿なしの入れる欄（specs/collect/004 User Story 1）。名前（必須）・ふりがな・どこで申し込んだか（必須）・紹介してくれた人。
+ * 紹介してくれた人の候補は出さない（ほかの人の名前が見えるため）。
+ * @param props - token・link：リンク、onEntered：名簿に入った、onModeChanged：受付のしかたが変わった
+ * @returns 画面
+ */
+function EntryForm({
+  token,
+  link,
+  onEntered,
+  onModeChanged,
+}: {
+  token: string;
+  link: SelfLinkInfo;
+  onEntered: (person: SelfPerson) => void;
+  onModeChanged: () => void;
+}) {
+  const [name, setName] = useState("");
+  const [kana, setKana] = useState("");
+  const [media, setMedia] = useState<CollectMedia | null>(null);
+  const [referrer, setReferrer] = useState("");
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  // 1回の入力に1つ（送り直しても同じ人になる）
+  const [clientRequestId] = useState(() => crypto.randomUUID());
+  const ready = name.trim() !== "" && media !== null;
+  return (
+    <section className="space-y-4" aria-labelledby="entry-title">
+      <h2 id="entry-title" className="font-medium">
+        受付をする
+      </h2>
+      <p className="text-sm text-muted-foreground">名前と、どこで申し込んだかを入れてください。ほかの人の名前は出ません。</p>
+      <form
+        className="space-y-4"
+        onSubmit={async (e) => {
+          e.preventDefault();
+          if (!ready || media === null || pending) return;
+          setPending(true);
+          setError(null);
+          try {
+            const { person } = await selfApi.entry(token, { name: name.trim(), kana: kana.trim() || null, media, referrer: referrer.trim() || null, clientRequestId });
+            onEntered(person);
+          } catch (err) {
+            if (err instanceof ApiError && err.code === "CHECK_IN_MODE_MISMATCH") onModeChanged();
+            else setError(err instanceof ApiError && err.code === "RATE_LIMITED" ? "受付が混んでいます。受付の人に声をかけてください。" : collectErrorText(err));
+          } finally {
+            setPending(false);
+          }
+        }}
+      >
+        <div className="space-y-2">
+          <Input aria-label="名前" placeholder="名前（申し込んだときの名前）" className="h-11" value={name} maxLength={COLLECT_LIMITS.personName} onChange={(e) => setName(e.target.value)} />
+          <Input aria-label="ふりがな（なくてもよい）" placeholder="ふりがな（なくてもよい）" className="h-11" value={kana} maxLength={COLLECT_LIMITS.kana} onChange={(e) => setKana(e.target.value)} />
+        </div>
+        <fieldset className="space-y-2">
+          <legend className="text-sm font-medium">どこで申し込みましたか</legend>
+          <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="どこで申し込みましたか">
+            {link.media.map((m) => (
+              <Button
+                key={m}
+                type="button"
+                role="radio"
+                aria-checked={media === m}
+                variant={media === m ? "default" : "outline"}
+                className="h-11 rounded-full"
+                onClick={() => setMedia(m)}
+              >
+                {COLLECT_MEDIA_LABELS[m]}
+              </Button>
+            ))}
+          </div>
+        </fieldset>
+        <Input
+          aria-label="紹介してくれた人（なくてもよい）"
+          placeholder="紹介してくれた人（なくてもよい）"
+          className="h-11"
+          value={referrer}
+          maxLength={COLLECT_LIMITS.referrer}
+          onChange={(e) => setReferrer(e.target.value)}
+        />
+        {error && (
+          <p className="text-sm text-destructive" role="alert">
+            {error}
+          </p>
+        )}
+        <Button type="submit" className="h-12 w-full" disabled={!ready || pending}>
+          受付をする
+        </Button>
+      </form>
+    </section>
+  );
+}
+
+/**
  * 申し出の状態（待ち・名簿に入った）。
  * @param props - request：申し出、onChoose：名簿の人として払い方を選ぶ
  * @returns 画面
  */
-function RequestState({ request, onChoose }: { request: NonNullable<SelfMe["request"]>; onChoose: (person: SelfPerson) => void }) {
+function RequestState({
+  link,
+  request,
+  onChoose,
+  onRetry,
+}: {
+  link: SelfLinkInfo;
+  request: NonNullable<SelfMe["request"]>;
+  onChoose: (person: SelfPerson) => void;
+  onRetry: () => void;
+}) {
+  // 名簿に入ったあとで受付の人が名簿から外した（名簿なしの二重の受付など。specs/collect/004 FR-024）
+  if (request.status !== "pending" && !request.person) {
+    return (
+      <section className="space-y-3 text-center" aria-live="polite">
+        <h2 className="font-medium">受付の人に声をかけてください</h2>
+        <p className="text-sm text-muted-foreground">名簿から外されました。間違いのときは、受付の人に伝えてください。</p>
+        <Button type="button" variant="outline" className="h-11" onClick={onRetry}>
+          最初からやり直す
+        </Button>
+      </section>
+    );
+  }
   if (request.status === "pending" || !request.person) {
     return (
       <section className="space-y-3 text-center" aria-live="polite">
@@ -289,8 +442,9 @@ function RequestState({ request, onChoose }: { request: NonNullable<SelfMe["requ
     <section className="space-y-3" aria-live="polite">
       <h2 className="font-medium">名簿に入りました</h2>
       <p className="text-sm">
-        受付番号 <span className="font-semibold tabular-nums">{person.number}</span>・{person.name}さん（{person.tierName} {yen(person.amount)}）
+        受付番号 <span className="font-semibold tabular-nums">{person.number}</span>・{person.name}さん（{priceText(person, link)}）
       </p>
+      {person.tierUndecided && <p className="text-xs text-muted-foreground">{TIER_NOTE}</p>}
       <Button type="button" className="h-11 w-full" onClick={() => onChoose(person)}>
         払い方を選ぶ
       </Button>
@@ -331,9 +485,8 @@ function ChooseMethod({ token, link, person, onDone, onBack }: { token: string; 
         <p className="text-xs text-muted-foreground">受付番号</p>
         <p className="text-2xl font-semibold tabular-nums">{person.number}</p>
         <p className="font-medium">{person.name}さん</p>
-        <p className="text-sm text-muted-foreground">
-          {person.tierName} {yen(person.amount)}
-        </p>
+        <p className="text-sm text-muted-foreground">{priceText(person, link)}</p>
+        {person.tierUndecided && <p className="text-xs text-muted-foreground">{TIER_NOTE}</p>}
       </div>
       <h2 id="choose-title" className="font-medium">
         {person.amount === 0 ? "来場を伝えてください" : "払い方を選んでください"}
@@ -385,6 +538,9 @@ function Declared({
 }) {
   const { person, record } = declaration;
   const paid = record.paymentStatus === "paid";
+  // 区分が未定のあいだは、仮の金額の代わりに区分ごとの金額を出す（specs/collect/004 FR-013）
+  const undecided = person.tierUndecided && link.tiers.length > 0;
+  const amountText = undecided ? priceText(person, link) : yen(record.amount);
   return (
     <section className="space-y-4" aria-live="polite">
       <div className="rounded-lg border p-3">
@@ -400,7 +556,8 @@ function Declared({
         </div>
       ) : record.paymentStatus === "awaiting_transfer" ? (
         <div className="space-y-2">
-          <h2 className="font-semibold">振込をお願いします（{yen(record.amount)}）</h2>
+          <h2 className="font-semibold">振込をお願いします（{amountText}）</h2>
+          {undecided && <p className="text-xs text-muted-foreground">申し込んだときの区分の金額を振り込んでください。わからなければ受付の人に聞いてください。</p>}
           <p className="text-sm">
             振込の名義の前に、受付番号「{person.number}」を付けてください（例：{person.number}ヤマダタロウ）。
           </p>
@@ -408,10 +565,11 @@ function Declared({
           <p className="text-xs text-muted-foreground">受付は済んでいます。入金は主催者があとで確かめます。</p>
         </div>
       ) : record.method === "paypay" ? (
-        <PaypayGuide token={token} amount={record.amount} hasQr={link.settings.hasPaypayQr} />
+        <PaypayGuide token={token} amountText={amountText} undecided={undecided} hasQr={link.settings.hasPaypayQr} />
       ) : (
         <div className="space-y-2">
-          <h2 className="font-semibold">受付で{yen(record.amount)}を払ってください</h2>
+          <h2 className="font-semibold">{undecided ? `受付で払ってください（${amountText}）` : `受付で${amountText}を払ってください`}</h2>
+          {undecided && <p className="text-xs text-muted-foreground">{TIER_NOTE}</p>}
           <p className="text-sm text-muted-foreground">受付の人に、この画面と受付番号を見せてください。受け取ったら、この画面が「受付が済みました」に変わります。</p>
         </div>
       )}
@@ -431,15 +589,16 @@ function Declared({
 
 /**
  * PayPay の案内（主催者のQRと金額）。
- * @param props - token：リンク、amount：金額、hasQr：QRがあるか
+ * @param props - token：リンク、amountText：金額（区分が未定なら区分ごとの金額）、undecided：区分が未定、hasQr：QRがあるか
  * @returns 案内
  */
-function PaypayGuide({ token, amount, hasQr }: { token: string; amount: number; hasQr: boolean }) {
+function PaypayGuide({ token, amountText, undecided, hasQr }: { token: string; amountText: string; undecided: boolean; hasQr: boolean }) {
   const qr = useQuery({ queryKey: collectQueryKeys.selfPaypayQr(token), queryFn: () => selfApi.paypayQr(token), enabled: hasQr, staleTime: 60_000 });
   const url = useObjectUrl(qr.data);
   return (
     <div className="space-y-2">
-      <h2 className="font-semibold">PayPayで{yen(amount)}を送ってください</h2>
+      <h2 className="font-semibold">{undecided ? `PayPayで送ってください（${amountText}）` : `PayPayで${amountText}を送ってください`}</h2>
+      {undecided && <p className="text-xs text-muted-foreground">申し込んだときの区分の金額を送ってください。{TIER_NOTE}</p>}
       <div className="flex justify-center">
         {!hasQr ? (
           <p className="text-sm text-muted-foreground">QRは受付で見せてもらってください。</p>

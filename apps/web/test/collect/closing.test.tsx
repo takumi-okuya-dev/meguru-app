@@ -105,6 +105,13 @@ describe("締め", () => {
     expect(await screen.findByRole("button", { name: /履歴と合った（/ })).toBeInTheDocument();
   });
 
+  it("名簿なしでは、来なかった人の代わりに受付の記録がない人の数を出す（specs/collect/004 FR-030、tasks.md T033）", async () => {
+    mocks.closing.mockResolvedValue(snapshot({ checkInMode: "rosterless", unrecordedCount: 2, absent: [] }));
+    renderClosing();
+    expect(await screen.findByRole("heading", { name: "受付の記録がない人 2人" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: /来なかった人/ })).toBeNull();
+  });
+
   it("精算していない人がいれば、締める前に知らせる（止めない）", async () => {
     mocks.close.mockResolvedValue({ closedAt: "2026-11-20T13:00:00.000Z", unsettled: ["owner", "h1"] });
     const user = userEvent.setup();

@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogTitle } from "@/components/ui/dialog";
 import { yen } from "../../lib/reception-model";
 import type { ReceptionState } from "../../lib/use-reception";
+import { TierChoiceDialog } from "./TierChoiceDialog";
 
 /**
  * 確かめ待ちと申し出。
@@ -18,6 +19,9 @@ export function SelfPanel({ state, snap }: { state: ReceptionState; snap: Recept
   const [undoing, setUndoing] = useState<{ id: string; label: string } | null>(null);
   const [matching, setMatching] = useState<SelfRequest | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
+  // 区分を選んでから受け取る人（区分が未定で、区分が2つ以上。specs/collect/004 FR-021）
+  const [choosingTier, setChoosingTier] = useState<{ id: string; label: string; method?: "cash" | "paypay" } | null>(null);
+  const needsTier = (p: { tierUndecided: boolean }) => p.tierUndecided && snap.event.tiers.length > 1;
   const awaiting = snap.people.filter((p) => p.record?.paymentStatus === "awaiting_confirmation");
   const requests = snap.selfRequests;
   if (awaiting.length === 0 && requests.length === 0) return null;
@@ -50,15 +54,34 @@ export function SelfPanel({ state, snap }: { state: ReceptionState; snap: Recept
                   <div className="min-w-0 flex-1 text-sm">
                     <span className="text-muted-foreground tabular-nums">No.{person.number}</span> <span className="font-medium">{person.name}</span>
                     <span className="ml-2 text-muted-foreground">
-                      {RECEPTION_METHOD_LABELS[method]} {yen(record!.amount)}
+                      {RECEPTION_METHOD_LABELS[method]} {needsTier(person) ? <span className="font-medium text-amber-700 dark:text-amber-400">区分を確かめる</span> : yen(record!.amount)}
                     </span>
                   </div>
                   <div className="flex flex-wrap gap-2">
-                    <Button type="button" className="h-11" disabled={busy === key} onClick={() => void run(key, () => state.confirm(person.id))}>
+                    <Button
+                      type="button"
+                      className="h-11"
+                      disabled={busy === key}
+                      onClick={() =>
+                        needsTier(person)
+                          ? setChoosingTier({ id: person.id, label: `No.${person.number} ${person.name}` })
+                          : void run(key, () => state.confirm(person.id))
+                      }
+                    >
                       受け取った
                     </Button>
                     {canSwitch && (
-                      <Button type="button" variant="outline" className="h-11" disabled={busy === key} onClick={() => void run(key, () => state.confirm(person.id, { method: other }))}>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="h-11"
+                        disabled={busy === key}
+                        onClick={() =>
+                          needsTier(person)
+                            ? setChoosingTier({ id: person.id, label: `No.${person.number} ${person.name}`, method: other })
+                            : void run(key, () => state.confirm(person.id, { method: other }))
+                        }
+                      >
                         {RECEPTION_METHOD_LABELS[other]}で受け取った
                       </Button>
                     )}
@@ -105,6 +128,18 @@ export function SelfPanel({ state, snap }: { state: ReceptionState; snap: Recept
         </section>
       )}
 
+      {choosingTier && (
+        <TierChoiceDialog
+          title={`${choosingTier.label}の区分`}
+          tiers={snap.event.tiers}
+          onChoose={(priceTierId) => {
+            const { id, method } = choosingTier;
+            setChoosingTier(null);
+            void run(`c:${id}`, () => state.confirm(id, { priceTierId, ...(method ? { method } : {}) }));
+          }}
+          onClose={() => setChoosingTier(null)}
+        />
+      )}
       {undoing && (
         <ConfirmDialog
           title="本人の申告を取り消しますか？"

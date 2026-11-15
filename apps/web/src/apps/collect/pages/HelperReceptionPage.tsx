@@ -146,6 +146,7 @@ export function HelperReceptionPage() {
       walkIn: (input) => helperApi.walkIn(token, secret, input),
       confirm: (personId, input) => helperApi.confirm(token, secret, personId, input),
       resolveRequest: (requestId, action, personId) => helperApi.resolveRequest(token, secret, requestId, action, personId),
+      removeEntry: (personId) => helperApi.removeEntry(token, secret, personId),
       liveTicket: () => helperApi.liveTicket(token, secret),
       onLinkStopped: () => setStopped(true),
     }),

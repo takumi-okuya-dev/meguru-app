@@ -65,9 +65,26 @@ describe("振込待ち", () => {
     const user = userEvent.setup();
     renderPage();
     await user.click(within(await screen.findByRole("listitem", { name: "No.12 松本 れい" })).getByRole("button", { name: "入金を確かめた" }));
-    await waitFor(() => expect(mocks.confirmTransfer).toHaveBeenCalledWith("p1"));
+    await waitFor(() => expect(mocks.confirmTransfer).toHaveBeenCalledWith("p1", undefined));
     await user.click(within(screen.getByRole("listitem", { name: "No.3 木村" })).getByRole("button", { name: "振込待ちに戻す" }));
     await waitFor(() => expect(mocks.unconfirmTransfer).toHaveBeenCalledWith("p2"));
+  });
+
+  it("区分が未定の人は「区分を確かめる」と出し、入金を確かめるときに区分を選ぶ（specs/collect/004 FR-022、tasks.md T030）", async () => {
+    const tiers = [
+      { id: "t1", name: "通常", amount: 3000 },
+      { id: "t2", name: "早割", amount: 2500 },
+    ];
+    mocks.transfers.mockResolvedValue({ awaiting: [item({ tierUndecided: true, tiers, amount: 2500 })], confirmed: [] });
+    mocks.confirmTransfer.mockResolvedValue(item({ transferConfirmedAt: "2026-11-21T00:00:00.000Z" }));
+    const user = userEvent.setup();
+    renderPage();
+    const row = await screen.findByRole("listitem", { name: "No.12 松本 れい" });
+    expect(row).toHaveTextContent("区分を確かめる");
+    await user.click(within(row).getByRole("button", { name: "入金を確かめた" }));
+    expect(mocks.confirmTransfer).not.toHaveBeenCalled();
+    await user.click(await screen.findByRole("button", { name: /通常/ }));
+    await waitFor(() => expect(mocks.confirmTransfer).toHaveBeenCalledWith("p1", "t1"));
   });
 
   it("連絡文をコピーする。コピーできないときは文を選べるように出す", async () => {

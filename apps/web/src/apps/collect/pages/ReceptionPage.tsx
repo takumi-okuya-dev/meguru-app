@@ -28,6 +28,7 @@ export function ReceptionPage() {
       walkIn: (input) => collectApi.walkIn(eventId, input),
       confirm: (personId, input) => collectApi.confirm(eventId, personId, input),
       resolveRequest: (requestId, action, personId) => collectApi.resolveRequest(eventId, requestId, action, personId),
+      removeEntry: (personId) => collectApi.removeEntry(eventId, personId),
       liveTicket: () => collectApi.liveTicket(eventId),
     }),
     [eventId],

@@ -1,6 +1,16 @@
 // イベントを作る・直す入力欄（specs/collect/001-event-day-collection FR-010・FR-011、tasks.md T029）。
-// 名前・開催日・始まりと終わりの時刻・会場・定員・使う払い方・料金の区分（名前と金額。1つ以上・並べ替えられる）。
-import { COLLECT_LIMITS, COLLECT_METHODS, COLLECT_METHOD_LABELS, type CollectEvent, type CollectMethod, type ThreadsCandidate } from "@meguru/shared";
+// 名前・開催日・始まりと終わりの時刻・会場・定員・使う払い方・料金の区分（名前と金額。1つ以上・並べ替えられる）・
+// 受付のしかた（名簿なし・名簿あり。作るときの初めの値は名簿なし。specs/collect/004 FR-001）。
+import {
+  COLLECT_LIMITS,
+  COLLECT_METHODS,
+  COLLECT_METHOD_LABELS,
+  NEW_EVENT_CHECK_IN_MODE,
+  type CheckInMode,
+  type CollectEvent,
+  type CollectMethod,
+  type ThreadsCandidate,
+} from "@meguru/shared";
 import { ArrowDownIcon, ArrowUpIcon, PlusIcon, Trash2Icon } from "lucide-react";
 import { useState, type FormEvent } from "react";
 import { Button } from "@/components/ui/button";
@@ -20,6 +30,12 @@ function toNumber(text: string): number {
   const s = text.normalize("NFKC").replace(/,/g, "").trim();
   return /^\d+$/.test(s) ? Number(s) : Number.NaN;
 }
+
+/** 受付のしかたの選びかた（specs/collect/004）。 */
+const CHECK_IN_MODE_OPTIONS: { value: CheckInMode; label: string; description: string }[] = [
+  { value: "rosterless", label: "名簿なし", description: "参加者がセルフ受付のQRで名前と申し込んだ場所を入れると、名簿に入ります。" },
+  { value: "roster", label: "名簿あり", description: "先に名簿を入れておき、参加者は名簿の中から自分を探します。" },
+];
 
 let tierSeq = 0;
 const newTier = (name = "", amount = ""): TierDraft => ({ key: `t${++tierSeq}`, name, amount });
@@ -42,10 +58,21 @@ function initialOf(event?: CollectEvent, draft?: ThreadsCandidate) {
       capacity: draft.capacity === null ? "" : String(draft.capacity),
       methods: [...COLLECT_METHODS] as CollectMethod[],
       tiers: [newTier("通常", draft.feeAmount === null ? "" : String(draft.feeAmount))],
+      checkInMode: NEW_EVENT_CHECK_IN_MODE as CheckInMode,
     };
   }
   if (!event) {
-    return { name: "", date: "", start: "19:00", end: "21:00", venue: "", capacity: "", methods: [...COLLECT_METHODS] as CollectMethod[], tiers: [newTier("通常")] };
+    return {
+      name: "",
+      date: "",
+      start: "19:00",
+      end: "21:00",
+      venue: "",
+      capacity: "",
+      methods: [...COLLECT_METHODS] as CollectMethod[],
+      tiers: [newTier("通常")],
+      checkInMode: NEW_EVENT_CHECK_IN_MODE as CheckInMode,
+    };
   }
   const starts = toJstParts(event.startsAt);
   return {
@@ -57,6 +84,7 @@ function initialOf(event?: CollectEvent, draft?: ThreadsCandidate) {
     capacity: event.capacity === null ? "" : String(event.capacity),
     methods: event.methods,
     tiers: event.tiers.map((t) => ({ ...newTier(t.name, String(t.amount)), id: t.id })),
+    checkInMode: event.checkInMode,
   };
 }
 
@@ -122,6 +150,7 @@ export function EventForm({
       capacity,
       methods: COLLECT_METHODS.filter((m) => v.methods.includes(m)),
       tiers: tiers.map((t) => (t.id ? t : { name: t.name, amount: t.amount })),
+      checkInMode: v.checkInMode,
     });
   };
 
@@ -168,6 +197,27 @@ export function EventForm({
           <Input id="event-capacity" inputMode="numeric" value={v.capacity} onChange={(e) => set("capacity", e.target.value)} />
         </div>
       </div>
+      <fieldset className="space-y-2">
+        <legend className="text-sm font-medium">受付のしかた</legend>
+        <div className="grid gap-2 sm:grid-cols-2" role="radiogroup" aria-label="受付のしかた">
+          {CHECK_IN_MODE_OPTIONS.map((o) => {
+            const on = v.checkInMode === o.value;
+            return (
+              <button
+                key={o.value}
+                type="button"
+                role="radio"
+                aria-checked={on}
+                className={`min-h-11 rounded-lg border px-3 py-2 text-left text-sm ${on ? "border-primary bg-primary/5 ring-1 ring-primary" : "hover:bg-accent"}`}
+                onClick={() => set("checkInMode", o.value)}
+              >
+                <span className="block font-medium">{o.label}</span>
+                <span className="block text-xs text-muted-foreground">{o.description}</span>
+              </button>
+            );
+          })}
+        </div>
+      </fieldset>
       <fieldset className="space-y-2">
         <legend className="text-sm font-medium">使う払い方</legend>
         <div className="flex flex-wrap gap-2">

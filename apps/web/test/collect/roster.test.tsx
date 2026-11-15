@@ -173,6 +173,14 @@ describe("まとめて貼る", () => {
 });
 
 describe("名簿の表", () => {
+  it("名簿なしのイベントでは、参加者が入れると増えることを知らせ、区分が未定の人に「区分を確かめる」（specs/collect/004、tasks.md T033）", async () => {
+    mocks.event.mockResolvedValue({ ...EVENT, checkInMode: "rosterless" });
+    mocks.roster.mockResolvedValue({ people: [person({ tierUndecided: true, selfEntered: true, priceTierId: "t2" })], version: 1 });
+    renderRoster();
+    expect(await screen.findByText(/名簿なしの受付です/)).toBeInTheDocument();
+    expect(await screen.findByRole("cell", { name: "区分を確かめる" })).toBeInTheDocument();
+  });
+
   it("受付番号・名前・媒体・区分を出す", async () => {
     mocks.roster.mockResolvedValue({ people: [person({ kana: "まつもと れい", memo: "紹介：井上" }), person({ id: "p3", number: 3, name: "井上 そら", media: "minato", priceTierId: "t2" })], version: 3 });
     renderRoster();

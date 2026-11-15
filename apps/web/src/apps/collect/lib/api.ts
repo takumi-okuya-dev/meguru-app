@@ -46,6 +46,7 @@ import {
   rosterListSchema,
   rosterPersonSchema,
   type CollectMedia,
+  type CheckInMode,
   type CollectMethod,
 } from "@meguru/shared";
 import { z } from "zod";
@@ -62,6 +63,8 @@ export type EventInput = {
   tiers: { id?: string; name: string; amount: number }[];
   /** Threads の候補から作るときの、元の宣伝内容の番号（作るときだけ） */
   sourceThreadsPromotionId?: string | null;
+  /** 受付のしかた（specs/collect/004。作る画面の初めの値は NEW_EVENT_CHECK_IN_MODE） */
+  checkInMode?: CheckInMode;
 };
 
 /** 名簿の人を足す・直すときの入力。 */
@@ -123,6 +126,9 @@ export const collectApi = {
       resolveSelfRequestResponseSchema,
       json("POST", personId ? { personId } : {}),
     ),
+  // 名簿なしで入った人を名簿から外す（specs/collect/004 contracts/api.md 3-3）
+  removeEntry: (eventId: string, personId: string) =>
+    request(`${ev(eventId)}/reception/${encodeURIComponent(personId)}/entry`, versionResponseSchema, { method: "DELETE" }),
   workers: (eventId: string) => request(`${ev(eventId)}/helpers`, receptionWorkersResponseSchema),
   // ---- 締め ----
   closing: (eventId: string) => request(`${ev(eventId)}/closing`, closingSnapshotSchema),
@@ -134,7 +140,9 @@ export const collectApi = {
   exportCsv: (eventId: string) => requestFile(`${ev(eventId)}/export.csv`),
   // ---- 振込待ち ----
   transfers: (q: string) => request(`/api/collect/transfers${q ? `?${new URLSearchParams({ q })}` : ""}`, transferListSchema),
-  confirmTransfer: (personId: string) => request(`/api/collect/transfers/${encodeURIComponent(personId)}/confirm`, transferItemSchema, { method: "POST" }),
+  // 区分が未定の人は、確かめるときに区分を選ぶ（specs/collect/004 contracts/api.md 4-1）
+  confirmTransfer: (personId: string, priceTierId?: string) =>
+    request(`/api/collect/transfers/${encodeURIComponent(personId)}/confirm`, transferItemSchema, json("POST", priceTierId ? { priceTierId } : {})),
   unconfirmTransfer: (personId: string) => request(`/api/collect/transfers/${encodeURIComponent(personId)}/confirm`, transferItemSchema, { method: "DELETE" }),
   // ---- 消す・まとめ ----
   deleteEvent: (eventId: string) => request(ev(eventId), deleteEventResponseSchema, { method: "DELETE" }),

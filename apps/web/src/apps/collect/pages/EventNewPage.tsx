@@ -12,7 +12,7 @@ import { PageBody, PageHeader } from "@/shell";
 import { EventForm } from "../components/EventForm";
 import { collectApi } from "../lib/api";
 import { collectErrorText } from "../lib/errors";
-import { rosterPath } from "../lib/paths";
+import { rosterPath, selfCheckInPath } from "../lib/paths";
 import { collectQueryKeys } from "../lib/query-keys";
 import { yen } from "../lib/reception-model";
 
@@ -77,8 +77,14 @@ export function EventNewPage() {
       queryClient.setQueryData(collectQueryKeys.event(event.id), event);
       void queryClient.invalidateQueries({ queryKey: collectQueryKeys.events });
       void queryClient.invalidateQueries({ queryKey: collectQueryKeys.threadsCandidates });
-      toast.success("イベントを作りました。名簿を入れましょう。");
-      navigate(rosterPath(event.id));
+      // 名簿なしなら、すぐセルフ受付のQRを出せるようにセルフ受付の画面へ（specs/collect/004 FR-003）
+      if (event.checkInMode === "rosterless") {
+        toast.success("イベントを作りました。セルフ受付のQRを出しましょう。");
+        navigate(selfCheckInPath(event.id));
+      } else {
+        toast.success("イベントを作りました。名簿を入れましょう。");
+        navigate(rosterPath(event.id));
+      }
     },
     onError: (err) => toast.error(collectErrorText(err)),
   });

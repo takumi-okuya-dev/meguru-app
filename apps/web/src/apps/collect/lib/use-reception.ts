@@ -35,6 +35,8 @@ export type ReceptionSource = {
   // セルフ受付の本人の申告を確かめる・申し出を片付ける（specs/collect/002）
   confirm: (personId: string, input: ConfirmReceptionRequest) => Promise<RecordReceptionResponse>;
   resolveRequest: (requestId: string, action: SelfRequestAction, personId?: string) => Promise<{ version: number; person?: ReceptionPerson }>;
+  // 名簿なしで入った人を名簿から外す（specs/collect/004）
+  removeEntry: (personId: string) => Promise<{ version: number }>;
   // リンクが止められた（手伝う人）
   onLinkStopped?: () => void;
 };
@@ -227,6 +229,18 @@ export function useReception(source: ReceptionSource, enabled = true) {
       } catch (err) {
         if (err instanceof ApiError && err.code === "REQUEST_RESOLVED") toast.info("この申し出は、ほかの人がもう片付けました。");
         else toast.error(collectErrorText(err));
+        resync();
+        return false;
+      }
+    },
+    // 名簿なしで入った人を名簿から外す（記録のない人だけ。specs/collect/004 FR-024）
+    removeEntry: async (personId: string): Promise<boolean> => {
+      try {
+        const { version } = await source.removeEntry(personId);
+        apply(version, (s) => ({ ...s, people: s.people.filter((p) => p.person.id !== personId) }));
+        return true;
+      } catch (err) {
+        toast.error(collectErrorText(err));
         resync();
         return false;
       }

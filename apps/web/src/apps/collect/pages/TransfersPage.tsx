@@ -17,6 +17,7 @@ import { collectApi } from "../lib/api";
 import { collectErrorText } from "../lib/errors";
 import { collectQueryKeys } from "../lib/query-keys";
 import { yen } from "../lib/reception-model";
+import { TierChoiceDialog } from "../components/reception/TierChoiceDialog";
 
 /**
  * 振込待ちの画面。
@@ -29,14 +30,16 @@ export function TransfersPage() {
   const transfers = useQuery({ queryKey: collectQueryKeys.transfers(q), queryFn: () => collectApi.transfers(q), placeholderData: (prev) => prev });
   const settings = useQuery({ queryKey: collectQueryKeys.settings, queryFn: collectApi.settings });
   const [manualCopy, setManualCopy] = useState<string | null>(null);
+  // 区分を選んでから入金を確かめる人（名簿なしで区分が未定。specs/collect/004 FR-022）
+  const [choosingTier, setChoosingTier] = useState<TransferItem | null>(null);
   const refresh = () => {
     void queryClient.invalidateQueries({ queryKey: collectQueryKeys.transfersAll });
     void queryClient.invalidateQueries({ queryKey: collectQueryKeys.me });
     void queryClient.invalidateQueries({ queryKey: collectQueryKeys.events });
   };
   const confirm = useMutation({
-    mutationFn: ({ personId, confirmed }: { personId: string; confirmed: boolean }) =>
-      confirmed ? collectApi.confirmTransfer(personId) : collectApi.unconfirmTransfer(personId),
+    mutationFn: ({ personId, confirmed, priceTierId }: { personId: string; confirmed: boolean; priceTierId?: string }) =>
+      confirmed ? collectApi.confirmTransfer(personId, priceTierId) : collectApi.unconfirmTransfer(personId),
     onSuccess: (_, { confirmed }) => {
       toast.success(confirmed ? "入金を確かめました。" : "振込待ちに戻しました。");
       refresh();
@@ -64,7 +67,11 @@ export function TransfersPage() {
         <div className="flex items-baseline gap-2">
           <span className="text-sm text-muted-foreground tabular-nums">No.{t.number}</span>
           <span className="truncate font-medium">{t.name}</span>
-          <span className="tabular-nums">{yen(t.amount)}</span>
+          {t.tierUndecided && t.tiers.length > 1 ? (
+            <span className="text-sm font-medium text-amber-700 dark:text-amber-400">区分を確かめる</span>
+          ) : (
+            <span className="tabular-nums">{yen(t.amount)}</span>
+          )}
         </div>
         <div className="truncate text-xs text-muted-foreground">
           {t.eventName}（{formatJstMonthDay(t.eventStartsAt)}）・{t.method === "transfer_today" ? "当日" : "後日"}・受付 {formatJstShort(t.recordedAt)}
@@ -81,7 +88,12 @@ export function TransfersPage() {
             <Button type="button" variant="outline" size="sm" onClick={() => void copy(t)}>
               <CopyIcon className="size-4" /> 連絡文をコピー
             </Button>
-            <Button type="button" size="sm" disabled={confirm.isPending} onClick={() => confirm.mutate({ personId: t.personId, confirmed: true })}>
+            <Button
+              type="button"
+              size="sm"
+              disabled={confirm.isPending}
+              onClick={() => (t.tierUndecided && t.tiers.length > 1 ? setChoosingTier(t) : confirm.mutate({ personId: t.personId, confirmed: true }))}
+            >
               入金を確かめた
             </Button>
           </>
@@ -113,6 +125,17 @@ export function TransfersPage() {
           </section>
         )}
       </PageBody>
+      {choosingTier && (
+        <TierChoiceDialog
+          title={`No.${choosingTier.number} ${choosingTier.name}の区分`}
+          tiers={choosingTier.tiers}
+          onChoose={(priceTierId) => {
+            confirm.mutate({ personId: choosingTier.personId, confirmed: true, priceTierId });
+            setChoosingTier(null);
+          }}
+          onClose={() => setChoosingTier(null)}
+        />
+      )}
       {manualCopy && (
         <Dialog open onOpenChange={(v) => !v && setManualCopy(null)}>
           <DialogContent className="sm:max-w-lg" aria-describedby="manual-copy-desc">
