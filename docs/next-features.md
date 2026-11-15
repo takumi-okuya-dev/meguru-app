@@ -10,7 +10,8 @@
 |---|---|---|
 | 集金 | テスト版で、名簿なしで受付する流れを確かめる（004 T040）。001〜003の流れも、同じときに通す（001 T082） | [004 tasks.md](../specs/collect/004-rosterless-check-in/tasks.md)・[001 tasks.md](../specs/collect/001-event-day-collection/tasks.md) |
 | 集金 | 1回のイベントのあと、Durable Objectsの使用量をCloudflareの画面で確かめ、research.md R4と[運用コストの試算](./cost-estimate.md)に足す（001 T084） | [001 tasks.md](../specs/collect/001-event-day-collection/tasks.md) |
-| 人物メモ | テスト版での手の確かめ（001 T095）・サイドバーの名前・専門家への確かめ・過去のアンケートの取り込み（ユーザーの確認待ち） | [人物メモの地図](./apps/people.md) |
+| 人物メモ | テスト版での手の確かめ（001 T095） | [手の確かめの表](../specs/people/001-people-memo/checklists/manual-check.md) |
+| 人物メモ | サイドバーの名前・専門家への確かめ・過去のアンケートの取り込み（ユーザーが決めること） | このバックログ |
 | めぐる | アプリをまとめて買う料金と、アプリごとの契約の持ち方（人物メモ・集金を広く出す前に決める） | [プロダクトの構造](./product-structure.md) 7 |
 
 ## F. このアプリ専用のThreadsコンサルAIエージェント（2026-11-02）
