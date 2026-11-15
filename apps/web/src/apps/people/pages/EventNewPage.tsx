@@ -1,9 +1,10 @@
 // 「/people/events/new」：イベントを作る（specs/people/001-people-memo contracts/ui-routes.md 1）。名前・開催日・自分の会か。
+// Threads のイベントの候補から選んで作れる（specs/people/003）。
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router";
 import { describeError } from "@/lib/api-client";
 import { PageBody, PageHeader } from "@/shell";
-import { EventForm } from "../components/EventForm";
+import { EventCreateForm } from "../components/EventCreateForm";
 import { peopleApi } from "../lib/api";
 import { eventPath, eventsPath } from "../lib/paths";
 import { refreshEvents } from "../lib/refresh";
@@ -26,8 +27,7 @@ export function EventNewPage() {
     <>
       <PageHeader title="イベントを作る" />
       <PageBody>
-        <EventForm
-          submitLabel="作る"
+        <EventCreateForm
           pending={create.isPending}
           error={create.isError ? describeError(create.error) : null}
           onSubmit={(input) => create.mutate(input)}

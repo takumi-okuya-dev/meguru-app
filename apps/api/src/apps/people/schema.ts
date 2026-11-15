@@ -45,12 +45,34 @@ export const peopleEvents = peopleSchema.table(
     name: text("name").notNull(),
     heldOn: date("held_on", { mode: "string" }).notNull(),
     isOwn: boolean("is_own").notNull().default(true),
+    // Threads のイベントの候補から作ったときの元の宣伝内容の番号（specs/people/003。値だけで外部キーなし）
+    sourceThreadsPromotionId: text("source_threads_promotion_id"),
     ...timestamps,
   },
   (t) => [
     check("people_events_name_length", sql`char_length(${t.name}) BETWEEN 1 AND 100`),
     index("people_events_user_held_idx").on(t.userId, t.heldOn),
+    // 1つの宣伝内容から作れるのは、作り手ごとに1つ（空は重ならない）
+    uniqueIndex("people_events_user_source_threads_uq").on(t.userId, t.sourceThreadsPromotionId),
   ],
+);
+
+/**
+ * Threads のイベントの候補（specs/people/003 plan.md データ）。Threads の出来事を受け取って写す。
+ * Threads の表は読まない（パターン①）。写すのは人物メモのイベントを作るのに要る値だけ。
+ */
+export const peopleThreadsEventCandidates = peopleSchema.table(
+  "threads_event_candidates",
+  {
+    promotionId: text("promotion_id").primaryKey(),
+    userId: uuid("user_id").notNull(),
+    name: text("name").notNull(),
+    startsAt: timestamp("starts_at", { withTimezone: true }).notNull(),
+    deletedAt: timestamp("deleted_at", { withTimezone: true }),
+    // 最後に写した出来事の起きた時刻（これより古い出来事は捨てる）
+    detailsOccurredAt: at("details_occurred_at").notNull(),
+  },
+  (t) => [index("people_threads_event_candidates_user_idx").on(t.userId, t.startsAt)],
 );
 
 // ---- 2-2. 取り込み ----

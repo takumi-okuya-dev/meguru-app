@@ -40,6 +40,7 @@ import type {
   OutreachStage,
   PeopleSettings,
   PeopleStats,
+  PeopleThreadsCandidate,
 } from "@meguru/shared/people";
 import { z } from "zod";
 import { request, requestFile } from "@/lib/api-client";
@@ -52,6 +53,8 @@ const typed = <T>() => z.custom<T>(() => true);
 
 /** イベントを作る・直すの入力。 */
 export type EventInput = { name: string; heldOn: string; isOwn: boolean };
+/** イベントを作るときの入力。sourceThreadsPromotionId は Threads のイベントの候補から作るときの元の番号（specs/people/003）。 */
+export type EventCreateInput = EventInput & { sourceThreadsPromotionId?: string };
 
 /** 取り込みのプレビューの入力（CSVの見出しと行は、メモリーにだけ置いたものを送る。research.md R18）。 */
 export type ImportPreviewInput = {
@@ -258,12 +261,14 @@ export const peopleApi = {
   me: () => request("/api/people/me", typed<PeopleMe>()),
   // ---- イベント（contracts/api.md 2）----
   events: async () => (await request("/api/people/events", typed<{ events: PeopleEventListItem[] }>())).events,
-  createEvent: async (input: EventInput) =>
+  createEvent: async (input: EventCreateInput) =>
     (await request("/api/people/events", typed<{ event: PeopleEvent }>(), withBody("POST", input))).event,
   event: (id: string) => request(eventUrl(id), typed<PeopleEventDetail>()),
   attendees: async (id: string) => (await request(`${eventUrl(id)}/attendees`, typed<{ attendees: PeopleAttendee[] }>())).attendees,
   updateEvent: async (id: string, input: Partial<EventInput>) =>
     (await request(eventUrl(id), typed<{ event: PeopleEvent }>(), withBody("PATCH", input))).event,
+  // ---- Threads のイベントの候補（specs/people/003 plan.md API）----
+  threadsCandidates: async () => (await request("/api/people/threads-candidates", typed<{ candidates: PeopleThreadsCandidate[] }>())).candidates,
   eventDeletePreview: (id: string) => request(`${eventUrl(id)}/delete-preview`, typed<EventDeletePreview>()),
   deleteEvent: (id: string, keepPeopleWithNotes?: boolean) =>
     request(eventUrl(id), typed<UndoResult>(), withBody("DELETE", { keepPeopleWithNotes })),

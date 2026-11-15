@@ -60,14 +60,21 @@ export const consentSchema = z.object({ invite: z.boolean(), work: z.boolean() }
 
 // ---- イベント（contracts/api.md 2） ----
 
-/** POST /api/people/events の入力。 */
-export const eventCreateSchema = z.object({
+const eventFields = {
   name: z.string().trim().min(1).max(100),
   heldOn: dateString,
   isOwn: z.boolean(),
+};
+/** POST /api/people/events の入力。sourceThreadsPromotionId は Threads のイベントの候補から作るときの元の番号（specs/people/003）。 */
+export const eventCreateSchema = z.object({
+  ...eventFields,
+  sourceThreadsPromotionId: z.string().min(1).max(100).optional(),
 });
-/** PATCH /api/people/events/:eventId の入力（1つ以上）。 */
-export const eventUpdateSchema = eventCreateSchema.partial().refine((v) => Object.keys(v).length > 0, { message: "empty", path: ["name"] });
+/** PATCH /api/people/events/:eventId の入力（1つ以上）。元の宣伝内容の番号は変えられない。 */
+export const eventUpdateSchema = z
+  .object(eventFields)
+  .partial()
+  .refine((v) => Object.keys(v).length > 0, { message: "empty", path: ["name"] });
 
 /** 取り消し・イベントを消すの本文。 */
 export const keepPeopleSchema = z.object({ keepPeopleWithNotes: z.boolean().optional() });
@@ -322,6 +329,8 @@ export type PeopleMe = { personCount: number; eventCount: number };
 
 /** イベント。 */
 export type PeopleEvent = { id: string; name: string; heldOn: string; isOwn: boolean };
+/** Threads のイベントの候補（specs/people/003 plan.md API）。usedByEventId はこの候補から作ったイベントの番号。 */
+export type PeopleThreadsCandidate = { promotionId: string; name: string; startsAt: string; usedByEventId: string | null };
 /** イベントの一覧の1行。 */
 export type PeopleEventListItem = PeopleEvent & { attendeeCount: number; importCount: number };
 /** 取り込みの数。 */

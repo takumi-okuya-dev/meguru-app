@@ -8,7 +8,8 @@ specs/people/001-people-memo。運営者が開いた人だけが使える（`reg
 
 | 小分け | 表 | 処理とAPIの入口 |
 |---|---|---|
-| `events/`（イベント） | `events` | `event-service.ts`（作る・直す・一覧・数字・来た人・消す。参加者数は毎回数える。`nextOwnEvent`：今日以降でいちばん近い自分の会）・`event-routes.ts` |
+| `events/`（イベント） | `events` | `event-service.ts`（作る・直す・一覧・数字・来た人・消す。参加者数は毎回数える。`nextOwnEvent`：今日以降でいちばん近い自分の会。Threads のイベントの候補から作るときは元の宣伝内容の番号`source_threads_promotion_id`を持つ（作り手ごとに1つ）。003）・`event-routes.ts` |
+| `threads-candidates/`（Threads のイベントの候補。003） | `threads_event_candidates` | `candidate-service.ts`（作り手の候補を開催日時の近い順に・作ったイベントの番号を添える・自分の候補かの確かめ）・`candidate-routes.ts`（`GET /api/people/threads-candidates`） |
 | `imports/`（取り込み） | `imports`・`column_mappings`・`choice_mappings`・`responses`・`erased_responses` | `mapping.ts`（列と同意の選択肢の対応・覚える）・`classify.ts`（行の判定・二重の印）・`candidates.ts`（同じ人の候補）・`import-service.ts`（プレビューと書く）・`undo.ts`（取り消し・イベントを消すときの取り消し）・`import-routes.ts` |
 | `persons/`（人） | `persons`・`manual_attendances`・`consent_changes`・`erased_attendances` | `person-derive.ts`（今のLINE名と同意を決め直す）・`person-query.ts`（来た記録・最後に会った日・いちばん新しい回答の問い合わせの部品）・`person-list.ts`（人の一覧・選べる値）・`person-service.ts`（人のページ・直す・同意を直す）・`person-create.ts`（手で足す・会ったイベント）・`person-merge.ts`（まとめる・分ける）・`person-delete.ts`（人を消す。数と回答の印は残す）・`person-export.ts`（CSV の書き出し。002）・`person-routes.ts` |
 | `outreach/`（誘う候補・声かけ） | `outreaches` | `candidate-service.ts`（誘う候補。目的の同意を問い合わせの条件に入れる。`eventId=next` なら誘う会を API が決める）・`outreach-service.ts`（始める・進み具合・消す・自動で「来た」・まとめるときの移し替え）・`outreach-board.ts`（会ごとの声かけの一覧。002）・`outreach-routes.ts` |
@@ -18,16 +19,16 @@ specs/people/001-people-memo。運営者が開いた人だけが使える（`reg
 | `home/`（今日やること・過ぎたもの・近い誕生日。002） | — | `home-service.ts`・`home-routes.ts` |
 | `settings/`（設定と数字） | `owner_settings` | `settings-service.ts`（誘いの文の型・リピーターの目標・リピーターの数・次の自分の会）・`settings-routes.ts` |
 | `me/`（人物メモの「自分」） | — | `me-routes.ts`（`GET /api/people/me`） |
-| `inbox/`（出来事の受け取り） | `received_events` | `withdrawal.ts`（`user.withdrawn`の受け取り） |
-| （直下） | — | `index.ts`（入口）・`schema.ts`（19表。スキーマ`people`）・`register.ts`（`registerPeople()`）・`registry.ts`（アプリの番号）・`access.ts`（作り手のロック・持ち主の行の読み込み `loadOwnedRow` とその包み `loadOwnedEvent` など・名前の重なりの確かめ `assertKeyFree`）・`usage.ts`（`reportUsage`。数はいつも0）・`routes.ts`（`/api/people`の関所と道筋） |
+| `inbox/`（出来事の受け取り） | `received_events` | `withdrawal.ts`（`user.withdrawn`の受け取り。Threads のイベントの候補も消す）・`threads-candidates.ts`（Threads の`threads.promotion_event.saved`・`.deleted`を候補に写す。名前と開始の時刻だけ。古い出来事は捨てる。候補から作ったイベントは変えない。003） |
+| （直下） | — | `index.ts`（入口）・`schema.ts`（20表。スキーマ`people`）・`register.ts`（`registerPeople()`）・`registry.ts`（アプリの番号）・`access.ts`（作り手のロック・持ち主の行の読み込み `loadOwnedRow` とその包み `loadOwnedEvent` など・名前の重なりの確かめ `assertKeyFree`）・`usage.ts`（`reportUsage`。数はいつも0）・`routes.ts`（`/api/people`の関所と道筋） |
 
 ## 2. 2作目の実例として（docs/app-separation.md 5 の Threads の表と同じ見方）
 
 | 何 | 人物メモの実例 |
 |---|---|
-| 表の置き場所 | `apps/api/src/apps/people/schema.ts`。`pgSchema("people")`で19表。共通の表との外部キーは0本で、作り手は`user_id`の値で持つ |
+| 表の置き場所 | `apps/api/src/apps/people/schema.ts`。`pgSchema("people")`で20表。共通の表との外部キーは0本で、作り手は`user_id`の値で持つ |
 | 使える人 | `register.ts`で`registerAppAccess("people", "granted")`、`routes.ts`で`requireAppAccess("people")`（運営者が開いた人だけ。specs/meguru/030） |
-| 出来事の受け取り | `inbox/withdrawal.ts`。`user.withdrawn`で、自分のトランザクションの中で`people.received_events`に番号を記録し、作り手のロックを取ってからデータを消す |
+| 出来事の受け取り | `inbox/withdrawal.ts`。`user.withdrawn`で、自分のトランザクションの中で`people.received_events`に番号を記録し、作り手のロックを取ってからデータを消す。`inbox/threads-candidates.ts`は Threads の宣伝内容のイベントを、同じく番号を記録してから自分の表に写す（Threads の表は読まない。003） |
 | 書き込みの直列 | `access.ts`の`lockOwner`（作り手ごとのアドバイザリーロック）。行を作る書き込みは`lockActiveOwner`で、退会の途中でないことをロックの中で確かめる |
 | 利用の数 | `usage.ts`の`reportPeopleUsage`（料金の数はいつも0、イベントか人があれば「使っている」） |
 | 使い方 | この文書の4章 |
@@ -37,7 +38,7 @@ specs/people/001-people-memo。運営者が開いた人だけが使える（`reg
 
 | モジュール | 主な中身 |
 |---|---|
-| `apps/people/` | `index.ts`（`peopleApp`）・`routes.tsx`・`shell/`（`PeopleShell`：サイドバーの中身と、767px以下の下のバー）・`pages/`（誘う候補・取り込み・イベント・イベントのページ・会ごとの声かけの一覧・人の一覧・人のページ・人を足す・誘いの文と目標）・`components/`（`import/`：取り込みの段・同じ人の候補のカード／`person/`：探す欄・絞り込み・人の行・人のページの各段・まとめる・消す・声かけの記録・タグ・次にやること・連絡の記録・自由な項目・SNS のリンク／`candidates/`：誘う会の選択・目的の切り替え・候補の行と文のコピー・リピーターの段／`home/`：今日の声かけ／`outreach/`：声かけの進み具合の操作（誘う候補・人のページ・会ごとの声かけの一覧で共通）／`settings/`：タグと自由な項目の設定）・`lib/`（`api.ts`・`query-keys.ts`・`paths.ts`・`refresh.ts`・`read-csv-file.ts`） |
+| `apps/people/` | `index.ts`（`peopleApp`）・`routes.tsx`・`shell/`（`PeopleShell`：サイドバーの中身と、767px以下の下のバー）・`pages/`（誘う候補・取り込み・イベント・イベントのページ・会ごとの声かけの一覧・人の一覧・人のページ・人を足す・誘いの文と目標）・`components/`（`EventCreateForm.tsx`・`ThreadsEventPicker.tsx`：イベントを作る入力欄と Threads のイベントの候補から選ぶ欄。003／`import/`：取り込みの段・同じ人の候補のカード／`person/`：探す欄・絞り込み・人の行・人のページの各段・まとめる・消す・声かけの記録・タグ・次にやること・連絡の記録・自由な項目・SNS のリンク／`candidates/`：誘う会の選択・目的の切り替え・候補の行と文のコピー・リピーターの段／`home/`：今日の声かけ／`outreach/`：声かけの進み具合の操作（誘う候補・人のページ・会ごとの声かけの一覧で共通）／`settings/`：タグと自由な項目の設定）・`lib/`（`api.ts`・`query-keys.ts`・`paths.ts`・`refresh.ts`・`read-csv-file.ts`） |
 | 共通の部品 | 書き出しのファイルの受け取りは `lib/api-client.ts` の `requestFile`、保存は `lib/save-file.ts`（ほかのアプリと共通） |
 
 ## 4. 使い方（主催者向け）
@@ -50,7 +51,7 @@ specs/people/001-people-memo。運営者が開いた人だけが使える（`reg
 
 1. Googleフォームの回答を、CSVで書き出します（「回答」→ スプレッドシート → 「ファイル」→「ダウンロード」→「CSV」）。
 2. 人物メモの「取り込み」を開き、CSVを選びます。ファイルは画面の中で読むだけで、そのまま送ったり残したりはしません。
-3. どのイベントの回答かを選びます。まだなければ、その場で作れます（名前・開催日・自分の会か）。
+3. どのイベントの回答かを選びます。まだなければ、その場で作れます（名前・開催日・自分の会か）。めぐる Threads の宣伝内容に開催日時を入れて保存してあれば、「Threadsのイベントから作る」で選ぶと名前と開催日が入ります（Threads で直しても、作ったイベントは変わりません）。
 4. 列の対応を確かめます。LINE名の列は必ず選んでください。一度選んだ対応は覚えるので、次から同じ質問文は自動で当たります。
 5. 同じ人の候補が出たら、1行ずつ「つなぐ」か「別の人」を選びます。勝手にはつなぎません。
 6. 「取り込む」を押すと、人の一覧ができます。間違えたときは、イベントのページから取り込みを取り消せます。

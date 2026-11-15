@@ -77,7 +77,7 @@ flowchart TB
 |---|---|---|
 | `user.withdrawn` | 退会の処理（`platform/withdrawal/withdrawal-service.ts`）。利用者を退会にしたのと同じトランザクション。すべての受け取りが済んだあとで、共通が`users`の行を消す | その人が持ち主のアカウントを消し（テスター招待の片づけ・Metaのデータ削除の要求の完了を含む）、メンバー・チーム・担当から外し、作った人の欄を空にする（`apps/threads/accounts/withdrawal-cleanup.ts`） |
 | `limits.changed` | 運営者が上限を保存したとき（`platform/operator/limit-service.ts`）。保存と同じトランザクション | 自動投稿を起こす（`notifyWake`） |
-| `threads.promotion_event.saved`・`threads.promotion_event.deleted`・`threads.listing_status.changed` | Threads が宣伝内容のイベントの情報・外部媒体の掲載の状況を変えたとき（同じトランザクション） | （Threadsは受け取らない）集金管理が「Threadsのイベントの候補」に写す（specs/collect/001 contracts/events.md 2） |
+| `threads.promotion_event.saved`・`threads.promotion_event.deleted`・`threads.listing_status.changed` | Threads が宣伝内容のイベントの情報・外部媒体の掲載の状況を変えたとき（同じトランザクション） | （Threadsは受け取らない）集金管理が「Threadsのイベントの候補」に写す（specs/collect/001 contracts/events.md 2）。人物メモも、保存した・消したを自分の「Threadsのイベントの候補」に写す（掲載の状況は使わない。specs/people/003） |
 
 - アカウントを消すとき・開くときの処理は、アカウントがThreadsの持ち物なので、Threadsの中の処理にしている（共通からアプリへの同じトランザクションの「知らせ」はない）。
 

@@ -1,4 +1,4 @@
-// 宣伝内容のイベントの情報を、ほかのアプリ（集金管理）に出来事で伝える（specs/collect/001-event-day-collection contracts/events.md 2、
+// 宣伝内容のイベントの情報を、ほかのアプリ（集金管理・人物メモ）に出来事で伝える（specs/collect/001-event-day-collection contracts/events.md 2、
 // docs/module-map.md 1-4）。Threads は宣伝内容を変えるのと同じトランザクションで出来事を書き、トランザクションのあとで届ける。
 // 受け取るアプリがまだない（入っていない）こともあるので、届け先がなければ何も書かない（allowNoConsumers）。
 // 中身に入れるのは、受け取る側が候補として写すのに要る値だけ（宣伝の本文・ターゲットなどは入れない）。

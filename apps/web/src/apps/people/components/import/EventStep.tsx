@@ -5,7 +5,8 @@ import { PlusIcon } from "lucide-react";
 import { useId, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { describeError } from "@/lib/api-client";
-import { EventForm, fieldClass } from "../EventForm";
+import { EventCreateForm } from "../EventCreateForm";
+import { fieldClass } from "../EventForm";
 import { formatHeldOn } from "../format";
 import { peopleApi } from "../../lib/api";
 import { peopleQueryKeys } from "../../lib/query-keys";
@@ -51,8 +52,7 @@ export function EventStep({
       {creating ? (
         <div className="space-y-3 rounded-2xl border bg-card p-4">
           <h3 className="text-sm font-medium">新しいイベントを作る</h3>
-          <EventForm
-            submitLabel="作る"
+          <EventCreateForm
             pending={create.isPending}
             error={create.isError ? describeError(create.error) : null}
             onSubmit={(input) => create.mutate(input)}
