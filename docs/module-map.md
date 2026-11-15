@@ -59,7 +59,7 @@ flowchart TB
 ### 1-3. データの持ち主
 
 - 表には持ち主のモジュールが1つある（2章）。表の定義は持ち主の`schema.ts`に置く。
-- 持ち主でないモジュールは、表を読まないし、書き換えない（例外の列は029でなくなった。3章）。ほかのモジュールのデータが要るときは、入口の関数で受け取る。
+- 持ち主でないモジュールは、表を読まないし、書き換えない（例外はない。3章）。ほかのモジュールのデータが要るときは、入口の関数で受け取る。
 - アプリの表は共通の表を参照しない（読む・外部キーのどちらも）。利用者のIDを値として持ち、名前や利用権は共通の入口の関数から受け取る。共通の表もアプリの表を参照しない（Threadsと共通の間の外部キーは0本）。
 - アプリの表はアプリ専用のスキーマに置く（Threadsは`threads`）。共通の表は`public`。今後マイクロサービスにしていく可能性に備えた決まりで、詳しくは[docs/app-separation.md](./app-separation.md)。
 
@@ -79,7 +79,7 @@ flowchart TB
 | `limits.changed` | 運営者が上限を保存したとき（`platform/operator/limit-service.ts`）。保存と同じトランザクション | 自動投稿を起こす（`notifyWake`） |
 | `threads.promotion_event.saved`・`threads.promotion_event.deleted`・`threads.listing_status.changed` | Threads が宣伝内容のイベントの情報・外部媒体の掲載の状況を変えたとき（同じトランザクション） | （Threadsは受け取らない）集金管理が「Threadsのイベントの候補」に写す（specs/collect/001 contracts/events.md 2） |
 
-- 027で作った同じトランザクションの「知らせ」（`platform/hooks.ts`）は、029で消した。アカウントを消すとき・開くときの処理は、アカウントがThreadsの持ち物になったので、Threadsの中の処理にした。
+- アカウントを消すとき・開くときの処理は、アカウントがThreadsの持ち物なので、Threadsの中の処理にしている（共通からアプリへの同じトランザクションの「知らせ」はない）。
 
 ### 1-5. 自動のチェック
 
@@ -160,7 +160,7 @@ flowchart TB
 
 ## 3. 例外：持ち主でないモジュールが書き換えてよい列
 
-今は**ない**。029で、`accounts`をThreadsの持ち物にし、`operator_settings.tester_slot_capacity`をThreadsの`threads.settings`へ移した（`operator_settings`は消し、上限の既定の値は`app_limit_defaults`へ移した）ので、027で書いていた例外の列はなくなった。
+今は**ない**。`accounts`はThreadsの持ち物、Metaのテスターの枠の数はThreadsの`threads.settings`、上限の既定の値は`app_limit_defaults`にある。
 
 - 例外は、組み立ての`jobs/key-rotation.ts`だけ（暗号の鍵の入れ替えのため、共通とThreadsの両方の表を書き換える。2-5）。
 - ESLintでは列までは止められない。新しく例外が要るときは、ここに表・書き換えるモジュール・列・理由を書いて、レビューで確かめる。
@@ -173,15 +173,10 @@ ESLintで止められる違反は0件にする。今すぐ直せないものは�
 |---|---|---|---|
 | （なし） | — | — | — |
 
-- 027で書いていた例外（`operator_events.application_id`の外部キーのために、`platform/schema.ts`がThreadsの`tester_applications`を読む）は、029で外部キーを外して値だけにしたので、なくなった。
 
-## 5. 027での並べ替えの記録
+## 5. 並べ替えの記録
 
-- 2026-11-10、027のPR2で、このとおりに並べ替えた。動きは変えていない（テストの数・`db:generate`で変更なし・APIの入口の一覧（`apps/api/test/repo/routes.snapshot.txt`）が同じ）。
-- 逆向きの依存の解消：接続の処理（`completeConnection`・`verifyConnection`）と確かめ待ちの件数の入口はThreadsへ移し、残りは1-4の知らせにした。
-- DBの接続（`kernel/db/client.ts`）には表の定義を渡さないようにした（`db.query`のリレーションの問い合わせは使っていない。土台が表の定義に依存しないため）。
-- 境界の規則は`strictPlacement`を有効にした。
-- 029（2026-11-13）で、上の知らせは出来事と入口の関数に置き換え、`accounts`・チーム・権限・活動の記録をThreadsへ移した（1-4・2章）。
+027で今の並びに並べ替えたときの記録（動きを変えていないことの確かめ・逆向きの依存の解消）は、[specs/027-modular-monolith](../specs/027-modular-monolith/spec.md)に残している。章の番号を変えないために、この章を残している。
 
 ## 6. アプリのモジュールを足す手順
 

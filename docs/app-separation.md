@@ -4,7 +4,7 @@
 
 めぐるのアプリ（Threadsと2作目以降）は、モジュラーモノリスの**パターン①**（アプリごとにDBを持ち、DBのトランザクション以外の方法で一貫性を保つ）で作る。あとでアプリを別のWorker・別のDBに切り出し、マイクロサービスにしやすくするためである。
 
-> **今後、マイクロサービスにしていく可能性がある**（2026-11-12）。アプリが増えて、アプリごとに出す時期・使う量・担当が分かれてきたら、アプリを1つずつ切り出す。そのときに作り直しにならないよう、2作目からは最初から切り出せる形で作る。いつ・どのアプリから切り出すかは、まだ決めていない（6章）。
+> **今後、マイクロサービスにしていく可能性がある**。アプリが増えて、アプリごとに出す時期・使う量・担当が分かれてきたら、アプリを1つずつ切り出す。そのときに作り直しにならないよう、2作目からは最初から切り出せる形で作る。いつ・どのアプリから切り出すかは、まだ決めていない（6章）。
 
 027・028のめぐるは**パターン②**（DBを共有し、DBのトランザクションで一貫性を保つ）だった。2作目より前に、Threadsも029（`specs/meguru/029-threads-pattern1`）でパターン①にそろえた。2作目からのアプリは、Threadsを実例にして同じ形で作る（5章）。
 
@@ -274,7 +274,7 @@ Threadsも、2作目より前に、029（`specs/meguru/029-threads-pattern1`）�
 | APIの道筋 | すべて`/api/threads/…`の下。Threadsの「自分」は`/api/threads/me`（`apps/threads/me/threads-me.ts`） |
 | 画面 | `apps/web/src/apps/threads/lib/`（`api.ts`の`threadsApi`・`query-keys.ts`の`threadsQueryKeys`・`use-threads-me.ts`の`useThreadsMe`）。退会の確かめは`withdrawalPreview` |
 
-- 027で共通に置いていた`accounts`・`memberships`・チーム・権限の判定・活動の記録は、Threadsの持ち物にした（[module-map.md](./module-map.md) 2-2）。
+- `accounts`・`memberships`・チーム・権限の判定・活動の記録は、Threadsの持ち物（[module-map.md](./module-map.md) 2-2）。
 - 共通の処理と同じトランザクションでアプリの処理を呼ぶ「知らせ」はなくし、出来事に置き換えた（[module-map.md](./module-map.md) 1-4）。
 - Metaに登録したURL（`/api/threads/callback`・`/api/threads/webhooks/…`など）と`/api/data-deletion`は、登録し直さないよう、今のまま残した。
 

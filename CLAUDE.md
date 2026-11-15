@@ -9,6 +9,7 @@
 | 仕様のフォルダと番号・仕様の役目・ブランチとコミットの名前 | [docs/rules/specs.md](docs/rules/specs.md) |
 | コードの書き方・設定と環境・マイグレーション・テスト | [docs/rules/coding.md](docs/rules/coding.md) |
 | アプリごとにセッションを分けて同時に進める・ぶつからないための決まり（**11章**） | [docs/rules/parallel-development.md](docs/rules/parallel-development.md) |
+| 文書の種類と置き場所・作らない文書・書き方 | [docs/rules/documents.md](docs/rules/documents.md) |
 | モジュールの境界（どこが何を持ち、どこから読んでよいか） | [docs/module-map.md](docs/module-map.md)・[docs/app-separation.md](docs/app-separation.md)。アプリごとの地図は`docs/apps/<アプリ>.md` |
 
 どのセッションも、作業を始める前に読み、必ず守る。
