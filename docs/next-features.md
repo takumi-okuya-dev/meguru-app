@@ -1,8 +1,18 @@
-# 次の機能のメモ（仕様づくりの前）
+# バックログ（次にやること・仕様づくりの前のメモ）
 
-**最終更新**：2026-11-12（仕様に移し終えた節を消した。移した先は各`specs/`。018・020・021・022・023など）
+**最終更新**：2026-11-15（バックログにして、残っている確かめを足した）
 
 **位置づけ**：ユーザーと話して決めたこと・まだ決めていないことを、`/speckit-specify`の前に残すメモ。各機能の仕様（`specs/<アプリ>/NNN-…/spec.md`。[仕様と名前の決まり](./rules/specs.md)）を作るときの入力にし、移したらこのメモからは消す。決済のメモは[specs/013-billing/notes.md](../specs/013-billing/notes.md)。
+
+## 残っている確かめ（作り終えたもの）
+
+| アプリ | やること | 正本 |
+|---|---|---|
+| 集金 | テスト版で、名簿なしで受付する流れを確かめる（004 T040）。001〜003の流れも、同じときに通す（001 T082） | [004 tasks.md](../specs/collect/004-rosterless-check-in/tasks.md)・[001 tasks.md](../specs/collect/001-event-day-collection/tasks.md) |
+| 集金 | 1回のイベントのあと、Durable Objectsの使用量をCloudflareの画面で確かめ、research.md R4と[運用コストの試算](./cost-estimate.md)に足す（001 T084） | [001 tasks.md](../specs/collect/001-event-day-collection/tasks.md) |
+| 人物メモ | テスト版での手の確かめ（001 T095） | [手の確かめの表](../specs/people/001-people-memo/checklists/manual-check.md) |
+| 人物メモ | サイドバーの名前・専門家への確かめ・過去のアンケートの取り込み（ユーザーが決めること） | このバックログ |
+| めぐる | アプリをまとめて買う料金と、アプリごとの契約の持ち方（人物メモ・集金を広く出す前に決める） | [プロダクトの構造](./product-structure.md) 7 |
 
 ## F. このアプリ専用のThreadsコンサルAIエージェント（2026-11-02）
 
