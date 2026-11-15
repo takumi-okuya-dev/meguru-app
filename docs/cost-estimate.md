@@ -1,6 +1,6 @@
 # 運用コストの試算
 
-**作成**：2026-10-05（005 自動投稿の計画のときに作成） ／ **更新**：2026-11-12（古い料金の表を消した。総コストの試算は2026-11-05） ／ **関係**：[Constitution](../.specify/memory/constitution.md)「運用コスト制約」、[005 research.md](../specs/005-auto-post/research.md) R3・R14
+**作成**：2026-10-05（005 自動投稿の計画のときに作成） ／ **更新**：2026-11-15（集金の会場の共有のDurable Objectsを足した） ／ **関係**：[Constitution](../.specify/memory/constitution.md)「運用コスト制約」、[005 research.md](../specs/005-auto-post/research.md) R3・R14
 
 利用者の数ごとに、毎月のインフラの費用がどう変わるかの見込み。料金は2026-10-05時点のもの。利用者が増えたとき、または料金が変わったときに見直す。
 
@@ -136,6 +136,7 @@
 | Neon | 月100 CU-hours・通信量5GB・保存1GB | Launch：最低料金なし。$0.106/CU-hour、保存$0.35/GB-month、通信量は月500GBまで含む（超えたら$0.10/GB） |
 | Cloudflare Workers | 1日10万リクエスト。1回の呼び出しでCPU 10ms・外部へのサブリクエスト50回 | Workers Paid：月$5（月1,000万リクエスト・CPU 3,000万msを含む）。KVの枠も増える |
 | Cloudflare Pages・KV | 十分 | — |
+| Cloudflare Durable Objects（SQLite型） | 無料プランで使える（1日10万リクエスト）。集金の会場の共有だけが使う。休止中のWebSocketは時間で課金されず、1回のイベント（記録100件・画面3台）で数百リクエスト程度の見込み（[集金 001 research.md R4](../specs/collect/001-event-day-collection/research.md)。テスト版の実際の数は、イベントのあとに確かめて足す） | Workers Paid（月$5）で枠が増える |
 | Clerk | 月50,000人まで | Pro：月$25（Clerkのロゴを消す、セッションの長さを変えるなど）。必要になるまで付けない |
 
 出典：[Neon pricing](https://neon.com/pricing)、[Neon plans](https://neon.com/docs/introduction/plans)、[Workers pricing](https://developers.cloudflare.com/workers/platform/pricing/)、[Workers limits](https://developers.cloudflare.com/workers/platform/limits/)、[Clerk pricing](https://clerk.com/pricing)

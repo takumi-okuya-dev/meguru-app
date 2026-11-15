@@ -234,8 +234,14 @@ shadcn/uiの色の変数（`apps/web/src/index.css`）を使う。画面イメ�
 
 ### 下のバー（人物メモ。specs/people/001-people-memo research.md R20）
 
-- 人物メモは、767px以下で中身の下に固定の下のバー（誘う候補・人・取り込み・イベント。まだない画面は出さない）を出す。アイコンと短い名前、今いる画面を濃く出す。押すところは44px以上、下の安全な余白（`env(safe-area-inset-bottom)`）をとり、中身の最後が隠れないよう下に余白をとる。
+- 人物メモは、767px以下で中身の下に固定の下のバー（誘う候補・人・取り込み・イベント）を出す。アイコンと短い名前、今いる画面を濃く出す。押すところは44px以上、下の安全な余白（`env(safe-area-inset-bottom)`）をとり、中身の最後が隠れないよう下に余白をとる。390px幅で、はみ出し・押すところの大きさ・下のバーで隠れないかをE2E（`e2e/tests/people-phone-width.spec.ts`）で確かめる。
 - めぐるのアプリの切り替えは、上部バーの左のボタン（ドロワー）から開く。768px以上は、ほかのアプリと同じサイドバー・ドロワー。外枠（`AppShell`）は直さず、人物メモの`PeopleShell`が出す（docs/product-structure.md 5「スマートフォンのメニュー」）。
+
+### 下のタブバー（集金のイベントの画面。specs/collect/001-event-day-collection contracts/ui-routes.md 1）
+
+- 集金は、イベントを開いているとき、どの画面幅でも中身の下に「このイベント」のタブバー（名簿・受付・手伝い・セルフ受付・締め・分配。当日の流れの順）を出す（`sidebar/EventTabBar.tsx`）。アイコンと短い名前、今いる画面を濃く出し、下の安全な余白（`env(safe-area-inset-bottom)`）をとる。
+- サイドバー（767px以下は引き出し）には、アプリ全体の項目（イベント・作る・振込待ち・まとめ）と、足元の「このアプリの設定」だけを置く。イベントの中の画面を開いているときは「イベント」を今いる場所として濃く出す。イベントを開くとサイドバーの項目が増える形はやめた（2026-11-15、ユーザーがスマートフォンで見て決めた）。
+- 390px幅の見え方は、E2E（`e2e/tests/collect-phone-width.spec.ts`）で確かめる。
 
 ### スマートフォンの上部バー
 
@@ -298,6 +304,8 @@ shadcn/uiの色の変数（`apps/web/src/index.css`）を使う。画面イメ�
 | 見せてもらっているアカウント | `/threads/teams/:teamId/accounts/:accountId` | 1カラムの読み物（読むだけ） | 011 |
 | 利用規約 | `/terms` | 1カラムの読み物（ログイン不要） | 010 |
 | トークンの作り方 | `/guide/threads-token` | 1カラムの読み物（ログイン不要） | 010 |
+
+- 人物メモ（`/people/…`）と集金（`/collect/…`）の画面のURLは、この表に写さず、それぞれの画面契約を正本にする（[人物メモ](../specs/people/001-people-memo/contracts/ui-routes.md)・[集金](../specs/collect/001-event-day-collection/contracts/ui-routes.md)。人物メモは001の`ui-routes.md`にまとめている。集金であとの機能で足した画面は、その機能の`contracts/ui-routes.md`）。
 
 - **028で変えたもの**：Threadsの画面を`/threads/…`に移した（前の`/accounts/…`・`/teams/…`は転送する）。「すべてのアプリ」（`/apps`）と、ユーザーメニューの「すべてのアプリ」、アプリが2本以上の人のアプリの切り替えを足した。アプリが1本の人の見た目は変えない。詳しくは[028 contracts/ui-routes.md](../specs/028-meguru-shell/contracts/ui-routes.md)。
 - **018で足したもの**：課題の区分ごとの「AIと考える」とそのポップアップ（2026-11-04に、進み具合のカードの「AIと壁打ちして埋める」と欄から変えた）。ほかの画面は変えない。詳しくは[018 contracts/ui-routes.md](../specs/018-strategy-ai-sparring/contracts/ui-routes.md)。
