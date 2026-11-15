@@ -9,7 +9,7 @@
 027・028のめぐるは**パターン②**（DBを共有し、DBのトランザクションで一貫性を保つ）だった。2作目より前に、Threadsも029（`specs/meguru/029-threads-pattern1`）でパターン①にそろえた。2作目からのアプリは、Threadsを実例にして同じ形で作る（5章）。
 
 - モジュールの種類・依存の向き・入口の決まりは[docs/module-map.md](./module-map.md)（ここはその上に足す決まり）
-- プロダクト全体の形とアプリを並行して作る決まりは[docs/product-structure.md](./product-structure.md) 6
+- プロダクト全体の形は[docs/product-structure.md](./product-structure.md)、アプリを並行して作る決まりは[docs/rules/parallel-development.md](./rules/parallel-development.md)
 - パターン①・②の分け方は、[モジュラーモノリスのパターン（Qiita）](https://qiita.com/k-kanno/items/0fd88fb7146ea29e7b77)に合わせた
 
 ## 1. 決まり
@@ -258,7 +258,7 @@ flowchart LR
 | 機能と上限 | 名前・表示名・範囲はアプリが決め、`registerAppFeatures`・`registerAppLimits`で共通に登録する（Threadsの例：`apps/threads/registry.ts`）。運営の画面は`GET /api/operator/app-registry`で一覧を読むので、外枠にアプリの名前を書かない |
 | APIの道筋 | `/api/<アプリ>/…`。アプリの「自分」の情報は`/api/<アプリ>/me`から返し、共通の`/api/me`には入れない（Threadsの例：`/api/threads/me`＝`apps/threads/me/threads-me.ts`） |
 | 画面 | APIの呼び出しとキャッシュのキーは`apps/web/src/apps/<アプリ>/lib/`に置き、共通の`lib/api-client.ts`・`lib/query.ts`には置かない（Threadsの例：`apps/web/src/apps/threads/lib/`の`api.ts`・`query-keys.ts`・`use-threads-me.ts`）。退会の確かめに出す中身は、`AppModule`の`withdrawalPreview`で外枠に渡す |
-| マイグレーション | 今は同じ`apps/api/drizzle/`の1列で作る（並行するときの決まりは[product-structure.md](./product-structure.md) 6）。切り出すときに、アプリのマイグレーションを分ける |
+| マイグレーション | 今は同じ`apps/api/drizzle/`の1列で作る（並行するときの決まりは[並行開発の決まりと手順](./rules/parallel-development.md) 6・11-4）。切り出すときに、アプリのマイグレーションを分ける |
 | 自動のチェック | ESLintの規則（`eslint-rules/module-boundaries.js`）が、Threadsを含むすべてのアプリで`platform/schema`の読みこみを止める（`appToPlatformSchema`）。2作目を足しても、設定は要らない |
 
 ## 5. Threadsの扱い

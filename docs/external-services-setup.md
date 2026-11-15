@@ -583,7 +583,7 @@ git checkout main && git pull && git checkout -b develop && git push -u origin d
 - Require status checks to pass → `check`（`ci.yml`のジョブ）
 - Bypass list → **Repository admin** を「**For pull requests only**」で足す
 
-最後の例外は、**コードを変えないPR（文書だけなど）を、CIを待たずにマージするため**です（2026-10-31に決めた運用）。どの変更でCIを流すかは[リリースの手順書](release-runbook.md) 2が正本です。管理者がPRから`gh pr merge --admin`（画面なら「Merge without waiting for requirements」）でマージできます。PRを通さない直接のpushは、管理者でもできません。コードを変えるPRは、これまでどおりCIの成功を待ってからマージします。
+最後の例外は、**コードを変えないPR（文書だけなど）を、CIを待たずにマージするため**です（2026-10-31に決めた運用）。どの変更でCIを流すかは[開発の流れの決まり](rules/development-flow.md) 3が正本です。管理者がPRから`gh pr merge --admin`（画面なら「Merge without waiting for requirements」）でマージできます。PRを通さない直接のpushは、管理者でもできません。コードを変えるPRは、これまでどおりCIの成功を待ってからマージします。
 
 2026-10-31に、この設定（ルールセット`main と develop を守る`）と4のタグの規則を、APIで作りました。
 
