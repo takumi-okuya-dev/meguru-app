@@ -1,6 +1,6 @@
 # 人物メモのモジュール地図
 
-**対象**：apps/api/src/apps/people・apps/web/src/apps/people（specs/people/001-people-memo・002-sales-list）。全体の決まりは[docs/module-map.md](../module-map.md)。アプリごとの地図をここに分けて置き、並行開発で同じ文書に行を足し合わないようにする（specs/meguru/031-conflict-free-composition、[docs/parallel-development.md](../parallel-development.md) 11）。
+**対象**：apps/api/src/apps/people・apps/web/src/apps/people（specs/people/001-people-memo・002-sales-list）。全体の決まりは[docs/module-map.md](../module-map.md)。アプリごとの地図をここに分けて置き、並行開発で同じ文書に行を足し合わないようにする（specs/meguru/031-conflict-free-composition、[並行開発の決まり](../rules/parallel-development.md) 11）。
 
 ## 1. API：人物メモ（apps/people）
 
